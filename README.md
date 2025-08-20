@@ -1,7 +1,3 @@
 # cloesce
 
-To view the internal documentation, run
-
-```
-mkdocs serve
-```
+View the [internal documentation](https://cloesce.pages.dev)
