@@ -1,0 +1,10 @@
+version: 1
+
+build:
+  base_dir: mkdocs
+
+  command: |
+    pip install -r requirements.txt
+    mkdocs build --clean
+
+  output_dir: site
