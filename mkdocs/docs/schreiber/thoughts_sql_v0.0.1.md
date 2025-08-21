@@ -4,23 +4,23 @@ General ideas on working through [milestone 1](https://github.com/bens-schreiber
 
 ## Milestone 1
 
-The SQL generator takes the Cloesce IDL as input and is capable of outputting the correct SQL interpretation of the model, as well as the Wrangler file setup. For v0.0.1 our goals are:
+The SQL generator takes the Cloesce IDL as input, interpreting the model as if it were a SQL table, as well as the Wrangler file setup. For v0.0.1 the goals are:
 
 - A rust process that can take the CIDL as input, elegantly error handle format deviations
 - Interpet a json model as a SQL table in the default SQL database, with any Sqlite type, and with primary keys
 - Output the correct D1 infrastructure config as a Wrangler file
 
-By the end of this version, we should be capable of creating a Cloudflare deployable D1 database from CIDL models.
+By the end of this version, we should be able to deploy a D1 database to Cloudflare.
 
 ## Approach
 
-This initial version should be very simple, all we need to do is:
+The process for this milestone is simple:
 
 1. Convert CIDL model => SQLite
-2. Add the correct database to the wrangler file
+2. Set up the database in the Wrangler file
 3. Run migrations
 
-Really, the only part that has nuance is generating the SQLite schema, however, we have tons of options within Rust to do that. As of right now, we are deciding to keep the CIDL simple and just have attributes be JSON. An example input would be:
+Really, the only nuance is generating the SQLite schema, which tons of Rust libraries can help with. As of now, we are keeping the CIDL as simple and malleable as possible:
 
 ```json
 {
@@ -36,7 +36,7 @@ Really, the only part that has nuance is generating the SQLite schema, however, 
 }
 ```
 
-After generation, we would make the following SQL (for `default.db`):
+After generation, the SQL would be: (`default.db`):
 
 ```sql
 CREATE TABLE Person (
@@ -47,13 +47,13 @@ CREATE TABLE Person (
 
 Note SQLite only has [5 types](https://www.sqlite.org/datatype3.html) (including NULL).
 
-Choosing the right tool for this will be important. There are hundreds of SQL-Query builders, so we don't need to reinvent the wheel there. [Sea Query](https://github.com/SeaQL/sea-query) seems promising in it's easy fluent table creation.
+There are hundreds of SQL-Query builders in Rust. [Sea Query](https://github.com/SeaQL/sea-query) seems promising in it's fluent table creation. We won't be able to take advantage of creating classes and enums beforehand.
 
-Lastly we need to create the wrangler file. It will be important to not _replace_ the existing wrangler file, but only the relevant fields.
+Lastly we need to create the wrangler file. It will be important to not _replace_ the existing wrangler file, but only update or insert relevant fields.
 
 ```toml
 [[d1_databases]]
-binding = "some_binding_name"
+binding = "some_binding_name_tbd"
 database_name = "default"
 ```
 
@@ -85,9 +85,9 @@ For a full integration test, these commands should be ran as well.
 
 ## Foreign Keys
 
-For this milestone, foreign keys aren't going to be supported, however, our MVP `v0.1.0` will support any kind of relationship, so we should consider it in this initial design as well.
+For this milestone, foreign keys aren't going to be supported, however, our MVP `v0.1.0` will support it. I'll throw an initial brain dump here.
 
-Ideally, Cloesce can utilize the same design that .NET's Entity Framework achieves. For example, declaring a 1:M relationship in Entity Framework looks like:
+Ideally, Cloesce can utilize the same design patterns as .NET's Entity Framework. For example, declaring a 1:M relationship in Entity Framework looks like:
 
 ```C#
 public class Blog
@@ -109,7 +109,7 @@ public class Post
 }
 ```
 
-which would generate the Sqlite
+which would generate the sql
 
 ```sql
 CREATE TABLE Blogs (
@@ -128,7 +128,7 @@ CREATE TABLE Posts (
 CREATE INDEX IX_Posts_BlogId ON Posts(BlogId);
 ```
 
-There's a lot to take in. First, looking a the `Blog` model, there is a defined `Posts` field, but we can see in the Sqlite output `Blog` has no array of `Posts`. This is because Sqlite (really, most database languages) have no concept of an array, only foreign keys. `Posts` is a "navigation property", meaning if I had a `Blog` model I would need to explicitly fetch it for it to populate:
+There's a lot to take in. First, looking a the `Blog` model, there is a defined `Posts` attribute, but we can see in the sql output `Blog` has no array of `Posts`. Sqlite (really, most database languages) has no concept of an array, only foreign keys. `Posts` is a "navigation property", meaning if I had a `Blog` model I would need to explicitly fetch it for it to populate, ex:
 
 ```C#
 var blog = db.Blogs.Include(b => b.Posts).First();
@@ -152,5 +152,7 @@ public class Passport
 ```
 
 Since Cloesce aims to function entirely from the IDL, creating an ORM to sit client side would make us slower to adapt to new languages (instead of just writing a generator, we now need to support ORM libraries for each language).
+
+The alternative to lazy inclusion is to preimptively include all dependencies, which could be _very_ slow in complicated databases.
 
 Because of this, I think we should avoid navigation properties for the time being, though, I'd be open to lightweight solutions.
