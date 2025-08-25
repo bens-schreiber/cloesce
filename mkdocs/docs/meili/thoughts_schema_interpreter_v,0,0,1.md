@@ -77,23 +77,6 @@ Turn a **TypeScript** input into a single **JSON manifest** describing:
       "handler": "Person.foo"
     },
     {
-      "method": "GET",
-      "path": "/person/:id/name",
-      "handler": "Person.getName",
-      "request": {
-        "pathParams": {
-          "id": { "type": "int", "required": true }
-        }
-      },
-      "response": {
-        "returns": {
-          "entity": "Person",
-          "projection": ["name"]
-        },
-        "contentType": "application/json",
-      }
-    }
-    {
       "method": "POST",
       "path": "/person",
       "handler": "Person.create",
