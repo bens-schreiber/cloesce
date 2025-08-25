@@ -238,7 +238,7 @@ cloece compile [--project <tsconfig path>] [--include <glob>] [--out <file>] [--
 ## 3) Discover Entities
 
 * For each **class** with `@D1`, mark it as an **entity**.
-* Determine the **entity name** and compute the **table name** (default: `snake_case(ClassName)`; allow `@D1({ table })` override).
+* Determine the **entity name** and compute the **table name** (allow `@D1({ table })` override).
 
 ---
 
@@ -288,7 +288,7 @@ cloece compile [--project <tsconfig path>] [--include <glob>] [--out <file>] [--
 
 ## 8) Validation
 
-* Enforce rules during **AST extraction** (fast, with file\:line diagnostics):
+* We should be good to do a validation check here, so enforce rules during **AST extraction**:
 
   * Entities have **`id: number`** as the primary key.
   * Only the **allowed field types** (table above).
@@ -296,11 +296,10 @@ cloece compile [--project <tsconfig path>] [--include <glob>] [--out <file>] [--
   * Routes **start with `/`** and **(method, path)** pairs are unique.
   * **Decorator arguments are literal-only** (no identifiers/expressions).
 
-> *Optionally* run a `zod` shape check on the final in-memory manifest as a guardrail before emitting.
 
 ---
 
 ## 9) Emit
 
 * Pretty-print the manifest to the `--out` JSON file.
-* Exit **non-zero** on any validation/extraction errors with clear, actionable messages.
+* Exit **non-zero** on any validation/extraction errors with clear messages.
