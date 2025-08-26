@@ -36,7 +36,7 @@ The final stage employs dependency injection to provide the resolved method with
 
 The entire serverless function codebase is generated programmatically through a builder pattern implementation, ensuring consistent structure and maintainability.
 
-## Builder Interface Sudo Code
+## Builder Interface Pseudo Code
 
 ```typescript
 interface WorkersApiBuilder {
