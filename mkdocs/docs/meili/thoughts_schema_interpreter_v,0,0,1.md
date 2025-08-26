@@ -15,7 +15,7 @@ Turn a **TypeScript** input into a single **JSON manifest** describing:
 ## Scope
 
 * Single database (for now). User defines the DB name.
-* **Decorators supported:** `@D1`, `@GET`, `@POST`
+* **Decorators supported:** `@D1`, `@PrimaryKey`, `@GET`, `@POST`
 * **Types supported:** float, int, string, boolean, Date
 * **Out of scope (v0.0.1):** relations, indexes, uniques, defaults, auth, hashing, watch mode, migrations.
 
