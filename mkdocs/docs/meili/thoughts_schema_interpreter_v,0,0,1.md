@@ -1,4 +1,4 @@
-# cloece — TS → JSON Manifest (MVP)
+# Cloece — TS → JSON Manifest (MVP)
 
 ## Goal
 
@@ -6,16 +6,18 @@ Turn a **TypeScript** input into a single **JSON manifest** describing:
 
 * **Entities** → D1 tables + fields
 * **CRUD Routes** → Workers
-* **Resource list** → D1 + R2 buckets
+* **Resource list** → D1
+
+> *To do this we essentially have to create a domain specific compiler.*
 
 ---
 
 ## Scope
 
 * Single database (for now). User defines the DB name.
-* **Decorators supported:** `@D1`, `@R2`, `@Workers.GET`, `@Workers.POST`
-* **Types supported:** float, int, string, boolean, Date, R2Id
-* **Out of scope (v0):** relations, indexes, uniques, defaults, auth, hashing, watch mode, migrations.
+* **Decorators supported:** `@D1`, `@Workers.GET`, `@Workers.POST`
+* **Types supported:** float, int, string, boolean, Date
+* **Out of scope (v0.0.1):** relations, indexes, uniques, defaults, auth, hashing, watch mode, migrations.
 
 ---
 
@@ -25,10 +27,8 @@ Turn a **TypeScript** input into a single **JSON manifest** describing:
 @D1(options?)              // class: marks an entity
 // options: { table?: string }  // optional table override
 
-@R2({ bucket: string })    // field: marks an R2 object key
-
-@Workers.GET(path?)        // method: emits a GET route
-@Workers.POST(path?)       // method: emits a POST route
+@GET(path?)        // method: emits a GET route
+@POST(path?)       // method: emits a POST route
 // If path omitted → "/<entity>/<methodName>"
 ```
 
@@ -38,60 +38,85 @@ Turn a **TypeScript** input into a single **JSON manifest** describing:
 
 | TS type | IR `type`  | Notes                      |
 | ------: | ---------- | -------------------------- |
-|  number | int        |                            |
+|  number | int        |                       |
 |  string | text       |                            |
 | boolean | bool       |                            |
 |    Date | date       | store as ISO string        |
-|    R2Id | r2\_object | requires `@R2({ bucket })` |
 
-**Nullability:** a field is nullable if it has `?` or is unioned with `null`/`undefined`.
-**Primary key rule:** if a numeric field named `id` exists → `pk: true`, `auto: true`. Otherwise: **error** (v0 only supports `id: number` as PK).
+**Nullability:** a field is nullable if it has ` | null` attatched to it.
+**Primary key rule:** primary key must explicitly be defined using `@PrimaryKey` decorator.
 
 ---
 
 ## JSON Manifest
 
 > **Note**
-> Subject to change. Since all of cloece’s functionality depends on the manifest, we may tweak it to fit the Rust compiler’s needs. The POST request syntax is a bit verbose, but we assume users won’t hand-edit this JSON.
+> Subject to change. Since all of Cloece’s functionality depends on the manifest, we may tweak it to fit the Rust compiler’s needs.
 
 ```json
 {
-  "version": "0.0.1",
-  "project": "my-app",
-  "entities": [
-    {
-      "name": "Person",
-      "table": "person",
-      "fields": [
-        { "name": "id", "type": "int", "pk": true, "auto": true, "nullable": false },
-        { "name": "name", "type": "text", "nullable": false },
-        { "name": "age", "type": "int", "nullable": false },
-        { "name": "image", "type": "r2_object", "bucket": "images", "nullable": true }
-      ]
-    }
-  ],
-  "routes": [
-    {
-      "method": "GET",
-      "path": "/person/foo",
-      "handler": "Person.foo"
-    },
-    {
-      "method": "POST",
-      "path": "/person",
-      "handler": "Person.create",
-      "impl": {
-        "language": "ts",
-        "code": {
-          "source": "async function create(db, req, env) {\n  const { name, age, imageKey } = await req.json();\n\n  if (typeof name !== 'string' || typeof age !== 'number') {\n    return new Response(JSON.stringify({ error: 'name (string) and age (number) required' }), { status: 400, headers: { 'content-type': 'application/json' } });\n  }\n  if (age < 0 || age > 150) {\n    return new Response(JSON.stringify({ error: 'age out of range' }), { status: 422, headers: { 'content-type': 'application/json' } });\n  }\n\n  // Optional R2 existence check example (env.R2_IMAGES.head(imageKey))\n\n  const row = await db\n    .prepare('INSERT INTO person (name, age, image) VALUES (?, ?, ?) RETURNING id')\n    .bind(name, age, imageKey ?? null)\n    .first();\n\n  return new Response(JSON.stringify({ id: row?.id, name, age, image: imageKey ?? null }), {\n    status: 201,\n    headers: { 'content-type': 'application/json' }\n  });\n}"
+    "version": "0.0.1",
+    "project_name": "..",
+    "language": "typescript",
+    "models": [
+        {
+            "Person": {
+                "attributes": [
+                    {
+                        "name": "id",
+                        "type": 0,
+                        "nullable": false,
+                        "pk": true
+                    },
+                    {
+                        "name": "name",
+                        "type:": 1,
+                        "nullable": false
+                    },
+                    {
+                        "name": "middle_name",
+                        "type:": 1,
+                        "nullable": true
+                    },
+                ],
+                "methods": [
+                    {
+                        "name": "speak",
+                        "static": true,
+                        "http_verb": "POST",
+                        "parameters": [
+                            {
+                                "name": "phrase",
+                                "type": 1, // string
+                                "nullable": false
+                            },
+                            {
+                                "name": "d1",
+                                "type": 6 // d1 type
+                            }
+                        ],
+                        "return": {
+                            "type": 7 // json with http result
+                        }
+                    },
+                    {
+                        "name": "foo",
+                        "static": false,
+                        "http_verb": "GET",
+                        "parameters": [
+                            {
+                                "name": "d1",
+                                "type": 6 // d1 type
+                            }
+                        ],
+                        "return": {
+                            "type": 7 // json with http result
+                        }
+                    }
+                ]
+            }
         }
-      }
-    }
-  ],
-  "resources": {
-    "d1": [{ "name": "default" }],
-    "r2": [{ "bucket": "images" }]
-  }
+    ]
 }
 ```
 
@@ -104,15 +129,12 @@ Turn a **TypeScript** input into a single **JSON manifest** describing:
 ```ts
 @D1
 class Person {
-  id: number;             // ← pk: true, auto: true
+  @PrimaryKey
+  id: number;
   name: string;
-  age: number;
+  middle_name: string | null
 
-  @R2({ bucket: "images" })
-  image?: R2Id;
-
-  // Simple read path: /person/foo?name=...
-  @Workers.GET("/person/foo")
+  @GET
   async foo(db: D1Db, req: Request) {
     const who = new URL(req.url).searchParams.get("name") ?? "world";
     return new Response(JSON.stringify({ hello: who }), {
@@ -120,35 +142,10 @@ class Person {
     });
   }
 
-  // Create path: POST /person
-  // Body: { "name": string, "age": number, "imageKey"?: string }
-  @Workers.POST("/person")
-  async create(db: D1Db, req: Request, env: any) {
-    const { name, age, imageKey } = await req.json();
-
-    if (typeof name !== "string" || typeof age !== "number") {
-      return new Response(
-        JSON.stringify({ error: "name (string) and age (number) required" }),
-        { status: 400, headers: { "content-type": "application/json" } }
-      );
-    }
-    if (age < 0 || age > 150) {
-      return new Response(
-        JSON.stringify({ error: "age out of range" }),
-        { status: 422, headers: { "content-type": "application/json" } }
-      );
-    }
-
-    // (Optional) If using R2 you could validate existence:
-    // const exists = imageKey && await env.R2_IMAGES.head(imageKey);
-    // if (imageKey && !exists) return new Response(JSON.stringify({ error: "image not found" }), { status: 404 });
-
-    const row = await db
-      .prepare("INSERT INTO person (name, age, image) VALUES (?, ?, ?) RETURNING id")
-      .bind(name, age, imageKey ?? null)
-      .first<{ id: number }>();
-
-    return new Response(JSON.stringify({ id: row?.id, name, age, image: imageKey ?? null }), {
+  // path override
+  @POST("/person/speak")
+  static async speak(db: D1Db, req: Request, phrase: string) {
+    return new Response(JSON.stringify({ phrase }), {
       status: 201,
       headers: { "content-type": "application/json" },
     });
@@ -163,11 +160,11 @@ class Person {
 ## Validation
 
 * Classes must have `@D1`.
-* Must have `id: number` (exact name `id`) → inferred as `pk: true`, `auto: true`.
+* Must have `id: number` (exact name `id`) and explicit declaration of primary key.
 * Only the five TS types above are allowed; anything else is an error.
-* `@R2` requires a **literal** bucket string and `R2Id` field type.
-* Route paths must start with `/` and be **unique** per manifest.
+* Route paths, when overriden, must start with `/` and be **unique** per manifest.
 * Decorator args must be **literal-only**.
+* For methods, the return type must be a Response.
 
 ---
 
@@ -182,7 +179,7 @@ class Person {
 ## CLI (one command)
 
 ```
-cloece compile [--project <tsconfig path>] [--include <glob>] [--out <file>] [--projectName <name>]
+cloece-ts compile [--project <tsconfig path>] [--include <glob>] [--projectName <name>]
 ```
 
 ---
@@ -198,7 +195,7 @@ cloece compile [--project <tsconfig path>] [--include <glob>] [--out <file>] [--
 * **AST tooling:** `ts-morph`
 * **File discovery:** `globby`
 * **CLI:** `commander`
-* **Schema validation:** `zod` (final shape check; primary validation happens during AST walk)
+* **Schema validation:** `zod` (Will use for unit testing)
 * **Bundling:** `tsup`
 * **Publish:** npm
 
@@ -206,7 +203,7 @@ cloece compile [--project <tsconfig path>] [--include <glob>] [--out <file>] [--
 
 ## 1) Startup (CLI)
 
-* Parse flags: `--project`, `--include`, `--out`, `--projectName`.
+* Parse flags: `--project`, `--include`, `--projectName`.
 * Resolve files via `globby` and the provided `tsconfig`.
 
 ---
@@ -220,34 +217,31 @@ cloece compile [--project <tsconfig path>] [--include <glob>] [--out <file>] [--
 
 ## 3) Discover Entities
 
-* For each **class** with `@D1`, mark it as an **entity**.
+* For each **class** in <root>/models with `@D1`, mark it as an **entity**.
 * Determine the **entity name** and compute the **table name** (allow `@D1({ table })` override).
 
 ---
 
 ## 4) Extract Fields
 
-* For each **property**, map TypeScript → IR type:
+* For each **property**, map TypeScript → IR type. I left the 3-5 undefined for now to add more types later:
 
-  | TS type   | IR `type`   |
-  | --------- | ----------- |
-  | `number`  | `int`       |
-  | `string`  | `text`      |
-  | `boolean` | `bool`      |
-  | `Date`    | `date`      |
-  | `R2Id`    | `r2_object` |
+  | TS type   | IR `type`       |
+  | --------- | -----------     |
+  | `number`  | `int`  (0)      |
+  | `string`  | `text` (1)      |
+  | `boolean` | `bool` (2)      |
+  | `Date`    | `ISO string` (3)|
+  | `D1`      | `string`     (6)|
+  | `Response`| `string`     (7)|
 
-* Determine **nullability** (`?` or union with `null`/`undefined`).
-
-* If the name is exactly `id` and the type is numeric & non-nullable, mark it as **primary key** (`pk: true`, `auto: true`).
-
-* If decorated with `@R2({ bucket })`, record the **bucket** and ensure the field type is **`R2Id`**.
+* Determine **nullability**. User must explicitly define nullability for now.
 
 ---
 
 ## 5) Extract Routes
 
-* For each **method** with `@Workers.GET(path)` or `@Workers.POST(path)`:
+* For each **method** with `GET(path)` or `POST(path)`:
 
   * Method: `GET` or `POST`.
   * Path: provided literal or default `/<entity>/<methodName>`.
@@ -259,7 +253,6 @@ cloece compile [--project <tsconfig path>] [--include <glob>] [--out <file>] [--
 ## 6) Accumulate Resources
 
 * **D1:** single item `{ "name": "default" }`.
-* **R2:** unique list of buckets discovered on fields with `@R2`.
 
 ---
 
@@ -271,11 +264,10 @@ cloece compile [--project <tsconfig path>] [--include <glob>] [--out <file>] [--
 
 ## 8) Validation
 
-* We should be good to do a validation check here, so enforce rules during **AST extraction**:
+* Validation will be handeled by code generator, but we should keep these in mind.
 
-  * Entities have **`id: number`** as the primary key.
+  * User must declare primary key using `@PrimaryKey` decorator.
   * Only the **allowed field types** (table above).
-  * `@R2` uses a **literal** `bucket` and the field type is **`R2Id`**.
   * Routes **start with `/`** and **(method, path)** pairs are unique.
   * **Decorator arguments are literal-only** (no identifiers/expressions).
 
@@ -284,5 +276,4 @@ cloece compile [--project <tsconfig path>] [--include <glob>] [--out <file>] [--
 
 ## 9) Emit
 
-* Pretty-print the manifest to the `--out` JSON file.
-* Exit **non-zero** on any validation/extraction errors with clear messages.
+* Pretty-print the manifest to the <root>/.generated/cidl.json.
