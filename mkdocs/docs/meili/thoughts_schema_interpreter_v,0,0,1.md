@@ -15,7 +15,7 @@ Turn a **TypeScript** input into a single **JSON manifest** describing:
 ## Scope
 
 * Single database (for now). User defines the DB name.
-* **Decorators supported:** `@D1`, `@Workers.GET`, `@Workers.POST`
+* **Decorators supported:** `@D1`, `@GET`, `@POST`
 * **Types supported:** float, int, string, boolean, Date
 * **Out of scope (v0.0.1):** relations, indexes, uniques, defaults, auth, hashing, watch mode, migrations.
 
@@ -38,7 +38,7 @@ Turn a **TypeScript** input into a single **JSON manifest** describing:
 
 | TS type | IR `type`  | Notes                      |
 | ------: | ---------- | -------------------------- |
-|  number | int        |                       |
+|  number | int        |                            |
 |  string | text       |                            |
 | boolean | bool       |                            |
 |    Date | date       | store as ISO string        |
@@ -51,7 +51,7 @@ Turn a **TypeScript** input into a single **JSON manifest** describing:
 ## JSON Manifest
 
 > **Note**
-> Subject to change. Since all of Cloece’s functionality depends on the manifest, we may tweak it to fit the Rust compiler’s needs.
+> Subject to change. Since all of Cloece’s functionality depends on the manifest, we may tweak it to fit the code generators needs.
 
 ```json
 {
