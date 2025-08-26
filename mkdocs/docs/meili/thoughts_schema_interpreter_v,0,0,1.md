@@ -1,4 +1,4 @@
-# Cloece — TS → JSON Manifest (MVP)
+# Cloece — TS → JSON Manifest (v0.0.1)
 
 ## Goal
 
@@ -21,27 +21,26 @@ Turn a **TypeScript** input into a single **JSON manifest** describing:
 
 ---
 
-## Decorators (MVP)
+## Decorators (v0.0.1)
 
 ```ts
 @D1(options?)              // class: marks an entity
 // options: { table?: string }  // optional table override
 
-@GET(path?)        // method: emits a GET route
-@POST(path?)       // method: emits a POST route
-// If path omitted → "/<entity>/<methodName>"
+@GET        // method: emits a GET route
+@POST       // method: emits a POST route
 ```
 
 ---
 
 ## Type Mapping
 
-| TS type | IR `type`  | Notes                      |
-| ------: | ---------- | -------------------------- |
-|  number | int        |                            |
-|  string | text       |                            |
-| boolean | bool       |                            |
-|    Date | date       | store as ISO string        |
+| TS type | IR `type` | Notes               |
+|---------|-----------|---------------------|
+| number  | int       |                     |
+| string  | text      |                     |
+| boolean | bool      |                     |
+| Date    | date      | store as ISO string |
 
 **Nullability:** a field is nullable if it has ` | null` attatched to it.
 **Primary key rule:** primary key must explicitly be defined using `@PrimaryKey` decorator.
@@ -142,8 +141,7 @@ class Person {
     });
   }
 
-  // path override
-  @POST("/person/speak")
+  @POST
   static async speak(db: D1Db, req: Request, phrase: string) {
     return new Response(JSON.stringify({ phrase }), {
       status: 201,
@@ -157,12 +155,11 @@ class Person {
 
 ---
 
-## Validation
+## Validation (This will be handeled by code generator, but good to define here)
 
 * Classes must have `@D1`.
 * Must have `id: number` (exact name `id`) and explicit declaration of primary key.
 * Only the five TS types above are allowed; anything else is an error.
-* Route paths, when overriden, must start with `/` and be **unique** per manifest.
 * Decorator args must be **literal-only**.
 * For methods, the return type must be a Response.
 
@@ -179,7 +176,7 @@ class Person {
 ## CLI (one command)
 
 ```
-cloece-ts compile [--project <tsconfig path>] [--include <glob>] [--projectName <name>]
+npm cloece-ts [--project <tsconfig path>] [--include <glob>] [--projectName <name>]
 ```
 
 ---
@@ -188,7 +185,7 @@ cloece-ts compile [--project <tsconfig path>] [--include <glob>] [--projectName 
 
 > *This is a working plan. Everything here is subject to change as development progresses.*
 
-## Tech Stack (MVP)
+## Tech Stack (v0.0.1)
 
 * **Runtime:** Node.js ≥ 18
 * **Language:** TypeScript
@@ -226,14 +223,15 @@ cloece-ts compile [--project <tsconfig path>] [--include <glob>] [--projectName 
 
 * For each **property**, map TypeScript → IR type. I left the 3-5 undefined for now to add more types later:
 
-  | TS type   | IR `type`       |
-  | --------- | -----------     |
-  | `number`  | `int`  (0)      |
-  | `string`  | `text` (1)      |
-  | `boolean` | `bool` (2)      |
-  | `Date`    | `ISO string` (3)|
-  | `D1`      | `string`     (6)|
-  | `Response`| `string`     (7)|
+| TS type   | IR `type`        |
+|-----------|------------------|
+| number    | int (0)          |
+| string    | text (1)         |
+| boolean   | bool (2)         |
+| Date      | ISO string (3)   |
+| D1        | string (6)       |
+| Response  | string (7)       |
+
 
 * Determine **nullability**. User must explicitly define nullability for now.
 
@@ -258,7 +256,7 @@ cloece-ts compile [--project <tsconfig path>] [--include <glob>] [--projectName 
 
 ## 7) Build Manifest Object
 
-* Assemble `{ version, project, entities, routes, resources }` in memory.
+* Assemble `{ version, project, methods, routes, D1 }` in memory.
 
 ---
 
@@ -268,7 +266,6 @@ cloece-ts compile [--project <tsconfig path>] [--include <glob>] [--projectName 
 
   * User must declare primary key using `@PrimaryKey` decorator.
   * Only the **allowed field types** (table above).
-  * Routes **start with `/`** and **(method, path)** pairs are unique.
   * **Decorator arguments are literal-only** (no identifiers/expressions).
 
 
