@@ -10,6 +10,9 @@ jobs:
   fmt:
     name: Check formatting
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: src/generator
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -27,6 +30,9 @@ jobs:
   clippy:
     name: Run Clippy
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: src/generator
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
