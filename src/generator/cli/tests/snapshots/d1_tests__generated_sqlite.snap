@@ -1,0 +1,5 @@
+---
+source: cli/tests/d1_tests.rs
+expression: generated_sqlite
+---
+CREATE TABLE "User" ( "id" integer PRIMARY KEY, "name" text NOT NULL )
