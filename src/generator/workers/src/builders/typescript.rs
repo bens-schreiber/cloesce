@@ -1,5 +1,5 @@
-use common::{CidlSpec, CidlType, HttpVerb, InputLanguage, Method, Model, WranglerSpec};
 use anyhow::anyhow;
+use common::{CidlSpec, CidlType, HttpVerb, InputLanguage, Method, Model, WranglerSpec};
 
 use crate::WorkersApiBuilder;
 pub struct TsWorkersApiBuilder {
@@ -234,7 +234,6 @@ import {{ {} }} from './models';
         }
     }
 
-
     fn build_router_trie(&self) -> String {
         let mut router_entries = Vec::new();
 
@@ -363,7 +362,6 @@ export default {
     }
 }
 
-
 impl WorkersApiBuilder for TsWorkersApiBuilder {
     /// Main build method that orchestrates all generation stages
     fn build(&self) -> Result<String, anyhow::Error> {
@@ -372,10 +370,10 @@ impl WorkersApiBuilder for TsWorkersApiBuilder {
             return Err(anyhow!("Only TypeScript is currently supported"));
         }
 
-        let imports = self.generate_imports(); 
-        let router_trie = self.build_router_trie(); 
-        let match_function = self.generate_match_function(); 
-        let fetch_handler = self.generate_fetch_handler(); 
+        let imports = self.generate_imports();
+        let router_trie = self.build_router_trie();
+        let match_function = self.generate_match_function();
+        let fetch_handler = self.generate_fetch_handler();
 
         // Combine all components into final output
         let output = format!(

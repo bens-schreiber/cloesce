@@ -1,5 +1,5 @@
 mod builders;
-use anyhow::{Result};
+use anyhow::Result;
 use common::{CidlSpec, InputLanguage, WranglerSpec};
 
 use crate::builders::typescript::TsWorkersApiBuilder;
@@ -7,7 +7,6 @@ use crate::builders::typescript::TsWorkersApiBuilder;
 pub trait WorkersApiBuilder {
     fn build(&self) -> Result<String>;
 }
-
 
 pub struct WorkersGenerator {
     cidl: CidlSpec,
@@ -22,22 +21,22 @@ impl WorkersGenerator {
     pub fn generate(&self) -> Result<String> {
         match self.cidl.language {
             InputLanguage::TypeScript => {
-
                 let builder = TsWorkersApiBuilder::new(self.cidl.clone(), self.wrangler.clone());
                 builder.build()
-            } 
-
+            }
         }
     }
 }
-
 
 #[cfg(test)]
 mod tests {
     use crate::{TsWorkersApiBuilder, WorkersApiBuilder, WorkersGenerator};
 
-    use common::{Attribute, CidlSpec, CidlType, D1Database, HttpVerb, InputLanguage, Method, Model, TypedValue};
     use common::WranglerSpec;
+    use common::{
+        Attribute, CidlSpec, CidlType, D1Database, HttpVerb, InputLanguage, Method, Model,
+        TypedValue,
+    };
 
     /// Helper to create test CIDL spec with a Person model
     fn create_test_cidl() -> CidlSpec {
@@ -126,7 +125,6 @@ mod tests {
         let generator = WorkersGenerator::new(cidl, wrangler);
         let result = generator.generate();
 
-   
         assert!(result.is_ok());
         let output = result.unwrap();
         println!("{}", output);
