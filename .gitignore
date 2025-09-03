@@ -291,3 +291,5 @@ marimo/\_lsp/
 # Streamlit
 
 .streamlit/secrets.toml
+
+.vscode/
