@@ -181,6 +181,8 @@ class Person {
 }
 ```
 
+An interesting approach to this would to be using file templating, with [handlebars](https://github.com/sunng87/handlebars-rust) for example. All we would have to do is load the language template and utilize the handlebars library. It would be important to link the templates to the actual binary instead of reading a file.
+
 ## Notes
 
 In `v0.0.1` we aren't adding the functionality of the backend returning a Model type, like

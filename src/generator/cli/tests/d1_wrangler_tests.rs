@@ -53,8 +53,8 @@ fn test_generate_d1_snapshot() -> Result<()> {
     let d1gen = D1Generator::new(cidl, wrangler.as_spec()?);
 
     // Act
-    let generated_sqlite = d1gen.gen_sqlite()?;
-    let updated_wrangler = d1gen.gen_wrangler();
+    let generated_sqlite = d1gen.sqlite()?;
+    let updated_wrangler = d1gen.wrangler();
 
     // Assert
     assert_snapshot!("generated_sqlite", generated_sqlite);
@@ -80,7 +80,7 @@ fn test_generate_d1_from_empty_wrangler_snapshot() -> Result<()> {
     let d1gen = D1Generator::new(cidl, wrangler.as_spec()?);
 
     // Act
-    let updated_wrangler = d1gen.gen_wrangler();
+    let updated_wrangler = d1gen.wrangler();
 
     // Assert
     assert_snapshot!(
