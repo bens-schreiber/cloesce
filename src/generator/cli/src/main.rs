@@ -35,7 +35,6 @@ enum GenerateTarget {
     },
     Workers {},
     Client {
-        client_api_path: PathBuf,
         cidl_path: PathBuf,
     },
 }
@@ -99,10 +98,7 @@ fn main() -> Result<()> {
             GenerateTarget::Workers {} => {
                 todo!("generate workers api");
             }
-            GenerateTarget::Client {
-                client_api_path,
-                cidl_path,
-            } => {
+            GenerateTarget::Client { cidl_path } => {
                 let spec = cidl_from_path(cidl_path)?;
                 println!("{}", client::generate_client_api(spec));
             }
