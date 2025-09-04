@@ -13,7 +13,7 @@ impl D1Generator {
         Self { cidl, wrangler }
     }
 
-    pub fn gen_wrangler(&self) -> WranglerSpec {
+    pub fn wrangler(&self) -> WranglerSpec {
         // Validate existing database configs, filling in missing values with a default
         let mut res = self.wrangler.clone();
         for (i, d1) in res.d1_databases.iter_mut().enumerate() {
@@ -49,7 +49,7 @@ impl D1Generator {
         res
     }
 
-    pub fn gen_sqlite(&self) -> Result<String> {
+    pub fn sqlite(&self) -> Result<String> {
         let mut res = Vec::<String>::default();
 
         for model in self.cidl.models.iter() {
@@ -161,7 +161,7 @@ mod tests {
         let d1gen = D1Generator::new(spec, create_wrangler());
 
         // Act
-        let sql = d1gen.gen_sqlite().expect("gen_sqlite to work");
+        let sql = d1gen.sqlite().expect("gen_sqlite to work");
 
         // Assert
         assert!(sql.contains("CREATE TABLE"));
@@ -199,7 +199,7 @@ mod tests {
         let d1gen = D1Generator::new(spec, create_wrangler());
 
         // Act
-        let err = d1gen.gen_sqlite().unwrap_err();
+        let err = d1gen.sqlite().unwrap_err();
 
         // Assert
         assert!(err.to_string().contains("Duplicate primary keys"));
@@ -224,7 +224,7 @@ mod tests {
         let d1gen = D1Generator::new(spec, create_wrangler());
 
         // Act
-        let err = d1gen.gen_sqlite().unwrap_err();
+        let err = d1gen.sqlite().unwrap_err();
 
         // Assert
         assert!(

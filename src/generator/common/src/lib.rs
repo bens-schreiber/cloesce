@@ -10,11 +10,11 @@ pub enum CidlType {
 
 #[derive(Serialize, Deserialize)]
 pub enum HttpVerb {
-    Get,
-    Post,
-    Put,
-    Patch,
-    Delete,
+    GET,
+    POST,
+    PUT,
+    PATCH,
+    DELETE,
 }
 
 #[derive(Serialize, Deserialize)]

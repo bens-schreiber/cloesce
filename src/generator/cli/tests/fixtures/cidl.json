@@ -23,7 +23,42 @@
                     "primary_key": false
                 }
             ],
-            "methods": []
+            "methods": [
+                {
+                  "name": "do_something",
+                  "is_static": false,
+                  "http_verb": "GET",
+                  "parameters": [
+                    {
+                        "name": "age",
+                        "cidl_type": "Integer",
+                        "nullable": false
+                    },
+                    {
+                        "name": "name",
+                        "cidl_type": "Text",
+                        "nullable": false
+                    }
+                  ]
+                },
+                {
+                  "name": "say_all_names",
+                  "is_static": true,
+                  "http_verb": "GET",
+                  "parameters": [
+                    {
+                        "name": "age",
+                        "cidl_type": "Integer",
+                        "nullable": false
+                    },
+                    {
+                        "name": "name",
+                        "cidl_type": "Text",
+                        "nullable": false
+                    }
+                  ]
+                }
+              ]
         }
     ]
 }

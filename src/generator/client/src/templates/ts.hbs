@@ -1,0 +1,36 @@
+type Ok<T> = { ok: true; data: T };
+type Err = { ok: false; status: number; message: string };
+type Result<T> = Ok<T> | Err;
+
+{{#each models}}
+class {{name}} {
+  {{#each attributes}}
+  {{value.name}}: {{lang_type value.cidl_type value.nullable}};
+  {{/each}}
+
+  {{#each methods}}
+  {{#if is_static}}static {{/if}}async {{name}}(
+    {{#each parameters}}
+      {{name}}: {{lang_type cidl_type nullable}}{{#unless @last}}, {{/unless}}
+    {{/each}}
+  ): Promise<Result<string>> {
+    const url = {{#if is_static}}`/api/{{../name}}/{{name}}`{{else}}`/api/{{../name}}/${this.id}/{{name}}`{{/if}};
+
+    const res = await fetch(url, {
+      method: "{{http_verb}}",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        {{#each parameters}}
+          {{name}}{{#unless @last}}, {{/unless}}
+        {{/each}}
+      })
+    });
+
+    if (!res.ok) return { ok: false, status: res.status, message: res.statusText };
+
+    const data = await res.json();
+    return { ok: true, data };
+  }
+  {{/each}}
+}
+{{/each}}
