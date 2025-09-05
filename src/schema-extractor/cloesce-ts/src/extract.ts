@@ -6,10 +6,10 @@ export type ExtractOptions = {
   cwd?: string;
   projectName?: string;
   version?: string;
-  dirNames?: string[];             
-  extPattern?: RegExp;             
   tsconfigPath?: string | undefined;
 };
+
+// ---- filesystem helpers ----------------------------------------------------
 
 function readPkgMeta(cwd: string) {
   const pkgPath = path.join(cwd, "package.json");
@@ -25,48 +25,74 @@ function readPkgMeta(cwd: string) {
   return { projectName, version };
 }
 
-function findModelsDir(cwd: string, dirNames: string[]) {
-  for (const name of dirNames) {
-    const p = path.join(cwd, name);
-    if (fs.existsSync(p) && fs.statSync(p).isDirectory()) return p;
-  }
-  return null;
-}
+const IGNORE_DIRS = new Set([
+  "node_modules", ".git", "dist", "build", "out",
+  ".next", ".turbo", "coverage", ".vercel", ".svelte-kit",
+  ".output", ".cache"
+]);
 
-function walkFiles(root: string, extPattern: RegExp) {
+// Recursively collect only files strictly ending with `.cloesce.ts`, skipping vendor/build dirs 
+function walkCloesceFiles(root: string): string[] {
   const out: string[] = [];
   for (const entry of fs.readdirSync(root, { withFileTypes: true })) {
     const full = path.join(root, entry.name);
-    if (entry.isDirectory()) out.push(...walkFiles(full, extPattern));
-    else if (entry.isFile() && extPattern.test(entry.name)) out.push(full);
+    if (entry.isDirectory()) {
+      if (!IGNORE_DIRS.has(entry.name)) out.push(...walkCloesceFiles(full));
+    } else if (entry.isFile() && /\.cloesce\.ts$/i.test(entry.name)) {
+      out.push(full);
+    }
   }
   return out;
 }
 
-// ---- type helpers ----------------------------------------------------------
+  // strip import stuff so comparisons are stable
 function cleanTypeText(t: Type, sf: SourceFile) {
   return t.getText(sf).replace(/import\(".*?"\)\./g, "");
 }
 
-/** 0=int, 1=string, 2=boolean, 3=Date ISO, 6=D1Db, 7=JSON/http */
-function mapTypeToCode(t: Type, sf: SourceFile): number {
-  const txt = cleanTypeText(t, sf);
-  if (t.isNumber() || txt === "number") return 0;
-  if (t.isString() || txt === "string") return 1;
-  if (t.isBoolean() || txt === "boolean") return 2;
-  if (txt === "Date") return 3;
+export enum TypeCode {
+  Number = "number",
+  String = "string",
+  Boolean = "boolean",
+  Date = "Date",
+  D1Db = "D1Db",
+  Response = "Response",
+}
 
-  const sym = t.getSymbol();
-  if (sym?.getName() === "Promise" && t.getTypeArguments().length === 1) {
-    const inner = t.getTypeArguments()[0];
-    const innerTxt = cleanTypeText(inner, sf);
-    if (innerTxt === "Response") return 7;
-    return mapTypeToCode(inner, sf);
+export namespace TypeCode {
+  const basicTypeMap: Record<string, TypeCode> = {
+    number: TypeCode.Number,
+    string: TypeCode.String,
+    boolean: TypeCode.Boolean,
+    Date: TypeCode.Date,
+    Response: TypeCode.Response,
+    D1Db: TypeCode.D1Db,
+  };
+
+  export function fromType(t: Type, sf: SourceFile): TypeCode {
+    const txt = cleanTypeText(t, sf);
+    const symName = t.getSymbol()?.getName();
+
+    // Robust primitive checks
+    if (t.isNumber() || txt === "number") return TypeCode.Number;
+    if (t.isString() || txt === "string") return TypeCode.String;
+    if (t.isBoolean() || txt === "boolean") return TypeCode.Boolean;
+
+    // Unwrap Promise<T> recursively
+    if (symName === "Promise" && t.getTypeArguments().length === 1) {
+      return fromType(t.getTypeArguments()[0], sf);
+    }
+
+    // Known names by text or symbol
+    if (txt in basicTypeMap) return basicTypeMap[txt as keyof typeof basicTypeMap];
+    if (symName === "Response" || txt === "Response") return TypeCode.Response;
+
+    // D1Db types by suffix or symbol name
+    if (txt.endsWith("D1Db") || symName === "D1Db") return TypeCode.D1Db;
+
+    // Fallback
+    return TypeCode.String;
   }
-
-  if (txt === "Response") return 7;
-  if (txt.endsWith("D1Db") || sym?.getName() === "D1Db") return 6;
-  return 1;
 }
 
 function isNullable(t: Type) {
@@ -74,24 +100,26 @@ function isNullable(t: Type) {
   return t.getUnionTypes().some(u => u.isNull() || u.isUndefined());
 }
 
+function hasDecoratorNamed(node: { getDecorators(): any[] }, name: string): boolean {
+  return node.getDecorators().some(d => {
+    const n = d.getName() ?? d.getExpression().getText();
+    // we should normalize things like "D1()", "ns.D1", etc.
+    const plain = String(n).replace(/\(.*\)$/, "");
+    return plain === name || plain.endsWith("." + name);
+  });
+}
+
+// ---- main ------------------------------------------------------------------
 export function extractModels(opts: ExtractOptions = {}) {
   const cwd = opts.cwd ?? process.cwd();
   const { projectName: pn, version: ver } = readPkgMeta(cwd);
   const projectName = opts.projectName ?? pn;
   const version = opts.version ?? ver;
 
-  // ONLY this directory name, users don't really need to define it
-  const dirNames = opts.dirNames ?? ["models-cloesce"];
-  const modelsDir = findModelsDir(cwd, dirNames);
-  if (!modelsDir) {
-    throw new Error(`Could not find models directory "models-cloesce" in ${cwd}`);
-  }
-
-  // ONLY this file suffix, same reason as above
-  const extPattern = opts.extPattern ?? /\.cloesce\.ts$/;
-  const files = walkFiles(modelsDir, extPattern);
+  // Find *.cloesce.ts everywhere in project using cwd as the root
+  const files = walkCloesceFiles(cwd);
   if (files.length === 0) {
-    throw new Error(`No ".cloesce.ts" files found in "${modelsDir}"`);
+    throw new Error(`No ".cloesce.ts" files found anywhere under "${cwd}"`);
   }
 
   const tsconfigPath =
@@ -100,7 +128,7 @@ export function extractModels(opts: ExtractOptions = {}) {
 
   const project = new Project({
     tsConfigFilePath: tsconfigPath,
-    compilerOptions: tsconfigPath ? undefined : { target: 99 /* ESNext */, lib: ["es2022", "dom"] }
+    compilerOptions: tsconfigPath ? undefined : { target: 99, lib: ["es2022", "dom"] },
   });
 
   for (const f of files) project.addSourceFileAtPath(f);
@@ -109,37 +137,41 @@ export function extractModels(opts: ExtractOptions = {}) {
 
   for (const sf of project.getSourceFiles()) {
     for (const cls of sf.getClasses()) {
+      // Only parse classes with @D1!
+      if (!hasDecoratorNamed(cls, "D1")) continue;
+
       const className = cls.getName() ?? "<anonymous>";
 
       const attributes = cls.getProperties().map(prop => {
         const t = prop.getType();
         const entry: any = {
           name: prop.getName(),
-          type: mapTypeToCode(t, sf),
-          nullable: isNullable(t)
+          type: TypeCode.fromType(t, sf),
+          nullable: isNullable(t),
         };
-        if (prop.getDecorators().some(d => (d.getName() ?? d.getExpression().getText()) === "PrimaryKey")) {
-          entry.pk = true;
-        }
+        if (hasDecoratorNamed(prop, "PrimaryKey")) entry.pk = true;
         return entry;
       });
 
       const methods = cls.getMethods().map(m => {
         const decos = m.getDecorators().map(d => d.getName() ?? d.getExpression().getText());
-        const httpVerb = decos.includes("GET") ? "GET" : decos.includes("POST") ? "POST" : undefined;
+        const httpVerb =
+          decos.includes("GET") ? "GET" :
+          decos.includes("POST") ? "POST" :
+          undefined;
 
         const parameters: any[] = [];
         for (const p of m.getParameters()) {
           const pt = p.getType();
           const raw = cleanTypeText(pt, sf);
-          if (raw === "Request") continue;
+          if (raw === "Request") continue; 
           if (raw.endsWith("D1Db") || p.getName() === "db") {
-            parameters.push({ name: "d1", type: 6 });
+            parameters.push({ name: "d1", type: TypeCode.D1Db, nullable: isNullable(pt) || false });
           } else {
             parameters.push({
               name: p.getName(),
-              type: mapTypeToCode(pt, sf),
-              nullable: isNullable(pt) || false
+              type: TypeCode.fromType(pt, sf),
+              nullable: isNullable(pt) || false,
             });
           }
         }
@@ -149,7 +181,7 @@ export function extractModels(opts: ExtractOptions = {}) {
           static: m.isStatic(),
           http_verb: httpVerb,
           parameters,
-          return: { type: mapTypeToCode(m.getReturnType(), sf) }
+          return: { type: TypeCode.fromType(m.getReturnType(), sf) },
         };
       });
 
@@ -161,6 +193,6 @@ export function extractModels(opts: ExtractOptions = {}) {
     version,
     project_name: projectName,
     language: "typescript",
-    models
+    models,
   };
 }
