@@ -1,0 +1,8 @@
+---
+source: cli/tests/d1_wrangler_tests.rs
+expression: "format!(\"{}\", toml::to_string_pretty(&updated_wrangler).unwrap())"
+---
+[[d1_databases]]
+binding = "DB"
+database_name = "foo_database"
+database_id = "<unique-ID-for-your-database>"

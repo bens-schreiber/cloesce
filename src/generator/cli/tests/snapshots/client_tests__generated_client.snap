@@ -1,0 +1,53 @@
+---
+source: cli/tests/client_tests.rs
+expression: client
+---
+type Ok<T> = { ok: true; data: T };
+type Err = { ok: false; status: number; message: string };
+type Result<T> = Ok<T> | Err;
+
+class User {
+  id: number;
+  name: string;
+
+  async do_something(
+      age: number, 
+      name: string
+  ): Promise<Result<string>> {
+    const url = `/api/User/${this.id}/do_something`;
+
+    const res = await fetch(url, {
+      method: "GET",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+          age, 
+          name
+      })
+    });
+
+    if (!res.ok) return { ok: false, status: res.status, message: res.statusText };
+
+    const data = await res.json();
+    return { ok: true, data };
+  }
+  static async say_all_names(
+      age: number, 
+      name: string
+  ): Promise<Result<string>> {
+    const url = `/api/User/say_all_names`;
+
+    const res = await fetch(url, {
+      method: "GET",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+          age, 
+          name
+      })
+    });
+
+    if (!res.ok) return { ok: false, status: res.status, message: res.statusText };
+
+    const data = await res.json();
+    return { ok: true, data };
+  }
+}

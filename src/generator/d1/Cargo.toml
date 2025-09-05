@@ -1,8 +1,9 @@
 [package]
-name = "common"
+name = "d1"
 version = "0.0.1"
 edition = "2024"
 
 [dependencies]
 anyhow = { workspace = true }
-serde = { workspace = true }
+sea-query = "0.32.7"
+common = { path = "../common" }

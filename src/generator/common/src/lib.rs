@@ -1,22 +1,20 @@
 use serde::{Deserialize, Serialize};
-use std::fs;
 
-#[repr(u32)]
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub enum CidlType {
-    Integer = 0,
-    Real = 1,
-    Text = 2,
-    Blob = 3,
+    Integer,
+    Real,
+    Text,
+    Blob,
 }
 
 #[derive(Serialize, Deserialize)]
 pub enum HttpVerb {
-    Get,
-    Post,
-    Put,
-    Patch,
-    Delete,
+    GET,
+    POST,
+    PUT,
+    PATCH,
+    DELETE,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -42,6 +40,7 @@ pub struct Method {
 
 #[derive(Serialize, Deserialize)]
 pub struct Model {
+    pub name: String,
     pub attributes: Vec<Attribute>,
     pub methods: Vec<Method>,
 }
@@ -59,10 +58,15 @@ pub struct CidlSpec {
     pub models: Vec<Model>,
 }
 
-impl CidlSpec {
-    pub fn from_file_path(file_path: &String) -> Result<Self, Box<dyn std::error::Error>> {
-        let contents = fs::read_to_string(file_path)?;
-        let spec = serde_json::from_str::<CidlSpec>(&contents)?;
-        Ok(spec)
-    }
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
+pub struct D1Database {
+    pub binding: Option<String>,
+    pub database_name: Option<String>,
+    pub database_id: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
+pub struct WranglerSpec {
+    #[serde(default)]
+    pub d1_databases: Vec<D1Database>,
 }
