@@ -9,8 +9,6 @@ export type ExtractOptions = {
   tsconfigPath?: string | undefined;
 };
 
-// ---- filesystem helpers ----------------------------------------------------
-
 function readPkgMeta(cwd: string) {
   const pkgPath = path.join(cwd, "package.json");
   let projectName = path.basename(cwd);
@@ -31,7 +29,7 @@ const IGNORE_DIRS = new Set([
   ".output", ".cache"
 ]);
 
-// Recursively collect only files strictly ending with `.cloesce.ts`, skipping vendor/build dirs 
+// Recursively collect only files strictly ending with `.cloesce.ts`
 function walkCloesceFiles(root: string): string[] {
   const out: string[] = [];
   for (const entry of fs.readdirSync(root, { withFileTypes: true })) {
@@ -45,7 +43,7 @@ function walkCloesceFiles(root: string): string[] {
   return out;
 }
 
-  // strip import stuff so comparisons are stable
+// strip import stuff so comparisons are stable
 function cleanTypeText(t: Type, sf: SourceFile) {
   return t.getText(sf).replace(/import\(".*?"\)\./g, "");
 }
@@ -103,7 +101,7 @@ function isNullable(t: Type) {
 function hasDecoratorNamed(node: { getDecorators(): any[] }, name: string): boolean {
   return node.getDecorators().some(d => {
     const n = d.getName() ?? d.getExpression().getText();
-    // we should normalize things like "D1()", "ns.D1", etc.
+    // we should normalize things like "D1()"
     const plain = String(n).replace(/\(.*\)$/, "");
     return plain === name || plain.endsWith("." + name);
   });

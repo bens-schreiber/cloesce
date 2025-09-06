@@ -3,8 +3,6 @@ import os from "node:os";
 import path from "node:path";
 import { extractModels } from "../src/extract.js";
 
-// ---- helpers ---------------------------------------------------------------
-
 function copyFileToTmp(tmp: string, rel: string, sourcePath: string) {
   const dest = path.join(tmp, rel);
   fs.mkdirSync(path.dirname(dest), { recursive: true });
@@ -49,7 +47,7 @@ function stubCloesce(tmp: string) {
   );
 }
 
-// stable key order for snapshots (so diffs are clean)
+// stable order for snapshots 
 function sortDeep<T>(x: T): T {
   if (Array.isArray(x)) return x.map(sortDeep) as any;
   if (x && typeof x === "object") {
@@ -74,8 +72,7 @@ async function runOnSnapFile(projectName: string, snapRelPath: string) {
   return sortDeep(result);
 }
 
-// ---- tests -----------------------------------------------------------------
-
+// tests here!
 describe("cloesce-ts extractModels snapshot", () => {
   it("turns person.cloesce.ts into expected JSON spec", async () => {
     const normalized = await runOnSnapFile("Person", "person.cloesce.ts");
