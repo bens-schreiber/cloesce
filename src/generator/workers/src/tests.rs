@@ -46,7 +46,7 @@ mod tests {
                     Method {
                         name: "speak".to_string(),
                         is_static: false, // Instance method
-                        http_verb: HttpVerb::Get,
+                        http_verb: HttpVerb::GET,
                         parameters: vec![TypedValue {
                             name: "message".to_string(),
                             cidl_type: CidlType::Text,
@@ -56,7 +56,7 @@ mod tests {
                     Method {
                         name: "getAverageAge".to_string(),
                         is_static: true, // Static method
-                        http_verb: HttpVerb::Get,
+                        http_verb: HttpVerb::GET,
                         parameters: vec![],
                     },
                 ],

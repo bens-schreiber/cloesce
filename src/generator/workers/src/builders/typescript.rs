@@ -6,10 +6,8 @@ pub struct TsWorkersApiBuilder {
     cidl: CidlSpec,         // The input spec with models and methods
     wrangler: WranglerSpec, // Cloudflare configuration (D1 databases, etc.)
 }
-
-impl TsWorkersApiBuilder {
-    /// Creates a new TypeScript builder instance
-    pub fn new(cidl: CidlSpec, wrangler: WranglerSpec) -> Self {
+impl WorkersApiBuilder for TsWorkersApiBuilder {
+    fn new(cidl: CidlSpec, wrangler: WranglerSpec) -> Self {
         Self { cidl, wrangler }
     }
 
@@ -31,6 +29,7 @@ import {{ {} }} from './models';
             model_names
         )
     }
+
     fn generate_parameter_validation(&self, method: &Method) -> String {
         let mut validations = Vec::new();
 
@@ -83,11 +82,11 @@ import {{ {} }} from './models';
 
     fn generate_http_verb_validation(&self, verb: &HttpVerb) -> String {
         let verb_str = match verb {
-            HttpVerb::Get => "GET",
-            HttpVerb::Post => "POST",
-            HttpVerb::Put => "PUT",
-            HttpVerb::Patch => "PATCH",
-            HttpVerb::Delete => "DELETE",
+            HttpVerb::GET => "GET",
+            HttpVerb::POST => "POST",
+            HttpVerb::PUT => "PUT",
+            HttpVerb::PATCH => "PATCH",
+            HttpVerb::DELETE => "DELETE",
         };
 
         format!(
@@ -279,7 +278,7 @@ const router = {{
         )
     }
 
-    fn generate_match_function(&self) -> &str {
+    fn generate_match_function(&self) -> String {
         r#"
 function match(path: string, request: Request, env: any): Response {
     // Start at the router root
@@ -331,9 +330,10 @@ function match(path: string, request: Request, env: any): Response {
         }
     );
 }"#
+        .to_string()
     }
 
-    fn generate_fetch_handler(&self) -> &str {
+    fn generate_fetch_handler(&self) -> String {
         r#"
 // Main Cloudflare Workers handler
 export default {
@@ -359,11 +359,9 @@ export default {
         }
     }
 };"#
+        .to_string()
     }
-}
 
-impl WorkersApiBuilder for TsWorkersApiBuilder {
-    /// Main build method that orchestrates all generation stages
     fn build(&self) -> Result<String, anyhow::Error> {
         // Validate we're generating TypeScript
         if !matches!(self.cidl.language, InputLanguage::TypeScript) {
