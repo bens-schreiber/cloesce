@@ -42,7 +42,7 @@ enum GenerateTarget {
 fn main() -> Result<()> {
     match Cli::parse().command {
         Commands::Validate { cidl_path } => {
-            let _ = cidl_from_path(cidl_path);
+            cidl_from_path(cidl_path)?;
             println!("Ok.")
         }
         Commands::Generate { target } => match target {
