@@ -1,7 +1,7 @@
 use std::{io::Write, path::PathBuf};
 
 use anyhow::{Context, Result};
-use clap::{command, Parser, Subcommand};
+use clap::{Parser, Subcommand, command};
 
 use cli::WranglerFormat;
 use common::CidlSpec;
