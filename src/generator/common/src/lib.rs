@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum CidlType {
     Integer,
     Real,
@@ -8,7 +8,7 @@ pub enum CidlType {
     Blob,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub enum HttpVerb {
     GET,
     POST,
@@ -17,20 +17,20 @@ pub enum HttpVerb {
     DELETE,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct TypedValue {
     pub name: String,
     pub cidl_type: CidlType,
     pub nullable: bool,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct Attribute {
     pub value: TypedValue,
     pub primary_key: bool,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct Method {
     pub name: String,
     pub is_static: bool,
@@ -38,19 +38,19 @@ pub struct Method {
     pub parameters: Vec<TypedValue>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct Model {
     pub name: String,
     pub attributes: Vec<Attribute>,
     pub methods: Vec<Method>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub enum InputLanguage {
     TypeScript,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize,Clone)]
 pub struct CidlSpec {
     pub version: String,
     pub project_name: String,
