@@ -70,19 +70,24 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # Direct tsc typecheck (no npm script required)
+      # Use npx with -p so it knows which package provides "tsc"
       - name: TypeScript typecheck
+        shell: bash
         run: |
-          npx --yes typescript@^5 tsc -p tsconfig.json --noEmit
-          if [ -f tsconfig.test.json ]; then npx --yes typescript@^5 tsc -p tsconfig.test.json --noEmit; fi
+          if [ -f tsconfig.json ]; then
+            npx --yes -p typescript@^5 tsc -p tsconfig.json --noEmit
+          fi
+          if [ -f tsconfig.test.json ]; then
+            npx --yes -p typescript@^5 tsc -p tsconfig.test.json --noEmit
+          fi
 
-      # Build (assumes you have a "build" script; otherwise call tsc directly)
       - name: Build
+        shell: bash
         run: |
-          if npm run | grep -q "^  build$"; then
+          if npm run | grep -qE '^[[:space:]]+build$'; then
             npm run build
           else
-            npx --yes typescript@^5 tsc -p tsconfig.json
+            npx --yes -p typescript@^5 tsc -p tsconfig.json
           fi
 
       - name: Unit tests
