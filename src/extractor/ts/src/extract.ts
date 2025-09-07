@@ -120,6 +120,17 @@ export namespace TypeCode {
       return toCidlType(t.getTypeArguments()[0], sf);
     }
 
+    // disregard nullish
+    if (t.isUnion()) {
+      const nonNullish = t
+        .getUnionTypes()
+        .find((u) => !u.isNull() && !u.isUndefined());
+
+      if (nonNullish) return toCidlType(nonNullish, sf);
+
+      throw new Error(`Union only contains null/undefined: ${txt}`);
+    }
+
     if (txt in cidlTypeMap) {
       return cidlTypeMap[txt as keyof typeof cidlTypeMap];
     }

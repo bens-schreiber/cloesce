@@ -11,6 +11,7 @@ export class Actions {
   name: string;
 
   static async create(
+        payload: string
   ): Promise<Result<string>> {
     const url = `http://localhost:1000/api/Actions/create`;
 
@@ -18,8 +19,7 @@ export class Actions {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-          db, 
-          payload
+            payload
       })
     });
 
@@ -36,6 +36,8 @@ export class Actions {
     return { ok: true, data };
   }
   static async update(
+        id: number, 
+        payload: string | null
   ): Promise<Result<string>> {
     const url = `http://localhost:1000/api/Actions/update`;
 
@@ -43,9 +45,8 @@ export class Actions {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-          db, 
-          id, 
-          payload
+            id, 
+            payload
       })
     });
 
@@ -62,6 +63,7 @@ export class Actions {
     return { ok: true, data };
   }
   static async patch(
+        phrase: string
   ): Promise<Result<string>> {
     const url = `http://localhost:1000/api/Actions/patch`;
 
@@ -69,8 +71,7 @@ export class Actions {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-          db, 
-          phrase
+            phrase
       })
     });
 
@@ -87,6 +88,7 @@ export class Actions {
     return { ok: true, data };
   }
   static async remove(
+        id: number
   ): Promise<Result<string>> {
     const url = `http://localhost:1000/api/Actions/remove`;
 
@@ -94,8 +96,7 @@ export class Actions {
       method: "DELETE",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-          db, 
-          id
+            id
       })
     });
 
@@ -126,7 +127,6 @@ export class Dog {
       method: "GET",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-          db
       })
     });
 
@@ -150,7 +150,6 @@ export class Dog {
       method: "GET",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-          db
       })
     });
 
@@ -167,6 +166,7 @@ export class Dog {
     return { ok: true, data };
   }
   static async woof(
+        phrase: string
   ): Promise<Result<string>> {
     const url = `http://localhost:1000/api/Dog/woof`;
 
@@ -174,8 +174,7 @@ export class Dog {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-          db, 
-          phrase
+            phrase
       })
     });
 
@@ -205,7 +204,6 @@ export class Person {
       method: "GET",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-          db
       })
     });
 
@@ -222,6 +220,7 @@ export class Person {
     return { ok: true, data };
   }
   static async speak(
+        phrase: string
   ): Promise<Result<string>> {
     const url = `http://localhost:1000/api/Person/speak`;
 
@@ -229,8 +228,7 @@ export class Person {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-          db, 
-          phrase
+            phrase
       })
     });
 

@@ -59,6 +59,9 @@ const port = 5001;
   assert(res2.ok, JSON.stringify(res2));
 }
 
+console.log("e2e tests sucessfull ✅\n");
+process.exit(0);
+
 function runSync(label: string, cmd: string, opts: { cwd?: string } = {}) {
   try {
     console.log(`${label}...`);

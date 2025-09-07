@@ -8,7 +8,7 @@ export class Person {
   ssn: string | null;
 
   async speak(
-      count: number
+        count: number
   ): Promise<Result<string>> {
     const url = `http://localhost:5001/api/Person/${this.id}/speak`;
 
@@ -16,7 +16,7 @@ export class Person {
       method: "GET",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-          count
+            count
       })
     });
 
@@ -33,8 +33,8 @@ export class Person {
     return { ok: true, data };
   }
   static async post(
-      name: string, 
-      ssn: string | null
+        name: string, 
+        ssn: string | null
   ): Promise<Result<string>> {
     const url = `http://localhost:5001/api/Person/post`;
 
@@ -42,8 +42,8 @@ export class Person {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-          name, 
-          ssn
+            name, 
+            ssn
       })
     });
 

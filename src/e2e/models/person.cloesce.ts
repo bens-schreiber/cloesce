@@ -19,7 +19,7 @@ export class Person {
   @POST
   static async post(db: D1Database, name: string, ssn: string | null) {
     let result = await db
-      .prepare("INSERT INTO users (name, ssn) VALUES (?, ?)")
+      .prepare("INSERT INTO Person (name, ssn) VALUES (?, ?)")
       .bind(name, ssn)
       .run();
     let id = result.lastInsertRowId;

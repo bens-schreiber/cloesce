@@ -11,7 +11,7 @@ export class {{name}} {
   {{#each methods}}
   {{#if is_static}}static {{/if}}async {{name}}(
     {{#each parameters}}
-      {{#if is_parameter cidl_type}}
+      {{#if (is_serializable cidl_type)}}
         {{name}}: {{lang_type cidl_type nullable}}{{#unless @last}}, {{/unless}}
       {{/if}}
     {{/each}}
@@ -23,7 +23,9 @@ export class {{name}} {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         {{#each parameters}}
-          {{name}}{{#unless @last}}, {{/unless}}
+          {{#if (is_serializable cidl_type)}}
+            {{name}}{{#unless @last}}, {{/unless}}
+          {{/if}}
         {{/each}}
       })
     });

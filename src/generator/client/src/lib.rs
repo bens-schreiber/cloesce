@@ -3,7 +3,7 @@ mod mappers;
 use std::sync::Arc;
 
 use common::{CidlSpec, CidlType, InputLanguage};
-use handlebars::Handlebars;
+use handlebars::{Handlebars, handlebars_helper};
 
 use mappers::TypeScriptMapper;
 
@@ -11,10 +11,14 @@ pub trait ClientLanguageTypeMapper {
     fn type_name(&self, ty: &CidlType, nullable: bool) -> String;
 }
 
+handlebars_helper!(is_serializable: |cidl_type: CidlType| matches!(cidl_type, CidlType::Sql(_)));
+
 fn register_helpers(
     handlebars: &mut Handlebars<'_>,
     mapper: Arc<dyn ClientLanguageTypeMapper + Send + Sync>,
 ) {
+    handlebars.register_helper("is_serializable", Box::new(is_serializable));
+
     handlebars.register_helper(
         "lang_type",
         Box::new(
@@ -34,27 +38,6 @@ fn register_helpers(
 
                 let rendered = mapper.type_name(&cidl_type, nullable);
                 out.write(&rendered)?;
-                Ok(())
-            },
-        ),
-    );
-
-    handlebars.register_helper(
-        "is_parameter",
-        Box::new(
-            move |h: &handlebars::Helper<'_>,
-                  _: &Handlebars,
-                  _: &handlebars::Context,
-                  _: &mut handlebars::RenderContext<'_, '_>,
-                  out: &mut dyn handlebars::Output| {
-                let cidl_type: CidlType =
-                    serde_json::from_value(h.param(0).unwrap().value().clone())
-                        .expect("Expected CidlType");
-
-                let serializable = matches!(cidl_type, CidlType::Sql(_));
-
-                out.write(if serializable { "true" } else { "false" })?;
-
                 Ok(())
             },
         ),
