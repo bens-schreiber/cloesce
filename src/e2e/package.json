@@ -3,17 +3,17 @@
     "@cloudflare/workers-types": "^4.20250906.0",
     "@types/node": "^24.3.1",
     "ts-node": "^10.9.2",
-    "typescript": "^5.9.2"
+    "typescript": "^5.9.2",
+    "prettier": "^3.6.2"
   },
   "scripts": {
-    "start": "ts-node main.ts",
+    "start": "ts-node ./src/main.ts",
     "format:fix": "prettier --write .",
     "format": "prettier --check ."
   },
   "type": "module",
   "dependencies": {
     "cloesce": "file:../extractor/ts",
-    "wrangler": "^4.34.0",
-    "prettier": "^3.6.2"
+    "wrangler": "^4.34.0"
   }
 }
