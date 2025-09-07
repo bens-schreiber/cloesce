@@ -7,9 +7,10 @@
     "prettier": "^3.6.2"
   },
   "scripts": {
-    "start": "ts-node ./src/main.ts",
     "format:fix": "prettier --write .",
-    "format": "prettier --check ."
+    "format": "prettier --check .",
+    "build": "tsc",
+    "start": "npm run build && node dist/main.js"
   },
   "type": "module",
   "dependencies": {

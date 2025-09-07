@@ -1,7 +1,9 @@
-export function GET() {}
-export function POST() {}
-export function PUT() {}
-export function PATCH() {}
-export function DELETE() {}
-export function D1() {}
-export function PrimaryKey() {}
+export const D1: ClassDecorator = () => {};
+
+export const PrimaryKey: PropertyDecorator = () => {};
+
+export const GET: MethodDecorator = () => {};
+export const POST: MethodDecorator = () => {};
+export const PUT: MethodDecorator = () => {};
+export const PATCH: MethodDecorator = () => {};
+export const DELETE: MethodDecorator = () => {};
