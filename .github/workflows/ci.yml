@@ -90,14 +90,12 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # Install Rust
       - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
           override: true
 
-      # Cache Cargo registry and build
       - name: Cache Cargo registry
         uses: actions/cache@v3
         with:
@@ -112,12 +110,10 @@ jobs:
           path: src/generator/target
           key: cargo-build-${{ hashFiles('**/Cargo.lock') }}
 
-      # Build Rust generator
       - name: Build Rust generator
         run: cargo build --all-targets
         working-directory: src/generator
 
-      # Install Node.js and dependencies
       - name: Use Node.js
         uses: actions/setup-node@v4
         with:
