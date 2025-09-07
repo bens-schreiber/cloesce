@@ -27,7 +27,7 @@ impl WorkersFactory {
             let hydration = if method.is_static {
                 ""
             } else {
-                &lang.instantiate_model(&model)
+                &lang.instantiate_model(model)
             };
             let dispatch = lang.dispatch_method(&model.name, method);
 
