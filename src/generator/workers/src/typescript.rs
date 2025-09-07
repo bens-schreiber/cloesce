@@ -105,7 +105,7 @@ impl LanguageWorkersGenerator for TypescriptWorkersGenerator {
 
     fn router_method(&self, method: &Method, proto: String) -> String {
         if method.is_static {
-            format!("{proto}")
+            proto
         } else {
             format!(
                 r#"
