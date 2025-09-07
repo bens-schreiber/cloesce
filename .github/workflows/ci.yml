@@ -25,7 +25,7 @@ jobs:
           override: true
 
       - name: Cache Cargo registry
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: |
             ~/.cargo/registry
@@ -33,7 +33,7 @@ jobs:
           key: cargo-registry-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Cache Cargo build
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: target
           key: cargo-build-${{ hashFiles('**/Cargo.lock') }}
@@ -50,9 +50,6 @@ jobs:
       - name: Run tests
         run: cargo test --all
 
-  # -------------------------
-  # Node/TypeScript job
-  # -------------------------
   ts:
     name: TypeScript CI (cloesce-ts)
     runs-on: ubuntu-latest
@@ -73,19 +70,15 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # Optional: Prettier format check (requires "format" script)
+      # Option 2: call Prettier directly (no package.json script required)
       - name: Prettier (format check)
-        run: npm run format
-        continue-on-error: false
+        run: npx --yes prettier@^3 --check .
 
-      # Strict types (no emit)
       - name: TypeScript typecheck
         run: npm run typecheck
 
-      # Build to dist/
       - name: Build
         run: npm run build
 
-      # Run Jest tests
       - name: Unit tests
         run: npm test
