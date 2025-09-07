@@ -188,7 +188,7 @@ if (id !== null && typeof id !== 'number') { throw new Error('Parameter id must 
                 { status: 404, headers: { "Content-Type": "application/json" } }
             );
         }
-        const instance: Dog = {id,name,breed,preferred_treat};
+        const instance: Dog = Object.assign(new Dog(), record)
         
                 
         return instance.get_name(env.DB)
@@ -215,7 +215,7 @@ if (id !== null && typeof id !== 'number') { throw new Error('Parameter id must 
                 { status: 404, headers: { "Content-Type": "application/json" } }
             );
         }
-        const instance: Dog = {id,name,breed,preferred_treat};
+        const instance: Dog = Object.assign(new Dog(), record)
         
                 
         return instance.get_breed(env.DB)
@@ -272,7 +272,7 @@ if (phrase !== null && typeof phrase !== 'string') { throw new Error('Parameter 
                 { status: 404, headers: { "Content-Type": "application/json" } }
             );
         }
-        const instance: Person = {id,name,middle_name};
+        const instance: Person = Object.assign(new Person(), record)
         
                 
         return instance.foo(env.DB)
