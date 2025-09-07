@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { extractModels } from "../src/extract.js";
 
-// Embedded class configurations as strings
+// ── Embedded class configurations ─────────────────────────────────────────────
 const PERSON_CLASS = `import { D1, D1Db, GET, POST, PrimaryKey } from "cloesce-ts";
 
 @D1
@@ -12,7 +12,7 @@ class Person {
   id!: number;
   name!: string;
   middle_name: string | null;
-  
+
   @GET
   async foo(db: D1Db, req: Request) {
     const who = new URL(req.url).searchParams.get("name") ?? "world";
@@ -20,7 +20,7 @@ class Person {
       headers: { "content-type": "application/json" },
     });
   }
-  
+
   @POST
   static async speak(db: D1Db, req: Request, phrase: string) {
     return new Response(JSON.stringify({ phrase }), {
@@ -39,7 +39,7 @@ class Dog {
   name!: string;
   breed!: number;
   preferred_treat: string | null;
-  
+
   @GET
   async get_name(db: D1Db, req: Request) {
     const who = new URL(req.url).searchParams.get("name");
@@ -47,7 +47,7 @@ class Dog {
       headers: { "content-type": "application/json" },
     });
   }
-  
+
   @GET
   async get_breed(db: D1Db, req: Request) {
     const breed = new URL(req.url).searchParams.get("breed");
@@ -55,7 +55,7 @@ class Dog {
       headers: { "content-type": "application/json" },
     });
   }
-  
+
   @POST
   static async woof(db: D1Db, req: Request, phrase: string) {
     return new Response(JSON.stringify({ phrase }), {
@@ -65,6 +65,36 @@ class Dog {
   }
 }`;
 
+const ACTIONS_CLASS = `import { D1, D1Db, POST, PUT, PATCH, DELETE, PrimaryKey } from "cloesce-ts";
+
+@D1
+class Actions {
+  @PrimaryKey id!: number;
+  name!: string;
+
+  @POST
+  static create(db: D1Db, req: Request, payload: string) {
+    return new Response("ok", { status: 201 });
+  }
+
+  @PUT
+  static update(db: D1Db, req: Request, id: number, payload: string | null) {
+    return new Response("ok");
+  }
+
+  @PATCH
+  static patchlol(db: D1Db, req: Request, phrase: string) {
+    return new Response("ok");
+  }
+
+  @DELETE
+  static remove(db: D1Db, req: Request, id: number) {
+    return new Response("ok");
+  }
+}
+`;
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
 function writeTmpTsconfig(tmp: string) {
   fs.writeFileSync(
     path.join(tmp, "tsconfig.json"),
@@ -76,13 +106,21 @@ function writeTmpTsconfig(tmp: string) {
           moduleResolution: "Bundler",
           experimentalDecorators: true,
           skipLibCheck: true,
-          strict: true
+          strict: true,
+          lib: ["ES2022", "DOM"]
         },
         include: ["**/*.ts"]
       },
       null,
       2
     )
+  );
+}
+
+function writeConfig(tmp: string, source: string = ".") {
+  fs.writeFileSync(
+    path.join(tmp, "cloesce-config.json"),
+    JSON.stringify({ source }, null, 2)
   );
 }
 
@@ -95,14 +133,19 @@ function stubCloesce(tmp: string) {
     export declare function PrimaryKey(...args: any[]): any;
     export declare function GET(...args: any[]): any;
     export declare function POST(...args: any[]): any;
+    export declare function PUT(...args: any[]): any;
+    export declare function PATCH(...args: any[]): any;
+    export declare function DELETE(...args: any[]): any;
     export interface D1Db {}
-    export interface Request {}
-    export interface Response {}
+    // Use the DOM ones at runtime; these are just to satisfy the type checker if needed.
+    // If you prefer, you can omit these and rely on "lib": ["DOM"] above.
+    // export interface Request {}
+    // export interface Response {}
   `
   );
 }
 
-// stable order for snapshots 
+// stable order for snapshots / comparisons
 function sortDeep<T>(x: T): T {
   if (Array.isArray(x)) return x.map(sortDeep) as any;
   if (x && typeof x === "object") {
@@ -112,185 +155,153 @@ function sortDeep<T>(x: T): T {
   return x;
 }
 
-// Modified runner that takes class content directly
 async function runOnClassContent(projectName: string, fileName: string, classContent: string) {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "cloesce-"));
   writeTmpTsconfig(tmp);
   stubCloesce(tmp);
 
-  // Write the class content directly to a .cloesce.ts file
   fs.writeFileSync(path.join(tmp, fileName), classContent);
+  writeConfig(tmp, "."); // make sure extractor sees our *.cloesce.ts
 
-  // run extractor on tmp project
   const result = await extractModels({ projectName, cwd: tmp });
   return sortDeep(result);
 }
 
-// tests here!
-describe("cloesce-ts extractModels snapshot", () => {
-  it("turns person.cloesce.ts into expected JSON spec", async () => {
-    const normalized = await runOnClassContent("Person", "person.cloesce.ts", PERSON_CLASS);
+// ── Tests ────────────────────────────────────────────────────────────────────
+describe("cloesce-ts extractModels", () => {
+  it("turns person.cloesce.ts into expected JSON spec (wrapped attributes, cidl_type, skip db/request)", async () => {
+    const res = await runOnClassContent("Person", "person.cloesce.ts", PERSON_CLASS);
+    expect(res.language).toBe("TypeScript");
 
-    expect(normalized).toMatchInlineSnapshot(`
-{
-  "language": "typescript",
-  "models": [
-    {
-      "Person": {
-        "attributes": [
-          {
-            "name": "id",
-            "nullable": false,
-            "pk": true,
-            "type": "number",
-          },
-          {
-            "name": "name",
-            "nullable": false,
-            "type": "string",
-          },
-          {
-            "name": "middle_name",
-            "nullable": true,
-            "type": "string",
-          },
-        ],
-        "methods": [
-          {
-            "http_verb": "GET",
-            "is_static": false,
-            "name": "foo",
-            "parameters": [
-              {
-                "name": "d1",
-                "nullable": false,
-                "type": "D1Db",
-              },
-            ],
-            "return": {
-              "type": "Response",
-            },
-          },
-          {
-            "http_verb": "POST",
-            "is_static": true,
-            "name": "speak",
-            "parameters": [
-              {
-                "name": "d1",
-                "nullable": false,
-                "type": "D1Db",
-              },
-              {
-                "name": "phrase",
-                "nullable": false,
-                "type": "string",
-              },
-            ],
-            "return": {
-              "type": "Response",
-            },
-          },
-        ],
-      },
-    },
-  ],
-  "project_name": "Person",
-  "version": "0.0.1",
-}
-`);
+    const person = res.models.find((m: any) => m.name === "Person");
+    expect(person).toBeTruthy();
+
+    // Attribute wrapping: { value: { name, cidl_type, nullable }, primary_key }
+    expect(person.attributes).toEqual(
+      expect.arrayContaining([
+        {
+          value: { name: "id", cidl_type: "Integer", nullable: false },
+          primary_key: true,
+        },
+        {
+          value: { name: "name", cidl_type: "Text", nullable: false },
+          primary_key: false,
+        },
+        {
+          value: { name: "middle_name", cidl_type: "Text", nullable: true },
+          primary_key: false,
+        },
+      ])
+    );
+
+    // Methods: POST static, GET instance; params should skip db & Request
+    const post = person.methods.find((m: any) => m.name === "speak");
+    expect(post).toMatchObject({
+      name: "speak",
+      is_static: true,
+      http_verb: "POST",
+    });
+    expect(post.parameters).toEqual([
+      { name: "phrase", cidl_type: "Text", nullable: false },
+    ]);
+
+    const get = person.methods.find((m: any) => m.name === "foo");
+    expect(get).toMatchObject({
+      name: "foo",
+      is_static: false,
+      http_verb: "GET",
+    });
+    expect(get.parameters).toEqual([]); // db and Request omitted
   });
 
   it("turns dog.cloesce.ts into expected JSON spec", async () => {
-    const normalized = await runOnClassContent("dog", "dog.cloesce.ts", DOG_CLASS);
+    const res = await runOnClassContent("dog", "dog.cloesce.ts", DOG_CLASS);
+    expect(res.language).toBe("TypeScript");
 
-    expect(normalized).toMatchInlineSnapshot(`
-{
-  "language": "typescript",
-  "models": [
-    {
-      "Dog": {
-        "attributes": [
-          {
-            "name": "id",
-            "nullable": false,
-            "pk": true,
-            "type": "number",
-          },
-          {
-            "name": "name",
-            "nullable": false,
-            "type": "string",
-          },
-          {
-            "name": "breed",
-            "nullable": false,
-            "type": "number",
-          },
-          {
-            "name": "preferred_treat",
-            "nullable": true,
-            "type": "string",
-          },
-        ],
-        "methods": [
-          {
-            "http_verb": "GET",
-            "is_static": false,
-            "name": "get_name",
-            "parameters": [
-              {
-                "name": "d1",
-                "nullable": false,
-                "type": "D1Db",
-              },
-            ],
-            "return": {
-              "type": "Response",
-            },
-          },
-          {
-            "http_verb": "GET",
-            "is_static": false,
-            "name": "get_breed",
-            "parameters": [
-              {
-                "name": "d1",
-                "nullable": false,
-                "type": "D1Db",
-              },
-            ],
-            "return": {
-              "type": "Response",
-            },
-          },
-          {
-            "http_verb": "POST",
-            "is_static": true,
-            "name": "woof",
-            "parameters": [
-              {
-                "name": "d1",
-                "nullable": false,
-                "type": "D1Db",
-              },
-              {
-                "name": "phrase",
-                "nullable": false,
-                "type": "string",
-              },
-            ],
-            "return": {
-              "type": "Response",
-            },
-          },
-        ],
-      },
-    },
-  ],
-  "project_name": "dog",
-  "version": "0.0.1",
-}
-`);
+    const dog = res.models.find((m: any) => m.name === "Dog");
+    expect(dog).toBeTruthy();
+
+    // basic attribute checks
+    expect(dog.attributes).toEqual(
+      expect.arrayContaining([
+        { value: { name: "id", cidl_type: "Integer", nullable: false }, primary_key: true },
+        { value: { name: "name", cidl_type: "Text", nullable: false }, primary_key: false },
+        { value: { name: "breed", cidl_type: "Integer", nullable: false }, primary_key: false },
+        { value: { name: "preferred_treat", cidl_type: "Text", nullable: true }, primary_key: false },
+      ])
+    );
+
+    // GET methods should have no params (db/request skipped)
+    const gets = dog.methods.filter((m: any) => m.http_verb === "GET");
+    expect(gets).toHaveLength(2);
+    gets.forEach((m: any) => {
+      expect(m.is_static).toBe(false);
+      expect(m.parameters).toEqual([]);
+    });
+
+    // static POST woof should only include phrase
+    const woof = dog.methods.find((m: any) => m.name === "woof");
+    expect(woof).toMatchObject({ http_verb: "POST", is_static: true });
+    expect(woof.parameters).toEqual([
+      { name: "phrase", cidl_type: "Text", nullable: false },
+    ]);
+  });
+
+  it("captures ALL static HTTP verbs (POST/PUT/PATCH/DELETE) and skips db/request params", async () => {
+    const res = await runOnClassContent("verbs", "verbs.cloesce.ts", ACTIONS_CLASS);
+    expect(res.language).toBe("TypeScript");
+
+    const actions = res.models.find((m: any) => m.name === "Actions");
+    expect(actions).toBeTruthy();
+
+    // Make a small map for convenience
+    const byName: Record<string, any> = Object.fromEntries(
+      actions.methods.map((m: any) => [m.name, m])
+    );
+
+    expect(byName.create).toMatchObject({
+      name: "create",
+      http_verb: "POST",
+      is_static: true,
+    });
+    expect(byName.create.parameters).toEqual([
+      { name: "payload", cidl_type: "Text", nullable: false },
+    ]);
+
+    expect(byName.update).toMatchObject({
+      name: "update",
+      http_verb: "PUT",
+      is_static: true,
+    });
+    expect(byName.update.parameters).toEqual([
+      { name: "id", cidl_type: "Integer", nullable: false },
+      { name: "payload", cidl_type: "Text", nullable: true }, // string | null
+    ]);
+
+    expect(byName.patchlol).toMatchObject({
+      name: "patchlol",
+      http_verb: "PATCH",
+      is_static: true,
+    });
+    expect(byName.patchlol.parameters).toEqual([
+      { name: "phrase", cidl_type: "Text", nullable: false },
+    ]);
+
+    expect(byName.remove).toMatchObject({
+      name: "remove",
+      http_verb: "DELETE",
+      is_static: true,
+    });
+    expect(byName.remove.parameters).toEqual([
+      { name: "id", cidl_type: "Integer", nullable: false },
+    ]);
+
+    // Sanity: ensure no param leaked as D1Db / db / Request
+    actions.methods.forEach((m: any) => {
+      m.parameters.forEach((p: any) => {
+        expect(p.name).not.toBe("db");
+        expect(p.cidl_type).not.toBe("D1Db");
+      });
+    });
   });
 });
