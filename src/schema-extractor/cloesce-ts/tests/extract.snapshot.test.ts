@@ -107,20 +107,20 @@ function writeTmpTsconfig(tmp: string) {
           experimentalDecorators: true,
           skipLibCheck: true,
           strict: true,
-          lib: ["ES2022", "DOM"]
+          lib: ["ES2022", "DOM"],
         },
-        include: ["**/*.ts"]
+        include: ["**/*.ts"],
       },
       null,
-      2
-    )
+      2,
+    ),
   );
 }
 
 function writeConfig(tmp: string, source: string = ".") {
   fs.writeFileSync(
     path.join(tmp, "cloesce-config.json"),
-    JSON.stringify({ source }, null, 2)
+    JSON.stringify({ source }, null, 2),
   );
 }
 
@@ -141,7 +141,7 @@ function stubCloesce(tmp: string) {
     // If you prefer, you can omit these and rely on "lib": ["DOM"] above.
     // export interface Request {}
     // export interface Response {}
-  `
+  `,
   );
 }
 
@@ -149,13 +149,19 @@ function stubCloesce(tmp: string) {
 function sortDeep<T>(x: T): T {
   if (Array.isArray(x)) return x.map(sortDeep) as any;
   if (x && typeof x === "object") {
-    const entries = Object.entries(x as any).sort(([a], [b]) => a.localeCompare(b));
+    const entries = Object.entries(x as any).sort(([a], [b]) =>
+      a.localeCompare(b),
+    );
     return Object.fromEntries(entries.map(([k, v]) => [k, sortDeep(v)])) as any;
   }
   return x;
 }
 
-async function runOnClassContent(projectName: string, fileName: string, classContent: string) {
+async function runOnClassContent(
+  projectName: string,
+  fileName: string,
+  classContent: string,
+) {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "cloesce-"));
   writeTmpTsconfig(tmp);
   stubCloesce(tmp);
@@ -170,7 +176,11 @@ async function runOnClassContent(projectName: string, fileName: string, classCon
 // ── Tests ────────────────────────────────────────────────────────────────────
 describe("cloesce-ts extractModels", () => {
   it("turns person.cloesce.ts into expected JSON spec (wrapped attributes, cidl_type, skip db/request)", async () => {
-    const res = await runOnClassContent("Person", "person.cloesce.ts", PERSON_CLASS);
+    const res = await runOnClassContent(
+      "Person",
+      "person.cloesce.ts",
+      PERSON_CLASS,
+    );
     expect(res.language).toBe("TypeScript");
 
     const person = res.models.find((m: any) => m.name === "Person");
@@ -191,7 +201,7 @@ describe("cloesce-ts extractModels", () => {
           value: { name: "middle_name", cidl_type: "Text", nullable: true },
           primary_key: false,
         },
-      ])
+      ]),
     );
 
     // Methods: POST static, GET instance; params should skip db & Request
@@ -224,11 +234,23 @@ describe("cloesce-ts extractModels", () => {
     // basic attribute checks
     expect(dog.attributes).toEqual(
       expect.arrayContaining([
-        { value: { name: "id", cidl_type: "Integer", nullable: false }, primary_key: true },
-        { value: { name: "name", cidl_type: "Text", nullable: false }, primary_key: false },
-        { value: { name: "breed", cidl_type: "Integer", nullable: false }, primary_key: false },
-        { value: { name: "preferred_treat", cidl_type: "Text", nullable: true }, primary_key: false },
-      ])
+        {
+          value: { name: "id", cidl_type: "Integer", nullable: false },
+          primary_key: true,
+        },
+        {
+          value: { name: "name", cidl_type: "Text", nullable: false },
+          primary_key: false,
+        },
+        {
+          value: { name: "breed", cidl_type: "Integer", nullable: false },
+          primary_key: false,
+        },
+        {
+          value: { name: "preferred_treat", cidl_type: "Text", nullable: true },
+          primary_key: false,
+        },
+      ]),
     );
 
     // GET methods should have no params (db/request skipped)
@@ -248,7 +270,11 @@ describe("cloesce-ts extractModels", () => {
   });
 
   it("captures ALL static HTTP verbs (POST/PUT/PATCH/DELETE) and skips db/request params", async () => {
-    const res = await runOnClassContent("verbs", "verbs.cloesce.ts", ACTIONS_CLASS);
+    const res = await runOnClassContent(
+      "verbs",
+      "verbs.cloesce.ts",
+      ACTIONS_CLASS,
+    );
     expect(res.language).toBe("TypeScript");
 
     const actions = res.models.find((m: any) => m.name === "Actions");
@@ -256,7 +282,7 @@ describe("cloesce-ts extractModels", () => {
 
     // Make a small map for convenience
     const byName: Record<string, any> = Object.fromEntries(
-      actions.methods.map((m: any) => [m.name, m])
+      actions.methods.map((m: any) => [m.name, m]),
     );
 
     expect(byName.create).toMatchObject({

@@ -14,8 +14,11 @@ export function DELETE(_value: Handler, _ctx: ClassMethodDecoratorContext) {}
 
 /** Class decorator (no-op) */
 export function D1<T extends new (...a: any[]) => object>(
-  value: T, _ctx: ClassDecoratorContext<T>
-) { return value; }
+  value: T,
+  _ctx: ClassDecoratorContext<T>,
+) {
+  return value;
+}
 
 /** Field decorator (no-op) */
 export function PrimaryKey(_v: undefined, _ctx: ClassFieldDecoratorContext) {}
