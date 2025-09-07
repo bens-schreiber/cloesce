@@ -1,4 +1,4 @@
-name: Rust CI
+name: CI
 
 on:
   push:
@@ -7,18 +7,16 @@ on:
     branches: ["main"]
 
 jobs:
-  ci:
+  rust:
     name: Rust CI
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: src/generator
     steps:
-      # Checkout code
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # Install Rust stable
       - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:
@@ -26,7 +24,6 @@ jobs:
           components: rustfmt, clippy
           override: true
 
-      # Cache Cargo registry and build artifacts
       - name: Cache Cargo registry
         uses: actions/cache@v3
         with:
@@ -41,18 +38,54 @@ jobs:
           path: target
           key: cargo-build-${{ hashFiles('**/Cargo.lock') }}
 
-      # Check formatting
       - name: Run cargo fmt
         run: cargo fmt --all -- --check
 
-      # Run Clippy
       - name: Run Clippy
         run: cargo clippy --all-targets --all-features -- -D warnings
 
-      # Build all targets
       - name: Build crate
         run: cargo build --all-targets
 
-      # Run tests
       - name: Run tests
         run: cargo test --all
+
+  # -------------------------
+  # Node/TypeScript job
+  # -------------------------
+  ts:
+    name: TypeScript CI (cloesce-ts)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: src/schema-extractor/cloesce-ts
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: src/schema-extractor/cloesce-ts/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Optional: Prettier format check (requires "format" script)
+      - name: Prettier (format check)
+        run: npm run format
+        continue-on-error: false
+
+      # Strict types (no emit)
+      - name: TypeScript typecheck
+        run: npm run typecheck
+
+      # Build to dist/
+      - name: Build
+        run: npm run build
+
+      # Run Jest tests
+      - name: Unit tests
+        run: npm test
