@@ -119,6 +119,12 @@ jobs:
         with:
           node-version: 20
 
+      - name: Build extractor dependency
+        working-directory: src/extractor/ts
+        run: |
+          npm ci
+          npm run build
+
       - name: Install dependencies
         run: npm ci
 
