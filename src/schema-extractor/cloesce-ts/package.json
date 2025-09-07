@@ -22,6 +22,8 @@
     "prepublishOnly": "npm run build",
     "format": "prettier --check .",
     "format:fix": "prettier --write .",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "typecheck:test": "tsc -p tsconfig.test.json --noEmit",
     "test": "jest",
     "test:update": "jest -u",
     "test:watch": "jest --watch"
