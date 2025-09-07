@@ -134,9 +134,15 @@ impl LanguageWorkersGenerator for TypescriptWorkersGenerator {
             .collect::<Vec<_>>()
             .join(",");
 
+        let id = if !method.is_static {
+            "id: number, "
+        } else {
+            ""
+        };
+
         format!(
             r#"
-            {method_name}: async ({params}, request: Request, env: any) => {{{body}}}
+            {method_name}: async ({id}{params}, request: Request, env: any) => {{{body}}}
             "#
         )
     }
@@ -197,7 +203,17 @@ impl LanguageWorkersGenerator for TypescriptWorkersGenerator {
         }
     }
 
-    fn instantiate_model(&self, model_name: &str) -> String {
+    fn instantiate_model(&self, model: &Model) -> String {
+        let model_name = &model.name;
+        let instance = model
+            .attributes
+            .iter()
+            .map(|a| a.value.name.clone())
+            .collect::<Vec<_>>()
+            .join(",");
+
+        // explicitly create the model so that users don't need
+        // to create a constructor
         format!(
             r#"
         const d1 = env.D1_DB || env.DB;
@@ -212,7 +228,7 @@ impl LanguageWorkersGenerator for TypescriptWorkersGenerator {
             );
         }}
 
-        const instance = new Person(record);
+        const instance: {model_name} = {{{instance}}};
         "#
         )
     }
