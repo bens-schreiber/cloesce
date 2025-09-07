@@ -292,6 +292,11 @@ marimo/\_lsp/
 
 .streamlit/secrets.toml
 
+
+
+
+# ----------- TYPESCRIPT VVV  ----------- 
+
 # Node modules
 node_modules/
 
