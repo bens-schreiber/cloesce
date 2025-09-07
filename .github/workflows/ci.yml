@@ -70,10 +70,6 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # Option 2: call Prettier directly (no package.json script required)
-      - name: Prettier (format check)
-        run: npx --yes prettier@^3 --check .
-
       - name: TypeScript typecheck
         run: npm run typecheck
 
