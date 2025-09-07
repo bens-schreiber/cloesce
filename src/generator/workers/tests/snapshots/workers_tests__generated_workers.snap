@@ -47,7 +47,7 @@ expression: workers
         const router = { api: {
         User: {
         "<id>": {
-            do_something: async (age: number,name: string, request: Request, env: any) => {
+            do_something: async (id: number, age: number,name: string, request: Request, env: any) => {
                 
             if (request.method !== "GET") {
                 return new Response("Method Not Allowed", { status: 405 });
@@ -70,7 +70,7 @@ if (name !== null && typeof name !== 'string') { throw new Error('Parameter name
             );
         }
 
-        const instance = new Person(record);
+        const instance: User = {id,name};
         
                 
         instance.do_something(age, name)
