@@ -13,7 +13,7 @@ class Actions {
     db: D1Database,
     req: Request,
     id: number,
-    payload: string | null
+    payload: string | null,
   ) {
     return new Response("ok");
   }
