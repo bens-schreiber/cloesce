@@ -129,7 +129,9 @@ jobs:
       # Check formatting before running E2E
       - name: Prettier
         run: npm run format -- --check
+        working-directory: src/e2e
 
       # Run E2E tests
       - name: Run E2E tests
         run: npm run start
+        working-directory: src/e2e
