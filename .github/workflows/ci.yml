@@ -55,7 +55,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: src/schema-extractor/ts
+        working-directory: src/extractor/ts
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
