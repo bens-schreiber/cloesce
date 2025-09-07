@@ -2,8 +2,8 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "noEmit": true,
-    "rootDir": ".",                 
-    "outDir": "dist-test",           
+    "rootDir": ".",
+    "outDir": "dist-test",
     "types": ["jest", "node"]
   },
   "include": ["src/**/*.ts", "tests/**/*.ts"],
