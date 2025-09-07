@@ -42,10 +42,10 @@
                 {
                     "name": "speak",
                     "is_static": false,
-                    "http_verb": "GET",
+                    "http_verb": "POST",
                     "parameters": [
                         {
-                            "name": "count",
+                            "name": "favorite_number",
                             "cidl_type": {
                                 "Sql": "Integer"
                             },

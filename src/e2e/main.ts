@@ -4,15 +4,15 @@ import { pathToFileURL } from "url";
 import net from "net";
 
 const generatorPath = path.resolve("../generator");
-const outputDir = path.join(process.cwd(), ".generated/");
+const outputDir = path.join(process.cwd(), ".generated");
 const cidlPath = path.join(outputDir, "cidl.json");
 const d1Path = path.join(process.cwd(), "migrations/d1.sql");
 const workersPath = path.join(outputDir, "workers.ts");
 const clientPath = path.join(outputDir, "client.ts");
 const port = 5001;
 
-// 1. Cloesce compiler
-{
+async function main() {
+  // 1. Cloesce compiler
   runSync("Running the extractor", "npx cloesce");
   runSync("Generating d1", `cargo run generate d1 ${cidlPath} ${d1Path}`, {
     cwd: generatorPath,
@@ -27,10 +27,18 @@ const port = 5001;
     `cargo run generate client ${cidlPath} ${clientPath} localhost:${port}`,
     { cwd: generatorPath }
   );
+
+  // 2. Wrangler
+  await runWrangler();
+
+  // 3. Client tests
+  await runClientTests();
+
+  console.log("E2E tests successful ✅");
+  process.exit(0);
 }
 
-// 2. Wrangler
-{
+async function runWrangler() {
   runSync("Running wrangler build", "npx wrangler build");
 
   const wrangler = exec(`npx wrangler dev --port ${port}`);
@@ -39,6 +47,7 @@ const port = 5001;
     wrangler.kill();
     process.exit(1);
   });
+
   wrangler.stdout?.pipe(process.stdout);
   wrangler.stderr?.pipe(process.stderr);
 
@@ -46,21 +55,35 @@ const port = 5001;
   console.log("Wrangler server ready ✅\n");
 }
 
-// 3. Client
-{
+async function runClientTests() {
+  // Link module
   const mod = await import(pathToFileURL(clientPath).href);
   const Person = mod.Person;
-  assert(Person != undefined, "failed to link client module");
+  assert(Person, "Failed to link client module");
 
-  let res1: Person = await Person.post("larry", "1-2-3");
-  assert(res1.ok, JSON.stringify(res1));
+  // Use generated post method
+  const postResults = await Promise.all([
+    Person.post("larry", "1-2-3"),
+    Person.post("barry", null),
+  ]);
+  postResults.forEach((res, i) => assert(res.ok, JSON.stringify(res)));
+  const [p1, p2] = postResults.map((res) =>
+    Object.assign(new Person(), res.data)
+  );
 
-  let res2: Person = await Person.post("barry", null);
-  assert(res2.ok, JSON.stringify(res2));
+  // Use generated speak method
+  const speakResults = await Promise.all([p1.speak(1), p2.speak(3)]);
+  assert(speakResults[0].ok, JSON.stringify(speakResults[0]));
+  assert(
+    speakResults[0].data === "larry 1-2-3 1",
+    `Expected "larry 1-2-3 1", got: ${JSON.stringify(speakResults[0].data)}`
+  );
+  assert(speakResults[1].ok, JSON.stringify(speakResults[1]));
+  assert(
+    speakResults[1].data === "barry null 3",
+    `Expected "barry null 3", got: ${JSON.stringify(speakResults[1].data)}`
+  );
 }
-
-console.log("e2e tests sucessfull ✅\n");
-process.exit(0);
 
 function runSync(label: string, cmd: string, opts: { cwd?: string } = {}) {
   try {
@@ -73,41 +96,17 @@ function runSync(label: string, cmd: string, opts: { cwd?: string } = {}) {
   }
 }
 
-async function runAsync(label: string, cmd: string) {
-  return new Promise<void>((resolve) => {
-    console.log(`${label}...`);
-    const child = exec(cmd);
-
-    child.stdout?.pipe(process.stdout);
-    child.stderr?.pipe(process.stderr);
-
-    child.on("error", (err) => {
-      console.error(`${label} failed:`, err);
-      process.exit(1);
-    });
-
-    child.on("exit", (code) => {
-      if (code !== 0) process.exit(code ?? 1);
-      console.log("Ok ✅\n");
-      resolve();
-    });
-  });
-}
-
 function assert(condition: unknown, msg?: string): asserts condition {
-  if (!condition) {
-    throw new Error(msg ?? "Assertion failed");
-  }
+  if (!condition) throw new Error(msg ?? "Assertion failed");
 }
 
 function waitForPort(
   port: number,
   host: string,
-  timeout_ms: number
+  timeoutMs: number
 ): Promise<void> {
   return new Promise((resolve, reject) => {
     const start = Date.now();
-
     const check = () => {
       const socket = net.connect({ port, host }, () => {
         socket.destroy();
@@ -116,7 +115,7 @@ function waitForPort(
 
       const cleanupAndRetry = () => {
         socket.destroy();
-        if (Date.now() - start > timeout_ms)
+        if (Date.now() - start > timeoutMs)
           reject(new Error(`Timed out waiting for port ${port}`));
         else setTimeout(check, 200);
       };
@@ -125,7 +124,8 @@ function waitForPort(
       socket.once("timeout", cleanupAndRetry);
       socket.setTimeout(500);
     };
-
     check();
   });
 }
+
+await main();

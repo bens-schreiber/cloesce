@@ -48,7 +48,7 @@
             "<id>": {
             speak: async (id: number,  request: Request, env: Env) => {
                 
-            if (request.method !== "GET") {
+            if (request.method !== "POST") {
                 return new Response("Method Not Allowed", { status: 405 });
             }
             
@@ -63,10 +63,10 @@
                 });
             }
             
-            const {count} = body;
+            const {favorite_number} = body;
             
-if (count === null || count === undefined) { throw new Error('Required parameter missing: count');}
-if (count !== null && typeof count !== 'number') { throw new Error('Parameter count must be a number'); }
+if (favorite_number === null || favorite_number === undefined) { throw new Error('Required parameter missing: favorite_number');}
+if (favorite_number !== null && typeof favorite_number !== 'number') { throw new Error('Parameter favorite_number must be a number'); }
                 
         const d1 = env.DB;
         const query = `SELECT * FROM Person WHERE id = ?`;
@@ -77,10 +77,10 @@ if (count !== null && typeof count !== 'number') { throw new Error('Parameter co
                 { status: 404, headers: { "Content-Type": "application/json" } }
             );
         }
-        const instance: Person = {id,name,ssn};
+        const instance: Person = Object.assign(new Person(), record)
         
                 
-        return instance.speak(count)
+        return instance.speak(favorite_number)
         
             }
             }

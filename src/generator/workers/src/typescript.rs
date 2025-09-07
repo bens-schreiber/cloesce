@@ -218,12 +218,6 @@ impl LanguageWorkersGenerator for TypescriptWorkersGenerator {
 
     fn instantiate_model(&self, model: &Model) -> String {
         let model_name = &model.name;
-        let instance = model
-            .attributes
-            .iter()
-            .map(|a| a.value.name.clone())
-            .collect::<Vec<_>>()
-            .join(",");
 
         // explicitly create the model so that users don't need
         // to create a constructor
@@ -238,7 +232,7 @@ impl LanguageWorkersGenerator for TypescriptWorkersGenerator {
                 {{ status: 404, headers: {{ "Content-Type": "application/json" }} }}
             );
         }}
-        const instance: {model_name} = {{{instance}}};
+        const instance: {model_name} = Object.assign(new {model_name}(), record)
         "#
         )
     }

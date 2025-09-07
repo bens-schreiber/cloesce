@@ -340,3 +340,8 @@ tmp/
 
 # ----------- CLOUDFLARE VVV  ----------- 
 .wrangler
+
+
+# ----------- CLOESCE VVV  ----------- 
+.generated
+migrations

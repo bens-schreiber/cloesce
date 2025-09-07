@@ -8,15 +8,15 @@ export class Person {
   ssn: string | null;
 
   async speak(
-        count: number
+        favorite_number: number
   ): Promise<Result<string>> {
     const url = `http://localhost:5001/api/Person/${this.id}/speak`;
 
     const res = await fetch(url, {
-      method: "GET",
+      method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-            count
+            favorite_number
       })
     });
 

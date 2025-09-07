@@ -8,23 +8,20 @@ export class Person {
   name!: string;
   ssn!: string | null;
 
-  @GET
-  async speak(req: Request, count: number) {
-    let res = `hello I am ${this.name} and my ssn is ${this.ssn}!\n`.repeat(
-      count
-    );
-    return new Response(JSON.stringify({ res, "my request deets": req }));
+  @POST
+  async speak(favorite_number: number) {
+    let res = `${this.name} ${this.ssn} ${favorite_number}`;
+    return new Response(JSON.stringify(res));
   }
 
   @POST
   static async post(db: D1Database, name: string, ssn: string | null) {
     let result = await db
-      .prepare("INSERT INTO Person (name, ssn) VALUES (?, ?)")
+      .prepare("INSERT INTO Person (name, ssn) VALUES (?, ?) RETURNING *")
       .bind(name, ssn)
       .run();
-    let id = result.lastInsertRowId;
 
-    return new Response(JSON.stringify({ id, name, ssn }), {
+    return new Response(JSON.stringify({ ...result.results[0] }), {
       headers: { "content-type": "application/json" },
     });
   }

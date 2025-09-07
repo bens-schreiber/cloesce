@@ -64,7 +64,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-    
+
       - name: Install dependencies
         run: npm ci
 
@@ -87,3 +87,57 @@ jobs:
 
       - name: Unit tests
         run: npm test
+
+  e2e:
+    name: E2E Tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: src/extractor/ts
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Install Rust
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+
+      # Cache Cargo registry and build
+      - name: Cache Cargo registry
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Cache Cargo build
+        uses: actions/cache@v3
+        with:
+          path: src/generator/target
+          key: cargo-build-${{ hashFiles('**/Cargo.lock') }}
+
+      # Build Rust generator
+      - name: Build Rust generator
+        run: cargo build --all-targets
+        working-directory: src/generator
+
+      # Install Node.js and dependencies
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Check formatting before running E2E
+      - name: Prettier check
+        run: npm run format -- --check
+
+      # Run E2E tests
+      - name: Run E2E tests
+        run: npm start
