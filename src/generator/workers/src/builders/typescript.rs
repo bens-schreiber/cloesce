@@ -1,36 +1,22 @@
 use anyhow::anyhow;
-use common::{CidlSpec, CidlType, HttpVerb, InputLanguage, Method, Model, WranglerSpec};
+use common::{CidlType, HttpVerb, Method, Model};
 
 use crate::WorkersApiBuilder;
+
 pub struct TsWorkersApiBuilder {
-    cidl: CidlSpec,         // The input spec with models and methods
-    wrangler: WranglerSpec, // Cloudflare configuration (D1 databases, etc.)
+    stack: Vec<String>,
 }
-impl WorkersApiBuilder for TsWorkersApiBuilder {
-    fn new(cidl: CidlSpec, wrangler: WranglerSpec) -> Self {
-        Self { cidl, wrangler }
+
+impl TsWorkersApiBuilder {
+    pub fn new() -> Self {
+        Self { stack: Vec::new() }
     }
 
-    fn generate_imports(&self) -> String {
-        // Collect all model names
-        let model_names = self
-            .cidl
-            .models
-            .iter()
-            .map(|m| &m.name)
-            .cloned()
-            .collect::<Vec<_>>()
-            .join(", ");
-
-        format!(
-            r#"// Import generated models
-import {{ {} }} from './models';
-"#,
-            model_names
-        )
+    fn push(&mut self, content: String) {
+        self.stack.push(content);
     }
 
-    fn generate_parameter_validation(&self, method: &Method) -> String {
+    fn generate_parameter_validation_for_method(&self, method: &Method) -> String {
         let mut validations = Vec::new();
 
         for param in &method.parameters {
@@ -80,7 +66,7 @@ import {{ {} }} from './models';
         }
     }
 
-    fn generate_http_verb_validation(&self, verb: &HttpVerb) -> String {
+    fn generate_http_verb_validation_for_verb(&self, verb: &HttpVerb) -> String {
         let verb_str = match verb {
             HttpVerb::GET => "GET",
             HttpVerb::POST => "POST",
@@ -98,7 +84,7 @@ import {{ {} }} from './models';
         )
     }
 
-    fn generate_method_handler(&self, model: &Model, method: &Method) -> String {
+    fn generate_method_handler_code(&self, model: &Model, method: &Method) -> String {
         // Build parameter list for the handler function
         let mut params = Vec::new();
         if !method.is_static {
@@ -155,8 +141,8 @@ import {{ {} }} from './models';
     }}
 }}"#,
                 params_str,
-                self.generate_http_verb_validation(&method.http_verb),
-                self.generate_parameter_validation(method),
+                self.generate_http_verb_validation_for_verb(&method.http_verb),
+                self.generate_parameter_validation_for_method(method),
                 model.name,
                 method.name,
                 method_params,
@@ -220,8 +206,8 @@ import {{ {} }} from './models';
     }}
 }}"#,
                 params_str,
-                self.generate_http_verb_validation(&method.http_verb),
-                self.generate_parameter_validation(method),
+                self.generate_http_verb_validation_for_verb(&method.http_verb),
+                self.generate_parameter_validation_for_method(method),
                 model.name,
                 pk_field,
                 model.name,
@@ -232,20 +218,197 @@ import {{ {} }} from './models';
             )
         }
     }
+}
 
-    fn build_router_trie(&self) -> String {
+impl Default for TsWorkersApiBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl WorkersApiBuilder for TsWorkersApiBuilder {
+    fn imports(&mut self, models: &[Model]) -> &mut Self {
+        // Collect all model names
+        let model_names = models
+            .iter()
+            .map(|m| &m.name)
+            .cloned()
+            .collect::<Vec<_>>()
+            .join(", ");
+
+        let content = format!(
+            r#"// Import generated models
+import {{ {} }} from './models';
+"#,
+            model_names
+        );
+
+        self.push(content);
+        self
+    }
+
+    fn parameter_validation(&mut self, methods: &[Method]) -> &mut Self {
+        if methods.is_empty() {
+            return self;
+        }
+
+        let validation_functions: Vec<String> = methods
+            .iter()
+            .map(|method| {
+                let validation_code = self.generate_parameter_validation_for_method(method);
+                if validation_code.is_empty() {
+                    format!(
+                        "function validate{}Params() {{\n    // No validation needed\n}}",
+                        method.name
+                    )
+                } else {
+                    format!(
+                        "function validate{}Params({}) {{\n{}\n}}",
+                        method.name,
+                        method
+                            .parameters
+                            .iter()
+                            .map(|p| format!("{}: any", p.name))
+                            .collect::<Vec<_>>()
+                            .join(", "),
+                        validation_code
+                    )
+                }
+            })
+            .collect();
+
+        let content = format!(
+            r#"
+// PARAMETER VALIDATION FUNCTIONS
+
+{}
+"#,
+            validation_functions.join("\n\n")
+        );
+
+        self.push(content);
+        self
+    }
+
+    fn http_verb_validation(&mut self, verbs: &[HttpVerb]) -> &mut Self {
+        if verbs.is_empty() {
+            return self;
+        }
+
+        // Simple deduplication without requiring Eq/Hash
+        let mut unique_verbs = Vec::new();
+        for verb in verbs {
+            let verb_name = match verb {
+                HttpVerb::GET => "Get",
+                HttpVerb::POST => "Post",
+                HttpVerb::PUT => "Put",
+                HttpVerb::PATCH => "Patch",
+                HttpVerb::DELETE => "Delete",
+            };
+
+            // Check if we already have this verb
+            if !unique_verbs.iter().any(|(_, name)| name == &verb_name) {
+                unique_verbs.push((verb, verb_name));
+            }
+        }
+
+        let validation_functions: Vec<String> = unique_verbs
+            .iter()
+            .map(|(verb, verb_name)| {
+                format!(
+                    "function validate{}Method(request: Request): Response | null {{\n{}\n    return null;\n}}",
+                    verb_name,
+                    self.generate_http_verb_validation_for_verb(verb)
+                )
+            })
+            .collect();
+
+        let content = format!(
+            r#"
+// HTTP VERB VALIDATION FUNCTIONS
+
+{}
+"#,
+            validation_functions.join("\n\n")
+        );
+
+        self.push(content);
+        self
+    }
+
+    fn method_handlers(&mut self, models: &[Model]) -> &mut Self {
+        if models.is_empty() {
+            return self;
+        }
+
+        let mut handlers = Vec::new();
+
+        for model in models {
+            for method in &model.methods {
+                let handler_name = if method.is_static {
+                    format!("{}_{}_handler", model.name, method.name)
+                } else {
+                    format!("{}_{}_instance_handler", model.name, method.name)
+                };
+
+                let handler_code = format!(
+                    "const {} = {};",
+                    handler_name,
+                    self.generate_method_handler_code(model, method)
+                );
+
+                handlers.push(handler_code);
+            }
+        }
+
+        let content = format!(
+            r#"
+// METHOD HANDLERS
+
+{}
+"#,
+            handlers.join("\n\n")
+        );
+
+        self.push(content);
+        self
+    }
+
+    fn router_trie(&mut self, models: &[Model]) -> &mut Self {
+        if models.is_empty() {
+            let content = r#"
+// TYPE DEFINITIONS
+
+type Handler = (...args: any[]) => Response;
+
+// ROUTER STRUCTURE (TRIE)
+
+// Trie-based router structure
+const router = {
+  api: {}
+};
+"#
+            .to_string();
+            self.push(content);
+            return self;
+        }
+
         let mut router_entries = Vec::new();
 
-        for model in &self.cidl.models {
+        for model in models {
             let mut routes = Vec::new();
 
             for method in &model.methods {
-                let handler = self.generate_method_handler(model, method);
+                let handler_name = if method.is_static {
+                    format!("{}_{}_handler", model.name, method.name)
+                } else {
+                    format!("{}_{}_instance_handler", model.name, method.name)
+                };
 
                 if method.is_static {
                     // Static routes go directly under the model
                     // Example: /api/Person/count
-                    routes.push(format!("        {}: {}", method.name, handler));
+                    routes.push(format!("        {}: {}", method.name, handler_name));
                 } else {
                     // Instance routes need an ID parameter
                     // Example: /api/Person/123/speak
@@ -253,7 +416,7 @@ import {{ {} }} from './models';
                         r#"        "<id>": {{
             {}: {}
         }}"#,
-                        method.name, handler
+                        method.name, handler_name
                     ));
                 }
             }
@@ -267,19 +430,31 @@ import {{ {} }} from './models';
         }
 
         // Build the complete router
-        format!(
-            r#"// Trie-based router structure
+        let content = format!(
+            r#"
+// TYPE DEFINITIONS
+
+type Handler = (...args: any[]) => Response;
+
+// ROUTER STRUCTURE (TRIE)
+
+// Trie-based router structure
 const router = {{
   api: {{
 {}
   }}
 }};"#,
             router_entries.join(",\n")
-        )
+        );
+
+        self.push(content);
+        self
     }
 
-    fn generate_match_function(&self) -> String {
-        r#"
+    fn route_matcher(&mut self) -> &mut Self {
+        let content = r#"
+// ROUTE MATCHING LOGIC
+
 function match(path: string, request: Request, env: any): Response {
     // Start at the router root
     let node: any = router;
@@ -330,11 +505,17 @@ function match(path: string, request: Request, env: any): Response {
         }
     );
 }"#
-        .to_string()
+        .to_string();
+
+        self.push(content);
+        self
     }
 
-    fn generate_fetch_handler(&self) -> String {
-        r#"
+    fn fetch_handler(&mut self) -> &mut Self {
+        let content = r#"
+
+// WORKER ENTRY POINT
+
 // Main Cloudflare Workers handler
 export default {
     async fetch(request: Request, env: any, ctx: any): Promise<Response> {
@@ -359,52 +540,33 @@ export default {
         }
     }
 };"#
-        .to_string()
+        .to_string();
+
+        self.push(content);
+        self
     }
 
-    fn build(&self) -> Result<String, anyhow::Error> {
-        // Validate we're generating TypeScript
-        if !matches!(self.cidl.language, InputLanguage::TypeScript) {
-            return Err(anyhow!("Only TypeScript is currently supported"));
-        }
-
-        let imports = self.generate_imports();
-        let router_trie = self.build_router_trie();
-        let match_function = self.generate_match_function();
-        let fetch_handler = self.generate_fetch_handler();
-
-        // Combine all components into final output
-        let output = format!(
+    fn header(&mut self, version: &str, project_name: &str) -> &mut Self {
+        let content = format!(
             r#"// Generated Cloudflare Workers API
 // Version: {}
 // Project: {}
 
 // IMPORTS
-
-{}
-
-// TYPE DEFINITIONS
-
-type Handler = (...args: any[]) => Response;
-
-// ROUTER STRUCTURE (TRIE)
-
-{}
-
-// ROUTE MATCHING LOGIC
-{}
-
-
-// WORKER ENTRY POINT
-{}"#,
-            self.cidl.version,
-            self.cidl.project_name,
-            imports,
-            router_trie,
-            match_function,
-            fetch_handler
+"#,
+            version, project_name
         );
 
-        Ok(output)
+        // Insert at the beginning
+        self.stack.insert(0, content);
+        self
+    }
+
+    fn build(&self) -> Result<String, anyhow::Error> {
+        if self.stack.is_empty() {
+            return Err(anyhow!("No content generated - builder stack is empty"));
+        }
+
+        Ok(self.stack.join(""))
     }
 }

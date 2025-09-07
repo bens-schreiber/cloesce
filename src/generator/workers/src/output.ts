@@ -3,23 +3,37 @@
 // Project: test_project
 
 // IMPORTS
-
 // Import generated models
 import { Person } from './models';
 
+// PARAMETER VALIDATION FUNCTIONS
 
-// TYPE DEFINITIONS
+function validatespeakParams(message: any) {
+    if (message === null || message === undefined) {
+        throw new Error('Required parameter missing: message');
+    }
+    if (message !== null && typeof message !== 'string') {
+        throw new Error('Parameter message must be a string');
+    }
+}
 
-type Handler = (...args: any[]) => Response;
+function validategetAverageAgeParams() {
+    // No validation needed
+}
 
-// ROUTER STRUCTURE (TRIE)
+// HTTP VERB VALIDATION FUNCTIONS
 
-// Trie-based router structure
-const router = {
-  api: {
-    Person: {
-        "<id>": {
-            speak: async (id: string, message: any, request: Request, env: any) => {
+function validateGetMethod(request: Request): Response | null {
+    // Check HTTP method
+    if (request.method !== "GET") {
+        return new Response("Method Not Allowed", { status: 405 });
+    }
+    return null;
+}
+
+// METHOD HANDLERS
+
+const Person_speak_instance_handler = async (id: string, message: any, request: Request, env: any) => {
     try {
         // STAGE 1: HTTP Method Validation
     // Check HTTP method
@@ -71,9 +85,9 @@ const router = {
             }
         );
     }
-}
-        },
-        getAverageAge: async (request: Request, env: any) => {
+};
+
+const Person_getAverageAge_handler = async (request: Request, env: any) => {
     try {
         // STAGE 1: HTTP Method Validation
     // Check HTTP method
@@ -106,11 +120,25 @@ const router = {
             }
         );
     }
-}
+};
+
+// TYPE DEFINITIONS
+
+type Handler = (...args: any[]) => Response;
+
+// ROUTER STRUCTURE (TRIE)
+
+// Trie-based router structure
+const router = {
+  api: {
+    Person: {
+        "<id>": {
+            speak: Person_speak_instance_handler
+        },
+        getAverageAge: Person_getAverageAge_handler
     }
   }
 };
-
 // ROUTE MATCHING LOGIC
 
 function match(path: string, request: Request, env: any): Response {
@@ -163,7 +191,6 @@ function match(path: string, request: Request, env: any): Response {
         }
     );
 }
-
 
 // WORKER ENTRY POINT
 

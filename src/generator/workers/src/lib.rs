@@ -1,48 +1,61 @@
-mod builders;
-mod tests;
-use anyhow::Result;
+use anyhow::anyhow;
 use common::{CidlSpec, HttpVerb, InputLanguage, Method, Model, WranglerSpec};
 
 use crate::builders::typescript::TsWorkersApiBuilder;
+mod builders;
+mod tests;
 
-/// Main trait defining the interface for generating Workers API code
 pub trait WorkersApiBuilder {
-    /// Creates a new builder instance
-    fn new(cidl: CidlSpec, wrangler: WranglerSpec) -> Self;
+    fn imports(&mut self, models: &[Model]) -> &mut Self;
 
-    fn generate_imports(&self) -> String;
+    fn parameter_validation(&mut self, methods: &[Method]) -> &mut Self;
 
-    fn generate_parameter_validation(&self, method: &Method) -> String;
+    fn http_verb_validation(&mut self, verbs: &[HttpVerb]) -> &mut Self;
 
-    fn generate_http_verb_validation(&self, verb: &HttpVerb) -> String;
+    fn method_handlers(&mut self, models: &[Model]) -> &mut Self;
 
-    fn generate_method_handler(&self, model: &Model, method: &Method) -> String;
+    fn router_trie(&mut self, models: &[Model]) -> &mut Self;
 
-    fn build_router_trie(&self) -> String;
+    fn route_matcher(&mut self) -> &mut Self;
 
-    fn generate_match_function(&self) -> String;
+    fn fetch_handler(&mut self) -> &mut Self;
 
-    fn generate_fetch_handler(&self) -> String;
+    /// Adds header/metadata to the stack
+    fn header(&mut self, version: &str, project_name: &str) -> &mut Self;
 
     fn build(&self) -> Result<String, anyhow::Error>;
 }
 
-pub struct WorkersGenerator {
-    cidl: CidlSpec,
-    wrangler: WranglerSpec,
-}
+pub struct WorkersGenerator;
 
 impl WorkersGenerator {
-    pub fn new(cidl: CidlSpec, wrangler: WranglerSpec) -> Self {
-        Self { cidl, wrangler }
-    }
-
-    pub fn generate(&self) -> Result<String> {
-        match self.cidl.language {
-            InputLanguage::TypeScript => {
-                let builder = TsWorkersApiBuilder::new(self.cidl.clone(), self.wrangler.clone());
-                builder.build()
-            }
+    pub fn generate(cidl: &CidlSpec, wrangler: &WranglerSpec) -> Result<String, anyhow::Error> {
+        if !matches!(cidl.language, InputLanguage::TypeScript) {
+            return Err(anyhow!("Only TypeScript is currently supported"));
         }
+
+        let all_methods: Vec<Method> = cidl
+            .models
+            .iter()
+            .flat_map(|model| model.methods.clone())
+            .collect();
+
+        let all_verbs: Vec<HttpVerb> = all_methods
+            .iter()
+            .map(|method| method.http_verb.clone())
+            .collect();
+
+        let mut builder = TsWorkersApiBuilder::new();
+
+        builder
+            .header(&cidl.version, &cidl.project_name)
+            .imports(&cidl.models)
+            .parameter_validation(&all_methods)
+            .http_verb_validation(&all_verbs)
+            .method_handlers(&cidl.models)
+            .router_trie(&cidl.models)
+            .route_matcher()
+            .fetch_handler()
+            .build()
     }
 }
