@@ -854,4 +854,6 @@ dependencies = [
  "anyhow",
  "client",
  "common",
+ "insta",
+ "serde_json",
 ]
