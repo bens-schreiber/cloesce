@@ -6,11 +6,13 @@
     "typescript": "^5.9.2"
   },
   "scripts": {
-    "start": "ts-node main.ts"
+    "start": "ts-node main.ts",
+    "format:fix": "prettier --write ."
   },
   "type": "module",
   "dependencies": {
     "cloesce": "file:../extractor/ts",
-    "wrangler": "^4.34.0"
+    "wrangler": "^4.34.0",
+    "prettier": "^3.6.2"
   }
 }

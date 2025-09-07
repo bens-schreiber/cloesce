@@ -20,12 +20,12 @@ async function main() {
   runSync(
     "Generating workers",
     `cargo run generate workers ${cidlPath} ${workersPath}`,
-    { cwd: generatorPath }
+    { cwd: generatorPath },
   );
   runSync(
     "Generating client",
     `cargo run generate client ${cidlPath} ${clientPath} localhost:${port}`,
-    { cwd: generatorPath }
+    { cwd: generatorPath },
   );
 
   // 2. Wrangler
@@ -68,7 +68,7 @@ async function runClientTests() {
   ]);
   postResults.forEach((res, i) => assert(res.ok, JSON.stringify(res)));
   const [p1, p2] = postResults.map((res) =>
-    Object.assign(new Person(), res.data)
+    Object.assign(new Person(), res.data),
   );
 
   // Use generated speak method
@@ -76,12 +76,12 @@ async function runClientTests() {
   assert(speakResults[0].ok, JSON.stringify(speakResults[0]));
   assert(
     speakResults[0].data === "larry 1-2-3 1",
-    `Expected "larry 1-2-3 1", got: ${JSON.stringify(speakResults[0].data)}`
+    `Expected "larry 1-2-3 1", got: ${JSON.stringify(speakResults[0].data)}`,
   );
   assert(speakResults[1].ok, JSON.stringify(speakResults[1]));
   assert(
     speakResults[1].data === "barry null 3",
-    `Expected "barry null 3", got: ${JSON.stringify(speakResults[1].data)}`
+    `Expected "barry null 3", got: ${JSON.stringify(speakResults[1].data)}`,
   );
 }
 
@@ -103,7 +103,7 @@ function assert(condition: unknown, msg?: string): asserts condition {
 function waitForPort(
   port: number,
   host: string,
-  timeoutMs: number
+  timeoutMs: number,
 ): Promise<void> {
   return new Promise((resolve, reject) => {
     const start = Date.now();
