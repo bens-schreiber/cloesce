@@ -126,6 +126,7 @@ dependencies = [
  "serde",
  "serde_json",
  "toml",
+ "workers",
 ]
 
 [[package]]

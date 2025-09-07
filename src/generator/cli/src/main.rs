@@ -6,6 +6,7 @@ use clap::{Parser, Subcommand, command};
 use cli::WranglerFormat;
 use common::CidlSpec;
 use d1::D1Generator;
+use workers::WorkersGenerator;
 
 #[derive(Parser)]
 #[command(name = "generate", version = "0.0.1")]
@@ -33,7 +34,11 @@ enum GenerateTarget {
         sqlite_path: PathBuf,
         wrangler_path: Option<PathBuf>,
     },
-    Workers {},
+    Workers {
+        cidl_path: PathBuf,
+        wrangler_path: Option<PathBuf>,
+        output_path: Option<PathBuf>,
+    },
     Client {
         cidl_path: PathBuf,
     },
@@ -95,8 +100,44 @@ fn main() -> Result<()> {
                 }
                 // endregion: Generate SQL
             }
-            GenerateTarget::Workers {} => {
-                todo!("generate workers api");
+            GenerateTarget::Workers {
+                cidl_path,
+                wrangler_path,
+                output_path,
+            } => {
+                let cidl = cidl_from_path(cidl_path)?;
+
+                let wrangler = match wrangler_path {
+                    Some(ref wrangler_path) => WranglerFormat::from_path(wrangler_path)
+                        .context("Failed to open wrangler file")?,
+                    _ => {
+                        // Default to an empty TOML if the path is not given.
+                        WranglerFormat::Toml(toml::from_str("").unwrap())
+                    }
+                };
+
+                let wrangler_spec = wrangler
+                    .as_spec()
+                    .context("Failed to validate Wrangler file")?;
+
+                let generated_code = WorkersGenerator::generate(&cidl, &wrangler_spec)
+                    .context("Failed to generate Workers API code")?;
+
+                // Write to file or stdout
+                match output_path {
+                    Some(output_path) => {
+                        let mut output_file = std::fs::File::create(output_path)
+                            .context("Failed to create output file")?;
+                        output_file
+                            .write_all(generated_code.as_bytes())
+                            .context("Failed to write Workers API code to file")?;
+                        println!("Workers API code generated successfully!");
+                    }
+                    None => {
+                        // Output to stdout if no file specified
+                        println!("{}", generated_code);
+                    }
+                }
             }
             GenerateTarget::Client { cidl_path } => {
                 let spec = cidl_from_path(cidl_path)?;
