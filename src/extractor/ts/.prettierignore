@@ -4,3 +4,4 @@ build
 coverage
 .generated
 *.snap
+src/generator/client/src/templates/**/*.hbs
