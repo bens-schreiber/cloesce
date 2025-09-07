@@ -1,4 +1,4 @@
-mod mappers;
+pub mod mappers;
 
 use std::sync::Arc;
 

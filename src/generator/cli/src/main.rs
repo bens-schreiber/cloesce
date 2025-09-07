@@ -6,6 +6,7 @@ use clap::{Parser, Subcommand, command};
 use cli::WranglerFormat;
 use common::CidlSpec;
 use d1::D1Generator;
+use workers::WorkersFactory;
 
 #[derive(Parser)]
 #[command(name = "generate", version = "0.0.1")]
@@ -33,7 +34,9 @@ enum GenerateTarget {
         sqlite_path: PathBuf,
         wrangler_path: Option<PathBuf>,
     },
-    Workers {},
+    Workers {
+        cidl_path: PathBuf,
+    },
     Client {
         cidl_path: PathBuf,
     },
@@ -95,8 +98,10 @@ fn main() -> Result<()> {
                 }
                 // endregion: Generate SQL
             }
-            GenerateTarget::Workers {} => {
-                todo!("generate workers api");
+            GenerateTarget::Workers { cidl_path } => {
+                let cidl = cidl_from_path(cidl_path)?;
+                let out = WorkersFactory.create(cidl);
+                println!("{out}");
             }
             GenerateTarget::Client { cidl_path } => {
                 let spec = cidl_from_path(cidl_path)?;

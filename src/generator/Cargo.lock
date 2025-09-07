@@ -126,6 +126,7 @@ dependencies = [
  "serde",
  "serde_json",
  "toml",
+ "workers",
 ]
 
 [[package]]
@@ -842,3 +843,8 @@ checksum = "21a0236b59786fed61e2a80582dd500fe61f18b5dca67a4a067d0bc9039339cf"
 [[package]]
 name = "workers"
 version = "0.0.1"
+dependencies = [
+ "anyhow",
+ "client",
+ "common",
+]
