@@ -65,7 +65,6 @@ jobs:
         with:
           node-version: 20
           cache: npm
-          cache-dependency-path: src/extractor/ts/package-lock.json
 
       - name: Install dependencies
         run: npm ci
