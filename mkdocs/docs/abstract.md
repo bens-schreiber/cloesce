@@ -54,6 +54,7 @@ Cloesce is a compiler: given a programing language as input, extract an agreed u
 ![Cloesce Compiler Drawio Diagram](./assets/abstract-how-compiler-diagram.png)
 
 A pseudo-code example of a Cloesce Model:
+
 ```typescript
 @D1
 class Person {
@@ -68,7 +69,6 @@ class Person {
     async foo(db: D1Db) {...}
 }
 ```
-
 
 ### Cloudflare
 

@@ -60,11 +60,11 @@ enum TrieNode {
 ```typescript
 new TsWorkersApiBuilder()
   // router
-  .router("Person")                     // /person
+  .router("Person") // /person
   .transition([
-    TrieNode.Id()                       // /person/:id
+    TrieNode.Id() // /person/:id
       .transition([
-        TrieNode.Method("speak")        // /person/:id/speak
+        TrieNode.Method("speak") // /person/:id/speak
           // Function configuration
           .validate(Validator.HttpVerb(HttpVerb.POST))
           .validator(Validator.UrlParam("id"))
@@ -72,15 +72,15 @@ new TsWorkersApiBuilder()
           .sql(Sql.GetById("id"))
           .model<Person>()
           .dependency<D1Db, Request>()
-          .dispatch("speak")
+          .dispatch("speak"),
       ]),
-    
-    TrieNode.Method("avgHeight")        // /person/avgHeight
+
+    TrieNode.Method("avgHeight") // /person/avgHeight
       .validate(Validator.HttpVerb(HttpVerb.POST))
       .dependency<D1Db, Request>()
-      .dispatch("avgHeight")
+      .dispatch("avgHeight"),
   ])
-  .build()
+  .build();
 ```
 
 ## Generated Code
@@ -90,14 +90,14 @@ new TsWorkersApiBuilder()
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const router = // generated => Map { Map { Map: function }}
-    
+
     const pathSegments = new URL(request.url).pathname.split('/').filter(Boolean);
     const func = router[pathSegments[0]]?.[pathSegments[1]]?.[pathSegments[2]]; // api/model/id etc
-    
+
     if (!func) {
       return new Response('Not Found', { status: 404 });
     }
-    
+
     return func(request, env, ctx);
   }
 } satisfies ExportedHandler<Env>;

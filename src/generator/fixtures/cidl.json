@@ -1,64 +1,64 @@
 {
-    "version": "0.0.1",
-    "project_name": "foo_proj",
-    "language": "TypeScript",
-    "models": [
+  "version": "0.0.1",
+  "project_name": "foo_proj",
+  "language": "TypeScript",
+  "models": [
+    {
+      "name": "User",
+      "attributes": [
         {
-            "name": "User",
-            "attributes": [
-                {
-                    "value": {
-                        "name": "id",
-                        "cidl_type": "Integer",
-                        "nullable": false
-                    },
-                    "primary_key": true
-                },
-                {
-                    "value": {
-                        "name": "name",
-                        "cidl_type": "Text",
-                        "nullable": false
-                    },
-                    "primary_key": false
-                }
-            ],
-            "methods": [
-                {
-                  "name": "do_something",
-                  "is_static": false,
-                  "http_verb": "GET",
-                  "parameters": [
-                    {
-                        "name": "age",
-                        "cidl_type": "Integer",
-                        "nullable": false
-                    },
-                    {
-                        "name": "name",
-                        "cidl_type": "Text",
-                        "nullable": false
-                    }
-                  ]
-                },
-                {
-                  "name": "say_all_names",
-                  "is_static": true,
-                  "http_verb": "GET",
-                  "parameters": [
-                    {
-                        "name": "age",
-                        "cidl_type": "Integer",
-                        "nullable": false
-                    },
-                    {
-                        "name": "name",
-                        "cidl_type": "Text",
-                        "nullable": false
-                    }
-                  ]
-                }
-              ]
+          "value": {
+            "name": "id",
+            "cidl_type": "Integer",
+            "nullable": false
+          },
+          "primary_key": true
+        },
+        {
+          "value": {
+            "name": "name",
+            "cidl_type": "Text",
+            "nullable": false
+          },
+          "primary_key": false
         }
-    ]
+      ],
+      "methods": [
+        {
+          "name": "do_something",
+          "is_static": false,
+          "http_verb": "GET",
+          "parameters": [
+            {
+              "name": "age",
+              "cidl_type": "Integer",
+              "nullable": false
+            },
+            {
+              "name": "name",
+              "cidl_type": "Text",
+              "nullable": false
+            }
+          ]
+        },
+        {
+          "name": "say_all_names",
+          "is_static": true,
+          "http_verb": "GET",
+          "parameters": [
+            {
+              "name": "age",
+              "cidl_type": "Integer",
+              "nullable": false
+            },
+            {
+              "name": "name",
+              "cidl_type": "Text",
+              "nullable": false
+            }
+          ]
+        }
+      ]
+    }
+  ]
 }
