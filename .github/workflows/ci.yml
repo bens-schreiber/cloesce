@@ -55,7 +55,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: src/schema-extractor/cloesce-ts
+        working-directory: src/schema-extractor/ts
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -65,7 +65,7 @@ jobs:
         with:
           node-version: 20
           cache: npm
-          cache-dependency-path: src/schema-extractor/cloesce-ts/package-lock.json
+          cache-dependency-path: src/schema-extractor/ts/package-lock.json
 
       - name: Install dependencies
         run: npm ci
