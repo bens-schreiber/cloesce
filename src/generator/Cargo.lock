@@ -122,7 +122,6 @@ dependencies = [
  "client",
  "common",
  "d1",
- "insta",
  "serde",
  "serde_json",
  "toml",
@@ -133,8 +132,10 @@ dependencies = [
 name = "client"
 version = "0.0.1"
 dependencies = [
+ "anyhow",
  "common",
  "handlebars",
+ "insta",
  "serde_json",
 ]
 
@@ -150,6 +151,8 @@ version = "0.0.1"
 dependencies = [
  "anyhow",
  "serde",
+ "serde_json",
+ "toml",
 ]
 
 [[package]]
@@ -189,7 +192,11 @@ version = "0.0.1"
 dependencies = [
  "anyhow",
  "common",
+ "insta",
  "sea-query",
+ "serde",
+ "serde_json",
+ "toml",
 ]
 
 [[package]]

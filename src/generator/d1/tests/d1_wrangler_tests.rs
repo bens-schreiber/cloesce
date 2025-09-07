@@ -1,7 +1,5 @@
-use cli::WranglerFormat;
-
 use anyhow::{Context, Result};
-use common::CidlSpec;
+use common::{CidlSpec, WranglerFormat};
 use d1::D1Generator;
 use insta::assert_snapshot;
 
@@ -11,7 +9,7 @@ use std::path::PathBuf;
 fn test_serialize_wrangler_spec() {
     // Filled TOML
     {
-        let wrangler_path = PathBuf::from("tests/fixtures/wrangler.toml");
+        let wrangler_path = PathBuf::from("../fixtures/wrangler.toml");
         WranglerFormat::from_path(&wrangler_path).expect("Wrangler file to serialize");
     }
 
@@ -24,7 +22,7 @@ fn test_serialize_wrangler_spec() {
 
     // Filled JSON
     {
-        let wrangler_path = PathBuf::from("tests/fixtures/wrangler.json");
+        let wrangler_path = PathBuf::from("../fixtures/wrangler.json");
         WranglerFormat::from_path(&wrangler_path).expect("Wrangler file to serialize");
     }
 
@@ -40,13 +38,13 @@ fn test_serialize_wrangler_spec() {
 fn test_generate_d1_snapshot() -> Result<()> {
     // Arrange
     let cidl = {
-        let cidl_path = PathBuf::from("tests/fixtures/cidl.json");
+        let cidl_path = PathBuf::from("../fixtures/cidl.json");
         let cidl_contents = std::fs::read_to_string(cidl_path)?;
         serde_json::from_str::<CidlSpec>(&cidl_contents)?
     };
 
     let wrangler = {
-        let wrangler_path = PathBuf::from("tests/fixtures/wrangler.toml");
+        let wrangler_path = PathBuf::from("../fixtures/wrangler.toml");
         WranglerFormat::from_path(&wrangler_path).context("Failed to open wrangler file")?
     };
 
@@ -70,7 +68,7 @@ fn test_generate_d1_snapshot() -> Result<()> {
 fn test_generate_d1_from_empty_wrangler_snapshot() -> Result<()> {
     // Arrange
     let cidl = {
-        let cidl_path = PathBuf::from("tests/fixtures/cidl.json");
+        let cidl_path = PathBuf::from("../fixtures/cidl.json");
         let cidl_contents = std::fs::read_to_string(cidl_path)?;
         serde_json::from_str::<CidlSpec>(&cidl_contents)?
     };

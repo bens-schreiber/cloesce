@@ -3,8 +3,7 @@ use std::{io::Write, path::PathBuf};
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand, command};
 
-use cli::WranglerFormat;
-use common::CidlSpec;
+use common::{CidlSpec, WranglerFormat};
 use d1::D1Generator;
 use workers::WorkersFactory;
 
