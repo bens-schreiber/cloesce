@@ -1,12 +1,16 @@
 import fs from "node:fs";
 import path from "node:path";
-import { Project, Type, SourceFile } from "ts-morph";
+import { Project, Type, SourceFile, PropertyDeclaration, PropertySignature, MethodDeclaration, ParameterDeclaration } from "ts-morph";
 
 export type ExtractOptions = {
   cwd?: string;
   projectName?: string;
   version?: string;
   tsconfigPath?: string | undefined;
+};
+
+type CloesceConfig = {
+  source: string | string[];
 };
 
 function readPkgMeta(cwd: string) {
@@ -23,23 +27,74 @@ function readPkgMeta(cwd: string) {
   return { projectName, version };
 }
 
+function isD1DbType(t: Type, sf: SourceFile): boolean {
+  // robust even if the type shows up as import("...").D1Db
+  const txt = cleanTypeText(t, sf);
+  const sym = t.getSymbol()?.getName();
+  return txt === "D1Db" || sym === "D1Db" || TypeCode.fromType(t, sf) === TypeCode.D1Db;
+}
+
+function readCloesceConfig(cwd: string): CloesceConfig | null {
+  const configPath = path.join(cwd, "cloesce-config.json");
+  if (!fs.existsSync(configPath)) {
+    return null;
+  }
+  
+  try {
+    const configContent = fs.readFileSync(configPath, "utf8");
+    const config = JSON.parse(configContent) as CloesceConfig;
+    
+    // Validate config structure
+    if (!config.source) {
+      throw new Error('cloesce-config.json must contain a "source" field');
+    }
+    
+    return config;
+  } catch (error) {
+    throw new Error(`Failed to parse cloesce-config.json: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
 const IGNORE_DIRS = new Set([
   "node_modules", ".git", "dist", "build", "out",
   ".next", ".turbo", "coverage", ".vercel", ".svelte-kit",
   ".output", ".cache"
 ]);
 
-// Recursively collect only files strictly ending with `.cloesce.ts`
-function walkCloesceFiles(root: string): string[] {
-  const out: string[] = [];
-  for (const entry of fs.readdirSync(root, { withFileTypes: true })) {
-    const full = path.join(root, entry.name);
-    if (entry.isDirectory()) {
-      if (!IGNORE_DIRS.has(entry.name)) out.push(...walkCloesceFiles(full));
-    } else if (entry.isFile() && /\.cloesce\.ts$/i.test(entry.name)) {
-      out.push(full);
-    }
+// Recursively collect only files strictly ending with `.cloesce.ts` from specified path
+function walkCloesceFiles(root: string, searchPath: string): string[] {
+  const fullPath = path.resolve(root, searchPath);
+  
+  if (!fs.existsSync(fullPath)) {
+    console.warn(`Warning: Path "${searchPath}" specified in cloesce-config.json does not exist`);
+    return [];
   }
+  
+  const out: string[] = [];
+  const stats = fs.statSync(fullPath);
+  
+  if (stats.isFile()) {
+    // If it's a file, check if it ends with .cloesce.ts
+    if (/\.cloesce\.ts$/i.test(fullPath)) {
+      out.push(fullPath);
+    }
+  } else if (stats.isDirectory()) {
+    // Recursively search directory
+    function walkDir(dir: string) {
+      for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+        const full = path.join(dir, entry.name);
+        if (entry.isDirectory()) {
+          if (!IGNORE_DIRS.has(entry.name)) {
+            walkDir(full);
+          }
+        } else if (entry.isFile() && /\.cloesce\.ts$/i.test(entry.name)) {
+          out.push(full);
+        }
+      }
+    }
+    walkDir(fullPath);
+  }
+  
   return out;
 }
 
@@ -49,8 +104,8 @@ function cleanTypeText(t: Type, sf: SourceFile) {
 }
 
 export enum TypeCode {
-  Number = "number",
-  String = "string",
+  Number = "Integer",
+  String = "Text",
   Boolean = "boolean",
   Date = "Date",
   D1Db = "D1Db",
@@ -72,9 +127,9 @@ export namespace TypeCode {
     const symName = t.getSymbol()?.getName();
 
     // Robust primitive checks
-    if (t.isNumber() || txt === "number") return TypeCode.Number;
-    if (t.isString() || txt === "string") return TypeCode.String;
-    if (t.isBoolean() || txt === "boolean") return TypeCode.Boolean;
+    if (t.isNumber()) return TypeCode.Number;
+    if (t.isString()) return TypeCode.String;
+    if (t.isBoolean()) return TypeCode.Boolean;
 
     // Unwrap Promise<T> recursively
     if (symName === "Promise" && t.getTypeArguments().length === 1) {
@@ -83,20 +138,92 @@ export namespace TypeCode {
 
     // Known names by text or symbol
     if (txt in basicTypeMap) return basicTypeMap[txt as keyof typeof basicTypeMap];
-    if (symName === "Response" || txt === "Response") return TypeCode.Response;
-
-    // D1Db types by suffix or symbol name
-    if (txt.endsWith("D1Db") || symName === "D1Db") return TypeCode.D1Db;
 
     // Fallback
     return TypeCode.String;
   }
 }
 
-function isNullable(t: Type) {
-  if (!t.isUnion()) return false;
-  return t.getUnionTypes().some(u => u.isNull() || u.isUndefined());
+/**
+ * True if a union type includes null or undefined.
+ * This uses the Type API and works regardless of type text.
+ */
+function unionIncludesNullish(t: Type): { hasNull: boolean; hasUndefined: boolean } {
+  if (!t.isUnion()) return { hasNull: false, hasUndefined: false };
+  let hasNull = false, hasUndefined = false;
+  for (const u of t.getUnionTypes()) {
+    if (u.isNull()) hasNull = true;
+    if (u.isUndefined()) hasUndefined = true;
+  }
+  return { hasNull, hasUndefined };
 }
+
+/**
+ * Fallback textual check for declared type nodes (covers cases where the compiler
+ * flattens or where strictNullChecks interfere).
+ */
+function typeNodeTextHasNullish(typeText?: string): { hasNull: boolean; hasUndefined: boolean } {
+  if (!typeText) return { hasNull: false, hasUndefined: false };
+  // token-boundary regex so we don't match substrings in identifiers
+  const hasNull = /\bnull\b/.test(typeText);
+  const hasUndefined = /\bundefined\b/.test(typeText);
+  return { hasNull, hasUndefined };
+}
+
+/**
+ * Extracts a robust "nullable" for a class property or interface property.
+ * We treat:
+ *   - optional (`?`) as DB-nullable (common mapping),
+ *   - explicit unions with null/undefined as DB-nullable,
+ *   - declared text that includes null/undefined as DB-nullable.
+ * Also returns a reason tag for debugging/logging if you want it.
+ */
+function getNullability(
+  prop: PropertyDeclaration | PropertySignature,
+  sf: SourceFile
+): { nullable: boolean; reason: "optional" | "union-null" | "union-undefined" | "text-null" | "text-undefined" | null } {
+  // 1) Syntactic optional (`foo?: ...`)
+  if ((prop as PropertyDeclaration).hasQuestionToken && (prop as PropertyDeclaration).hasQuestionToken()) {
+    return { nullable: true, reason: "optional" };
+  }
+
+  // 2) Type-level union check
+  const t = (prop as PropertyDeclaration).getType
+    ? (prop as PropertyDeclaration).getType()
+    : (prop as PropertySignature).getType();
+  const { hasNull, hasUndefined } = unionIncludesNullish(t);
+  if (hasNull) return { nullable: true, reason: "union-null" };
+  if (hasUndefined) return { nullable: true, reason: "union-undefined" };
+
+  // 3) Textual fallback on declared type
+  const node = (prop as PropertyDeclaration).getTypeNode?.() ?? (prop as PropertySignature).getTypeNode?.();
+  const typeText = node?.getText();
+  const textCheck = typeNodeTextHasNullish(typeText);
+  if (textCheck.hasNull) return { nullable: true, reason: "text-null" };
+  if (textCheck.hasUndefined) return { nullable: true, reason: "text-undefined" };
+
+  return { nullable: false, reason: null };
+}
+
+/**
+ * Parameter nullability similar to properties (covers `arg?: T`, `T | null`, `T | undefined`).
+ */
+function getParamNullability(param: ParameterDeclaration, sf: SourceFile): boolean {
+  // `?` ⇒ treat as DB-nullable
+  if (param.hasQuestionToken()) return true;
+
+  const t = param.getType();
+
+  // union T | null/undefined
+  const { hasNull, hasUndefined } = unionIncludesNullish(t);
+  if (hasNull || hasUndefined) return true;
+
+  // textual fallback on declared type (covers odd inference cases)
+  const typeText = param.getTypeNode()?.getText();
+  const textCheck = typeNodeTextHasNullish(typeText);
+  return textCheck.hasNull || textCheck.hasUndefined;
+}
+
 
 function hasDecoratorNamed(node: { getDecorators(): any[] }, name: string): boolean {
   return node.getDecorators().some(d => {
@@ -114,10 +241,24 @@ export function extractModels(opts: ExtractOptions = {}) {
   const projectName = opts.projectName ?? pn;
   const version = opts.version ?? ver;
 
-  // Find *.cloesce.ts everywhere in project using cwd as the root
-  const files = walkCloesceFiles(cwd);
+  // Read cloesce-config.json
+  const config = readCloesceConfig(cwd);
+  if (!config) {
+    throw new Error(`No "cloesce-config.json" found in "${cwd}". Please create a cloesce-config.json with a "source" field.`);
+  }
+
+  // Normalize source to array
+  const sourcePaths = Array.isArray(config.source) ? config.source : [config.source];
+  
+  // Find *.cloesce.ts files in specified paths
+  const files: string[] = [];
+  for (const sourcePath of sourcePaths) {
+    files.push(...walkCloesceFiles(cwd, sourcePath));
+  }
+  
   if (files.length === 0) {
-    throw new Error(`No ".cloesce.ts" files found anywhere under "${cwd}"`);
+    const paths = sourcePaths.join(", ");
+    throw new Error(`No ".cloesce.ts" files found in specified source path(s): ${paths}`);
   }
 
   const tsconfigPath =
@@ -142,55 +283,69 @@ export function extractModels(opts: ExtractOptions = {}) {
 
       const attributes = cls.getProperties().map(prop => {
         const t = prop.getType();
+        const { nullable } = getNullability(prop, sf);
+
         const entry: any = {
-          name: prop.getName(),
-          type: TypeCode.fromType(t, sf),
-          nullable: isNullable(t),
+          value: {
+            name: prop.getName(),
+            cidl_type: TypeCode.fromType(t, sf),
+            nullable,
+          }
         };
-        if (hasDecoratorNamed(prop, "PrimaryKey")) entry.pk = true;
+        
+        if (hasDecoratorNamed(prop, "PrimaryKey")) 
+        {
+            entry.primary_key = true;
+        }
+        else {
+            entry.primary_key = false;
+        }
         return entry;
       });
 
       const methods = cls.getMethods().map(m => {
         const decos = m.getDecorators().map(d => d.getName() ?? d.getExpression().getText());
-        const httpVerb =
-          decos.includes("GET") ? "GET" :
-          decos.includes("POST") ? "POST" :
-          undefined;
+        const HTTP_VERBS = ["GET", "POST", "PUT", "PATCH", "DELETE"];
+        const httpVerb = HTTP_VERBS.find(verb => decos.includes(verb)) || undefined;
 
         const parameters: any[] = [];
         for (const p of m.getParameters()) {
           const pt = p.getType();
+        
           const raw = cleanTypeText(pt, sf);
-          if (raw === "Request") continue; 
-          if (raw.endsWith("D1Db") || p.getName() === "db") {
-            parameters.push({ name: "d1", type: TypeCode.D1Db, nullable: isNullable(pt) || false });
-          } else {
-            parameters.push({
-              name: p.getName(),
-              type: TypeCode.fromType(pt, sf),
-              nullable: isNullable(pt) || false,
-            });
-          }
+          if (raw === "Request") continue;
+        
+          if (isD1DbType(pt, sf) || p.getName() === "db") continue;
+        
+          const nullable = getParamNullability(p, sf);
+          parameters.push({
+            name: p.getName(),
+            cidl_type: TypeCode.fromType(pt, sf),
+            nullable,
+          });
         }
+
 
         return {
           name: m.getName(),
-          static: m.isStatic(),
+          is_static: m.isStatic(),
           http_verb: httpVerb,
           parameters,
-          return: { type: TypeCode.fromType(m.getReturnType(), sf) },
         };
       });
 
-      models.push({ [className]: { attributes, methods } });
+      models.push({
+        name: className,
+        attributes,
+        methods,
+      });
     }
   }
 
   return {
     version,
     project_name: projectName,
-    language: "typescript",
+    language: "TypeScript",
     models,
   };
 }

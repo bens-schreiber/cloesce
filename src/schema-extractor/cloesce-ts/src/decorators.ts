@@ -6,6 +6,12 @@ export function GET(_value: Handler, _ctx: ClassMethodDecoratorContext) {}
 /** Use as @POST (no parentheses) */
 export function POST(_value: Handler, _ctx: ClassMethodDecoratorContext) {}
 
+export function PUT(_value: Handler, _ctx: ClassMethodDecoratorContext) {}
+
+export function PATCH(_value: Handler, _ctx: ClassMethodDecoratorContext) {}
+
+export function DELETE(_value: Handler, _ctx: ClassMethodDecoratorContext) {}
+
 /** Class decorator (no-op) */
 export function D1<T extends new (...a: any[]) => object>(
   value: T, _ctx: ClassDecoratorContext<T>

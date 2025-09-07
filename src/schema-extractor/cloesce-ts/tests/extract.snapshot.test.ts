@@ -3,12 +3,67 @@ import os from "node:os";
 import path from "node:path";
 import { extractModels } from "../src/extract.js";
 
-function copyFileToTmp(tmp: string, rel: string, sourcePath: string) {
-  const dest = path.join(tmp, rel);
-  fs.mkdirSync(path.dirname(dest), { recursive: true });
-  fs.copyFileSync(sourcePath, dest);
-  return dest;
-}
+// Embedded class configurations as strings
+const PERSON_CLASS = `import { D1, D1Db, GET, POST, PrimaryKey } from "cloesce-ts";
+
+@D1
+class Person {
+  @PrimaryKey
+  id!: number;
+  name!: string;
+  middle_name: string | null;
+  
+  @GET
+  async foo(db: D1Db, req: Request) {
+    const who = new URL(req.url).searchParams.get("name") ?? "world";
+    return new Response(JSON.stringify({ hello: who }), {
+      headers: { "content-type": "application/json" },
+    });
+  }
+  
+  @POST
+  static async speak(db: D1Db, req: Request, phrase: string) {
+    return new Response(JSON.stringify({ phrase }), {
+      status: 201,
+      headers: { "content-type": "application/json" },
+    });
+  }
+}`;
+
+const DOG_CLASS = `import { D1, D1Db, GET, POST, PrimaryKey } from "cloesce-ts";
+
+@D1
+class Dog {
+  @PrimaryKey
+  id!: number;
+  name!: string;
+  breed!: number;
+  preferred_treat: string | null;
+  
+  @GET
+  async get_name(db: D1Db, req: Request) {
+    const who = new URL(req.url).searchParams.get("name");
+    return new Response(JSON.stringify({ hello: who }), {
+      headers: { "content-type": "application/json" },
+    });
+  }
+  
+  @GET
+  async get_breed(db: D1Db, req: Request) {
+    const breed = new URL(req.url).searchParams.get("breed");
+    return new Response(JSON.stringify({ hello: breed }), {
+      headers: { "content-type": "application/json" },
+    });
+  }
+  
+  @POST
+  static async woof(db: D1Db, req: Request, phrase: string) {
+    return new Response(JSON.stringify({ phrase }), {
+      status: 201,
+      headers: { "content-type": "application/json" },
+    });
+  }
+}`;
 
 function writeTmpTsconfig(tmp: string) {
   fs.writeFileSync(
@@ -57,15 +112,14 @@ function sortDeep<T>(x: T): T {
   return x;
 }
 
-// Reusable runner for one file
-async function runOnSnapFile(projectName: string, snapRelPath: string) {
+// Modified runner that takes class content directly
+async function runOnClassContent(projectName: string, fileName: string, classContent: string) {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "cloesce-"));
   writeTmpTsconfig(tmp);
   stubCloesce(tmp);
 
-  // copy the snap file into tmp root (keep same name)
-  const sourceFile = path.join(__dirname, "snap", snapRelPath);
-  copyFileToTmp(tmp, path.basename(snapRelPath), sourceFile);
+  // Write the class content directly to a .cloesce.ts file
+  fs.writeFileSync(path.join(tmp, fileName), classContent);
 
   // run extractor on tmp project
   const result = await extractModels({ projectName, cwd: tmp });
@@ -75,7 +129,7 @@ async function runOnSnapFile(projectName: string, snapRelPath: string) {
 // tests here!
 describe("cloesce-ts extractModels snapshot", () => {
   it("turns person.cloesce.ts into expected JSON spec", async () => {
-    const normalized = await runOnSnapFile("Person", "person.cloesce.ts");
+    const normalized = await runOnClassContent("Person", "person.cloesce.ts", PERSON_CLASS);
 
     expect(normalized).toMatchInlineSnapshot(`
 {
@@ -104,6 +158,7 @@ describe("cloesce-ts extractModels snapshot", () => {
         "methods": [
           {
             "http_verb": "GET",
+            "is_static": false,
             "name": "foo",
             "parameters": [
               {
@@ -115,10 +170,10 @@ describe("cloesce-ts extractModels snapshot", () => {
             "return": {
               "type": "Response",
             },
-            "static": false,
           },
           {
             "http_verb": "POST",
+            "is_static": true,
             "name": "speak",
             "parameters": [
               {
@@ -135,7 +190,6 @@ describe("cloesce-ts extractModels snapshot", () => {
             "return": {
               "type": "Response",
             },
-            "static": true,
           },
         ],
       },
@@ -148,7 +202,7 @@ describe("cloesce-ts extractModels snapshot", () => {
   });
 
   it("turns dog.cloesce.ts into expected JSON spec", async () => {
-    const normalized = await runOnSnapFile("dog", "dog.cloesce.ts");
+    const normalized = await runOnClassContent("dog", "dog.cloesce.ts", DOG_CLASS);
 
     expect(normalized).toMatchInlineSnapshot(`
 {
@@ -182,6 +236,7 @@ describe("cloesce-ts extractModels snapshot", () => {
         "methods": [
           {
             "http_verb": "GET",
+            "is_static": false,
             "name": "get_name",
             "parameters": [
               {
@@ -193,10 +248,10 @@ describe("cloesce-ts extractModels snapshot", () => {
             "return": {
               "type": "Response",
             },
-            "static": false,
           },
           {
             "http_verb": "GET",
+            "is_static": false,
             "name": "get_breed",
             "parameters": [
               {
@@ -208,10 +263,10 @@ describe("cloesce-ts extractModels snapshot", () => {
             "return": {
               "type": "Response",
             },
-            "static": false,
           },
           {
             "http_verb": "POST",
+            "is_static": true,
             "name": "woof",
             "parameters": [
               {
@@ -228,7 +283,6 @@ describe("cloesce-ts extractModels snapshot", () => {
             "return": {
               "type": "Response",
             },
-            "static": true,
           },
         ],
       },
