@@ -1,0 +1,199 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`actions snapshot 1`] = `
+{
+  "language": "TypeScript",
+  "models": [
+    {
+      "attributes": [
+        {
+          "primary_key": true,
+          "value": {
+            "cidl_type": "Integer",
+            "name": "id",
+            "nullable": false,
+          },
+        },
+        {
+          "primary_key": false,
+          "value": {
+            "cidl_type": "Text",
+            "name": "name",
+            "nullable": false,
+          },
+        },
+      ],
+      "methods": [
+        {
+          "http_verb": "POST",
+          "is_static": true,
+          "name": "create",
+          "parameters": [
+            {
+              "cidl_type": "Text",
+              "name": "payload",
+              "nullable": false,
+            },
+          ],
+        },
+        {
+          "http_verb": "PUT",
+          "is_static": true,
+          "name": "update",
+          "parameters": [
+            {
+              "cidl_type": "Integer",
+              "name": "id",
+              "nullable": false,
+            },
+            {
+              "cidl_type": "Text",
+              "name": "payload",
+              "nullable": true,
+            },
+          ],
+        },
+        {
+          "http_verb": "PATCH",
+          "is_static": true,
+          "name": "patchlol",
+          "parameters": [
+            {
+              "cidl_type": "Text",
+              "name": "phrase",
+              "nullable": false,
+            },
+          ],
+        },
+        {
+          "http_verb": "DELETE",
+          "is_static": true,
+          "name": "remove",
+          "parameters": [
+            {
+              "cidl_type": "Integer",
+              "name": "id",
+              "nullable": false,
+            },
+          ],
+        },
+      ],
+      "name": "Actions",
+    },
+    {
+      "attributes": [
+        {
+          "primary_key": true,
+          "value": {
+            "cidl_type": "Integer",
+            "name": "id",
+            "nullable": false,
+          },
+        },
+        {
+          "primary_key": false,
+          "value": {
+            "cidl_type": "Text",
+            "name": "name",
+            "nullable": false,
+          },
+        },
+        {
+          "primary_key": false,
+          "value": {
+            "cidl_type": "Integer",
+            "name": "breed",
+            "nullable": false,
+          },
+        },
+        {
+          "primary_key": false,
+          "value": {
+            "cidl_type": "Text",
+            "name": "preferred_treat",
+            "nullable": true,
+          },
+        },
+      ],
+      "methods": [
+        {
+          "http_verb": "GET",
+          "is_static": false,
+          "name": "get_name",
+          "parameters": [],
+        },
+        {
+          "http_verb": "GET",
+          "is_static": false,
+          "name": "get_breed",
+          "parameters": [],
+        },
+        {
+          "http_verb": "POST",
+          "is_static": true,
+          "name": "woof",
+          "parameters": [
+            {
+              "cidl_type": "Text",
+              "name": "phrase",
+              "nullable": false,
+            },
+          ],
+        },
+      ],
+      "name": "Dog",
+    },
+    {
+      "attributes": [
+        {
+          "primary_key": true,
+          "value": {
+            "cidl_type": "Integer",
+            "name": "id",
+            "nullable": false,
+          },
+        },
+        {
+          "primary_key": false,
+          "value": {
+            "cidl_type": "Text",
+            "name": "name",
+            "nullable": false,
+          },
+        },
+        {
+          "primary_key": false,
+          "value": {
+            "cidl_type": "Text",
+            "name": "middle_name",
+            "nullable": true,
+          },
+        },
+      ],
+      "methods": [
+        {
+          "http_verb": "GET",
+          "is_static": false,
+          "name": "foo",
+          "parameters": [],
+        },
+        {
+          "http_verb": "POST",
+          "is_static": true,
+          "name": "speak",
+          "parameters": [
+            {
+              "cidl_type": "Text",
+              "name": "phrase",
+              "nullable": false,
+            },
+          ],
+        },
+      ],
+      "name": "Person",
+    },
+  ],
+  "project_name": "actions",
+  "version": "0.0.1",
+}
+`;

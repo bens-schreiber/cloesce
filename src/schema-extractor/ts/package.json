@@ -31,13 +31,14 @@
   "dependencies": {
     "cmd-ts": "^0.14.1",
     "commander": "^14.0.0",
+    "prettier": "^3.6.2",
     "ts-morph": "^22.0.0",
     "ts-node": "^10.9.2",
-    "typescript": "^5.6.0",
-    "prettier": "^3.6.2"
+    "typescript": "^5.6.0"
   },
   "devDependencies": {
     "@types/jest": "^29.5.14",
+    "@types/mocha": "^10.0.10",
     "@types/node": "^22.18.1",
     "jest": "^29.7.0",
     "prettier": "^3.6.2",
