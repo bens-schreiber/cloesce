@@ -1,12 +1,14 @@
-use common::{CidlType, HttpVerb, Method, Model, TypedValue};
+use common::{CfType, CidlType, HttpVerb, Method, Model, SqlType, TypedValue};
 
 use crate::LanguageWorkerGenerator as LanguageWorkersGenerator;
 
 pub struct TypescriptWorkersGenerator {}
 impl LanguageWorkersGenerator for TypescriptWorkersGenerator {
     fn imports(&self, models: &[Model]) -> String {
+        let cf_types = r#"import { D1Database } from "@cloudflare/workers-types""#;
+
         // TODO: Fix hardcoding path ../{}
-        models
+        let model_imports = models
             .iter()
             .map(|m| {
                 format!(
@@ -18,12 +20,16 @@ impl LanguageWorkersGenerator for TypescriptWorkersGenerator {
                 )
             })
             .collect::<Vec<_>>()
-            .join("\n")
+            .join("\n");
+
+        format!("{cf_types}\n{model_imports}")
     }
 
     fn preamble(&self) -> String {
         r#"
-        function match(router: any, path: string, request: Request, env: any): Response {
+        export interface Env { DB: D1Database }
+
+        function match(router: any, path: string, request: Request, env: Env): Response {
             let node: any = router;
             const params: any[] = [];
             const segments = path.split("/").filter(Boolean);
@@ -64,7 +70,7 @@ impl LanguageWorkersGenerator for TypescriptWorkersGenerator {
     fn main(&self) -> String {
         r#"
         export default {
-            async fetch(request: Request, env: any, ctx: any): Promise<Response> {
+            async fetch(request: Request, env: Env, ctx: any): Promise<Response> {
                 try {
                     const url = new URL(request.url);
                     return await match(router, url.pathname, request, env);
@@ -120,7 +126,7 @@ impl LanguageWorkersGenerator for TypescriptWorkersGenerator {
 
         format!(
             r#"
-            {method_name}: async ({id} request: Request, env: any) => {{{body}}}
+            {method_name}: async ({id} request: Request, env: Env) => {{{body}}}
             "#
         )
     }
@@ -151,28 +157,38 @@ impl LanguageWorkersGenerator for TypescriptWorkersGenerator {
         }
 
         let mut validate = Vec::new();
-        validate.push(format!(
-            r#"
+
+        let valid_params = params
+            .iter()
+            .filter(|p| matches!(p.cidl_type, CidlType::Sql(_)))
+            .collect::<Vec<_>>();
+
+        // Instantiate Request Body
+        if !valid_params.is_empty() {
+            validate.push(format!(
+                r#"
             let body;
             try {{
                 body = await request.json();
             }} catch {{
                 return new Response(JSON.stringify({{ error: "Invalid request body" }}), {{
-                status: 400,
-                headers: {{ "Content-Type": "application/json" }},
+                    status: 400,
+                    headers: {{ "Content-Type": "application/json" }},
                 }});
             }}
-
+            
             const {{{}}} = body;
-        "#,
-            params
-                .iter()
-                .map(|p| p.name.clone())
-                .collect::<Vec<_>>()
-                .join(",")
-        ));
+            "#,
+                valid_params
+                    .iter()
+                    .map(|p| p.name.clone())
+                    .collect::<Vec<_>>()
+                    .join(",")
+            ));
+        }
 
-        for param in params {
+        // Validate Request Body
+        for param in valid_params {
             if !param.nullable {
                 validate.push(format!(
                     "if ({} === null || {} === undefined) {{ throw new Error('Required parameter missing: {}');}}",
@@ -180,25 +196,24 @@ impl LanguageWorkersGenerator for TypescriptWorkersGenerator {
                 ));
             }
 
-            let type_check = match param.cidl_type {
-                CidlType::Integer | CidlType::Real => fmt_error(&param.name, "number"),
-                CidlType::Text => fmt_error(&param.name, "string"),
-                CidlType::Blob => {
-                    format!(
-                        "if ({} !== null && !({} instanceof ArrayBuffer || {} instanceof Uint8Array)) {{ throw new Error('Parameter {} must be a Uint8Array'); }}",
-                        param.name, param.name, param.name, param.name
-                    )
+            match &param.cidl_type {
+                CidlType::Sql(sql_type) => match sql_type {
+                    SqlType::Integer | SqlType::Real => validate.push(fmt_error(&param.name, "number")),
+                    SqlType::Text => validate.push(fmt_error(&param.name, "string")),
+                    SqlType::Blob => {
+                        validate.push(format!(
+                            "if ({} !== null && !({} instanceof ArrayBuffer || {} instanceof Uint8Array)) {{ throw new Error('Parameter {} must be a Uint8Array'); }}",
+                            param.name, param.name, param.name, param.name
+                        ))
+                    }
+                },
+                _ => {
+                    // Skip any other params, they may be dependency injected
                 }
             };
-
-            validate.push(type_check);
         }
 
-        if validate.is_empty() {
-            String::from("")
-        } else {
-            validate.join("\n")
-        }
+        validate.join("\n")
     }
 
     fn instantiate_model(&self, model: &Model) -> String {
@@ -214,18 +229,15 @@ impl LanguageWorkersGenerator for TypescriptWorkersGenerator {
         // to create a constructor
         format!(
             r#"
-        const d1 = env.D1_DB || env.DB;
-
+        const d1 = env.DB;
         const query = `SELECT * FROM {model_name} WHERE id = ?`;
         const record = await d1.prepare(query).bind(id).first();
-
         if (!record) {{
             return new Response(
                 JSON.stringify({{ error: "Record not found" }}),
                 {{ status: 404, headers: {{ "Content-Type": "application/json" }} }}
             );
         }}
-
         const instance: {model_name} = {{{instance}}};
         "#
         )
@@ -233,12 +245,18 @@ impl LanguageWorkersGenerator for TypescriptWorkersGenerator {
 
     fn dispatch_method(&self, model_name: &str, method: &Method) -> String {
         let method_name = &method.name;
+
+        // SQL params are built by the body validator, CF params are dependency injected
         let params = method
             .parameters
             .iter()
-            .map(|p| p.name.clone())
+            .map(|p| match &p.cidl_type {
+                CidlType::Sql(_) => p.name.clone(),
+                CidlType::Cf(CfType::D1Database) => "env.DB".to_string(),
+            })
             .collect::<Vec<_>>()
             .join(", ");
+
         let callee = if method.is_static {
             model_name
         } else {

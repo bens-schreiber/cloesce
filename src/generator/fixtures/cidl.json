@@ -1,65 +1,296 @@
 {
-  "version": "0.0.1",
-  "project_name": "foo_proj",
   "language": "TypeScript",
   "models": [
     {
-      "name": "User",
-      "source_path": "models/user.cloesce.ts",
       "attributes": [
         {
+          "primary_key": true,
           "value": {
+            "cidl_type": {
+              "Sql": "Integer"
+            },
             "name": "id",
-            "cidl_type": "Integer",
             "nullable": false
-          },
-          "primary_key": true
+          }
         },
         {
+          "primary_key": false,
           "value": {
+            "cidl_type": {
+              "Sql": "Text"
+            },
             "name": "name",
-            "cidl_type": "Text",
             "nullable": false
-          },
-          "primary_key": false
+          }
         }
       ],
       "methods": [
         {
-          "name": "do_something",
-          "is_static": false,
-          "http_verb": "GET",
+          "http_verb": "POST",
+          "is_static": true,
+          "name": "create",
           "parameters": [
             {
-              "name": "age",
-              "cidl_type": "Integer",
+              "cidl_type": {
+                "Cf": "D1Database"
+              },
+              "name": "db",
               "nullable": false
             },
             {
-              "name": "name",
-              "cidl_type": "Text",
+              "cidl_type": {
+                "Sql": "Text"
+              },
+              "name": "payload",
               "nullable": false
             }
           ]
         },
         {
-          "name": "say_all_names",
+          "http_verb": "PUT",
           "is_static": true,
-          "http_verb": "GET",
+          "name": "update",
           "parameters": [
             {
-              "name": "age",
-              "cidl_type": "Integer",
+              "cidl_type": {
+                "Cf": "D1Database"
+              },
+              "name": "db",
               "nullable": false
             },
             {
-              "name": "name",
-              "cidl_type": "Text",
+              "cidl_type": {
+                "Sql": "Integer"
+              },
+              "name": "id",
+              "nullable": false
+            },
+            {
+              "cidl_type": {
+                "Sql": "Text"
+              },
+              "name": "payload",
+              "nullable": true
+            }
+          ]
+        },
+        {
+          "http_verb": "PATCH",
+          "is_static": true,
+          "name": "patch",
+          "parameters": [
+            {
+              "cidl_type": {
+                "Cf": "D1Database"
+              },
+              "name": "db",
+              "nullable": false
+            },
+            {
+              "cidl_type": {
+                "Sql": "Text"
+              },
+              "name": "phrase",
+              "nullable": false
+            }
+          ]
+        },
+        {
+          "http_verb": "DELETE",
+          "is_static": true,
+          "name": "remove",
+          "parameters": [
+            {
+              "cidl_type": {
+                "Cf": "D1Database"
+              },
+              "name": "db",
+              "nullable": false
+            },
+            {
+              "cidl_type": {
+                "Sql": "Integer"
+              },
+              "name": "id",
               "nullable": false
             }
           ]
         }
-      ]
+      ],
+      "name": "Actions",
+      "source_path": "actions.cloesce.ts"
+    },
+    {
+      "attributes": [
+        {
+          "primary_key": true,
+          "value": {
+            "cidl_type": {
+              "Sql": "Integer"
+            },
+            "name": "id",
+            "nullable": false
+          }
+        },
+        {
+          "primary_key": false,
+          "value": {
+            "cidl_type": {
+              "Sql": "Text"
+            },
+            "name": "name",
+            "nullable": false
+          }
+        },
+        {
+          "primary_key": false,
+          "value": {
+            "cidl_type": {
+              "Sql": "Integer"
+            },
+            "name": "breed",
+            "nullable": false
+          }
+        },
+        {
+          "primary_key": false,
+          "value": {
+            "cidl_type": {
+              "Sql": "Text"
+            },
+            "name": "preferred_treat",
+            "nullable": true
+          }
+        }
+      ],
+      "methods": [
+        {
+          "http_verb": "GET",
+          "is_static": false,
+          "name": "get_name",
+          "parameters": [
+            {
+              "cidl_type": {
+                "Cf": "D1Database"
+              },
+              "name": "db",
+              "nullable": false
+            }
+          ]
+        },
+        {
+          "http_verb": "GET",
+          "is_static": false,
+          "name": "get_breed",
+          "parameters": [
+            {
+              "cidl_type": {
+                "Cf": "D1Database"
+              },
+              "name": "db",
+              "nullable": false
+            }
+          ]
+        },
+        {
+          "http_verb": "POST",
+          "is_static": true,
+          "name": "woof",
+          "parameters": [
+            {
+              "cidl_type": {
+                "Cf": "D1Database"
+              },
+              "name": "db",
+              "nullable": false
+            },
+            {
+              "cidl_type": {
+                "Sql": "Text"
+              },
+              "name": "phrase",
+              "nullable": false
+            }
+          ]
+        }
+      ],
+      "name": "Dog",
+      "source_path": "dog.cloesce.ts"
+    },
+    {
+      "attributes": [
+        {
+          "primary_key": true,
+          "value": {
+            "cidl_type": {
+              "Sql": "Integer"
+            },
+            "name": "id",
+            "nullable": false
+          }
+        },
+        {
+          "primary_key": false,
+          "value": {
+            "cidl_type": {
+              "Sql": "Text"
+            },
+            "name": "name",
+            "nullable": false
+          }
+        },
+        {
+          "primary_key": false,
+          "value": {
+            "cidl_type": {
+              "Sql": "Text"
+            },
+            "name": "middle_name",
+            "nullable": true
+          }
+        }
+      ],
+      "methods": [
+        {
+          "http_verb": "GET",
+          "is_static": false,
+          "name": "foo",
+          "parameters": [
+            {
+              "cidl_type": {
+                "Cf": "D1Database"
+              },
+              "name": "db",
+              "nullable": false
+            }
+          ]
+        },
+        {
+          "http_verb": "POST",
+          "is_static": true,
+          "name": "speak",
+          "parameters": [
+            {
+              "cidl_type": {
+                "Cf": "D1Database"
+              },
+              "name": "db",
+              "nullable": false
+            },
+            {
+              "cidl_type": {
+                "Sql": "Text"
+              },
+              "name": "phrase",
+              "nullable": false
+            }
+          ]
+        }
+      ],
+      "name": "Person",
+      "source_path": "person.cloesce.ts"
     }
-  ]
+  ],
+  "project_name": "actions",
+  "version": "0.0.1"
 }

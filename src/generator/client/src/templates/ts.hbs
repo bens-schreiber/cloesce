@@ -11,7 +11,9 @@ export class {{name}} {
   {{#each methods}}
   {{#if is_static}}static {{/if}}async {{name}}(
     {{#each parameters}}
-      {{name}}: {{lang_type cidl_type nullable}}{{#unless @last}}, {{/unless}}
+      {{#if is_parameter cidl_type}}
+        {{name}}: {{lang_type cidl_type nullable}}{{#unless @last}}, {{/unless}}
+      {{/if}}
     {{/each}}
   ): Promise<Result<string>> {
     const url = `http://{{../../domain}}{{#if is_static}}/api/{{../name}}/{{name}}{{else}}/api/{{../name}}/${this.id}/{{name}}{{/if}}`;

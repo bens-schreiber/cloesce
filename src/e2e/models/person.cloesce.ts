@@ -1,4 +1,5 @@
-import { D1, GET, POST, PrimaryKey, type D1Db } from "cloesce";
+import { D1Database } from "@cloudflare/workers-types";
+import { D1, GET, POST, PrimaryKey } from "cloesce";
 
 @D1
 export class Person {
@@ -16,7 +17,7 @@ export class Person {
   }
 
   @POST
-  static async post(db: D1Db, name: string, ssn: string | null) {
+  static async post(db: D1Database, name: string, ssn: string | null) {
     let result = await db
       .prepare("INSERT INTO users (name, ssn) VALUES (?, ?)")
       .bind(name, ssn)

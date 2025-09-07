@@ -9,7 +9,9 @@ exports[`actions snapshot 1`] = `
         {
           "primary_key": true,
           "value": {
-            "cidl_type": "Integer",
+            "cidl_type": {
+              "Sql": "Integer",
+            },
             "name": "id",
             "nullable": false,
           },
@@ -17,7 +19,9 @@ exports[`actions snapshot 1`] = `
         {
           "primary_key": false,
           "value": {
-            "cidl_type": "Text",
+            "cidl_type": {
+              "Sql": "Text",
+            },
             "name": "name",
             "nullable": false,
           },
@@ -30,7 +34,16 @@ exports[`actions snapshot 1`] = `
           "name": "create",
           "parameters": [
             {
-              "cidl_type": "Text",
+              "cidl_type": {
+                "Cf": "D1Database",
+              },
+              "name": "db",
+              "nullable": false,
+            },
+            {
+              "cidl_type": {
+                "Sql": "Text",
+              },
               "name": "payload",
               "nullable": false,
             },
@@ -42,12 +55,23 @@ exports[`actions snapshot 1`] = `
           "name": "update",
           "parameters": [
             {
-              "cidl_type": "Integer",
+              "cidl_type": {
+                "Cf": "D1Database",
+              },
+              "name": "db",
+              "nullable": false,
+            },
+            {
+              "cidl_type": {
+                "Sql": "Integer",
+              },
               "name": "id",
               "nullable": false,
             },
             {
-              "cidl_type": "Text",
+              "cidl_type": {
+                "Sql": "Text",
+              },
               "name": "payload",
               "nullable": true,
             },
@@ -56,10 +80,19 @@ exports[`actions snapshot 1`] = `
         {
           "http_verb": "PATCH",
           "is_static": true,
-          "name": "patchlol",
+          "name": "patch",
           "parameters": [
             {
-              "cidl_type": "Text",
+              "cidl_type": {
+                "Cf": "D1Database",
+              },
+              "name": "db",
+              "nullable": false,
+            },
+            {
+              "cidl_type": {
+                "Sql": "Text",
+              },
               "name": "phrase",
               "nullable": false,
             },
@@ -71,7 +104,16 @@ exports[`actions snapshot 1`] = `
           "name": "remove",
           "parameters": [
             {
-              "cidl_type": "Integer",
+              "cidl_type": {
+                "Cf": "D1Database",
+              },
+              "name": "db",
+              "nullable": false,
+            },
+            {
+              "cidl_type": {
+                "Sql": "Integer",
+              },
               "name": "id",
               "nullable": false,
             },
@@ -86,7 +128,9 @@ exports[`actions snapshot 1`] = `
         {
           "primary_key": true,
           "value": {
-            "cidl_type": "Integer",
+            "cidl_type": {
+              "Sql": "Integer",
+            },
             "name": "id",
             "nullable": false,
           },
@@ -94,7 +138,9 @@ exports[`actions snapshot 1`] = `
         {
           "primary_key": false,
           "value": {
-            "cidl_type": "Text",
+            "cidl_type": {
+              "Sql": "Text",
+            },
             "name": "name",
             "nullable": false,
           },
@@ -102,7 +148,9 @@ exports[`actions snapshot 1`] = `
         {
           "primary_key": false,
           "value": {
-            "cidl_type": "Integer",
+            "cidl_type": {
+              "Sql": "Integer",
+            },
             "name": "breed",
             "nullable": false,
           },
@@ -110,7 +158,9 @@ exports[`actions snapshot 1`] = `
         {
           "primary_key": false,
           "value": {
-            "cidl_type": "Text",
+            "cidl_type": {
+              "Sql": "Text",
+            },
             "name": "preferred_treat",
             "nullable": true,
           },
@@ -121,13 +171,29 @@ exports[`actions snapshot 1`] = `
           "http_verb": "GET",
           "is_static": false,
           "name": "get_name",
-          "parameters": [],
+          "parameters": [
+            {
+              "cidl_type": {
+                "Cf": "D1Database",
+              },
+              "name": "db",
+              "nullable": false,
+            },
+          ],
         },
         {
           "http_verb": "GET",
           "is_static": false,
           "name": "get_breed",
-          "parameters": [],
+          "parameters": [
+            {
+              "cidl_type": {
+                "Cf": "D1Database",
+              },
+              "name": "db",
+              "nullable": false,
+            },
+          ],
         },
         {
           "http_verb": "POST",
@@ -135,7 +201,16 @@ exports[`actions snapshot 1`] = `
           "name": "woof",
           "parameters": [
             {
-              "cidl_type": "Text",
+              "cidl_type": {
+                "Cf": "D1Database",
+              },
+              "name": "db",
+              "nullable": false,
+            },
+            {
+              "cidl_type": {
+                "Sql": "Text",
+              },
               "name": "phrase",
               "nullable": false,
             },
@@ -150,7 +225,9 @@ exports[`actions snapshot 1`] = `
         {
           "primary_key": true,
           "value": {
-            "cidl_type": "Integer",
+            "cidl_type": {
+              "Sql": "Integer",
+            },
             "name": "id",
             "nullable": false,
           },
@@ -158,7 +235,9 @@ exports[`actions snapshot 1`] = `
         {
           "primary_key": false,
           "value": {
-            "cidl_type": "Text",
+            "cidl_type": {
+              "Sql": "Text",
+            },
             "name": "name",
             "nullable": false,
           },
@@ -166,7 +245,9 @@ exports[`actions snapshot 1`] = `
         {
           "primary_key": false,
           "value": {
-            "cidl_type": "Text",
+            "cidl_type": {
+              "Sql": "Text",
+            },
             "name": "middle_name",
             "nullable": true,
           },
@@ -177,7 +258,15 @@ exports[`actions snapshot 1`] = `
           "http_verb": "GET",
           "is_static": false,
           "name": "foo",
-          "parameters": [],
+          "parameters": [
+            {
+              "cidl_type": {
+                "Cf": "D1Database",
+              },
+              "name": "db",
+              "nullable": false,
+            },
+          ],
         },
         {
           "http_verb": "POST",
@@ -185,7 +274,16 @@ exports[`actions snapshot 1`] = `
           "name": "speak",
           "parameters": [
             {
-              "cidl_type": "Text",
+              "cidl_type": {
+                "Cf": "D1Database",
+              },
+              "name": "db",
+              "nullable": false,
+            },
+            {
+              "cidl_type": {
+                "Sql": "Text",
+              },
               "name": "phrase",
               "nullable": false,
             },

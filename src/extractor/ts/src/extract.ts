@@ -35,17 +35,6 @@ function readPkgMeta(cwd: string) {
   return { projectName, version };
 }
 
-function isD1DbType(t: Type, sf: SourceFile): boolean {
-  // robust even if the type shows up as import("...").D1Db
-  const txt = cleanTypeText(t, sf);
-  const sym = t.getSymbol()?.getName();
-  return (
-    txt === "D1Db" ||
-    sym === "D1Db" ||
-    TypeCode.fromType(t, sf) === TypeCode.D1Db
-  );
-}
-
 function readCloesceConfig(cwd: string): CloesceConfig | null {
   const configPath = path.join(cwd, "cloesce-config.json");
   if (!fs.existsSync(configPath)) {
@@ -68,21 +57,6 @@ function readCloesceConfig(cwd: string): CloesceConfig | null {
     );
   }
 }
-
-const IGNORE_DIRS = new Set([
-  "node_modules",
-  ".git",
-  "dist",
-  "build",
-  "out",
-  ".next",
-  ".turbo",
-  "coverage",
-  ".vercel",
-  ".svelte-kit",
-  ".output",
-  ".cache",
-]);
 
 // Recursively collect only files strictly ending with `.cloesce.ts` from specified path
 function walkCloesceFiles(root: string, searchPath: string): string[] {
@@ -109,9 +83,7 @@ function walkCloesceFiles(root: string, searchPath: string): string[] {
       for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
         const full = path.join(dir, entry.name);
         if (entry.isDirectory()) {
-          if (!IGNORE_DIRS.has(entry.name)) {
-            walkDir(full);
-          }
+          walkDir(full);
         } else if (entry.isFile() && /\.cloesce\.ts$/i.test(entry.name)) {
           out.push(full);
         }
@@ -123,50 +95,36 @@ function walkCloesceFiles(root: string, searchPath: string): string[] {
   return out;
 }
 
-// strip import stuff so comparisons are stable
 function cleanTypeText(t: Type, sf: SourceFile) {
   return t.getText(sf).replace(/import\(".*?"\)\./g, "");
 }
 
-export enum TypeCode {
-  Number = "Integer",
-  String = "Text",
-  Boolean = "boolean",
-  Date = "Date",
-  D1Db = "D1Db",
-  Response = "Response",
-}
+export type SqlTypeJson = "Integer" | "Real" | "Text" | "Blob";
+export type CfTypeJson = "D1Database";
+export type CidlTypeJson = { Sql: SqlTypeJson } | { Cf: CfTypeJson };
+
+const cidlTypeMap = {
+  number: { Sql: "Integer" } as const,
+  string: { Sql: "Text" } as const,
+  boolean: { Sql: "Integer" } as const,
+  D1Database: { Cf: "D1Database" } as const,
+} satisfies Record<string, CidlTypeJson>;
 
 export namespace TypeCode {
-  const basicTypeMap: Record<string, TypeCode> = {
-    number: TypeCode.Number,
-    string: TypeCode.String,
-    boolean: TypeCode.Boolean,
-    Date: TypeCode.Date,
-    Response: TypeCode.Response,
-    D1Db: TypeCode.D1Db,
-  };
-
-  export function fromType(t: Type, sf: SourceFile): TypeCode {
+  export function toCidlType(t: Type, sf: SourceFile): CidlTypeJson {
     const txt = cleanTypeText(t, sf);
     const symName = t.getSymbol()?.getName();
 
-    // Robust primitive checks
-    if (t.isNumber()) return TypeCode.Number;
-    if (t.isString()) return TypeCode.String;
-    if (t.isBoolean()) return TypeCode.Boolean;
-
-    // Unwrap Promise<T> recursively
+    // unwrap Promise<T>
     if (symName === "Promise" && t.getTypeArguments().length === 1) {
-      return fromType(t.getTypeArguments()[0], sf);
+      return toCidlType(t.getTypeArguments()[0], sf);
     }
 
-    // Known names by text or symbol
-    if (txt in basicTypeMap)
-      return basicTypeMap[txt as keyof typeof basicTypeMap];
+    if (txt in cidlTypeMap) {
+      return cidlTypeMap[txt as keyof typeof cidlTypeMap];
+    }
 
-    // Fallback
-    return TypeCode.String;
+    throw new Error(`Unknown Cloesce type: ${txt}`);
   }
 }
 
@@ -351,7 +309,7 @@ export function extractModels(opts: ExtractOptions = {}) {
         const entry: any = {
           value: {
             name: prop.getName(),
-            cidl_type: TypeCode.fromType(t, sf),
+            cidl_type: TypeCode.toCidlType(t, sf),
             nullable,
           },
         };
@@ -379,12 +337,10 @@ export function extractModels(opts: ExtractOptions = {}) {
           const raw = cleanTypeText(pt, sf);
           if (raw === "Request") continue;
 
-          if (isD1DbType(pt, sf) || p.getName() === "db") continue;
-
           const nullable = getParamNullability(p, sf);
           parameters.push({
             name: p.getName(),
-            cidl_type: TypeCode.fromType(pt, sf),
+            cidl_type: TypeCode.toCidlType(pt, sf),
             nullable,
           });
         }

@@ -1,2 +1,7 @@
-export { D1, GET, POST, PUT, PATCH, DELETE, PrimaryKey } from "./decorators.js";
-export type { D1Db, Handler } from "./types.js";
+export function GET() {}
+export function POST() {}
+export function PUT() {}
+export function PATCH() {}
+export function DELETE() {}
+export function D1() {}
+export function PrimaryKey() {}

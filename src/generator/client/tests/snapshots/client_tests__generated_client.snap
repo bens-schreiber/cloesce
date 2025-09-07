@@ -6,46 +6,242 @@ type Ok<T> = { ok: true; data: T };
 type Err = { ok: false; status: number; message: string };
 type Result<T> = Ok<T> | Err;
 
-export class User {
+export class Actions {
   id: number;
   name: string;
 
-  async do_something(
-      age: number, 
-      name: string
+  static async create(
   ): Promise<Result<string>> {
-    const url = `http://localhost:1000/api/User/${this.id}/do_something`;
+    const url = `http://localhost:1000/api/Actions/create`;
 
     const res = await fetch(url, {
-      method: "GET",
+      method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-          age, 
-          name
+          db, 
+          payload
       })
     });
 
-    if (!res.ok) return { ok: false, status: res.status, message: res.statusText };
+    if (!res.ok) {
+      const data = await res.text();
+      return {
+        ok: false,
+        status: res.status,
+        message: data
+      };
+    }
 
     const data = await res.json();
     return { ok: true, data };
   }
-  static async say_all_names(
-      age: number, 
-      name: string
+  static async update(
   ): Promise<Result<string>> {
-    const url = `http://localhost:1000/api/User/say_all_names`;
+    const url = `http://localhost:1000/api/Actions/update`;
+
+    const res = await fetch(url, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+          db, 
+          id, 
+          payload
+      })
+    });
+
+    if (!res.ok) {
+      const data = await res.text();
+      return {
+        ok: false,
+        status: res.status,
+        message: data
+      };
+    }
+
+    const data = await res.json();
+    return { ok: true, data };
+  }
+  static async patch(
+  ): Promise<Result<string>> {
+    const url = `http://localhost:1000/api/Actions/patch`;
+
+    const res = await fetch(url, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+          db, 
+          phrase
+      })
+    });
+
+    if (!res.ok) {
+      const data = await res.text();
+      return {
+        ok: false,
+        status: res.status,
+        message: data
+      };
+    }
+
+    const data = await res.json();
+    return { ok: true, data };
+  }
+  static async remove(
+  ): Promise<Result<string>> {
+    const url = `http://localhost:1000/api/Actions/remove`;
+
+    const res = await fetch(url, {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+          db, 
+          id
+      })
+    });
+
+    if (!res.ok) {
+      const data = await res.text();
+      return {
+        ok: false,
+        status: res.status,
+        message: data
+      };
+    }
+
+    const data = await res.json();
+    return { ok: true, data };
+  }
+}
+export class Dog {
+  id: number;
+  name: string;
+  breed: number;
+  preferred_treat: string | null;
+
+  async get_name(
+  ): Promise<Result<string>> {
+    const url = `http://localhost:1000/api/Dog/${this.id}/get_name`;
 
     const res = await fetch(url, {
       method: "GET",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-          age, 
-          name
+          db
       })
     });
 
-    if (!res.ok) return { ok: false, status: res.status, message: res.statusText };
+    if (!res.ok) {
+      const data = await res.text();
+      return {
+        ok: false,
+        status: res.status,
+        message: data
+      };
+    }
+
+    const data = await res.json();
+    return { ok: true, data };
+  }
+  async get_breed(
+  ): Promise<Result<string>> {
+    const url = `http://localhost:1000/api/Dog/${this.id}/get_breed`;
+
+    const res = await fetch(url, {
+      method: "GET",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+          db
+      })
+    });
+
+    if (!res.ok) {
+      const data = await res.text();
+      return {
+        ok: false,
+        status: res.status,
+        message: data
+      };
+    }
+
+    const data = await res.json();
+    return { ok: true, data };
+  }
+  static async woof(
+  ): Promise<Result<string>> {
+    const url = `http://localhost:1000/api/Dog/woof`;
+
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+          db, 
+          phrase
+      })
+    });
+
+    if (!res.ok) {
+      const data = await res.text();
+      return {
+        ok: false,
+        status: res.status,
+        message: data
+      };
+    }
+
+    const data = await res.json();
+    return { ok: true, data };
+  }
+}
+export class Person {
+  id: number;
+  name: string;
+  middle_name: string | null;
+
+  async foo(
+  ): Promise<Result<string>> {
+    const url = `http://localhost:1000/api/Person/${this.id}/foo`;
+
+    const res = await fetch(url, {
+      method: "GET",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+          db
+      })
+    });
+
+    if (!res.ok) {
+      const data = await res.text();
+      return {
+        ok: false,
+        status: res.status,
+        message: data
+      };
+    }
+
+    const data = await res.json();
+    return { ok: true, data };
+  }
+  static async speak(
+  ): Promise<Result<string>> {
+    const url = `http://localhost:1000/api/Person/speak`;
+
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+          db, 
+          phrase
+      })
+    });
+
+    if (!res.ok) {
+      const data = await res.text();
+      return {
+        ok: false,
+        status: res.status,
+        message: data
+      };
+    }
 
     const data = await res.json();
     return { ok: true, data };
