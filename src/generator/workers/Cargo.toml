@@ -2,3 +2,12 @@
 name = "workers"
 version = "0.0.1"
 edition = "2024"
+
+[dependencies]
+anyhow = { workspace = true }
+common = { path = "../common" }
+client = { path = "../client" }
+
+[dev-dependencies]
+insta = { workspace = true }
+serde_json = { workspace = true }

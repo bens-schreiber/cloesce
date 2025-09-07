@@ -1,0 +1,123 @@
+---
+source: workers/tests/workers_tests.rs
+expression: workers
+---
+ 
+        
+        import { User } from './models';
+        
+        
+        function match(path: string, request: Request, env: any): Response {
+            let node: any = router;
+            const params: any[] = [];
+            const segments = path.split("/").filter(Boolean);
+            for (const segment of segments) {
+                if (node[segment]) {
+                    node = node[segment];
+                } 
+                else {
+                    const paramKey = Object.keys(node).find(k => k.startsWith("<") && k.endsWith(">"));
+                    if (paramKey) {
+                        params.push(segment);
+                        node = node[paramKey];
+                    } else {
+                        return new Response(
+                            JSON.stringify({ error: "Route not found", path }),
+                            { 
+                                status: 404,
+                                headers: { "Content-Type": "application/json" }
+                            }
+                        );
+                    }
+                }
+            }
+            if (typeof node === "function") {
+                return node(...params, request, env);
+            }
+            return new Response(
+                JSON.stringify({ error: "Route not found", path }),
+                { 
+                    status: 404,
+                    headers: { "Content-Type": "application/json" }
+                }
+            );
+        }
+        
+        
+        const router = { api: {
+        User: {
+        "<id>": {
+            do_something: async (age: number,name: string, request: Request, env: any) => {
+                
+            if (request.method !== "GET") {
+                return new Response("Method Not Allowed", { status: 405 });
+            }
+            
+                if (age === null || age === undefined) { throw new Error('Required parameter missing: age');}
+if (age !== null && typeof age !== 'number') { throw new Error('Parameter age must be a number'); }
+if (name === null || name === undefined) { throw new Error('Required parameter missing: name');}
+if (name !== null && typeof name !== 'string') { throw new Error('Parameter name must be a string'); }
+                
+        const d1 = env.D1_DB || env.DB;
+
+        const query = `SELECT * FROM User WHERE id = ?`;
+        const record = await d1.prepare(query).bind(id).first();
+
+        if (!record) {
+            return new Response(
+                JSON.stringify({ error: "Record not found" }),
+                { status: 404, headers: { "Content-Type": "application/json" } }
+            );
+        }
+
+        const instance = new Person(record);
+        
+                
+        instance.do_something(age, name)
+        
+            }
+            }
+        ,
+
+        "say_all_names": {
+            say_all_names: async (age: number,name: string, request: Request, env: any) => {
+                
+            if (request.method !== "GET") {
+                return new Response("Method Not Allowed", { status: 405 });
+            }
+            
+                if (age === null || age === undefined) { throw new Error('Required parameter missing: age');}
+if (age !== null && typeof age !== 'number') { throw new Error('Parameter age must be a number'); }
+if (name === null || name === undefined) { throw new Error('Required parameter missing: name');}
+if (name !== null && typeof name !== 'string') { throw new Error('Parameter name must be a string'); }
+                
+                
+        User.say_all_names(age, name)
+        
+            }
+            }
+        }
+        } }
+        
+        
+        export default {
+            async fetch(request: Request, env: any, ctx: any): Promise<Response> {
+                {}
+                try {
+                    const url = new URL(request.url);
+                    return match(url.pathname, request, env);
+                } catch (error) {
+                    console.error("Worker error:", error);
+                    return new Response(
+                        JSON.stringify({ 
+                            error: "Internal server error",
+                            message: error.message 
+                        }),
+                        { 
+                            status: 500,
+                            headers: { "Content-Type": "application/json" }
+                        }
+                    );
+                }
+            }
+        };

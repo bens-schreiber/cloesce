@@ -7,3 +7,7 @@ edition = "2024"
 common = { path = "../common" }
 handlebars = "6.3.2"
 serde_json = { workspace = true }
+
+[dev-dependencies]
+anyhow = { workspace = true }
+insta = { workspace = true }

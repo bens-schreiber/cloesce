@@ -122,18 +122,20 @@ dependencies = [
  "client",
  "common",
  "d1",
- "insta",
  "serde",
  "serde_json",
  "toml",
+ "workers",
 ]
 
 [[package]]
 name = "client"
 version = "0.0.1"
 dependencies = [
+ "anyhow",
  "common",
  "handlebars",
+ "insta",
  "serde_json",
 ]
 
@@ -149,6 +151,8 @@ version = "0.0.1"
 dependencies = [
  "anyhow",
  "serde",
+ "serde_json",
+ "toml",
 ]
 
 [[package]]
@@ -188,7 +192,11 @@ version = "0.0.1"
 dependencies = [
  "anyhow",
  "common",
+ "insta",
  "sea-query",
+ "serde",
+ "serde_json",
+ "toml",
 ]
 
 [[package]]
@@ -842,3 +850,10 @@ checksum = "21a0236b59786fed61e2a80582dd500fe61f18b5dca67a4a067d0bc9039339cf"
 [[package]]
 name = "workers"
 version = "0.0.1"
+dependencies = [
+ "anyhow",
+ "client",
+ "common",
+ "insta",
+ "serde_json",
+]
