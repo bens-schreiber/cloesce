@@ -335,3 +335,8 @@ coverage/
 
 # Other temporary files
 tmp/
+
+
+
+# ----------- CLOUDFLARE VVV  ----------- 
+.wrangler

@@ -1,0 +1,14 @@
+{
+  "devDependencies": {
+    "@types/node": "^24.3.1",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.2"
+  },
+  "scripts": {
+    "start": "ts-node main.ts"
+  },
+  "type": "module",
+  "dependencies": {
+    "cloesce": "file:../extractor/ts"
+  }
+}

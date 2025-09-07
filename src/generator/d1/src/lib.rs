@@ -96,7 +96,7 @@ impl D1Generator {
                 table.col(column);
             }
 
-            res.push(table.to_string(SqliteQueryBuilder));
+            res.push(format!("{};", table.to_string(SqliteQueryBuilder)));
         }
 
         Ok(res.join("\n"))
@@ -128,6 +128,7 @@ mod tests {
     fn test_primary_key_and_value_yields_sqlite() {
         // Arrange
         let spec = create_cidl(Model {
+            source_path: "./models/user.cloesce.ts".into(),
             name: String::from("User"),
             attributes: vec![
                 Attribute {
@@ -174,6 +175,7 @@ mod tests {
     fn test_duplicate_primary_key_error() {
         // Arrange
         let spec = create_cidl(Model {
+            source_path: "./models/user.cloesce.ts".into(),
             name: String::from("User"),
             attributes: vec![
                 Attribute {
@@ -209,6 +211,7 @@ mod tests {
     fn test_nullable_primary_key_error() {
         // Arrange
         let spec = create_cidl(Model {
+            source_path: "./models/user.cloesce.ts".into(),
             name: String::from("User"),
             attributes: vec![Attribute {
                 value: TypedValue {

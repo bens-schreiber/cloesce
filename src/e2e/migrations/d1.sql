@@ -1,0 +1,1 @@
+CREATE TABLE "Person" ( "id" integer PRIMARY KEY, "name" text NOT NULL, "ssn" text );

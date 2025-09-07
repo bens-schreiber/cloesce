@@ -5,6 +5,7 @@
   "models": [
     {
       "name": "User",
+      "source_path": "models/user.cloesce.ts",
       "attributes": [
         {
           "value": {

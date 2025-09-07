@@ -3,7 +3,7 @@ type Err = { ok: false; status: number; message: string };
 type Result<T> = Ok<T> | Err;
 
 {{#each models}}
-class {{name}} {
+export class {{name}} {
   {{#each attributes}}
   {{value.name}}: {{lang_type value.cidl_type value.nullable}};
   {{/each}}
@@ -14,7 +14,7 @@ class {{name}} {
       {{name}}: {{lang_type cidl_type nullable}}{{#unless @last}}, {{/unless}}
     {{/each}}
   ): Promise<Result<string>> {
-    const url = {{#if is_static}}`/api/{{../name}}/{{name}}`{{else}}`/api/{{../name}}/${this.id}/{{name}}`{{/if}};
+    const url = `http://{{../../domain}}{{#if is_static}}/api/{{../name}}/{{name}}{{else}}/api/{{../name}}/${this.id}/{{name}}{{/if}}`;
 
     const res = await fetch(url, {
       method: "{{http_verb}}",
@@ -26,7 +26,14 @@ class {{name}} {
       })
     });
 
-    if (!res.ok) return { ok: false, status: res.status, message: res.statusText };
+    if (!res.ok) {
+      const data = await res.text();
+      return {
+        ok: false,
+        status: res.status,
+        message: data
+      };
+    }
 
     const data = await res.json();
     return { ok: true, data };

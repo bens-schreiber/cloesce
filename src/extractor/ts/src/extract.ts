@@ -64,7 +64,7 @@ function readCloesceConfig(cwd: string): CloesceConfig | null {
     return config;
   } catch (error) {
     throw new Error(
-      `Failed to parse cloesce-config.json: ${error instanceof Error ? error.message : String(error)}`,
+      `Failed to parse cloesce-config.json: ${error instanceof Error ? error.message : String(error)}`
     );
   }
 }
@@ -90,7 +90,7 @@ function walkCloesceFiles(root: string, searchPath: string): string[] {
 
   if (!fs.existsSync(fullPath)) {
     console.warn(
-      `Warning: Path "${searchPath}" specified in cloesce-config.json does not exist`,
+      `Warning: Path "${searchPath}" specified in cloesce-config.json does not exist`
     );
     return [];
   }
@@ -213,7 +213,7 @@ function typeNodeTextHasNullish(typeText?: string): {
  */
 function getNullability(
   prop: PropertyDeclaration | PropertySignature,
-  sf: SourceFile,
+  sf: SourceFile
 ): {
   nullable: boolean;
   reason:
@@ -258,7 +258,7 @@ function getNullability(
  */
 function getParamNullability(
   param: ParameterDeclaration,
-  sf: SourceFile,
+  sf: SourceFile
 ): boolean {
   // `?` ⇒ treat as DB-nullable
   if (param.hasQuestionToken()) return true;
@@ -277,7 +277,7 @@ function getParamNullability(
 
 function hasDecoratorNamed(
   node: { getDecorators(): any[] },
-  name: string,
+  name: string
 ): boolean {
   return node.getDecorators().some((d) => {
     const n = d.getName() ?? d.getExpression().getText();
@@ -298,7 +298,7 @@ export function extractModels(opts: ExtractOptions = {}) {
   const config = readCloesceConfig(cwd);
   if (!config) {
     throw new Error(
-      `No "cloesce-config.json" found in "${cwd}". Please create a cloesce-config.json with a "source" field.`,
+      `No "cloesce-config.json" found in "${cwd}". Please create a cloesce-config.json with a "source" field.`
     );
   }
 
@@ -316,7 +316,7 @@ export function extractModels(opts: ExtractOptions = {}) {
   if (files.length === 0) {
     const paths = sourcePaths.join(", ");
     throw new Error(
-      `No ".cloesce.ts" files found in specified source path(s): ${paths}`,
+      `No ".cloesce.ts" files found in specified source path(s): ${paths}`
     );
   }
 
@@ -397,8 +397,11 @@ export function extractModels(opts: ExtractOptions = {}) {
         };
       });
 
+      const sourcePath = path.relative(cwd, sf.getFilePath());
+
       models.push({
         name: className,
+        source_path: sourcePath,
         attributes,
         methods,
       });

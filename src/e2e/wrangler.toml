@@ -1,0 +1,10 @@
+name = "e2e"
+compatibility_date = "2025-09-07"
+main = ".generated/workers.ts"
+
+
+[[d1_databases]]
+binding = "DB"
+database_id = "..."
+database_name = "examples_database"
+migrations_dir = "./migrations"

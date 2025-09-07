@@ -79,6 +79,7 @@ exports[`actions snapshot 1`] = `
         },
       ],
       "name": "Actions",
+      "source_path": "actions.cloesce.ts",
     },
     {
       "attributes": [
@@ -142,6 +143,7 @@ exports[`actions snapshot 1`] = `
         },
       ],
       "name": "Dog",
+      "source_path": "dog.cloesce.ts",
     },
     {
       "attributes": [
@@ -191,6 +193,7 @@ exports[`actions snapshot 1`] = `
         },
       ],
       "name": "Person",
+      "source_path": "person.cloesce.ts",
     },
   ],
   "project_name": "actions",

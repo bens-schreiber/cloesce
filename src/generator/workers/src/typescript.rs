@@ -1,5 +1,3 @@
-use client::LanguageTypeMapper;
-use client::mappers::TypeScriptMapper;
 use common::{CidlType, HttpVerb, Method, Model, TypedValue};
 
 use crate::LanguageWorkerGenerator as LanguageWorkersGenerator;
@@ -7,23 +5,25 @@ use crate::LanguageWorkerGenerator as LanguageWorkersGenerator;
 pub struct TypescriptWorkersGenerator {}
 impl LanguageWorkersGenerator for TypescriptWorkersGenerator {
     fn imports(&self, models: &[Model]) -> String {
-        let model_names = models
+        // TODO: Fix hardcoding path ../{}
+        models
             .iter()
-            .map(|m| &m.name)
-            .cloned()
+            .map(|m| {
+                format!(
+                    r#"
+        import {{ {} }} from '../{}'; 
+        "#,
+                    m.name,
+                    m.source_path.with_extension("").display() // strip the .ts off
+                )
+            })
             .collect::<Vec<_>>()
-            .join(", ");
-
-        format!(
-            r#"
-        import {{ {model_names} }} from './models';
-        "#
-        )
+            .join("\n")
     }
 
     fn preamble(&self) -> String {
         r#"
-        function match(path: string, request: Request, env: any): Response {
+        function match(router: any, path: string, request: Request, env: any): Response {
             let node: any = router;
             const params: any[] = [];
             const segments = path.split("/").filter(Boolean);
@@ -65,22 +65,15 @@ impl LanguageWorkersGenerator for TypescriptWorkersGenerator {
         r#"
         export default {
             async fetch(request: Request, env: any, ctx: any): Promise<Response> {
-                {}
                 try {
                     const url = new URL(request.url);
-                    return match(url.pathname, request, env);
-                } catch (error) {
-                    console.error("Worker error:", error);
-                    return new Response(
-                        JSON.stringify({ 
-                            error: "Internal server error",
-                            message: error.message 
-                        }),
-                        { 
-                            status: 500,
-                            headers: { "Content-Type": "application/json" }
-                        }
-                    );
+                    return await match(router, url.pathname, request, env);
+                } catch (error: any) {
+                    console.error("Internal server error:", error);
+                    return new Response(JSON.stringify({ error: error?.message }), {
+                        status: 500,
+                        headers: { "Content-Type": "application/json" },
+                    });
                 }
             }
         };
@@ -88,51 +81,36 @@ impl LanguageWorkersGenerator for TypescriptWorkersGenerator {
         .to_string()
     }
 
-    fn router(&self, body: String) -> String {
+    fn router(&self, model: String) -> String {
         format!(
             r#"
-        const router = {{ api: {{{body}}} }}
+        const router = {{ api: {{{model}}} }}
         "#
         )
     }
 
-    fn router_model(&self, model_name: &str, body: String) -> String {
+    fn router_model(&self, model_name: &str, method: String) -> String {
         format!(
             r#"
-        {model_name}: {{{body}}}
+        {model_name}: {{{method}}}
         "#
         )
     }
 
-    fn router_method(&self, method: &Method, body: String) -> String {
-        let route = if method.is_static {
-            &method.name
+    fn router_method(&self, method: &Method, proto: String) -> String {
+        if method.is_static {
+            format!("{proto}")
         } else {
-            "<id>"
-        };
-
-        format!(
-            r#"
-        "{route}": {{{body}}}
-        "#
-        )
+            format!(
+                r#"
+            "<id>": {{{proto}}}
+            "#
+            )
+        }
     }
 
     fn proto(&self, method: &Method, body: String) -> String {
         let method_name = &method.name;
-
-        let params = method
-            .parameters
-            .iter()
-            .map(|p| {
-                format!(
-                    "{}: {}",
-                    p.name,
-                    TypeScriptMapper.type_name(&p.cidl_type, p.nullable)
-                )
-            })
-            .collect::<Vec<_>>()
-            .join(",");
 
         let id = if !method.is_static {
             "id: number, "
@@ -142,7 +120,7 @@ impl LanguageWorkersGenerator for TypescriptWorkersGenerator {
 
         format!(
             r#"
-            {method_name}: async ({id}{params}, request: Request, env: any) => {{{body}}}
+            {method_name}: async ({id} request: Request, env: any) => {{{body}}}
             "#
         )
     }
@@ -165,18 +143,38 @@ impl LanguageWorkersGenerator for TypescriptWorkersGenerator {
         )
     }
 
-    fn validate_params(&self, params: &[TypedValue]) -> String {
+    fn validate_req_body(&self, params: &[TypedValue]) -> String {
         fn fmt_error(name: &String, ty: &str) -> String {
             format!(
                 "if ({name} !== null && typeof {name} !== '{ty}') {{ throw new Error('Parameter {name} must be a {ty}'); }}",
             )
         }
 
-        let mut validations = Vec::new();
+        let mut validate = Vec::new();
+        validate.push(format!(
+            r#"
+            let body;
+            try {{
+                body = await request.json();
+            }} catch {{
+                return new Response(JSON.stringify({{ error: "Invalid request body" }}), {{
+                status: 400,
+                headers: {{ "Content-Type": "application/json" }},
+                }});
+            }}
+
+            const {{{}}} = body;
+        "#,
+            params
+                .iter()
+                .map(|p| p.name.clone())
+                .collect::<Vec<_>>()
+                .join(",")
+        ));
 
         for param in params {
             if !param.nullable {
-                validations.push(format!(
+                validate.push(format!(
                     "if ({} === null || {} === undefined) {{ throw new Error('Required parameter missing: {}');}}",
                     param.name, param.name, param.name
                 ));
@@ -193,13 +191,13 @@ impl LanguageWorkersGenerator for TypescriptWorkersGenerator {
                 }
             };
 
-            validations.push(type_check);
+            validate.push(type_check);
         }
 
-        if validations.is_empty() {
+        if validate.is_empty() {
             String::from("")
         } else {
-            validations.join("\n")
+            validate.join("\n")
         }
     }
 
@@ -249,7 +247,7 @@ impl LanguageWorkersGenerator for TypescriptWorkersGenerator {
 
         format!(
             r#"
-        {callee}.{method_name}({params})
+        return {callee}.{method_name}({params})
         "#
         )
     }

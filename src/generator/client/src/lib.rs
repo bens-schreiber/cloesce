@@ -43,7 +43,7 @@ fn register_type_mapper(
 
 const TYPESCRIPT_TEMPLATE: &str = include_str!("./templates/ts.hbs");
 
-pub fn generate_client_api(spec: CidlSpec) -> String {
+pub fn generate_client_api(spec: CidlSpec, domain: String) -> String {
     let template = match spec.language {
         InputLanguage::TypeScript => TYPESCRIPT_TEMPLATE,
     };
@@ -58,5 +58,11 @@ pub fn generate_client_api(spec: CidlSpec) -> String {
         .unwrap();
     register_type_mapper(&mut handlebars, mapper);
 
-    handlebars.render("models", &spec).unwrap()
+    // TODO: Determine where we want the domain passed in...
+    let mut context = serde_json::to_value(&spec).unwrap();
+    if let serde_json::Value::Object(ref mut map) = context {
+        map.insert("domain".to_string(), serde_json::Value::String(domain));
+    }
+
+    handlebars.render("models", &context).unwrap()
 }

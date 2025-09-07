@@ -1,51 +1,60 @@
----
-source: client/tests/client_tests.rs
-expression: client
----
 type Ok<T> = { ok: true; data: T };
 type Err = { ok: false; status: number; message: string };
 type Result<T> = Ok<T> | Err;
 
-export class User {
+export class Person {
   id: number;
   name: string;
+  ssn: string | null;
 
-  async do_something(
-      age: number, 
-      name: string
+  async speak(
+      count: number
   ): Promise<Result<string>> {
-    const url = `http://localhost:1000/api/User/${this.id}/do_something`;
+    const url = `http://localhost:5001/api/Person/${this.id}/speak`;
 
     const res = await fetch(url, {
       method: "GET",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-          age, 
-          name
+          count
       })
     });
 
-    if (!res.ok) return { ok: false, status: res.status, message: res.statusText };
+    if (!res.ok) {
+      const data = await res.text();
+      return {
+        ok: false,
+        status: res.status,
+        message: data
+      };
+    }
 
     const data = await res.json();
     return { ok: true, data };
   }
-  static async say_all_names(
-      age: number, 
-      name: string
+  static async post(
+      name: string, 
+      ssn: string | null
   ): Promise<Result<string>> {
-    const url = `http://localhost:1000/api/User/say_all_names`;
+    const url = `http://localhost:5001/api/Person/post`;
 
     const res = await fetch(url, {
-      method: "GET",
+      method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-          age, 
-          name
+          name, 
+          ssn
       })
     });
 
-    if (!res.ok) return { ok: false, status: res.status, message: res.statusText };
+    if (!res.ok) {
+      const data = await res.text();
+      return {
+        ok: false,
+        status: res.status,
+        message: data
+      };
+    }
 
     const data = await res.json();
     return { ok: true, data };

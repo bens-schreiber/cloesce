@@ -1,4 +1,4 @@
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::{fs::File, io::Write};
 
 use anyhow::{Context, Result, anyhow};
@@ -50,6 +50,7 @@ pub struct Model {
     pub name: String,
     pub attributes: Vec<Attribute>,
     pub methods: Vec<Method>,
+    pub source_path: PathBuf,
 }
 
 #[derive(Serialize, Deserialize)]

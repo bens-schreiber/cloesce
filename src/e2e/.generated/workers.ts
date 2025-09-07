@@ -1,10 +1,6 @@
----
-source: workers/tests/workers_tests.rs
-expression: workers
----
  
         
-        import { User } from '../models/user.cloesce'; 
+        import { Person } from '../models/person.cloesce'; 
         
         
         function match(router: any, path: string, request: Request, env: any): Response {
@@ -45,9 +41,9 @@ expression: workers
         
         
         const router = { api: {
-        User: {
+        Person: {
             "<id>": {
-            do_something: async (id: number,  request: Request, env: any) => {
+            speak: async (id: number,  request: Request, env: any) => {
                 
             if (request.method !== "GET") {
                 return new Response("Method Not Allowed", { status: 405 });
@@ -64,16 +60,14 @@ expression: workers
                 });
             }
 
-            const {age,name} = body;
+            const {count} = body;
         
-if (age === null || age === undefined) { throw new Error('Required parameter missing: age');}
-if (age !== null && typeof age !== 'number') { throw new Error('Parameter age must be a number'); }
-if (name === null || name === undefined) { throw new Error('Required parameter missing: name');}
-if (name !== null && typeof name !== 'string') { throw new Error('Parameter name must be a string'); }
+if (count === null || count === undefined) { throw new Error('Required parameter missing: count');}
+if (count !== null && typeof count !== 'number') { throw new Error('Parameter count must be a number'); }
                 
         const d1 = env.D1_DB || env.DB;
 
-        const query = `SELECT * FROM User WHERE id = ?`;
+        const query = `SELECT * FROM Person WHERE id = ?`;
         const record = await d1.prepare(query).bind(id).first();
 
         if (!record) {
@@ -83,18 +77,18 @@ if (name !== null && typeof name !== 'string') { throw new Error('Parameter name
             );
         }
 
-        const instance: User = {id,name};
+        const instance: Person = {id,name,ssn};
         
                 
-        return instance.do_something(age, name)
+        return instance.speak(count)
         
             }
             }
             ,
 
-            say_all_names: async ( request: Request, env: any) => {
+            post: async ( request: Request, env: any) => {
                 
-            if (request.method !== "GET") {
+            if (request.method !== "POST") {
                 return new Response("Method Not Allowed", { status: 405 });
             }
             
@@ -109,15 +103,14 @@ if (name !== null && typeof name !== 'string') { throw new Error('Parameter name
                 });
             }
 
-            const {age,name} = body;
+            const {name,ssn} = body;
         
-if (age === null || age === undefined) { throw new Error('Required parameter missing: age');}
-if (age !== null && typeof age !== 'number') { throw new Error('Parameter age must be a number'); }
 if (name === null || name === undefined) { throw new Error('Required parameter missing: name');}
 if (name !== null && typeof name !== 'string') { throw new Error('Parameter name must be a string'); }
+if (ssn !== null && typeof ssn !== 'string') { throw new Error('Parameter ssn must be a string'); }
                 
                 
-        return User.say_all_names(age, name)
+        return Person.post(name, ssn)
         
             }
             }
@@ -128,8 +121,8 @@ if (name !== null && typeof name !== 'string') { throw new Error('Parameter name
             async fetch(request: Request, env: any, ctx: any): Promise<Response> {
                 try {
                     const url = new URL(request.url);
-                    return match(router, url.pathname, request, env);
-                } catch (error) {
+                    return await match(router, url.pathname, request, env);
+                } catch (error: any) {
                     console.error("Internal server error:", error);
                     return new Response(JSON.stringify({ error: error?.message }), {
                         status: 500,
@@ -138,3 +131,5 @@ if (name !== null && typeof name !== 'string') { throw new Error('Parameter name
                 }
             }
         };
+        
+        
