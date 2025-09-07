@@ -125,6 +125,7 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+        working-directory: src/e2e
 
       # Check formatting before running E2E
       - name: Prettier
