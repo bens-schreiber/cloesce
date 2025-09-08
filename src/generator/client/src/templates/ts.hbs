@@ -16,7 +16,7 @@ export class {{name}} {
       {{/if}}
     {{/each}}
   ): Promise<Result<string>> {
-    const url = `http://{{../../domain}}{{#if is_static}}/api/{{../name}}/{{name}}{{else}}/api/{{../name}}/${this.id}/{{name}}{{/if}}`;
+    const url = `{{../../domain}}/{{#if is_static}}{{../name}}/{{name}}{{else}}{{../name}}/${this.id}/{{name}}{{/if}}`;
 
     const res = await fetch(url, {
       method: "{{http_verb}}",
