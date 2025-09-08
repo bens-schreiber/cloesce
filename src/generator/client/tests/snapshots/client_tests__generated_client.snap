@@ -13,7 +13,7 @@ export class Actions {
   static async create(
         payload: string
   ): Promise<Result<string>> {
-    const url = `http://localhost:1000/api/Actions/create`;
+    const url = `localhost:1000/Actions/create`;
 
     const res = await fetch(url, {
       method: "POST",
@@ -39,7 +39,7 @@ export class Actions {
         id: number, 
         payload: string | null
   ): Promise<Result<string>> {
-    const url = `http://localhost:1000/api/Actions/update`;
+    const url = `localhost:1000/Actions/update`;
 
     const res = await fetch(url, {
       method: "PUT",
@@ -65,7 +65,7 @@ export class Actions {
   static async patch(
         phrase: string
   ): Promise<Result<string>> {
-    const url = `http://localhost:1000/api/Actions/patch`;
+    const url = `localhost:1000/Actions/patch`;
 
     const res = await fetch(url, {
       method: "PATCH",
@@ -90,7 +90,7 @@ export class Actions {
   static async remove(
         id: number
   ): Promise<Result<string>> {
-    const url = `http://localhost:1000/api/Actions/remove`;
+    const url = `localhost:1000/Actions/remove`;
 
     const res = await fetch(url, {
       method: "DELETE",
@@ -121,7 +121,7 @@ export class Dog {
 
   async get_name(
   ): Promise<Result<string>> {
-    const url = `http://localhost:1000/api/Dog/${this.id}/get_name`;
+    const url = `localhost:1000/Dog/${this.id}/get_name`;
 
     const res = await fetch(url, {
       method: "GET",
@@ -144,7 +144,7 @@ export class Dog {
   }
   async get_breed(
   ): Promise<Result<string>> {
-    const url = `http://localhost:1000/api/Dog/${this.id}/get_breed`;
+    const url = `localhost:1000/Dog/${this.id}/get_breed`;
 
     const res = await fetch(url, {
       method: "GET",
@@ -168,7 +168,7 @@ export class Dog {
   static async woof(
         phrase: string
   ): Promise<Result<string>> {
-    const url = `http://localhost:1000/api/Dog/woof`;
+    const url = `localhost:1000/Dog/woof`;
 
     const res = await fetch(url, {
       method: "POST",
@@ -198,7 +198,7 @@ export class Person {
 
   async foo(
   ): Promise<Result<string>> {
-    const url = `http://localhost:1000/api/Person/${this.id}/foo`;
+    const url = `localhost:1000/Person/${this.id}/foo`;
 
     const res = await fetch(url, {
       method: "GET",
@@ -222,7 +222,7 @@ export class Person {
   static async speak(
         phrase: string
   ): Promise<Result<string>> {
-    const url = `http://localhost:1000/api/Person/speak`;
+    const url = `localhost:1000/Person/speak`;
 
     const res = await fetch(url, {
       method: "POST",

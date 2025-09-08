@@ -1,6 +1,6 @@
 compatibility_date = "2025-09-07"
 main = ".generated/workers.ts"
-name = "e2e"
+name = "example"
 
 [[d1_databases]]
 binding = "DB"
