@@ -24,7 +24,7 @@ async function main() {
   );
   runSync(
     "Generating client",
-    `cargo run generate client ${cidlPath} ${clientPath} localhost:${port}`,
+    `cargo run generate client ${cidlPath} ${clientPath} http://localhost:${port}/api`,
     { cwd: generatorPath },
   );
 
