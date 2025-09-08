@@ -10,8 +10,11 @@ document.getElementById("personForm")!.onsubmit = async (e) => {
   const name = (document.getElementById("name") as HTMLInputElement).value;
   const ssn = (document.getElementById("ssn") as HTMLInputElement).value;
 
+  // Static method `post`
   const res = await Person.post(name, ssn);
   if (res.ok) {
+    // Since `post` returns JSON and `Person` has no constructor, this
+    // syntax is required (for v0.0.1)
     person = Object.assign(new Person(), res.data);
     out.textContent = `Created ${person.name} (id=${person.id})`;
     speakButton.removeAttribute("disabled");

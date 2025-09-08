@@ -10,21 +10,27 @@ import { D1, POST, PrimaryKey } from "cloesce";
 /// `D1Database` can be dependency injected into a method.
 @D1
 export class Person {
+  // Explicit primary key hint for the extractor
   @PrimaryKey
   id!: number;
   name!: string;
+
+  // Denoting null cannot be done with ? as that also means undefined
   ssn!: string | null;
 
   /// Replies with the phrase: "<name> <social security number> <favorite_number>"
   @POST
   async speak(favorite_number: number) {
     let res = `${this.name} ${this.ssn} ${favorite_number}`;
+
+    // v0.0.1 only supports JSON return types
     return new Response(JSON.stringify(res));
   }
 
   /// A basic 'POST Person' endpoint, returning a newly inserted Person in JSON
   @POST
   static async post(db: D1Database, name: string, ssn: string | null) {
+    // db is dependency injected from the Cloudflare environment
     let result = await db
       .prepare("INSERT INTO Person (name, ssn) VALUES (?, ?) RETURNING *")
       .bind(name, ssn)
