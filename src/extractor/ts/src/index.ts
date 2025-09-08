@@ -1,2 +1,9 @@
-export { D1, GET, POST, PUT, PATCH, DELETE, PrimaryKey } from "./decorators.js";
-export type { D1Db, Handler } from "./types.js";
+export const D1: ClassDecorator = () => {};
+
+export const PrimaryKey: PropertyDecorator = () => {};
+
+export const GET: MethodDecorator = () => {};
+export const POST: MethodDecorator = () => {};
+export const PUT: MethodDecorator = () => {};
+export const PATCH: MethodDecorator = () => {};
+export const DELETE: MethodDecorator = () => {};

@@ -1,15 +1,18 @@
-use common::CidlType;
+use common::{CidlType, SqlType};
 
-use crate::LanguageTypeMapper;
+use crate::ClientLanguageTypeMapper;
 
 pub struct TypeScriptMapper;
-impl LanguageTypeMapper for TypeScriptMapper {
+impl ClientLanguageTypeMapper for TypeScriptMapper {
     fn type_name(&self, ty: &CidlType, nullable: bool) -> String {
         let base = match ty {
-            CidlType::Integer => "number",
-            CidlType::Real => "number",
-            CidlType::Text => "string",
-            CidlType::Blob => "Uint8Array",
+            CidlType::Sql(sql_type) => match sql_type {
+                SqlType::Integer => "number",
+                SqlType::Real => "number",
+                SqlType::Text => "string",
+                SqlType::Blob => "Uint8Array",
+            },
+            _ => panic!("Non SQL types are not supported in the client"),
         };
         if nullable {
             format!("{} | null", base)

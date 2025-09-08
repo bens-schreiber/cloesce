@@ -1,4 +1,4 @@
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::{fs::File, io::Write};
 
 use anyhow::{Context, Result, anyhow};
@@ -8,11 +8,22 @@ use serde_json::Value as JsonValue;
 use toml::Value as TomlValue;
 
 #[derive(Serialize, Deserialize, Debug)]
-pub enum CidlType {
+pub enum SqlType {
     Integer,
     Real,
     Text,
     Blob,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub enum CfType {
+    D1Database,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub enum CidlType {
+    Sql(SqlType),
+    Cf(CfType),
 }
 
 #[derive(Serialize, Deserialize)]
@@ -50,6 +61,7 @@ pub struct Model {
     pub name: String,
     pub attributes: Vec<Attribute>,
     pub methods: Vec<Method>,
+    pub source_path: PathBuf,
 }
 
 #[derive(Serialize, Deserialize)]

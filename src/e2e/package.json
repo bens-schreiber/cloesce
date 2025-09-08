@@ -1,0 +1,20 @@
+{
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20250906.0",
+    "@types/node": "^24.3.1",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.2",
+    "prettier": "^3.6.2"
+  },
+  "scripts": {
+    "format:fix": "prettier --write .",
+    "format": "prettier --check .",
+    "build": "tsc",
+    "start": "npm run build && node dist/main.js"
+  },
+  "type": "module",
+  "dependencies": {
+    "cloesce": "file:../extractor/ts",
+    "wrangler": "^4.34.0"
+  }
+}

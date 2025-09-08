@@ -3,11 +3,20 @@ source: workers/tests/workers_tests.rs
 expression: workers
 ---
  
+        import { D1Database } from "@cloudflare/workers-types"
+
+        import { Actions } from '../actions.cloesce'; 
         
-        import { User } from './models';
+
+        import { Dog } from '../dog.cloesce'; 
+        
+
+        import { Person } from '../person.cloesce'; 
         
         
-        function match(path: string, request: Request, env: any): Response {
+        export interface Env { DB: D1Database }
+
+        function match(router: any, path: string, request: Request, env: Env): Response {
             let node: any = router;
             const params: any[] = [];
             const segments = path.split("/").filter(Boolean);
@@ -45,79 +54,274 @@ expression: workers
         
         
         const router = { api: {
-        User: {
-        "<id>": {
-            do_something: async (id: number, age: number,name: string, request: Request, env: any) => {
+        Actions: {
+            create: async ( request: Request, env: Env) => {
+                
+            if (request.method !== "POST") {
+                return new Response("Method Not Allowed", { status: 405 });
+            }
+            
+                
+            let body;
+            try {
+                body = await request.json();
+            } catch {
+                return new Response(JSON.stringify({ error: "Invalid request body" }), {
+                    status: 400,
+                    headers: { "Content-Type": "application/json" },
+                });
+            }
+            
+            const {payload} = body;
+            
+if (payload === null || payload === undefined) { throw new Error('Required parameter missing: payload');}
+if (payload !== null && typeof payload !== 'string') { throw new Error('Parameter payload must be a string'); }
+                
+                
+        return Actions.create(env.DB, payload)
+        
+            }
+            ,
+
+            update: async ( request: Request, env: Env) => {
+                
+            if (request.method !== "PUT") {
+                return new Response("Method Not Allowed", { status: 405 });
+            }
+            
+                
+            let body;
+            try {
+                body = await request.json();
+            } catch {
+                return new Response(JSON.stringify({ error: "Invalid request body" }), {
+                    status: 400,
+                    headers: { "Content-Type": "application/json" },
+                });
+            }
+            
+            const {id,payload} = body;
+            
+if (id === null || id === undefined) { throw new Error('Required parameter missing: id');}
+if (id !== null && typeof id !== 'number') { throw new Error('Parameter id must be a number'); }
+if (payload !== null && typeof payload !== 'string') { throw new Error('Parameter payload must be a string'); }
+                
+                
+        return Actions.update(env.DB, id, payload)
+        
+            }
+            ,
+
+            patch: async ( request: Request, env: Env) => {
+                
+            if (request.method !== "PATCH") {
+                return new Response("Method Not Allowed", { status: 405 });
+            }
+            
+                
+            let body;
+            try {
+                body = await request.json();
+            } catch {
+                return new Response(JSON.stringify({ error: "Invalid request body" }), {
+                    status: 400,
+                    headers: { "Content-Type": "application/json" },
+                });
+            }
+            
+            const {phrase} = body;
+            
+if (phrase === null || phrase === undefined) { throw new Error('Required parameter missing: phrase');}
+if (phrase !== null && typeof phrase !== 'string') { throw new Error('Parameter phrase must be a string'); }
+                
+                
+        return Actions.patch(env.DB, phrase)
+        
+            }
+            ,
+
+            remove: async ( request: Request, env: Env) => {
+                
+            if (request.method !== "DELETE") {
+                return new Response("Method Not Allowed", { status: 405 });
+            }
+            
+                
+            let body;
+            try {
+                body = await request.json();
+            } catch {
+                return new Response(JSON.stringify({ error: "Invalid request body" }), {
+                    status: 400,
+                    headers: { "Content-Type": "application/json" },
+                });
+            }
+            
+            const {id} = body;
+            
+if (id === null || id === undefined) { throw new Error('Required parameter missing: id');}
+if (id !== null && typeof id !== 'number') { throw new Error('Parameter id must be a number'); }
+                
+                
+        return Actions.remove(env.DB, id)
+        
+            }
+            }
+        
+
+        Dog: {
+            "<id>": {
+            get_name: async (id: number,  request: Request, env: Env) => {
                 
             if (request.method !== "GET") {
                 return new Response("Method Not Allowed", { status: 405 });
             }
             
-                if (age === null || age === undefined) { throw new Error('Required parameter missing: age');}
-if (age !== null && typeof age !== 'number') { throw new Error('Parameter age must be a number'); }
-if (name === null || name === undefined) { throw new Error('Required parameter missing: name');}
-if (name !== null && typeof name !== 'string') { throw new Error('Parameter name must be a string'); }
                 
-        const d1 = env.D1_DB || env.DB;
-
-        const query = `SELECT * FROM User WHERE id = ?`;
+                
+        const d1 = env.DB;
+        const query = `SELECT * FROM Dog WHERE id = ?`;
         const record = await d1.prepare(query).bind(id).first();
-
         if (!record) {
             return new Response(
                 JSON.stringify({ error: "Record not found" }),
                 { status: 404, headers: { "Content-Type": "application/json" } }
             );
         }
-
-        const instance: User = {id,name};
+        const instance: Dog = Object.assign(new Dog(), record)
         
                 
-        instance.do_something(age, name)
+        return instance.get_name(env.DB)
         
             }
             }
-        ,
+            ,
 
-        "say_all_names": {
-            say_all_names: async (age: number,name: string, request: Request, env: any) => {
+            "<id>": {
+            get_breed: async (id: number,  request: Request, env: Env) => {
                 
             if (request.method !== "GET") {
                 return new Response("Method Not Allowed", { status: 405 });
             }
             
-                if (age === null || age === undefined) { throw new Error('Required parameter missing: age');}
-if (age !== null && typeof age !== 'number') { throw new Error('Parameter age must be a number'); }
-if (name === null || name === undefined) { throw new Error('Required parameter missing: name');}
-if (name !== null && typeof name !== 'string') { throw new Error('Parameter name must be a string'); }
                 
                 
-        User.say_all_names(age, name)
+        const d1 = env.DB;
+        const query = `SELECT * FROM Dog WHERE id = ?`;
+        const record = await d1.prepare(query).bind(id).first();
+        if (!record) {
+            return new Response(
+                JSON.stringify({ error: "Record not found" }),
+                { status: 404, headers: { "Content-Type": "application/json" } }
+            );
+        }
+        const instance: Dog = Object.assign(new Dog(), record)
+        
+                
+        return instance.get_breed(env.DB)
         
             }
             }
+            ,
+
+            woof: async ( request: Request, env: Env) => {
+                
+            if (request.method !== "POST") {
+                return new Response("Method Not Allowed", { status: 405 });
+            }
+            
+                
+            let body;
+            try {
+                body = await request.json();
+            } catch {
+                return new Response(JSON.stringify({ error: "Invalid request body" }), {
+                    status: 400,
+                    headers: { "Content-Type": "application/json" },
+                });
+            }
+            
+            const {phrase} = body;
+            
+if (phrase === null || phrase === undefined) { throw new Error('Required parameter missing: phrase');}
+if (phrase !== null && typeof phrase !== 'string') { throw new Error('Parameter phrase must be a string'); }
+                
+                
+        return Dog.woof(env.DB, phrase)
+        
+            }
+            }
+        
+
+        Person: {
+            "<id>": {
+            foo: async (id: number,  request: Request, env: Env) => {
+                
+            if (request.method !== "GET") {
+                return new Response("Method Not Allowed", { status: 405 });
+            }
+            
+                
+                
+        const d1 = env.DB;
+        const query = `SELECT * FROM Person WHERE id = ?`;
+        const record = await d1.prepare(query).bind(id).first();
+        if (!record) {
+            return new Response(
+                JSON.stringify({ error: "Record not found" }),
+                { status: 404, headers: { "Content-Type": "application/json" } }
+            );
         }
+        const instance: Person = Object.assign(new Person(), record)
+        
+                
+        return instance.foo(env.DB)
+        
+            }
+            }
+            ,
+
+            speak: async ( request: Request, env: Env) => {
+                
+            if (request.method !== "POST") {
+                return new Response("Method Not Allowed", { status: 405 });
+            }
+            
+                
+            let body;
+            try {
+                body = await request.json();
+            } catch {
+                return new Response(JSON.stringify({ error: "Invalid request body" }), {
+                    status: 400,
+                    headers: { "Content-Type": "application/json" },
+                });
+            }
+            
+            const {phrase} = body;
+            
+if (phrase === null || phrase === undefined) { throw new Error('Required parameter missing: phrase');}
+if (phrase !== null && typeof phrase !== 'string') { throw new Error('Parameter phrase must be a string'); }
+                
+                
+        return Person.speak(env.DB, phrase)
+        
+            }
+            }
         } }
         
         
         export default {
-            async fetch(request: Request, env: any, ctx: any): Promise<Response> {
-                {}
+            async fetch(request: Request, env: Env, ctx: any): Promise<Response> {
                 try {
                     const url = new URL(request.url);
-                    return match(url.pathname, request, env);
-                } catch (error) {
-                    console.error("Worker error:", error);
-                    return new Response(
-                        JSON.stringify({ 
-                            error: "Internal server error",
-                            message: error.message 
-                        }),
-                        { 
-                            status: 500,
-                            headers: { "Content-Type": "application/json" }
-                        }
-                    );
+                    return await match(router, url.pathname, request, env);
+                } catch (error: any) {
+                    console.error("Internal server error:", error);
+                    return new Response(JSON.stringify({ error: error?.message }), {
+                        status: 500,
+                        headers: { "Content-Type": "application/json" },
+                    });
                 }
             }
         };

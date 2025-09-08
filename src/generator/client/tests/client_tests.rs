@@ -14,7 +14,7 @@ fn test_generate_client_snapshot() -> Result<()> {
     };
 
     // Act
-    let client = client::generate_client_api(cidl);
+    let client = client::generate_client_api(cidl, "localhost:1000".to_string());
 
     // Assert
     assert_snapshot!("generated_client", client);
