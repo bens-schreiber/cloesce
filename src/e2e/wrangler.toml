@@ -6,5 +6,5 @@ main = ".generated/workers.ts"
 [[d1_databases]]
 binding = "DB"
 database_id = "..."
-database_name = "examples_database"
+database_name = "e2e_db"
 migrations_dir = "./migrations"
