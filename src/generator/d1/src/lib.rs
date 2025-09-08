@@ -1,4 +1,4 @@
-use common::{CidlSpec, CidlType, D1Database, SqlType, WranglerSpec};
+use common::{CidlSpec, CidlType, D1Database, WranglerSpec};
 
 use anyhow::{Result, anyhow};
 use sea_query::{Alias, ColumnDef, SqliteQueryBuilder, Table};
@@ -86,12 +86,10 @@ impl D1Generator {
                 }
 
                 match &attribute.value.cidl_type {
-                    CidlType::Sql(sql_type) => match sql_type {
-                        SqlType::Integer => column.integer(),
-                        SqlType::Real => column.decimal(),
-                        SqlType::Text => column.text(),
-                        SqlType::Blob => column.blob(),
-                    },
+                    CidlType::Integer => column.integer(),
+                    CidlType::Real => column.decimal(),
+                    CidlType::Text => column.text(),
+                    CidlType::Blob => column.blob(),
                     other => return Err(anyhow!("Invalid SQLite type {:?}", other)),
                 };
 
@@ -107,9 +105,7 @@ impl D1Generator {
 
 #[cfg(test)]
 mod tests {
-    use common::{
-        Attribute, CidlSpec, CidlType, InputLanguage, Model, SqlType, TypedValue, WranglerSpec,
-    };
+    use common::{Attribute, CidlSpec, CidlType, InputLanguage, Model, TypedValue, WranglerSpec};
 
     use crate::D1Generator;
 
@@ -138,26 +134,29 @@ mod tests {
                 Attribute {
                     value: TypedValue {
                         name: String::from("id"),
-                        cidl_type: CidlType::Sql(SqlType::Integer),
+                        cidl_type: CidlType::Integer,
                         nullable: false,
                     },
                     primary_key: true,
+                    foreign_key: false,
                 },
                 Attribute {
                     value: TypedValue {
                         name: String::from("name"),
-                        cidl_type: CidlType::Sql(SqlType::Text),
+                        cidl_type: CidlType::Text,
                         nullable: true,
                     },
                     primary_key: false,
+                    foreign_key: false,
                 },
                 Attribute {
                     value: TypedValue {
                         name: String::from("age"),
-                        cidl_type: CidlType::Sql(SqlType::Integer),
+                        cidl_type: CidlType::Integer,
                         nullable: false,
                     },
                     primary_key: false,
+                    foreign_key: false,
                 },
             ],
             methods: vec![],
@@ -185,18 +184,20 @@ mod tests {
                 Attribute {
                     value: TypedValue {
                         name: String::from("id"),
-                        cidl_type: CidlType::Sql(SqlType::Integer),
+                        cidl_type: CidlType::Integer,
                         nullable: false,
                     },
                     primary_key: true,
+                    foreign_key: false,
                 },
                 Attribute {
                     value: TypedValue {
                         name: String::from("user_id"),
-                        cidl_type: CidlType::Sql(SqlType::Integer),
+                        cidl_type: CidlType::Integer,
                         nullable: false,
                     },
                     primary_key: true,
+                    foreign_key: false,
                 },
             ],
             methods: vec![],
@@ -220,10 +221,11 @@ mod tests {
             attributes: vec![Attribute {
                 value: TypedValue {
                     name: String::from("id"),
-                    cidl_type: CidlType::Sql(SqlType::Integer),
+                    cidl_type: CidlType::Integer,
                     nullable: true,
                 },
                 primary_key: true,
+                foreign_key: false,
             }],
             methods: vec![],
         });

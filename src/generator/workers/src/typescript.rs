@@ -1,4 +1,4 @@
-use common::{CfType, CidlType, HttpVerb, Method, Model, SqlType, TypedValue};
+use common::{CidlType, HttpVerb, Method, Model, TypedValue};
 
 use crate::LanguageWorkerGenerator as LanguageWorkersGenerator;
 
@@ -160,7 +160,7 @@ impl LanguageWorkersGenerator for TypescriptWorkersGenerator {
 
         let valid_params = params
             .iter()
-            .filter(|p| matches!(p.cidl_type, CidlType::Sql(_)))
+            .filter(|p| !matches!(p.cidl_type, CidlType::D1Database))
             .collect::<Vec<_>>();
 
         // Instantiate Request Body
@@ -197,15 +197,13 @@ impl LanguageWorkersGenerator for TypescriptWorkersGenerator {
             }
 
             match &param.cidl_type {
-                CidlType::Sql(sql_type) => match sql_type {
-                    SqlType::Integer | SqlType::Real => validate.push(fmt_error(&param.name, "number")),
-                    SqlType::Text => validate.push(fmt_error(&param.name, "string")),
-                    SqlType::Blob => {
-                        validate.push(format!(
-                            "if ({} !== null && !({} instanceof ArrayBuffer || {} instanceof Uint8Array)) {{ throw new Error('Parameter {} must be a Uint8Array'); }}",
-                            param.name, param.name, param.name, param.name
-                        ))
-                    }
+                CidlType::Integer | CidlType::Real => validate.push(fmt_error(&param.name, "number")),
+                CidlType::Text => validate.push(fmt_error(&param.name, "string")),
+                CidlType::Blob => {
+                    validate.push(format!(
+                        "if ({} !== null && !({} instanceof ArrayBuffer || {} instanceof Uint8Array)) {{ throw new Error('Parameter {} must be a Uint8Array'); }}",
+                        param.name, param.name, param.name, param.name
+                    ))
                 },
                 _ => {
                     // Skip any other params, they may be dependency injected
@@ -245,8 +243,8 @@ impl LanguageWorkersGenerator for TypescriptWorkersGenerator {
             .parameters
             .iter()
             .map(|p| match &p.cidl_type {
-                CidlType::Sql(_) => p.name.clone(),
-                CidlType::Cf(CfType::D1Database) => "env.DB".to_string(),
+                CidlType::D1Database => "env.DB".to_string(),
+                _ => p.name.clone(),
             })
             .collect::<Vec<_>>()
             .join(", ");

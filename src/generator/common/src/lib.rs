@@ -8,22 +8,14 @@ use serde_json::Value as JsonValue;
 use toml::Value as TomlValue;
 
 #[derive(Serialize, Deserialize, Debug)]
-pub enum SqlType {
+pub enum CidlType {
     Integer,
     Real,
     Text,
     Blob,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-pub enum CfType {
     D1Database,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-pub enum CidlType {
-    Sql(SqlType),
-    Cf(CfType),
+    Model(String),
+    Array(Box<CidlType>),
 }
 
 #[derive(Serialize, Deserialize)]
@@ -46,6 +38,7 @@ pub struct TypedValue {
 pub struct Attribute {
     pub value: TypedValue,
     pub primary_key: bool,
+    pub foreign_key: bool,
 }
 
 #[derive(Serialize, Deserialize)]
