@@ -1,3 +1,6 @@
+# note: temporary script for v0.0.1 until npm orchestrates everything
+
+
 # extract cidl
 npx cloesce
 
