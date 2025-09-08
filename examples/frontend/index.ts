@@ -25,6 +25,8 @@ document.getElementById("personForm")!.onsubmit = async (e) => {
 
 speakButton.onclick = async () => {
   if (!person) return;
+
+  // Instantiated method `speak`
   const res = await person.speak(42);
   out.textContent = res.ok ? res.data : `Error: ${res.message}`;
 };
