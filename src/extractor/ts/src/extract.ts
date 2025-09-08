@@ -99,15 +99,13 @@ function cleanTypeText(t: Type, sf: SourceFile) {
   return t.getText(sf).replace(/import\(".*?"\)\./g, "");
 }
 
-export type SqlTypeJson = "Integer" | "Real" | "Text" | "Blob";
-export type CfTypeJson = "D1Database";
-export type CidlTypeJson = { Sql: SqlTypeJson } | { Cf: CfTypeJson };
+export type CidlTypeJson = "Integer" | "Real" | "Text" | "Blob" | "D1Database";
 
 const cidlTypeMap = {
-  number: { Sql: "Integer" } as const,
-  string: { Sql: "Text" } as const,
-  boolean: { Sql: "Integer" } as const,
-  D1Database: { Cf: "D1Database" } as const,
+  number: "Integer" as const,
+  string: "Text" as const,
+  boolean: "Integer" as const,
+  D1Database: "D1Database" as const,
 } satisfies Record<string, CidlTypeJson>;
 
 export namespace TypeCode {
@@ -323,6 +321,7 @@ export function extractModels(opts: ExtractOptions = {}) {
             cidl_type: TypeCode.toCidlType(t, sf),
             nullable,
           },
+          foreign_key: false, // TODO: FK's
         };
 
         if (hasDecoratorNamed(prop, "PrimaryKey")) {

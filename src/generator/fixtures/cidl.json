@@ -4,21 +4,19 @@
     {
       "attributes": [
         {
+          "foreign_key": false,
           "primary_key": true,
           "value": {
-            "cidl_type": {
-              "Sql": "Integer"
-            },
+            "cidl_type": "Integer",
             "name": "id",
             "nullable": false
           }
         },
         {
+          "foreign_key": false,
           "primary_key": false,
           "value": {
-            "cidl_type": {
-              "Sql": "Text"
-            },
+            "cidl_type": "Text",
             "name": "name",
             "nullable": false
           }
@@ -31,16 +29,12 @@
           "name": "create",
           "parameters": [
             {
-              "cidl_type": {
-                "Cf": "D1Database"
-              },
+              "cidl_type": "D1Database",
               "name": "db",
               "nullable": false
             },
             {
-              "cidl_type": {
-                "Sql": "Text"
-              },
+              "cidl_type": "Text",
               "name": "payload",
               "nullable": false
             }
@@ -52,23 +46,17 @@
           "name": "update",
           "parameters": [
             {
-              "cidl_type": {
-                "Cf": "D1Database"
-              },
+              "cidl_type": "D1Database",
               "name": "db",
               "nullable": false
             },
             {
-              "cidl_type": {
-                "Sql": "Integer"
-              },
+              "cidl_type": "Integer",
               "name": "id",
               "nullable": false
             },
             {
-              "cidl_type": {
-                "Sql": "Text"
-              },
+              "cidl_type": "Text",
               "name": "payload",
               "nullable": true
             }
@@ -80,16 +68,12 @@
           "name": "patch",
           "parameters": [
             {
-              "cidl_type": {
-                "Cf": "D1Database"
-              },
+              "cidl_type": "D1Database",
               "name": "db",
               "nullable": false
             },
             {
-              "cidl_type": {
-                "Sql": "Text"
-              },
+              "cidl_type": "Text",
               "name": "phrase",
               "nullable": false
             }
@@ -101,16 +85,12 @@
           "name": "remove",
           "parameters": [
             {
-              "cidl_type": {
-                "Cf": "D1Database"
-              },
+              "cidl_type": "D1Database",
               "name": "db",
               "nullable": false
             },
             {
-              "cidl_type": {
-                "Sql": "Integer"
-              },
+              "cidl_type": "Integer",
               "name": "id",
               "nullable": false
             }
@@ -123,41 +103,37 @@
     {
       "attributes": [
         {
+          "foreign_key": false,
           "primary_key": true,
           "value": {
-            "cidl_type": {
-              "Sql": "Integer"
-            },
+            "cidl_type": "Integer",
             "name": "id",
             "nullable": false
           }
         },
         {
+          "foreign_key": false,
           "primary_key": false,
           "value": {
-            "cidl_type": {
-              "Sql": "Text"
-            },
+            "cidl_type": "Text",
             "name": "name",
             "nullable": false
           }
         },
         {
+          "foreign_key": false,
           "primary_key": false,
           "value": {
-            "cidl_type": {
-              "Sql": "Integer"
-            },
+            "cidl_type": "Integer",
             "name": "breed",
             "nullable": false
           }
         },
         {
+          "foreign_key": false,
           "primary_key": false,
           "value": {
-            "cidl_type": {
-              "Sql": "Text"
-            },
+            "cidl_type": "Text",
             "name": "preferred_treat",
             "nullable": true
           }
@@ -170,9 +146,7 @@
           "name": "get_name",
           "parameters": [
             {
-              "cidl_type": {
-                "Cf": "D1Database"
-              },
+              "cidl_type": "D1Database",
               "name": "db",
               "nullable": false
             }
@@ -184,9 +158,7 @@
           "name": "get_breed",
           "parameters": [
             {
-              "cidl_type": {
-                "Cf": "D1Database"
-              },
+              "cidl_type": "D1Database",
               "name": "db",
               "nullable": false
             }
@@ -198,16 +170,12 @@
           "name": "woof",
           "parameters": [
             {
-              "cidl_type": {
-                "Cf": "D1Database"
-              },
+              "cidl_type": "D1Database",
               "name": "db",
               "nullable": false
             },
             {
-              "cidl_type": {
-                "Sql": "Text"
-              },
+              "cidl_type": "Text",
               "name": "phrase",
               "nullable": false
             }
@@ -220,31 +188,28 @@
     {
       "attributes": [
         {
+          "foreign_key": false,
           "primary_key": true,
           "value": {
-            "cidl_type": {
-              "Sql": "Integer"
-            },
+            "cidl_type": "Integer",
             "name": "id",
             "nullable": false
           }
         },
         {
+          "foreign_key": false,
           "primary_key": false,
           "value": {
-            "cidl_type": {
-              "Sql": "Text"
-            },
+            "cidl_type": "Text",
             "name": "name",
             "nullable": false
           }
         },
         {
+          "foreign_key": false,
           "primary_key": false,
           "value": {
-            "cidl_type": {
-              "Sql": "Text"
-            },
+            "cidl_type": "Text",
             "name": "middle_name",
             "nullable": true
           }
@@ -257,9 +222,7 @@
           "name": "foo",
           "parameters": [
             {
-              "cidl_type": {
-                "Cf": "D1Database"
-              },
+              "cidl_type": "D1Database",
               "name": "db",
               "nullable": false
             }
@@ -271,16 +234,12 @@
           "name": "speak",
           "parameters": [
             {
-              "cidl_type": {
-                "Cf": "D1Database"
-              },
+              "cidl_type": "D1Database",
               "name": "db",
               "nullable": false
             },
             {
-              "cidl_type": {
-                "Sql": "Text"
-              },
+              "cidl_type": "Text",
               "name": "phrase",
               "nullable": false
             }
@@ -294,3 +253,4 @@
   "project_name": "actions",
   "version": "0.0.1"
 }
+

@@ -11,7 +11,7 @@ pub trait ClientLanguageTypeMapper {
     fn type_name(&self, ty: &CidlType, nullable: bool) -> String;
 }
 
-handlebars_helper!(is_serializable: |cidl_type: CidlType| matches!(cidl_type, CidlType::Sql(_)));
+handlebars_helper!(is_serializable: |cidl_type: CidlType| !matches!(cidl_type, CidlType::D1Database));
 
 fn register_helpers(
     handlebars: &mut Handlebars<'_>,
