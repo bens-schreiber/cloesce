@@ -1,6 +1,6 @@
 use common::{CidlSpec, CidlType, D1Database, WranglerSpec};
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use sea_query::{Alias, ColumnDef, SqliteQueryBuilder, Table};
 
 pub struct D1Generator {
@@ -239,8 +239,9 @@ mod tests {
         let err = d1gen.sqlite().unwrap_err();
 
         // Assert
-        assert!(err
-            .to_string()
-            .contains("A primary key cannot be nullable."));
+        assert!(
+            err.to_string()
+                .contains("A primary key cannot be nullable.")
+        );
     }
 }
