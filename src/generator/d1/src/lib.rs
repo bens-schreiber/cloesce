@@ -1,6 +1,6 @@
 use common::{CidlSpec, CidlType, D1Database, WranglerSpec};
 
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use sea_query::{Alias, ColumnDef, SqliteQueryBuilder, Table};
 
 pub struct D1Generator {
@@ -105,9 +105,7 @@ impl D1Generator {
 
 #[cfg(test)]
 mod tests {
-    use common::{
-        Attribute, CidlSpec, CidlType, ForeignKey, InputLanguage, Model, TypedValue, WranglerSpec,
-    };
+    use common::{Attribute, CidlSpec, CidlType, InputLanguage, Model, TypedValue, WranglerSpec};
 
     use crate::D1Generator;
 
@@ -241,9 +239,8 @@ mod tests {
         let err = d1gen.sqlite().unwrap_err();
 
         // Assert
-        assert!(
-            err.to_string()
-                .contains("A primary key cannot be nullable.")
-        );
+        assert!(err
+            .to_string()
+            .contains("A primary key cannot be nullable."));
     }
 }
