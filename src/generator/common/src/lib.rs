@@ -35,10 +35,17 @@ pub struct TypedValue {
 }
 
 #[derive(Serialize, Deserialize)]
+pub enum ForeignKey {
+    ManyToMany(String),
+    OneToOne(String),
+    OneToMany(String),
+}
+
+#[derive(Serialize, Deserialize)]
 pub struct Attribute {
     pub value: TypedValue,
     pub primary_key: bool,
-    pub foreign_key: bool,
+    pub foreign_key: Option<ForeignKey>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -50,10 +57,26 @@ pub struct Method {
 }
 
 #[derive(Serialize, Deserialize)]
+pub enum IncludeTree {
+    Node {
+        value: TypedValue,
+        tree: Vec<IncludeTree>,
+    },
+    None,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct DataSource {
+    name: String,
+    tree: IncludeTree,
+}
+
+#[derive(Serialize, Deserialize)]
 pub struct Model {
     pub name: String,
     pub attributes: Vec<Attribute>,
     pub methods: Vec<Method>,
+    pub data_sources: Vec<DataSource>,
     pub source_path: PathBuf,
 }
 

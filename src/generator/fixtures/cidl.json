@@ -4,7 +4,6 @@
     {
       "attributes": [
         {
-          "foreign_key": false,
           "primary_key": true,
           "value": {
             "cidl_type": "Integer",
@@ -13,7 +12,6 @@
           }
         },
         {
-          "foreign_key": false,
           "primary_key": false,
           "value": {
             "cidl_type": "Text",
@@ -97,13 +95,13 @@
           ]
         }
       ],
+      "data_sources": [],
       "name": "Actions",
       "source_path": "actions.cloesce.ts"
     },
     {
       "attributes": [
         {
-          "foreign_key": false,
           "primary_key": true,
           "value": {
             "cidl_type": "Integer",
@@ -112,7 +110,6 @@
           }
         },
         {
-          "foreign_key": false,
           "primary_key": false,
           "value": {
             "cidl_type": "Text",
@@ -121,7 +118,6 @@
           }
         },
         {
-          "foreign_key": false,
           "primary_key": false,
           "value": {
             "cidl_type": "Integer",
@@ -130,7 +126,6 @@
           }
         },
         {
-          "foreign_key": false,
           "primary_key": false,
           "value": {
             "cidl_type": "Text",
@@ -182,13 +177,13 @@
           ]
         }
       ],
+      "data_sources": [],
       "name": "Dog",
       "source_path": "dog.cloesce.ts"
     },
     {
       "attributes": [
         {
-          "foreign_key": false,
           "primary_key": true,
           "value": {
             "cidl_type": "Integer",
@@ -197,7 +192,6 @@
           }
         },
         {
-          "foreign_key": false,
           "primary_key": false,
           "value": {
             "cidl_type": "Text",
@@ -206,7 +200,6 @@
           }
         },
         {
-          "foreign_key": false,
           "primary_key": false,
           "value": {
             "cidl_type": "Text",
@@ -246,6 +239,7 @@
           ]
         }
       ],
+      "data_sources": [],
       "name": "Person",
       "source_path": "person.cloesce.ts"
     }

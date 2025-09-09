@@ -105,7 +105,9 @@ impl D1Generator {
 
 #[cfg(test)]
 mod tests {
-    use common::{Attribute, CidlSpec, CidlType, InputLanguage, Model, TypedValue, WranglerSpec};
+    use common::{
+        Attribute, CidlSpec, CidlType, ForeignKey, InputLanguage, Model, TypedValue, WranglerSpec,
+    };
 
     use crate::D1Generator;
 
@@ -138,7 +140,7 @@ mod tests {
                         nullable: false,
                     },
                     primary_key: true,
-                    foreign_key: false,
+                    foreign_key: None,
                 },
                 Attribute {
                     value: TypedValue {
@@ -147,7 +149,7 @@ mod tests {
                         nullable: true,
                     },
                     primary_key: false,
-                    foreign_key: false,
+                    foreign_key: None,
                 },
                 Attribute {
                     value: TypedValue {
@@ -156,10 +158,11 @@ mod tests {
                         nullable: false,
                     },
                     primary_key: false,
-                    foreign_key: false,
+                    foreign_key: None,
                 },
             ],
             methods: vec![],
+            data_sources: vec![],
         });
 
         let d1gen = D1Generator::new(spec, create_wrangler());
@@ -188,7 +191,7 @@ mod tests {
                         nullable: false,
                     },
                     primary_key: true,
-                    foreign_key: false,
+                    foreign_key: None,
                 },
                 Attribute {
                     value: TypedValue {
@@ -197,10 +200,11 @@ mod tests {
                         nullable: false,
                     },
                     primary_key: true,
-                    foreign_key: false,
+                    foreign_key: None,
                 },
             ],
             methods: vec![],
+            data_sources: vec![],
         });
 
         let d1gen = D1Generator::new(spec, create_wrangler());
@@ -225,9 +229,10 @@ mod tests {
                     nullable: true,
                 },
                 primary_key: true,
-                foreign_key: false,
+                foreign_key: None,
             }],
             methods: vec![],
+            data_sources: vec![],
         });
 
         let d1gen = D1Generator::new(spec, create_wrangler());

@@ -7,7 +7,6 @@ exports[`actions snapshot 1`] = `
     {
       "attributes": [
         {
-          "foreign_key": false,
           "primary_key": true,
           "value": {
             "cidl_type": "Integer",
@@ -16,7 +15,6 @@ exports[`actions snapshot 1`] = `
           },
         },
         {
-          "foreign_key": false,
           "primary_key": false,
           "value": {
             "cidl_type": "Text",
@@ -25,6 +23,7 @@ exports[`actions snapshot 1`] = `
           },
         },
       ],
+      "data_sources": [],
       "methods": [
         {
           "http_verb": "POST",
@@ -106,7 +105,6 @@ exports[`actions snapshot 1`] = `
     {
       "attributes": [
         {
-          "foreign_key": false,
           "primary_key": true,
           "value": {
             "cidl_type": "Integer",
@@ -115,7 +113,6 @@ exports[`actions snapshot 1`] = `
           },
         },
         {
-          "foreign_key": false,
           "primary_key": false,
           "value": {
             "cidl_type": "Text",
@@ -124,7 +121,6 @@ exports[`actions snapshot 1`] = `
           },
         },
         {
-          "foreign_key": false,
           "primary_key": false,
           "value": {
             "cidl_type": "Integer",
@@ -133,7 +129,6 @@ exports[`actions snapshot 1`] = `
           },
         },
         {
-          "foreign_key": false,
           "primary_key": false,
           "value": {
             "cidl_type": "Text",
@@ -142,6 +137,7 @@ exports[`actions snapshot 1`] = `
           },
         },
       ],
+      "data_sources": [],
       "methods": [
         {
           "http_verb": "GET",
@@ -191,7 +187,6 @@ exports[`actions snapshot 1`] = `
     {
       "attributes": [
         {
-          "foreign_key": false,
           "primary_key": true,
           "value": {
             "cidl_type": "Integer",
@@ -200,7 +195,6 @@ exports[`actions snapshot 1`] = `
           },
         },
         {
-          "foreign_key": false,
           "primary_key": false,
           "value": {
             "cidl_type": "Text",
@@ -209,7 +203,6 @@ exports[`actions snapshot 1`] = `
           },
         },
         {
-          "foreign_key": false,
           "primary_key": false,
           "value": {
             "cidl_type": "Text",
@@ -218,6 +211,7 @@ exports[`actions snapshot 1`] = `
           },
         },
       ],
+      "data_sources": [],
       "methods": [
         {
           "http_verb": "GET",
