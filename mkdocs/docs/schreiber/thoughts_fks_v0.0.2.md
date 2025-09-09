@@ -50,7 +50,7 @@ class Class {
 
 ## Problems with naive view
 
-As talked about [here](http://127.0.0.1:8000/schreiber/thoughts_sql_v0.0.1/), the previous design has some drawbacks, caused by cartesian explosion and recursive definitions.
+As talked about [here](thoughts_sql_v0.0.1.md), the previous design has some drawbacks, caused by cartesian explosion and recursive definitions.
 
 - Performance issues
 - Cost issues (D1 is charged by [rows read, written](https://developers.cloudflare.com/d1/platform/pricing/#:~:text=D1%20bills%20based%20on%3A,are%20not%20billed%20for%20compute.))
@@ -291,17 +291,17 @@ creating the CIDL
       "data_sources": [
         {
           "name": "default",
-          "include":[
+          "include": [
             {
               "cidl_type": { "model": "Dog" },
               "name": "dog",
               "nullable": false,
-              "include":[
+              "include": [
                 {
                   "cidl_type": { "model": "Treat" },
                   "name": "treat",
                   "nullable": false,
-                  "include":[]
+                  "include": []
                 }
               ]
             }
@@ -331,7 +331,7 @@ creating the CIDL
       "data_sources": [
         {
           "name": "default",
-          "include":[
+          "include": [
             {
               "cidl_type": { "model": "Class" },
               "name": "classes",
@@ -361,7 +361,7 @@ creating the CIDL
       "data_sources": [
         {
           "name": "default",
-          "include":[
+          "include": [
             {
               "cidl_type": { "model": "Student" },
               "name": "students",
