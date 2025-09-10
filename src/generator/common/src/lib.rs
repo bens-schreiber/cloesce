@@ -18,7 +18,7 @@ pub enum CidlType {
     Array(Box<CidlType>),
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub enum HttpVerb {
     GET,
     POST,
@@ -27,28 +27,38 @@ pub enum HttpVerb {
     DELETE,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct TypedValue {
     pub name: String,
     pub cidl_type: CidlType,
     pub nullable: bool,
 }
 
-#[derive(Serialize, Deserialize)]
-pub enum ForeignKey {
+#[derive(Serialize, Deserialize, Debug)]
+pub enum CidlForeignKey {
     ManyToMany(String),
     OneToOne(String),
     OneToMany(String),
 }
 
-#[derive(Serialize, Deserialize)]
+impl CidlForeignKey {
+    pub fn as_str(&self) -> &str {
+        match self {
+            CidlForeignKey::ManyToMany(s) => s,
+            CidlForeignKey::OneToOne(s) => s,
+            CidlForeignKey::OneToMany(s) => s,
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Attribute {
     pub value: TypedValue,
     pub primary_key: bool,
-    pub foreign_key: Option<ForeignKey>,
+    pub foreign_key: Option<CidlForeignKey>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Method {
     pub name: String,
     pub is_static: bool,
@@ -56,7 +66,7 @@ pub struct Method {
     pub parameters: Vec<TypedValue>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub enum IncludeTree {
     Node {
         value: TypedValue,
@@ -65,13 +75,13 @@ pub enum IncludeTree {
     None,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct DataSource {
     name: String,
     tree: IncludeTree,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Model {
     pub name: String,
     pub attributes: Vec<Attribute>,
