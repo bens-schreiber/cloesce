@@ -185,7 +185,7 @@ class Person {
   dog: Dog | undefined; //  | null
   cat: Cat | undefined; //  | null
 
-  @DataSource(default = true) // note: we could infer that default is default based off names, but thats for a later milestone
+  @DataSource("default")
   readonly default: IncludeTree<Person> = {
     dog: { bone: {} },
     cat: {},
@@ -257,6 +257,11 @@ class Person {
   @ForeignKey
   dogId: number;
   dog: Dog | undefined;
+
+  @DataSource("default")
+  readonly default: IncludeTree<Person> = {
+    dog: { treat: {} },
+  };
 }
 ```
 
@@ -288,6 +293,7 @@ creating the CIDL
         }
       ],
 
+      // explicitly created data source, includes treat
       "data_sources": [
         {
           "name": "default",
