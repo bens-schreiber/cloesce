@@ -4,7 +4,7 @@
 
 ## Naive World View
 
-Let's consider the types of FK relationships using simple object composition
+Foreign key relationships can be naively mapped to object composition.
 
 **(1:1)** Person has a Dog
 
@@ -50,14 +50,14 @@ class Class {
 
 ## Problems with naive view
 
-As talked about [here](thoughts_sql_v0.0.1.md), the previous design has some drawbacks, caused by cartesian explosion and recursive definitions.
+The direct object mapping is naive because of two problems:
 
-- Performance issues
-- Cost issues (D1 is charged by [rows read, written](https://developers.cloudflare.com/d1/platform/pricing/#:~:text=D1%20bills%20based%20on%3A,are%20not%20billed%20for%20compute.))
+1. Cartesian explosions
+2. Recursive definitions
 
-### Rercursive Definitions, Cartesian Explosion
+Both of these issues will significantly reduce performance, usability, and most importantly, charge the developer a [significant amount of money](https://developers.cloudflare.com/d1/platform/pricing/#:~:text=D1%20bills%20based%20on%3A,are%20not%20billed%20for%20compute.) per query for more complex models who have deep nested composition.
 
-Let's use our M:M example of Students to Classes. Assume I want to hydrate a student model from the database (represent as JSON):
+To demonstrate a recursive definition, let's use our M:M example of Students to Classes. Assume I want to return a list of `Student` models from the database (represent as JSON). If we follow the naive pattern (Student has a list of classes, classes have a list of students...) we might run into a recursive model:
 
 ```json
 {
@@ -85,9 +85,7 @@ Let's use our M:M example of Students to Classes. Assume I want to hydrate a stu
 }
 ```
 
-This is an example of a recursive definition.
-
-A cartesian explosion can be modeled:
+Cartesian explosions on the other hand happen when many joins are done on a table. Let a student have an enrollment which has classes, and let classes have textbooks:
 
 ```sql
 SELECT
@@ -102,12 +100,12 @@ LEFT JOIN Textbooks t ON ct.TextbookId = t.Id
 ORDER BY s.Name, c.Name, t.Title;
 ```
 
-Assuming a student is enrolled in 2 classes, and each class has 3 textbooks, a single query would return 6 rows and have to be deduped. See [single vs split queries](https://learn.microsoft.com/en-us/ef/core/querying/single-split-queries) for the Entity Framework solution.
+Assuming a student is enrolled in 5 classes, and each class has 3 textbooks, a single query would return 15 rows consisting of all the joined information. See [single vs split queries](https://learn.microsoft.com/en-us/ef/core/querying/single-split-queries) for the Entity Framework solution.
 
-### Data Source Solution
+### Data Sources
 
-GraphQL and Entity Framework solve this dependency problem in a similiar way, using a tree data structure.
-For the many to many example, GraphQL would make you specify the exact structure of the query:
+GraphQL and Entity Framework solve these issues in similiar ways, by having an explicit map (or tree) of what to include.
+For the M:M example, GraphQL would make you specify the exact result structure of a query:
 
 ```
 query {
@@ -133,7 +131,9 @@ var students = db.Students
 
 ```
 
-Coalesce tackles this issue using the concept of a ["Data Source"](https://intellitect.github.io/Coalesce/concepts/include-tree.html). By default, Coalesce will only look at a models direct neighbors (in data hydration). However, you can customize many sources, all of which are serialized to the frontend:
+IntelliTect's Coalesce tackles this issue by introducing a ["Data Source"](https://intellitect.github.io/Coalesce/concepts/include-tree.html). The [Coalesce docs](https://intellitect.github.io/Coalesce/modeling/model-components/data-sources.html#default-loading-behavior) mention that the default data source will "load all of the immediate relationships of the object (parent objects and child collections), as well as the far side of many-to-many relationships". Coalesce also allows you to specify your own include trees, which serialize to the frontend such that they can use a specific data source. This takes advantage of Entity Framework's include tree.
+
+Data sources are only relevant on generated endpoints, when querying the database in Coalesce the `Include` API has to be used.
 
 ```c#
 public class Person
@@ -161,30 +161,42 @@ public class NamesStartingWithA : StandardDataSource<Person, AppDbContext>
 }
 ```
 
-Note that the data source is only applied in Coalesce generated endpoints, if someone just did `Db.Persons...` it wouldn't magically apply there.
-
-If we are to take inspiration from Coalesce, it will be important to make an `Include` function of our own. Note we can't make nice filters like `NamesStartingWithA`, because Cloesce _currently_ lacks an ORM (we may try to make one in the future...) so we will be closer to GraphQL syntax (while only caring about FK's)
+Then, on the frontend, a client API is generated:
 
 ```ts
+var viewModel = new PersonViewModel();
+viewModel.$dataSource = new Person.DataSources.IncludeFamily();
+viewModel.$load(1);
+```
+
+Coalesce's implicit data source is an area confusion for new developers, when it's first encountered there is generally a "hey why is this list empty" with a deeply nested model, followed by time spent debugging in all the wrong places.
+
+For now, we will have explicit data sources and default to no FK's unless directly given.
+
+It's also worth noting we can't make nice filters like `NamesStartingWithA`, because Cloesce doesn't have an ORM (we may try to make one in the future). Our design will mostly take inspiration from GraphQL's query builder (but only care about FK's, like Entity Framework).
+
+```ts
+// Really the only time TypeScript has been nice, I assume this won't be easy
+// in other languages
 type IncludeTree<T> = {
-     // Really the only time TypeScript has been nice, I assume this won't be quite as easy
-     // in other languages
     [K in keyof T]?: T[K] extends ClassType ? IncludeTree<T[K]> : never;
 };
 
-class Treat {}
+class Cat {...}
+
+class Treat {...}
 
 class Dog {
-  treat: Treat;
+  ...
+  treat: Treat | undefined;
 }
-
-class Cat {}
 
 class Person {
   id: number;
   dog: Dog | undefined; //  | null
   cat: Cat | undefined; //  | null
 
+  // This data source will be used by all endpoints unless it's overriden
   @DataSource("default")
   readonly default: IncludeTree<Person> = {
     dog: { treat: {} },
@@ -208,17 +220,21 @@ class Person {
 }
 
 //... frontend
-let person = ...
+let person: Person = ...
 await person.animals()                      // => {dog: { treat: {} }, cat: {} }
-await person.animals(DataSources.noCats)    // => {dog: { treat: {} } }
-await person.animals(DataSources.nothin)    // => {}
+await person.animals(Person.dataSources.noCats)    // => {dog: { treat: {} } }
+await person.animals(Person.dataSources.nothin)    // => {}
 ```
+
+I think this is a great compromise. It's less boilerplate than GraphQL, the developer only needs to concern themselves with FK's. It's also less boilerplate than Coalesce (losing some versatility of course). Writing data sources will definitely be annoying, so in the future we will address this with more custom include trees, maybe introducing helpers like `IncludeTree<Person>(breadth = N)`.
 
 ---
 
 ## Generation
 
-Let's finally talk code generation. In order to make this work, we will need to introduce some new types: Data Sources, Foreign Keys, and Many to Many relationships
+Let's finally talk code generation. In order to make this all work, we will need to introduce some new types: Data Sources, Foreign Keys, and Many to Many relationships.
+
+Side note: Eventually, I'd like to introduce an "AutoMagic" update to Cloesce making decorators completely optional, "magically" inferring by context. For MVP we will keep them explicit.
 
 ```ts
 class Student {
@@ -258,6 +274,8 @@ class Person {
   dogId: number;
   dog: Dog | undefined;
 
+  // By default, we will only include Person's attributes, so this will explicitly say
+  // "fetch that dogs and his treat too"
   @DataSource("default")
   readonly default: IncludeTree<Person> = {
     dog: { treat: {} },
@@ -265,7 +283,7 @@ class Person {
 }
 ```
 
-creating the CIDL
+roughly making the CIDL
 
 ```json
 {
@@ -285,6 +303,9 @@ creating the CIDL
           }
         },
         {
+          "foreign_key": {
+            "OneToOne": "Dog"
+          },
           "value": {
             "cidl_type": { "model": "Dog" },
             "name": "dogId",
@@ -333,19 +354,8 @@ creating the CIDL
         }
       ],
 
-      // Implicitly constructed data source: get adjacent models only
-      "data_sources": [
-        {
-          "name": "default",
-          "include": [
-            {
-              "cidl_type": { "model": "Class" },
-              "name": "classes",
-              "nullable": false
-            }
-          ]
-        }
-      ]
+      // No implicit data sources for now.
+      "data_sources": []
     },
 
     {
@@ -363,19 +373,8 @@ creating the CIDL
         }
       ],
 
-      // Implicitly constructed data source: get adjacent models only
-      "data_sources": [
-        {
-          "name": "default",
-          "include": [
-            {
-              "cidl_type": { "model": "Student" },
-              "name": "students",
-              "nullable": false
-            }
-          ]
-        }
-      ]
+      // No implicit data sources for now.
+      "data_sources": []
     }
   ]
 }
