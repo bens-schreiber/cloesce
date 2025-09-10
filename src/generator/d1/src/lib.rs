@@ -37,6 +37,12 @@ fn topo_sort<'a>(models: &'a [Model]) -> Result<Vec<&'a Model>> {
                     ));
                 }
 
+                if attribute.value.nullable {
+                    // Important distinction: nullable FK's do not constrain table creation order,
+                    // and thus can be left out of our topo sort
+                    continue;
+                }
+
                 graph.entry(fk.as_str()).or_default().push(&model.name);
                 *name_to_in_degree.entry(&model.name).or_insert(0) += 1;
             }
@@ -67,7 +73,14 @@ fn topo_sort<'a>(models: &'a [Model]) -> Result<Vec<&'a Model>> {
     }
 
     if ordered.len() != models.len() {
-        return Err(anyhow!("Cycle detected in models"));
+        let cyclic_models: Vec<&str> = name_to_in_degree
+            .iter()
+            .filter_map(|(&name, &deg)| (deg > 0).then_some(name))
+            .collect();
+        return Err(anyhow!(
+            "Cycle detected involving the following models: {}",
+            cyclic_models.join(", ")
+        ));
     }
 
     Ok(ordered)
@@ -293,7 +306,7 @@ mod tests {
         for &model in sorted {
             for attribute in &model.attributes {
                 if let Some(fk) = &attribute.foreign_key {
-                    if !visited.contains(fk.as_str()) {
+                    if !visited.contains(fk.as_str()) && !attribute.value.nullable {
                         return false;
                     }
                 }
@@ -455,9 +468,9 @@ mod tests {
     }
 
     #[test]
-    // note: this test is kind of ridiculous
     fn test_topo_sort_yields_correct_order() {
         // Arrange
+        // note: this test is kind of ridiculous
         let creators: Vec<Box<dyn Fn() -> Model>> = vec![
             Box::new(|| create_model("Treat", vec![])),
             Box::new(|| create_model("Food", vec![])),
@@ -517,6 +530,24 @@ mod tests {
 
         // Assert
         assert!(err.to_string().contains("Cycle detected"));
+    }
+
+    #[test]
+    fn test_nullability_prevents_cycle_error() {
+        // Arrange
+        // A -> B -> C -> Nullable<A>
+        let mut models = vec![
+            create_model("A", vec!["B"]),
+            create_model("B", vec!["C"]),
+            create_model("C", vec!["A"]),
+        ];
+        models[2].attributes[0].value.nullable = true;
+
+        // Act
+        let sorted = topo_sort(&models);
+
+        // Assert
+        assert!(is_topo_ordered(&sorted.unwrap()));
     }
 
     #[test]
