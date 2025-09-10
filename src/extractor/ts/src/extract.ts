@@ -321,7 +321,7 @@ export function extractModels(opts: ExtractOptions = {}) {
             cidl_type: TypeCode.toCidlType(t, sf),
             nullable,
           },
-          foreign_key: false, // TODO: FK's
+          // TODO: FK's
         };
 
         if (hasDecoratorNamed(prop, "PrimaryKey")) {
@@ -370,6 +370,7 @@ export function extractModels(opts: ExtractOptions = {}) {
         source_path: sourcePath,
         attributes,
         methods,
+        data_sources: [],
       });
     }
   }
