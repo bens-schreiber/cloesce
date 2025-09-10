@@ -187,13 +187,13 @@ class Person {
 
   @DataSource("default")
   readonly default: IncludeTree<Person> = {
-    dog: { bone: {} },
+    dog: { treat: {} },
     cat: {},
   };
 
   @DataSource("noCats")
   readonly noCats: IncludeTree<Person> = {
-    dog: { bone: {} },
+    dog: { treat: {} },
   };
 
   @DataSource("nothin")
@@ -247,7 +247,7 @@ class Dog {
   id: number;
 
   @ForeignKey
-  treat: Treat;
+  treat: Treat | undefined;
 }
 
 class Person {
