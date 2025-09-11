@@ -3,7 +3,7 @@ use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
 use common::{CidlForeignKeyKind, CidlSpec, CidlType, D1Database, Model, WranglerSpec};
 
 use anyhow::{Result, anyhow};
-use sea_query::{Alias, ColumnDef, ForeignKey, SqliteQueryBuilder, Table};
+use sea_query::{Alias, ColumnDef, ForeignKey, SqliteQueryBuilder, Table, TableCreateStatement};
 
 /// Topological sort via Kahns algorithm, placing foreign keys before their dependencies.
 ///
@@ -47,8 +47,22 @@ fn topo_sort<'a>(models: &'a [Model]) -> Result<Vec<&'a Model>> {
                     continue;
                 }
 
-                graph.entry(&fk.model_name).or_default().push(&model.name);
-                *name_to_in_degree.entry(&model.name).or_insert(0) += 1;
+                match fk.kind {
+                    // Person(Dog) ..(sql)=> Person fk Dog
+                    // aka, Dog is a dependency of Person
+                    CidlForeignKeyKind::OneToOne => {
+                        graph.entry(&fk.model_name).or_default().push(&model.name);
+                        *name_to_in_degree.entry(&model.name).or_insert(0) += 1;
+                    }
+
+                    // Person([Dog]) ..(sql)=> Dog fk Person
+                    // aka, Person is a dependency of Dog
+                    CidlForeignKeyKind::OneToMany => {
+                        graph.entry(&model.name).or_default().push(&fk.model_name);
+                        *name_to_in_degree.entry(&fk.model_name).or_insert(0) += 1;
+                    }
+                    CidlForeignKeyKind::ManyToMany => todo!(),
+                }
             }
         }
     }
@@ -139,21 +153,50 @@ impl D1Generator {
     }
 
     /// Creates a Sqlite database schema from the CIDL Model AST
-    // Note: Model names, attributes do not need to be santized as SeaQuery
+    // NOTE: Model names, attributes do not need to be santized as SeaQuery
     // wraps them in quote literals.
     pub fn sqlite(&self) -> Result<String> {
         let models = topo_sort(&self.cidl.models)?;
-
-        let mut res = Vec::<String>::default();
         let mut pk_name_lookup = HashMap::<&String, String>::new();
+        let mut table_lookup = HashMap::<&String, TableCreateStatement>::new();
 
-        for model in models {
+        for &model in &models {
             let mut table = Table::create();
-            let mut pk_name: Option<String> = None;
             let mut column_names = HashSet::new();
 
             // Table will always just be the name of the model, in it's original case
             table.table(Alias::new(model.name.clone()));
+
+            // Verify a primary key exists
+            // We have to do this out of order because OneToMany relationships use this models own
+            // primary key.
+            //
+            // NOTE: As long as the CIDL always puts the PK as the first parameter this is O(1)
+            // (good thing we control that!)
+            {
+                let pk_attributes = model
+                    .attributes
+                    .iter()
+                    .filter(|a| a.primary_key)
+                    .collect::<Vec<_>>();
+                if pk_attributes.len() > 1 {
+                    return Err(anyhow!("Duplicate primary keys on model {}", model.name));
+                } else if pk_attributes.len() < 1 {
+                    return Err(anyhow!("Model {} is missing a primary key.", model.name));
+                }
+
+                let &pk_attribute = pk_attributes.first().unwrap();
+                if pk_attribute.value.nullable {
+                    return Err(anyhow!("A primary key cannot be nullable."));
+                }
+
+                if pk_attribute.foreign_key.is_some() {
+                    // TODO: Revisit this, should this design be allowed?
+                    return Err(anyhow!("A primary key cannot be a foreign key"));
+                }
+
+                pk_name_lookup.insert(&model.name, pk_attribute.value.name.clone());
+            }
 
             for attribute in model.attributes.iter() {
                 // Validate column name
@@ -170,25 +213,7 @@ impl D1Generator {
 
                 // Set primary key
                 if attribute.primary_key {
-                    if let Some(pk_name) = &pk_name {
-                        return Err(anyhow!(
-                            "Duplicate primary keys {} {}",
-                            pk_name,
-                            attribute.value.name
-                        ));
-                    }
-
-                    if attribute.value.nullable {
-                        return Err(anyhow!("A primary key cannot be nullable."));
-                    }
-
-                    if attribute.foreign_key.is_some() {
-                        // TODO: Revisit this, should this design be allowed?
-                        return Err(anyhow!("A primary key cannot be a foreign key"));
-                    }
-
                     column.primary_key();
-                    pk_name = Some(attribute.value.name.clone());
                 }
                 // Set nullability
                 else if !attribute.value.nullable {
@@ -204,39 +229,16 @@ impl D1Generator {
                     other => return Err(anyhow!("Invalid SQLite type {:?}", other)),
                 };
 
-                // Set foreign key
-                if let Some(fk) = &attribute.foreign_key {
-                    // Unwrap: safe because `topo_sort` validates all FK's
-                    let pk_name = pk_name_lookup.get(&fk.model_name).unwrap();
-
-                    match fk.kind {
-                        CidlForeignKeyKind::OneToOne => {
-                            table.foreign_key(
-                                ForeignKey::create()
-                                    .name(format!("fk_{}_{}", model.name, fk.model_name))
-                                    .from(
-                                        Alias::new(model.name.clone()),
-                                        Alias::new(attribute.value.name.as_str()),
-                                    )
-                                    .to(Alias::new(fk.model_name.clone()), Alias::new(pk_name))
-                                    .on_update(sea_query::ForeignKeyAction::Cascade)
-                                    .on_delete(sea_query::ForeignKeyAction::Restrict),
-                            );
-                        }
-                        CidlForeignKeyKind::ManyToMany => todo!(),
-                        CidlForeignKeyKind::OneToMany => todo!(),
-                    };
-                }
-
                 table.col(column);
             }
+            table_lookup.insert(&model.name, table);
+        }
 
-            // Verify a primary key exists
-            match pk_name {
-                Some(pk_name) => pk_name_lookup.insert(&model.name, pk_name.clone()),
-                None => return Err(anyhow!("Model {} is missing a primary key.", model.name)),
-            };
-
+        // Finally, loop in topo order and create our SQL statement
+        let mut res = Vec::new();
+        for model in models {
+            // Unwrap: safe because the lookup was populated from `models`
+            let table = table_lookup.get(&model.name).unwrap();
             res.push(format!("{};", table.to_string(SqliteQueryBuilder)));
         }
 
@@ -275,8 +277,22 @@ mod tests {
         for &model in sorted {
             for attribute in &model.attributes {
                 if let Some(fk) = &attribute.foreign_key {
-                    if !visited.contains(&fk.model_name) && !attribute.value.nullable {
-                        return false;
+                    match fk.kind {
+                        CidlForeignKeyKind::OneToOne => {
+                            // Person(Dog) ..(sql) => Person fk Dog
+                            // aka, Dog must appear before person
+                            if !visited.contains(&fk.model_name) && !attribute.value.nullable {
+                                return false;
+                            }
+                        }
+                        CidlForeignKeyKind::OneToMany => {
+                            // Person([Dog]) ..(sql) => Dog fk Person
+                            // aka, Person must appear before Dog
+                            if visited.contains(&fk.model_name) && !attribute.value.nullable {
+                                return false;
+                            }
+                        }
+                        CidlForeignKeyKind::ManyToMany => todo!(),
                     }
                 }
             }
@@ -330,7 +346,13 @@ mod tests {
     #[test]
     fn test_duplicate_column_error() {
         // Arrange
-        let spec = create_cidl(vec![ModelBuilder::new("User").id().id().build()]);
+        let spec = create_cidl(vec![
+            ModelBuilder::new("User")
+                .id()
+                .attribute("foo", CidlType::Integer, false)
+                .attribute("foo", CidlType::Real, true)
+                .build(),
+        ]);
 
         let d1gen = D1Generator::new(spec, create_wrangler());
 
@@ -391,9 +413,8 @@ mod tests {
     }
 
     #[test]
-    fn test_topo_sort_yields_correct_order() {
+    fn test_one_to_one_topo_sort_yields_correct_order() {
         // Arrange
-        // note: this test is kind of ridiculous
         let creators: Vec<Box<dyn Fn() -> Model>> = vec![
             Box::new(|| ModelBuilder::new("Treat").id().build()),
             Box::new(|| ModelBuilder::new("Food").id().build()),
@@ -594,6 +615,68 @@ mod tests {
         expected_str!(
             sql,
             r#"FOREIGN KEY ("dogId") REFERENCES "Dog" ("id") ON DELETE RESTRICT ON UPDATE CASCADE "#
+        );
+    }
+
+    #[test]
+    fn test_one_to_many_topo_sort_yields_correct_order() {
+        // Arrange
+        let models: Vec<Model> = vec![
+            ModelBuilder::new("Treat").id().build(),
+            ModelBuilder::new("Dog")
+                .id()
+                .fk(
+                    "treat",
+                    CidlType::Integer,
+                    CidlForeignKeyKind::OneToOne,
+                    "Treat",
+                    false,
+                )
+                .build(),
+            ModelBuilder::new("Person")
+                .id()
+                .fk(
+                    "dogs",
+                    CidlType::Array(Box::new(CidlType::Model("Dog".into()))),
+                    CidlForeignKeyKind::OneToMany,
+                    "Dog",
+                    false,
+                )
+                .build(),
+        ];
+
+        // Act
+        let sorted = topo_sort(&models).expect("topo_sort failed");
+
+        // Assert
+        assert!(is_topo_ordered(&sorted));
+    }
+
+    #[test]
+    fn test_one_to_many_fk_yields_sqlite() {
+        // Arrange
+        let spec = create_cidl(vec![
+            ModelBuilder::new("User")
+                .id()
+                .fk(
+                    "dogs",
+                    CidlType::Array(Box::new(CidlType::Model("Dog".to_string()))),
+                    CidlForeignKeyKind::OneToMany,
+                    "Dog",
+                    false,
+                )
+                .build(),
+            ModelBuilder::new("Dog").id().build(),
+        ]);
+        let d1gen = D1Generator::new(spec, create_wrangler());
+
+        // Act
+        let sql = d1gen.sqlite().expect("gen_sqlite to work");
+
+        // Assert
+        expected_str!(
+            sql,
+            r#"FOREIGN KEY ("personId") REFERENCES "Person" ("id") ON DELETE RESTRICT ON UPDATE CASCADE "#
         );
     }
 }

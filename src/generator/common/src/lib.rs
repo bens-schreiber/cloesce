@@ -38,9 +38,9 @@ pub struct TypedValue {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub enum CidlForeignKeyKind {
-    ManyToMany,
     OneToOne,
     OneToMany,
+    ManyToMany,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
