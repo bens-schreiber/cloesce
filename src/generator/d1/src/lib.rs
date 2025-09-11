@@ -14,14 +14,14 @@ use sea_query::{Alias, ColumnDef, ForeignKey, Index, SqliteQueryBuilder, Table};
 /// - duplicate models
 /// - unknown FK model
 /// - unknown attribute reference
-fn sql_topo_sort<'a>(models: &'a [Model]) -> Result<Vec<&'a Model>> {
+fn sql_topo_sort(models: &[Model]) -> Result<Vec<&Model>> {
     let mut model_lookup = HashMap::<&str, &Model>::new();
     let mut in_degree = BTreeMap::<&str, usize>::new();
     let mut graph = BTreeMap::<&str, Vec<&str>>::new();
 
     // Detect dups, populate reverse lookup
     for model in models {
-        if let Some(_) = model_lookup.insert(&model.name, model) {
+        if model_lookup.insert(&model.name, model).is_some() {
             return Err(anyhow!("Duplicate model name: {}", model.name));
         }
 
@@ -57,7 +57,7 @@ fn sql_topo_sort<'a>(models: &'a [Model]) -> Result<Vec<&'a Model>> {
 
             // One To One: Person(Dog), but Dog must appear before Person in sql thus
             // the dependency is Dog -> Person; increase in degree of Person
-            graph.entry(&fk_model_name).or_default().push(&model.name);
+            graph.entry(fk_model_name).or_default().push(&model.name);
             in_degree.entry(&model.name).and_modify(|d| *d += 1);
 
             attr_to_fk.insert(&attr.value.name, fk_model_name);
@@ -110,7 +110,7 @@ fn sql_topo_sort<'a>(models: &'a [Model]) -> Result<Vec<&'a Model>> {
                     // One to Many, Person( [Dog] ) => Dog -> Person,
                     // however in SQL this means Person must appear before Dog;
                     // increase in degree of Dog
-                    graph.entry(&model.name).or_default().push(&fk_model_name);
+                    graph.entry(&model.name).or_default().push(fk_model_name);
                     *in_degree.entry(fk_model_name).or_insert(0) += 1;
                 }
                 CidlForeignKeyKind::ManyToMany => {
