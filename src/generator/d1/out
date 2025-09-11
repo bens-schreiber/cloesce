@@ -1,3 +1,0 @@
-CREATE TABLE "Dog" ( "id" integer PRIMARY KEY );
-CREATE TABLE "User" ( "id" integer PRIMARY KEY );
-CREATE TABLE "fk_Dog_User" ( "a_id" integer NOT NULL, "b_id" integer NOT NULL, PRIMARY KEY ("a_id", "b_id"), FOREIGN KEY ("a_id") REFERENCES "Dog" ("id"), FOREIGN KEY ("b_id") REFERENCES "User" ("id") );
