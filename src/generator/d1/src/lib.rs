@@ -945,45 +945,6 @@ mod tests {
     }
 
     #[test]
-    fn test_many_to_many_topo_sort_yields_correct_order() {
-        // // Arrange
-        // let models = [
-        //     ModelBuilder::new("Dog").id().build(),
-        //     ModelBuilder::new("Cat").id().build(),
-        //     ModelBuilder::new("Person")
-        //         .id()
-        //         .nav_p(
-        //             "dogs",
-        //             CidlType::Array(Box::new(CidlType::Model("Dog".to_string()))),
-        //             false,
-        //             CidlForeignKeyKind::OneToMany,
-        //         )
-        //         .nav_p(
-        //             "cats",
-        //             CidlType::Array(Box::new(CidlType::Model("Cat".to_string()))),
-        //             false,
-        //             CidlForeignKeyKind::OneToMany,
-        //         )
-        //         .build(),
-        //     ModelBuilder::new("Boss")
-        //         .id()
-        //         .nav_p(
-        //             "persons",
-        //             CidlType::Array(Box::new(CidlType::Model("Person".to_string()))),
-        //             false,
-        //             CidlForeignKeyKind::OneToMany,
-        //         )
-        //         .build(),
-        // ];
-
-        // // Act
-        // let sorted = topo_sort(&models).expect("topo_sort failed");
-
-        // // Assert
-        // assert!(is_topo_ordered(&sorted));
-    }
-
-    #[test]
     fn test_invalid_sqlite_type_error() {
         // Arrange: Attribute with unsupported type (Model instead of primitive)
         let spec = create_cidl(vec![
