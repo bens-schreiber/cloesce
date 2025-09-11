@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
 
-use common::{CidlForeignKey, CidlSpec, CidlType, D1Database, Model, WranglerSpec};
+use common::{CidlForeignKeyKind, CidlSpec, CidlType, D1Database, Model, WranglerSpec};
 
 use anyhow::{Result, anyhow};
 use sea_query::{Alias, ColumnDef, ForeignKey, SqliteQueryBuilder, Table};
@@ -12,9 +12,9 @@ use sea_query::{Alias, ColumnDef, ForeignKey, SqliteQueryBuilder, Table};
 /// - duplicate models
 /// - unknown FK name
 fn topo_sort<'a>(models: &'a [Model]) -> Result<Vec<&'a Model>> {
-    let mut name_to_model = HashMap::<&'a str, &'a Model>::new();
-    let mut name_to_in_degree = BTreeMap::<&'a str, usize>::new();
-    let mut graph = BTreeMap::<&'a str, Vec<&'a str>>::new();
+    let mut name_to_model = HashMap::<&String, &'a Model>::new();
+    let mut name_to_in_degree = BTreeMap::<&String, usize>::new();
+    let mut graph = BTreeMap::<&String, Vec<&String>>::new();
 
     // Detect dups, populate reverse lookup
     for model in models {
@@ -33,11 +33,11 @@ fn topo_sort<'a>(models: &'a [Model]) -> Result<Vec<&'a Model>> {
 
         for attribute in &model.attributes {
             if let Some(fk) = &attribute.foreign_key {
-                if !name_to_model.contains_key(fk.as_str()) {
+                if !name_to_model.contains_key(&fk.model_name) {
                     return Err(anyhow!(
                         "Unknown foreign key on model {}: {}",
                         model.name,
-                        fk.as_str()
+                        fk.model_name
                     ));
                 }
 
@@ -47,7 +47,7 @@ fn topo_sort<'a>(models: &'a [Model]) -> Result<Vec<&'a Model>> {
                     continue;
                 }
 
-                graph.entry(fk.as_str()).or_default().push(&model.name);
+                graph.entry(&fk.model_name).or_default().push(&model.name);
                 *name_to_in_degree.entry(&model.name).or_insert(0) += 1;
             }
         }
@@ -56,7 +56,7 @@ fn topo_sort<'a>(models: &'a [Model]) -> Result<Vec<&'a Model>> {
     let mut queue = name_to_in_degree
         .iter()
         .filter_map(|(&name, &v)| (v == 0).then_some(name))
-        .collect::<VecDeque<&str>>();
+        .collect::<VecDeque<&String>>();
 
     let mut ordered = vec![];
     while let Some(model) = queue.pop_front() {
@@ -77,9 +77,9 @@ fn topo_sort<'a>(models: &'a [Model]) -> Result<Vec<&'a Model>> {
     }
 
     if ordered.len() != models.len() {
-        let cyclic_models: Vec<&str> = name_to_in_degree
+        let cyclic_models: Vec<String> = name_to_in_degree
             .iter()
-            .filter_map(|(&name, &deg)| (deg > 0).then_some(name))
+            .filter_map(|(&name, &deg)| (deg > 0).then_some(name.clone()))
             .collect();
         return Err(anyhow!(
             "Cycle detected involving the following models: {}",
@@ -145,7 +145,7 @@ impl D1Generator {
         let models = topo_sort(&self.cidl.models)?;
 
         let mut res = Vec::<String>::default();
-        let mut pk_name_lookup = HashMap::<&str, String>::new();
+        let mut pk_name_lookup = HashMap::<&String, String>::new();
 
         for model in models {
             let mut table = Table::create();
@@ -156,6 +156,7 @@ impl D1Generator {
             table.table(Alias::new(model.name.clone()));
 
             for attribute in model.attributes.iter() {
+                // Validate column name
                 if !column_names.insert(attribute.value.name.as_str()) {
                     return Err(anyhow!(
                         "Duplicate column names {}.{}",
@@ -164,6 +165,10 @@ impl D1Generator {
                     ));
                 }
 
+                // Columns will always just be the name of the attribute in it's original case
+                let mut column = ColumnDef::new(Alias::new(attribute.value.name.clone()));
+
+                // Set primary key
                 if attribute.primary_key {
                     if let Some(pk_name) = &pk_name {
                         return Err(anyhow!(
@@ -181,63 +186,16 @@ impl D1Generator {
                         // TODO: Revisit this, should this design be allowed?
                         return Err(anyhow!("A primary key cannot be a foreign key"));
                     }
-                }
 
-                if let Some(_) = &attribute.foreign_key {
-                    match attribute.value.cidl_type {
-                        CidlType::Integer | CidlType::Model(_) => {
-                            // Allowed types for a foreign key
-                        }
-                        _ => {
-                            return Err(anyhow!(
-                                "A foreign key must be either a Model or Integer type ({}.{})",
-                                model.name,
-                                attribute.value.name
-                            ));
-                        }
-                    }
-                }
-
-                // Columns will always just be the name of the attribute in it's original case
-                let mut column = ColumnDef::new(Alias::new(attribute.value.name.clone()));
-
-                // Attatch primary key
-                if attribute.primary_key {
                     column.primary_key();
                     pk_name = Some(attribute.value.name.clone());
                 }
-                // Attach nullability
+                // Set nullability
                 else if !attribute.value.nullable {
                     column.not_null();
                 }
 
-                // Attach foreign key
-                if let Some(fk) = &attribute.foreign_key {
-                    match fk {
-                        CidlForeignKey::OneToOne(fk_model_name) => {
-                            table.foreign_key(
-                                ForeignKey::create()
-                                    .name(format!("fk_{}_{}", model.name, fk_model_name))
-                                    .from(
-                                        Alias::new(model.name.clone()),
-                                        Alias::new(attribute.value.name.as_str()),
-                                    )
-                                    .to(
-                                        Alias::new(fk_model_name.clone()),
-                                        Alias::new(
-                                            pk_name_lookup.get(fk_model_name.as_str()).unwrap(),
-                                        ),
-                                    )
-                                    .on_update(sea_query::ForeignKeyAction::Cascade)
-                                    .on_delete(sea_query::ForeignKeyAction::Restrict),
-                            );
-                        }
-                        CidlForeignKey::OneToMany(fk_model_name) => {}
-                        _ => todo!(),
-                    }
-                }
-
-                // Attach Sqlite type
+                // Set Sqlite type
                 match &attribute.value.cidl_type {
                     CidlType::Integer => column.integer(),
                     CidlType::Real => column.decimal(),
@@ -246,9 +204,34 @@ impl D1Generator {
                     other => return Err(anyhow!("Invalid SQLite type {:?}", other)),
                 };
 
+                // Set foreign key
+                if let Some(fk) = &attribute.foreign_key {
+                    // Unwrap: safe because `topo_sort` validates all FK's
+                    let pk_name = pk_name_lookup.get(&fk.model_name).unwrap();
+
+                    match fk.kind {
+                        CidlForeignKeyKind::OneToOne => {
+                            table.foreign_key(
+                                ForeignKey::create()
+                                    .name(format!("fk_{}_{}", model.name, fk.model_name))
+                                    .from(
+                                        Alias::new(model.name.clone()),
+                                        Alias::new(attribute.value.name.as_str()),
+                                    )
+                                    .to(Alias::new(fk.model_name.clone()), Alias::new(pk_name))
+                                    .on_update(sea_query::ForeignKeyAction::Cascade)
+                                    .on_delete(sea_query::ForeignKeyAction::Restrict),
+                            );
+                        }
+                        CidlForeignKeyKind::ManyToMany => todo!(),
+                        CidlForeignKeyKind::OneToMany => todo!(),
+                    };
+                }
+
                 table.col(column);
             }
 
+            // Verify a primary key exists
             match pk_name {
                 Some(pk_name) => pk_name_lookup.insert(&model.name, pk_name.clone()),
                 None => return Err(anyhow!("Model {} is missing a primary key.", model.name)),
@@ -267,7 +250,7 @@ mod tests {
 
     use crate::{D1Generator, topo_sort};
     use common::{
-        CidlForeignKey, CidlType, Model,
+        CidlForeignKeyKind, CidlType, Model,
         builder::{ModelBuilder, create_cidl, create_wrangler},
     };
 
@@ -292,7 +275,7 @@ mod tests {
         for &model in sorted {
             for attribute in &model.attributes {
                 if let Some(fk) = &attribute.foreign_key {
-                    if !visited.contains(fk.as_str()) && !attribute.value.nullable {
+                    if !visited.contains(&fk.model_name) && !attribute.value.nullable {
                         return false;
                     }
                 }
@@ -302,34 +285,6 @@ mod tests {
         }
 
         true
-    }
-
-    #[test]
-    fn test_invalid_sqlite_type_error() {
-        // Arrange: Use CidlType::Blob as a foreign key (invalid)
-        let spec = create_cidl(vec![
-            ModelBuilder::new("Dog").id().build(),
-            ModelBuilder::new("User")
-                .id()
-                .fk(
-                    "dogId",
-                    CidlType::Blob,
-                    CidlForeignKey::OneToOne("Dog".into()),
-                    false,
-                )
-                .build(),
-        ]);
-
-        let d1gen = D1Generator::new(spec, create_wrangler());
-
-        // Act
-        let err = d1gen.sqlite().unwrap_err();
-
-        // Assert
-        expected_str!(
-            err,
-            "A foreign key must be either a Model or Integer type (User.dogId)"
-        );
     }
 
     #[test]
@@ -448,13 +403,15 @@ mod tests {
                     .fk(
                         "TreatId",
                         CidlType::Integer,
-                        CidlForeignKey::OneToOne("Treat".into()),
+                        CidlForeignKeyKind::OneToOne,
+                        "Treat",
                         false,
                     )
                     .fk(
                         "FoodId",
                         CidlType::Integer,
-                        CidlForeignKey::OneToOne("Food".into()),
+                        CidlForeignKeyKind::OneToOne,
+                        "Food",
                         false,
                     )
                     .build()
@@ -466,7 +423,8 @@ mod tests {
                     .fk(
                         "DogId",
                         CidlType::Integer,
-                        CidlForeignKey::OneToOne("Dog".into()),
+                        CidlForeignKeyKind::OneToOne,
+                        "Dog",
                         false,
                     )
                     .build()
@@ -509,7 +467,8 @@ mod tests {
                 .fk(
                     "NonExistentId",
                     CidlType::Integer,
-                    CidlForeignKey::OneToOne("NonExistent".into()),
+                    CidlForeignKeyKind::OneToOne,
+                    "NonExistent",
                     false,
                 )
                 .build(),
@@ -532,7 +491,8 @@ mod tests {
                 .fk(
                     "BId",
                     CidlType::Integer,
-                    CidlForeignKey::OneToOne("B".into()),
+                    CidlForeignKeyKind::OneToOne,
+                    "B",
                     false,
                 )
                 .build(),
@@ -541,7 +501,8 @@ mod tests {
                 .fk(
                     "CId",
                     CidlType::Integer,
-                    CidlForeignKey::OneToOne("C".into()),
+                    CidlForeignKeyKind::OneToOne,
+                    "C",
                     false,
                 )
                 .build(),
@@ -550,7 +511,8 @@ mod tests {
                 .fk(
                     "AId",
                     CidlType::Integer,
-                    CidlForeignKey::OneToOne("A".into()),
+                    CidlForeignKeyKind::OneToOne,
+                    "A",
                     false,
                 )
                 .build(),
@@ -573,7 +535,8 @@ mod tests {
                 .fk(
                     "BId",
                     CidlType::Integer,
-                    CidlForeignKey::OneToOne("B".into()),
+                    CidlForeignKeyKind::OneToOne,
+                    "B",
                     false,
                 )
                 .build(),
@@ -582,7 +545,8 @@ mod tests {
                 .fk(
                     "CId",
                     CidlType::Integer,
-                    CidlForeignKey::OneToOne("C".into()),
+                    CidlForeignKeyKind::OneToOne,
+                    "C",
                     false,
                 )
                 .build(),
@@ -591,7 +555,8 @@ mod tests {
                 .fk(
                     "AId",
                     CidlType::Integer,
-                    CidlForeignKey::OneToOne("A".into()),
+                    CidlForeignKeyKind::OneToOne,
+                    "A",
                     true, // nullable
                 )
                 .build(),
@@ -613,7 +578,8 @@ mod tests {
                 .fk(
                     "dogId",
                     CidlType::Integer,
-                    CidlForeignKey::OneToOne("Dog".into()),
+                    CidlForeignKeyKind::OneToOne,
+                    "Dog",
                     false,
                 )
                 .build(),

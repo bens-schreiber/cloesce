@@ -76,13 +76,15 @@ fn test_generate_d1_snapshot_from_models() -> Result<()> {
             .fk(
                 "Treat",
                 common::CidlType::Integer,
-                common::CidlForeignKey::OneToOne("Treat".to_string()),
+                common::CidlForeignKeyKind::OneToOne,
+                "Treat",
                 false,
             )
             .fk(
                 "Collar",
                 common::CidlType::Integer,
-                common::CidlForeignKey::OneToOne("Collar".to_string()),
+                common::CidlForeignKeyKind::OneToOne,
+                "Collar",
                 false,
             )
             .build();

@@ -37,20 +37,17 @@ pub struct TypedValue {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-pub enum CidlForeignKey {
-    ManyToMany(String),
-    OneToOne(String),
-    OneToMany(String),
+pub enum CidlForeignKeyKind {
+    ManyToMany,
+    OneToOne,
+    OneToMany,
 }
 
-impl CidlForeignKey {
-    pub fn as_str(&self) -> &str {
-        match self {
-            CidlForeignKey::ManyToMany(s) => s,
-            CidlForeignKey::OneToOne(s) => s,
-            CidlForeignKey::OneToMany(s) => s,
-        }
-    }
+#[derive(Serialize, Deserialize, Debug)]
+pub struct CidlForeignKey {
+    pub kind: CidlForeignKeyKind,
+    pub model_name: String,
+    pub navigation_property_name: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]

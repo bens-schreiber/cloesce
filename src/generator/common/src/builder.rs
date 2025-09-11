@@ -1,8 +1,8 @@
 use std::path::PathBuf;
 
 use crate::{
-    Attribute, CidlForeignKey, CidlSpec, CidlType, DataSource, HttpVerb, IncludeTree,
-    InputLanguage, Method, Model, TypedValue, WranglerSpec,
+    Attribute, CidlForeignKey, CidlForeignKeyKind, CidlSpec, CidlType, DataSource, HttpVerb,
+    IncludeTree, InputLanguage, Method, Model, TypedValue, WranglerSpec,
 };
 
 pub fn create_cidl(models: Vec<Model>) -> CidlSpec {
@@ -79,7 +79,8 @@ impl ModelBuilder {
         mut self,
         name: impl Into<String>,
         cidl_type: CidlType,
-        fk: CidlForeignKey,
+        kind: CidlForeignKeyKind,
+        model_name: impl Into<String>,
         nullable: bool,
     ) -> Self {
         self.attributes.push(Attribute {
@@ -89,7 +90,11 @@ impl ModelBuilder {
                 nullable,
             },
             primary_key: false,
-            foreign_key: Some(fk),
+            foreign_key: Some(CidlForeignKey {
+                kind,
+                model_name: model_name.into(),
+                navigation_property_name: None, // TODO: hardcoding for now
+            }),
         });
         self
     }
