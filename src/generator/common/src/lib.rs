@@ -1,3 +1,5 @@
+pub mod builder;
+
 use std::path::{Path, PathBuf};
 use std::{fs::File, io::Write};
 

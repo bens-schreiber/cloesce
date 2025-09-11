@@ -1,12 +1,16 @@
-use std::collections::{BTreeMap, HashMap, VecDeque};
+use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
 
 use common::{CidlForeignKey, CidlSpec, CidlType, D1Database, Model, WranglerSpec};
 
 use anyhow::{Result, anyhow};
 use sea_query::{Alias, ColumnDef, ForeignKey, SqliteQueryBuilder, Table};
 
-/// Topological sort via Kahns algorithm
-/// Returns an error if there is a cycle, duplicate models, or an unknown FK.
+/// Topological sort via Kahns algorithm, placing foreign keys before their dependencies.
+///
+/// Returns an error if there is:
+/// - a cycle
+/// - duplicate models
+/// - unknown FK name
 fn topo_sort<'a>(models: &'a [Model]) -> Result<Vec<&'a Model>> {
     let mut name_to_model = HashMap::<&'a str, &'a Model>::new();
     let mut name_to_in_degree = BTreeMap::<&'a str, usize>::new();
@@ -138,17 +142,28 @@ impl D1Generator {
     // Note: Model names, attributes do not need to be santized as SeaQuery
     // wraps them in quote literals.
     pub fn sqlite(&self) -> Result<String> {
+        let models = topo_sort(&self.cidl.models)?;
+
         let mut res = Vec::<String>::default();
         let mut pk_name_lookup = HashMap::<&str, String>::new();
 
-        let models = topo_sort(&self.cidl.models)?;
-
         for model in models {
             let mut table = Table::create();
+            let mut pk_name: Option<String> = None;
+            let mut column_names = HashSet::new();
+
+            // Table will always just be the name of the model, in it's original case
             table.table(Alias::new(model.name.clone()));
 
-            let mut pk_name: Option<String> = None;
             for attribute in model.attributes.iter() {
+                if !column_names.insert(attribute.value.name.as_str()) {
+                    return Err(anyhow!(
+                        "Duplicate column names {}.{}",
+                        model.name,
+                        attribute.value.name
+                    ));
+                }
+
                 if attribute.primary_key {
                     if let Some(pk_name) = &pk_name {
                         return Err(anyhow!(
@@ -183,15 +198,20 @@ impl D1Generator {
                     }
                 }
 
+                // Columns will always just be the name of the attribute in it's original case
                 let mut column = ColumnDef::new(Alias::new(attribute.value.name.clone()));
 
+                // Attatch primary key
                 if attribute.primary_key {
                     column.primary_key();
                     pk_name = Some(attribute.value.name.clone());
-                } else if !attribute.value.nullable {
+                }
+                // Attach nullability
+                else if !attribute.value.nullable {
                     column.not_null();
                 }
 
+                // Attach foreign key
                 if let Some(fk) = &attribute.foreign_key {
                     match fk {
                         CidlForeignKey::OneToOne(fk_model_name) => {
@@ -200,22 +220,24 @@ impl D1Generator {
                                     .name(format!("fk_{}_{}", model.name, fk_model_name))
                                     .from(
                                         Alias::new(model.name.clone()),
-                                        Alias::new(format!("{}Id", fk_model_name)),
+                                        Alias::new(attribute.value.name.as_str()),
                                     )
                                     .to(
                                         Alias::new(fk_model_name.clone()),
                                         Alias::new(
                                             pk_name_lookup.get(fk_model_name.as_str()).unwrap(),
-                                        ), // Dog.id
+                                        ),
                                     )
                                     .on_update(sea_query::ForeignKeyAction::Cascade)
                                     .on_delete(sea_query::ForeignKeyAction::Restrict),
                             );
                         }
+                        CidlForeignKey::OneToMany(fk_model_name) => {}
                         _ => todo!(),
                     }
                 }
 
+                // Attach Sqlite type
                 match &attribute.value.cidl_type {
                     CidlType::Integer => column.integer(),
                     CidlType::Real => column.decimal(),
@@ -241,61 +263,25 @@ impl D1Generator {
 
 #[cfg(test)]
 mod tests {
-
     use itertools::Itertools;
 
     use crate::{D1Generator, topo_sort};
     use common::{
-        Attribute, CidlForeignKey, CidlSpec, CidlType, InputLanguage, Model, TypedValue,
-        WranglerSpec,
+        CidlForeignKey, CidlType, Model,
+        builder::{ModelBuilder, create_cidl, create_wrangler},
     };
 
-    fn create_cidl(models: Vec<Model>) -> CidlSpec {
-        CidlSpec {
-            version: "1.0".to_string(),
-            project_name: "test".to_string(),
-            language: InputLanguage::TypeScript,
-            models,
-        }
-    }
-
-    fn create_wrangler() -> WranglerSpec {
-        WranglerSpec {
-            d1_databases: vec![],
-        }
-    }
-
-    fn create_model(name: &str, fk: Vec<&str>) -> Model {
-        let mut attributes = fk
-            .iter()
-            .map(|fk| Attribute {
-                value: TypedValue {
-                    name: format!("{}Id", fk),
-                    cidl_type: CidlType::Integer,
-                    nullable: false,
-                },
-                foreign_key: Some(CidlForeignKey::OneToOne(fk.to_string())),
-                primary_key: false,
-            })
-            .collect::<Vec<Attribute>>();
-
-        attributes.push(Attribute {
-            value: TypedValue {
-                name: "id".to_string(),
-                cidl_type: CidlType::Integer,
-                nullable: false,
-            },
-            foreign_key: None,
-            primary_key: true,
-        });
-
-        Model {
-            name: name.to_string(),
-            attributes,
-            methods: vec![],
-            data_sources: vec![],
-            source_path: "".into(),
-        }
+    macro_rules! expected_str {
+        ($got:expr, $expected:expr) => {{
+            let got_val = &$got;
+            let expected_val = &$expected;
+            assert!(
+                got_val.to_string().contains(&expected_val.to_string()),
+                "Expected `{}`, got:\n{:?}",
+                expected_val,
+                got_val
+            );
+        }};
     }
 
     fn is_topo_ordered(sorted: &[&Model]) -> bool {
@@ -319,43 +305,60 @@ mod tests {
     }
 
     #[test]
+    fn test_invalid_sqlite_type_error() {
+        // Arrange: Use CidlType::Blob as a foreign key (invalid)
+        let spec = create_cidl(vec![
+            ModelBuilder::new("Dog").id().build(),
+            ModelBuilder::new("User")
+                .id()
+                .fk(
+                    "dogId",
+                    CidlType::Blob,
+                    CidlForeignKey::OneToOne("Dog".into()),
+                    false,
+                )
+                .build(),
+        ]);
+
+        let d1gen = D1Generator::new(spec, create_wrangler());
+
+        // Act
+        let err = d1gen.sqlite().unwrap_err();
+
+        // Assert
+        expected_str!(
+            err,
+            "A foreign key must be either a Model or Integer type (User.dogId)"
+        );
+    }
+
+    #[test]
+    fn test_empty_cidl_models_yields_empty_sqlite() {
+        // Arrange: Empty CIDL
+        let spec = create_cidl(vec![]);
+        let d1gen = D1Generator::new(spec, create_wrangler());
+
+        // Act
+        let sql = d1gen.sqlite().expect("Empty models should succeed");
+
+        // Assert
+        assert!(
+            sql.is_empty(),
+            "Expected empty SQL output for empty CIDL, got: {}",
+            sql
+        );
+    }
+
+    #[test]
     fn test_primary_key_and_value_yields_sqlite() {
         // Arrange
-        let spec = create_cidl(vec![Model {
-            source_path: "./models/user.cloesce.ts".into(),
-            name: String::from("User"),
-            attributes: vec![
-                Attribute {
-                    value: TypedValue {
-                        name: String::from("id"),
-                        cidl_type: CidlType::Integer,
-                        nullable: false,
-                    },
-                    primary_key: true,
-                    foreign_key: None,
-                },
-                Attribute {
-                    value: TypedValue {
-                        name: String::from("name"),
-                        cidl_type: CidlType::Text,
-                        nullable: true,
-                    },
-                    primary_key: false,
-                    foreign_key: None,
-                },
-                Attribute {
-                    value: TypedValue {
-                        name: String::from("age"),
-                        cidl_type: CidlType::Integer,
-                        nullable: false,
-                    },
-                    primary_key: false,
-                    foreign_key: None,
-                },
-            ],
-            methods: vec![],
-            data_sources: vec![],
-        }]);
+        let spec = create_cidl(vec![
+            ModelBuilder::new("User")
+                .id()
+                .attribute("name", CidlType::Text, true)
+                .attribute("age", CidlType::Integer, false)
+                .build(),
+        ]);
 
         let d1gen = D1Generator::new(spec, create_wrangler());
 
@@ -363,41 +366,35 @@ mod tests {
         let sql = d1gen.sqlite().expect("gen_sqlite to work");
 
         // Assert
-        assert!(sql.contains("CREATE TABLE"));
-        assert!(sql.contains("\"id\" integer PRIMARY KEY"));
-        assert!(sql.contains("\"name\" text"));
-        assert!(sql.contains("\"age\" integer NOT NULL"));
+        expected_str!(sql, "CREATE TABLE");
+        expected_str!(sql, "\"id\" integer PRIMARY KEY");
+        expected_str!(sql, "\"name\" text");
+        expected_str!(sql, "\"age\" integer NOT NULL");
+    }
+
+    #[test]
+    fn test_duplicate_column_error() {
+        // Arrange
+        let spec = create_cidl(vec![ModelBuilder::new("User").id().id().build()]);
+
+        let d1gen = D1Generator::new(spec, create_wrangler());
+
+        // Act
+        let err = d1gen.sqlite().unwrap_err();
+
+        // Assert
+        expected_str!(err, "Duplicate column names");
     }
 
     #[test]
     fn test_duplicate_primary_key_error() {
         // Arrange
-        let spec = create_cidl(vec![Model {
-            source_path: "./models/user.cloesce.ts".into(),
-            name: String::from("User"),
-            attributes: vec![
-                Attribute {
-                    value: TypedValue {
-                        name: String::from("id"),
-                        cidl_type: CidlType::Integer,
-                        nullable: false,
-                    },
-                    primary_key: true,
-                    foreign_key: None,
-                },
-                Attribute {
-                    value: TypedValue {
-                        name: String::from("user_id"),
-                        cidl_type: CidlType::Integer,
-                        nullable: false,
-                    },
-                    primary_key: true,
-                    foreign_key: None,
-                },
-            ],
-            methods: vec![],
-            data_sources: vec![],
-        }]);
+        let spec = create_cidl(vec![
+            ModelBuilder::new("User")
+                .pk("id", CidlType::Integer)
+                .pk("user_id", CidlType::Integer)
+                .build(),
+        ]);
 
         let d1gen = D1Generator::new(spec, create_wrangler());
 
@@ -405,58 +402,29 @@ mod tests {
         let err = d1gen.sqlite().unwrap_err();
 
         // Assert
-        assert!(err.to_string().contains("Duplicate primary keys"));
+        expected_str!(err, "Duplicate primary keys");
     }
 
     #[test]
     fn test_nullable_primary_key_error() {
         // Arrange
-        let spec = create_cidl(vec![Model {
-            source_path: "./models/user.cloesce.ts".into(),
-            name: String::from("User"),
-            attributes: vec![Attribute {
-                value: TypedValue {
-                    name: String::from("id"),
-                    cidl_type: CidlType::Integer,
-                    nullable: true,
-                },
-                primary_key: true,
-                foreign_key: None,
-            }],
-            methods: vec![],
-            data_sources: vec![],
-        }]);
+        let mut model = ModelBuilder::new("User").id().build();
+        model.attributes[0].value.nullable = true;
 
+        let spec = create_cidl(vec![model]);
         let d1gen = D1Generator::new(spec, create_wrangler());
 
         // Act
         let err = d1gen.sqlite().unwrap_err();
 
         // Assert
-        assert!(
-            err.to_string()
-                .contains("A primary key cannot be nullable.")
-        );
+        expected_str!(err, "A primary key cannot be nullable.");
     }
 
     #[test]
     fn test_missing_primary_key_error() {
         // Arrange
-        let spec = create_cidl(vec![Model {
-            source_path: "./models/user.cloesce.ts".into(),
-            name: String::from("User"),
-            attributes: vec![Attribute {
-                value: TypedValue {
-                    name: String::from("id"),
-                    cidl_type: CidlType::Integer,
-                    nullable: true,
-                },
-                primary_key: false,
-                foreign_key: None,
-            }],
-            methods: vec![],
-            data_sources: vec![],
-        }]);
+        let spec = create_cidl(vec![ModelBuilder::new("User").build()]);
 
         let d1gen = D1Generator::new(spec, create_wrangler());
 
@@ -464,7 +432,7 @@ mod tests {
         let err = d1gen.sqlite().unwrap_err();
 
         // Assert
-        assert!(err.to_string().contains("User is missing a primary key."));
+        expected_str!(err, "User is missing a primary key.");
     }
 
     #[test]
@@ -472,11 +440,37 @@ mod tests {
         // Arrange
         // note: this test is kind of ridiculous
         let creators: Vec<Box<dyn Fn() -> Model>> = vec![
-            Box::new(|| create_model("Treat", vec![])),
-            Box::new(|| create_model("Food", vec![])),
-            Box::new(|| create_model("Dog", vec!["Treat", "Food"])),
-            Box::new(|| create_model("Independent", vec![])),
-            Box::new(|| create_model("Person", vec!["Dog"])),
+            Box::new(|| ModelBuilder::new("Treat").id().build()),
+            Box::new(|| ModelBuilder::new("Food").id().build()),
+            Box::new(|| {
+                ModelBuilder::new("Dog")
+                    .id()
+                    .fk(
+                        "TreatId",
+                        CidlType::Integer,
+                        CidlForeignKey::OneToOne("Treat".into()),
+                        false,
+                    )
+                    .fk(
+                        "FoodId",
+                        CidlType::Integer,
+                        CidlForeignKey::OneToOne("Food".into()),
+                        false,
+                    )
+                    .build()
+            }),
+            Box::new(|| ModelBuilder::new("Independent").id().build()),
+            Box::new(|| {
+                ModelBuilder::new("Person")
+                    .id()
+                    .fk(
+                        "DogId",
+                        CidlType::Integer,
+                        CidlForeignKey::OneToOne("Dog".into()),
+                        false,
+                    )
+                    .build()
+            }),
         ];
 
         // 5 items, 120 permutations
@@ -494,25 +488,38 @@ mod tests {
     #[test]
     fn test_duplicate_model_error() {
         // Arrange
-        let models = vec![create_model("User", vec![]), create_model("User", vec![])];
+        let models = vec![
+            ModelBuilder::new("User").id().build(),
+            ModelBuilder::new("User").id().build(),
+        ];
 
         // Act
         let err = topo_sort(&models).unwrap_err();
 
         // Assert
-        assert!(err.to_string().contains("Duplicate model name"));
+        expected_str!(err, "Duplicate model name");
     }
 
     #[test]
     fn test_unknown_foreign_key_error() {
         // Arrange
-        let models = vec![create_model("User", vec!["NonExistent"])];
+        let models = vec![
+            ModelBuilder::new("User")
+                .id()
+                .fk(
+                    "NonExistentId",
+                    CidlType::Integer,
+                    CidlForeignKey::OneToOne("NonExistent".into()),
+                    false,
+                )
+                .build(),
+        ];
 
         // Act
         let err = topo_sort(&models).unwrap_err();
 
         // Assert
-        assert!(err.to_string().contains("Unknown foreign key"));
+        expected_str!(err, "Unknown foreign key");
     }
 
     #[test]
@@ -520,28 +527,75 @@ mod tests {
         // Arrange
         // A -> B -> C -> A
         let models = vec![
-            create_model("A", vec!["B"]),
-            create_model("B", vec!["C"]),
-            create_model("C", vec!["A"]),
+            ModelBuilder::new("A")
+                .id()
+                .fk(
+                    "BId",
+                    CidlType::Integer,
+                    CidlForeignKey::OneToOne("B".into()),
+                    false,
+                )
+                .build(),
+            ModelBuilder::new("B")
+                .id()
+                .fk(
+                    "CId",
+                    CidlType::Integer,
+                    CidlForeignKey::OneToOne("C".into()),
+                    false,
+                )
+                .build(),
+            ModelBuilder::new("C")
+                .id()
+                .fk(
+                    "AId",
+                    CidlType::Integer,
+                    CidlForeignKey::OneToOne("A".into()),
+                    false,
+                )
+                .build(),
         ];
 
         // Act
         let err = topo_sort(&models).unwrap_err();
 
         // Assert
-        assert!(err.to_string().contains("Cycle detected"));
+        expected_str!(err, "Cycle detected");
     }
 
     #[test]
     fn test_nullability_prevents_cycle_error() {
         // Arrange
         // A -> B -> C -> Nullable<A>
-        let mut models = vec![
-            create_model("A", vec!["B"]),
-            create_model("B", vec!["C"]),
-            create_model("C", vec!["A"]),
+        let models = vec![
+            ModelBuilder::new("A")
+                .id()
+                .fk(
+                    "BId",
+                    CidlType::Integer,
+                    CidlForeignKey::OneToOne("B".into()),
+                    false,
+                )
+                .build(),
+            ModelBuilder::new("B")
+                .id()
+                .fk(
+                    "CId",
+                    CidlType::Integer,
+                    CidlForeignKey::OneToOne("C".into()),
+                    false,
+                )
+                .build(),
+            ModelBuilder::new("C")
+                .id()
+                .fk(
+                    "AId",
+                    CidlType::Integer,
+                    CidlForeignKey::OneToOne("A".into()),
+                    true, // nullable
+                )
+                .build(),
         ];
-        models[2].attributes[0].value.nullable = true;
 
         // Act
         let sorted = topo_sort(&models);
@@ -554,8 +608,16 @@ mod tests {
     fn test_one_to_one_fk_yields_sqlite() {
         // Arrange
         let spec = create_cidl(vec![
-            create_model("User", vec!["Dog"]),
-            create_model("Dog", vec![]),
+            ModelBuilder::new("User")
+                .id()
+                .fk(
+                    "dogId",
+                    CidlType::Integer,
+                    CidlForeignKey::OneToOne("Dog".into()),
+                    false,
+                )
+                .build(),
+            ModelBuilder::new("Dog").id().build(),
         ]);
         let d1gen = D1Generator::new(spec, create_wrangler());
 
@@ -563,8 +625,9 @@ mod tests {
         let sql = d1gen.sqlite().expect("gen_sqlite to work");
 
         // Assert
-        assert!(sql.contains(
-            r#"FOREIGN KEY ("DogId") REFERENCES "Dog" ("id") ON DELETE RESTRICT ON UPDATE CASCADE "#
-        ));
+        expected_str!(
+            sql,
+            r#"FOREIGN KEY ("dogId") REFERENCES "Dog" ("id") ON DELETE RESTRICT ON UPDATE CASCADE "#
+        );
     }
 }
