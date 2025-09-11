@@ -9,7 +9,7 @@ use serde::Serialize;
 use serde_json::Value as JsonValue;
 use toml::Value as TomlValue;
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum CidlType {
     Integer,
     Real,
@@ -18,6 +18,15 @@ pub enum CidlType {
     D1Database,
     Model(String),
     Array(Box<CidlType>),
+}
+
+impl CidlType {
+    pub fn unwrap_array(&self) -> &CidlType {
+        match self {
+            CidlType::Array(inner) => inner.unwrap_array(),
+            other => other,
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -37,23 +46,10 @@ pub struct TypedValue {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-pub enum CidlForeignKeyKind {
-    OneToOne,
-    OneToMany,
-    ManyToMany,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-pub struct CidlForeignKey {
-    pub kind: CidlForeignKeyKind,
-    pub model_name: String,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
 pub struct Attribute {
     pub value: TypedValue,
     pub primary_key: bool,
-    pub foreign_key: Option<CidlForeignKey>,
+    pub foreign_key: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -80,10 +76,16 @@ pub struct DataSource {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
+pub enum CidlForeignKeyKind {
+    OneToOne(String),
+    OneToMany,
+    ManyToMany,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
 pub struct NavigationProperty {
-    pub attribute_name: Option<String>,
     pub value: TypedValue,
-    pub foreign_key: CidlForeignKey,
+    pub foreign_key: CidlForeignKeyKind,
 }
 
 #[derive(Serialize, Deserialize, Debug)]

@@ -1,8 +1,8 @@
 use std::path::PathBuf;
 
 use crate::{
-    Attribute, CidlForeignKey, CidlForeignKeyKind, CidlSpec, CidlType, DataSource, HttpVerb,
-    IncludeTree, InputLanguage, Method, Model, NavigationProperty, TypedValue, WranglerSpec,
+    Attribute, CidlForeignKeyKind, CidlSpec, CidlType, DataSource, HttpVerb, IncludeTree,
+    InputLanguage, Method, Model, NavigationProperty, TypedValue, WranglerSpec,
 };
 
 pub fn create_cidl(models: Vec<Model>) -> CidlSpec {
@@ -47,6 +47,7 @@ impl ModelBuilder {
         name: impl Into<String>,
         cidl_type: CidlType,
         nullable: bool,
+        foreign_key: Option<String>,
     ) -> Self {
         self.attributes.push(Attribute {
             value: TypedValue {
@@ -55,31 +56,25 @@ impl ModelBuilder {
                 nullable,
             },
             primary_key: false,
-            foreign_key: None,
+            foreign_key,
         });
         self
     }
 
     pub fn nav_p(
         mut self,
-        attribute_name: Option<&str>,
         name: impl Into<String>,
         cidl_type: CidlType,
         nullable: bool,
-        fk_kind: CidlForeignKeyKind,
-        fk_model_name: impl Into<String>,
+        foreign_key: CidlForeignKeyKind,
     ) -> Self {
         self.navigation_properties.push(NavigationProperty {
-            attribute_name: attribute_name.map(|s| s.into()),
             value: TypedValue {
                 name: name.into(),
                 cidl_type,
                 nullable,
             },
-            foreign_key: CidlForeignKey {
-                kind: fk_kind,
-                model_name: fk_model_name.into(),
-            },
+            foreign_key,
         });
         self
     }
@@ -99,29 +94,6 @@ impl ModelBuilder {
 
     pub fn id(self) -> Self {
         self.pk("id", CidlType::Integer)
-    }
-
-    pub fn fk(
-        mut self,
-        name: impl Into<String>,
-        cidl_type: CidlType,
-        kind: CidlForeignKeyKind,
-        model_name: impl Into<String>,
-        nullable: bool,
-    ) -> Self {
-        self.attributes.push(Attribute {
-            value: TypedValue {
-                name: name.into(),
-                cidl_type,
-                nullable,
-            },
-            primary_key: false,
-            foreign_key: Some(CidlForeignKey {
-                kind,
-                model_name: model_name.into(),
-            }),
-        });
-        self
     }
 
     pub fn method(

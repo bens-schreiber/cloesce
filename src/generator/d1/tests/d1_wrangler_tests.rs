@@ -1,5 +1,7 @@
 use anyhow::{Context, Result};
-use common::{CidlSpec, InputLanguage, WranglerFormat, WranglerSpec, builder::ModelBuilder};
+use common::{
+    CidlSpec, CidlType, InputLanguage, WranglerFormat, WranglerSpec, builder::ModelBuilder,
+};
 use d1::D1Generator;
 use insta::assert_snapshot;
 
@@ -73,21 +75,15 @@ fn test_generate_d1_snapshot_from_models() -> Result<()> {
         let treat = ModelBuilder::new("Treat").id().build();
         let dog = ModelBuilder::new("Dog")
             .id()
-            .fk(
-                "Treat",
-                common::CidlType::Integer,
-                common::CidlForeignKeyKind::OneToOne,
-                "Treat",
+            .attribute("treat", CidlType::Integer, false, Some("Treat".to_string()))
+            .attribute(
+                "collar",
+                CidlType::Integer,
                 false,
-            )
-            .fk(
-                "Collar",
-                common::CidlType::Integer,
-                common::CidlForeignKeyKind::OneToOne,
-                "Collar",
-                false,
+                Some("Collar".to_string()),
             )
             .build();
+
         let person = ModelBuilder::new("Person").id().build();
 
         let wrangler = WranglerSpec {
