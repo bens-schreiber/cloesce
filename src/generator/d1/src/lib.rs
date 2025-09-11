@@ -163,40 +163,11 @@ impl D1Generator {
         for &model in &models {
             let mut table = Table::create();
             let mut column_names = HashSet::new();
+            let mut one_to_one_fks = HashSet::new();
+            let mut pk_set = false;
 
             // Table will always just be the name of the model, in it's original case
             table.table(Alias::new(model.name.clone()));
-
-            // Verify a primary key exists
-            // We have to do this out of order because OneToMany relationships use this models own
-            // primary key.
-            //
-            // NOTE: As long as the CIDL always puts the PK as the first parameter this is O(1)
-            // (good thing we control that!)
-            {
-                let pk_attributes = model
-                    .attributes
-                    .iter()
-                    .filter(|a| a.primary_key)
-                    .collect::<Vec<_>>();
-                if pk_attributes.len() > 1 {
-                    return Err(anyhow!("Duplicate primary keys on model {}", model.name));
-                } else if pk_attributes.len() < 1 {
-                    return Err(anyhow!("Model {} is missing a primary key.", model.name));
-                }
-
-                let &pk_attribute = pk_attributes.first().unwrap();
-                if pk_attribute.value.nullable {
-                    return Err(anyhow!("A primary key cannot be nullable."));
-                }
-
-                if pk_attribute.foreign_key.is_some() {
-                    // TODO: Revisit this, should this design be allowed?
-                    return Err(anyhow!("A primary key cannot be a foreign key"));
-                }
-
-                pk_name_lookup.insert(&model.name, pk_attribute.value.name.clone());
-            }
 
             for attribute in model.attributes.iter() {
                 // Validate column name
@@ -213,11 +184,51 @@ impl D1Generator {
 
                 // Set primary key
                 if attribute.primary_key {
+                    if pk_set {
+                        return Err(anyhow!("Duplicate primary keys on model {}", model.name));
+                    }
+
+                    if attribute.value.nullable {
+                        return Err(anyhow!("A primary key cannot be nullable."));
+                    }
+
+                    if attribute.foreign_key.is_some() {
+                        // TODO: Revisit this, should this design be allowed?
+                        return Err(anyhow!("A primary key cannot be a foreign key"));
+                    }
+
                     column.primary_key();
+                    pk_set = true;
+                    pk_name_lookup.insert(&model.name, attribute.value.name.clone());
                 }
                 // Set nullability
                 else if !attribute.value.nullable {
                     column.not_null();
+                }
+
+                // Set foreign key
+                if let Some(fk) = &attribute.foreign_key {
+                    match fk.kind {
+                        CidlForeignKeyKind::OneToOne => {
+                            // Unwrap: safe because `topo_sort` validates all FK's
+                            let pk_name = pk_name_lookup.get(&fk.model_name).unwrap();
+                            set_one_to_one_fk(
+                                &mut table,
+                                &model.name,
+                                &fk.model_name,
+                                &attribute.value.name,
+                                pk_name,
+                            );
+                            one_to_one_fks.insert(&attribute.value.name);
+                        }
+                        _ => {
+                            return Err(anyhow!(
+                                "Attribute foreign keys can only be One To One: {}.{}",
+                                model.name,
+                                attribute.value.name
+                            ));
+                        }
+                    };
                 }
 
                 // Set Sqlite type
@@ -231,6 +242,108 @@ impl D1Generator {
 
                 table.col(column);
             }
+
+            if !pk_set {
+                return Err(anyhow!("Missing primary key on model {}", model.name));
+            }
+
+            for nav_prop in &model.navigation_properties {
+                let fk = &nav_prop.foreign_key;
+                match fk.kind {
+                    CidlForeignKeyKind::OneToOne => {
+                        // Validate type
+                        if !matches!(nav_prop.value.cidl_type, CidlType::Model(_)) {
+                            return Err(anyhow!(
+                                "One To One navigation properties must have a model type ({}.{})",
+                                model.name,
+                                nav_prop.value.name
+                            ));
+                        }
+
+                        // Validate referenced attribute name
+                        if let Some(attribute_name) = &nav_prop.attribute_name {
+                            if !column_names.contains(attribute_name.as_str()) {
+                                return Err(anyhow!(
+                                    "Unknown navigation property reference ({}.{})",
+                                    model.name,
+                                    nav_prop.value.name
+                                ));
+                            }
+
+                            // Unwrap: safe because `topo_sort` validates all FK's
+                            let pk_name = pk_name_lookup.get(&fk.model_name).unwrap();
+                            if !one_to_one_fks.contains(attribute_name) {
+                                set_one_to_one_fk(
+                                    &mut table,
+                                    &model.name,
+                                    &fk.model_name,
+                                    attribute_name,
+                                    pk_name,
+                                );
+                            }
+                        } else {
+                            return Err(anyhow!(
+                                "One To One navigation properties must reference an attribute ({}.{})",
+                                model.name,
+                                nav_prop.value.name
+                            ));
+                        }
+                    }
+                    CidlForeignKeyKind::OneToMany => {
+                        // Validate type
+                        match &nav_prop.value.cidl_type {
+                            CidlType::Array(inner) => match inner.as_ref() {
+                                CidlType::Model(model_name) if *model_name == fk.model_name => {
+                                    // Safe!
+                                }
+                                CidlType::Model(model_name) => {
+                                    return Err(anyhow!(
+                                        "One To Many navigation property model type does not match the foreign key type {} {}",
+                                        model_name,
+                                        fk.model_name
+                                    ));
+                                }
+                                _ => {
+                                    return Err(anyhow!(
+                                        "One To Many navigation property does not contain a Model {}.{}",
+                                        model.name,
+                                        nav_prop.value.name
+                                    ));
+                                }
+                            },
+                            _ => {
+                                return Err(anyhow!(
+                                    "One To Many navigation property does not contain an Array {}.{}",
+                                    model.name,
+                                    nav_prop.value.name
+                                ));
+                            }
+                        }
+
+                        // Unwrap: safe because `topo_sort` order ensures the fk model dependency has
+                        // already been inserted
+                        let fk_table = table_lookup.get_mut(&fk.model_name).unwrap();
+
+                        // Unwrap: safe because we explicitly set it
+                        let pk_name = pk_name_lookup.get(&model.name).unwrap();
+
+                        fk_table.foreign_key(
+                            ForeignKey::create()
+                                .name(format!("fk_{}_{}", fk.model_name, model.name))
+                                .from(
+                                    Alias::new(fk.model_name.clone()),
+                                    // TODO: We're hardcoding PascalCase here (or camelCase)
+                                    Alias::new(format!("{}Id", model.name)),
+                                )
+                                .to(Alias::new(model.name.clone()), Alias::new(pk_name))
+                                .on_update(sea_query::ForeignKeyAction::Cascade)
+                                .on_delete(sea_query::ForeignKeyAction::Restrict),
+                        );
+                    }
+                    CidlForeignKeyKind::ManyToMany => todo!(),
+                }
+            }
+
             table_lookup.insert(&model.name, table);
         }
 
@@ -242,7 +355,27 @@ impl D1Generator {
             res.push(format!("{};", table.to_string(SqliteQueryBuilder)));
         }
 
-        Ok(res.join("\n"))
+        return Ok(res.join("\n"));
+
+        fn set_one_to_one_fk(
+            table: &mut TableCreateStatement,
+            model_name: &String,
+            fk_model_name: &String,
+            attribute_name: &String,
+            pk_name: &String,
+        ) {
+            table.foreign_key(
+                ForeignKey::create()
+                    .name(format!("fk_{}_{}", model_name, fk_model_name))
+                    .from(
+                        Alias::new(model_name.clone()),
+                        Alias::new(attribute_name.as_str()),
+                    )
+                    .to(Alias::new(fk_model_name.clone()), Alias::new(pk_name))
+                    .on_update(sea_query::ForeignKeyAction::Cascade)
+                    .on_delete(sea_query::ForeignKeyAction::Restrict),
+            );
+        }
     }
 }
 
@@ -409,7 +542,7 @@ mod tests {
         let err = d1gen.sqlite().unwrap_err();
 
         // Assert
-        expected_str!(err, "User is missing a primary key.");
+        expected_str!(err, "Missing primary key on model");
     }
 
     #[test]
@@ -658,12 +791,13 @@ mod tests {
         let spec = create_cidl(vec![
             ModelBuilder::new("User")
                 .id()
-                .fk(
-                    "dogs",
-                    CidlType::Array(Box::new(CidlType::Model("Dog".to_string()))),
+                .nav_p(
+                    None,
+                    "Dogs",
+                    CidlType::Array(Box::new(CidlType::Model("Dog".into()))),
+                    false,
                     CidlForeignKeyKind::OneToMany,
                     "Dog",
-                    false,
                 )
                 .build(),
             ModelBuilder::new("Dog").id().build(),
@@ -676,7 +810,80 @@ mod tests {
         // Assert
         expected_str!(
             sql,
-            r#"FOREIGN KEY ("personId") REFERENCES "Person" ("id") ON DELETE RESTRICT ON UPDATE CASCADE "#
+            r#"FOREIGN KEY ("UserId") REFERENCES "User" ("id") ON DELETE RESTRICT ON UPDATE CASCADE "#
         );
+    }
+
+    #[test]
+    fn test_invalid_sqlite_type_error() {
+        // Arrange: Attribute with unsupported type (Model instead of primitive)
+        let spec = create_cidl(vec![
+            ModelBuilder::new("BadType")
+                .id()
+                .attribute("attr", CidlType::Model("User".into()), false)
+                .build(),
+        ]);
+
+        let d1gen = D1Generator::new(spec, create_wrangler());
+
+        // Act
+        let err = d1gen.sqlite().unwrap_err();
+
+        // Assert
+        expected_str!(err, "Invalid SQLite type");
+    }
+
+    #[test]
+    fn test_one_to_one_nav_property_missing_attribute_name_error() {
+        // Arrange: OneToOne nav property without attribute_name
+        let spec = create_cidl(vec![
+            ModelBuilder::new("Dog").id().build(),
+            ModelBuilder::new("User")
+                .id()
+                .nav_p(
+                    None, // Missing attribute reference
+                    "DogRef",
+                    CidlType::Model("Dog".into()),
+                    false,
+                    CidlForeignKeyKind::OneToOne,
+                    "Dog",
+                )
+                .build(),
+        ]);
+
+        let d1gen = D1Generator::new(spec, create_wrangler());
+
+        // Act
+        let err = d1gen.sqlite().unwrap_err();
+
+        // Assert
+        expected_str!(err, "must reference an attribute");
+    }
+
+    #[test]
+    fn test_one_to_one_nav_property_unknown_attribute_reference_error() {
+        // Arrange: OneToOne nav property references a non-existent attribute
+        let spec = create_cidl(vec![
+            ModelBuilder::new("Dog").id().build(),
+            ModelBuilder::new("User")
+                .id()
+                .nav_p(
+                    Some("non_existent_attr"), // Attribute does not exist
+                    "DogRef",
+                    CidlType::Model("Dog".into()),
+                    false,
+                    CidlForeignKeyKind::OneToOne,
+                    "Dog",
+                )
+                .build(),
+        ]);
+
+        let d1gen = D1Generator::new(spec, create_wrangler());
+
+        // Act
+        let err = d1gen.sqlite().unwrap_err();
+
+        // Assert
+        expected_str!(err, "Unknown navigation property reference");
     }
 }

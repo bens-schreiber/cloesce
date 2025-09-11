@@ -47,7 +47,6 @@ pub enum CidlForeignKeyKind {
 pub struct CidlForeignKey {
     pub kind: CidlForeignKeyKind,
     pub model_name: String,
-    pub navigation_property_name: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -81,9 +80,17 @@ pub struct DataSource {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
+pub struct NavigationProperty {
+    pub attribute_name: Option<String>,
+    pub value: TypedValue,
+    pub foreign_key: CidlForeignKey,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Model {
     pub name: String,
     pub attributes: Vec<Attribute>,
+    pub navigation_properties: Vec<NavigationProperty>,
     pub methods: Vec<Method>,
     pub data_sources: Vec<DataSource>,
     pub source_path: PathBuf,

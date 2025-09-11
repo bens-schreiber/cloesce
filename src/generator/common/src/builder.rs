@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use crate::{
     Attribute, CidlForeignKey, CidlForeignKeyKind, CidlSpec, CidlType, DataSource, HttpVerb,
-    IncludeTree, InputLanguage, Method, Model, TypedValue, WranglerSpec,
+    IncludeTree, InputLanguage, Method, Model, NavigationProperty, TypedValue, WranglerSpec,
 };
 
 pub fn create_cidl(models: Vec<Model>) -> CidlSpec {
@@ -24,6 +24,7 @@ pub fn create_wrangler() -> WranglerSpec {
 pub struct ModelBuilder {
     name: String,
     attributes: Vec<Attribute>,
+    navigation_properties: Vec<NavigationProperty>,
     methods: Vec<Method>,
     data_sources: Vec<DataSource>,
     source_path: Option<PathBuf>,
@@ -34,6 +35,7 @@ impl ModelBuilder {
         Self {
             name: name.into(),
             attributes: Vec::new(),
+            navigation_properties: Vec::new(),
             methods: Vec::new(),
             data_sources: Vec::new(),
             source_path: None,
@@ -54,6 +56,30 @@ impl ModelBuilder {
             },
             primary_key: false,
             foreign_key: None,
+        });
+        self
+    }
+
+    pub fn nav_p(
+        mut self,
+        attribute_name: Option<&str>,
+        name: impl Into<String>,
+        cidl_type: CidlType,
+        nullable: bool,
+        fk_kind: CidlForeignKeyKind,
+        fk_model_name: impl Into<String>,
+    ) -> Self {
+        self.navigation_properties.push(NavigationProperty {
+            attribute_name: attribute_name.map(|s| s.into()),
+            value: TypedValue {
+                name: name.into(),
+                cidl_type,
+                nullable,
+            },
+            foreign_key: CidlForeignKey {
+                kind: fk_kind,
+                model_name: fk_model_name.into(),
+            },
         });
         self
     }
@@ -93,7 +119,6 @@ impl ModelBuilder {
             foreign_key: Some(CidlForeignKey {
                 kind,
                 model_name: model_name.into(),
-                navigation_property_name: None, // TODO: hardcoding for now
             }),
         });
         self
@@ -132,6 +157,7 @@ impl ModelBuilder {
         Model {
             name: self.name,
             attributes: self.attributes,
+            navigation_properties: self.navigation_properties,
             methods: self.methods,
             data_sources: self.data_sources,
             source_path: self.source_path.unwrap_or_default(),
