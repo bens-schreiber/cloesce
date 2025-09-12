@@ -13,6 +13,7 @@ use sea_query::{Alias, ColumnDef, ForeignKey, Index, SqliteQueryBuilder, Table};
 /// - a cycle
 /// - unknown FK model
 /// - unknown attribute reference
+/// - invalid FK cidl type
 fn sql_topo_sort<'a>(
     models: &'a [Model],
     model_lookup: &HashMap<&str, &'a Model>,
@@ -119,7 +120,7 @@ fn sql_topo_sort<'a>(
     // Kahn's algorithm
     let mut queue = in_degree
         .iter()
-        .filter_map(|(&name, &v)| (v == 0).then_some(name))
+        .filter_map(|(&name, &deg)| (deg == 0).then_some(name))
         .collect::<VecDeque<_>>();
 
     let mut ordered = Vec::with_capacity(models.len());
@@ -192,14 +193,13 @@ impl<'a> JunctionTableBuilder<'a> {
     }
 
     fn build(self) -> Result<String> {
-        // Unwrap: assume program flow will never encounter an unfilled first model
         let [Some(a), Some(b)] = self.models else {
             return Err(anyhow!("Both models must be set for a junction table"));
         };
 
         let mut table = Table::create();
 
-        // TODO: case jnct table better
+        // TODO: Name the junction table in some standard way
         let mut col_a = ColumnDef::new(Alias::new(format!("a_{}", a.model_pk_name)));
         type_column(&mut col_a, &a.model_pk_type)?;
 
@@ -306,18 +306,11 @@ impl D1Generator {
             None => Err(anyhow!("Missing primary key on model {}", model_name)),
         };
 
-        // Sort models
-        let models = sql_topo_sort(&self.cidl.models, &model_lookup)?;
-
-        // One To Many models will appear before their dependency in topological sql table create order.
-        // Models will invert the relationship in this table for the dependency to later use.
+        let sorted_models = sql_topo_sort(&self.cidl.models, &model_lookup)?;
         let mut many_to_one_lookup = HashMap::<&String, Vec<&String>>::new();
-
-        // Many to Many models create a junction table, which requires all dependencies to be created first.
         let mut junction_tables = HashMap::<String, JunctionTableBuilder>::new();
-
         let mut res = Vec::new();
-        for &model in &models {
+        for &model in &sorted_models {
             let mut table = Table::create();
             let mut column_names = HashSet::new();
 
@@ -388,6 +381,7 @@ impl D1Generator {
                 return Err(anyhow!("Missing primary key on model {}", model.name));
             }
 
+            // Set Many to One FK's (One to Many from the perspective of the navigation property)
             let many_to_one = many_to_one_lookup.entry(&model.name).or_default();
             for model_name in many_to_one {
                 // TODO: Hardcoding PascalCase
@@ -412,6 +406,7 @@ impl D1Generator {
                 match fk {
                     CidlForeignKeyKind::OneToOne(_) => {
                         // Already validated in `topo_sort`, and created in attribute loop
+                        // TODO: Allow creation of OneToOne with just a navigation property
                     }
                     CidlForeignKeyKind::OneToMany => {
                         let fk_model_name = match nav_prop.value.cidl_type.unwrap_array() {
@@ -419,6 +414,8 @@ impl D1Generator {
                             _ => unreachable!("Expected topo sort type verificiation"),
                         };
 
+                        // Invert the relationship since the dependent table has not been created
+                        // in SQL topological order
                         many_to_one_lookup
                             .entry(fk_model_name)
                             .or_default()
@@ -442,10 +439,12 @@ impl D1Generator {
                     }
                 }
             }
+
+            // Generate SQLite
             res.push(format!("{};", table.build(SqliteQueryBuilder)));
         }
 
-        // Add junction tables to the SQL statement
+        // Add junction tables to the end of the query
         for (_, builder) in junction_tables {
             res.push(builder.build()?);
         }
@@ -456,7 +455,7 @@ impl D1Generator {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashMap;
+    use std::collections::{HashMap, HashSet};
 
     use itertools::Itertools;
 
@@ -491,8 +490,6 @@ mod tests {
     }
 
     fn is_topo_ordered(sorted: &[&Model]) -> bool {
-        use std::collections::HashSet;
-
         let mut visited = HashSet::<String>::new();
 
         for &model in sorted {
@@ -507,9 +504,6 @@ mod tests {
 
             for nav_prop in &model.navigation_properties {
                 match nav_prop.foreign_key {
-                    CidlForeignKeyKind::OneToOne(_) => {
-                        // Handled by attribute
-                    }
                     CidlForeignKeyKind::OneToMany => {
                         let fk_model_name = match nav_prop.value.cidl_type.unwrap_array() {
                             CidlType::Model(model_name) => model_name,
@@ -520,8 +514,8 @@ mod tests {
                             return false;
                         }
                     }
-                    CidlForeignKeyKind::ManyToMany => {
-                        // Handeled by junction tables
+                    _ => {
+                        // Handled by attribute or junction tables
                     }
                 }
             }
@@ -979,7 +973,7 @@ mod tests {
 
     #[test]
     fn test_invalid_sqlite_type_error() {
-        // Arrange: Attribute with unsupported type (Model instead of primitive)
+        // Arrange
         let spec = create_cidl(vec![
             ModelBuilder::new("BadType")
                 .id()
@@ -998,7 +992,7 @@ mod tests {
 
     #[test]
     fn test_one_to_one_nav_property_unknown_attribute_reference_error() {
-        // Arrange: OneToOne nav property references a non-existent attribute
+        // Arrange
         let spec = create_cidl(vec![
             ModelBuilder::new("Dog").id().build(),
             ModelBuilder::new("User")
