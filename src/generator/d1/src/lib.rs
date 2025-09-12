@@ -479,7 +479,7 @@ mod tests {
         }};
     }
 
-    fn model_lookup<'a>(models: &'a [Model]) -> HashMap<&'a str, &'a Model> {
+    fn model_lookup(models: &[Model]) -> HashMap<&str, &Model> {
         let mut model_lookup = HashMap::<&str, &Model>::new();
         for model in models {
             if model_lookup.insert(&model.name, model).is_some() {
@@ -497,10 +497,11 @@ mod tests {
 
         for &model in sorted {
             for attribute in &model.attributes {
-                if let Some(fk_model_name) = &attribute.foreign_key {
-                    if !visited.contains(fk_model_name) && !attribute.value.nullable {
-                        return false;
-                    }
+                if let Some(fk_model_name) = &attribute.foreign_key
+                    && !visited.contains(fk_model_name)
+                    && !attribute.value.nullable
+                {
+                    return false;
                 }
             }
 
