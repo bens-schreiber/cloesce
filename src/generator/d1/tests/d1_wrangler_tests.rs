@@ -1,6 +1,7 @@
 use anyhow::{Context, Result};
 use common::{
-    CidlSpec, CidlType, InputLanguage, WranglerFormat, WranglerSpec, builder::ModelBuilder,
+    CidlForeignKeyKind, CidlSpec, CidlType, InputLanguage, WranglerFormat, WranglerSpec,
+    builder::ModelBuilder,
 };
 use d1::D1Generator;
 use insta::assert_snapshot;
@@ -71,20 +72,101 @@ fn test_generate_d1_snapshot_from_json() -> Result<()> {
 fn test_generate_d1_snapshot_from_models() -> Result<()> {
     // Arrange
     let (cidl, wrangler) = {
-        let collar = ModelBuilder::new("Collar").id().build();
-        let treat = ModelBuilder::new("Treat").id().build();
-        let dog = ModelBuilder::new("Dog")
-            .id()
-            .attribute("treat", CidlType::Integer, false, Some("Treat".to_string()))
-            .attribute(
-                "collar",
-                CidlType::Integer,
-                false,
-                Some("Collar".to_string()),
-            )
-            .build();
-
-        let person = ModelBuilder::new("Person").id().build();
+        // Shoutout CHATGPT heres a huge list of crap
+        let models = vec![
+            // Basic User with attributes
+            ModelBuilder::new("User")
+                .id()
+                .attribute("name", CidlType::Text, true, None)
+                .attribute("age", CidlType::Integer, false, None)
+                .build(),
+            // One-to-One via attribute only
+            ModelBuilder::new("Profile")
+                .id()
+                .attribute("userId", CidlType::Integer, false, Some("User".into()))
+                .build(),
+            // One-to-One via attribute + nav property
+            ModelBuilder::new("Passport")
+                .id()
+                .attribute("userId", CidlType::Integer, false, Some("User".into()))
+                .nav_p(
+                    "user",
+                    CidlType::Model("User".into()),
+                    false,
+                    CidlForeignKeyKind::OneToOne("userId".into()),
+                )
+                .build(),
+            // One-to-Many: Person -> Dog
+            ModelBuilder::new("Person")
+                .id()
+                .nav_p(
+                    "dogs",
+                    CidlType::Array(Box::new(CidlType::Model("Dog".into()))),
+                    false,
+                    CidlForeignKeyKind::OneToMany,
+                )
+                .build(),
+            // One-to-Many: Boss -> Person
+            ModelBuilder::new("Boss")
+                .id()
+                .nav_p(
+                    "people",
+                    CidlType::Array(Box::new(CidlType::Model("Person".into()))),
+                    false,
+                    CidlForeignKeyKind::OneToMany,
+                )
+                .build(),
+            // Dogs belong to a Person
+            ModelBuilder::new("Dog")
+                .id()
+                .attribute("name", CidlType::Text, false, None)
+                .build(),
+            // Cats belong to a Person
+            ModelBuilder::new("Cat")
+                .id()
+                .attribute("breed", CidlType::Text, true, None)
+                .build(),
+            // Many-to-Many: Student <-> Course
+            ModelBuilder::new("Student")
+                .id()
+                .nav_p(
+                    "courses",
+                    CidlType::Array(Box::new(CidlType::Model("Course".into()))),
+                    false,
+                    CidlForeignKeyKind::ManyToMany,
+                )
+                .build(),
+            ModelBuilder::new("Course")
+                .id()
+                .nav_p(
+                    "students",
+                    CidlType::Array(Box::new(CidlType::Model("Student".into()))),
+                    false,
+                    CidlForeignKeyKind::ManyToMany,
+                )
+                .build(),
+            // Nullable FK: optional Car -> Garage
+            ModelBuilder::new("Garage").id().build(),
+            ModelBuilder::new("Car")
+                .id()
+                .attribute("garageId", CidlType::Integer, true, Some("Garage".into()))
+                .build(),
+            // Multi-FK model: Order -> User + Product
+            ModelBuilder::new("Product")
+                .id()
+                .attribute("name", CidlType::Text, false, None)
+                .build(),
+            ModelBuilder::new("Order")
+                .id()
+                .attribute("userId", CidlType::Integer, false, Some("User".into()))
+                .attribute(
+                    "productId",
+                    CidlType::Integer,
+                    false,
+                    Some("Product".into()),
+                )
+                .build(),
+        ];
 
         let wrangler = WranglerSpec {
             d1_databases: vec![],
@@ -94,7 +176,7 @@ fn test_generate_d1_snapshot_from_models() -> Result<()> {
             version: "0.0.1".to_string(),
             project_name: "People who own dogs, dogs have treats and collars".to_string(),
             language: InputLanguage::TypeScript,
-            models: vec![collar, treat, dog, person],
+            models,
         };
 
         (cidl, wrangler)

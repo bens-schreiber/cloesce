@@ -1,9 +1,0 @@
----
-source: d1/tests/d1_wrangler_tests.rs
-assertion_line: 109
-expression: generated_sqlite
----
-CREATE TABLE "Collar" ( "id" integer PRIMARY KEY );
-CREATE TABLE "Person" ( "id" integer PRIMARY KEY );
-CREATE TABLE "Treat" ( "id" integer PRIMARY KEY );
-CREATE TABLE "Dog" ( "id" integer PRIMARY KEY, "treat" integer NOT NULL, "collar" integer NOT NULL, FOREIGN KEY ("treat") REFERENCES "Treat" ("id") ON DELETE RESTRICT ON UPDATE CASCADE, FOREIGN KEY ("collar") REFERENCES "Collar" ("id") ON DELETE RESTRICT ON UPDATE CASCADE );

@@ -11,26 +11,20 @@ use sea_query::{Alias, ColumnDef, ForeignKey, Index, SqliteQueryBuilder, Table};
 ///
 /// Returns an error if there is:
 /// - a cycle
-/// - duplicate models
 /// - unknown FK model
 /// - unknown attribute reference
-fn sql_topo_sort(models: &[Model]) -> Result<Vec<&Model>> {
-    let mut model_lookup = HashMap::<&str, &Model>::new();
+fn sql_topo_sort<'a>(
+    models: &'a [Model],
+    model_lookup: &HashMap<&str, &'a Model>,
+) -> Result<Vec<&'a Model>> {
     let mut in_degree = BTreeMap::<&str, usize>::new();
     let mut graph = BTreeMap::<&str, Vec<&str>>::new();
 
-    // Detect dups, populate reverse lookup
-    for model in models {
-        if model_lookup.insert(&model.name, model).is_some() {
-            return Err(anyhow!("Duplicate model name: {}", model.name));
-        }
-
-        graph.entry(&model.name).or_default();
-        in_degree.entry(&model.name).or_insert(0);
-    }
-
     // Increment in-degree
     for model in models {
+        graph.entry(&model.name).or_default();
+        in_degree.entry(&model.name).or_insert(0);
+
         let mut attr_to_fk = HashMap::new();
 
         // Handle attribute FK's (One To One)
@@ -299,12 +293,30 @@ impl D1Generator {
     // NOTE: Model names, attributes do not need to be santized as SeaQuery
     // wraps them in quote literals.
     pub fn sqlite(&self) -> Result<String> {
-        let mut res = Vec::new();
-        let models = sql_topo_sort(&self.cidl.models)?;
-        let mut pk_lookup = HashMap::<&String, &TypedValue>::new();
+        // Detect dups, populate reverse lookup
+        let mut model_lookup = HashMap::<&str, &Model>::new();
+        for model in &self.cidl.models {
+            if model_lookup.insert(&model.name, model).is_some() {
+                return Err(anyhow!("Duplicate model name: {}", model.name));
+            }
+        }
+        let pk_lookup = |model_name: &str| match model_lookup.get(model_name).unwrap().primary_key()
+        {
+            Some(value) => Ok(value),
+            None => Err(anyhow!("Missing primary key on model {}", model_name)),
+        };
+
+        // Sort models
+        let models = sql_topo_sort(&self.cidl.models, &model_lookup)?;
+
+        // One To Many models will appear before their dependency in topological sql table create order.
+        // Models will invert the relationship in this table for the dependency to later use.
         let mut many_to_one_lookup = HashMap::<&String, Vec<&String>>::new();
+
+        // Many to Many models create a junction table, which requires all dependencies to be created first.
         let mut junction_tables = HashMap::<String, JunctionTableBuilder>::new();
 
+        let mut res = Vec::new();
         for &model in &models {
             let mut table = Table::create();
             let mut column_names = HashSet::new();
@@ -312,6 +324,7 @@ impl D1Generator {
             // Table will always just be the name of the model, in it's original case
             table.table(Alias::new(model.name.clone()));
 
+            let mut self_pk: Option<&TypedValue> = None;
             for attr in model.attributes.iter() {
                 // Validate column name
                 if !column_names.insert(attr.value.name.as_str()) {
@@ -330,7 +343,7 @@ impl D1Generator {
 
                 // Set primary key
                 if attr.primary_key {
-                    if pk_lookup.contains_key(&model.name) {
+                    if self_pk.is_some() {
                         return Err(anyhow!("Duplicate primary keys on model {}", model.name));
                     }
 
@@ -344,7 +357,7 @@ impl D1Generator {
                     }
 
                     column.primary_key();
-                    pk_lookup.insert(&model.name, &attr.value);
+                    self_pk = Some(&attr.value);
                 }
                 // Set nullability
                 else if !attr.value.nullable {
@@ -353,8 +366,9 @@ impl D1Generator {
 
                 // Set attribute foreign key
                 if let Some(fk_model_name) = &attr.foreign_key {
-                    // Unwrap: safe because of topo order
-                    let pk_name = &pk_lookup.get(&fk_model_name).unwrap().name;
+                    // Unwrap: safe because `sql_topo_sort`` validates FKs
+                    let pk_name = &pk_lookup(&fk_model_name)?.name;
+
                     table.foreign_key(
                         ForeignKey::create()
                             .from(
@@ -370,7 +384,7 @@ impl D1Generator {
                 table.col(column);
             }
 
-            if !pk_lookup.contains_key(&model.name) {
+            if self_pk.is_none() {
                 return Err(anyhow!("Missing primary key on model {}", model.name));
             }
 
@@ -380,8 +394,7 @@ impl D1Generator {
                 let fk_id_col_name = format!("{}Id", *model_name);
                 let mut fk_id_col = ColumnDef::new(Alias::new(&fk_id_col_name));
 
-                // Unwrap: safe because `sql_topo_sort` guaruantees dependencies before dependents
-                let pk = pk_lookup.get(*model_name).unwrap();
+                let pk = pk_lookup(model_name)?;
                 type_column(&mut fk_id_col, &pk.cidl_type)?;
                 table.col(fk_id_col);
 
@@ -417,7 +430,7 @@ impl D1Generator {
                             _ => unreachable!("Expected topo sort type verificiation"),
                         };
 
-                        let pk = pk_lookup.get(&model.name).unwrap();
+                        let pk = pk_lookup(&model.name)?;
                         junction_tables
                             .entry(JunctionTableBuilder::key(&model.name, fk_model_name))
                             .or_default()
@@ -443,6 +456,8 @@ impl D1Generator {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
+
     use itertools::Itertools;
 
     use crate::{D1Generator, sql_topo_sort};
@@ -462,6 +477,17 @@ mod tests {
                 got_val
             );
         }};
+    }
+
+    fn model_lookup<'a>(models: &'a [Model]) -> HashMap<&'a str, &'a Model> {
+        let mut model_lookup = HashMap::<&str, &Model>::new();
+        for model in models {
+            if model_lookup.insert(&model.name, model).is_some() {
+                panic!("Duplicate model name: {}", model.name);
+            }
+        }
+
+        model_lookup
     }
 
     fn is_topo_ordered(sorted: &[&Model]) -> bool {
@@ -806,7 +832,8 @@ mod tests {
             // Act
             let perm_slice: Vec<Model> = permutation.into_iter().map(|f| f()).collect();
 
-            let sorted = sql_topo_sort(&perm_slice).expect("topo_sort failed");
+            let lookup = model_lookup(&perm_slice);
+            let sorted = sql_topo_sort(&perm_slice, &lookup).expect("topo_sort failed");
 
             // Assert
             assert!(is_topo_ordered(&sorted));
@@ -816,13 +843,14 @@ mod tests {
     #[test]
     fn test_duplicate_model_error() {
         // Arrange
-        let models = vec![
+        let cidl = create_cidl(vec![
             ModelBuilder::new("User").id().build(),
             ModelBuilder::new("User").id().build(),
-        ];
+        ]);
 
         // Act
-        let err = sql_topo_sort(&models).unwrap_err();
+        let d1gen = D1Generator::new(cidl, create_wrangler());
+        let err = d1gen.sqlite().unwrap_err();
 
         // Assert
         expected_str!(err, "Duplicate model name");
@@ -844,7 +872,8 @@ mod tests {
         ];
 
         // Act
-        let err = sql_topo_sort(&models).unwrap_err();
+        let lookup = model_lookup(&models);
+        let err = sql_topo_sort(&models, &lookup).unwrap_err();
 
         // Assert
         expected_str!(
@@ -857,7 +886,7 @@ mod tests {
     fn test_cycle_detection_error() {
         // Arrange
         // A -> B -> C -> A
-        let models = vec![
+        let models = [
             ModelBuilder::new("A")
                 .id()
                 .attribute("bId", CidlType::Integer, false, Some("B".to_string()))
@@ -873,7 +902,8 @@ mod tests {
         ];
 
         // Act
-        let err = sql_topo_sort(&models).unwrap_err();
+        let lookup = model_lookup(&models);
+        let err = sql_topo_sort(&models, &lookup).unwrap_err();
 
         // Assert
         expected_str!(err, "Cycle detected");
@@ -899,7 +929,8 @@ mod tests {
         ];
 
         // Act
-        let sorted = sql_topo_sort(&models);
+        let lookup = model_lookup(&models);
+        let sorted = sql_topo_sort(&models, &lookup);
 
         // Assert
         assert!(is_topo_ordered(&sorted.unwrap()));
@@ -938,7 +969,8 @@ mod tests {
         ];
 
         // Act
-        let sorted = sql_topo_sort(&models).expect("topo_sort failed");
+        let lookup = model_lookup(&models);
+        let sorted = sql_topo_sort(&models, &lookup).expect("toposort to work");
 
         // Assert
         assert!(is_topo_ordered(&sorted));

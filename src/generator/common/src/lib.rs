@@ -98,6 +98,21 @@ pub struct Model {
     pub source_path: PathBuf,
 }
 
+impl Model {
+    /// Linear searches over attributes to find the primary key
+    ///
+    /// TODO: Certainly not efficient, but required because of
+    /// cyclical nulled dependencies. A cache could enhance this if needed.
+    ///
+    /// Alternatively, CIDL could ensure PK's are always placed first in the list,
+    /// ensuring this is O(1).
+    pub fn primary_key(&self) -> Option<&TypedValue> {
+        self.attributes
+            .iter()
+            .find_map(|a| a.primary_key.then_some(&a.value))
+    }
+}
+
 #[derive(Serialize, Deserialize)]
 pub enum InputLanguage {
     TypeScript,
