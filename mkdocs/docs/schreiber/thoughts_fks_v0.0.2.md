@@ -384,4 +384,10 @@ The tricky part with generation is the order of table creation. If B depends on 
 
 ![Dependency graph](../assets/fk_dependencies.drawio.png)
 
-We can turn the CIDL into a digraph. It's pretty much arbitrary what order we traverse the graph, we will simply continue until a parent is found and then work our way down. A problem could arise in cyclical dependencies: A depends on B who depends on A. This isn't really allowed in SQL (unless the FK is nullable), so we will have to detect loops in the graph and blow up with an error. Should be a fun time all around.
+The CIDL be turned into a graph, and using a topological sorting algorithm we would return a valid ordering of dependencies. One problem with this is the kind of topological ordering: do we make it relative to the AST, or relative to SQL.
+
+If the ordering was relative to the AST, in a 1:M relationship like `Person( [Dog] )`, Dog would come before Person, and it would be Person's responsibility as a model to place a key to itself on Dog.
+
+In the same case, if the ordering was relative to SQL, Person would come before Dog, because Dog holds an FK to person, and Dog cannot be inserted before Person.
+
+It seems obvious the best choice is to do SQL ordering, but the challenge is that the Dog model in our AST has no idea it has a dependency to Person, we would have to somehow forward Person's foreign key properties to Dog. Alternatively, we try to turn AST ordering into SQL ordering in some trivial way. For now, I'll work with SQL ordering.
