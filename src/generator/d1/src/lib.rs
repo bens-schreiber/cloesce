@@ -367,7 +367,7 @@ impl D1Generator {
                 // Set attribute foreign key
                 if let Some(fk_model_name) = &attr.foreign_key {
                     // Unwrap: safe because `sql_topo_sort`` validates FKs
-                    let pk_name = &pk_lookup(&fk_model_name)?.name;
+                    let pk_name = &pk_lookup(fk_model_name)?.name;
 
                     table.foreign_key(
                         ForeignKey::create()
