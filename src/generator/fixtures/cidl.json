@@ -95,6 +95,7 @@
           ]
         }
       ],
+      "navigation_properties": [],
       "data_sources": [],
       "name": "Actions",
       "source_path": "actions.cloesce.ts"
@@ -177,6 +178,7 @@
           ]
         }
       ],
+      "navigation_properties": [],
       "data_sources": [],
       "name": "Dog",
       "source_path": "dog.cloesce.ts"
@@ -239,6 +241,7 @@
           ]
         }
       ],
+      "navigation_properties": [],
       "data_sources": [],
       "name": "Person",
       "source_path": "person.cloesce.ts"

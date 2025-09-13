@@ -1,0 +1,18 @@
+---
+source: d1/tests/d1_wrangler_tests.rs
+expression: generated_sqlite
+---
+CREATE TABLE "Boss" ( "id" integer PRIMARY KEY );
+CREATE TABLE "Car" ( "id" integer PRIMARY KEY, "garageId" integer, FOREIGN KEY ("garageId") REFERENCES "Garage" ("id") ON DELETE RESTRICT ON UPDATE CASCADE );
+CREATE TABLE "Cat" ( "id" integer PRIMARY KEY, "breed" text );
+CREATE TABLE "Course" ( "id" integer PRIMARY KEY );
+CREATE TABLE "Garage" ( "id" integer PRIMARY KEY );
+CREATE TABLE "Product" ( "id" integer PRIMARY KEY, "name" text NOT NULL );
+CREATE TABLE "Student" ( "id" integer PRIMARY KEY );
+CREATE TABLE "User" ( "id" integer PRIMARY KEY, "name" text, "age" integer NOT NULL );
+CREATE TABLE "Person" ( "id" integer PRIMARY KEY, "BossId" integer, FOREIGN KEY ("BossId") REFERENCES "Boss" ("id") ON DELETE RESTRICT ON UPDATE CASCADE );
+CREATE TABLE "Profile" ( "id" integer PRIMARY KEY, "userId" integer NOT NULL, FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE RESTRICT ON UPDATE CASCADE );
+CREATE TABLE "Passport" ( "id" integer PRIMARY KEY, "userId" integer NOT NULL, FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE RESTRICT ON UPDATE CASCADE );
+CREATE TABLE "Order" ( "id" integer PRIMARY KEY, "userId" integer NOT NULL, "productId" integer NOT NULL, FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE RESTRICT ON UPDATE CASCADE, FOREIGN KEY ("productId") REFERENCES "Product" ("id") ON DELETE RESTRICT ON UPDATE CASCADE );
+CREATE TABLE "Dog" ( "id" integer PRIMARY KEY, "name" text NOT NULL, "PersonId" integer, FOREIGN KEY ("PersonId") REFERENCES "Person" ("id") ON DELETE RESTRICT ON UPDATE CASCADE );
+CREATE TABLE "fk_Course_Student" ( "a_id" integer NOT NULL, "b_id" integer NOT NULL, PRIMARY KEY ("a_id", "b_id"), FOREIGN KEY ("a_id") REFERENCES "Course" ("id") ON DELETE RESTRICT ON UPDATE CASCADE, FOREIGN KEY ("b_id") REFERENCES "Student" ("id") ON DELETE RESTRICT ON UPDATE CASCADE );
