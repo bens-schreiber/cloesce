@@ -21,10 +21,10 @@ pub enum CidlType {
 }
 
 impl CidlType {
-    pub fn unwrap_array(&self) -> &CidlType {
+    pub fn unwrap_array(&self) -> Option<&CidlType> {
         match self {
-            CidlType::Array(inner) => inner.unwrap_array(),
-            other => other,
+            CidlType::Array(inner) => Some(inner),
+            _ => None,
         }
     }
 }
@@ -77,9 +77,9 @@ pub struct DataSource {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub enum CidlForeignKeyKind {
-    OneToOne(String),
-    OneToMany,
-    ManyToMany,
+    OneToOne { reference: String },
+    OneToMany { reference: String },
+    ManyToMany { unique_id: String },
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -101,12 +101,9 @@ pub struct Model {
 impl Model {
     /// Linear searches over attributes to find the primary key
     ///
-    /// TODO: Certainly not efficient, but required because of
-    /// cyclical nulled dependencies. A cache could enhance this if needed.
-    ///
-    /// Alternatively, CIDL could ensure PK's are always placed first in the list,
+    /// TODO: The CIDL should ensure PK's are always placed first in the list
     /// ensuring this is O(1).
-    pub fn primary_key(&self) -> Option<&TypedValue> {
+    pub fn find_primary_key(&self) -> Option<&TypedValue> {
         self.attributes
             .iter()
             .find_map(|a| a.primary_key.then_some(&a.value))
