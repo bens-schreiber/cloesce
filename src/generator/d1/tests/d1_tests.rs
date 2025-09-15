@@ -26,7 +26,7 @@ fn test_sqlite_output() {
         let d1gen = D1Generator::new(cidl, create_wrangler());
 
         // Act
-        let sql = d1gen.sqlite().expect("Empty models should succeed");
+        let sql = d1gen.tables().expect("Empty models should succeed");
 
         // Assert
         assert!(
@@ -49,7 +49,7 @@ fn test_sqlite_output() {
         let d1gen = D1Generator::new(cidl, create_wrangler());
 
         // Act
-        let sql = d1gen.sqlite().expect("gen_sqlite to work");
+        let sql = d1gen.tables().expect("gen_sqlite to work");
 
         // Assert
         expected_str!(sql, "CREATE TABLE");
@@ -71,7 +71,7 @@ fn test_sqlite_output() {
         let d1gen = D1Generator::new(cidl, create_wrangler());
 
         // Act
-        let sql = d1gen.sqlite().expect("gen_sqlite to work");
+        let sql = d1gen.tables().expect("gen_sqlite to work");
 
         // Assert
         expected_str!(
@@ -101,7 +101,7 @@ fn test_sqlite_output() {
         let d1gen = D1Generator::new(cidl, create_wrangler());
 
         // Act
-        let sql = d1gen.sqlite().expect("gen_sqlite to work");
+        let sql = d1gen.tables().expect("gen_sqlite to work");
 
         // Assert
         expected_str!(
@@ -157,7 +157,7 @@ fn test_sqlite_output() {
         let d1gen = D1Generator::new(cidl, create_wrangler());
 
         // Act
-        let sql = d1gen.sqlite().expect("gen_sqlite to work");
+        let sql = d1gen.tables().expect("gen_sqlite to work");
 
         // Assert: boss table
         expected_str!(sql, r#"CREATE TABLE "Boss" ( "id" integer PRIMARY KEY );"#);
@@ -211,7 +211,7 @@ fn test_sqlite_output() {
         let d1gen = D1Generator::new(cidl, create_wrangler());
 
         // Act
-        let sql = d1gen.sqlite().expect("gen_sqlite to work");
+        let sql = d1gen.tables().expect("gen_sqlite to work");
 
         // Assert: Junction table exists
         expected_str!(sql, r#"CREATE TABLE "StudentsCourses""#);
@@ -247,7 +247,7 @@ fn test_duplicate_column_error() {
     let d1gen = D1Generator::new(cidl, create_wrangler());
 
     // Act
-    let err = d1gen.sqlite().unwrap_err();
+    let err = d1gen.tables().unwrap_err();
 
     // Assert
     expected_str!(err, "Duplicate column names");
@@ -266,7 +266,7 @@ fn test_duplicate_primary_key_error() {
     let d1gen = D1Generator::new(cidl, create_wrangler());
 
     // Act
-    let err = d1gen.sqlite().unwrap_err();
+    let err = d1gen.tables().unwrap_err();
 
     // Assert
     expected_str!(err, "Duplicate primary keys");
@@ -282,7 +282,7 @@ fn test_nullable_primary_key_error() {
     let d1gen = D1Generator::new(cidl, create_wrangler());
 
     // Act
-    let err = d1gen.sqlite().unwrap_err();
+    let err = d1gen.tables().unwrap_err();
 
     // Assert
     expected_str!(err, "A primary key cannot be nullable.");
@@ -296,7 +296,7 @@ fn test_missing_primary_key_error() {
     let d1gen = D1Generator::new(cidl, create_wrangler());
 
     // Act
-    let err = d1gen.sqlite().unwrap_err();
+    let err = d1gen.tables().unwrap_err();
 
     // Assert
     expected_str!(err, "Missing primary key on model");
@@ -312,7 +312,7 @@ fn test_duplicate_model_error() {
 
     // Act
     let d1gen = D1Generator::new(cidl, create_wrangler());
-    let err = d1gen.sqlite().unwrap_err();
+    let err = d1gen.tables().unwrap_err();
 
     // Assert
     expected_str!(err, "Duplicate model name");
@@ -335,7 +335,7 @@ fn test_unknown_foreign_key_error() {
 
     // Act
     let d1gen = D1Generator::new(cidl, create_wrangler());
-    let err = d1gen.sqlite().unwrap_err();
+    let err = d1gen.tables().unwrap_err();
 
     // Assert
     expected_str!(
@@ -365,7 +365,7 @@ fn test_cycle_detection_error() {
 
     // Act
     let d1gen = D1Generator::new(cidl, create_wrangler());
-    let err = d1gen.sqlite().unwrap_err();
+    let err = d1gen.tables().unwrap_err();
 
     // Assert
     expected_str!(err, "Cycle detected");
@@ -394,7 +394,7 @@ fn test_nullability_prevents_cycle_error() {
     let d1gen = D1Generator::new(cidl, create_wrangler());
 
     // Assert
-    d1gen.sqlite().expect("sqlite gen to work");
+    d1gen.tables().expect("sqlite gen to work");
 }
 
 #[test]
@@ -410,7 +410,7 @@ fn test_invalid_sqlite_type_error() {
     let d1gen = D1Generator::new(cidl, create_wrangler());
 
     // Act
-    let err = d1gen.sqlite().unwrap_err();
+    let err = d1gen.tables().unwrap_err();
 
     // Assert
     expected_str!(err, "Invalid SQLite type");
@@ -437,7 +437,7 @@ fn test_one_to_one_nav_property_unknown_attribute_reference_error() {
     let d1gen = D1Generator::new(spec, create_wrangler());
 
     // Act
-    let err = d1gen.sqlite().unwrap_err();
+    let err = d1gen.tables().unwrap_err();
 
     // Assert
     expected_str!(
@@ -458,7 +458,7 @@ fn test_primary_key_cannot_be_foreign_key() {
     let d1gen = D1Generator::new(cidl, create_wrangler());
 
     // Act
-    let err = d1gen.sqlite().unwrap_err();
+    let err = d1gen.tables().unwrap_err();
 
     // Assert
     expected_str!(err, "A primary key cannot be a foreign key");
@@ -486,7 +486,7 @@ fn test_one_to_one_nav_property_expected_model_type_error() {
     let d1gen = D1Generator::new(spec, create_wrangler());
 
     // Act
-    let err = d1gen.sqlite().unwrap_err();
+    let err = d1gen.tables().unwrap_err();
 
     // Assert
     expected_str!(
@@ -518,7 +518,7 @@ fn test_one_to_one_mismatched_fk_and_nav_type_error() {
     let d1gen = D1Generator::new(spec, create_wrangler());
 
     // Act
-    let err = d1gen.sqlite().unwrap_err();
+    let err = d1gen.tables().unwrap_err();
 
     // Assert - message includes "Mismatched types between foreign key and One to One navigation property"
     expected_str!(
@@ -551,7 +551,7 @@ fn test_one_to_many_expected_collection_type_error() {
     let d1gen = D1Generator::new(spec, create_wrangler());
 
     // Act
-    let err = d1gen.sqlite().unwrap_err();
+    let err = d1gen.tables().unwrap_err();
 
     // Assert
     expected_str!(
@@ -581,7 +581,7 @@ fn test_one_to_many_nullable_nav_property_error() {
     let d1gen = D1Generator::new(spec, create_wrangler());
 
     // Act
-    let err = d1gen.sqlite().unwrap_err();
+    let err = d1gen.tables().unwrap_err();
 
     // Assert
     expected_str!(
@@ -611,7 +611,7 @@ fn test_one_to_many_unknown_nav_model_error() {
     let d1gen = D1Generator::new(spec, create_wrangler());
 
     // Act
-    let err = d1gen.sqlite().unwrap_err();
+    let err = d1gen.tables().unwrap_err();
 
     // Assert
     expected_str!(
@@ -642,7 +642,7 @@ fn test_one_to_many_unresolved_reference_error() {
     let d1gen = D1Generator::new(spec, create_wrangler());
 
     // Act
-    let err = d1gen.sqlite().unwrap_err();
+    let err = d1gen.tables().unwrap_err();
 
     // Assert
     expected_str!(
@@ -672,7 +672,7 @@ fn test_many_to_many_expected_collection_type_error() {
     let d1gen = D1Generator::new(cidl, create_wrangler());
 
     // Act
-    let err = d1gen.sqlite().unwrap_err();
+    let err = d1gen.tables().unwrap_err();
 
     // Assert
     expected_str!(
@@ -702,7 +702,7 @@ fn test_many_to_many_nullable_nav_property_error() {
     let d1gen = D1Generator::new(cidl, create_wrangler());
 
     // Act
-    let err = d1gen.sqlite().unwrap_err();
+    let err = d1gen.tables().unwrap_err();
 
     // Assert
     expected_str!(
@@ -732,7 +732,7 @@ fn test_many_to_many_unknown_nav_model_error() {
     let d1gen = D1Generator::new(cidl, create_wrangler());
 
     // Act
-    let err = d1gen.sqlite().unwrap_err();
+    let err = d1gen.tables().unwrap_err();
 
     // Assert
     expected_str!(
@@ -762,7 +762,7 @@ fn test_junction_table_builder_errors() {
         ]);
 
         let d1gen = D1Generator::new(cidl, create_wrangler());
-        let err = d1gen.sqlite().unwrap_err();
+        let err = d1gen.tables().unwrap_err();
         expected_str!(err, "Both models must be set for a junction table");
     }
 
@@ -806,7 +806,7 @@ fn test_junction_table_builder_errors() {
         ]);
 
         let d1gen = D1Generator::new(cidl, create_wrangler());
-        let err = d1gen.sqlite().unwrap_err();
+        let err = d1gen.tables().unwrap_err();
         expected_str!(
             err,
             "Too many ManyToMany navigation properties for junction table"
