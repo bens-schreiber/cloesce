@@ -69,6 +69,47 @@ function readCloesceConfig(cwd: string): CloesceConfig | null {
   }
 }
 
+function getDecoratorPlainName(dec: import("ts-morph").Decorator): string {
+  const n = dec.getName() ?? dec.getExpression().getText();
+  return String(n).replace(/\(.*\)$/, "");
+}
+
+function getDecoratorArgText(dec: import("ts-morph").Decorator, idx: number): string | undefined {
+  const args = dec.getArguments();
+  if (!args[idx]) return undefined;
+  const a = args[idx];
+
+  // Identifier (e.g., ForeignKey(Dog))
+  if ((a as any).getKind && (a as any).getKind() === 77 /* SyntaxKind.Identifier */) {
+    return (a as any).getText();
+  }
+
+  // String literal (e.g., ForeignKey("Dog"))
+  const txt = (a as any).getText?.();
+  if (!txt) return undefined;
+  // strip quotes if string
+  const m = txt.match(/^['"](.*)['"]$/);
+  return m ? m[1] : txt;
+}
+
+/** Turn a Type (Dog | import("...").Dog) into "Dog" if it's a class/interface name. */
+function typeToModelName(t: Type, sf: SourceFile): string | undefined {
+  const sym = t.getSymbol();
+  const name = sym?.getName();
+  if (name && !["Array", "Promise"].includes(name)) return name;
+
+  const txt = cleanTypeText(t, sf);
+  // Handle "Dog" or "Dog | undefined" etc
+  const m = txt.match(/^[A-Za-z_]\w*/);
+  return m ? m[0] : undefined;
+}
+
+/** Convenience: find a property by name on a class (works for class properties only). */
+function findClassPropertyByName(cls: import("ts-morph").ClassDeclaration, name: string) {
+  return cls.getProperties().find((p) => p.getName() === name);
+}
+
+
 const IGNORE_DIRS = new Set([
   "node_modules",
   ".git",
@@ -344,25 +385,108 @@ export function extractModels(opts: ExtractOptions = {}) {
 
       const className = cls.getName() ?? "<anonymous>";
 
-      const attributes = cls.getProperties().map((prop) => {
+      const fkMap = new Map<string, string>();
+
+      const oneToOneMap = new Map<string, string>(); // relationPropName -> fkName
+
+      for (const prop of cls.getProperties()) {
+        for (const dec of prop.getDecorators()) {
+          const dname = getDecoratorPlainName(dec);
+          if (dname === "ForeignKey") {
+            // Support ForeignKey(Dog) or ForeignKey("Dog", "id")
+            const modelArg = getDecoratorArgText(dec, 0); // "Dog" or Dog
+            if (modelArg) {
+              fkMap.set(prop.getName(), modelArg);
+            }
+          } else if (dname === "OneToOne") {
+            // @OneToOne("dogId")
+            const fkName = getDecoratorArgText(dec, 0);
+            if (fkName) {
+              oneToOneMap.set(prop.getName(), fkName);
+            }
+          }
+        }
+      }
+    
+      const attributes: any[] = [];
+      const consumedProps = new Set<string>();
+    
+      // Emit default attributes for properties that are not part of FK/relations
+      function pushDefaultAttribute(prop: PropertyDeclaration) {
         const t = prop.getType();
         const { nullable } = getNullability(prop, sf);
-
-        const entry: any = {
+        attributes.push({
           value: {
             name: prop.getName(),
             cidl_type: TypeCode.fromType(t, sf),
             nullable,
           },
-        };
+          primary_key: hasDecoratorNamed(prop, "PrimaryKey"),
+        });
+        consumedProps.add(prop.getName());
+      }
 
-        if (hasDecoratorNamed(prop, "PrimaryKey")) {
-          entry.primary_key = true;
-        } else {
-          entry.primary_key = false;
+      for (const [relationPropName, fkName] of oneToOneMap.entries()) {
+        const relationProp = findClassPropertyByName(cls, relationPropName);
+        const fkProp = findClassPropertyByName(cls, fkName);
+        if (!relationProp || !fkProp) {
+          // If schema is malformed, fall back to default where possible
+          if (relationProp && !consumedProps.has(relationPropName)) {
+            pushDefaultAttribute(relationProp);
+          }
+          if (fkProp && !consumedProps.has(fkName)) {
+            pushDefaultAttribute(fkProp);
+          }
+          continue;
         }
-        return entry;
-      });
+      
+        // Determine target model
+        let targetModel = fkMap.get(fkName);
+        if (!targetModel) {
+          const relT = relationProp.getType();
+          targetModel = typeToModelName(relT, sf);
+        }
+        if (!targetModel) {
+          // If still unknown, fall back to default props rather than crashing
+          if (!consumedProps.has(relationPropName)) pushDefaultAttribute(relationProp);
+          if (!consumedProps.has(fkName)) pushDefaultAttribute(fkProp);
+          continue;
+        }
+      
+        // Scalar FK entry (e.g., dogId: number)
+        const fkType = fkProp.getType();
+        const { nullable: fkNullable } = getNullability(fkProp, sf);
+        attributes.push({
+          foreign_key: { OneToOne: targetModel },
+          value: {
+            cidl_type: TypeCode.fromType(fkType, sf),
+            name: fkName,             // NOTE: matches your desired JSON
+            nullable: fkNullable,
+          },
+          primary_key: hasDecoratorNamed(fkProp, "PrimaryKey"),
+        });
+      
+        // Relation entry (e.g., dog: Dog | undefined) — but "name" = fkName per your spec
+        const relNullable = getNullability(relationProp, sf).nullable;
+        attributes.push({
+          foreign_key: { OneToOne: targetModel },
+          value: {
+            cidl_type: { model: targetModel },
+            name: fkName,           
+            nullable: relNullable,
+          },
+          primary_key: false,
+        });
+      
+        consumedProps.add(fkName);
+        consumedProps.add(relationPropName);
+      }
+    
+      // 2b) Emit any remaining properties (that weren’t consumed by FK/OneToOne)
+      for (const prop of cls.getProperties()) {
+        if (consumedProps.has(prop.getName())) continue;
+        pushDefaultAttribute(prop);
+      }
 
       const methods = cls.getMethods().map((m) => {
         const decos = m
