@@ -35,6 +35,17 @@ function readPkgMeta(cwd: string) {
   return { projectName, version };
 }
 
+function isD1DbType(t: Type, sf: SourceFile): boolean {
+  // robust even if the type shows up as import("...").D1Db
+  const txt = cleanTypeText(t, sf);
+  const sym = t.getSymbol()?.getName();
+  return (
+    txt === "D1Db" ||
+    sym === "D1Db" ||
+    TypeCode.fromType(t, sf) === TypeCode.D1Db
+  );
+}
+
 function readCloesceConfig(cwd: string): CloesceConfig | null {
   const configPath = path.join(cwd, "cloesce-config.json");
   if (!fs.existsSync(configPath)) {
@@ -139,7 +150,9 @@ function walkCloesceFiles(root: string, searchPath: string): string[] {
       for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
         const full = path.join(dir, entry.name);
         if (entry.isDirectory()) {
-          walkDir(full);
+          if (!IGNORE_DIRS.has(entry.name)) {
+            walkDir(full);
+          }
         } else if (entry.isFile() && /\.cloesce\.ts$/i.test(entry.name)) {
           out.push(full);
         }
@@ -151,45 +164,50 @@ function walkCloesceFiles(root: string, searchPath: string): string[] {
   return out;
 }
 
+// strip import stuff so comparisons are stable
 function cleanTypeText(t: Type, sf: SourceFile) {
   return t.getText(sf).replace(/import\(".*?"\)\./g, "");
 }
 
-export type CidlTypeJson = "Integer" | "Real" | "Text" | "Blob" | "D1Database";
-
-const cidlTypeMap = {
-  number: "Integer" as const,
-  string: "Text" as const,
-  boolean: "Integer" as const,
-  D1Database: "D1Database" as const,
-} satisfies Record<string, CidlTypeJson>;
+export enum TypeCode {
+  Number = "Integer",
+  String = "Text",
+  Boolean = "boolean",
+  Date = "Date",
+  D1Db = "D1Db",
+  Response = "Response",
+}
 
 export namespace TypeCode {
-  export function toCidlType(t: Type, sf: SourceFile): CidlTypeJson {
+  const basicTypeMap: Record<string, TypeCode> = {
+    number: TypeCode.Number,
+    string: TypeCode.String,
+    boolean: TypeCode.Boolean,
+    Date: TypeCode.Date,
+    Response: TypeCode.Response,
+    D1Db: TypeCode.D1Db,
+  };
+
+  export function fromType(t: Type, sf: SourceFile): TypeCode {
     const txt = cleanTypeText(t, sf);
     const symName = t.getSymbol()?.getName();
 
-    // unwrap Promise<T>
+    // Robust primitive checks
+    if (t.isNumber()) return TypeCode.Number;
+    if (t.isString()) return TypeCode.String;
+    if (t.isBoolean()) return TypeCode.Boolean;
+
+    // Unwrap Promise<T> recursively
     if (symName === "Promise" && t.getTypeArguments().length === 1) {
-      return toCidlType(t.getTypeArguments()[0], sf);
+      return fromType(t.getTypeArguments()[0], sf);
     }
 
-    // disregard nullish
-    if (t.isUnion()) {
-      const nonNullish = t
-        .getUnionTypes()
-        .find((u) => !u.isNull() && !u.isUndefined());
+    // Known names by text or symbol
+    if (txt in basicTypeMap)
+      return basicTypeMap[txt as keyof typeof basicTypeMap];
 
-      if (nonNullish) return toCidlType(nonNullish, sf);
-
-      throw new Error(`Union only contains null/undefined: ${txt}`);
-    }
-
-    if (txt in cidlTypeMap) {
-      return cidlTypeMap[txt as keyof typeof cidlTypeMap];
-    }
-
-    throw new Error(`Unknown Cloesce type: ${txt}`);
+    // Fallback
+    return TypeCode.String;
   }
 }
 
@@ -400,7 +418,7 @@ export function extractModels(opts: ExtractOptions = {}) {
         attributes.push({
           value: {
             name: prop.getName(),
-            cidl_type: TypeCode.toCidlType(t, sf),
+            cidl_type: TypeCode.fromType(t, sf),
             nullable,
           },
           primary_key: hasDecoratorNamed(prop, "PrimaryKey"),
@@ -485,10 +503,12 @@ export function extractModels(opts: ExtractOptions = {}) {
           const raw = cleanTypeText(pt, sf);
           if (raw === "Request") continue;
 
+          if (isD1DbType(pt, sf) || p.getName() === "db") continue;
+
           const nullable = getParamNullability(p, sf);
           parameters.push({
             name: p.getName(),
-            cidl_type: TypeCode.toCidlType(pt, sf),
+            cidl_type: TypeCode.fromType(pt, sf),
             nullable,
           });
         }
@@ -501,15 +521,10 @@ export function extractModels(opts: ExtractOptions = {}) {
         };
       });
 
-      const sourcePath = path.relative(cwd, sf.getFilePath());
-
       models.push({
         name: className,
-        source_path: sourcePath,
         attributes,
         methods,
-        navigation_properties: [],
-        data_sources: [],
       });
     }
   }
