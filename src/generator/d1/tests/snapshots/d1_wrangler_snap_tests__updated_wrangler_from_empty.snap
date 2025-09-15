@@ -1,5 +1,5 @@
 ---
-source: cli/tests/d1_wrangler_tests.rs
+source: d1/tests/d1_wrangler_snap_tests.rs
 expression: "format!(\"{}\", toml::to_string_pretty(&updated_wrangler).unwrap())"
 ---
 [[d1_databases]]

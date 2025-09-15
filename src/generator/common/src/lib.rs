@@ -1,4 +1,6 @@
-use std::path::Path;
+pub mod builder;
+
+use std::path::{Path, PathBuf};
 use std::{fs::File, io::Write};
 
 use anyhow::{Context, Result, anyhow};
@@ -7,15 +9,27 @@ use serde::Serialize;
 use serde_json::Value as JsonValue;
 use toml::Value as TomlValue;
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub enum CidlType {
     Integer,
     Real,
     Text,
     Blob,
+    D1Database,
+    Model(String),
+    Array(Box<CidlType>),
 }
 
-#[derive(Serialize, Deserialize)]
+impl CidlType {
+    pub fn unwrap_array(&self) -> Option<&CidlType> {
+        match self {
+            CidlType::Array(inner) => Some(inner),
+            _ => None,
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug)]
 pub enum HttpVerb {
     GET,
     POST,
@@ -24,20 +38,21 @@ pub enum HttpVerb {
     DELETE,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct TypedValue {
     pub name: String,
     pub cidl_type: CidlType,
     pub nullable: bool,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Attribute {
     pub value: TypedValue,
     pub primary_key: bool,
+    pub foreign_key: Option<String>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Method {
     pub name: String,
     pub is_static: bool,
@@ -45,11 +60,54 @@ pub struct Method {
     pub parameters: Vec<TypedValue>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
+pub enum IncludeTree {
+    Node {
+        value: TypedValue,
+        tree: Vec<IncludeTree>,
+    },
+    None,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct DataSource {
+    name: String,
+    tree: IncludeTree,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub enum CidlForeignKeyKind {
+    OneToOne { reference: String },
+    OneToMany { reference: String },
+    ManyToMany { unique_id: String },
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct NavigationProperty {
+    pub value: TypedValue,
+    pub foreign_key: CidlForeignKeyKind,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Model {
     pub name: String,
     pub attributes: Vec<Attribute>,
+    pub navigation_properties: Vec<NavigationProperty>,
     pub methods: Vec<Method>,
+    pub data_sources: Vec<DataSource>,
+    pub source_path: PathBuf,
+}
+
+impl Model {
+    /// Linear searches over attributes to find the primary key
+    ///
+    /// TODO: The CIDL should ensure PK's are always placed first in the list
+    /// ensuring this is O(1).
+    pub fn find_primary_key(&self) -> Option<&TypedValue> {
+        self.attributes
+            .iter()
+            .find_map(|a| a.primary_key.then_some(&a.value))
+    }
 }
 
 #[derive(Serialize, Deserialize)]

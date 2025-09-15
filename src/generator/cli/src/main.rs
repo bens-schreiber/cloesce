@@ -35,9 +35,12 @@ enum GenerateTarget {
     },
     Workers {
         cidl_path: PathBuf,
+        workers_path: PathBuf,
     },
     Client {
         cidl_path: PathBuf,
+        client_path: PathBuf,
+        domain: String,
     },
 }
 
@@ -53,7 +56,7 @@ fn main() -> Result<()> {
                 wrangler_path,
                 sqlite_path,
             } => {
-                let mut sqlite_file = std::fs::File::create(sqlite_path)?;
+                let mut sqlite_file = create_file_and_dir(sqlite_path)?;
                 let cidl = cidl_from_path(cidl_path)?;
 
                 let mut wrangler = match wrangler_path {
@@ -72,7 +75,7 @@ fn main() -> Result<()> {
                         .context("Failed to validate Wrangler file")?,
                 );
 
-                // region: Update Wrangler
+                // Update wrangler config
                 {
                     let updated_wrangler = d1gen.wrangler();
                     let wrangler_file = match wrangler_path {
@@ -85,9 +88,8 @@ fn main() -> Result<()> {
                         .update(&updated_wrangler, wrangler_file)
                         .context("Failed to update wrangler file")?;
                 }
-                // endregion: Update Wrangler
 
-                // region: Generate SQL
+                // Generate SQL
                 {
                     let generated_sqlite =
                         d1gen.sqlite().context("Failed to generate sqlite file")?;
@@ -95,21 +97,42 @@ fn main() -> Result<()> {
                         .write(generated_sqlite.as_bytes())
                         .context("Failed to write to sqlite file")?;
                 }
-                // endregion: Generate SQL
             }
-            GenerateTarget::Workers { cidl_path } => {
+            GenerateTarget::Workers {
+                cidl_path,
+                workers_path,
+            } => {
                 let cidl = cidl_from_path(cidl_path)?;
-                let out = WorkersFactory.create(cidl);
-                println!("{out}");
+                let mut file =
+                    create_file_and_dir(workers_path).context("Failed to open workers file")?;
+
+                file.write(WorkersFactory.create(cidl).as_bytes())
+                    .context("Failed to write workers file")?;
             }
-            GenerateTarget::Client { cidl_path } => {
+            GenerateTarget::Client {
+                cidl_path,
+                client_path,
+                domain,
+            } => {
                 let spec = cidl_from_path(cidl_path)?;
-                println!("{}", client::generate_client_api(spec));
+                let mut file =
+                    create_file_and_dir(client_path).context("Failed to open client file")?;
+
+                file.write(client::generate_client_api(spec, domain).as_bytes())
+                    .context("Failed to write client file")?;
             }
         },
     }
 
     Ok(())
+}
+
+fn create_file_and_dir(path: PathBuf) -> Result<std::fs::File> {
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    let file = std::fs::File::create(path)?;
+    Ok(file)
 }
 
 fn cidl_from_path(cidl_path: PathBuf) -> Result<CidlSpec> {

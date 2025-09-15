@@ -7,6 +7,7 @@ exports[`actions snapshot 1`] = `
     {
       "attributes": [
         {
+          "foreign_key": null,
           "primary_key": true,
           "value": {
             "cidl_type": "Integer",
@@ -15,6 +16,7 @@ exports[`actions snapshot 1`] = `
           },
         },
         {
+          "foreign_key": null,
           "primary_key": false,
           "value": {
             "cidl_type": "Text",
@@ -23,12 +25,18 @@ exports[`actions snapshot 1`] = `
           },
         },
       ],
+      "data_sources": [],
       "methods": [
         {
           "http_verb": "POST",
           "is_static": true,
           "name": "create",
           "parameters": [
+            {
+              "cidl_type": "D1Database",
+              "name": "db",
+              "nullable": false,
+            },
             {
               "cidl_type": "Text",
               "name": "payload",
@@ -41,6 +49,11 @@ exports[`actions snapshot 1`] = `
           "is_static": true,
           "name": "update",
           "parameters": [
+            {
+              "cidl_type": "D1Database",
+              "name": "db",
+              "nullable": false,
+            },
             {
               "cidl_type": "Integer",
               "name": "id",
@@ -56,8 +69,13 @@ exports[`actions snapshot 1`] = `
         {
           "http_verb": "PATCH",
           "is_static": true,
-          "name": "patchlol",
+          "name": "patch",
           "parameters": [
+            {
+              "cidl_type": "D1Database",
+              "name": "db",
+              "nullable": false,
+            },
             {
               "cidl_type": "Text",
               "name": "phrase",
@@ -71,6 +89,11 @@ exports[`actions snapshot 1`] = `
           "name": "remove",
           "parameters": [
             {
+              "cidl_type": "D1Database",
+              "name": "db",
+              "nullable": false,
+            },
+            {
               "cidl_type": "Integer",
               "name": "id",
               "nullable": false,
@@ -79,10 +102,13 @@ exports[`actions snapshot 1`] = `
         },
       ],
       "name": "Actions",
+      "navigation_properties": [],
+      "source_path": "actions.cloesce.ts",
     },
     {
       "attributes": [
         {
+          "foreign_key": null,
           "primary_key": true,
           "value": {
             "cidl_type": "Integer",
@@ -91,6 +117,7 @@ exports[`actions snapshot 1`] = `
           },
         },
         {
+          "foreign_key": null,
           "primary_key": false,
           "value": {
             "cidl_type": "Text",
@@ -99,6 +126,7 @@ exports[`actions snapshot 1`] = `
           },
         },
         {
+          "foreign_key": null,
           "primary_key": false,
           "value": {
             "cidl_type": "Integer",
@@ -107,6 +135,7 @@ exports[`actions snapshot 1`] = `
           },
         },
         {
+          "foreign_key": null,
           "primary_key": false,
           "value": {
             "cidl_type": "Text",
@@ -115,24 +144,42 @@ exports[`actions snapshot 1`] = `
           },
         },
       ],
+      "data_sources": [],
       "methods": [
         {
           "http_verb": "GET",
           "is_static": false,
           "name": "get_name",
-          "parameters": [],
+          "parameters": [
+            {
+              "cidl_type": "D1Database",
+              "name": "db",
+              "nullable": false,
+            },
+          ],
         },
         {
           "http_verb": "GET",
           "is_static": false,
           "name": "get_breed",
-          "parameters": [],
+          "parameters": [
+            {
+              "cidl_type": "D1Database",
+              "name": "db",
+              "nullable": false,
+            },
+          ],
         },
         {
           "http_verb": "POST",
           "is_static": true,
           "name": "woof",
           "parameters": [
+            {
+              "cidl_type": "D1Database",
+              "name": "db",
+              "nullable": false,
+            },
             {
               "cidl_type": "Text",
               "name": "phrase",
@@ -142,10 +189,13 @@ exports[`actions snapshot 1`] = `
         },
       ],
       "name": "Dog",
+      "navigation_properties": [],
+      "source_path": "dog.cloesce.ts",
     },
     {
       "attributes": [
         {
+          "foreign_key": null,
           "primary_key": true,
           "value": {
             "cidl_type": "Integer",
@@ -154,6 +204,7 @@ exports[`actions snapshot 1`] = `
           },
         },
         {
+          "foreign_key": null,
           "primary_key": false,
           "value": {
             "cidl_type": "Text",
@@ -162,6 +213,7 @@ exports[`actions snapshot 1`] = `
           },
         },
         {
+          "foreign_key": null,
           "primary_key": false,
           "value": {
             "cidl_type": "Text",
@@ -170,18 +222,30 @@ exports[`actions snapshot 1`] = `
           },
         },
       ],
+      "data_sources": [],
       "methods": [
         {
           "http_verb": "GET",
           "is_static": false,
           "name": "foo",
-          "parameters": [],
+          "parameters": [
+            {
+              "cidl_type": "D1Database",
+              "name": "db",
+              "nullable": false,
+            },
+          ],
         },
         {
           "http_verb": "POST",
           "is_static": true,
           "name": "speak",
           "parameters": [
+            {
+              "cidl_type": "D1Database",
+              "name": "db",
+              "nullable": false,
+            },
             {
               "cidl_type": "Text",
               "name": "phrase",
@@ -191,6 +255,8 @@ exports[`actions snapshot 1`] = `
         },
       ],
       "name": "Person",
+      "navigation_properties": [],
+      "source_path": "person.cloesce.ts",
     },
   ],
   "project_name": "actions",

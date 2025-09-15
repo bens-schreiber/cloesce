@@ -1,0 +1,8 @@
+compatibility_date = "2025-09-07"
+main = ".generated/workers.ts"
+name = "example"
+
+[[d1_databases]]
+binding = "DB"
+database_id = "not_needed_for_example"
+database_name = "example"

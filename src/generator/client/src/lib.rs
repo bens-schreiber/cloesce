@@ -1,21 +1,24 @@
-pub mod mappers;
+mod mappers;
 
 use std::sync::Arc;
 
 use common::{CidlSpec, CidlType, InputLanguage};
-use handlebars::Handlebars;
+use handlebars::{Handlebars, handlebars_helper};
 
 use mappers::TypeScriptMapper;
 
-pub trait LanguageTypeMapper {
+pub trait ClientLanguageTypeMapper {
     fn type_name(&self, ty: &CidlType, nullable: bool) -> String;
 }
 
-/// A helper that can be used inside of an `.hbs` file via `lang_type`
-fn register_type_mapper(
+handlebars_helper!(is_serializable: |cidl_type: CidlType| !matches!(cidl_type, CidlType::D1Database));
+
+fn register_helpers(
     handlebars: &mut Handlebars<'_>,
-    mapper: Arc<dyn LanguageTypeMapper + Send + Sync>,
+    mapper: Arc<dyn ClientLanguageTypeMapper + Send + Sync>,
 ) {
+    handlebars.register_helper("is_serializable", Box::new(is_serializable));
+
     handlebars.register_helper(
         "lang_type",
         Box::new(
@@ -43,7 +46,7 @@ fn register_type_mapper(
 
 const TYPESCRIPT_TEMPLATE: &str = include_str!("./templates/ts.hbs");
 
-pub fn generate_client_api(spec: CidlSpec) -> String {
+pub fn generate_client_api(spec: CidlSpec, domain: String) -> String {
     let template = match spec.language {
         InputLanguage::TypeScript => TYPESCRIPT_TEMPLATE,
     };
@@ -56,7 +59,13 @@ pub fn generate_client_api(spec: CidlSpec) -> String {
     handlebars
         .register_template_string("models", template)
         .unwrap();
-    register_type_mapper(&mut handlebars, mapper);
+    register_helpers(&mut handlebars, mapper);
 
-    handlebars.render("models", &spec).unwrap()
+    // TODO: Determine where we want the domain passed in...
+    let mut context = serde_json::to_value(&spec).unwrap();
+    if let serde_json::Value::Object(ref mut map) = context {
+        map.insert("domain".to_string(), serde_json::Value::String(domain));
+    }
+
+    handlebars.render("models", &context).unwrap()
 }

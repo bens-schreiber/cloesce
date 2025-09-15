@@ -1,0 +1,7 @@
+---
+source: d1/tests/d1_wrangler_snap_tests.rs
+expression: generated_sqlite
+---
+CREATE TABLE "Actions" ( "id" integer PRIMARY KEY, "name" text NOT NULL );
+CREATE TABLE "Dog" ( "id" integer PRIMARY KEY, "name" text NOT NULL, "breed" integer NOT NULL, "preferred_treat" text );
+CREATE TABLE "Person" ( "id" integer PRIMARY KEY, "name" text NOT NULL, "middle_name" text );

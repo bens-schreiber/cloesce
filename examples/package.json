@@ -1,0 +1,24 @@
+{
+  "name": "examples",
+  "version": "0.0.1",
+  "description": "A basic Cloesce Typescript project",
+  "license": "ISC",
+  "author": "Cloesce",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "backend": "sh generate.sh",
+    "frontend": "vite ./frontend"
+  },
+  "dependencies": {
+    "cloesce": "file:../src/extractor/ts",
+    "wrangler": "^4.34.0"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20250906.0",
+    "@types/node": "^24.3.1",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.2",
+    "vite": "^7.1.2"
+  }
+}

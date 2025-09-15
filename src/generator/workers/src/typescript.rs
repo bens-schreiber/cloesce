@@ -1,5 +1,3 @@
-use client::LanguageTypeMapper;
-use client::mappers::TypeScriptMapper;
 use common::{CidlType, HttpVerb, Method, Model, TypedValue};
 
 use crate::LanguageWorkerGenerator as LanguageWorkersGenerator;
@@ -7,23 +5,31 @@ use crate::LanguageWorkerGenerator as LanguageWorkersGenerator;
 pub struct TypescriptWorkersGenerator {}
 impl LanguageWorkersGenerator for TypescriptWorkersGenerator {
     fn imports(&self, models: &[Model]) -> String {
-        let model_names = models
-            .iter()
-            .map(|m| &m.name)
-            .cloned()
-            .collect::<Vec<_>>()
-            .join(", ");
+        let cf_types = r#"import { D1Database } from "@cloudflare/workers-types""#;
 
-        format!(
-            r#"
-        import {{ {model_names} }} from './models';
-        "#
-        )
+        // TODO: Fix hardcoding path ../{}
+        let model_imports = models
+            .iter()
+            .map(|m| {
+                format!(
+                    r#"
+        import {{ {} }} from '../{}'; 
+        "#,
+                    m.name,
+                    m.source_path.with_extension("").display() // strip the .ts off
+                )
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
+
+        format!("{cf_types}\n{model_imports}")
     }
 
     fn preamble(&self) -> String {
         r#"
-        function match(path: string, request: Request, env: any): Response {
+        export interface Env { DB: D1Database }
+
+        function match(router: any, path: string, request: Request, env: Env): Response {
             let node: any = router;
             const params: any[] = [];
             const segments = path.split("/").filter(Boolean);
@@ -64,23 +70,16 @@ impl LanguageWorkersGenerator for TypescriptWorkersGenerator {
     fn main(&self) -> String {
         r#"
         export default {
-            async fetch(request: Request, env: any, ctx: any): Promise<Response> {
-                {}
+            async fetch(request: Request, env: Env, ctx: any): Promise<Response> {
                 try {
                     const url = new URL(request.url);
-                    return match(url.pathname, request, env);
-                } catch (error) {
-                    console.error("Worker error:", error);
-                    return new Response(
-                        JSON.stringify({ 
-                            error: "Internal server error",
-                            message: error.message 
-                        }),
-                        { 
-                            status: 500,
-                            headers: { "Content-Type": "application/json" }
-                        }
-                    );
+                    return await match(router, url.pathname, request, env);
+                } catch (error: any) {
+                    console.error("Internal server error:", error);
+                    return new Response(JSON.stringify({ error: error?.message }), {
+                        status: 500,
+                        headers: { "Content-Type": "application/json" },
+                    });
                 }
             }
         };
@@ -88,51 +87,36 @@ impl LanguageWorkersGenerator for TypescriptWorkersGenerator {
         .to_string()
     }
 
-    fn router(&self, body: String) -> String {
+    fn router(&self, model: String) -> String {
         format!(
             r#"
-        const router = {{ api: {{{body}}} }}
+        const router = {{ api: {{{model}}} }}
         "#
         )
     }
 
-    fn router_model(&self, model_name: &str, body: String) -> String {
+    fn router_model(&self, model_name: &str, method: String) -> String {
         format!(
             r#"
-        {model_name}: {{{body}}}
+        {model_name}: {{{method}}}
         "#
         )
     }
 
-    fn router_method(&self, method: &Method, body: String) -> String {
-        let route = if method.is_static {
-            &method.name
+    fn router_method(&self, method: &Method, proto: String) -> String {
+        if method.is_static {
+            proto
         } else {
-            "<id>"
-        };
-
-        format!(
-            r#"
-        "{route}": {{{body}}}
-        "#
-        )
+            format!(
+                r#"
+            "<id>": {{{proto}}}
+            "#
+            )
+        }
     }
 
     fn proto(&self, method: &Method, body: String) -> String {
         let method_name = &method.name;
-
-        let params = method
-            .parameters
-            .iter()
-            .map(|p| {
-                format!(
-                    "{}: {}",
-                    p.name,
-                    TypeScriptMapper.type_name(&p.cidl_type, p.nullable)
-                )
-            })
-            .collect::<Vec<_>>()
-            .join(",");
 
         let id = if !method.is_static {
             "id: number, "
@@ -142,7 +126,7 @@ impl LanguageWorkersGenerator for TypescriptWorkersGenerator {
 
         format!(
             r#"
-            {method_name}: async ({id}{params}, request: Request, env: any) => {{{body}}}
+            {method_name}: async ({id} request: Request, env: Env) => {{{body}}}
             "#
         )
     }
@@ -165,82 +149,106 @@ impl LanguageWorkersGenerator for TypescriptWorkersGenerator {
         )
     }
 
-    fn validate_params(&self, params: &[TypedValue]) -> String {
+    fn validate_req_body(&self, params: &[TypedValue]) -> String {
         fn fmt_error(name: &String, ty: &str) -> String {
             format!(
                 "if ({name} !== null && typeof {name} !== '{ty}') {{ throw new Error('Parameter {name} must be a {ty}'); }}",
             )
         }
 
-        let mut validations = Vec::new();
+        let mut validate = Vec::new();
 
-        for param in params {
+        let valid_params = params
+            .iter()
+            .filter(|p| !matches!(p.cidl_type, CidlType::D1Database))
+            .collect::<Vec<_>>();
+
+        // Instantiate Request Body
+        if !valid_params.is_empty() {
+            validate.push(format!(
+                r#"
+            let body;
+            try {{
+                body = await request.json();
+            }} catch {{
+                return new Response(JSON.stringify({{ error: "Invalid request body" }}), {{
+                    status: 400,
+                    headers: {{ "Content-Type": "application/json" }},
+                }});
+            }}
+            
+            const {{{}}} = body;
+            "#,
+                valid_params
+                    .iter()
+                    .map(|p| p.name.clone())
+                    .collect::<Vec<_>>()
+                    .join(",")
+            ));
+        }
+
+        // Validate Request Body
+        for param in valid_params {
             if !param.nullable {
-                validations.push(format!(
+                validate.push(format!(
                     "if ({} === null || {} === undefined) {{ throw new Error('Required parameter missing: {}');}}",
                     param.name, param.name, param.name
                 ));
             }
 
-            let type_check = match param.cidl_type {
-                CidlType::Integer | CidlType::Real => fmt_error(&param.name, "number"),
-                CidlType::Text => fmt_error(&param.name, "string"),
+            match &param.cidl_type {
+                CidlType::Integer | CidlType::Real => validate.push(fmt_error(&param.name, "number")),
+                CidlType::Text => validate.push(fmt_error(&param.name, "string")),
                 CidlType::Blob => {
-                    format!(
+                    validate.push(format!(
                         "if ({} !== null && !({} instanceof ArrayBuffer || {} instanceof Uint8Array)) {{ throw new Error('Parameter {} must be a Uint8Array'); }}",
                         param.name, param.name, param.name, param.name
-                    )
+                    ))
+                },
+                _ => {
+                    // Skip any other params, they may be dependency injected
                 }
             };
-
-            validations.push(type_check);
         }
 
-        if validations.is_empty() {
-            String::from("")
-        } else {
-            validations.join("\n")
-        }
+        validate.join("\n")
     }
 
     fn instantiate_model(&self, model: &Model) -> String {
         let model_name = &model.name;
-        let instance = model
-            .attributes
-            .iter()
-            .map(|a| a.value.name.clone())
-            .collect::<Vec<_>>()
-            .join(",");
 
         // explicitly create the model so that users don't need
         // to create a constructor
         format!(
             r#"
-        const d1 = env.D1_DB || env.DB;
-
+        const d1 = env.DB;
         const query = `SELECT * FROM {model_name} WHERE id = ?`;
         const record = await d1.prepare(query).bind(id).first();
-
         if (!record) {{
             return new Response(
                 JSON.stringify({{ error: "Record not found" }}),
                 {{ status: 404, headers: {{ "Content-Type": "application/json" }} }}
             );
         }}
-
-        const instance: {model_name} = {{{instance}}};
+        const instance: {model_name} = Object.assign(new {model_name}(), record)
         "#
         )
     }
 
     fn dispatch_method(&self, model_name: &str, method: &Method) -> String {
         let method_name = &method.name;
+
+        // SQL params are built by the body validator, CF params are dependency injected
         let params = method
             .parameters
             .iter()
-            .map(|p| p.name.clone())
+            .map(|p| match &p.cidl_type {
+                CidlType::D1Database => "env.DB".to_string(),
+                _ => p.name.clone(),
+            })
             .collect::<Vec<_>>()
             .join(", ");
+
         let callee = if method.is_static {
             model_name
         } else {
@@ -249,7 +257,7 @@ impl LanguageWorkersGenerator for TypescriptWorkersGenerator {
 
         format!(
             r#"
-        {callee}.{method_name}({params})
+        return {callee}.{method_name}({params})
         "#
         )
     }
