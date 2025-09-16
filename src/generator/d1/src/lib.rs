@@ -1,9 +1,9 @@
-pub mod tables;
+pub mod sql;
 
 use common::{CidlSpec, D1Database, WranglerSpec};
+use sql::generate_sql;
 
 use anyhow::Result;
-use tables::generate_sql_tables;
 
 pub struct D1Generator {
     cidl: CidlSpec,
@@ -53,11 +53,8 @@ impl D1Generator {
         res
     }
 
-    pub fn tables(&self) -> Result<String> {
-        generate_sql_tables(&self.cidl.models)
-    }
-
-    pub fn views(&self) -> Result<String> {
-        Ok(String::default())
+    /// Transforms the Model AST into their SQL table equivalents
+    pub fn sql(&self) -> Result<String> {
+        generate_sql(&self.cidl.models)
     }
 }

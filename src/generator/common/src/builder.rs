@@ -20,6 +20,45 @@ pub fn create_wrangler() -> WranglerSpec {
     }
 }
 
+#[derive(Default)]
+pub struct IncludeTreeBuilder {
+    nodes: Vec<(TypedValue, IncludeTree)>,
+}
+
+impl IncludeTreeBuilder {
+    pub fn add(mut self, name: &str, cidl_type: CidlType) -> Self {
+        self.nodes.push((
+            TypedValue {
+                name: name.into(),
+                cidl_type,
+                nullable: false,
+            },
+            IncludeTree(vec![]),
+        ));
+        self
+    }
+
+    pub fn add_with_children<F>(mut self, name: &str, cidl_type: CidlType, build: F) -> Self
+    where
+        F: FnOnce(IncludeTreeBuilder) -> IncludeTreeBuilder,
+    {
+        let subtree = build(IncludeTreeBuilder::default()).build();
+        self.nodes.push((
+            TypedValue {
+                name: name.into(),
+                cidl_type,
+                nullable: false,
+            },
+            subtree,
+        ));
+        self
+    }
+
+    pub fn build(self) -> IncludeTree {
+        IncludeTree(self.nodes)
+    }
+}
+
 /// A builder pattern for tests to create models easily
 pub struct ModelBuilder {
     name: String,
