@@ -1,253 +1,192 @@
 {
+  "version": "0.0.1",
+  "project_name": "cidl_all_types_demo",
   "language": "TypeScript",
   "models": [
     {
+      "name": "ExampleModel",
+      "source_path": "example_model.ts",
       "attributes": [
         {
           "primary_key": true,
+          "foreign_key": null,
           "value": {
-            "cidl_type": "Integer",
             "name": "id",
+            "cidl_type": "Integer",
             "nullable": false
           }
         },
         {
           "primary_key": false,
+          "foreign_key": null,
           "value": {
+            "name": "rating",
+            "cidl_type": "Real",
+            "nullable": false
+          }
+        },
+        {
+          "primary_key": false,
+          "foreign_key": null,
+          "value": {
+            "name": "description",
             "cidl_type": "Text",
-            "name": "name",
+            "nullable": true
+          }
+        },
+        {
+          "primary_key": false,
+          "foreign_key": null,
+          "value": {
+            "name": "data_blob",
+            "cidl_type": "Blob",
             "nullable": false
           }
         }
       ],
+      "navigation_properties": [],
+      "data_sources": [],
       "methods": [
         {
-          "http_verb": "POST",
+          "name": "create_example",
           "is_static": true,
-          "name": "create",
+          "http_verb": "POST",
+          "return_type": { "Model": "ExampleModel" },
           "parameters": [
             {
-              "cidl_type": "D1Database",
               "name": "db",
+              "cidl_type": "D1Database",
               "nullable": false
             },
             {
-              "cidl_type": "Text",
               "name": "payload",
+              "cidl_type": { "Model": "ExampleModel" },
               "nullable": false
             }
           ]
         },
         {
-          "http_verb": "PUT",
+          "name": "read_example",
           "is_static": true,
-          "name": "update",
+          "http_verb": "GET",
+          "return_type": { "Array": "Text" },
           "parameters": [
             {
-              "cidl_type": "D1Database",
               "name": "db",
+              "cidl_type": "D1Database",
               "nullable": false
             },
             {
-              "cidl_type": "Integer",
               "name": "id",
-              "nullable": false
-            },
-            {
-              "cidl_type": "Text",
-              "name": "payload",
+              "cidl_type": "Integer",
               "nullable": true
             }
           ]
         },
         {
-          "http_verb": "PATCH",
+          "name": "list_examples",
           "is_static": true,
-          "name": "patch",
+          "http_verb": "GET",
+          "return_type": { "Array": { "Model": "ExampleModel" } },
           "parameters": [
             {
-              "cidl_type": "D1Database",
               "name": "db",
-              "nullable": false
-            },
-            {
-              "cidl_type": "Text",
-              "name": "phrase",
+              "cidl_type": "D1Database",
               "nullable": false
             }
           ]
         },
         {
-          "http_verb": "DELETE",
+          "name": "update_example",
           "is_static": true,
-          "name": "remove",
+          "http_verb": "PUT",
+          "return_type": "Integer",
           "parameters": [
             {
-              "cidl_type": "D1Database",
               "name": "db",
+              "cidl_type": "D1Database",
               "nullable": false
             },
             {
-              "cidl_type": "Integer",
               "name": "id",
-              "nullable": false
-            }
-          ]
-        }
-      ],
-      "navigation_properties": [],
-      "data_sources": [],
-      "name": "Actions",
-      "source_path": "actions.cloesce.ts"
-    },
-    {
-      "attributes": [
-        {
-          "primary_key": true,
-          "value": {
-            "cidl_type": "Integer",
-            "name": "id",
-            "nullable": false
-          }
-        },
-        {
-          "primary_key": false,
-          "value": {
-            "cidl_type": "Text",
-            "name": "name",
-            "nullable": false
-          }
-        },
-        {
-          "primary_key": false,
-          "value": {
-            "cidl_type": "Integer",
-            "name": "breed",
-            "nullable": false
-          }
-        },
-        {
-          "primary_key": false,
-          "value": {
-            "cidl_type": "Text",
-            "name": "preferred_treat",
-            "nullable": true
-          }
-        }
-      ],
-      "methods": [
-        {
-          "http_verb": "GET",
-          "is_static": false,
-          "name": "get_name",
-          "parameters": [
-            {
-              "cidl_type": "D1Database",
-              "name": "db",
-              "nullable": false
-            }
-          ]
-        },
-        {
-          "http_verb": "GET",
-          "is_static": false,
-          "name": "get_breed",
-          "parameters": [
-            {
-              "cidl_type": "D1Database",
-              "name": "db",
-              "nullable": false
-            }
-          ]
-        },
-        {
-          "http_verb": "POST",
-          "is_static": true,
-          "name": "woof",
-          "parameters": [
-            {
-              "cidl_type": "D1Database",
-              "name": "db",
+              "cidl_type": "Integer",
               "nullable": false
             },
             {
-              "cidl_type": "Text",
-              "name": "phrase",
-              "nullable": false
-            }
-          ]
-        }
-      ],
-      "navigation_properties": [],
-      "data_sources": [],
-      "name": "Dog",
-      "source_path": "dog.cloesce.ts"
-    },
-    {
-      "attributes": [
-        {
-          "primary_key": true,
-          "value": {
-            "cidl_type": "Integer",
-            "name": "id",
-            "nullable": false
-          }
-        },
-        {
-          "primary_key": false,
-          "value": {
-            "cidl_type": "Text",
-            "name": "name",
-            "nullable": false
-          }
-        },
-        {
-          "primary_key": false,
-          "value": {
-            "cidl_type": "Text",
-            "name": "middle_name",
-            "nullable": true
-          }
-        }
-      ],
-      "methods": [
-        {
-          "http_verb": "GET",
-          "is_static": false,
-          "name": "foo",
-          "parameters": [
-            {
-              "cidl_type": "D1Database",
-              "name": "db",
-              "nullable": false
+              "name": "rating",
+              "cidl_type": "Real",
+              "nullable": true
             }
           ]
         },
         {
-          "http_verb": "POST",
+          "name": "patch_example",
           "is_static": true,
-          "name": "speak",
+          "http_verb": "PATCH",
+          "return_type": "Real",
           "parameters": [
             {
-              "cidl_type": "D1Database",
               "name": "db",
+              "cidl_type": "D1Database",
               "nullable": false
             },
             {
+              "name": "description",
               "cidl_type": "Text",
-              "name": "phrase",
+              "nullable": true
+            }
+          ]
+        },
+        {
+          "name": "delete_example",
+          "is_static": true,
+          "http_verb": "DELETE",
+          "return_type": "Blob",
+          "parameters": [
+            {
+              "name": "db",
+              "cidl_type": "D1Database",
+              "nullable": false
+            },
+            {
+              "name": "id",
+              "cidl_type": "Integer",
+              "nullable": false
+            }
+          ]
+        },
+        {
+          "name": "get_description",
+          "is_static": false,
+          "http_verb": "GET",
+          "return_type": "Text",
+          "parameters": [
+            {
+              "name": "db",
+              "cidl_type": "D1Database",
+              "nullable": false
+            }
+          ]
+        },
+        {
+          "name": "increment_rating",
+          "is_static": false,
+          "http_verb": "PATCH",
+          "return_type": "Real",
+          "parameters": [
+            {
+              "name": "db",
+              "cidl_type": "D1Database",
+              "nullable": false
+            },
+            {
+              "name": "amount",
+              "cidl_type": "Real",
               "nullable": false
             }
           ]
         }
-      ],
-      "navigation_properties": [],
-      "data_sources": [],
-      "name": "Person",
-      "source_path": "person.cloesce.ts"
+      ]
     }
-  ],
-  "project_name": "actions",
-  "version": "0.0.1"
+  ]
 }
-

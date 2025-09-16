@@ -141,11 +141,13 @@ impl ModelBuilder {
         http_verb: HttpVerb,
         is_static: bool,
         parameters: Vec<TypedValue>,
+        return_type: Option<CidlType>,
     ) -> Self {
         self.methods.push(Method {
             name: name.into(),
             is_static,
             http_verb,
+            return_type,
             parameters,
         });
         self

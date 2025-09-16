@@ -29,6 +29,13 @@ impl CidlType {
         }
     }
 
+    pub fn array_type(&self) -> &CidlType {
+        match self {
+            CidlType::Array(inner) => inner.array_type(),
+            _ => self,
+        }
+    }
+
     pub fn array(cidl_type: CidlType) -> CidlType {
         CidlType::Array(Box::new(cidl_type))
     }
@@ -62,6 +69,7 @@ pub struct Method {
     pub name: String,
     pub is_static: bool,
     pub http_verb: HttpVerb,
+    pub return_type: Option<CidlType>,
     pub parameters: Vec<TypedValue>,
 }
 

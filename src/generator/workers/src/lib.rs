@@ -70,10 +70,10 @@ impl WorkersFactory {
 
         format!(
             r#" 
-        {imports}
-        {preamble}
-        {router}
-        {main}
+{imports}
+{preamble}
+{router}
+{main}
         "#
         )
     }

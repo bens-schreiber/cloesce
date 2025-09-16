@@ -5,7 +5,9 @@ use crate::LanguageWorkerGenerator as LanguageWorkersGenerator;
 pub struct TypescriptWorkersGenerator {}
 impl LanguageWorkersGenerator for TypescriptWorkersGenerator {
     fn imports(&self, models: &[Model]) -> String {
-        let cf_types = r#"import { D1Database } from "@cloudflare/workers-types""#;
+        let cf_types = r#"
+import { D1Database } from "@cloudflare/workers-types"
+"#;
 
         // TODO: Fix hardcoding path ../{}
         let model_imports = models
@@ -13,8 +15,8 @@ impl LanguageWorkersGenerator for TypescriptWorkersGenerator {
             .map(|m| {
                 format!(
                     r#"
-        import {{ {} }} from '../{}'; 
-        "#,
+import {{ {} }} from '../{}'; 
+"#,
                     m.name,
                     m.source_path.with_extension("").display() // strip the .ts off
                 )
@@ -26,80 +28,42 @@ impl LanguageWorkersGenerator for TypescriptWorkersGenerator {
     }
 
     fn preamble(&self) -> String {
-        r#"
-        export interface Env { DB: D1Database }
-
-        function match(router: any, path: string, request: Request, env: Env): Response {
-            let node: any = router;
-            const params: any[] = [];
-            const segments = path.split("/").filter(Boolean);
-            for (const segment of segments) {
-                if (node[segment]) {
-                    node = node[segment];
-                } 
-                else {
-                    const paramKey = Object.keys(node).find(k => k.startsWith("<") && k.endsWith(">"));
-                    if (paramKey) {
-                        params.push(segment);
-                        node = node[paramKey];
-                    } else {
-                        return new Response(
-                            JSON.stringify({ error: "Route not found", path }),
-                            { 
-                                status: 404,
-                                headers: { "Content-Type": "application/json" }
-                            }
-                        );
-                    }
-                }
-            }
-            if (typeof node === "function") {
-                return node(...params, request, env);
-            }
-            return new Response(
-                JSON.stringify({ error: "Route not found", path }),
-                { 
-                    status: 404,
-                    headers: { "Content-Type": "application/json" }
-                }
-            );
-        }
-        "#.to_string()
+        include_str!("./templates/preamble.ts").to_string()
     }
 
     fn main(&self) -> String {
         r#"
-        export default {
-            async fetch(request: Request, env: Env, ctx: any): Promise<Response> {
-                try {
-                    const url = new URL(request.url);
-                    return await match(router, url.pathname, request, env);
-                } catch (error: any) {
-                    console.error("Internal server error:", error);
-                    return new Response(JSON.stringify({ error: error?.message }), {
-                        status: 500,
-                        headers: { "Content-Type": "application/json" },
-                    });
-                }
-            }
-        };
-        "#
+export default {
+    async fetch(request: Request, env: Env, ctx: any): Promise<Response> {
+        try {
+            const url = new URL(request.url);
+            return await match(router, url.pathname, request, env);
+        } catch (error: any) {
+            console.error("Internal server error:", error);
+            return new Response(JSON.stringify({ error: error?.message }), {
+                status: 500,
+                headers: { "Content-Type": "application/json" },
+            });
+        }
+    }
+};
+"#
         .to_string()
     }
 
     fn router(&self, model: String) -> String {
         format!(
             r#"
-        const router = {{ api: {{{model}}} }}
-        "#
+const router = {{ api: {{{model}}} }}
+"#
         )
     }
 
     fn router_model(&self, model_name: &str, method: String) -> String {
         format!(
             r#"
-        {model_name}: {{{method}}}
-        "#
+{model_name}: {{{method}}}
+"#
         )
     }
 
@@ -109,8 +73,8 @@ impl LanguageWorkersGenerator for TypescriptWorkersGenerator {
         } else {
             format!(
                 r#"
-            "<id>": {{{proto}}}
-            "#
+"<id>": {{{proto}}}
+"#
             )
         }
     }
@@ -126,8 +90,8 @@ impl LanguageWorkersGenerator for TypescriptWorkersGenerator {
 
         format!(
             r#"
-            {method_name}: async ({id} request: Request, env: Env) => {{{body}}}
-            "#
+{method_name}: async ({id} request: Request, env: Env) => {{{body}}}
+"#
         )
     }
 
@@ -142,10 +106,10 @@ impl LanguageWorkersGenerator for TypescriptWorkersGenerator {
 
         format!(
             r#"
-            if (request.method !== "{verb_str}") {{
-                return new Response("Method Not Allowed", {{ status: 405 }});
-            }}
-            "#,
+if (request.method !== "{verb_str}") {{
+    return new Response("Method Not Allowed", {{ status: 405 }});
+}}
+"#,
         )
     }
 
@@ -167,18 +131,18 @@ impl LanguageWorkersGenerator for TypescriptWorkersGenerator {
         if !valid_params.is_empty() {
             validate.push(format!(
                 r#"
-            let body;
-            try {{
-                body = await request.json();
-            }} catch {{
-                return new Response(JSON.stringify({{ error: "Invalid request body" }}), {{
-                    status: 400,
-                    headers: {{ "Content-Type": "application/json" }},
-                }});
-            }}
-            
-            const {{{}}} = body;
-            "#,
+let body;
+try {{
+    body = await request.json();
+}} catch {{
+    return new Response(JSON.stringify({{ error: "Invalid request body" }}), {{
+        status: 400,
+        headers: {{ "Content-Type": "application/json" }},
+    }});
+}}
+
+const {{{}}} = body;
+"#,
                 valid_params
                     .iter()
                     .map(|p| p.name.clone())
@@ -216,22 +180,37 @@ impl LanguageWorkersGenerator for TypescriptWorkersGenerator {
 
     fn instantiate_model(&self, model: &Model) -> String {
         let model_name = &model.name;
+        let pk = &model.find_primary_key().unwrap().name;
 
-        // explicitly create the model so that users don't need
-        // to create a constructor
+        // TODO: Switch based off DataSource type
+        // For now, we will just assume there is a _default (or none)
+        let has_ds = model.data_sources.len() > 1;
+
+        let query = if has_ds {
+            format!("`SELECT * FROM{model_name}_default WHERE {model_name}_{pk} = ?")
+        } else {
+            format!("`SELECT * FROM {model_name} WHERE {pk} = ?`")
+        };
+
+        let instance = if has_ds {
+            format!("Object.assign(new {model_name}(), mapSql<{model_name}>(record)[0])")
+        } else {
+            format!("Object.assign(new {model_name}(), record)")
+        };
+
         format!(
             r#"
-        const d1 = env.DB;
-        const query = `SELECT * FROM {model_name} WHERE id = ?`;
-        const record = await d1.prepare(query).bind(id).first();
-        if (!record) {{
-            return new Response(
-                JSON.stringify({{ error: "Record not found" }}),
-                {{ status: 404, headers: {{ "Content-Type": "application/json" }} }}
-            );
-        }}
-        const instance: {model_name} = Object.assign(new {model_name}(), record)
-        "#
+const d1 = env.DB;
+const query = {query};
+const record = await d1.prepare(query).bind(id).first();
+if (!record) {{
+    return new Response(
+        JSON.stringify({{ error: "Record not found" }}),
+        {{ status: 404, headers: {{ "Content-Type": "application/json" }} }}
+    );
+}}
+const instance = {instance};
+"#
         )
     }
 
@@ -257,8 +236,8 @@ impl LanguageWorkersGenerator for TypescriptWorkersGenerator {
 
         format!(
             r#"
-        return {callee}.{method_name}({params})
-        "#
+return {callee}.{method_name}({params})
+"#
         )
     }
 }
