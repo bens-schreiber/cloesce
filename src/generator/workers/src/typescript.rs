@@ -48,11 +48,7 @@ impl TypescriptValidatorGenerator {
                     nullable: false,
                 });
 
-                if let Some(inner_code) = inner_ts {
-                    Some(format!("{}.map(item => {})", value.name, inner_code))
-                } else {
-                    None
-                }
+                inner_ts.map(|inner_code| format!("{}.map(item => {})", value.name, inner_code))
             }
 
             _ => None,
