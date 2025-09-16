@@ -1,6 +1,6 @@
 {
   "version": "0.0.1",
-  "project_name": "cidl_all_types_demo",
+  "project_name": "example",
   "language": "TypeScript",
   "models": [
     {
@@ -182,6 +182,42 @@
             {
               "name": "amount",
               "cidl_type": "Real",
+              "nullable": false
+            }
+          ]
+        },
+        {
+          "name": "process_model",
+          "is_static": true,
+          "http_verb": "POST",
+          "return_type": "Integer",
+          "parameters": [
+            {
+              "name": "db",
+              "cidl_type": "D1Database",
+              "nullable": false
+            },
+            {
+              "name": "model",
+              "cidl_type": { "Model": "ExampleModel" },
+              "nullable": false
+            }
+          ]
+        },
+        {
+          "name": "process_models",
+          "is_static": true,
+          "http_verb": "POST",
+          "return_type": "Integer",
+          "parameters": [
+            {
+              "name": "db",
+              "cidl_type": "D1Database",
+              "nullable": false
+            },
+            {
+              "name": "models",
+              "cidl_type": { "Array": { "Model": "ExampleModel" } },
               "nullable": false
             }
           ]

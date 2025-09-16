@@ -211,5 +211,53 @@ export class ExampleModel {
     return { ok: true, data };
   }
 
+  static async process_model(
+        model: ExampleModel
+  ): Promise<Result<number>> {
+    const url = `http://localhost:1000/api/ExampleModel/process_model`;
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+            model
+      })
+    });
+    if (!res.ok) {
+      const message = await res.text();
+      return {
+        ok: false,
+        status: res.status,
+        message
+      };
+    }
+
+    const data = await res.json();
+    return { ok: true, data };
+  }
+
+  static async process_models(
+        models: ExampleModel[]
+  ): Promise<Result<number>> {
+    const url = `http://localhost:1000/api/ExampleModel/process_models`;
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+            models
+      })
+    });
+    if (!res.ok) {
+      const message = await res.text();
+      return {
+        ok: false,
+        status: res.status,
+        message
+      };
+    }
+
+    const data = await res.json();
+    return { ok: true, data };
+  }
+
 
 }

@@ -6,6 +6,7 @@ use typescript::TypescriptWorkersGenerator;
 trait LanguageWorkerGenerator {
     fn imports(&self, models: &[Model]) -> String;
     fn preamble(&self) -> String;
+    fn validators(&self, models: &[Model]) -> String;
     fn main(&self) -> String;
     fn router(&self, model: String) -> String;
     fn router_model(&self, model_name: &str, method: String) -> String;
@@ -13,7 +14,7 @@ trait LanguageWorkerGenerator {
     fn proto(&self, method: &Method, body: String) -> String;
     fn validate_http(&self, verb: &HttpVerb) -> String;
     fn validate_req_body(&self, params: &[TypedValue]) -> String;
-    fn instantiate_model(&self, model_name: &Model) -> String;
+    fn hydrate_model(&self, model_name: &Model) -> String;
     fn dispatch_method(&self, model_name: &str, method: &Method) -> String;
 }
 
@@ -27,7 +28,7 @@ impl WorkersFactory {
             let hydration = if method.is_static {
                 ""
             } else {
-                &lang.instantiate_model(model)
+                &lang.hydrate_model(model)
             };
             let dispatch = lang.dispatch_method(&model.name, method);
 
@@ -55,6 +56,7 @@ impl WorkersFactory {
 
         let imports = generator.imports(&spec.models);
         let preamble = generator.preamble();
+        let validators = generator.validators(&spec.models);
 
         let router = {
             let router_body = spec
@@ -72,6 +74,7 @@ impl WorkersFactory {
             r#" 
 {imports}
 {preamble}
+{validators}
 {router}
 {main}
         "#

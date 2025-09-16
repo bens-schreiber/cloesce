@@ -6,7 +6,6 @@ expression: workers
 
 import { D1Database } from "@cloudflare/workers-types"
 
-
 import { ExampleModel } from '../example_model'; 
 
 // @ts-nocheck
@@ -118,6 +117,21 @@ function match(
 }
 
 
+            const $: any = {};
+
+            
+                $.ExampleModel = {
+                    validate(obj: any): boolean {
+                        if (obj.id == null || typeof obj.id !== "number") {return false;}
+if (obj.rating == null || typeof obj.rating !== "number") {return false;}
+if (obj.description !== undefined && typeof obj.description !== "string") {return false;}
+if (obj.data_blob == null || !(obj.data_blob instanceof ArrayBuffer || obj.data_blob instanceof Uint8Array)) {return false;}
+                        return true;
+                    }
+                };
+            
+        
+
 const router = { api: {
 ExampleModel: {
 create_example: async ( request: Request, env: Env) => {
@@ -127,19 +141,27 @@ if (request.method !== "POST") {
 }
 
                 
-let body;
-try {
-    body = await request.json();
-} catch {
-    return new Response(JSON.stringify({ error: "Invalid request body" }), {
-        status: 400,
-        headers: { "Content-Type": "application/json" },
-    });
-}
+                let body;
+                try {
+                    body = await request.json();
+                } catch {
+                    
+            return new Response(JSON.stringify({ error: "Invalid request body" }), {
+                status: 400,
+                headers: { "Content-Type": "application/json" },
+            });
+        
+                }
 
-const {payload} = body;
-
-if (payload === null || payload === undefined) { throw new Error('Required parameter missing: payload');}
+                let {payload} = body;
+                
+if ((payload == null || !$.ExampleModel.validate(payload))) { 
+            return new Response(JSON.stringify({ error: "Invalid request body" }), {
+                status: 400,
+                headers: { "Content-Type": "application/json" },
+            });
+         }
+payload = Object.assign(new ExampleModel(), payload)
                 
                 
 return JSON.stringify(ExampleModel.create_example(env.DB, payload));
@@ -154,19 +176,26 @@ if (request.method !== "GET") {
 }
 
                 
-let body;
-try {
-    body = await request.json();
-} catch {
-    return new Response(JSON.stringify({ error: "Invalid request body" }), {
-        status: 400,
-        headers: { "Content-Type": "application/json" },
-    });
-}
+                let body;
+                try {
+                    body = await request.json();
+                } catch {
+                    
+            return new Response(JSON.stringify({ error: "Invalid request body" }), {
+                status: 400,
+                headers: { "Content-Type": "application/json" },
+            });
+        
+                }
 
-const {id} = body;
-
-if (id !== null && typeof id !== 'number') { throw new Error('Parameter id must be a number'); }
+                let {id} = body;
+                
+if ((id !== undefined && typeof id !== "number")) { 
+            return new Response(JSON.stringify({ error: "Invalid request body" }), {
+                status: 400,
+                headers: { "Content-Type": "application/json" },
+            });
+         }
                 
                 
 return JSON.stringify(ExampleModel.read_example(env.DB, id));
@@ -195,21 +224,32 @@ if (request.method !== "PUT") {
 }
 
                 
-let body;
-try {
-    body = await request.json();
-} catch {
-    return new Response(JSON.stringify({ error: "Invalid request body" }), {
-        status: 400,
-        headers: { "Content-Type": "application/json" },
-    });
-}
+                let body;
+                try {
+                    body = await request.json();
+                } catch {
+                    
+            return new Response(JSON.stringify({ error: "Invalid request body" }), {
+                status: 400,
+                headers: { "Content-Type": "application/json" },
+            });
+        
+                }
 
-const {id,rating} = body;
-
-if (id === null || id === undefined) { throw new Error('Required parameter missing: id');}
-if (id !== null && typeof id !== 'number') { throw new Error('Parameter id must be a number'); }
-if (rating !== null && typeof rating !== 'number') { throw new Error('Parameter rating must be a number'); }
+                let {id,rating} = body;
+                
+if ((id == null || typeof id !== "number")) { 
+            return new Response(JSON.stringify({ error: "Invalid request body" }), {
+                status: 400,
+                headers: { "Content-Type": "application/json" },
+            });
+         }
+if ((rating !== undefined && typeof rating !== "number")) { 
+            return new Response(JSON.stringify({ error: "Invalid request body" }), {
+                status: 400,
+                headers: { "Content-Type": "application/json" },
+            });
+         }
                 
                 
 return JSON.stringify(ExampleModel.update_example(env.DB, id, rating));
@@ -224,19 +264,26 @@ if (request.method !== "PATCH") {
 }
 
                 
-let body;
-try {
-    body = await request.json();
-} catch {
-    return new Response(JSON.stringify({ error: "Invalid request body" }), {
-        status: 400,
-        headers: { "Content-Type": "application/json" },
-    });
-}
+                let body;
+                try {
+                    body = await request.json();
+                } catch {
+                    
+            return new Response(JSON.stringify({ error: "Invalid request body" }), {
+                status: 400,
+                headers: { "Content-Type": "application/json" },
+            });
+        
+                }
 
-const {description} = body;
-
-if (description !== null && typeof description !== 'string') { throw new Error('Parameter description must be a string'); }
+                let {description} = body;
+                
+if ((description !== undefined && typeof description !== "string")) { 
+            return new Response(JSON.stringify({ error: "Invalid request body" }), {
+                status: 400,
+                headers: { "Content-Type": "application/json" },
+            });
+         }
                 
                 
 return JSON.stringify(ExampleModel.patch_example(env.DB, description));
@@ -251,20 +298,26 @@ if (request.method !== "DELETE") {
 }
 
                 
-let body;
-try {
-    body = await request.json();
-} catch {
-    return new Response(JSON.stringify({ error: "Invalid request body" }), {
-        status: 400,
-        headers: { "Content-Type": "application/json" },
-    });
-}
+                let body;
+                try {
+                    body = await request.json();
+                } catch {
+                    
+            return new Response(JSON.stringify({ error: "Invalid request body" }), {
+                status: 400,
+                headers: { "Content-Type": "application/json" },
+            });
+        
+                }
 
-const {id} = body;
-
-if (id === null || id === undefined) { throw new Error('Required parameter missing: id');}
-if (id !== null && typeof id !== 'number') { throw new Error('Parameter id must be a number'); }
+                let {id} = body;
+                
+if ((id == null || typeof id !== "number")) { 
+            return new Response(JSON.stringify({ error: "Invalid request body" }), {
+                status: 400,
+                headers: { "Content-Type": "application/json" },
+            });
+         }
                 
                 
 return JSON.stringify(ExampleModel.delete_example(env.DB, id));
@@ -307,20 +360,26 @@ if (request.method !== "PATCH") {
 }
 
                 
-let body;
-try {
-    body = await request.json();
-} catch {
-    return new Response(JSON.stringify({ error: "Invalid request body" }), {
-        status: 400,
-        headers: { "Content-Type": "application/json" },
-    });
-}
+                let body;
+                try {
+                    body = await request.json();
+                } catch {
+                    
+            return new Response(JSON.stringify({ error: "Invalid request body" }), {
+                status: 400,
+                headers: { "Content-Type": "application/json" },
+            });
+        
+                }
 
-const {amount} = body;
-
-if (amount === null || amount === undefined) { throw new Error('Required parameter missing: amount');}
-if (amount !== null && typeof amount !== 'number') { throw new Error('Parameter amount must be a number'); }
+                let {amount} = body;
+                
+if ((amount == null || typeof amount !== "number")) { 
+            return new Response(JSON.stringify({ error: "Invalid request body" }), {
+                status: 400,
+                headers: { "Content-Type": "application/json" },
+            });
+         }
                 
 const d1 = env.DB;
 const query = `SELECT * FROM ExampleModel WHERE id = ?`;
@@ -338,6 +397,76 @@ return JSON.stringify(instance.increment_rating(env.DB, amount));
 
             }
 }
+,
+
+process_model: async ( request: Request, env: Env) => {
+                
+if (request.method !== "POST") {
+    return new Response("Method Not Allowed", { status: 405 });
+}
+
+                
+                let body;
+                try {
+                    body = await request.json();
+                } catch {
+                    
+            return new Response(JSON.stringify({ error: "Invalid request body" }), {
+                status: 400,
+                headers: { "Content-Type": "application/json" },
+            });
+        
+                }
+
+                let {model} = body;
+                
+if ((model == null || !$.ExampleModel.validate(model))) { 
+            return new Response(JSON.stringify({ error: "Invalid request body" }), {
+                status: 400,
+                headers: { "Content-Type": "application/json" },
+            });
+         }
+model = Object.assign(new ExampleModel(), model)
+                
+                
+return JSON.stringify(ExampleModel.process_model(env.DB, model));
+
+            }
+,
+
+process_models: async ( request: Request, env: Env) => {
+                
+if (request.method !== "POST") {
+    return new Response("Method Not Allowed", { status: 405 });
+}
+
+                
+                let body;
+                try {
+                    body = await request.json();
+                } catch {
+                    
+            return new Response(JSON.stringify({ error: "Invalid request body" }), {
+                status: 400,
+                headers: { "Content-Type": "application/json" },
+            });
+        
+                }
+
+                let {models} = body;
+                
+if ((models == null || !Array.isArray(models) || models.some(item => (item == null || !$.ExampleModel.validate(item))))) { 
+            return new Response(JSON.stringify({ error: "Invalid request body" }), {
+                status: 400,
+                headers: { "Content-Type": "application/json" },
+            });
+         }
+models = models.map(item => Object.assign(new ExampleModel(), item))
+                
+                
+return JSON.stringify(ExampleModel.process_models(env.DB, models));
+
+            }
 }
 } }
 
