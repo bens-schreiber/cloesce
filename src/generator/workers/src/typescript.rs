@@ -236,7 +236,7 @@ const instance = {instance};
 
         format!(
             r#"
-return {callee}.{method_name}({params})
+return JSON.stringify({callee}.{method_name}({params}));
 "#
         )
     }

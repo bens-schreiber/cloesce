@@ -142,7 +142,7 @@ const {payload} = body;
 if (payload === null || payload === undefined) { throw new Error('Required parameter missing: payload');}
                 
                 
-return ExampleModel.create_example(env.DB, payload)
+return JSON.stringify(ExampleModel.create_example(env.DB, payload));
 
             }
 ,
@@ -169,7 +169,7 @@ const {id} = body;
 if (id !== null && typeof id !== 'number') { throw new Error('Parameter id must be a number'); }
                 
                 
-return ExampleModel.read_example(env.DB, id)
+return JSON.stringify(ExampleModel.read_example(env.DB, id));
 
             }
 ,
@@ -183,7 +183,7 @@ if (request.method !== "GET") {
                 
                 
                 
-return ExampleModel.list_examples(env.DB)
+return JSON.stringify(ExampleModel.list_examples(env.DB));
 
             }
 ,
@@ -212,7 +212,7 @@ if (id !== null && typeof id !== 'number') { throw new Error('Parameter id must 
 if (rating !== null && typeof rating !== 'number') { throw new Error('Parameter rating must be a number'); }
                 
                 
-return ExampleModel.update_example(env.DB, id, rating)
+return JSON.stringify(ExampleModel.update_example(env.DB, id, rating));
 
             }
 ,
@@ -239,7 +239,7 @@ const {description} = body;
 if (description !== null && typeof description !== 'string') { throw new Error('Parameter description must be a string'); }
                 
                 
-return ExampleModel.patch_example(env.DB, description)
+return JSON.stringify(ExampleModel.patch_example(env.DB, description));
 
             }
 ,
@@ -267,7 +267,7 @@ if (id === null || id === undefined) { throw new Error('Required parameter missi
 if (id !== null && typeof id !== 'number') { throw new Error('Parameter id must be a number'); }
                 
                 
-return ExampleModel.delete_example(env.DB, id)
+return JSON.stringify(ExampleModel.delete_example(env.DB, id));
 
             }
 ,
@@ -293,7 +293,7 @@ if (!record) {
 const instance = Object.assign(new ExampleModel(), record);
 
                 
-return instance.get_description(env.DB)
+return JSON.stringify(instance.get_description(env.DB));
 
             }
 }
@@ -334,7 +334,7 @@ if (!record) {
 const instance = Object.assign(new ExampleModel(), record);
 
                 
-return instance.increment_rating(env.DB, amount)
+return JSON.stringify(instance.increment_rating(env.DB, amount));
 
             }
 }
