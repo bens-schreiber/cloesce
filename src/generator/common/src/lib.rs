@@ -1,5 +1,6 @@
 pub mod builder;
 
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::{fs::File, io::Write};
 
@@ -9,7 +10,7 @@ use serde::Serialize;
 use serde_json::Value as JsonValue;
 use toml::Value as TomlValue;
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
 pub enum CidlType {
     Integer,
     Real,
@@ -27,6 +28,17 @@ impl CidlType {
             _ => None,
         }
     }
+
+    pub fn array_type(&self) -> &CidlType {
+        match self {
+            CidlType::Array(inner) => inner.array_type(),
+            _ => self,
+        }
+    }
+
+    pub fn array(cidl_type: CidlType) -> CidlType {
+        CidlType::Array(Box::new(cidl_type))
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -38,7 +50,7 @@ pub enum HttpVerb {
     DELETE,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash)]
 pub struct TypedValue {
     pub name: String,
     pub cidl_type: CidlType,
@@ -57,22 +69,26 @@ pub struct Method {
     pub name: String,
     pub is_static: bool,
     pub http_verb: HttpVerb,
+    pub return_type: Option<CidlType>,
     pub parameters: Vec<TypedValue>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-pub enum IncludeTree {
-    Node {
-        value: TypedValue,
-        tree: Vec<IncludeTree>,
-    },
-    None,
+pub struct IncludeTree(pub Vec<(TypedValue, IncludeTree)>);
+
+impl IncludeTree {
+    pub fn to_lookup(&self) -> HashMap<&TypedValue, &IncludeTree> {
+        self.0
+            .iter()
+            .map(|(tv, tree)| (tv, tree))
+            .collect::<HashMap<_, _>>()
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct DataSource {
-    name: String,
-    tree: IncludeTree,
+    pub name: String,
+    pub tree: IncludeTree,
 }
 
 #[derive(Serialize, Deserialize, Debug)]

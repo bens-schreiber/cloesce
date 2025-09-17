@@ -91,8 +91,7 @@ fn main() -> Result<()> {
 
                 // Generate SQL
                 {
-                    let generated_sqlite =
-                        d1gen.sqlite().context("Failed to generate sqlite file")?;
+                    let generated_sqlite = d1gen.sql().context("Failed to generate sqlite file")?;
                     sqlite_file
                         .write(generated_sqlite.as_bytes())
                         .context("Failed to write to sqlite file")?;

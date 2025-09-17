@@ -1,6 +1,6 @@
 use common::{
     CidlForeignKeyKind, CidlType,
-    builder::{ModelBuilder, create_cidl, create_wrangler},
+    builder::{IncludeTreeBuilder, ModelBuilder, create_cidl, create_wrangler},
 };
 use d1::D1Generator;
 
@@ -18,7 +18,7 @@ macro_rules! expected_str {
 }
 
 #[test]
-fn test_sqlite_output() {
+fn test_sqlite_table_output() {
     // Empty
     {
         // Arrange
@@ -26,11 +26,11 @@ fn test_sqlite_output() {
         let d1gen = D1Generator::new(cidl, create_wrangler());
 
         // Act
-        let sql = d1gen.sqlite().expect("Empty models should succeed");
+        let sql = d1gen.sql().expect("Empty models should succeed");
 
         // Assert
         assert!(
-            sql.is_empty(),
+            sql.trim().is_empty(),
             "Expected empty SQL output for empty CIDL, got: {}",
             sql
         );
@@ -49,7 +49,7 @@ fn test_sqlite_output() {
         let d1gen = D1Generator::new(cidl, create_wrangler());
 
         // Act
-        let sql = d1gen.sqlite().expect("gen_sqlite to work");
+        let sql = d1gen.sql().expect("gen_sqlite to work");
 
         // Assert
         expected_str!(sql, "CREATE TABLE");
@@ -71,7 +71,7 @@ fn test_sqlite_output() {
         let d1gen = D1Generator::new(cidl, create_wrangler());
 
         // Act
-        let sql = d1gen.sqlite().expect("gen_sqlite to work");
+        let sql = d1gen.sql().expect("gen_sqlite to work");
 
         // Assert
         expected_str!(
@@ -101,7 +101,7 @@ fn test_sqlite_output() {
         let d1gen = D1Generator::new(cidl, create_wrangler());
 
         // Act
-        let sql = d1gen.sqlite().expect("gen_sqlite to work");
+        let sql = d1gen.sql().expect("gen_sqlite to work");
 
         // Assert
         expected_str!(
@@ -157,7 +157,7 @@ fn test_sqlite_output() {
         let d1gen = D1Generator::new(cidl, create_wrangler());
 
         // Act
-        let sql = d1gen.sqlite().expect("gen_sqlite to work");
+        let sql = d1gen.sql().expect("gen_sqlite to work");
 
         // Assert: boss table
         expected_str!(sql, r#"CREATE TABLE "Boss" ( "id" integer PRIMARY KEY );"#);
@@ -211,24 +211,207 @@ fn test_sqlite_output() {
         let d1gen = D1Generator::new(cidl, create_wrangler());
 
         // Act
-        let sql = d1gen.sqlite().expect("gen_sqlite to work");
+        let sql = d1gen.sql().expect("gen_sqlite to work");
 
         // Assert: Junction table exists
         expected_str!(sql, r#"CREATE TABLE "StudentsCourses""#);
 
         // Assert: Junction table has StudentId + CourseId composite PK
-        expected_str!(sql, r#""a_id" integer NOT NULL"#);
-        expected_str!(sql, r#""b_id" integer NOT NULL"#);
-        expected_str!(sql, r#"PRIMARY KEY ("a_id", "b_id")"#);
+        expected_str!(sql, r#""Student_id" integer NOT NULL"#);
+        expected_str!(sql, r#""Course_id" integer NOT NULL"#);
+        expected_str!(sql, r#"PRIMARY KEY ("Student_id", "Course_id")"#);
 
         // Assert: FKs to Student and Course
         expected_str!(
             sql,
-            r#"FOREIGN KEY ("a_id") REFERENCES "Student" ("id") ON DELETE RESTRICT ON UPDATE CASCADE"#
+            r#"FOREIGN KEY ("Student_id") REFERENCES "Student" ("id") ON DELETE RESTRICT ON UPDATE CASCADE"#
         );
         expected_str!(
             sql,
-            r#"FOREIGN KEY ("b_id") REFERENCES "Course" ("id") ON DELETE RESTRICT ON UPDATE CASCADE"#
+            r#"FOREIGN KEY ("Course_id") REFERENCES "Course" ("id") ON DELETE RESTRICT ON UPDATE CASCADE"#
+        );
+    }
+}
+
+#[test]
+fn test_sqlite_view_output() {
+    // One to One
+    {
+        // Arrange
+        let cidl = create_cidl(vec![
+            ModelBuilder::new("Person")
+                .id()
+                .attribute("dogId", CidlType::Integer, false, Some("Dog".into()))
+                .nav_p(
+                    "dog",
+                    CidlType::Model("Dog".into()),
+                    false,
+                    CidlForeignKeyKind::OneToOne {
+                        reference: "dogId".into(),
+                    },
+                )
+                // Data Source includes Dog nav prop
+                .data_source(
+                    "default",
+                    IncludeTreeBuilder::default()
+                        .add("dog", CidlType::Model("Dog".into()))
+                        .build(),
+                )
+                .build(),
+            ModelBuilder::new("Dog").id().build(),
+        ]);
+        let d1gen = D1Generator::new(cidl, create_wrangler());
+
+        // Act
+        let sql = d1gen.sql().expect("gen_sqlite to work");
+
+        // Assert
+        expected_str!(
+            sql,
+            r#"CREATE VIEW "Person_default" AS SELECT "Person"."id" AS "Person_id", "Person"."dogId" AS "Person_dogId", "Dog"."id" AS "Dog_id" FROM "Person" LEFT JOIN "Dog" ON "Person"."dogId" = "Dog"."id""#
+        )
+    }
+
+    // One to Many
+    {
+        // Arrange
+        let cidl = create_cidl(vec![
+            ModelBuilder::new("Dog")
+                .id()
+                .attribute("personId", CidlType::Integer, false, Some("Person".into()))
+                .build(),
+            ModelBuilder::new("Cat")
+                .attribute("personId", CidlType::Integer, false, Some("Person".into()))
+                .id()
+                .build(),
+            ModelBuilder::new("Person")
+                .id()
+                .nav_p(
+                    "dogs",
+                    CidlType::array(CidlType::Model("Dog".into())),
+                    false,
+                    CidlForeignKeyKind::OneToMany {
+                        reference: "personId".into(),
+                    },
+                )
+                .nav_p(
+                    "cats",
+                    CidlType::array(CidlType::Model("Cat".into())),
+                    false,
+                    CidlForeignKeyKind::OneToMany {
+                        reference: "personId".into(),
+                    },
+                )
+                .attribute("bossId", CidlType::Integer, false, Some("Boss".into()))
+                .data_source(
+                    "default",
+                    IncludeTreeBuilder::default()
+                        .add("dogs", CidlType::array(CidlType::Model("Dog".into())))
+                        .add("cats", CidlType::array(CidlType::Model("Cat".into())))
+                        .build(),
+                )
+                .build(),
+            ModelBuilder::new("Boss")
+                .id()
+                .nav_p(
+                    "persons",
+                    CidlType::array(CidlType::Model("Person".into())),
+                    false,
+                    CidlForeignKeyKind::OneToMany {
+                        reference: "bossId".into(),
+                    },
+                )
+                .data_source(
+                    "default",
+                    IncludeTreeBuilder::default()
+                        .add_with_children(
+                            "persons",
+                            CidlType::array(CidlType::Model("Person".into())),
+                            |b| {
+                                b.add("dogs", CidlType::array(CidlType::Model("Dog".into())))
+                                    .add("cats", CidlType::array(CidlType::Model("Cat".into())))
+                            },
+                        )
+                        .build(),
+                )
+                .build(),
+        ]);
+
+        let d1gen = D1Generator::new(cidl, create_wrangler());
+
+        // Act
+        let sql = d1gen.sql().expect("gen_sqlite to work");
+
+        // Assert
+        expected_str!(
+            sql,
+            r#"CREATE VIEW "Person_default" AS SELECT "Person"."id" AS "Person_id", "Person"."bossId" AS "Person_bossId", "Dog"."id" AS "Dog_id", "Dog"."personId" AS "Dog_personId", "Cat"."personId" AS "Cat_personId", "Cat"."id" AS "Cat_id" FROM "Person" LEFT JOIN "Dog" ON "Person"."id" = "Dog"."personId" LEFT JOIN "Cat" ON "Person"."id" = "Cat"."personId";"#
+        );
+
+        expected_str!(
+            sql,
+            r#"CREATE VIEW "Boss_default" AS SELECT "Boss"."id" AS "Boss_id", "Person"."id" AS "Person_id", "Person"."bossId" AS "Person_bossId", "Dog"."id" AS "Dog_id", "Dog"."personId" AS "Dog_personId", "Cat"."personId" AS "Cat_personId", "Cat"."id" AS "Cat_id" FROM "Boss" LEFT JOIN "Person" ON "Boss"."id" = "Person"."bossId" LEFT JOIN "Dog" ON "Person"."id" = "Dog"."personId" LEFT JOIN "Cat" ON "Person"."id" = "Cat"."personId";"#
+        );
+    }
+
+    // Many to Many
+    {
+        // Arrange
+        let cidl = create_cidl(vec![
+            ModelBuilder::new("Student")
+                .id()
+                .nav_p(
+                    "courses",
+                    CidlType::array(CidlType::Model("Course".to_string())),
+                    false,
+                    CidlForeignKeyKind::ManyToMany {
+                        unique_id: "StudentsCourses".into(),
+                    },
+                )
+                .data_source(
+                    "default",
+                    IncludeTreeBuilder::default()
+                        .add("courses", CidlType::array(CidlType::Model("Course".into())))
+                        .build(),
+                )
+                .build(),
+            ModelBuilder::new("Course")
+                .id()
+                .nav_p(
+                    "students",
+                    CidlType::array(CidlType::Model("Student".to_string())),
+                    false,
+                    CidlForeignKeyKind::ManyToMany {
+                        unique_id: "StudentsCourses".into(),
+                    },
+                )
+                .data_source(
+                    "default",
+                    IncludeTreeBuilder::default()
+                        .add(
+                            "students",
+                            CidlType::array(CidlType::Model("Student".into())),
+                        )
+                        .build(),
+                )
+                .build(),
+        ]);
+        let d1gen = D1Generator::new(cidl, create_wrangler());
+
+        // Act
+        let sql = d1gen.sql().expect("gen_sqlite to work");
+        expected_str!(sql, r#"CREATE TABLE "StudentsCourses""#);
+
+        // Assert: Many-to-many view for Student
+        expected_str!(
+            sql,
+            r#"CREATE VIEW "Student_default" AS SELECT "Student"."id" AS "Student_id", "Course"."id" AS "Course_id" FROM "Student" LEFT JOIN "StudentsCourses" ON "Student"."id" = "StudentsCourses"."Student_id" LEFT JOIN "Course" ON "StudentsCourses"."Course_id" = "Course"."id";"#
+        );
+
+        // Assert: Many-to-many view for Course
+        expected_str!(
+            sql,
+            r#"CREATE VIEW "Course_default" AS SELECT "Course"."id" AS "Course_id", "Student"."id" AS "Student_id" FROM "Course" LEFT JOIN "StudentsCourses" ON "Course"."id" = "StudentsCourses"."Course_id" LEFT JOIN "Student" ON "StudentsCourses"."Student_id" = "Student"."id";"#
         );
     }
 }
@@ -247,7 +430,7 @@ fn test_duplicate_column_error() {
     let d1gen = D1Generator::new(cidl, create_wrangler());
 
     // Act
-    let err = d1gen.sqlite().unwrap_err();
+    let err = d1gen.sql().unwrap_err();
 
     // Assert
     expected_str!(err, "Duplicate column names");
@@ -266,7 +449,7 @@ fn test_duplicate_primary_key_error() {
     let d1gen = D1Generator::new(cidl, create_wrangler());
 
     // Act
-    let err = d1gen.sqlite().unwrap_err();
+    let err = d1gen.sql().unwrap_err();
 
     // Assert
     expected_str!(err, "Duplicate primary keys");
@@ -282,7 +465,7 @@ fn test_nullable_primary_key_error() {
     let d1gen = D1Generator::new(cidl, create_wrangler());
 
     // Act
-    let err = d1gen.sqlite().unwrap_err();
+    let err = d1gen.sql().unwrap_err();
 
     // Assert
     expected_str!(err, "A primary key cannot be nullable.");
@@ -296,7 +479,7 @@ fn test_missing_primary_key_error() {
     let d1gen = D1Generator::new(cidl, create_wrangler());
 
     // Act
-    let err = d1gen.sqlite().unwrap_err();
+    let err = d1gen.sql().unwrap_err();
 
     // Assert
     expected_str!(err, "Missing primary key on model");
@@ -312,7 +495,7 @@ fn test_duplicate_model_error() {
 
     // Act
     let d1gen = D1Generator::new(cidl, create_wrangler());
-    let err = d1gen.sqlite().unwrap_err();
+    let err = d1gen.sql().unwrap_err();
 
     // Assert
     expected_str!(err, "Duplicate model name");
@@ -335,7 +518,7 @@ fn test_unknown_foreign_key_error() {
 
     // Act
     let d1gen = D1Generator::new(cidl, create_wrangler());
-    let err = d1gen.sqlite().unwrap_err();
+    let err = d1gen.sql().unwrap_err();
 
     // Assert
     expected_str!(
@@ -365,7 +548,7 @@ fn test_cycle_detection_error() {
 
     // Act
     let d1gen = D1Generator::new(cidl, create_wrangler());
-    let err = d1gen.sqlite().unwrap_err();
+    let err = d1gen.sql().unwrap_err();
 
     // Assert
     expected_str!(err, "Cycle detected");
@@ -394,7 +577,7 @@ fn test_nullability_prevents_cycle_error() {
     let d1gen = D1Generator::new(cidl, create_wrangler());
 
     // Assert
-    d1gen.sqlite().expect("sqlite gen to work");
+    d1gen.sql().expect("sqlite gen to work");
 }
 
 #[test]
@@ -410,10 +593,10 @@ fn test_invalid_sqlite_type_error() {
     let d1gen = D1Generator::new(cidl, create_wrangler());
 
     // Act
-    let err = d1gen.sqlite().unwrap_err();
+    let err = d1gen.sql().unwrap_err();
 
     // Assert
-    expected_str!(err, "Invalid SQLite type");
+    expected_str!(err, "Invalid SQL Type");
 }
 
 #[test]
@@ -437,7 +620,7 @@ fn test_one_to_one_nav_property_unknown_attribute_reference_error() {
     let d1gen = D1Generator::new(spec, create_wrangler());
 
     // Act
-    let err = d1gen.sqlite().unwrap_err();
+    let err = d1gen.sql().unwrap_err();
 
     // Assert
     expected_str!(
@@ -458,7 +641,7 @@ fn test_primary_key_cannot_be_foreign_key() {
     let d1gen = D1Generator::new(cidl, create_wrangler());
 
     // Act
-    let err = d1gen.sqlite().unwrap_err();
+    let err = d1gen.sql().unwrap_err();
 
     // Assert
     expected_str!(err, "A primary key cannot be a foreign key");
@@ -486,7 +669,7 @@ fn test_one_to_one_nav_property_expected_model_type_error() {
     let d1gen = D1Generator::new(spec, create_wrangler());
 
     // Act
-    let err = d1gen.sqlite().unwrap_err();
+    let err = d1gen.sql().unwrap_err();
 
     // Assert
     expected_str!(
@@ -518,7 +701,7 @@ fn test_one_to_one_mismatched_fk_and_nav_type_error() {
     let d1gen = D1Generator::new(spec, create_wrangler());
 
     // Act
-    let err = d1gen.sqlite().unwrap_err();
+    let err = d1gen.sql().unwrap_err();
 
     // Assert - message includes "Mismatched types between foreign key and One to One navigation property"
     expected_str!(
@@ -551,7 +734,7 @@ fn test_one_to_many_expected_collection_type_error() {
     let d1gen = D1Generator::new(spec, create_wrangler());
 
     // Act
-    let err = d1gen.sqlite().unwrap_err();
+    let err = d1gen.sql().unwrap_err();
 
     // Assert
     expected_str!(
@@ -581,13 +764,10 @@ fn test_one_to_many_nullable_nav_property_error() {
     let d1gen = D1Generator::new(spec, create_wrangler());
 
     // Act
-    let err = d1gen.sqlite().unwrap_err();
+    let err = d1gen.sql().unwrap_err();
 
     // Assert
-    expected_str!(
-        err,
-        "One To Many navigation property cannot be nullable Person.dogs"
-    );
+    expected_str!(err, "Navigation property cannot be nullable Person.dogs");
 }
 
 #[test]
@@ -611,7 +791,7 @@ fn test_one_to_many_unknown_nav_model_error() {
     let d1gen = D1Generator::new(spec, create_wrangler());
 
     // Act
-    let err = d1gen.sqlite().unwrap_err();
+    let err = d1gen.sql().unwrap_err();
 
     // Assert
     expected_str!(
@@ -642,7 +822,7 @@ fn test_one_to_many_unresolved_reference_error() {
     let d1gen = D1Generator::new(spec, create_wrangler());
 
     // Act
-    let err = d1gen.sqlite().unwrap_err();
+    let err = d1gen.sql().unwrap_err();
 
     // Assert
     expected_str!(
@@ -672,7 +852,7 @@ fn test_many_to_many_expected_collection_type_error() {
     let d1gen = D1Generator::new(cidl, create_wrangler());
 
     // Act
-    let err = d1gen.sqlite().unwrap_err();
+    let err = d1gen.sql().unwrap_err();
 
     // Assert
     expected_str!(
@@ -702,12 +882,12 @@ fn test_many_to_many_nullable_nav_property_error() {
     let d1gen = D1Generator::new(cidl, create_wrangler());
 
     // Act
-    let err = d1gen.sqlite().unwrap_err();
+    let err = d1gen.sql().unwrap_err();
 
     // Assert
     expected_str!(
         err,
-        "Many To Many navigation property cannot be nullable Student.courses"
+        "Navigation property cannot be nullable Student.courses"
     );
 }
 
@@ -732,7 +912,7 @@ fn test_many_to_many_unknown_nav_model_error() {
     let d1gen = D1Generator::new(cidl, create_wrangler());
 
     // Act
-    let err = d1gen.sqlite().unwrap_err();
+    let err = d1gen.sql().unwrap_err();
 
     // Assert
     expected_str!(
@@ -762,7 +942,7 @@ fn test_junction_table_builder_errors() {
         ]);
 
         let d1gen = D1Generator::new(cidl, create_wrangler());
-        let err = d1gen.sqlite().unwrap_err();
+        let err = d1gen.sql().unwrap_err();
         expected_str!(err, "Both models must be set for a junction table");
     }
 
@@ -806,7 +986,7 @@ fn test_junction_table_builder_errors() {
         ]);
 
         let d1gen = D1Generator::new(cidl, create_wrangler());
-        let err = d1gen.sqlite().unwrap_err();
+        let err = d1gen.sql().unwrap_err();
         expected_str!(
             err,
             "Too many ManyToMany navigation properties for junction table"

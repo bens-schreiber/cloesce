@@ -2,6 +2,13 @@ type Ok<T> = { ok: true; data: T };
 type Err = { ok: false; status: number; message: string };
 type Result<T> = Ok<T> | Err;
 
+function instantiateModelArray<T>(data: any, ctor: { new(): T }): T[] {
+  if (Array.isArray(data)) {
+    return data.map(x => instantiateModelArray(x, ctor)).flat();
+  }
+  return [Object.assign(new ctor(), data)];
+}
+
 {{#each models}}
 export class {{name}} {
   {{#each attributes}}
@@ -15,9 +22,8 @@ export class {{name}} {
         {{name}}: {{lang_type cidl_type nullable}}{{#unless @last}}, {{/unless}}
       {{/if}}
     {{/each}}
-  ): Promise<Result<string>> {
+  ): Promise<Result<{{lang_type return_type}}>> {
     const url = `{{../../domain}}/{{#if is_static}}{{../name}}/{{name}}{{else}}{{../name}}/${this.id}/{{name}}{{/if}}`;
-
     const res = await fetch(url, {
       method: "{{http_verb}}",
       headers: { "Content-Type": "application/json" },
@@ -29,19 +35,30 @@ export class {{name}} {
         {{/each}}
       })
     });
-
     if (!res.ok) {
-      const data = await res.text();
+      const message = await res.text();
       return {
         ok: false,
         status: res.status,
-        message: data
+        message
       };
     }
 
     const data = await res.json();
+    {{#if (is_model return_type)}}
+    const instantiated = Object.assign(new {{../name}}(), data);
+    return { ok: true, data: instantiated };
+    {{else}}
+      {{#if (is_model_array return_type)}}
+    const instantiated = instantiateModelArray(data, {{../name}});
+    return { ok: true, data: instantiated };
+      {{else}}
     return { ok: true, data };
+      {{/if}}
+    {{/if}}
   }
+
   {{/each}}
+
 }
 {{/each}}
