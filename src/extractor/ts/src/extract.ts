@@ -349,7 +349,7 @@ type TreeNode = {
     cidl_type: { Model: string };
     nullable: boolean;
   };
-  tree: TreeNode[] | {};
+  data_sources: TreeNode[] | {};
 };
 
 function buildIncludeTreeFromObjectLiteral(
@@ -431,7 +431,7 @@ function buildIncludeTreeFromObjectLiteral(
         cidl_type: { Model: targetModel },
         nullable,
       },
-      tree: nestedTree,
+      data_sources: nestedTree,
     });
   }
 
@@ -501,6 +501,7 @@ export function extractModels(opts: ExtractOptions = {}) {
       // relationPropName -> fkPropName (as *declared*, but we will alias-match)
       const oneToOneMap = new Map<string, string>();
       const oneToManyMap = new Map<string, string>();
+      const manyToManyMap = new Map<string, string>();
 
       for (const prop of cls.getProperties()) {
         for (const dec of prop.getDecorators()) {
@@ -517,6 +518,10 @@ export function extractModels(opts: ExtractOptions = {}) {
             // OneToMany("dog_id") - stores the FK field name in the related model
             const fkNameArg = getDecoratorArgText(dec, 0);
             if (fkNameArg) oneToManyMap.set(prop.getName(), fkNameArg);
+          } else if (dname === "ManyToMany") {
+            // ManyToMany("StudentClasses") - stores the junction table name
+            const junctionTableArg = getDecoratorArgText(dec, 0);
+            if (junctionTableArg) manyToManyMap.set(prop.getName(), junctionTableArg);
           }
         }
       }
@@ -568,26 +573,26 @@ export function extractModels(opts: ExtractOptions = {}) {
           continue;
         }
       
-        // Scalar FK entry (e.g., treat_id: number)
+        // Scalar FK entry (e.g., dogId: number)
         const fkType = fkProp.getType();
         const { nullable: fkNullable } = getNullability(fkProp, sf);
         attributes.push({
           foreign_key: { OneToOne: targetModel },
           value: {
             cidl_type: TypeCode.fromType(fkType, sf),
-            name: fkProp.getName(),    // use actual FK prop name (snake/camel safe)
+            name: fkProp.getName(),    // use actual FK prop name (e.g., "dogId")
             nullable: fkNullable,
           },
           primary_key: hasDecoratorNamed(fkProp, "PrimaryKey"),
         });
       
-        // Relation entry (e.g., treat: Treat | undefined) — name is the relation prop
+        // Relation entry (e.g., dog: Dog | undefined)
         const relNullable = getNullability(relationProp, sf).nullable;
         attributes.push({
           foreign_key: { OneToOne: targetModel },
           value: {
-            cidl_type: { model: targetModel },
-            name: relationProp.getName(),  // relation property name, e.g. "treat"
+            cidl_type: { model: targetModel },  // Note: lowercase "model" to match expected output
+            name: relationProp.getName(),  // relation property name, e.g. "dog"
             nullable: relNullable,
           },
           primary_key: false,
@@ -621,14 +626,98 @@ export function extractModels(opts: ExtractOptions = {}) {
         const relationProp = findClassPropertyByAlias(cls, relationPropName);
         if (!relationProp) continue;
 
-        // OneToMany relations are just tracked, not emitted as attributes
-        // They'll be handled in data sources if referenced
+        // Extract the model name from the array type
+        const propType = relationProp.getType();
+        const typeText = cleanTypeText(propType, sf);
+        let targetModel: string | undefined;
+        
+        // Extract model name from array type (e.g., "Dog[]" -> "Dog")
+        const arrayMatch = typeText.match(/^([A-Za-z_]\w*)\[\]/);
+        if (arrayMatch) {
+          targetModel = arrayMatch[1];
+        }
+        
+        if (!targetModel) {
+          // Try to get from type symbol if text parsing fails
+          const typeArgs = propType.getTypeArguments();
+          if (typeArgs && typeArgs.length > 0) {
+            targetModel = typeToModelName(typeArgs[0], sf);
+          }
+        }
+        
+        if (!targetModel) {
+          console.log(`Warning: Could not determine target model for OneToMany relation ${relationProp.getName()}`);
+          continue;
+        }
+
+        // Create the OneToMany relation entry with array type
+        const { nullable } = getNullability(relationProp, sf);
+        attributes.push({
+          foreign_key: { OneToMany: targetModel },
+          value: {
+            cidl_type: { array: { model: targetModel } },
+            name: relationProp.getName(),  // e.g., "dogs"
+            nullable,
+          },
+          primary_key: false,
+        });
+
+        consumedProps.add(relationProp.getName());
+      }
+
+      // ---------- PASS 2a.3: ManyToMany relations ----------
+      for (const [relationPropName, junctionTableName] of manyToManyMap.entries()) {
+        const relationProp = findClassPropertyByAlias(cls, relationPropName);
+        if (!relationProp) continue;
+
+        // Extract the model name from the array type
+        const propType = relationProp.getType();
+        const typeText = cleanTypeText(propType, sf);
+        let targetModel: string | undefined;
+        
+        // Extract model name from array type (e.g., "Class[]" -> "Class", "Student[]" -> "Student")
+        const arrayMatch = typeText.match(/^([A-Za-z_]\w*)\[\]/);
+        if (arrayMatch) {
+          targetModel = arrayMatch[1];
+        }
+        
+        if (!targetModel) {
+          // Try to get from type symbol if text parsing fails
+          const typeArgs = propType.getTypeArguments();
+          if (typeArgs && typeArgs.length > 0) {
+            targetModel = typeToModelName(typeArgs[0], sf);
+          }
+        }
+        
+        if (!targetModel) {
+          console.log(`Warning: Could not determine target model for ManyToMany relation ${relationProp.getName()}`);
+          continue;
+        }
+
+        // Create the ManyToMany relation entry with array type
+        // Note: The name field uses the junction table name, not the property name
+        const { nullable } = getNullability(relationProp, sf);
+        attributes.push({
+          foreign_key: { ManyToMany: targetModel },
+          value: {
+            cidl_type: { array: { model: targetModel } },
+            name: junctionTableName,  // e.g., "StudentClasses" - the junction table name
+            nullable,
+          },
+          primary_key: false,
+        });
+
         consumedProps.add(relationProp.getName());
       }
     
       // 2b) Emit any remaining properties (that weren't consumed by FK/OneToOne/OneToMany)
+      // BUT SKIP properties that have @DataSource decorator
       for (const prop of cls.getProperties()) {
         if (consumedProps.has(prop.getName())) continue;
+        
+        // Skip properties with @DataSource decorator
+        if (hasDecoratorNamed(prop, "DataSource")) continue;
+        
         pushDefaultAttribute(prop);
       }
 
@@ -646,13 +735,13 @@ export function extractModels(opts: ExtractOptions = {}) {
         
         if (!init || !init.isKind || !init.isKind(SyntaxKind.ObjectLiteralExpression)) {
           console.log(`  - No initializer or not object literal`);
-          data_sources.push({ name: dsName, tree: {} });
+          data_sources.push({ name: dsName, data_sources: {} });
           continue;
         }
 
         const tree = buildIncludeTreeFromObjectLiteral(init, cls, sf);
         console.log(`  - Built tree:`, JSON.stringify(tree, null, 2));
-        data_sources.push({ name: dsName, tree: tree.length > 0 ? tree : {} });
+        data_sources.push({ name: dsName, data_sources: tree.length > 0 ? tree : {} });
       }
 
       const methods = cls.getMethods().map((m) => {
@@ -688,8 +777,12 @@ export function extractModels(opts: ExtractOptions = {}) {
         };
       });
 
+      // Get the source file path relative to the cwd
+      const sourcePath = path.relative(cwd, sf.getFilePath());
+
       models.push({
         name: className,
+        source_path: sourcePath,
         attributes,
         methods,
         ...(data_sources.length ? { data_sources } : {}),
