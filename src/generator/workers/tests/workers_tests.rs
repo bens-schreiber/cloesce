@@ -1,7 +1,7 @@
 use anyhow::Result;
 use common::CidlSpec;
 use insta::assert_snapshot;
-use workers::WorkersFactory;
+use workers::WorkersGenerator;
 
 use std::path::PathBuf;
 
@@ -15,7 +15,7 @@ fn test_generate_workers_snapshot() -> Result<()> {
     };
 
     // Act
-    let workers = WorkersFactory.create(cidl);
+    let workers = WorkersGenerator.create(cidl);
 
     // Assert
     assert_snapshot!("generated_workers", workers);

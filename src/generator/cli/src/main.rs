@@ -5,7 +5,7 @@ use clap::{Parser, Subcommand, command};
 
 use common::{CidlSpec, WranglerFormat};
 use d1::D1Generator;
-use workers::WorkersFactory;
+use workers::WorkersGenerator;
 
 #[derive(Parser)]
 #[command(name = "generate", version = "0.0.1")]
@@ -105,7 +105,7 @@ fn main() -> Result<()> {
                 let mut file =
                     create_file_and_dir(workers_path).context("Failed to open workers file")?;
 
-                file.write(WorkersFactory.create(cidl).as_bytes())
+                file.write(WorkersGenerator.create(cidl).as_bytes())
                     .context("Failed to write workers file")?;
             }
             GenerateTarget::Client {

@@ -1,6 +1,6 @@
 use common::{CidlType, HttpVerb, Method, Model, TypedValue};
 
-use crate::LanguageWorkerGenerator as LanguageWorkersGenerator;
+use crate::WorkersGeneratable as LanguageWorkersGenerator;
 
 pub struct TypescriptValidatorGenerator;
 impl TypescriptValidatorGenerator {
@@ -58,13 +58,14 @@ impl TypescriptValidatorGenerator {
     fn validators(models: &[Model]) -> String {
         let mut validators = Vec::with_capacity(models.len());
         for model in models {
-            let mut stmts = Vec::with_capacity(model.attributes.len());
-            for attr in &model.attributes {
-                let stmt = Self::validate_type(&attr.value, "obj.").expect("Valid method type");
-                stmts.push(format!("if {stmt} {{return false;}}"))
-            }
+            let stmts = model
+                .attributes
+                .iter()
+                .filter_map(|attr| Self::validate_type(&attr.value, "obj."))
+                .map(|stmt| format!("if {stmt} {{return false;}}"))
+                .collect::<Vec<_>>()
+                .join("\n");
 
-            let stmts = stmts.join("\n");
             let model_name = &model.name;
             validators.push(format!(
                 r#"
@@ -92,26 +93,22 @@ impl TypescriptValidatorGenerator {
 pub struct TypescriptWorkersGenerator;
 impl LanguageWorkersGenerator for TypescriptWorkersGenerator {
     fn imports(&self, models: &[Model]) -> String {
-        let cf_types = r#"
-import { D1Database } from "@cloudflare/workers-types"
-"#;
+        const CLOUDFLARE_TYPES: &str = r#"import { D1Database } from "@cloudflare/workers-types""#;
 
         // TODO: Fix hardcoding path ../{}
         let model_imports = models
             .iter()
-            .map(|m| {
+            .map(|model| {
                 format!(
-                    r#"
-import {{ {} }} from '../{}'; 
-"#,
-                    m.name,
-                    m.source_path.with_extension("").display() // strip the .ts off
+                    "import {{ {} }} from '../{}';",
+                    model.name,
+                    model.source_path.with_extension("").display()
                 )
             })
             .collect::<Vec<_>>()
             .join("\n");
 
-        format!("{cf_types}{model_imports}")
+        format!("{CLOUDFLARE_TYPES}\n{model_imports}")
     }
 
     fn preamble(&self) -> String {
@@ -143,47 +140,26 @@ export default {
     }
 
     fn router(&self, model: String) -> String {
-        format!(
-            r#"
-const router = {{ api: {{{model}}} }}
-"#
-        )
+        format!("const router = {{ api: {{{model}}} }}")
     }
 
     fn router_model(&self, model_name: &str, method: String) -> String {
-        format!(
-            r#"
-{model_name}: {{{method}}}
-"#
-        )
+        format!("{model_name}: {{{method}}}")
     }
 
     fn router_method(&self, method: &Method, proto: String) -> String {
         if method.is_static {
             proto
         } else {
-            format!(
-                r#"
-"<id>": {{{proto}}}
-"#
-            )
+            format!("\"<id>\": {{{proto}}}")
         }
     }
 
     fn proto(&self, method: &Method, body: String) -> String {
         let method_name = &method.name;
+        let id_param = if method.is_static { "" } else { "id: number, " };
 
-        let id = if !method.is_static {
-            "id: number, "
-        } else {
-            ""
-        };
-
-        format!(
-            r#"
-{method_name}: async ({id} request: Request, env: Env) => {{{body}}}
-"#
-        )
+        format!("{method_name}: async ({id_param}request: Request, env: Env) => {{{body}}}")
     }
 
     fn validate_http(&self, verb: &HttpVerb) -> String {
@@ -205,54 +181,54 @@ if (request.method !== "{verb_str}") {{
     }
 
     fn validate_req_body(&self, params: &[TypedValue]) -> String {
-        let mut validate = Vec::new();
-
-        let req_body_params = params
-            .iter()
-            .filter(|p| !matches!(p.cidl_type, CidlType::D1Database))
-            .collect::<Vec<_>>();
-
-        let invalid = r#"
+        const INVALID_BODY_RESPONSE: &str = r#"
             return new Response(JSON.stringify({ error: "Invalid request body" }), {
                 status: 400,
                 headers: { "Content-Type": "application/json" },
             });
         "#;
 
-        // Instantiate from request body
-        if !req_body_params.is_empty() {
-            let req_body_params_lst = req_body_params
-                .iter()
-                .map(|p| p.name.clone())
-                .collect::<Vec<_>>()
-                .join(",");
+        let req_body_params: Vec<_> = params
+            .iter()
+            .filter(|p| !matches!(p.cidl_type, CidlType::D1Database))
+            .collect();
 
-            validate.push(format!(
-                r#"
+        if req_body_params.is_empty() {
+            return String::new();
+        }
+
+        let mut validation_code = Vec::new();
+
+        let param_names = req_body_params
+            .iter()
+            .map(|p| p.name.clone())
+            .collect::<Vec<_>>()
+            .join(",");
+        validation_code.push(format!(
+            r#"
                 let body;
                 try {{
                     body = await request.json();
                 }} catch {{
-                    {invalid}
+                    {INVALID_BODY_RESPONSE}
                 }}
 
-                let {{{req_body_params_lst}}} = body;
+                let {{{param_names}}} = body;
                 "#
-            ));
-        }
+        ));
 
         // Validate params from request body
         // Assign models to actual instances
         for param in req_body_params {
             if let Some(type_check) = TypescriptValidatorGenerator::validate_type(param, "") {
-                validate.push(format!("if ({type_check}) {{ {invalid} }}"))
+                validation_code.push(format!("if ({type_check}) {{ {INVALID_BODY_RESPONSE} }}"))
             }
             if let Some(assign) = TypescriptValidatorGenerator::assign_type(param) {
-                validate.push(format!("{} = {assign}", param.name))
+                validation_code.push(format!("{} = {assign}", param.name))
             }
         }
 
-        validate.join("\n")
+        validation_code.join("\n")
     }
 
     fn hydrate_model(&self, model: &Model) -> String {
@@ -261,60 +237,55 @@ if (request.method !== "{verb_str}") {{
 
         // TODO: Switch based off DataSource type
         // For now, we will just assume there is a _default (or none)
-        let has_ds = model.data_sources.len() > 1;
+        let has_data_sources = model.data_sources.len() > 1;
 
-        let query = if has_ds {
-            format!("`SELECT * FROM{model_name}_default WHERE {model_name}_{pk} = ?")
+        let (query, instance_creation) = if has_data_sources {
+            (
+                format!("`SELECT * FROM {model_name}_default WHERE {model_name}_{pk} = ?`"),
+                format!("Object.assign(new {model_name}(), mapSql<{model_name}>(record)[0])"),
+            )
         } else {
-            format!("`SELECT * FROM {model_name} WHERE {pk} = ?`")
-        };
-
-        let instance = if has_ds {
-            format!("Object.assign(new {model_name}(), mapSql<{model_name}>(record)[0])")
-        } else {
-            format!("Object.assign(new {model_name}(), record)")
+            (
+                format!("`SELECT * FROM {model_name} WHERE {pk} = ?`"),
+                format!("Object.assign(new {model_name}(), record)"),
+            )
         };
 
         format!(
             r#"
-const d1 = env.DB;
-const query = {query};
-const record = await d1.prepare(query).bind(id).first();
-if (!record) {{
-    return new Response(
-        JSON.stringify({{ error: "Record not found" }}),
-        {{ status: 404, headers: {{ "Content-Type": "application/json" }} }}
-    );
-}}
-const instance = {instance};
-"#
+                const d1 = env.DB;
+                const query = {query};
+                const record = await d1.prepare(query).bind(id).first();
+                if (!record) {{
+                    return new Response(
+                        JSON.stringify({{ error: "Record not found" }}),
+                        {{ status: 404, headers: {{ "Content-Type": "application/json" }} }}
+                    );
+                }}
+                const instance = {instance_creation};
+            "#
         )
     }
 
     fn dispatch_method(&self, model_name: &str, method: &Method) -> String {
         let method_name = &method.name;
 
-        // SQL params are built by the body validator, CF params are dependency injected
         let params = method
             .parameters
             .iter()
-            .map(|p| match &p.cidl_type {
+            .map(|param| match &param.cidl_type {
                 CidlType::D1Database => "env.DB".to_string(),
-                _ => p.name.clone(),
+                _ => param.name.clone(),
             })
             .collect::<Vec<_>>()
             .join(", ");
 
-        let callee = if method.is_static {
+        let caller = if method.is_static {
             model_name
         } else {
             "instance"
         };
 
-        format!(
-            r#"
-return JSON.stringify({callee}.{method_name}({params}));
-"#
-        )
+        format!("return JSON.stringify({caller}.{method_name}({params}));")
     }
 }

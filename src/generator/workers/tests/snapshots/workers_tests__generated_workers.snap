@@ -3,12 +3,9 @@ source: workers/tests/workers_tests.rs
 expression: workers
 ---
  
-
-import { D1Database } from "@cloudflare/workers-types"
-
-import { ExampleModel } from '../example_model'; 
-
-// @ts-nocheck
+        import { D1Database } from "@cloudflare/workers-types"
+import { ExampleModel } from '../example_model';
+        // @ts-nocheck
 
 export interface Env {
   DB: D1Database;
@@ -116,7 +113,7 @@ function match(
     : notFound();
 }
 
-
+        
             const $: any = {};
 
             
@@ -131,10 +128,7 @@ if (obj.data_blob == null || !(obj.data_blob instanceof ArrayBuffer || obj.data_
                 };
             
         
-
-const router = { api: {
-ExampleModel: {
-create_example: async ( request: Request, env: Env) => {
+        const router = { api: {ExampleModel: {create_example: async (request: Request, env: Env) => {
                 
 if (request.method !== "POST") {
     return new Response("Method Not Allowed", { status: 405 });
@@ -163,13 +157,9 @@ if ((payload == null || !$.ExampleModel.validate(payload))) {
          }
 payload = Object.assign(new ExampleModel(), payload)
                 
-                
-return JSON.stringify(ExampleModel.create_example(env.DB, payload));
-
-            }
-,
-
-read_example: async ( request: Request, env: Env) => {
+                return JSON.stringify(ExampleModel.create_example(env.DB, payload));
+            },
+read_example: async (request: Request, env: Env) => {
                 
 if (request.method !== "GET") {
     return new Response("Method Not Allowed", { status: 405 });
@@ -197,13 +187,9 @@ if ((id !== undefined && typeof id !== "number")) {
             });
          }
                 
-                
-return JSON.stringify(ExampleModel.read_example(env.DB, id));
-
-            }
-,
-
-list_examples: async ( request: Request, env: Env) => {
+                return JSON.stringify(ExampleModel.read_example(env.DB, id));
+            },
+list_examples: async (request: Request, env: Env) => {
                 
 if (request.method !== "GET") {
     return new Response("Method Not Allowed", { status: 405 });
@@ -211,13 +197,9 @@ if (request.method !== "GET") {
 
                 
                 
-                
-return JSON.stringify(ExampleModel.list_examples(env.DB));
-
-            }
-,
-
-update_example: async ( request: Request, env: Env) => {
+                return JSON.stringify(ExampleModel.list_examples(env.DB));
+            },
+update_example: async (request: Request, env: Env) => {
                 
 if (request.method !== "PUT") {
     return new Response("Method Not Allowed", { status: 405 });
@@ -251,13 +233,9 @@ if ((rating !== undefined && typeof rating !== "number")) {
             });
          }
                 
-                
-return JSON.stringify(ExampleModel.update_example(env.DB, id, rating));
-
-            }
-,
-
-patch_example: async ( request: Request, env: Env) => {
+                return JSON.stringify(ExampleModel.update_example(env.DB, id, rating));
+            },
+patch_example: async (request: Request, env: Env) => {
                 
 if (request.method !== "PATCH") {
     return new Response("Method Not Allowed", { status: 405 });
@@ -285,13 +263,9 @@ if ((description !== undefined && typeof description !== "string")) {
             });
          }
                 
-                
-return JSON.stringify(ExampleModel.patch_example(env.DB, description));
-
-            }
-,
-
-delete_example: async ( request: Request, env: Env) => {
+                return JSON.stringify(ExampleModel.patch_example(env.DB, description));
+            },
+delete_example: async (request: Request, env: Env) => {
                 
 if (request.method !== "DELETE") {
     return new Response("Method Not Allowed", { status: 405 });
@@ -319,14 +293,9 @@ if ((id == null || typeof id !== "number")) {
             });
          }
                 
-                
-return JSON.stringify(ExampleModel.delete_example(env.DB, id));
-
-            }
-,
-
-"<id>": {
-get_description: async (id: number,  request: Request, env: Env) => {
+                return JSON.stringify(ExampleModel.delete_example(env.DB, id));
+            },
+"<id>": {get_description: async (id: number, request: Request, env: Env) => {
                 
 if (request.method !== "GET") {
     return new Response("Method Not Allowed", { status: 405 });
@@ -334,26 +303,20 @@ if (request.method !== "GET") {
 
                 
                 
-const d1 = env.DB;
-const query = `SELECT * FROM ExampleModel WHERE id = ?`;
-const record = await d1.prepare(query).bind(id).first();
-if (!record) {
-    return new Response(
-        JSON.stringify({ error: "Record not found" }),
-        { status: 404, headers: { "Content-Type": "application/json" } }
-    );
-}
-const instance = Object.assign(new ExampleModel(), record);
-
-                
-return JSON.stringify(instance.get_description(env.DB));
-
-            }
-}
-,
-
-"<id>": {
-increment_rating: async (id: number,  request: Request, env: Env) => {
+                const d1 = env.DB;
+                const query = `SELECT * FROM ExampleModel WHERE id = ?`;
+                const record = await d1.prepare(query).bind(id).first();
+                if (!record) {
+                    return new Response(
+                        JSON.stringify({ error: "Record not found" }),
+                        { status: 404, headers: { "Content-Type": "application/json" } }
+                    );
+                }
+                const instance = Object.assign(new ExampleModel(), record);
+            
+                return JSON.stringify(instance.get_description(env.DB));
+            }},
+"<id>": {increment_rating: async (id: number, request: Request, env: Env) => {
                 
 if (request.method !== "PATCH") {
     return new Response("Method Not Allowed", { status: 405 });
@@ -381,25 +344,20 @@ if ((amount == null || typeof amount !== "number")) {
             });
          }
                 
-const d1 = env.DB;
-const query = `SELECT * FROM ExampleModel WHERE id = ?`;
-const record = await d1.prepare(query).bind(id).first();
-if (!record) {
-    return new Response(
-        JSON.stringify({ error: "Record not found" }),
-        { status: 404, headers: { "Content-Type": "application/json" } }
-    );
-}
-const instance = Object.assign(new ExampleModel(), record);
-
-                
-return JSON.stringify(instance.increment_rating(env.DB, amount));
-
-            }
-}
-,
-
-process_model: async ( request: Request, env: Env) => {
+                const d1 = env.DB;
+                const query = `SELECT * FROM ExampleModel WHERE id = ?`;
+                const record = await d1.prepare(query).bind(id).first();
+                if (!record) {
+                    return new Response(
+                        JSON.stringify({ error: "Record not found" }),
+                        { status: 404, headers: { "Content-Type": "application/json" } }
+                    );
+                }
+                const instance = Object.assign(new ExampleModel(), record);
+            
+                return JSON.stringify(instance.increment_rating(env.DB, amount));
+            }},
+process_model: async (request: Request, env: Env) => {
                 
 if (request.method !== "POST") {
     return new Response("Method Not Allowed", { status: 405 });
@@ -428,13 +386,9 @@ if ((model == null || !$.ExampleModel.validate(model))) {
          }
 model = Object.assign(new ExampleModel(), model)
                 
-                
-return JSON.stringify(ExampleModel.process_model(env.DB, model));
-
-            }
-,
-
-process_models: async ( request: Request, env: Env) => {
+                return JSON.stringify(ExampleModel.process_model(env.DB, model));
+            },
+process_models: async (request: Request, env: Env) => {
                 
 if (request.method !== "POST") {
     return new Response("Method Not Allowed", { status: 405 });
@@ -463,14 +417,9 @@ if ((models == null || !Array.isArray(models) || models.some(item => (item == nu
          }
 models = models.map(item => Object.assign(new ExampleModel(), item))
                 
-                
-return JSON.stringify(ExampleModel.process_models(env.DB, models));
-
-            }
-}
-} }
-
-
+                return JSON.stringify(ExampleModel.process_models(env.DB, models));
+            }}} }
+        
 export default {
     async fetch(request: Request, env: Env, ctx: any): Promise<Response> {
         try {

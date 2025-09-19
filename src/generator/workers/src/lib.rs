@@ -3,7 +3,7 @@ mod typescript;
 use common::{CidlSpec, HttpVerb, InputLanguage, Method, Model, TypedValue};
 use typescript::TypescriptWorkersGenerator;
 
-trait LanguageWorkerGenerator {
+trait WorkersGeneratable {
     fn imports(&self, models: &[Model]) -> String;
     fn preamble(&self) -> String;
     fn validators(&self, models: &[Model]) -> String;
@@ -18,9 +18,9 @@ trait LanguageWorkerGenerator {
     fn dispatch_method(&self, model_name: &str, method: &Method) -> String;
 }
 
-pub struct WorkersFactory;
-impl WorkersFactory {
-    fn model(model: &Model, lang: &dyn LanguageWorkerGenerator) -> String {
+pub struct WorkersGenerator;
+impl WorkersGenerator {
+    fn model(model: &Model, lang: &dyn WorkersGeneratable) -> String {
         let mut router_methods = vec![];
         for method in &model.methods {
             let validate_http = lang.validate_http(&method.http_verb);
@@ -50,12 +50,15 @@ impl WorkersFactory {
     }
 
     pub fn create(self, spec: CidlSpec) -> String {
-        let generator: &dyn LanguageWorkerGenerator = match spec.language {
+        let generator: &dyn WorkersGeneratable = match spec.language {
             InputLanguage::TypeScript => &TypescriptWorkersGenerator {},
         };
 
         let imports = generator.imports(&spec.models);
+
+        // TODO: This should all just be apart of the NPM package
         let preamble = generator.preamble();
+
         let validators = generator.validators(&spec.models);
 
         let router = {
@@ -72,11 +75,11 @@ impl WorkersFactory {
 
         format!(
             r#" 
-{imports}
-{preamble}
-{validators}
-{router}
-{main}
+        {imports}
+        {preamble}
+        {validators}
+        {router}
+        {main}
         "#
         )
     }
