@@ -1,3 +1,4 @@
+use std::path::PathBuf;
 use common::{CidlType, HttpVerb, Method, Model, TypedValue};
 
 use crate::LanguageWorkerGenerator as LanguageWorkersGenerator;
@@ -91,21 +92,21 @@ impl TypescriptValidatorGenerator {
 
 pub struct TypescriptWorkersGenerator;
 impl LanguageWorkersGenerator for TypescriptWorkersGenerator {
-    fn imports(&self, models: &[Model]) -> String {
+    fn imports(&self, models: &[Model], models_path: &PathBuf) -> String {
         let cf_types = r#"
 import { D1Database } from "@cloudflare/workers-types"
 "#;
 
-        // TODO: Fix hardcoding path ../{}
         let model_imports = models
             .iter()
             .map(|m| {
+                let import_path = models_path.join(&m.name);
                 format!(
                     r#"
-import {{ {} }} from '../{}'; 
+import {{ {} }} from '{}'; 
 "#,
                     m.name,
-                    m.source_path.with_extension("").display() // strip the .ts off
+                    import_path.display()
                 )
             })
             .collect::<Vec<_>>()
@@ -264,7 +265,7 @@ if (request.method !== "{verb_str}") {{
         let has_ds = model.data_sources.len() > 1;
 
         let query = if has_ds {
-            format!("`SELECT * FROM{model_name}_default WHERE {model_name}_{pk} = ?")
+            format!("`SELECT * FROM{model_name}_default WHERE {model_name}_{pk} = ?`")
         } else {
             format!("`SELECT * FROM {model_name} WHERE {pk} = ?`")
         };
@@ -313,7 +314,7 @@ const instance = {instance};
 
         format!(
             r#"
-return JSON.stringify({callee}.{method_name}({params}));
+        return JSON.stringify({callee}.{method_name}({params}));
 "#
         )
     }
