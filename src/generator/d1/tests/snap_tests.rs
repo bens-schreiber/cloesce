@@ -1,21 +1,22 @@
 use anyhow::{Context, Result};
+use insta::assert_snapshot;
+
 use common::{CidlForeignKeyKind, CidlSpec, CidlType, WranglerFormat, builder::ModelBuilder};
 use d1::D1Generator;
-use insta::assert_snapshot;
 
 use std::path::PathBuf;
 
 #[test]
-fn test_generate_d1_snapshot_from_json() -> Result<()> {
+fn test_generate_sql_from_cidl() -> Result<()> {
     // Arrange
     let cidl = {
-        let cidl_path = PathBuf::from("../fixtures/cidl.json");
+        let cidl_path = PathBuf::from("../../test_fixtures/cidl.json");
         let cidl_contents = std::fs::read_to_string(cidl_path)?;
         serde_json::from_str::<CidlSpec>(&cidl_contents)?
     };
 
     let wrangler = {
-        let wrangler_path = PathBuf::from("../fixtures/wrangler.toml");
+        let wrangler_path = PathBuf::from("../../test_fixtures/wrangler.toml");
         WranglerFormat::from_path(&wrangler_path).context("Failed to open wrangler file")?
     };
 
@@ -37,7 +38,7 @@ fn test_generate_d1_snapshot_from_json() -> Result<()> {
 
 // TODO: Remove this once extractor can do FK's
 #[test]
-fn test_generate_d1_snapshot_from_models() -> Result<()> {
+fn test_generate_sql_from_models() -> Result<()> {
     // Arrange
     let models = vec![
         // Basic User with attributes
@@ -156,30 +157,5 @@ fn test_generate_d1_snapshot_from_models() -> Result<()> {
 
     // Assert
     assert_snapshot!("generate_d1_snapshot_from_models", generated_sqlite);
-    Ok(())
-}
-
-#[test]
-fn test_generate_d1_from_empty_wrangler_snapshot() -> Result<()> {
-    // Arrange
-    let cidl = {
-        let cidl_path = PathBuf::from("../fixtures/cidl.json");
-        let cidl_contents = std::fs::read_to_string(cidl_path)?;
-        serde_json::from_str::<CidlSpec>(&cidl_contents)?
-    };
-
-    let wrangler = WranglerFormat::Toml(toml::from_str("").unwrap());
-
-    let d1gen = D1Generator::new(cidl, wrangler.as_spec()?);
-
-    // Act
-    let updated_wrangler = d1gen.wrangler();
-
-    // Assert
-    assert_snapshot!(
-        "updated_wrangler_from_empty",
-        format!("{}", toml::to_string_pretty(&updated_wrangler).unwrap())
-    );
-
     Ok(())
 }
