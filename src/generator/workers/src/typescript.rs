@@ -29,7 +29,7 @@ impl TypescriptValidatorGenerator {
         }?;
 
         let check = if value.nullable {
-            format!("({name} !== undefined && {type_check})",)
+            format!("({name} == undefined || {type_check})",)
         } else {
             format!("({name} == null || {type_check})",)
         };
@@ -90,10 +90,19 @@ impl TypescriptValidatorGenerator {
     }
 }
 
+fn error_state(status: u32, stage: &str, message: &str) -> String {
+    format!(
+        r#"
+        return {{ ok: false, status: {status}, message: `{stage}: ${{{message}}}`}}
+    "#
+    )
+}
+
 pub struct TypescriptWorkersGenerator;
 impl LanguageWorkersGenerator for TypescriptWorkersGenerator {
     fn imports(&self, models: &[Model]) -> String {
         const CLOUDFLARE_TYPES: &str = r#"import { D1Database } from "@cloudflare/workers-types""#;
+        const CLOESCE_TYPES: &str = r#"import { mapSql, match, Result } from "cloesce""#;
 
         // TODO: Fix hardcoding path ../{}
         let model_imports = models
@@ -108,11 +117,17 @@ impl LanguageWorkersGenerator for TypescriptWorkersGenerator {
             .collect::<Vec<_>>()
             .join("\n");
 
-        format!("{CLOUDFLARE_TYPES}\n{model_imports}")
+        format!("{CLOUDFLARE_TYPES}\n{CLOESCE_TYPES}\n{model_imports}")
     }
 
     fn preamble(&self) -> String {
-        include_str!("./templates/preamble.ts").to_string()
+        // TODO: Generate environment
+        r#"
+        export interface Env {
+            DB: D1Database;
+        }
+        "#
+        .to_string()
     }
 
     fn validators(&self, models: &[Model]) -> String {
@@ -123,16 +138,8 @@ impl LanguageWorkersGenerator for TypescriptWorkersGenerator {
         r#"
 export default {
     async fetch(request: Request, env: Env, ctx: any): Promise<Response> {
-        try {
-            const url = new URL(request.url);
-            return await match(router, url.pathname, request, env);
-        } catch (error: any) {
-            console.error("Internal server error:", error);
-            return new Response(JSON.stringify({ error: error?.message }), {
-                status: 500,
-                headers: { "Content-Type": "application/json" },
-            });
-        }
+        const url = new URL(request.url);
+        return await match(router, url.pathname, request, env);
     }
 };
 "#
@@ -159,7 +166,9 @@ export default {
         let method_name = &method.name;
         let id_param = if method.is_static { "" } else { "id: number, " };
 
-        format!("{method_name}: async ({id_param}request: Request, env: Env) => {{{body}}}")
+        format!(
+            "{method_name}: async ({id_param}request: Request, env: Env): Promise<Result<any>> => {{{body}}}"
+        )
     }
 
     fn validate_http(&self, verb: &HttpVerb) -> String {
@@ -171,57 +180,54 @@ export default {
             HttpVerb::DELETE => "DELETE",
         };
 
+        // Error state: any method outside of the allowed HTTP verbs will exit with 405.
+        let method_not_allowed = error_state(405, "validate_http", "\"Method Not Allowed\"");
         format!(
             r#"
-if (request.method !== "{verb_str}") {{
-    return new Response("Method Not Allowed", {{ status: 405 }});
-}}
-"#,
+                if (request.method !== "{verb_str}") {{
+                    {method_not_allowed}
+                }}
+            "#,
         )
     }
 
     fn validate_req_body(&self, params: &[NamedTypedValue]) -> String {
-        const INVALID_BODY_RESPONSE: &str = r#"
-            return new Response(JSON.stringify({ error: "Invalid request body" }), {
-                status: 400,
-                headers: { "Content-Type": "application/json" },
-            });
-        "#;
-
         let req_body_params: Vec<_> = params
             .iter()
             .filter(|p| !matches!(p.cidl_type, CidlType::D1Database))
             .collect();
-
         if req_body_params.is_empty() {
+            // No parameters, no validation.
             return String::new();
         }
 
-        let mut validation_code = Vec::new();
+        // Error state: any missing parameter, body, or malformed input will exit with 400.
+        let invalid_request_body =
+            error_state(400, "validate_req_body", "\"Invalid Request Body\"");
 
-        let param_names = req_body_params
-            .iter()
-            .map(|p| p.name.clone())
-            .collect::<Vec<_>>()
-            .join(",");
+        let mut validation_code = Vec::new();
         validation_code.push(format!(
             r#"
                 let body;
                 try {{
                     body = await request.json();
                 }} catch {{
-                    {INVALID_BODY_RESPONSE}
+                    {invalid_request_body}
                 }}
 
-                let {{{param_names}}} = body;
-                "#
+                let {{{}}} = body;
+                "#,
+            req_body_params
+                .iter()
+                .map(|p| p.name.clone())
+                .collect::<Vec<_>>()
+                .join(",")
         ));
 
         // Validate params from request body
-        // Assign models to actual instances
         for param in req_body_params {
             if let Some(type_check) = TypescriptValidatorGenerator::validate_type(param, "") {
-                validation_code.push(format!("if ({type_check}) {{ {INVALID_BODY_RESPONSE} }}"))
+                validation_code.push(format!("if ({type_check}) {{ {invalid_request_body} }}"))
             }
             if let Some(assign) = TypescriptValidatorGenerator::assign_type(param) {
                 validation_code.push(format!("{} = {assign}", param.name))
@@ -238,7 +244,6 @@ if (request.method !== "{verb_str}") {{
         // TODO: Switch based off DataSource type
         // For now, we will just assume there is a _default (or none)
         let has_data_sources = model.data_sources.len() > 1;
-
         let (query, instance_creation) = if has_data_sources {
             (
                 format!("`SELECT * FROM {model_name}_default WHERE {model_name}_{pk} = ?`"),
@@ -251,16 +256,30 @@ if (request.method !== "{verb_str}") {{
             )
         };
 
+        // Error state: If the D1 database has been tweaked outside of Cloesce
+        // resulting in a malformed query, exit with a 500.
+        let malformed_query = error_state(
+            500,
+            "hydrate_model",
+            "e instanceof Error ? e.message : String(e)",
+        );
+
+        // Error state: If no record is found for the id, return a 404
+        let missing_record = error_state(404, "hydrate_model", "\"Record not found\"");
+
         format!(
             r#"
                 const d1 = env.DB;
                 const query = {query};
-                const record = await d1.prepare(query).bind(id).first();
-                if (!record) {{
-                    return new Response(
-                        JSON.stringify({{ error: "Record not found" }}),
-                        {{ status: 404, headers: {{ "Content-Type": "application/json" }} }}
-                    );
+                let record;
+                try {{
+                    record = await d1.prepare(query).bind(id).first();
+                    if (!record) {{
+                        {missing_record}
+                    }}
+                }}
+                catch (e) {{
+                    {malformed_query}
                 }}
                 const instance = {instance_creation};
             "#
@@ -286,6 +305,34 @@ if (request.method !== "{verb_str}") {{
             "instance"
         };
 
-        format!("return JSON.stringify({caller}.{method_name}({params}));")
+        let dispatch = match method.return_type {
+            None => "return { ok: true, data: undefined };".to_string(),
+            Some(CidlType::HttpResult(_)) => {
+                format!("return await {caller}.{method_name}({params});")
+            }
+            Some(_) => {
+                format!(
+                    "return {{ ok: true, data: JSON.stringify( await {caller}.{method_name}({params}))}}"
+                )
+            }
+        };
+
+        // Error state: Client code ran into an uncaught exception.
+        let uncaught_exception = error_state(
+            500,
+            "dispatch_method",
+            "e instanceof Error ? e.message : String(e)",
+        );
+
+        format!(
+            r#"
+            try {{
+                {dispatch}
+            }}
+            catch (e) {{
+                {uncaught_exception}
+            }}
+        "#
+        )
     }
 }
