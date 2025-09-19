@@ -7,7 +7,7 @@ npx cloesce
 # generate via rust
 cd ../src/generator
 cargo run generate d1 ../../examples/.generated/cidl.json ../../examples/migrations/d1.sql ../../examples/wrangler.toml
-cargo run generate workers ../../examples/.generated/cidl.json ../../examples/.generated/workers.ts
+cargo run generate workers ../../examples/.generated/cidl.json ../../examples/.generated/workers.ts ../../examples/models
 cargo run generate client ../../examples/.generated/cidl.json ../../examples/.generated/client.ts api
 
 # migrate wrangler
