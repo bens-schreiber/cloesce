@@ -744,6 +744,42 @@ export function extractModels(opts: ExtractOptions = {}) {
         data_sources.push({ name: dsName, data_sources: tree.length > 0 ? tree : {} });
       }
 
+      // ---------- PASS 4: Navigation Properties ----------
+      const navigation_properties: any[] = [];
+      
+      // Add OneToOne navigation properties
+      for (const [relationPropName, _fkName] of oneToOneMap.entries()) {
+        const relationProp = findClassPropertyByAlias(cls, relationPropName);
+        if (!relationProp) continue;
+        
+        navigation_properties.push({
+          value: relationProp.getName(),
+          foreign_key: "OneToOne"
+        });
+      }
+      
+      // Add OneToMany navigation properties
+      for (const [relationPropName, _fkName] of oneToManyMap.entries()) {
+        const relationProp = findClassPropertyByAlias(cls, relationPropName);
+        if (!relationProp) continue;
+        
+        navigation_properties.push({
+          value: relationProp.getName(),
+          foreign_key: "OneToMany"
+        });
+      }
+      
+      // Add ManyToMany navigation properties
+      for (const [relationPropName, _junctionTableName] of manyToManyMap.entries()) {
+        const relationProp = findClassPropertyByAlias(cls, relationPropName);
+        if (!relationProp) continue;
+        
+        navigation_properties.push({
+          value: relationProp.getName(),
+          foreign_key: "ManyToMany"
+        });
+      }
+
       const methods = cls.getMethods().map((m) => {
         const decos = m
           .getDecorators()
@@ -778,14 +814,15 @@ export function extractModels(opts: ExtractOptions = {}) {
       });
 
       // Get the source file path relative to the cwd
-      const sourcePath = path.relative(cwd, sf.getFilePath());
+      const sourcePath = path.basename(sf.getFilePath());
 
       models.push({
-        name: className,
-        source_path: sourcePath,
         attributes,
         methods,
+        navigation_properties: navigation_properties,
         ...(data_sources.length ? { data_sources } : {}),
+        name: className,
+        source_path: sourcePath,
       });
     }
   }
