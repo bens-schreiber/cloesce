@@ -36,6 +36,7 @@ enum GenerateTarget {
     Workers {
         cidl_path: PathBuf,
         workers_path: PathBuf,
+        models_path: PathBuf,
     },
     Client {
         cidl_path: PathBuf,
@@ -100,12 +101,13 @@ fn main() -> Result<()> {
             GenerateTarget::Workers {
                 cidl_path,
                 workers_path,
+                models_path,
             } => {
                 let cidl = cidl_from_path(cidl_path)?;
                 let mut file =
                     create_file_and_dir(workers_path).context("Failed to open workers file")?;
 
-                file.write(WorkersFactory.create(cidl).as_bytes())
+                file.write(WorkersFactory.create(cidl, models_path).as_bytes())
                     .context("Failed to write workers file")?;
             }
             GenerateTarget::Client {

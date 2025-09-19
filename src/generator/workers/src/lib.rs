@@ -1,10 +1,11 @@
 mod typescript;
 
+use std::path::PathBuf;
 use common::{CidlSpec, HttpVerb, InputLanguage, Method, Model, TypedValue};
 use typescript::TypescriptWorkersGenerator;
 
 trait LanguageWorkerGenerator {
-    fn imports(&self, models: &[Model]) -> String;
+    fn imports(&self, models: &[Model], models_path: &PathBuf) -> String;
     fn preamble(&self) -> String;
     fn validators(&self, models: &[Model]) -> String;
     fn main(&self) -> String;
@@ -14,7 +15,7 @@ trait LanguageWorkerGenerator {
     fn proto(&self, method: &Method, body: String) -> String;
     fn validate_http(&self, verb: &HttpVerb) -> String;
     fn validate_req_body(&self, params: &[TypedValue]) -> String;
-    fn hydrate_model(&self, model_name: &Model) -> String;
+    fn hydrate_model(&self, model: &Model) -> String;
     fn dispatch_method(&self, model_name: &str, method: &Method) -> String;
 }
 
@@ -26,9 +27,9 @@ impl WorkersFactory {
             let validate_http = lang.validate_http(&method.http_verb);
             let validate_params = lang.validate_req_body(&method.parameters);
             let hydration = if method.is_static {
-                ""
+                String::new()
             } else {
-                &lang.hydrate_model(model)
+                lang.hydrate_model(model)
             };
             let dispatch = lang.dispatch_method(&model.name, method);
 
@@ -49,12 +50,12 @@ impl WorkersFactory {
         lang.router_model(&model.name, router_methods.join(",\n"))
     }
 
-    pub fn create(self, spec: CidlSpec) -> String {
+    pub fn create(self, spec: CidlSpec, models_path: PathBuf) -> String {
         let generator: &dyn LanguageWorkerGenerator = match spec.language {
             InputLanguage::TypeScript => &TypescriptWorkersGenerator {},
         };
 
-        let imports = generator.imports(&spec.models);
+        let imports = generator.imports(&spec.models, &models_path);
         let preamble = generator.preamble();
         let validators = generator.validators(&spec.models);
 
