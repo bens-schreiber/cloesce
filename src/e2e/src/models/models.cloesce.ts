@@ -1,19 +1,32 @@
 import { D1Database } from "@cloudflare/workers-types";
-import { D1, GET, PATCH, POST, PrimaryKey } from "cloesce";
+import {
+  D1,
+  GET,
+  PATCH,
+  POST,
+  PrimaryKey,
+  OneToMany,
+  OneToOne,
+  ForeignKey,
+  Result,
+  IncludeTree,
+  mapSql,
+  DataSource,
+} from "cloesce";
 
 @D1
 class Horse {
   // Denotes that `id` is the primary key of table `Horse`
   @PrimaryKey
-  id!: number;
+  id: number;
 
-  name!: string;
-  bio!: string | null;
+  name: string;
+  bio: string | null;
 
   // A navigation property. Horse has many Matches, specifically to the attribute
   // `Match.horseId1`. This attribute can be populated explicitly by a Data Source,
   // directly putting all matching values into memory.
-  @OneToMany(Match.prototype.horseId1)
+  @OneToMany("horseId1")
   matches: Match[];
 
   // Represents a SQL view `Horse_default`. All attributes are included by default, but foreign key
@@ -34,13 +47,33 @@ class Horse {
   @POST
   static async post(db: D1Database, horse: Horse): Promise<Result<Horse>> {
     let records = await db
-      .prepare("INSERT INTO Horse (name, bio) VALUES (?, ?) RETURNING *")
-      .bind(horse.name, horse.bio)
+      .prepare(
+        "INSERT INTO Horse (id, name, bio) VALUES (:id, :name, :bio) RETURNING *"
+      )
+      .bind(horse)
       .run();
 
     // `mapSql<Horse>` turns an ORM friendly query result into a list of JSON formatted Horse
-    let horse = mapSql<Horse>(records)[0];
-    return Result.ok(horse);
+    let horseJson = mapSql<Horse>(records)[0];
+    return Result.ok(horseJson);
+  }
+
+  // Workers endpoint `domain/Horse/get`
+  // `D1Database` is injected into the method call.
+  //
+  // Generates a client method `Horse.get`
+  //
+  // By v0.0.3, generic get methods will be completely generated.
+  @GET
+  static async get(db: D1Database, id: number): Promise<Result<Horse[]>> {
+    let records = await db
+      .prepare("SELECT * FROM Horse_default WHERE id = ?")
+      .bind(id)
+      .run();
+
+    // `mapSql<Horse>` turns an ORM friendly query result into a list of JSON formatted Horse
+    let horses = mapSql<Horse>(records);
+    return Result.ok(horses[0]);
   }
 
   // Workers endpoint `domain/Horse/list`
@@ -67,8 +100,8 @@ class Horse {
   @PATCH
   async patch(db: D1Database, horse: Horse): Promise<Result> {
     await db
-      .prepare("UPDATE Horse SET name = ?, bio = ? WHERE Horse.id = ?")
-      .bind(horse.name, horse.bio, this.id);
+      .prepare("UPDATE Horse SET name = :name, bio = :bio WHERE Horse.id = :id")
+      .bind(horse);
     return Result.ok();
   }
 
@@ -93,11 +126,11 @@ class Horse {
 class Match {
   // Denotes that `id` is the primary key of table `Match`
   @PrimaryKey
-  id!: number;
+  id: number;
 
   // A foreign key to the model Horse, denoting that models id.
   @ForeignKey(Horse)
-  horseId1!: number;
+  horseId1: number;
 
   // Another foreign key to the model Horse, denoting that models id.
   @ForeignKey(Horse)
