@@ -1,17 +1,26 @@
-type Ok<T> = { ok: true; data: T };
-type Err = { ok: false; status: number; message: string };
-type Result<T> = Ok<T> | Err;
+export type Ok<T> = { ok: true; data: T };
+export type Err = { ok: false; status: number; message: string };
+export type Result<T> = Ok<T> | Err;
 
-function instantiateModelArray<T>(data: any, ctor: { new(): T }): T[] {
+/// A helper to turn a JSON array into an array of
+/// instantiated models
+function instantiateModelArray<T extends object>(
+  data: any,
+  ctor: { new (): T }
+): T[] {
   if (Array.isArray(data)) {
-    return data.map(x => instantiateModelArray(x, ctor)).flat();
+    return data.map((x) => instantiateModelArray(x, ctor)).flat();
   }
   return [Object.assign(new ctor(), data)];
 }
 
+
 {{#each models}}
 export class {{name}} {
   {{#each attributes}}
+  {{value.name}}: {{lang_type value.cidl_type value.nullable}};
+  {{/each}}
+  {{#each navigation_properties}}
   {{value.name}}: {{lang_type value.cidl_type value.nullable}};
   {{/each}}
 
@@ -49,10 +58,10 @@ export class {{name}} {
     const instantiated = Object.assign(new {{../name}}(), data);
     return { ok: true, data: instantiated };
     {{else}}
-      {{#if (is_model_array return_type)}}
+    {{#if (is_model_array return_type)}}
     const instantiated = instantiateModelArray(data, {{../name}});
     return { ok: true, data: instantiated };
-      {{else}}
+    {{else}}
     return { ok: true, data };
       {{/if}}
     {{/if}}

@@ -2,16 +2,22 @@
 source: client/tests/client_tests.rs
 expression: client
 ---
-type Ok<T> = { ok: true; data: T };
-type Err = { ok: false; status: number; message: string };
-type Result<T> = Ok<T> | Err;
+export type Ok<T> = { ok: true; data: T };
+export type Err = { ok: false; status: number; message: string };
+export type Result<T> = Ok<T> | Err;
 
-function instantiateModelArray<T>(data: any, ctor: { new(): T }): T[] {
+/// A helper to turn a JSON array into an array of
+/// instantiated models
+function instantiateModelArray<T extends object>(
+  data: any,
+  ctor: { new (): T }
+): T[] {
   if (Array.isArray(data)) {
-    return data.map(x => instantiateModelArray(x, ctor)).flat();
+    return data.map((x) => instantiateModelArray(x, ctor)).flat();
   }
   return [Object.assign(new ctor(), data)];
 }
+
 
 export class ExampleModel {
   id: number;

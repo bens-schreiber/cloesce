@@ -21,6 +21,7 @@ import { ExampleModel } from '../example_model';
 if (obj.rating == null || typeof obj.rating !== "number") {return false;}
 if (obj.description == undefined || typeof obj.description !== "string") {return false;}
 if (obj.data_blob == null || !(obj.data_blob instanceof ArrayBuffer || obj.data_blob instanceof Uint8Array)) {return false;}
+                        
                         return true;
                     }
                 };
@@ -237,7 +238,7 @@ if ((id == null || typeof id !== "number")) {
                 
                 
                 const d1 = env.DB;
-                const query = `SELECT * FROM ExampleModel WHERE id = ?`;
+                const query = "SELECT * FROM ExampleModel WHERE id = ?";
                 let record;
                 try {
                     record = await d1.prepare(query).bind(id).first();
@@ -290,7 +291,7 @@ if ((amount == null || typeof amount !== "number")) {
      }
                 
                 const d1 = env.DB;
-                const query = `SELECT * FROM ExampleModel WHERE id = ?`;
+                const query = "SELECT * FROM ExampleModel WHERE id = ?";
                 let record;
                 try {
                     record = await d1.prepare(query).bind(id).first();

@@ -54,7 +54,7 @@ class Horse {
       .run();
 
     // `mapSql<Horse>` turns an ORM friendly query result into a list of JSON formatted Horse
-    let horseJson = mapSql<Horse>(records)[0];
+    let horseJson = mapSql<Horse>(records.results)[0];
     return Result.ok(horseJson);
   }
 
@@ -72,8 +72,8 @@ class Horse {
       .run();
 
     // `mapSql<Horse>` turns an ORM friendly query result into a list of JSON formatted Horse
-    let horses = mapSql<Horse>(records);
-    return Result.ok(horses[0]);
+    let horses = mapSql<Horse>(records.results);
+    return Result.ok(horses);
   }
 
   // Workers endpoint `domain/Horse/list`
@@ -87,7 +87,7 @@ class Horse {
     let records = await db.prepare("SELECT * FROM Horse_default").run();
 
     // `mapSql<Horse>` turns an ORM friendly query result into a list of JSON formatted Horse
-    let horses = mapSql<Horse>(records);
+    let horses = mapSql<Horse>(records.results);
     return Result.ok(horses);
   }
 

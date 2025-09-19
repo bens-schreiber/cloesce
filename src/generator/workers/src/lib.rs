@@ -67,7 +67,7 @@ impl WorkersGenerator {
                 .iter()
                 .map(|m| Self::model(m, generator))
                 .collect::<Vec<_>>()
-                .join("\n");
+                .join(",\n");
             generator.router(router_body)
         };
 

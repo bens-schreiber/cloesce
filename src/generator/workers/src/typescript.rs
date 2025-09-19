@@ -20,7 +20,7 @@ impl TypescriptValidatorGenerator {
                     cidl_type: *inner.clone(),
                     nullable: false,
                 };
-                let inner_check = Self::validate_type(&inner_value, name_prefix)?;
+                let inner_check = Self::validate_type(&inner_value, "")?;
                 Some(format!(
                     "!Array.isArray({name}) || {name}.some(item => {inner_check})",
                 ))
@@ -28,13 +28,25 @@ impl TypescriptValidatorGenerator {
             _ => None,
         }?;
 
-        let check = if value.nullable {
-            format!("({name} == undefined || {type_check})",)
+        let cond = if value.nullable {
+            match &value.cidl_type {
+                CidlType::Model(_) => {
+                    // Models can be undefined, but if they are defined,
+                    // must be valid
+                    format!("{name} != undefined && {type_check}")
+                }
+                _ => {
+                    // All other types must be defined and valid.
+                    format!("{name} == undefined || {type_check}")
+                }
+            }
         } else {
-            format!("({name} == null || {type_check})",)
+            // Cannot be undefined OR null (TS is weird, null covers both cases),
+            // and must be valid
+            format!("{name} == null || {type_check}")
         };
 
-        Some(check)
+        Some(format!("({cond})"))
     }
 
     fn assign_type(value: &NamedTypedValue) -> Option<String> {
@@ -58,11 +70,22 @@ impl TypescriptValidatorGenerator {
     fn validators(models: &[Model]) -> String {
         let mut validators = Vec::with_capacity(models.len());
         for model in models {
-            let stmts = model
+            let attributes = model
                 .attributes
                 .iter()
                 .filter_map(|attr| Self::validate_type(&attr.value, "obj."))
                 .map(|stmt| format!("if {stmt} {{return false;}}"))
+                .collect::<Vec<_>>()
+                .join("\n");
+
+            let navs = model
+                .navigation_properties
+                .iter()
+                .map(|nav| {
+                    let stmt = Self::validate_type(&nav.value, "obj.")
+                        .expect("all navigation properties should be mappable");
+                    format!("if {stmt} {{return false}}")
+                })
                 .collect::<Vec<_>>()
                 .join("\n");
 
@@ -71,7 +94,8 @@ impl TypescriptValidatorGenerator {
                 r#"
                 $.{model_name} = {{
                     validate(obj: any): boolean {{
-                        {stmts}
+                        {attributes}
+                        {navs}
                         return true;
                     }}
                 }};
@@ -246,12 +270,12 @@ export default {
         let has_data_sources = model.data_sources.len() > 1;
         let (query, instance_creation) = if has_data_sources {
             (
-                format!("`SELECT * FROM {model_name}_default WHERE {model_name}_{pk} = ?`"),
+                format!("\"SELECT * FROM {model_name}_default WHERE {model_name}_{pk} = ?\""),
                 format!("Object.assign(new {model_name}(), mapSql<{model_name}>(record)[0])"),
             )
         } else {
             (
-                format!("`SELECT * FROM {model_name} WHERE {pk} = ?`"),
+                format!("\"SELECT * FROM {model_name} WHERE {pk} = ?\""),
                 format!("Object.assign(new {model_name}(), record)"),
             )
         };

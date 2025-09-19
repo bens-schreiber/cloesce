@@ -12,7 +12,13 @@ pub trait ClientLanguageTypeMapper {
 }
 
 handlebars_helper!(is_serializable: |cidl_type: CidlType| !matches!(cidl_type, CidlType::D1Database));
-handlebars_helper!(is_model: |cidl_type: CidlType| matches!(cidl_type, CidlType::Model(_)));
+handlebars_helper!(is_model: |cidl_type: CidlType| {
+    match cidl_type {
+        CidlType::Model(_) => true,
+        CidlType::HttpResult(inner) => matches!(*inner, CidlType::Model(_)),
+        _ => false
+    }
+});
 handlebars_helper!(is_model_array: |cidl_type: CidlType| matches!(cidl_type.array_type(), CidlType::Model(_)));
 
 fn register_helpers(

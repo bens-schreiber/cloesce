@@ -8,9 +8,20 @@ export const PATCH: MethodDecorator = () => {};
 export const DELETE: MethodDecorator = () => {};
 
 // HTTP return types
-export type Ok<T> = { ok: true; data: T };
+export type Ok<T = void> = { ok: true; data: T };
 export type Err = { ok: false; status: number; message: string };
-export type Result<T> = Ok<T> | Err;
+export type Result<T = void> = Ok<T> | Err;
+
+// HTTP Result factory
+function ok(): Ok<void>;
+function ok<T>(data: T): Ok<T>;
+function ok<T>(data?: T): Ok<T | void> {
+  return { ok: true, data: data as T | void };
+}
+function err(status: number, message: string): Err {
+  return { ok: false, status, message };
+}
+export const Result = { ok, err };
 
 /**
  * TODO: This could be WASM
