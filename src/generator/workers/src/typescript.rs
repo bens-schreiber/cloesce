@@ -1,10 +1,10 @@
-use common::{CidlType, HttpVerb, Method, Model, TypedValue};
+use common::{CidlType, HttpVerb, Model, ModelMethod, NamedTypedValue};
 
 use crate::WorkersGeneratable as LanguageWorkersGenerator;
 
 pub struct TypescriptValidatorGenerator;
 impl TypescriptValidatorGenerator {
-    fn validate_type(value: &TypedValue, name_prefix: &str) -> Option<String> {
+    fn validate_type(value: &NamedTypedValue, name_prefix: &str) -> Option<String> {
         let name = format!("{name_prefix}{}", &value.name);
 
         let type_check = match &value.cidl_type {
@@ -15,7 +15,7 @@ impl TypescriptValidatorGenerator {
             )),
             CidlType::Model(m) => Some(format!("!$.{m}.validate({name})")),
             CidlType::Array(inner) => {
-                let inner_value = TypedValue {
+                let inner_value = NamedTypedValue {
                     name: "item".to_string(),
                     cidl_type: *inner.clone(),
                     nullable: false,
@@ -37,12 +37,12 @@ impl TypescriptValidatorGenerator {
         Some(check)
     }
 
-    fn assign_type(value: &TypedValue) -> Option<String> {
+    fn assign_type(value: &NamedTypedValue) -> Option<String> {
         match &value.cidl_type {
             CidlType::Model(m) => Some(format!("Object.assign(new {}(), {})", m, value.name)),
 
             CidlType::Array(inner) => {
-                let inner_ts = Self::assign_type(&TypedValue {
+                let inner_ts = Self::assign_type(&NamedTypedValue {
                     name: "item".to_string(),
                     cidl_type: *inner.clone(),
                     nullable: false,
@@ -147,7 +147,7 @@ export default {
         format!("{model_name}: {{{method}}}")
     }
 
-    fn router_method(&self, method: &Method, proto: String) -> String {
+    fn router_method(&self, method: &ModelMethod, proto: String) -> String {
         if method.is_static {
             proto
         } else {
@@ -155,7 +155,7 @@ export default {
         }
     }
 
-    fn proto(&self, method: &Method, body: String) -> String {
+    fn proto(&self, method: &ModelMethod, body: String) -> String {
         let method_name = &method.name;
         let id_param = if method.is_static { "" } else { "id: number, " };
 
@@ -180,7 +180,7 @@ if (request.method !== "{verb_str}") {{
         )
     }
 
-    fn validate_req_body(&self, params: &[TypedValue]) -> String {
+    fn validate_req_body(&self, params: &[NamedTypedValue]) -> String {
         const INVALID_BODY_RESPONSE: &str = r#"
             return new Response(JSON.stringify({ error: "Invalid request body" }), {
                 status: 400,
@@ -267,7 +267,7 @@ if (request.method !== "{verb_str}") {{
         )
     }
 
-    fn dispatch_method(&self, model_name: &str, method: &Method) -> String {
+    fn dispatch_method(&self, model_name: &str, method: &ModelMethod) -> String {
         let method_name = &method.name;
 
         let params = method

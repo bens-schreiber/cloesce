@@ -1,7 +1,9 @@
 use anyhow::{Context, Result};
 use insta::assert_snapshot;
 
-use common::{CidlForeignKeyKind, CidlSpec, CidlType, WranglerFormat, builder::ModelBuilder};
+use common::{
+    CidlSpec, CidlType, NavigationPropertyKind, builder::ModelBuilder, wrangler::WranglerFormat,
+};
 use d1::D1Generator;
 
 use std::path::PathBuf;
@@ -60,7 +62,7 @@ fn test_generate_sql_from_models() -> Result<()> {
                 "user",
                 CidlType::Model("User".into()),
                 false,
-                CidlForeignKeyKind::OneToOne {
+                NavigationPropertyKind::OneToOne {
                     reference: "userId".into(),
                 },
             )
@@ -73,7 +75,7 @@ fn test_generate_sql_from_models() -> Result<()> {
                 "dogs",
                 CidlType::Array(Box::new(CidlType::Model("Dog".into()))),
                 false,
-                CidlForeignKeyKind::OneToMany {
+                NavigationPropertyKind::OneToMany {
                     reference: "personId".into(),
                 },
             )
@@ -85,7 +87,7 @@ fn test_generate_sql_from_models() -> Result<()> {
                 "people",
                 CidlType::Array(Box::new(CidlType::Model("Person".into()))),
                 false,
-                CidlForeignKeyKind::OneToMany {
+                NavigationPropertyKind::OneToMany {
                     reference: "bossId".into(),
                 },
             )
@@ -109,7 +111,7 @@ fn test_generate_sql_from_models() -> Result<()> {
                 "courses",
                 CidlType::Array(Box::new(CidlType::Model("Course".into()))),
                 false,
-                CidlForeignKeyKind::ManyToMany {
+                NavigationPropertyKind::ManyToMany {
                     unique_id: "StudentsCourses".into(),
                 },
             )
@@ -120,7 +122,7 @@ fn test_generate_sql_from_models() -> Result<()> {
                 "students",
                 CidlType::Array(Box::new(CidlType::Model("Student".into()))),
                 false,
-                CidlForeignKeyKind::ManyToMany {
+                NavigationPropertyKind::ManyToMany {
                     unique_id: "StudentsCourses".into(),
                 },
             )

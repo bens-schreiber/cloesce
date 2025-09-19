@@ -1,6 +1,6 @@
 mod typescript;
 
-use common::{CidlSpec, HttpVerb, InputLanguage, Method, Model, TypedValue};
+use common::{CidlSpec, HttpVerb, InputLanguage, Model, ModelMethod, NamedTypedValue};
 use typescript::TypescriptWorkersGenerator;
 
 trait WorkersGeneratable {
@@ -10,12 +10,12 @@ trait WorkersGeneratable {
     fn main(&self) -> String;
     fn router(&self, model: String) -> String;
     fn router_model(&self, model_name: &str, method: String) -> String;
-    fn router_method(&self, method: &Method, proto: String) -> String;
-    fn proto(&self, method: &Method, body: String) -> String;
+    fn router_method(&self, method: &ModelMethod, proto: String) -> String;
+    fn proto(&self, method: &ModelMethod, body: String) -> String;
     fn validate_http(&self, verb: &HttpVerb) -> String;
-    fn validate_req_body(&self, params: &[TypedValue]) -> String;
+    fn validate_req_body(&self, params: &[NamedTypedValue]) -> String;
     fn hydrate_model(&self, model_name: &Model) -> String;
-    fn dispatch_method(&self, model_name: &str, method: &Method) -> String;
+    fn dispatch_method(&self, model_name: &str, method: &ModelMethod) -> String;
 }
 
 pub struct WorkersGenerator;

@@ -8,8 +8,8 @@
       "source_path": "example_model.ts",
       "attributes": [
         {
-          "primary_key": true,
-          "foreign_key": null,
+          "is_primary_key": true,
+          "foreign_key_reference": null,
           "value": {
             "name": "id",
             "cidl_type": "Integer",
@@ -17,8 +17,8 @@
           }
         },
         {
-          "primary_key": false,
-          "foreign_key": null,
+          "is_primary_key": false,
+          "foreign_key_reference": null,
           "value": {
             "name": "rating",
             "cidl_type": "Real",
@@ -26,8 +26,8 @@
           }
         },
         {
-          "primary_key": false,
-          "foreign_key": null,
+          "is_primary_key": false,
+          "foreign_key_reference": null,
           "value": {
             "name": "description",
             "cidl_type": "Text",
@@ -35,8 +35,8 @@
           }
         },
         {
-          "primary_key": false,
-          "foreign_key": null,
+          "is_primary_key": false,
+          "foreign_key_reference": null,
           "value": {
             "name": "data_blob",
             "cidl_type": "Blob",

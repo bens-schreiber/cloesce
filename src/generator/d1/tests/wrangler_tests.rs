@@ -1,4 +1,4 @@
-use common::{CidlSpec, WranglerFormat};
+use common::{CidlSpec, wrangler::WranglerFormat};
 use d1::D1Generator;
 
 use anyhow::Result;

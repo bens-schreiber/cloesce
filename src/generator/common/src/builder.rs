@@ -1,8 +1,9 @@
 use std::path::PathBuf;
 
 use crate::{
-    Attribute, CidlForeignKeyKind, CidlSpec, CidlType, DataSource, HttpVerb, IncludeTree,
-    InputLanguage, Method, Model, NavigationProperty, TypedValue, WranglerSpec,
+    CidlSpec, CidlType, DataSource, HttpVerb, IncludeTree, InputLanguage, Model, ModelAttribute,
+    ModelMethod, NamedTypedValue, NavigationProperty, NavigationPropertyKind,
+    wrangler::WranglerSpec,
 };
 
 pub fn create_cidl(models: Vec<Model>) -> CidlSpec {
@@ -22,13 +23,13 @@ pub fn create_wrangler() -> WranglerSpec {
 
 #[derive(Default)]
 pub struct IncludeTreeBuilder {
-    nodes: Vec<(TypedValue, IncludeTree)>,
+    nodes: Vec<(NamedTypedValue, IncludeTree)>,
 }
 
 impl IncludeTreeBuilder {
     pub fn add(mut self, name: &str, cidl_type: CidlType) -> Self {
         self.nodes.push((
-            TypedValue {
+            NamedTypedValue {
                 name: name.into(),
                 cidl_type,
                 nullable: false,
@@ -44,7 +45,7 @@ impl IncludeTreeBuilder {
     {
         let subtree = build(IncludeTreeBuilder::default()).build();
         self.nodes.push((
-            TypedValue {
+            NamedTypedValue {
                 name: name.into(),
                 cidl_type,
                 nullable: false,
@@ -62,9 +63,9 @@ impl IncludeTreeBuilder {
 /// A builder pattern for tests to create models easily
 pub struct ModelBuilder {
     name: String,
-    attributes: Vec<Attribute>,
+    attributes: Vec<ModelAttribute>,
     navigation_properties: Vec<NavigationProperty>,
-    methods: Vec<Method>,
+    methods: Vec<ModelMethod>,
     data_sources: Vec<DataSource>,
     source_path: Option<PathBuf>,
 }
@@ -88,14 +89,14 @@ impl ModelBuilder {
         nullable: bool,
         foreign_key: Option<String>,
     ) -> Self {
-        self.attributes.push(Attribute {
-            value: TypedValue {
+        self.attributes.push(ModelAttribute {
+            value: NamedTypedValue {
                 name: name.into(),
                 cidl_type,
                 nullable,
             },
-            primary_key: false,
-            foreign_key,
+            is_primary_key: false,
+            foreign_key_reference: foreign_key,
         });
         self
     }
@@ -105,28 +106,28 @@ impl ModelBuilder {
         name: impl Into<String>,
         cidl_type: CidlType,
         nullable: bool,
-        foreign_key: CidlForeignKeyKind,
+        foreign_key: NavigationPropertyKind,
     ) -> Self {
         self.navigation_properties.push(NavigationProperty {
-            value: TypedValue {
+            value: NamedTypedValue {
                 name: name.into(),
                 cidl_type,
                 nullable,
             },
-            foreign_key,
+            kind: foreign_key,
         });
         self
     }
 
     pub fn pk(mut self, name: impl Into<String>, cidl_type: CidlType) -> Self {
-        self.attributes.push(Attribute {
-            value: TypedValue {
+        self.attributes.push(ModelAttribute {
+            value: NamedTypedValue {
                 name: name.into(),
                 cidl_type,
                 nullable: false,
             },
-            primary_key: true,
-            foreign_key: None,
+            is_primary_key: true,
+            foreign_key_reference: None,
         });
         self
     }
@@ -140,10 +141,10 @@ impl ModelBuilder {
         name: impl Into<String>,
         http_verb: HttpVerb,
         is_static: bool,
-        parameters: Vec<TypedValue>,
+        parameters: Vec<NamedTypedValue>,
         return_type: Option<CidlType>,
     ) -> Self {
-        self.methods.push(Method {
+        self.methods.push(ModelMethod {
             name: name.into(),
             is_static,
             http_verb,

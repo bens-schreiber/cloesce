@@ -1,6 +1,8 @@
 use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
 
-use common::{CidlForeignKeyKind, CidlType, IncludeTree, Model, NavigationProperty, TypedValue};
+use common::{
+    CidlType, IncludeTree, Model, NamedTypedValue, NavigationProperty, NavigationPropertyKind,
+};
 
 use anyhow::{Result, anyhow, ensure};
 use sea_query::{
@@ -126,11 +128,11 @@ fn validate_models(models: &[Model]) -> Result<HashMap<&str, &Model>> {
             );
 
             // Validate primary key
-            if attr.primary_key {
+            if attr.is_primary_key {
                 ensure!(!has_pk, "Duplicate primary keys on model {}", model.name);
                 ensure!(!attr.value.nullable, "A primary key cannot be nullable.");
                 ensure!(
-                    attr.foreign_key.is_none(),
+                    attr.foreign_key_reference.is_none(),
                     "A primary key cannot be a foreign key"
                 );
                 has_pk = true;
@@ -180,10 +182,10 @@ fn validate_fks<'a>(
         graph.entry(&model.name).or_default();
         in_degree.entry(&model.name).or_insert(0);
 
-        let mut pk: Option<&TypedValue> = None;
+        let mut pk: Option<&NamedTypedValue> = None;
         for attr in &model.attributes {
-            let Some(fk_model) = &attr.foreign_key else {
-                if attr.primary_key {
+            let Some(fk_model) = &attr.foreign_key_reference else {
+                if attr.is_primary_key {
                     pk = Some(&attr.value);
                 }
                 continue;
@@ -212,8 +214,8 @@ fn validate_fks<'a>(
 
         // Validate navigation property types
         for nav in &model.navigation_properties {
-            match &nav.foreign_key {
-                CidlForeignKeyKind::OneToOne { reference } => {
+            match &nav.kind {
+                NavigationPropertyKind::OneToOne { reference } => {
                     // Validate nav prop has a Model type
                     let CidlType::Model(nav_model) = &nav.value.cidl_type else {
                         return Err(anyhow!(
@@ -257,11 +259,11 @@ fn validate_fks<'a>(
                     // navigation property, but have no foreign key for it?
                     // ( ie, make the enum OneToOne(Option<String>) )
                 }
-                CidlForeignKeyKind::OneToMany { reference: _ } => {
+                NavigationPropertyKind::OneToMany { reference: _ } => {
                     let nav_model = validate_nav_array(model, nav, model_lookup)?;
                     unvalidated_navs.push((&model.name, nav_model, nav));
                 }
-                CidlForeignKeyKind::ManyToMany { unique_id } => {
+                NavigationPropertyKind::ManyToMany { unique_id } => {
                     validate_nav_array(model, nav, model_lookup)?;
 
                     let pk = pk.expect("safe beause validate_models halts on missing pk");
@@ -280,7 +282,7 @@ fn validate_fks<'a>(
 
     // Validate 1:M nav props
     for (model_name, nav_model, nav) in unvalidated_navs {
-        let CidlForeignKeyKind::OneToMany { reference } = &nav.foreign_key else {
+        let NavigationPropertyKind::OneToMany { reference } = &nav.kind else {
             continue;
         };
 
@@ -373,14 +375,14 @@ fn generate_tables(
         for attr in model.attributes.iter() {
             let mut column = typed_column(&attr.value.name, &attr.value.cidl_type);
 
-            if attr.primary_key {
+            if attr.is_primary_key {
                 column.primary_key();
             } else if !attr.value.nullable {
                 column.not_null();
             }
 
             // Set attribute foreign key
-            if let Some(fk_model_name) = &attr.foreign_key {
+            if let Some(fk_model_name) = &attr.foreign_key_reference {
                 // Unwrap: safe because `validate_models` and `validate_fks` halt
                 // if the values are missing
                 let pk_name = &model_lookup
@@ -496,8 +498,8 @@ fn generate_views<'a>(models: &'a [Model], model_lookup: &HashMap<&str, &'a Mode
                     .expect("nav model to be validated by `validate_fks`")
             };
 
-            match &nav.foreign_key {
-                CidlForeignKeyKind::OneToOne { reference } => {
+            match &nav.kind {
+                NavigationPropertyKind::OneToOne { reference } => {
                     let nav_model_pk = &nav_model
                         .find_primary_key()
                         .expect("primary key to be validated by `validate_models`")
@@ -509,7 +511,7 @@ fn generate_views<'a>(models: &'a [Model], model_lookup: &HashMap<&str, &'a Mode
                             .equals((alias(&nav_model.name), alias(nav_model_pk))),
                     );
                 }
-                CidlForeignKeyKind::OneToMany { reference } => {
+                NavigationPropertyKind::OneToMany { reference } => {
                     let pk = &model
                         .find_primary_key()
                         .expect("primary key to be validated by `validate_models`")
@@ -521,7 +523,7 @@ fn generate_views<'a>(models: &'a [Model], model_lookup: &HashMap<&str, &'a Mode
                             .equals((alias(&nav_model.name), alias(reference))),
                     );
                 }
-                CidlForeignKeyKind::ManyToMany { unique_id } => {
+                NavigationPropertyKind::ManyToMany { unique_id } => {
                     let nav_model_pk = nav_model
                         .find_primary_key()
                         .expect("primary key to be validated by `validate_models`");

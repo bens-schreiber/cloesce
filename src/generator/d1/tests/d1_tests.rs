@@ -1,5 +1,5 @@
 use common::{
-    CidlForeignKeyKind, CidlType,
+    CidlType, NavigationPropertyKind,
     builder::{IncludeTreeBuilder, ModelBuilder, create_cidl, create_wrangler},
 };
 use d1::D1Generator;
@@ -91,7 +91,7 @@ fn test_sqlite_table_output() {
                     "dog",
                     CidlType::Model("Dog".into()),
                     false,
-                    CidlForeignKeyKind::OneToOne {
+                    NavigationPropertyKind::OneToOne {
                         reference: "dogId".into(),
                     },
                 )
@@ -128,7 +128,7 @@ fn test_sqlite_table_output() {
                     "dogs",
                     CidlType::Array(Box::new(CidlType::Model("Dog".to_string()))),
                     false,
-                    CidlForeignKeyKind::OneToMany {
+                    NavigationPropertyKind::OneToMany {
                         reference: "personId".into(),
                     },
                 )
@@ -136,7 +136,7 @@ fn test_sqlite_table_output() {
                     "cats",
                     CidlType::Array(Box::new(CidlType::Model("Cat".to_string()))),
                     false,
-                    CidlForeignKeyKind::OneToMany {
+                    NavigationPropertyKind::OneToMany {
                         reference: "personId".into(),
                     },
                 )
@@ -148,7 +148,7 @@ fn test_sqlite_table_output() {
                     "persons",
                     CidlType::Array(Box::new(CidlType::Model("Person".to_string()))),
                     false,
-                    CidlForeignKeyKind::OneToMany {
+                    NavigationPropertyKind::OneToMany {
                         reference: "bossId".into(),
                     },
                 )
@@ -191,7 +191,7 @@ fn test_sqlite_table_output() {
                     "courses",
                     CidlType::Array(Box::new(CidlType::Model("Course".to_string()))),
                     false,
-                    CidlForeignKeyKind::ManyToMany {
+                    NavigationPropertyKind::ManyToMany {
                         unique_id: "StudentsCourses".into(),
                     },
                 )
@@ -202,7 +202,7 @@ fn test_sqlite_table_output() {
                     "students",
                     CidlType::Array(Box::new(CidlType::Model("Student".to_string()))),
                     false,
-                    CidlForeignKeyKind::ManyToMany {
+                    NavigationPropertyKind::ManyToMany {
                         unique_id: "StudentsCourses".into(),
                     },
                 )
@@ -246,7 +246,7 @@ fn test_sqlite_view_output() {
                     "dog",
                     CidlType::Model("Dog".into()),
                     false,
-                    CidlForeignKeyKind::OneToOne {
+                    NavigationPropertyKind::OneToOne {
                         reference: "dogId".into(),
                     },
                 )
@@ -290,7 +290,7 @@ fn test_sqlite_view_output() {
                     "dogs",
                     CidlType::array(CidlType::Model("Dog".into())),
                     false,
-                    CidlForeignKeyKind::OneToMany {
+                    NavigationPropertyKind::OneToMany {
                         reference: "personId".into(),
                     },
                 )
@@ -298,7 +298,7 @@ fn test_sqlite_view_output() {
                     "cats",
                     CidlType::array(CidlType::Model("Cat".into())),
                     false,
-                    CidlForeignKeyKind::OneToMany {
+                    NavigationPropertyKind::OneToMany {
                         reference: "personId".into(),
                     },
                 )
@@ -317,7 +317,7 @@ fn test_sqlite_view_output() {
                     "persons",
                     CidlType::array(CidlType::Model("Person".into())),
                     false,
-                    CidlForeignKeyKind::OneToMany {
+                    NavigationPropertyKind::OneToMany {
                         reference: "bossId".into(),
                     },
                 )
@@ -364,7 +364,7 @@ fn test_sqlite_view_output() {
                     "courses",
                     CidlType::array(CidlType::Model("Course".to_string())),
                     false,
-                    CidlForeignKeyKind::ManyToMany {
+                    NavigationPropertyKind::ManyToMany {
                         unique_id: "StudentsCourses".into(),
                     },
                 )
@@ -381,7 +381,7 @@ fn test_sqlite_view_output() {
                     "students",
                     CidlType::array(CidlType::Model("Student".to_string())),
                     false,
-                    CidlForeignKeyKind::ManyToMany {
+                    NavigationPropertyKind::ManyToMany {
                         unique_id: "StudentsCourses".into(),
                     },
                 )
@@ -610,7 +610,7 @@ fn test_one_to_one_nav_property_unknown_attribute_reference_error() {
                 "dog",
                 CidlType::Model("Dog".into()),
                 false,
-                CidlForeignKeyKind::OneToOne {
+                NavigationPropertyKind::OneToOne {
                     reference: "dogId".to_string(),
                 },
             )
@@ -635,7 +635,7 @@ fn test_primary_key_cannot_be_foreign_key() {
     let mut model = ModelBuilder::new("Person")
         .attribute("id", CidlType::Integer, false, Some("Other".into()))
         .build();
-    model.attributes[0].primary_key = true;
+    model.attributes[0].is_primary_key = true;
 
     let cidl = create_cidl(vec![model]);
     let d1gen = D1Generator::new(cidl, create_wrangler());
@@ -659,7 +659,7 @@ fn test_one_to_one_nav_property_expected_model_type_error() {
                 "dog",
                 CidlType::Integer,
                 false,
-                CidlForeignKeyKind::OneToOne {
+                NavigationPropertyKind::OneToOne {
                     reference: "dogId".to_string(),
                 },
             )
@@ -691,7 +691,7 @@ fn test_one_to_one_mismatched_fk_and_nav_type_error() {
                 "dog",
                 CidlType::Model("Cat".into()), // incorrect: says Cat but fk points to Dog
                 false,
-                CidlForeignKeyKind::OneToOne {
+                NavigationPropertyKind::OneToOne {
                     reference: "dogId".to_string(),
                 },
             )
@@ -724,7 +724,7 @@ fn test_one_to_many_expected_collection_type_error() {
                 "dogs",
                 CidlType::Model("Dog".into()), // wrong: not an array
                 false,
-                CidlForeignKeyKind::OneToMany {
+                NavigationPropertyKind::OneToMany {
                     reference: "personId".into(),
                 },
             )
@@ -754,7 +754,7 @@ fn test_one_to_many_nullable_nav_property_error() {
                 "dogs",
                 CidlType::Array(Box::new(CidlType::Model("Dog".into()))),
                 true, // nullable -> should error
-                CidlForeignKeyKind::OneToMany {
+                NavigationPropertyKind::OneToMany {
                     reference: "personId".into(),
                 },
             )
@@ -780,7 +780,7 @@ fn test_one_to_many_unknown_nav_model_error() {
                 "dogs",
                 CidlType::Array(Box::new(CidlType::Model("Dog".into()))),
                 false,
-                CidlForeignKeyKind::OneToMany {
+                NavigationPropertyKind::OneToMany {
                     reference: "personId".into(),
                 },
             )
@@ -812,7 +812,7 @@ fn test_one_to_many_unresolved_reference_error() {
                 "dogs",
                 CidlType::Array(Box::new(CidlType::Model("Dog".to_string()))),
                 false,
-                CidlForeignKeyKind::OneToMany {
+                NavigationPropertyKind::OneToMany {
                     reference: "personId".into(),
                 },
             )
@@ -841,7 +841,7 @@ fn test_many_to_many_expected_collection_type_error() {
                 "courses",
                 CidlType::Model("Course".into()), // wrong: not array
                 false,
-                CidlForeignKeyKind::ManyToMany {
+                NavigationPropertyKind::ManyToMany {
                     unique_id: "StudentsCourses".into(),
                 },
             )
@@ -871,7 +871,7 @@ fn test_many_to_many_nullable_nav_property_error() {
                 "courses",
                 CidlType::Array(Box::new(CidlType::Model("Course".into()))),
                 true, // nullable -> should error
-                CidlForeignKeyKind::ManyToMany {
+                NavigationPropertyKind::ManyToMany {
                     unique_id: "StudentsCourses".into(),
                 },
             )
@@ -901,7 +901,7 @@ fn test_many_to_many_unknown_nav_model_error() {
                 "courses",
                 CidlType::Array(Box::new(CidlType::Model("Course".into()))),
                 false,
-                CidlForeignKeyKind::ManyToMany {
+                NavigationPropertyKind::ManyToMany {
                     unique_id: "StudentsCourses".into(),
                 },
             )
@@ -932,7 +932,7 @@ fn test_junction_table_builder_errors() {
                     "courses",
                     CidlType::Array(Box::new(CidlType::Model("Course".into()))),
                     false,
-                    CidlForeignKeyKind::ManyToMany {
+                    NavigationPropertyKind::ManyToMany {
                         unique_id: "OnlyOne".into(),
                     },
                 )
@@ -955,7 +955,7 @@ fn test_junction_table_builder_errors() {
                     "bs",
                     CidlType::Array(Box::new(CidlType::Model("B".into()))),
                     false,
-                    CidlForeignKeyKind::ManyToMany {
+                    NavigationPropertyKind::ManyToMany {
                         unique_id: "TriJ".into(),
                     },
                 )
@@ -966,7 +966,7 @@ fn test_junction_table_builder_errors() {
                     "as",
                     CidlType::Array(Box::new(CidlType::Model("A".into()))),
                     false,
-                    CidlForeignKeyKind::ManyToMany {
+                    NavigationPropertyKind::ManyToMany {
                         unique_id: "TriJ".into(),
                     },
                 )
@@ -978,7 +978,7 @@ fn test_junction_table_builder_errors() {
                     "as",
                     CidlType::Array(Box::new(CidlType::Model("A".into()))),
                     false,
-                    CidlForeignKeyKind::ManyToMany {
+                    NavigationPropertyKind::ManyToMany {
                         unique_id: "TriJ".into(),
                     },
                 )
