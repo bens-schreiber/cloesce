@@ -2,27 +2,27 @@ use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
 
 use common::{CidlForeignKeyKind, CidlType, IncludeTree, Model, NavigationProperty, TypedValue};
 
-use anyhow::{Result, anyhow};
+use anyhow::{Result, anyhow, ensure};
 use sea_query::{
     ColumnDef, Expr, ForeignKey, Index, Query, SelectStatement, SqliteQueryBuilder, Table,
 };
 
 // TODO: SeaQuery forcing us to do alias everywhere is really annoying,
 // it feels like this library is a bad choice for our use case.
-macro_rules! alias {
-    ($name:expr) => {
-        sea_query::Alias::new($name)
-    };
+fn alias(name: impl Into<String>) -> sea_query::Alias {
+    sea_query::Alias::new(name)
 }
 
-fn type_column(column: &mut ColumnDef, ty: &CidlType) {
-    match &ty {
-        CidlType::Integer => column.integer(),
-        CidlType::Real => column.decimal(),
-        CidlType::Text => column.text(),
-        CidlType::Blob => column.blob(),
-        _ => unreachable!("Expected column type to be validated"),
+fn typed_column(name: &str, ty: &CidlType) -> ColumnDef {
+    let mut col = ColumnDef::new(alias(name));
+    match ty {
+        CidlType::Integer => col.integer(),
+        CidlType::Real => col.decimal(),
+        CidlType::Text => col.text(),
+        CidlType::Blob => col.blob(),
+        _ => unreachable!("column type must be validated earlier"),
     };
+    col
 }
 
 /// Represents one side of a Many to Many junction table
@@ -41,29 +41,23 @@ struct JunctionTable<'a> {
 
 #[derive(Default)]
 struct JunctionTableBuilder<'a> {
-    models: [Option<JunctionModel<'a>>; 2],
+    models: Vec<JunctionModel<'a>>,
 }
 
 impl<'a> JunctionTableBuilder<'a> {
     fn model(&mut self, jm: JunctionModel<'a>) -> Result<()> {
-        if self.models[0].is_none() {
-            self.models[0] = Some(jm);
-        } else if self.models[1].is_none() {
-            self.models[1] = Some(jm);
-        } else {
+        if self.models.len() >= 2 {
             return Err(anyhow!(
                 "Too many ManyToMany navigation properties for junction table"
             ));
         }
-
+        self.models.push(jm);
         Ok(())
     }
 
     fn build(self, unique_id: &'a str) -> Result<JunctionTable<'a>> {
-        let [Some(a), Some(b)] = self.models else {
-            return Err(anyhow!("Both models must be set for a junction table"));
-        };
-
+        let [a, b] = <[_; 2]>::try_from(self.models)
+            .map_err(|_| anyhow!("Both models must be set for a junction table"))?;
         Ok(JunctionTable { a, b, unique_id })
     }
 }
@@ -114,56 +108,46 @@ fn validate_models(models: &[Model]) -> Result<HashMap<&str, &Model>> {
     let mut model_lookup = HashMap::<&str, &Model>::new();
     for model in models {
         // Duplicate models
-        if model_lookup.insert(&model.name, model).is_some() {
-            return Err(anyhow!("Duplicate model name: {}", model.name));
-        }
+        ensure!(
+            !model_lookup.insert(&model.name, model).is_some(),
+            "Duplicate model name: {}",
+            model.name
+        );
 
         let mut column_names = HashSet::new();
         let mut has_pk = false;
         for attr in &model.attributes {
             // Duplicate columns
-            if !column_names.insert(attr.value.name.as_str()) {
-                return Err(anyhow!(
-                    "Duplicate column names {}.{}",
-                    model.name,
-                    attr.value.name
-                ));
-            }
+            ensure!(
+                column_names.insert(&attr.value.name),
+                "Duplicate column names {}.{}",
+                model.name,
+                attr.value.name
+            );
 
             // Validate primary key
             if attr.primary_key {
-                if has_pk {
-                    return Err(anyhow!("Duplicate primary keys on model {}", model.name));
-                }
-
-                if attr.value.nullable {
-                    return Err(anyhow!("A primary key cannot be nullable."));
-                }
-
-                if attr.foreign_key.is_some() {
-                    // TODO: Revisit this, should this design be allowed?
-                    return Err(anyhow!("A primary key cannot be a foreign key"));
-                }
-
+                ensure!(!has_pk, "Duplicate primary keys on model {}", model.name);
+                ensure!(!attr.value.nullable, "A primary key cannot be nullable.");
+                ensure!(
+                    attr.foreign_key.is_none(),
+                    "A primary key cannot be a foreign key"
+                );
                 has_pk = true;
             }
 
-            // Validate attribute type
-            if !matches!(
-                attr.value.cidl_type,
-                CidlType::Integer | CidlType::Real | CidlType::Text | CidlType::Blob
-            ) {
-                return Err(anyhow!(
-                    "Invalid SQL Type {}.{}",
-                    model.name,
-                    attr.value.name
-                ));
-            }
+            ensure!(
+                matches!(
+                    attr.value.cidl_type,
+                    CidlType::Integer | CidlType::Real | CidlType::Text | CidlType::Blob
+                ),
+                "Invalid SQL Type {}.{}",
+                model.name,
+                attr.value.name
+            );
         }
 
-        if !has_pk {
-            return Err(anyhow!("Missing primary key on model {}", model.name));
-        }
+        ensure!(has_pk, "Missing primary key on model {}", model.name);
     }
 
     Ok(model_lookup)
@@ -206,14 +190,13 @@ fn validate_fks<'a>(
             };
 
             // Validate the fk's model exists
-            if !model_lookup.contains_key(fk_model.as_str()) {
-                return Err(anyhow!(
-                    "Unknown Model for foreign key {}.{} => {}?",
-                    model.name,
-                    attr.value.name,
-                    fk_model
-                ));
-            }
+            ensure!(
+                model_lookup.contains_key(fk_model.as_str()),
+                "Unknown Model for foreign key {}.{} => {}?",
+                model.name,
+                attr.value.name,
+                fk_model
+            );
 
             model_reference_to_fk_model.insert((&model.name, attr.value.name.as_str()), fk_model);
 
@@ -241,27 +224,25 @@ fn validate_fks<'a>(
                     };
 
                     // Validate the nav prop's model exists
-                    if !model_lookup.contains_key(nav_model.as_str()) {
-                        return Err(anyhow!(
-                            "Unknown Model for navigation property {}.{} => {}?",
-                            model.name,
-                            nav.value.name,
-                            nav_model
-                        ));
-                    }
+                    ensure!(
+                        model_lookup.contains_key(nav_model.as_str()),
+                        "Unknown Model for navigation property {}.{} => {}?",
+                        model.name,
+                        nav.value.name,
+                        nav_model
+                    );
 
                     // Validate the nav prop's reference is consistent
                     if let Some(&fk_model) =
                         model_reference_to_fk_model.get(&(&model.name, reference))
                     {
-                        if fk_model != nav_model {
-                            return Err(anyhow!(
-                                "Mismatched types between foreign key and One to One navigation property ({}.{}) ({})",
-                                model.name,
-                                nav.value.name,
-                                fk_model
-                            ));
-                        }
+                        ensure!(
+                            fk_model == nav_model,
+                            "Mismatched types between foreign key and One to One navigation property ({}.{}) ({})",
+                            model.name,
+                            nav.value.name,
+                            fk_model
+                        );
                     } else {
                         return Err(anyhow!(
                             "Navigation property {}.{} references {}.{} which does not exist.",
@@ -299,36 +280,37 @@ fn validate_fks<'a>(
 
     // Validate 1:M nav props
     for (model_name, nav_model, nav) in unvalidated_navs {
-        if let CidlForeignKeyKind::OneToMany { reference } = &nav.foreign_key {
-            // Validate the nav props reference is consistent to an attribute
-            // on another model
-            if let Some(&fk_model) = model_reference_to_fk_model.get(&(nav_model, reference)) {
-                // The types should reference one another
-                // ie, Person has many dogs, personId on dog should be an fk to Person
-                if model_name != fk_model {
-                    return Err(anyhow!(
-                        "Mismatched types between foreign key and One to Many navigation property ({}.{}) ({}.{})",
-                        model_name,
-                        nav.value.name,
-                        nav_model,
-                        reference
-                    ));
-                }
-            } else {
-                return Err(anyhow!(
-                    "Navigation property {}.{} references {}.{} which does not exist.",
-                    model_name,
-                    nav.value.name,
-                    nav_model,
-                    reference
-                ));
-            }
+        let CidlForeignKeyKind::OneToMany { reference } = &nav.foreign_key else {
+            continue;
+        };
 
-            // One To Many: Person has many Dogs (sql)=> Dog has an fk to  Person
-            // Person must come before Dog in topo order
-            graph.entry(model_name).or_default().push(nav_model);
-            *in_degree.entry(nav_model).or_insert(0) += 1;
-        }
+        // Validate the nav props reference is consistent to an attribute
+        // on another model
+        let Some(&fk_model) = model_reference_to_fk_model.get(&(nav_model, reference)) else {
+            return Err(anyhow!(
+                "Navigation property {}.{} references {}.{} which does not exist.",
+                model_name,
+                nav.value.name,
+                nav_model,
+                reference
+            ));
+        };
+
+        // The types should reference one another
+        // ie, Person has many dogs, personId on dog should be an fk to Person
+        ensure!(
+            model_name == fk_model,
+            "Mismatched types between foreign key and One to Many navigation property ({}.{}) ({}.{})",
+            model_name,
+            nav.value.name,
+            nav_model,
+            reference,
+        );
+
+        // One To Many: Person has many Dogs (sql)=> Dog has an fk to  Person
+        // Person must come before Dog in topo order
+        graph.entry(model_name).or_default().push(nav_model);
+        *in_degree.entry(nav_model).or_insert(0) += 1;
     }
 
     // Validate M:M
@@ -382,15 +364,14 @@ fn generate_tables(
     sorted_models: &[&Model],
     many_to_many_tables: Vec<JunctionTable>,
     model_lookup: &HashMap<&str, &Model>,
-) -> String {
+) -> Vec<String> {
     let mut res = Vec::new();
     for &model in sorted_models {
         let mut table = Table::create();
-        table.table(alias!(model.name.clone()));
+        table.table(alias(model.name.clone()));
 
         for attr in model.attributes.iter() {
-            let mut column = ColumnDef::new(alias!(attr.value.name.clone()));
-            type_column(&mut column, &attr.value.cidl_type);
+            let mut column = typed_column(&attr.value.name, &attr.value.cidl_type);
 
             if attr.primary_key {
                 column.primary_key();
@@ -411,8 +392,8 @@ fn generate_tables(
 
                 table.foreign_key(
                     ForeignKey::create()
-                        .from(alias!(model.name.clone()), alias!(attr.value.name.as_str()))
-                        .to(alias!(fk_model_name.clone()), alias!(pk_name))
+                        .from(alias(model.name.clone()), alias(attr.value.name.as_str()))
+                        .to(alias(fk_model_name.clone()), alias(pk_name))
                         .on_update(sea_query::ForeignKeyAction::Cascade)
                         .on_delete(sea_query::ForeignKeyAction::Restrict),
                 );
@@ -430,33 +411,31 @@ fn generate_tables(
 
         // TODO: Name the junction table in some standard way
         let col_a_name = format!("{}_{}", a.model_name, a.model_pk_name);
-        let mut col_a = ColumnDef::new(alias!(&col_a_name));
-        type_column(&mut col_a, &a.model_pk_type);
+        let mut col_a = typed_column(&col_a_name, &a.model_pk_type);
 
         let col_b_name = format!("{}_{}", b.model_name, b.model_pk_name);
-        let mut col_b = ColumnDef::new(alias!(&col_b_name));
-        type_column(&mut col_b, &b.model_pk_type);
+        let mut col_b = typed_column(&col_b_name, &b.model_pk_type);
 
         table
-            .table(alias!(unique_id))
+            .table(alias(unique_id))
             .col(col_a.not_null())
             .col(col_b.not_null())
             .primary_key(
                 Index::create()
-                    .col(alias!(&col_a_name))
-                    .col(alias!(&col_b_name)),
+                    .col(alias(&col_a_name))
+                    .col(alias(&col_b_name)),
             )
             .foreign_key(
                 ForeignKey::create()
-                    .from(alias!(unique_id), alias!(&col_a_name))
-                    .to(alias!(a.model_name), alias!(a.model_pk_name))
+                    .from(alias(unique_id), alias(&col_a_name))
+                    .to(alias(a.model_name), alias(a.model_pk_name))
                     .on_update(sea_query::ForeignKeyAction::Cascade)
                     .on_delete(sea_query::ForeignKeyAction::Restrict),
             )
             .foreign_key(
                 ForeignKey::create()
-                    .from(alias!(unique_id), alias!(&col_b_name))
-                    .to(alias!(b.model_name), alias!(b.model_pk_name))
+                    .from(alias(unique_id), alias(&col_b_name))
+                    .to(alias(b.model_name), alias(b.model_pk_name))
                     .on_update(sea_query::ForeignKeyAction::Cascade)
                     .on_delete(sea_query::ForeignKeyAction::Restrict),
             );
@@ -464,16 +443,16 @@ fn generate_tables(
         res.push(format!("{};", table.to_string(SqliteQueryBuilder)));
     }
 
-    res.join("\n")
+    res
 }
 
-fn generate_views<'a>(models: &'a [Model], model_lookup: &HashMap<&str, &'a Model>) -> String {
+fn generate_views<'a>(models: &'a [Model], model_lookup: &HashMap<&str, &'a Model>) -> Vec<String> {
     let mut views = vec![];
 
     for model in models {
         for ds in &model.data_sources {
             let mut query = Query::select();
-            query.from(alias!(&model.name));
+            query.from(alias(&model.name));
             dfs(model, &ds.tree, model_lookup, &mut query);
 
             views.push(format!(
@@ -485,7 +464,7 @@ fn generate_views<'a>(models: &'a [Model], model_lookup: &HashMap<&str, &'a Mode
         }
     }
 
-    return views.join("\n");
+    return views;
 
     fn dfs(
         model: &Model,
@@ -495,8 +474,8 @@ fn generate_views<'a>(models: &'a [Model], model_lookup: &HashMap<&str, &'a Mode
     ) {
         for attr in &model.attributes {
             query.expr_as(
-                Expr::col((alias!(&model.name), alias!(&attr.value.name))),
-                alias!(&format!("{}_{}", model.name, attr.value.name)),
+                Expr::col((alias(&model.name), alias(&attr.value.name))),
+                alias(&format!("{}_{}", model.name, attr.value.name)),
             );
         }
 
@@ -507,70 +486,42 @@ fn generate_views<'a>(models: &'a [Model], model_lookup: &HashMap<&str, &'a Mode
                 continue;
             };
 
+            let nav_model = {
+                let CidlType::Model(nav_model_name) = &nav.value.cidl_type.array_type() else {
+                    unreachable!();
+                };
+
+                model_lookup
+                    .get(nav_model_name.as_str())
+                    .expect("nav model to be validated by `validate_fks`")
+            };
+
             match &nav.foreign_key {
                 CidlForeignKeyKind::OneToOne { reference } => {
-                    let nav_model = {
-                        let CidlType::Model(nav_model_name) = &nav.value.cidl_type else {
-                            unreachable!();
-                        };
-
-                        model_lookup
-                            .get(nav_model_name.as_str())
-                            .expect("nav model to be validated by `validate_fks`")
-                    };
-
                     let nav_model_pk = &nav_model
                         .find_primary_key()
                         .expect("primary key to be validated by `validate_models`")
                         .name;
 
                     query.left_join(
-                        alias!(&nav_model.name),
-                        Expr::col((alias!(&model.name), alias!(reference)))
-                            .equals((alias!(&nav_model.name), alias!(nav_model_pk))),
+                        alias(&nav_model.name),
+                        Expr::col((alias(&model.name), alias(reference)))
+                            .equals((alias(&nav_model.name), alias(nav_model_pk))),
                     );
-
-                    dfs(nav_model, include_tree, model_lookup, query);
                 }
                 CidlForeignKeyKind::OneToMany { reference } => {
-                    let nav_model = {
-                        let Some(CidlType::Model(nav_model_name)) =
-                            &nav.value.cidl_type.unwrap_array()
-                        else {
-                            unreachable!();
-                        };
-
-                        model_lookup
-                            .get(nav_model_name.as_str())
-                            .expect("nav model to be validated by `validate_fks`")
-                    };
-
                     let pk = &model
                         .find_primary_key()
                         .expect("primary key to be validated by `validate_models`")
                         .name;
 
                     query.left_join(
-                        alias!(&nav_model.name),
-                        Expr::col((alias!(&model.name), alias!(pk)))
-                            .equals((alias!(&nav_model.name), alias!(reference))),
+                        alias(&nav_model.name),
+                        Expr::col((alias(&model.name), alias(pk)))
+                            .equals((alias(&nav_model.name), alias(reference))),
                     );
-
-                    dfs(nav_model, include_tree, model_lookup, query);
                 }
                 CidlForeignKeyKind::ManyToMany { unique_id } => {
-                    let nav_model = {
-                        let Some(CidlType::Model(nav_model_name)) =
-                            &nav.value.cidl_type.unwrap_array()
-                        else {
-                            unreachable!();
-                        };
-
-                        model_lookup
-                            .get(nav_model_name.as_str())
-                            .expect("nav model to be validated by `validate_fks`")
-                    };
-
                     let nav_model_pk = nav_model
                         .find_primary_key()
                         .expect("primary key to be validated by `validate_models`");
@@ -581,22 +532,22 @@ fn generate_views<'a>(models: &'a [Model], model_lookup: &HashMap<&str, &'a Mode
                         .name;
 
                     query.left_join(
-                        alias!(unique_id),
-                        Expr::col((alias!(&model.name), alias!(pk)))
-                            .equals((alias!(unique_id), alias!(format!("{}_{}", model.name, pk)))),
+                        alias(unique_id),
+                        Expr::col((alias(&model.name), alias(pk)))
+                            .equals((alias(unique_id), alias(format!("{}_{}", model.name, pk)))),
                     );
                     query.left_join(
-                        alias!(&nav_model.name),
+                        alias(&nav_model.name),
                         Expr::col((
-                            alias!(unique_id),
-                            alias!(format!("{}_{}", nav_model.name, pk)),
+                            alias(unique_id),
+                            alias(format!("{}_{}", nav_model.name, pk)),
                         ))
-                        .equals((alias!(&nav_model.name), alias!(&nav_model_pk.name))),
+                        .equals((alias(&nav_model.name), alias(&nav_model_pk.name))),
                     );
-
-                    dfs(nav_model, include_tree, model_lookup, query);
                 }
             }
+
+            dfs(nav_model, include_tree, model_lookup, query);
         }
     }
 }
@@ -610,5 +561,5 @@ pub fn generate_sql(models: &[Model]) -> Result<String> {
     let tables = generate_tables(&sorted_models, many_to_many_tables, &model_lookup);
     let views = generate_views(models, &model_lookup);
 
-    Ok(format!("{tables}\n{views}"))
+    Ok(format!("{}\n{}", tables.join("\n"), views.join("\n")))
 }
