@@ -12,13 +12,16 @@ pub trait ClientLanguageTypeMapper {
 }
 
 handlebars_helper!(is_serializable: |cidl_type: CidlType| !matches!(cidl_type, CidlType::D1Database));
+handlebars_helper!(is_model: |cidl_type: CidlType| matches!(cidl_type, CidlType::Model(_)));
+handlebars_helper!(is_model_array: |cidl_type: CidlType| matches!(cidl_type.array_type(), CidlType::Model(_)));
 
 fn register_helpers(
     handlebars: &mut Handlebars<'_>,
     mapper: Arc<dyn ClientLanguageTypeMapper + Send + Sync>,
 ) {
     handlebars.register_helper("is_serializable", Box::new(is_serializable));
-
+    handlebars.register_helper("is_model", Box::new(is_model));
+    handlebars.register_helper("is_model_array", Box::new(is_model_array));
     handlebars.register_helper(
         "lang_type",
         Box::new(
