@@ -52,7 +52,7 @@ export enum TypeCode {
   Blob = "Blob",
 }
 
-// ============ Helper Functions ============
+// Helper Functions
 
 function cleanTypeText(t: Type, sf: SourceFile): string {
   return t.getText(sf).replace(/import\(".*?"\)\./g, "");
@@ -64,18 +64,17 @@ function readPackageJson(cwd: string) {
   let version = "0.0.1";
   
   if (fs.existsSync(pkgPath)) {
-    try {
-      const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf8"));
-      projectName = pkg.name ?? projectName;
-      version = pkg.version ?? version;
-    } catch {
-      // Ignore parse errors, use defaults
-    }
+    const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf8"));
+    projectName = pkg.name ?? projectName;
+    version = pkg.version ?? version;
+
   }
   
   return { projectName, version };
 }
 
+// We read the cloesce file, if there is no file or they messed up the syntax
+// we should have some verbose errors
 function readCloesceConfig(cwd: string): CloesceConfig {
   const configPath = path.join(cwd, "cloesce-config.json");
   
@@ -222,11 +221,6 @@ function extractArrayModelName(t: Type, sf: SourceFile): string | undefined {
 }
 
 function checkNullability(prop: PropertyDeclaration | PropertySignature, sf: SourceFile): boolean {
-  // Check for optional property
-  if ('hasQuestionToken' in prop && prop.hasQuestionToken?.()) {
-    return true;
-  }
-  
   const type = prop.getType();
   
   // Check if union type contains null or undefined
