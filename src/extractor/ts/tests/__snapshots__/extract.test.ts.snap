@@ -258,7 +258,203 @@ exports[`actions snapshot 1`] = `
       "navigation_properties": [],
       "source_path": "person.cloesce.ts",
     },
-  ],
+    {
+            "name": "Horse",
+            "attributes": [
+                {
+                    "primary_key": true,
+                    "foreign_key": null,
+                    "value": {
+                        "name": "id",
+                        "cidl_type": "Integer",
+                        "nullable": false
+                    }
+                },
+                {
+                    "primary_key": false,
+                    "foreign_key": null,
+                    "value": {
+                        "name": "name",
+                        "cidl_type": "Text",
+                        "nullable": false
+                    }
+                },
+                {
+                    "primary_key": false,
+                    "foreign_key": null,
+                    "value": {
+                        "name": "bio",
+                        "cidl_type": "Text",
+                        "nullable": true
+                    }
+                }
+            ],
+            "navigation_properties": [
+                {
+                    "value": {
+                        "name": "matches",
+                        "cidl_type": {
+                            "Array": {
+                                "Model": "Match"
+                            }
+                        },
+                        "nullable": false
+                    },
+                    "foreign_key": {
+                        "OneToMany": {
+                            "reference": "Match"
+                        }
+                    }
+                }
+            ],
+            "methods": [
+                {
+                    "name": "post",
+                    "is_static": true,
+                    "http_verb": "POST",
+                    "return_type": {
+                        "Model": "Promise"
+                    },
+                    "parameters": [
+                        {
+                            "name": "horse",
+                            "cidl_type": "Text",
+                            "nullable": false
+                        }
+                    ]
+                },
+                {
+                    "name": "list",
+                    "is_static": true,
+                    "http_verb": "GET",
+                    "return_type": {
+                        "Model": "Promise"
+                    },
+                    "parameters": []
+                },
+                {
+                    "name": "patch",
+                    "is_static": false,
+                    "http_verb": "PATCH",
+                    "return_type": {
+                        "Model": "Promise"
+                    },
+                    "parameters": [
+                        {
+                            "name": "horse",
+                            "cidl_type": "Text",
+                            "nullable": false
+                        }
+                    ]
+                },
+                {
+                    "name": "match",
+                    "is_static": false,
+                    "http_verb": "POST",
+                    "return_type": {
+                        "Model": "Promise"
+                    },
+                    "parameters": [
+                        {
+                            "name": "horse",
+                            "cidl_type": "Text",
+                            "nullable": false
+                        }
+                    ]
+                }
+            ],
+            "data_sources": [
+                {
+                    "name": "default",
+                    "tree": [
+                        [
+                            {
+                                "name": "matches",
+                                "cidl_type": {
+                                    "Model": "Match"
+                                },
+                                "nullable": false
+                            },
+                            [
+                                [
+                                    {
+                                        "name": "horse2",
+                                        "cidl_type": {
+                                            "Model": "Horse"
+                                        },
+                                        "nullable": true
+                                    },
+                                    []
+                                ]
+                            ]
+                        ]
+                    ]
+                }
+            ],
+            "source_path": "horse.cloesce.ts"
+        },
+        {
+          "attributes": [
+              {
+                  "primary_key": false,
+                  "foreign_key": "Horse",
+                  "value": {
+                      "cidl_type": "Integer",
+                      "name": "horseId2",
+                      "nullable": false
+                  }
+              },
+              {
+                  "primary_key": false,
+                  "foreign_key": "Horse",
+                  "value": {
+                      "cidl_type": {
+                          "Model": "Horse"
+                      },
+                      "name": "horse2",
+                      "nullable": true
+                  }
+              },
+              {
+                  "primary_key": false,
+                  "foreign_key": "Horse",
+                  "value": {
+                      "cidl_type": "Integer",
+                      "name": "horseId1",
+                      "nullable": false
+                  }
+              },
+              {
+                  "primary_key": true,
+                  "foreign_key": null,
+                  "value": {
+                      "name": "id",
+                      "cidl_type": "Integer",
+                      "nullable": false
+                  }
+              }
+          ],
+          "navigation_properties": [
+              {
+                  "value": {
+                      "name": "horse2",
+                      "cidl_type": {
+                          "Model": "Horse"
+                      },
+                      "nullable": true
+                  },
+                  "foreign_key": {
+                      "OneToOne": {
+                          "reference": "Horse"
+                      }
+                  }
+              }
+          ],
+          "methods": [],
+          "data_sources": [],
+          "source_path": "horse.cloesce.ts"
+        }
+    ]
   "project_name": "actions",
   "version": "0.0.1",
 }
