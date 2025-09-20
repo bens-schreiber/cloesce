@@ -33,20 +33,27 @@ exports[`actions snapshot 1`] = `
           "name": "create",
           "parameters": [
             {
+              "cidl_type": "D1Database",
+              "name": "db",
+              "nullable": false,
+            },
+            {
               "cidl_type": "Text",
               "name": "payload",
               "nullable": false,
             },
           ],
-          "return_type": {
-            "Model": "Response",
-          },
         },
         {
           "http_verb": "PUT",
           "is_static": true,
           "name": "update",
           "parameters": [
+            {
+              "cidl_type": "D1Database",
+              "name": "db",
+              "nullable": false,
+            },
             {
               "cidl_type": "Integer",
               "name": "id",
@@ -58,9 +65,6 @@ exports[`actions snapshot 1`] = `
               "nullable": true,
             },
           ],
-          "return_type": {
-            "Model": "Response",
-          },
         },
         {
           "http_verb": "PATCH",
@@ -68,14 +72,16 @@ exports[`actions snapshot 1`] = `
           "name": "patch",
           "parameters": [
             {
+              "cidl_type": "D1Database",
+              "name": "db",
+              "nullable": false,
+            },
+            {
               "cidl_type": "Text",
               "name": "phrase",
               "nullable": false,
             },
           ],
-          "return_type": {
-            "Model": "Response",
-          },
         },
         {
           "http_verb": "DELETE",
@@ -83,14 +89,16 @@ exports[`actions snapshot 1`] = `
           "name": "remove",
           "parameters": [
             {
+              "cidl_type": "D1Database",
+              "name": "db",
+              "nullable": false,
+            },
+            {
               "cidl_type": "Integer",
               "name": "id",
               "nullable": false,
             },
           ],
-          "return_type": {
-            "Model": "Response",
-          },
         },
       ],
       "name": "Actions",
@@ -142,19 +150,25 @@ exports[`actions snapshot 1`] = `
           "http_verb": "GET",
           "is_static": false,
           "name": "get_name",
-          "parameters": [],
-          "return_type": {
-            "Model": "Promise",
-          },
+          "parameters": [
+            {
+              "cidl_type": "D1Database",
+              "name": "db",
+              "nullable": false,
+            },
+          ],
         },
         {
           "http_verb": "GET",
           "is_static": false,
           "name": "get_breed",
-          "parameters": [],
-          "return_type": {
-            "Model": "Promise",
-          },
+          "parameters": [
+            {
+              "cidl_type": "D1Database",
+              "name": "db",
+              "nullable": false,
+            },
+          ],
         },
         {
           "http_verb": "POST",
@@ -162,216 +176,21 @@ exports[`actions snapshot 1`] = `
           "name": "woof",
           "parameters": [
             {
+              "cidl_type": "D1Database",
+              "name": "db",
+              "nullable": false,
+            },
+            {
               "cidl_type": "Text",
               "name": "phrase",
               "nullable": false,
             },
           ],
-          "return_type": {
-            "Model": "Promise",
-          },
         },
       ],
       "name": "Dog",
       "navigation_properties": [],
       "source_path": "dog.cloesce.ts",
-    },
-    {
-      "attributes": [
-        {
-          "foreign_key": null,
-          "primary_key": true,
-          "value": {
-            "cidl_type": "Integer",
-            "name": "id",
-            "nullable": false,
-          },
-        },
-        {
-          "foreign_key": null,
-          "primary_key": false,
-          "value": {
-            "cidl_type": "Text",
-            "name": "name",
-            "nullable": false,
-          },
-        },
-        {
-          "foreign_key": null,
-          "primary_key": false,
-          "value": {
-            "cidl_type": "Text",
-            "name": "bio",
-            "nullable": true,
-          },
-        },
-      ],
-      "data_sources": [
-        {
-          "name": "default",
-          "tree": [
-            [
-              {
-                "cidl_type": {
-                  "Model": "Match",
-                },
-                "name": "matches",
-                "nullable": false,
-              },
-              [
-                [
-                  {
-                    "cidl_type": {
-                      "Model": "Horse",
-                    },
-                    "name": "horse2",
-                    "nullable": true,
-                  },
-                  [],
-                ],
-              ],
-            ],
-          ],
-        },
-      ],
-      "methods": [
-        {
-          "http_verb": "POST",
-          "is_static": true,
-          "name": "post",
-          "parameters": [
-            {
-              "cidl_type": "Text",
-              "name": "horse",
-              "nullable": false,
-            },
-          ],
-          "return_type": {
-            "Model": "Promise",
-          },
-        },
-        {
-          "http_verb": "GET",
-          "is_static": true,
-          "name": "list",
-          "parameters": [],
-          "return_type": {
-            "Model": "Promise",
-          },
-        },
-        {
-          "http_verb": "PATCH",
-          "is_static": false,
-          "name": "patch",
-          "parameters": [
-            {
-              "cidl_type": "Text",
-              "name": "horse",
-              "nullable": false,
-            },
-          ],
-          "return_type": {
-            "Model": "Promise",
-          },
-        },
-        {
-          "http_verb": "POST",
-          "is_static": false,
-          "name": "match",
-          "parameters": [
-            {
-              "cidl_type": "Text",
-              "name": "horse",
-              "nullable": false,
-            },
-          ],
-          "return_type": {
-            "Model": "Promise",
-          },
-        },
-      ],
-      "name": "Horse",
-      "navigation_properties": [
-        {
-          "foreign_key": {
-            "OneToMany": {
-              "reference": "Match",
-            },
-          },
-          "value": {
-            "cidl_type": {
-              "Array": {
-                "Model": "Match",
-              },
-            },
-            "name": "matches",
-            "nullable": false,
-          },
-        },
-      ],
-      "source_path": "horse.cloesce.ts",
-    },
-    {
-      "attributes": [
-        {
-          "foreign_key": "Horse",
-          "primary_key": false,
-          "value": {
-            "cidl_type": "Integer",
-            "name": "horseId2",
-            "nullable": false,
-          },
-        },
-        {
-          "foreign_key": "Horse",
-          "primary_key": false,
-          "value": {
-            "cidl_type": {
-              "Model": "Horse",
-            },
-            "name": "horse2",
-            "nullable": true,
-          },
-        },
-        {
-          "foreign_key": "Horse",
-          "primary_key": false,
-          "value": {
-            "cidl_type": "Integer",
-            "name": "horseId1",
-            "nullable": false,
-          },
-        },
-        {
-          "foreign_key": null,
-          "primary_key": true,
-          "value": {
-            "cidl_type": "Integer",
-            "name": "id",
-            "nullable": false,
-          },
-        },
-      ],
-      "data_sources": [],
-      "methods": [],
-      "name": "Match",
-      "navigation_properties": [
-        {
-          "foreign_key": {
-            "OneToOne": {
-              "reference": "Horse",
-            },
-          },
-          "value": {
-            "cidl_type": {
-              "Model": "Horse",
-            },
-            "name": "horse2",
-            "nullable": true,
-          },
-        },
-      ],
-      "source_path": "horse.cloesce.ts",
     },
     {
       "attributes": [
@@ -409,10 +228,13 @@ exports[`actions snapshot 1`] = `
           "http_verb": "GET",
           "is_static": false,
           "name": "foo",
-          "parameters": [],
-          "return_type": {
-            "Model": "Promise",
-          },
+          "parameters": [
+            {
+              "cidl_type": "D1Database",
+              "name": "db",
+              "nullable": false,
+            },
+          ],
         },
         {
           "http_verb": "POST",
@@ -420,14 +242,16 @@ exports[`actions snapshot 1`] = `
           "name": "speak",
           "parameters": [
             {
+              "cidl_type": "D1Database",
+              "name": "db",
+              "nullable": false,
+            },
+            {
               "cidl_type": "Text",
               "name": "phrase",
               "nullable": false,
             },
           ],
-          "return_type": {
-            "Model": "Promise",
-          },
         },
       ],
       "name": "Person",
@@ -436,6 +260,6 @@ exports[`actions snapshot 1`] = `
     },
   ],
   "project_name": "actions",
-  "version": "0.0.2",
+  "version": "0.0.1",
 }
 `;
