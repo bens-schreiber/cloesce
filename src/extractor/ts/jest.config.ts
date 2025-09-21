@@ -8,11 +8,14 @@ const config: Config = {
     "^cloesce-ts$": "<rootDir>/src/index.ts",
     "^(\\.{1,2}/.*)\\.js$": "$1",
   },
-  globals: {
-    "ts-jest": {
-      useESM: true,
-      tsconfig: "tsconfig.test.json",
-    },
+  transform: {
+    "^.+\\.ts$": [
+      "ts-jest",
+      {
+        useESM: true,
+        tsconfig: "tsconfig.test.json",
+      },
+    ],
   },
 };
 

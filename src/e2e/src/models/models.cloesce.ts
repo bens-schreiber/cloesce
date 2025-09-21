@@ -110,15 +110,15 @@ class Horse {
   // Instantiated, so `this` values are populated by the default data source.
   //
   // Generates a client method `horse.match(horse2)`
-  // @POST
-  // async match(db: D1Database, horse: Horse): Promise<Result> {
-  //   await db
-  //     .prepare("INSERT INTO Match (horseId1, horseId2) VALUES (?, ?)")
-  //     .bind(this.id, horse.id)
-  //     .run();
+  @POST
+  async match(db: D1Database, horse: Horse): Promise<Result> {
+    await db
+      .prepare("INSERT INTO Match (horseId1, horseId2) VALUES (?, ?)")
+      .bind(this.id, horse.id)
+      .run();
 
-  //   return Result.ok();
-  // }
+    return Result.ok();
+  }
 }
 
 @D1

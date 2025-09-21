@@ -3,9 +3,9 @@ import { Project } from "ts-morph";
 
 test("actions snapshot", () => {
   const project = new Project({
-    tsConfigFilePath: "./tests/fixtures/tsconfig.json",
+    tsConfigFilePath: "../../test_fixtures/tsconfig.json",
   });
-  project.addSourceFileAtPath("./tests/fixtures/models.cloesce.ts");
+  project.addSourceFileAtPath("../../test_fixtures/models.cloesce.ts");
 
   let extractor = new CidlExtractor("snapshotProject", "0.0.2");
   let models = extractor.extract(project);

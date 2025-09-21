@@ -35,7 +35,7 @@ const cli = command({
     const files = findCloesceFiles(projectRoot, sourcePaths);
     if (files.length === 0) {
       throw new Error(
-        `No ".cloesce.ts" files found in specified source path(s): ${sourcePaths.join(", ")}`,
+        `No ".cloesce.ts" files found in specified source path(s): ${sourcePaths.join(", ")}`
       );
     }
 
@@ -100,13 +100,13 @@ function readCloesceConfig(cwd: string): CloesceConfig {
 
   if (!fs.existsSync(configPath)) {
     throw new Error(
-      `No "cloesce-config.json" found in "${cwd}". Please create a cloesce-config.json with a "source" field.`,
+      `No "cloesce-config.json" found in "${cwd}". Please create a cloesce-config.json with a "source" field.`
     );
   }
 
   try {
     const config = JSON.parse(
-      fs.readFileSync(configPath, "utf8"),
+      fs.readFileSync(configPath, "utf8")
     ) as CloesceConfig;
 
     if (!config.source) {
@@ -116,7 +116,7 @@ function readCloesceConfig(cwd: string): CloesceConfig {
     return config;
   } catch (error) {
     throw new Error(
-      `Failed to parse cloesce-config.json: ${error instanceof Error ? error.message : String(error)}`,
+      `Failed to parse cloesce-config.json: ${error instanceof Error ? error.message : String(error)}`
     );
   }
 }
@@ -129,7 +129,7 @@ function findCloesceFiles(root: string, searchPaths: string[]): string[] {
 
     if (!fs.existsSync(fullPath)) {
       console.warn(
-        `Warning: Path "${searchPath}" specified in cloesce-config.json does not exist`,
+        `Warning: Path "${searchPath}" specified in cloesce-config.json does not exist`
       );
       continue;
     }
