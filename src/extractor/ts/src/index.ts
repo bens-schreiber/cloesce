@@ -19,7 +19,7 @@ export const ForeignKey =
   () => {};
 
 // API Result
-export type Ok<T = void> = { ok: true; data: T };
+export type Ok<T> = T;
 export type Err = { ok: false; status: number; message: string };
 export type Result<T = void> = Ok<T> | Err;
 
@@ -27,11 +27,13 @@ export type Result<T = void> = Ok<T> | Err;
 function ok(): Ok<void>;
 function ok<T>(data: T): Ok<T>;
 function ok<T>(data?: T): Ok<T | void> {
-  return { ok: true, data: data as T | void };
+  return data;
 }
+
 function err(status: number, message: string): Err {
   return { ok: false, status, message };
 }
+
 export const Result = { ok, err };
 
 // Include Tree
@@ -56,17 +58,21 @@ export function mapSql<T>(rows: Record<string, any>[]): T[] {
   const entityMaps: Record<string, Map<string, any>> = {};
 
   function getEntityKey(entityObj: any): string {
-    // Use JSON string of all values as a "unique key" for deduplication
     return JSON.stringify(entityObj);
   }
 
   for (const row of rows) {
     const rowEntities: Record<string, any> = {};
+    const baseEntity: any = {};
 
-    // Step 1: split row into entities by prefix
     for (const col in row) {
       const parts = col.split("_");
-      if (parts.length < 2) continue;
+
+      if (parts.length < 2) {
+        // No prefix → base entity
+        baseEntity[col] = row[col];
+        continue;
+      }
 
       const entity = parts[0];
       const field = parts.slice(1).join("_");
@@ -75,8 +81,7 @@ export function mapSql<T>(rows: Record<string, any>[]): T[] {
       rowEntities[entity][field] = row[col];
     }
 
-    // Step 2: merge entities into result
-    let topObj: any = null;
+    let topObj = baseEntity;
 
     for (const entity in rowEntities) {
       const entityObj = rowEntities[entity];
@@ -87,21 +92,13 @@ export function mapSql<T>(rows: Record<string, any>[]): T[] {
         entityMaps[entity].set(key, entityObj);
       }
 
-      if (!topObj) {
-        topObj = entityObj; // first entity becomes top-level
-      } else {
-        // If entity already exists on topObj
-        if (!topObj[entity]) {
-          topObj[entity] = [];
-        }
-        // Only push if not already in array
-        if (!topObj[entity].some((o: any) => getEntityKey(o) === key)) {
-          topObj[entity].push(entityObj);
-        }
+      if (!topObj[entity]) topObj[entity] = [];
+      if (!topObj[entity].some((o: any) => getEntityKey(o) === key)) {
+        topObj[entity].push(entityObj);
       }
     }
 
-    if (topObj && !result.includes(topObj)) {
+    if (!result.includes(topObj)) {
       result.push(topObj);
     }
   }
@@ -113,7 +110,7 @@ export function match(
   router: any,
   path: string,
   request: Request,
-  env: any
+  env: any,
 ): Response {
   const segments = path.split("/").filter(Boolean);
   const params: string[] = [];
@@ -132,7 +129,7 @@ export function match(
     }
 
     const paramKey = Object.keys(node).find(
-      (k) => k.startsWith("<") && k.endsWith(">")
+      (k) => k.startsWith("<") && k.endsWith(">"),
     );
     if (!paramKey) return notFound();
 

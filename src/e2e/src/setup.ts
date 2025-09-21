@@ -16,22 +16,22 @@ export function compile() {
   runSync("Generating d1", `cargo run generate d1 ${cidlPath} ${d1Path}`, {
     cwd: generatorPath,
   });
-  runSync(
-    "Generating workers",
-    `cargo run generate workers ${cidlPath} ${workersPath}`,
-    { cwd: generatorPath }
-  );
+  // runSync(
+  //   "Generating workers",
+  //   `cargo run generate workers ${cidlPath} ${workersPath}`,
+  //   { cwd: generatorPath }
+  // );
   runSync(
     "Generating client",
     `cargo run generate client ${cidlPath} ${clientPath} http://localhost:${port}/api`,
-    { cwd: generatorPath }
+    { cwd: generatorPath },
   );
 }
 
 export async function startWrangler() {
   runSync(
     "Running wrangler migrate",
-    "echo y | npx wrangler d1 migrations apply e2e_db"
+    "echo y | npx wrangler d1 migrations apply e2e_db",
   );
 
   runSync("Running wrangler build", "npx wrangler build");
@@ -55,7 +55,7 @@ export async function linkGeneratedModule() {
   const compiledClientPath = clientPath.replace(".ts", ".js");
   runSync(
     "Compiling generated client",
-    `npx tsc ${clientPath} --outDir ${outputJsDir} --target ES2022 --module ESNext --moduleResolution node --allowSyntheticDefaultImports --esModuleInterop`
+    `npx tsc ${clientPath} --outDir ${outputJsDir} --target ES2022 --module ESNext --moduleResolution node --allowSyntheticDefaultImports --esModuleInterop`,
   );
   return await import(pathToFileURL(compiledClientPath).href);
 }
@@ -74,7 +74,7 @@ function runSync(label: string, cmd: string, opts: { cwd?: string } = {}) {
 function waitForPort(
   port: number,
   host: string,
-  timeoutMs: number
+  timeoutMs: number,
 ): Promise<void> {
   return new Promise((resolve, reject) => {
     const start = Date.now();

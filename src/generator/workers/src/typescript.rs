@@ -2,6 +2,22 @@ use common::{CidlType, HttpVerb, Model, ModelMethod, NamedTypedValue};
 
 use crate::WorkersGeneratable as LanguageWorkersGenerator;
 
+fn final_state(status: u32, body: &str) -> String {
+    format!(
+        r#"return new Response(
+    JSON.stringify({body}),
+    {{ status: {status}, headers: {{ "Content-Type": "application/json" }} }}
+);"#
+    )
+}
+
+fn error_state(status: u32, stage: &str, message: &str) -> String {
+    final_state(
+        status,
+        &format!(r#"{{ ok: false, message: `{stage}: {message}`, status: {status} }}"#,),
+    )
+}
+
 pub struct TypescriptValidatorGenerator;
 impl TypescriptValidatorGenerator {
     fn validate_type(value: &NamedTypedValue, name_prefix: &str) -> Option<String> {
@@ -114,14 +130,6 @@ impl TypescriptValidatorGenerator {
     }
 }
 
-fn error_state(status: u32, stage: &str, message: &str) -> String {
-    format!(
-        r#"
-        return {{ ok: false, status: {status}, message: `{stage}: ${{{message}}}`}}
-    "#
-    )
-}
-
 pub struct TypescriptWorkersGenerator;
 impl LanguageWorkersGenerator for TypescriptWorkersGenerator {
     fn imports(&self, models: &[Model]) -> String {
@@ -190,9 +198,7 @@ export default {
         let method_name = &method.name;
         let id_param = if method.is_static { "" } else { "id: number, " };
 
-        format!(
-            "{method_name}: async ({id_param}request: Request, env: Env): Promise<Result<any>> => {{{body}}}"
-        )
+        format!("{method_name}: async ({id_param}request: Request, env: Env) => {{{body}}}")
     }
 
     fn validate_http(&self, verb: &HttpVerb) -> String {
@@ -205,7 +211,7 @@ export default {
         };
 
         // Error state: any method outside of the allowed HTTP verbs will exit with 405.
-        let method_not_allowed = error_state(405, "validate_http", "\"Method Not Allowed\"");
+        let method_not_allowed = error_state(405, "validate_http", "Method Not Allowed");
         format!(
             r#"
                 if (request.method !== "{verb_str}") {{
@@ -226,8 +232,7 @@ export default {
         }
 
         // Error state: any missing parameter, body, or malformed input will exit with 400.
-        let invalid_request_body =
-            error_state(400, "validate_req_body", "\"Invalid Request Body\"");
+        let invalid_request_body = error_state(400, "validate_req_body", "Invalid Request Body");
 
         let mut validation_code = Vec::new();
         validation_code.push(format!(
@@ -285,11 +290,11 @@ export default {
         let malformed_query = error_state(
             500,
             "hydrate_model",
-            "e instanceof Error ? e.message : String(e)",
+            "${e instanceof Error ? e.message : String(e)}",
         );
 
         // Error state: If no record is found for the id, return a 404
-        let missing_record = error_state(404, "hydrate_model", "\"Record not found\"");
+        let missing_record = error_state(404, "hydrate_model", "Record not found");
 
         format!(
             r#"
@@ -329,29 +334,19 @@ export default {
             "instance"
         };
 
-        let dispatch = match method.return_type {
-            None => "return { ok: true, data: undefined };".to_string(),
-            Some(CidlType::HttpResult(_)) => {
-                format!("return await {caller}.{method_name}({params});")
-            }
-            Some(_) => {
-                format!(
-                    "return {{ ok: true, data: JSON.stringify( await {caller}.{method_name}({params}))}}"
-                )
-            }
-        };
+        let success_state = final_state(200, &format!("await {caller}.{method_name}({params})"));
 
         // Error state: Client code ran into an uncaught exception.
         let uncaught_exception = error_state(
             500,
             "dispatch_method",
-            "e instanceof Error ? e.message : String(e)",
+            "${e instanceof Error ? e.message : String(e)}",
         );
 
         format!(
             r#"
             try {{
-                {dispatch}
+                {success_state}
             }}
             catch (e) {{
                 {uncaught_exception}

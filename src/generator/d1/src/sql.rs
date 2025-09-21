@@ -111,7 +111,7 @@ fn validate_models(models: &[Model]) -> Result<HashMap<&str, &Model>> {
     for model in models {
         // Duplicate models
         ensure!(
-            !model_lookup.insert(&model.name, model).is_some(),
+            model_lookup.insert(&model.name, model).is_none(),
             "Duplicate model name: {}",
             model.name
         );
@@ -477,7 +477,7 @@ fn generate_views<'a>(models: &'a [Model], model_lookup: &HashMap<&str, &'a Mode
         for attr in &model.attributes {
             query.expr_as(
                 Expr::col((alias(&model.name), alias(&attr.value.name))),
-                alias(&format!("{}_{}", model.name, attr.value.name)),
+                alias(format!("{}_{}", model.name, attr.value.name)),
             );
         }
 

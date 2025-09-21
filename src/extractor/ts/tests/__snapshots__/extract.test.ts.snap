@@ -10,7 +10,7 @@ exports[`actions snapshot 1`] = `
           "foreign_key_reference": null,
           "is_primary_key": true,
           "value": {
-            "cidl_type": "Real",
+            "cidl_type": "Integer",
             "name": "id",
             "nullable": false,
           },
@@ -100,7 +100,7 @@ exports[`actions snapshot 1`] = `
               "nullable": false,
             },
             {
-              "cidl_type": "Real",
+              "cidl_type": "Integer",
               "name": "id",
               "nullable": false,
             },
@@ -204,7 +204,7 @@ exports[`actions snapshot 1`] = `
           "foreign_key_reference": null,
           "is_primary_key": true,
           "value": {
-            "cidl_type": "Real",
+            "cidl_type": "Integer",
             "name": "id",
             "nullable": false,
           },
@@ -213,7 +213,7 @@ exports[`actions snapshot 1`] = `
           "foreign_key_reference": "Horse",
           "is_primary_key": false,
           "value": {
-            "cidl_type": "Real",
+            "cidl_type": "Integer",
             "name": "horseId1",
             "nullable": false,
           },
@@ -222,7 +222,7 @@ exports[`actions snapshot 1`] = `
           "foreign_key_reference": "Horse",
           "is_primary_key": false,
           "value": {
-            "cidl_type": "Real",
+            "cidl_type": "Integer",
             "name": "horseId2",
             "nullable": false,
           },

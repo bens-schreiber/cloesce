@@ -15,14 +15,7 @@ handlebars_helper!(is_serializable: |cidl_type: CidlType| !matches!(cidl_type, C
 handlebars_helper!(is_model: |cidl_type: CidlType| {
     match cidl_type {
         CidlType::Model(_) => true,
-        CidlType::HttpResult(opt) => {
-            if let Some(inner) = opt {
-                matches!(*inner, CidlType::Model(_))
-            } else {
-                false
-            }
-
-        },
+        CidlType::HttpResult(Some(inner)) => matches!(*inner, CidlType::Model(_)),
         _ => false
     }
 });

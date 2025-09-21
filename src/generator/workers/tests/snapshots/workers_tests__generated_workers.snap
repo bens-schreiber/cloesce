@@ -27,12 +27,13 @@ if (obj.data_blob == null || !(obj.data_blob instanceof ArrayBuffer || obj.data_
                 };
             
         
-        const router = { api: {ExampleModel: {create_example: async (request: Request, env: Env): Promise<Result<any>> => {
+        const router = { api: {ExampleModel: {create_example: async (request: Request, env: Env) => {
                 
                 if (request.method !== "POST") {
-                    
-        return { ok: false, status: 405, message: `validate_http: ${"Method Not Allowed"}`}
-    
+                    return new Response(
+    JSON.stringify({ ok: false, message: `validate_http: Method Not Allowed`, status: 405 }),
+    { status: 405, headers: { "Content-Type": "application/json" } }
+);
                 }
             
                 
@@ -40,35 +41,42 @@ if (obj.data_blob == null || !(obj.data_blob instanceof ArrayBuffer || obj.data_
                 try {
                     body = await request.json();
                 } catch {
-                    
-        return { ok: false, status: 400, message: `validate_req_body: ${"Invalid Request Body"}`}
-    
+                    return new Response(
+    JSON.stringify({ ok: false, message: `validate_req_body: Invalid Request Body`, status: 400 }),
+    { status: 400, headers: { "Content-Type": "application/json" } }
+);
                 }
 
                 let {payload} = body;
                 
-if ((payload == null || !$.ExampleModel.validate(payload))) { 
-        return { ok: false, status: 400, message: `validate_req_body: ${"Invalid Request Body"}`}
-     }
+if ((payload == null || !$.ExampleModel.validate(payload))) { return new Response(
+    JSON.stringify({ ok: false, message: `validate_req_body: Invalid Request Body`, status: 400 }),
+    { status: 400, headers: { "Content-Type": "application/json" } }
+); }
 payload = Object.assign(new ExampleModel(), payload)
                 
                 
             try {
-                return { ok: true, data: JSON.stringify( await ExampleModel.create_example(env.DB, payload))}
+                return new Response(
+    JSON.stringify(await ExampleModel.create_example(env.DB, payload)),
+    { status: 200, headers: { "Content-Type": "application/json" } }
+);
             }
             catch (e) {
-                
-        return { ok: false, status: 500, message: `dispatch_method: ${e instanceof Error ? e.message : String(e)}`}
-    
+                return new Response(
+    JSON.stringify({ ok: false, message: `dispatch_method: ${e instanceof Error ? e.message : String(e)}`, status: 500 }),
+    { status: 500, headers: { "Content-Type": "application/json" } }
+);
             }
         
             },
-read_example: async (request: Request, env: Env): Promise<Result<any>> => {
+read_example: async (request: Request, env: Env) => {
                 
                 if (request.method !== "GET") {
-                    
-        return { ok: false, status: 405, message: `validate_http: ${"Method Not Allowed"}`}
-    
+                    return new Response(
+    JSON.stringify({ ok: false, message: `validate_http: Method Not Allowed`, status: 405 }),
+    { status: 405, headers: { "Content-Type": "application/json" } }
+);
                 }
             
                 
@@ -76,55 +84,67 @@ read_example: async (request: Request, env: Env): Promise<Result<any>> => {
                 try {
                     body = await request.json();
                 } catch {
-                    
-        return { ok: false, status: 400, message: `validate_req_body: ${"Invalid Request Body"}`}
-    
+                    return new Response(
+    JSON.stringify({ ok: false, message: `validate_req_body: Invalid Request Body`, status: 400 }),
+    { status: 400, headers: { "Content-Type": "application/json" } }
+);
                 }
 
                 let {id} = body;
                 
-if ((id == undefined || typeof id !== "number")) { 
-        return { ok: false, status: 400, message: `validate_req_body: ${"Invalid Request Body"}`}
-     }
+if ((id == undefined || typeof id !== "number")) { return new Response(
+    JSON.stringify({ ok: false, message: `validate_req_body: Invalid Request Body`, status: 400 }),
+    { status: 400, headers: { "Content-Type": "application/json" } }
+); }
                 
                 
             try {
-                return { ok: true, data: JSON.stringify( await ExampleModel.read_example(env.DB, id))}
+                return new Response(
+    JSON.stringify(await ExampleModel.read_example(env.DB, id)),
+    { status: 200, headers: { "Content-Type": "application/json" } }
+);
             }
             catch (e) {
-                
-        return { ok: false, status: 500, message: `dispatch_method: ${e instanceof Error ? e.message : String(e)}`}
-    
+                return new Response(
+    JSON.stringify({ ok: false, message: `dispatch_method: ${e instanceof Error ? e.message : String(e)}`, status: 500 }),
+    { status: 500, headers: { "Content-Type": "application/json" } }
+);
             }
         
             },
-list_examples: async (request: Request, env: Env): Promise<Result<any>> => {
+list_examples: async (request: Request, env: Env) => {
                 
                 if (request.method !== "GET") {
-                    
-        return { ok: false, status: 405, message: `validate_http: ${"Method Not Allowed"}`}
-    
+                    return new Response(
+    JSON.stringify({ ok: false, message: `validate_http: Method Not Allowed`, status: 405 }),
+    { status: 405, headers: { "Content-Type": "application/json" } }
+);
                 }
             
                 
                 
                 
             try {
-                return { ok: true, data: JSON.stringify( await ExampleModel.list_examples(env.DB))}
+                return new Response(
+    JSON.stringify(await ExampleModel.list_examples(env.DB)),
+    { status: 200, headers: { "Content-Type": "application/json" } }
+);
             }
             catch (e) {
-                
-        return { ok: false, status: 500, message: `dispatch_method: ${e instanceof Error ? e.message : String(e)}`}
-    
+                return new Response(
+    JSON.stringify({ ok: false, message: `dispatch_method: ${e instanceof Error ? e.message : String(e)}`, status: 500 }),
+    { status: 500, headers: { "Content-Type": "application/json" } }
+);
             }
         
             },
-update_example: async (request: Request, env: Env): Promise<Result<any>> => {
+update_example: async (request: Request, env: Env) => {
                 
                 if (request.method !== "PUT") {
-                    
-        return { ok: false, status: 405, message: `validate_http: ${"Method Not Allowed"}`}
-    
+                    return new Response(
+    JSON.stringify({ ok: false, message: `validate_http: Method Not Allowed`, status: 405 }),
+    { status: 405, headers: { "Content-Type": "application/json" } }
+);
                 }
             
                 
@@ -132,37 +152,45 @@ update_example: async (request: Request, env: Env): Promise<Result<any>> => {
                 try {
                     body = await request.json();
                 } catch {
-                    
-        return { ok: false, status: 400, message: `validate_req_body: ${"Invalid Request Body"}`}
-    
+                    return new Response(
+    JSON.stringify({ ok: false, message: `validate_req_body: Invalid Request Body`, status: 400 }),
+    { status: 400, headers: { "Content-Type": "application/json" } }
+);
                 }
 
                 let {id,rating} = body;
                 
-if ((id == null || typeof id !== "number")) { 
-        return { ok: false, status: 400, message: `validate_req_body: ${"Invalid Request Body"}`}
-     }
-if ((rating == undefined || typeof rating !== "number")) { 
-        return { ok: false, status: 400, message: `validate_req_body: ${"Invalid Request Body"}`}
-     }
+if ((id == null || typeof id !== "number")) { return new Response(
+    JSON.stringify({ ok: false, message: `validate_req_body: Invalid Request Body`, status: 400 }),
+    { status: 400, headers: { "Content-Type": "application/json" } }
+); }
+if ((rating == undefined || typeof rating !== "number")) { return new Response(
+    JSON.stringify({ ok: false, message: `validate_req_body: Invalid Request Body`, status: 400 }),
+    { status: 400, headers: { "Content-Type": "application/json" } }
+); }
                 
                 
             try {
-                return { ok: true, data: JSON.stringify( await ExampleModel.update_example(env.DB, id, rating))}
+                return new Response(
+    JSON.stringify(await ExampleModel.update_example(env.DB, id, rating)),
+    { status: 200, headers: { "Content-Type": "application/json" } }
+);
             }
             catch (e) {
-                
-        return { ok: false, status: 500, message: `dispatch_method: ${e instanceof Error ? e.message : String(e)}`}
-    
+                return new Response(
+    JSON.stringify({ ok: false, message: `dispatch_method: ${e instanceof Error ? e.message : String(e)}`, status: 500 }),
+    { status: 500, headers: { "Content-Type": "application/json" } }
+);
             }
         
             },
-patch_example: async (request: Request, env: Env): Promise<Result<any>> => {
+patch_example: async (request: Request, env: Env) => {
                 
                 if (request.method !== "PATCH") {
-                    
-        return { ok: false, status: 405, message: `validate_http: ${"Method Not Allowed"}`}
-    
+                    return new Response(
+    JSON.stringify({ ok: false, message: `validate_http: Method Not Allowed`, status: 405 }),
+    { status: 405, headers: { "Content-Type": "application/json" } }
+);
                 }
             
                 
@@ -170,34 +198,41 @@ patch_example: async (request: Request, env: Env): Promise<Result<any>> => {
                 try {
                     body = await request.json();
                 } catch {
-                    
-        return { ok: false, status: 400, message: `validate_req_body: ${"Invalid Request Body"}`}
-    
+                    return new Response(
+    JSON.stringify({ ok: false, message: `validate_req_body: Invalid Request Body`, status: 400 }),
+    { status: 400, headers: { "Content-Type": "application/json" } }
+);
                 }
 
                 let {description} = body;
                 
-if ((description == undefined || typeof description !== "string")) { 
-        return { ok: false, status: 400, message: `validate_req_body: ${"Invalid Request Body"}`}
-     }
+if ((description == undefined || typeof description !== "string")) { return new Response(
+    JSON.stringify({ ok: false, message: `validate_req_body: Invalid Request Body`, status: 400 }),
+    { status: 400, headers: { "Content-Type": "application/json" } }
+); }
                 
                 
             try {
-                return { ok: true, data: JSON.stringify( await ExampleModel.patch_example(env.DB, description))}
+                return new Response(
+    JSON.stringify(await ExampleModel.patch_example(env.DB, description)),
+    { status: 200, headers: { "Content-Type": "application/json" } }
+);
             }
             catch (e) {
-                
-        return { ok: false, status: 500, message: `dispatch_method: ${e instanceof Error ? e.message : String(e)}`}
-    
+                return new Response(
+    JSON.stringify({ ok: false, message: `dispatch_method: ${e instanceof Error ? e.message : String(e)}`, status: 500 }),
+    { status: 500, headers: { "Content-Type": "application/json" } }
+);
             }
         
             },
-delete_example: async (request: Request, env: Env): Promise<Result<any>> => {
+delete_example: async (request: Request, env: Env) => {
                 
                 if (request.method !== "DELETE") {
-                    
-        return { ok: false, status: 405, message: `validate_http: ${"Method Not Allowed"}`}
-    
+                    return new Response(
+    JSON.stringify({ ok: false, message: `validate_http: Method Not Allowed`, status: 405 }),
+    { status: 405, headers: { "Content-Type": "application/json" } }
+);
                 }
             
                 
@@ -205,34 +240,41 @@ delete_example: async (request: Request, env: Env): Promise<Result<any>> => {
                 try {
                     body = await request.json();
                 } catch {
-                    
-        return { ok: false, status: 400, message: `validate_req_body: ${"Invalid Request Body"}`}
-    
+                    return new Response(
+    JSON.stringify({ ok: false, message: `validate_req_body: Invalid Request Body`, status: 400 }),
+    { status: 400, headers: { "Content-Type": "application/json" } }
+);
                 }
 
                 let {id} = body;
                 
-if ((id == null || typeof id !== "number")) { 
-        return { ok: false, status: 400, message: `validate_req_body: ${"Invalid Request Body"}`}
-     }
+if ((id == null || typeof id !== "number")) { return new Response(
+    JSON.stringify({ ok: false, message: `validate_req_body: Invalid Request Body`, status: 400 }),
+    { status: 400, headers: { "Content-Type": "application/json" } }
+); }
                 
                 
             try {
-                return { ok: true, data: JSON.stringify( await ExampleModel.delete_example(env.DB, id))}
+                return new Response(
+    JSON.stringify(await ExampleModel.delete_example(env.DB, id)),
+    { status: 200, headers: { "Content-Type": "application/json" } }
+);
             }
             catch (e) {
-                
-        return { ok: false, status: 500, message: `dispatch_method: ${e instanceof Error ? e.message : String(e)}`}
-    
+                return new Response(
+    JSON.stringify({ ok: false, message: `dispatch_method: ${e instanceof Error ? e.message : String(e)}`, status: 500 }),
+    { status: 500, headers: { "Content-Type": "application/json" } }
+);
             }
         
             },
-"<id>": {get_description: async (id: number, request: Request, env: Env): Promise<Result<any>> => {
+"<id>": {get_description: async (id: number, request: Request, env: Env) => {
                 
                 if (request.method !== "GET") {
-                    
-        return { ok: false, status: 405, message: `validate_http: ${"Method Not Allowed"}`}
-    
+                    return new Response(
+    JSON.stringify({ ok: false, message: `validate_http: Method Not Allowed`, status: 405 }),
+    { status: 405, headers: { "Content-Type": "application/json" } }
+);
                 }
             
                 
@@ -243,35 +285,42 @@ if ((id == null || typeof id !== "number")) {
                 try {
                     record = await d1.prepare(query).bind(id).first();
                     if (!record) {
-                        
-        return { ok: false, status: 404, message: `hydrate_model: ${"Record not found"}`}
-    
+                        return new Response(
+    JSON.stringify({ ok: false, message: `hydrate_model: Record not found`, status: 404 }),
+    { status: 404, headers: { "Content-Type": "application/json" } }
+);
                     }
                 }
                 catch (e) {
-                    
-        return { ok: false, status: 500, message: `hydrate_model: ${e instanceof Error ? e.message : String(e)}`}
-    
+                    return new Response(
+    JSON.stringify({ ok: false, message: `hydrate_model: ${e instanceof Error ? e.message : String(e)}`, status: 500 }),
+    { status: 500, headers: { "Content-Type": "application/json" } }
+);
                 }
                 const instance = Object.assign(new ExampleModel(), record);
             
                 
             try {
-                return { ok: true, data: JSON.stringify( await instance.get_description(env.DB))}
+                return new Response(
+    JSON.stringify(await instance.get_description(env.DB)),
+    { status: 200, headers: { "Content-Type": "application/json" } }
+);
             }
             catch (e) {
-                
-        return { ok: false, status: 500, message: `dispatch_method: ${e instanceof Error ? e.message : String(e)}`}
-    
+                return new Response(
+    JSON.stringify({ ok: false, message: `dispatch_method: ${e instanceof Error ? e.message : String(e)}`, status: 500 }),
+    { status: 500, headers: { "Content-Type": "application/json" } }
+);
             }
         
             }},
-"<id>": {increment_rating: async (id: number, request: Request, env: Env): Promise<Result<any>> => {
+"<id>": {increment_rating: async (id: number, request: Request, env: Env) => {
                 
                 if (request.method !== "PATCH") {
-                    
-        return { ok: false, status: 405, message: `validate_http: ${"Method Not Allowed"}`}
-    
+                    return new Response(
+    JSON.stringify({ ok: false, message: `validate_http: Method Not Allowed`, status: 405 }),
+    { status: 405, headers: { "Content-Type": "application/json" } }
+);
                 }
             
                 
@@ -279,16 +328,18 @@ if ((id == null || typeof id !== "number")) {
                 try {
                     body = await request.json();
                 } catch {
-                    
-        return { ok: false, status: 400, message: `validate_req_body: ${"Invalid Request Body"}`}
-    
+                    return new Response(
+    JSON.stringify({ ok: false, message: `validate_req_body: Invalid Request Body`, status: 400 }),
+    { status: 400, headers: { "Content-Type": "application/json" } }
+);
                 }
 
                 let {amount} = body;
                 
-if ((amount == null || typeof amount !== "number")) { 
-        return { ok: false, status: 400, message: `validate_req_body: ${"Invalid Request Body"}`}
-     }
+if ((amount == null || typeof amount !== "number")) { return new Response(
+    JSON.stringify({ ok: false, message: `validate_req_body: Invalid Request Body`, status: 400 }),
+    { status: 400, headers: { "Content-Type": "application/json" } }
+); }
                 
                 const d1 = env.DB;
                 const query = "SELECT * FROM ExampleModel WHERE id = ?";
@@ -296,35 +347,42 @@ if ((amount == null || typeof amount !== "number")) {
                 try {
                     record = await d1.prepare(query).bind(id).first();
                     if (!record) {
-                        
-        return { ok: false, status: 404, message: `hydrate_model: ${"Record not found"}`}
-    
+                        return new Response(
+    JSON.stringify({ ok: false, message: `hydrate_model: Record not found`, status: 404 }),
+    { status: 404, headers: { "Content-Type": "application/json" } }
+);
                     }
                 }
                 catch (e) {
-                    
-        return { ok: false, status: 500, message: `hydrate_model: ${e instanceof Error ? e.message : String(e)}`}
-    
+                    return new Response(
+    JSON.stringify({ ok: false, message: `hydrate_model: ${e instanceof Error ? e.message : String(e)}`, status: 500 }),
+    { status: 500, headers: { "Content-Type": "application/json" } }
+);
                 }
                 const instance = Object.assign(new ExampleModel(), record);
             
                 
             try {
-                return { ok: true, data: JSON.stringify( await instance.increment_rating(env.DB, amount))}
+                return new Response(
+    JSON.stringify(await instance.increment_rating(env.DB, amount)),
+    { status: 200, headers: { "Content-Type": "application/json" } }
+);
             }
             catch (e) {
-                
-        return { ok: false, status: 500, message: `dispatch_method: ${e instanceof Error ? e.message : String(e)}`}
-    
+                return new Response(
+    JSON.stringify({ ok: false, message: `dispatch_method: ${e instanceof Error ? e.message : String(e)}`, status: 500 }),
+    { status: 500, headers: { "Content-Type": "application/json" } }
+);
             }
         
             }},
-process_model: async (request: Request, env: Env): Promise<Result<any>> => {
+process_model: async (request: Request, env: Env) => {
                 
                 if (request.method !== "POST") {
-                    
-        return { ok: false, status: 405, message: `validate_http: ${"Method Not Allowed"}`}
-    
+                    return new Response(
+    JSON.stringify({ ok: false, message: `validate_http: Method Not Allowed`, status: 405 }),
+    { status: 405, headers: { "Content-Type": "application/json" } }
+);
                 }
             
                 
@@ -332,35 +390,42 @@ process_model: async (request: Request, env: Env): Promise<Result<any>> => {
                 try {
                     body = await request.json();
                 } catch {
-                    
-        return { ok: false, status: 400, message: `validate_req_body: ${"Invalid Request Body"}`}
-    
+                    return new Response(
+    JSON.stringify({ ok: false, message: `validate_req_body: Invalid Request Body`, status: 400 }),
+    { status: 400, headers: { "Content-Type": "application/json" } }
+);
                 }
 
                 let {model} = body;
                 
-if ((model == null || !$.ExampleModel.validate(model))) { 
-        return { ok: false, status: 400, message: `validate_req_body: ${"Invalid Request Body"}`}
-     }
+if ((model == null || !$.ExampleModel.validate(model))) { return new Response(
+    JSON.stringify({ ok: false, message: `validate_req_body: Invalid Request Body`, status: 400 }),
+    { status: 400, headers: { "Content-Type": "application/json" } }
+); }
 model = Object.assign(new ExampleModel(), model)
                 
                 
             try {
-                return { ok: true, data: JSON.stringify( await ExampleModel.process_model(env.DB, model))}
+                return new Response(
+    JSON.stringify(await ExampleModel.process_model(env.DB, model)),
+    { status: 200, headers: { "Content-Type": "application/json" } }
+);
             }
             catch (e) {
-                
-        return { ok: false, status: 500, message: `dispatch_method: ${e instanceof Error ? e.message : String(e)}`}
-    
+                return new Response(
+    JSON.stringify({ ok: false, message: `dispatch_method: ${e instanceof Error ? e.message : String(e)}`, status: 500 }),
+    { status: 500, headers: { "Content-Type": "application/json" } }
+);
             }
         
             },
-process_models: async (request: Request, env: Env): Promise<Result<any>> => {
+process_models: async (request: Request, env: Env) => {
                 
                 if (request.method !== "POST") {
-                    
-        return { ok: false, status: 405, message: `validate_http: ${"Method Not Allowed"}`}
-    
+                    return new Response(
+    JSON.stringify({ ok: false, message: `validate_http: Method Not Allowed`, status: 405 }),
+    { status: 405, headers: { "Content-Type": "application/json" } }
+);
                 }
             
                 
@@ -368,26 +433,32 @@ process_models: async (request: Request, env: Env): Promise<Result<any>> => {
                 try {
                     body = await request.json();
                 } catch {
-                    
-        return { ok: false, status: 400, message: `validate_req_body: ${"Invalid Request Body"}`}
-    
+                    return new Response(
+    JSON.stringify({ ok: false, message: `validate_req_body: Invalid Request Body`, status: 400 }),
+    { status: 400, headers: { "Content-Type": "application/json" } }
+);
                 }
 
                 let {models} = body;
                 
-if ((models == null || !Array.isArray(models) || models.some(item => (item == null || !$.ExampleModel.validate(item))))) { 
-        return { ok: false, status: 400, message: `validate_req_body: ${"Invalid Request Body"}`}
-     }
+if ((models == null || !Array.isArray(models) || models.some(item => (item == null || !$.ExampleModel.validate(item))))) { return new Response(
+    JSON.stringify({ ok: false, message: `validate_req_body: Invalid Request Body`, status: 400 }),
+    { status: 400, headers: { "Content-Type": "application/json" } }
+); }
 models = models.map(item => Object.assign(new ExampleModel(), item))
                 
                 
             try {
-                return { ok: true, data: JSON.stringify( await ExampleModel.process_models(env.DB, models))}
+                return new Response(
+    JSON.stringify(await ExampleModel.process_models(env.DB, models)),
+    { status: 200, headers: { "Content-Type": "application/json" } }
+);
             }
             catch (e) {
-                
-        return { ok: false, status: 500, message: `dispatch_method: ${e instanceof Error ? e.message : String(e)}`}
-    
+                return new Response(
+    JSON.stringify({ ok: false, message: `dispatch_method: ${e instanceof Error ? e.message : String(e)}`, status: 500 }),
+    { status: 500, headers: { "Content-Type": "application/json" } }
+);
             }
         
             }}} }

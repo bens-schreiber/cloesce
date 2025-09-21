@@ -20,7 +20,7 @@ class Horse {
   static async post(db: D1Database, horse: Horse): Promise<Result<Horse>> {
     let records = await db
       .prepare(
-        "INSERT INTO Horse (id, name, bio) VALUES (:id, :name, :bio) RETURNING *"
+        "INSERT INTO Horse (id, name, bio) VALUES (:id, :name, :bio) RETURNING *",
       )
       .bind(horse)
       .run();

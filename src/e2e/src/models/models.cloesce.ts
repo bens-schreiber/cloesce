@@ -46,12 +46,10 @@ class Horse {
   // By v0.0.3, generic Post methods will be completely generated.
   @POST
   static async post(db: D1Database, horse: Horse): Promise<Result<Horse>> {
-    let records = await db
-      .prepare(
-        "INSERT INTO Horse (id, name, bio) VALUES (:id, :name, :bio) RETURNING *"
-      )
-      .bind(horse)
-      .run();
+    const records = await db
+      .prepare("INSERT INTO Horse (id, name, bio) VALUES (?, ?, ?) RETURNING *")
+      .bind(horse.id, horse.name, horse.bio)
+      .all();
 
     // `mapSql<Horse>` turns an ORM friendly query result into a list of JSON formatted Horse
     let horseJson = mapSql<Horse>(records.results)[0];
@@ -97,14 +95,14 @@ class Horse {
   // Generates a client method `Horse.patch(horse)`
   //
   // By v0.0.3, generic patch methods will be completely generated.
-  // @PATCH
-  // async patch(db: D1Database, horse: Horse): Promise<Result> {
-  //   await db
-  //     .prepare("UPDATE Horse SET name = :name, bio = :bio WHERE Horse.id = :id")
-  //     .bind(horse)
-  //     .run();
-  //   return Result.ok();
-  // }
+  @PATCH
+  async patch(db: D1Database, horse: Horse): Promise<Result<void>> {
+    await db
+      .prepare("UPDATE Horse SET name = ?, bio = ? WHERE Horse.id = ?")
+      .bind(horse.name, horse.bio, horse.id)
+      .run();
+    return Result.ok();
+  }
 
   // Workers endpoint `domain/Horse/:id/match`
   // `D1Database` is injected into the method call.

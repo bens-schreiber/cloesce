@@ -34,7 +34,7 @@ enum AttributeDecoratorKind {
 export class CidlExtractor {
   constructor(
     public projectName: string,
-    public version: string
+    public version: string,
   ) {}
 
   extract(project: Project) {
@@ -42,7 +42,7 @@ export class CidlExtractor {
       sourceFile
         .getClasses()
         .filter((classDecl) => hasDecorator(classDecl, "D1"))
-        .map((classDecl) => CidlExtractor.model(classDecl, sourceFile))
+        .map((classDecl) => CidlExtractor.model(classDecl, sourceFile)),
     );
 
     return {
@@ -165,7 +165,7 @@ export class CidlExtractor {
   /// Throws an error if no type can be extracted.
   private static cidlType(type: Type): [CidlType, boolean] {
     let map: Record<string, CidlType> = {
-      number: "Real",
+      number: "Integer", // TODO: It's wrong to assume number is always an int.
       string: "Text",
       boolean: "Integer",
       Date: "Text",
@@ -211,7 +211,7 @@ export class CidlExtractor {
   private static includeTree(
     obj: any,
     currentClass: ClassDeclaration,
-    sf: SourceFile
+    sf: SourceFile,
   ): any[] {
     if (!obj.isKind || !obj.isKind(SyntaxKind.ObjectLiteralExpression)) {
       return [];
@@ -224,7 +224,7 @@ export class CidlExtractor {
       let navProp = findPropertyByName(currentClass, prop.getName());
       if (!navProp) {
         console.log(
-          `  Warning: Could not find property "${prop.getName()}" in class ${currentClass.getName()}`
+          `  Warning: Could not find property "${prop.getName()}" in class ${currentClass.getName()}`,
         );
         continue;
       }
@@ -300,7 +300,7 @@ function getDecoratorName(decorator: Decorator): string {
 
 function getDecoratorArgument(
   decorator: Decorator,
-  index: number
+  index: number,
 ): string | undefined {
   const args = decorator.getArguments();
   if (!args[index]) return undefined;
@@ -336,7 +336,7 @@ function getModelName(t: CidlType): string | undefined {
 
 function findPropertyByName(
   cls: ClassDeclaration,
-  name: string
+  name: string,
 ): PropertyDeclaration | undefined {
   // Try exact match first
   const exactMatch = cls.getProperties().find((p) => p.getName() === name);
@@ -345,7 +345,7 @@ function findPropertyByName(
 
 function hasDecorator(
   node: { getDecorators(): Decorator[] },
-  name: string
+  name: string,
 ): boolean {
   return node.getDecorators().some((d) => {
     const decoratorName = getDecoratorName(d);
