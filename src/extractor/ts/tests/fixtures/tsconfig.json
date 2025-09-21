@@ -1,1 +1,6 @@
 // @ts-nocheck
+{
+  "compilerOptions": {
+    "strictNullChecks": true
+  }
+}

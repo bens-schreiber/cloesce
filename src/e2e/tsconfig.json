@@ -15,6 +15,7 @@
     "strictPropertyInitialization": false,
     "noEmit": true,
     "allowImportingTsExtensions": true,
+    "strictNullChecks": true, // REQUIRED FOR CLOESCE
     "types": ["jest", "node"]
   },
   "include": ["src/**/*.ts"],

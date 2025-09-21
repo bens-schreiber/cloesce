@@ -15,8 +15,14 @@ impl ClientLanguageTypeMapper for TypeScriptMapper {
                 let inner_ts = self.type_name(inner, nullable);
                 format!("{}[]", inner_ts)
             }
-            CidlType::HttpResult(inner) => self.type_name(&inner, nullable),
-            ty => panic!("Invalid TypeScript type, {:?}", ty),
+            CidlType::HttpResult(inner) => {
+                if let Some(inner) = inner.as_deref() {
+                    self.type_name(inner, nullable)
+                } else {
+                    "void".to_string()
+                }
+            }
+            invalid => panic!("Invalid TypeScript type, {:?}", invalid),
         };
 
         if nullable {

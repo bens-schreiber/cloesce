@@ -97,14 +97,14 @@ class Horse {
   // Generates a client method `Horse.patch(horse)`
   //
   // By v0.0.3, generic patch methods will be completely generated.
-  @PATCH
-  async patch(db: D1Database, horse: Horse): Promise<Result> {
-    await db
-      .prepare("UPDATE Horse SET name = :name, bio = :bio WHERE Horse.id = :id")
-      .bind(horse)
-      .run();
-    return Result.ok();
-  }
+  // @PATCH
+  // async patch(db: D1Database, horse: Horse): Promise<Result> {
+  //   await db
+  //     .prepare("UPDATE Horse SET name = :name, bio = :bio WHERE Horse.id = :id")
+  //     .bind(horse)
+  //     .run();
+  //   return Result.ok();
+  // }
 
   // Workers endpoint `domain/Horse/:id/match`
   // `D1Database` is injected into the method call.
@@ -112,15 +112,15 @@ class Horse {
   // Instantiated, so `this` values are populated by the default data source.
   //
   // Generates a client method `horse.match(horse2)`
-  @POST
-  async match(db: D1Database, horse: Horse): Promise<Result> {
-    await db
-      .prepare("INSERT INTO Match (horseId1, horseId2) VALUES (?, ?)")
-      .bind(this.id, horse.id)
-      .run();
+  // @POST
+  // async match(db: D1Database, horse: Horse): Promise<Result> {
+  //   await db
+  //     .prepare("INSERT INTO Match (horseId1, horseId2) VALUES (?, ?)")
+  //     .bind(this.id, horse.id)
+  //     .run();
 
-    return Result.ok();
-  }
+  //   return Result.ok();
+  // }
 }
 
 @D1

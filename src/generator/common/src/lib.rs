@@ -16,7 +16,7 @@ pub enum CidlType {
     D1Database,
     Model(String),
     Array(Box<CidlType>),
-    HttpResult(Box<CidlType>),
+    HttpResult(Option<Box<CidlType>>),
 }
 
 impl CidlType {

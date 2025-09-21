@@ -10,7 +10,7 @@ exports[`actions snapshot 1`] = `
           "foreign_key_reference": null,
           "is_primary_key": true,
           "value": {
-            "cidl_type": "Integer",
+            "cidl_type": "Real",
             "name": "id",
             "nullable": false,
           },
@@ -36,12 +36,14 @@ exports[`actions snapshot 1`] = `
       ],
       "data_sources": [
         {
-          "DataSource": "default",
+          "name": "default",
           "tree": [
             [
               {
                 "cidl_type": {
-                  "Model": "Match",
+                  "Array": {
+                    "Model": "Match",
+                  },
                 },
                 "name": "matches",
                 "nullable": false,
@@ -53,7 +55,7 @@ exports[`actions snapshot 1`] = `
                       "Model": "Horse",
                     },
                     "name": "horse2",
-                    "nullable": true,
+                    "nullable": false,
                   },
                   [],
                 ],
@@ -69,13 +71,22 @@ exports[`actions snapshot 1`] = `
           "name": "post",
           "parameters": [
             {
-              "cidl_type": "Text",
+              "cidl_type": "D1Database",
+              "name": "db",
+              "nullable": false,
+            },
+            {
+              "cidl_type": {
+                "Model": "Horse",
+              },
               "name": "horse",
               "nullable": false,
             },
           ],
           "return_type": {
-            "Model": "Promise",
+            "HttpResult": {
+              "Model": "Horse",
+            },
           },
         },
         {
@@ -84,22 +95,41 @@ exports[`actions snapshot 1`] = `
           "name": "get",
           "parameters": [
             {
-              "cidl_type": "Integer",
+              "cidl_type": "D1Database",
+              "name": "db",
+              "nullable": false,
+            },
+            {
+              "cidl_type": "Real",
               "name": "id",
               "nullable": false,
             },
           ],
           "return_type": {
-            "Model": "Promise",
+            "HttpResult": {
+              "Array": {
+                "Model": "Horse",
+              },
+            },
           },
         },
         {
           "http_verb": "GET",
           "is_static": true,
           "name": "list",
-          "parameters": [],
+          "parameters": [
+            {
+              "cidl_type": "D1Database",
+              "name": "db",
+              "nullable": false,
+            },
+          ],
           "return_type": {
-            "Model": "Promise",
+            "HttpResult": {
+              "Array": {
+                "Model": "Horse",
+              },
+            },
           },
         },
         {
@@ -108,13 +138,20 @@ exports[`actions snapshot 1`] = `
           "name": "patch",
           "parameters": [
             {
-              "cidl_type": "Text",
+              "cidl_type": "D1Database",
+              "name": "db",
+              "nullable": false,
+            },
+            {
+              "cidl_type": {
+                "Model": "Horse",
+              },
               "name": "horse",
               "nullable": false,
             },
           ],
           "return_type": {
-            "Model": "Promise",
+            "HttpResult": undefined,
           },
         },
         {
@@ -123,13 +160,20 @@ exports[`actions snapshot 1`] = `
           "name": "match",
           "parameters": [
             {
-              "cidl_type": "Text",
+              "cidl_type": "D1Database",
+              "name": "db",
+              "nullable": false,
+            },
+            {
+              "cidl_type": {
+                "Model": "Horse",
+              },
               "name": "horse",
               "nullable": false,
             },
           ],
           "return_type": {
-            "Model": "Promise",
+            "HttpResult": undefined,
           },
         },
       ],
@@ -143,7 +187,9 @@ exports[`actions snapshot 1`] = `
           },
           "value": {
             "cidl_type": {
-              "Model": "Match",
+              "Array": {
+                "Model": "Match",
+              },
             },
             "name": "matches",
             "nullable": false,
@@ -158,7 +204,7 @@ exports[`actions snapshot 1`] = `
           "foreign_key_reference": null,
           "is_primary_key": true,
           "value": {
-            "cidl_type": "Integer",
+            "cidl_type": "Real",
             "name": "id",
             "nullable": false,
           },
@@ -167,7 +213,7 @@ exports[`actions snapshot 1`] = `
           "foreign_key_reference": "Horse",
           "is_primary_key": false,
           "value": {
-            "cidl_type": "Integer",
+            "cidl_type": "Real",
             "name": "horseId1",
             "nullable": false,
           },
@@ -176,7 +222,7 @@ exports[`actions snapshot 1`] = `
           "foreign_key_reference": "Horse",
           "is_primary_key": false,
           "value": {
-            "cidl_type": "Integer",
+            "cidl_type": "Real",
             "name": "horseId2",
             "nullable": false,
           },
@@ -197,14 +243,14 @@ exports[`actions snapshot 1`] = `
               "Model": "Horse",
             },
             "name": "horse2",
-            "nullable": true,
+            "nullable": false,
           },
         },
       ],
       "source_path": "models.cloesce.ts",
     },
   ],
-  "project_name": "actions",
-  "version": "0.0.1",
+  "project_name": "snapshotProject",
+  "version": "0.0.2",
 }
 `;
