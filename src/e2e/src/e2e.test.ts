@@ -1,104 +1,111 @@
-import { compile, linkGeneratedModule, startWrangler } from "./setup.js";
+import test, { before } from "node:test";
+import assert from "node:assert/strict";
+import { compile, linkGeneratedModule, startWrangler } from "./setup.ts";
 
 let Horse: any;
 let Match: any;
 
-describe("E2E Tests", () => {
-  beforeAll(async () => {
+before(
+  async () => {
     compile();
     await startWrangler();
 
-    let mod = await linkGeneratedModule();
-    expect(mod.Horse).toBeDefined();
-    expect(mod.Match).toBeDefined();
+    const mod = await linkGeneratedModule();
+    assert.ok(mod.Horse);
+    assert.ok(mod.Match);
 
     Horse = mod.Horse;
     Match = mod.Match;
-  }, 30_000);
+  },
+  { timeout: 30_000 }
+);
 
-  it("Post, Patch, Get a Horse", async () => {
-    let body = {
-      id: 0,
-      name: "roach",
-      bio: "geralts horse",
+test("Post, Patch, Get a Horse", async () => {
+  let body = {
+    id: 0,
+    name: "roach",
+    bio: "geralts horse",
+    matches: [],
+  };
+
+  let res = await Horse.post(body);
+  assert.ok(res.ok);
+  assert.deepEqual(res.data, body);
+
+  body.name = "ROACH";
+  res = await Horse.patch(body);
+  assert.ok(res.ok);
+
+  res = await Horse.get(body.id);
+  assert.ok(res.ok);
+  assert.deepEqual(res.data, body);
+});
+
+test("List horse returns all horses", async () => {
+  let res = await Horse.list();
+  assert.ok(res.ok);
+  let horses = res.data;
+  assert.equal(horses.length, 1);
+
+  let newHorses = [
+    {
+      id: 2,
+      name: "sonic",
+      bio: "the horse",
       matches: [],
-    };
+    },
+    {
+      id: 3,
+      name: "other roach",
+      bio: "geralts other horse",
+      matches: [],
+    },
+  ];
 
-    let res = await Horse.post(body);
-    expect(res.ok);
-    expect(res.data).toEqual(body);
+  let postResults = await Promise.all(newHorses.map((h) => Horse.post(h)));
+  postResults.forEach((res) => assert.ok(res.ok));
 
-    body.name = "ROACH";
-    res = await Horse.patch(body);
-    expect(res.ok);
+  res = await Horse.list();
+  assert.ok(res.ok);
+  assert.equal(res.data.length, 3);
 
-    res = await Horse.get(body.id);
-    expect(res.ok);
-    expect(res.data).toEqual(body);
-  });
+  // Node's assert doesn't have `arrayContaining`, so use deepEqual after sorting
+  const allHorses = [...horses, ...newHorses];
+  assert.deepEqual(
+    res.data.sort((a: any, b: any) => a.id - b.id),
+    allHorses.sort((a: any, b: any) => a.id - b.id)
+  );
+});
 
-  it("List horse returns all horses", async () => {
-    let res = await Horse.list();
-    expect(res.ok);
-    let horses = res.data;
-    expect(horses.length).toBe(1);
+test("Horse can match with another horse", async () => {
+  let res = await Horse.get(0);
+  assert.ok(res.ok);
+  let horse1 = res.data;
 
-    let newHorses = [
-      {
-        id: 2,
-        name: "sonic",
-        bio: "the horse",
-        matches: [],
-      },
-      {
-        id: 3,
-        name: "other roach",
-        bio: "geralts other horse",
-        matches: [],
-      },
-    ];
+  res = await Horse.get(1);
+  assert.ok(res.ok);
+  let horse2 = res.data;
 
-    let postResults = await Promise.all(newHorses.map((h) => Horse.post(h)));
-    postResults.forEach((res) => {
-      expect(res.ok).toBe(true);
-    });
+  res = await horse1.match(horse2);
+  assert.ok(res.ok);
 
-    res = await Horse.list();
-    expect(res.ok).toBe(true);
-    expect(res.data.length).toBe(3);
-    expect(res.data).toEqual(expect.arrayContaining([...horses, ...newHorses]));
-  });
+  res = await Horse.get(horse1.id);
+  assert.ok(res.ok);
+  let updated_horse1 = res.data;
 
-  it("Horse can match with another horse", async () => {
-    let res = await Horse.get(0);
-    expect(res.ok).toBe(true);
-    let horse1 = res.data;
+  res = await Horse.get(horse2.id);
+  assert.ok(res.ok);
+  let updated_horse2 = res.data;
 
-    res = await Horse.get(1);
-    expect(res.ok).toBe(true);
-    let horse2 = res.data;
+  assert.equal(horse1.matches.length, 1);
+  assert.equal(horse2.matches.length, 1);
+  assert.ok(updated_horse1.matches.includes(horse2.id));
+  assert.ok(updated_horse2.matches.includes(horse1.id));
+});
 
-    res = await horse1.match(horse2);
-    expect(res.ok).toBe(true);
-
-    res = await Horse.get(horse1.id);
-    expect(res.ok).toBe(true);
-    let updated_horse1 = res.data;
-
-    res = await Horse.get(horse2.id);
-    expect(res.ok).toBe(true);
-    let updated_horse2 = res.data;
-
-    expect(horse1.matches.length).toBe(1);
-    expect(horse2.matches.length).toBe(1);
-    expect(updated_horse1.matches).toContain(horse2.id);
-    expect(updated_horse2.matches).toContain(horse1.id);
-  });
-
-  it("Default include tree shows all matches but goes no further", async () => {
-    let res = await Horse.get(0);
-    expect(res.ok).toBe(true);
-    let horse1 = res.data;
-    expect(horse1.matches[0].matches.length).toBe(0);
-  });
+test("Default include tree shows all matches but goes no further", async () => {
+  let res = await Horse.get(0);
+  assert.ok(res.ok);
+  let horse1 = res.data;
+  assert.equal(horse1.matches[0].matches.length, 0);
 });

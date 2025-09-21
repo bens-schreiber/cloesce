@@ -6,13 +6,24 @@ export const POST: MethodDecorator = () => {};
 export const PUT: MethodDecorator = () => {};
 export const PATCH: MethodDecorator = () => {};
 export const DELETE: MethodDecorator = () => {};
+export const DataSource: PropertyDecorator = () => {};
+export const OneToMany =
+  (_: string): PropertyDecorator =>
+  () => {};
+export const OneToOne =
+  (_: string): PropertyDecorator =>
+  () => {};
 
-// HTTP return types
+export const ForeignKey =
+  <T>(_: T): PropertyDecorator =>
+  () => {};
+
+// API Result
 export type Ok<T = void> = { ok: true; data: T };
 export type Err = { ok: false; status: number; message: string };
 export type Result<T = void> = Ok<T> | Err;
 
-// HTTP Result factory
+// Result factory
 function ok(): Ok<void>;
 function ok<T>(data: T): Ok<T>;
 function ok<T>(data?: T): Ok<T | void> {
@@ -22,6 +33,16 @@ function err(status: number, message: string): Err {
   return { ok: false, status, message };
 }
 export const Result = { ok, err };
+
+// Include Tree
+type Primitive = string | number | boolean | bigint | symbol | null | undefined;
+export type IncludeTree<T> = T extends Primitive
+  ? never
+  : {
+      [K in keyof T]?: T[K] extends (infer U)[]
+        ? IncludeTree<NonNullable<U>>
+        : IncludeTree<NonNullable<T[K]>>;
+    };
 
 /**
  * TODO: This could be WASM

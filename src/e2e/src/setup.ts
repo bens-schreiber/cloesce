@@ -12,7 +12,7 @@ const clientPath = path.join(outputDir, "client.ts");
 const port = 5001;
 
 export function compile() {
-  // runSync("Running the extractor", "npx cloesce");
+  runSync("Running the extractor", "npx cloesce");
   runSync("Generating d1", `cargo run generate d1 ${cidlPath} ${d1Path}`, {
     cwd: generatorPath,
   });

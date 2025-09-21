@@ -101,7 +101,8 @@ class Horse {
   async patch(db: D1Database, horse: Horse): Promise<Result> {
     await db
       .prepare("UPDATE Horse SET name = :name, bio = :bio WHERE Horse.id = :id")
-      .bind(horse);
+      .bind(horse)
+      .run();
     return Result.ok();
   }
 
@@ -139,7 +140,7 @@ class Match {
   // A navigation property. Match has a Horse (because of the FK above),
   // so this attribute can be populated explicitly by a Data Source,
   // directly putting the matching Horse into memory.
-  @OneToOne(Match.prototype.horseId2)
+  @OneToOne("horseId2")
   horse2: Horse | undefined;
 }
 
