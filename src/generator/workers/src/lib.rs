@@ -107,7 +107,7 @@ impl WorkersFactory {
     }
 }
 
-// Backward compatibility - default factory without domain
+// Backward compatibility just in case
 impl Default for WorkersFactory {
     fn default() -> Self {
         Self::new()
