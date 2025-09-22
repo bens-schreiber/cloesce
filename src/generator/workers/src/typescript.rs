@@ -1,4 +1,3 @@
-// typescript.rs
 use common::{CidlType, HttpVerb, Method, Model, TypedValue};
 
 use crate::LanguageWorkerGenerator as LanguageWorkersGenerator;
@@ -107,7 +106,7 @@ impl TypescriptWorkersGenerator {
     fn parse_domain(domain: Option<String>) -> (String, String) {
         let domain = domain.unwrap_or_else(|| "http://localhost:8787/api".to_string());
         
-        // Normalize the domain - add http:// if no scheme is present
+        // Normalize the domain
         let normalized = if !domain.starts_with("http://") && !domain.starts_with("https://") {
             format!("http://{}", domain)
         } else {

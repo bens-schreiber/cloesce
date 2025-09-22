@@ -1,4 +1,3 @@
-// lib.rs
 mod typescript;
 
 use common::{CidlSpec, HttpVerb, InputLanguage, Method, Model, TypedValue};

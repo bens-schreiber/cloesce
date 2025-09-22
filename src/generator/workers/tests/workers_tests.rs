@@ -1,4 +1,3 @@
-// workers_tests.rs
 use anyhow::Result;
 use common::CidlSpec;
 use insta::assert_snapshot;
@@ -34,7 +33,7 @@ fn test_generate_client_with_custom_domain() -> Result<()> {
         .with_domain("https://localhost:5000/foo/bar/baz".to_string())
         .create(cidl);
     
-    // Assert - router should use "baz" as root
+    // Assert: router should use "baz" as root
     assert!(workers.contains("const router = { baz:"));
     
     Ok(())
