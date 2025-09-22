@@ -107,7 +107,7 @@ impl TypescriptWorkersGenerator {
     fn parse_domain(domain: Option<String>) -> (String, String) {
         let domain = domain.unwrap_or_else(|| "http://localhost:8787/api".to_string());
         
-        // Let's normalize the domain here
+        // Normalize the domain - add http:// if no scheme is present
         let normalized = if !domain.starts_with("http://") && !domain.starts_with("https://") {
             format!("http://{}", domain)
         } else {
@@ -122,7 +122,7 @@ impl TypescriptWorkersGenerator {
             if let Some(path_idx) = after_scheme.find('/') {
                 // Get everything after the host
                 let path = &after_scheme[path_idx + 1..];
-
+                // Split by '/' and get the last non-empty segment
                 path.split('/')
                     .filter(|s| !s.is_empty())
                     .last()
@@ -180,24 +180,22 @@ import {{ {} }} from '../{}';
     }
 
     fn main(&self) -> String {
-        format!(r#"
-// Workers domain: {domain}
-// Router root: {root}
-export default {{
-    async fetch(request: Request, env: Env, ctx: any): Promise<Response> {{
-        try {{
+        r#"
+export default {
+    async fetch(request: Request, env: Env, ctx: any): Promise<Response> {
+        try {
             const url = new URL(request.url);
             return await match(router, url.pathname, request, env);
-        }} catch (error: any) {{
+        } catch (error: any) {
             console.error("Internal server error:", error);
-            return new Response(JSON.stringify({{ error: error?.message }}), {{
+            return new Response(JSON.stringify({ error: error?.message }), {
                 status: 500,
-                headers: {{ "Content-Type": "application/json" }},
-            }});
-        }}
-    }}
-}};
-"#, domain = self.domain, root = self.root_path)
+                headers: { "Content-Type": "application/json" },
+            });
+        }
+    }
+};
+"#.to_string()
     }
 
     fn router(&self, model: String) -> String {
@@ -218,14 +216,11 @@ const router = {{ {root}: {{{model}}} }}
     }
 
     fn router_method(&self, method: &Method, proto: String) -> String {
+        let method_name = &method.name;
         if method.is_static {
-            proto
+            format!(r#"{method_name}: {proto}"#)
         } else {
-            format!(
-                r#"
-"<id>": {{{proto}}}
-"#
-            )
+            format!(r#"{method_name}: {proto}"#)
         }
     }
 

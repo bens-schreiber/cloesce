@@ -1,11 +1,8 @@
 // @ts-nocheck
-
 export interface Env {
   DB: D1Database;
 }
-
 type SQLRow = Record<string, any>;
-
 /**
  * TODO: This could be WASM
  * TODO: This is all GPT slop
@@ -15,39 +12,30 @@ type SQLRow = Record<string, any>;
 export function mapSql<T>(rows: SQLRow[]): T[] {
   const result: any[] = [];
   const entityMaps: Record<string, Map<string, any>> = {};
-
   function getEntityKey(entityObj: any): string {
     // Use JSON string of all values as a "unique key" for deduplication
     return JSON.stringify(entityObj);
   }
-
   for (const row of rows) {
     const rowEntities: Record<string, any> = {};
-
     // Step 1: split row into entities by prefix
     for (const col in row) {
       const parts = col.split("_");
       if (parts.length < 2) continue;
-
       const entity = parts[0];
       const field = parts.slice(1).join("_");
-
       if (!rowEntities[entity]) rowEntities[entity] = {};
       rowEntities[entity][field] = row[col];
     }
-
     // Step 2: merge entities into result
     let topObj: any = null;
-
     for (const entity in rowEntities) {
       const entityObj = rowEntities[entity];
       const key = getEntityKey(entityObj);
-
       if (!entityMaps[entity]) entityMaps[entity] = new Map();
       if (!entityMaps[entity].has(key)) {
         entityMaps[entity].set(key, entityObj);
       }
-
       if (!topObj) {
         topObj = entityObj; // first entity becomes top-level
       } else {
@@ -61,15 +49,12 @@ export function mapSql<T>(rows: SQLRow[]): T[] {
         }
       }
     }
-
     if (topObj && !result.includes(topObj)) {
       result.push(topObj);
     }
   }
-
   return result as T[];
 }
-
 function match(
   router: any,
   path: string,
@@ -79,28 +64,41 @@ function match(
   const segments = path.split("/").filter(Boolean);
   const params: string[] = [];
   let node: any = router;
-
   const notFound = () =>
     new Response(JSON.stringify({ error: "Route not found", path }), {
       status: 404,
       headers: { "Content-Type": "application/json" },
     });
-
-  for (const segment of segments) {
+  
+  for (let i = 0; i < segments.length; i++) {
+    const segment = segments[i];
+    
     if (node[segment]) {
       node = node[segment];
       continue;
     }
-
+    
+    // Check for parameterized route (e.g., <id>)
     const paramKey = Object.keys(node).find(
       (k) => k.startsWith("<") && k.endsWith(">")
     );
+    
     if (!paramKey) return notFound();
-
+    
     params.push(segment);
     node = node[paramKey];
+    
+    // For instance methods, we need to check the next segment for the method name
+    if (typeof node === "object" && !node.call) {
+      const nextSegment = segments[i + 1];
+      if (!nextSegment || !node[nextSegment]) {
+        return notFound();
+      }
+      node = node[nextSegment];
+      i++; 
+    }
   }
-
+  
   return typeof node === "function"
     ? node(...params, request, env)
     : notFound();

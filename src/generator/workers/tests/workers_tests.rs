@@ -74,3 +74,52 @@ fn test_domain_normalization() -> Result<()> {
     
     Ok(())
 }
+
+#[test]
+fn test_multiple_instance_methods_no_conflict() -> Result<()> {
+    // This test verifies that multiple instance methods don't create conflicting "<id>" keys
+    let cidl = load_cidl()?;
+    
+    let workers = WorkersFactory::new().create(cidl);
+    
+    // Check that the generated code compiles (no duplicate keys)
+    // Look for the pattern where <id> contains an object with multiple methods
+    assert!(workers.contains(r#""<id>": {"#), "Should have <id> route");
+    
+    // Count occurrences of "<id>" at the same nesting level
+    // There should be only one per model
+    let lines: Vec<&str> = workers.lines().collect();
+    let mut id_count_per_model = 0;
+    let mut in_model = false;
+    let mut brace_depth = 0;
+    
+    for line in lines {
+        if line.contains(": {") && !line.contains("function") {
+            brace_depth += 1;
+            if line.contains("Person:") || line.contains("ExampleModel:") {
+                in_model = true;
+                id_count_per_model = 0;
+            }
+        }
+        
+        if in_model && line.contains(r#""<id>":"#) && brace_depth == 2 {
+            id_count_per_model += 1;
+        }
+        
+        if line.contains("}") {
+            brace_depth -= 1;
+            if brace_depth == 1 && in_model {
+                // Each model should have at most one "<id>" key
+                assert!(
+                    id_count_per_model <= 1,
+                    "Found {} '<id>' keys in same model, should be at most 1",
+                    id_count_per_model
+                );
+                in_model = false;
+            }
+        }
+    }
+    
+    println!("No conflicting <id> keys found");
+    Ok(())
+}
