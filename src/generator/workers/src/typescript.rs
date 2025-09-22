@@ -1,4 +1,5 @@
 use common::{CidlType, HttpVerb, Method, Model, TypedValue};
+use std::path::{Path};
 
 use crate::LanguageWorkerGenerator as LanguageWorkersGenerator;
 
@@ -91,21 +92,47 @@ impl TypescriptValidatorGenerator {
 
 pub struct TypescriptWorkersGenerator;
 impl LanguageWorkersGenerator for TypescriptWorkersGenerator {
-    fn imports(&self, models: &[Model]) -> String {
+    fn imports(&self, models: &[Model], workers_path: &Path) -> String {
         let cf_types = r#"
 import { D1Database } from "@cloudflare/workers-types"
 "#;
 
-        // TODO: Fix hardcoding path ../{}
+        // Get the directory where the workers file will be generated
+        let workers_dir = workers_path.parent().unwrap_or(Path::new("."));
+
+        // Generate proper import paths for each model
         let model_imports = models
             .iter()
             .map(|m| {
+                // Remove the .ts extension from the source path
+                let model_path_without_ext = m.source_path.with_extension("");
+                
+                // Calculate relative path using pathdiff
+                let relative_path = pathdiff::diff_paths(&model_path_without_ext, workers_dir)
+                    .map(|p| {
+                        let path_str = p.to_string_lossy().replace('\\', "/");
+                        if path_str.starts_with("../") || path_str.starts_with("./") {
+                            path_str
+                        } else {
+                            format!("./{}", path_str)
+                        }
+                    })
+                    .unwrap_or_else(|| {
+                        // Fallback if pathdiff fails
+                        let path_str = model_path_without_ext.to_string_lossy().replace('\\', "/");
+                        if path_str.starts_with("./") || path_str.starts_with("../") {
+                            path_str
+                        } else {
+                            format!("./{}", path_str)
+                        }
+                    });
+                
                 format!(
                     r#"
-import {{ {} }} from '../{}'; 
+import {{ {} }} from '{}'; 
 "#,
                     m.name,
-                    m.source_path.with_extension("").display() // strip the .ts off
+                    relative_path
                 )
             })
             .collect::<Vec<_>>()

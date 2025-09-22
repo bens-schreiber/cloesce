@@ -2,9 +2,10 @@ mod typescript;
 
 use common::{CidlSpec, HttpVerb, InputLanguage, Method, Model, TypedValue};
 use typescript::TypescriptWorkersGenerator;
+use std::path::Path;
 
 trait LanguageWorkerGenerator {
-    fn imports(&self, models: &[Model]) -> String;
+    fn imports(&self, models: &[Model], workers_path: &Path) -> String;
     fn preamble(&self) -> String;
     fn validators(&self, models: &[Model]) -> String;
     fn main(&self) -> String;
@@ -49,12 +50,12 @@ impl WorkersFactory {
         lang.router_model(&model.name, router_methods.join(",\n"))
     }
 
-    pub fn create(self, spec: CidlSpec) -> String {
+    pub fn create(self, spec: CidlSpec, workers_path: &Path) -> String {
         let generator: &dyn LanguageWorkerGenerator = match spec.language {
             InputLanguage::TypeScript => &TypescriptWorkersGenerator {},
         };
 
-        let imports = generator.imports(&spec.models);
+        let imports = generator.imports(&spec.models, workers_path);
         let preamble = generator.preamble();
         let validators = generator.validators(&spec.models);
 

@@ -103,9 +103,9 @@ fn main() -> Result<()> {
             } => {
                 let cidl = cidl_from_path(cidl_path)?;
                 let mut file =
-                    create_file_and_dir(workers_path).context("Failed to open workers file")?;
+                    create_file_and_dir(workers_path.clone()).context("Failed to open workers file")?;
 
-                file.write(WorkersFactory.create(cidl).as_bytes())
+                file.write(WorkersFactory.create(cidl, &workers_path).as_bytes())
                     .context("Failed to write workers file")?;
             }
             GenerateTarget::Client {
