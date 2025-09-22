@@ -1,3 +1,4 @@
+// typescript.rs
 use common::{CidlType, HttpVerb, Method, Model, TypedValue};
 
 use crate::LanguageWorkerGenerator as LanguageWorkersGenerator;
@@ -89,7 +90,63 @@ impl TypescriptValidatorGenerator {
     }
 }
 
-pub struct TypescriptWorkersGenerator;
+pub struct TypescriptWorkersGenerator {
+    domain: String,
+    root_path: String,
+}
+
+impl TypescriptWorkersGenerator {
+    pub fn new(domain: Option<String>) -> Self {
+        let (normalized_domain, root) = Self::parse_domain(domain);
+        Self {
+            domain: normalized_domain,
+            root_path: root,
+        }
+    }
+
+    fn parse_domain(domain: Option<String>) -> (String, String) {
+        let domain = domain.unwrap_or_else(|| "http://localhost:8787/api".to_string());
+        
+        // Let's normalize the domain here
+        let normalized = if !domain.starts_with("http://") && !domain.starts_with("https://") {
+            format!("http://{}", domain)
+        } else {
+            domain.clone()
+        };
+
+        // Extract the path from the URL
+        let root = if let Some(idx) = normalized.find("://") {
+            // Skip the scheme
+            let after_scheme = &normalized[idx + 3..];
+            // Find the first '/' after the host
+            if let Some(path_idx) = after_scheme.find('/') {
+                // Get everything after the host
+                let path = &after_scheme[path_idx + 1..];
+
+                path.split('/')
+                    .filter(|s| !s.is_empty())
+                    .last()
+                    .unwrap_or("api")
+                    .to_string()
+            } else {
+                // No path in the URL, use default
+                "api".to_string()
+            }
+        } else {
+            // No scheme found, try to parse as simple path
+            normalized.split('/')
+                .filter(|s| !s.is_empty() && !s.contains(':'))
+                .last()
+                .unwrap_or("api")
+                .to_string()
+        };
+
+        (normalized, root)
+    }
+
+
+}
+
 impl LanguageWorkersGenerator for TypescriptWorkersGenerator {
     fn imports(&self, models: &[Model]) -> String {
         let cf_types = r#"
@@ -123,30 +180,32 @@ import {{ {} }} from '../{}';
     }
 
     fn main(&self) -> String {
-        r#"
-export default {
-    async fetch(request: Request, env: Env, ctx: any): Promise<Response> {
-        try {
+        format!(r#"
+// Workers domain: {domain}
+// Router root: {root}
+export default {{
+    async fetch(request: Request, env: Env, ctx: any): Promise<Response> {{
+        try {{
             const url = new URL(request.url);
             return await match(router, url.pathname, request, env);
-        } catch (error: any) {
+        }} catch (error: any) {{
             console.error("Internal server error:", error);
-            return new Response(JSON.stringify({ error: error?.message }), {
+            return new Response(JSON.stringify({{ error: error?.message }}), {{
                 status: 500,
-                headers: { "Content-Type": "application/json" },
-            });
-        }
-    }
-};
-"#
-        .to_string()
+                headers: {{ "Content-Type": "application/json" }},
+            }});
+        }}
+    }}
+}};
+"#, domain = self.domain, root = self.root_path)
     }
 
     fn router(&self, model: String) -> String {
         format!(
             r#"
-const router = {{ api: {{{model}}} }}
-"#
+const router = {{ {root}: {{{model}}} }}
+"#,
+            root = self.root_path
         )
     }
 

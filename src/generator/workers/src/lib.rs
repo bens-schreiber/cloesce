@@ -1,3 +1,4 @@
+// lib.rs
 mod typescript;
 
 use common::{CidlSpec, HttpVerb, InputLanguage, Method, Model, TypedValue};
@@ -18,8 +19,20 @@ trait LanguageWorkerGenerator {
     fn dispatch_method(&self, model_name: &str, method: &Method) -> String;
 }
 
-pub struct WorkersFactory;
+pub struct WorkersFactory {
+    domain: Option<String>,
+}
+
 impl WorkersFactory {
+    pub fn new() -> Self {
+        Self { domain: None }
+    }
+
+    pub fn with_domain(mut self, domain: String) -> Self {
+        self.domain = Some(domain);
+        self
+    }
+
     fn model(model: &Model, lang: &dyn LanguageWorkerGenerator) -> String {
         let mut router_methods = vec![];
         for method in &model.methods {
@@ -31,7 +44,6 @@ impl WorkersFactory {
                 &lang.hydrate_model(model)
             };
             let dispatch = lang.dispatch_method(&model.name, method);
-
             let method_body = format!(
                 r#"
                 {validate_http}
@@ -40,38 +52,35 @@ impl WorkersFactory {
                 {dispatch}
             "#
             );
-
             let proto = lang.proto(method, method_body);
-
             router_methods.push(lang.router_method(method, proto))
         }
-
         lang.router_model(&model.name, router_methods.join(",\n"))
     }
 
     pub fn create(self, spec: CidlSpec) -> String {
-        let generator: &dyn LanguageWorkerGenerator = match spec.language {
-            InputLanguage::TypeScript => &TypescriptWorkersGenerator {},
+        let generator: Box<dyn LanguageWorkerGenerator> = match spec.language {
+            InputLanguage::TypeScript => {
+                Box::new(TypescriptWorkersGenerator::new(self.domain))
+            }
         };
 
         let imports = generator.imports(&spec.models);
         let preamble = generator.preamble();
         let validators = generator.validators(&spec.models);
-
         let router = {
             let router_body = spec
                 .models
                 .iter()
-                .map(|m| Self::model(m, generator))
+                .map(|m| Self::model(m, generator.as_ref()))
                 .collect::<Vec<_>>()
                 .join("\n");
             generator.router(router_body)
         };
-
         let main = generator.main();
-
+        
         format!(
-            r#" 
+            r#"
 {imports}
 {preamble}
 {validators}
@@ -79,5 +88,12 @@ impl WorkersFactory {
 {main}
         "#
         )
+    }
+}
+
+// Backward compatibility - default factory without domain
+impl Default for WorkersFactory {
+    fn default() -> Self {
+        Self::new()
     }
 }
