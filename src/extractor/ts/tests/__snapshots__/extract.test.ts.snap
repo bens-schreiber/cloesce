@@ -33,27 +33,20 @@ exports[`actions snapshot 1`] = `
           "name": "create",
           "parameters": [
             {
-              "cidl_type": "D1Database",
-              "name": "db",
-              "nullable": false,
-            },
-            {
               "cidl_type": "Text",
               "name": "payload",
               "nullable": false,
             },
           ],
+          "return_type": {
+            "Model": "Response",
+          },
         },
         {
           "http_verb": "PUT",
           "is_static": true,
           "name": "update",
           "parameters": [
-            {
-              "cidl_type": "D1Database",
-              "name": "db",
-              "nullable": false,
-            },
             {
               "cidl_type": "Integer",
               "name": "id",
@@ -65,6 +58,9 @@ exports[`actions snapshot 1`] = `
               "nullable": true,
             },
           ],
+          "return_type": {
+            "Model": "Response",
+          },
         },
         {
           "http_verb": "PATCH",
@@ -72,16 +68,14 @@ exports[`actions snapshot 1`] = `
           "name": "patch",
           "parameters": [
             {
-              "cidl_type": "D1Database",
-              "name": "db",
-              "nullable": false,
-            },
-            {
               "cidl_type": "Text",
               "name": "phrase",
               "nullable": false,
             },
           ],
+          "return_type": {
+            "Model": "Response",
+          },
         },
         {
           "http_verb": "DELETE",
@@ -89,16 +83,14 @@ exports[`actions snapshot 1`] = `
           "name": "remove",
           "parameters": [
             {
-              "cidl_type": "D1Database",
-              "name": "db",
-              "nullable": false,
-            },
-            {
               "cidl_type": "Integer",
               "name": "id",
               "nullable": false,
             },
           ],
+          "return_type": {
+            "Model": "Response",
+          },
         },
       ],
       "name": "Actions",
@@ -150,25 +142,19 @@ exports[`actions snapshot 1`] = `
           "http_verb": "GET",
           "is_static": false,
           "name": "get_name",
-          "parameters": [
-            {
-              "cidl_type": "D1Database",
-              "name": "db",
-              "nullable": false,
-            },
-          ],
+          "parameters": [],
+          "return_type": {
+            "Model": "Promise",
+          },
         },
         {
           "http_verb": "GET",
           "is_static": false,
           "name": "get_breed",
-          "parameters": [
-            {
-              "cidl_type": "D1Database",
-              "name": "db",
-              "nullable": false,
-            },
-          ],
+          "parameters": [],
+          "return_type": {
+            "Model": "Promise",
+          },
         },
         {
           "http_verb": "POST",
@@ -176,16 +162,14 @@ exports[`actions snapshot 1`] = `
           "name": "woof",
           "parameters": [
             {
-              "cidl_type": "D1Database",
-              "name": "db",
-              "nullable": false,
-            },
-            {
               "cidl_type": "Text",
               "name": "phrase",
               "nullable": false,
             },
           ],
+          "return_type": {
+            "Model": "Promise",
+          },
         },
       ],
       "name": "Dog",
@@ -228,13 +212,10 @@ exports[`actions snapshot 1`] = `
           "http_verb": "GET",
           "is_static": false,
           "name": "foo",
-          "parameters": [
-            {
-              "cidl_type": "D1Database",
-              "name": "db",
-              "nullable": false,
-            },
-          ],
+          "parameters": [],
+          "return_type": {
+            "Model": "Promise",
+          },
         },
         {
           "http_verb": "POST",
@@ -242,16 +223,14 @@ exports[`actions snapshot 1`] = `
           "name": "speak",
           "parameters": [
             {
-              "cidl_type": "D1Database",
-              "name": "db",
-              "nullable": false,
-            },
-            {
               "cidl_type": "Text",
               "name": "phrase",
               "nullable": false,
             },
           ],
+          "return_type": {
+            "Model": "Promise",
+          },
         },
       ],
       "name": "Person",
