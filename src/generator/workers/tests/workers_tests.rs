@@ -19,7 +19,6 @@ fn test_generate_client_snapshot() -> Result<()> {
     // Act
     let workers = WorkersFactory.create(cidl, &workers_path)?;
 
-
     // Assert
     assert_snapshot!("generated_workers", workers);
     Ok(())

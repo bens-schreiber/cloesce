@@ -1,7 +1,7 @@
-use common::{CidlType, HttpVerb, Method, Model, TypedValue};
-use std::path::{Path};
-use anyhow::{Context, Result};
 use anyhow::anyhow;
+use anyhow::{Context, Result};
+use common::{CidlType, HttpVerb, Method, Model, TypedValue};
+use std::path::Path;
 
 use crate::LanguageWorkerGenerator as LanguageWorkersGenerator;
 
@@ -143,7 +143,6 @@ import { D1Database } from "@cloudflare/workers-types"
 
         Ok(format!("{cf_types}\n{model_imports}\n"))
     }
-
 
     fn preamble(&self) -> String {
         include_str!("./templates/preamble.ts").to_string()

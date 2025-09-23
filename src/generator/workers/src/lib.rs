@@ -1,9 +1,9 @@
 mod typescript;
 
+use anyhow::Result;
 use common::{CidlSpec, HttpVerb, InputLanguage, Method, Model, TypedValue};
-use typescript::TypescriptWorkersGenerator;
 use std::path::Path;
-use anyhow::{Result};
+use typescript::TypescriptWorkersGenerator;
 
 trait LanguageWorkerGenerator {
     fn imports(&self, models: &[Model], workers_path: &Path) -> Result<String>;
