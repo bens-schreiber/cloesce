@@ -6,7 +6,7 @@ expression: workers
 
 import { D1Database } from "@cloudflare/workers-types"
 
-import { ExampleModel } from '../example_model'; 
+import { ExampleModel } from './model/example_model';
 
 // @ts-nocheck
 
