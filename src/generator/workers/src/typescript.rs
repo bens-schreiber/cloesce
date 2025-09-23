@@ -90,9 +90,77 @@ impl TypescriptValidatorGenerator {
         "#
         )
     }
+    pub fn extract_query_params(params: &[&TypedValue]) -> String {
+        let extractions: Vec<String> = params
+            .iter()
+            .map(|p| {
+                let name = &p.name;
+                match &p.cidl_type {
+                    CidlType::Integer => {
+                        format!(
+                            r#"
+                const {name}Str = searchParams.get("{name}");
+                if ({name}Str !== null) {{
+                    const parsed = parseInt({name}Str, 10);
+                    if (!isNaN(parsed)) {{
+                        params.{name} = parsed;
+                    }}
+                }}"#
+                        )
+                    }
+                    CidlType::Real => {
+                        format!(
+                            r#"
+                const {name}Str = searchParams.get("{name}");
+                if ({name}Str !== null) {{
+                    const parsed = parseFloat({name}Str);
+                    if (!isNaN(parsed)) {{
+                        params.{name} = parsed;
+                    }}
+                }}"#
+                        )
+                    }
+                    CidlType::Text => {
+                        format!(
+                            r#"
+                const {name}Str = searchParams.get("{name}");
+                if ({name}Str !== null) {{
+                    params.{name} = {name}Str;
+                }}"#
+                        )
+                    }
+                    CidlType::Array(_) => {
+                        format!(
+                            r#"
+                throw new Error("Array parameters are not supported in GET requests. Parameter: {name}");"#
+                        )
+                    }
+                    CidlType::Model(_) => {
+                        format!(
+                            r#"
+                throw new Error("Model parameters are not supported in GET requests. Parameter: {name}");"#
+                        )
+                    }
+                    _ => {
+                        // For other types, attempt to get as string
+                        format!(
+                            r#"
+                const {name}Str = searchParams.get("{name}");
+                if ({name}Str !== null) {{
+                    params.{name} = {name}Str;
+                }}"#
+                        )
+                    }
+                }
+            })
+            .collect();
+
+        extractions.join("\n                ")
+    }
 }
 
 pub struct TypescriptWorkersGenerator;
+
 impl LanguageWorkersGenerator for TypescriptWorkersGenerator {
     fn imports(&self, models: &[Model], workers_path: &Path) -> Result<String> {
         let cf_types = r#"
@@ -234,8 +302,8 @@ if (request.method !== "{verb_str}") {{
         )
     }
 
-    fn validate_request_params(&self, params: &[TypedValue]) -> String {
-        let mut validate = Vec::new();
+    fn validate_request(&self, method: &Method) -> String {
+        let params = &method.parameters;
 
         let req_params = params
             .iter()
@@ -246,136 +314,76 @@ if (request.method !== "{verb_str}") {{
             return String::new();
         }
 
-        let invalid = r#"
+        let param_names = req_params
+            .iter()
+            .map(|p| p.name.clone())
+            .collect::<Vec<_>>()
+            .join(", ");
+
+        let invalid_response = r#"
             return new Response(JSON.stringify({ error: "Invalid request parameters" }), {
                 status: 400,
                 headers: { "Content-Type": "application/json" },
             });
         "#;
 
-        // Check if this is a GET request by looking at the request context
-        // Since we don't have direct access to the HTTP verb here, we'll need to
-        // generate code that handles both cases
-        validate.push(
-            r#"
-            const url = new URL(request.url);
-            const isGetRequest = request.method === "GET";
-            let params: any = {};
-        "#
-            .to_string(),
-        );
+        let mut validation_checks = Vec::new();
+        let mut assignments = Vec::new();
 
-        // Generate parameter extraction based on request method
-        let param_names = req_params
-            .iter()
-            .map(|p| p.name.clone())
-            .collect::<Vec<_>>()
-            .join(",");
-
-        validate.push(format!(
-            r#"
-            if (isGetRequest) {{
-                // Extract parameters from URL query string
-                const searchParams = url.searchParams;
-                
-                // Extract GET parameters
-                {get_param_extraction}
-            }} else {{
-                // Extract parameters from request body for non-GET requests
-                let body;
-                try {{
-                    body = await request.json();
-                }} catch {{
-                    {invalid}
-                }}
-                params = body;
-            }}
-            
-            let {{{param_names}}} = params;
-        "#,
-            get_param_extraction = self.generate_get_param_extraction(&req_params),
-        ));
-
-        // Validate parameters and assign models to actual instances
-        for param in req_params {
+        for param in &req_params {
             if let Some(type_check) = TypescriptValidatorGenerator::validate_type(param, "") {
-                validate.push(format!("if ({type_check}) {{ {invalid} }}"))
+                validation_checks.push(format!("if ({type_check}) {{ {invalid_response} }}"));
             }
+
             if let Some(assign) = TypescriptValidatorGenerator::assign_type(param) {
-                validate.push(format!("{} = {assign}", param.name))
+                assignments.push(format!("{} = {assign}", param.name));
             }
         }
 
-        validate.join("\n")
-    }
+        let validation_code = validation_checks.join("\n            ");
+        let assignment_code = assignments.join(";\n            ");
 
-    fn generate_get_param_extraction(&self, params: &[&TypedValue]) -> String {
-        let extractions: Vec<String> = params
-        .iter()
-        .map(|p| {
-            let name = &p.name;
-            let extraction = match &p.cidl_type {
-                CidlType::Integer => {
-                    format!(
-                        r#"
-            const {name}Str = searchParams.get("{name}");
-            if ({name}Str !== null) {{
-                const parsed = parseInt({name}Str, 10);
-                if (!isNaN(parsed)) {{
-                    params.{name} = parsed;
-                }}
+        let extraction_logic = match method.http_verb {
+            HttpVerb::GET => {
+                let query_param_extractors =
+                    TypescriptValidatorGenerator::extract_query_params(&req_params);
+                format!(
+                    r#"
+            // Extract parameters from URL query string for GET request
+            const url = new URL(request.url);
+            const searchParams = url.searchParams;
+            let params: any = {{}};
+            
+            {query_param_extractors}"#
+                )
+            }
+            _ => {
+                format!(
+                    r#"
+            // Extract parameters from request body for non-GET requests
+            let params: any;
+            try {{
+                params = await request.json();
+            }} catch {{
+                {invalid_response}
             }}"#
-                    )
-                }
-                CidlType::Real => {
-                    format!(
-                        r#"
-            const {name}Str = searchParams.get("{name}");
-            if ({name}Str !== null) {{
-                const parsed = parseFloat({name}Str);
-                if (!isNaN(parsed)) {{
-                    params.{name} = parsed;
-                }}
-            }}"#
-                    )
-                }
-                CidlType::Text => {
-                    format!(
-                        r#"
-            const {name}Str = searchParams.get("{name}");
-            if ({name}Str !== null) {{
-                params.{name} = {name}Str;
-            }}"#
-                    )
-                }
-                CidlType::Array(_) => {
-                    format!(
-                        r#"
-            throw new Error("Array parameters are not supported in GET requests. Parameter: {name}");"#
-                    )
-                }
-                CidlType::Model(_) => {
-                    format!(
-                        r#"
-            throw new Error("Model parameters are not supported in GET requests. Parameter: {name}");"#
-                    )
-                }
-                _ => {
-                    // For other types, attempt to get as string
-                    format!(
-                        r#"
-            const {name}Str = searchParams.get("{name}");
-            if ({name}Str !== null) {{
-                params.{name} = {name}Str;
-            }}"#
-                    )
-                }
-            };
-            extraction
-        })
-        .collect();
+                )
+            }
+        };
 
-        extractions.join("\n                ")
+        format!(
+            r#"
+            {extraction_logic}
+            
+            let {{{param_names}}} = params;
+            
+            // Validate parameters
+            {validation_code}
+            
+            // Assign model instances
+            {assignment_code}
+        "#
+        )
     }
 
     fn hydrate_model(&self, model: &Model) -> String {
@@ -387,7 +395,7 @@ if (request.method !== "{verb_str}") {{
         let has_ds = model.data_sources.len() > 1;
 
         let query = if has_ds {
-            format!("`SELECT * FROM{model_name}_default WHERE {model_name}_{pk} = ?")
+            format!("`SELECT * FROM {model_name}_default WHERE {model_name}_{pk} = ?`")
         } else {
             format!("`SELECT * FROM {model_name} WHERE {pk} = ?`")
         };
