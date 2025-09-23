@@ -234,46 +234,70 @@ if (request.method !== "{verb_str}") {{
         )
     }
 
-    fn validate_req_body(&self, params: &[TypedValue]) -> String {
+    fn validate_request_params(&self, params: &[TypedValue]) -> String {
         let mut validate = Vec::new();
 
-        let req_body_params = params
+        let req_params = params
             .iter()
             .filter(|p| !matches!(p.cidl_type, CidlType::D1Database))
             .collect::<Vec<_>>();
 
+        if req_params.is_empty() {
+            return String::new();
+        }
+
         let invalid = r#"
-            return new Response(JSON.stringify({ error: "Invalid request body" }), {
+            return new Response(JSON.stringify({ error: "Invalid request parameters" }), {
                 status: 400,
                 headers: { "Content-Type": "application/json" },
             });
         "#;
 
-        // Instantiate from request body
-        if !req_body_params.is_empty() {
-            let req_body_params_lst = req_body_params
-                .iter()
-                .map(|p| p.name.clone())
-                .collect::<Vec<_>>()
-                .join(",");
+        // Check if this is a GET request by looking at the request context
+        // Since we don't have direct access to the HTTP verb here, we'll need to
+        // generate code that handles both cases
+        validate.push(
+            r#"
+            const url = new URL(request.url);
+            const isGetRequest = request.method === "GET";
+            let params: any = {};
+        "#
+            .to_string(),
+        );
 
-            validate.push(format!(
-                r#"
+        // Generate parameter extraction based on request method
+        let param_names = req_params
+            .iter()
+            .map(|p| p.name.clone())
+            .collect::<Vec<_>>()
+            .join(",");
+
+        validate.push(format!(
+            r#"
+            if (isGetRequest) {{
+                // Extract parameters from URL query string
+                const searchParams = url.searchParams;
+                
+                // Extract GET parameters
+                {get_param_extraction}
+            }} else {{
+                // Extract parameters from request body for non-GET requests
                 let body;
                 try {{
                     body = await request.json();
                 }} catch {{
                     {invalid}
                 }}
+                params = body;
+            }}
+            
+            let {{{param_names}}} = params;
+        "#,
+            get_param_extraction = self.generate_get_param_extraction(&req_params),
+        ));
 
-                let {{{req_body_params_lst}}} = body;
-                "#
-            ));
-        }
-
-        // Validate params from request body
-        // Assign models to actual instances
-        for param in req_body_params {
+        // Validate parameters and assign models to actual instances
+        for param in req_params {
             if let Some(type_check) = TypescriptValidatorGenerator::validate_type(param, "") {
                 validate.push(format!("if ({type_check}) {{ {invalid} }}"))
             }
@@ -283,6 +307,75 @@ if (request.method !== "{verb_str}") {{
         }
 
         validate.join("\n")
+    }
+
+    fn generate_get_param_extraction(&self, params: &[&TypedValue]) -> String {
+        let extractions: Vec<String> = params
+        .iter()
+        .map(|p| {
+            let name = &p.name;
+            let extraction = match &p.cidl_type {
+                CidlType::Integer => {
+                    format!(
+                        r#"
+            const {name}Str = searchParams.get("{name}");
+            if ({name}Str !== null) {{
+                const parsed = parseInt({name}Str, 10);
+                if (!isNaN(parsed)) {{
+                    params.{name} = parsed;
+                }}
+            }}"#
+                    )
+                }
+                CidlType::Real => {
+                    format!(
+                        r#"
+            const {name}Str = searchParams.get("{name}");
+            if ({name}Str !== null) {{
+                const parsed = parseFloat({name}Str);
+                if (!isNaN(parsed)) {{
+                    params.{name} = parsed;
+                }}
+            }}"#
+                    )
+                }
+                CidlType::Text => {
+                    format!(
+                        r#"
+            const {name}Str = searchParams.get("{name}");
+            if ({name}Str !== null) {{
+                params.{name} = {name}Str;
+            }}"#
+                    )
+                }
+                CidlType::Array(_) => {
+                    format!(
+                        r#"
+            throw new Error("Array parameters are not supported in GET requests. Parameter: {name}");"#
+                    )
+                }
+                CidlType::Model(_) => {
+                    format!(
+                        r#"
+            throw new Error("Model parameters are not supported in GET requests. Parameter: {name}");"#
+                    )
+                }
+                _ => {
+                    // For other types, attempt to get as string
+                    format!(
+                        r#"
+            const {name}Str = searchParams.get("{name}");
+            if ({name}Str !== null) {{
+                params.{name} = {name}Str;
+            }}"#
+                    )
+                }
+            };
+            extraction
+        })
+        .collect();
+
+        extractions.join("\n                ")
     }
 
     fn hydrate_model(&self, model: &Model) -> String {

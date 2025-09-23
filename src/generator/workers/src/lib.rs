@@ -15,9 +15,10 @@ trait LanguageWorkerGenerator {
     fn router_method(&self, method: &Method, proto: String) -> String;
     fn proto(&self, method: &Method, body: String) -> String;
     fn validate_http(&self, verb: &HttpVerb) -> String;
-    fn validate_req_body(&self, params: &[TypedValue]) -> String;
     fn hydrate_model(&self, model_name: &Model) -> String;
     fn dispatch_method(&self, model_name: &str, method: &Method) -> String;
+    fn generate_get_param_extraction(&self, params: &[&TypedValue]) -> String;
+    fn validate_request_params(&self, params: &[TypedValue]) -> String;
 }
 
 pub struct WorkersFactory;
@@ -26,7 +27,7 @@ impl WorkersFactory {
         let mut router_methods = vec![];
         for method in &model.methods {
             let validate_http = lang.validate_http(&method.http_verb);
-            let validate_params = lang.validate_req_body(&method.parameters);
+            let validate_params = lang.validate_request_params(&method.parameters);
             let hydration = if method.is_static {
                 ""
             } else {
