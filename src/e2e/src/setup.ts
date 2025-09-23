@@ -16,11 +16,11 @@ export function compile() {
   runSync("Generating d1", `cargo run generate d1 ${cidlPath} ${d1Path}`, {
     cwd: generatorPath,
   });
-  // runSync(
-  //   "Generating workers",
-  //   `cargo run generate workers ${cidlPath} ${workersPath}`,
-  //   { cwd: generatorPath }
-  // );
+  runSync(
+    "Generating workers",
+    `cargo run generate workers ${cidlPath} ${workersPath}`,
+    { cwd: generatorPath },
+  );
   runSync(
     "Generating client",
     `cargo run generate client ${cidlPath} ${clientPath} http://localhost:${port}/api`,

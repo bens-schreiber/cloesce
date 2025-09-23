@@ -35,16 +35,16 @@ enum AttributeDecoratorKind {
 export class CidlExtractor {
   constructor(
     public projectName: string,
-    public version: string
+    public version: string,
   ) {}
 
   extract(project: Project) {
-    const models = project.getSourceFiles().flatMap((sourceFile) =>
-      sourceFile
+    const models = project.getSourceFiles().flatMap((sourceFile) => {
+      return sourceFile
         .getClasses()
         .filter((classDecl) => hasDecorator(classDecl, "D1"))
-        .map((classDecl) => CidlExtractor.model(classDecl, sourceFile))
-    );
+        .map((classDecl) => CidlExtractor.model(classDecl, sourceFile));
+    });
 
     return {
       version: this.version,
@@ -160,7 +160,7 @@ export class CidlExtractor {
       navigation_properties: navigationProperties,
       methods,
       data_sources: dataSources,
-      source_path: path.basename(sourceFile.getFilePath()),
+      source_path: sourceFile.getFilePath().toString(),
     };
   }
 
@@ -214,7 +214,7 @@ export class CidlExtractor {
   private static includeTree(
     obj: any,
     currentClass: ClassDeclaration,
-    sf: SourceFile
+    sf: SourceFile,
   ): any[] {
     if (!obj.isKind || !obj.isKind(SyntaxKind.ObjectLiteralExpression)) {
       return [];
@@ -227,7 +227,7 @@ export class CidlExtractor {
       let navProp = findPropertyByName(currentClass, prop.getName());
       if (!navProp) {
         console.log(
-          `  Warning: Could not find property "${prop.getName()}" in class ${currentClass.getName()}`
+          `  Warning: Could not find property "${prop.getName()}" in class ${currentClass.getName()}`,
         );
         continue;
       }
@@ -303,7 +303,7 @@ function getDecoratorName(decorator: Decorator): string {
 
 function getDecoratorArgument(
   decorator: Decorator,
-  index: number
+  index: number,
 ): string | undefined {
   const args = decorator.getArguments();
   if (!args[index]) return undefined;
@@ -339,7 +339,7 @@ function getModelName(t: CidlType): string | undefined {
 
 function findPropertyByName(
   cls: ClassDeclaration,
-  name: string
+  name: string,
 ): PropertyDeclaration | undefined {
   // Try exact match first
   const exactMatch = cls.getProperties().find((p) => p.getName() === name);
@@ -348,7 +348,7 @@ function findPropertyByName(
 
 function hasDecorator(
   node: { getDecorators(): Decorator[] },
-  name: string
+  name: string,
 ): boolean {
   return node.getDecorators().some((d) => {
     const decoratorName = getDecoratorName(d);

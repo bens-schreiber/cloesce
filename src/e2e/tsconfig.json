@@ -8,6 +8,7 @@
     "declaration": true,
     "declarationMap": true,
     "strict": true,
+    "strictNullChecks": true,
     "skipLibCheck": true,
     "esModuleInterop": true,
     "experimentalDecorators": true,
@@ -15,7 +16,6 @@
     "strictPropertyInitialization": false,
     "noEmit": true,
     "allowImportingTsExtensions": true,
-    "strictNullChecks": true, // REQUIRED FOR CLOESCE
     "types": ["jest", "node"]
   },
   "include": ["src/**/*.ts"],

@@ -8,7 +8,12 @@ test("actions snapshot", () => {
   project.addSourceFileAtPath("../../test_fixtures/models.cloesce.ts");
 
   let extractor = new CidlExtractor("snapshotProject", "0.0.2");
-  let models = extractor.extract(project);
+  let cidl = extractor.extract(project);
+  for (const m of cidl.models) {
+    if (m) {
+      m.source_path = "void for tests";
+    }
+  }
 
-  expect(models).toMatchSnapshot();
+  expect(cidl).toMatchSnapshot();
 });

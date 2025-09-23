@@ -111,7 +111,7 @@ class Horse {
   //
   // Generates a client method `horse.match(horse2)`
   @POST
-  async match(db: D1Database, horse: Horse): Promise<Result> {
+  async match(db: D1Database, horse: Horse): Promise<Result<void>> {
     await db
       .prepare("INSERT INTO Match (horseId1, horseId2) VALUES (?, ?)")
       .bind(this.id, horse.id)

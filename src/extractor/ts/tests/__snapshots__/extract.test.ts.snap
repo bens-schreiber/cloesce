@@ -196,7 +196,7 @@ exports[`actions snapshot 1`] = `
           },
         },
       ],
-      "source_path": "models.cloesce.ts",
+      "source_path": "void for tests",
     },
     {
       "attributes": [
@@ -247,7 +247,7 @@ exports[`actions snapshot 1`] = `
           },
         },
       ],
-      "source_path": "models.cloesce.ts",
+      "source_path": "void for tests",
     },
   ],
   "project_name": "snapshotProject",
