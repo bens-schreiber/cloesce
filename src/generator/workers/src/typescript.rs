@@ -1,6 +1,9 @@
-use common::{CidlType, HttpVerb, Model, ModelMethod, NamedTypedValue};
+use std::path::Path;
+
+use anyhow::{Context, Result, anyhow};
 
 use crate::WorkersGeneratable as LanguageWorkersGenerator;
+use common::{CidlType, HttpVerb, Model, ModelMethod, NamedTypedValue};
 
 fn final_state(status: u32, body: &str) -> String {
     format!(
@@ -132,24 +135,50 @@ impl TypescriptValidatorGenerator {
 
 pub struct TypescriptWorkersGenerator;
 impl LanguageWorkersGenerator for TypescriptWorkersGenerator {
-    fn imports(&self, models: &[Model]) -> String {
+    fn imports(&self, models: &[Model], workers_path: &Path) -> Result<String> {
         const CLOUDFLARE_TYPES: &str = r#"import { D1Database } from "@cloudflare/workers-types""#;
         const CLOESCE_TYPES: &str = r#"import { mapSql, match, Result } from "cloesce""#;
 
-        // TODO: Fix hardcoding path ../{}
+        let workers_dir = workers_path
+            .parent()
+            .context("workers_path has no parent; cannot compute relative imports")?;
+
         let model_imports = models
             .iter()
-            .map(|model| {
-                format!(
-                    "import {{ {} }} from '../{}';",
-                    model.name,
-                    model.source_path.with_extension("").display()
-                )
+            .map(|m| -> Result<String> {
+                // Remove the extension (e.g., .ts/.tsx/.js)
+                let no_ext = m.source_path.with_extension("");
+
+                // Compute the relative path from the workers file directory
+                let rel = pathdiff::diff_paths(&no_ext, workers_dir).ok_or_else(|| {
+                    anyhow!(
+                        "Failed to compute relative path for '{}'\nfrom base '{}'",
+                        m.source_path.display(),
+                        workers_dir.display()
+                    )
+                })?;
+
+                // Stringify + normalize to forward slashes
+                let mut rel_str = rel.to_string_lossy().replace('\\', "/");
+
+                // Ensure we have a leading './' when not starting with '../' or '/'
+                if !rel_str.starts_with("../") && !rel_str.starts_with("./") {
+                    rel_str = format!("./{}", rel_str);
+                }
+
+                // If we collapsed to empty (it can happen if model sits exactly at from_dir/index)
+                if rel_str.is_empty() || rel_str == "." {
+                    rel_str = "./".to_string();
+                }
+
+                Ok(format!("import {{ {} }} from '{}';", m.name, rel_str))
             })
-            .collect::<Vec<_>>()
+            .collect::<Result<Vec<_>>>()?
             .join("\n");
 
-        format!("{CLOUDFLARE_TYPES}\n{CLOESCE_TYPES}\n{model_imports}")
+        Ok(format!(
+            "{CLOUDFLARE_TYPES}\n{CLOESCE_TYPES}\n{model_imports}"
+        ))
     }
 
     fn preamble(&self) -> String {

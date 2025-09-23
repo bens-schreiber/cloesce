@@ -14,8 +14,10 @@ fn test_generate_workers_snapshot() -> Result<()> {
         serde_json::from_str::<CidlSpec>(&cidl_contents)?
     };
 
+    let workers_path = PathBuf::from("root/workers.snap.new");
+
     // Act
-    let workers = WorkersGenerator.create(cidl);
+    let workers = WorkersGenerator.generate(cidl, &workers_path)?;
 
     // Assert
     assert_snapshot!("generated_workers", workers);

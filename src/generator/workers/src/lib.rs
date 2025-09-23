@@ -1,10 +1,14 @@
 mod typescript;
 
+use std::path::Path;
+
 use common::{CidlSpec, HttpVerb, InputLanguage, Model, ModelMethod, NamedTypedValue};
 use typescript::TypescriptWorkersGenerator;
 
+use anyhow::Result;
+
 trait WorkersGeneratable {
-    fn imports(&self, models: &[Model]) -> String;
+    fn imports(&self, models: &[Model], workers_path: &Path) -> Result<String>;
     fn preamble(&self) -> String;
     fn validators(&self, models: &[Model]) -> String;
     fn main(&self) -> String;
@@ -49,18 +53,14 @@ impl WorkersGenerator {
         lang.router_model(&model.name, router_methods.join(",\n"))
     }
 
-    pub fn create(self, spec: CidlSpec) -> String {
+    pub fn generate(self, spec: CidlSpec, workers_path: &Path) -> Result<String> {
         let generator: &dyn WorkersGeneratable = match spec.language {
             InputLanguage::TypeScript => &TypescriptWorkersGenerator {},
         };
 
-        let imports = generator.imports(&spec.models);
-
-        // TODO: This should all just be apart of the NPM package
+        let imports = generator.imports(&spec.models, workers_path)?;
         let preamble = generator.preamble();
-
         let validators = generator.validators(&spec.models);
-
         let router = {
             let router_body = spec
                 .models
@@ -70,10 +70,9 @@ impl WorkersGenerator {
                 .join(",\n");
             generator.router(router_body)
         };
-
         let main = generator.main();
 
-        format!(
+        Ok(format!(
             r#" 
         {imports}
         {preamble}
@@ -81,6 +80,6 @@ impl WorkersGenerator {
         {router}
         {main}
         "#
-        )
+        ))
     }
 }
