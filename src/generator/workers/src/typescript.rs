@@ -119,23 +119,8 @@ import { D1Database } from "@cloudflare/workers-types"
             // Stringify + normalize to forward slashes
             let mut rel_str = rel.to_string_lossy().replace('\\', "/");
 
-            // Collapse trailing "/index" -> "" (importing a dir resolves to its index)
-            if rel_str.ends_with("/index") {
-                rel_str.truncate(rel_str.len() - "/index".len());
-            }
-
-            // Trim any trailing "/." or "/.." that might sneak in
-            while rel_str.ends_with("/.") || rel_str.ends_with("/..") {
-                if rel_str.ends_with("/.") {
-                    rel_str.truncate(rel_str.len() - 2);
-                } else {
-                    // If we ever got here, something is off—bubble up a clear error.
-                    return Err(anyhow!("Refused to emit an import ending with '/..' for '{}'", rel_str));
-                }
-            }
-
             // Ensure we have a leading './' when not starting with '../' or '/'
-            if !rel_str.starts_with("../") && !rel_str.starts_with("./") && !rel_str.starts_with('/') {
+            if !rel_str.starts_with("../") && !rel_str.starts_with("./") {
                 rel_str = format!("./{}", rel_str);
             }
 
