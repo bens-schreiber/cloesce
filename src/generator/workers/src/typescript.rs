@@ -1,5 +1,7 @@
 use common::{CidlType, HttpVerb, Method, Model, TypedValue};
 use std::path::{Path};
+use anyhow::{Context, Result};
+use anyhow::anyhow;
 
 use crate::LanguageWorkerGenerator as LanguageWorkersGenerator;
 
@@ -92,54 +94,71 @@ impl TypescriptValidatorGenerator {
 
 pub struct TypescriptWorkersGenerator;
 impl LanguageWorkersGenerator for TypescriptWorkersGenerator {
-    fn imports(&self, models: &[Model], workers_path: &Path) -> String {
+    fn imports(&self, models: &[Model], workers_path: &Path) -> Result<String> {
         let cf_types = r#"
 import { D1Database } from "@cloudflare/workers-types"
 "#;
 
-        // Get the directory where the workers file will be generated
-        let workers_dir = workers_path.parent().unwrap_or(Path::new("."));
+        let workers_dir = workers_path
+            .parent()
+            .context("workers_path has no parent; cannot compute relative imports")?;
 
-        // Generate proper import paths for each model
+        fn to_ts_import_path(abs_model_path: &Path, from_dir: &Path) -> Result<String> {
+            // Remove the extension (e.g., .ts/.tsx/.js)
+            let no_ext = abs_model_path.with_extension("");
+
+            // Compute the relative path from the workers file directory
+            let rel = pathdiff::diff_paths(&no_ext, from_dir).ok_or_else(|| {
+                anyhow!(
+                    "Failed to compute relative path for '{}'\nfrom base '{}'",
+                    abs_model_path.display(),
+                    from_dir.display()
+                )
+            })?;
+
+            // Stringify + normalize to forward slashes
+            let mut rel_str = rel.to_string_lossy().replace('\\', "/");
+
+            // Collapse trailing "/index" -> "" (importing a dir resolves to its index)
+            if rel_str.ends_with("/index") {
+                rel_str.truncate(rel_str.len() - "/index".len());
+            }
+
+            // Trim any trailing "/." or "/.." that might sneak in
+            while rel_str.ends_with("/.") || rel_str.ends_with("/..") {
+                if rel_str.ends_with("/.") {
+                    rel_str.truncate(rel_str.len() - 2);
+                } else {
+                    // If we ever got here, something is off—bubble up a clear error.
+                    return Err(anyhow!("Refused to emit an import ending with '/..' for '{}'", rel_str));
+                }
+            }
+
+            // Ensure we have a leading './' when not starting with '../' or '/'
+            if !rel_str.starts_with("../") && !rel_str.starts_with("./") && !rel_str.starts_with('/') {
+                rel_str = format!("./{}", rel_str);
+            }
+
+            // If we collapsed to empty (it can happen if model sits exactly at from_dir/index)
+            if rel_str.is_empty() || rel_str == "." {
+                rel_str = "./".to_string();
+            }
+
+            Ok(rel_str)
+        }
+
         let model_imports = models
             .iter()
-            .map(|m| {
-                // Remove the .ts extension from the source path
-                let model_path_without_ext = m.source_path.with_extension("");
-                
-                // Calculate relative path using pathdiff
-                let relative_path = pathdiff::diff_paths(&model_path_without_ext, workers_dir)
-                    .map(|p| {
-                        let path_str = p.to_string_lossy().replace('\\', "/");
-                        if path_str.starts_with("../") || path_str.starts_with("./") {
-                            path_str
-                        } else {
-                            format!("./{}", path_str)
-                        }
-                    })
-                    .unwrap_or_else(|| {
-                        // Fallback if pathdiff fails
-                        let path_str = model_path_without_ext.to_string_lossy().replace('\\', "/");
-                        if path_str.starts_with("./") || path_str.starts_with("../") {
-                            path_str
-                        } else {
-                            format!("./{}", path_str)
-                        }
-                    });
-                
-                format!(
-                    r#"
-import {{ {} }} from '{}'; 
-"#,
-                    m.name,
-                    relative_path
-                )
+            .map(|m| -> Result<String> {
+                let rel_str = to_ts_import_path(&m.source_path, workers_dir)?;
+                Ok(format!("import {{ {} }} from '{}';", m.name, rel_str))
             })
-            .collect::<Vec<_>>()
+            .collect::<Result<Vec<_>>>()?
             .join("\n");
 
-        format!("{cf_types}{model_imports}")
+        Ok(format!("{cf_types}\n{model_imports}\n"))
     }
+
 
     fn preamble(&self) -> String {
         include_str!("./templates/preamble.ts").to_string()

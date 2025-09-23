@@ -1,13 +1,13 @@
 ---
 source: workers/tests/workers_tests.rs
-assertion_line: 21
+assertion_line: 24
 expression: workers
 ---
  
 
 import { D1Database } from "@cloudflare/workers-types"
 
-import { ExampleModel } from './example_model'; 
+import { ExampleModel } from './example_model';
 
 // @ts-nocheck
 

@@ -56,7 +56,7 @@ fn main() -> Result<()> {
                 wrangler_path,
                 sqlite_path,
             } => {
-                let mut sqlite_file = create_file_and_dir(sqlite_path)?;
+                let mut sqlite_file = create_file_and_dir(&sqlite_path)?;
                 let cidl = cidl_from_path(cidl_path)?;
 
                 let mut wrangler = match wrangler_path {
@@ -103,9 +103,12 @@ fn main() -> Result<()> {
             } => {
                 let cidl = cidl_from_path(cidl_path)?;
                 let mut file =
-                    create_file_and_dir(workers_path.clone()).context("Failed to open workers file")?;
+                    create_file_and_dir(&workers_path).context("Failed to open workers file")?;
 
-                file.write(WorkersFactory.create(cidl, &workers_path).as_bytes())
+                let workers_code = WorkersFactory
+                    .create(cidl, &workers_path)
+                    .context("Failed to generate workers code")?;
+                file.write(workers_code.as_bytes())
                     .context("Failed to write workers file")?;
             }
             GenerateTarget::Client {
@@ -115,7 +118,7 @@ fn main() -> Result<()> {
             } => {
                 let spec = cidl_from_path(cidl_path)?;
                 let mut file =
-                    create_file_and_dir(client_path).context("Failed to open client file")?;
+                    create_file_and_dir(&client_path).context("Failed to open client file")?;
 
                 file.write(client::generate_client_api(spec, domain).as_bytes())
                     .context("Failed to write client file")?;
@@ -126,7 +129,7 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-fn create_file_and_dir(path: PathBuf) -> Result<std::fs::File> {
+fn create_file_and_dir(path: &PathBuf) -> Result<std::fs::File> {
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent)?;
     }
