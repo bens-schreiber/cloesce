@@ -23,6 +23,17 @@ export class {{name}} {
       {{/if}}
     {{/each}}
   ): Promise<Result<{{lang_type return_type}}>> {
+    {{#if (eq http_verb "GET")}}
+    const url = new URL(`{{../../domain}}/{{#if is_static}}{{../name}}/{{name}}{{else}}{{../name}}/${this.id}/{{name}}{{/if}}`);
+    {{#each parameters}}
+    {{#if (is_serializable cidl_type)}}
+    url.searchParams.append('{{name}}', String({{name}}));
+    {{/if}}
+    {{/each}}
+    const res = await fetch(url.toString(), {
+      method: "GET"
+    });
+    {{else}}
     const url = `{{../../domain}}/{{#if is_static}}{{../name}}/{{name}}{{else}}{{../name}}/${this.id}/{{name}}{{/if}}`;
     const res = await fetch(url, {
       method: "{{http_verb}}",
@@ -35,6 +46,8 @@ export class {{name}} {
         {{/each}}
       })
     });
+    {{/if}}
+
     if (!res.ok) {
       const message = await res.text();
       return {
@@ -44,7 +57,9 @@ export class {{name}} {
       };
     }
 
-    const data = await res.json();
+    const text = await res.text();
+    const data = text ? JSON.parse(text) : null;
+
     {{#if (is_model return_type)}}
     const instantiated = Object.assign(new {{../name}}(), data);
     return { ok: true, data: instantiated };

@@ -30,6 +30,7 @@ export class ExampleModel {
             payload
       })
     });
+
     if (!res.ok) {
       const message = await res.text();
       return {
@@ -39,7 +40,9 @@ export class ExampleModel {
       };
     }
 
-    const data = await res.json();
+    const text = await res.text();
+    const data = text ? JSON.parse(text) : null;
+
     const instantiated = Object.assign(new ExampleModel(), data);
     return { ok: true, data: instantiated };
   }
@@ -47,14 +50,12 @@ export class ExampleModel {
   static async read_example(
         id: number | null
   ): Promise<Result<string[]>> {
-    const url = `http://localhost:1000/api/ExampleModel/read_example`;
-    const res = await fetch(url, {
-      method: "GET",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-            id
-      })
+    const url = new URL(`http://localhost:1000/api/ExampleModel/read_example`);
+    url.searchParams.append('id', String(id));
+    const res = await fetch(url.toString(), {
+      method: "GET"
     });
+
     if (!res.ok) {
       const message = await res.text();
       return {
@@ -64,19 +65,19 @@ export class ExampleModel {
       };
     }
 
-    const data = await res.json();
+    const text = await res.text();
+    const data = text ? JSON.parse(text) : null;
+
     return { ok: true, data };
   }
 
   static async list_examples(
   ): Promise<Result<ExampleModel[]>> {
-    const url = `http://localhost:1000/api/ExampleModel/list_examples`;
-    const res = await fetch(url, {
-      method: "GET",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-      })
+    const url = new URL(`http://localhost:1000/api/ExampleModel/list_examples`);
+    const res = await fetch(url.toString(), {
+      method: "GET"
     });
+
     if (!res.ok) {
       const message = await res.text();
       return {
@@ -86,7 +87,9 @@ export class ExampleModel {
       };
     }
 
-    const data = await res.json();
+    const text = await res.text();
+    const data = text ? JSON.parse(text) : null;
+
     const instantiated = instantiateModelArray(data, ExampleModel);
     return { ok: true, data: instantiated };
   }
@@ -104,6 +107,7 @@ export class ExampleModel {
             rating
       })
     });
+
     if (!res.ok) {
       const message = await res.text();
       return {
@@ -113,7 +117,9 @@ export class ExampleModel {
       };
     }
 
-    const data = await res.json();
+    const text = await res.text();
+    const data = text ? JSON.parse(text) : null;
+
     return { ok: true, data };
   }
 
@@ -128,6 +134,7 @@ export class ExampleModel {
             description
       })
     });
+
     if (!res.ok) {
       const message = await res.text();
       return {
@@ -137,7 +144,9 @@ export class ExampleModel {
       };
     }
 
-    const data = await res.json();
+    const text = await res.text();
+    const data = text ? JSON.parse(text) : null;
+
     return { ok: true, data };
   }
 
@@ -152,6 +161,7 @@ export class ExampleModel {
             id
       })
     });
+
     if (!res.ok) {
       const message = await res.text();
       return {
@@ -161,19 +171,19 @@ export class ExampleModel {
       };
     }
 
-    const data = await res.json();
+    const text = await res.text();
+    const data = text ? JSON.parse(text) : null;
+
     return { ok: true, data };
   }
 
   async get_description(
   ): Promise<Result<string>> {
-    const url = `http://localhost:1000/api/ExampleModel/${this.id}/get_description`;
-    const res = await fetch(url, {
-      method: "GET",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-      })
+    const url = new URL(`http://localhost:1000/api/ExampleModel/${this.id}/get_description`);
+    const res = await fetch(url.toString(), {
+      method: "GET"
     });
+
     if (!res.ok) {
       const message = await res.text();
       return {
@@ -183,7 +193,9 @@ export class ExampleModel {
       };
     }
 
-    const data = await res.json();
+    const text = await res.text();
+    const data = text ? JSON.parse(text) : null;
+
     return { ok: true, data };
   }
 
@@ -198,6 +210,7 @@ export class ExampleModel {
             amount
       })
     });
+
     if (!res.ok) {
       const message = await res.text();
       return {
@@ -207,7 +220,9 @@ export class ExampleModel {
       };
     }
 
-    const data = await res.json();
+    const text = await res.text();
+    const data = text ? JSON.parse(text) : null;
+
     return { ok: true, data };
   }
 
@@ -222,6 +237,7 @@ export class ExampleModel {
             model
       })
     });
+
     if (!res.ok) {
       const message = await res.text();
       return {
@@ -231,7 +247,9 @@ export class ExampleModel {
       };
     }
 
-    const data = await res.json();
+    const text = await res.text();
+    const data = text ? JSON.parse(text) : null;
+
     return { ok: true, data };
   }
 
@@ -246,6 +264,7 @@ export class ExampleModel {
             models
       })
     });
+
     if (!res.ok) {
       const message = await res.text();
       return {
@@ -255,7 +274,9 @@ export class ExampleModel {
       };
     }
 
-    const data = await res.json();
+    const text = await res.text();
+    const data = text ? JSON.parse(text) : null;
+
     return { ok: true, data };
   }
 
