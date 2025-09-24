@@ -97,7 +97,7 @@ impl WorkersFactory {
 
     pub fn create(&self, spec: CidlSpec, domain: &str) -> String {
         let generator: &mut dyn LanguageWorkerGenerator = match spec.language {
-            InputLanguage::TypeScript => &mut TypescriptWorkersGenerator::default(),
+            InputLanguage::TypeScript => &mut TypescriptWorkersGenerator,
         };
 
         let imports = generator.imports(&spec.models);

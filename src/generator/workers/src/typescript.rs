@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use common::{CidlType, HttpVerb, Method, Model, TypedValue};
 
 use crate::{LanguageWorkerGenerator as LanguageWorkersGenerator, RouterTrie, TrieNode};
@@ -91,7 +89,6 @@ impl TypescriptValidatorGenerator {
     }
 }
 
-#[derive(Default)]
 pub struct TypescriptWorkersGenerator;
 impl LanguageWorkersGenerator for TypescriptWorkersGenerator {
     fn imports(&self, models: &[Model]) -> String {
