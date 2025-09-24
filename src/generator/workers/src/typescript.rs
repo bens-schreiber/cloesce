@@ -90,73 +90,6 @@ impl TypescriptValidatorGenerator {
         "#
         )
     }
-    pub fn extract_query_params(params: &[&TypedValue]) -> String {
-        let extractions: Vec<String> = params
-            .iter()
-            .map(|p| {
-                let name = &p.name;
-                match &p.cidl_type {
-                    CidlType::Integer => {
-                        format!(
-                            r#"
-                const {name}Str = searchParams.get("{name}");
-                if ({name}Str !== null) {{
-                    const parsed = parseInt({name}Str, 10);
-                    if (!isNaN(parsed)) {{
-                        params.{name} = parsed;
-                    }}
-                }}"#
-                        )
-                    }
-                    CidlType::Real => {
-                        format!(
-                            r#"
-                const {name}Str = searchParams.get("{name}");
-                if ({name}Str !== null) {{
-                    const parsed = parseFloat({name}Str);
-                    if (!isNaN(parsed)) {{
-                        params.{name} = parsed;
-                    }}
-                }}"#
-                        )
-                    }
-                    CidlType::Text => {
-                        format!(
-                            r#"
-                const {name}Str = searchParams.get("{name}");
-                if ({name}Str !== null) {{
-                    params.{name} = {name}Str;
-                }}"#
-                        )
-                    }
-                    CidlType::Array(_) => {
-                        format!(
-                            r#"
-                throw new Error("Array parameters are not supported in GET requests. Parameter: {name}");"#
-                        )
-                    }
-                    CidlType::Model(_) => {
-                        format!(
-                            r#"
-                throw new Error("Model parameters are not supported in GET requests. Parameter: {name}");"#
-                        )
-                    }
-                    _ => {
-                        // For other types, attempt to get as string
-                        format!(
-                            r#"
-                const {name}Str = searchParams.get("{name}");
-                if ({name}Str !== null) {{
-                    params.{name} = {name}Str;
-                }}"#
-                        )
-                    }
-                }
-            })
-            .collect();
-
-        extractions.join("\n                ")
-    }
 }
 
 pub struct TypescriptWorkersGenerator;
@@ -346,7 +279,7 @@ if (request.method !== "{verb_str}") {{
         let extraction_logic = match method.http_verb {
             HttpVerb::GET => {
                 let query_param_extractors =
-                    TypescriptValidatorGenerator::extract_query_params(&req_params);
+                    "params = Object.fromEntries(url.searchParams.entries())";
                 format!(
                     r#"
             // Extract parameters from URL query string for GET request
