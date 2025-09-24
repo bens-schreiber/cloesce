@@ -12,7 +12,8 @@ trait LanguageWorkerGenerator {
     fn main(&self) -> String;
     fn router(&self, model: String) -> String;
     fn router_model(&self, model_name: &str, method: String) -> String;
-    fn router_method(&self, method: &Method, proto: String) -> String;
+    //adds all instance methods under "<id>" key
+    fn router_instance_method(&self, methods: Vec<String>) -> String;
     fn proto(&self, method: &Method, body: String) -> String;
     fn validate_http(&self, verb: &HttpVerb) -> String;
     fn validate_req_body(&self, params: &[TypedValue]) -> String;
@@ -71,12 +72,8 @@ impl WorkersFactory {
             }
 
             // Add the grouped instance methods under "<id>"
-            router_entries.push(format!(
-                r#"
-"<id>": {{{}}}
-"#,
-                instance_router_methods.join(",")
-            ));
+            let instanceMethods = lang.router_instance_method(instance_router_methods);
+            router_entries.push(instanceMethods);
         }
 
         lang.router_model(&model.name, router_entries.join(","))

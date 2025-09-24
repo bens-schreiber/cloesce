@@ -188,21 +188,13 @@ const router = {{ api: {{{model}}} }}
         )
     }
 
-    fn router_method(&self, method: &Method, proto: String) -> String {
-        // FIX: Use method name as the key for static methods,
-        // and nest under "<id>" for instance methods
-        if method.is_static {
-            format!(
-                r#"
-{}: {{{proto}}}
+    fn router_instance_method(&self, methods: Vec<String>) -> String {
+        format!(
+            r#"
+"<id>": {{{}}}
 "#,
-                method.name
-            )
-        } else {
-            // For instance methods, we need to group them under "<id>"
-            // This will be handled by the calling code to avoid duplicates
-            proto
-        }
+            methods.join(",")
+        )
     }
 
     fn proto(&self, method: &Method, body: String) -> String {
