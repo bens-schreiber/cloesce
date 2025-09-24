@@ -95,16 +95,6 @@ function match(
     
     params.push(segment);
     node = node[paramKey];
-    
-    // For instance methods, we need to check the next segment for the method name
-    if (typeof node === "object" && !node.call) {
-      const nextSegment = segments[i + 1];
-      if (!nextSegment || !node[nextSegment]) {
-        return notFound();
-      }
-      node = node[nextSegment];
-      i++; // Skip the next iteration since we've already processed it
-    }
   }
   
   return typeof node === "function"
@@ -128,8 +118,7 @@ if (obj.data_blob == null || !(obj.data_blob instanceof ArrayBuffer || obj.data_
         
 
 const router = { api: {
-ExampleModel: {create_example: 
-create_example: async ( request: Request, env: Env) => {
+ExampleModel: {create_example: async (request: Request, env: Env) => {
                 
 if (request.method !== "POST") {
     return new Response("Method Not Allowed", { status: 405 });
@@ -161,10 +150,8 @@ payload = Object.assign(new ExampleModel(), payload)
                 
 return JSON.stringify(ExampleModel.create_example(env.DB, payload));
 
-            }
-,
-read_example: 
-read_example: async ( request: Request, env: Env) => {
+            },
+read_example: async (request: Request, env: Env) => {
                 
 if (request.method !== "GET") {
     return new Response("Method Not Allowed", { status: 405 });
@@ -195,10 +182,8 @@ if ((id !== undefined && typeof id !== "number")) {
                 
 return JSON.stringify(ExampleModel.read_example(env.DB, id));
 
-            }
-,
-list_examples: 
-list_examples: async ( request: Request, env: Env) => {
+            },
+list_examples: async (request: Request, env: Env) => {
                 
 if (request.method !== "GET") {
     return new Response("Method Not Allowed", { status: 405 });
@@ -209,10 +194,8 @@ if (request.method !== "GET") {
                 
 return JSON.stringify(ExampleModel.list_examples(env.DB));
 
-            }
-,
-update_example: 
-update_example: async ( request: Request, env: Env) => {
+            },
+update_example: async (request: Request, env: Env) => {
                 
 if (request.method !== "PUT") {
     return new Response("Method Not Allowed", { status: 405 });
@@ -249,10 +232,8 @@ if ((rating !== undefined && typeof rating !== "number")) {
                 
 return JSON.stringify(ExampleModel.update_example(env.DB, id, rating));
 
-            }
-,
-patch_example: 
-patch_example: async ( request: Request, env: Env) => {
+            },
+patch_example: async (request: Request, env: Env) => {
                 
 if (request.method !== "PATCH") {
     return new Response("Method Not Allowed", { status: 405 });
@@ -283,10 +264,8 @@ if ((description !== undefined && typeof description !== "string")) {
                 
 return JSON.stringify(ExampleModel.patch_example(env.DB, description));
 
-            }
-,
-delete_example: 
-delete_example: async ( request: Request, env: Env) => {
+            },
+delete_example: async (request: Request, env: Env) => {
                 
 if (request.method !== "DELETE") {
     return new Response("Method Not Allowed", { status: 405 });
@@ -317,10 +296,8 @@ if ((id == null || typeof id !== "number")) {
                 
 return JSON.stringify(ExampleModel.delete_example(env.DB, id));
 
-            }
-,
-process_model: 
-process_model: async ( request: Request, env: Env) => {
+            },
+process_model: async (request: Request, env: Env) => {
                 
 if (request.method !== "POST") {
     return new Response("Method Not Allowed", { status: 405 });
@@ -352,10 +329,8 @@ model = Object.assign(new ExampleModel(), model)
                 
 return JSON.stringify(ExampleModel.process_model(env.DB, model));
 
-            }
-,
-process_models: 
-process_models: async ( request: Request, env: Env) => {
+            },
+process_models: async (request: Request, env: Env) => {
                 
 if (request.method !== "POST") {
     return new Response("Method Not Allowed", { status: 405 });
@@ -387,10 +362,8 @@ models = models.map(item => Object.assign(new ExampleModel(), item))
                 
 return JSON.stringify(ExampleModel.process_models(env.DB, models));
 
-            }
-,
-"<id>": { get_description: 
-get_description: async (id: number,  request: Request, env: Env) => {
+            },
+"<id>": { get_description: async (id: number, request: Request, env: Env) => {
                 
 if (request.method !== "GET") {
     return new Response("Method Not Allowed", { status: 405 });
@@ -412,10 +385,8 @@ const instance = Object.assign(new ExampleModel(), record);
                 
 return JSON.stringify(instance.get_description(env.DB));
 
-            }
-,
-increment_rating: 
-increment_rating: async (id: number,  request: Request, env: Env) => {
+            },
+increment_rating: async (id: number, request: Request, env: Env) => {
                 
 if (request.method !== "PATCH") {
     return new Response("Method Not Allowed", { status: 405 });
@@ -457,8 +428,7 @@ const instance = Object.assign(new ExampleModel(), record);
                 
 return JSON.stringify(instance.increment_rating(env.DB, amount));
 
-            }
- }}
+            } }}
 } }
 
 

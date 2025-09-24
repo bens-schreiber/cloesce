@@ -1,5 +1,4 @@
 mod typescript;
-
 use common::{CidlSpec, HttpVerb, InputLanguage, Method, Model, TypedValue};
 use typescript::TypescriptWorkersGenerator;
 
@@ -23,19 +22,20 @@ pub struct WorkersFactory {
 }
 
 impl WorkersFactory {
-    pub fn new() -> Self {
-        Self { domain: None }
+    pub fn new(domain: String) -> Self {
+        Self { domain: Some(domain) }
     }
 
+    // If you want builder-style, you can still add a setter:
     pub fn with_domain(mut self, domain: String) -> Self {
         self.domain = Some(domain);
         self
     }
-
+   
     fn model(model: &Model, lang: &dyn LanguageWorkerGenerator) -> String {
         let mut static_methods = vec![];
         let mut instance_methods = vec![];
-        
+       
         for method in &model.methods {
             let validate_http = lang.validate_http(&method.http_verb);
             let validate_params = lang.validate_req_body(&method.parameters);
@@ -55,21 +55,21 @@ impl WorkersFactory {
             );
             let proto = lang.proto(method, method_body);
             let router_method = lang.router_method(method, proto);
-            
+           
             if method.is_static {
                 static_methods.push(router_method);
             } else {
                 instance_methods.push(router_method);
             }
         }
-        
+       
         // Combine static methods and instance methods under <id> if any exist
         let mut all_methods = static_methods;
         if !instance_methods.is_empty() {
             let instance_routes = instance_methods.join(",\n");
             all_methods.push(format!(r#""<id>": {{ {} }}"#, instance_routes));
         }
-        
+       
         lang.router_model(&model.name, all_methods.join(",\n"))
     }
 
@@ -93,7 +93,7 @@ impl WorkersFactory {
             generator.router(router_body)
         };
         let main = generator.main();
-        
+       
         format!(
             r#"
 {imports}
@@ -103,12 +103,5 @@ impl WorkersFactory {
 {main}
         "#
         )
-    }
-}
-
-// Backward compatibility just in case
-impl Default for WorkersFactory {
-    fn default() -> Self {
-        Self::new()
     }
 }

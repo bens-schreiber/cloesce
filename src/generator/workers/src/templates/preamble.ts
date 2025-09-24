@@ -87,16 +87,6 @@ function match(
     
     params.push(segment);
     node = node[paramKey];
-    
-    // For instance methods, we need to check the next segment for the method name
-    if (typeof node === "object" && !node.call) {
-      const nextSegment = segments[i + 1];
-      if (!nextSegment || !node[nextSegment]) {
-        return notFound();
-      }
-      node = node[nextSegment];
-      i++; 
-    }
   }
   
   return typeof node === "function"

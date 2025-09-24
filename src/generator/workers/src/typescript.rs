@@ -104,19 +104,16 @@ impl TypescriptWorkersGenerator {
     }
 
     fn parse_domain(domain: Option<String>) -> (String, String) {
-        let domain = domain.unwrap_or_else(|| "http://localhost:8787/api".to_string());
+        // Handle the Option<String> properly, defaulting to localhost
+        let domain_str = domain.unwrap_or_else(|| "localhost".to_string());
         
         // Normalize the domain
-        let normalized = if !domain.starts_with("http://") && !domain.starts_with("https://") {
-            format!("http://{}", domain)
-        } else {
-            domain.clone()
-        };
+        let normalized = format!("http://{}", domain_str);
 
         // Extract the path from the URL
-        let root = if let Some(idx) = normalized.find("://") {
+        let root = if let Some(scheme_end) = normalized.find("://") {
             // Skip the scheme
-            let after_scheme = &normalized[idx + 3..];
+            let after_scheme = &normalized[scheme_end + 3..];
             // Find the first '/' after the host
             if let Some(path_idx) = after_scheme.find('/') {
                 // Get everything after the host
@@ -128,22 +125,16 @@ impl TypescriptWorkersGenerator {
                     .unwrap_or("api")
                     .to_string()
             } else {
-                // No path in the URL, use default
+                // No path in domain, use default
                 "api".to_string()
             }
         } else {
-            // No scheme found, try to parse as simple path
-            normalized.split('/')
-                .filter(|s| !s.is_empty() && !s.contains(':'))
-                .last()
-                .unwrap_or("api")
-                .to_string()
+            // domain is messed up somehow
+            panic!("Domain is formatted incorrectly! (Hint: It should be some sort of exact pattern).");
         };
-
+        
         (normalized, root)
     }
-
-
 }
 
 impl LanguageWorkersGenerator for TypescriptWorkersGenerator {
@@ -224,8 +215,6 @@ const router = {{ {root}: {{{model}}} }}
     }
 
     fn proto(&self, method: &Method, body: String) -> String {
-        let method_name = &method.name;
-
         let id = if !method.is_static {
             "id: number, "
         } else {
@@ -233,9 +222,7 @@ const router = {{ {root}: {{{model}}} }}
         };
 
         format!(
-            r#"
-{method_name}: async ({id} request: Request, env: Env) => {{{body}}}
-"#
+            r#"async ({id}request: Request, env: Env) => {{{body}}}"#
         )
     }
 
@@ -317,7 +304,7 @@ if (request.method !== "{verb_str}") {{
         let has_ds = model.data_sources.len() > 1;
 
         let query = if has_ds {
-            format!("`SELECT * FROM{model_name}_default WHERE {model_name}_{pk} = ?")
+            format!("`SELECT * FROM {model_name}_default WHERE {model_name}_{pk} = ?`")
         } else {
             format!("`SELECT * FROM {model_name} WHERE {pk} = ?`")
         };
