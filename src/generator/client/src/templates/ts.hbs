@@ -57,8 +57,7 @@ export class {{name}} {
       };
     }
 
-    const text = await res.text();
-    const data = text ? JSON.parse(text) : null;
+    const data = await res.json();
 
     {{#if (is_model return_type)}}
     const instantiated = Object.assign(new {{../name}}(), data);
