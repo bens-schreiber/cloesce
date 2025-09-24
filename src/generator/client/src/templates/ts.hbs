@@ -23,8 +23,10 @@ export class {{name}} {
       {{/if}}
     {{/each}}
   ): Promise<Result<{{lang_type return_type}}>> {
+    const baseUrl = `{{../../domain}}/{{#if is_static}}{{../name}}/{{name}}{{else}}{{../name}}/${this.id}/{{name}}{{/if}}`;
+
     {{#if (eq http_verb "GET")}}
-    const url = new URL(`{{../../domain}}/{{#if is_static}}{{../name}}/{{name}}{{else}}{{../name}}/${this.id}/{{name}}{{/if}}`);
+    const url = new URL(baseUrl);
     {{#each parameters}}
     {{#if (is_serializable cidl_type)}}
     url.searchParams.append('{{name}}', String({{name}}));
@@ -34,8 +36,7 @@ export class {{name}} {
       method: "GET"
     });
     {{else}}
-    const url = `{{../../domain}}/{{#if is_static}}{{../name}}/{{name}}{{else}}{{../name}}/${this.id}/{{name}}{{/if}}`;
-    const res = await fetch(url, {
+    const res = await fetch(baseUrl, {
       method: "{{http_verb}}",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -71,8 +72,6 @@ export class {{name}} {
       {{/if}}
     {{/if}}
   }
-
   {{/each}}
-
 }
 {{/each}}
