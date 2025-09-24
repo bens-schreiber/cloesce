@@ -37,18 +37,17 @@ if (obj.data_blob == null || !(obj.data_blob instanceof ArrayBuffer || obj.data_
                 }
             
                 
-                let body;
-                try {
-                    body = await request.json();
-                } catch {
-                    return new Response(
+                    let body;
+                    try {
+                        body = await request.json();
+                    } catch {
+                        return new Response(
     JSON.stringify({ ok: false, message: `validate_req_body: Invalid Request Body`, status: 400 }),
     { status: 400, headers: { "Content-Type": "application/json" } }
 );
-                }
-
-                let {payload} = body;
-                
+                    }
+                    let {payload} = body;
+                    
 if ((payload == null || !$.ExampleModel.validate(payload))) { return new Response(
     JSON.stringify({ ok: false, message: `validate_req_body: Invalid Request Body`, status: 400 }),
     { status: 400, headers: { "Content-Type": "application/json" } }
@@ -80,18 +79,9 @@ read_example: async (request: Request, env: Env) => {
                 }
             
                 
-                let body;
-                try {
-                    body = await request.json();
-                } catch {
-                    return new Response(
-    JSON.stringify({ ok: false, message: `validate_req_body: Invalid Request Body`, status: 400 }),
-    { status: 400, headers: { "Content-Type": "application/json" } }
-);
-                }
-
-                let {id} = body;
-                
+                    const url = new URL(request.url);
+                    let {id} = Object.fromEntries(url.searchParams.entries());
+                    
 if ((id == undefined || typeof id !== "number")) { return new Response(
     JSON.stringify({ ok: false, message: `validate_req_body: Invalid Request Body`, status: 400 }),
     { status: 400, headers: { "Content-Type": "application/json" } }
@@ -148,18 +138,17 @@ update_example: async (request: Request, env: Env) => {
                 }
             
                 
-                let body;
-                try {
-                    body = await request.json();
-                } catch {
-                    return new Response(
+                    let body;
+                    try {
+                        body = await request.json();
+                    } catch {
+                        return new Response(
     JSON.stringify({ ok: false, message: `validate_req_body: Invalid Request Body`, status: 400 }),
     { status: 400, headers: { "Content-Type": "application/json" } }
 );
-                }
-
-                let {id,rating} = body;
-                
+                    }
+                    let {id, rating} = body;
+                    
 if ((id == null || typeof id !== "number")) { return new Response(
     JSON.stringify({ ok: false, message: `validate_req_body: Invalid Request Body`, status: 400 }),
     { status: 400, headers: { "Content-Type": "application/json" } }
@@ -194,18 +183,17 @@ patch_example: async (request: Request, env: Env) => {
                 }
             
                 
-                let body;
-                try {
-                    body = await request.json();
-                } catch {
-                    return new Response(
+                    let body;
+                    try {
+                        body = await request.json();
+                    } catch {
+                        return new Response(
     JSON.stringify({ ok: false, message: `validate_req_body: Invalid Request Body`, status: 400 }),
     { status: 400, headers: { "Content-Type": "application/json" } }
 );
-                }
-
-                let {description} = body;
-                
+                    }
+                    let {description} = body;
+                    
 if ((description == undefined || typeof description !== "string")) { return new Response(
     JSON.stringify({ ok: false, message: `validate_req_body: Invalid Request Body`, status: 400 }),
     { status: 400, headers: { "Content-Type": "application/json" } }
@@ -236,18 +224,17 @@ delete_example: async (request: Request, env: Env) => {
                 }
             
                 
-                let body;
-                try {
-                    body = await request.json();
-                } catch {
-                    return new Response(
+                    let body;
+                    try {
+                        body = await request.json();
+                    } catch {
+                        return new Response(
     JSON.stringify({ ok: false, message: `validate_req_body: Invalid Request Body`, status: 400 }),
     { status: 400, headers: { "Content-Type": "application/json" } }
 );
-                }
-
-                let {id} = body;
-                
+                    }
+                    let {id} = body;
+                    
 if ((id == null || typeof id !== "number")) { return new Response(
     JSON.stringify({ ok: false, message: `validate_req_body: Invalid Request Body`, status: 400 }),
     { status: 400, headers: { "Content-Type": "application/json" } }
@@ -324,18 +311,17 @@ if ((id == null || typeof id !== "number")) { return new Response(
                 }
             
                 
-                let body;
-                try {
-                    body = await request.json();
-                } catch {
-                    return new Response(
+                    let body;
+                    try {
+                        body = await request.json();
+                    } catch {
+                        return new Response(
     JSON.stringify({ ok: false, message: `validate_req_body: Invalid Request Body`, status: 400 }),
     { status: 400, headers: { "Content-Type": "application/json" } }
 );
-                }
-
-                let {amount} = body;
-                
+                    }
+                    let {amount} = body;
+                    
 if ((amount == null || typeof amount !== "number")) { return new Response(
     JSON.stringify({ ok: false, message: `validate_req_body: Invalid Request Body`, status: 400 }),
     { status: 400, headers: { "Content-Type": "application/json" } }
@@ -386,18 +372,17 @@ process_model: async (request: Request, env: Env) => {
                 }
             
                 
-                let body;
-                try {
-                    body = await request.json();
-                } catch {
-                    return new Response(
+                    let body;
+                    try {
+                        body = await request.json();
+                    } catch {
+                        return new Response(
     JSON.stringify({ ok: false, message: `validate_req_body: Invalid Request Body`, status: 400 }),
     { status: 400, headers: { "Content-Type": "application/json" } }
 );
-                }
-
-                let {model} = body;
-                
+                    }
+                    let {model} = body;
+                    
 if ((model == null || !$.ExampleModel.validate(model))) { return new Response(
     JSON.stringify({ ok: false, message: `validate_req_body: Invalid Request Body`, status: 400 }),
     { status: 400, headers: { "Content-Type": "application/json" } }
@@ -429,18 +414,17 @@ process_models: async (request: Request, env: Env) => {
                 }
             
                 
-                let body;
-                try {
-                    body = await request.json();
-                } catch {
-                    return new Response(
+                    let body;
+                    try {
+                        body = await request.json();
+                    } catch {
+                        return new Response(
     JSON.stringify({ ok: false, message: `validate_req_body: Invalid Request Body`, status: 400 }),
     { status: 400, headers: { "Content-Type": "application/json" } }
 );
-                }
-
-                let {models} = body;
-                
+                    }
+                    let {models} = body;
+                    
 if ((models == null || !Array.isArray(models) || models.some(item => (item == null || !$.ExampleModel.validate(item))))) { return new Response(
     JSON.stringify({ ok: false, message: `validate_req_body: Invalid Request Body`, status: 400 }),
     { status: 400, headers: { "Content-Type": "application/json" } }

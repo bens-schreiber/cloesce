@@ -20,6 +20,7 @@ handlebars_helper!(is_model: |cidl_type: CidlType| {
     }
 });
 handlebars_helper!(is_model_array: |cidl_type: CidlType| matches!(cidl_type.array_type(), CidlType::Model(_)));
+handlebars_helper!(eq: |a: str, b: str| a == b);
 
 fn register_helpers(
     handlebars: &mut Handlebars<'_>,
@@ -28,6 +29,7 @@ fn register_helpers(
     handlebars.register_helper("is_serializable", Box::new(is_serializable));
     handlebars.register_helper("is_model", Box::new(is_model));
     handlebars.register_helper("is_model_array", Box::new(is_model_array));
+    handlebars.register_helper("eq", Box::new(eq));
     handlebars.register_helper(
         "lang_type",
         Box::new(

@@ -28,14 +28,16 @@ export class ExampleModel {
   static async create_example(
         payload: ExampleModel
   ): Promise<Result<ExampleModel>> {
-    const url = `http://localhost:1000/api/ExampleModel/create_example`;
-    const res = await fetch(url, {
+    const baseUrl = `http://localhost:1000/api/ExampleModel/create_example`;
+
+    const res = await fetch(baseUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
             payload
       })
     });
+
     if (!res.ok) {
       const message = await res.text();
       return {
@@ -46,21 +48,21 @@ export class ExampleModel {
     }
 
     const data = await res.json();
+
     const instantiated = Object.assign(new ExampleModel(), data);
     return { ok: true, data: instantiated };
   }
-
   static async read_example(
         id: number | null
   ): Promise<Result<string[]>> {
-    const url = `http://localhost:1000/api/ExampleModel/read_example`;
-    const res = await fetch(url, {
-      method: "GET",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-            id
-      })
+    const baseUrl = `http://localhost:1000/api/ExampleModel/read_example`;
+
+    const url = new URL(baseUrl);
+    url.searchParams.append('id', String(id));
+    const res = await fetch(url.toString(), {
+      method: "GET"
     });
+
     if (!res.ok) {
       const message = await res.text();
       return {
@@ -71,18 +73,18 @@ export class ExampleModel {
     }
 
     const data = await res.json();
+
     return { ok: true, data };
   }
-
   static async list_examples(
   ): Promise<Result<ExampleModel[]>> {
-    const url = `http://localhost:1000/api/ExampleModel/list_examples`;
-    const res = await fetch(url, {
-      method: "GET",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-      })
+    const baseUrl = `http://localhost:1000/api/ExampleModel/list_examples`;
+
+    const url = new URL(baseUrl);
+    const res = await fetch(url.toString(), {
+      method: "GET"
     });
+
     if (!res.ok) {
       const message = await res.text();
       return {
@@ -93,16 +95,17 @@ export class ExampleModel {
     }
 
     const data = await res.json();
+
     const instantiated = instantiateModelArray(data, ExampleModel);
     return { ok: true, data: instantiated };
   }
-
   static async update_example(
         id: number, 
         rating: number | null
   ): Promise<Result<number>> {
-    const url = `http://localhost:1000/api/ExampleModel/update_example`;
-    const res = await fetch(url, {
+    const baseUrl = `http://localhost:1000/api/ExampleModel/update_example`;
+
+    const res = await fetch(baseUrl, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -110,6 +113,7 @@ export class ExampleModel {
             rating
       })
     });
+
     if (!res.ok) {
       const message = await res.text();
       return {
@@ -120,20 +124,22 @@ export class ExampleModel {
     }
 
     const data = await res.json();
+
     return { ok: true, data };
   }
-
   static async patch_example(
         description: string | null
   ): Promise<Result<number>> {
-    const url = `http://localhost:1000/api/ExampleModel/patch_example`;
-    const res = await fetch(url, {
+    const baseUrl = `http://localhost:1000/api/ExampleModel/patch_example`;
+
+    const res = await fetch(baseUrl, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
             description
       })
     });
+
     if (!res.ok) {
       const message = await res.text();
       return {
@@ -144,20 +150,22 @@ export class ExampleModel {
     }
 
     const data = await res.json();
+
     return { ok: true, data };
   }
-
   static async delete_example(
         id: number
   ): Promise<Result<Uint8Array>> {
-    const url = `http://localhost:1000/api/ExampleModel/delete_example`;
-    const res = await fetch(url, {
+    const baseUrl = `http://localhost:1000/api/ExampleModel/delete_example`;
+
+    const res = await fetch(baseUrl, {
       method: "DELETE",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
             id
       })
     });
+
     if (!res.ok) {
       const message = await res.text();
       return {
@@ -168,18 +176,18 @@ export class ExampleModel {
     }
 
     const data = await res.json();
+
     return { ok: true, data };
   }
-
   async get_description(
   ): Promise<Result<string>> {
-    const url = `http://localhost:1000/api/ExampleModel/${this.id}/get_description`;
-    const res = await fetch(url, {
-      method: "GET",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-      })
+    const baseUrl = `http://localhost:1000/api/ExampleModel/${this.id}/get_description`;
+
+    const url = new URL(baseUrl);
+    const res = await fetch(url.toString(), {
+      method: "GET"
     });
+
     if (!res.ok) {
       const message = await res.text();
       return {
@@ -190,20 +198,22 @@ export class ExampleModel {
     }
 
     const data = await res.json();
+
     return { ok: true, data };
   }
-
   async increment_rating(
         amount: number
   ): Promise<Result<number>> {
-    const url = `http://localhost:1000/api/ExampleModel/${this.id}/increment_rating`;
-    const res = await fetch(url, {
+    const baseUrl = `http://localhost:1000/api/ExampleModel/${this.id}/increment_rating`;
+
+    const res = await fetch(baseUrl, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
             amount
       })
     });
+
     if (!res.ok) {
       const message = await res.text();
       return {
@@ -214,20 +224,22 @@ export class ExampleModel {
     }
 
     const data = await res.json();
+
     return { ok: true, data };
   }
-
   static async process_model(
         model: ExampleModel
   ): Promise<Result<number>> {
-    const url = `http://localhost:1000/api/ExampleModel/process_model`;
-    const res = await fetch(url, {
+    const baseUrl = `http://localhost:1000/api/ExampleModel/process_model`;
+
+    const res = await fetch(baseUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
             model
       })
     });
+
     if (!res.ok) {
       const message = await res.text();
       return {
@@ -238,20 +250,22 @@ export class ExampleModel {
     }
 
     const data = await res.json();
+
     return { ok: true, data };
   }
-
   static async process_models(
         models: ExampleModel[]
   ): Promise<Result<number>> {
-    const url = `http://localhost:1000/api/ExampleModel/process_models`;
-    const res = await fetch(url, {
+    const baseUrl = `http://localhost:1000/api/ExampleModel/process_models`;
+
+    const res = await fetch(baseUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
             models
       })
     });
+
     if (!res.ok) {
       const message = await res.text();
       return {
@@ -262,8 +276,7 @@ export class ExampleModel {
     }
 
     const data = await res.json();
+
     return { ok: true, data };
   }
-
-
 }

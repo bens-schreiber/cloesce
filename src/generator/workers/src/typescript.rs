@@ -134,6 +134,7 @@ impl TypescriptValidatorGenerator {
 }
 
 pub struct TypescriptWorkersGenerator;
+
 impl LanguageWorkersGenerator for TypescriptWorkersGenerator {
     fn imports(&self, models: &[Model], workers_path: &Path) -> Result<String> {
         const CLOUDFLARE_TYPES: &str = r#"import { D1Database } from "@cloudflare/workers-types""#;
@@ -250,49 +251,64 @@ export default {
         )
     }
 
-    fn validate_req_body(&self, params: &[NamedTypedValue]) -> String {
-        let req_body_params: Vec<_> = params
+    fn validate_request(&self, method: &ModelMethod) -> String {
+        let params = &method.parameters;
+
+        let req_params = params
             .iter()
             .filter(|p| !matches!(p.cidl_type, CidlType::D1Database))
-            .collect();
-        if req_body_params.is_empty() {
+            .collect::<Vec<&NamedTypedValue>>();
+        if req_params.is_empty() {
             // No parameters, no validation.
             return String::new();
         }
 
+        let param_names = req_params
+            .iter()
+            .map(|p| p.name.clone())
+            .collect::<Vec<_>>()
+            .join(", ");
+
         // Error state: any missing parameter, body, or malformed input will exit with 400.
-        let invalid_request_body = error_state(400, "validate_req_body", "Invalid Request Body");
+        let invalid_request = error_state(400, "validate_req_body", "Invalid Request Body");
 
-        let mut validation_code = Vec::new();
-        validation_code.push(format!(
-            r#"
-                let body;
-                try {{
-                    body = await request.json();
-                }} catch {{
-                    {invalid_request_body}
-                }}
+        let mut validate = vec![];
 
-                let {{{}}} = body;
-                "#,
-            req_body_params
-                .iter()
-                .map(|p| p.name.clone())
-                .collect::<Vec<_>>()
-                .join(",")
-        ));
-
-        // Validate params from request body
-        for param in req_body_params {
-            if let Some(type_check) = TypescriptValidatorGenerator::validate_type(param, "") {
-                validation_code.push(format!("if ({type_check}) {{ {invalid_request_body} }}"))
+        validate.push(match method.http_verb {
+            HttpVerb::GET => {
+                format!(
+                    r#"
+                    const url = new URL(request.url);
+                    let {{{param_names}}} = Object.fromEntries(url.searchParams.entries());
+                    "#
+                )
             }
+            _ => {
+                format!(
+                    r#"
+                    let body;
+                    try {{
+                        body = await request.json();
+                    }} catch {{
+                        {invalid_request}
+                    }}
+                    let {{{param_names}}} = body;
+                    "#
+                )
+            }
+        });
+
+        for param in &req_params {
+            if let Some(type_check) = TypescriptValidatorGenerator::validate_type(param, "") {
+                validate.push(format!("if ({type_check}) {{ {invalid_request} }}"));
+            }
+
             if let Some(assign) = TypescriptValidatorGenerator::assign_type(param) {
-                validation_code.push(format!("{} = {assign}", param.name))
+                validate.push(format!("{} = {assign}", param.name));
             }
         }
 
-        validation_code.join("\n")
+        validate.join("\n")
     }
 
     fn hydrate_model(&self, model: &Model) -> String {
