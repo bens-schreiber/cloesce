@@ -44,12 +44,7 @@ impl WorkersFactory {
             );
 
             let proto = lang.proto(method, method_body);
-            router_entries.push(format!(
-                r#"
-{}: {{{proto}}}
-"#,
-                method.name
-            ));
+            router_entries.push(proto);
         }
 
         // Group all instance methods under a single "<id>" key
@@ -72,12 +67,7 @@ impl WorkersFactory {
                 );
 
                 let proto = lang.proto(method, method_body);
-                instance_router_methods.push(format!(
-                    r#"
-{}: {{{proto}}}
-"#,
-                    method.name
-                ));
+                instance_router_methods.push(proto);
             }
 
             // Add the grouped instance methods under "<id>"
