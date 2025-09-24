@@ -17,7 +17,7 @@ before(
     Horse = mod.Horse;
     Match = mod.Match;
   },
-  { timeout: 30_000 }
+  { timeout: 30_000 },
 );
 
 test("Post, Patch, Get a Horse", async () => {
@@ -31,7 +31,7 @@ test("Post, Patch, Get a Horse", async () => {
   assert.ok(res.ok, "POST should be OK");
   assert.ok(
     res.data.id == body.id,
-    "POST response id should be the same as the inputted id"
+    "POST response id should be the same as the inputted id",
   );
 
   body.name = "ROACH";
@@ -44,7 +44,7 @@ test("Post, Patch, Get a Horse", async () => {
   assert.ok(res.ok, "GET should be OK");
   assert.ok(
     res.data.id == body.id,
-    "GET response id should be the same as the inputted id"
+    "GET response id should be the same as the inputted id",
   );
 });
 
@@ -80,7 +80,7 @@ test("List horse returns all horses", async () => {
   const allHorses = [...horses, ...newHorses];
   assert.deepEqual(
     res.data.sort((a: any, b: any) => a.id - b.id),
-    allHorses.sort((a: any, b: any) => a.id - b.id)
+    allHorses.sort((a: any, b: any) => a.id - b.id),
   );
 });
 
