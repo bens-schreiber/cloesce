@@ -16,39 +16,80 @@ trait LanguageWorkerGenerator {
     fn proto(&self, method: &Method, body: String) -> String;
     fn validate_http(&self, verb: &HttpVerb) -> String;
     fn validate_req_body(&self, params: &[TypedValue]) -> String;
-    fn hydrate_model(&self, model_name: &Model) -> String;
+    fn hydrate_model(&self, model: &Model) -> String;
     fn dispatch_method(&self, model_name: &str, method: &Method) -> String;
 }
 
 pub struct WorkersFactory;
 impl WorkersFactory {
     fn model(model: &Model, lang: &dyn LanguageWorkerGenerator) -> String {
-        let mut router_methods = vec![];
-        for method in &model.methods {
+        // Separate static and instance methods
+        let static_methods: Vec<_> = model.methods.iter().filter(|m| m.is_static).collect();
+        let instance_methods: Vec<_> = model.methods.iter().filter(|m| !m.is_static).collect();
+
+        let mut router_entries = vec![];
+
+        // Add static methods directly at the model level
+        for method in &static_methods {
             let validate_http = lang.validate_http(&method.http_verb);
             let validate_params = lang.validate_req_body(&method.parameters);
-            let hydration = if method.is_static {
-                ""
-            } else {
-                &lang.hydrate_model(model)
-            };
             let dispatch = lang.dispatch_method(&model.name, method);
 
             let method_body = format!(
                 r#"
                 {validate_http}
                 {validate_params}
-                {hydration}
                 {dispatch}
             "#
             );
 
             let proto = lang.proto(method, method_body);
-
-            router_methods.push(lang.router_method(method, proto))
+            router_entries.push(format!(
+                r#"
+{}: {{{proto}}}
+"#,
+                method.name
+            ));
         }
 
-        lang.router_model(&model.name, router_methods.join(",\n"))
+        // Group all instance methods under a single "<id>" key
+        if !instance_methods.is_empty() {
+            let mut instance_router_methods = vec![];
+
+            for method in &instance_methods {
+                let validate_http = lang.validate_http(&method.http_verb);
+                let validate_params = lang.validate_req_body(&method.parameters);
+                let hydration = lang.hydrate_model(model);
+                let dispatch = lang.dispatch_method(&model.name, method);
+
+                let method_body = format!(
+                    r#"
+                    {validate_http}
+                    {validate_params}
+                    {hydration}
+                    {dispatch}
+                "#
+                );
+
+                let proto = lang.proto(method, method_body);
+                instance_router_methods.push(format!(
+                    r#"
+{}: {{{proto}}}
+"#,
+                    method.name
+                ));
+            }
+
+            // Add the grouped instance methods under "<id>"
+            router_entries.push(format!(
+                r#"
+"<id>": {{{}}}
+"#,
+                instance_router_methods.join(",")
+            ));
+        }
+
+        lang.router_model(&model.name, router_entries.join(","))
     }
 
     pub fn create(self, spec: CidlSpec, workers_path: &Path) -> Result<String> {
