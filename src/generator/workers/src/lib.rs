@@ -1,7 +1,7 @@
 mod typescript;
 
 use anyhow::Result;
-use common::{CidlSpec, HttpVerb, InputLanguage, Method, Model, TypedValue};
+use common::{CidlSpec, HttpVerb, InputLanguage, Method, Model};
 use std::path::Path;
 use typescript::TypescriptWorkersGenerator;
 
