@@ -93,6 +93,7 @@ impl TypescriptValidatorGenerator {
 }
 
 pub struct TypescriptWorkersGenerator;
+
 impl LanguageWorkersGenerator for TypescriptWorkersGenerator {
     fn imports(&self, models: &[Model], workers_path: &Path) -> Result<String> {
         let cf_types = r#"
@@ -234,51 +235,64 @@ if (request.method !== "{verb_str}") {{
         )
     }
 
-    fn validate_req_body(&self, params: &[TypedValue]) -> String {
-        let mut validate = Vec::new();
+    fn validate_request(&self, method: &Method) -> String {
+        let params = &method.parameters;
 
-        let req_body_params = params
+        let req_params = params
             .iter()
             .filter(|p| !matches!(p.cidl_type, CidlType::D1Database))
             .collect::<Vec<_>>();
 
-        let invalid = r#"
-            return new Response(JSON.stringify({ error: "Invalid request body" }), {
+        if req_params.is_empty() {
+            return String::new();
+        }
+
+        let param_names = req_params
+            .iter()
+            .map(|p| p.name.clone())
+            .collect::<Vec<_>>()
+            .join(", ");
+
+        let invalid_request = r#"
+            return new Response(JSON.stringify({ error: "Invalid request parameters" }), {
                 status: 400,
                 headers: { "Content-Type": "application/json" },
             });
         "#;
 
-        // Instantiate from request body
-        if !req_body_params.is_empty() {
-            let req_body_params_lst = req_body_params
-                .iter()
-                .map(|p| p.name.clone())
-                .collect::<Vec<_>>()
-                .join(",");
+        let mut validate = vec![];
 
-            validate.push(format!(
-                r#"
-                let body;
-                try {{
-                    body = await request.json();
-                }} catch {{
-                    {invalid}
-                }}
-
-                let {{{req_body_params_lst}}} = body;
-                "#
-            ));
-        }
-
-        // Validate params from request body
-        // Assign models to actual instances
-        for param in req_body_params {
-            if let Some(type_check) = TypescriptValidatorGenerator::validate_type(param, "") {
-                validate.push(format!("if ({type_check}) {{ {invalid} }}"))
+        validate.push(match method.http_verb {
+            HttpVerb::GET => {
+                format!(
+                    r#"
+                    const url = new URL(request.url);
+                    let {{{param_names}}} = Object.fromEntries(url.searchParams.entries());
+                    "#
+                )
             }
+            _ => {
+                format!(
+                    r#"
+                    let body;
+                    try {{
+                        body = await request.json();
+                    }} catch {{
+                        {invalid_request}
+                    }}
+                    let {{{param_names}}} = body;
+                    "#
+                )
+            }
+        });
+
+        for param in &req_params {
+            if let Some(type_check) = TypescriptValidatorGenerator::validate_type(param, "") {
+                validate.push(format!("if ({type_check}) {{ {invalid_request} }}"));
+            }
+
             if let Some(assign) = TypescriptValidatorGenerator::assign_type(param) {
-                validate.push(format!("{} = {assign}", param.name))
+                validate.push(format!("{} = {assign}", param.name));
             }
         }
 
@@ -294,7 +308,7 @@ if (request.method !== "{verb_str}") {{
         let has_ds = model.data_sources.len() > 1;
 
         let query = if has_ds {
-            format!("`SELECT * FROM{model_name}_default WHERE {model_name}_{pk} = ?")
+            format!("`SELECT * FROM {model_name}_default WHERE {model_name}_{pk} = ?`")
         } else {
             format!("`SELECT * FROM {model_name} WHERE {pk} = ?`")
         };

@@ -1,7 +1,7 @@
 mod typescript;
 
 use anyhow::Result;
-use common::{CidlSpec, HttpVerb, InputLanguage, Method, Model, TypedValue};
+use common::{CidlSpec, HttpVerb, InputLanguage, Method, Model};
 use std::path::Path;
 use typescript::TypescriptWorkersGenerator;
 
@@ -15,9 +15,9 @@ trait LanguageWorkerGenerator {
     fn router_method(&self, method: &Method, proto: String) -> String;
     fn proto(&self, method: &Method, body: String) -> String;
     fn validate_http(&self, verb: &HttpVerb) -> String;
-    fn validate_req_body(&self, params: &[TypedValue]) -> String;
-    fn hydrate_model(&self, model_name: &Model) -> String;
+    fn hydrate_model(&self, model: &Model) -> String;
     fn dispatch_method(&self, model_name: &str, method: &Method) -> String;
+    fn validate_request(&self, method: &Method) -> String;
 }
 
 pub struct WorkersFactory;
@@ -26,11 +26,11 @@ impl WorkersFactory {
         let mut router_methods = vec![];
         for method in &model.methods {
             let validate_http = lang.validate_http(&method.http_verb);
-            let validate_params = lang.validate_req_body(&method.parameters);
+            let validate_params = lang.validate_request(method);
             let hydration = if method.is_static {
-                ""
+                String::new()
             } else {
-                &lang.hydrate_model(model)
+                lang.hydrate_model(model)
             };
             let dispatch = lang.dispatch_method(&model.name, method);
 
