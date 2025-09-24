@@ -1,6 +1,7 @@
 use common::{CidlType, HttpVerb, Method, Model, TypedValue};
 
-use crate::LanguageWorkerGenerator as LanguageWorkersGenerator;
+use crate::{LanguageWorkerGenerator, RouterTrie};
+use std::collections::HashMap;
 
 pub struct TypescriptValidatorGenerator;
 impl TypescriptValidatorGenerator {
@@ -92,6 +93,7 @@ impl TypescriptValidatorGenerator {
 pub struct TypescriptWorkersGenerator {
     domain: String,
     root_path: String,
+    router: RouterTrie,
 }
 
 impl TypescriptWorkersGenerator {
@@ -100,10 +102,11 @@ impl TypescriptWorkersGenerator {
         Self {
             domain: normalized_domain,
             root_path: root,
+            router: RouterTrie::default(),
         }
     }
 
-    fn parse_domain(domain: Option<String>) -> (String, String) {
+    pub fn parse_domain(domain: Option<String>) -> (String, String) {
         // Handle the Option<String> properly, defaulting to localhost
         let domain_str = domain.unwrap_or_else(|| "localhost".to_string());
         
@@ -137,7 +140,7 @@ impl TypescriptWorkersGenerator {
     }
 }
 
-impl LanguageWorkersGenerator for TypescriptWorkersGenerator {
+impl LanguageWorkerGenerator for TypescriptWorkersGenerator {
     fn imports(&self, models: &[Model]) -> String {
         let cf_types = r#"
 import { D1Database } from "@cloudflare/workers-types"
@@ -188,30 +191,87 @@ export default {
 "#.to_string()
     }
 
-    fn router(&self, model: String) -> String {
-        format!(
-            r#"
-const router = {{ {root}: {{{model}}} }}
-"#,
-            root = self.root_path
-        )
+    fn router_init(&mut self, root_path: &str) {
+        self.root_path = root_path.to_string();
     }
-
-    fn router_model(&self, model_name: &str, method: String) -> String {
-        format!(
-            r#"
-{model_name}: {{{method}}}
-"#
-        )
-    }
-
-    fn router_method(&self, method: &Method, proto: String) -> String {
-        let method_name = &method.name;
-        if method.is_static {
-            format!(r#"{method_name}: {proto}"#)
+    
+    fn router_add_method(&mut self, model_name: &str, method: &Method, is_instance: bool) {
+        // Build the method body
+        let validate_http = self.validate_http(&method.http_verb);
+        let validate_params = self.validate_req_body(&method.parameters);
+        let hydration = if !is_instance {
+            String::new()
         } else {
-            format!(r#"{method_name}: {proto}"#)
+            // We need to pass a dummy model here since we don't have it in this context
+            // This is a design issue - we might need to refactor this
+            format!(
+                r#"
+const d1 = env.DB;
+const record = await d1.prepare(`SELECT * FROM {model_name} WHERE id = ?`).bind(id).first();
+if (!record) {{
+    return new Response(
+        JSON.stringify({{ error: "Record not found" }}),
+        {{ status: 404, headers: {{ "Content-Type": "application/json" }} }}
+    );
+}}
+const instance = Object.assign(new {model_name}(), record);
+"#
+            )
+        };
+        let dispatch = self.dispatch_method(model_name, method);
+        
+        let method_body = format!(
+            r#"
+            {validate_http}
+            {validate_params}
+            {hydration}
+            {dispatch}
+        "#
+        );
+        
+        let proto = self.proto(method, method_body);
+        
+        // Build the path in the trie
+        let path = if is_instance {
+            vec![model_name, "<id>", &method.name]
+        } else {
+            vec![model_name, &method.name]
+        };
+        
+        // Insert into the router trie
+        self.router.insert(path, proto);
+    }
+    
+    fn router_build(&self) -> String {
+        // Recursively build the router object from the trie
+        fn build_node(node: &crate::TrieNode, depth: usize) -> String {
+            if node.children.is_empty() {
+                // Leaf node - return the value (the method implementation)
+                node.value.clone()
+            } else {
+                // Build object with children
+                let mut entries = Vec::new();
+                for (key, child) in &node.children {
+                    let child_content = build_node(child, depth + 1);
+                    if child.children.is_empty() {
+                        // Direct method
+                        entries.push(format!(r#"{}: {}"#, key, child_content));
+                    } else {
+                        // Nested object
+                        entries.push(format!(r#""{}": {{ {} }}"#, key, child_content));
+                    }
+                }
+                entries.join(",\n")
+            }
         }
+        
+        let router_content = build_node(&self.router.root, 0);
+        format!(
+            r#"
+const router = {{ {}: {{ {} }} }}
+"#,
+            self.root_path, router_content
+        )
     }
 
     fn proto(&self, method: &Method, body: String) -> String {

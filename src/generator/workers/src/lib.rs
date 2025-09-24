@@ -1,19 +1,53 @@
 mod typescript;
 use common::{CidlSpec, HttpVerb, InputLanguage, Method, Model, TypedValue};
 use typescript::TypescriptWorkersGenerator;
+use std::collections::HashMap;
+
+#[derive(Default)]
+pub struct TrieNode {
+    value: String,
+    children: HashMap<String, TrieNode>,
+}
+
+#[derive(Default)]
+pub struct RouterTrie {
+    root: TrieNode,
+}
+
+impl RouterTrie {
+    pub fn insert(&mut self, path: Vec<&str>, value: String) {
+        let mut current = &mut self.root;
+        for segment in path {
+            current = current.children.entry(segment.to_string()).or_default();
+        }
+        current.value = value;
+    }
+    
+    pub fn get(&self, path: Vec<&str>) -> Option<&String> {
+        let mut current = &self.root;
+        for segment in path {
+            current = current.children.get(segment)?;
+        }
+        Some(&current.value)
+    }
+}
 
 trait LanguageWorkerGenerator {
     fn imports(&self, models: &[Model]) -> String;
     fn preamble(&self) -> String;
     fn validators(&self, models: &[Model]) -> String;
     fn main(&self) -> String;
-    fn router(&self, model: String) -> String;
-    fn router_model(&self, model_name: &str, method: String) -> String;
-    fn router_method(&self, method: &Method, proto: String) -> String;
+    
+    // Router building methods - these modify internal state
+    fn router_init(&mut self, root_path: &str);
+    fn router_add_method(&mut self, model_name: &str, method: &Method, is_instance: bool);
+    fn router_build(&self) -> String;
+    
+    // Method generation
     fn proto(&self, method: &Method, body: String) -> String;
     fn validate_http(&self, verb: &HttpVerb) -> String;
     fn validate_req_body(&self, params: &[TypedValue]) -> String;
-    fn hydrate_model(&self, model_name: &Model) -> String;
+    fn hydrate_model(&self, model: &Model) -> String;
     fn dispatch_method(&self, model_name: &str, method: &Method) -> String;
 }
 
@@ -24,66 +58,36 @@ impl WorkersFactory {
         Self
     }
    
-    fn model(model: &Model, lang: &dyn LanguageWorkerGenerator) -> String {
-        let mut static_methods = vec![];
-        let mut instance_methods = vec![];
-       
-        for method in &model.methods {
-            let validate_http = lang.validate_http(&method.http_verb);
-            let validate_params = lang.validate_req_body(&method.parameters);
-            let hydration = if method.is_static {
-                ""
-            } else {
-                &lang.hydrate_model(model)
-            };
-            let dispatch = lang.dispatch_method(&model.name, method);
-            let method_body = format!(
-                r#"
-                {validate_http}
-                {validate_params}
-                {hydration}
-                {dispatch}
-            "#
-            );
-            let proto = lang.proto(method, method_body);
-            let router_method = lang.router_method(method, proto);
-           
-            if method.is_static {
-                static_methods.push(router_method);
-            } else {
-                instance_methods.push(router_method);
+    fn build_routes(models: &[Model], lang: &mut dyn LanguageWorkerGenerator) {
+        for model in models {
+            for method in &model.methods {
+                // Let the language implementation handle how to add this method to the router
+                lang.router_add_method(&model.name, method, !method.is_static);
             }
         }
-       
-        // Combine static methods and instance methods under <id> if any exist
-        let mut all_methods = static_methods;
-        if !instance_methods.is_empty() {
-            let instance_routes = instance_methods.join(",\n");
-            all_methods.push(format!(r#""<id>": {{ {} }}"#, instance_routes));
-        }
-       
-        lang.router_model(&model.name, all_methods.join(",\n"))
     }
-
+    
     pub fn create(self, spec: CidlSpec, domain: Option<String>) -> String {
-        let generator: Box<dyn LanguageWorkerGenerator> = match spec.language {
+        // Parse domain first to get root_path before moving domain
+        let (_, root_path) = TypescriptWorkersGenerator::parse_domain(domain.clone());
+        
+        let mut generator: Box<dyn LanguageWorkerGenerator> = match spec.language {
             InputLanguage::TypeScript => {
                 Box::new(TypescriptWorkersGenerator::new(domain))
             }
         };
-
+        
+        // Initialize the router with domain info
+        generator.router_init(&root_path);
+        
+        // Build all routes
+        Self::build_routes(&spec.models, generator.as_mut());
+        
+        // Generate the final output
         let imports = generator.imports(&spec.models);
         let preamble = generator.preamble();
         let validators = generator.validators(&spec.models);
-        let router = {
-            let router_body = spec
-                .models
-                .iter()
-                .map(|m| Self::model(m, generator.as_ref()))
-                .collect::<Vec<_>>()
-                .join("\n");
-            generator.router(router_body)
-        };
+        let router = generator.router_build();
         let main = generator.main();
        
         format!(
