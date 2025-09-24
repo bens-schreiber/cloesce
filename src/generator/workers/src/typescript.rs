@@ -253,70 +253,50 @@ if (request.method !== "{verb_str}") {{
             .collect::<Vec<_>>()
             .join(", ");
 
-        let invalid_response = r#"
+        let invalid_request = r#"
             return new Response(JSON.stringify({ error: "Invalid request parameters" }), {
                 status: 400,
                 headers: { "Content-Type": "application/json" },
             });
         "#;
 
-        let mut validation_checks = Vec::new();
-        let mut assignments = Vec::new();
+        let mut validate = vec![];
 
-        for param in &req_params {
-            if let Some(type_check) = TypescriptValidatorGenerator::validate_type(param, "") {
-                validation_checks.push(format!("if ({type_check}) {{ {invalid_response} }}"));
-            }
-
-            if let Some(assign) = TypescriptValidatorGenerator::assign_type(param) {
-                assignments.push(format!("{} = {assign}", param.name));
-            }
-        }
-
-        let validation_code = validation_checks.join("\n            ");
-        let assignment_code = assignments.join(";\n            ");
-
-        let extraction_logic = match method.http_verb {
+        validate.push(match method.http_verb {
             HttpVerb::GET => {
-                let query_param_extractors =
-                    "params = Object.fromEntries(url.searchParams.entries())";
                 format!(
                     r#"
-            // Extract parameters from URL query string for GET request
-            const url = new URL(request.url);
-            const searchParams = url.searchParams;
-            let params: any = {{}};
-            
-            {query_param_extractors}"#
+                    const url = new URL(request.url);
+                    let {{{param_names}}} = Object.fromEntries(url.searchParams.entries())
+                    "#
                 )
             }
             _ => {
                 format!(
                     r#"
-            // Extract parameters from request body for non-GET requests
-            let params: any;
-            try {{
-                params = await request.json();
-            }} catch {{
-                {invalid_response}
-            }}"#
+                    let body;
+                    try {{
+                        body = await request.json();
+                    }} catch {{
+                        {invalid_request}
+                    }}
+                    let {{{param_names}}} = body;
+                    "#
                 )
             }
-        };
+        });
 
-        format!(
-            r#"
-            {extraction_logic}
-            
-            let {{{param_names}}} = params;
-            
-            // Validate parameters
-            {validation_code}
-            
-            // Assign model instances
-            {assignment_code}
-        "#
-        )
+        for param in &req_params {
+            if let Some(type_check) = TypescriptValidatorGenerator::validate_type(param, "") {
+                validate.push(format!("if ({type_check}) {{ {invalid_request} }}"));
+            }
+
+            if let Some(assign) = TypescriptValidatorGenerator::assign_type(param) {
+                validate.push(format!("{} = {assign}", param.name));
+            }
+        }
+
+        validate.join("\n")
     }
 
     fn hydrate_model(&self, model: &Model) -> String {
