@@ -17,19 +17,11 @@ trait LanguageWorkerGenerator {
     fn dispatch_method(&self, model_name: &str, method: &Method) -> String;
 }
 
-pub struct WorkersFactory {
-    domain: Option<String>,
-}
+pub struct WorkersFactory;
 
 impl WorkersFactory {
-    pub fn new(domain: String) -> Self {
-        Self { domain: Some(domain) }
-    }
-
-    // If you want builder-style, you can still add a setter:
-    pub fn with_domain(mut self, domain: String) -> Self {
-        self.domain = Some(domain);
-        self
+    pub fn new() -> Self {
+        Self
     }
    
     fn model(model: &Model, lang: &dyn LanguageWorkerGenerator) -> String {
@@ -73,10 +65,10 @@ impl WorkersFactory {
         lang.router_model(&model.name, all_methods.join(",\n"))
     }
 
-    pub fn create(self, spec: CidlSpec) -> String {
+    pub fn create(self, spec: CidlSpec, domain: Option<String>) -> String {
         let generator: Box<dyn LanguageWorkerGenerator> = match spec.language {
             InputLanguage::TypeScript => {
-                Box::new(TypescriptWorkersGenerator::new(self.domain))
+                Box::new(TypescriptWorkersGenerator::new(domain))
             }
         };
 

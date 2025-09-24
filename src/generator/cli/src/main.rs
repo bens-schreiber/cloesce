@@ -105,8 +105,7 @@ fn main() -> Result<()> {
                 let mut file =
                     create_file_and_dir(workers_path).context("Failed to open workers file")?;
                 
-                // since we're not making domains optional, we need to have a default value
-                let generated = workers::WorkersFactory::new("localhost".to_string()).create(cidl);
+                let generated = workers::WorkersFactory::new().create(cidl, None);
                 file.write_all(generated.as_bytes()).expect("failed to write output");
             }
             GenerateTarget::Client {

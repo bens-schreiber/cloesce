@@ -16,7 +16,7 @@ fn test_generate_client_snapshot() -> Result<()> {
     let cidl = load_cidl()?;
    
     // Use the default domain here
-    let workers = WorkersFactory::new("localhost".to_string()).create(cidl);
+    let workers = WorkersFactory::new().create(cidl, Some("localhost".to_string()));
    
     // Assert
     assert_snapshot!("generated_workers", workers);
@@ -29,8 +29,8 @@ fn test_generate_client_with_custom_domain() -> Result<()> {
     let cidl = load_cidl()?;
    
     // Use a custom domain with path to test root extraction
-    let workers = WorkersFactory::new("example.com/foo/bar/baz".to_string())
-        .create(cidl);
+    let workers = WorkersFactory::new()
+        .create(cidl, Some("example.com/foo/bar/baz".to_string()));
    
     // Assert: router should use "baz" as root
     assert!(workers.contains("const router = { baz:"));
@@ -53,8 +53,8 @@ fn test_domain_normalization() -> Result<()> {
         let cidl = load_cidl()?;
        
         // Act
-        let workers = WorkersFactory::new(domain.to_string())
-            .create(cidl);
+        let workers = WorkersFactory::new()
+            .create(cidl, Some(domain.to_string()));
        
         // Assert
         let expected = format!("const router = {{ {}:", expected_root);
