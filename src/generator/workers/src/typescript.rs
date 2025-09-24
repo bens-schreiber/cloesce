@@ -267,7 +267,7 @@ if (request.method !== "{verb_str}") {{
                 format!(
                     r#"
                     const url = new URL(request.url);
-                    let {{{param_names}}} = Object.fromEntries(url.searchParams.entries())
+                    let {{{param_names}}} = Object.fromEntries(url.searchParams.entries());
                     "#
                 )
             }

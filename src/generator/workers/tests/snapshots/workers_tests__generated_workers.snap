@@ -176,7 +176,7 @@ if (request.method !== "GET") {
 
                 
                     const url = new URL(request.url);
-                    let {id} = Object.fromEntries(url.searchParams.entries())
+                    let {id} = Object.fromEntries(url.searchParams.entries());
                     
 if ((id !== undefined && typeof id !== "number")) { 
             return new Response(JSON.stringify({ error: "Invalid request parameters" }), {
