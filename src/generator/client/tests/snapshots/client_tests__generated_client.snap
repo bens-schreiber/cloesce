@@ -40,8 +40,7 @@ export class ExampleModel {
       };
     }
 
-    const text = await res.text();
-    const data = text ? JSON.parse(text) : null;
+    const data = await res.json();
 
     const instantiated = Object.assign(new ExampleModel(), data);
     return { ok: true, data: instantiated };
@@ -65,8 +64,7 @@ export class ExampleModel {
       };
     }
 
-    const text = await res.text();
-    const data = text ? JSON.parse(text) : null;
+    const data = await res.json();
 
     return { ok: true, data };
   }
@@ -87,8 +85,7 @@ export class ExampleModel {
       };
     }
 
-    const text = await res.text();
-    const data = text ? JSON.parse(text) : null;
+    const data = await res.json();
 
     const instantiated = instantiateModelArray(data, ExampleModel);
     return { ok: true, data: instantiated };
@@ -117,8 +114,7 @@ export class ExampleModel {
       };
     }
 
-    const text = await res.text();
-    const data = text ? JSON.parse(text) : null;
+    const data = await res.json();
 
     return { ok: true, data };
   }
@@ -144,8 +140,7 @@ export class ExampleModel {
       };
     }
 
-    const text = await res.text();
-    const data = text ? JSON.parse(text) : null;
+    const data = await res.json();
 
     return { ok: true, data };
   }
@@ -171,8 +166,7 @@ export class ExampleModel {
       };
     }
 
-    const text = await res.text();
-    const data = text ? JSON.parse(text) : null;
+    const data = await res.json();
 
     return { ok: true, data };
   }
@@ -193,8 +187,7 @@ export class ExampleModel {
       };
     }
 
-    const text = await res.text();
-    const data = text ? JSON.parse(text) : null;
+    const data = await res.json();
 
     return { ok: true, data };
   }
@@ -220,8 +213,7 @@ export class ExampleModel {
       };
     }
 
-    const text = await res.text();
-    const data = text ? JSON.parse(text) : null;
+    const data = await res.json();
 
     return { ok: true, data };
   }
@@ -247,8 +239,7 @@ export class ExampleModel {
       };
     }
 
-    const text = await res.text();
-    const data = text ? JSON.parse(text) : null;
+    const data = await res.json();
 
     return { ok: true, data };
   }
@@ -274,8 +265,7 @@ export class ExampleModel {
       };
     }
 
-    const text = await res.text();
-    const data = text ? JSON.parse(text) : null;
+    const data = await res.json();
 
     return { ok: true, data };
   }
