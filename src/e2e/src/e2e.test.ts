@@ -63,41 +63,42 @@ test("Post, Patch, Get a Horse", async () => {
   );
 });
 
-// test("List horse returns all horses", async () => {
-//   let res = await Horse.list();
-//   assert.ok(res.ok);
-//   let horses = res.data;
-//   assert.equal(horses.length, 1);
+test("List horse returns all horses", async () => {
+  let res = await Horse.list();
+  assert.ok(res.ok);
+  let horses = res.data;
+  assert.equal(horses.length, 1);
 
-//   let newHorses = [
-//     {
-//       id: 2,
-//       name: "sonic",
-//       bio: "the horse",
-//       matches: [],
-//     },
-//     {
-//       id: 3,
-//       name: "other roach",
-//       bio: "geralts other horse",
-//       matches: [],
-//     },
-//   ];
+  let newHorses = [
+    {
+      id: 2,
+      name: "sonic",
+      bio: "the horse",
+      matches: [],
+    },
+    {
+      id: 3,
+      name: "other roach",
+      bio: "geralts other horse",
+      matches: [],
+    },
+  ];
 
-//   let postResults = await Promise.all(newHorses.map((h) => Horse.post(h)));
-//   postResults.forEach((res) => assert.ok(res.ok));
+  let postResults = await Promise.all(newHorses.map((h) => Horse.post(h)));
+  postResults.forEach((res) => assert.ok(res.ok));
 
-//   res = await Horse.list();
-//   assert.ok(res.ok);
-//   assert.equal(res.data.length, 3);
+  res = await Horse.list();
+  assert.ok(res.ok);
+  assert.equal(res.data.length, 3);
 
-//   // Node's assert doesn't have `arrayContaining`, so use deepEqual after sorting
-//   const allHorses = [...horses, ...newHorses];
-//   assert.deepEqual(
-//     res.data.sort((a: any, b: any) => a.id - b.id),
-//     allHorses.sort((a: any, b: any) => a.id - b.id),
-//   );
-// });
+  // Node's assert doesn't have `arrayContaining`, so use deepEqual after sorting
+  const allHorses = [...horses, ...newHorses];
+
+  const normalize = (arr: any[]) =>
+    arr.sort((a, b) => a.id - b.id).map((h) => ({ ...h })); // strips prototype so Horse === plain object
+
+  assert.deepEqual(normalize(res.data), normalize(allHorses));
+});
 
 // test("Horse can match with another horse", async () => {
 //   let res = await Horse.get(0);

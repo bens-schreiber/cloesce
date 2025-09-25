@@ -89,10 +89,10 @@ horse = Object.assign(new Horse(), horse)
             try {
                 let dispatch = await instance.match(env.DB, horse);
                 
-                return new Response(
-                    JSON.stringify(dispatch),
-                    { status: dispatch.status, headers: { "Content-Type": "application/json" } }
-                );
+            return new Response(
+                JSON.stringify(dispatch),
+                { status: dispatch.status, headers: { "Content-Type": "application/json" } }
+            );
             }
             catch (e) {
                 return new Response(
@@ -153,10 +153,10 @@ horse = Object.assign(new Horse(), horse)
             try {
                 let dispatch = await instance.patch(env.DB, horse);
                 
-                return new Response(
-                    JSON.stringify(dispatch),
-                    { status: dispatch.status, headers: { "Content-Type": "application/json" } }
-                );
+            return new Response(
+                JSON.stringify(dispatch),
+                { status: dispatch.status, headers: { "Content-Type": "application/json" } }
+            );
             }
             catch (e) {
                 return new Response(
@@ -188,10 +188,10 @@ if ((id == null || Number.isNaN(id))) { return new Response(
             try {
                 let dispatch = await Horse.get(env.DB, id);
                 
-                return new Response(
-                    JSON.stringify(dispatch),
-                    { status: dispatch.status, headers: { "Content-Type": "application/json" } }
-                );
+            return new Response(
+                JSON.stringify(dispatch),
+                { status: dispatch.status, headers: { "Content-Type": "application/json" } }
+            );
             }
             catch (e) {
                 return new Response(
@@ -216,10 +216,10 @@ list: async (request: Request, env: Env) => {
             try {
                 let dispatch = await Horse.list(env.DB);
                 
-                return new Response(
-                    JSON.stringify(dispatch),
-                    { status: dispatch.status, headers: { "Content-Type": "application/json" } }
-                );
+            return new Response(
+                JSON.stringify(dispatch),
+                { status: dispatch.status, headers: { "Content-Type": "application/json" } }
+            );
             }
             catch (e) {
                 return new Response(
@@ -260,10 +260,10 @@ horse = Object.assign(new Horse(), horse)
             try {
                 let dispatch = await Horse.post(env.DB, horse);
                 
-                return new Response(
-                    JSON.stringify(dispatch),
-                    { status: dispatch.status, headers: { "Content-Type": "application/json" } }
-                );
+            return new Response(
+                JSON.stringify(dispatch),
+                { status: dispatch.status, headers: { "Content-Type": "application/json" } }
+            );
             }
             catch (e) {
                 return new Response(

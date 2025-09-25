@@ -37,10 +37,15 @@ export type IncludeTree<T> = T extends Primitive
     };
 
 /**
- * TODO: This could be WASM
+ * TODO: This could be WASM?
  *
  * TODO: I hit ChatGPT with a hammer 10-15 times until it spit out this algorithm
  * that seems to work. No clue what it does, some day I might look into it.
+ *
+ * TODO: If there is a return result for an object that has a OneToMany or ManyToMany
+ * relationship, and no values are found for that relationship, the array will not
+ * be included in the return results body. We fix this by having default params on the
+ * client side for navigation properties... Is that the best solution?
  *
  * @returns JSON of type T
  */

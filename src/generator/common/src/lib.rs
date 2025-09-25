@@ -7,6 +7,44 @@ use std::path::PathBuf;
 use serde::Deserialize;
 use serde::Serialize;
 
+#[macro_export]
+macro_rules! match_cidl {
+    // Base: simple variant without inner
+    ($value:expr, $variant:ident => $body:expr) => {
+        if let CidlType::$variant = $value { $body } else { false }
+    };
+
+    // Base: Model(_)
+    ($value:expr, Model(_) => $body:expr) => {
+        if let CidlType::Model(_) = $value { $body } else { false }
+    };
+
+    // Recursive: HttpResult(inner)
+    ($value:expr, HttpResult($($inner:tt)+) => $body:expr) => {
+        if let CidlType::HttpResult(Some(inner)) = $value {
+            match_cidl!(inner.as_ref(), $($inner)+ => $body)
+        } else {
+            false
+        }
+    };
+
+    // Recursive: Array(inner)
+    ($value:expr, Array($($inner:tt)+) => $body:expr) => {
+        if let CidlType::Array(inner) = $value {
+            match_cidl!(inner.as_ref(), $($inner)+ => $body)
+        } else {
+            false
+        }
+    };
+}
+
+#[macro_export]
+macro_rules! matches_cidl {
+    ($value:expr, $($pattern:tt)+) => {
+        $crate::match_cidl!($value, $($pattern)+ => true)
+    };
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
 pub enum CidlType {
     Integer,

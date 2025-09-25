@@ -68,9 +68,7 @@ struct JunctionTableBuilder<'a> {
 impl<'a> JunctionTableBuilder<'a> {
     fn model(&mut self, jm: JunctionModel<'a>) -> Result<()> {
         if self.models.len() >= 2 {
-            return Err(anyhow!(
-                "Too many ManyToMany navigation properties for junction table"
-            ));
+            bail!("Too many ManyToMany navigation properties for junction table");
         }
         self.models.push(jm);
         Ok(())
@@ -89,28 +87,28 @@ fn validate_nav_array<'a>(
     model_lookup: &HashMap<&str, &Model>,
 ) -> Result<&'a str> {
     let Some(CidlType::Model(model_name)) = nav.value.cidl_type.unwrap_array() else {
-        return Err(anyhow!(
+        bail!(
             "Expected collection of Model type for navigation property {}.{}",
             model.name,
             nav.value.name
-        ));
+        );
     };
 
     if nav.value.nullable {
-        return Err(anyhow!(
+        bail!(
             "Navigation property cannot be nullable {}.{}",
             model.name,
             nav.value.name
-        ));
+        );
     }
 
     if !model_lookup.contains_key(model_name.as_str()) {
-        return Err(anyhow!(
+        bail!(
             "Unknown Model for navigation property {}.{} => {}?",
             model.name,
             nav.value.name,
             model_name
-        ));
+        );
     }
 
     Ok(model_name.as_str())
@@ -237,11 +235,11 @@ fn validate_fks<'a>(
                 NavigationPropertyKind::OneToOne { reference } => {
                     // Validate nav prop has a Model type
                     let CidlType::Model(nav_model) = &nav.value.cidl_type else {
-                        return Err(anyhow!(
+                        bail!(
                             "Expected Model type for navigation property {}.{}",
                             model.name,
                             nav.value.name
-                        ));
+                        );
                     };
 
                     // Validate the nav prop's model exists
@@ -265,13 +263,13 @@ fn validate_fks<'a>(
                             fk_model
                         );
                     } else {
-                        return Err(anyhow!(
+                        bail!(
                             "Navigation property {}.{} references {}.{} which does not exist.",
                             model.name,
                             nav.value.name,
                             nav_model,
                             reference
-                        ));
+                        );
                     }
 
                     // TODO: Revisit this. Should a user be able to decorate a One To One
@@ -308,13 +306,13 @@ fn validate_fks<'a>(
         // Validate the nav props reference is consistent to an attribute
         // on another model
         let Some(&fk_model) = model_reference_to_fk_model.get(&(nav_model, reference)) else {
-            return Err(anyhow!(
+            bail!(
                 "Navigation property {}.{} references {}.{} which does not exist.",
                 model_name,
                 nav.value.name,
                 nav_model,
                 reference
-            ));
+            );
         };
 
         // The types should reference one another
@@ -372,7 +370,7 @@ fn validate_fks<'a>(
                 .iter()
                 .filter_map(|(&n, &d)| (d > 0).then_some(n))
                 .collect();
-            return Err(anyhow!("Cycle detected: {}", cyclic.join(", ")));
+            bail!("Cycle detected: {}", cyclic.join(", "));
         }
 
         sorted

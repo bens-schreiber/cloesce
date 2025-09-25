@@ -4,8 +4,6 @@ expression: client
 ---
 import { Result } from "cloesce";
 
-/// A helper to turn a JSON array into an array of
-/// instantiated models
 function instantiateModelArray<T extends object>(
   data: any,
   ctor: { new (): T }
@@ -21,7 +19,8 @@ export class Horse {
   id: number;
   name: string;
   bio: string | null;
-  matches: Match[];
+  matches: Match[] = [];
+
 
   static async post(
         horse: Horse
@@ -52,6 +51,7 @@ export class Horse {
 
     raw.data = Object.assign(new Horse(), raw.data)
     return raw;
+
   }
   static async get(
         id: number
@@ -78,7 +78,9 @@ export class Horse {
       return raw;
     }
 
+    raw.data = instantiateModelArray(raw.data, Horse)
     return raw;
+
   }
   static async list(
   ): Promise<Result<Horse[]>> {
@@ -103,7 +105,9 @@ export class Horse {
       return raw;
     }
 
+    raw.data = instantiateModelArray(raw.data, Horse)
     return raw;
+
   }
   async patch(
         horse: Horse
@@ -133,6 +137,7 @@ export class Horse {
     }
 
     return raw;
+
   }
   async match(
         horse: Horse
@@ -162,6 +167,7 @@ export class Horse {
     }
 
     return raw;
+
   }
 }
 export class Match {
@@ -169,5 +175,6 @@ export class Match {
   horseId1: number;
   horseId2: number;
   horse2: Horse;
+
 
 }

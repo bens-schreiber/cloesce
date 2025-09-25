@@ -2,7 +2,7 @@ mod mappers;
 
 use std::sync::Arc;
 
-use common::{CidlSpec, CidlType, InputLanguage};
+use common::{CidlSpec, CidlType, InputLanguage, match_cidl, matches_cidl};
 use handlebars::{Handlebars, handlebars_helper};
 
 use mappers::TypeScriptMapper;
@@ -12,14 +12,8 @@ pub trait ClientLanguageTypeMapper {
 }
 
 handlebars_helper!(is_serializable: |cidl_type: CidlType| !matches!(cidl_type, CidlType::D1Database));
-handlebars_helper!(is_model: |cidl_type: CidlType| {
-    match cidl_type {
-        CidlType::Model(_) => true,
-        CidlType::HttpResult(Some(inner)) => matches!(*inner, CidlType::Model(_)),
-        _ => false
-    }
-});
-handlebars_helper!(is_model_array: |cidl_type: CidlType| matches!(cidl_type.array_type(), CidlType::Model(_)));
+handlebars_helper!(is_model: |cidl_type: CidlType| matches_cidl!(&cidl_type, Model(_)) || matches_cidl!(&cidl_type, HttpResult(Model(_))));
+handlebars_helper!(is_model_array: |cidl_type: CidlType| matches_cidl!(&cidl_type, HttpResult(Array(Model(_)))) || matches_cidl!(&cidl_type, Array(Model(_))));
 handlebars_helper!(eq: |a: str, b: str| a == b);
 
 fn register_helpers(

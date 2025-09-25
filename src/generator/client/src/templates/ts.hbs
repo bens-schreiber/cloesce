@@ -1,7 +1,5 @@
 import { Result } from "cloesce";
 
-/// A helper to turn a JSON array into an array of
-/// instantiated models
 function instantiateModelArray<T extends object>(
   data: any,
   ctor: { new (): T }
@@ -19,8 +17,9 @@ export class {{name}} {
   {{value.name}}: {{lang_type value.cidl_type value.nullable}};
   {{/each}}
   {{#each navigation_properties}}
-  {{value.name}}: {{lang_type value.cidl_type value.nullable}};
+  {{value.name}}: {{lang_type value.cidl_type value.nullable}}{{#if (is_model_array value.cidl_type)}} = []{{/if}};
   {{/each}}
+
 
   {{#each methods}}
   {{#if is_static}}static {{/if}}async {{name}}(
@@ -72,15 +71,20 @@ export class {{name}} {
 
     {{#if (eq (lang_type return_type) "void")}}
     return raw;
-    {{else if (is_model return_type)}}
-    raw.data = Object.assign(new {{../name}}(), raw.data)
-    return raw;
-    {{else if (is_model_array return_type)}}
+    {{else}}
+      {{#if (is_model_array return_type)}}
     raw.data = instantiateModelArray(raw.data, {{../name}})
     return raw;
-    {{else}}
+      {{else}}
+        {{#if (is_model return_type)}}
+    raw.data = Object.assign(new {{../name}}(), raw.data)
     return raw;
+        {{else}}
+    return raw;
+        {{/if}}
+      {{/if}}
     {{/if}}
+
   }
   {{/each}}
 }

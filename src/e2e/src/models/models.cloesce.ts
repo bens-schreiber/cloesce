@@ -71,6 +71,7 @@ class Horse {
 
     // `mapSql<Horse>` turns an ORM friendly query result into a list of JSON formatted Horse
     let horses = mapSql<Horse>(records.results);
+
     return { ok: true, status: 200, data: horses[0] };
   }
 
@@ -86,6 +87,8 @@ class Horse {
 
     // `mapSql<Horse>` turns an ORM friendly query result into a list of JSON formatted Horse
     let horses = mapSql<Horse>(records.results);
+    console.log(horses);
+
     return { ok: true, status: 200, data: horses };
   }
 
