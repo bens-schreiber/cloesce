@@ -71,13 +71,13 @@ test("List horse returns all horses", async () => {
 
   let newHorses = [
     {
-      id: 2,
+      id: 1,
       name: "sonic",
       bio: "the horse",
       matches: [],
     },
     {
-      id: 3,
+      id: 2,
       name: "other roach",
       bio: "geralts other horse",
       matches: [],
@@ -100,31 +100,34 @@ test("List horse returns all horses", async () => {
   assert.deepEqual(normalize(res.data), normalize(allHorses));
 });
 
-// test("Horse can match with another horse", async () => {
-//   let res = await Horse.get(0);
-//   assert.ok(res.ok);
-//   let horse1 = res.data;
+test("Horse can match with another horse", async () => {
+  // Arrange
+  let res = await Horse.get(0);
+  assert.ok(res.ok, withRes("GET response should be OK", res));
+  let horse1 = Object.assign(new Horse(), res.data);
 
-//   res = await Horse.get(1);
-//   assert.ok(res.ok);
-//   let horse2 = res.data;
+  res = await Horse.get(1);
+  assert.ok(res.ok, withRes("GET response should be OK", res));
+  let horse2 = Object.assign(new Horse(), res.data);
 
-//   res = await horse1.match(horse2);
-//   assert.ok(res.ok);
+  // Act
+  res = await horse1.match(horse2);
+  assert.ok(res.ok, withRes(".match() response should be OK", res));
 
-//   res = await Horse.get(horse1.id);
-//   assert.ok(res.ok);
-//   let updated_horse1 = res.data;
+  res = await Horse.get(horse1.id);
+  assert.ok(res.ok, withRes("GET response should be OK", res));
+  let updated_horse1 = res.data;
 
-//   res = await Horse.get(horse2.id);
-//   assert.ok(res.ok);
-//   let updated_horse2 = res.data;
+  res = await Horse.get(horse2.id);
+  assert.ok(res.ok, withRes("GET response should be OK", res));
+  let updated_horse2 = res.data;
 
-//   assert.equal(horse1.matches.length, 1);
-//   assert.equal(horse2.matches.length, 1);
-//   assert.ok(updated_horse1.matches.includes(horse2.id));
-//   assert.ok(updated_horse2.matches.includes(horse1.id));
-// });
+  // Assert
+  assert.equal(updated_horse1.matches.length, 1);
+  assert.equal(updated_horse2.matches.length, 1);
+  assert.ok(updated_horse1.matches.includes(horse2.id));
+  assert.ok(updated_horse2.matches.includes(horse1.id));
+});
 
 // test("Default include tree shows all matches but goes no further", async () => {
 //   let res = await Horse.get(0);
