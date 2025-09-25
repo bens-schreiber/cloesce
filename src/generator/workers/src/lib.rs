@@ -1,20 +1,22 @@
 mod typescript;
 
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 use common::{CidlSpec, HttpVerb, InputLanguage, Method, Model, TypedValue};
 use typescript::TypescriptWorkersGenerator;
 
+use anyhow::{Result, anyhow};
+
 struct TrieNode {
     value: String,
-    children: HashMap<String, TrieNode>,
+    children: BTreeMap<String, TrieNode>,
 }
 
 impl TrieNode {
     fn new(value: String) -> Self {
         Self {
             value,
-            children: HashMap::default(),
+            children: BTreeMap::default(),
         }
     }
 }
@@ -24,11 +26,11 @@ struct RouterTrie {
 }
 
 impl RouterTrie {
-    fn new(domain: &str) -> Self {
+    fn from_domain(domain: String) -> Self {
         Self {
             root: TrieNode {
-                value: domain.to_string(),
-                children: HashMap::default(),
+                value: format!("\"{domain}\""),
+                children: BTreeMap::default(),
             },
         }
     }
@@ -62,9 +64,16 @@ trait LanguageWorkerGenerator {
     /// Places a function body inside of a function prototype or header
     fn proto(&self, method: &Method, body: String) -> String;
 
+    /// Validates that the request matches the correct http verb
     fn validate_http(&self, verb: &HttpVerb) -> String;
+
+    /// Validates that the request body has the correct structure and input
     fn validate_req_body(&self, params: &[TypedValue]) -> String;
+
+    /// Fetches the model from the database on instantiated methods
     fn hydrate_model(&self, model_name: &Model) -> String;
+
+    /// Dispatches the model function
     fn dispatch_method(&self, model_name: &str, method: &Method) -> String;
 }
 
@@ -95,7 +104,30 @@ impl WorkersFactory {
         }
     }
 
-    pub fn create(&self, spec: CidlSpec, domain: &str) -> String {
+    /// Returns the API route
+    fn validate_domain(domain: &String) -> Result<String> {
+        if domain.is_empty() {
+            return Err(anyhow!("Empty domain."));
+        }
+
+        match domain.split_once("://") {
+            None => return Err(anyhow!("Missing HTTP protocol")),
+            Some((protocol, rest)) => {
+                if protocol != "http" {
+                    return Err(anyhow!("Unsupported protocol {}", protocol));
+                }
+
+                match rest.split_once("/") {
+                    None => return Err(anyhow!("Missing API route on domain")),
+                    Some((_, rest)) => Ok(rest.to_string()),
+                }
+            }
+        }
+    }
+
+    pub fn create(&self, spec: CidlSpec, domain: String) -> Result<String> {
+        let api_route = Self::validate_domain(&domain)?;
+
         let generator: &mut dyn LanguageWorkerGenerator = match spec.language {
             InputLanguage::TypeScript => &mut TypescriptWorkersGenerator,
         };
@@ -105,7 +137,7 @@ impl WorkersFactory {
         let validators = generator.validators(&spec.models);
 
         let router = {
-            let mut router = RouterTrie::new(domain);
+            let mut router = RouterTrie::from_domain(api_route);
             for m in spec.models {
                 Self::model(&m, generator, &mut router);
             }
@@ -114,7 +146,7 @@ impl WorkersFactory {
 
         let main = generator.main();
 
-        format!(
+        Ok(format!(
             r#" 
 {imports}
 {preamble}
@@ -122,6 +154,6 @@ impl WorkersFactory {
 {router}
 {main}
         "#
-        )
+        ))
     }
 }

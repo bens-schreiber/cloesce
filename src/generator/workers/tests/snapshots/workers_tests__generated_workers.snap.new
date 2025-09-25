@@ -1,5 +1,6 @@
 ---
 source: workers/tests/workers_tests.rs
+assertion_line: 21
 expression: workers
 ---
  
@@ -131,7 +132,7 @@ if (obj.data_blob == null || !(obj.data_blob instanceof ArrayBuffer || obj.data_
                 };
             
         
-const router = {api: {ExampleModel: {"<id>": {
+const router = {"foo/api": {ExampleModel: {"<id>": {
 get_description: async (id: number,  request: Request, env: Env) => {
                 
 if (request.method !== "GET") {
