@@ -54,14 +54,12 @@ class Horse {
       .prepare("SELECT * FROM Horse_default WHERE Horse_id = ?")
       .bind(id)
       .run();
-    console.log(records.results);
     let horses = modelsFromSql<Horse>(
       "Horse",
       cidl,
       records.results,
       Horse.default
     );
-    console.log(JSON.stringify(horses));
     return { ok: true, status: 200, data: horses[0] };
   }
 

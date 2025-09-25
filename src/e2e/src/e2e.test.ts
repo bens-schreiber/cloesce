@@ -11,8 +11,8 @@ function withRes(message: string, res: any): string {
   return `${message}\n\n${JSON.stringify(res, null, 2)}`;
 }
 
+// Because we link the files at runtime, types must be declared like this.
 let Horse: any;
-let Like: any;
 
 before(
   async () => {
@@ -22,9 +22,7 @@ before(
     const mod = await linkGeneratedModule();
     assert.ok(mod.Horse);
     assert.ok(mod.Like);
-
     Horse = mod.Horse;
-    Like = mod.Like;
   },
   { timeout: 30_000 }
 );
@@ -41,70 +39,99 @@ test("Post, Patch, Get a Horse", async () => {
     likes: [],
   };
 
-  let res = await Horse.post(body);
-  assert.ok(res.ok, withRes("POST should be OK", res));
-  assert.ok(
-    res.data.id == body.id,
-    withRes("POST response id should be the same as the inputted id", res)
-  );
+  // POST
+  {
+    // Act
+    let res = await Horse.post(body);
 
-  body.name = "ROACH";
-  let horse = Object.assign(new Horse(), body);
-  res = await horse.patch(body);
-  assert.ok(res.ok, withRes("PATCH should be OK", res));
+    // Assert
+    assert.ok(res.ok, withRes("POST should be OK", res));
+    assert.ok(
+      res.data.id == body.id,
+      withRes("POST response id should be the same as the inputted id", res)
+    );
+  }
 
-  res = await Horse.get(body.id);
-  assert.ok(res.ok, withRes("GET should be OK", res));
+  // GET
+  let horse = undefined;
+  {
+    // Act
+    let res = await Horse.get(body.id);
+    horse = res.data;
 
-  horse = res.data;
-  assert.ok(
-    horse.id == body.id,
-    withRes("GET response id should be the same as the inputted id", res)
-  );
+    // Assert
+    assert.ok(res.ok, withRes("GET should be OK", res));
+    assert.ok(
+      horse.id == body.id,
+      withRes("GET response id should be the same as the inputted id", res)
+    );
+  }
+
+  // PATCH
+  {
+    body.name = "ROACH";
+
+    // Act
+    let res = await horse.patch(body);
+
+    // Assert
+    assert.ok(res.ok, withRes("PATCH should be OK", res));
+  }
 });
 
 test("List horse returns all horses", async () => {
-  let res = await Horse.list();
-  assert.ok(res.ok);
-  let horses = res.data;
-  assert.equal(horses.length, 1);
+  // Initial List
+  let horses = undefined;
+  {
+    // Act
+    let res = await Horse.list();
 
-  let newHorses = [
-    {
-      id: 1,
-      name: "sonic",
-      bio: "the horse",
-      likes: [],
-    },
-    {
-      id: 2,
-      name: "other roach",
-      bio: "geralts other horse",
-      likes: [],
-    },
-  ];
+    // Assert
+    assert.ok(res.ok);
+    horses = res.data;
+    assert.equal(horses.length, 1);
+  }
 
-  let postResults = await Promise.all(newHorses.map((h) => Horse.post(h)));
-  postResults.forEach((res) => assert.ok(res.ok));
+  // Updated List
+  {
+    // Arrange
+    let newHorses = [
+      {
+        id: 1,
+        name: "sonic",
+        bio: "the horse",
+        likes: [],
+      },
+      {
+        id: 2,
+        name: "other roach",
+        bio: "geralts other horse",
+        likes: [],
+      },
+    ];
 
-  res = await Horse.list();
-  assert.ok(res.ok);
-  assert.equal(res.data.length, 3);
+    let postResults = await Promise.all(newHorses.map((h) => Horse.post(h)));
+    postResults.forEach((res) => assert.ok(res.ok));
 
-  // Node's assert doesn't have `arrayContaining`, so use deepEqual after sorting
-  const allHorses = [...horses, ...newHorses];
+    // Act
+    let res = await Horse.list();
 
-  const normalize = (arr: any[]) =>
-    arr.sort((a, b) => a.id - b.id).map((h) => ({ ...h })); // strips prototype so Horse === plain object
+    // Assert
+    assert.ok(res.ok, withRes("List should be OK", res));
+    assert.equal(res.data.length, 3);
 
-  assert.deepEqual(normalize(res.data), normalize(allHorses));
+    const allHorses = [...horses, ...newHorses];
+    const normalize = (arr: any[]) =>
+      arr.sort((a, b) => a.id - b.id).map((h) => ({ ...h })); // strips prototype so Horse === plain object
+    assert.deepEqual(normalize(res.data), normalize(allHorses));
+  }
 });
 
 test("Horse can like another horse", async () => {
   // Arrange
   let res = await Horse.get(0);
   assert.ok(res.ok, withRes("GET response should be OK", res));
-  let horse1 = Object.assign(new Horse(), res.data);
+  let horse1 = res.data;
 
   res = await Horse.get(1);
   assert.ok(res.ok, withRes("GET response should be OK", res));
@@ -129,9 +156,12 @@ test("Horse can like another horse", async () => {
 });
 
 test("Default include tree shows all likes but goes no further", async () => {
+  // Act
   let res = await Horse.get(0);
-  assert.ok(res.ok);
+  assert.ok(res.ok, withRes("GET should be OK", res));
   let horse1 = res.data;
+
+  // Assert
   assert.notEqual(horse1.likes[0].horse2, undefined);
   assert.ok(horse1.likes[0].horse2.likes.length == 0);
 });
