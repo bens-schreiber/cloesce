@@ -36,78 +36,168 @@ export type IncludeTree<T> = T extends Primitive
         : IncludeTree<NonNullable<T[K]>>;
     };
 
-/**
- * TODO: This could be WASM?
- *
- * TODO: I hit ChatGPT with a hammer 10-15 times until it spit out this algorithm
- * that seems to work. No clue what it does, some day I might look into it.
- *
- * TODO: If there is a return result for an object that has a OneToMany or ManyToMany
- * relationship, and no values are found for that relationship, the array will not
- * be included in the return results body. We fix this by having default params on the
- * client side for navigation properties... Is that the best solution?
- *
- * @returns JSON of type T
- */
+// TODO: Look into this more. Is the best option keeping the CIDL in memory here?
+export function modelsFromSql<T>(
+  modelName: string,
+  cidl: any,
+  records: Record<string, any>[],
+  includeTree: IncludeTree<T>
+): T[] {
+  if (!records.length) return [];
 
-export function mapSql<T>(rows: Record<string, any>[]): T[] {
-  const result: any[] = [];
-  const entityMaps: Record<string, Map<string, any>> = {};
-
-  for (const row of rows) {
-    const topObj: Record<string, any> = {};
-    const nestedObjs: Record<string, any> = {};
-
-    for (const col in row) {
-      const idx = col.lastIndexOf("_");
-      if (idx === -1) {
-        topObj[col] = row[col];
-        continue;
-      }
-
-      const entity = col.slice(0, idx);
-      const field = col.slice(idx + 1);
-
-      if (!nestedObjs[entity]) nestedObjs[entity] = {};
-      nestedObjs[entity][field] = row[col];
-    }
-
-    const entityKeys = Object.keys(nestedObjs);
-    let topEntity: string | null = null;
-
-    // Automatically detect top-level entity: the one with all non-null values
-    for (const entity of entityKeys) {
-      const obj = nestedObjs[entity];
-      if (!Object.values(obj).every((v) => v === null)) {
-        if (!topEntity) topEntity = entity; // first non-null entity is top
-      }
-    }
-
-    for (const entity of entityKeys) {
-      const obj = nestedObjs[entity];
-      if (Object.values(obj).every((v) => v === null)) continue;
-
-      if (!entityMaps[entity]) entityMaps[entity] = new Map();
-      const idKey = obj.id ?? JSON.stringify(obj);
-      if (!entityMaps[entity].has(idKey)) {
-        entityMaps[entity].set(idKey, obj);
-      }
-
-      const entityObj = entityMaps[entity].get(idKey);
-
-      if (entity === topEntity) {
-        // assign directly to top-level object
-        Object.assign(topObj, entityObj);
-      } else {
-        if (!topObj[entity]) topObj[entity] = [];
-        topObj[entity].push(entityObj);
-      }
-    }
-
-    result.push(topObj);
+  if (!cidl || !Array.isArray(cidl.models)) {
+    throw new Error("Invalid CIDL: 'models' array is missing");
   }
 
-  return result as T[];
+  // Find the root model in the CIDL
+  const modelMeta = cidl.models.find((m: any) => m.name === modelName);
+  if (!modelMeta) throw new Error(`Model ${modelName} not found in CIDL`);
+
+  const pkAttr = modelMeta.attributes.find((a: any) => a.is_primary_key);
+  if (!pkAttr) throw new Error(`Primary key not found for ${modelName}`);
+  const pkName = pkAttr.value.name;
+
+  const itemsById: Record<string, any> = {};
+
+  for (const row of records) {
+    const isPrefixed = Object.keys(row).some((k) =>
+      k.startsWith(`${modelName}_`)
+    );
+    const rootId = String(isPrefixed ? row[`${modelName}_id`] : row[pkName]);
+
+    // Build root model if not exists
+    if (!itemsById[rootId]) {
+      itemsById[rootId] = buildModelFromRow(
+        modelMeta,
+        row,
+        includeTree,
+        isPrefixed,
+        cidl
+      );
+    } else if (isPrefixed) {
+      // Merge additional navigation rows into existing model
+      mergeNavigations(
+        itemsById[rootId],
+        modelMeta,
+        row,
+        includeTree,
+        isPrefixed,
+        cidl
+      );
+    }
+  }
+
+  return Object.values(itemsById) as T[];
+
+  // --- helper to build a model from a row ---
+  function buildModelFromRow(
+    meta: any,
+    row: Record<string, any>,
+    tree: any,
+    isPrefixed: boolean,
+    cidl: any
+  ): any {
+    const obj: any = {};
+
+    // Map attributes
+    for (const attr of meta.attributes) {
+      const col = isPrefixed
+        ? `${meta.name}_${attr.value.name}`
+        : attr.value.name;
+      obj[attr.value.name] = row[col] ?? null;
+    }
+
+    // Initialize navigation properties
+    for (const nav of meta.navigation_properties) {
+      const navName = nav.value.name;
+      const navTypeArray = nav.value.cidl_type.Array?.Model;
+      const navTypeModel = nav.value.cidl_type.Model;
+
+      const navModelName = navTypeArray || navTypeModel;
+      if (!navModelName) continue;
+
+      const navMeta = cidl.models.find((m: any) => m.name === navModelName);
+      if (!navMeta) continue;
+
+      const navPk = navMeta.attributes.find((a: any) => a.is_primary_key);
+      const nestedId = row[`${navMeta.name}_${navPk.value.name}`];
+
+      if (tree?.[navName]) {
+        // Include property from tree
+        if (nestedId != null) {
+          const nestedObj = buildModelFromRow(
+            navMeta,
+            row,
+            tree[navName],
+            true,
+            cidl
+          );
+          if (navTypeArray) {
+            obj[navName] = obj[navName] || [];
+            if (
+              !obj[navName].some((x: any) => x[navPk.value.name] === nestedId)
+            ) {
+              obj[navName].push(nestedObj);
+            }
+          } else if (navTypeModel) {
+            obj[navName] = nestedObj;
+          }
+        } else if (navTypeArray) {
+          obj[navName] = []; // array included but empty
+        }
+      } else if (navTypeArray) {
+        // Not in tree but array -> initialize empty
+        obj[navName] = [];
+      }
+      // One-to-one navs not in tree are skipped
+    }
+
+    return obj;
+  }
+
+  // --- helper to merge additional navigation rows into an existing object ---
+  function mergeNavigations(
+    obj: any,
+    meta: any,
+    row: Record<string, any>,
+    tree: any,
+    isPrefixed: boolean,
+    cidl: any
+  ) {
+    for (const nav of meta.navigation_properties) {
+      const navName = nav.value.name;
+      if (!tree?.[navName]) continue;
+
+      const navTypeArray = nav.value.cidl_type.Array?.Model;
+      const navTypeModel = nav.value.cidl_type.Model;
+      const navModelName = navTypeArray || navTypeModel;
+      if (!navModelName) continue;
+
+      const navMeta = cidl.models.find((m: any) => m.name === navModelName);
+      if (!navMeta) continue;
+
+      const navPk = navMeta.attributes.find((a: any) => a.is_primary_key);
+      const nestedId = row[`${navMeta.name}_${navPk.value.name}`];
+      if (nestedId == null) continue;
+
+      const nestedObj = buildModelFromRow(
+        navMeta,
+        row,
+        tree[navName],
+        true,
+        cidl
+      );
+
+      if (navTypeArray) {
+        obj[navName] = obj[navName] || [];
+        if (!obj[navName].some((x: any) => x[navPk.value.name] === nestedId)) {
+          obj[navName].push(nestedObj);
+        }
+      } else if (navTypeModel) {
+        obj[navName] = nestedObj;
+      }
+    }
+  }
 }
 
 export function match(

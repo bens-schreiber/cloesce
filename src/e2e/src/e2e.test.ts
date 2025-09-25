@@ -12,7 +12,7 @@ function withRes(message: string, res: any): string {
 }
 
 let Horse: any;
-let Match: any;
+let Like: any;
 
 before(
   async () => {
@@ -21,10 +21,10 @@ before(
 
     const mod = await linkGeneratedModule();
     assert.ok(mod.Horse);
-    assert.ok(mod.Match);
+    assert.ok(mod.Like);
 
     Horse = mod.Horse;
-    Match = mod.Match;
+    Like = mod.Like;
   },
   { timeout: 30_000 }
 );
@@ -38,7 +38,7 @@ test("Post, Patch, Get a Horse", async () => {
     id: 0,
     name: "roach",
     bio: "geralts horse",
-    matches: [],
+    likes: [],
   };
 
   let res = await Horse.post(body);
@@ -74,13 +74,13 @@ test("List horse returns all horses", async () => {
       id: 1,
       name: "sonic",
       bio: "the horse",
-      matches: [],
+      likes: [],
     },
     {
       id: 2,
       name: "other roach",
       bio: "geralts other horse",
-      matches: [],
+      likes: [],
     },
   ];
 
@@ -100,7 +100,7 @@ test("List horse returns all horses", async () => {
   assert.deepEqual(normalize(res.data), normalize(allHorses));
 });
 
-test("Horse can match with another horse", async () => {
+test("Horse can like another horse", async () => {
   // Arrange
   let res = await Horse.get(0);
   assert.ok(res.ok, withRes("GET response should be OK", res));
@@ -111,8 +111,8 @@ test("Horse can match with another horse", async () => {
   let horse2 = Object.assign(new Horse(), res.data);
 
   // Act
-  res = await horse1.match(horse2);
-  assert.ok(res.ok, withRes(".match() response should be OK", res));
+  res = await horse1.like(horse2);
+  assert.ok(res.ok, withRes(".like() response should be OK", res));
 
   res = await Horse.get(horse1.id);
   assert.ok(res.ok, withRes("GET response should be OK", res));
@@ -123,15 +123,15 @@ test("Horse can match with another horse", async () => {
   let updated_horse2 = res.data;
 
   // Assert
-  assert.equal(updated_horse1.matches.length, 1);
-  assert.equal(updated_horse2.matches.length, 1);
-  assert.ok(updated_horse1.matches.includes(horse2.id));
-  assert.ok(updated_horse2.matches.includes(horse1.id));
+  assert.equal(updated_horse1.likes.length, 1);
+  assert.equal(updated_horse2.likes.length, 0);
+  assert.ok(updated_horse1.likes.find((l: any) => l.horseId2 == horse2.id));
 });
 
-// test("Default include tree shows all matches but goes no further", async () => {
-//   let res = await Horse.get(0);
-//   assert.ok(res.ok);
-//   let horse1 = res.data;
-//   assert.equal(horse1.matches[0].matches.length, 0);
-// });
+test("Default include tree shows all likes but goes no further", async () => {
+  let res = await Horse.get(0);
+  assert.ok(res.ok);
+  let horse1 = res.data;
+  assert.notEqual(horse1.likes[0].horse2, undefined);
+  assert.ok(horse1.likes[0].horse2.likes.length == 0);
+});
