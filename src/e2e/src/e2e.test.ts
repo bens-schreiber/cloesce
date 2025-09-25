@@ -24,7 +24,7 @@ before(
     assert.ok(mod.Like);
     Horse = mod.Horse;
   },
-  { timeout: 30_000 }
+  { timeout: 30_000 },
 );
 
 after(async () => {
@@ -48,7 +48,7 @@ test("Post, Patch, Get a Horse", async () => {
     assert.ok(res.ok, withRes("POST should be OK", res));
     assert.ok(
       res.data.id == body.id,
-      withRes("POST response id should be the same as the inputted id", res)
+      withRes("POST response id should be the same as the inputted id", res),
     );
   }
 
@@ -63,7 +63,7 @@ test("Post, Patch, Get a Horse", async () => {
     assert.ok(res.ok, withRes("GET should be OK", res));
     assert.ok(
       horse.id == body.id,
-      withRes("GET response id should be the same as the inputted id", res)
+      withRes("GET response id should be the same as the inputted id", res),
     );
   }
 
