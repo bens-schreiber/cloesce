@@ -165,3 +165,28 @@ test("Default include tree shows all likes but goes no further", async () => {
   assert.notEqual(horse1.likes[0].horse2, undefined);
   assert.ok(horse1.likes[0].horse2.likes.length == 0);
 });
+
+test("Methods can return both data and errors", async () => {
+  // Err
+  {
+    let res = await Horse.divide(1, 0);
+    assert.deepEqual(
+      res,
+      { ok: false, status: 400, message: "divided by 0" },
+      withRes("Divide by zero should produce an error", res),
+    );
+  }
+
+  // No err
+  {
+    let res = await Horse.divide(1, 1);
+    assert.equal(
+      res.data,
+      1,
+      withRes(
+        "Divide by 1 should not produce an error and give an integer result",
+        res,
+      ),
+    );
+  }
+});

@@ -92,6 +92,16 @@ class Horse {
       .run();
     return { ok: true, status: 200 };
   }
+
+  /*  Random functions for test coverage  */
+  @GET
+  static async divide(a: number, b: number): Promise<Result<number>> {
+    if (b != 0) {
+      return { ok: true, status: 200, data: a / b };
+    } else {
+      return { ok: false, status: 400, message: "divided by 0" };
+    }
+  }
 }
 
 @D1

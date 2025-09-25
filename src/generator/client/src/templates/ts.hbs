@@ -56,12 +56,8 @@ export class {{name}} {
     {{/if}}
 
     if (!res.ok) {
-      const message = await res.text();
-      return {
-        ok: false,
-        status: res.status,
-        message
-      };
+      const data = await res.json();
+      return data;
     }
 
     let raw = await res.json();
