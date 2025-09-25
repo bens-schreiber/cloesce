@@ -55,8 +55,10 @@ test("Post, Patch, Get a Horse", async () => {
 
   res = await Horse.get(body.id);
   assert.ok(res.ok, withRes("GET should be OK", res));
+
+  horse = res.data;
   assert.ok(
-    res.data.id == body.id,
+    horse.id == body.id,
     withRes("GET response id should be the same as the inputted id", res)
   );
 });

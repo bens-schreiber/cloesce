@@ -39,58 +39,67 @@ export type IncludeTree<T> = T extends Primitive
 /**
  * TODO: This could be WASM
  *
- * TODO: This is all GPT slop
+ * TODO: I hit ChatGPT with a hammer 10-15 times until it spit out this algorithm
+ * that seems to work. No clue what it does, some day I might look into it.
  *
  * @returns JSON of type T
  */
+
 export function mapSql<T>(rows: Record<string, any>[]): T[] {
   const result: any[] = [];
   const entityMaps: Record<string, Map<string, any>> = {};
 
-  function getEntityKey(entityObj: any): string {
-    return JSON.stringify(entityObj);
-  }
-
   for (const row of rows) {
-    const rowEntities: Record<string, any> = {};
-    const baseEntity: any = {};
+    const topObj: Record<string, any> = {};
+    const nestedObjs: Record<string, any> = {};
 
     for (const col in row) {
-      const parts = col.split("_");
-
-      if (parts.length < 2) {
-        // No prefix → base entity
-        baseEntity[col] = row[col];
+      const idx = col.lastIndexOf("_");
+      if (idx === -1) {
+        topObj[col] = row[col];
         continue;
       }
 
-      const entity = parts[0];
-      const field = parts.slice(1).join("_");
+      const entity = col.slice(0, idx);
+      const field = col.slice(idx + 1);
 
-      if (!rowEntities[entity]) rowEntities[entity] = {};
-      rowEntities[entity][field] = row[col];
+      if (!nestedObjs[entity]) nestedObjs[entity] = {};
+      nestedObjs[entity][field] = row[col];
     }
 
-    let topObj = baseEntity;
+    const entityKeys = Object.keys(nestedObjs);
+    let topEntity: string | null = null;
 
-    for (const entity in rowEntities) {
-      const entityObj = rowEntities[entity];
-      const key = getEntityKey(entityObj);
+    // Automatically detect top-level entity: the one with all non-null values
+    for (const entity of entityKeys) {
+      const obj = nestedObjs[entity];
+      if (!Object.values(obj).every((v) => v === null)) {
+        if (!topEntity) topEntity = entity; // first non-null entity is top
+      }
+    }
+
+    for (const entity of entityKeys) {
+      const obj = nestedObjs[entity];
+      if (Object.values(obj).every((v) => v === null)) continue;
 
       if (!entityMaps[entity]) entityMaps[entity] = new Map();
-      if (!entityMaps[entity].has(key)) {
-        entityMaps[entity].set(key, entityObj);
+      const idKey = obj.id ?? JSON.stringify(obj);
+      if (!entityMaps[entity].has(idKey)) {
+        entityMaps[entity].set(idKey, obj);
       }
 
-      if (!topObj[entity]) topObj[entity] = [];
-      if (!topObj[entity].some((o: any) => getEntityKey(o) === key)) {
+      const entityObj = entityMaps[entity].get(idKey);
+
+      if (entity === topEntity) {
+        // assign directly to top-level object
+        Object.assign(topObj, entityObj);
+      } else {
+        if (!topObj[entity]) topObj[entity] = [];
         topObj[entity].push(entityObj);
       }
     }
 
-    if (!result.includes(topObj)) {
-      result.push(topObj);
-    }
+    result.push(topObj);
   }
 
   return result as T[];

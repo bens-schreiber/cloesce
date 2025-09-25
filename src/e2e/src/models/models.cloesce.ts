@@ -10,8 +10,8 @@ import {
   ForeignKey,
   Result,
   IncludeTree,
-  mapSql,
   DataSource,
+  mapSql,
 } from "cloesce";
 
 @D1
@@ -63,7 +63,7 @@ class Horse {
   //
   // By v0.0.3, generic get methods will be completely generated.
   @GET
-  static async get(db: D1Database, id: number): Promise<Result<Horse[]>> {
+  static async get(db: D1Database, id: number): Promise<Result<Horse>> {
     let records = await db
       .prepare("SELECT * FROM Horse_default WHERE Horse_id = ?")
       .bind(id)
@@ -71,7 +71,7 @@ class Horse {
 
     // `mapSql<Horse>` turns an ORM friendly query result into a list of JSON formatted Horse
     let horses = mapSql<Horse>(records.results);
-    return { ok: true, status: 200, data: horses };
+    return { ok: true, status: 200, data: horses[0] };
   }
 
   // Workers endpoint `domain/Horse/list`

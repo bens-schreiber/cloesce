@@ -421,7 +421,7 @@ export default {
             Some(CidlType::HttpResult(_)) => r#"
             return new Response(
                 JSON.stringify(dispatch),
-                {{ status: dispatch.status, headers: {{ "Content-Type": "application/json" }} }}
+                { status: dispatch.status, headers: { "Content-Type": "application/json" } }
             );"#
             .to_string(),
             _ => final_state(200, "dispatch"),
