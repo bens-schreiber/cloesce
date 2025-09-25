@@ -66,7 +66,6 @@ pub fn generate_client_api(spec: CidlSpec, domain: String) -> String {
         .unwrap();
     register_helpers(&mut handlebars, mapper);
 
-    // TODO: Determine where we want the domain passed in...
     let mut context = serde_json::to_value(&spec).unwrap();
     if let serde_json::Value::Object(ref mut map) = context {
         map.insert("domain".to_string(), serde_json::Value::String(domain));
