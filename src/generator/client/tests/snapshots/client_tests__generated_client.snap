@@ -34,11 +34,6 @@ export class Horse {
       })
     });
 
-    if (!res.ok) {
-      const data = await res.json();
-      return data;
-    }
-
     let raw = await res.json();
     if (!raw.ok) {
       return raw;
@@ -59,11 +54,6 @@ export class Horse {
       method: "GET"
     });
 
-    if (!res.ok) {
-      const data = await res.json();
-      return data;
-    }
-
     let raw = await res.json();
     if (!raw.ok) {
       return raw;
@@ -81,11 +71,6 @@ export class Horse {
     const res = await fetch(url.toString(), {
       method: "GET"
     });
-
-    if (!res.ok) {
-      const data = await res.json();
-      return data;
-    }
 
     let raw = await res.json();
     if (!raw.ok) {
@@ -109,11 +94,6 @@ export class Horse {
       })
     });
 
-    if (!res.ok) {
-      const data = await res.json();
-      return data;
-    }
-
     let raw = await res.json();
     if (!raw.ok) {
       return raw;
@@ -135,11 +115,6 @@ export class Horse {
       })
     });
 
-    if (!res.ok) {
-      const data = await res.json();
-      return data;
-    }
-
     let raw = await res.json();
     if (!raw.ok) {
       return raw;
@@ -160,11 +135,6 @@ export class Horse {
     const res = await fetch(url.toString(), {
       method: "GET"
     });
-
-    if (!res.ok) {
-      const data = await res.json();
-      return data;
-    }
 
     let raw = await res.json();
     if (!raw.ok) {
