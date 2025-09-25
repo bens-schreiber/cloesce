@@ -138,7 +138,8 @@ pub struct TypescriptWorkersGenerator;
 impl WorkersGenerateable for TypescriptWorkersGenerator {
     fn imports(&self, models: &[Model], workers_path: &Path) -> Result<String> {
         const CLOUDFLARE_TYPES: &str = r#"import { D1Database } from "@cloudflare/workers-types""#;
-        const CLOESCE_TYPES: &str = r#"import { mapSql, match, Result } from "cloesce""#;
+        const CLOESCE_TYPES: &str = r#"import { modelsFromSql, match, Result } from "cloesce""#;
+        const CIDL_IMPORT: &str = r#"import cidl from "./cidl.json" with { type: "json" };"#;
 
         let workers_dir = workers_path
             .parent()
@@ -176,9 +177,13 @@ impl WorkersGenerateable for TypescriptWorkersGenerator {
             })
             .collect::<Result<Vec<_>>>()?
             .join("\n");
-
         Ok(format!(
-            "{CLOUDFLARE_TYPES}\n{CLOESCE_TYPES}\n{model_imports}"
+            r#"
+            {CLOUDFLARE_TYPES}
+            {CLOESCE_TYPES}
+            {CIDL_IMPORT}
+            {model_imports}
+        "#
         ))
     }
 
@@ -347,11 +352,14 @@ export default {
 
         // TODO: Switch based off DataSource type
         // For now, we will just assume there is a _default (or none)
-        let has_data_sources = model.data_sources.len() > 1;
+        let has_data_sources = !model.data_sources.is_empty();
         let (query, instance_creation) = if has_data_sources {
+            // TODO: We have to manually Object.assign right now...
             (
                 format!("\"SELECT * FROM {model_name}_default WHERE {model_name}_{pk} = ?\""),
-                format!("Object.assign(new {model_name}(), mapSql<{model_name}>(record)[0])"),
+                format!(
+                    "Object.assign(new {model_name}(), modelsFromSql<{model_name}>(\"{model_name}\", cidl, record.results, {model_name}.default)[0])"
+                ),
             )
         } else {
             (
@@ -377,7 +385,7 @@ export default {
                 const query = {query};
                 let record;
                 try {{
-                    record = await d1.prepare(query).bind(id).first();
+                    record = await d1.prepare(query).bind(id).run()
                     if (!record) {{
                         {missing_record}
                     }}
