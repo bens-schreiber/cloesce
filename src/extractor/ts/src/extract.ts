@@ -21,7 +21,7 @@ type CidlType =
   | "D1Database"
   | { Model: string }
   | { Array: CidlType }
-  | { HttpResult: CidlType };
+  | { HttpResult: CidlType | null };
 
 enum AttributeDecoratorKind {
   PrimaryKey = "PrimaryKey",
@@ -35,7 +35,7 @@ enum AttributeDecoratorKind {
 export class CidlExtractor {
   constructor(
     public projectName: string,
-    public version: string,
+    public version: string
   ) {}
 
   extract(project: Project) {
@@ -202,8 +202,13 @@ export class CidlExtractor {
           : { Array: { Model: item } };
       }
 
+      // Skip void
+      if (base == "void") return acc;
+
       // Result wrapper
-      if (base === "Result") return { HttpResult: acc! };
+      if (base === "Result") {
+        return { HttpResult: acc == undefined ? null : acc };
+      }
 
       return { Model: base };
     }, undefined)!;
@@ -214,7 +219,7 @@ export class CidlExtractor {
   private static includeTree(
     obj: any,
     currentClass: ClassDeclaration,
-    sf: SourceFile,
+    sf: SourceFile
   ): any[] {
     if (!obj.isKind || !obj.isKind(SyntaxKind.ObjectLiteralExpression)) {
       return [];
@@ -227,7 +232,7 @@ export class CidlExtractor {
       let navProp = findPropertyByName(currentClass, prop.getName());
       if (!navProp) {
         console.log(
-          `  Warning: Could not find property "${prop.getName()}" in class ${currentClass.getName()}`,
+          `  Warning: Could not find property "${prop.getName()}" in class ${currentClass.getName()}`
         );
         continue;
       }
@@ -303,7 +308,7 @@ function getDecoratorName(decorator: Decorator): string {
 
 function getDecoratorArgument(
   decorator: Decorator,
-  index: number,
+  index: number
 ): string | undefined {
   const args = decorator.getArguments();
   if (!args[index]) return undefined;
@@ -331,7 +336,8 @@ function getModelName(t: CidlType): string | undefined {
   } else if ("Array" in t) {
     return getModelName(t.Array);
   } else if ("HttpResult" in t) {
-    return getModelName(t.HttpResult);
+    if (t == null) return undefined;
+    return getModelName(t.HttpResult!);
   }
 
   return undefined;
@@ -339,7 +345,7 @@ function getModelName(t: CidlType): string | undefined {
 
 function findPropertyByName(
   cls: ClassDeclaration,
-  name: string,
+  name: string
 ): PropertyDeclaration | undefined {
   // Try exact match first
   const exactMatch = cls.getProperties().find((p) => p.getName() === name);
@@ -348,7 +354,7 @@ function findPropertyByName(
 
 function hasDecorator(
   node: { getDecorators(): Decorator[] },
-  name: string,
+  name: string
 ): boolean {
   return node.getDecorators().some((d) => {
     const decoratorName = getDecoratorName(d);

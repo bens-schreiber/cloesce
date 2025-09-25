@@ -27,7 +27,7 @@ impl TypescriptValidatorGenerator {
         let name = format!("{name_prefix}{}", &value.name);
 
         let type_check = match &value.cidl_type {
-            CidlType::Integer | CidlType::Real => Some(format!("typeof {name} !== \"number\"")),
+            CidlType::Integer | CidlType::Real => Some(format!("Number.isNaN({name})")),
             CidlType::Text => Some(format!("typeof {name} !== \"string\"")),
             CidlType::Blob => Some(format!(
                 "!({name} instanceof ArrayBuffer || {name} instanceof Uint8Array)",
@@ -409,8 +409,6 @@ export default {
             "instance"
         };
 
-        let success_state = final_state(200, &format!("await {caller}.{method_name}({params})"));
-
         // Error state: Client code ran into an uncaught exception.
         let uncaught_exception = error_state(
             500,
@@ -418,10 +416,22 @@ export default {
             "${e instanceof Error ? e.message : String(e)}",
         );
 
+        let dispatch = match method.return_type {
+            None => final_state(200, "null"),
+            Some(CidlType::HttpResult(_)) => r#"
+            return new Response(
+                JSON.stringify(dispatch),
+                {{ status: dispatch.status, headers: {{ "Content-Type": "application/json" }} }}
+            );"#
+            .to_string(),
+            _ => final_state(200, "dispatch"),
+        };
+
         format!(
             r#"
             try {{
-                {success_state}
+                let dispatch = await {caller}.{method_name}({params});
+                {dispatch}
             }}
             catch (e) {{
                 {uncaught_exception}

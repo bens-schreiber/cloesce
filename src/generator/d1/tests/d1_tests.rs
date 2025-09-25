@@ -414,6 +414,66 @@ fn test_sqlite_view_output() {
             r#"CREATE VIEW "Course_default" AS SELECT "Course"."id" AS "Course_id", "Student"."id" AS "Student_id" FROM "Course" LEFT JOIN "StudentsCourses" ON "Course"."id" = "StudentsCourses"."Course_id" LEFT JOIN "Student" ON "StudentsCourses"."Student_id" = "Student"."id";"#
         );
     }
+
+    // Auto aliasing
+    {
+        // Arrange
+        let horse_model = ModelBuilder::new("Horse")
+            // Attributes
+            .id() // id is primary key
+            .attribute("name", CidlType::Text, false, None)
+            .attribute("bio", CidlType::Text, true, None)
+            // Navigation Properties
+            .nav_p(
+                "matches",
+                CidlType::array(CidlType::Model("Match".into())),
+                false,
+                NavigationPropertyKind::OneToMany {
+                    reference: "horseId1".into(),
+                },
+            )
+            // Data Sources
+            .data_source(
+                "default",
+                IncludeTreeBuilder::default()
+                    .add_with_children(
+                        "matches",
+                        CidlType::array(CidlType::Model("Match".into())),
+                        |b| b.add("horse2", CidlType::Model("Horse".into())),
+                    )
+                    .build(),
+            )
+            .build();
+
+        let match_model = ModelBuilder::new("Match")
+            // Attributes
+            .id()
+            .attribute("horseId1", CidlType::Integer, false, Some("Horse".into()))
+            .attribute("horseId2", CidlType::Integer, false, Some("Horse".into()))
+            // Navigation Properties
+            .nav_p(
+                "horse2",
+                CidlType::Model("Horse".into()),
+                false,
+                NavigationPropertyKind::OneToOne {
+                    reference: "horseId2".into(),
+                },
+            )
+            .build();
+
+        let cidl = create_cidl(vec![horse_model, match_model]);
+
+        let d1gen = D1Generator::new(cidl, create_wrangler());
+
+        // Act
+        let sql = d1gen.sql().expect("gen_sqlite to work");
+
+        // Assert
+        expected_str!(
+            sql,
+            r#"CREATE VIEW "Horse_default" AS SELECT "Horse"."id" AS "Horse_id", "Horse"."name" AS "Horse_name", "Horse"."bio" AS "Horse_bio", "Match"."id" AS "Match_id", "Match"."horseId1" AS "Match_horseId1", "Match"."horseId2" AS "Match_horseId2", "Horse_1"."id" AS "Horse_1_id", "Horse_1"."name" AS "Horse_1_name", "Horse_1"."bio" AS "Horse_1_bio" FROM "Horse" LEFT JOIN "Match" ON "Horse"."id" = "Match"."horseId1" LEFT JOIN "Horse" AS "Horse_1" ON "Match"."horseId2" = "Horse_1"."id";"#
+        );
+    }
 }
 
 #[test]

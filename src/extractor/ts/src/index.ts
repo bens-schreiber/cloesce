@@ -18,23 +18,13 @@ export const ForeignKey =
   <T>(_: T): PropertyDecorator =>
   () => {};
 
-// API Result
-export type Ok<T> = T;
-export type Err = { ok: false; status: number; message: string };
-export type Result<T = void> = Ok<T> | Err;
-
-// Result factory
-function ok(): Ok<void>;
-function ok<T>(data: T): Ok<T>;
-function ok<T>(data?: T): Ok<T | void> {
-  return data;
-}
-
-function err(status: number, message: string): Err {
-  return { ok: false, status, message };
-}
-
-export const Result = { ok, err };
+// Result
+export type Result<T = void> = {
+  ok: boolean;
+  status: number;
+  data?: T;
+  message?: string;
+};
 
 // Include Tree
 type Primitive = string | number | boolean | bigint | symbol | null | undefined;
@@ -110,7 +100,7 @@ export function match(
   router: any,
   path: string,
   request: Request,
-  env: any,
+  env: any
 ): Response {
   const segments = path.split("/").filter(Boolean);
   const params: string[] = [];
@@ -129,7 +119,7 @@ export function match(
     }
 
     const paramKey = Object.keys(node).find(
-      (k) => k.startsWith("<") && k.endsWith(">"),
+      (k) => k.startsWith("<") && k.endsWith(">")
     );
     if (!paramKey) return notFound();
 

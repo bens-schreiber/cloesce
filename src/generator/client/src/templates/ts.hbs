@@ -1,6 +1,4 @@
-export type Ok<T> = { ok: true; data: T };
-export type Err = { ok: false; status: number; message: string };
-export type Result<T> = Ok<T> | Err;
+import { Result } from "cloesce";
 
 /// A helper to turn a JSON array into an array of
 /// instantiated models
@@ -67,18 +65,21 @@ export class {{name}} {
       };
     }
 
-    const data = await res.json();
+    let raw = await res.json();
+    if (!raw.ok) {
+      return raw;
+    }
 
-    {{#if (is_model return_type)}}
-    const instantiated = Object.assign(new {{../name}}(), data);
-    return { ok: true, data: instantiated };
+    {{#if (eq (lang_type return_type) "void")}}
+    return raw;
+    {{else if (is_model return_type)}}
+    raw.data = Object.assign(new {{../name}}(), raw.data)
+    return raw;
+    {{else if (is_model_array return_type)}}
+    raw.data = instantiateModelArray(raw.data, {{../name}})
+    return raw;
     {{else}}
-    {{#if (is_model_array return_type)}}
-    const instantiated = instantiateModelArray(data, {{../name}});
-    return { ok: true, data: instantiated };
-    {{else}}
-    return { ok: true, data };
-      {{/if}}
+    return raw;
     {{/if}}
   }
   {{/each}}

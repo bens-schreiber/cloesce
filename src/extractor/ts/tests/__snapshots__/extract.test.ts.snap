@@ -151,7 +151,7 @@ exports[`actions snapshot 1`] = `
             },
           ],
           "return_type": {
-            "HttpResult": undefined,
+            "HttpResult": null,
           },
         },
         {
@@ -173,7 +173,7 @@ exports[`actions snapshot 1`] = `
             },
           ],
           "return_type": {
-            "HttpResult": undefined,
+            "HttpResult": null,
           },
         },
       ],

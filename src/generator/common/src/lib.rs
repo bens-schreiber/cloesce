@@ -89,7 +89,7 @@ pub struct DataSource {
     pub tree: IncludeTree,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum NavigationPropertyKind {
     OneToOne { reference: String },
     OneToMany { reference: String },

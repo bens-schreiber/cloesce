@@ -4,15 +4,34 @@ use common::{
     CidlType, IncludeTree, Model, NamedTypedValue, NavigationProperty, NavigationPropertyKind,
 };
 
-use anyhow::{Result, anyhow, ensure};
+use anyhow::{Context, Result, anyhow, bail, ensure};
 use sea_query::{
-    ColumnDef, Expr, ForeignKey, Index, Query, SelectStatement, SqliteQueryBuilder, Table,
+    ColumnDef, Expr, ForeignKey, Index, IntoCondition, Query, SelectStatement, SqliteQueryBuilder,
+    Table,
 };
 
 // TODO: SeaQuery forcing us to do alias everywhere is really annoying,
 // it feels like this library is a bad choice for our use case.
 fn alias(name: impl Into<String>) -> sea_query::Alias {
     sea_query::Alias::new(name)
+}
+
+fn left_join_as(
+    query: &mut SelectStatement,
+    model_name: &str,
+    model_alias: &str,
+    condition: impl IntoCondition,
+) {
+    if model_name == model_alias {
+        query.left_join(alias(model_name), condition);
+    } else {
+        query.join_as(
+            sea_query::JoinType::LeftJoin,
+            alias(model_name),
+            alias(model_alias),
+            condition,
+        );
+    }
 }
 
 fn typed_column(name: &str, ty: &CidlType) -> ColumnDef {
@@ -362,6 +381,122 @@ fn validate_fks<'a>(
     Ok((topo_sorted, many_to_many_tables))
 }
 
+struct ModelTreeNode<'a> {
+    parent_transition: Option<NavigationPropertyKind>,
+    alias: String,
+    model: &'a Model,
+    children: Vec<ModelTreeNode<'a>>,
+}
+
+struct ModelTree<'a> {
+    name: String,
+    root: ModelTreeNode<'a>,
+}
+
+/// Validates all data sources, ensuring types and references check out.
+/// Returns an intermediate [ModelTree] which houses both the models and their
+/// SQL correct aliases (Foo vs Foo1 vs Foo2).
+///
+/// Returns error on
+/// - Invalid data source type
+/// - Invalid data source reference
+/// - Unknown model
+fn validate_data_sources<'a>(
+    models: &'a [Model],
+    model_lookup: &HashMap<&str, &'a Model>,
+) -> Result<Vec<ModelTree<'a>>> {
+    let mut model_trees = vec![];
+
+    for model in models {
+        for ds in &model.data_sources {
+            let mut alias_counter = HashMap::<String, u32>::new();
+
+            let tree =
+                dfs(model, None, &ds.tree, model_lookup, &mut alias_counter).context(format!(
+                    "Problem found while validating data source {}.{}",
+                    model.name, ds.name
+                ))?;
+
+            model_trees.push(ModelTree {
+                name: ds.name.clone(),
+                root: tree,
+            })
+        }
+    }
+
+    fn dfs<'a>(
+        model: &'a Model,
+        transition: Option<NavigationPropertyKind>,
+        include_tree: &IncludeTree,
+        model_lookup: &HashMap<&str, &'a Model>,
+        alias_counter: &mut HashMap<String, u32>,
+    ) -> Result<ModelTreeNode<'a>> {
+        let alias = generate_alias(&model.name, alias_counter);
+
+        let mut node = ModelTreeNode {
+            parent_transition: transition,
+            alias: alias.clone(),
+            model,
+            children: vec![],
+        };
+
+        for (value, child_tree) in &include_tree.0 {
+            // Validate cidl type
+            let nav_model_name = match &value.cidl_type {
+                CidlType::Model(m) => m,
+                CidlType::Array(inner) => {
+                    if let CidlType::Model(m) = &**inner {
+                        m
+                    } else {
+                        bail!("Data Sources must be composed of model references")
+                    }
+                }
+                _ => bail!("Data Sources must be composed of model references"),
+            };
+
+            // todo: why even give the option??
+            ensure!(!value.nullable, "Data Sources cannot be nullable");
+
+            // Referenced attribute must exist
+            let Some(nav) = model
+                .navigation_properties
+                .iter()
+                .find(|nav| nav.value.name == value.name && nav.value.cidl_type == value.cidl_type)
+            else {
+                bail!("Invalid reference {}.{}", model.name, value.name)
+            };
+
+            // Validate model exists
+            let child_model = model_lookup
+                .get(nav_model_name.as_str())
+                .ok_or(anyhow!("Unknown model reference {}", nav_model_name))?;
+
+            let child_node = dfs(
+                child_model,
+                Some(nav.kind.clone()),
+                child_tree,
+                model_lookup,
+                alias_counter,
+            )?;
+            node.children.push(child_node);
+        }
+
+        Ok(node)
+    }
+
+    fn generate_alias(name: &str, alias_counter: &mut HashMap<String, u32>) -> String {
+        let count = alias_counter.entry(name.to_string()).or_default();
+        let alias = if *count == 0 {
+            name.to_string()
+        } else {
+            format!("{}_{}", name, count)
+        };
+        *count += 1;
+        alias
+    }
+    Ok(model_trees)
+}
+
 fn generate_tables(
     sorted_models: &[&Model],
     many_to_many_tables: Vec<JunctionTable>,
@@ -448,108 +583,93 @@ fn generate_tables(
     res
 }
 
-fn generate_views<'a>(models: &'a [Model], model_lookup: &HashMap<&str, &'a Model>) -> Vec<String> {
+fn generate_views(model_tree: Vec<ModelTree>) -> Vec<String> {
     let mut views = vec![];
 
-    for model in models {
-        for ds in &model.data_sources {
-            let mut query = Query::select();
-            query.from(alias(&model.name));
-            dfs(model, &ds.tree, model_lookup, &mut query);
+    for tree in model_tree {
+        let mut query = Query::select();
 
-            views.push(format!(
-                "CREATE VIEW \"{}_{}\" AS {};",
-                model.name,
-                ds.name,
-                query.to_string(SqliteQueryBuilder)
-            ))
-        }
+        query.from(alias(&tree.root.model.name));
+        dfs(&tree.root, &mut query);
+
+        views.push(format!(
+            "CREATE VIEW \"{}_{}\" AS {};",
+            tree.root.model.name,
+            tree.name,
+            query.to_string(SqliteQueryBuilder)
+        ))
     }
 
     return views;
 
-    fn dfs(
-        model: &Model,
-        tree: &IncludeTree,
-        model_lookup: &HashMap<&str, &Model>,
-        query: &mut SelectStatement,
-    ) {
-        for attr in &model.attributes {
+    fn dfs(node: &ModelTreeNode, query: &mut SelectStatement) {
+        for attr in &node.model.attributes {
             query.expr_as(
-                Expr::col((alias(&model.name), alias(&attr.value.name))),
-                alias(format!("{}_{}", model.name, attr.value.name)),
+                Expr::col((alias(&node.alias), alias(&attr.value.name))),
+                alias(format!("{}_{}", &node.alias, attr.value.name)),
             );
         }
 
-        let include_lookup = tree.to_lookup();
-
-        for nav in &model.navigation_properties {
-            let Some(include_tree) = include_lookup.get(&nav.value) else {
-                continue;
-            };
-
-            let nav_model = {
-                let CidlType::Model(nav_model_name) = &nav.value.cidl_type.array_type() else {
-                    unreachable!();
-                };
-
-                model_lookup
-                    .get(nav_model_name.as_str())
-                    .expect("nav model to be validated by `validate_fks`")
-            };
-
-            match &nav.kind {
+        for child in &node.children {
+            match child.parent_transition.as_ref().unwrap() {
                 NavigationPropertyKind::OneToOne { reference } => {
-                    let nav_model_pk = &nav_model
+                    let nav_model_pk = &child
+                        .model
                         .find_primary_key()
                         .expect("primary key to be validated by `validate_models`")
                         .name;
 
-                    query.left_join(
-                        alias(&nav_model.name),
-                        Expr::col((alias(&model.name), alias(reference)))
-                            .equals((alias(&nav_model.name), alias(nav_model_pk))),
+                    left_join_as(
+                        query,
+                        &child.model.name,
+                        &child.alias,
+                        Expr::col((alias(&node.alias), alias(reference)))
+                            .equals((alias(&child.alias), alias(nav_model_pk))),
                     );
                 }
                 NavigationPropertyKind::OneToMany { reference } => {
-                    let pk = &model
+                    let pk = &node
+                        .model
                         .find_primary_key()
                         .expect("primary key to be validated by `validate_models`")
                         .name;
 
-                    query.left_join(
-                        alias(&nav_model.name),
-                        Expr::col((alias(&model.name), alias(pk)))
-                            .equals((alias(&nav_model.name), alias(reference))),
+                    left_join_as(
+                        query,
+                        &child.model.name,
+                        &child.alias,
+                        Expr::col((alias(&node.alias), alias(pk)))
+                            .equals((alias(&child.alias), alias(reference))),
                     );
                 }
                 NavigationPropertyKind::ManyToMany { unique_id } => {
-                    let nav_model_pk = nav_model
+                    let nav_model_pk = child
+                        .model
                         .find_primary_key()
                         .expect("primary key to be validated by `validate_models`");
 
-                    let pk = &model
+                    let pk = &node
+                        .model
                         .find_primary_key()
                         .expect("primary key to be validated by `validate_models`")
                         .name;
 
                     query.left_join(
                         alias(unique_id),
-                        Expr::col((alias(&model.name), alias(pk)))
-                            .equals((alias(unique_id), alias(format!("{}_{}", model.name, pk)))),
+                        Expr::col((alias(&node.alias), alias(pk)))
+                            .equals((alias(unique_id), alias(format!("{}_{}", node.alias, pk)))),
                     );
-                    query.left_join(
-                        alias(&nav_model.name),
-                        Expr::col((
-                            alias(unique_id),
-                            alias(format!("{}_{}", nav_model.name, pk)),
-                        ))
-                        .equals((alias(&nav_model.name), alias(&nav_model_pk.name))),
+
+                    left_join_as(
+                        query,
+                        &child.model.name,
+                        &child.alias,
+                        Expr::col((alias(unique_id), alias(format!("{}_{}", child.alias, pk))))
+                            .equals((alias(&child.alias), alias(&nav_model_pk.name))),
                     );
                 }
             }
-
-            dfs(nav_model, include_tree, model_lookup, query);
+            dfs(child, query);
         }
     }
 }
@@ -559,9 +679,10 @@ fn generate_views<'a>(models: &'a [Model], model_lookup: &HashMap<&str, &'a Mode
 pub fn generate_sql(models: &[Model]) -> Result<String> {
     let model_lookup = validate_models(models)?;
     let (sorted_models, many_to_many_tables) = validate_fks(models, &model_lookup)?;
+    let model_tree = validate_data_sources(models, &model_lookup)?;
 
     let tables = generate_tables(&sorted_models, many_to_many_tables, &model_lookup);
-    let views = generate_views(models, &model_lookup);
+    let views = generate_views(model_tree);
 
     Ok(format!("{}\n{}", tables.join("\n"), views.join("\n")))
 }

@@ -53,7 +53,7 @@ class Horse {
 
     // `mapSql<Horse>` turns an ORM friendly query result into a list of JSON formatted Horse
     let horseJson = mapSql<Horse>(records.results)[0];
-    return Result.ok(horseJson);
+    return { ok: true, status: 200, data: horseJson };
   }
 
   // Workers endpoint `domain/Horse/get`
@@ -65,13 +65,13 @@ class Horse {
   @GET
   static async get(db: D1Database, id: number): Promise<Result<Horse[]>> {
     let records = await db
-      .prepare("SELECT * FROM Horse_default WHERE id = ?")
+      .prepare("SELECT * FROM Horse_default WHERE Horse_id = ?")
       .bind(id)
       .run();
 
     // `mapSql<Horse>` turns an ORM friendly query result into a list of JSON formatted Horse
     let horses = mapSql<Horse>(records.results);
-    return Result.ok(horses);
+    return { ok: true, status: 200, data: horses };
   }
 
   // Workers endpoint `domain/Horse/list`
@@ -86,7 +86,7 @@ class Horse {
 
     // `mapSql<Horse>` turns an ORM friendly query result into a list of JSON formatted Horse
     let horses = mapSql<Horse>(records.results);
-    return Result.ok(horses);
+    return { ok: true, status: 200, data: horses };
   }
 
   // Workers endpoint `domain/Horse/patch`
@@ -101,7 +101,7 @@ class Horse {
       .prepare("UPDATE Horse SET name = ?, bio = ? WHERE Horse.id = ?")
       .bind(horse.name, horse.bio, horse.id)
       .run();
-    return Result.ok();
+    return { ok: true, status: 200 };
   }
 
   // Workers endpoint `domain/Horse/:id/match`
@@ -117,7 +117,7 @@ class Horse {
       .bind(this.id, horse.id)
       .run();
 
-    return Result.ok();
+    return { ok: true, status: 200 };
   }
 }
 
