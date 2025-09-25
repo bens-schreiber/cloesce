@@ -8,7 +8,7 @@ expression: workers
             import { modelsFromSql, match, Result } from "cloesce"
             import cidl from "./cidl.json" with { type: "json" };
             import { Horse } from './/Users/benjaminschreiber/projects/cloesce/src/e2e/src/models/models.cloesce';
-import { Match } from './/Users/benjaminschreiber/projects/cloesce/src/e2e/src/models/models.cloesce';
+import { Like } from './/Users/benjaminschreiber/projects/cloesce/src/e2e/src/models/models.cloesce';
         
         
         export interface Env {
@@ -24,13 +24,13 @@ import { Match } from './/Users/benjaminschreiber/projects/cloesce/src/e2e/src/m
                         if (obj.id == null || Number.isNaN(obj.id)) {return false;}
 if (obj.name == null || typeof obj.name !== "string") {return false;}
 if (obj.bio == undefined || typeof obj.bio !== "string") {return false;}
-                        if (obj.matches == null || !Array.isArray(obj.matches) || obj.matches.some(item => (item == null || !$.Match.validate(item)))) {return false}
+                        if (obj.likes == null || !Array.isArray(obj.likes) || obj.likes.some(item => (item == null || !$.Like.validate(item)))) {return false}
                         return true;
                     }
                 };
             
 
-                $.Match = {
+                $.Like = {
                     validate(obj: any): boolean {
                         if (obj.id == null || Number.isNaN(obj.id)) {return false;}
 if (obj.horseId1 == null || Number.isNaN(obj.horseId1)) {return false;}
@@ -41,7 +41,7 @@ if (obj.horseId2 == null || Number.isNaN(obj.horseId2)) {return false;}
                 };
             
         
-        const router = {"foo/api": {Horse: {"<id>": {match: async (id: number, request: Request, env: Env) => {
+        const router = {"foo/api": {Horse: {"<id>": {like: async (id: number, request: Request, env: Env) => {
                 
                 if (request.method !== "POST") {
                     return new Response(
@@ -90,7 +90,7 @@ horse = Object.assign(new Horse(), horse)
             
                 
             try {
-                let dispatch = await instance.match(env.DB, horse);
+                let dispatch = await instance.like(env.DB, horse);
                 
             return new Response(
                 JSON.stringify(dispatch),
@@ -169,6 +169,45 @@ horse = Object.assign(new Horse(), horse)
             }
         
             }},
+divide: async (request: Request, env: Env) => {
+                
+                if (request.method !== "GET") {
+                    return new Response(
+    JSON.stringify({ ok: false, message: `validate_http: Method Not Allowed`, status: 405 }),
+    { status: 405, headers: { "Content-Type": "application/json" } }
+);
+                }
+            
+                
+                    const url = new URL(request.url);
+                    let {a, b} = Object.fromEntries(url.searchParams.entries());
+                    
+if ((a == null || Number.isNaN(a))) { return new Response(
+    JSON.stringify({ ok: false, message: `validate_req_body: Invalid Request Body`, status: 400 }),
+    { status: 400, headers: { "Content-Type": "application/json" } }
+); }
+if ((b == null || Number.isNaN(b))) { return new Response(
+    JSON.stringify({ ok: false, message: `validate_req_body: Invalid Request Body`, status: 400 }),
+    { status: 400, headers: { "Content-Type": "application/json" } }
+); }
+                
+                
+            try {
+                let dispatch = await Horse.divide(a, b);
+                
+            return new Response(
+                JSON.stringify(dispatch),
+                { status: dispatch.status, headers: { "Content-Type": "application/json" } }
+            );
+            }
+            catch (e) {
+                return new Response(
+    JSON.stringify({ ok: false, message: `dispatch_method: ${e instanceof Error ? e.message : String(e)}`, status: 500 }),
+    { status: 500, headers: { "Content-Type": "application/json" } }
+);
+            }
+        
+            },
 get: async (request: Request, env: Env) => {
                 
                 if (request.method !== "GET") {

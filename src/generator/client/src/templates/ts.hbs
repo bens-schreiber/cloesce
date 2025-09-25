@@ -17,9 +17,8 @@ export class {{name}} {
   {{value.name}}: {{lang_type value.cidl_type value.nullable}};
   {{/each}}
   {{#each navigation_properties}}
-  {{value.name}}: {{lang_type value.cidl_type value.nullable}}{{#if (is_model_array value.cidl_type)}} = []{{/if}};
+  {{value.name}}: {{lang_type value.cidl_type value.nullable}};
   {{/each}}
-
 
   {{#each methods}}
   {{#if is_static}}static {{/if}}async {{name}}(
@@ -54,11 +53,6 @@ export class {{name}} {
       })
     });
     {{/if}}
-
-    if (!res.ok) {
-      const data = await res.json();
-      return data;
-    }
 
     let raw = await res.json();
     if (!raw.ok) {

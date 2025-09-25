@@ -19,8 +19,7 @@ export class Horse {
   id: number;
   name: string;
   bio: string | null;
-  matches: Match[] = [];
-
+  likes: Like[];
 
   static async post(
         horse: Horse
@@ -51,7 +50,7 @@ export class Horse {
   }
   static async get(
         id: number
-  ): Promise<Result<Horse[]>> {
+  ): Promise<Result<Horse>> {
     const baseUrl = `http://localhost:1000/api/Horse/get`;
 
     const url = new URL(baseUrl);
@@ -70,7 +69,7 @@ export class Horse {
       return raw;
     }
 
-    raw.data = instantiateModelArray(raw.data, Horse)
+    raw.data = Object.assign(new Horse(), raw.data)
     return raw;
 
   }
@@ -123,10 +122,10 @@ export class Horse {
     return raw;
 
   }
-  async match(
+  async like(
         horse: Horse
   ): Promise<Result<void>> {
-    const baseUrl = `http://localhost:1000/api/Horse/${this.id}/match`;
+    const baseUrl = `http://localhost:1000/api/Horse/${this.id}/like`;
 
     const res = await fetch(baseUrl, {
       method: "POST",
@@ -149,12 +148,37 @@ export class Horse {
     return raw;
 
   }
+  static async divide(
+        a: number, 
+        b: number
+  ): Promise<Result<number>> {
+    const baseUrl = `http://localhost:1000/api/Horse/divide`;
+
+    const url = new URL(baseUrl);
+    url.searchParams.append('a', String(a));
+    url.searchParams.append('b', String(b));
+    const res = await fetch(url.toString(), {
+      method: "GET"
+    });
+
+    if (!res.ok) {
+      const data = await res.json();
+      return data;
+    }
+
+    let raw = await res.json();
+    if (!raw.ok) {
+      return raw;
+    }
+
+    return raw;
+
+  }
 }
-export class Match {
+export class Like {
   id: number;
   horseId1: number;
   horseId2: number;
   horse2: Horse;
-
 
 }

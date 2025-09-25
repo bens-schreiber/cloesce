@@ -482,6 +482,8 @@ fn validate_data_sources<'a>(
         Ok(node)
     }
 
+    return Ok(model_trees);
+
     fn generate_alias(name: &str, alias_counter: &mut HashMap<String, u32>) -> String {
         let count = alias_counter.entry(name.to_string()).or_default();
         let alias = if *count == 0 {
@@ -492,7 +494,6 @@ fn validate_data_sources<'a>(
         *count += 1;
         alias
     }
-    Ok(model_trees)
 }
 
 fn generate_tables(
