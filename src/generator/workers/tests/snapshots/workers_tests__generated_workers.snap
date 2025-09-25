@@ -131,186 +131,7 @@ if (obj.data_blob == null || !(obj.data_blob instanceof ArrayBuffer || obj.data_
                 };
             
         
-
-const router = { api: {
-ExampleModel: {
-create_example: async ( request: Request, env: Env) => {
-                
-if (request.method !== "POST") {
-    return new Response("Method Not Allowed", { status: 405 });
-}
-
-                
-                    let body;
-                    try {
-                        body = await request.json();
-                    } catch {
-                        
-            return new Response(JSON.stringify({ error: "Invalid request parameters" }), {
-                status: 400,
-                headers: { "Content-Type": "application/json" },
-            });
-        
-                    }
-                    let {payload} = body;
-                    
-if ((payload == null || !$.ExampleModel.validate(payload))) { 
-            return new Response(JSON.stringify({ error: "Invalid request parameters" }), {
-                status: 400,
-                headers: { "Content-Type": "application/json" },
-            });
-         }
-payload = Object.assign(new ExampleModel(), payload)
-                
-                
-return JSON.stringify(ExampleModel.create_example(env.DB, payload));
-
-            }
-,
-
-read_example: async ( request: Request, env: Env) => {
-                
-if (request.method !== "GET") {
-    return new Response("Method Not Allowed", { status: 405 });
-}
-
-                
-                    const url = new URL(request.url);
-                    let {id} = Object.fromEntries(url.searchParams.entries());
-                    
-if ((id !== undefined && typeof id !== "number")) { 
-            return new Response(JSON.stringify({ error: "Invalid request parameters" }), {
-                status: 400,
-                headers: { "Content-Type": "application/json" },
-            });
-         }
-                
-                
-return JSON.stringify(ExampleModel.read_example(env.DB, id));
-
-            }
-,
-
-list_examples: async ( request: Request, env: Env) => {
-                
-if (request.method !== "GET") {
-    return new Response("Method Not Allowed", { status: 405 });
-}
-
-                
-                
-                
-return JSON.stringify(ExampleModel.list_examples(env.DB));
-
-            }
-,
-
-update_example: async ( request: Request, env: Env) => {
-                
-if (request.method !== "PUT") {
-    return new Response("Method Not Allowed", { status: 405 });
-}
-
-                
-                    let body;
-                    try {
-                        body = await request.json();
-                    } catch {
-                        
-            return new Response(JSON.stringify({ error: "Invalid request parameters" }), {
-                status: 400,
-                headers: { "Content-Type": "application/json" },
-            });
-        
-                    }
-                    let {id, rating} = body;
-                    
-if ((id == null || typeof id !== "number")) { 
-            return new Response(JSON.stringify({ error: "Invalid request parameters" }), {
-                status: 400,
-                headers: { "Content-Type": "application/json" },
-            });
-         }
-if ((rating !== undefined && typeof rating !== "number")) { 
-            return new Response(JSON.stringify({ error: "Invalid request parameters" }), {
-                status: 400,
-                headers: { "Content-Type": "application/json" },
-            });
-         }
-                
-                
-return JSON.stringify(ExampleModel.update_example(env.DB, id, rating));
-
-            }
-,
-
-patch_example: async ( request: Request, env: Env) => {
-                
-if (request.method !== "PATCH") {
-    return new Response("Method Not Allowed", { status: 405 });
-}
-
-                
-                    let body;
-                    try {
-                        body = await request.json();
-                    } catch {
-                        
-            return new Response(JSON.stringify({ error: "Invalid request parameters" }), {
-                status: 400,
-                headers: { "Content-Type": "application/json" },
-            });
-        
-                    }
-                    let {description} = body;
-                    
-if ((description !== undefined && typeof description !== "string")) { 
-            return new Response(JSON.stringify({ error: "Invalid request parameters" }), {
-                status: 400,
-                headers: { "Content-Type": "application/json" },
-            });
-         }
-                
-                
-return JSON.stringify(ExampleModel.patch_example(env.DB, description));
-
-            }
-,
-
-delete_example: async ( request: Request, env: Env) => {
-                
-if (request.method !== "DELETE") {
-    return new Response("Method Not Allowed", { status: 405 });
-}
-
-                
-                    let body;
-                    try {
-                        body = await request.json();
-                    } catch {
-                        
-            return new Response(JSON.stringify({ error: "Invalid request parameters" }), {
-                status: 400,
-                headers: { "Content-Type": "application/json" },
-            });
-        
-                    }
-                    let {id} = body;
-                    
-if ((id == null || typeof id !== "number")) { 
-            return new Response(JSON.stringify({ error: "Invalid request parameters" }), {
-                status: 400,
-                headers: { "Content-Type": "application/json" },
-            });
-         }
-                
-                
-return JSON.stringify(ExampleModel.delete_example(env.DB, id));
-
-            }
-,
-
-"<id>": {
+const router = {"foo/api": {ExampleModel: {"<id>": {
 get_description: async (id: number,  request: Request, env: Env) => {
                 
 if (request.method !== "GET") {
@@ -334,10 +155,8 @@ const instance = Object.assign(new ExampleModel(), record);
 return JSON.stringify(instance.get_description(env.DB));
 
             }
-}
 ,
 
-"<id>": {
 increment_rating: async (id: number,  request: Request, env: Env) => {
                 
 if (request.method !== "PATCH") {
@@ -380,7 +199,120 @@ const instance = Object.assign(new ExampleModel(), record);
 return JSON.stringify(instance.increment_rating(env.DB, amount));
 
             }
+},
+
+create_example: async ( request: Request, env: Env) => {
+                
+if (request.method !== "POST") {
+    return new Response("Method Not Allowed", { status: 405 });
 }
+
+                
+                    let body;
+                    try {
+                        body = await request.json();
+                    } catch {
+                        
+            return new Response(JSON.stringify({ error: "Invalid request parameters" }), {
+                status: 400,
+                headers: { "Content-Type": "application/json" },
+            });
+        
+                    }
+                    let {payload} = body;
+                    
+if ((payload == null || !$.ExampleModel.validate(payload))) { 
+            return new Response(JSON.stringify({ error: "Invalid request parameters" }), {
+                status: 400,
+                headers: { "Content-Type": "application/json" },
+            });
+         }
+payload = Object.assign(new ExampleModel(), payload)
+                
+                
+return JSON.stringify(ExampleModel.create_example(env.DB, payload));
+
+            }
+,
+
+delete_example: async ( request: Request, env: Env) => {
+                
+if (request.method !== "DELETE") {
+    return new Response("Method Not Allowed", { status: 405 });
+}
+
+                
+                    let body;
+                    try {
+                        body = await request.json();
+                    } catch {
+                        
+            return new Response(JSON.stringify({ error: "Invalid request parameters" }), {
+                status: 400,
+                headers: { "Content-Type": "application/json" },
+            });
+        
+                    }
+                    let {id} = body;
+                    
+if ((id == null || typeof id !== "number")) { 
+            return new Response(JSON.stringify({ error: "Invalid request parameters" }), {
+                status: 400,
+                headers: { "Content-Type": "application/json" },
+            });
+         }
+                
+                
+return JSON.stringify(ExampleModel.delete_example(env.DB, id));
+
+            }
+,
+
+list_examples: async ( request: Request, env: Env) => {
+                
+if (request.method !== "GET") {
+    return new Response("Method Not Allowed", { status: 405 });
+}
+
+                
+                
+                
+return JSON.stringify(ExampleModel.list_examples(env.DB));
+
+            }
+,
+
+patch_example: async ( request: Request, env: Env) => {
+                
+if (request.method !== "PATCH") {
+    return new Response("Method Not Allowed", { status: 405 });
+}
+
+                
+                    let body;
+                    try {
+                        body = await request.json();
+                    } catch {
+                        
+            return new Response(JSON.stringify({ error: "Invalid request parameters" }), {
+                status: 400,
+                headers: { "Content-Type": "application/json" },
+            });
+        
+                    }
+                    let {description} = body;
+                    
+if ((description !== undefined && typeof description !== "string")) { 
+            return new Response(JSON.stringify({ error: "Invalid request parameters" }), {
+                status: 400,
+                headers: { "Content-Type": "application/json" },
+            });
+         }
+                
+                
+return JSON.stringify(ExampleModel.patch_example(env.DB, description));
+
+            }
 ,
 
 process_model: async ( request: Request, env: Env) => {
@@ -449,9 +381,69 @@ models = models.map(item => Object.assign(new ExampleModel(), item))
 return JSON.stringify(ExampleModel.process_models(env.DB, models));
 
             }
-}
-} }
+,
 
+read_example: async ( request: Request, env: Env) => {
+                
+if (request.method !== "GET") {
+    return new Response("Method Not Allowed", { status: 405 });
+}
+
+                
+                    const url = new URL(request.url);
+                    let {id} = Object.fromEntries(url.searchParams.entries());
+                    
+if ((id !== undefined && typeof id !== "number")) { 
+            return new Response(JSON.stringify({ error: "Invalid request parameters" }), {
+                status: 400,
+                headers: { "Content-Type": "application/json" },
+            });
+         }
+                
+                
+return JSON.stringify(ExampleModel.read_example(env.DB, id));
+
+            }
+,
+
+update_example: async ( request: Request, env: Env) => {
+                
+if (request.method !== "PUT") {
+    return new Response("Method Not Allowed", { status: 405 });
+}
+
+                
+                    let body;
+                    try {
+                        body = await request.json();
+                    } catch {
+                        
+            return new Response(JSON.stringify({ error: "Invalid request parameters" }), {
+                status: 400,
+                headers: { "Content-Type": "application/json" },
+            });
+        
+                    }
+                    let {id, rating} = body;
+                    
+if ((id == null || typeof id !== "number")) { 
+            return new Response(JSON.stringify({ error: "Invalid request parameters" }), {
+                status: 400,
+                headers: { "Content-Type": "application/json" },
+            });
+         }
+if ((rating !== undefined && typeof rating !== "number")) { 
+            return new Response(JSON.stringify({ error: "Invalid request parameters" }), {
+                status: 400,
+                headers: { "Content-Type": "application/json" },
+            });
+         }
+                
+                
+return JSON.stringify(ExampleModel.update_example(env.DB, id, rating));
+
+            }
+}}}
 
 export default {
     async fetch(request: Request, env: Env, ctx: any): Promise<Response> {

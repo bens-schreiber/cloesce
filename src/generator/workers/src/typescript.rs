@@ -3,7 +3,7 @@ use anyhow::{Context, Result};
 use common::{CidlType, HttpVerb, Method, Model, TypedValue};
 use std::path::Path;
 
-use crate::LanguageWorkerGenerator as LanguageWorkersGenerator;
+use crate::{LanguageWorkerGenerator as LanguageWorkersGenerator, RouterTrie, TrieNode};
 
 pub struct TypescriptValidatorGenerator;
 impl TypescriptValidatorGenerator {
@@ -173,32 +173,50 @@ export default {
         .to_string()
     }
 
-    fn router(&self, model: String) -> String {
-        format!(
-            r#"
-const router = {{ api: {{{model}}} }}
-"#
-        )
-    }
+    fn router_method(
+        &self,
+        model_name: &str,
+        method: &Method,
+        proto: String,
+        router: &mut RouterTrie,
+    ) {
+        let model_root = router
+            .root
+            .children
+            .entry(model_name.to_string())
+            .or_insert(TrieNode::new(model_name.to_string()));
 
-    fn router_model(&self, model_name: &str, method: String) -> String {
-        format!(
-            r#"
-{model_name}: {{{method}}}
-"#
-        )
-    }
-
-    fn router_method(&self, method: &Method, proto: String) -> String {
         if method.is_static {
-            proto
+            model_root
+                .children
+                .insert(method.name.clone(), TrieNode::new(proto));
         } else {
-            format!(
-                r#"
-"<id>": {{{proto}}}
-"#
-            )
+            let id_root = model_root
+                .children
+                .entry("\"<id>\"".to_string())
+                .or_insert(TrieNode::new("\"<id>\"".to_string()));
+
+            id_root
+                .children
+                .insert(method.name.clone(), TrieNode::new(proto));
         }
+    }
+
+    fn router_serialize(&self, router: &RouterTrie) -> String {
+        fn dfs(node: &TrieNode) -> String {
+            if node.children.is_empty() {
+                return node.value.clone();
+            }
+
+            let mut serialized = vec![];
+            for n in node.children.values() {
+                serialized.push(dfs(n))
+            }
+
+            format!("{}: {{{}}}", node.value, serialized.join(",\n"))
+        }
+
+        format!("const router = {{{}}}", dfs(&router.root))
     }
 
     fn proto(&self, method: &Method, body: String) -> String {
