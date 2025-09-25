@@ -345,3 +345,9 @@ tmp/
 # ----------- CLOESCE VVV  ----------- 
 .generated
 migrations
+
+
+
+
+# ----------- VSCODE -----------
+.vscode

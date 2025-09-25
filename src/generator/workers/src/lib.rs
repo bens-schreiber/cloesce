@@ -1,8 +1,8 @@
 mod typescript;
 
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, path::Path};
 
-use common::{CidlSpec, HttpVerb, InputLanguage, Method, Model, TypedValue};
+use common::{CidlSpec, HttpVerb, InputLanguage, Method, Model};
 use typescript::TypescriptWorkersGenerator;
 
 use anyhow::{Result, anyhow};
@@ -38,7 +38,7 @@ impl RouterTrie {
 
 trait LanguageWorkerGenerator {
     /// Necessary imports for the language
-    fn imports(&self, models: &[Model]) -> String;
+    fn imports(&self, models: &[Model], workers_path: &Path) -> Result<String>;
 
     /// Necessary boilerplate for the language
     fn preamble(&self) -> String;
@@ -68,10 +68,10 @@ trait LanguageWorkerGenerator {
     fn validate_http(&self, verb: &HttpVerb) -> String;
 
     /// Validates that the request body has the correct structure and input
-    fn validate_req_body(&self, params: &[TypedValue]) -> String;
+    fn validate_request(&self, method: &Method) -> String;
 
     /// Fetches the model from the database on instantiated methods
-    fn hydrate_model(&self, model_name: &Model) -> String;
+    fn hydrate_model(&self, model: &Model) -> String;
 
     /// Dispatches the model function
     fn dispatch_method(&self, model_name: &str, method: &Method) -> String;
@@ -82,11 +82,11 @@ impl WorkersFactory {
     fn model(model: &Model, lang: &dyn LanguageWorkerGenerator, router: &mut RouterTrie) {
         for method in &model.methods {
             let validate_http = lang.validate_http(&method.http_verb);
-            let validate_params = lang.validate_req_body(&method.parameters);
+            let validate_params = lang.validate_request(method);
             let hydration = if method.is_static {
-                ""
+                String::new()
             } else {
-                &lang.hydrate_model(model)
+                lang.hydrate_model(model)
             };
             let dispatch = lang.dispatch_method(&model.name, method);
 
@@ -105,34 +105,34 @@ impl WorkersFactory {
     }
 
     /// Returns the API route
-    fn validate_domain(domain: &String) -> Result<String> {
+    fn validate_domain(domain: &str) -> Result<String> {
         if domain.is_empty() {
             return Err(anyhow!("Empty domain."));
         }
 
         match domain.split_once("://") {
-            None => return Err(anyhow!("Missing HTTP protocol")),
+            None => Err(anyhow!("Missing HTTP protocol")),
             Some((protocol, rest)) => {
                 if protocol != "http" {
                     return Err(anyhow!("Unsupported protocol {}", protocol));
                 }
 
                 match rest.split_once("/") {
-                    None => return Err(anyhow!("Missing API route on domain")),
+                    None => Err(anyhow!("Missing API route on domain")),
                     Some((_, rest)) => Ok(rest.to_string()),
                 }
             }
         }
     }
 
-    pub fn create(&self, spec: CidlSpec, domain: String) -> Result<String> {
+    pub fn create(&self, spec: CidlSpec, domain: String, workers_path: &Path) -> Result<String> {
         let api_route = Self::validate_domain(&domain)?;
 
-        let generator: &mut dyn LanguageWorkerGenerator = match spec.language {
-            InputLanguage::TypeScript => &mut TypescriptWorkersGenerator,
+        let generator: &dyn LanguageWorkerGenerator = match spec.language {
+            InputLanguage::TypeScript => &TypescriptWorkersGenerator {},
         };
 
-        let imports = generator.imports(&spec.models);
+        let imports = generator.imports(&spec.models, workers_path)?;
         let preamble = generator.preamble();
         let validators = generator.validators(&spec.models);
 

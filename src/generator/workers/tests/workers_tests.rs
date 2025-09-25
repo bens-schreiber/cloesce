@@ -14,8 +14,14 @@ fn test_generate_client_snapshot() -> Result<()> {
         serde_json::from_str::<CidlSpec>(&cidl_contents)?
     };
 
+    let workers_path = PathBuf::from("root/workers.snap.new");
+
     // Act
-    let workers = WorkersFactory.create(cidl, String::from("http://cloesce.com/foo/api"))?;
+    let workers = WorkersFactory.create(
+        cidl,
+        String::from("http://cloesce.com/foo/api"),
+        &workers_path,
+    )?;
 
     // Assert
     assert_snapshot!("generated_workers", workers);

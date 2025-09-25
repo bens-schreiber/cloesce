@@ -5,7 +5,7 @@
   "models": [
     {
       "name": "ExampleModel",
-      "source_path": "example_model.ts",
+      "source_path": "root/model/example_model.ts",
       "attributes": [
         {
           "primary_key": true,

@@ -6,7 +6,7 @@ expression: workers
 
 import { D1Database } from "@cloudflare/workers-types"
 
-import { ExampleModel } from '../example_model'; 
+import { ExampleModel } from './model/example_model';
 
 // @ts-nocheck
 
@@ -131,7 +131,7 @@ if (obj.data_blob == null || !(obj.data_blob instanceof ArrayBuffer || obj.data_
                 };
             
         
-const router = {api: {ExampleModel: {"<id>": {
+const router = {"foo/api": {ExampleModel: {"<id>": {
 get_description: async (id: number,  request: Request, env: Env) => {
                 
 if (request.method !== "GET") {
@@ -164,22 +164,21 @@ if (request.method !== "PATCH") {
 }
 
                 
-                let body;
-                try {
-                    body = await request.json();
-                } catch {
-                    
-            return new Response(JSON.stringify({ error: "Invalid request body" }), {
+                    let body;
+                    try {
+                        body = await request.json();
+                    } catch {
+                        
+            return new Response(JSON.stringify({ error: "Invalid request parameters" }), {
                 status: 400,
                 headers: { "Content-Type": "application/json" },
             });
         
-                }
-
-                let {amount} = body;
-                
+                    }
+                    let {amount} = body;
+                    
 if ((amount == null || typeof amount !== "number")) { 
-            return new Response(JSON.stringify({ error: "Invalid request body" }), {
+            return new Response(JSON.stringify({ error: "Invalid request parameters" }), {
                 status: 400,
                 headers: { "Content-Type": "application/json" },
             });
@@ -209,22 +208,21 @@ if (request.method !== "POST") {
 }
 
                 
-                let body;
-                try {
-                    body = await request.json();
-                } catch {
-                    
-            return new Response(JSON.stringify({ error: "Invalid request body" }), {
+                    let body;
+                    try {
+                        body = await request.json();
+                    } catch {
+                        
+            return new Response(JSON.stringify({ error: "Invalid request parameters" }), {
                 status: 400,
                 headers: { "Content-Type": "application/json" },
             });
         
-                }
-
-                let {payload} = body;
-                
+                    }
+                    let {payload} = body;
+                    
 if ((payload == null || !$.ExampleModel.validate(payload))) { 
-            return new Response(JSON.stringify({ error: "Invalid request body" }), {
+            return new Response(JSON.stringify({ error: "Invalid request parameters" }), {
                 status: 400,
                 headers: { "Content-Type": "application/json" },
             });
@@ -244,22 +242,21 @@ if (request.method !== "DELETE") {
 }
 
                 
-                let body;
-                try {
-                    body = await request.json();
-                } catch {
-                    
-            return new Response(JSON.stringify({ error: "Invalid request body" }), {
+                    let body;
+                    try {
+                        body = await request.json();
+                    } catch {
+                        
+            return new Response(JSON.stringify({ error: "Invalid request parameters" }), {
                 status: 400,
                 headers: { "Content-Type": "application/json" },
             });
         
-                }
-
-                let {id} = body;
-                
+                    }
+                    let {id} = body;
+                    
 if ((id == null || typeof id !== "number")) { 
-            return new Response(JSON.stringify({ error: "Invalid request body" }), {
+            return new Response(JSON.stringify({ error: "Invalid request parameters" }), {
                 status: 400,
                 headers: { "Content-Type": "application/json" },
             });
@@ -292,22 +289,21 @@ if (request.method !== "PATCH") {
 }
 
                 
-                let body;
-                try {
-                    body = await request.json();
-                } catch {
-                    
-            return new Response(JSON.stringify({ error: "Invalid request body" }), {
+                    let body;
+                    try {
+                        body = await request.json();
+                    } catch {
+                        
+            return new Response(JSON.stringify({ error: "Invalid request parameters" }), {
                 status: 400,
                 headers: { "Content-Type": "application/json" },
             });
         
-                }
-
-                let {description} = body;
-                
+                    }
+                    let {description} = body;
+                    
 if ((description !== undefined && typeof description !== "string")) { 
-            return new Response(JSON.stringify({ error: "Invalid request body" }), {
+            return new Response(JSON.stringify({ error: "Invalid request parameters" }), {
                 status: 400,
                 headers: { "Content-Type": "application/json" },
             });
@@ -326,22 +322,21 @@ if (request.method !== "POST") {
 }
 
                 
-                let body;
-                try {
-                    body = await request.json();
-                } catch {
-                    
-            return new Response(JSON.stringify({ error: "Invalid request body" }), {
+                    let body;
+                    try {
+                        body = await request.json();
+                    } catch {
+                        
+            return new Response(JSON.stringify({ error: "Invalid request parameters" }), {
                 status: 400,
                 headers: { "Content-Type": "application/json" },
             });
         
-                }
-
-                let {model} = body;
-                
+                    }
+                    let {model} = body;
+                    
 if ((model == null || !$.ExampleModel.validate(model))) { 
-            return new Response(JSON.stringify({ error: "Invalid request body" }), {
+            return new Response(JSON.stringify({ error: "Invalid request parameters" }), {
                 status: 400,
                 headers: { "Content-Type": "application/json" },
             });
@@ -361,22 +356,21 @@ if (request.method !== "POST") {
 }
 
                 
-                let body;
-                try {
-                    body = await request.json();
-                } catch {
-                    
-            return new Response(JSON.stringify({ error: "Invalid request body" }), {
+                    let body;
+                    try {
+                        body = await request.json();
+                    } catch {
+                        
+            return new Response(JSON.stringify({ error: "Invalid request parameters" }), {
                 status: 400,
                 headers: { "Content-Type": "application/json" },
             });
         
-                }
-
-                let {models} = body;
-                
+                    }
+                    let {models} = body;
+                    
 if ((models == null || !Array.isArray(models) || models.some(item => (item == null || !$.ExampleModel.validate(item))))) { 
-            return new Response(JSON.stringify({ error: "Invalid request body" }), {
+            return new Response(JSON.stringify({ error: "Invalid request parameters" }), {
                 status: 400,
                 headers: { "Content-Type": "application/json" },
             });
@@ -396,22 +390,11 @@ if (request.method !== "GET") {
 }
 
                 
-                let body;
-                try {
-                    body = await request.json();
-                } catch {
+                    const url = new URL(request.url);
+                    let {id} = Object.fromEntries(url.searchParams.entries());
                     
-            return new Response(JSON.stringify({ error: "Invalid request body" }), {
-                status: 400,
-                headers: { "Content-Type": "application/json" },
-            });
-        
-                }
-
-                let {id} = body;
-                
 if ((id !== undefined && typeof id !== "number")) { 
-            return new Response(JSON.stringify({ error: "Invalid request body" }), {
+            return new Response(JSON.stringify({ error: "Invalid request parameters" }), {
                 status: 400,
                 headers: { "Content-Type": "application/json" },
             });
@@ -430,28 +413,27 @@ if (request.method !== "PUT") {
 }
 
                 
-                let body;
-                try {
-                    body = await request.json();
-                } catch {
-                    
-            return new Response(JSON.stringify({ error: "Invalid request body" }), {
+                    let body;
+                    try {
+                        body = await request.json();
+                    } catch {
+                        
+            return new Response(JSON.stringify({ error: "Invalid request parameters" }), {
                 status: 400,
                 headers: { "Content-Type": "application/json" },
             });
         
-                }
-
-                let {id,rating} = body;
-                
+                    }
+                    let {id, rating} = body;
+                    
 if ((id == null || typeof id !== "number")) { 
-            return new Response(JSON.stringify({ error: "Invalid request body" }), {
+            return new Response(JSON.stringify({ error: "Invalid request parameters" }), {
                 status: 400,
                 headers: { "Content-Type": "application/json" },
             });
          }
 if ((rating !== undefined && typeof rating !== "number")) { 
-            return new Response(JSON.stringify({ error: "Invalid request body" }), {
+            return new Response(JSON.stringify({ error: "Invalid request parameters" }), {
                 status: 400,
                 headers: { "Content-Type": "application/json" },
             });
