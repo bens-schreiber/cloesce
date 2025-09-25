@@ -1,7 +1,9 @@
-use anyhow::Result;
-use common::CidlSpec;
-use insta::assert_snapshot;
 use workers::WorkersGenerator;
+
+use common::CidlSpec;
+
+use anyhow::Result;
+use insta::assert_snapshot;
 
 use std::path::PathBuf;
 
@@ -17,7 +19,11 @@ fn test_generate_workers_snapshot() -> Result<()> {
     let workers_path = PathBuf::from("root/workers.snap.new");
 
     // Act
-    let workers = WorkersGenerator.generate(cidl, &workers_path)?;
+    let workers = WorkersGenerator.create(
+        cidl,
+        String::from("http://cloesce.com/foo/api"),
+        &workers_path,
+    )?;
 
     // Assert
     assert_snapshot!("generated_workers", workers);
