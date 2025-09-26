@@ -42,10 +42,10 @@ exports[`actions snapshot 1`] = `
               {
                 "cidl_type": {
                   "Array": {
-                    "Model": "Match",
+                    "Model": "Like",
                   },
                 },
-                "name": "matches",
+                "name": "likes",
                 "nullable": false,
               },
               [
@@ -107,9 +107,7 @@ exports[`actions snapshot 1`] = `
           ],
           "return_type": {
             "HttpResult": {
-              "Array": {
-                "Model": "Horse",
-              },
+              "Model": "Horse",
             },
           },
         },
@@ -157,7 +155,7 @@ exports[`actions snapshot 1`] = `
         {
           "http_verb": "POST",
           "is_static": false,
-          "name": "match",
+          "name": "like",
           "parameters": [
             {
               "cidl_type": "D1Database",
@@ -176,6 +174,26 @@ exports[`actions snapshot 1`] = `
             "HttpResult": null,
           },
         },
+        {
+          "http_verb": "GET",
+          "is_static": true,
+          "name": "divide",
+          "parameters": [
+            {
+              "cidl_type": "Integer",
+              "name": "a",
+              "nullable": false,
+            },
+            {
+              "cidl_type": "Integer",
+              "name": "b",
+              "nullable": false,
+            },
+          ],
+          "return_type": {
+            "HttpResult": "Integer",
+          },
+        },
       ],
       "name": "Horse",
       "navigation_properties": [
@@ -188,10 +206,10 @@ exports[`actions snapshot 1`] = `
           "value": {
             "cidl_type": {
               "Array": {
-                "Model": "Match",
+                "Model": "Like",
               },
             },
-            "name": "matches",
+            "name": "likes",
             "nullable": false,
           },
         },
@@ -230,7 +248,7 @@ exports[`actions snapshot 1`] = `
       ],
       "data_sources": [],
       "methods": [],
-      "name": "Match",
+      "name": "Like",
       "navigation_properties": [
         {
           "kind": {

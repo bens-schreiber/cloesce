@@ -1,271 +1,270 @@
 {
-    "version": "v0.0.2",
-    "project_name": "e2e",
-    "language": "TypeScript",
-    "models": [
+  "version": "v0.0.2",
+  "project_name": "e2e",
+  "language": "TypeScript",
+  "models": [
       {
-        "name": "Horse",
-        "attributes": [
-          {
-            "is_primary_key": true,
-            "foreign_key_reference": null,
-            "value": {
-              "name": "id",
-              "cidl_type": "Integer",
-              "nullable": false
-            }
-          },
-          {
-            "is_primary_key": false,
-            "foreign_key_reference": null,
-            "value": {
-              "name": "name",
-              "cidl_type": "Text",
-              "nullable": false
-            }
-          },
-          {
-            "is_primary_key": false,
-            "foreign_key_reference": null,
-            "value": {
-              "name": "bio",
-              "cidl_type": "Text",
-              "nullable": true
-            }
-          }
-        ],
-        "navigation_properties": [
-          {
-            "value": {
-              "name": "likes",
-              "cidl_type": {
-                "Array": {
-                  "Model": "Like"
-                }
-              },
-              "nullable": false
-            },
-            "kind": {
-              "OneToMany": {
-                "reference": "horseId1"
-              }
-            }
-          }
-        ],
-        "methods": [
-          {
-            "name": "post",
-            "is_static": true,
-            "http_verb": "POST",
-            "return_type": {
-              "HttpResult": {
-                "Model": "Horse"
-              }
-            },
-            "parameters": [
+          "name": "Horse",
+          "attributes": [
               {
-                "name": "db",
-                "cidl_type": "D1Database",
-                "nullable": false
+                  "is_primary_key": true,
+                  "foreign_key_reference": null,
+                  "value": {
+                      "name": "id",
+                      "cidl_type": "Integer",
+                      "nullable": false
+                  }
               },
               {
-                "name": "horse",
-                "cidl_type": {
-                  "Model": "Horse"
-                },
-                "nullable": false
-              }
-            ]
-          },
-          {
-            "name": "get",
-            "is_static": true,
-            "http_verb": "GET",
-            "return_type": {
-              "HttpResult": {
-                "Model": "Horse"
-              }
-            },
-            "parameters": [
-              {
-                "name": "db",
-                "cidl_type": "D1Database",
-                "nullable": false
+                  "is_primary_key": false,
+                  "foreign_key_reference": null,
+                  "value": {
+                      "name": "name",
+                      "cidl_type": "Text",
+                      "nullable": false
+                  }
               },
               {
-                "name": "id",
-                "cidl_type": "Integer",
-                "nullable": false
+                  "is_primary_key": false,
+                  "foreign_key_reference": null,
+                  "value": {
+                      "name": "bio",
+                      "cidl_type": "Text",
+                      "nullable": true
+                  }
               }
-            ]
-          },
-          {
-            "name": "list",
-            "is_static": true,
-            "http_verb": "GET",
-            "return_type": {
-              "HttpResult": {
-                "Array": {
-                  "Model": "Horse"
-                }
-              }
-            },
-            "parameters": [
+          ],
+          "navigation_properties": [
               {
-                "name": "db",
-                "cidl_type": "D1Database",
-                "nullable": false
-              }
-            ]
-          },
-          {
-            "name": "patch",
-            "is_static": false,
-            "http_verb": "PATCH",
-            "return_type": {
-              "HttpResult": null
-            },
-            "parameters": [
-              {
-                "name": "db",
-                "cidl_type": "D1Database",
-                "nullable": false
-              },
-              {
-                "name": "horse",
-                "cidl_type": {
-                  "Model": "Horse"
-                },
-                "nullable": false
-              }
-            ]
-          },
-          {
-            "name": "like",
-            "is_static": false,
-            "http_verb": "POST",
-            "return_type": {
-              "HttpResult": null
-            },
-            "parameters": [
-              {
-                "name": "db",
-                "cidl_type": "D1Database",
-                "nullable": false
-              },
-              {
-                "name": "horse",
-                "cidl_type": {
-                  "Model": "Horse"
-                },
-                "nullable": false
-              }
-            ]
-          },
-          {
-            "name": "divide",
-            "is_static": true,
-            "http_verb": "GET",
-            "return_type": {
-              "HttpResult": "Integer"
-            },
-            "parameters": [
-              {
-                "name": "a",
-                "cidl_type": "Integer",
-                "nullable": false
-              },
-              {
-                "name": "b",
-                "cidl_type": "Integer",
-                "nullable": false
-              }
-            ]
-          }
-        ],
-        "data_sources": [
-          {
-            "name": "default",
-            "tree": [
-              [
-                {
-                  "name": "likes",
-                  "cidl_type": {
-                    "Array": {
-                      "Model": "Like"
-                    }
-                  },
-                  "nullable": false
-                },
-                [
-                  [
-                    {
-                      "name": "horse2",
+                  "value": {
+                      "name": "likes",
                       "cidl_type": {
-                        "Model": "Horse"
+                          "Array": {
+                              "Model": "Like"
+                          }
                       },
                       "nullable": false
-                    },
-                    []
+                  },
+                  "kind": {
+                      "OneToMany": {
+                          "reference": "horseId1"
+                      }
+                  }
+              }
+          ],
+          "methods": [
+              {
+                  "name": "post",
+                  "is_static": true,
+                  "http_verb": "POST",
+                  "return_type": {
+                      "HttpResult": {
+                          "Model": "Horse"
+                      }
+                  },
+                  "parameters": [
+                      {
+                          "name": "db",
+                          "cidl_type": "D1Database",
+                          "nullable": false
+                      },
+                      {
+                          "name": "horse",
+                          "cidl_type": {
+                              "Model": "Horse"
+                          },
+                          "nullable": false
+                      }
                   ]
-                ]
-              ]
-            ]
-          }
-        ],
-        "source_path": "/Users/benjaminschreiber/projects/cloesce/src/e2e/src/models/models.cloesce.ts"
+              },
+              {
+                  "name": "get",
+                  "is_static": true,
+                  "http_verb": "GET",
+                  "return_type": {
+                      "HttpResult": {
+                          "Model": "Horse"
+                      }
+                  },
+                  "parameters": [
+                      {
+                          "name": "db",
+                          "cidl_type": "D1Database",
+                          "nullable": false
+                      },
+                      {
+                          "name": "id",
+                          "cidl_type": "Integer",
+                          "nullable": false
+                      }
+                  ]
+              },
+              {
+                  "name": "list",
+                  "is_static": true,
+                  "http_verb": "GET",
+                  "return_type": {
+                      "HttpResult": {
+                          "Array": {
+                              "Model": "Horse"
+                          }
+                      }
+                  },
+                  "parameters": [
+                      {
+                          "name": "db",
+                          "cidl_type": "D1Database",
+                          "nullable": false
+                      }
+                  ]
+              },
+              {
+                  "name": "patch",
+                  "is_static": false,
+                  "http_verb": "PATCH",
+                  "return_type": {
+                      "HttpResult": null
+                  },
+                  "parameters": [
+                      {
+                          "name": "db",
+                          "cidl_type": "D1Database",
+                          "nullable": false
+                      },
+                      {
+                          "name": "horse",
+                          "cidl_type": {
+                              "Model": "Horse"
+                          },
+                          "nullable": false
+                      }
+                  ]
+              },
+              {
+                  "name": "like",
+                  "is_static": false,
+                  "http_verb": "POST",
+                  "return_type": {
+                      "HttpResult": null
+                  },
+                  "parameters": [
+                      {
+                          "name": "db",
+                          "cidl_type": "D1Database",
+                          "nullable": false
+                      },
+                      {
+                          "name": "horse",
+                          "cidl_type": {
+                              "Model": "Horse"
+                          },
+                          "nullable": false
+                      }
+                  ]
+              },
+              {
+                  "name": "divide",
+                  "is_static": true,
+                  "http_verb": "GET",
+                  "return_type": {
+                      "HttpResult": "Integer"
+                  },
+                  "parameters": [
+                      {
+                          "name": "a",
+                          "cidl_type": "Integer",
+                          "nullable": false
+                      },
+                      {
+                          "name": "b",
+                          "cidl_type": "Integer",
+                          "nullable": false
+                      }
+                  ]
+              }
+          ],
+          "data_sources": [
+              {
+                  "name": "default",
+                  "tree": [
+                      [
+                          {
+                              "name": "likes",
+                              "cidl_type": {
+                                  "Array": {
+                                      "Model": "Like"
+                                  }
+                              },
+                              "nullable": false
+                          },
+                          [
+                              [
+                                  {
+                                      "name": "horse2",
+                                      "cidl_type": {
+                                          "Model": "Horse"
+                                      },
+                                      "nullable": false
+                                  },
+                                  []
+                              ]
+                          ]
+                      ]
+                  ]
+              }
+          ],
+          "source_path": "/Users/benjaminschreiber/projects/cloesce/src/e2e/src/models/models.cloesce.ts"
       },
       {
-        "name": "Like",
-        "attributes": [
-          {
-            "is_primary_key": true,
-            "foreign_key_reference": null,
-            "value": {
-              "name": "id",
-              "cidl_type": "Integer",
-              "nullable": false
-            }
-          },
-          {
-            "is_primary_key": false,
-            "foreign_key_reference": "Horse",
-            "value": {
-              "name": "horseId1",
-              "cidl_type": "Integer",
-              "nullable": false
-            }
-          },
-          {
-            "is_primary_key": false,
-            "foreign_key_reference": "Horse",
-            "value": {
-              "name": "horseId2",
-              "cidl_type": "Integer",
-              "nullable": false
-            }
-          }
-        ],
-        "navigation_properties": [
-          {
-            "value": {
-              "name": "horse2",
-              "cidl_type": {
-                "Model": "Horse"
+          "name": "Like",
+          "attributes": [
+              {
+                  "is_primary_key": true,
+                  "foreign_key_reference": null,
+                  "value": {
+                      "name": "id",
+                      "cidl_type": "Integer",
+                      "nullable": false
+                  }
               },
-              "nullable": false
-            },
-            "kind": {
-              "OneToOne": {
-                "reference": "horseId2"
+              {
+                  "is_primary_key": false,
+                  "foreign_key_reference": "Horse",
+                  "value": {
+                      "name": "horseId1",
+                      "cidl_type": "Integer",
+                      "nullable": false
+                  }
+              },
+              {
+                  "is_primary_key": false,
+                  "foreign_key_reference": "Horse",
+                  "value": {
+                      "name": "horseId2",
+                      "cidl_type": "Integer",
+                      "nullable": false
+                  }
               }
-            }
-          }
-        ],
-        "methods": [],
-        "data_sources": [],
-        "source_path": "/Users/benjaminschreiber/projects/cloesce/src/e2e/src/models/models.cloesce.ts"
+          ],
+          "navigation_properties": [
+              {
+                  "value": {
+                      "name": "horse2",
+                      "cidl_type": {
+                          "Model": "Horse"
+                      },
+                      "nullable": false
+                  },
+                  "kind": {
+                      "OneToOne": {
+                          "reference": "horseId2"
+                      }
+                  }
+              }
+          ],
+          "methods": [],
+          "data_sources": [],
+          "source_path": "/Users/benjaminschreiber/projects/cloesce/src/e2e/src/models/models.cloesce.ts"
       }
-    ]
-  }
-  
+  ]
+}
