@@ -2,7 +2,7 @@
 source: client/tests/client_tests.rs
 expression: client
 ---
-import { Result } from "cloesce";
+import { HttpResult } from "cloesce";
 
 function instantiateModelArray<T extends object>(
   data: any,
@@ -23,7 +23,7 @@ export class Horse {
 
   static async post(
         horse: Horse
-  ): Promise<Result<Horse>> {
+  ): Promise<HttpResult<Horse>> {
     const baseUrl = `http://localhost:1000/api/Horse/post`;
 
     const res = await fetch(baseUrl, {
@@ -45,7 +45,7 @@ export class Horse {
   }
   static async get(
         id: number
-  ): Promise<Result<Horse>> {
+  ): Promise<HttpResult<Horse>> {
     const baseUrl = `http://localhost:1000/api/Horse/get`;
 
     const url = new URL(baseUrl);
@@ -64,7 +64,7 @@ export class Horse {
 
   }
   static async list(
-  ): Promise<Result<Horse[]>> {
+  ): Promise<HttpResult<Horse[]>> {
     const baseUrl = `http://localhost:1000/api/Horse/list`;
 
     const url = new URL(baseUrl);
@@ -83,7 +83,7 @@ export class Horse {
   }
   async patch(
         horse: Horse
-  ): Promise<Result<void>> {
+  ): Promise<HttpResult<void>> {
     const baseUrl = `http://localhost:1000/api/Horse/${this.id}/patch`;
 
     const res = await fetch(baseUrl, {
@@ -104,7 +104,7 @@ export class Horse {
   }
   async like(
         horse: Horse
-  ): Promise<Result<void>> {
+  ): Promise<HttpResult<void>> {
     const baseUrl = `http://localhost:1000/api/Horse/${this.id}/like`;
 
     const res = await fetch(baseUrl, {
@@ -126,7 +126,7 @@ export class Horse {
   static async divide(
         a: number, 
         b: number
-  ): Promise<Result<number>> {
+  ): Promise<HttpResult<number>> {
     const baseUrl = `http://localhost:1000/api/Horse/divide`;
 
     const url = new URL(baseUrl);
