@@ -8,12 +8,11 @@ import {
   OneToMany,
   OneToOne,
   ForeignKey,
-  Result,
+  HttpResult,
   IncludeTree,
   DataSource,
   modelsFromSql,
 } from "cloesce";
-import cidl from "../../.generated/cidl.json" with { type: "json" };
 
 @D1
 class Horse {
@@ -32,51 +31,36 @@ class Horse {
   };
 
   @POST
-  static async post(db: D1Database, horse: Horse): Promise<Result<Horse>> {
+  static async post(db: D1Database, horse: Horse): Promise<HttpResult<Horse>> {
     const records = await db
       .prepare("INSERT INTO Horse (id, name, bio) VALUES (?, ?, ?) RETURNING *")
       .bind(horse.id, horse.name, horse.bio)
       .all();
 
-    let horseRes = modelsFromSql<Horse>(
-      "Horse",
-      cidl,
-      records.results,
-      Horse.default
-    )[0];
+    let horseRes = modelsFromSql(Horse, records.results, Horse.default)[0];
 
     return { ok: true, status: 200, data: horseRes };
   }
 
   @GET
-  static async get(db: D1Database, id: number): Promise<Result<Horse>> {
+  static async get(db: D1Database, id: number): Promise<HttpResult<Horse>> {
     let records = await db
       .prepare("SELECT * FROM Horse_default WHERE Horse_id = ?")
       .bind(id)
       .run();
-    let horses = modelsFromSql<Horse>(
-      "Horse",
-      cidl,
-      records.results,
-      Horse.default
-    );
+    let horses = modelsFromSql(Horse, records.results, Horse.default);
     return { ok: true, status: 200, data: horses[0] };
   }
 
   @GET
-  static async list(db: D1Database): Promise<Result<Horse[]>> {
+  static async list(db: D1Database): Promise<HttpResult<Horse[]>> {
     let records = await db.prepare("SELECT * FROM Horse_default").run();
-    let horses = modelsFromSql<Horse>(
-      "Horse",
-      cidl,
-      records.results,
-      Horse.default
-    );
+    let horses = modelsFromSql(Horse, records.results, Horse.default);
     return { ok: true, status: 200, data: horses };
   }
 
   @PATCH
-  async patch(db: D1Database, horse: Horse): Promise<Result<void>> {
+  async patch(db: D1Database, horse: Horse): Promise<HttpResult<void>> {
     await db
       .prepare("UPDATE Horse SET name = ?, bio = ? WHERE Horse.id = ?")
       .bind(horse.name, horse.bio, horse.id)
@@ -85,7 +69,7 @@ class Horse {
   }
 
   @POST
-  async like(db: D1Database, horse: Horse): Promise<Result<void>> {
+  async like(db: D1Database, horse: Horse): Promise<HttpResult<void>> {
     await db
       .prepare("INSERT INTO Like (horseId1, horseId2) VALUES (?, ?)")
       .bind(this.id, horse.id)
@@ -95,7 +79,7 @@ class Horse {
 
   /*  Random functions for test coverage  */
   @GET
-  static async divide(a: number, b: number): Promise<Result<number>> {
+  static async divide(a: number, b: number): Promise<HttpResult<number>> {
     if (b != 0) {
       return { ok: true, status: 200, data: a / b };
     } else {

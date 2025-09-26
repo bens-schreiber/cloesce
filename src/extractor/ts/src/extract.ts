@@ -1,4 +1,3 @@
-import path from "node:path";
 import {
   Project,
   Type,
@@ -8,20 +7,20 @@ import {
   SyntaxKind,
   ClassDeclaration,
   Decorator,
+  Expression,
 } from "ts-morph";
-
-const HTTP_VERBS = ["GET", "POST", "PUT", "PATCH", "DELETE"];
-
-// Mirrors the rust bindings
-type CidlType =
-  | "Integer"
-  | "Real"
-  | "Text"
-  | "Blob"
-  | "D1Database"
-  | { Model: string }
-  | { Array: CidlType }
-  | { HttpResult: CidlType | null };
+import {
+  CidlIncludeTree,
+  CidlSpec,
+  CidlType,
+  DataSource,
+  HttpVerb,
+  Model,
+  ModelAttribute,
+  ModelMethod,
+  NamedTypedValue,
+  NavigationProperty,
+} from "./common.js";
 
 enum AttributeDecoratorKind {
   PrimaryKey = "PrimaryKey",
@@ -38,12 +37,15 @@ export class CidlExtractor {
     public version: string
   ) {}
 
-  extract(project: Project) {
+  extract(project: Project): CidlSpec {
     const models = project.getSourceFiles().flatMap((sourceFile) => {
       return sourceFile
         .getClasses()
         .filter((classDecl) => hasDecorator(classDecl, "D1"))
-        .map((classDecl) => CidlExtractor.model(classDecl, sourceFile));
+        .flatMap((classDecl) => {
+          const model = CidlExtractor.model(classDecl, sourceFile);
+          return model ? [model] : [];
+        });
     });
 
     return {
@@ -54,11 +56,14 @@ export class CidlExtractor {
     };
   }
 
-  private static model(classDecl: ClassDeclaration, sourceFile: SourceFile) {
+  private static model(
+    classDecl: ClassDeclaration,
+    sourceFile: SourceFile
+  ): Model | undefined {
     const className = classDecl.getName() ?? "<anonymous>";
-    const attributes: any[] = [];
-    const navigationProperties: any[] = [];
-    const dataSources: any[] = [];
+    const attributes: ModelAttribute[] = [];
+    const navigationProperties: NavigationProperty[] = [];
+    const dataSources: DataSource[] = [];
 
     for (const prop of classDecl.getProperties()) {
       const decorators = prop.getDecorators();
@@ -81,9 +86,9 @@ export class CidlExtractor {
       // TODO: Limiting to one decorator. Can't get too fancy on us.
       const decorator = decorators[0];
       const name = getDecoratorName(decorator);
+      let [cidl_type, nullable] = CidlExtractor.cidlType(prop.getType());
       switch (name) {
         case AttributeDecoratorKind.PrimaryKey: {
-          let [cidl_type, nullable] = CidlExtractor.cidlType(prop.getType());
           attributes.push({
             is_primary_key: true,
             foreign_key_reference: null,
@@ -96,10 +101,9 @@ export class CidlExtractor {
           break;
         }
         case AttributeDecoratorKind.ForeignKey: {
-          let [cidl_type, nullable] = CidlExtractor.cidlType(prop.getType());
           attributes.push({
             is_primary_key: false,
-            foreign_key_reference: getDecoratorArgument(decorator, 0),
+            foreign_key_reference: getDecoratorArgument(decorator, 0) ?? null,
             value: {
               name: prop.getName(),
               cidl_type,
@@ -112,35 +116,40 @@ export class CidlExtractor {
           const reference = getDecoratorArgument(decorator, 0);
           if (!reference) return;
 
-          let [cidl_type, nullable] = CidlExtractor.cidlType(prop.getType());
           navigationProperties.push({
-            value: {
-              name: prop.getName(),
-              cidl_type,
-              nullable,
-            },
-            kind: { [name]: { reference } },
+            value: { name: prop.getName(), cidl_type, nullable },
+            kind: { OneToOne: { reference } },
           });
           break;
         }
         case AttributeDecoratorKind.OneToMany:
-        case AttributeDecoratorKind.ManyToMany: {
           const reference = getDecoratorArgument(decorator, 0);
           if (!reference) return;
 
-          let [cidl_type, nullable] = CidlExtractor.cidlType(prop.getType());
           navigationProperties.push({
             value: {
               name: prop.getName(),
               cidl_type,
               nullable,
             },
-            kind: { [name]: { reference } },
+            kind: { OneToMany: { reference } },
+          });
+          break;
+        case AttributeDecoratorKind.ManyToMany: {
+          const unique_id = getDecoratorArgument(decorator, 0);
+          if (!unique_id) return;
+          navigationProperties.push({
+            value: {
+              name: prop.getName(),
+              cidl_type,
+              nullable,
+            },
+            kind: { ManyToMany: { unique_id } },
           });
           break;
         }
         case AttributeDecoratorKind.DataSource: {
-          const initializer = (prop as any).getInitializer?.();
+          const initializer = prop.getInitializer?.();
           const tree = initializer
             ? CidlExtractor.includeTree(initializer, classDecl, sourceFile)
             : [];
@@ -150,9 +159,7 @@ export class CidlExtractor {
       }
     }
 
-    const methods = classDecl
-      .getMethods()
-      .map((m) => CidlExtractor.method(m, sourceFile));
+    const methods = classDecl.getMethods().map((m) => CidlExtractor.method(m));
 
     return {
       name: className,
@@ -206,7 +213,7 @@ export class CidlExtractor {
       if (base == "void") return acc;
 
       // Result wrapper
-      if (base === "Result") {
+      if (base === "HttpResult") {
         return { HttpResult: acc == undefined ? null : acc };
       }
 
@@ -217,16 +224,16 @@ export class CidlExtractor {
   }
 
   private static includeTree(
-    obj: any,
+    expr: Expression,
     currentClass: ClassDeclaration,
     sf: SourceFile
-  ): any[] {
-    if (!obj.isKind || !obj.isKind(SyntaxKind.ObjectLiteralExpression)) {
+  ): CidlIncludeTree {
+    if (!expr.isKind || !expr.isKind(SyntaxKind.ObjectLiteralExpression)) {
       return [];
     }
 
-    const result: any[] = [];
-    for (const prop of obj.getProperties()) {
+    const result: CidlIncludeTree = [];
+    for (const prop of expr.getProperties()) {
       if (!prop.isKind(SyntaxKind.PropertyAssignment)) continue;
 
       let navProp = findPropertyByName(currentClass, prop.getName());
@@ -248,7 +255,7 @@ export class CidlExtractor {
 
       // Recurse for nested includes
       const initializer = (prop as any).getInitializer?.();
-      let nestedTree: any[] = [];
+      let nestedTree: CidlIncludeTree = [];
 
       if (initializer?.isKind?.(SyntaxKind.ObjectLiteralExpression)) {
         let targetModel = getModelName(cidl_type);
@@ -270,14 +277,15 @@ export class CidlExtractor {
     return result;
   }
 
-  private static method(method: MethodDeclaration, sf: SourceFile): any {
+  private static method(method: MethodDeclaration): ModelMethod {
     const decorators = method.getDecorators();
     const decoratorNames = decorators.map((d) => getDecoratorName(d));
 
-    const httpVerb =
-      HTTP_VERBS.find((verb) => decoratorNames.includes(verb)) || null;
+    const httpVerb = decoratorNames.find((name) =>
+      Object.values(HttpVerb).includes(name as HttpVerb)
+    ) as HttpVerb;
 
-    const parameters: any[] = [];
+    const parameters: NamedTypedValue[] = [];
 
     for (const param of method.getParameters()) {
       let [cidl_type, nullable] = CidlExtractor.cidlType(param.getType());
@@ -347,7 +355,6 @@ function findPropertyByName(
   cls: ClassDeclaration,
   name: string
 ): PropertyDeclaration | undefined {
-  // Try exact match first
   const exactMatch = cls.getProperties().find((p) => p.getName() === name);
   return exactMatch;
 }
