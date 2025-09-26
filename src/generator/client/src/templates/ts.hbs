@@ -1,17 +1,22 @@
-type Ok<T> = { ok: true; data: T };
-type Err = { ok: false; status: number; message: string };
-type Result<T> = Ok<T> | Err;
+import { Result } from "cloesce";
 
-function instantiateModelArray<T>(data: any, ctor: { new(): T }): T[] {
+function instantiateModelArray<T extends object>(
+  data: any,
+  ctor: { new (): T }
+): T[] {
   if (Array.isArray(data)) {
-    return data.map(x => instantiateModelArray(x, ctor)).flat();
+    return data.map((x) => instantiateModelArray(x, ctor)).flat();
   }
   return [Object.assign(new ctor(), data)];
 }
 
+
 {{#each models}}
 export class {{name}} {
   {{#each attributes}}
+  {{value.name}}: {{lang_type value.cidl_type value.nullable}};
+  {{/each}}
+  {{#each navigation_properties}}
   {{value.name}}: {{lang_type value.cidl_type value.nullable}};
   {{/each}}
 
@@ -49,28 +54,27 @@ export class {{name}} {
     });
     {{/if}}
 
-    if (!res.ok) {
-      const message = await res.text();
-      return {
-        ok: false,
-        status: res.status,
-        message
-      };
+    let raw = await res.json();
+    if (!raw.ok) {
+      return raw;
     }
 
-    const data = await res.json();
-
-    {{#if (is_model return_type)}}
-    const instantiated = Object.assign(new {{../name}}(), data);
-    return { ok: true, data: instantiated };
+    {{#if (eq (lang_type return_type) "void")}}
+    return raw;
     {{else}}
       {{#if (is_model_array return_type)}}
-    const instantiated = instantiateModelArray(data, {{../name}});
-    return { ok: true, data: instantiated };
+    raw.data = instantiateModelArray(raw.data, {{../name}})
+    return raw;
       {{else}}
-    return { ok: true, data };
+        {{#if (is_model return_type)}}
+    raw.data = Object.assign(new {{../name}}(), raw.data)
+    return raw;
+        {{else}}
+    return raw;
+        {{/if}}
       {{/if}}
     {{/if}}
+
   }
   {{/each}}
 }

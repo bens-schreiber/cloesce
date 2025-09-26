@@ -2,7 +2,7 @@ mod mappers;
 
 use std::sync::Arc;
 
-use common::{CidlSpec, CidlType, InputLanguage};
+use common::{CidlSpec, CidlType, InputLanguage, match_cidl, matches_cidl};
 use handlebars::{Handlebars, handlebars_helper};
 
 use mappers::TypeScriptMapper;
@@ -12,8 +12,8 @@ pub trait ClientLanguageTypeMapper {
 }
 
 handlebars_helper!(is_serializable: |cidl_type: CidlType| !matches!(cidl_type, CidlType::D1Database));
-handlebars_helper!(is_model: |cidl_type: CidlType| matches!(cidl_type, CidlType::Model(_)));
-handlebars_helper!(is_model_array: |cidl_type: CidlType| matches!(cidl_type.array_type(), CidlType::Model(_)));
+handlebars_helper!(is_model: |cidl_type: CidlType| matches_cidl!(&cidl_type, Model(_)) || matches_cidl!(&cidl_type, HttpResult(Model(_))));
+handlebars_helper!(is_model_array: |cidl_type: CidlType| matches_cidl!(&cidl_type, HttpResult(Array(Model(_)))) || matches_cidl!(&cidl_type, Array(Model(_))));
 handlebars_helper!(eq: |a: str, b: str| a == b);
 
 fn register_helpers(
@@ -66,7 +66,6 @@ pub fn generate_client_api(spec: CidlSpec, domain: String) -> String {
         .unwrap();
     register_helpers(&mut handlebars, mapper);
 
-    // TODO: Determine where we want the domain passed in...
     let mut context = serde_json::to_value(&spec).unwrap();
     if let serde_json::Value::Object(ref mut map) = context {
         map.insert("domain".to_string(), serde_json::Value::String(domain));

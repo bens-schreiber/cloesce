@@ -1,29 +1,45 @@
-use anyhow::anyhow;
-use anyhow::{Context, Result};
-use common::{CidlType, HttpVerb, Method, Model, TypedValue};
 use std::path::Path;
 
-use crate::{LanguageWorkerGenerator as LanguageWorkersGenerator, RouterTrie, TrieNode};
+use anyhow::{Context, Result, anyhow};
+
+use crate::{RouterTrie, TrieNode, WorkersGenerateable};
+use common::{CidlType, HttpVerb, Model, ModelMethod, NamedTypedValue};
+
+fn final_state(status: u32, body: &str) -> String {
+    format!(
+        r#"return new Response(
+    JSON.stringify({body}),
+    {{ status: {status}, headers: {{ "Content-Type": "application/json" }} }}
+);"#
+    )
+}
+
+fn error_state(status: u32, stage: &str, message: &str) -> String {
+    final_state(
+        status,
+        &format!(r#"{{ ok: false, message: `{stage}: {message}`, status: {status} }}"#,),
+    )
+}
 
 pub struct TypescriptValidatorGenerator;
 impl TypescriptValidatorGenerator {
-    fn validate_type(value: &TypedValue, name_prefix: &str) -> Option<String> {
+    fn validate_type(value: &NamedTypedValue, name_prefix: &str) -> Option<String> {
         let name = format!("{name_prefix}{}", &value.name);
 
         let type_check = match &value.cidl_type {
-            CidlType::Integer | CidlType::Real => Some(format!("typeof {name} !== \"number\"")),
+            CidlType::Integer | CidlType::Real => Some(format!("Number.isNaN({name})")),
             CidlType::Text => Some(format!("typeof {name} !== \"string\"")),
             CidlType::Blob => Some(format!(
                 "!({name} instanceof ArrayBuffer || {name} instanceof Uint8Array)",
             )),
             CidlType::Model(m) => Some(format!("!$.{m}.validate({name})")),
             CidlType::Array(inner) => {
-                let inner_value = TypedValue {
+                let inner_value = NamedTypedValue {
                     name: "item".to_string(),
                     cidl_type: *inner.clone(),
                     nullable: false,
                 };
-                let inner_check = Self::validate_type(&inner_value, name_prefix)?;
+                let inner_check = Self::validate_type(&inner_value, "")?;
                 Some(format!(
                     "!Array.isArray({name}) || {name}.some(item => {inner_check})",
                 ))
@@ -31,21 +47,33 @@ impl TypescriptValidatorGenerator {
             _ => None,
         }?;
 
-        let check = if value.nullable {
-            format!("({name} !== undefined && {type_check})",)
+        let cond = if value.nullable {
+            match &value.cidl_type {
+                CidlType::Model(_) => {
+                    // Models can be undefined, but if they are defined,
+                    // must be valid
+                    format!("{name} != undefined && {type_check}")
+                }
+                _ => {
+                    // All other types must be defined and valid.
+                    format!("{name} == undefined || {type_check}")
+                }
+            }
         } else {
-            format!("({name} == null || {type_check})",)
+            // Cannot be undefined OR null (TS is weird, null covers both cases),
+            // and must be valid
+            format!("{name} == null || {type_check}")
         };
 
-        Some(check)
+        Some(format!("({cond})"))
     }
 
-    fn assign_type(value: &TypedValue) -> Option<String> {
+    fn assign_type(value: &NamedTypedValue) -> Option<String> {
         match &value.cidl_type {
             CidlType::Model(m) => Some(format!("Object.assign(new {}(), {})", m, value.name)),
 
             CidlType::Array(inner) => {
-                let inner_ts = Self::assign_type(&TypedValue {
+                let inner_ts = Self::assign_type(&NamedTypedValue {
                     name: "item".to_string(),
                     cidl_type: *inner.clone(),
                     nullable: false,
@@ -61,19 +89,32 @@ impl TypescriptValidatorGenerator {
     fn validators(models: &[Model]) -> String {
         let mut validators = Vec::with_capacity(models.len());
         for model in models {
-            let mut stmts = Vec::with_capacity(model.attributes.len());
-            for attr in &model.attributes {
-                let stmt = Self::validate_type(&attr.value, "obj.").expect("Valid method type");
-                stmts.push(format!("if {stmt} {{return false;}}"))
-            }
+            let attributes = model
+                .attributes
+                .iter()
+                .filter_map(|attr| Self::validate_type(&attr.value, "obj."))
+                .map(|stmt| format!("if {stmt} {{return false;}}"))
+                .collect::<Vec<_>>()
+                .join("\n");
 
-            let stmts = stmts.join("\n");
+            let navs = model
+                .navigation_properties
+                .iter()
+                .map(|nav| {
+                    let stmt = Self::validate_type(&nav.value, "obj.")
+                        .expect("all navigation properties should be mappable");
+                    format!("if {stmt} {{return false}}")
+                })
+                .collect::<Vec<_>>()
+                .join("\n");
+
             let model_name = &model.name;
             validators.push(format!(
                 r#"
                 $.{model_name} = {{
                     validate(obj: any): boolean {{
-                        {stmts}
+                        {attributes}
+                        {navs}
                         return true;
                     }}
                 }};
@@ -94,59 +135,66 @@ impl TypescriptValidatorGenerator {
 
 pub struct TypescriptWorkersGenerator;
 
-impl LanguageWorkersGenerator for TypescriptWorkersGenerator {
+impl WorkersGenerateable for TypescriptWorkersGenerator {
     fn imports(&self, models: &[Model], workers_path: &Path) -> Result<String> {
-        let cf_types = r#"
-import { D1Database } from "@cloudflare/workers-types"
-"#;
+        const CLOUDFLARE_TYPES: &str = r#"import { D1Database } from "@cloudflare/workers-types""#;
+        const CLOESCE_TYPES: &str = r#"import { modelsFromSql, match, Result } from "cloesce""#;
+        const CIDL_IMPORT: &str = r#"import cidl from "./cidl.json" with { type: "json" };"#;
 
         let workers_dir = workers_path
             .parent()
             .context("workers_path has no parent; cannot compute relative imports")?;
 
-        fn to_ts_import_path(abs_model_path: &Path, from_dir: &Path) -> Result<String> {
-            // Remove the extension (e.g., .ts/.tsx/.js)
-            let no_ext = abs_model_path.with_extension("");
-
-            // Compute the relative path from the workers file directory
-            let rel = pathdiff::diff_paths(&no_ext, from_dir).ok_or_else(|| {
-                anyhow!(
-                    "Failed to compute relative path for '{}'\nfrom base '{}'",
-                    abs_model_path.display(),
-                    from_dir.display()
-                )
-            })?;
-
-            // Stringify + normalize to forward slashes
-            let mut rel_str = rel.to_string_lossy().replace('\\', "/");
-
-            // Ensure we have a leading './' when not starting with '../' or '/'
-            if !rel_str.starts_with("../") && !rel_str.starts_with("./") {
-                rel_str = format!("./{}", rel_str);
-            }
-
-            // If we collapsed to empty (it can happen if model sits exactly at from_dir/index)
-            if rel_str.is_empty() || rel_str == "." {
-                rel_str = "./".to_string();
-            }
-
-            Ok(rel_str)
-        }
-
         let model_imports = models
             .iter()
             .map(|m| -> Result<String> {
-                let rel_str = to_ts_import_path(&m.source_path, workers_dir)?;
+                // Remove the extension (e.g., .ts/.tsx/.js)
+                let no_ext = m.source_path.with_extension("");
+
+                // Compute the relative path from the workers file directory
+                let rel = pathdiff::diff_paths(&no_ext, workers_dir).ok_or_else(|| {
+                    anyhow!(
+                        "Failed to compute relative path for '{}'\nfrom base '{}'",
+                        m.source_path.display(),
+                        workers_dir.display()
+                    )
+                })?;
+
+                // Stringify + normalize to forward slashes
+                let mut rel_str = rel.to_string_lossy().replace('\\', "/");
+
+                // Ensure we have a leading './' when not starting with '../' or '/'
+                if !rel_str.starts_with("../") && !rel_str.starts_with("./") {
+                    rel_str = format!("./{}", rel_str);
+                }
+
+                // If we collapsed to empty (it can happen if model sits exactly at from_dir/index)
+                if rel_str.is_empty() || rel_str == "." {
+                    rel_str = "./".to_string();
+                }
+
                 Ok(format!("import {{ {} }} from '{}';", m.name, rel_str))
             })
             .collect::<Result<Vec<_>>>()?
             .join("\n");
-
-        Ok(format!("{cf_types}\n{model_imports}\n"))
+        Ok(format!(
+            r#"
+            {CLOUDFLARE_TYPES}
+            {CLOESCE_TYPES}
+            {CIDL_IMPORT}
+            {model_imports}
+        "#
+        ))
     }
 
     fn preamble(&self) -> String {
-        include_str!("./templates/preamble.ts").to_string()
+        // TODO: Generate environment
+        r#"
+        export interface Env {
+            DB: D1Database;
+        }
+        "#
+        .to_string()
     }
 
     fn validators(&self, models: &[Model]) -> String {
@@ -157,16 +205,8 @@ import { D1Database } from "@cloudflare/workers-types"
         r#"
 export default {
     async fetch(request: Request, env: Env, ctx: any): Promise<Response> {
-        try {
-            const url = new URL(request.url);
-            return await match(router, url.pathname, request, env);
-        } catch (error: any) {
-            console.error("Internal server error:", error);
-            return new Response(JSON.stringify({ error: error?.message }), {
-                status: 500,
-                headers: { "Content-Type": "application/json" },
-            });
-        }
+        const url = new URL(request.url);
+        return await match(router, url.pathname, request, env);
     }
 };
 "#
@@ -176,7 +216,7 @@ export default {
     fn router_method(
         &self,
         model_name: &str,
-        method: &Method,
+        method: &ModelMethod,
         proto: String,
         router: &mut RouterTrie,
     ) {
@@ -219,20 +259,11 @@ export default {
         format!("const router = {{{}}}", dfs(&router.root))
     }
 
-    fn proto(&self, method: &Method, body: String) -> String {
+    fn proto(&self, method: &ModelMethod, body: String) -> String {
         let method_name = &method.name;
+        let id_param = if method.is_static { "" } else { "id: number, " };
 
-        let id = if !method.is_static {
-            "id: number, "
-        } else {
-            ""
-        };
-
-        format!(
-            r#"
-{method_name}: async ({id} request: Request, env: Env) => {{{body}}}
-"#
-        )
+        format!("{method_name}: async ({id_param}request: Request, env: Env) => {{{body}}}")
     }
 
     fn validate_http(&self, verb: &HttpVerb) -> String {
@@ -244,24 +275,26 @@ export default {
             HttpVerb::DELETE => "DELETE",
         };
 
+        // Error state: any method outside of the allowed HTTP verbs will exit with 405.
+        let method_not_allowed = error_state(405, "validate_http", "Method Not Allowed");
         format!(
             r#"
-if (request.method !== "{verb_str}") {{
-    return new Response("Method Not Allowed", {{ status: 405 }});
-}}
-"#,
+                if (request.method !== "{verb_str}") {{
+                    {method_not_allowed}
+                }}
+            "#,
         )
     }
 
-    fn validate_request(&self, method: &Method) -> String {
+    fn validate_request(&self, method: &ModelMethod) -> String {
         let params = &method.parameters;
 
         let req_params = params
             .iter()
             .filter(|p| !matches!(p.cidl_type, CidlType::D1Database))
-            .collect::<Vec<_>>();
-
+            .collect::<Vec<&NamedTypedValue>>();
         if req_params.is_empty() {
+            // No parameters, no validation.
             return String::new();
         }
 
@@ -271,12 +304,8 @@ if (request.method !== "{verb_str}") {{
             .collect::<Vec<_>>()
             .join(", ");
 
-        let invalid_request = r#"
-            return new Response(JSON.stringify({ error: "Invalid request parameters" }), {
-                status: 400,
-                headers: { "Content-Type": "application/json" },
-            });
-        "#;
+        // Error state: any missing parameter, body, or malformed input will exit with 400.
+        let invalid_request = error_state(400, "validate_req_body", "Invalid Request Body");
 
         let mut validate = vec![];
 
@@ -323,60 +352,99 @@ if (request.method !== "{verb_str}") {{
 
         // TODO: Switch based off DataSource type
         // For now, we will just assume there is a _default (or none)
-        let has_ds = model.data_sources.len() > 1;
-
-        let query = if has_ds {
-            format!("`SELECT * FROM {model_name}_default WHERE {model_name}_{pk} = ?`")
+        let has_data_sources = !model.data_sources.is_empty();
+        let (query, instance_creation) = if has_data_sources {
+            // TODO: We have to manually Object.assign right now...
+            (
+                format!("\"SELECT * FROM {model_name}_default WHERE {model_name}_{pk} = ?\""),
+                format!(
+                    "Object.assign(new {model_name}(), modelsFromSql<{model_name}>(\"{model_name}\", cidl, record.results, {model_name}.default)[0])"
+                ),
+            )
         } else {
-            format!("`SELECT * FROM {model_name} WHERE {pk} = ?`")
+            (
+                format!("\"SELECT * FROM {model_name} WHERE {pk} = ?\""),
+                format!("Object.assign(new {model_name}(), record)"),
+            )
         };
 
-        let instance = if has_ds {
-            format!("Object.assign(new {model_name}(), mapSql<{model_name}>(record)[0])")
-        } else {
-            format!("Object.assign(new {model_name}(), record)")
-        };
+        // Error state: If the D1 database has been tweaked outside of Cloesce
+        // resulting in a malformed query, exit with a 500.
+        let malformed_query = error_state(
+            500,
+            "hydrate_model",
+            "${e instanceof Error ? e.message : String(e)}",
+        );
+
+        // Error state: If no record is found for the id, return a 404
+        let missing_record = error_state(404, "hydrate_model", "Record not found");
 
         format!(
             r#"
-const d1 = env.DB;
-const query = {query};
-const record = await d1.prepare(query).bind(id).first();
-if (!record) {{
-    return new Response(
-        JSON.stringify({{ error: "Record not found" }}),
-        {{ status: 404, headers: {{ "Content-Type": "application/json" }} }}
-    );
-}}
-const instance = {instance};
-"#
+                const d1 = env.DB;
+                const query = {query};
+                let record;
+                try {{
+                    record = await d1.prepare(query).bind(id).run()
+                    if (!record) {{
+                        {missing_record}
+                    }}
+                }}
+                catch (e) {{
+                    {malformed_query}
+                }}
+                const instance = {instance_creation};
+            "#
         )
     }
 
-    fn dispatch_method(&self, model_name: &str, method: &Method) -> String {
+    fn dispatch_method(&self, model_name: &str, method: &ModelMethod) -> String {
         let method_name = &method.name;
 
-        // SQL params are built by the body validator, CF params are dependency injected
         let params = method
             .parameters
             .iter()
-            .map(|p| match &p.cidl_type {
+            .map(|param| match &param.cidl_type {
                 CidlType::D1Database => "env.DB".to_string(),
-                _ => p.name.clone(),
+                _ => param.name.clone(),
             })
             .collect::<Vec<_>>()
             .join(", ");
 
-        let callee = if method.is_static {
+        let caller = if method.is_static {
             model_name
         } else {
             "instance"
         };
 
+        // Error state: Client code ran into an uncaught exception.
+        let uncaught_exception = error_state(
+            500,
+            "dispatch_method",
+            "${e instanceof Error ? e.message : String(e)}",
+        );
+
+        let dispatch = match method.return_type {
+            None => final_state(200, "null"),
+            Some(CidlType::HttpResult(_)) => r#"
+            return new Response(
+                JSON.stringify(dispatch),
+                { status: dispatch.status, headers: { "Content-Type": "application/json" } }
+            );"#
+            .to_string(),
+            _ => final_state(200, "dispatch"),
+        };
+
         format!(
             r#"
-return JSON.stringify({callee}.{method_name}({params}));
-"#
+            try {{
+                let dispatch = await {caller}.{method_name}({params});
+                {dispatch}
+            }}
+            catch (e) {{
+                {uncaught_exception}
+            }}
+        "#
         )
     }
 }

@@ -1,19 +1,19 @@
-import fs from "node:fs";
-import os from "node:os";
-import path from "node:path";
-import { extractModels } from "../src/extract.js";
-import { readFileSync } from "fs";
-
-import { readdirSync } from "fs";
-import { join } from "path";
+import { CidlExtractor } from "../src/extract.js";
+import { Project } from "ts-morph";
 
 test("actions snapshot", () => {
-  let models = extractModels({
-    version: "0.0.1",
-    projectName: "actions",
-    cwd: "./tests/fixtures",
-    tsconfigPath: "./tests/fixtures/tsconfig.json",
+  const project = new Project({
+    tsConfigFilePath: "../../test_fixtures/tsconfig.json",
   });
+  project.addSourceFileAtPath("../../test_fixtures/models.cloesce.ts");
 
-  expect(models).toMatchSnapshot();
+  let extractor = new CidlExtractor("snapshotProject", "0.0.2");
+  let cidl = extractor.extract(project);
+  for (const m of cidl.models) {
+    if (m) {
+      m.source_path = "void for tests";
+    }
+  }
+
+  expect(cidl).toMatchSnapshot();
 });

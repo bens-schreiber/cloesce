@@ -3,9 +3,9 @@ use std::{io::Write, path::PathBuf};
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand, command};
 
-use common::{CidlSpec, WranglerFormat};
+use common::{CidlSpec, wrangler::WranglerFormat};
 use d1::D1Generator;
-use workers::WorkersFactory;
+use workers::WorkersGenerator;
 
 #[derive(Parser)]
 #[command(name = "generate", version = "0.0.1")]
@@ -108,7 +108,7 @@ fn main() -> Result<()> {
                     create_file_and_dir(&workers_path).context("Failed to open workers file")?;
 
                 file.write(
-                    WorkersFactory
+                    WorkersGenerator
                         .create(cidl, domain, &workers_path)?
                         .as_bytes(),
                 )

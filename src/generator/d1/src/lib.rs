@@ -1,6 +1,9 @@
 pub mod sql;
 
-use common::{CidlSpec, D1Database, WranglerSpec};
+use common::{
+    CidlSpec,
+    wrangler::{D1Database, WranglerSpec},
+};
 use sql::generate_sql;
 
 use anyhow::Result;

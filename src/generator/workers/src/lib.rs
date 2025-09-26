@@ -2,7 +2,7 @@ mod typescript;
 
 use std::{collections::BTreeMap, path::Path};
 
-use common::{CidlSpec, HttpVerb, InputLanguage, Method, Model};
+use common::{CidlSpec, HttpVerb, InputLanguage, Model, ModelMethod};
 use typescript::TypescriptWorkersGenerator;
 
 use anyhow::{Result, anyhow};
@@ -36,7 +36,7 @@ impl RouterTrie {
     }
 }
 
-trait LanguageWorkerGenerator {
+trait WorkersGenerateable {
     /// Necessary imports for the language
     fn imports(&self, models: &[Model], workers_path: &Path) -> Result<String>;
 
@@ -53,7 +53,7 @@ trait LanguageWorkerGenerator {
     fn router_method(
         &self,
         model_name: &str,
-        method: &Method,
+        method: &ModelMethod,
         proto: String,
         router: &mut RouterTrie,
     );
@@ -62,24 +62,24 @@ trait LanguageWorkerGenerator {
     fn router_serialize(&self, router: &RouterTrie) -> String;
 
     /// Places a function body inside of a function prototype or header
-    fn proto(&self, method: &Method, body: String) -> String;
+    fn proto(&self, method: &ModelMethod, body: String) -> String;
 
     /// Validates that the request matches the correct http verb
     fn validate_http(&self, verb: &HttpVerb) -> String;
 
     /// Validates that the request body has the correct structure and input
-    fn validate_request(&self, method: &Method) -> String;
+    fn validate_request(&self, method: &ModelMethod) -> String;
 
     /// Fetches the model from the database on instantiated methods
     fn hydrate_model(&self, model: &Model) -> String;
 
     /// Dispatches the model function
-    fn dispatch_method(&self, model_name: &str, method: &Method) -> String;
+    fn dispatch_method(&self, model_name: &str, method: &ModelMethod) -> String;
 }
 
-pub struct WorkersFactory;
-impl WorkersFactory {
-    fn model(model: &Model, lang: &dyn LanguageWorkerGenerator, router: &mut RouterTrie) {
+pub struct WorkersGenerator;
+impl WorkersGenerator {
+    fn model(model: &Model, lang: &dyn WorkersGenerateable, router: &mut RouterTrie) {
         for method in &model.methods {
             let validate_http = lang.validate_http(&method.http_verb);
             let validate_params = lang.validate_request(method);
@@ -128,14 +128,13 @@ impl WorkersFactory {
     pub fn create(&self, spec: CidlSpec, domain: String, workers_path: &Path) -> Result<String> {
         let api_route = Self::validate_domain(&domain)?;
 
-        let generator: &dyn LanguageWorkerGenerator = match spec.language {
+        let generator: &dyn WorkersGenerateable = match spec.language {
             InputLanguage::TypeScript => &TypescriptWorkersGenerator {},
         };
 
         let imports = generator.imports(&spec.models, workers_path)?;
         let preamble = generator.preamble();
         let validators = generator.validators(&spec.models);
-
         let router = {
             let mut router = RouterTrie::from_domain(api_route);
             for m in spec.models {
@@ -143,16 +142,15 @@ impl WorkersFactory {
             }
             generator.router_serialize(&router)
         };
-
         let main = generator.main();
 
         Ok(format!(
             r#" 
-{imports}
-{preamble}
-{validators}
-{router}
-{main}
+        {imports}
+        {preamble}
+        {validators}
+        {router}
+        {main}
         "#
         ))
     }

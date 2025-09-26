@@ -1,386 +1,363 @@
-import fs from "node:fs";
 import path from "node:path";
 import {
   Project,
   Type,
   SourceFile,
   PropertyDeclaration,
-  PropertySignature,
   MethodDeclaration,
-  ParameterDeclaration,
+  SyntaxKind,
+  ClassDeclaration,
+  Decorator,
 } from "ts-morph";
 
-export type ExtractOptions = {
-  cwd?: string;
-  projectName?: string;
-  version?: string;
-  tsconfigPath?: string | undefined;
-};
+const HTTP_VERBS = ["GET", "POST", "PUT", "PATCH", "DELETE"];
 
-type CloesceConfig = {
-  source: string | string[];
-};
+// Mirrors the rust bindings
+type CidlType =
+  | "Integer"
+  | "Real"
+  | "Text"
+  | "Blob"
+  | "D1Database"
+  | { Model: string }
+  | { Array: CidlType }
+  | { HttpResult: CidlType | null };
 
-function readPkgMeta(cwd: string) {
-  const pkgPath = path.join(cwd, "package.json");
-  let projectName = path.basename(cwd);
-  let version = "0.0.1";
-  if (fs.existsSync(pkgPath)) {
-    try {
-      const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf8"));
-      projectName = pkg.name ?? projectName;
-      version = pkg.version ?? version;
-    } catch {}
-  }
-  return { projectName, version };
+enum AttributeDecoratorKind {
+  PrimaryKey = "PrimaryKey",
+  ForeignKey = "ForeignKey",
+  OneToOne = "OneToOne",
+  OneToMany = "OneToMany",
+  ManyToMany = "ManyToMany",
+  DataSource = "DataSource",
 }
 
-function readCloesceConfig(cwd: string): CloesceConfig | null {
-  const configPath = path.join(cwd, "cloesce-config.json");
-  if (!fs.existsSync(configPath)) {
-    return null;
+export class CidlExtractor {
+  constructor(
+    public projectName: string,
+    public version: string,
+  ) {}
+
+  extract(project: Project) {
+    const models = project.getSourceFiles().flatMap((sourceFile) => {
+      return sourceFile
+        .getClasses()
+        .filter((classDecl) => hasDecorator(classDecl, "D1"))
+        .map((classDecl) => CidlExtractor.model(classDecl, sourceFile));
+    });
+
+    return {
+      version: this.version,
+      project_name: this.projectName,
+      language: "TypeScript",
+      models,
+    };
   }
 
-  try {
-    const configContent = fs.readFileSync(configPath, "utf8");
-    const config = JSON.parse(configContent) as CloesceConfig;
+  private static model(classDecl: ClassDeclaration, sourceFile: SourceFile) {
+    const className = classDecl.getName() ?? "<anonymous>";
+    const attributes: any[] = [];
+    const navigationProperties: any[] = [];
+    const dataSources: any[] = [];
 
-    // Validate config structure
-    if (!config.source) {
-      throw new Error('cloesce-config.json must contain a "source" field');
-    }
+    for (const prop of classDecl.getProperties()) {
+      const decorators = prop.getDecorators();
 
-    return config;
-  } catch (error) {
-    throw new Error(
-      `Failed to parse cloesce-config.json: ${error instanceof Error ? error.message : String(error)}`,
-    );
-  }
-}
+      // No decorators means this is a standard attribute
+      if (decorators.length === 0) {
+        let [cidl_type, nullable] = CidlExtractor.cidlType(prop.getType());
+        attributes.push({
+          is_primary_key: false,
+          foreign_key_reference: null,
+          value: {
+            name: prop.getName(),
+            cidl_type,
+            nullable,
+          },
+        });
+        continue;
+      }
 
-// Recursively collect only files strictly ending with `.cloesce.ts` from specified path
-function walkCloesceFiles(root: string, searchPath: string): string[] {
-  const fullPath = path.resolve(root, searchPath);
+      // TODO: Limiting to one decorator. Can't get too fancy on us.
+      const decorator = decorators[0];
+      const name = getDecoratorName(decorator);
+      switch (name) {
+        case AttributeDecoratorKind.PrimaryKey: {
+          let [cidl_type, nullable] = CidlExtractor.cidlType(prop.getType());
+          attributes.push({
+            is_primary_key: true,
+            foreign_key_reference: null,
+            value: {
+              name: prop.getName(),
+              cidl_type,
+              nullable,
+            },
+          });
+          break;
+        }
+        case AttributeDecoratorKind.ForeignKey: {
+          let [cidl_type, nullable] = CidlExtractor.cidlType(prop.getType());
+          attributes.push({
+            is_primary_key: false,
+            foreign_key_reference: getDecoratorArgument(decorator, 0),
+            value: {
+              name: prop.getName(),
+              cidl_type,
+              nullable,
+            },
+          });
+          break;
+        }
+        case AttributeDecoratorKind.OneToOne: {
+          const reference = getDecoratorArgument(decorator, 0);
+          if (!reference) return;
 
-  if (!fs.existsSync(fullPath)) {
-    console.warn(
-      `Warning: Path "${searchPath}" specified in cloesce-config.json does not exist`,
-    );
-    return [];
-  }
+          let [cidl_type, nullable] = CidlExtractor.cidlType(prop.getType());
+          navigationProperties.push({
+            value: {
+              name: prop.getName(),
+              cidl_type,
+              nullable,
+            },
+            kind: { [name]: { reference } },
+          });
+          break;
+        }
+        case AttributeDecoratorKind.OneToMany:
+        case AttributeDecoratorKind.ManyToMany: {
+          const reference = getDecoratorArgument(decorator, 0);
+          if (!reference) return;
 
-  const out: string[] = [];
-  const stats = fs.statSync(fullPath);
-
-  if (stats.isFile()) {
-    // If it's a file, check if it ends with .cloesce.ts
-    if (/\.cloesce\.ts$/i.test(fullPath)) {
-      out.push(fullPath);
-    }
-  } else if (stats.isDirectory()) {
-    // Recursively search directory
-    function walkDir(dir: string) {
-      for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-        const full = path.join(dir, entry.name);
-        if (entry.isDirectory()) {
-          walkDir(full);
-        } else if (entry.isFile() && /\.cloesce\.ts$/i.test(entry.name)) {
-          out.push(full);
+          let [cidl_type, nullable] = CidlExtractor.cidlType(prop.getType());
+          navigationProperties.push({
+            value: {
+              name: prop.getName(),
+              cidl_type,
+              nullable,
+            },
+            kind: { [name]: { reference } },
+          });
+          break;
+        }
+        case AttributeDecoratorKind.DataSource: {
+          const initializer = (prop as any).getInitializer?.();
+          const tree = initializer
+            ? CidlExtractor.includeTree(initializer, classDecl, sourceFile)
+            : [];
+          dataSources.push({ name: prop.getName(), tree });
+          break;
         }
       }
     }
-    walkDir(fullPath);
+
+    const methods = classDecl
+      .getMethods()
+      .map((m) => CidlExtractor.method(m, sourceFile));
+
+    return {
+      name: className,
+      attributes,
+      navigation_properties: navigationProperties,
+      methods,
+      data_sources: dataSources,
+      source_path: sourceFile.getFilePath().toString(),
+    };
   }
 
-  return out;
-}
+  /// Returns a `CidlType` from a TypeScript type, along with if the base value is nullable.
+  /// Throws an error if no type can be extracted.
+  private static cidlType(type: Type): [CidlType, boolean] {
+    let map: Record<string, CidlType> = {
+      number: "Integer", // TODO: It's wrong to assume number is always an int.
+      string: "Text",
+      boolean: "Integer",
+      Date: "Text",
+      D1Database: "D1Database",
+    };
 
-function cleanTypeText(t: Type, sf: SourceFile) {
-  return t.getText(sf).replace(/import\(".*?"\)\./g, "");
-}
+    // TODO: We don't support type unions like Foo | Bar, should we?
+    let nullable = type.getUnionTypes().find((t) => t.isNull()) !== undefined;
 
-export type CidlTypeJson = "Integer" | "Real" | "Text" | "Blob" | "D1Database";
+    // Split by generics and imports
+    let split = type.getText().split(/<|>|import\([^)]+\)\.?/);
 
-const cidlTypeMap = {
-  number: "Integer" as const,
-  string: "Text" as const,
-  boolean: "Integer" as const,
-  D1Database: "D1Database" as const,
-} satisfies Record<string, CidlTypeJson>;
+    let cidlType = split.reduceRight<CidlType | undefined>((acc, x) => {
+      // Strip unions
+      let base = x
+        .split("|")
+        .map((s) => s.trim())
+        .find((s) => s !== "null" && s !== "undefined")!;
 
-export namespace TypeCode {
-  export function toCidlType(t: Type, sf: SourceFile): CidlTypeJson {
-    const txt = cleanTypeText(t, sf);
-    const symName = t.getSymbol()?.getName();
+      // Disregard any promises, they have no meaning as of now
+      if (!base || base === "Promise") return acc!;
 
-    // unwrap Promise<T>
-    if (symName === "Promise" && t.getTypeArguments().length === 1) {
-      return toCidlType(t.getTypeArguments()[0], sf);
+      // Primitive or nullable primitive
+      if (map[base] !== undefined) return map[base];
+
+      // Array of primitive
+      if (base.endsWith("[]")) {
+        const item = base.slice(0, -2);
+        return map[item] !== undefined
+          ? { Array: map[item] }
+          : { Array: { Model: item } };
+      }
+
+      // Skip void
+      if (base == "void") return acc;
+
+      // Result wrapper
+      if (base === "Result") {
+        return { HttpResult: acc == undefined ? null : acc };
+      }
+
+      return { Model: base };
+    }, undefined)!;
+
+    return [cidlType, nullable];
+  }
+
+  private static includeTree(
+    obj: any,
+    currentClass: ClassDeclaration,
+    sf: SourceFile,
+  ): any[] {
+    if (!obj.isKind || !obj.isKind(SyntaxKind.ObjectLiteralExpression)) {
+      return [];
     }
 
-    // disregard nullish
-    if (t.isUnion()) {
-      const nonNullish = t
-        .getUnionTypes()
-        .find((u) => !u.isNull() && !u.isUndefined());
+    const result: any[] = [];
+    for (const prop of obj.getProperties()) {
+      if (!prop.isKind(SyntaxKind.PropertyAssignment)) continue;
 
-      if (nonNullish) return toCidlType(nonNullish, sf);
+      let navProp = findPropertyByName(currentClass, prop.getName());
+      if (!navProp) {
+        console.log(
+          `  Warning: Could not find property "${prop.getName()}" in class ${currentClass.getName()}`,
+        );
+        continue;
+      }
 
-      throw new Error(`Union only contains null/undefined: ${txt}`);
+      let [cidl_type, _] = CidlExtractor.cidlType(navProp.getType());
+      if (typeof cidl_type === "string") continue;
+
+      const typedValue = {
+        name: navProp.getName(),
+        cidl_type,
+        nullable: false, // TODO: hardcoding this for now, it doesn't mean anything for the IncludeTree
+      };
+
+      // Recurse for nested includes
+      const initializer = (prop as any).getInitializer?.();
+      let nestedTree: any[] = [];
+
+      if (initializer?.isKind?.(SyntaxKind.ObjectLiteralExpression)) {
+        let targetModel = getModelName(cidl_type);
+        const targetClass = currentClass
+          .getSourceFile()
+          .getProject()
+          .getSourceFiles()
+          .flatMap((f) => f.getClasses())
+          .find((c) => c.getName() === targetModel);
+
+        if (targetClass) {
+          nestedTree = CidlExtractor.includeTree(initializer, targetClass, sf);
+        }
+      }
+
+      result.push([typedValue, nestedTree]);
     }
 
-    if (txt in cidlTypeMap) {
-      return cidlTypeMap[txt as keyof typeof cidlTypeMap];
+    return result;
+  }
+
+  private static method(method: MethodDeclaration, sf: SourceFile): any {
+    const decorators = method.getDecorators();
+    const decoratorNames = decorators.map((d) => getDecoratorName(d));
+
+    const httpVerb =
+      HTTP_VERBS.find((verb) => decoratorNames.includes(verb)) || null;
+
+    const parameters: any[] = [];
+
+    for (const param of method.getParameters()) {
+      let [cidl_type, nullable] = CidlExtractor.cidlType(param.getType());
+      parameters.push({
+        name: param.getName(),
+        cidl_type,
+        nullable,
+      });
     }
 
-    throw new Error(`Unknown Cloesce type: ${txt}`);
+    // TODO: return types cant be nullable??
+    let [return_type, _] = CidlExtractor.cidlType(method.getReturnType());
+
+    return {
+      name: method.getName(),
+      is_static: method.isStatic(),
+      http_verb: httpVerb,
+      return_type,
+      parameters,
+    };
   }
 }
 
-/**
- * True if a union type includes null or undefined.
- * This uses the Type API and works regardless of type text.
- */
-function unionIncludesNullish(t: Type): {
-  hasNull: boolean;
-  hasUndefined: boolean;
-} {
-  if (!t.isUnion()) return { hasNull: false, hasUndefined: false };
-  let hasNull = false,
-    hasUndefined = false;
-  for (const u of t.getUnionTypes()) {
-    if (u.isNull()) hasNull = true;
-    if (u.isUndefined()) hasUndefined = true;
-  }
-  return { hasNull, hasUndefined };
+function getDecoratorName(decorator: Decorator): string {
+  const name = decorator.getName() ?? decorator.getExpression().getText();
+  return String(name).replace(/\(.*\)$/, "");
 }
 
-/**
- * Fallback textual check for declared type nodes (covers cases where the compiler
- * flattens or where strictNullChecks interfere).
- */
-function typeNodeTextHasNullish(typeText?: string): {
-  hasNull: boolean;
-  hasUndefined: boolean;
-} {
-  if (!typeText) return { hasNull: false, hasUndefined: false };
-  // token-boundary regex so we don't match substrings in identifiers
-  const hasNull = /\bnull\b/.test(typeText);
-  const hasUndefined = /\bundefined\b/.test(typeText);
-  return { hasNull, hasUndefined };
-}
+function getDecoratorArgument(
+  decorator: Decorator,
+  index: number,
+): string | undefined {
+  const args = decorator.getArguments();
+  if (!args[index]) return undefined;
 
-/**
- * Extracts a robust "nullable" for a class property or interface property.
- * We treat:
- *   - optional (`?`) as DB-nullable (common mapping),
- *   - explicit unions with null/undefined as DB-nullable,
- *   - declared text that includes null/undefined as DB-nullable.
- * Also returns a reason tag for debugging/logging if you want it.
- */
-function getNullability(
-  prop: PropertyDeclaration | PropertySignature,
-  sf: SourceFile,
-): {
-  nullable: boolean;
-  reason:
-    | "optional"
-    | "union-null"
-    | "union-undefined"
-    | "text-null"
-    | "text-undefined"
-    | null;
-} {
-  // 1) Syntactic optional (`foo?: ...`)
-  if (
-    (prop as PropertyDeclaration).hasQuestionToken &&
-    (prop as PropertyDeclaration).hasQuestionToken()
-  ) {
-    return { nullable: true, reason: "optional" };
+  const arg = args[index] as any;
+
+  // Identifier
+  if (arg.getKind?.() === SyntaxKind.Identifier) {
+    return arg.getText();
   }
 
-  // 2) Type-level union check
-  const t = (prop as PropertyDeclaration).getType
-    ? (prop as PropertyDeclaration).getType()
-    : (prop as PropertySignature).getType();
-  const { hasNull, hasUndefined } = unionIncludesNullish(t);
-  if (hasNull) return { nullable: true, reason: "union-null" };
-  if (hasUndefined) return { nullable: true, reason: "union-undefined" };
+  // String literal
+  const text = arg.getText?.();
+  if (!text) return undefined;
 
-  // 3) Textual fallback on declared type
-  const node =
-    (prop as PropertyDeclaration).getTypeNode?.() ??
-    (prop as PropertySignature).getTypeNode?.();
-  const typeText = node?.getText();
-  const textCheck = typeNodeTextHasNullish(typeText);
-  if (textCheck.hasNull) return { nullable: true, reason: "text-null" };
-  if (textCheck.hasUndefined)
-    return { nullable: true, reason: "text-undefined" };
-
-  return { nullable: false, reason: null };
+  const match = text.match(/^['"](.*)['"]$/);
+  return match ? match[1] : text;
 }
 
-/**
- * Parameter nullability similar to properties (covers `arg?: T`, `T | null`, `T | undefined`).
- */
-function getParamNullability(
-  param: ParameterDeclaration,
-  sf: SourceFile,
-): boolean {
-  // `?` ⇒ treat as DB-nullable
-  if (param.hasQuestionToken()) return true;
+function getModelName(t: CidlType): string | undefined {
+  if (typeof t === "string") return undefined;
 
-  const t = param.getType();
+  if ("Model" in t) {
+    return t.Model;
+  } else if ("Array" in t) {
+    return getModelName(t.Array);
+  } else if ("HttpResult" in t) {
+    if (t == null) return undefined;
+    return getModelName(t.HttpResult!);
+  }
 
-  // union T | null/undefined
-  const { hasNull, hasUndefined } = unionIncludesNullish(t);
-  if (hasNull || hasUndefined) return true;
-
-  // textual fallback on declared type (covers odd inference cases)
-  const typeText = param.getTypeNode()?.getText();
-  const textCheck = typeNodeTextHasNullish(typeText);
-  return textCheck.hasNull || textCheck.hasUndefined;
+  return undefined;
 }
 
-function hasDecoratorNamed(
-  node: { getDecorators(): any[] },
+function findPropertyByName(
+  cls: ClassDeclaration,
+  name: string,
+): PropertyDeclaration | undefined {
+  // Try exact match first
+  const exactMatch = cls.getProperties().find((p) => p.getName() === name);
+  return exactMatch;
+}
+
+function hasDecorator(
+  node: { getDecorators(): Decorator[] },
   name: string,
 ): boolean {
   return node.getDecorators().some((d) => {
-    const n = d.getName() ?? d.getExpression().getText();
-    // we should normalize things like "D1()"
-    const plain = String(n).replace(/\(.*\)$/, "");
-    return plain === name || plain.endsWith("." + name);
+    const decoratorName = getDecoratorName(d);
+    return decoratorName === name || decoratorName.endsWith("." + name);
   });
-}
-
-// ---- main ------------------------------------------------------------------
-export function extractModels(opts: ExtractOptions = {}) {
-  const cwd = opts.cwd ?? process.cwd();
-  const { projectName: pn, version: ver } = readPkgMeta(cwd);
-  const projectName = opts.projectName ?? pn;
-  const version = opts.version ?? ver;
-
-  // Read cloesce-config.json
-  const config = readCloesceConfig(cwd);
-  if (!config) {
-    throw new Error(
-      `No "cloesce-config.json" found in "${cwd}". Please create a cloesce-config.json with a "source" field.`,
-    );
-  }
-
-  // Normalize source to array
-  const sourcePaths = Array.isArray(config.source)
-    ? config.source
-    : [config.source];
-
-  // Find *.cloesce.ts files in specified paths
-  const files: string[] = [];
-  for (const sourcePath of sourcePaths) {
-    files.push(...walkCloesceFiles(cwd, sourcePath));
-  }
-
-  if (files.length === 0) {
-    const paths = sourcePaths.join(", ");
-    throw new Error(
-      `No ".cloesce.ts" files found in specified source path(s): ${paths}`,
-    );
-  }
-
-  const tsconfigPath =
-    opts.tsconfigPath ??
-    (fs.existsSync(path.join(cwd, "tsconfig.json"))
-      ? path.join(cwd, "tsconfig.json")
-      : undefined);
-
-  const project = new Project({
-    tsConfigFilePath: tsconfigPath,
-    compilerOptions: tsconfigPath
-      ? undefined
-      : { target: 99, lib: ["es2022", "dom"] },
-  });
-
-  for (const f of files) project.addSourceFileAtPath(f);
-
-  const models: any[] = [];
-
-  for (const sf of project.getSourceFiles()) {
-    for (const cls of sf.getClasses()) {
-      // Only parse classes with @D1!
-      if (!hasDecoratorNamed(cls, "D1")) continue;
-
-      const className = cls.getName() ?? "<anonymous>";
-
-      const attributes = cls.getProperties().map((prop) => {
-        const t = prop.getType();
-        const { nullable } = getNullability(prop, sf);
-
-        const entry: any = {
-          value: {
-            name: prop.getName(),
-            cidl_type: TypeCode.toCidlType(t, sf),
-            nullable,
-          },
-        };
-
-        if (hasDecoratorNamed(prop, "PrimaryKey")) {
-          entry.primary_key = true;
-        } else {
-          entry.primary_key = false;
-        }
-
-        entry.foreign_key = null;
-        return entry;
-      });
-
-      const methods = cls.getMethods().map((m) => {
-        const decos = m
-          .getDecorators()
-          .map((d) => d.getName() ?? d.getExpression().getText());
-        const HTTP_VERBS = ["GET", "POST", "PUT", "PATCH", "DELETE"];
-        const httpVerb =
-          HTTP_VERBS.find((verb) => decos.includes(verb)) || undefined;
-
-        const parameters: any[] = [];
-        for (const p of m.getParameters()) {
-          const pt = p.getType();
-
-          const raw = cleanTypeText(pt, sf);
-          if (raw === "Request") continue;
-
-          const nullable = getParamNullability(p, sf);
-          parameters.push({
-            name: p.getName(),
-            cidl_type: TypeCode.toCidlType(pt, sf),
-            nullable,
-          });
-        }
-
-        return {
-          name: m.getName(),
-          is_static: m.isStatic(),
-          http_verb: httpVerb,
-          parameters,
-        };
-      });
-
-      const sourcePath = path.relative(cwd, sf.getFilePath());
-
-      models.push({
-        name: className,
-        source_path: sourcePath,
-        attributes,
-        methods,
-        navigation_properties: [],
-        data_sources: [],
-      });
-    }
-  }
-
-  return {
-    version,
-    project_name: projectName,
-    language: "TypeScript",
-    models,
-  };
 }
