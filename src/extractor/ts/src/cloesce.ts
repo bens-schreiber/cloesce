@@ -34,10 +34,10 @@ type ConstructorRegistry = Record<string, new () => UserDefinedModel>;
 
 /**
  * Singleton instance of the MetaCidl and Constructor Registry.
- * These values are guaranteed to be static.
+ * These values are guaranteed to never change throughout a programs lifetime.
  */
-class Cloesce {
-  private static instance: Cloesce | undefined;
+class MetaContainer {
+  private static instance: MetaContainer | undefined;
   private constructor(
     public readonly cidl: MetaCidl,
     public readonly constructorRegistry: ConstructorRegistry,
@@ -46,9 +46,9 @@ class Cloesce {
   static init(
     rawCidl: CidlSpec,
     constructorRegistry: ConstructorRegistry,
-  ): Cloesce {
+  ): MetaContainer {
     if (!this.instance) {
-      this.instance = new Cloesce(
+      this.instance = new MetaContainer(
         {
           ...rawCidl,
           models: Object.fromEntries(
@@ -67,7 +67,7 @@ class Cloesce {
     return this.instance;
   }
 
-  static get(): Cloesce {
+  static get(): MetaContainer {
     if (!this.instance) {
       throw new Error("Cloesce not initialized. Call Cloesce.init() first.");
     }
@@ -88,7 +88,7 @@ export function modelsFromSql<T>(
   records: Record<string, any>[],
   includeTree: Record<string, UserDefinedModel>,
 ): T[] {
-  const { cidl, constructorRegistry } = Cloesce.get();
+  const { cidl, constructorRegistry } = MetaContainer.get();
   return _modelsFromSql(
     ctor.name,
     cidl,
@@ -115,7 +115,7 @@ export async function cloesce(
   api_route: string,
   d1: D1Database,
 ): Promise<Response> {
-  const { cidl } = Cloesce.init(rawCidl, constructorRegistry);
+  const { cidl } = MetaContainer.init(rawCidl, constructorRegistry);
 
   // 1. Route the HTTP request
   let route = matchRoute(request, api_route, cidl);

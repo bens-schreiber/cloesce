@@ -35,12 +35,13 @@ Cloesce aims to operate across all domains of web development transparently, agn
 
 Let's now imagine we have a framework capable of generating all relevant of a web development project including cloud infrastructure from individual models (much like how RPC defines a shared interface). Cloesce aims to do this natively from your code: be it in TypeScript, Python, Rust, etc. What would the developer gain?
 
-We aim to create transparency: the developer writes a simple class (model). From the developers perspective, it isn't obvious this model also creates a database schema, a REST API, and so on. Cloesce utilizes the same transparency RPC achieves. Continuing with this transparency, a developer should not need to think of the final cloud environment a model lives on as a seperate entity, but only decide how that model should be called (be it through a serverless lambda, or a long lived container). From the perspective of the frontend, the developer should be able to call the exact same model as if it exists on it's own machine, regardless of the original language we defined the model in, because those methods will exist as a network call.
-With this, Cloesce enables a _model first_ programming paradigm-- a central area of business logic that dictates the system design of an application.
+Transparency. The developer needs only to write a class (model). From their perspective, it isn't obvious this model also creates a database schema, a REST API, and so on. Continuing with this transparency, a developer should not need to think of the final cloud environment a model lives on as a seperate entity, but only decide how that model should be called (be it through a serverless lambda, or a long lived container). From the perspective of the frontend, the developer should be able to call the exact same model as if it exists on it's own machine, regardless of the original language we defined the model in, because those methods will exist as a network call.
 
-Another important gain of this paradigm is security. Every time a developer has to write their own boilerplate, or glue together different domains, they risk introducing vulnerabilities into the system. If the majority of this can be deterministically generated, the security can be verified from the compiler.
+Cloesce enables a _model first_ programming paradigm, a template of data that dictates the system design of an application.
 
-Finally, in the age of LLM's producing most of our code, we should ask: what do I want the LLM to spend it's time doing? Spinning up the latest OpenAI model and asking it to "make me a full stack TODO app deployed on the cloud" is almost sure to fail, because the task is far too general. The LLM would need to decide on the languages and frameworks, as well as the cloud provider. Because of this, the query would burn through tokens, and likely requery itself a number of times before arriving at some final output after some time. An LLM would benefit the same way developers would from a central area for logic-- all it needs to do is write a model, run a generate command, and make a pretty frontend.
+Another important gain is security. Every time a developer has to write their own boilerplate, or glue together different domains, they risk introducing vulnerabilities into the system. If the glue can be deterministically generated, security can be verified from the compiler, also ensuring no runtime erors can occur unexpectedly.
+
+Finally, in the age of LLM's producing most of our code, we should ask: what do I want the LLM to spend it's time doing? Spinning up the latest OpenAI model and asking it to "make me a full stack note taking app deployed on the cloud" is almost sure to fail, because the task is far too general. The LLM would have to manually write not only the system design, but all of the glue to tie everything together, choosing a set of backend and frontend frameworks, databases, languages and cloud providers to accomplish this task. The query will burn through tokens, requery itself a number of times, and arriving at some final output which is unlikely function correctly. An LLM would benefit from a model first paradigm: create simple object composition, run the generator, and make a pretty frontend-- a realisitc and massively reduced output.
 
 ## Cloesce Compiler
 
@@ -72,7 +73,7 @@ class Person {
 
 ### Cloudflare
 
-Cloudflare provides the ideal cloud infrastructure ecosystem for Cloesce to take advantage of. From a [single configuration file](https://developers.cloudflare.com/workers/wrangler/), we can spin up a both a local development environment, and a cloud deployed environment. Cloesce aims to use the full capacity of Cloudflares developer platform, mainly:
+Cloudflare provides an ideal cloud ecosystem for Cloesce. From a [single configuration file](https://developers.cloudflare.com/workers/wrangler/), we can spin up a both a local development environment and a deployed environment. Cloesce aims to use the full capacity of Cloudflares developer platform, mainly:
 
 - [Workers](https://developers.cloudflare.com/workers/) for serverless REST API calls
 - [D1](https://developers.cloudflare.com/d1/) for SQLite databases
