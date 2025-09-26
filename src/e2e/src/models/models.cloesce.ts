@@ -42,7 +42,7 @@ class Horse {
       "Horse",
       cidl,
       records.results,
-      Horse.default,
+      Horse.default
     )[0];
 
     return { ok: true, status: 200, data: horseRes };
@@ -58,7 +58,7 @@ class Horse {
       "Horse",
       cidl,
       records.results,
-      Horse.default,
+      Horse.default
     );
     return { ok: true, status: 200, data: horses[0] };
   }
@@ -70,7 +70,7 @@ class Horse {
       "Horse",
       cidl,
       records.results,
-      Horse.default,
+      Horse.default
     );
     return { ok: true, status: 200, data: horses };
   }

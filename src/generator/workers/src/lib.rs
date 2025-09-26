@@ -1,107 +1,19 @@
-mod typescript;
+use std::path::Path;
 
-use std::{collections::BTreeMap, path::Path};
+use common::{CidlSpec, Model};
 
-use common::{CidlSpec, HttpVerb, InputLanguage, Model, ModelMethod};
-use typescript::TypescriptWorkersGenerator;
-
-use anyhow::{Result, anyhow};
-
-struct TrieNode {
-    value: String,
-    children: BTreeMap<String, TrieNode>,
-}
-
-impl TrieNode {
-    fn new(value: String) -> Self {
-        Self {
-            value,
-            children: BTreeMap::default(),
-        }
-    }
-}
-
-struct RouterTrie {
-    root: TrieNode,
-}
-
-impl RouterTrie {
-    fn from_domain(domain: String) -> Self {
-        Self {
-            root: TrieNode {
-                value: format!("\"{domain}\""),
-                children: BTreeMap::default(),
-            },
-        }
-    }
-}
-
-trait WorkersGenerateable {
-    /// Necessary imports for the language
-    fn imports(&self, models: &[Model], workers_path: &Path) -> Result<String>;
-
-    /// Necessary boilerplate for the language
-    fn preamble(&self) -> String;
-
-    /// Model validators
-    fn validators(&self, models: &[Model]) -> String;
-
-    /// Workers entrypoint
-    fn main(&self) -> String;
-
-    /// Adds a method onto a model in the router.
-    fn router_method(
-        &self,
-        model_name: &str,
-        method: &ModelMethod,
-        proto: String,
-        router: &mut RouterTrie,
-    );
-
-    /// Serializes the router into a language appropriate router trie
-    fn router_serialize(&self, router: &RouterTrie) -> String;
-
-    /// Places a function body inside of a function prototype or header
-    fn proto(&self, method: &ModelMethod, body: String) -> String;
-
-    /// Validates that the request matches the correct http verb
-    fn validate_http(&self, verb: &HttpVerb) -> String;
-
-    /// Validates that the request body has the correct structure and input
-    fn validate_request(&self, method: &ModelMethod) -> String;
-
-    /// Fetches the model from the database on instantiated methods
-    fn hydrate_model(&self, model: &Model) -> String;
-
-    /// Dispatches the model function
-    fn dispatch_method(&self, model_name: &str, method: &ModelMethod) -> String;
-}
+use anyhow::{Context, Result, anyhow};
 
 pub struct WorkersGenerator;
 impl WorkersGenerator {
-    fn model(model: &Model, lang: &dyn WorkersGenerateable, router: &mut RouterTrie) {
-        for method in &model.methods {
-            let validate_http = lang.validate_http(&method.http_verb);
-            let validate_params = lang.validate_request(method);
-            let hydration = if method.is_static {
-                String::new()
-            } else {
-                lang.hydrate_model(model)
-            };
-            let dispatch = lang.dispatch_method(&model.name, method);
-
-            let method_body = format!(
-                r#"
-                {validate_http}
-                {validate_params}
-                {hydration}
-                {dispatch}
-            "#
-            );
-
-            let proto = lang.proto(method, method_body);
-            lang.router_method(&model.name, method, proto, router);
+    fn constructor_registry(models: &[Model]) -> String {
+        let mut entries = Vec::new();
+        for model in models {
+            let model_name = &model.name;
+            entries.push(format!("  {}: {},", model_name, model_name));
         }
+        let body = entries.join("\n");
+        format!("const constructorRegistry = {{\n{}\n}};", body)
     }
 
     /// Returns the API route
@@ -125,33 +37,66 @@ impl WorkersGenerator {
         }
     }
 
+    fn linker(models: &[Model], workers_path: &Path) -> Result<String> {
+        let workers_dir = workers_path
+            .parent()
+            .context("workers_path has no parent; cannot compute relative imports")?;
+
+        Ok(models
+            .iter()
+            .map(|m| -> Result<String> {
+                // Remove the extension (e.g., .ts/.tsx/.js)
+                let no_ext = m.source_path.with_extension("");
+
+                // Compute the relative path from the workers file directory
+                let rel = pathdiff::diff_paths(&no_ext, workers_dir).ok_or_else(|| {
+                    anyhow!(
+                        "Failed to compute relative path for '{}'\nfrom base '{}'",
+                        m.source_path.display(),
+                        workers_dir.display()
+                    )
+                })?;
+
+                // Stringify + normalize to forward slashes
+                let mut rel_str = rel.to_string_lossy().replace('\\', "/");
+
+                // Ensure we have a leading './' when not starting with '../' or '/'
+                if !rel_str.starts_with("../") && !rel_str.starts_with("./") {
+                    rel_str = format!("./{}", rel_str);
+                }
+
+                // If we collapsed to empty (it can happen if model sits exactly at from_dir/index)
+                if rel_str.is_empty() || rel_str == "." {
+                    rel_str = "./".to_string();
+                }
+
+                Ok(format!("import {{ {} }} from '{}';", m.name, rel_str))
+            })
+            .collect::<Result<Vec<_>>>()?
+            .join("\n"))
+    }
+
+    // TODO: compile-time validation of methods still has to happen
     pub fn create(&self, spec: CidlSpec, domain: String, workers_path: &Path) -> Result<String> {
+        let linker = Self::linker(&spec.models, workers_path)?;
+        let registry = Self::constructor_registry(&spec.models);
         let api_route = Self::validate_domain(&domain)?;
 
-        let generator: &dyn WorkersGenerateable = match spec.language {
-            InputLanguage::TypeScript => &TypescriptWorkersGenerator {},
-        };
-
-        let imports = generator.imports(&spec.models, workers_path)?;
-        let preamble = generator.preamble();
-        let validators = generator.validators(&spec.models);
-        let router = {
-            let mut router = RouterTrie::from_domain(api_route);
-            for m in spec.models {
-                Self::model(&m, generator, &mut router);
-            }
-            generator.router_serialize(&router)
-        };
-        let main = generator.main();
-
+        // TODO: Use the correct DB name
         Ok(format!(
-            r#" 
-        {imports}
-        {preamble}
-        {validators}
-        {router}
-        {main}
-        "#
+            r#"
+import {{ cloesce }} from "cloesce";
+import cidl from "./cidl.json" with {{ type: "json" }};
+{linker}
+
+{registry}
+
+export default {{
+    async fetch(request: Request, env: any, ctx: any): Promise<Response> {{
+        return await cloesce(cidl, constructorRegistry, request, "/{api_route}", env.DB);
+    }}
+}};
+"#
         ))
     }
 }

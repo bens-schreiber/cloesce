@@ -1,3 +1,6 @@
+// Backend function
+export { cloesce } from "./backend.js";
+
 // Compiler hints
 export const D1: ClassDecorator = () => {};
 export const PrimaryKey: PropertyDecorator = () => {};
@@ -36,13 +39,11 @@ export type IncludeTree<T> = T extends Primitive
         : IncludeTree<NonNullable<T[K]>>;
     };
 
-// TODO: Look into this more. Is the best option keeping the CIDL in memory here?
-// If so, we should probably reduce it as much as possible to some `meta_idl`
 export function modelsFromSql<T>(
   modelName: string,
   cidl: any,
   records: Record<string, any>[],
-  includeTree: IncludeTree<T>,
+  includeTree: IncludeTree<T>
 ): T[] {
   if (!records.length) return [];
 
@@ -60,7 +61,7 @@ export function modelsFromSql<T>(
     meta: any,
     attrName: string,
     row: Record<string, any>,
-    prefixed: boolean,
+    prefixed: boolean
   ) => row[prefixed ? `${meta.name}_${attrName}` : attrName] ?? null;
 
   const addUnique = (arr: any[], item: any, key: string) => {
@@ -76,7 +77,7 @@ export function modelsFromSql<T>(
     meta: any,
     row: Record<string, any>,
     tree: any,
-    prefixed: boolean,
+    prefixed: boolean
   ) => {
     const model: any = {};
 
@@ -116,7 +117,7 @@ export function modelsFromSql<T>(
 
   for (const row of records) {
     const isPrefixed = Object.keys(row).some((k) =>
-      k.startsWith(`${modelName}_`),
+      k.startsWith(`${modelName}_`)
     );
     const rootId = String(isPrefixed ? row[`${modelName}_id`] : row[pkName]);
 
@@ -133,11 +134,7 @@ export function modelsFromSql<T>(
       if (Array.isArray(val)) {
         itemsById[rootId][key] = itemsById[rootId][key] || [];
         val.forEach((item) =>
-          addUnique(
-            itemsById[rootId][key],
-            item,
-            `${itemsById[rootId]}_${key}`,
-          ),
+          addUnique(itemsById[rootId][key], item, `${itemsById[rootId]}_${key}`)
         );
       } else if (val != null) {
         itemsById[rootId][key] = val;
@@ -146,41 +143,4 @@ export function modelsFromSql<T>(
   }
 
   return Object.values(itemsById) as T[];
-}
-
-// Router trie traversal function
-export function match(
-  router: any,
-  path: string,
-  request: Request,
-  env: any,
-): Response {
-  const segments = path.split("/").filter(Boolean);
-  const params: string[] = [];
-  let node: any = router;
-
-  const notFound = () =>
-    new Response(JSON.stringify({ error: "Route not found", path }), {
-      status: 404,
-      headers: { "Content-Type": "application/json" },
-    });
-
-  for (const segment of segments) {
-    if (node[segment]) {
-      node = node[segment];
-      continue;
-    }
-
-    const paramKey = Object.keys(node).find(
-      (k) => k.startsWith("<") && k.endsWith(">"),
-    );
-    if (!paramKey) return notFound();
-
-    params.push(segment);
-    node = node[paramKey];
-  }
-
-  return typeof node === "function"
-    ? node(...params, request, env)
-    : notFound();
 }
