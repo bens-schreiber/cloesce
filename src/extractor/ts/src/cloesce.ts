@@ -40,12 +40,12 @@ class Cloesce {
   private static instance: Cloesce | undefined;
   private constructor(
     public readonly cidl: MetaCidl,
-    public readonly constructorRegistry: ConstructorRegistry
+    public readonly constructorRegistry: ConstructorRegistry,
   ) {}
 
   static init(
     rawCidl: CidlSpec,
-    constructorRegistry: ConstructorRegistry
+    constructorRegistry: ConstructorRegistry,
   ): Cloesce {
     if (!this.instance) {
       this.instance = new Cloesce(
@@ -58,10 +58,10 @@ class Cloesce {
                 ...m,
                 methods: Object.fromEntries(m.methods.map((x) => [x.name, x])),
               },
-            ])
+            ]),
           ),
         },
-        constructorRegistry
+        constructorRegistry,
       );
     }
     return this.instance;
@@ -86,7 +86,7 @@ class Cloesce {
 export function modelsFromSql<T>(
   ctor: new () => UserDefinedModel,
   records: Record<string, any>[],
-  includeTree: Record<string, UserDefinedModel>
+  includeTree: Record<string, UserDefinedModel>,
 ): T[] {
   const { cidl, constructorRegistry } = Cloesce.get();
   return _modelsFromSql(
@@ -94,7 +94,7 @@ export function modelsFromSql<T>(
     cidl,
     constructorRegistry,
     records,
-    includeTree
+    includeTree,
   ) as T[];
 }
 
@@ -113,7 +113,7 @@ export async function cloesce(
   constructorRegistry: ConstructorRegistry,
   request: Request,
   api_route: string,
-  d1: D1Database
+  d1: D1Database,
 ): Promise<Response> {
   const { cidl } = Cloesce.init(rawCidl, constructorRegistry);
 
@@ -145,7 +145,7 @@ export async function cloesce(
       modelMeta,
       constructorRegistry,
       d1,
-      id!
+      id!,
     );
 
     if (!successfulModel.ok) {
@@ -159,7 +159,7 @@ export async function cloesce(
 
   // 5. Method Dispatch
   return toResponse(
-    await methodDispatch(instance, methodMeta, requestParamMap, d1)
+    await methodDispatch(instance, methodMeta, requestParamMap, d1),
   );
 }
 
@@ -168,7 +168,7 @@ export async function cloesce(
 function matchRoute(
   request: Request,
   api_route: string,
-  cidl: MetaCidl
+  cidl: MetaCidl,
 ): Either<HttpResult, Route> {
   const url = new URL(request.url);
 
@@ -202,7 +202,7 @@ function matchRoute(
 
 function validateHttpVerb(
   request: Request,
-  methodMeta: ModelMethod
+  methodMeta: ModelMethod,
 ): Either<HttpResult, null> {
   const url = new URL(request.url);
   return request.method === methodMeta.http_verb
@@ -214,7 +214,7 @@ async function validateRequest(
   request: Request,
   cidl: MetaCidl,
   methodMeta: ModelMethod,
-  id: string | null
+  id: string | null,
 ): Promise<Either<HttpResult, RequestParamMap>> {
   if (methodMeta.parameters.length < 1) {
     return right({});
@@ -231,7 +231,7 @@ async function validateRequest(
   // Filter out any injected parameters that will not be passed
   // by the query.
   let requiredParams = methodMeta.parameters.filter(
-    (p) => p.cidl_type !== "D1Database"
+    (p) => p.cidl_type !== "D1Database",
   );
 
   let requestBodyMap: RequestParamMap;
@@ -265,7 +265,7 @@ async function validateRequest(
 function validateCidlType(
   value: unknown,
   cidlType: CidlType,
-  cidl: MetaCidl
+  cidl: MetaCidl,
 ): boolean {
   if (value === null || value === undefined) return false;
 
@@ -294,7 +294,7 @@ function validateCidlType(
     // Validate attributes
     if (
       !model.attributes.every((attr) =>
-        validateCidlType(obj[attr.value.name], attr.value.cidl_type, cidl)
+        validateCidlType(obj[attr.value.name], attr.value.cidl_type, cidl),
       )
     ) {
       return false;
@@ -331,7 +331,7 @@ async function hydrateModel(
   modelMeta: MetaModel,
   constructorRegistry: ConstructorRegistry,
   d1: D1Database,
-  id: string
+  id: string,
 ): Promise<Either<HttpResult, object>> {
   // Error state: If the D1 database has been tweaked outside of Cloesce
   // resulting in a malformed query, exit with a 500.
@@ -368,13 +368,16 @@ async function hydrateModel(
       cidl,
       constructorRegistry,
       records.results,
-      includeTree
+      includeTree,
     );
     return right(models[0]);
   }
 
   return right(
-    Object.assign(new constructorRegistry[modelMeta.name](), records.results[0])
+    Object.assign(
+      new constructorRegistry[modelMeta.name](),
+      records.results[0],
+    ),
   );
 }
 
@@ -382,14 +385,14 @@ async function methodDispatch(
   instance: InstantiatedUserDefinedModel,
   methodMeta: ModelMethod,
   params: Record<string, unknown>,
-  d1: D1Database
+  d1: D1Database,
 ): Promise<HttpResult<unknown>> {
   // Error state: Client code ran into an uncaught exception.
   const uncaughtException = (e: any) =>
     error_state(500, `${e instanceof Error ? e.message : String(e)}`);
 
   const paramArray = methodMeta.parameters.map((p) =>
-    params[p.name] == undefined ? d1 : params[p.name]
+    params[p.name] == undefined ? d1 : params[p.name],
   );
 
   // Ensure the result is always some HttpResult
@@ -409,7 +412,7 @@ async function methodDispatch(
 
   try {
     return resultWrapper(
-      await (instance as any)[methodMeta.name](...paramArray)
+      await (instance as any)[methodMeta.name](...paramArray),
     );
   } catch (e) {
     return uncaughtException(e);
@@ -424,7 +427,7 @@ function _modelsFromSql(
   cidl: MetaCidl,
   constructorRegistry: ConstructorRegistry,
   records: Record<string, any>[],
-  includeTree: Record<string, UserDefinedModel>
+  includeTree: Record<string, UserDefinedModel>,
 ): InstantiatedUserDefinedModel[] {
   if (!records.length) return [];
 
@@ -450,7 +453,7 @@ function _modelsFromSql(
     meta: MetaModel,
     attrName: string,
     row: Record<string, any>,
-    prefixed: boolean
+    prefixed: boolean,
   ) => row[prefixed ? `${meta.name}_${attrName}` : attrName] ?? null;
 
   const addUnique = (arr: any[], item: any, key: string) => {
@@ -466,7 +469,7 @@ function _modelsFromSql(
     meta: MetaModel,
     row: Record<string, any>,
     tree: Record<string, any>,
-    prefixed: boolean
+    prefixed: boolean,
   ): any => {
     const instance = new constructorRegistry[meta.name]();
 
@@ -516,7 +519,7 @@ function _modelsFromSql(
 
   for (const row of records) {
     const isPrefixed = Object.keys(row).some((k) =>
-      k.startsWith(`${modelName}_`)
+      k.startsWith(`${modelName}_`),
     );
     const rootId = String(isPrefixed ? row[`${modelName}_id`] : row[pkName]);
 
@@ -534,7 +537,7 @@ function _modelsFromSql(
       if (Array.isArray(val)) {
         existing[key] = existing[key] || [];
         val.forEach((item) =>
-          addUnique(existing[key], item, `${modelMeta.name}_${key}`)
+          addUnique(existing[key], item, `${modelMeta.name}_${key}`),
         );
       } else if (val != null) {
         existing[key] = val;
