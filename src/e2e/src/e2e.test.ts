@@ -24,7 +24,7 @@ before(
     assert.ok(mod.Like);
     Horse = mod.Horse;
   },
-  { timeout: 30_000 }
+  { timeout: 30_000 },
 );
 
 after(async () => {
@@ -48,7 +48,7 @@ test("Post, Patch, Get a Horse", async () => {
     assert.ok(res.ok, withRes("POST should be OK", res));
     assert.ok(
       res.data.id == body.id,
-      withRes("POST response id should be the same as the inputted id", res)
+      withRes("POST response id should be the same as the inputted id", res),
     );
   }
 
@@ -63,7 +63,7 @@ test("Post, Patch, Get a Horse", async () => {
     assert.ok(res.ok, withRes("GET should be OK", res));
     assert.ok(
       horse.id == body.id,
-      withRes("GET response id should be the same as the inputted id", res)
+      withRes("GET response id should be the same as the inputted id", res),
     );
   }
 
@@ -154,7 +154,7 @@ test("Horse can like another horse", async () => {
   assert.equal(updated_horse2.likes.length, 0);
   assert.ok(
     updated_horse1.likes.find((l: any) => l.horseId2 == horse2.id),
-    `${JSON.stringify(updated_horse1)}`
+    `${JSON.stringify(updated_horse1)}`,
   );
 });
 
@@ -176,7 +176,7 @@ test("Methods can return both data and errors", async () => {
     assert.deepEqual(
       res,
       { ok: false, status: 400, message: "divided by 0" },
-      withRes("Divide by zero should produce an error", res)
+      withRes("Divide by zero should produce an error", res),
     );
   }
 
@@ -188,8 +188,8 @@ test("Methods can return both data and errors", async () => {
       1,
       withRes(
         "Divide by 1 should not produce an error and give an integer result",
-        res
-      )
+        res,
+      ),
     );
   }
 });

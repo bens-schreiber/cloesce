@@ -77,6 +77,7 @@ impl WorkersGenerator {
     }
 
     // TODO: compile-time validation of methods still has to happen
+    // TODO: just hardcoding typescript for now, probably change that when validation is implemented
     pub fn create(&self, spec: CidlSpec, domain: String, workers_path: &Path) -> Result<String> {
         let linker = Self::linker(&spec.models, workers_path)?;
         let registry = Self::constructor_registry(&spec.models);
