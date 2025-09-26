@@ -13,6 +13,26 @@ import {
 } from "./common.js";
 
 /**
+ * Users will create Cloesce models, which have metadata for them in the CIDL.
+ * For TypeScript's purposes, these models can be anything. We can assume any
+ * `UserDefinedModel` has been verified by the compiler.
+ */
+type UserDefinedModel = any;
+type InstantiatedUserDefinedModel = object;
+
+/**
+ * Given a request, this represents a map of each body / url  param name to
+ * its actual value. Unknown, as the a request can be anything.
+ */
+type RequestParamMap = Record<string, unknown>;
+
+/**
+ * A map of class names to their appropriate constructor, which is generated
+ * by the Cloesce compiler.
+ */
+type ConstructorRegistry = Record<string, new () => UserDefinedModel>;
+
+/**
  * Singleton instance of the MetaCidl and Constructor Registry.
  * These values are guaranteed to be static.
  */
@@ -20,12 +40,12 @@ class Cloesce {
   private static instance: Cloesce | undefined;
   private constructor(
     public readonly cidl: MetaCidl,
-    public readonly constructorRegistry: Record<string, new () => any>,
+    public readonly constructorRegistry: ConstructorRegistry
   ) {}
 
   static init(
     rawCidl: CidlSpec,
-    constructorRegistry: Record<string, new () => any>,
+    constructorRegistry: ConstructorRegistry
   ): Cloesce {
     if (!this.instance) {
       this.instance = new Cloesce(
@@ -38,10 +58,10 @@ class Cloesce {
                 ...m,
                 methods: Object.fromEntries(m.methods.map((x) => [x.name, x])),
               },
-            ]),
+            ])
           ),
         },
-        constructorRegistry,
+        constructorRegistry
       );
     }
     return this.instance;
@@ -64,9 +84,9 @@ class Cloesce {
  * @returns
  */
 export function modelsFromSql<T>(
-  ctor: new () => T,
+  ctor: new () => UserDefinedModel,
   records: Record<string, any>[],
-  includeTree: Record<string, any>,
+  includeTree: Record<string, UserDefinedModel>
 ): T[] {
   const { cidl, constructorRegistry } = Cloesce.get();
   return _modelsFromSql(
@@ -74,8 +94,8 @@ export function modelsFromSql<T>(
     cidl,
     constructorRegistry,
     records,
-    includeTree,
-  );
+    includeTree
+  ) as T[];
 }
 
 /**
@@ -90,10 +110,10 @@ export function modelsFromSql<T>(
  */
 export async function cloesce(
   rawCidl: CidlSpec,
-  constructorRegistry: Record<string, new () => any>,
+  constructorRegistry: ConstructorRegistry,
   request: Request,
   api_route: string,
-  d1: D1Database,
+  d1: D1Database
 ): Promise<Response> {
   const { cidl } = Cloesce.init(rawCidl, constructorRegistry);
 
@@ -105,7 +125,7 @@ export async function cloesce(
 
   // 2. Validate HTTP verb
   let { modelMeta, methodMeta, id } = route.value;
-  let isValidHttp = validateHttp(request, methodMeta);
+  let isValidHttp = validateHttpVerb(request, methodMeta);
   if (!isValidHttp.ok) {
     return toResponse(isValidHttp.value);
   }
@@ -115,7 +135,7 @@ export async function cloesce(
   if (!isValidRequest.ok) {
     return toResponse(isValidRequest.value);
   }
-  let requestParams = isValidRequest.value;
+  let requestParamMap = isValidRequest.value;
 
   // 4. Data Hydration
   let instance: object;
@@ -125,7 +145,7 @@ export async function cloesce(
       modelMeta,
       constructorRegistry,
       d1,
-      id!,
+      id!
     );
 
     if (!successfulModel.ok) {
@@ -139,7 +159,7 @@ export async function cloesce(
 
   // 5. Method Dispatch
   return toResponse(
-    await methodDispatch(instance, methodMeta, requestParams, d1),
+    await methodDispatch(instance, methodMeta, requestParamMap, d1)
   );
 }
 
@@ -148,7 +168,7 @@ export async function cloesce(
 function matchRoute(
   request: Request,
   api_route: string,
-  cidl: MetaCidl,
+  cidl: MetaCidl
 ): Either<HttpResult, Route> {
   const url = new URL(request.url);
 
@@ -180,9 +200,9 @@ function matchRoute(
   });
 }
 
-function validateHttp(
+function validateHttpVerb(
   request: Request,
-  methodMeta: ModelMethod,
+  methodMeta: ModelMethod
 ): Either<HttpResult, null> {
   const url = new URL(request.url);
   return request.method === methodMeta.http_verb
@@ -194,8 +214,8 @@ async function validateRequest(
   request: Request,
   cidl: MetaCidl,
   methodMeta: ModelMethod,
-  id: string | null,
-): Promise<Either<HttpResult, Record<string, unknown>>> {
+  id: string | null
+): Promise<Either<HttpResult, RequestParamMap>> {
   if (methodMeta.parameters.length < 1) {
     return right({});
   }
@@ -208,43 +228,44 @@ async function validateRequest(
     return invalid_request;
   }
 
-  // D1Database is injected
+  // Filter out any injected parameters that will not be passed
+  // by the query.
   let requiredParams = methodMeta.parameters.filter(
-    (p) => p.cidl_type !== "D1Database",
+    (p) => p.cidl_type !== "D1Database"
   );
 
-  let requestBody: Record<string, unknown>;
+  let requestBodyMap: RequestParamMap;
   if (methodMeta.http_verb === "GET") {
     const url = new URL(request.url);
-    requestBody = Object.fromEntries(url.searchParams.entries());
+    requestBodyMap = Object.fromEntries(url.searchParams.entries());
   } else {
     try {
-      requestBody = await request.json();
+      requestBodyMap = await request.json();
     } catch {
       return invalid_request;
     }
   }
 
   // Ensure all required params exist
-  if (!requiredParams.every((p) => requestBody[p.name] !== undefined)) {
+  if (!requiredParams.every((p) => requestBodyMap[p.name] !== undefined)) {
     return invalid_request;
   }
 
   // Validate all parameters type
   for (const p of requiredParams) {
-    const value = requestBody[p.name];
+    const value = requestBodyMap[p.name];
     if (!validateCidlType(value, p.cidl_type, cidl)) {
       return invalid_request;
     }
   }
 
-  return right(requestBody);
+  return right(requestBodyMap);
 }
 
 function validateCidlType(
   value: unknown,
   cidlType: CidlType,
-  cidl: MetaCidl,
+  cidl: MetaCidl
 ): boolean {
   if (value === null || value === undefined) return false;
 
@@ -273,7 +294,7 @@ function validateCidlType(
     // Validate attributes
     if (
       !model.attributes.every((attr) =>
-        validateCidlType(obj[attr.value.name], attr.value.cidl_type, cidl),
+        validateCidlType(obj[attr.value.name], attr.value.cidl_type, cidl)
       )
     ) {
       return false;
@@ -308,9 +329,9 @@ function validateCidlType(
 async function hydrateModel(
   cidl: MetaCidl,
   modelMeta: MetaModel,
-  constructorRegistry: Record<string, new () => any>,
+  constructorRegistry: ConstructorRegistry,
   d1: D1Database,
-  id: string,
+  id: string
 ): Promise<Either<HttpResult, object>> {
   // Error state: If the D1 database has been tweaked outside of Cloesce
   // resulting in a malformed query, exit with a 500.
@@ -338,41 +359,37 @@ async function hydrateModel(
     return malformedQuery(e);
   }
 
-  // Convert the record to an instance of the Model
-  let instance: any;
+  // TODO: assuming default DS again
   if (hasDataSources) {
-    // TODO: assuming default DS again
     let includeTree: any = new constructorRegistry[modelMeta.name]().default;
-    let models: any[] = _modelsFromSql(
+
+    let models: object[] = _modelsFromSql(
       modelMeta.name,
       cidl,
       constructorRegistry,
       records.results,
-      includeTree,
+      includeTree
     );
-    instance = models[0];
-  } else {
-    instance = Object.assign(
-      new constructorRegistry[modelMeta.name](),
-      records.results[0],
-    );
+    return right(models[0]);
   }
 
-  return right(instance);
+  return right(
+    Object.assign(new constructorRegistry[modelMeta.name](), records.results[0])
+  );
 }
 
 async function methodDispatch(
-  instance: any,
+  instance: InstantiatedUserDefinedModel,
   methodMeta: ModelMethod,
   params: Record<string, unknown>,
-  d1: D1Database,
+  d1: D1Database
 ): Promise<HttpResult<unknown>> {
   // Error state: Client code ran into an uncaught exception.
   const uncaughtException = (e: any) =>
     error_state(500, `${e instanceof Error ? e.message : String(e)}`);
 
   const paramArray = methodMeta.parameters.map((p) =>
-    params[p.name] == undefined ? d1 : params[p.name],
+    params[p.name] == undefined ? d1 : params[p.name]
   );
 
   // Ensure the result is always some HttpResult
@@ -391,7 +408,9 @@ async function methodDispatch(
   };
 
   try {
-    return resultWrapper(await instance[methodMeta.name](...paramArray));
+    return resultWrapper(
+      await (instance as any)[methodMeta.name](...paramArray)
+    );
   } catch (e) {
     return uncaughtException(e);
   }
@@ -403,10 +422,10 @@ async function methodDispatch(
 function _modelsFromSql(
   modelName: string,
   cidl: MetaCidl,
-  constructorRegistry: Record<string, new () => any>,
+  constructorRegistry: ConstructorRegistry,
   records: Record<string, any>[],
-  includeTree: Record<string, any>,
-): any[] {
+  includeTree: Record<string, UserDefinedModel>
+): InstantiatedUserDefinedModel[] {
   if (!records.length) return [];
 
   const modelMeta = cidl.models[modelName];
@@ -431,7 +450,7 @@ function _modelsFromSql(
     meta: MetaModel,
     attrName: string,
     row: Record<string, any>,
-    prefixed: boolean,
+    prefixed: boolean
   ) => row[prefixed ? `${meta.name}_${attrName}` : attrName] ?? null;
 
   const addUnique = (arr: any[], item: any, key: string) => {
@@ -447,7 +466,7 @@ function _modelsFromSql(
     meta: MetaModel,
     row: Record<string, any>,
     tree: Record<string, any>,
-    prefixed: boolean,
+    prefixed: boolean
   ): any => {
     const instance = new constructorRegistry[meta.name]();
 
@@ -497,7 +516,7 @@ function _modelsFromSql(
 
   for (const row of records) {
     const isPrefixed = Object.keys(row).some((k) =>
-      k.startsWith(`${modelName}_`),
+      k.startsWith(`${modelName}_`)
     );
     const rootId = String(isPrefixed ? row[`${modelName}_id`] : row[pkName]);
 
@@ -515,7 +534,7 @@ function _modelsFromSql(
       if (Array.isArray(val)) {
         existing[key] = existing[key] || [];
         val.forEach((item) =>
-          addUnique(existing[key], item, `${modelMeta.name}_${key}`),
+          addUnique(existing[key], item, `${modelMeta.name}_${key}`)
         );
       } else if (val != null) {
         existing[key] = val;
@@ -530,7 +549,7 @@ function error_state(status: number, message: string): HttpResult {
   return { ok: false, status, message };
 }
 
-function toResponse(r: HttpResult) {
+function toResponse(r: HttpResult): Response {
   return new Response(JSON.stringify(r), {
     status: r.status,
     headers: { "Content-Type": "application/json" },

@@ -1,21 +1,11 @@
-use std::path::Path;
+use std::{collections::HashMap, path::Path};
 
-use common::{CidlSpec, Model};
+use common::{CidlSpec, CidlType, HttpVerb, Model};
 
-use anyhow::{Context, Result, anyhow};
+use anyhow::{Context, Result, anyhow, bail, ensure};
 
 pub struct WorkersGenerator;
 impl WorkersGenerator {
-    fn constructor_registry(models: &[Model]) -> String {
-        let mut entries = Vec::new();
-        for model in models {
-            let model_name = &model.name;
-            entries.push(format!("  {}: {},", model_name, model_name));
-        }
-        let body = entries.join("\n");
-        format!("const constructorRegistry = {{\n{}\n}};", body)
-    }
-
     /// Returns the API route
     fn validate_domain(domain: &str) -> Result<String> {
         if domain.is_empty() {
@@ -35,6 +25,79 @@ impl WorkersGenerator {
                 }
             }
         }
+    }
+
+    /// Validates all methods contain valid types and references.
+    ///
+    /// Returns error on
+    /// - Unknown model reference on return type
+    /// - Invalid parameter type on methods
+    /// - Unknown model reference on method
+    /// -
+    fn validate_methods(models: &[Model]) -> Result<()> {
+        let mut lookup = HashMap::<&str, &Model>::new();
+
+        // TODO: We create a similiar lookup for D1 validation. It would be smart to pass that around.
+        for model in models {
+            lookup.insert(&model.name, model);
+        }
+
+        for model in models {
+            for method in &model.methods {
+                if let Some(Some(CidlType::Model(m))) =
+                    method.return_type.as_ref().map(|r| r.root_type())
+                {
+                    ensure!(
+                        lookup.contains_key(m.as_str()),
+                        "Unknown model reference on model method return type {}.{}",
+                        model.name,
+                        method.name
+                    );
+                }
+
+                for param in &method.parameters {
+                    let Some(root_type) = param.cidl_type.root_type() else {
+                        bail!(
+                            "Invalid parameter type on model method {}.{}.{}",
+                            model.name,
+                            method.name,
+                            param.name
+                        );
+                    };
+
+                    if let CidlType::Model(m) = root_type {
+                        ensure!(
+                            lookup.contains_key(m.as_str()),
+                            "Unknown model reference on model method {}.{}.{}",
+                            model.name,
+                            method.name,
+                            param.name
+                        );
+
+                        if method.http_verb == HttpVerb::GET {
+                            bail!(
+                                "GET Requests currently do not support model parameters {}.{}.{}",
+                                model.name,
+                                method.name,
+                                param.name
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    fn constructor_registry(models: &[Model]) -> String {
+        let mut entries = Vec::new();
+        for model in models {
+            let model_name = &model.name;
+            entries.push(format!("  {}: {},", model_name, model_name));
+        }
+        let body = entries.join("\n");
+        format!("const constructorRegistry = {{\n{}\n}};", body)
     }
 
     fn linker(models: &[Model], workers_path: &Path) -> Result<String> {
@@ -76,12 +139,13 @@ impl WorkersGenerator {
             .join("\n"))
     }
 
-    // TODO: compile-time validation of methods still has to happen
-    // TODO: just hardcoding typescript for now, probably change that when validation is implemented
-    pub fn create(&self, spec: CidlSpec, domain: String, workers_path: &Path) -> Result<String> {
-        let linker = Self::linker(&spec.models, workers_path)?;
-        let registry = Self::constructor_registry(&spec.models);
+    // TODO: just hardcoding typescript for now
+    pub fn create(&self, cidl: CidlSpec, domain: String, workers_path: &Path) -> Result<String> {
+        Self::validate_methods(&cidl.models)?;
         let api_route = Self::validate_domain(&domain)?;
+
+        let linker = Self::linker(&cidl.models, workers_path)?;
+        let registry = Self::constructor_registry(&cidl.models);
 
         // TODO: Use the correct DB name
         Ok(format!(
