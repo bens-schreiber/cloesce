@@ -138,7 +138,7 @@ To make good use of `Result`, several declarative methods would need to be built
 
 ## Request State Machine
 
-![Request state machine](../assets/client-state-machine.png)
+![Request state machine](../../assets/client-state-machine.png)
 
 ## Generator
 

@@ -382,7 +382,7 @@ roughly making the CIDL
 
 The tricky part with generation is the order of table creation. If B depends on A, in Sqlite A must be created first. It'll be important to create a model dependency graph. Using the previous CIDL:
 
-![Dependency graph](../assets/fk_dependencies.drawio.png)
+![Dependency graph](../../assets/fk_dependencies.drawio.png)
 
 The CIDL be turned into a graph, and using a topological sorting algorithm we would return a valid ordering of dependencies. One problem with this is the kind of topological ordering: do we make it relative to the AST, or relative to SQL.
 

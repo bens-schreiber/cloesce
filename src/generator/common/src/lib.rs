@@ -58,6 +58,7 @@ pub enum CidlType {
 }
 
 impl CidlType {
+    /// Returns the inner part of an array if the type is an array
     pub fn unwrap_array(&self) -> Option<&CidlType> {
         match self {
             CidlType::Array(inner) => Some(inner),
@@ -65,10 +66,12 @@ impl CidlType {
         }
     }
 
-    pub fn array_type(&self) -> &CidlType {
+    /// Returns the root most CidlType, being any non Model/Array/Result
+    pub fn root_type(&self) -> Option<&CidlType> {
         match self {
-            CidlType::Array(inner) => inner.array_type(),
-            _ => self,
+            CidlType::Array(inner) => inner.root_type(),
+            CidlType::HttpResult(inner) => inner.as_ref().map(|i| i.root_type())?,
+            t => Some(t),
         }
     }
 
@@ -77,7 +80,7 @@ impl CidlType {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub enum HttpVerb {
     GET,
     POST,

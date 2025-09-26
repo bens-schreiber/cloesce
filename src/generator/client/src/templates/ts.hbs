@@ -1,4 +1,4 @@
-import { Result } from "cloesce";
+import { HttpResult } from "cloesce";
 
 function instantiateModelArray<T extends object>(
   data: any,
@@ -27,7 +27,7 @@ export class {{name}} {
         {{name}}: {{lang_type cidl_type nullable}}{{#unless @last}}, {{/unless}}
       {{/if}}
     {{/each}}
-  ): Promise<Result<{{lang_type return_type}}>> {
+  ): Promise<HttpResult<{{lang_type return_type}}>> {
     const baseUrl = `{{../../domain}}/{{#if is_static}}{{../name}}/{{name}}{{else}}{{../name}}/${this.id}/{{name}}{{/if}}`;
 
     {{#if (eq http_verb "GET")}}
