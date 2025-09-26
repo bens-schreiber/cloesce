@@ -152,7 +152,10 @@ test("Horse can like another horse", async () => {
   // Assert
   assert.equal(updated_horse1.likes.length, 1);
   assert.equal(updated_horse2.likes.length, 0);
-  assert.ok(updated_horse1.likes.find((l: any) => l.horseId2 == horse2.id));
+  assert.ok(
+    updated_horse1.likes.find((l: any) => l.horseId2 == horse2.id),
+    `${JSON.stringify(updated_horse1)}`
+  );
 });
 
 test("Default include tree shows all likes but goes no further", async () => {
