@@ -1,6 +1,6 @@
 # State of the Compiler (v0.0.2)
 
-As of 10/26/2025, we have just finished our second milestone. In v0.0.2, we introduced
+As of 9/26/2025, we have just finished our second milestone. In v0.0.2, we introduced
 
 - Foreign key relationships
 - Data sources with include trees
