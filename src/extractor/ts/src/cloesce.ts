@@ -40,12 +40,12 @@ class MetaContainer {
   private static instance: MetaContainer | undefined;
   private constructor(
     public readonly cidl: MetaCidl,
-    public readonly constructorRegistry: ConstructorRegistry,
+    public readonly constructorRegistry: ConstructorRegistry
   ) {}
 
   static init(
     rawCidl: CidlSpec,
-    constructorRegistry: ConstructorRegistry,
+    constructorRegistry: ConstructorRegistry
   ): MetaContainer {
     if (!this.instance) {
       this.instance = new MetaContainer(
@@ -58,10 +58,10 @@ class MetaContainer {
                 ...m,
                 methods: Object.fromEntries(m.methods.map((x) => [x.name, x])),
               },
-            ]),
+            ])
           ),
         },
-        constructorRegistry,
+        constructorRegistry
       );
     }
     return this.instance;
@@ -86,7 +86,7 @@ class MetaContainer {
 export function modelsFromSql<T>(
   ctor: new () => UserDefinedModel,
   records: Record<string, any>[],
-  includeTree: Record<string, UserDefinedModel>,
+  includeTree: Record<string, UserDefinedModel>
 ): T[] {
   const { cidl, constructorRegistry } = MetaContainer.get();
   return _modelsFromSql(
@@ -94,7 +94,7 @@ export function modelsFromSql<T>(
     cidl,
     constructorRegistry,
     records,
-    includeTree,
+    includeTree
   ) as T[];
 }
 
@@ -113,7 +113,7 @@ export async function cloesce(
   constructorRegistry: ConstructorRegistry,
   request: Request,
   api_route: string,
-  d1: D1Database,
+  d1: D1Database
 ): Promise<Response> {
   const { cidl } = MetaContainer.init(rawCidl, constructorRegistry);
 
@@ -122,22 +122,16 @@ export async function cloesce(
   if (!route.ok) {
     return toResponse(route.value);
   }
-
-  // 2. Validate HTTP verb
   let { modelMeta, methodMeta, id } = route.value;
-  let isValidHttp = validateHttpVerb(request, methodMeta);
-  if (!isValidHttp.ok) {
-    return toResponse(isValidHttp.value);
-  }
 
-  // 3. Validate Request
+  // 2. Validate Request
   let isValidRequest = await validateRequest(request, cidl, methodMeta, id);
   if (!isValidRequest.ok) {
     return toResponse(isValidRequest.value);
   }
   let requestParamMap = isValidRequest.value;
 
-  // 4. Data Hydration
+  // 3. Data Hydration
   let instance: object;
   if (!methodMeta.is_static) {
     let successfulModel = await hydrateModel(
@@ -145,7 +139,7 @@ export async function cloesce(
       modelMeta,
       constructorRegistry,
       d1,
-      id!,
+      id!
     );
 
     if (!successfulModel.ok) {
@@ -157,9 +151,9 @@ export async function cloesce(
     instance = constructorRegistry[modelMeta.name];
   }
 
-  // 5. Method Dispatch
+  // 4. Method Dispatch
   return toResponse(
-    await methodDispatch(instance, methodMeta, requestParamMap, d1),
+    await methodDispatch(instance, methodMeta, requestParamMap, d1)
   );
 }
 
@@ -168,30 +162,40 @@ export async function cloesce(
 function matchRoute(
   request: Request,
   api_route: string,
-  cidl: MetaCidl,
+  cidl: MetaCidl
 ): Either<HttpResult, Route> {
   const url = new URL(request.url);
 
-  const err = left(error_state(404, `Path not found ${url.pathname}`));
-
-  if (!url.pathname.startsWith(api_route)) return err;
+  const notFound = (e: string) =>
+    left(error_state(404, `Path not found: ${e} ${url.pathname}`));
 
   const routeParts = url.pathname
     .slice(api_route.length)
     .split("/")
     .filter(Boolean);
 
-  if (routeParts.length < 2) return err;
+  if (routeParts.length < 2) {
+    return notFound("Expected /model/method or /model/:id/method");
+  }
 
+  // Attempt to extract from routeParts
   const modelName = routeParts[0];
   const methodName = routeParts[routeParts.length - 1];
   const id = routeParts.length === 3 ? routeParts[1] : null;
 
   const modelMeta = cidl.models[modelName];
-  if (!modelMeta) return err;
+  if (!modelMeta) {
+    return notFound(`Unknown model ${modelName}`);
+  }
 
   const methodMeta = modelMeta.methods[methodName];
-  if (!methodMeta) return err;
+  if (!methodMeta) {
+    return notFound(`Unknown method ${modelName}.${methodName}`);
+  }
+
+  if (request.method !== methodMeta.http_verb) {
+    return notFound("Unmatched HTTP method");
+  }
 
   return right({
     modelMeta,
@@ -200,38 +204,24 @@ function matchRoute(
   });
 }
 
-function validateHttpVerb(
-  request: Request,
-  methodMeta: ModelMethod,
-): Either<HttpResult, null> {
-  const url = new URL(request.url);
-  return request.method === methodMeta.http_verb
-    ? right(null)
-    : left(error_state(404, `Path not found ${url.pathname}`));
-}
-
 async function validateRequest(
   request: Request,
   cidl: MetaCidl,
   methodMeta: ModelMethod,
-  id: string | null,
+  id: string | null
 ): Promise<Either<HttpResult, RequestParamMap>> {
-  if (methodMeta.parameters.length < 1) {
-    return right({});
-  }
-
   // Error state: any missing parameter, body, or malformed input will exit with 400.
-  let invalid_request = left(error_state(400, "Invalid Request Body"));
+  const invalid_request = (e: string) =>
+    left(error_state(400, `Invalid Request Body: ${e}`));
 
-  // Id's are required for instantaited methods.
   if (!methodMeta.is_static && id == null) {
-    return invalid_request;
+    return invalid_request("Id's are required for instantiated methods.");
   }
 
   // Filter out any injected parameters that will not be passed
   // by the query.
   let requiredParams = methodMeta.parameters.filter(
-    (p) => p.cidl_type !== "D1Database",
+    (p) => p.cidl_type !== "D1Database"
   );
 
   let requestBodyMap: RequestParamMap;
@@ -242,88 +232,103 @@ async function validateRequest(
     try {
       requestBodyMap = await request.json();
     } catch {
-      return invalid_request;
+      return invalid_request("Could not retrieve JSON body.");
     }
   }
 
   // Ensure all required params exist
-  if (!requiredParams.every((p) => requestBodyMap[p.name] !== undefined)) {
-    return invalid_request;
+  if (!requiredParams.every((p) => p.name in requestBodyMap)) {
+    return invalid_request(`Missing parameters.`);
   }
 
   // Validate all parameters type
   for (const p of requiredParams) {
     const value = requestBodyMap[p.name];
-    if (!validateCidlType(value, p.cidl_type, cidl)) {
-      return invalid_request;
+    if (!validateCidlType(value, p.cidl_type, cidl, p.nullable)) {
+      return invalid_request("Invalid parameters.");
     }
   }
 
   return right(requestBodyMap);
-}
 
-function validateCidlType(
-  value: unknown,
-  cidlType: CidlType,
-  cidl: MetaCidl,
-): boolean {
-  if (value === null || value === undefined) return false;
+  function validateCidlType(
+    value: unknown,
+    cidlType: CidlType,
+    cidl: MetaCidl,
+    nullable: boolean
+  ): boolean {
+    if (value === undefined) return false;
 
-  // Handle primitive string types with switch
-  if (typeof cidlType === "string") {
-    switch (cidlType) {
-      case "Integer":
-        return Number.isInteger(Number(value));
-      case "Real":
-        return !Number.isNaN(Number(value));
-      case "Text":
-        return typeof value === "string";
-      case "Blob":
-        return value instanceof Blob || value instanceof ArrayBuffer;
-      default:
+    // TODO: consequences of null checking like this? 'null' is passed in
+    // as a string for GET requests...
+    if (value == null || value === "null") return nullable;
+
+    // Handle primitive string types with switch
+    if (typeof cidlType === "string") {
+      switch (cidlType) {
+        case "Integer":
+          return Number.isInteger(Number(value));
+        case "Real":
+          return !Number.isNaN(Number(value));
+        case "Text":
+          return typeof value === "string";
+        case "Blob":
+          return value instanceof Blob || value instanceof ArrayBuffer;
+        default:
+          return false;
+      }
+    }
+
+    // Handle object types
+    if ("Model" in cidlType) {
+      const model = cidl.models[cidlType.Model];
+      if (!model || typeof value !== "object") return false;
+      const obj = value as Record<string, unknown>;
+
+      // Validate attributes
+      if (
+        !model.attributes.every((attr) =>
+          validateCidlType(
+            obj[attr.value.name],
+            attr.value.cidl_type,
+            cidl,
+            attr.value.nullable
+          )
+        )
+      ) {
         return false;
+      }
+
+      // Validate navigation properties (optional)
+      return model.navigation_properties.every((nav) => {
+        const navValue = obj[nav.value.name];
+        return (
+          navValue == null ||
+          validateCidlType(
+            navValue,
+            nav.value.cidl_type,
+            cidl,
+            nav.value.nullable
+          )
+        );
+      });
     }
-  }
 
-  // Handle object types
-  if ("Model" in cidlType) {
-    const model = cidl.models[cidlType.Model];
-    if (!model || typeof value !== "object") return false;
-    const obj = value as Record<string, unknown>;
-
-    // Validate attributes
-    if (
-      !model.attributes.every((attr) =>
-        validateCidlType(obj[attr.value.name], attr.value.cidl_type, cidl),
-      )
-    ) {
-      return false;
-    }
-
-    // Validate navigation properties (optional)
-    return model.navigation_properties.every((nav) => {
-      const navValue = obj[nav.value.name];
+    if ("Array" in cidlType) {
       return (
-        navValue == null ||
-        validateCidlType(navValue, nav.value.cidl_type, cidl)
+        Array.isArray(value) &&
+        value.every((v) => validateCidlType(v, cidlType.Array, cidl, nullable))
       );
-    });
-  }
+    }
 
-  if ("Array" in cidlType) {
-    return (
-      Array.isArray(value) &&
-      value.every((v) => validateCidlType(v, cidlType.Array, cidl))
-    );
-  }
+    if ("HttpResult" in cidlType) {
+      if (value === null) return cidlType.HttpResult === null;
+      if (cidlType.HttpResult === null) return false;
+      return validateCidlType(value, cidlType.HttpResult, cidl, nullable);
+    }
 
-  if ("HttpResult" in cidlType) {
-    if (value === null) return cidlType.HttpResult === null;
-    if (cidlType.HttpResult === null) return false;
-    return validateCidlType(value, cidlType.HttpResult, cidl);
+    return false;
   }
-
-  return false;
 }
 
 async function hydrateModel(
@@ -331,7 +336,7 @@ async function hydrateModel(
   modelMeta: MetaModel,
   constructorRegistry: ConstructorRegistry,
   d1: D1Database,
-  id: string,
+  id: string
 ): Promise<Either<HttpResult, object>> {
   // Error state: If the D1 database has been tweaked outside of Cloesce
   // resulting in a malformed query, exit with a 500.
@@ -368,16 +373,13 @@ async function hydrateModel(
       cidl,
       constructorRegistry,
       records.results,
-      includeTree,
+      includeTree
     );
     return right(models[0]);
   }
 
   return right(
-    Object.assign(
-      new constructorRegistry[modelMeta.name](),
-      records.results[0],
-    ),
+    Object.assign(new constructorRegistry[modelMeta.name](), records.results[0])
   );
 }
 
@@ -385,14 +387,14 @@ async function methodDispatch(
   instance: InstantiatedUserDefinedModel,
   methodMeta: ModelMethod,
   params: Record<string, unknown>,
-  d1: D1Database,
+  d1: D1Database
 ): Promise<HttpResult<unknown>> {
   // Error state: Client code ran into an uncaught exception.
   const uncaughtException = (e: any) =>
     error_state(500, `${e instanceof Error ? e.message : String(e)}`);
 
   const paramArray = methodMeta.parameters.map((p) =>
-    params[p.name] == undefined ? d1 : params[p.name],
+    params[p.name] == undefined ? d1 : params[p.name]
   );
 
   // Ensure the result is always some HttpResult
@@ -412,7 +414,7 @@ async function methodDispatch(
 
   try {
     return resultWrapper(
-      await (instance as any)[methodMeta.name](...paramArray),
+      await (instance as any)[methodMeta.name](...paramArray)
     );
   } catch (e) {
     return uncaughtException(e);
@@ -427,7 +429,7 @@ function _modelsFromSql(
   cidl: MetaCidl,
   constructorRegistry: ConstructorRegistry,
   records: Record<string, any>[],
-  includeTree: Record<string, UserDefinedModel>,
+  includeTree: Record<string, UserDefinedModel>
 ): InstantiatedUserDefinedModel[] {
   if (!records.length) return [];
 
@@ -453,7 +455,7 @@ function _modelsFromSql(
     meta: MetaModel,
     attrName: string,
     row: Record<string, any>,
-    prefixed: boolean,
+    prefixed: boolean
   ) => row[prefixed ? `${meta.name}_${attrName}` : attrName] ?? null;
 
   const addUnique = (arr: any[], item: any, key: string) => {
@@ -469,7 +471,7 @@ function _modelsFromSql(
     meta: MetaModel,
     row: Record<string, any>,
     tree: Record<string, any>,
-    prefixed: boolean,
+    prefixed: boolean
   ): any => {
     const instance = new constructorRegistry[meta.name]();
 
@@ -519,7 +521,7 @@ function _modelsFromSql(
 
   for (const row of records) {
     const isPrefixed = Object.keys(row).some((k) =>
-      k.startsWith(`${modelName}_`),
+      k.startsWith(`${modelName}_`)
     );
     const rootId = String(isPrefixed ? row[`${modelName}_id`] : row[pkName]);
 
@@ -537,7 +539,7 @@ function _modelsFromSql(
       if (Array.isArray(val)) {
         existing[key] = existing[key] || [];
         val.forEach((item) =>
-          addUnique(existing[key], item, `${modelMeta.name}_${key}`),
+          addUnique(existing[key], item, `${modelMeta.name}_${key}`)
         );
       } else if (val != null) {
         existing[key] = val;
@@ -564,3 +566,13 @@ interface Route {
   methodMeta: ModelMethod;
   id: string | null;
 }
+
+/**
+ * Each individual state of the `cloesce` function for testing purposes.
+ */
+export const cloesceStates = {
+  matchRoute,
+  validateRequest,
+  hydrateModel,
+  methodDispatch,
+};
