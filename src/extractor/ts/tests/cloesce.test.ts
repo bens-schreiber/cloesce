@@ -1,4 +1,4 @@
-import { cloesceInternal } from "../src/cloesce";
+import { _cloesceInternal } from "../src/cloesce";
 import { HttpVerb, MetaCidl, NamedTypedValue } from "../src/common";
 
 const makeCidl = (methods: Record<string, any>) => ({
@@ -25,7 +25,7 @@ describe("Router Error States", () => {
     const url = "http://foo.com/api";
 
     // Act
-    const result = cloesceInternal.matchRoute(makeRequest(url), "/api", {
+    const result = _cloesceInternal.matchRoute(makeRequest(url), "/api", {
       models: {},
     });
 
@@ -53,7 +53,7 @@ describe("Router Error States", () => {
     };
 
     // Act
-    const result = cloesceInternal.matchRoute(makeRequest(url), "/api", cidl);
+    const result = _cloesceInternal.matchRoute(makeRequest(url), "/api", cidl);
 
     // Assert
     expect(result.value).toStrictEqual({
@@ -77,7 +77,7 @@ describe("Router Error States", () => {
     });
 
     // Act
-    const result = cloesceInternal.matchRoute(makeRequest(url), "/api", cidl);
+    const result = _cloesceInternal.matchRoute(makeRequest(url), "/api", cidl);
 
     // Assert
     expect(result.value).toStrictEqual({
@@ -101,7 +101,7 @@ describe("Router Error States", () => {
     });
 
     // Act
-    const result = cloesceInternal.matchRoute(makeRequest(url), "/api", cidl);
+    const result = _cloesceInternal.matchRoute(makeRequest(url), "/api", cidl);
 
     // Assert
     expect(result.value).toStrictEqual({
@@ -129,7 +129,7 @@ describe("Router Success States", () => {
     const url = "http://foo.com/api/Horse/neigh";
 
     // Act
-    const result = cloesceInternal.matchRoute(makeRequest(url), "/api", cidl);
+    const result = _cloesceInternal.matchRoute(makeRequest(url), "/api", cidl);
 
     // Assert
     expect(result.value).toStrictEqual({
@@ -144,7 +144,7 @@ describe("Router Success States", () => {
     const url = "http://foo.com/api/Horse/0/neigh";
 
     // Act
-    const result = cloesceInternal.matchRoute(makeRequest(url), "/api", cidl);
+    const result = _cloesceInternal.matchRoute(makeRequest(url), "/api", cidl);
 
     // Assert
     expect(result.value).toStrictEqual({
@@ -161,7 +161,7 @@ describe("Validate Request Error States", () => {
     const request = makeRequest("http://foo.com/api/Horse/0/neigh");
 
     // Act
-    const result = await cloesceInternal.validateRequest(
+    const result = await _cloesceInternal.validateRequest(
       request,
       { models: {} },
       {
@@ -188,7 +188,7 @@ describe("Validate Request Error States", () => {
     const request = makeRequest("http://foo.com/api/Horse/0/neigh");
 
     // Act
-    const result = await cloesceInternal.validateRequest(
+    const result = await _cloesceInternal.validateRequest(
       request,
       { models: {} },
       {
@@ -242,7 +242,7 @@ describe("Validate Request Error States", () => {
       });
 
       // Act
-      const result = await cloesceInternal.validateRequest(
+      const result = await _cloesceInternal.validateRequest(
         request,
         cidl,
         cidl.models.Horse.methods.neigh,
@@ -308,7 +308,7 @@ describe("Validate Request Success States", () => {
     });
 
     // Act
-    const result = await cloesceInternal.validateRequest(
+    const result = await _cloesceInternal.validateRequest(
       request,
       cidl,
       cidl.models.Horse.methods.neigh,
@@ -393,7 +393,7 @@ describe("modelsFromSql", () => {
     const records: any[] = [];
 
     // Act
-    const result = cloesceInternal._modelsFromSql(
+    const result = _cloesceInternal._modelsFromSql(
       modelName,
       baseCidl,
       constructorRegistry,
@@ -424,7 +424,7 @@ describe("modelsFromSql", () => {
     const tree = { riders: {} };
 
     // Act
-    const result = cloesceInternal._modelsFromSql(
+    const result = _cloesceInternal._modelsFromSql(
       modelName,
       baseCidl,
       constructorRegistry,
@@ -447,7 +447,7 @@ describe("modelsFromSql", () => {
     const records = [{ Horse_id: "1", Horse_name: "Lightning" }];
 
     // Act
-    const result = cloesceInternal._modelsFromSql(
+    const result = _cloesceInternal._modelsFromSql(
       modelName,
       baseCidl,
       constructorRegistry,
@@ -486,7 +486,7 @@ describe("modelsFromSql", () => {
     const tree = { riders: {} };
 
     // Act
-    const result = cloesceInternal._modelsFromSql(
+    const result = _cloesceInternal._modelsFromSql(
       modelName,
       baseCidl,
       constructorRegistry,
@@ -500,5 +500,175 @@ describe("modelsFromSql", () => {
     expect(horse.riders.map((r: any) => r.id)).toEqual(
       expect.arrayContaining(["r1", "r2"]),
     );
+  });
+});
+
+describe("methodDispatch", () => {
+  const createMethodMeta = (overrides: Partial<any> = {}) => ({
+    name: "testMethod",
+    is_static: true,
+    http_verb: HttpVerb.GET,
+    return_type: null,
+    parameters: [],
+    ...overrides,
+  });
+
+  const createMockD1 = (): any => ({
+    prepare: jest.fn(),
+    batch: jest.fn(),
+    exec: jest.fn(),
+    withSession: jest.fn(),
+    dump: jest.fn(),
+  });
+
+  test("returns 200 with no data when return_type is null", async () => {
+    // Arrange
+    const instance = {
+      testMethod: jest.fn().mockResolvedValue("ignored"),
+    };
+    const methodMeta = createMethodMeta({ return_type: null });
+    const params = {};
+    const d1 = createMockD1();
+
+    // Act
+    const result = await _cloesceInternal.methodDispatch(
+      instance,
+      methodMeta,
+      params,
+      d1,
+    );
+
+    // Assert
+    expect(instance.testMethod).toHaveBeenCalledWith();
+    expect(result).toStrictEqual({ ok: true, status: 200 });
+  });
+
+  test("wraps result in HttpResult when return_type is { HttpResult }", async () => {
+    // Arrange
+    const instance = {
+      testMethod: jest.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        data: "already wrapped",
+      }),
+    };
+    const methodMeta = createMethodMeta({ return_type: { HttpResult: null } });
+    const params = {};
+    const d1 = createMockD1();
+
+    // Act
+    const result = await _cloesceInternal.methodDispatch(
+      instance,
+      methodMeta,
+      params,
+      d1,
+    );
+
+    // Assert
+    expect(result).toStrictEqual({
+      ok: true,
+      status: 200,
+      data: "already wrapped",
+    });
+  });
+
+  test("wraps raw value when return_type is a value type", async () => {
+    // Arrange
+    const instance = {
+      testMethod: jest.fn().mockResolvedValue("neigh"),
+    };
+    const methodMeta = createMethodMeta({ return_type: "Text" });
+    const params = {};
+    const d1 = createMockD1();
+
+    // Act
+    const result = await _cloesceInternal.methodDispatch(
+      instance,
+      methodMeta,
+      params,
+      d1,
+    );
+
+    // Assert
+    expect(result).toStrictEqual({ ok: true, status: 200, data: "neigh" });
+  });
+
+  test("supplies d1 as default param when missing in params", async () => {
+    // Arrange
+    const d1 = createMockD1();
+    const instance = {
+      testMethod: jest.fn().mockResolvedValue("used d1"),
+    };
+    const methodMeta = createMethodMeta({
+      return_type: "Text",
+      parameters: [{ name: "database" }],
+    });
+    const params = {}; // missing "database"
+
+    // Act
+    const result = await _cloesceInternal.methodDispatch(
+      instance,
+      methodMeta,
+      params,
+      d1,
+    );
+
+    // Assert
+    expect(instance.testMethod).toHaveBeenCalledWith(d1);
+    expect(result).toStrictEqual({ ok: true, status: 200, data: "used d1" });
+  });
+
+  test("returns 500 on thrown Error", async () => {
+    // Arrange
+    const instance = {
+      testMethod: jest.fn().mockImplementation(() => {
+        throw new Error("boom");
+      }),
+    };
+    const methodMeta = createMethodMeta({ return_type: "Text" });
+    const params = {};
+    const d1 = createMockD1();
+
+    // Act
+    const result = await _cloesceInternal.methodDispatch(
+      instance,
+      methodMeta,
+      params,
+      d1,
+    );
+
+    // Assert
+    expect(result).toStrictEqual({
+      ok: false,
+      status: 500,
+      message: "boom",
+    });
+  });
+
+  test("returns 500 on thrown non-Error value", async () => {
+    // Arrange
+    const instance = {
+      testMethod: jest.fn().mockImplementation(() => {
+        throw "stringError";
+      }),
+    };
+    const methodMeta = createMethodMeta({ return_type: "Text" });
+    const params = {};
+    const d1 = createMockD1();
+
+    // Act
+    const result = await _cloesceInternal.methodDispatch(
+      instance,
+      methodMeta,
+      params,
+      d1,
+    );
+
+    // Assert
+    expect(result).toStrictEqual({
+      ok: false,
+      status: 500,
+      message: "stringError",
+    });
   });
 });

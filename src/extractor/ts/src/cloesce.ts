@@ -40,12 +40,12 @@ class MetaContainer {
   private static instance: MetaContainer | undefined;
   private constructor(
     public readonly cidl: MetaCidl,
-    public readonly constructorRegistry: ConstructorRegistry
+    public readonly constructorRegistry: ConstructorRegistry,
   ) {}
 
   static init(
     rawCidl: CidlSpec,
-    constructorRegistry: ConstructorRegistry
+    constructorRegistry: ConstructorRegistry,
   ): MetaContainer {
     if (!this.instance) {
       this.instance = new MetaContainer(
@@ -58,10 +58,10 @@ class MetaContainer {
                 ...m,
                 methods: Object.fromEntries(m.methods.map((x) => [x.name, x])),
               },
-            ])
+            ]),
           ),
         },
-        constructorRegistry
+        constructorRegistry,
       );
     }
     return this.instance;
@@ -86,7 +86,7 @@ class MetaContainer {
 export function modelsFromSql<T>(
   ctor: new () => UserDefinedModel,
   records: Record<string, any>[],
-  includeTree: Record<string, UserDefinedModel>
+  includeTree: Record<string, UserDefinedModel>,
 ): T[] {
   const { cidl, constructorRegistry } = MetaContainer.get();
   return _modelsFromSql(
@@ -94,7 +94,7 @@ export function modelsFromSql<T>(
     cidl,
     constructorRegistry,
     records,
-    includeTree
+    includeTree,
   ) as T[];
 }
 
@@ -113,33 +113,35 @@ export async function cloesce(
   constructorRegistry: ConstructorRegistry,
   request: Request,
   api_route: string,
-  d1: D1Database
+  d1: D1Database,
 ): Promise<Response> {
   const { cidl } = MetaContainer.init(rawCidl, constructorRegistry);
 
-  // 1. Route the HTTP request
+  // Match the route to a model method
   let route = matchRoute(request, api_route, cidl);
   if (!route.ok) {
     return toResponse(route.value);
   }
   let { modelMeta, methodMeta, id } = route.value;
 
-  // 2. Validate Request
+  // Validate request body to the model method
   let isValidRequest = await validateRequest(request, cidl, methodMeta, id);
   if (!isValidRequest.ok) {
     return toResponse(isValidRequest.value);
   }
   let requestParamMap = isValidRequest.value;
 
-  // 3. Data Hydration
+  // Instantatiate the model
   let instance: object;
-  if (!methodMeta.is_static) {
+  if (methodMeta.is_static) {
+    instance = constructorRegistry[modelMeta.name];
+  } else {
     let successfulModel = await hydrateModel(
       cidl,
       modelMeta,
       constructorRegistry,
       d1,
-      id!
+      id!,
     );
 
     if (!successfulModel.ok) {
@@ -147,23 +149,26 @@ export async function cloesce(
     }
 
     instance = successfulModel.value;
-  } else {
-    instance = constructorRegistry[modelMeta.name];
   }
 
-  // 4. Method Dispatch
+  // Dispatch a method on the model and return the result
   return toResponse(
-    await methodDispatch(instance, methodMeta, requestParamMap, d1)
+    await methodDispatch(instance, methodMeta, requestParamMap, d1),
   );
 }
 
 // TODO: In the previous version, we would walk a generated trie
 // This is more hardcode-y, and I'm not sure it will hold up to time.
+/**
+ * Matches a request to a method on a model.
+ * @param api_route The route from the domain to the actual API, ie https://foo.com/route/to/api => route/to/api/
+ * @returns 404 or a `MatchedRoute`
+ */
 function matchRoute(
   request: Request,
   api_route: string,
-  cidl: MetaCidl
-): Either<HttpResult, Route> {
+  cidl: MetaCidl,
+): Either<HttpResult, MatchedRoute> {
   const url = new URL(request.url);
 
   const notFound = (e: string) =>
@@ -204,11 +209,15 @@ function matchRoute(
   });
 }
 
+/**
+ * Validates the request's body/search params against a ModelMethod
+ * @returns 400 or a `RequestParamMap` consisting of each parameters name mapped to its value
+ */
 async function validateRequest(
   request: Request,
   cidl: MetaCidl,
   methodMeta: ModelMethod,
-  id: string | null
+  id: string | null,
 ): Promise<Either<HttpResult, RequestParamMap>> {
   // Error state: any missing parameter, body, or malformed input will exit with 400.
   const invalid_request = (e: string) =>
@@ -221,7 +230,7 @@ async function validateRequest(
   // Filter out any injected parameters that will not be passed
   // by the query.
   let requiredParams = methodMeta.parameters.filter(
-    (p) => p.cidl_type !== "D1Database"
+    (p) => p.cidl_type !== "D1Database",
   );
 
   let requestBodyMap: RequestParamMap;
@@ -255,7 +264,7 @@ async function validateRequest(
     value: unknown,
     cidlType: CidlType,
     cidl: MetaCidl,
-    nullable: boolean
+    nullable: boolean,
   ): boolean {
     if (value === undefined) return false;
 
@@ -292,8 +301,8 @@ async function validateRequest(
             obj[attr.value.name],
             attr.value.cidl_type,
             cidl,
-            attr.value.nullable
-          )
+            attr.value.nullable,
+          ),
         )
       ) {
         return false;
@@ -308,7 +317,7 @@ async function validateRequest(
             navValue,
             nav.value.cidl_type,
             cidl,
-            nav.value.nullable
+            nav.value.nullable,
           )
         );
       });
@@ -331,12 +340,19 @@ async function validateRequest(
   }
 }
 
+/**
+ * Queries D1 for a particular model's ID, then transforms the SQL column output into
+ * an instance of a model using the provided include tree and metadata as a guide.
+ * @returns 404 if no record was found for the provided ID
+ * @returns 500 if the D1 database is not synced with Cloesce and yields an error
+ * @returns The instantiated model on success
+ */
 async function hydrateModel(
   cidl: MetaCidl,
   modelMeta: MetaModel,
   constructorRegistry: ConstructorRegistry,
   d1: D1Database,
-  id: string
+  id: string,
 ): Promise<Either<HttpResult, object>> {
   // Error state: If the D1 database has been tweaked outside of Cloesce
   // resulting in a malformed query, exit with a 500.
@@ -373,28 +389,36 @@ async function hydrateModel(
       cidl,
       constructorRegistry,
       records.results,
-      includeTree
+      includeTree,
     );
     return right(models[0]);
   }
 
   return right(
-    Object.assign(new constructorRegistry[modelMeta.name](), records.results[0])
+    Object.assign(
+      new constructorRegistry[modelMeta.name](),
+      records.results[0],
+    ),
   );
 }
 
+/**
+ * Calls a method on a model given a list of parameters.
+ * @returns 500 on an uncaught client error, 200 with a result body on success
+ */
 async function methodDispatch(
   instance: InstantiatedUserDefinedModel,
   methodMeta: ModelMethod,
   params: Record<string, unknown>,
-  d1: D1Database
+  d1: D1Database,
 ): Promise<HttpResult<unknown>> {
   // Error state: Client code ran into an uncaught exception.
   const uncaughtException = (e: any) =>
     error_state(500, `${e instanceof Error ? e.message : String(e)}`);
 
+  // For now, the only injected dependency is d1, so we will assume that is what this is
   const paramArray = methodMeta.parameters.map((p) =>
-    params[p.name] == undefined ? d1 : params[p.name]
+    params[p.name] == undefined ? d1 : params[p.name],
   );
 
   // Ensure the result is always some HttpResult
@@ -414,7 +438,7 @@ async function methodDispatch(
 
   try {
     return resultWrapper(
-      await (instance as any)[methodMeta.name](...paramArray)
+      await (instance as any)[methodMeta.name](...paramArray),
     );
   } catch (e) {
     return uncaughtException(e);
@@ -432,7 +456,7 @@ function _modelsFromSql(
   cidl: MetaCidl,
   constructorRegistry: ConstructorRegistry,
   records: Record<string, any>[],
-  includeTree: Record<string, UserDefinedModel>
+  includeTree: Record<string, UserDefinedModel>,
 ): InstantiatedUserDefinedModel[] {
   if (!records.length) return [];
   const modelMeta = cidl.models[modelName];
@@ -446,7 +470,7 @@ function _modelsFromSql(
   // Create all root entities with initialized arrays
   for (const row of records) {
     const isPrefixed = Object.keys(row).some((k) =>
-      k.startsWith(`${modelName}_`)
+      k.startsWith(`${modelName}_`),
     );
     const rootId = String(isPrefixed ? row[`${modelName}_id`] : row[pkName]);
 
@@ -459,7 +483,7 @@ function _modelsFromSql(
           modelMeta,
           attr.value.name,
           row,
-          isPrefixed
+          isPrefixed,
         );
       }
 
@@ -478,7 +502,7 @@ function _modelsFromSql(
   // Populate navigation properties
   for (const row of records) {
     const isPrefixed = Object.keys(row).some((k) =>
-      k.startsWith(`${modelName}_`)
+      k.startsWith(`${modelName}_`),
     );
     const rootId = String(isPrefixed ? row[`${modelName}_id`] : row[pkName]);
     const existing = itemsById[rootId];
@@ -512,7 +536,7 @@ function _modelsFromSql(
           navMeta,
           row,
           includeTree[navName],
-          true
+          true,
         );
 
         if (isArray) {
@@ -520,7 +544,7 @@ function _modelsFromSql(
             existing[navName],
             nestedObj,
             `${modelMeta.name}_${navName}`,
-            navModelName
+            navModelName,
           );
         } else {
           existing[navName] = nestedObj;
@@ -543,7 +567,7 @@ function _modelsFromSql(
     meta: MetaModel,
     attrName: string,
     row: Record<string, any>,
-    prefixed: boolean
+    prefixed: boolean,
   ) {
     return row[prefixed ? `${meta.name}_${attrName}` : attrName] ?? null;
   }
@@ -567,7 +591,7 @@ function _modelsFromSql(
     meta: MetaModel,
     row: Record<string, any>,
     tree: Record<string, any>,
-    prefixed: boolean
+    prefixed: boolean,
   ): any {
     const instance = new constructorRegistry[meta.name]();
 
@@ -611,7 +635,7 @@ function _modelsFromSql(
             instance[navName],
             nestedObj,
             `${meta.name}_${navName}`,
-            navModelName
+            navModelName,
           );
         } else {
           instance[navName] = nestedObj;
@@ -633,7 +657,7 @@ function toResponse(r: HttpResult): Response {
   });
 }
 
-interface Route {
+interface MatchedRoute {
   modelMeta: MetaModel;
   methodMeta: ModelMethod;
   id: string | null;
@@ -642,7 +666,7 @@ interface Route {
 /**
  * Each individual state of the `cloesce` function for testing purposes.
  */
-export const cloesceInternal = {
+export const _cloesceInternal = {
   matchRoute,
   validateRequest,
   hydrateModel,

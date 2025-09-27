@@ -122,7 +122,7 @@ test("List horse returns all horses", async () => {
 
     const allHorses = [...horses, ...newHorses];
     const normalize = (arr: any[]) =>
-      arr.sort((a, b) => a.id - b.id).map((h) => ({ ...h })); // strips prototype so Horse === plain object
+      arr.sort((a, b) => a.id - b.id).map((h) => ({ ...h }));
     assert.deepEqual(normalize(res.data), normalize(allHorses));
   }
 });
