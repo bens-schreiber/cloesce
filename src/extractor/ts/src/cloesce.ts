@@ -423,6 +423,9 @@ async function methodDispatch(
 
 /**
  * Actual implementation of sql to model mapping.
+ *
+ * TODO: If we don't want to write this in every language, would it be possible to create a
+ * single WASM binary for this method?
  */
 function _modelsFromSql(
   modelName: string,
@@ -432,59 +435,58 @@ function _modelsFromSql(
   includeTree: Record<string, UserDefinedModel>
 ): InstantiatedUserDefinedModel[] {
   if (!records.length) return [];
-
   const modelMeta = cidl.models[modelName];
   if (!modelMeta) throw new Error(`Model ${modelName} not found in CIDL`);
-
   const pkAttr = modelMeta.attributes.find((a) => a.is_primary_key);
   if (!pkAttr) throw new Error(`Primary key not found for ${modelName}`);
   const pkName = pkAttr.value.name;
-
   const itemsById: Record<string, any> = {};
   const seenNestedIds: Record<string, Set<string>> = {};
 
-  function isCidlModel(value: CidlType): value is { Model: string } {
-    return typeof value === "object" && value !== null && "Model" in value;
+  // Create all root entities with initialized arrays
+  for (const row of records) {
+    const isPrefixed = Object.keys(row).some((k) =>
+      k.startsWith(`${modelName}_`)
+    );
+    const rootId = String(isPrefixed ? row[`${modelName}_id`] : row[pkName]);
+
+    if (!itemsById[rootId]) {
+      const instance = new constructorRegistry[modelName]();
+
+      // Assign scalar attributes
+      for (const attr of modelMeta.attributes) {
+        instance[attr.value.name] = getCol(
+          modelMeta,
+          attr.value.name,
+          row,
+          isPrefixed
+        );
+      }
+
+      // Initialize all array navigation properties
+      for (const nav of modelMeta.navigation_properties) {
+        const navCidlType = nav.value.cidl_type;
+        if (isCidlArray(navCidlType)) {
+          instance[nav.value.name] = [];
+        }
+      }
+
+      itemsById[rootId] = instance;
+    }
   }
 
-  function isCidlArray(value: CidlType): value is { Array: CidlType } {
-    return typeof value === "object" && value !== null && "Array" in value;
-  }
+  // Populate navigation properties
+  for (const row of records) {
+    const isPrefixed = Object.keys(row).some((k) =>
+      k.startsWith(`${modelName}_`)
+    );
+    const rootId = String(isPrefixed ? row[`${modelName}_id`] : row[pkName]);
+    const existing = itemsById[rootId];
 
-  const getCol = (
-    meta: MetaModel,
-    attrName: string,
-    row: Record<string, any>,
-    prefixed: boolean
-  ) => row[prefixed ? `${meta.name}_${attrName}` : attrName] ?? null;
-
-  const addUnique = (arr: any[], item: any, key: string) => {
-    seenNestedIds[key] = seenNestedIds[key] || new Set();
-    const id = String(item[Object.keys(item)[0]]);
-    if (!seenNestedIds[key].has(id)) {
-      arr.push(item);
-      seenNestedIds[key].add(id);
-    }
-  };
-
-  const buildInstance = (
-    meta: MetaModel,
-    row: Record<string, any>,
-    tree: Record<string, any>,
-    prefixed: boolean
-  ): any => {
-    const instance = new constructorRegistry[meta.name]();
-
-    // Assign scalar attributes
-    for (const attr of meta.attributes) {
-      instance[attr.value.name] = getCol(meta, attr.value.name, row, prefixed);
-    }
-
-    // Assign navigation properties
-    for (const nav of meta.navigation_properties) {
+    // Process navigation properties
+    for (const nav of modelMeta.navigation_properties) {
       const navName = nav.value.name;
       const navCidlType = nav.value.cidl_type;
-
       let navModelName: string | undefined;
 
       if (isCidlArray(navCidlType)) {
@@ -502,52 +504,122 @@ function _modelsFromSql(
 
       const nestedPkAttr = navMeta.attributes.find((a) => a.is_primary_key)!;
       const nestedId = row[`${navMeta.name}_${nestedPkAttr.value.name}`];
-
       const isArray = isCidlArray(navCidlType);
-      if (isArray) instance[navName] = instance[navName] || [];
 
-      if (tree?.[navName] && nestedId != null) {
-        const nestedObj = buildInstance(navMeta, row, tree[navName], true);
-        if (isArray)
-          addUnique(instance[navName], nestedObj, `${meta.name}_${navName}`);
-        else instance[navName] = nestedObj;
-      } else if (isArray) {
-        instance[navName] = instance[navName] || [];
-      }
-    }
-
-    return instance;
-  };
-
-  for (const row of records) {
-    const isPrefixed = Object.keys(row).some((k) =>
-      k.startsWith(`${modelName}_`)
-    );
-    const rootId = String(isPrefixed ? row[`${modelName}_id`] : row[pkName]);
-
-    const instance = buildInstance(modelMeta, row, includeTree, isPrefixed);
-
-    if (!itemsById[rootId]) {
-      itemsById[rootId] = instance;
-      continue;
-    }
-
-    // Merge scalars and arrays for duplicates
-    const existing = itemsById[rootId];
-    for (const key in instance) {
-      const val = instance[key];
-      if (Array.isArray(val)) {
-        existing[key] = existing[key] || [];
-        val.forEach((item) =>
-          addUnique(existing[key], item, `${modelMeta.name}_${key}`)
+      // Only process if we're supposed to include this navigation property AND there's data
+      if (includeTree?.[navName] && nestedId != null) {
+        const nestedObj = buildInstance(
+          navMeta,
+          row,
+          includeTree[navName],
+          true
         );
-      } else if (val != null) {
-        existing[key] = val;
+
+        if (isArray) {
+          addUnique(
+            existing[navName],
+            nestedObj,
+            `${modelMeta.name}_${navName}`,
+            navModelName
+          );
+        } else {
+          existing[navName] = nestedObj;
+        }
       }
     }
   }
 
   return Object.values(itemsById);
+
+  function isCidlModel(value: CidlType): value is { Model: string } {
+    return typeof value === "object" && value !== null && "Model" in value;
+  }
+
+  function isCidlArray(value: CidlType): value is { Array: CidlType } {
+    return typeof value === "object" && value !== null && "Array" in value;
+  }
+
+  function getCol(
+    meta: MetaModel,
+    attrName: string,
+    row: Record<string, any>,
+    prefixed: boolean
+  ) {
+    return row[prefixed ? `${meta.name}_${attrName}` : attrName] ?? null;
+  }
+
+  function addUnique(arr: any[], item: any, key: string, navModelName: string) {
+    seenNestedIds[key] = seenNestedIds[key] || new Set();
+
+    // Get the primary key name for the nested model
+    const navMeta = cidl.models[navModelName];
+    const nestedPkAttr = navMeta?.attributes.find((a) => a.is_primary_key);
+    const nestedPkName = nestedPkAttr?.value.name || "id";
+
+    const id = String(item[nestedPkName]);
+    if (!seenNestedIds[key].has(id)) {
+      arr.push(item);
+      seenNestedIds[key].add(id);
+    }
+  }
+
+  function buildInstance(
+    meta: MetaModel,
+    row: Record<string, any>,
+    tree: Record<string, any>,
+    prefixed: boolean
+  ): any {
+    const instance = new constructorRegistry[meta.name]();
+
+    // Assign scalar attributes
+    for (const attr of meta.attributes) {
+      instance[attr.value.name] = getCol(meta, attr.value.name, row, prefixed);
+    }
+
+    // Assign navigation properties
+    for (const nav of meta.navigation_properties) {
+      const navName = nav.value.name;
+      const navCidlType = nav.value.cidl_type;
+      let navModelName: string | undefined;
+
+      if (isCidlArray(navCidlType)) {
+        if (isCidlModel(navCidlType.Array)) {
+          navModelName = navCidlType.Array.Model;
+        }
+      } else if (isCidlModel(navCidlType)) {
+        navModelName = navCidlType.Model;
+      }
+
+      if (!navModelName) continue;
+
+      const navMeta = cidl.models[navModelName];
+      if (!navMeta) continue;
+
+      const nestedPkAttr = navMeta.attributes.find((a) => a.is_primary_key)!;
+      const nestedId = row[`${navMeta.name}_${nestedPkAttr.value.name}`];
+      const isArray = isCidlArray(navCidlType);
+
+      // Always initialize arrays, even if empty
+      if (isArray) {
+        instance[navName] = instance[navName] || [];
+      }
+
+      if (tree?.[navName] && nestedId != null) {
+        const nestedObj = buildInstance(navMeta, row, tree[navName], true);
+        if (isArray) {
+          addUnique(
+            instance[navName],
+            nestedObj,
+            `${meta.name}_${navName}`,
+            navModelName
+          );
+        } else {
+          instance[navName] = nestedObj;
+        }
+      }
+    }
+    return instance;
+  }
 }
 
 function error_state(status: number, message: string): HttpResult {
@@ -570,9 +642,10 @@ interface Route {
 /**
  * Each individual state of the `cloesce` function for testing purposes.
  */
-export const cloesceStates = {
+export const cloesceInternal = {
   matchRoute,
   validateRequest,
   hydrateModel,
   methodDispatch,
+  _modelsFromSql,
 };

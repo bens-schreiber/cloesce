@@ -1,4 +1,4 @@
-import { cloesceStates } from "../src/cloesce";
+import { cloesceInternal } from "../src/cloesce";
 import { HttpVerb, MetaCidl, NamedTypedValue } from "../src/common";
 
 const makeCidl = (methods: Record<string, any>) => ({
@@ -16,7 +16,7 @@ const makeCidl = (methods: Record<string, any>) => ({
 const makeRequest = (url: string, method?: string, body?: any) =>
   new Request(
     url,
-    method ? { method, body: body && JSON.stringify(body) } : undefined
+    method ? { method, body: body && JSON.stringify(body) } : undefined,
   );
 
 describe("Router Error States", () => {
@@ -25,7 +25,7 @@ describe("Router Error States", () => {
     const url = "http://foo.com/api";
 
     // Act
-    const result = cloesceStates.matchRoute(makeRequest(url), "/api", {
+    const result = cloesceInternal.matchRoute(makeRequest(url), "/api", {
       models: {},
     });
 
@@ -53,7 +53,7 @@ describe("Router Error States", () => {
     };
 
     // Act
-    const result = cloesceStates.matchRoute(makeRequest(url), "/api", cidl);
+    const result = cloesceInternal.matchRoute(makeRequest(url), "/api", cidl);
 
     // Assert
     expect(result.value).toStrictEqual({
@@ -77,7 +77,7 @@ describe("Router Error States", () => {
     });
 
     // Act
-    const result = cloesceStates.matchRoute(makeRequest(url), "/api", cidl);
+    const result = cloesceInternal.matchRoute(makeRequest(url), "/api", cidl);
 
     // Assert
     expect(result.value).toStrictEqual({
@@ -101,7 +101,7 @@ describe("Router Error States", () => {
     });
 
     // Act
-    const result = cloesceStates.matchRoute(makeRequest(url), "/api", cidl);
+    const result = cloesceInternal.matchRoute(makeRequest(url), "/api", cidl);
 
     // Assert
     expect(result.value).toStrictEqual({
@@ -129,7 +129,7 @@ describe("Router Success States", () => {
     const url = "http://foo.com/api/Horse/neigh";
 
     // Act
-    const result = cloesceStates.matchRoute(makeRequest(url), "/api", cidl);
+    const result = cloesceInternal.matchRoute(makeRequest(url), "/api", cidl);
 
     // Assert
     expect(result.value).toStrictEqual({
@@ -144,7 +144,7 @@ describe("Router Success States", () => {
     const url = "http://foo.com/api/Horse/0/neigh";
 
     // Act
-    const result = cloesceStates.matchRoute(makeRequest(url), "/api", cidl);
+    const result = cloesceInternal.matchRoute(makeRequest(url), "/api", cidl);
 
     // Assert
     expect(result.value).toStrictEqual({
@@ -161,7 +161,7 @@ describe("Validate Request Error States", () => {
     const request = makeRequest("http://foo.com/api/Horse/0/neigh");
 
     // Act
-    const result = await cloesceStates.validateRequest(
+    const result = await cloesceInternal.validateRequest(
       request,
       { models: {} },
       {
@@ -171,7 +171,7 @@ describe("Validate Request Error States", () => {
         return_type: null,
         parameters: [],
       },
-      null
+      null,
     );
 
     // Assert
@@ -188,7 +188,7 @@ describe("Validate Request Error States", () => {
     const request = makeRequest("http://foo.com/api/Horse/0/neigh");
 
     // Act
-    const result = await cloesceStates.validateRequest(
+    const result = await cloesceInternal.validateRequest(
       request,
       { models: {} },
       {
@@ -198,7 +198,7 @@ describe("Validate Request Error States", () => {
         return_type: null,
         parameters: [],
       },
-      null
+      null,
     );
 
     // Assert
@@ -242,11 +242,11 @@ describe("Validate Request Error States", () => {
       });
 
       // Act
-      const result = await cloesceStates.validateRequest(
+      const result = await cloesceInternal.validateRequest(
         request,
         cidl,
         cidl.models.Horse.methods.neigh,
-        "0"
+        "0",
       );
 
       // Assert
@@ -255,7 +255,7 @@ describe("Validate Request Error States", () => {
         status: 400,
         message: `Invalid Request Body: ${message}.`,
       });
-    }
+    },
   );
 });
 
@@ -283,8 +283,8 @@ describe("Validate Request Success States", () => {
         is_get,
         value: nullable ? null : i.value,
         typed_value: { ...i.typed_value, nullable },
-      }))
-    )
+      })),
+    ),
   );
 
   test.each(expanded)("input is accepted %#", async (arg) => {
@@ -295,7 +295,7 @@ describe("Validate Request Success States", () => {
     const request = makeRequest(
       url,
       arg.is_get ? undefined : "POST",
-      arg.is_get ? undefined : { [arg.typed_value.name]: arg.value }
+      arg.is_get ? undefined : { [arg.typed_value.name]: arg.value },
     );
     const cidl: MetaCidl = makeCidl({
       neigh: {
@@ -308,16 +308,197 @@ describe("Validate Request Success States", () => {
     });
 
     // Act
-    const result = await cloesceStates.validateRequest(
+    const result = await cloesceInternal.validateRequest(
       request,
       cidl,
       cidl.models.Horse.methods.neigh,
-      "0"
+      "0",
     );
 
     // Assert
     expect(result.value).toEqual({
       [arg.typed_value.name]: arg.is_get ? String(arg.value) : arg.value,
     });
+  });
+});
+
+describe("modelsFromSql", () => {
+  const modelName = "Horse";
+  const nestedModelName = "Rider";
+
+  const constructorRegistry = {
+    [modelName]: class {
+      id?: string;
+      name?: string;
+      riders?: any[];
+    },
+    [nestedModelName]: class {
+      id?: string;
+      nickname?: string;
+    },
+  };
+
+  const baseCidl: MetaCidl = {
+    models: {
+      [modelName]: {
+        name: modelName,
+        attributes: [
+          {
+            is_primary_key: true,
+            value: { name: "id", cidl_type: "Integer", nullable: false },
+            foreign_key_reference: null,
+          },
+          {
+            is_primary_key: false,
+            value: { name: "name", cidl_type: "Text", nullable: true },
+            foreign_key_reference: null,
+          },
+        ],
+        navigation_properties: [
+          {
+            value: {
+              name: "riders",
+              cidl_type: { Array: { Model: nestedModelName } },
+              nullable: false,
+            },
+            kind: { OneToMany: { reference: "id" } },
+          },
+        ],
+        data_sources: [],
+        methods: {},
+      },
+      [nestedModelName]: {
+        name: nestedModelName,
+        attributes: [
+          {
+            is_primary_key: true,
+            value: { name: "id", cidl_type: "Integer", nullable: false },
+            foreign_key_reference: null,
+          },
+          {
+            is_primary_key: false,
+            value: { name: "nickname", cidl_type: "Text", nullable: true },
+            foreign_key_reference: null,
+          },
+        ],
+        navigation_properties: [],
+        data_sources: [],
+        methods: {},
+      },
+    },
+  };
+
+  test("returns empty array if no records", () => {
+    // Arrange
+    const records: any[] = [];
+
+    // Act
+    const result = cloesceInternal._modelsFromSql(
+      modelName,
+      baseCidl,
+      constructorRegistry,
+      records,
+      {},
+    );
+
+    // Assert
+    expect(result).toEqual([]);
+  });
+
+  test("assigns scalar attributes and navigation arrays correctly", () => {
+    // Arrange
+    const records = [
+      {
+        Horse_id: "1",
+        Horse_name: "Thunder",
+        Rider_id: "r1",
+        Rider_nickname: "Speedy",
+      },
+      {
+        Horse_id: "1",
+        Horse_name: "Thunder",
+        Rider_id: "r2",
+        Rider_nickname: "Flash",
+      },
+    ];
+    const tree = { riders: {} };
+
+    // Act
+    const result = cloesceInternal._modelsFromSql(
+      modelName,
+      baseCidl,
+      constructorRegistry,
+      records,
+      tree,
+    );
+    const horse: any = result[0];
+
+    // Assert
+    expect(horse.id).toBe("1");
+    expect(horse.name).toBe("Thunder");
+    expect(Array.isArray(horse.riders)).toBe(true);
+    expect(horse.riders.map((r: any) => r.id)).toEqual(
+      expect.arrayContaining(["r1", "r2"]),
+    );
+  });
+
+  test("handles prefixed columns correctly", () => {
+    // Arrange
+    const records = [{ Horse_id: "1", Horse_name: "Lightning" }];
+
+    // Act
+    const result = cloesceInternal._modelsFromSql(
+      modelName,
+      baseCidl,
+      constructorRegistry,
+      records,
+      {},
+    );
+    const horse: any = result[0];
+
+    // Assert
+    expect(horse.id).toBe("1");
+    expect(horse.name).toBe("Lightning");
+  });
+
+  test("merges duplicate rows with arrays", () => {
+    // Arrange
+    const records = [
+      {
+        Horse_id: "1",
+        Horse_name: "hoarse",
+        Rider_id: "r1",
+        Rider_nickname: "Speedy",
+      },
+      {
+        Horse_id: "1",
+        Horse_name: "hoarse",
+        Rider_id: "r1",
+        Rider_nickname: "Speedy",
+      },
+      {
+        Horse_id: "1",
+        Horse_name: "hoarse",
+        Rider_id: "r2",
+        Rider_nickname: "Flash",
+      },
+    ];
+    const tree = { riders: {} };
+
+    // Act
+    const result = cloesceInternal._modelsFromSql(
+      modelName,
+      baseCidl,
+      constructorRegistry,
+      records,
+      tree,
+    );
+    const horse: any = result[0];
+
+    // Assert
+    expect(horse.riders.length).toBe(2);
+    expect(horse.riders.map((r: any) => r.id)).toEqual(
+      expect.arrayContaining(["r1", "r2"]),
+    );
   });
 });
