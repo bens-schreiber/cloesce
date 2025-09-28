@@ -117,29 +117,25 @@ export async function cloesce(
 ): Promise<Response> {
   const { cidl } = MetaContainer.init(rawCidl, constructorRegistry);
 
-  // 1. Route the HTTP request
+  // Match the route to a model method
   let route = matchRoute(request, api_route, cidl);
   if (!route.ok) {
     return toResponse(route.value);
   }
-
-  // 2. Validate HTTP verb
   let { modelMeta, methodMeta, id } = route.value;
-  let isValidHttp = validateHttpVerb(request, methodMeta);
-  if (!isValidHttp.ok) {
-    return toResponse(isValidHttp.value);
-  }
 
-  // 3. Validate Request
+  // Validate request body to the model method
   let isValidRequest = await validateRequest(request, cidl, methodMeta, id);
   if (!isValidRequest.ok) {
     return toResponse(isValidRequest.value);
   }
   let requestParamMap = isValidRequest.value;
 
-  // 4. Data Hydration
+  // Instantatiate the model
   let instance: object;
-  if (!methodMeta.is_static) {
+  if (methodMeta.is_static) {
+    instance = constructorRegistry[modelMeta.name];
+  } else {
     let successfulModel = await hydrateModel(
       cidl,
       modelMeta,
@@ -153,11 +149,9 @@ export async function cloesce(
     }
 
     instance = successfulModel.value;
-  } else {
-    instance = constructorRegistry[modelMeta.name];
   }
 
-  // 5. Method Dispatch
+  // Dispatch a method on the model and return the result
   return toResponse(
     await methodDispatch(instance, methodMeta, requestParamMap, d1),
   );
@@ -165,33 +159,48 @@ export async function cloesce(
 
 // TODO: In the previous version, we would walk a generated trie
 // This is more hardcode-y, and I'm not sure it will hold up to time.
+/**
+ * Matches a request to a method on a model.
+ * @param api_route The route from the domain to the actual API, ie https://foo.com/route/to/api => route/to/api/
+ * @returns 404 or a `MatchedRoute`
+ */
 function matchRoute(
   request: Request,
   api_route: string,
   cidl: MetaCidl,
-): Either<HttpResult, Route> {
+): Either<HttpResult, MatchedRoute> {
   const url = new URL(request.url);
 
-  const err = left(error_state(404, `Path not found ${url.pathname}`));
-
-  if (!url.pathname.startsWith(api_route)) return err;
+  const notFound = (e: string) =>
+    left(error_state(404, `Path not found: ${e} ${url.pathname}`));
 
   const routeParts = url.pathname
     .slice(api_route.length)
     .split("/")
     .filter(Boolean);
 
-  if (routeParts.length < 2) return err;
+  if (routeParts.length < 2) {
+    return notFound("Expected /model/method or /model/:id/method");
+  }
 
+  // Attempt to extract from routeParts
   const modelName = routeParts[0];
   const methodName = routeParts[routeParts.length - 1];
   const id = routeParts.length === 3 ? routeParts[1] : null;
 
   const modelMeta = cidl.models[modelName];
-  if (!modelMeta) return err;
+  if (!modelMeta) {
+    return notFound(`Unknown model ${modelName}`);
+  }
 
   const methodMeta = modelMeta.methods[methodName];
-  if (!methodMeta) return err;
+  if (!methodMeta) {
+    return notFound(`Unknown method ${modelName}.${methodName}`);
+  }
+
+  if (request.method !== methodMeta.http_verb) {
+    return notFound("Unmatched HTTP method");
+  }
 
   return right({
     modelMeta,
@@ -200,32 +209,22 @@ function matchRoute(
   });
 }
 
-function validateHttpVerb(
-  request: Request,
-  methodMeta: ModelMethod,
-): Either<HttpResult, null> {
-  const url = new URL(request.url);
-  return request.method === methodMeta.http_verb
-    ? right(null)
-    : left(error_state(404, `Path not found ${url.pathname}`));
-}
-
+/**
+ * Validates the request's body/search params against a ModelMethod
+ * @returns 400 or a `RequestParamMap` consisting of each parameters name mapped to its value
+ */
 async function validateRequest(
   request: Request,
   cidl: MetaCidl,
   methodMeta: ModelMethod,
   id: string | null,
 ): Promise<Either<HttpResult, RequestParamMap>> {
-  if (methodMeta.parameters.length < 1) {
-    return right({});
-  }
-
   // Error state: any missing parameter, body, or malformed input will exit with 400.
-  let invalid_request = left(error_state(400, "Invalid Request Body"));
+  const invalid_request = (e: string) =>
+    left(error_state(400, `Invalid Request Body: ${e}`));
 
-  // Id's are required for instantaited methods.
   if (!methodMeta.is_static && id == null) {
-    return invalid_request;
+    return invalid_request("Id's are required for instantiated methods.");
   }
 
   // Filter out any injected parameters that will not be passed
@@ -242,90 +241,112 @@ async function validateRequest(
     try {
       requestBodyMap = await request.json();
     } catch {
-      return invalid_request;
+      return invalid_request("Could not retrieve JSON body.");
     }
   }
 
   // Ensure all required params exist
-  if (!requiredParams.every((p) => requestBodyMap[p.name] !== undefined)) {
-    return invalid_request;
+  if (!requiredParams.every((p) => p.name in requestBodyMap)) {
+    return invalid_request(`Missing parameters.`);
   }
 
   // Validate all parameters type
   for (const p of requiredParams) {
     const value = requestBodyMap[p.name];
-    if (!validateCidlType(value, p.cidl_type, cidl)) {
-      return invalid_request;
+    if (!validateCidlType(value, p.cidl_type, cidl, p.nullable)) {
+      return invalid_request("Invalid parameters.");
     }
   }
 
   return right(requestBodyMap);
-}
 
-function validateCidlType(
-  value: unknown,
-  cidlType: CidlType,
-  cidl: MetaCidl,
-): boolean {
-  if (value === null || value === undefined) return false;
+  function validateCidlType(
+    value: unknown,
+    cidlType: CidlType,
+    cidl: MetaCidl,
+    nullable: boolean,
+  ): boolean {
+    if (value === undefined) return false;
 
-  // Handle primitive string types with switch
-  if (typeof cidlType === "string") {
-    switch (cidlType) {
-      case "Integer":
-        return Number.isInteger(Number(value));
-      case "Real":
-        return !Number.isNaN(Number(value));
-      case "Text":
-        return typeof value === "string";
-      case "Blob":
-        return value instanceof Blob || value instanceof ArrayBuffer;
-      default:
+    // TODO: consequences of null checking like this? 'null' is passed in
+    // as a string for GET requests...
+    if (value == null || value === "null") return nullable;
+
+    // Handle primitive string types with switch
+    if (typeof cidlType === "string") {
+      switch (cidlType) {
+        case "Integer":
+          return Number.isInteger(Number(value));
+        case "Real":
+          return !Number.isNaN(Number(value));
+        case "Text":
+          return typeof value === "string";
+        case "Blob":
+          return value instanceof Blob || value instanceof ArrayBuffer;
+        default:
+          return false;
+      }
+    }
+
+    // Handle object types
+    if ("Model" in cidlType) {
+      const model = cidl.models[cidlType.Model];
+      if (!model || typeof value !== "object") return false;
+      const obj = value as Record<string, unknown>;
+
+      // Validate attributes
+      if (
+        !model.attributes.every((attr) =>
+          validateCidlType(
+            obj[attr.value.name],
+            attr.value.cidl_type,
+            cidl,
+            attr.value.nullable,
+          ),
+        )
+      ) {
         return false;
+      }
+
+      // Validate navigation properties (optional)
+      return model.navigation_properties.every((nav) => {
+        const navValue = obj[nav.value.name];
+        return (
+          navValue == null ||
+          validateCidlType(
+            navValue,
+            nav.value.cidl_type,
+            cidl,
+            nav.value.nullable,
+          )
+        );
+      });
     }
-  }
 
-  // Handle object types
-  if ("Model" in cidlType) {
-    const model = cidl.models[cidlType.Model];
-    if (!model || typeof value !== "object") return false;
-    const obj = value as Record<string, unknown>;
-
-    // Validate attributes
-    if (
-      !model.attributes.every((attr) =>
-        validateCidlType(obj[attr.value.name], attr.value.cidl_type, cidl),
-      )
-    ) {
-      return false;
-    }
-
-    // Validate navigation properties (optional)
-    return model.navigation_properties.every((nav) => {
-      const navValue = obj[nav.value.name];
+    if ("Array" in cidlType) {
       return (
-        navValue == null ||
-        validateCidlType(navValue, nav.value.cidl_type, cidl)
+        Array.isArray(value) &&
+        value.every((v) => validateCidlType(v, cidlType.Array, cidl, nullable))
       );
-    });
-  }
+    }
 
-  if ("Array" in cidlType) {
-    return (
-      Array.isArray(value) &&
-      value.every((v) => validateCidlType(v, cidlType.Array, cidl))
-    );
-  }
+    if ("HttpResult" in cidlType) {
+      if (value === null) return cidlType.HttpResult === null;
+      if (cidlType.HttpResult === null) return false;
+      return validateCidlType(value, cidlType.HttpResult, cidl, nullable);
+    }
 
-  if ("HttpResult" in cidlType) {
-    if (value === null) return cidlType.HttpResult === null;
-    if (cidlType.HttpResult === null) return false;
-    return validateCidlType(value, cidlType.HttpResult, cidl);
+    return false;
   }
-
-  return false;
 }
 
+/**
+ * Queries D1 for a particular model's ID, then transforms the SQL column output into
+ * an instance of a model using the provided include tree and metadata as a guide.
+ * @returns 404 if no record was found for the provided ID
+ * @returns 500 if the D1 database is not synced with Cloesce and yields an error
+ * @returns The instantiated model on success
+ */
 async function hydrateModel(
   cidl: MetaCidl,
   modelMeta: MetaModel,
@@ -381,6 +402,10 @@ async function hydrateModel(
   );
 }
 
+/**
+ * Calls a method on a model given a list of parameters.
+ * @returns 500 on an uncaught client error, 200 with a result body on success
+ */
 async function methodDispatch(
   instance: InstantiatedUserDefinedModel,
   methodMeta: ModelMethod,
@@ -391,6 +416,7 @@ async function methodDispatch(
   const uncaughtException = (e: any) =>
     error_state(500, `${e instanceof Error ? e.message : String(e)}`);
 
+  // For now, the only injected dependency is d1, so we will assume that is what this is
   const paramArray = methodMeta.parameters.map((p) =>
     params[p.name] == undefined ? d1 : params[p.name],
   );
@@ -421,6 +447,9 @@ async function methodDispatch(
 
 /**
  * Actual implementation of sql to model mapping.
+ *
+ * TODO: If we don't want to write this in every language, would it be possible to create a
+ * single WASM binary for this method?
  */
 function _modelsFromSql(
   modelName: string,
@@ -430,59 +459,58 @@ function _modelsFromSql(
   includeTree: Record<string, UserDefinedModel>,
 ): InstantiatedUserDefinedModel[] {
   if (!records.length) return [];
-
   const modelMeta = cidl.models[modelName];
   if (!modelMeta) throw new Error(`Model ${modelName} not found in CIDL`);
-
   const pkAttr = modelMeta.attributes.find((a) => a.is_primary_key);
   if (!pkAttr) throw new Error(`Primary key not found for ${modelName}`);
   const pkName = pkAttr.value.name;
-
   const itemsById: Record<string, any> = {};
   const seenNestedIds: Record<string, Set<string>> = {};
 
-  function isCidlModel(value: CidlType): value is { Model: string } {
-    return typeof value === "object" && value !== null && "Model" in value;
+  // Create all root entities with initialized arrays
+  for (const row of records) {
+    const isPrefixed = Object.keys(row).some((k) =>
+      k.startsWith(`${modelName}_`),
+    );
+    const rootId = String(isPrefixed ? row[`${modelName}_id`] : row[pkName]);
+
+    if (!itemsById[rootId]) {
+      const instance = new constructorRegistry[modelName]();
+
+      // Assign scalar attributes
+      for (const attr of modelMeta.attributes) {
+        instance[attr.value.name] = getCol(
+          modelMeta,
+          attr.value.name,
+          row,
+          isPrefixed,
+        );
+      }
+
+      // Initialize all array navigation properties
+      for (const nav of modelMeta.navigation_properties) {
+        const navCidlType = nav.value.cidl_type;
+        if (isCidlArray(navCidlType)) {
+          instance[nav.value.name] = [];
+        }
+      }
+
+      itemsById[rootId] = instance;
+    }
   }
 
-  function isCidlArray(value: CidlType): value is { Array: CidlType } {
-    return typeof value === "object" && value !== null && "Array" in value;
-  }
+  // Populate navigation properties
+  for (const row of records) {
+    const isPrefixed = Object.keys(row).some((k) =>
+      k.startsWith(`${modelName}_`),
+    );
+    const rootId = String(isPrefixed ? row[`${modelName}_id`] : row[pkName]);
+    const existing = itemsById[rootId];
 
-  const getCol = (
-    meta: MetaModel,
-    attrName: string,
-    row: Record<string, any>,
-    prefixed: boolean,
-  ) => row[prefixed ? `${meta.name}_${attrName}` : attrName] ?? null;
-
-  const addUnique = (arr: any[], item: any, key: string) => {
-    seenNestedIds[key] = seenNestedIds[key] || new Set();
-    const id = String(item[Object.keys(item)[0]]);
-    if (!seenNestedIds[key].has(id)) {
-      arr.push(item);
-      seenNestedIds[key].add(id);
-    }
-  };
-
-  const buildInstance = (
-    meta: MetaModel,
-    row: Record<string, any>,
-    tree: Record<string, any>,
-    prefixed: boolean,
-  ): any => {
-    const instance = new constructorRegistry[meta.name]();
-
-    // Assign scalar attributes
-    for (const attr of meta.attributes) {
-      instance[attr.value.name] = getCol(meta, attr.value.name, row, prefixed);
-    }
-
-    // Assign navigation properties
-    for (const nav of meta.navigation_properties) {
+    // Process navigation properties
+    for (const nav of modelMeta.navigation_properties) {
       const navName = nav.value.name;
       const navCidlType = nav.value.cidl_type;
-
       let navModelName: string | undefined;
 
       if (isCidlArray(navCidlType)) {
@@ -500,52 +528,122 @@ function _modelsFromSql(
 
       const nestedPkAttr = navMeta.attributes.find((a) => a.is_primary_key)!;
       const nestedId = row[`${navMeta.name}_${nestedPkAttr.value.name}`];
-
       const isArray = isCidlArray(navCidlType);
-      if (isArray) instance[navName] = instance[navName] || [];
 
-      if (tree?.[navName] && nestedId != null) {
-        const nestedObj = buildInstance(navMeta, row, tree[navName], true);
-        if (isArray)
-          addUnique(instance[navName], nestedObj, `${meta.name}_${navName}`);
-        else instance[navName] = nestedObj;
-      } else if (isArray) {
-        instance[navName] = instance[navName] || [];
-      }
-    }
-
-    return instance;
-  };
-
-  for (const row of records) {
-    const isPrefixed = Object.keys(row).some((k) =>
-      k.startsWith(`${modelName}_`),
-    );
-    const rootId = String(isPrefixed ? row[`${modelName}_id`] : row[pkName]);
-
-    const instance = buildInstance(modelMeta, row, includeTree, isPrefixed);
-
-    if (!itemsById[rootId]) {
-      itemsById[rootId] = instance;
-      continue;
-    }
-
-    // Merge scalars and arrays for duplicates
-    const existing = itemsById[rootId];
-    for (const key in instance) {
-      const val = instance[key];
-      if (Array.isArray(val)) {
-        existing[key] = existing[key] || [];
-        val.forEach((item) =>
-          addUnique(existing[key], item, `${modelMeta.name}_${key}`),
+      // Only process if we're supposed to include this navigation property AND there's data
+      if (includeTree?.[navName] && nestedId != null) {
+        const nestedObj = buildInstance(
+          navMeta,
+          row,
+          includeTree[navName],
+          true,
         );
-      } else if (val != null) {
-        existing[key] = val;
+
+        if (isArray) {
+          addUnique(
+            existing[navName],
+            nestedObj,
+            `${modelMeta.name}_${navName}`,
+            navModelName,
+          );
+        } else {
+          existing[navName] = nestedObj;
+        }
       }
     }
   }
 
   return Object.values(itemsById);
+
+  function isCidlModel(value: CidlType): value is { Model: string } {
+    return typeof value === "object" && value !== null && "Model" in value;
+  }
+
+  function isCidlArray(value: CidlType): value is { Array: CidlType } {
+    return typeof value === "object" && value !== null && "Array" in value;
+  }
+
+  function getCol(
+    meta: MetaModel,
+    attrName: string,
+    row: Record<string, any>,
+    prefixed: boolean,
+  ) {
+    return row[prefixed ? `${meta.name}_${attrName}` : attrName] ?? null;
+  }
+
+  function addUnique(arr: any[], item: any, key: string, navModelName: string) {
+    seenNestedIds[key] = seenNestedIds[key] || new Set();
+
+    // Get the primary key name for the nested model
+    const navMeta = cidl.models[navModelName];
+    const nestedPkAttr = navMeta?.attributes.find((a) => a.is_primary_key);
+    const nestedPkName = nestedPkAttr?.value.name || "id";
+
+    const id = String(item[nestedPkName]);
+    if (!seenNestedIds[key].has(id)) {
+      arr.push(item);
+      seenNestedIds[key].add(id);
+    }
+  }
+
+  function buildInstance(
+    meta: MetaModel,
+    row: Record<string, any>,
+    tree: Record<string, any>,
+    prefixed: boolean,
+  ): any {
+    const instance = new constructorRegistry[meta.name]();
+
+    // Assign scalar attributes
+    for (const attr of meta.attributes) {
+      instance[attr.value.name] = getCol(meta, attr.value.name, row, prefixed);
+    }
+
+    // Assign navigation properties
+    for (const nav of meta.navigation_properties) {
+      const navName = nav.value.name;
+      const navCidlType = nav.value.cidl_type;
+      let navModelName: string | undefined;
+
+      if (isCidlArray(navCidlType)) {
+        if (isCidlModel(navCidlType.Array)) {
+          navModelName = navCidlType.Array.Model;
+        }
+      } else if (isCidlModel(navCidlType)) {
+        navModelName = navCidlType.Model;
+      }
+
+      if (!navModelName) continue;
+
+      const navMeta = cidl.models[navModelName];
+      if (!navMeta) continue;
+
+      const nestedPkAttr = navMeta.attributes.find((a) => a.is_primary_key)!;
+      const nestedId = row[`${navMeta.name}_${nestedPkAttr.value.name}`];
+      const isArray = isCidlArray(navCidlType);
+
+      // Always initialize arrays, even if empty
+      if (isArray) {
+        instance[navName] = instance[navName] || [];
+      }
+
+      if (tree?.[navName] && nestedId != null) {
+        const nestedObj = buildInstance(navMeta, row, tree[navName], true);
+        if (isArray) {
+          addUnique(
+            instance[navName],
+            nestedObj,
+            `${meta.name}_${navName}`,
+            navModelName,
+          );
+        } else {
+          instance[navName] = nestedObj;
+        }
+      }
+    }
+    return instance;
+  }
 }
 
 function error_state(status: number, message: string): HttpResult {
@@ -559,8 +657,19 @@ function toResponse(r: HttpResult): Response {
   });
 }
 
-interface Route {
+interface MatchedRoute {
   modelMeta: MetaModel;
   methodMeta: ModelMethod;
   id: string | null;
 }
+
+/**
+ * Each individual state of the `cloesce` function for testing purposes.
+ */
+export const _cloesceInternal = {
+  matchRoute,
+  validateRequest,
+  hydrateModel,
+  methodDispatch,
+  _modelsFromSql,
+};
