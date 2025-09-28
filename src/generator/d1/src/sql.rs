@@ -119,12 +119,24 @@ fn validate_nav_array<'a>(
 /// Returns error on
 /// - Duplicate Model names
 /// - Duplicate column names
-/// - Duplicate primary keys
 /// - Invalid typed primary keys
-/// - Missing primary keys
 /// - Invalid SQL column type
 fn validate_models(models: &[Model]) -> Result<HashMap<&str, &Model>> {
     let mut model_lookup = HashMap::<&str, &Model>::new();
+
+    let ensure_valid_sql_type = |model: &Model, value: &NamedTypedValue| {
+        ensure!(
+            matches!(
+                value.cidl_type,
+                CidlType::Integer | CidlType::Real | CidlType::Text | CidlType::Blob
+            ),
+            "Invalid SQL Type {}.{}",
+            model.name,
+            value.name
+        );
+        Ok(())
+    };
+
     for model in models {
         // Duplicate models
         ensure!(
@@ -134,7 +146,6 @@ fn validate_models(models: &[Model]) -> Result<HashMap<&str, &Model>> {
         );
 
         let mut column_names = HashSet::new();
-        let mut has_pk = false;
         for attr in &model.attributes {
             // Duplicate columns
             ensure!(
@@ -144,29 +155,16 @@ fn validate_models(models: &[Model]) -> Result<HashMap<&str, &Model>> {
                 attr.value.name
             );
 
-            // Validate primary key
-            if attr.is_primary_key {
-                ensure!(!has_pk, "Duplicate primary keys on model {}", model.name);
-                ensure!(!attr.value.nullable, "A primary key cannot be nullable.");
-                ensure!(
-                    attr.foreign_key_reference.is_none(),
-                    "A primary key cannot be a foreign key"
-                );
-                has_pk = true;
-            }
-
-            ensure!(
-                matches!(
-                    attr.value.cidl_type,
-                    CidlType::Integer | CidlType::Real | CidlType::Text | CidlType::Blob
-                ),
-                "Invalid SQL Type {}.{}",
-                model.name,
-                attr.value.name
-            );
+            ensure_valid_sql_type(model, &attr.value)?;
         }
 
-        ensure!(has_pk, "Missing primary key on model {}", model.name);
+        // Validate primary key
+        // TODO: Why even give the option?
+        ensure!(
+            !model.primary_key.nullable,
+            "A primary key cannot be nullable."
+        );
+        ensure_valid_sql_type(model, &model.primary_key)?;
     }
 
     Ok(model_lookup)
@@ -199,12 +197,8 @@ fn validate_fks<'a>(
         graph.entry(&model.name).or_default();
         in_degree.entry(&model.name).or_insert(0);
 
-        let mut pk: Option<&NamedTypedValue> = None;
         for attr in &model.attributes {
             let Some(fk_model) = &attr.foreign_key_reference else {
-                if attr.is_primary_key {
-                    pk = Some(&attr.value);
-                }
                 continue;
             };
 
@@ -283,14 +277,13 @@ fn validate_fks<'a>(
                 NavigationPropertyKind::ManyToMany { unique_id } => {
                     validate_nav_array(model, nav, model_lookup)?;
 
-                    let pk = pk.expect("safe beause validate_models halts on missing pk");
                     many_to_many
                         .entry(unique_id)
                         .or_default()
                         .model(JunctionModel {
                             model_name: &model.name,
-                            model_pk_name: &pk.name,
-                            model_pk_type: pk.cidl_type.clone(),
+                            model_pk_name: &model.primary_key.name,
+                            model_pk_type: model.primary_key.cidl_type.clone(),
                         })?;
                 }
             }
@@ -506,12 +499,17 @@ fn generate_tables(
         let mut table = Table::create();
         table.table(alias(model.name.clone()));
 
+        // Set Primary Key
+        {
+            let mut column = typed_column(&model.primary_key.name, &model.primary_key.cidl_type);
+            column.primary_key();
+            table.col(column);
+        }
+
         for attr in model.attributes.iter() {
             let mut column = typed_column(&attr.value.name, &attr.value.cidl_type);
 
-            if attr.is_primary_key {
-                column.primary_key();
-            } else if !attr.value.nullable {
+            if !attr.value.nullable {
                 column.not_null();
             }
 
@@ -522,8 +520,7 @@ fn generate_tables(
                 let pk_name = &model_lookup
                     .get(fk_model_name.as_str())
                     .unwrap()
-                    .find_primary_key()
-                    .unwrap()
+                    .primary_key
                     .name;
 
                 table.foreign_key(
@@ -602,6 +599,16 @@ fn generate_views(model_tree: Vec<ModelTree>) -> Vec<String> {
     return views;
 
     fn dfs(node: &ModelTreeNode, query: &mut SelectStatement) {
+        // Primary Key
+        {
+            let pk = &node.model.primary_key.name;
+            query.expr_as(
+                Expr::col((alias(&node.alias), alias(pk))),
+                alias(format!("{}_{}", &node.alias, pk)),
+            );
+        }
+
+        // Columns
         for attr in &node.model.attributes {
             query.expr_as(
                 Expr::col((alias(&node.alias), alias(&attr.value.name))),
@@ -609,14 +616,11 @@ fn generate_views(model_tree: Vec<ModelTree>) -> Vec<String> {
             );
         }
 
+        // Navigation properties
         for child in &node.children {
             match child.parent_transition.as_ref().unwrap() {
                 NavigationPropertyKind::OneToOne { reference } => {
-                    let nav_model_pk = &child
-                        .model
-                        .find_primary_key()
-                        .expect("primary key to be validated by `validate_models`")
-                        .name;
+                    let nav_model_pk = &child.model.primary_key.name;
 
                     left_join_as(
                         query,
@@ -627,11 +631,7 @@ fn generate_views(model_tree: Vec<ModelTree>) -> Vec<String> {
                     );
                 }
                 NavigationPropertyKind::OneToMany { reference } => {
-                    let pk = &node
-                        .model
-                        .find_primary_key()
-                        .expect("primary key to be validated by `validate_models`")
-                        .name;
+                    let pk = &node.model.primary_key.name;
 
                     left_join_as(
                         query,
@@ -642,16 +642,8 @@ fn generate_views(model_tree: Vec<ModelTree>) -> Vec<String> {
                     );
                 }
                 NavigationPropertyKind::ManyToMany { unique_id } => {
-                    let nav_model_pk = child
-                        .model
-                        .find_primary_key()
-                        .expect("primary key to be validated by `validate_models`");
-
-                    let pk = &node
-                        .model
-                        .find_primary_key()
-                        .expect("primary key to be validated by `validate_models`")
-                        .name;
+                    let nav_model_pk = &child.model.primary_key;
+                    let pk = &node.model.primary_key.name;
 
                     query.left_join(
                         alias(unique_id),

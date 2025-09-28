@@ -10,7 +10,7 @@ macro_rules! expected_str {
         let expected_val = &$expected;
         assert!(
             got_val.to_string().contains(&expected_val.to_string()),
-            "Expected `{}`, got:\n{:?}",
+            "Expected: \n`{}`, \n\ngot:\n{:?}",
             expected_val,
             got_val
         );
@@ -177,7 +177,7 @@ fn test_sqlite_table_output() {
         // Assert: cat table with FK to person
         expected_str!(
             sql,
-            r#"CREATE TABLE "Cat" ( "personId" integer NOT NULL, "id" integer PRIMARY KEY, FOREIGN KEY ("personId") REFERENCES "Person" ("id") ON DELETE RESTRICT ON UPDATE CASCADE );"#
+            r#"CREATE TABLE "Cat" ( "id" integer PRIMARY KEY, "personId" integer NOT NULL, FOREIGN KEY ("personId") REFERENCES "Person" ("id") ON DELETE RESTRICT ON UPDATE CASCADE );"#
         );
     }
 
@@ -345,12 +345,12 @@ fn test_sqlite_view_output() {
         // Assert
         expected_str!(
             sql,
-            r#"CREATE VIEW "Person_default" AS SELECT "Person"."id" AS "Person_id", "Person"."bossId" AS "Person_bossId", "Dog"."id" AS "Dog_id", "Dog"."personId" AS "Dog_personId", "Cat"."personId" AS "Cat_personId", "Cat"."id" AS "Cat_id" FROM "Person" LEFT JOIN "Dog" ON "Person"."id" = "Dog"."personId" LEFT JOIN "Cat" ON "Person"."id" = "Cat"."personId";"#
+            r#"CREATE VIEW "Person_default" AS SELECT "Person"."id" AS "Person_id", "Person"."bossId" AS "Person_bossId", "Dog"."id" AS "Dog_id", "Dog"."personId" AS "Dog_personId", "Cat"."id" AS "Cat_id", "Cat"."personId" AS "Cat_personId" FROM "Person" LEFT JOIN "Dog" ON "Person"."id" = "Dog"."personId" LEFT JOIN "Cat" ON "Person"."id" = "Cat"."personId";"#
         );
 
         expected_str!(
             sql,
-            r#"CREATE VIEW "Boss_default" AS SELECT "Boss"."id" AS "Boss_id", "Person"."id" AS "Person_id", "Person"."bossId" AS "Person_bossId", "Dog"."id" AS "Dog_id", "Dog"."personId" AS "Dog_personId", "Cat"."personId" AS "Cat_personId", "Cat"."id" AS "Cat_id" FROM "Boss" LEFT JOIN "Person" ON "Boss"."id" = "Person"."bossId" LEFT JOIN "Dog" ON "Person"."id" = "Dog"."personId" LEFT JOIN "Cat" ON "Person"."id" = "Cat"."personId";"#
+            r#"CREATE VIEW "Boss_default" AS SELECT "Boss"."id" AS "Boss_id", "Person"."id" AS "Person_id", "Person"."bossId" AS "Person_bossId", "Dog"."id" AS "Dog_id", "Dog"."personId" AS "Dog_personId", "Cat"."id" AS "Cat_id", "Cat"."personId" AS "Cat_personId" FROM "Boss" LEFT JOIN "Person" ON "Boss"."id" = "Person"."bossId" LEFT JOIN "Dog" ON "Person"."id" = "Dog"."personId" LEFT JOIN "Cat" ON "Person"."id" = "Cat"."personId";"#
         );
     }
 
@@ -497,29 +497,10 @@ fn test_duplicate_column_error() {
 }
 
 #[test]
-fn test_duplicate_primary_key_error() {
-    // Arrange
-    let cidl = create_cidl(vec![
-        ModelBuilder::new("Person")
-            .pk("id1", CidlType::Integer)
-            .pk("id2", CidlType::Integer)
-            .build(),
-    ]);
-
-    let d1gen = D1Generator::new(cidl, create_wrangler());
-
-    // Act
-    let err = d1gen.sql().unwrap_err();
-
-    // Assert
-    expected_str!(err, "Duplicate primary keys");
-}
-
-#[test]
 fn test_nullable_primary_key_error() {
     // Arrange
     let mut model = ModelBuilder::new("Person").id().build();
-    model.attributes[0].value.nullable = true;
+    model.primary_key.nullable = true;
 
     let cidl = create_cidl(vec![model]);
     let d1gen = D1Generator::new(cidl, create_wrangler());
@@ -529,20 +510,6 @@ fn test_nullable_primary_key_error() {
 
     // Assert
     expected_str!(err, "A primary key cannot be nullable.");
-}
-
-#[test]
-fn test_missing_primary_key_error() {
-    // Arrange
-    let cidl = create_cidl(vec![ModelBuilder::new("Person").build()]);
-
-    let d1gen = D1Generator::new(cidl, create_wrangler());
-
-    // Act
-    let err = d1gen.sql().unwrap_err();
-
-    // Assert
-    expected_str!(err, "Missing primary key on model");
 }
 
 #[test]
@@ -687,24 +654,6 @@ fn test_one_to_one_nav_property_unknown_attribute_reference_error() {
         err,
         "Navigation property Person.dog references Dog.dogId which does not exist."
     );
-}
-
-#[test]
-fn test_primary_key_cannot_be_foreign_key() {
-    // Arrange: create an attribute that is both primary key and a foreign key
-    let mut model = ModelBuilder::new("Person")
-        .attribute("id", CidlType::Integer, false, Some("Other".into()))
-        .build();
-    model.attributes[0].is_primary_key = true;
-
-    let cidl = create_cidl(vec![model]);
-    let d1gen = D1Generator::new(cidl, create_wrangler());
-
-    // Act
-    let err = d1gen.sql().unwrap_err();
-
-    // Assert
-    expected_str!(err, "A primary key cannot be a foreign key");
 }
 
 #[test]

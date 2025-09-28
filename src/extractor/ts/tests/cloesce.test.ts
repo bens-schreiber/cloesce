@@ -1,13 +1,26 @@
 import { _cloesceInternal } from "../src/cloesce";
-import { HttpVerb, MetaCidl, NamedTypedValue } from "../src/common";
+import {
+  CidlSpec,
+  DataSource,
+  HttpVerb,
+  MetaCidl,
+  ModelAttribute,
+  NamedTypedValue,
+  NavigationProperty,
+} from "../src/common";
 
-const makeCidl = (methods: Record<string, any>) => ({
+const makeCidl = (methods: Record<string, any>): MetaCidl => ({
   models: {
     Horse: {
       name: "",
-      attributes: [],
-      navigation_properties: [],
-      data_sources: [],
+      attributes: [] as ModelAttribute[],
+      primary_key: {
+        name: "void",
+        cidl_type: "Integer",
+        nullable: false,
+      },
+      navigation_properties: [] as NavigationProperty[],
+      data_sources: [] as DataSource[],
       methods,
     },
   },
@@ -39,18 +52,8 @@ describe("Router Error States", () => {
 
   test("Router returns 404 on unknown model", () => {
     // Arrange
-    const url = "http://foo.com/api/Horse/neigh";
-    const cidl = {
-      models: {
-        NotHorse: {
-          name: "",
-          attributes: [],
-          navigation_properties: [],
-          data_sources: [],
-          methods: {},
-        },
-      },
-    };
+    const url = "http://foo.com/api/Dog/woof";
+    const cidl = makeCidl({});
 
     // Act
     const result = _cloesceInternal.matchRoute(makeRequest(url), "/api", cidl);
@@ -59,22 +62,14 @@ describe("Router Error States", () => {
     expect(result.value).toStrictEqual({
       ok: false,
       status: 404,
-      message: `Path not found: Unknown model Horse /api/Horse/neigh`,
+      message: `Path not found: Unknown model Dog /api/Dog/woof`,
     });
   });
 
   test("Router returns 404 on unknown method", () => {
     // Arrange
     const url = "http://foo.com/api/Horse/neigh";
-    const cidl = makeCidl({
-      notNeigh: {
-        name: "",
-        is_static: false,
-        http_verb: HttpVerb.GET,
-        return_type: null,
-        parameters: [],
-      },
-    });
+    const cidl = makeCidl({});
 
     // Act
     const result = _cloesceInternal.matchRoute(makeRequest(url), "/api", cidl);
@@ -344,12 +339,6 @@ describe("modelsFromSql", () => {
         name: modelName,
         attributes: [
           {
-            is_primary_key: true,
-            value: { name: "id", cidl_type: "Integer", nullable: false },
-            foreign_key_reference: null,
-          },
-          {
-            is_primary_key: false,
             value: { name: "name", cidl_type: "Text", nullable: true },
             foreign_key_reference: null,
           },
@@ -364,6 +353,11 @@ describe("modelsFromSql", () => {
             kind: { OneToMany: { reference: "id" } },
           },
         ],
+        primary_key: {
+          name: "id",
+          cidl_type: "Integer",
+          nullable: false,
+        },
         data_sources: [],
         methods: {},
       },
@@ -371,16 +365,15 @@ describe("modelsFromSql", () => {
         name: nestedModelName,
         attributes: [
           {
-            is_primary_key: true,
-            value: { name: "id", cidl_type: "Integer", nullable: false },
-            foreign_key_reference: null,
-          },
-          {
-            is_primary_key: false,
             value: { name: "nickname", cidl_type: "Text", nullable: true },
             foreign_key_reference: null,
           },
         ],
+        primary_key: {
+          name: "id",
+          cidl_type: "Integer",
+          nullable: false,
+        },
         navigation_properties: [],
         data_sources: [],
         methods: {},
