@@ -8,7 +8,7 @@ Use a middleware registry. Middleware defined once, referenced by name in decora
 
 ## How It Works
 
-```mermaid
+```
 TODO create image
 ```
 
