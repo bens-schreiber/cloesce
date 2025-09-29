@@ -282,7 +282,7 @@ exports[`actions snapshot 1`] = `
   "version": "0.0.2",
   "wrangler_env": {
     "name": "Env",
-    "source_path": "/Users/benjaminschreiber/projects/cloesce/src/test_fixtures/models.cloesce.ts",
+    "source_path": "void for tests",
   },
 }
 `;

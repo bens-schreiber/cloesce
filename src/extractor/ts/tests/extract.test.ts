@@ -14,6 +14,7 @@ test("actions snapshot", () => {
       m.source_path = "void for tests";
     }
   }
+  cidl.wrangler_env.source_path = "void for tests";
 
   expect(cidl).toMatchSnapshot();
 });
