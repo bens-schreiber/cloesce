@@ -91,7 +91,7 @@ impl WorkersGenerator {
     }
 
     /// Generates all model source imports
-    fn link_models(models: &[Model], wenv: &WranglerEnv, workers_path: &Path) -> Result<String> {
+    fn link_models(models: &[Model], workers_path: &Path) -> Result<String> {
         let workers_dir = workers_path
             .parent()
             .context("workers_path has no parent; cannot compute relative imports")?;
@@ -129,12 +129,6 @@ impl WorkersGenerator {
             Ok(rel_str)
         }
 
-        let wrangler_env = format!(
-            "import {{ {} }} from \"{}\"",
-            wenv.name,
-            rel_path(&wenv.source_path, workers_dir)?
-        );
-
         let models = models
             .iter()
             .map(|m| -> Result<String> {
@@ -144,7 +138,7 @@ impl WorkersGenerator {
             .collect::<Result<Vec<_>>>()?
             .join("\n");
 
-        Ok(format!("{wrangler_env}\n{models}"))
+        Ok(models)
     }
 
     /// Generates the constructor registry and instance registry
@@ -179,7 +173,7 @@ impl WorkersGenerator {
         let api_route = Self::validate_domain(&domain)?;
 
         // TODO: just hardcoding typescript for now
-        let model_sources = Self::link_models(&cidl.models, &cidl.wrangler_env, workers_path)?;
+        let model_sources = Self::link_models(&cidl.models, workers_path)?;
         let (constructor_registry, instance_registry) =
             Self::registries(&cidl.models, &cidl.wrangler_env);
 

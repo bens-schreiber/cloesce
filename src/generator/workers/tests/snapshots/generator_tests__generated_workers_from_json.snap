@@ -4,7 +4,6 @@ expression: res
 ---
 import { cloesce } from "cloesce";
 import cidl from "./cidl.json" with { type: "json" };
-import { Env } from "./Users/benjaminschreiber/projects/cloesce/src/e2e/src/models/models.cloesce"
 import { Horse } from "./Users/benjaminschreiber/projects/cloesce/src/e2e/src/models/models.cloesce";
 import { Like } from "./Users/benjaminschreiber/projects/cloesce/src/e2e/src/models/models.cloesce";
 
