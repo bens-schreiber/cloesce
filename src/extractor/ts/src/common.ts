@@ -1,3 +1,5 @@
+import { Named } from "cmd-ts/dist/cjs/helpdoc.js";
+
 export type Either<L, R> = { ok: false; value: L } | { ok: true; value: R };
 export function left<L>(value: L): Either<L, never> {
   return { ok: false, value };
@@ -12,6 +14,7 @@ export function right<R>(value: R): Either<never, R> {
 export interface MetaModel {
   name: string;
   attributes: ModelAttribute[];
+  primary_key: NamedTypedValue;
   navigation_properties: NavigationProperty[];
   data_sources: DataSource[];
   methods: Record<string, ModelMethod>;
@@ -62,7 +65,6 @@ export interface NamedTypedValue {
 
 export interface ModelAttribute {
   value: NamedTypedValue;
-  is_primary_key: boolean;
   foreign_key_reference: string | null;
 }
 
@@ -87,6 +89,7 @@ export interface NavigationProperty {
 export interface Model {
   name: string;
   attributes: ModelAttribute[];
+  primary_key: NamedTypedValue;
   navigation_properties: NavigationProperty[];
   data_sources: DataSource[];
   methods: ModelMethod[];

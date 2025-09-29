@@ -9,17 +9,21 @@ import {
   Decorator,
   Expression,
 } from "ts-morph";
+
 import {
   CidlIncludeTree,
   CidlSpec,
   CidlType,
   DataSource,
+  Either,
   HttpVerb,
   Model,
   ModelAttribute,
   ModelMethod,
   NamedTypedValue,
   NavigationProperty,
+  left,
+  right,
 } from "./common.js";
 
 enum AttributeDecoratorKind {
@@ -37,42 +41,51 @@ export class CidlExtractor {
     public version: string,
   ) {}
 
-  extract(project: Project): CidlSpec {
-    const models = project.getSourceFiles().flatMap((sourceFile) => {
-      return sourceFile
-        .getClasses()
-        .filter((classDecl) => hasDecorator(classDecl, "D1"))
-        .flatMap((classDecl) => {
-          const model = CidlExtractor.model(classDecl, sourceFile);
-          return model ? [model] : [];
-        });
-    });
+  extract(project: Project): Either<string, CidlSpec> {
+    let models = [];
+    for (const sourceFile of project.getSourceFiles()) {
+      for (const classDecl of sourceFile.getClasses()) {
+        if (!hasDecorator(classDecl, "D1")) continue;
 
-    return {
+        const result = CidlExtractor.model(classDecl, sourceFile);
+        if (!result.ok) {
+          return left(result.value);
+        }
+        models.push(result.value);
+      }
+    }
+
+    return right({
       version: this.version,
       project_name: this.projectName,
       language: "TypeScript",
       models,
-    };
+    });
   }
 
   private static model(
     classDecl: ClassDeclaration,
     sourceFile: SourceFile,
-  ): Model | undefined {
-    const className = classDecl.getName() ?? "<anonymous>";
+  ): Either<string, Model> {
+    const name = classDecl.getName() ?? "<anonymous>";
     const attributes: ModelAttribute[] = [];
     const navigationProperties: NavigationProperty[] = [];
     const dataSources: DataSource[] = [];
+    const methods: ModelMethod[] = [];
+    let primary_key: NamedTypedValue | undefined = undefined;
 
     for (const prop of classDecl.getProperties()) {
       const decorators = prop.getDecorators();
 
       // No decorators means this is a standard attribute
       if (decorators.length === 0) {
-        let [cidl_type, nullable] = CidlExtractor.cidlType(prop.getType());
+        let typeRes = CidlExtractor.cidlType(prop.getType());
+        if (!typeRes.ok) {
+          return typeRes;
+        }
+
+        let [cidl_type, nullable] = typeRes.value;
         attributes.push({
-          is_primary_key: false,
           foreign_key_reference: null,
           value: {
             name: prop.getName(),
@@ -86,23 +99,25 @@ export class CidlExtractor {
       // TODO: Limiting to one decorator. Can't get too fancy on us.
       const decorator = decorators[0];
       const name = getDecoratorName(decorator);
-      let [cidl_type, nullable] = CidlExtractor.cidlType(prop.getType());
+
+      let typeRes = CidlExtractor.cidlType(prop.getType());
+      if (!typeRes.ok) {
+        return typeRes;
+      }
+
+      // Process decorators
+      let [cidl_type, nullable] = typeRes.value;
       switch (name) {
         case AttributeDecoratorKind.PrimaryKey: {
-          attributes.push({
-            is_primary_key: true,
-            foreign_key_reference: null,
-            value: {
-              name: prop.getName(),
-              cidl_type,
-              nullable,
-            },
-          });
+          primary_key = {
+            name: prop.getName(),
+            cidl_type,
+            nullable,
+          };
           break;
         }
         case AttributeDecoratorKind.ForeignKey: {
           attributes.push({
-            is_primary_key: false,
             foreign_key_reference: getDecoratorArgument(decorator, 0) ?? null,
             value: {
               name: prop.getName(),
@@ -114,7 +129,11 @@ export class CidlExtractor {
         }
         case AttributeDecoratorKind.OneToOne: {
           const reference = getDecoratorArgument(decorator, 0);
-          if (!reference) return;
+          if (!reference) {
+            return left(
+              `One to One navigation properties must hold a model type ${name}.${prop.getName()}`,
+            );
+          }
 
           navigationProperties.push({
             value: { name: prop.getName(), cidl_type, nullable },
@@ -122,9 +141,13 @@ export class CidlExtractor {
           });
           break;
         }
-        case AttributeDecoratorKind.OneToMany:
+        case AttributeDecoratorKind.OneToMany: {
           const reference = getDecoratorArgument(decorator, 0);
-          if (!reference) return;
+          if (!reference) {
+            return left(
+              `One to Many navigation properties must hold an attribute reference ${name}.${prop.getName()}`,
+            );
+          }
 
           navigationProperties.push({
             value: {
@@ -135,9 +158,13 @@ export class CidlExtractor {
             kind: { OneToMany: { reference } },
           });
           break;
+        }
         case AttributeDecoratorKind.ManyToMany: {
           const unique_id = getDecoratorArgument(decorator, 0);
-          if (!unique_id) return;
+          if (!unique_id)
+            return left(
+              `Many to Many navigation properties must hold a unique table ID: ${name}.${prop.getName()}`,
+            );
           navigationProperties.push({
             value: {
               name: prop.getName(),
@@ -149,31 +176,55 @@ export class CidlExtractor {
           break;
         }
         case AttributeDecoratorKind.DataSource: {
-          const initializer = prop.getInitializer?.();
-          const tree = initializer
-            ? CidlExtractor.includeTree(initializer, classDecl, sourceFile)
-            : [];
-          dataSources.push({ name: prop.getName(), tree });
+          const initializer = prop.getInitializer();
+          if (!initializer) {
+            return left(
+              `Invalid Data Source initializer on model ${name}.${prop.getName()}`,
+            );
+          }
+
+          let treeRes = CidlExtractor.includeTree(
+            initializer,
+            classDecl,
+            sourceFile,
+          );
+          if (!treeRes.ok) {
+            return treeRes;
+          }
+
+          dataSources.push({ name: prop.getName(), tree: treeRes.value });
           break;
         }
       }
     }
 
-    const methods = classDecl.getMethods().map((m) => CidlExtractor.method(m));
+    if (primary_key == undefined) {
+      return left(`Missing primary key: ${name}`);
+    }
 
-    return {
-      name: className,
+    // Process methods
+    for (const m of classDecl.getMethods()) {
+      const result = CidlExtractor.method(m);
+      if (!result.ok) {
+        return left(result.value);
+      }
+      methods.push(result.value);
+    }
+
+    return right({
+      name,
       attributes,
+      primary_key,
       navigation_properties: navigationProperties,
       methods,
       data_sources: dataSources,
       source_path: sourceFile.getFilePath().toString(),
-    };
+    });
   }
 
   /// Returns a `CidlType` from a TypeScript type, along with if the base value is nullable.
   /// Throws an error if no type can be extracted.
-  private static cidlType(type: Type): [CidlType, boolean] {
+  private static cidlType(type: Type): Either<string, [CidlType, boolean]> {
     let map: Record<string, CidlType> = {
       number: "Integer", // TODO: It's wrong to assume number is always an int.
       string: "Text",
@@ -218,18 +269,23 @@ export class CidlExtractor {
       }
 
       return { Model: base };
-    }, undefined)!;
+    }, undefined);
 
-    return [cidlType, nullable];
+    if (cidlType === undefined) {
+      left(`Unknown or unsupported type ${type.getText()}`);
+    }
+
+    return right([cidlType!, nullable]);
   }
 
+  // TODO: Should really be more descriptive with the errors here
   private static includeTree(
     expr: Expression,
     currentClass: ClassDeclaration,
     sf: SourceFile,
-  ): CidlIncludeTree {
+  ): Either<string, CidlIncludeTree> {
     if (!expr.isKind || !expr.isKind(SyntaxKind.ObjectLiteralExpression)) {
-      return [];
+      return left(`Invalid include tree.`);
     }
 
     const result: CidlIncludeTree = [];
@@ -244,8 +300,15 @@ export class CidlExtractor {
         continue;
       }
 
-      let [cidl_type, _] = CidlExtractor.cidlType(navProp.getType());
-      if (typeof cidl_type === "string") continue;
+      let typeRes = CidlExtractor.cidlType(navProp.getType());
+      if (!typeRes.ok) {
+        return typeRes;
+      }
+
+      let [cidl_type, _] = typeRes.value;
+      if (typeof cidl_type === "string") {
+        return left(`Invalid include tree type ${cidl_type} expected Model`);
+      }
 
       const typedValue = {
         name: navProp.getName(),
@@ -267,17 +330,23 @@ export class CidlExtractor {
           .find((c) => c.getName() === targetModel);
 
         if (targetClass) {
-          nestedTree = CidlExtractor.includeTree(initializer, targetClass, sf);
+          let treeRes = CidlExtractor.includeTree(initializer, targetClass, sf);
+          if (!treeRes.ok) {
+            return treeRes;
+          }
+          nestedTree = treeRes.value;
         }
       }
 
       result.push([typedValue, nestedTree]);
     }
 
-    return result;
+    return right(result);
   }
 
-  private static method(method: MethodDeclaration): ModelMethod {
+  private static method(
+    method: MethodDeclaration,
+  ): Either<string, ModelMethod> {
     const decorators = method.getDecorators();
     const decoratorNames = decorators.map((d) => getDecoratorName(d));
 
@@ -288,7 +357,12 @@ export class CidlExtractor {
     const parameters: NamedTypedValue[] = [];
 
     for (const param of method.getParameters()) {
-      let [cidl_type, nullable] = CidlExtractor.cidlType(param.getType());
+      let typeRes = CidlExtractor.cidlType(param.getType());
+      if (!typeRes.ok) {
+        return typeRes;
+      }
+
+      let [cidl_type, nullable] = typeRes.value;
       parameters.push({
         name: param.getName(),
         cidl_type,
@@ -297,15 +371,19 @@ export class CidlExtractor {
     }
 
     // TODO: return types cant be nullable??
-    let [return_type, _] = CidlExtractor.cidlType(method.getReturnType());
+    let typeRes = CidlExtractor.cidlType(method.getReturnType());
+    if (!typeRes.ok) {
+      return typeRes;
+    }
+    let [return_type, _] = typeRes.value;
 
-    return {
+    return right({
       name: method.getName(),
       is_static: method.isStatic(),
       http_verb: httpVerb,
       return_type,
       parameters,
-    };
+    });
   }
 }
 

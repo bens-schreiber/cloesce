@@ -58,8 +58,11 @@ const cli = command({
     try {
       let extractor = new CidlExtractor(cloesceProjectName, "v0.0.2");
       const result = extractor.extract(project);
+      if (!result.ok) {
+        throw new Error(result.value);
+      }
 
-      fs.writeFileSync(outPath, JSON.stringify(result, null, 4));
+      fs.writeFileSync(outPath, JSON.stringify(result.value, null, 4));
       console.log(`Wrote ${outPath}`);
     } catch (err: any) {
       console.error(" ERROR - cloesce:", err?.message ?? err);
