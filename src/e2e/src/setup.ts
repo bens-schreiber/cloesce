@@ -9,18 +9,23 @@ const cidlPath = path.join(outputDir, "cidl.json");
 const d1Path = path.join(process.cwd(), "migrations/d1.sql");
 const workersPath = path.join(outputDir, "workers.ts");
 const clientPath = path.join(outputDir, "client.ts");
+const wranglerPath = path.resolve("wrangler.toml");
 const port = 5001;
 
 let wranglerProc: any = null;
 
 export function compile() {
   runSync("Running the extractor", "npx cloesce");
-  runSync("Generating d1", `cargo run generate d1 ${cidlPath} ${d1Path}`, {
-    cwd: generatorPath,
-  });
+  runSync(
+    "Generating d1",
+    `cargo run generate d1 ${cidlPath} ${d1Path} ${wranglerPath}`,
+    {
+      cwd: generatorPath,
+    },
+  );
   runSync(
     "Generating workers",
-    `cargo run generate workers ${cidlPath} ${workersPath} http://localhost:${port}/api`,
+    `cargo run generate workers ${cidlPath} ${workersPath} ${wranglerPath} http://localhost:${port}/api`,
     { cwd: generatorPath },
   );
   runSync(

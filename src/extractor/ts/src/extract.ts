@@ -20,6 +20,7 @@ import {
   ModelMethod,
   NamedTypedValue,
   NavigationProperty,
+  WranglerEnv,
 } from "./common.js";
 
 enum AttributeDecoratorKind {
@@ -31,27 +32,60 @@ enum AttributeDecoratorKind {
   DataSource = "DataSource",
 }
 
+enum ClassDecoratorKind {
+  D1 = "D1",
+  WranglerEnv = "WranglerEnv",
+}
+
+enum ParameterDecoratorKind {
+  Inject = "Inject",
+}
+
 export class CidlExtractor {
   constructor(
     public projectName: string,
     public version: string,
   ) {}
 
-  extract(project: Project): CidlSpec {
-    const models = project.getSourceFiles().flatMap((sourceFile) => {
+  public extract(project: Project): CidlSpec {
+    const models: Model[] = project.getSourceFiles().flatMap((sourceFile) => {
       return sourceFile
         .getClasses()
-        .filter((classDecl) => hasDecorator(classDecl, "D1"))
+        .filter((classDecl) => hasDecorator(classDecl, ClassDecoratorKind.D1))
         .flatMap((classDecl) => {
           const model = CidlExtractor.model(classDecl, sourceFile);
           return model ? [model] : [];
         });
     });
 
+    const wranglerEnvs: WranglerEnv[] = project
+      .getSourceFiles()
+      .flatMap((sourceFile) => {
+        return sourceFile
+          .getClasses()
+          .filter((classDecl) =>
+            hasDecorator(classDecl, ClassDecoratorKind.WranglerEnv),
+          )
+          .map((classDecl) => {
+            return {
+              name: classDecl.getName(),
+              source_path: sourceFile.getFilePath().toString(),
+            } as WranglerEnv;
+          });
+      });
+
+    if (wranglerEnvs.length < 1) {
+      // todo: err
+    }
+    if (wranglerEnvs.length > 1) {
+      // todo: err
+    }
+
     return {
       version: this.version,
       project_name: this.projectName,
       language: "TypeScript",
+      wrangler_env: wranglerEnvs[0],
       models,
     };
   }
@@ -173,13 +207,18 @@ export class CidlExtractor {
 
   /// Returns a `CidlType` from a TypeScript type, along with if the base value is nullable.
   /// Throws an error if no type can be extracted.
-  private static cidlType(type: Type): [CidlType, boolean] {
+  private static cidlType(
+    type: Type,
+    inject: boolean = false,
+  ): [CidlType, boolean] {
     let map: Record<string, CidlType> = {
       number: "Integer", // TODO: It's wrong to assume number is always an int.
+      Number: "Integer",
       string: "Text",
+      String: "Text",
       boolean: "Integer",
+      Boolean: "Integer",
       Date: "Text",
-      D1Database: "D1Database",
     };
 
     // TODO: We don't support type unions like Foo | Bar, should we?
@@ -217,6 +256,12 @@ export class CidlExtractor {
         return { HttpResult: acc == undefined ? null : acc };
       }
 
+      // Inject wrapper
+      if (inject) {
+        return { Inject: base };
+      }
+
+      // Model wrapper
       return { Model: base };
     }, undefined)!;
 
@@ -288,6 +333,18 @@ export class CidlExtractor {
     const parameters: NamedTypedValue[] = [];
 
     for (const param of method.getParameters()) {
+      // Handle injected param
+      if (param.getDecorator(ParameterDecoratorKind.Inject)) {
+        let [cidl_type, _] = CidlExtractor.cidlType(param.getType(), true);
+        parameters.push({
+          name: param.getName(),
+          cidl_type: cidl_type,
+          nullable: false,
+        });
+        continue;
+      }
+
+      // Handle all other params
       let [cidl_type, nullable] = CidlExtractor.cidlType(param.getType());
       parameters.push({
         name: param.getName(),

@@ -21,6 +21,7 @@ export interface MetaModel {
  * A `Cidl` meant for Cloesce Meta Data, utilzing an map of models.
  */
 export type MetaCidl = {
+  wrangler_env: WranglerEnv;
   models: Record<string, MetaModel>;
   [key: string]: unknown;
 };
@@ -42,6 +43,7 @@ export type CidlType =
   | "Text"
   | "Blob"
   | "D1Database"
+  | { Inject: string }
   | { Model: string }
   | { Array: CidlType }
   | { HttpResult: CidlType | null };
@@ -103,9 +105,15 @@ export interface DataSource {
   tree: CidlIncludeTree;
 }
 
+export interface WranglerEnv {
+  name: string;
+  source_path: string;
+}
+
 export interface CidlSpec {
   version: string;
   project_name: string;
   language: "TypeScript";
+  wrangler_env: WranglerEnv;
   models: Model[];
 }

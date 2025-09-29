@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use crate::{
     CidlSpec, CidlType, DataSource, HttpVerb, IncludeTree, InputLanguage, Model, ModelAttribute,
-    ModelMethod, NamedTypedValue, NavigationProperty, NavigationPropertyKind,
+    ModelMethod, NamedTypedValue, NavigationProperty, NavigationPropertyKind, WranglerEnv,
     wrangler::WranglerSpec,
 };
 
@@ -12,6 +12,10 @@ pub fn create_cidl(models: Vec<Model>) -> CidlSpec {
         project_name: "test".to_string(),
         language: InputLanguage::TypeScript,
         models,
+        wrangler_env: WranglerEnv {
+            name: "Env".into(),
+            source_path: "source.ts".into(),
+        },
     }
 }
 

@@ -11,7 +11,7 @@ pub trait ClientLanguageTypeMapper {
     fn type_name(&self, ty: &CidlType, nullable: bool) -> String;
 }
 
-handlebars_helper!(is_serializable: |cidl_type: CidlType| !matches!(cidl_type, CidlType::D1Database));
+handlebars_helper!(is_serializable: |cidl_type: CidlType| !matches!(cidl_type, CidlType::Inject(_)));
 handlebars_helper!(is_model: |cidl_type: CidlType| matches_cidl!(&cidl_type, Model(_)) || matches_cidl!(&cidl_type, HttpResult(Model(_))));
 handlebars_helper!(is_model_array: |cidl_type: CidlType| matches_cidl!(&cidl_type, HttpResult(Array(Model(_)))) || matches_cidl!(&cidl_type, Array(Model(_))));
 handlebars_helper!(eq: |a: str, b: str| a == b);

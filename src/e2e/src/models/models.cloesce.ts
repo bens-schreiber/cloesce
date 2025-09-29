@@ -4,6 +4,7 @@ import {
   GET,
   PATCH,
   POST,
+  Inject,
   PrimaryKey,
   OneToMany,
   OneToOne,
@@ -12,7 +13,14 @@ import {
   IncludeTree,
   DataSource,
   modelsFromSql,
+  WranglerEnv,
 } from "cloesce";
+
+@WranglerEnv
+class Env {
+  db: D1Database;
+  motd: string;
+}
 
 @D1
 class Horse {
@@ -31,7 +39,10 @@ class Horse {
   };
 
   @POST
-  static async post(db: D1Database, horse: Horse): Promise<HttpResult<Horse>> {
+  static async post(
+    @Inject { db }: Env,
+    horse: Horse
+  ): Promise<HttpResult<Horse>> {
     const records = await db
       .prepare("INSERT INTO Horse (id, name, bio) VALUES (?, ?, ?) RETURNING *")
       .bind(horse.id, horse.name, horse.bio)
@@ -43,7 +54,10 @@ class Horse {
   }
 
   @GET
-  static async get(db: D1Database, id: number): Promise<HttpResult<Horse>> {
+  static async get(
+    @Inject { db }: Env,
+    id: number
+  ): Promise<HttpResult<Horse>> {
     let records = await db
       .prepare("SELECT * FROM Horse_default WHERE Horse_id = ?")
       .bind(id)
@@ -53,14 +67,15 @@ class Horse {
   }
 
   @GET
-  static async list(db: D1Database): Promise<HttpResult<Horse[]>> {
+  static async list(@Inject { db }: Env): Promise<HttpResult<Horse[]>> {
     let records = await db.prepare("SELECT * FROM Horse_default").run();
     let horses = modelsFromSql(Horse, records.results, Horse.default);
     return { ok: true, status: 200, data: horses };
   }
 
   @PATCH
-  async patch(db: D1Database, horse: Horse): Promise<HttpResult<void>> {
+  async patch(@Inject { db }: Env, horse: Horse): Promise<HttpResult<void>> {
+    console.log(JSON.stringify(db));
     await db
       .prepare("UPDATE Horse SET name = ?, bio = ? WHERE Horse.id = ?")
       .bind(horse.name, horse.bio, horse.id)
@@ -69,7 +84,7 @@ class Horse {
   }
 
   @POST
-  async like(db: D1Database, horse: Horse): Promise<HttpResult<void>> {
+  async like(@Inject { db }: Env, horse: Horse): Promise<HttpResult<void>> {
     await db
       .prepare("INSERT INTO Like (horseId1, horseId2) VALUES (?, ?)")
       .bind(this.id, horse.id)
@@ -85,6 +100,11 @@ class Horse {
     } else {
       return { ok: false, status: 400, message: "divided by 0" };
     }
+  }
+
+  @GET
+  static async motd(@Inject e: Env): Promise<HttpResult<string>> {
+    return { ok: true, status: 200, data: e.motd };
   }
 }
 
@@ -103,4 +123,4 @@ class Like {
   horse2: Horse | undefined;
 }
 
-export { Like, Horse };
+export { Like, Horse, Env };
