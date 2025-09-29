@@ -81,7 +81,9 @@ impl CidlType {
         }
     }
 
-    /// Returns the root most CidlType, being any non Model/Array/Result
+    /// Returns the root most CidlType, being any non Model/Array/Result.
+    ///
+    /// Option as `HttpResult` can wrap None
     pub fn root_type(&self) -> Option<&CidlType> {
         match self {
             CidlType::Array(inner) => inner.root_type(),
@@ -114,7 +116,6 @@ pub struct NamedTypedValue {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ModelAttribute {
     pub value: NamedTypedValue,
-    pub is_primary_key: bool,
     pub foreign_key_reference: Option<String>,
 }
 
@@ -162,22 +163,11 @@ pub struct NavigationProperty {
 pub struct Model {
     pub name: String,
     pub attributes: Vec<ModelAttribute>,
+    pub primary_key: NamedTypedValue,
     pub navigation_properties: Vec<NavigationProperty>,
     pub methods: Vec<ModelMethod>,
     pub data_sources: Vec<DataSource>,
     pub source_path: PathBuf,
-}
-
-impl Model {
-    /// Linear searches over attributes to find the primary key
-    ///
-    /// TODO: The CIDL should ensure PK's are always placed first in the list
-    /// ensuring this is O(1).
-    pub fn find_primary_key(&self) -> Option<&NamedTypedValue> {
-        self.attributes
-            .iter()
-            .find_map(|a| a.is_primary_key.then_some(&a.value))
-    }
 }
 
 #[derive(Serialize, Deserialize)]

@@ -13,6 +13,7 @@ function instantiateModelArray<T extends object>(
 
 {{#each models}}
 export class {{name}} {
+  {{primary_key.name}}: {{lang_type primary_key.cidl_type primary_key.nullable}};
   {{#each attributes}}
   {{value.name}}: {{lang_type value.cidl_type value.nullable}};
   {{/each}}

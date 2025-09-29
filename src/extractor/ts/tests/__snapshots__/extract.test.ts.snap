@@ -8,16 +8,6 @@ exports[`actions snapshot 1`] = `
       "attributes": [
         {
           "foreign_key_reference": null,
-          "is_primary_key": true,
-          "value": {
-            "cidl_type": "Integer",
-            "name": "id",
-            "nullable": false,
-          },
-        },
-        {
-          "foreign_key_reference": null,
-          "is_primary_key": false,
           "value": {
             "cidl_type": "Text",
             "name": "name",
@@ -26,7 +16,6 @@ exports[`actions snapshot 1`] = `
         },
         {
           "foreign_key_reference": null,
-          "is_primary_key": false,
           "value": {
             "cidl_type": "Text",
             "name": "bio",
@@ -224,22 +213,17 @@ exports[`actions snapshot 1`] = `
           },
         },
       ],
+      "primary_key": {
+        "cidl_type": "Integer",
+        "name": "id",
+        "nullable": false,
+      },
       "source_path": "void for tests",
     },
     {
       "attributes": [
         {
-          "foreign_key_reference": null,
-          "is_primary_key": true,
-          "value": {
-            "cidl_type": "Integer",
-            "name": "id",
-            "nullable": false,
-          },
-        },
-        {
           "foreign_key_reference": "Horse",
-          "is_primary_key": false,
           "value": {
             "cidl_type": "Integer",
             "name": "horseId1",
@@ -248,7 +232,6 @@ exports[`actions snapshot 1`] = `
         },
         {
           "foreign_key_reference": "Horse",
-          "is_primary_key": false,
           "value": {
             "cidl_type": "Integer",
             "name": "horseId2",
@@ -275,6 +258,11 @@ exports[`actions snapshot 1`] = `
           },
         },
       ],
+      "primary_key": {
+        "cidl_type": "Integer",
+        "name": "id",
+        "nullable": false,
+      },
       "source_path": "void for tests",
     },
   ],

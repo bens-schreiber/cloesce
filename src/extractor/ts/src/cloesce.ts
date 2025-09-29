@@ -387,7 +387,7 @@ async function hydrateModel(
     left(
       error_state(
         500,
-        `Failed to hydrate model: ${e instanceof Error ? e.message : String(e)}`,
+        `Error in hydration query, is the database out of sync with the backend?: ${e instanceof Error ? e.message : String(e)}`,
       ),
     );
 
@@ -395,11 +395,11 @@ async function hydrateModel(
   const missingRecord = left(error_state(404, "Record not found"));
 
   // TODO: We are assuming defalt DS for now
-  const pk = modelMeta.attributes.find((a) => a.is_primary_key)!;
+  const pk = modelMeta.primary_key.name;
   const hasDataSources = modelMeta.data_sources.length > 0;
   const query = hasDataSources
-    ? `SELECT * FROM ${modelMeta.name}_default WHERE ${modelMeta.name}_${pk.value.name} = ?`
-    : `SELECT * FROM ${modelMeta.name} WHERE ${pk.value.name} = ?`;
+    ? `SELECT * FROM ${modelMeta.name}_default WHERE ${modelMeta.name}_${pk} = ?`
+    : `SELECT * FROM ${modelMeta.name} WHERE ${pk} = ?`;
 
   // Query DB
   let records;
@@ -489,6 +489,8 @@ async function methodDispatch(
  *
  * TODO: If we don't want to write this in every language, would it be possible to create a
  * single WASM binary for this method?
+ *
+ * @throws generic errors if the metadata is missing some value
  */
 function _modelsFromSql(
   modelName: string,
@@ -498,11 +500,14 @@ function _modelsFromSql(
   includeTree: Record<string, UserDefinedModel>,
 ): InstantiatedUserDefinedModel[] {
   if (!records.length) return [];
+
   const modelMeta = cidl.models[modelName];
   if (!modelMeta) throw new Error(`Model ${modelName} not found in CIDL`);
-  const pkAttr = modelMeta.attributes.find((a) => a.is_primary_key);
-  if (!pkAttr) throw new Error(`Primary key not found for ${modelName}`);
-  const pkName = pkAttr.value.name;
+
+  const pk = modelMeta.primary_key;
+  if (!pk) throw new Error(`Primary key not found for ${modelName}`);
+
+  const pkName = pk.name;
   const itemsById: Record<string, any> = {};
   const seenNestedIds: Record<string, Set<string>> = {};
 
@@ -515,6 +520,14 @@ function _modelsFromSql(
 
     if (!itemsById[rootId]) {
       const instance = new constructorRegistry[modelName]();
+
+      // Assign primary key
+      instance[modelMeta.primary_key.name] = getCol(
+        modelMeta,
+        modelMeta.primary_key.name,
+        row,
+        isPrefixed,
+      );
 
       // Assign scalar attributes
       for (const attr of modelMeta.attributes) {
@@ -565,8 +578,8 @@ function _modelsFromSql(
       const navMeta = cidl.models[navModelName];
       if (!navMeta) continue;
 
-      const nestedPkAttr = navMeta.attributes.find((a) => a.is_primary_key)!;
-      const nestedId = row[`${navMeta.name}_${nestedPkAttr.value.name}`];
+      const nestedPk = navMeta.primary_key.name;
+      const nestedId = row[`${navMeta.name}_${nestedPk}`];
       const isArray = isCidlArray(navCidlType);
 
       // Only process if we're supposed to include this navigation property AND there's data
@@ -616,8 +629,8 @@ function _modelsFromSql(
 
     // Get the primary key name for the nested model
     const navMeta = cidl.models[navModelName];
-    const nestedPkAttr = navMeta?.attributes.find((a) => a.is_primary_key);
-    const nestedPkName = nestedPkAttr?.value.name || "id";
+    const nestedPkAttr = navMeta?.primary_key;
+    const nestedPkName = nestedPkAttr?.name || "id";
 
     const id = String(item[nestedPkName]);
     if (!seenNestedIds[key].has(id)) {
@@ -633,6 +646,14 @@ function _modelsFromSql(
     prefixed: boolean,
   ): any {
     const instance = new constructorRegistry[meta.name]();
+
+    // Assign PK
+    instance[meta.primary_key.name] = getCol(
+      meta,
+      meta.primary_key.name,
+      row,
+      prefixed,
+    );
 
     // Assign scalar attributes
     for (const attr of meta.attributes) {
@@ -658,8 +679,8 @@ function _modelsFromSql(
       const navMeta = cidl.models[navModelName];
       if (!navMeta) continue;
 
-      const nestedPkAttr = navMeta.attributes.find((a) => a.is_primary_key)!;
-      const nestedId = row[`${navMeta.name}_${nestedPkAttr.value.name}`];
+      const nestedPk = navMeta.primary_key;
+      const nestedId = row[`${navMeta.name}_${nestedPk.name}`];
       const isArray = isCidlArray(navCidlType);
 
       // Always initialize arrays, even if empty

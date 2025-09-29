@@ -69,6 +69,7 @@ pub struct ModelBuilder {
     name: String,
     attributes: Vec<ModelAttribute>,
     navigation_properties: Vec<NavigationProperty>,
+    primary_key: Option<NamedTypedValue>,
     methods: Vec<ModelMethod>,
     data_sources: Vec<DataSource>,
     source_path: Option<PathBuf>,
@@ -83,6 +84,7 @@ impl ModelBuilder {
             methods: Vec::new(),
             data_sources: Vec::new(),
             source_path: None,
+            primary_key: None,
         }
     }
 
@@ -99,7 +101,6 @@ impl ModelBuilder {
                 cidl_type,
                 nullable,
             },
-            is_primary_key: false,
             foreign_key_reference: foreign_key,
         });
         self
@@ -124,14 +125,10 @@ impl ModelBuilder {
     }
 
     pub fn pk(mut self, name: impl Into<String>, cidl_type: CidlType) -> Self {
-        self.attributes.push(ModelAttribute {
-            value: NamedTypedValue {
-                name: name.into(),
-                cidl_type,
-                nullable: false,
-            },
-            is_primary_key: true,
-            foreign_key_reference: None,
+        self.primary_key = Some(NamedTypedValue {
+            name: name.into(),
+            cidl_type,
+            nullable: false,
         });
         self
     }
@@ -179,6 +176,7 @@ impl ModelBuilder {
             methods: self.methods,
             data_sources: self.data_sources,
             source_path: self.source_path.unwrap_or_default(),
+            primary_key: self.primary_key.unwrap(),
         }
     }
 }
