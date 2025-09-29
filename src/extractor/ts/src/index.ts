@@ -4,6 +4,7 @@ export { modelsFromSql } from "./cloesce.js";
 
 // Compiler hints
 export const D1: ClassDecorator = () => {};
+export const WranglerEnv: ClassDecorator = () => {};
 export const PrimaryKey: PropertyDecorator = () => {};
 export const GET: MethodDecorator = () => {};
 export const POST: MethodDecorator = () => {};
@@ -17,10 +18,10 @@ export const OneToMany =
 export const OneToOne =
   (_: string): PropertyDecorator =>
   () => {};
-
 export const ForeignKey =
   <T>(_: T): PropertyDecorator =>
   () => {};
+export const Inject: ParameterDecorator = () => {};
 
 // Include Tree
 type Primitive = string | number | boolean | bigint | symbol | null | undefined;

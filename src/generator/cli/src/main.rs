@@ -36,6 +36,7 @@ enum GenerateTarget {
     Workers {
         cidl_path: PathBuf,
         workers_path: PathBuf,
+        wrangler_path: PathBuf,
         domain: String,
     },
     Client {
@@ -101,16 +102,19 @@ fn main() -> Result<()> {
             GenerateTarget::Workers {
                 cidl_path,
                 workers_path,
+                wrangler_path,
                 domain,
             } => {
                 let cidl = cidl_from_path(cidl_path)?;
                 let mut file =
                     create_file_and_dir(&workers_path).context("Failed to open workers file")?;
 
+                let wrangler = WranglerFormat::from_path(&wrangler_path)
+                    .context("Failed to open wrangler file")?
+                    .as_spec()?;
+
                 file.write(
-                    WorkersGenerator
-                        .create(cidl, domain, &workers_path)?
-                        .as_bytes(),
+                    WorkersGenerator::create(cidl, wrangler, domain, &workers_path)?.as_bytes(),
                 )
                 .context("Failed to write workers file")?;
             }

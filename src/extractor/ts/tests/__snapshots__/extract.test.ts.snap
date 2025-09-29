@@ -60,8 +60,10 @@ exports[`actions snapshot 1`] = `
           "name": "post",
           "parameters": [
             {
-              "cidl_type": "D1Database",
-              "name": "db",
+              "cidl_type": {
+                "Inject": "Env",
+              },
+              "name": "{ db }",
               "nullable": false,
             },
             {
@@ -84,8 +86,10 @@ exports[`actions snapshot 1`] = `
           "name": "get",
           "parameters": [
             {
-              "cidl_type": "D1Database",
-              "name": "db",
+              "cidl_type": {
+                "Inject": "Env",
+              },
+              "name": "{ db }",
               "nullable": false,
             },
             {
@@ -106,8 +110,10 @@ exports[`actions snapshot 1`] = `
           "name": "list",
           "parameters": [
             {
-              "cidl_type": "D1Database",
-              "name": "db",
+              "cidl_type": {
+                "Inject": "Env",
+              },
+              "name": "{ db }",
               "nullable": false,
             },
           ],
@@ -125,8 +131,10 @@ exports[`actions snapshot 1`] = `
           "name": "patch",
           "parameters": [
             {
-              "cidl_type": "D1Database",
-              "name": "db",
+              "cidl_type": {
+                "Inject": "Env",
+              },
+              "name": "{ db }",
               "nullable": false,
             },
             {
@@ -147,8 +155,10 @@ exports[`actions snapshot 1`] = `
           "name": "like",
           "parameters": [
             {
-              "cidl_type": "D1Database",
-              "name": "db",
+              "cidl_type": {
+                "Inject": "Env",
+              },
+              "name": "{ db }",
               "nullable": false,
             },
             {
@@ -258,5 +268,9 @@ exports[`actions snapshot 1`] = `
   ],
   "project_name": "snapshotProject",
   "version": "0.0.2",
+  "wrangler_env": {
+    "name": "Env",
+    "source_path": "void for tests",
+  },
 }
 `;

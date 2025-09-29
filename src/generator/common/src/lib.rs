@@ -47,13 +47,28 @@ macro_rules! matches_cidl {
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
 pub enum CidlType {
+    /// SQLite integer
     Integer,
+
+    /// SQLite floating point number
     Real,
+
+    /// SQLite string
     Text,
+
+    /// SQLite large structured data
     Blob,
-    D1Database,
+
+    /// A dependency injected instance, containing a type name.
+    Inject(String),
+
+    /// A Cloesce model, containing it's name
     Model(String),
+
+    /// An array of any type
     Array(Box<CidlType>),
+
+    /// A REST API response, which can contain any type or nothing.
     HttpResult(Option<Box<CidlType>>),
 }
 
@@ -161,9 +176,16 @@ pub enum InputLanguage {
 }
 
 #[derive(Serialize, Deserialize)]
+pub struct WranglerEnv {
+    pub name: String,
+    pub source_path: PathBuf,
+}
+
+#[derive(Serialize, Deserialize)]
 pub struct CidlSpec {
     pub version: String,
     pub project_name: String,
     pub language: InputLanguage,
+    pub wrangler_env: WranglerEnv,
     pub models: Vec<Model>,
 }

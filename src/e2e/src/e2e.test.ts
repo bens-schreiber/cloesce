@@ -193,3 +193,12 @@ test("Methods can return both data and errors", async () => {
     );
   }
 });
+
+test("Wrangler variabels can be retrieved", async () => {
+  // Act
+  let res = await Horse.motd();
+
+  // Assert
+  assert.ok(res.ok, withRes("GET motd should be OK", res));
+  assert.equal(res.data, "horse tinder is awesome");
+});

@@ -1,3 +1,4 @@
+import { WranglerEnv } from "../dist/common";
 import { _cloesceInternal } from "../src/cloesce";
 import {
   CidlSpec,
@@ -10,6 +11,10 @@ import {
 } from "../src/common";
 
 const makeCidl = (methods: Record<string, any>): MetaCidl => ({
+  wrangler_env: {
+    name: "Env",
+    source_path: "./",
+  },
   models: {
     Horse: {
       name: "",
@@ -40,6 +45,10 @@ describe("Router Error States", () => {
     // Act
     const result = _cloesceInternal.matchRoute(makeRequest(url), "/api", {
       models: {},
+      wrangler_env: {
+        name: "",
+        source_path: "./",
+      },
     });
 
     // Assert
@@ -158,7 +167,7 @@ describe("Validate Request Error States", () => {
     // Act
     const result = await _cloesceInternal.validateRequest(
       request,
-      { models: {} },
+      { models: {}, wrangler_env: { name: "", source_path: "./" } },
       {
         name: "",
         is_static: false,
@@ -185,7 +194,7 @@ describe("Validate Request Error States", () => {
     // Act
     const result = await _cloesceInternal.validateRequest(
       request,
-      { models: {} },
+      { models: {}, wrangler_env: { name: "", source_path: "./" } },
       {
         name: "",
         is_static: true,
@@ -298,7 +307,14 @@ describe("Validate Request Success States", () => {
         is_static: true,
         http_verb: arg.is_get ? HttpVerb.GET : HttpVerb.POST,
         return_type: null,
-        parameters: [arg.typed_value],
+        parameters: [
+          arg.typed_value,
+          {
+            name: "db",
+            cidl_type: { Inject: "Env" },
+            nullable: false,
+          },
+        ],
       },
     });
 
@@ -334,6 +350,10 @@ describe("modelsFromSql", () => {
   };
 
   const baseCidl: MetaCidl = {
+    wrangler_env: {
+      name: "Env",
+      source_path: "./",
+    },
     models: {
       [modelName]: {
         name: modelName,
@@ -514,6 +534,21 @@ describe("methodDispatch", () => {
     dump: jest.fn(),
   });
 
+  const envMeta = {
+    envName: "Env",
+    dbName: "db",
+  };
+
+  const instanceRegistry = () =>
+    new Map([
+      [
+        "Env",
+        {
+          db: createMockD1(),
+        },
+      ],
+    ]);
+
   test("returns 200 with no data when return_type is null", async () => {
     // Arrange
     const instance = {
@@ -521,14 +556,14 @@ describe("methodDispatch", () => {
     };
     const methodMeta = createMethodMeta({ return_type: null });
     const params = {};
-    const d1 = createMockD1();
 
     // Act
     const result = await _cloesceInternal.methodDispatch(
       instance,
       methodMeta,
       params,
-      d1,
+      instanceRegistry(),
+      envMeta,
     );
 
     // Assert
@@ -547,14 +582,14 @@ describe("methodDispatch", () => {
     };
     const methodMeta = createMethodMeta({ return_type: { HttpResult: null } });
     const params = {};
-    const d1 = createMockD1();
 
     // Act
     const result = await _cloesceInternal.methodDispatch(
       instance,
       methodMeta,
       params,
-      d1,
+      instanceRegistry(),
+      envMeta,
     );
 
     // Assert
@@ -572,14 +607,14 @@ describe("methodDispatch", () => {
     };
     const methodMeta = createMethodMeta({ return_type: "Text" });
     const params = {};
-    const d1 = createMockD1();
 
     // Act
     const result = await _cloesceInternal.methodDispatch(
       instance,
       methodMeta,
       params,
-      d1,
+      instanceRegistry(),
+      envMeta,
     );
 
     // Assert
@@ -588,7 +623,6 @@ describe("methodDispatch", () => {
 
   test("supplies d1 as default param when missing in params", async () => {
     // Arrange
-    const d1 = createMockD1();
     const instance = {
       testMethod: jest.fn().mockResolvedValue("used d1"),
     };
@@ -596,18 +630,20 @@ describe("methodDispatch", () => {
       return_type: "Text",
       parameters: [{ name: "database" }],
     });
-    const params = {}; // missing "database"
+    const params = {};
+    let ireg = instanceRegistry();
 
     // Act
     const result = await _cloesceInternal.methodDispatch(
       instance,
       methodMeta,
       params,
-      d1,
+      ireg,
+      envMeta,
     );
 
     // Assert
-    expect(instance.testMethod).toHaveBeenCalledWith(d1);
+    expect(instance.testMethod).toHaveBeenCalledWith(ireg.get("Env"));
     expect(result).toStrictEqual({ ok: true, status: 200, data: "used d1" });
   });
 
@@ -620,21 +656,21 @@ describe("methodDispatch", () => {
     };
     const methodMeta = createMethodMeta({ return_type: "Text" });
     const params = {};
-    const d1 = createMockD1();
 
     // Act
     const result = await _cloesceInternal.methodDispatch(
       instance,
       methodMeta,
       params,
-      d1,
+      instanceRegistry(),
+      envMeta,
     );
 
     // Assert
     expect(result).toStrictEqual({
       ok: false,
       status: 500,
-      message: "boom",
+      message: "Uncaught exception in method dispatch: boom",
     });
   });
 
@@ -647,21 +683,21 @@ describe("methodDispatch", () => {
     };
     const methodMeta = createMethodMeta({ return_type: "Text" });
     const params = {};
-    const d1 = createMockD1();
 
     // Act
     const result = await _cloesceInternal.methodDispatch(
       instance,
       methodMeta,
       params,
-      d1,
+      instanceRegistry(),
+      envMeta,
     );
 
     // Assert
     expect(result).toStrictEqual({
       ok: false,
       status: 500,
-      message: "stringError",
+      message: "Uncaught exception in method dispatch: stringError",
     });
   });
 });
