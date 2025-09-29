@@ -39,60 +39,48 @@ class Horse {
   };
 
   @POST
-  static async post(
-    @Inject { db }: Env,
-    horse: Horse
-  ): Promise<HttpResult<Horse>> {
+  static async post(@Inject { db }: Env, horse: Horse): Promise<Horse> {
     const records = await db
       .prepare("INSERT INTO Horse (id, name, bio) VALUES (?, ?, ?) RETURNING *")
       .bind(horse.id, horse.name, horse.bio)
       .all();
 
-    let horseRes = modelsFromSql(Horse, records.results, Horse.default)[0];
-
-    return { ok: true, status: 200, data: horseRes };
+    return modelsFromSql(Horse, records.results, Horse.default)[0] as Horse;
   }
 
   @GET
-  static async get(
-    @Inject { db }: Env,
-    id: number
-  ): Promise<HttpResult<Horse>> {
+  static async get(@Inject { db }: Env, id: number): Promise<Horse> {
     let records = await db
       .prepare("SELECT * FROM Horse_default WHERE Horse_id = ?")
       .bind(id)
       .run();
-    let horses = modelsFromSql(Horse, records.results, Horse.default);
-    return { ok: true, status: 200, data: horses[0] };
+    return modelsFromSql(Horse, records.results, Horse.default)[0] as Horse;
   }
 
   @GET
-  static async list(@Inject { db }: Env): Promise<HttpResult<Horse[]>> {
+  static async list(@Inject { db }: Env): Promise<Horse[]> {
     let records = await db.prepare("SELECT * FROM Horse_default").run();
-    let horses = modelsFromSql(Horse, records.results, Horse.default);
-    return { ok: true, status: 200, data: horses };
+    return modelsFromSql(Horse, records.results, Horse.default) as Horse[];
   }
 
   @PATCH
-  async patch(@Inject { db }: Env, horse: Horse): Promise<HttpResult<void>> {
-    console.log(JSON.stringify(db));
+  async patch(@Inject { db }: Env, horse: Horse) {
     await db
       .prepare("UPDATE Horse SET name = ?, bio = ? WHERE Horse.id = ?")
       .bind(horse.name, horse.bio, horse.id)
       .run();
-    return { ok: true, status: 200 };
   }
 
   @POST
-  async like(@Inject { db }: Env, horse: Horse): Promise<HttpResult<void>> {
+  async like(@Inject { db }: Env, horse: Horse) {
     await db
       .prepare("INSERT INTO Like (horseId1, horseId2) VALUES (?, ?)")
       .bind(this.id, horse.id)
       .run();
-    return { ok: true, status: 200 };
   }
 
-  /*  Random functions for test coverage  */
+  /*  VVV Random functions for test coverage VVV */
+
   @GET
   static async divide(a: number, b: number): Promise<HttpResult<number>> {
     if (b != 0) {
@@ -103,8 +91,8 @@ class Horse {
   }
 
   @GET
-  static async motd(@Inject e: Env): Promise<HttpResult<string>> {
-    return { ok: true, status: 200, data: e.motd };
+  static async motd(@Inject e: Env): Promise<string> {
+    return e.motd;
   }
 }
 
