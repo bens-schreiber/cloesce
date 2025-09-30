@@ -44,9 +44,7 @@ impl WorkersGenerator {
 
         for model in models {
             for method in &model.methods {
-                if let Some(Some(CidlType::Model(m))) =
-                    method.return_type.as_ref().map(|r| r.root_type())
-                {
+                if let CidlType::Model(m) = &method.return_type {
                     ensure!(
                         lookup.contains_key(m.as_str()),
                         "Unknown model reference on model method return type {}.{}",
@@ -64,6 +62,15 @@ impl WorkersGenerator {
                             param.name
                         );
                     };
+
+                    if let CidlType::Void = root_type {
+                        bail!(
+                            "Method parameters cannot be void. {}.{}.{}",
+                            model.name,
+                            method.name,
+                            param.name
+                        )
+                    }
 
                     if let CidlType::Model(m) = root_type {
                         ensure!(

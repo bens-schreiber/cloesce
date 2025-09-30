@@ -7,46 +7,11 @@ use std::path::PathBuf;
 use serde::Deserialize;
 use serde::Serialize;
 
-#[macro_export]
-macro_rules! match_cidl {
-    // Base: simple variant without inner
-    ($value:expr, $variant:ident => $body:expr) => {
-        if let CidlType::$variant = $value { $body } else { false }
-    };
-
-    // Base: Model(_)
-    ($value:expr, Model(_) => $body:expr) => {
-        if let CidlType::Model(_) = $value { $body } else { false }
-    };
-
-    // Recursive: HttpResult(inner)
-    ($value:expr, HttpResult($($inner:tt)+) => $body:expr) => {
-        if let CidlType::HttpResult(Some(inner)) = $value {
-            match_cidl!(inner.as_ref(), $($inner)+ => $body)
-        } else {
-            false
-        }
-    };
-
-    // Recursive: Array(inner)
-    ($value:expr, Array($($inner:tt)+) => $body:expr) => {
-        if let CidlType::Array(inner) = $value {
-            match_cidl!(inner.as_ref(), $($inner)+ => $body)
-        } else {
-            false
-        }
-    };
-}
-
-#[macro_export]
-macro_rules! matches_cidl {
-    ($value:expr, $($pattern:tt)+) => {
-        $crate::match_cidl!($value, $($pattern)+ => true)
-    };
-}
-
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
 pub enum CidlType {
+    /// No type
+    Void,
+
     /// SQLite integer
     Integer,
 
@@ -69,7 +34,11 @@ pub enum CidlType {
     Array(Box<CidlType>),
 
     /// A REST API response, which can contain any type or nothing.
-    HttpResult(Option<Box<CidlType>>),
+    HttpResult(Box<CidlType>),
+
+    /// A wrapper denoting the type within can be null.
+    /// If the inner value is void, represents just null.
+    Nullable(Box<CidlType>),
 }
 
 impl CidlType {
@@ -83,17 +52,30 @@ impl CidlType {
 
     /// Returns the root most CidlType, being any non Model/Array/Result.
     ///
-    /// Option as `HttpResult` can wrap None
+    /// Option as the type could be null
     pub fn root_type(&self) -> Option<&CidlType> {
         match self {
             CidlType::Array(inner) => inner.root_type(),
-            CidlType::HttpResult(inner) => inner.as_ref().map(|i| i.root_type())?,
+            CidlType::HttpResult(inner) => inner.root_type(),
+            CidlType::Nullable(inner) => inner.root_type(),
             t => Some(t),
         }
     }
 
+    pub fn is_nullable(&self) -> bool {
+        matches!(self, CidlType::Nullable(_))
+    }
+
     pub fn array(cidl_type: CidlType) -> CidlType {
         CidlType::Array(Box::new(cidl_type))
+    }
+
+    pub fn nullable(cidl_type: CidlType) -> CidlType {
+        CidlType::Nullable(Box::new(cidl_type))
+    }
+
+    pub fn null() -> CidlType {
+        CidlType::Nullable(Box::new(CidlType::Void))
     }
 }
 
@@ -110,7 +92,6 @@ pub enum HttpVerb {
 pub struct NamedTypedValue {
     pub name: String,
     pub cidl_type: CidlType,
-    pub nullable: bool,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -124,7 +105,7 @@ pub struct ModelMethod {
     pub name: String,
     pub is_static: bool,
     pub http_verb: HttpVerb,
-    pub return_type: Option<CidlType>,
+    pub return_type: CidlType,
     pub parameters: Vec<NamedTypedValue>,
 }
 

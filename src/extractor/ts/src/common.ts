@@ -1,4 +1,4 @@
-import { Named } from "cmd-ts/dist/cjs/helpdoc.js";
+import { boolean } from "cmd-ts";
 
 export type Either<L, R> = { ok: false; value: L } | { ok: true; value: R };
 export function left<L>(value: L): Either<L, never> {
@@ -41,15 +41,20 @@ export type HttpResult<T = unknown> = {
 };
 
 export type CidlType =
+  | "Void"
   | "Integer"
   | "Real"
   | "Text"
   | "Blob"
-  | "D1Database"
   | { Inject: string }
   | { Model: string }
+  | { Nullable: CidlType }
   | { Array: CidlType }
-  | { HttpResult: CidlType | null };
+  | { HttpResult: CidlType };
+
+export function isNullableType(ty: CidlType): boolean {
+  return typeof ty === "object" && ty !== null && "Nullable" in ty;
+}
 
 export enum HttpVerb {
   GET = "GET",
@@ -62,7 +67,6 @@ export enum HttpVerb {
 export interface NamedTypedValue {
   name: string;
   cidl_type: CidlType;
-  nullable: boolean;
 }
 
 export interface ModelAttribute {

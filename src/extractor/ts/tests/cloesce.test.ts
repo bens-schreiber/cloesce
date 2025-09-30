@@ -1,7 +1,5 @@
-import { WranglerEnv } from "../dist/common";
 import { _cloesceInternal } from "../src/cloesce";
 import {
-  CidlSpec,
   DataSource,
   HttpVerb,
   MetaCidl,
@@ -22,7 +20,6 @@ const makeCidl = (methods: Record<string, any>): MetaCidl => ({
       primary_key: {
         name: "void",
         cidl_type: "Integer",
-        nullable: false,
       },
       navigation_properties: [] as NavigationProperty[],
       data_sources: [] as DataSource[],
@@ -264,17 +261,20 @@ describe("Validate Request Error States", () => {
 });
 
 describe("Validate Request Success States", () => {
-  const input: { typed_value: NamedTypedValue; value: string }[] = [
+  const input: {
+    typed_value: NamedTypedValue;
+    value: string;
+  }[] = [
     {
-      typed_value: { name: "id", cidl_type: "Integer", nullable: true },
+      typed_value: { name: "id", cidl_type: "Integer" },
       value: "1",
     },
     {
-      typed_value: { name: "lastName", cidl_type: "Text", nullable: true },
+      typed_value: { name: "lastName", cidl_type: "Text" },
       value: "pumpkin",
     },
     {
-      typed_value: { name: "gpa", cidl_type: "Real", nullable: true },
+      typed_value: { name: "gpa", cidl_type: "Real" },
       value: "4.0",
     },
   ];
@@ -286,7 +286,12 @@ describe("Validate Request Success States", () => {
         ...i,
         is_get,
         value: nullable ? null : i.value,
-        typed_value: { ...i.typed_value, nullable },
+        typed_value: {
+          ...i.typed_value,
+          cidl_type: nullable
+            ? { Nullable: i.typed_value.cidl_type }
+            : i.typed_value.cidl_type,
+        },
       })),
     ),
   );
@@ -359,7 +364,10 @@ describe("modelsFromSql", () => {
         name: modelName,
         attributes: [
           {
-            value: { name: "name", cidl_type: "Text", nullable: true },
+            value: {
+              name: "name",
+              cidl_type: { Nullable: "Text" },
+            },
             foreign_key_reference: null,
           },
         ],
@@ -368,7 +376,6 @@ describe("modelsFromSql", () => {
             value: {
               name: "riders",
               cidl_type: { Array: { Model: nestedModelName } },
-              nullable: false,
             },
             kind: { OneToMany: { reference: "id" } },
           },
@@ -376,7 +383,6 @@ describe("modelsFromSql", () => {
         primary_key: {
           name: "id",
           cidl_type: "Integer",
-          nullable: false,
         },
         data_sources: [],
         methods: {},
@@ -385,14 +391,16 @@ describe("modelsFromSql", () => {
         name: nestedModelName,
         attributes: [
           {
-            value: { name: "nickname", cidl_type: "Text", nullable: true },
+            value: {
+              name: "nickname",
+              cidl_type: { Nullable: "Text" },
+            },
             foreign_key_reference: null,
           },
         ],
         primary_key: {
           name: "id",
           cidl_type: "Integer",
-          nullable: false,
         },
         navigation_properties: [],
         data_sources: [],

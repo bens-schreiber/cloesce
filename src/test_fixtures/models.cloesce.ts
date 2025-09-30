@@ -42,8 +42,17 @@ class Horse {
   async like(@Inject { db }: Env, horse: Horse): Promise<HttpResult<void>> {}
 
   /*  Random functions for test coverage  */
+
   @GET
   static async divide(a: number, b: number): Promise<HttpResult<number>> {}
+
+  @POST
+  static async returnNull(): Promise<null> {}
+
+  @POST
+  static async returnNullArrayOrNull(
+    count: number | null
+  ): Promise<string[] | null> {}
 }
 
 @D1

@@ -1,5 +1,5 @@
 use common::{
-    CidlType, NavigationPropertyKind,
+    CidlType, NamedTypedValue, NavigationPropertyKind,
     builder::{IncludeTreeBuilder, ModelBuilder, create_cidl, create_wrangler},
 };
 use d1::D1Generator;
@@ -42,8 +42,8 @@ fn test_sqlite_table_output() {
         let cidl = create_cidl(vec![
             ModelBuilder::new("User")
                 .id() // adds a primary key
-                .attribute("name", CidlType::Text, true, None)
-                .attribute("age", CidlType::Integer, false, None)
+                .attribute("name", CidlType::nullable(CidlType::Text), None)
+                .attribute("age", CidlType::Integer, None)
                 .build(),
         ]);
         let d1gen = D1Generator::new(cidl, create_wrangler());
@@ -64,7 +64,7 @@ fn test_sqlite_table_output() {
         let cidl = create_cidl(vec![
             ModelBuilder::new("Person")
                 .id()
-                .attribute("dogId", CidlType::Integer, false, Some("Dog".to_string()))
+                .attribute("dogId", CidlType::Integer, Some("Dog".to_string()))
                 .build(),
             ModelBuilder::new("Dog").id().build(),
         ]);
@@ -86,11 +86,10 @@ fn test_sqlite_table_output() {
         let cidl = create_cidl(vec![
             ModelBuilder::new("Person")
                 .id()
-                .attribute("dogId", CidlType::Integer, false, Some("Dog".into()))
+                .attribute("dogId", CidlType::Integer, Some("Dog".into()))
                 .nav_p(
                     "dog",
                     CidlType::Model("Dog".into()),
-                    false,
                     NavigationPropertyKind::OneToOne {
                         reference: "dogId".into(),
                     },
@@ -116,38 +115,35 @@ fn test_sqlite_table_output() {
         let cidl = create_cidl(vec![
             ModelBuilder::new("Dog")
                 .id()
-                .attribute("personId", CidlType::Integer, false, Some("Person".into()))
+                .attribute("personId", CidlType::Integer, Some("Person".into()))
                 .build(),
             ModelBuilder::new("Cat")
-                .attribute("personId", CidlType::Integer, false, Some("Person".into()))
+                .attribute("personId", CidlType::Integer, Some("Person".into()))
                 .id()
                 .build(),
             ModelBuilder::new("Person")
                 .id()
                 .nav_p(
                     "dogs",
-                    CidlType::Array(Box::new(CidlType::Model("Dog".to_string()))),
-                    false,
+                    CidlType::array(CidlType::Model("Dog".to_string())),
                     NavigationPropertyKind::OneToMany {
                         reference: "personId".into(),
                     },
                 )
                 .nav_p(
                     "cats",
-                    CidlType::Array(Box::new(CidlType::Model("Cat".to_string()))),
-                    false,
+                    CidlType::array(CidlType::Model("Cat".to_string())),
                     NavigationPropertyKind::OneToMany {
                         reference: "personId".into(),
                     },
                 )
-                .attribute("bossId", CidlType::Integer, false, Some("Boss".into()))
+                .attribute("bossId", CidlType::Integer, Some("Boss".into()))
                 .build(),
             ModelBuilder::new("Boss")
                 .id()
                 .nav_p(
                     "persons",
-                    CidlType::Array(Box::new(CidlType::Model("Person".to_string()))),
-                    false,
+                    CidlType::array(CidlType::Model("Person".to_string())),
                     NavigationPropertyKind::OneToMany {
                         reference: "bossId".into(),
                     },
@@ -189,8 +185,7 @@ fn test_sqlite_table_output() {
                 .id()
                 .nav_p(
                     "courses",
-                    CidlType::Array(Box::new(CidlType::Model("Course".to_string()))),
-                    false,
+                    CidlType::array(CidlType::Model("Course".to_string())),
                     NavigationPropertyKind::ManyToMany {
                         unique_id: "StudentsCourses".into(),
                     },
@@ -200,8 +195,7 @@ fn test_sqlite_table_output() {
                 .id()
                 .nav_p(
                     "students",
-                    CidlType::Array(Box::new(CidlType::Model("Student".to_string()))),
-                    false,
+                    CidlType::array(CidlType::Model("Student".to_string())),
                     NavigationPropertyKind::ManyToMany {
                         unique_id: "StudentsCourses".into(),
                     },
@@ -241,11 +235,10 @@ fn test_sqlite_view_output() {
         let cidl = create_cidl(vec![
             ModelBuilder::new("Person")
                 .id()
-                .attribute("dogId", CidlType::Integer, false, Some("Dog".into()))
+                .attribute("dogId", CidlType::Integer, Some("Dog".into()))
                 .nav_p(
                     "dog",
                     CidlType::Model("Dog".into()),
-                    false,
                     NavigationPropertyKind::OneToOne {
                         reference: "dogId".into(),
                     },
@@ -278,10 +271,10 @@ fn test_sqlite_view_output() {
         let cidl = create_cidl(vec![
             ModelBuilder::new("Dog")
                 .id()
-                .attribute("personId", CidlType::Integer, false, Some("Person".into()))
+                .attribute("personId", CidlType::Integer, Some("Person".into()))
                 .build(),
             ModelBuilder::new("Cat")
-                .attribute("personId", CidlType::Integer, false, Some("Person".into()))
+                .attribute("personId", CidlType::Integer, Some("Person".into()))
                 .id()
                 .build(),
             ModelBuilder::new("Person")
@@ -289,7 +282,6 @@ fn test_sqlite_view_output() {
                 .nav_p(
                     "dogs",
                     CidlType::array(CidlType::Model("Dog".into())),
-                    false,
                     NavigationPropertyKind::OneToMany {
                         reference: "personId".into(),
                     },
@@ -297,12 +289,11 @@ fn test_sqlite_view_output() {
                 .nav_p(
                     "cats",
                     CidlType::array(CidlType::Model("Cat".into())),
-                    false,
                     NavigationPropertyKind::OneToMany {
                         reference: "personId".into(),
                     },
                 )
-                .attribute("bossId", CidlType::Integer, false, Some("Boss".into()))
+                .attribute("bossId", CidlType::Integer, Some("Boss".into()))
                 .data_source(
                     "default",
                     IncludeTreeBuilder::default()
@@ -316,7 +307,6 @@ fn test_sqlite_view_output() {
                 .nav_p(
                     "persons",
                     CidlType::array(CidlType::Model("Person".into())),
-                    false,
                     NavigationPropertyKind::OneToMany {
                         reference: "bossId".into(),
                     },
@@ -363,7 +353,6 @@ fn test_sqlite_view_output() {
                 .nav_p(
                     "courses",
                     CidlType::array(CidlType::Model("Course".to_string())),
-                    false,
                     NavigationPropertyKind::ManyToMany {
                         unique_id: "StudentsCourses".into(),
                     },
@@ -380,7 +369,6 @@ fn test_sqlite_view_output() {
                 .nav_p(
                     "students",
                     CidlType::array(CidlType::Model("Student".to_string())),
-                    false,
                     NavigationPropertyKind::ManyToMany {
                         unique_id: "StudentsCourses".into(),
                     },
@@ -421,13 +409,12 @@ fn test_sqlite_view_output() {
         let horse_model = ModelBuilder::new("Horse")
             // Attributes
             .id() // id is primary key
-            .attribute("name", CidlType::Text, false, None)
-            .attribute("bio", CidlType::Text, true, None)
+            .attribute("name", CidlType::Text, None)
+            .attribute("bio", CidlType::nullable(CidlType::Text), None)
             // Navigation Properties
             .nav_p(
                 "matches",
                 CidlType::array(CidlType::Model("Match".into())),
-                false,
                 NavigationPropertyKind::OneToMany {
                     reference: "horseId1".into(),
                 },
@@ -448,13 +435,12 @@ fn test_sqlite_view_output() {
         let match_model = ModelBuilder::new("Match")
             // Attributes
             .id()
-            .attribute("horseId1", CidlType::Integer, false, Some("Horse".into()))
-            .attribute("horseId2", CidlType::Integer, false, Some("Horse".into()))
+            .attribute("horseId1", CidlType::Integer, Some("Horse".into()))
+            .attribute("horseId2", CidlType::Integer, Some("Horse".into()))
             // Navigation Properties
             .nav_p(
                 "horse2",
                 CidlType::Model("Horse".into()),
-                false,
                 NavigationPropertyKind::OneToOne {
                     reference: "horseId2".into(),
                 },
@@ -482,8 +468,8 @@ fn test_duplicate_column_error() {
     let cidl = create_cidl(vec![
         ModelBuilder::new("Person")
             .id()
-            .attribute("name", CidlType::Integer, false, None)
-            .attribute("name", CidlType::Real, true, None)
+            .attribute("name", CidlType::Integer, None)
+            .attribute("name", CidlType::Real, None)
             .build(),
     ]);
 
@@ -500,7 +486,10 @@ fn test_duplicate_column_error() {
 fn test_nullable_primary_key_error() {
     // Arrange
     let mut model = ModelBuilder::new("Person").id().build();
-    model.primary_key.nullable = true;
+    model.primary_key = NamedTypedValue {
+        name: "id".into(),
+        cidl_type: CidlType::nullable(CidlType::Integer),
+    };
 
     let cidl = create_cidl(vec![model]);
     let d1gen = D1Generator::new(cidl, create_wrangler());
@@ -509,7 +498,7 @@ fn test_nullable_primary_key_error() {
     let err = d1gen.sql().unwrap_err();
 
     // Assert
-    expected_str!(err, "A primary key cannot be nullable.");
+    expected_str!(err, "Primary key cannot be nullable");
 }
 
 #[test]
@@ -537,7 +526,6 @@ fn test_unknown_foreign_key_error() {
             .attribute(
                 "nonExistentId",
                 CidlType::Integer,
-                false,
                 Some("NonExistent".to_string()),
             )
             .build(),
@@ -561,15 +549,15 @@ fn test_cycle_detection_error() {
     let cidl = create_cidl(vec![
         ModelBuilder::new("A")
             .id()
-            .attribute("bId", CidlType::Integer, false, Some("B".to_string()))
+            .attribute("bId", CidlType::Integer, Some("B".to_string()))
             .build(),
         ModelBuilder::new("B")
             .id()
-            .attribute("cId", CidlType::Integer, false, Some("C".to_string()))
+            .attribute("cId", CidlType::Integer, Some("C".to_string()))
             .build(),
         ModelBuilder::new("C")
             .id()
-            .attribute("aId", CidlType::Integer, false, Some("A".to_string()))
+            .attribute("aId", CidlType::Integer, Some("A".to_string()))
             .build(),
     ]);
 
@@ -588,15 +576,19 @@ fn test_nullability_prevents_cycle_error() {
     let cidl = create_cidl(vec![
         ModelBuilder::new("A")
             .id()
-            .attribute("bId", CidlType::Integer, false, Some("B".to_string()))
+            .attribute("bId", CidlType::Integer, Some("B".to_string()))
             .build(),
         ModelBuilder::new("B")
             .id()
-            .attribute("cId", CidlType::Integer, false, Some("C".to_string()))
+            .attribute("cId", CidlType::Integer, Some("C".to_string()))
             .build(),
         ModelBuilder::new("C")
             .id()
-            .attribute("aId", CidlType::Integer, true, Some("A".to_string()))
+            .attribute(
+                "aId",
+                CidlType::nullable(CidlType::Integer),
+                Some("A".to_string()),
+            )
             .build(),
     ]);
 
@@ -613,7 +605,7 @@ fn test_invalid_sqlite_type_error() {
     let cidl = create_cidl(vec![
         ModelBuilder::new("BadType")
             .id()
-            .attribute("attr", CidlType::Model("User".into()), false, None)
+            .attribute("attr", CidlType::Model("User".into()), None)
             .build(),
     ]);
 
@@ -636,7 +628,6 @@ fn test_one_to_one_nav_property_unknown_attribute_reference_error() {
             .nav_p(
                 "dog",
                 CidlType::Model("Dog".into()),
-                false,
                 NavigationPropertyKind::OneToOne {
                     reference: "dogId".to_string(),
                 },
@@ -667,7 +658,6 @@ fn test_one_to_one_nav_property_expected_model_type_error() {
             .nav_p(
                 "dog",
                 CidlType::Integer,
-                false,
                 NavigationPropertyKind::OneToOne {
                     reference: "dogId".to_string(),
                 },
@@ -695,11 +685,10 @@ fn test_one_to_one_mismatched_fk_and_nav_type_error() {
         ModelBuilder::new("Cat").id().build(),
         ModelBuilder::new("Person")
             .id()
-            .attribute("dogId", CidlType::Integer, false, Some("Dog".into()))
+            .attribute("dogId", CidlType::Integer, Some("Dog".into()))
             .nav_p(
                 "dog",
                 CidlType::Model("Cat".into()), // incorrect: says Cat but fk points to Dog
-                false,
                 NavigationPropertyKind::OneToOne {
                     reference: "dogId".to_string(),
                 },
@@ -725,14 +714,13 @@ fn test_one_to_many_expected_collection_type_error() {
     let spec = create_cidl(vec![
         ModelBuilder::new("Dog")
             .id()
-            .attribute("personId", CidlType::Integer, false, Some("Person".into()))
+            .attribute("personId", CidlType::Integer, Some("Person".into()))
             .build(),
         ModelBuilder::new("Person")
             .id()
             .nav_p(
                 "dogs",
                 CidlType::Model("Dog".into()), // wrong: not an array
-                false,
                 NavigationPropertyKind::OneToMany {
                     reference: "personId".into(),
                 },
@@ -761,8 +749,7 @@ fn test_one_to_many_nullable_nav_property_error() {
             .id()
             .nav_p(
                 "dogs",
-                CidlType::Array(Box::new(CidlType::Model("Dog".into()))),
-                true, // nullable -> should error
+                CidlType::null(), // nullable -> should error
                 NavigationPropertyKind::OneToMany {
                     reference: "personId".into(),
                 },
@@ -776,7 +763,10 @@ fn test_one_to_many_nullable_nav_property_error() {
     let err = d1gen.sql().unwrap_err();
 
     // Assert
-    expected_str!(err, "Navigation property cannot be nullable Person.dogs");
+    expected_str!(
+        err,
+        "Expected collection of Model type for navigation property Person.dogs"
+    );
 }
 
 #[test]
@@ -787,8 +777,7 @@ fn test_one_to_many_unknown_nav_model_error() {
             .id()
             .nav_p(
                 "dogs",
-                CidlType::Array(Box::new(CidlType::Model("Dog".into()))),
-                false,
+                CidlType::array(CidlType::Model("Dog".into())),
                 NavigationPropertyKind::OneToMany {
                     reference: "personId".into(),
                 },
@@ -819,8 +808,7 @@ fn test_one_to_many_unresolved_reference_error() {
             .id()
             .nav_p(
                 "dogs",
-                CidlType::Array(Box::new(CidlType::Model("Dog".to_string()))),
-                false,
+                CidlType::array(CidlType::Model("Dog".to_string())),
                 NavigationPropertyKind::OneToMany {
                     reference: "personId".into(),
                 },
@@ -849,7 +837,6 @@ fn test_many_to_many_expected_collection_type_error() {
             .nav_p(
                 "courses",
                 CidlType::Model("Course".into()), // wrong: not array
-                false,
                 NavigationPropertyKind::ManyToMany {
                     unique_id: "StudentsCourses".into(),
                 },
@@ -878,8 +865,7 @@ fn test_many_to_many_nullable_nav_property_error() {
             .id()
             .nav_p(
                 "courses",
-                CidlType::Array(Box::new(CidlType::Model("Course".into()))),
-                true, // nullable -> should error
+                CidlType::null(), // nullable, should err
                 NavigationPropertyKind::ManyToMany {
                     unique_id: "StudentsCourses".into(),
                 },
@@ -896,7 +882,7 @@ fn test_many_to_many_nullable_nav_property_error() {
     // Assert
     expected_str!(
         err,
-        "Navigation property cannot be nullable Student.courses"
+        "Expected collection of Model type for navigation property Student.courses"
     );
 }
 
@@ -908,8 +894,7 @@ fn test_many_to_many_unknown_nav_model_error() {
             .id()
             .nav_p(
                 "courses",
-                CidlType::Array(Box::new(CidlType::Model("Course".into()))),
-                false,
+                CidlType::array(CidlType::Model("Course".into())),
                 NavigationPropertyKind::ManyToMany {
                     unique_id: "StudentsCourses".into(),
                 },
@@ -939,8 +924,7 @@ fn test_junction_table_builder_errors() {
                 .id()
                 .nav_p(
                     "courses",
-                    CidlType::Array(Box::new(CidlType::Model("Course".into()))),
-                    false,
+                    CidlType::array(CidlType::Model("Course".into())),
                     NavigationPropertyKind::ManyToMany {
                         unique_id: "OnlyOne".into(),
                     },
@@ -962,8 +946,7 @@ fn test_junction_table_builder_errors() {
                 .id()
                 .nav_p(
                     "bs",
-                    CidlType::Array(Box::new(CidlType::Model("B".into()))),
-                    false,
+                    CidlType::array(CidlType::Model("B".into())),
                     NavigationPropertyKind::ManyToMany {
                         unique_id: "TriJ".into(),
                     },
@@ -973,8 +956,7 @@ fn test_junction_table_builder_errors() {
                 .id()
                 .nav_p(
                     "as",
-                    CidlType::Array(Box::new(CidlType::Model("A".into()))),
-                    false,
+                    CidlType::array(CidlType::Model("A".into())),
                     NavigationPropertyKind::ManyToMany {
                         unique_id: "TriJ".into(),
                     },
@@ -985,8 +967,7 @@ fn test_junction_table_builder_errors() {
                 .id()
                 .nav_p(
                     "as",
-                    CidlType::Array(Box::new(CidlType::Model("A".into()))),
-                    false,
+                    CidlType::array(CidlType::Model("A".into())),
                     NavigationPropertyKind::ManyToMany {
                         unique_id: "TriJ".into(),
                     },

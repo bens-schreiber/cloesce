@@ -36,7 +36,12 @@ fn left_join_as(
 
 fn typed_column(name: &str, ty: &CidlType) -> ColumnDef {
     let mut col = ColumnDef::new(alias(name));
-    match ty {
+    let inner = match ty {
+        CidlType::Nullable(inner) => inner.as_ref(),
+        t => t,
+    };
+
+    match inner {
         CidlType::Integer => col.integer(),
         CidlType::Real => col.decimal(),
         CidlType::Text => col.text(),
@@ -94,14 +99,6 @@ fn validate_nav_array<'a>(
         );
     };
 
-    if nav.value.nullable {
-        bail!(
-            "Navigation property cannot be nullable {}.{}",
-            model.name,
-            nav.value.name
-        );
-    }
-
     if !model_lookup.contains_key(model_name.as_str()) {
         bail!(
             "Unknown Model for navigation property {}.{} => {}?",
@@ -125,15 +122,24 @@ fn validate_models(models: &[Model]) -> Result<HashMap<&str, &Model>> {
     let mut model_lookup = HashMap::<&str, &Model>::new();
 
     let ensure_valid_sql_type = |model: &Model, value: &NamedTypedValue| {
+        let inner = match &value.cidl_type {
+            CidlType::Nullable(inner) if matches!(inner.as_ref(), CidlType::Void) => {
+                bail!("SQL types cannot be null, only nullable.")
+            }
+            CidlType::Nullable(inner) => inner.as_ref(),
+            other => other,
+        };
+
         ensure!(
             matches!(
-                value.cidl_type,
+                inner,
                 CidlType::Integer | CidlType::Real | CidlType::Text | CidlType::Blob
             ),
             "Invalid SQL Type {}.{}",
             model.name,
             value.name
         );
+
         Ok(())
     };
 
@@ -159,10 +165,9 @@ fn validate_models(models: &[Model]) -> Result<HashMap<&str, &Model>> {
         }
 
         // Validate primary key
-        // TODO: Why even give the option?
         ensure!(
-            !model.primary_key.nullable,
-            "A primary key cannot be nullable."
+            !model.primary_key.cidl_type.is_nullable(),
+            "Primary key cannot be nullable"
         );
         ensure_valid_sql_type(model, &model.primary_key)?;
     }
@@ -215,7 +220,7 @@ fn validate_fks<'a>(
 
             // Nullable FK's do not constrain table creation order, and thus
             // can be left out of the topo sort
-            if !attr.value.nullable {
+            if !attr.value.cidl_type.is_nullable() {
                 // One To One: Person has a Dog ..(sql)=> Person has a fk to Dog
                 // Dog must come before Person
                 graph.entry(fk_model).or_default().push(&model.name);
@@ -445,9 +450,6 @@ fn validate_data_sources<'a>(
                 _ => bail!("Data Sources must be composed of model references"),
             };
 
-            // todo: why even give the option??
-            ensure!(!value.nullable, "Data Sources cannot be nullable");
-
             // Referenced attribute must exist
             let Some(nav) = model
                 .navigation_properties
@@ -509,7 +511,7 @@ fn generate_tables(
         for attr in model.attributes.iter() {
             let mut column = typed_column(&attr.value.name, &attr.value.cidl_type);
 
-            if !attr.value.nullable {
+            if !attr.value.cidl_type.is_nullable() {
                 column.not_null();
             }
 
