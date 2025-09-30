@@ -83,10 +83,10 @@ export class CidlExtractor {
       });
 
     if (wranglerEnvs.length < 1) {
-      left("Missing wrangler environment @WranglerEnv");
+      return left("Missing wrangler environment @WranglerEnv");
     }
     if (wranglerEnvs.length > 1) {
-      left("Too many wrangler environments specified with @WranglerEnv");
+      return left("Too many wrangler environments specified with @WranglerEnv");
     }
 
     return right({
@@ -114,12 +114,12 @@ export class CidlExtractor {
 
       // No decorators means this is a standard attribute
       if (decorators.length === 0) {
-        let typeRes = CidlExtractor.cidlType(prop.getType());
+        const typeRes = CidlExtractor.cidlType(prop.getType());
         if (!typeRes.ok) {
           return typeRes;
         }
 
-        let cidl_type = typeRes.value;
+        const cidl_type = typeRes.value;
         attributes.push({
           foreign_key_reference: null,
           value: {
@@ -134,13 +134,13 @@ export class CidlExtractor {
       const decorator = decorators[0];
       const name = getDecoratorName(decorator);
 
-      let typeRes = CidlExtractor.cidlType(prop.getType());
+      const typeRes = CidlExtractor.cidlType(prop.getType());
       if (!typeRes.ok) {
         return typeRes;
       }
 
       // Process decorators
-      let cidl_type = typeRes.value;
+      const cidl_type = typeRes.value;
       switch (name) {
         case AttributeDecoratorKind.PrimaryKey: {
           primary_key = {
@@ -213,7 +213,7 @@ export class CidlExtractor {
             );
           }
 
-          let treeRes = CidlExtractor.includeTree(
+          const treeRes = CidlExtractor.includeTree(
             initializer,
             classDecl,
             sourceFile,
@@ -277,10 +277,10 @@ export class CidlExtractor {
     }
 
     // Nullable via union
-    let [unwrappedType, nullable] = unwrapNullable(type);
+    const [unwrappedType, nullable] = unwrapNullable(type);
 
     // Primitives
-    let tyText = unwrappedType
+    const tyText = unwrappedType
       .getText(undefined, TypeFormatFlags.UseAliasDefinedOutsideCurrentScope)
       .split("|")[0]
       .trim(); // trim `| null` if there
