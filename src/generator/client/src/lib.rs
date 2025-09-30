@@ -1,19 +1,27 @@
 mod mappers;
 
-use std::sync::Arc;
+use std::{ops::Deref, sync::Arc};
 
-use common::{CidlSpec, CidlType, InputLanguage, match_cidl, matches_cidl};
+use common::{CidlSpec, CidlType, InputLanguage};
 use handlebars::{Handlebars, handlebars_helper};
 
 use mappers::TypeScriptMapper;
 
 pub trait ClientLanguageTypeMapper {
-    fn type_name(&self, ty: Option<&CidlType>, nullable: bool) -> String;
+    fn type_name(&self, ty: &CidlType) -> String;
 }
 
 handlebars_helper!(is_serializable: |cidl_type: CidlType| !matches!(cidl_type, CidlType::Inject(_)));
-handlebars_helper!(is_model: |cidl_type: CidlType| matches_cidl!(&cidl_type, Model(_)) || matches_cidl!(&cidl_type, HttpResult(Model(_))));
-handlebars_helper!(is_model_array: |cidl_type: CidlType| matches_cidl!(&cidl_type, HttpResult(Array(Model(_)))) || matches_cidl!(&cidl_type, Array(Model(_))));
+handlebars_helper!(is_model: |cidl_type: CidlType| match cidl_type {
+    CidlType::Model(_) => true,
+    CidlType::HttpResult(inner) => matches!(inner.deref(), CidlType::Model(_)),
+    _ => false,
+});
+handlebars_helper!(is_model_array: |cidl_type: CidlType| match cidl_type {
+    CidlType::HttpResult(inner) => matches!(inner.deref(), CidlType::Array(inner2) if matches!(inner2.deref(), CidlType::Model(_))),
+    CidlType::Array(inner) => matches!(inner.deref(), CidlType::Model(_)),
+    _ => false,
+});
 handlebars_helper!(eq: |a: str, b: str| a == b);
 
 fn register_helpers(
@@ -32,15 +40,10 @@ fn register_helpers(
                   _: &handlebars::Context,
                   _: &mut handlebars::RenderContext<'_, '_>,
                   out: &mut dyn handlebars::Output| {
-                let cidl_type: Option<CidlType> =
+                let cidl_type: CidlType =
                     serde_json::from_value(h.param(0).unwrap().value().clone()).unwrap();
 
-                let nullable: bool = h
-                    .param(1)
-                    .and_then(|v| v.value().as_bool())
-                    .unwrap_or(false);
-
-                let rendered = mapper.type_name(cidl_type.as_ref(), nullable);
+                let rendered = mapper.type_name(&cidl_type);
                 out.write(&rendered)?;
                 Ok(())
             },

@@ -9,6 +9,7 @@ import {
   right,
   MetaModel,
   CidlSpec,
+  isNullableType,
 } from "./common.js";
 
 /**
@@ -134,25 +135,25 @@ export async function cloesce(
   const d1: D1Database = instanceRegistry.get(envMeta.envName)[envMeta.dbName];
 
   // Match the route to a model method
-  let route = matchRoute(request, api_route, cidl);
+  const route = matchRoute(request, api_route, cidl);
   if (!route.ok) {
     return toResponse(route.value);
   }
-  let { modelMeta, methodMeta, id } = route.value;
+  const { modelMeta, methodMeta, id } = route.value;
 
   // Validate request body to the model method
-  let isValidRequest = await validateRequest(request, cidl, methodMeta, id);
+  const isValidRequest = await validateRequest(request, cidl, methodMeta, id);
   if (!isValidRequest.ok) {
     return toResponse(isValidRequest.value);
   }
-  let requestParamMap = isValidRequest.value;
+  const requestParamMap = isValidRequest.value;
 
   // Instantatiate the model
   let instance: object;
   if (methodMeta.is_static) {
     instance = constructorRegistry[modelMeta.name];
   } else {
-    let successfulModel = await hydrateModel(
+    const successfulModel = await hydrateModel(
       cidl,
       modelMeta,
       constructorRegistry,
@@ -251,7 +252,7 @@ async function validateRequest(
 
   // Filter out any injected parameters that will not be passed
   // by the query.
-  let requiredParams = methodMeta.parameters.filter(
+  const requiredParams = methodMeta.parameters.filter(
     (p) =>
       !(
         typeof p.cidl_type === "object" &&
@@ -280,7 +281,7 @@ async function validateRequest(
   // Validate all parameters type
   for (const p of requiredParams) {
     const value = requestBodyMap[p.name];
-    if (!validateCidlType(value, p.cidl_type, cidl, p.nullable)) {
+    if (!validateCidlType(value, p.cidl_type, cidl)) {
       return invalid_request("Invalid parameters.");
     }
   }
@@ -291,13 +292,17 @@ async function validateRequest(
     value: unknown,
     cidlType: CidlType,
     cidl: MetaCidl,
-    nullable: boolean,
   ): boolean {
     if (value === undefined) return false;
 
     // TODO: consequences of null checking like this? 'null' is passed in
     // as a string for GET requests...
+    const nullable = isNullableType(cidlType);
     if (value == null || value === "null") return nullable;
+
+    if (nullable) {
+      cidlType = (cidlType as any).Nullable; // Unwrap the nullable type
+    }
 
     // Handle primitive string types with switch
     if (typeof cidlType === "string") {
@@ -324,12 +329,7 @@ async function validateRequest(
       // Validate attributes
       if (
         !model.attributes.every((attr) =>
-          validateCidlType(
-            obj[attr.value.name],
-            attr.value.cidl_type,
-            cidl,
-            attr.value.nullable,
-          ),
+          validateCidlType(obj[attr.value.name], attr.value.cidl_type, cidl),
         )
       ) {
         return false;
@@ -340,12 +340,7 @@ async function validateRequest(
         const navValue = obj[nav.value.name];
         return (
           navValue == null ||
-          validateCidlType(
-            navValue,
-            nav.value.cidl_type,
-            cidl,
-            nav.value.nullable,
-          )
+          validateCidlType(navValue, nav.value.cidl_type, cidl)
         );
       });
     }
@@ -353,14 +348,14 @@ async function validateRequest(
     if ("Array" in cidlType) {
       return (
         Array.isArray(value) &&
-        value.every((v) => validateCidlType(v, cidlType.Array, cidl, nullable))
+        value.every((v) => validateCidlType(v, cidlType.Array, cidl))
       );
     }
 
     if ("HttpResult" in cidlType) {
       if (value === null) return cidlType.HttpResult === null;
       if (cidlType.HttpResult === null) return false;
-      return validateCidlType(value, cidlType.HttpResult, cidl, nullable);
+      return validateCidlType(value, cidlType.HttpResult, cidl);
     }
 
     return false;
@@ -414,9 +409,9 @@ async function hydrateModel(
 
   // TODO: assuming default DS again
   if (hasDataSources) {
-    let includeTree: any = new constructorRegistry[modelMeta.name]().default;
+    const includeTree: any = new constructorRegistry[modelMeta.name]().default;
 
-    let models: object[] = _modelsFromSql(
+    const models: object[] = _modelsFromSql(
       modelMeta.name,
       cidl,
       constructorRegistry,

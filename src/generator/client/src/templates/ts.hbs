@@ -13,19 +13,19 @@ function instantiateModelArray<T extends object>(
 
 {{#each models}}
 export class {{name}} {
-  {{primary_key.name}}: {{lang_type primary_key.cidl_type primary_key.nullable}};
+  {{primary_key.name}}: {{lang_type primary_key.cidl_type}};
   {{#each attributes}}
-  {{value.name}}: {{lang_type value.cidl_type value.nullable}};
+  {{value.name}}: {{lang_type value.cidl_type}};
   {{/each}}
   {{#each navigation_properties}}
-  {{value.name}}: {{lang_type value.cidl_type value.nullable}};
+  {{value.name}}: {{lang_type value.cidl_type}};
   {{/each}}
 
   {{#each methods}}
   {{#if is_static}}static {{/if}}async {{name}}(
     {{#each parameters}}
       {{#if (is_serializable cidl_type)}}
-        {{name}}: {{lang_type cidl_type nullable}}{{#unless @last}}, {{/unless}}
+        {{name}}: {{lang_type cidl_type}}{{#unless @last}}, {{/unless}}
       {{/if}}
     {{/each}}
   ): Promise<HttpResult<{{lang_type return_type}}>> {

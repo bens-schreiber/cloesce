@@ -194,7 +194,7 @@ test("Methods can return both data and errors", async () => {
   }
 });
 
-test("Wrangler variabels can be retrieved", async () => {
+test("Wrangler variables can be retrieved", async () => {
   // Act
   let res = await Horse.motd();
 

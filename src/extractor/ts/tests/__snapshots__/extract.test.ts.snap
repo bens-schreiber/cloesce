@@ -11,15 +11,15 @@ exports[`actions snapshot 1`] = `
           "value": {
             "cidl_type": "Text",
             "name": "name",
-            "nullable": false,
           },
         },
         {
           "foreign_key_reference": null,
           "value": {
-            "cidl_type": "Text",
+            "cidl_type": {
+              "Nullable": "Text",
+            },
             "name": "bio",
-            "nullable": true,
           },
         },
       ],
@@ -35,7 +35,6 @@ exports[`actions snapshot 1`] = `
                   },
                 },
                 "name": "likes",
-                "nullable": false,
               },
               [
                 [
@@ -44,7 +43,6 @@ exports[`actions snapshot 1`] = `
                       "Model": "Horse",
                     },
                     "name": "horse2",
-                    "nullable": false,
                   },
                   [],
                 ],
@@ -64,14 +62,12 @@ exports[`actions snapshot 1`] = `
                 "Inject": "Env",
               },
               "name": "{ db }",
-              "nullable": false,
             },
             {
               "cidl_type": {
                 "Model": "Horse",
               },
               "name": "horse",
-              "nullable": false,
             },
           ],
           "return_type": {
@@ -90,12 +86,10 @@ exports[`actions snapshot 1`] = `
                 "Inject": "Env",
               },
               "name": "{ db }",
-              "nullable": false,
             },
             {
               "cidl_type": "Integer",
               "name": "id",
-              "nullable": false,
             },
           ],
           "return_type": {
@@ -114,7 +108,6 @@ exports[`actions snapshot 1`] = `
                 "Inject": "Env",
               },
               "name": "{ db }",
-              "nullable": false,
             },
           ],
           "return_type": {
@@ -135,18 +128,16 @@ exports[`actions snapshot 1`] = `
                 "Inject": "Env",
               },
               "name": "{ db }",
-              "nullable": false,
             },
             {
               "cidl_type": {
                 "Model": "Horse",
               },
               "name": "horse",
-              "nullable": false,
             },
           ],
           "return_type": {
-            "HttpResult": null,
+            "HttpResult": "Void",
           },
         },
         {
@@ -159,18 +150,16 @@ exports[`actions snapshot 1`] = `
                 "Inject": "Env",
               },
               "name": "{ db }",
-              "nullable": false,
             },
             {
               "cidl_type": {
                 "Model": "Horse",
               },
               "name": "horse",
-              "nullable": false,
             },
           ],
           "return_type": {
-            "HttpResult": null,
+            "HttpResult": "Void",
           },
         },
         {
@@ -181,16 +170,41 @@ exports[`actions snapshot 1`] = `
             {
               "cidl_type": "Integer",
               "name": "a",
-              "nullable": false,
             },
             {
               "cidl_type": "Integer",
               "name": "b",
-              "nullable": false,
             },
           ],
           "return_type": {
             "HttpResult": "Integer",
+          },
+        },
+        {
+          "http_verb": "POST",
+          "is_static": true,
+          "name": "returnNull",
+          "parameters": [],
+          "return_type": {
+            "Nullable": "Void",
+          },
+        },
+        {
+          "http_verb": "POST",
+          "is_static": true,
+          "name": "returnNullArrayOrNull",
+          "parameters": [
+            {
+              "cidl_type": {
+                "Nullable": "Integer",
+              },
+              "name": "count",
+            },
+          ],
+          "return_type": {
+            "Nullable": {
+              "Array": "Text",
+            },
           },
         },
       ],
@@ -209,14 +223,12 @@ exports[`actions snapshot 1`] = `
               },
             },
             "name": "likes",
-            "nullable": false,
           },
         },
       ],
       "primary_key": {
         "cidl_type": "Integer",
         "name": "id",
-        "nullable": false,
       },
       "source_path": "void for tests",
     },
@@ -227,7 +239,6 @@ exports[`actions snapshot 1`] = `
           "value": {
             "cidl_type": "Integer",
             "name": "horseId1",
-            "nullable": false,
           },
         },
         {
@@ -235,7 +246,6 @@ exports[`actions snapshot 1`] = `
           "value": {
             "cidl_type": "Integer",
             "name": "horseId2",
-            "nullable": false,
           },
         },
       ],
@@ -254,14 +264,12 @@ exports[`actions snapshot 1`] = `
               "Model": "Horse",
             },
             "name": "horse2",
-            "nullable": false,
           },
         },
       ],
       "primary_key": {
         "cidl_type": "Integer",
         "name": "id",
-        "nullable": false,
       },
       "source_path": "void for tests",
     },

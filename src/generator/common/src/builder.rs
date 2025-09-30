@@ -36,7 +36,6 @@ impl IncludeTreeBuilder {
             NamedTypedValue {
                 name: name.into(),
                 cidl_type,
-                nullable: false,
             },
             IncludeTree(vec![]),
         ));
@@ -52,7 +51,6 @@ impl IncludeTreeBuilder {
             NamedTypedValue {
                 name: name.into(),
                 cidl_type,
-                nullable: false,
             },
             subtree,
         ));
@@ -92,14 +90,12 @@ impl ModelBuilder {
         mut self,
         name: impl Into<String>,
         cidl_type: CidlType,
-        nullable: bool,
         foreign_key: Option<String>,
     ) -> Self {
         self.attributes.push(ModelAttribute {
             value: NamedTypedValue {
                 name: name.into(),
                 cidl_type,
-                nullable,
             },
             foreign_key_reference: foreign_key,
         });
@@ -110,14 +106,12 @@ impl ModelBuilder {
         mut self,
         name: impl Into<String>,
         cidl_type: CidlType,
-        nullable: bool,
         foreign_key: NavigationPropertyKind,
     ) -> Self {
         self.navigation_properties.push(NavigationProperty {
             value: NamedTypedValue {
                 name: name.into(),
                 cidl_type,
-                nullable,
             },
             kind: foreign_key,
         });
@@ -128,7 +122,6 @@ impl ModelBuilder {
         self.primary_key = Some(NamedTypedValue {
             name: name.into(),
             cidl_type,
-            nullable: false,
         });
         self
     }
@@ -143,7 +136,7 @@ impl ModelBuilder {
         http_verb: HttpVerb,
         is_static: bool,
         parameters: Vec<NamedTypedValue>,
-        return_type: Option<CidlType>,
+        return_type: CidlType,
     ) -> Self {
         self.methods.push(ModelMethod {
             name: name.into(),
