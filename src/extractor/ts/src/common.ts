@@ -1,5 +1,3 @@
-import { boolean } from "cmd-ts";
-
 export type Either<L, R> = { ok: false; value: L } | { ok: true; value: R };
 export function left<L>(value: L): Either<L, never> {
   return { ok: false, value };
@@ -7,27 +5,6 @@ export function left<L>(value: L): Either<L, never> {
 export function right<R>(value: R): Either<never, R> {
   return { ok: true, value };
 }
-
-/**
- * A `Model` meant for Cloesce Meta Data, utilzing an map of methods.
- */
-export interface MetaModel {
-  name: string;
-  attributes: ModelAttribute[];
-  primary_key: NamedTypedValue;
-  navigation_properties: NavigationProperty[];
-  data_sources: DataSource[];
-  methods: Record<string, ModelMethod>;
-}
-
-/**
- * A `Cidl` meant for Cloesce Meta Data, utilzing an map of models.
- */
-export type MetaCidl = {
-  wrangler_env: WranglerEnv;
-  models: Record<string, MetaModel>;
-  [key: string]: unknown;
-};
 
 // --------------------------------------------------
 // V CIDL types, mirroring the Rust bindings V
@@ -88,24 +65,32 @@ export type NavigationPropertyKind =
   | { ManyToMany: { unique_id: string } };
 
 export interface NavigationProperty {
-  value: NamedTypedValue;
+  var_name: string;
+  model_name: string;
   kind: NavigationPropertyKind;
+}
+
+export function getNavigationPropertyCidlType(
+  nav: NavigationProperty,
+): CidlType {
+  return "OneToOne" in nav.kind
+    ? { Model: nav.model_name }
+    : { Array: { Model: nav.model_name } };
 }
 
 export interface Model {
   name: string;
-  attributes: ModelAttribute[];
   primary_key: NamedTypedValue;
+  attributes: ModelAttribute[];
   navigation_properties: NavigationProperty[];
+  methods: Record<string, ModelMethod>;
   data_sources: DataSource[];
-  methods: ModelMethod[];
   source_path: string;
 }
 
-/**
- * The CIDL or JSON IncludeTree structure
- */
-export type CidlIncludeTree = Array<[NamedTypedValue, CidlIncludeTree]>;
+export interface CidlIncludeTree {
+  [key: string]: CidlIncludeTree;
+}
 
 export interface DataSource {
   name: string;
@@ -122,5 +107,5 @@ export interface CidlSpec {
   project_name: string;
   language: "TypeScript";
   wrangler_env: WranglerEnv;
-  models: Model[];
+  models: Record<string, Model>;
 }

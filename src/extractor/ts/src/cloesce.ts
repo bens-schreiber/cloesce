@@ -3,28 +3,14 @@ import {
   HttpResult,
   Either,
   ModelMethod,
-  MetaCidl,
   left,
   CidlType,
   right,
-  MetaModel,
   CidlSpec,
   isNullableType,
+  Model,
+  getNavigationPropertyCidlType,
 } from "./common.js";
-
-/**
- * Users will create Cloesce models, which have metadata for them in the CIDL.
- * For TypeScript's purposes, these models can be anything. We can assume any
- * `UserDefinedModel` has been verified by the compiler.
- */
-type UserDefinedModel = any;
-type InstantiatedUserDefinedModel = object;
-
-/**
- * Given a request, this represents a map of each body / url  param name to
- * its actual value. Unknown, as the a request can be anything.
- */
-type RequestParamMap = Record<string, unknown>;
 
 /**
  * A map of model names to their respective constructor.
@@ -43,46 +29,51 @@ type ModelConstructorRegistry = Record<string, new () => UserDefinedModel>;
 type InstanceRegistry = Map<string, any>;
 
 /**
- * Singleton instance of the MetaCidl and Constructor Registry.
- * These values are guaranteed to never change throughout a programs lifetime.
+ * Singleton instances of the MetaCidl and Constructor Registry.
+ * These values are guaranteed to never change throughout a workers lifetime.
  */
 class MetaContainer {
   private static instance: MetaContainer | undefined;
   private constructor(
-    public readonly cidl: MetaCidl,
+    public readonly cidl: CidlSpec,
     public readonly constructorRegistry: ModelConstructorRegistry,
   ) {}
 
   static init(
-    rawCidl: CidlSpec,
+    cidl: CidlSpec,
     constructorRegistry: ModelConstructorRegistry,
   ): MetaContainer {
     if (!this.instance) {
-      this.instance = new MetaContainer(
-        {
-          ...rawCidl,
-          models: Object.fromEntries(
-            rawCidl.models.map((m) => [
-              m.name,
-              {
-                ...m,
-                methods: Object.fromEntries(m.methods.map((x) => [x.name, x])),
-              },
-            ]),
-          ),
-        },
-        constructorRegistry,
-      );
+      this.instance = new MetaContainer(cidl, constructorRegistry);
     }
     return this.instance;
   }
 
   static get(): MetaContainer {
-    if (!this.instance) {
-      throw new Error("Cloesce not initialized. Call Cloesce.init() first.");
-    }
-    return this.instance;
+    return this.instance!;
   }
+}
+
+/**
+ * Users will create Cloesce models, which have metadata for them in the CIDL.
+ * For TypeScript's purposes, these models can be anything. We can assume any
+ * `UserDefinedModel` has been verified by the compiler.
+ */
+type UserDefinedModel = any;
+type InstantiatedUserDefinedModel = object;
+
+/**
+ * Given a request, this represents a map of each body / url  param name to
+ * its actual value. Unknown, as the a request can be anything.
+ */
+type RequestParamMap = Record<string, unknown>;
+
+/**
+ * Meta information on the wrangler env and db bindings
+ */
+interface MetaWranglerEnv {
+  envName: string;
+  dbName: string; // TODO: support many db's
 }
 
 /**
@@ -108,16 +99,12 @@ export function modelsFromSql<T>(
   ) as T[];
 }
 
-interface MetaWranglerEnv {
-  envName: string;
-  dbName: string; // TODO: support many db's
-}
-
 /**
  * Cloesce entry point. Given a request, undergoes routing, validating,
  * hydrating, and method dispatch.
  * @param rawCidl The full unfiltered cidl
  * @param constructorRegistry A mapping of user defined class names to their respective constructor
+ * @param instanceRegistry A mapping of a dependency class name to its instantiated object.
  * @param request An incoming request to the workers server
  * @param api_route The url's path to the api, e.g. api/v1/fooapi/
  * @param envMeta Meta information on the wrangler env and D1 databases
@@ -180,8 +167,6 @@ export async function cloesce(
   );
 }
 
-// TODO: In the previous version, we would walk a generated trie
-// This is more hardcode-y, and I'm not sure it will hold up to time.
 /**
  * Matches a request to a method on a model.
  * @param api_route The route from the domain to the actual API, ie https://foo.com/route/to/api => route/to/api/
@@ -190,7 +175,7 @@ export async function cloesce(
 function matchRoute(
   request: Request,
   api_route: string,
-  cidl: MetaCidl,
+  cidl: CidlSpec,
 ): Either<HttpResult, MatchedRoute> {
   const url = new URL(request.url);
 
@@ -238,7 +223,7 @@ function matchRoute(
  */
 async function validateRequest(
   request: Request,
-  cidl: MetaCidl,
+  cidl: CidlSpec,
   methodMeta: ModelMethod,
   id: string | null,
 ): Promise<Either<HttpResult, RequestParamMap>> {
@@ -291,7 +276,7 @@ async function validateRequest(
   function validateCidlType(
     value: unknown,
     cidlType: CidlType,
-    cidl: MetaCidl,
+    cidl: CidlSpec,
   ): boolean {
     if (value === undefined) return false;
 
@@ -335,12 +320,13 @@ async function validateRequest(
         return false;
       }
 
-      // Validate navigation properties (optional)
+      // Validate navigation properties
       return model.navigation_properties.every((nav) => {
-        const navValue = obj[nav.value.name];
+        const navValue = obj[nav.var_name];
+
         return (
           navValue == null ||
-          validateCidlType(navValue, nav.value.cidl_type, cidl)
+          validateCidlType(navValue, getNavigationPropertyCidlType(nav), cidl)
         );
       });
     }
@@ -370,8 +356,8 @@ async function validateRequest(
  * @returns The instantiated model on success
  */
 async function hydrateModel(
-  cidl: MetaCidl,
-  modelMeta: MetaModel,
+  cidl: CidlSpec,
+  modelMeta: Model,
   constructorRegistry: ModelConstructorRegistry,
   d1: D1Database,
   id: string,
@@ -389,7 +375,7 @@ async function hydrateModel(
   // Error state: If no record is found for the id, return a 404
   const missingRecord = left(error_state(404, "Record not found"));
 
-  // TODO: We are assuming defalt DS for now
+  // TODO: We are assuming default DS for now
   const pk = modelMeta.primary_key.name;
   const hasDataSources = modelMeta.data_sources.length > 0;
   const query = hasDataSources
@@ -489,7 +475,7 @@ async function methodDispatch(
  */
 function _modelsFromSql(
   modelName: string,
-  cidl: MetaCidl,
+  cidl: CidlSpec,
   constructorRegistry: ModelConstructorRegistry,
   records: Record<string, any>[],
   includeTree: Record<string, UserDefinedModel>,
@@ -536,9 +522,9 @@ function _modelsFromSql(
 
       // Initialize all array navigation properties
       for (const nav of modelMeta.navigation_properties) {
-        const navCidlType = nav.value.cidl_type;
+        const navCidlType = getNavigationPropertyCidlType(nav);
         if (isCidlArray(navCidlType)) {
-          instance[nav.value.name] = [];
+          instance[nav.var_name] = [];
         }
       }
 
@@ -556,8 +542,8 @@ function _modelsFromSql(
 
     // Process navigation properties
     for (const nav of modelMeta.navigation_properties) {
-      const navName = nav.value.name;
-      const navCidlType = nav.value.cidl_type;
+      const navName = nav.var_name;
+      const navCidlType = getNavigationPropertyCidlType(nav);
       let navModelName: string | undefined;
 
       if (isCidlArray(navCidlType)) {
@@ -611,7 +597,7 @@ function _modelsFromSql(
   }
 
   function getCol(
-    meta: MetaModel,
+    meta: Model,
     attrName: string,
     row: Record<string, any>,
     prefixed: boolean,
@@ -635,7 +621,7 @@ function _modelsFromSql(
   }
 
   function buildInstance(
-    meta: MetaModel,
+    meta: Model,
     row: Record<string, any>,
     tree: Record<string, any>,
     prefixed: boolean,
@@ -657,8 +643,8 @@ function _modelsFromSql(
 
     // Assign navigation properties
     for (const nav of meta.navigation_properties) {
-      const navName = nav.value.name;
-      const navCidlType = nav.value.cidl_type;
+      const navName = nav.var_name;
+      const navCidlType = getNavigationPropertyCidlType(nav);
       let navModelName: string | undefined;
 
       if (isCidlArray(navCidlType)) {
@@ -713,7 +699,7 @@ function toResponse(r: HttpResult): Response {
 }
 
 interface MatchedRoute {
-  modelMeta: MetaModel;
+  modelMeta: Model;
   methodMeta: ModelMethod;
   id: string | null;
 }

@@ -12,7 +12,7 @@ test("actions snapshot", () => {
   expect(res.ok).toBe(true);
 
   let cidl = res.value as CidlSpec;
-  for (const m of cidl.models) {
+  for (const m of Object.values(cidl.models)) {
     if (m) {
       m.source_path = "void for tests";
     }

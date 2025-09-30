@@ -1,18 +1,21 @@
 import { _cloesceInternal } from "../src/cloesce";
 import {
+  CidlSpec,
   DataSource,
   HttpVerb,
-  MetaCidl,
   ModelAttribute,
   NamedTypedValue,
   NavigationProperty,
 } from "../src/common";
 
-const makeCidl = (methods: Record<string, any>): MetaCidl => ({
+const makeCidl = (methods: Record<string, any>): CidlSpec => ({
   wrangler_env: {
-    name: "Env",
+    name: "",
     source_path: "./",
   },
+  version: "",
+  project_name: "",
+  language: "TypeScript",
   models: {
     Horse: {
       name: "",
@@ -24,6 +27,7 @@ const makeCidl = (methods: Record<string, any>): MetaCidl => ({
       navigation_properties: [] as NavigationProperty[],
       data_sources: [] as DataSource[],
       methods,
+      source_path: "",
     },
   },
 });
@@ -46,6 +50,9 @@ describe("Router Error States", () => {
         name: "",
         source_path: "./",
       },
+      version: "",
+      project_name: "",
+      language: "TypeScript",
     });
 
     // Assert
@@ -164,7 +171,13 @@ describe("Validate Request Error States", () => {
     // Act
     const result = await _cloesceInternal.validateRequest(
       request,
-      { models: {}, wrangler_env: { name: "", source_path: "./" } },
+      {
+        models: {},
+        wrangler_env: { name: "", source_path: "./" },
+        version: "",
+        project_name: "",
+        language: "TypeScript",
+      },
       {
         name: "",
         is_static: false,
@@ -191,7 +204,13 @@ describe("Validate Request Error States", () => {
     // Act
     const result = await _cloesceInternal.validateRequest(
       request,
-      { models: {}, wrangler_env: { name: "", source_path: "./" } },
+      {
+        models: {},
+        wrangler_env: { name: "", source_path: "./" },
+        version: "",
+        project_name: "",
+        language: "TypeScript",
+      },
       {
         name: "",
         is_static: true,
@@ -232,7 +251,7 @@ describe("Validate Request Error States", () => {
         ? `http://foo.com/api/Horse/neigh?${query}`
         : "http://foo.com/api/Horse/neigh";
       const request = makeRequest(url, method, body);
-      const cidl: MetaCidl = makeCidl({
+      const cidl = makeCidl({
         neigh: {
           name: "neigh",
           is_static: true,
@@ -306,7 +325,7 @@ describe("Validate Request Success States", () => {
       arg.is_get ? undefined : "POST",
       arg.is_get ? undefined : { [arg.typed_value.name]: arg.value },
     );
-    const cidl: MetaCidl = makeCidl({
+    const cidl = makeCidl({
       neigh: {
         name: "neigh",
         is_static: true,
@@ -354,7 +373,7 @@ describe("modelsFromSql", () => {
     },
   };
 
-  const baseCidl: MetaCidl = {
+  const baseCidl: CidlSpec = {
     wrangler_env: {
       name: "Env",
       source_path: "./",
@@ -373,10 +392,8 @@ describe("modelsFromSql", () => {
         ],
         navigation_properties: [
           {
-            value: {
-              name: "riders",
-              cidl_type: { Array: { Model: nestedModelName } },
-            },
+            var_name: "riders",
+            model_name: nestedModelName,
             kind: { OneToMany: { reference: "id" } },
           },
         ],
@@ -386,6 +403,7 @@ describe("modelsFromSql", () => {
         },
         data_sources: [],
         methods: {},
+        source_path: "",
       },
       [nestedModelName]: {
         name: nestedModelName,
@@ -405,8 +423,12 @@ describe("modelsFromSql", () => {
         navigation_properties: [],
         data_sources: [],
         methods: {},
+        source_path: "",
       },
     },
+    version: "",
+    project_name: "",
+    language: "TypeScript",
   };
 
   test("returns empty array if no records", () => {

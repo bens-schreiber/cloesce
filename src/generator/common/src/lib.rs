@@ -1,11 +1,14 @@
 pub mod builder;
 pub mod wrangler;
 
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::path::PathBuf;
 
+use anyhow::{Result, bail, ensure};
 use serde::Deserialize;
 use serde::Serialize;
+use serde_with::MapPreventDuplicates;
+use serde_with::serde_as;
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
 pub enum CidlType {
@@ -51,14 +54,12 @@ impl CidlType {
     }
 
     /// Returns the root most CidlType, being any non Model/Array/Result.
-    ///
-    /// Option as the type could be null
-    pub fn root_type(&self) -> Option<&CidlType> {
+    pub fn root_type(&self) -> &CidlType {
         match self {
             CidlType::Array(inner) => inner.root_type(),
             CidlType::HttpResult(inner) => inner.root_type(),
             CidlType::Nullable(inner) => inner.root_type(),
-            t => Some(t),
+            t => t,
         }
     }
 
@@ -110,16 +111,7 @@ pub struct ModelMethod {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct IncludeTree(pub Vec<(NamedTypedValue, IncludeTree)>);
-
-impl IncludeTree {
-    pub fn to_lookup(&self) -> HashMap<&NamedTypedValue, &IncludeTree> {
-        self.0
-            .iter()
-            .map(|(tv, tree)| (tv, tree))
-            .collect::<HashMap<_, _>>()
-    }
-}
+pub struct IncludeTree(pub BTreeMap<String, IncludeTree>);
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct DataSource {
@@ -136,17 +128,22 @@ pub enum NavigationPropertyKind {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct NavigationProperty {
-    pub value: NamedTypedValue,
+    pub var_name: String,
+    pub model_name: String,
     pub kind: NavigationPropertyKind,
 }
 
+#[serde_as]
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Model {
     pub name: String,
-    pub attributes: Vec<ModelAttribute>,
     pub primary_key: NamedTypedValue,
+    pub attributes: Vec<ModelAttribute>,
     pub navigation_properties: Vec<NavigationProperty>,
-    pub methods: Vec<ModelMethod>,
+
+    #[serde_as(as = "MapPreventDuplicates<_, _>")]
+    pub methods: BTreeMap<String, ModelMethod>,
+
     pub data_sources: Vec<DataSource>,
     pub source_path: PathBuf,
 }
@@ -162,11 +159,141 @@ pub struct WranglerEnv {
     pub source_path: PathBuf,
 }
 
+#[serde_as]
 #[derive(Serialize, Deserialize)]
 pub struct CidlSpec {
     pub version: String,
     pub project_name: String,
     pub language: InputLanguage,
     pub wrangler_env: WranglerEnv,
-    pub models: Vec<Model>,
+
+    #[serde_as(as = "MapPreventDuplicates<_, _>")]
+    pub models: BTreeMap<String, Model>,
+}
+
+impl CidlSpec {
+    /// Ensures all `CidlTypes` follow the correct grammar, essentially doing
+    /// syntax analysis with some shallow semantic analysis regarding model names.
+    ///
+    /// Returns error on
+    /// - Model attributes with invalid SQL types
+    /// - Primary keys with invalid SQL types
+    /// - Invalid Model or Method map K/V
+    /// - Unknown navigation property model references
+    /// - Unknown model references in method parameters
+    /// - Invalid method parameter types
+    pub fn validate_types(&self) -> Result<()> {
+        let ensure_valid_sql_type = |model: &Model, value: &NamedTypedValue| {
+            let inner = match &value.cidl_type {
+                CidlType::Nullable(inner) if matches!(inner.as_ref(), CidlType::Void) => {
+                    bail!("SQL types cannot be null, only nullable.")
+                }
+                CidlType::Nullable(inner) => inner.as_ref(),
+                other => other,
+            };
+
+            ensure!(
+                matches!(
+                    inner,
+                    CidlType::Integer | CidlType::Real | CidlType::Text | CidlType::Blob
+                ),
+                "Invalid SQL Type {}.{}",
+                model.name,
+                value.name
+            );
+
+            Ok(())
+        };
+
+        for (model_name, model) in &self.models {
+            // Validate record
+            ensure!(
+                *model_name == model.name,
+                "Model record key did not match it's model name?"
+            );
+
+            // Validate PK
+            ensure_valid_sql_type(model, &model.primary_key)?;
+
+            // Validate attributes
+            for a in &model.attributes {
+                ensure_valid_sql_type(model, &a.value)?;
+
+                if let Some(fk_model) = &a.foreign_key_reference {
+                    // Validate the fk's model exists
+                    ensure!(
+                        self.models.contains_key(fk_model.as_str()),
+                        "Unknown Model for foreign key {}.{} => {}?",
+                        model.name,
+                        a.value.name,
+                        fk_model
+                    );
+                }
+            }
+
+            // Validate navigation props
+            for nav in &model.navigation_properties {
+                ensure!(
+                    self.models.contains_key(nav.model_name.as_str()),
+                    "Unknown Model for navigation property on {} => {}?",
+                    model.name,
+                    nav.model_name
+                );
+            }
+
+            // Validate methods
+            for (method_name, method) in &model.methods {
+                // Validate record
+                ensure!(
+                    *method_name == method.name,
+                    "Method record key did not match it's method name?"
+                );
+
+                // Validate return type
+                if let CidlType::Model(m) = &method.return_type {
+                    ensure!(
+                        self.models.contains_key(m.as_str()),
+                        "Unknown model reference on model method return type {}.{}",
+                        model.name,
+                        method.name
+                    );
+                }
+
+                // Validate method params
+                for param in &method.parameters {
+                    let root_type = param.cidl_type.root_type();
+
+                    if let CidlType::Void = root_type {
+                        bail!(
+                            "Method parameters cannot be void. {}.{}.{}",
+                            model.name,
+                            method.name,
+                            param.name
+                        )
+                    }
+
+                    if let CidlType::Model(m) = root_type {
+                        ensure!(
+                            self.models.contains_key(m.as_str()),
+                            "Unknown model reference on model method {}.{}.{}",
+                            model.name,
+                            method.name,
+                            param.name
+                        );
+
+                        if method.http_verb == HttpVerb::GET {
+                            bail!(
+                                "GET Requests currently do not support model parameters {}.{}.{}",
+                                model.name,
+                                method.name,
+                                param.name
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        Ok(())
+    }
 }

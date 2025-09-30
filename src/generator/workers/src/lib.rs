@@ -1,8 +1,8 @@
-use std::{collections::HashMap, path::Path};
+use std::{collections::BTreeMap, path::Path};
 
-use common::{CidlSpec, CidlType, HttpVerb, Model, WranglerEnv, wrangler::WranglerSpec};
+use common::{CidlSpec, Model, WranglerEnv, wrangler::WranglerSpec};
 
-use anyhow::{Context, Result, anyhow, bail, ensure};
+use anyhow::{Context, Result, anyhow};
 
 pub struct WorkersGenerator;
 impl WorkersGenerator {
@@ -27,78 +27,8 @@ impl WorkersGenerator {
         }
     }
 
-    /// Validates all methods contain valid types and references.
-    ///
-    /// Returns error on
-    /// - Unknown model reference on return type
-    /// - Invalid parameter type on methods
-    /// - Unknown model reference on method
-    /// -
-    fn validate_methods(models: &[Model]) -> Result<()> {
-        let mut lookup = HashMap::<&str, &Model>::new();
-
-        // TODO: We create a similiar lookup for D1 validation. It would be smart to pass that around.
-        for model in models {
-            lookup.insert(&model.name, model);
-        }
-
-        for model in models {
-            for method in &model.methods {
-                if let CidlType::Model(m) = &method.return_type {
-                    ensure!(
-                        lookup.contains_key(m.as_str()),
-                        "Unknown model reference on model method return type {}.{}",
-                        model.name,
-                        method.name
-                    );
-                }
-
-                for param in &method.parameters {
-                    let Some(root_type) = param.cidl_type.root_type() else {
-                        bail!(
-                            "Invalid parameter type on model method {}.{}.{}",
-                            model.name,
-                            method.name,
-                            param.name
-                        );
-                    };
-
-                    if let CidlType::Void = root_type {
-                        bail!(
-                            "Method parameters cannot be void. {}.{}.{}",
-                            model.name,
-                            method.name,
-                            param.name
-                        )
-                    }
-
-                    if let CidlType::Model(m) = root_type {
-                        ensure!(
-                            lookup.contains_key(m.as_str()),
-                            "Unknown model reference on model method {}.{}.{}",
-                            model.name,
-                            method.name,
-                            param.name
-                        );
-
-                        if method.http_verb == HttpVerb::GET {
-                            bail!(
-                                "GET Requests currently do not support model parameters {}.{}.{}",
-                                model.name,
-                                method.name,
-                                param.name
-                            )
-                        }
-                    }
-                }
-            }
-        }
-
-        Ok(())
-    }
-
     /// Generates all model source imports
-    fn link_models(models: &[Model], workers_path: &Path) -> Result<String> {
+    fn link_models(models: &BTreeMap<String, Model>, workers_path: &Path) -> Result<String> {
         let workers_dir = workers_path
             .parent()
             .context("workers_path has no parent; cannot compute relative imports")?;
@@ -137,8 +67,8 @@ impl WorkersGenerator {
         }
 
         let models = models
-            .iter()
-            .map(|m| -> Result<String> {
+            .values()
+            .map(|m| {
                 rel_path(&m.source_path, workers_dir)
                     .map(|p| format!("import {{ {} }} from \"{}\";", m.name, p))
             })
@@ -149,9 +79,9 @@ impl WorkersGenerator {
     }
 
     /// Generates the constructor registry and instance registry
-    fn registries(models: &[Model], wenv: &WranglerEnv) -> (String, String) {
+    fn registries(models: &BTreeMap<String, Model>, wenv: &WranglerEnv) -> (String, String) {
         let mut constructor_registry = Vec::new();
-        for model in models {
+        for model in models.values() {
             constructor_registry.push(format!("\t{}: {}", &model.name, &model.name));
         }
 
@@ -176,7 +106,6 @@ impl WorkersGenerator {
         domain: String,
         workers_path: &Path,
     ) -> Result<String> {
-        Self::validate_methods(&cidl.models)?;
         let api_route = Self::validate_domain(&domain)?;
 
         // TODO: just hardcoding typescript for now
