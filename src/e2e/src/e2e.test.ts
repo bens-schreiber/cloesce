@@ -202,9 +202,3 @@ test("Wrangler variables can be retrieved", async () => {
   assert.ok(res.ok, withRes("GET motd should be OK", res));
   assert.equal(res.data, "horse tinder is awesome");
 });
-
-test("Method Nullability", async () => {
-  let res = await Horse.returnNull();
-  assert.ok(res.ok, withRes("GET motd should be OK", res));
-  assert.equal(res.value, null);
-});

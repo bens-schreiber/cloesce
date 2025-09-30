@@ -277,7 +277,7 @@ export class CidlExtractor {
     }
 
     // Nullable via union
-    let { ty: unwrappedType, nullable } = unwrapNullable(type);
+    let [unwrappedType, nullable] = unwrapNullable(type);
 
     // Primitives
     let tyText = unwrappedType
@@ -350,14 +350,14 @@ export class CidlExtractor {
       );
     }
 
-    function unwrapNullable(ty: Type): { ty: Type; nullable: boolean } {
+    function unwrapNullable(ty: Type): [Type, boolean] {
       if (ty.isUnion()) {
         const nonNull = ty.getUnionTypes().filter((t) => !t.isNull());
         if (nonNull.length === 1) {
-          return { ty: nonNull[0], nullable: true };
+          return [nonNull[0], true];
         }
       }
-      return { ty, nullable: false };
+      return [ty, false];
     }
   }
 
