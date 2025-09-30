@@ -49,7 +49,8 @@ enum GenerateTarget {
 fn main() -> Result<()> {
     match Cli::parse().command {
         Commands::Validate { cidl_path } => {
-            cidl_from_path(cidl_path)?;
+            let cidl = cidl_from_path(cidl_path)?;
+            cidl.validate_types()?;
             println!("Ok.")
         }
         Commands::Generate { target } => match target {
@@ -60,6 +61,7 @@ fn main() -> Result<()> {
             } => {
                 let mut sqlite_file = create_file_and_dir(&sqlite_path)?;
                 let cidl = cidl_from_path(cidl_path)?;
+                cidl.validate_types()?;
 
                 let mut wrangler = match wrangler_path {
                     Some(ref wrangler_path) => WranglerFormat::from_path(wrangler_path)
@@ -106,6 +108,8 @@ fn main() -> Result<()> {
                 domain,
             } => {
                 let cidl = cidl_from_path(cidl_path)?;
+                cidl.validate_types()?;
+
                 let mut file =
                     create_file_and_dir(&workers_path).context("Failed to open workers file")?;
 
@@ -123,11 +127,13 @@ fn main() -> Result<()> {
                 client_path,
                 domain,
             } => {
-                let spec = cidl_from_path(cidl_path)?;
+                let cidl = cidl_from_path(cidl_path)?;
+                cidl.validate_types()?;
+
                 let mut file =
                     create_file_and_dir(&client_path).context("Failed to open client file")?;
 
-                file.write(client::generate_client_api(spec, domain).as_bytes())
+                file.write(client::generate_client_api(cidl, domain).as_bytes())
                     .context("Failed to write client file")?;
             }
         },
