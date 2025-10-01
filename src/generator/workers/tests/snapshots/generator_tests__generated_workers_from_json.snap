@@ -18,6 +18,6 @@ export default {
             ["Env", env]
         ]);
 
-        return await cloesce(cidl, constructorRegistry, instanceRegistry, request, "/api", { envName: "Env", dbName: "DB" });
+        return await cloesce(request, cidl, constructorRegistry, instanceRegistry, { envName: "Env", dbName: "DB" },  "/api");
     }
 };
