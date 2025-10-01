@@ -2,7 +2,7 @@ mod mappers;
 
 use std::{ops::Deref, sync::Arc};
 
-use common::{CloesceAst, CidlType, InputLanguage, NavigationProperty};
+use common::{CidlType, CloesceAst, InputLanguage, NavigationProperty};
 use handlebars::{Handlebars, handlebars_helper};
 
 use mappers::TypeScriptMapper;
