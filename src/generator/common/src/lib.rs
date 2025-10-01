@@ -172,8 +172,8 @@ pub struct CloesceAst {
 }
 
 impl CloesceAst {
-    /// Ensures all `CidlTypes` follow the correct grammar, essentially doing
-    /// syntax analysis with some shallow semantic analysis regarding model names.
+    /// Ensures all `CidlTypes` are logically correct for the area, essentially doing
+    /// the first level of semantic analysis for the generator.
     ///
     /// Returns error on
     /// - Model attributes with invalid SQL types
