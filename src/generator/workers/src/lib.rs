@@ -1,6 +1,6 @@
 use std::{collections::BTreeMap, path::Path};
 
-use common::{CidlSpec, Model, WranglerEnv, wrangler::WranglerSpec};
+use common::{CloesceAst, Model, WranglerEnv, wrangler::WranglerSpec};
 
 use anyhow::{Context, Result, anyhow};
 
@@ -101,7 +101,7 @@ impl WorkersGenerator {
     }
 
     pub fn create(
-        cidl: CidlSpec,
+        ast: CloesceAst,
         wrangler: WranglerSpec,
         domain: String,
         workers_path: &Path,
@@ -109,9 +109,9 @@ impl WorkersGenerator {
         let api_route = Self::validate_domain(&domain)?;
 
         // TODO: just hardcoding typescript for now
-        let model_sources = Self::link_models(&cidl.models, workers_path)?;
+        let model_sources = Self::link_models(&ast.models, workers_path)?;
         let (constructor_registry, instance_registry) =
-            Self::registries(&cidl.models, &cidl.wrangler_env);
+            Self::registries(&ast.models, &ast.wrangler_env);
 
         // TODO: Hardcoding one database for now, in the future we need to support any amount
         let db_binding = wrangler
@@ -121,7 +121,7 @@ impl WorkersGenerator {
             .binding
             .as_ref()
             .context("A database needs a binding to reference it in the instance container")?;
-        let env_name = &cidl.wrangler_env.name;
+        let env_name = &ast.wrangler_env.name;
 
         // TODO: Middleware function should return the DI instance registry
         Ok(format!(

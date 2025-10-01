@@ -161,7 +161,7 @@ pub struct WranglerEnv {
 
 #[serde_as]
 #[derive(Serialize, Deserialize)]
-pub struct CidlSpec {
+pub struct CloesceAst {
     pub version: String,
     pub project_name: String,
     pub language: InputLanguage,
@@ -171,7 +171,7 @@ pub struct CidlSpec {
     pub models: BTreeMap<String, Model>,
 }
 
-impl CidlSpec {
+impl CloesceAst {
     /// Ensures all `CidlTypes` follow the correct grammar, essentially doing
     /// syntax analysis with some shallow semantic analysis regarding model names.
     ///

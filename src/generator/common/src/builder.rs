@@ -1,17 +1,17 @@
 use std::{collections::BTreeMap, path::PathBuf};
 
 use crate::{
-    CidlSpec, CidlType, DataSource, HttpVerb, IncludeTree, InputLanguage, Model, ModelAttribute,
+    CidlType, CloesceAst, DataSource, HttpVerb, IncludeTree, InputLanguage, Model, ModelAttribute,
     ModelMethod, NamedTypedValue, NavigationProperty, NavigationPropertyKind, WranglerEnv,
     wrangler::WranglerSpec,
 };
 
-pub fn create_cidl(mut models: Vec<Model>) -> CidlSpec {
+pub fn create_ast(mut models: Vec<Model>) -> CloesceAst {
     let map = models
         .drain(..)
         .map(|m| (m.name.clone(), m))
         .collect::<BTreeMap<String, Model>>();
-    CidlSpec {
+    CloesceAst {
         version: "1.0".to_string(),
         project_name: "test".to_string(),
         language: InputLanguage::TypeScript,

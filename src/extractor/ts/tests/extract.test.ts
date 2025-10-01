@@ -1,4 +1,4 @@
-import { CidlSpec, Model } from "../src/common.js";
+import { CloesceAst, Model } from "../src/common.js";
 import { CidlExtractor } from "../src/extract.js";
 import { Project } from "ts-morph";
 
@@ -11,13 +11,13 @@ test("actions snapshot", () => {
   let res = extractor.extract(project);
   expect(res.ok).toBe(true);
 
-  let cidl = res.value as CidlSpec;
-  for (const m of Object.values(cidl.models)) {
+  let ast = res.value as CloesceAst;
+  for (const m of Object.values(ast.models)) {
     if (m) {
       m.source_path = "void for tests";
     }
   }
-  cidl.wrangler_env.source_path = "void for tests";
+  ast.wrangler_env.source_path = "void for tests";
 
-  expect(cidl).toMatchSnapshot();
+  expect(ast).toMatchSnapshot();
 });

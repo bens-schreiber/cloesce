@@ -84,7 +84,7 @@ impl<'a> JunctionTableBuilder<'a> {
     }
 }
 
-/// Validates foreign key relationships for every [Model] in the CIDL. Returns a
+/// Validates foreign key relationships for every [Model] in the AST. Returns a
 /// SQL-safe topological ordering of the models, along with a vec of all necessary Junction tables
 ///
 /// Returns error on

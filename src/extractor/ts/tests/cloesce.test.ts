@@ -1,6 +1,6 @@
 import { _cloesceInternal } from "../src/cloesce";
 import {
-  CidlSpec,
+  CloesceAst,
   DataSource,
   HttpVerb,
   ModelAttribute,
@@ -8,7 +8,7 @@ import {
   NavigationProperty,
 } from "../src/common";
 
-const makeCidl = (methods: Record<string, any>): CidlSpec => ({
+const makeAst = (methods: Record<string, any>): CloesceAst => ({
   wrangler_env: {
     name: "",
     source_path: "./",
@@ -66,10 +66,10 @@ describe("Router Error States", () => {
   test("Router returns 404 on unknown model", () => {
     // Arrange
     const url = "http://foo.com/api/Dog/woof";
-    const cidl = makeCidl({});
+    const ast = makeAst({});
 
     // Act
-    const result = _cloesceInternal.matchRoute(makeRequest(url), "/api", cidl);
+    const result = _cloesceInternal.matchRoute(makeRequest(url), "/api", ast);
 
     // Assert
     expect(result.value).toStrictEqual({
@@ -82,10 +82,10 @@ describe("Router Error States", () => {
   test("Router returns 404 on unknown method", () => {
     // Arrange
     const url = "http://foo.com/api/Horse/neigh";
-    const cidl = makeCidl({});
+    const ast = makeAst({});
 
     // Act
-    const result = _cloesceInternal.matchRoute(makeRequest(url), "/api", cidl);
+    const result = _cloesceInternal.matchRoute(makeRequest(url), "/api", ast);
 
     // Assert
     expect(result.value).toStrictEqual({
@@ -98,7 +98,7 @@ describe("Router Error States", () => {
   test("Router returns 404 on mismatched HTTP verb", () => {
     // Arrange
     const url = "http://foo.com/api/Horse/0/neigh";
-    const cidl = makeCidl({
+    const ast = makeAst({
       neigh: {
         name: "",
         is_static: false,
@@ -109,7 +109,7 @@ describe("Router Error States", () => {
     });
 
     // Act
-    const result = _cloesceInternal.matchRoute(makeRequest(url), "/api", cidl);
+    const result = _cloesceInternal.matchRoute(makeRequest(url), "/api", ast);
 
     // Assert
     expect(result.value).toStrictEqual({
@@ -130,19 +130,19 @@ describe("Router Success States", () => {
       parameters: [],
     },
   };
-  const cidl = makeCidl(methods);
+  const ast = makeAst(methods);
 
   test("Router returns model on static route", () => {
     // Arrange
     const url = "http://foo.com/api/Horse/neigh";
 
     // Act
-    const result = _cloesceInternal.matchRoute(makeRequest(url), "/api", cidl);
+    const result = _cloesceInternal.matchRoute(makeRequest(url), "/api", ast);
 
     // Assert
     expect(result.value).toStrictEqual({
-      modelMeta: cidl.models.Horse,
-      methodMeta: cidl.models.Horse.methods.neigh,
+      modelMeta: ast.models.Horse,
+      methodMeta: ast.models.Horse.methods.neigh,
       id: null,
     });
   });
@@ -152,12 +152,12 @@ describe("Router Success States", () => {
     const url = "http://foo.com/api/Horse/0/neigh";
 
     // Act
-    const result = _cloesceInternal.matchRoute(makeRequest(url), "/api", cidl);
+    const result = _cloesceInternal.matchRoute(makeRequest(url), "/api", ast);
 
     // Assert
     expect(result.value).toStrictEqual({
-      modelMeta: cidl.models.Horse,
-      methodMeta: cidl.models.Horse.methods.neigh,
+      modelMeta: ast.models.Horse,
+      methodMeta: ast.models.Horse.methods.neigh,
       id: "0",
     });
   });
@@ -251,7 +251,7 @@ describe("Validate Request Error States", () => {
         ? `http://foo.com/api/Horse/neigh?${query}`
         : "http://foo.com/api/Horse/neigh";
       const request = makeRequest(url, method, body);
-      const cidl = makeCidl({
+      const ast = makeAst({
         neigh: {
           name: "neigh",
           is_static: true,
@@ -264,8 +264,8 @@ describe("Validate Request Error States", () => {
       // Act
       const result = await _cloesceInternal.validateRequest(
         request,
-        cidl,
-        cidl.models.Horse.methods.neigh,
+        ast,
+        ast.models.Horse.methods.neigh,
         "0",
       );
 
@@ -325,7 +325,7 @@ describe("Validate Request Success States", () => {
       arg.is_get ? undefined : "POST",
       arg.is_get ? undefined : { [arg.typed_value.name]: arg.value },
     );
-    const cidl = makeCidl({
+    const ast = makeAst({
       neigh: {
         name: "neigh",
         is_static: true,
@@ -345,8 +345,8 @@ describe("Validate Request Success States", () => {
     // Act
     const result = await _cloesceInternal.validateRequest(
       request,
-      cidl,
-      cidl.models.Horse.methods.neigh,
+      ast,
+      ast.models.Horse.methods.neigh,
       "0",
     );
 
@@ -373,7 +373,7 @@ describe("modelsFromSql", () => {
     },
   };
 
-  const baseCidl: CidlSpec = {
+  const baseCidl: CloesceAst = {
     wrangler_env: {
       name: "Env",
       source_path: "./",

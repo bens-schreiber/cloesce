@@ -1,6 +1,6 @@
 use common::{
     CidlType, NavigationPropertyKind,
-    builder::{ModelBuilder, create_cidl, create_wrangler},
+    builder::{ModelBuilder, create_ast, create_wrangler},
 };
 use d1::D1Generator;
 
@@ -22,8 +22,8 @@ fn test_sqlite_table_output() {
     // Empty
     {
         // Arrange
-        let cidl = create_cidl(vec![]);
-        let d1gen = D1Generator::new(cidl, create_wrangler());
+        let ast = create_ast(vec![]);
+        let d1gen = D1Generator::new(ast, create_wrangler());
 
         // Act
         let sql = d1gen.sql().expect("Empty models should succeed");
@@ -39,14 +39,14 @@ fn test_sqlite_table_output() {
     // Primary key, Basic attributes
     {
         // Arrange
-        let cidl = create_cidl(vec![
+        let ast = create_ast(vec![
             ModelBuilder::new("User")
                 .id() // adds a primary key
                 .attribute("name", CidlType::nullable(CidlType::Text), None)
                 .attribute("age", CidlType::Integer, None)
                 .build(),
         ]);
-        let d1gen = D1Generator::new(cidl, create_wrangler());
+        let d1gen = D1Generator::new(ast, create_wrangler());
 
         // Act
         let sql = d1gen.sql().expect("gen_sqlite to work");
@@ -61,14 +61,14 @@ fn test_sqlite_table_output() {
     // One to One FK's
     {
         // Arrange
-        let cidl = create_cidl(vec![
+        let ast = create_ast(vec![
             ModelBuilder::new("Person")
                 .id()
                 .attribute("dogId", CidlType::Integer, Some("Dog".to_string()))
                 .build(),
             ModelBuilder::new("Dog").id().build(),
         ]);
-        let d1gen = D1Generator::new(cidl, create_wrangler());
+        let d1gen = D1Generator::new(ast, create_wrangler());
 
         // Act
         let sql = d1gen.sql().expect("gen_sqlite to work");
@@ -83,7 +83,7 @@ fn test_sqlite_table_output() {
     // One to One FK's with Nav Prop
     {
         // Arrange
-        let cidl = create_cidl(vec![
+        let ast = create_ast(vec![
             ModelBuilder::new("Person")
                 .id()
                 .attribute("dogId", CidlType::Integer, Some("Dog".into()))
@@ -97,7 +97,7 @@ fn test_sqlite_table_output() {
                 .build(),
             ModelBuilder::new("Dog").id().build(),
         ]);
-        let d1gen = D1Generator::new(cidl, create_wrangler());
+        let d1gen = D1Generator::new(ast, create_wrangler());
 
         // Act
         let sql = d1gen.sql().expect("gen_sqlite to work");
@@ -112,7 +112,7 @@ fn test_sqlite_table_output() {
     // One to Many
     {
         // Arrange
-        let cidl = create_cidl(vec![
+        let ast = create_ast(vec![
             ModelBuilder::new("Dog")
                 .id()
                 .attribute("personId", CidlType::Integer, Some("Person".into()))
@@ -150,7 +150,7 @@ fn test_sqlite_table_output() {
                 )
                 .build(),
         ]);
-        let d1gen = D1Generator::new(cidl, create_wrangler());
+        let d1gen = D1Generator::new(ast, create_wrangler());
 
         // Act
         let sql = d1gen.sql().expect("gen_sqlite to work");
@@ -180,7 +180,7 @@ fn test_sqlite_table_output() {
     // Many to Many
     {
         // Arrange
-        let cidl = create_cidl(vec![
+        let ast = create_ast(vec![
             ModelBuilder::new("Student")
                 .id()
                 .nav_p(
@@ -202,7 +202,7 @@ fn test_sqlite_table_output() {
                 )
                 .build(),
         ]);
-        let d1gen = D1Generator::new(cidl, create_wrangler());
+        let d1gen = D1Generator::new(ast, create_wrangler());
 
         // Act
         let sql = d1gen.sql().expect("gen_sqlite to work");
@@ -231,7 +231,7 @@ fn test_sqlite_table_output() {
 fn test_cycle_detection_error() {
     // Arrange
     // A -> B -> C -> A
-    let cidl = create_cidl(vec![
+    let ast = create_ast(vec![
         ModelBuilder::new("A")
             .id()
             .attribute("bId", CidlType::Integer, Some("B".to_string()))
@@ -247,7 +247,7 @@ fn test_cycle_detection_error() {
     ]);
 
     // Act
-    let d1gen = D1Generator::new(cidl, create_wrangler());
+    let d1gen = D1Generator::new(ast, create_wrangler());
     let err = d1gen.sql().unwrap_err();
 
     // Assert
@@ -258,7 +258,7 @@ fn test_cycle_detection_error() {
 fn test_nullability_prevents_cycle_error() {
     // Arrange
     // A -> B -> C -> Nullable<A>
-    let cidl = create_cidl(vec![
+    let ast = create_ast(vec![
         ModelBuilder::new("A")
             .id()
             .attribute("bId", CidlType::Integer, Some("B".to_string()))
@@ -278,7 +278,7 @@ fn test_nullability_prevents_cycle_error() {
     ]);
 
     // Act
-    let d1gen = D1Generator::new(cidl, create_wrangler());
+    let d1gen = D1Generator::new(ast, create_wrangler());
 
     // Assert
     d1gen.sql().expect("sqlite gen to work");
@@ -287,7 +287,7 @@ fn test_nullability_prevents_cycle_error() {
 #[test]
 fn test_one_to_one_nav_property_unknown_attribute_reference_error() {
     // Arrange
-    let spec = create_cidl(vec![
+    let spec = create_ast(vec![
         ModelBuilder::new("Dog").id().build(),
         ModelBuilder::new("Person")
             .id()
@@ -316,7 +316,7 @@ fn test_one_to_one_nav_property_unknown_attribute_reference_error() {
 #[test]
 fn test_one_to_one_mismatched_fk_and_nav_type_error() {
     // Arrange: attribute dogId references Dog, but nav prop type is Cat -> mismatch
-    let spec = create_cidl(vec![
+    let spec = create_ast(vec![
         ModelBuilder::new("Dog").id().build(),
         ModelBuilder::new("Cat").id().build(),
         ModelBuilder::new("Person")
@@ -348,7 +348,7 @@ fn test_one_to_one_mismatched_fk_and_nav_type_error() {
 fn test_one_to_many_unresolved_reference_error() {
     // Arrange:
     // Person declares OneToMany to Dog referencing Dog.personId, but Dog has no personId FK attr.
-    let spec = create_cidl(vec![
+    let spec = create_ast(vec![
         ModelBuilder::new("Dog").id().build(), // no personId attribute
         ModelBuilder::new("Person")
             .id()
@@ -378,7 +378,7 @@ fn test_one_to_many_unresolved_reference_error() {
 fn test_junction_table_builder_errors() {
     // Missing second nav property case: only one side of many-to-many
     {
-        let cidl = create_cidl(vec![
+        let ast = create_ast(vec![
             ModelBuilder::new("Student")
                 .id()
                 .nav_p(
@@ -393,14 +393,14 @@ fn test_junction_table_builder_errors() {
             ModelBuilder::new("Course").id().build(),
         ]);
 
-        let d1gen = D1Generator::new(cidl, create_wrangler());
+        let d1gen = D1Generator::new(ast, create_wrangler());
         let err = d1gen.sql().unwrap_err();
         expected_str!(err, "Both models must be set for a junction table");
     }
 
     // Too many models case: three models register the same junction id
     {
-        let cidl = create_cidl(vec![
+        let ast = create_ast(vec![
             ModelBuilder::new("A")
                 .id()
                 .nav_p(
@@ -434,7 +434,7 @@ fn test_junction_table_builder_errors() {
                 .build(),
         ]);
 
-        let d1gen = D1Generator::new(cidl, create_wrangler());
+        let d1gen = D1Generator::new(ast, create_wrangler());
         let err = d1gen.sql().unwrap_err();
         expected_str!(
             err,

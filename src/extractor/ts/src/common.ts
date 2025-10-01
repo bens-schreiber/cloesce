@@ -102,7 +102,7 @@ export interface WranglerEnv {
   source_path: string;
 }
 
-export interface CidlSpec {
+export interface CloesceAst {
   version: string;
   project_name: string;
   language: "TypeScript";

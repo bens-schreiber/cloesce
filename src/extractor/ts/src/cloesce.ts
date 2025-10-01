@@ -6,7 +6,7 @@ import {
   left,
   CidlType,
   right,
-  CidlSpec,
+  CloesceAst,
   isNullableType,
   Model,
   getNavigationPropertyCidlType,
@@ -35,18 +35,14 @@ type InstanceRegistry = Map<string, any>;
 class MetaContainer {
   private static instance: MetaContainer | undefined;
   private constructor(
-    public readonly cidl: CidlSpec,
+    public readonly ast: CloesceAst,
     public readonly constructorRegistry: ModelConstructorRegistry,
   ) {}
 
-  static init(
-    cidl: CidlSpec,
-    constructorRegistry: ModelConstructorRegistry,
-  ): MetaContainer {
+  static init(ast: CloesceAst, constructorRegistry: ModelConstructorRegistry) {
     if (!this.instance) {
-      this.instance = new MetaContainer(cidl, constructorRegistry);
+      this.instance = new MetaContainer(ast, constructorRegistry);
     }
-    return this.instance;
   }
 
   static get(): MetaContainer {
@@ -55,7 +51,7 @@ class MetaContainer {
 }
 
 /**
- * Users will create Cloesce models, which have metadata for them in the CIDL.
+ * Users will create Cloesce models, which have metadata for them in the ast.
  * For TypeScript's purposes, these models can be anything. We can assume any
  * `UserDefinedModel` has been verified by the compiler.
  */
@@ -89,10 +85,10 @@ export function modelsFromSql<T>(
   records: Record<string, any>[],
   includeTree: Record<string, UserDefinedModel>,
 ): T[] {
-  const { cidl, constructorRegistry } = MetaContainer.get();
+  const { ast, constructorRegistry } = MetaContainer.get();
   return _modelsFromSql(
     ctor.name,
-    cidl,
+    ast,
     constructorRegistry,
     records,
     includeTree,
@@ -102,7 +98,7 @@ export function modelsFromSql<T>(
 /**
  * Cloesce entry point. Given a request, undergoes routing, validating,
  * hydrating, and method dispatch.
- * @param rawCidl The full unfiltered cidl
+ * @param ast The CIDL AST
  * @param constructorRegistry A mapping of user defined class names to their respective constructor
  * @param instanceRegistry A mapping of a dependency class name to its instantiated object.
  * @param request An incoming request to the workers server
@@ -111,25 +107,25 @@ export function modelsFromSql<T>(
  * @returns A Response with an `HttpResult` JSON body.
  */
 export async function cloesce(
-  rawCidl: CidlSpec,
+  ast: CloesceAst,
   constructorRegistry: ModelConstructorRegistry,
   instanceRegistry: InstanceRegistry,
   request: Request,
   api_route: string,
   envMeta: MetaWranglerEnv,
 ): Promise<Response> {
-  const { cidl } = MetaContainer.init(rawCidl, constructorRegistry);
+  MetaContainer.init(ast, constructorRegistry);
   const d1: D1Database = instanceRegistry.get(envMeta.envName)[envMeta.dbName];
 
   // Match the route to a model method
-  const route = matchRoute(request, api_route, cidl);
+  const route = matchRoute(request, api_route, ast);
   if (!route.ok) {
     return toResponse(route.value);
   }
   const { modelMeta, methodMeta, id } = route.value;
 
   // Validate request body to the model method
-  const isValidRequest = await validateRequest(request, cidl, methodMeta, id);
+  const isValidRequest = await validateRequest(request, ast, methodMeta, id);
   if (!isValidRequest.ok) {
     return toResponse(isValidRequest.value);
   }
@@ -141,7 +137,7 @@ export async function cloesce(
     instance = constructorRegistry[modelMeta.name];
   } else {
     const successfulModel = await hydrateModel(
-      cidl,
+      ast,
       modelMeta,
       constructorRegistry,
       d1,
@@ -175,7 +171,7 @@ export async function cloesce(
 function matchRoute(
   request: Request,
   api_route: string,
-  cidl: CidlSpec,
+  ast: CloesceAst,
 ): Either<HttpResult, MatchedRoute> {
   const url = new URL(request.url);
 
@@ -196,7 +192,7 @@ function matchRoute(
   const methodName = routeParts[routeParts.length - 1];
   const id = routeParts.length === 3 ? routeParts[1] : null;
 
-  const modelMeta = cidl.models[modelName];
+  const modelMeta = ast.models[modelName];
   if (!modelMeta) {
     return notFound(`Unknown model ${modelName}`);
   }
@@ -223,7 +219,7 @@ function matchRoute(
  */
 async function validateRequest(
   request: Request,
-  cidl: CidlSpec,
+  ast: CloesceAst,
   methodMeta: ModelMethod,
   id: string | null,
 ): Promise<Either<HttpResult, RequestParamMap>> {
@@ -266,7 +262,7 @@ async function validateRequest(
   // Validate all parameters type
   for (const p of requiredParams) {
     const value = requestBodyMap[p.name];
-    if (!validateCidlType(value, p.cidl_type, cidl)) {
+    if (!validateCidlType(value, p.cidl_type, ast)) {
       return invalid_request("Invalid parameters.");
     }
   }
@@ -276,7 +272,7 @@ async function validateRequest(
   function validateCidlType(
     value: unknown,
     cidlType: CidlType,
-    cidl: CidlSpec,
+    ast: CloesceAst,
   ): boolean {
     if (value === undefined) return false;
 
@@ -307,14 +303,14 @@ async function validateRequest(
 
     // Handle object types
     if ("Model" in cidlType) {
-      const model = cidl.models[cidlType.Model];
+      const model = ast.models[cidlType.Model];
       if (!model || typeof value !== "object") return false;
       const obj = value as Record<string, unknown>;
 
       // Validate attributes
       if (
         !model.attributes.every((attr) =>
-          validateCidlType(obj[attr.value.name], attr.value.cidl_type, cidl),
+          validateCidlType(obj[attr.value.name], attr.value.cidl_type, ast),
         )
       ) {
         return false;
@@ -326,7 +322,7 @@ async function validateRequest(
 
         return (
           navValue == null ||
-          validateCidlType(navValue, getNavigationPropertyCidlType(nav), cidl)
+          validateCidlType(navValue, getNavigationPropertyCidlType(nav), ast)
         );
       });
     }
@@ -334,14 +330,14 @@ async function validateRequest(
     if ("Array" in cidlType) {
       return (
         Array.isArray(value) &&
-        value.every((v) => validateCidlType(v, cidlType.Array, cidl))
+        value.every((v) => validateCidlType(v, cidlType.Array, ast))
       );
     }
 
     if ("HttpResult" in cidlType) {
       if (value === null) return cidlType.HttpResult === null;
       if (cidlType.HttpResult === null) return false;
-      return validateCidlType(value, cidlType.HttpResult, cidl);
+      return validateCidlType(value, cidlType.HttpResult, ast);
     }
 
     return false;
@@ -356,7 +352,7 @@ async function validateRequest(
  * @returns The instantiated model on success
  */
 async function hydrateModel(
-  cidl: CidlSpec,
+  ast: CloesceAst,
   modelMeta: Model,
   constructorRegistry: ModelConstructorRegistry,
   d1: D1Database,
@@ -399,7 +395,7 @@ async function hydrateModel(
 
     const models: object[] = _modelsFromSql(
       modelMeta.name,
-      cidl,
+      ast,
       constructorRegistry,
       records.results,
       includeTree,
@@ -475,15 +471,15 @@ async function methodDispatch(
  */
 function _modelsFromSql(
   modelName: string,
-  cidl: CidlSpec,
+  ast: CloesceAst,
   constructorRegistry: ModelConstructorRegistry,
   records: Record<string, any>[],
   includeTree: Record<string, UserDefinedModel>,
 ): InstantiatedUserDefinedModel[] {
   if (!records.length) return [];
 
-  const modelMeta = cidl.models[modelName];
-  if (!modelMeta) throw new Error(`Model ${modelName} not found in CIDL`);
+  const modelMeta = ast.models[modelName];
+  if (!modelMeta) throw new Error(`Model ${modelName} not found in ast`);
 
   const pk = modelMeta.primary_key;
   if (!pk) throw new Error(`Primary key not found for ${modelName}`);
@@ -556,7 +552,7 @@ function _modelsFromSql(
 
       if (!navModelName) continue;
 
-      const navMeta = cidl.models[navModelName];
+      const navMeta = ast.models[navModelName];
       if (!navMeta) continue;
 
       const nestedPk = navMeta.primary_key.name;
@@ -609,7 +605,7 @@ function _modelsFromSql(
     seenNestedIds[key] = seenNestedIds[key] || new Set();
 
     // Get the primary key name for the nested model
-    const navMeta = cidl.models[navModelName];
+    const navMeta = ast.models[navModelName];
     const nestedPkAttr = navMeta?.primary_key;
     const nestedPkName = nestedPkAttr?.name || "id";
 
@@ -657,7 +653,7 @@ function _modelsFromSql(
 
       if (!navModelName) continue;
 
-      const navMeta = cidl.models[navModelName];
+      const navMeta = ast.models[navModelName];
       if (!navMeta) continue;
 
       const nestedPk = navMeta.primary_key;

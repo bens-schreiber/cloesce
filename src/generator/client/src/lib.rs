@@ -2,7 +2,7 @@ mod mappers;
 
 use std::{ops::Deref, sync::Arc};
 
-use common::{CidlSpec, CidlType, InputLanguage, NavigationProperty};
+use common::{CloesceAst, CidlType, InputLanguage, NavigationProperty};
 use handlebars::{Handlebars, handlebars_helper};
 
 use mappers::TypeScriptMapper;
@@ -84,12 +84,12 @@ fn register_helpers(
 
 const TYPESCRIPT_TEMPLATE: &str = include_str!("./templates/ts.hbs");
 
-pub fn generate_client_api(spec: CidlSpec, domain: String) -> String {
-    let template = match spec.language {
+pub fn generate_client_api(ast: CloesceAst, domain: String) -> String {
+    let template = match ast.language {
         InputLanguage::TypeScript => TYPESCRIPT_TEMPLATE,
     };
 
-    let mapper = match spec.language {
+    let mapper = match ast.language {
         InputLanguage::TypeScript => Arc::new(TypeScriptMapper),
     };
 
@@ -99,7 +99,7 @@ pub fn generate_client_api(spec: CidlSpec, domain: String) -> String {
         .unwrap();
     register_helpers(&mut handlebars, mapper);
 
-    let mut context = serde_json::to_value(&spec).unwrap();
+    let mut context = serde_json::to_value(&ast).unwrap();
     if let serde_json::Value::Object(ref mut map) = context {
         map.insert("domain".to_string(), serde_json::Value::String(domain));
     }

@@ -12,7 +12,7 @@ import {
 
 import {
   CidlIncludeTree,
-  CidlSpec,
+  CloesceAst,
   CidlType,
   DataSource,
   Either,
@@ -52,7 +52,7 @@ export class CidlExtractor {
     public version: string,
   ) {}
 
-  extract(project: Project): Either<string, CidlSpec> {
+  extract(project: Project): Either<string, CloesceAst> {
     const models: Record<string, Model> = {};
     for (const sourceFile of project.getSourceFiles()) {
       for (const classDecl of sourceFile.getClasses()) {
