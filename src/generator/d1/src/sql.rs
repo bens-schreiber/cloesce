@@ -276,7 +276,7 @@ fn validate_data_sources<'a>(
     let mut model_trees = vec![];
 
     for model in model_lookup.values() {
-        for ds in &model.data_sources {
+        for ds in model.data_sources.values() {
             let mut alias_counter = HashMap::<String, u32>::new();
 
             let tree =

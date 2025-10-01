@@ -38,6 +38,11 @@ class Horse {
     likes: { horse2: {} },
   };
 
+  @DataSource
+  static readonly withLikes: IncludeTree<Horse> = {
+    likes: {},
+  };
+
   @POST
   static async post(@Inject { db }: Env, horse: Horse): Promise<Horse> {
     const records = await db
@@ -77,6 +82,11 @@ class Horse {
       .prepare("INSERT INTO Like (horseId1, horseId2) VALUES (?, ?)")
       .bind(this.id, horse.id)
       .run();
+  }
+
+  @GET
+  async refresh(): Promise<Horse> {
+    return this;
   }
 
   /*  VVV Random functions for test coverage VVV */

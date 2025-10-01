@@ -1,44 +1,35 @@
-import { HttpResult } from "cloesce";
-
-function instantiateModelArray<T extends object>(
-  data: any,
-  ctor: { new (): T }
-): T[] {
-  if (Array.isArray(data)) {
-    return data.map((x) => instantiateModelArray(x, ctor)).flat();
-  }
-  return [Object.assign(new ctor(), data)];
-}
-
+import { HttpResult, instantiateModelArray } from "cloesce";
 
 {{#each models}}
 export class {{this.name}} {
   {{this.primary_key.name}}: {{get_cidl_type this.primary_key.cidl_type}};
   {{#each this.attributes}}
-  {{this.value.name}}: {{get_cidl_type this.value.cidl_type}};
+  {{value.name}}: {{get_cidl_type value.cidl_type}};
   {{/each}}
   {{#each this.navigation_properties}}
-  {{var_name}}: {{get_nav_cidl_type this}};
+  {{var_name}}: {{get_nav_cidl_type this}}{{#if (is_one_to_one this)}} | undefined{{/if}};
   {{/each}}
 
   {{#each this.methods}}
   {{#if this.is_static}}static {{/if}}async {{this.name}}(
     {{#each this.parameters}}
       {{#if (is_serializable cidl_type)}}
-        {{name}}: {{get_cidl_type cidl_type}}{{#unless @last}}, {{/unless}}
+        {{name}}: {{get_cidl_type cidl_type}},
       {{/if}}
     {{/each}}
+    dataSource: {{#each ../data_sources}}"{{name}}" | {{/each}}null = null
   ): Promise<HttpResult<{{get_cidl_type this.return_type}}>> {
-    const baseUrl = `{{../../domain}}/{{#if this.is_static}}{{../name}}/{{this.name}}{{else}}{{../name}}/${this.id}/{{this.name}}{{/if}}`;
-
+    const baseUrl = new URL(`{{../../domain}}/{{#if this.is_static}}{{../name}}/{{this.name}}{{else}}{{../name}}/${this.id}/{{this.name}}{{/if}}`);
+    if (dataSource) {
+      baseUrl.searchParams.append("dataSource", dataSource);
+    }
     {{#if (eq this.http_verb "GET")}}
-    const url = new URL(baseUrl);
-    {{#each this.parameters}}
-      {{#if (is_serializable cidl_type)}}
-    url.searchParams.append('{{name}}', String({{name}}));
-      {{/if}}
-    {{/each}}
-    const res = await fetch(url.toString(), { method: "GET" });
+      {{#each this.parameters}}
+        {{#if (is_serializable cidl_type)}}
+    baseUrl.searchParams.append('{{name}}', String({{name}}));
+        {{/if}}
+      {{/each}}
+    const res = await fetch(baseUrl, { method: "GET" });
     {{else}}
     const res = await fetch(baseUrl, {
       method: "{{this.http_verb}}",
@@ -57,7 +48,6 @@ export class {{this.name}} {
     if (!raw.ok) {
       return raw;
     }
-
     {{#if (eq (get_cidl_type this.return_type) "void")}}
     return raw;
     {{else if (is_model_array this.return_type)}}

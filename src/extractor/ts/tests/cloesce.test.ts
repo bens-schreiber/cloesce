@@ -19,13 +19,13 @@ const makeAst = (methods: Record<string, any>): CloesceAst => ({
   models: {
     Horse: {
       name: "",
-      attributes: [] as ModelAttribute[],
+      attributes: [],
       primary_key: {
         name: "void",
         cidl_type: "Integer",
       },
-      navigation_properties: [] as NavigationProperty[],
-      data_sources: [] as DataSource[],
+      navigation_properties: [],
+      data_sources: {},
       methods,
       source_path: "",
     },
@@ -44,16 +44,11 @@ describe("Router Error States", () => {
     const url = "http://foo.com/api";
 
     // Act
-    const result = _cloesceInternal.matchRoute(makeRequest(url), "/api", {
-      models: {},
-      wrangler_env: {
-        name: "",
-        source_path: "./",
-      },
-      version: "",
-      project_name: "",
-      language: "TypeScript",
-    });
+    const result = _cloesceInternal.matchRoute(
+      makeRequest(url),
+      makeAst({}),
+      "/api",
+    );
 
     // Assert
     expect(result.value).toStrictEqual({
@@ -69,7 +64,7 @@ describe("Router Error States", () => {
     const ast = makeAst({});
 
     // Act
-    const result = _cloesceInternal.matchRoute(makeRequest(url), "/api", ast);
+    const result = _cloesceInternal.matchRoute(makeRequest(url), ast, "/api");
 
     // Assert
     expect(result.value).toStrictEqual({
@@ -85,7 +80,7 @@ describe("Router Error States", () => {
     const ast = makeAst({});
 
     // Act
-    const result = _cloesceInternal.matchRoute(makeRequest(url), "/api", ast);
+    const result = _cloesceInternal.matchRoute(makeRequest(url), ast, "/api");
 
     // Assert
     expect(result.value).toStrictEqual({
@@ -109,7 +104,7 @@ describe("Router Error States", () => {
     });
 
     // Act
-    const result = _cloesceInternal.matchRoute(makeRequest(url), "/api", ast);
+    const result = _cloesceInternal.matchRoute(makeRequest(url), ast, "/api");
 
     // Assert
     expect(result.value).toStrictEqual({
@@ -137,12 +132,12 @@ describe("Router Success States", () => {
     const url = "http://foo.com/api/Horse/neigh";
 
     // Act
-    const result = _cloesceInternal.matchRoute(makeRequest(url), "/api", ast);
+    const result = _cloesceInternal.matchRoute(makeRequest(url), ast, "/api");
 
     // Assert
     expect(result.value).toStrictEqual({
-      modelMeta: ast.models.Horse,
-      methodMeta: ast.models.Horse.methods.neigh,
+      model: ast.models.Horse,
+      method: ast.models.Horse.methods.neigh,
       id: null,
     });
   });
@@ -152,12 +147,12 @@ describe("Router Success States", () => {
     const url = "http://foo.com/api/Horse/0/neigh";
 
     // Act
-    const result = _cloesceInternal.matchRoute(makeRequest(url), "/api", ast);
+    const result = _cloesceInternal.matchRoute(makeRequest(url), ast, "/api");
 
     // Assert
     expect(result.value).toStrictEqual({
-      modelMeta: ast.models.Horse,
-      methodMeta: ast.models.Horse.methods.neigh,
+      model: ast.models.Horse,
+      method: ast.models.Horse.methods.neigh,
       id: "0",
     });
   });
@@ -177,6 +172,18 @@ describe("Validate Request Error States", () => {
         version: "",
         project_name: "",
         language: "TypeScript",
+      },
+      {
+        name: "",
+        primary_key: {
+          name: "",
+          cidl_type: "Void",
+        },
+        attributes: [],
+        navigation_properties: [],
+        methods: {},
+        data_sources: {},
+        source_path: "",
       },
       {
         name: "",
@@ -210,6 +217,18 @@ describe("Validate Request Error States", () => {
         version: "",
         project_name: "",
         language: "TypeScript",
+      },
+      {
+        name: "",
+        primary_key: {
+          name: "",
+          cidl_type: "Void",
+        },
+        attributes: [],
+        navigation_properties: [],
+        methods: {},
+        data_sources: {},
+        source_path: "",
       },
       {
         name: "",
@@ -265,6 +284,7 @@ describe("Validate Request Error States", () => {
       const result = await _cloesceInternal.validateRequest(
         request,
         ast,
+        ast.models.Horse,
         ast.models.Horse.methods.neigh,
         "0",
       );
@@ -346,14 +366,18 @@ describe("Validate Request Success States", () => {
     const result = await _cloesceInternal.validateRequest(
       request,
       ast,
+      ast.models.Horse,
       ast.models.Horse.methods.neigh,
       "0",
     );
 
     // Assert
-    expect(result.value).toEqual({
-      [arg.typed_value.name]: arg.is_get ? String(arg.value) : arg.value,
-    });
+    expect(result.value).toEqual([
+      {
+        [arg.typed_value.name]: arg.is_get ? String(arg.value) : arg.value,
+      },
+      null,
+    ]);
   });
 });
 
@@ -401,7 +425,7 @@ describe("modelsFromSql", () => {
           name: "id",
           cidl_type: "Integer",
         },
-        data_sources: [],
+        data_sources: {},
         methods: {},
         source_path: "",
       },
@@ -421,7 +445,7 @@ describe("modelsFromSql", () => {
           cidl_type: "Integer",
         },
         navigation_properties: [],
-        data_sources: [],
+        data_sources: {},
         methods: {},
         source_path: "",
       },
@@ -547,7 +571,7 @@ describe("modelsFromSql", () => {
 });
 
 describe("methodDispatch", () => {
-  const createMethodMeta = (overrides: Partial<any> = {}) => ({
+  const makeMethod = (overrides: Partial<any> = {}) => ({
     name: "testMethod",
     is_static: true,
     http_verb: HttpVerb.GET,
@@ -556,7 +580,7 @@ describe("methodDispatch", () => {
     ...overrides,
   });
 
-  const createMockD1 = (): any => ({
+  const makeMockD1 = (): any => ({
     prepare: jest.fn(),
     batch: jest.fn(),
     exec: jest.fn(),
@@ -569,12 +593,12 @@ describe("methodDispatch", () => {
     dbName: "db",
   };
 
-  const instanceRegistry = () =>
+  const makeInstanceRegistry = () =>
     new Map([
       [
         "Env",
         {
-          db: createMockD1(),
+          db: makeMockD1(),
         },
       ],
     ]);
@@ -584,16 +608,16 @@ describe("methodDispatch", () => {
     const instance = {
       testMethod: jest.fn().mockResolvedValue("ignored"),
     };
-    const methodMeta = createMethodMeta({ return_type: null });
+    const method = makeMethod({ return_type: null });
     const params = {};
 
     // Act
     const result = await _cloesceInternal.methodDispatch(
       instance,
-      methodMeta,
-      params,
-      instanceRegistry(),
+      makeInstanceRegistry(),
       envMeta,
+      method,
+      params,
     );
 
     // Assert
@@ -610,16 +634,16 @@ describe("methodDispatch", () => {
         data: "already wrapped",
       }),
     };
-    const methodMeta = createMethodMeta({ return_type: { HttpResult: null } });
+    const method = makeMethod({ return_type: { HttpResult: null } });
     const params = {};
 
     // Act
     const result = await _cloesceInternal.methodDispatch(
       instance,
-      methodMeta,
-      params,
-      instanceRegistry(),
+      makeInstanceRegistry(),
       envMeta,
+      method,
+      params,
     );
 
     // Assert
@@ -635,16 +659,16 @@ describe("methodDispatch", () => {
     const instance = {
       testMethod: jest.fn().mockResolvedValue("neigh"),
     };
-    const methodMeta = createMethodMeta({ return_type: "Text" });
+    const method = makeMethod({ return_type: "Text" });
     const params = {};
 
     // Act
     const result = await _cloesceInternal.methodDispatch(
       instance,
-      methodMeta,
-      params,
-      instanceRegistry(),
+      makeInstanceRegistry(),
       envMeta,
+      method,
+      params,
     );
 
     // Assert
@@ -656,20 +680,20 @@ describe("methodDispatch", () => {
     const instance = {
       testMethod: jest.fn().mockResolvedValue("used d1"),
     };
-    const methodMeta = createMethodMeta({
+    const method = makeMethod({
       return_type: "Text",
       parameters: [{ name: "database" }],
     });
     const params = {};
-    let ireg = instanceRegistry();
+    let ireg = makeInstanceRegistry();
 
     // Act
     const result = await _cloesceInternal.methodDispatch(
       instance,
-      methodMeta,
-      params,
       ireg,
       envMeta,
+      method,
+      params,
     );
 
     // Assert
@@ -684,16 +708,16 @@ describe("methodDispatch", () => {
         throw new Error("boom");
       }),
     };
-    const methodMeta = createMethodMeta({ return_type: "Text" });
+    const method = makeMethod({ return_type: "Text" });
     const params = {};
 
     // Act
     const result = await _cloesceInternal.methodDispatch(
       instance,
-      methodMeta,
-      params,
-      instanceRegistry(),
+      makeInstanceRegistry(),
       envMeta,
+      method,
+      params,
     );
 
     // Assert
@@ -711,16 +735,16 @@ describe("methodDispatch", () => {
         throw "stringError";
       }),
     };
-    const methodMeta = createMethodMeta({ return_type: "Text" });
+    const method = makeMethod({ return_type: "Text" });
     const params = {};
 
     // Act
     const result = await _cloesceInternal.methodDispatch(
       instance,
-      methodMeta,
-      params,
-      instanceRegistry(),
+      makeInstanceRegistry(),
       envMeta,
+      method,
+      params,
     );
 
     // Assert

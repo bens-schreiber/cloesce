@@ -136,7 +136,7 @@ export default {{
     async fetch(request: Request, env: any, ctx: any): Promise<Response> {{
         {instance_registry}
 
-        return await cloesce(cidl, constructorRegistry, instanceRegistry, request, "/{api_route}", {{ envName: "{env_name}", dbName: "{db_binding}" }});
+        return await cloesce(request, cidl, constructorRegistry, instanceRegistry, {{ envName: "{env_name}", dbName: "{db_binding}" }},  "/{api_route}");
     }}
 }};
 "#

@@ -2,7 +2,7 @@ mod mappers;
 
 use std::{ops::Deref, sync::Arc};
 
-use common::{CidlType, CloesceAst, InputLanguage, NavigationProperty};
+use common::{CidlType, CloesceAst, InputLanguage, NavigationProperty, NavigationPropertyKind};
 use handlebars::{Handlebars, handlebars_helper};
 
 use mappers::TypeScriptMapper;
@@ -22,6 +22,7 @@ handlebars_helper!(is_model_array: |cidl_type: CidlType| match cidl_type {
     CidlType::Array(inner) => matches!(inner.deref(), CidlType::Model(_)),
     _ => false,
 });
+handlebars_helper!(is_one_to_one: |nav: NavigationProperty| matches!(nav.kind, NavigationPropertyKind::OneToOne {..}));
 handlebars_helper!(eq: |a: str, b: str| a == b);
 
 fn register_helpers(
@@ -31,6 +32,7 @@ fn register_helpers(
     handlebars.register_helper("is_serializable", Box::new(is_serializable));
     handlebars.register_helper("is_model", Box::new(is_model));
     handlebars.register_helper("is_model_array", Box::new(is_model_array));
+    handlebars.register_helper("is_one_to_one", Box::new(is_one_to_one));
     handlebars.register_helper("eq", Box::new(eq));
 
     let mapper1 = mapper.clone();

@@ -144,7 +144,8 @@ pub struct Model {
     #[serde_as(as = "MapPreventDuplicates<_, _>")]
     pub methods: BTreeMap<String, ModelMethod>,
 
-    pub data_sources: Vec<DataSource>,
+    #[serde_as(as = "MapPreventDuplicates<_, _>")]
+    pub data_sources: BTreeMap<String, DataSource>,
     pub source_path: PathBuf,
 }
 

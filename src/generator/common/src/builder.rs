@@ -62,7 +62,7 @@ pub struct ModelBuilder {
     navigation_properties: Vec<NavigationProperty>,
     primary_key: Option<NamedTypedValue>,
     methods: BTreeMap<String, ModelMethod>,
-    data_sources: Vec<DataSource>,
+    data_sources: BTreeMap<String, DataSource>,
     source_path: Option<PathBuf>,
 }
 
@@ -73,7 +73,7 @@ impl ModelBuilder {
             attributes: Vec::new(),
             navigation_properties: Vec::new(),
             methods: BTreeMap::new(),
-            data_sources: Vec::new(),
+            data_sources: BTreeMap::new(),
             source_path: None,
             primary_key: None,
         }
@@ -142,11 +142,14 @@ impl ModelBuilder {
         self
     }
 
-    pub fn data_source(mut self, name: impl Into<String>, tree: IncludeTree) -> Self {
-        self.data_sources.push(DataSource {
-            name: name.into(),
-            tree,
-        });
+    pub fn data_source(mut self, name: impl Into<String> + Clone, tree: IncludeTree) -> Self {
+        self.data_sources.insert(
+            name.clone().into(),
+            DataSource {
+                name: name.into(),
+                tree,
+            },
+        );
         self
     }
 

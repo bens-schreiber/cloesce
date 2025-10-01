@@ -6,10 +6,6 @@ export function right<R>(value: R): Either<never, R> {
   return { ok: true, value };
 }
 
-// --------------------------------------------------
-// V CIDL types, mirroring the Rust bindings V
-// --------------------------------------------------
-
 export type HttpResult<T = unknown> = {
   ok: boolean;
   status: number;
@@ -84,7 +80,7 @@ export interface Model {
   attributes: ModelAttribute[];
   navigation_properties: NavigationProperty[];
   methods: Record<string, ModelMethod>;
-  data_sources: DataSource[];
+  data_sources: Record<string, DataSource>;
   source_path: string;
 }
 

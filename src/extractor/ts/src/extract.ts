@@ -105,7 +105,7 @@ export class CidlExtractor {
     const name = classDecl.getName() ?? "<anonymous>";
     const attributes: ModelAttribute[] = [];
     const navigationProperties: NavigationProperty[] = [];
-    const dataSources: DataSource[] = [];
+    const dataSources: Record<string, DataSource> = {};
     const methods: Record<string, ModelMethod> = {};
     let primary_key: NamedTypedValue | undefined = undefined;
 
@@ -240,7 +240,10 @@ export class CidlExtractor {
             return treeRes;
           }
 
-          dataSources.push({ name: prop.getName(), tree: treeRes.value });
+          dataSources[prop.getName()] = {
+            name: prop.getName(),
+            tree: treeRes.value,
+          };
           break;
         }
       }

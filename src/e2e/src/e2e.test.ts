@@ -202,3 +202,47 @@ test("Wrangler variables can be retrieved", async () => {
   assert.ok(res.ok, withRes("GET motd should be OK", res));
   assert.equal(res.data, "horse tinder is awesome");
 });
+
+test("Selecting different include trees impacts return result", async () => {
+  // Arrange
+  let horse;
+  {
+    let res = await Horse.get(0);
+    assert.ok(res.ok, withRes("GET should be OK", res));
+    horse = res.data;
+  }
+
+  // No data source
+  {
+    let res = await horse.refresh();
+    assert.ok(res.ok, withRes("refresh should be OK", res));
+    assert(res.data.likes.length == 0);
+  }
+
+  // withLikes data source
+  {
+    let res = await horse.refresh("withLikes");
+    assert.ok(res.ok, withRes("refresh should be OK", res));
+    assert(res.data.likes.length == 1);
+    assert(res.data.likes[0].horse === undefined);
+  }
+
+  // default data source
+  {
+    let res = await horse.refresh("default");
+    assert.ok(res.ok, withRes("refresh should be OK", res));
+    assert(res.data.likes.length == 1);
+    assert(res.data.likes[0].horse2 !== undefined);
+  }
+
+  // invalid data source
+  {
+    let res = await horse.refresh("julio pumpkin");
+    assert.ok(!res.ok);
+    assert.deepEqual(res, {
+      ok: false,
+      status: 400,
+      message: "Invalid Request Body: Unknown data source julio pumpkin",
+    });
+  }
+});

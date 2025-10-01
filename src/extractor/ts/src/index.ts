@@ -32,3 +32,14 @@ export type IncludeTree<T> = T extends Primitive
         ? IncludeTree<NonNullable<U>>
         : IncludeTree<NonNullable<T[K]>>;
     };
+
+// Helpers
+export function instantiateModelArray<T extends object>(
+  data: any,
+  ctor: { new (): T },
+): T[] {
+  if (Array.isArray(data)) {
+    return data.map((x) => instantiateModelArray(x, ctor)).flat();
+  }
+  return [Object.assign(new ctor(), data)];
+}
