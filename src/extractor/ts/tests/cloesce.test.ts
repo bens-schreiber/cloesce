@@ -1,29 +1,33 @@
 import { _cloesceInternal } from "../src/cloesce";
 import {
+  CloesceAst,
   DataSource,
   HttpVerb,
-  MetaCidl,
   ModelAttribute,
   NamedTypedValue,
   NavigationProperty,
 } from "../src/common";
 
-const makeCidl = (methods: Record<string, any>): MetaCidl => ({
+const makeAst = (methods: Record<string, any>): CloesceAst => ({
   wrangler_env: {
-    name: "Env",
+    name: "",
     source_path: "./",
   },
+  version: "",
+  project_name: "",
+  language: "TypeScript",
   models: {
     Horse: {
       name: "",
-      attributes: [] as ModelAttribute[],
+      attributes: [],
       primary_key: {
         name: "void",
         cidl_type: "Integer",
       },
-      navigation_properties: [] as NavigationProperty[],
-      data_sources: [] as DataSource[],
+      navigation_properties: [],
+      data_sources: {},
       methods,
+      source_path: "",
     },
   },
 });
@@ -40,13 +44,11 @@ describe("Router Error States", () => {
     const url = "http://foo.com/api";
 
     // Act
-    const result = _cloesceInternal.matchRoute(makeRequest(url), "/api", {
-      models: {},
-      wrangler_env: {
-        name: "",
-        source_path: "./",
-      },
-    });
+    const result = _cloesceInternal.matchRoute(
+      makeRequest(url),
+      makeAst({}),
+      "/api",
+    );
 
     // Assert
     expect(result.value).toStrictEqual({
@@ -59,10 +61,10 @@ describe("Router Error States", () => {
   test("Router returns 404 on unknown model", () => {
     // Arrange
     const url = "http://foo.com/api/Dog/woof";
-    const cidl = makeCidl({});
+    const ast = makeAst({});
 
     // Act
-    const result = _cloesceInternal.matchRoute(makeRequest(url), "/api", cidl);
+    const result = _cloesceInternal.matchRoute(makeRequest(url), ast, "/api");
 
     // Assert
     expect(result.value).toStrictEqual({
@@ -75,10 +77,10 @@ describe("Router Error States", () => {
   test("Router returns 404 on unknown method", () => {
     // Arrange
     const url = "http://foo.com/api/Horse/neigh";
-    const cidl = makeCidl({});
+    const ast = makeAst({});
 
     // Act
-    const result = _cloesceInternal.matchRoute(makeRequest(url), "/api", cidl);
+    const result = _cloesceInternal.matchRoute(makeRequest(url), ast, "/api");
 
     // Assert
     expect(result.value).toStrictEqual({
@@ -91,7 +93,7 @@ describe("Router Error States", () => {
   test("Router returns 404 on mismatched HTTP verb", () => {
     // Arrange
     const url = "http://foo.com/api/Horse/0/neigh";
-    const cidl = makeCidl({
+    const ast = makeAst({
       neigh: {
         name: "",
         is_static: false,
@@ -102,7 +104,7 @@ describe("Router Error States", () => {
     });
 
     // Act
-    const result = _cloesceInternal.matchRoute(makeRequest(url), "/api", cidl);
+    const result = _cloesceInternal.matchRoute(makeRequest(url), ast, "/api");
 
     // Assert
     expect(result.value).toStrictEqual({
@@ -123,19 +125,19 @@ describe("Router Success States", () => {
       parameters: [],
     },
   };
-  const cidl = makeCidl(methods);
+  const ast = makeAst(methods);
 
   test("Router returns model on static route", () => {
     // Arrange
     const url = "http://foo.com/api/Horse/neigh";
 
     // Act
-    const result = _cloesceInternal.matchRoute(makeRequest(url), "/api", cidl);
+    const result = _cloesceInternal.matchRoute(makeRequest(url), ast, "/api");
 
     // Assert
     expect(result.value).toStrictEqual({
-      modelMeta: cidl.models.Horse,
-      methodMeta: cidl.models.Horse.methods.neigh,
+      model: ast.models.Horse,
+      method: ast.models.Horse.methods.neigh,
       id: null,
     });
   });
@@ -145,12 +147,12 @@ describe("Router Success States", () => {
     const url = "http://foo.com/api/Horse/0/neigh";
 
     // Act
-    const result = _cloesceInternal.matchRoute(makeRequest(url), "/api", cidl);
+    const result = _cloesceInternal.matchRoute(makeRequest(url), ast, "/api");
 
     // Assert
     expect(result.value).toStrictEqual({
-      modelMeta: cidl.models.Horse,
-      methodMeta: cidl.models.Horse.methods.neigh,
+      model: ast.models.Horse,
+      method: ast.models.Horse.methods.neigh,
       id: "0",
     });
   });
@@ -164,7 +166,25 @@ describe("Validate Request Error States", () => {
     // Act
     const result = await _cloesceInternal.validateRequest(
       request,
-      { models: {}, wrangler_env: { name: "", source_path: "./" } },
+      {
+        models: {},
+        wrangler_env: { name: "", source_path: "./" },
+        version: "",
+        project_name: "",
+        language: "TypeScript",
+      },
+      {
+        name: "",
+        primary_key: {
+          name: "",
+          cidl_type: "Void",
+        },
+        attributes: [],
+        navigation_properties: [],
+        methods: {},
+        data_sources: {},
+        source_path: "",
+      },
       {
         name: "",
         is_static: false,
@@ -191,7 +211,25 @@ describe("Validate Request Error States", () => {
     // Act
     const result = await _cloesceInternal.validateRequest(
       request,
-      { models: {}, wrangler_env: { name: "", source_path: "./" } },
+      {
+        models: {},
+        wrangler_env: { name: "", source_path: "./" },
+        version: "",
+        project_name: "",
+        language: "TypeScript",
+      },
+      {
+        name: "",
+        primary_key: {
+          name: "",
+          cidl_type: "Void",
+        },
+        attributes: [],
+        navigation_properties: [],
+        methods: {},
+        data_sources: {},
+        source_path: "",
+      },
       {
         name: "",
         is_static: true,
@@ -232,7 +270,7 @@ describe("Validate Request Error States", () => {
         ? `http://foo.com/api/Horse/neigh?${query}`
         : "http://foo.com/api/Horse/neigh";
       const request = makeRequest(url, method, body);
-      const cidl: MetaCidl = makeCidl({
+      const ast = makeAst({
         neigh: {
           name: "neigh",
           is_static: true,
@@ -245,8 +283,9 @@ describe("Validate Request Error States", () => {
       // Act
       const result = await _cloesceInternal.validateRequest(
         request,
-        cidl,
-        cidl.models.Horse.methods.neigh,
+        ast,
+        ast.models.Horse,
+        ast.models.Horse.methods.neigh,
         "0",
       );
 
@@ -306,7 +345,7 @@ describe("Validate Request Success States", () => {
       arg.is_get ? undefined : "POST",
       arg.is_get ? undefined : { [arg.typed_value.name]: arg.value },
     );
-    const cidl: MetaCidl = makeCidl({
+    const ast = makeAst({
       neigh: {
         name: "neigh",
         is_static: true,
@@ -326,15 +365,19 @@ describe("Validate Request Success States", () => {
     // Act
     const result = await _cloesceInternal.validateRequest(
       request,
-      cidl,
-      cidl.models.Horse.methods.neigh,
+      ast,
+      ast.models.Horse,
+      ast.models.Horse.methods.neigh,
       "0",
     );
 
     // Assert
-    expect(result.value).toEqual({
-      [arg.typed_value.name]: arg.is_get ? String(arg.value) : arg.value,
-    });
+    expect(result.value).toEqual([
+      {
+        [arg.typed_value.name]: arg.is_get ? String(arg.value) : arg.value,
+      },
+      null,
+    ]);
   });
 });
 
@@ -354,7 +397,7 @@ describe("modelsFromSql", () => {
     },
   };
 
-  const baseCidl: MetaCidl = {
+  const baseCidl: CloesceAst = {
     wrangler_env: {
       name: "Env",
       source_path: "./",
@@ -373,10 +416,8 @@ describe("modelsFromSql", () => {
         ],
         navigation_properties: [
           {
-            value: {
-              name: "riders",
-              cidl_type: { Array: { Model: nestedModelName } },
-            },
+            var_name: "riders",
+            model_name: nestedModelName,
             kind: { OneToMany: { reference: "id" } },
           },
         ],
@@ -384,8 +425,9 @@ describe("modelsFromSql", () => {
           name: "id",
           cidl_type: "Integer",
         },
-        data_sources: [],
+        data_sources: {},
         methods: {},
+        source_path: "",
       },
       [nestedModelName]: {
         name: nestedModelName,
@@ -403,10 +445,14 @@ describe("modelsFromSql", () => {
           cidl_type: "Integer",
         },
         navigation_properties: [],
-        data_sources: [],
+        data_sources: {},
         methods: {},
+        source_path: "",
       },
     },
+    version: "",
+    project_name: "",
+    language: "TypeScript",
   };
 
   test("returns empty array if no records", () => {
@@ -525,7 +571,7 @@ describe("modelsFromSql", () => {
 });
 
 describe("methodDispatch", () => {
-  const createMethodMeta = (overrides: Partial<any> = {}) => ({
+  const makeMethod = (overrides: Partial<any> = {}) => ({
     name: "testMethod",
     is_static: true,
     http_verb: HttpVerb.GET,
@@ -534,7 +580,7 @@ describe("methodDispatch", () => {
     ...overrides,
   });
 
-  const createMockD1 = (): any => ({
+  const makeMockD1 = (): any => ({
     prepare: jest.fn(),
     batch: jest.fn(),
     exec: jest.fn(),
@@ -547,12 +593,12 @@ describe("methodDispatch", () => {
     dbName: "db",
   };
 
-  const instanceRegistry = () =>
+  const makeInstanceRegistry = () =>
     new Map([
       [
         "Env",
         {
-          db: createMockD1(),
+          db: makeMockD1(),
         },
       ],
     ]);
@@ -562,16 +608,16 @@ describe("methodDispatch", () => {
     const instance = {
       testMethod: jest.fn().mockResolvedValue("ignored"),
     };
-    const methodMeta = createMethodMeta({ return_type: null });
+    const method = makeMethod({ return_type: null });
     const params = {};
 
     // Act
     const result = await _cloesceInternal.methodDispatch(
       instance,
-      methodMeta,
-      params,
-      instanceRegistry(),
+      makeInstanceRegistry(),
       envMeta,
+      method,
+      params,
     );
 
     // Assert
@@ -588,16 +634,16 @@ describe("methodDispatch", () => {
         data: "already wrapped",
       }),
     };
-    const methodMeta = createMethodMeta({ return_type: { HttpResult: null } });
+    const method = makeMethod({ return_type: { HttpResult: null } });
     const params = {};
 
     // Act
     const result = await _cloesceInternal.methodDispatch(
       instance,
-      methodMeta,
-      params,
-      instanceRegistry(),
+      makeInstanceRegistry(),
       envMeta,
+      method,
+      params,
     );
 
     // Assert
@@ -613,16 +659,16 @@ describe("methodDispatch", () => {
     const instance = {
       testMethod: jest.fn().mockResolvedValue("neigh"),
     };
-    const methodMeta = createMethodMeta({ return_type: "Text" });
+    const method = makeMethod({ return_type: "Text" });
     const params = {};
 
     // Act
     const result = await _cloesceInternal.methodDispatch(
       instance,
-      methodMeta,
-      params,
-      instanceRegistry(),
+      makeInstanceRegistry(),
       envMeta,
+      method,
+      params,
     );
 
     // Assert
@@ -634,20 +680,20 @@ describe("methodDispatch", () => {
     const instance = {
       testMethod: jest.fn().mockResolvedValue("used d1"),
     };
-    const methodMeta = createMethodMeta({
+    const method = makeMethod({
       return_type: "Text",
       parameters: [{ name: "database" }],
     });
     const params = {};
-    let ireg = instanceRegistry();
+    let ireg = makeInstanceRegistry();
 
     // Act
     const result = await _cloesceInternal.methodDispatch(
       instance,
-      methodMeta,
-      params,
       ireg,
       envMeta,
+      method,
+      params,
     );
 
     // Assert
@@ -662,16 +708,16 @@ describe("methodDispatch", () => {
         throw new Error("boom");
       }),
     };
-    const methodMeta = createMethodMeta({ return_type: "Text" });
+    const method = makeMethod({ return_type: "Text" });
     const params = {};
 
     // Act
     const result = await _cloesceInternal.methodDispatch(
       instance,
-      methodMeta,
-      params,
-      instanceRegistry(),
+      makeInstanceRegistry(),
       envMeta,
+      method,
+      params,
     );
 
     // Assert
@@ -689,16 +735,16 @@ describe("methodDispatch", () => {
         throw "stringError";
       }),
     };
-    const methodMeta = createMethodMeta({ return_type: "Text" });
+    const method = makeMethod({ return_type: "Text" });
     const params = {};
 
     // Act
     const result = await _cloesceInternal.methodDispatch(
       instance,
-      methodMeta,
-      params,
-      instanceRegistry(),
+      makeInstanceRegistry(),
       envMeta,
+      method,
+      params,
     );
 
     // Assert

@@ -3,7 +3,7 @@ use std::{io::Write, path::PathBuf};
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand, command};
 
-use common::{CidlSpec, wrangler::WranglerFormat};
+use common::{CloesceAst, wrangler::WranglerFormat};
 use d1::D1Generator;
 use workers::WorkersGenerator;
 
@@ -49,7 +49,8 @@ enum GenerateTarget {
 fn main() -> Result<()> {
     match Cli::parse().command {
         Commands::Validate { cidl_path } => {
-            cidl_from_path(cidl_path)?;
+            let cidl = ast_from_path(cidl_path)?;
+            cidl.validate_types()?;
             println!("Ok.")
         }
         Commands::Generate { target } => match target {
@@ -59,7 +60,8 @@ fn main() -> Result<()> {
                 sqlite_path,
             } => {
                 let mut sqlite_file = create_file_and_dir(&sqlite_path)?;
-                let cidl = cidl_from_path(cidl_path)?;
+                let ast = ast_from_path(cidl_path)?;
+                ast.validate_types()?;
 
                 let mut wrangler = match wrangler_path {
                     Some(ref wrangler_path) => WranglerFormat::from_path(wrangler_path)
@@ -71,7 +73,7 @@ fn main() -> Result<()> {
                 };
 
                 let d1gen = D1Generator::new(
-                    cidl,
+                    ast,
                     wrangler
                         .as_spec()
                         .context("Failed to validate Wrangler file")?,
@@ -105,7 +107,9 @@ fn main() -> Result<()> {
                 wrangler_path,
                 domain,
             } => {
-                let cidl = cidl_from_path(cidl_path)?;
+                let ast = ast_from_path(cidl_path)?;
+                ast.validate_types()?;
+
                 let mut file =
                     create_file_and_dir(&workers_path).context("Failed to open workers file")?;
 
@@ -114,7 +118,7 @@ fn main() -> Result<()> {
                     .as_spec()?;
 
                 file.write(
-                    WorkersGenerator::create(cidl, wrangler, domain, &workers_path)?.as_bytes(),
+                    WorkersGenerator::create(ast, wrangler, domain, &workers_path)?.as_bytes(),
                 )
                 .context("Failed to write workers file")?;
             }
@@ -123,11 +127,13 @@ fn main() -> Result<()> {
                 client_path,
                 domain,
             } => {
-                let spec = cidl_from_path(cidl_path)?;
+                let ast = ast_from_path(cidl_path)?;
+                ast.validate_types()?;
+
                 let mut file =
                     create_file_and_dir(&client_path).context("Failed to open client file")?;
 
-                file.write(client::generate_client_api(spec, domain).as_bytes())
+                file.write(client::generate_client_api(ast, domain).as_bytes())
                     .context("Failed to write client file")?;
             }
         },
@@ -144,7 +150,7 @@ fn create_file_and_dir(path: &PathBuf) -> Result<std::fs::File> {
     Ok(file)
 }
 
-fn cidl_from_path(cidl_path: PathBuf) -> Result<CidlSpec> {
+fn ast_from_path(cidl_path: PathBuf) -> Result<CloesceAst> {
     let cidl_contents = std::fs::read_to_string(cidl_path).context("Failed to read cidl file")?;
-    serde_json::from_str::<CidlSpec>(&cidl_contents).context("Failed to validate cidl")
+    serde_json::from_str::<CloesceAst>(&cidl_contents).context("Failed to validate cidl")
 }

@@ -1,17 +1,21 @@
-use std::path::PathBuf;
+use std::{collections::BTreeMap, path::PathBuf};
 
 use crate::{
-    CidlSpec, CidlType, DataSource, HttpVerb, IncludeTree, InputLanguage, Model, ModelAttribute,
+    CidlType, CloesceAst, DataSource, HttpVerb, IncludeTree, InputLanguage, Model, ModelAttribute,
     ModelMethod, NamedTypedValue, NavigationProperty, NavigationPropertyKind, WranglerEnv,
     wrangler::WranglerSpec,
 };
 
-pub fn create_cidl(models: Vec<Model>) -> CidlSpec {
-    CidlSpec {
+pub fn create_ast(mut models: Vec<Model>) -> CloesceAst {
+    let map = models
+        .drain(..)
+        .map(|m| (m.name.clone(), m))
+        .collect::<BTreeMap<String, Model>>();
+    CloesceAst {
         version: "1.0".to_string(),
         project_name: "test".to_string(),
         language: InputLanguage::TypeScript,
-        models,
+        models: map,
         wrangler_env: WranglerEnv {
             name: "Env".into(),
             source_path: "source.ts".into(),
@@ -27,33 +31,22 @@ pub fn create_wrangler() -> WranglerSpec {
 
 #[derive(Default)]
 pub struct IncludeTreeBuilder {
-    nodes: Vec<(NamedTypedValue, IncludeTree)>,
+    nodes: BTreeMap<String, IncludeTree>,
 }
 
 impl IncludeTreeBuilder {
-    pub fn add(mut self, name: &str, cidl_type: CidlType) -> Self {
-        self.nodes.push((
-            NamedTypedValue {
-                name: name.into(),
-                cidl_type,
-            },
-            IncludeTree(vec![]),
-        ));
+    pub fn add_node(mut self, name: impl Into<String>) -> Self {
+        self.nodes
+            .insert(name.into(), IncludeTree(BTreeMap::default()));
         self
     }
 
-    pub fn add_with_children<F>(mut self, name: &str, cidl_type: CidlType, build: F) -> Self
+    pub fn add_with_children<F>(mut self, name: &str, build: F) -> Self
     where
         F: FnOnce(IncludeTreeBuilder) -> IncludeTreeBuilder,
     {
         let subtree = build(IncludeTreeBuilder::default()).build();
-        self.nodes.push((
-            NamedTypedValue {
-                name: name.into(),
-                cidl_type,
-            },
-            subtree,
-        ));
+        self.nodes.insert(name.to_string(), subtree);
         self
     }
 
@@ -68,8 +61,8 @@ pub struct ModelBuilder {
     attributes: Vec<ModelAttribute>,
     navigation_properties: Vec<NavigationProperty>,
     primary_key: Option<NamedTypedValue>,
-    methods: Vec<ModelMethod>,
-    data_sources: Vec<DataSource>,
+    methods: BTreeMap<String, ModelMethod>,
+    data_sources: BTreeMap<String, DataSource>,
     source_path: Option<PathBuf>,
 }
 
@@ -79,8 +72,8 @@ impl ModelBuilder {
             name: name.into(),
             attributes: Vec::new(),
             navigation_properties: Vec::new(),
-            methods: Vec::new(),
-            data_sources: Vec::new(),
+            methods: BTreeMap::new(),
+            data_sources: BTreeMap::new(),
             source_path: None,
             primary_key: None,
         }
@@ -104,15 +97,13 @@ impl ModelBuilder {
 
     pub fn nav_p(
         mut self,
-        name: impl Into<String>,
-        cidl_type: CidlType,
+        var_name: impl Into<String>,
+        model_name: impl Into<String>,
         foreign_key: NavigationPropertyKind,
     ) -> Self {
         self.navigation_properties.push(NavigationProperty {
-            value: NamedTypedValue {
-                name: name.into(),
-                cidl_type,
-            },
+            var_name: var_name.into(),
+            model_name: model_name.into(),
             kind: foreign_key,
         });
         self
@@ -132,27 +123,33 @@ impl ModelBuilder {
 
     pub fn method(
         mut self,
-        name: impl Into<String>,
+        name: impl Into<String> + Clone,
         http_verb: HttpVerb,
         is_static: bool,
         parameters: Vec<NamedTypedValue>,
         return_type: CidlType,
     ) -> Self {
-        self.methods.push(ModelMethod {
-            name: name.into(),
-            is_static,
-            http_verb,
-            return_type,
-            parameters,
-        });
+        self.methods.insert(
+            name.clone().into(),
+            ModelMethod {
+                name: name.into(),
+                is_static,
+                http_verb,
+                return_type,
+                parameters,
+            },
+        );
         self
     }
 
-    pub fn data_source(mut self, name: impl Into<String>, tree: IncludeTree) -> Self {
-        self.data_sources.push(DataSource {
-            name: name.into(),
-            tree,
-        });
+    pub fn data_source(mut self, name: impl Into<String> + Clone, tree: IncludeTree) -> Self {
+        self.data_sources.insert(
+            name.clone().into(),
+            DataSource {
+                name: name.into(),
+                tree,
+            },
+        );
         self
     }
 

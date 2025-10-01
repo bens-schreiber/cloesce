@@ -3,8 +3,8 @@
 exports[`actions snapshot 1`] = `
 {
   "language": "TypeScript",
-  "models": [
-    {
+  "models": {
+    "Horse": {
       "attributes": [
         {
           "foreign_key_reference": null,
@@ -23,36 +23,122 @@ exports[`actions snapshot 1`] = `
           },
         },
       ],
-      "data_sources": [
-        {
+      "data_sources": {
+        "default": {
           "name": "default",
-          "tree": [
-            [
-              {
-                "cidl_type": {
-                  "Array": {
-                    "Model": "Like",
-                  },
-                },
-                "name": "likes",
-              },
-              [
-                [
-                  {
-                    "cidl_type": {
-                      "Model": "Horse",
-                    },
-                    "name": "horse2",
-                  },
-                  [],
-                ],
-              ],
-            ],
-          ],
+          "tree": {
+            "likes": {
+              "horse2": {},
+            },
+          },
         },
-      ],
-      "methods": [
-        {
+      },
+      "methods": {
+        "divide": {
+          "http_verb": "GET",
+          "is_static": true,
+          "name": "divide",
+          "parameters": [
+            {
+              "cidl_type": "Integer",
+              "name": "a",
+            },
+            {
+              "cidl_type": "Integer",
+              "name": "b",
+            },
+          ],
+          "return_type": {
+            "HttpResult": "Integer",
+          },
+        },
+        "get": {
+          "http_verb": "GET",
+          "is_static": true,
+          "name": "get",
+          "parameters": [
+            {
+              "cidl_type": {
+                "Inject": "Env",
+              },
+              "name": "{ db }",
+            },
+            {
+              "cidl_type": "Integer",
+              "name": "id",
+            },
+          ],
+          "return_type": {
+            "HttpResult": {
+              "Model": "Horse",
+            },
+          },
+        },
+        "like": {
+          "http_verb": "POST",
+          "is_static": false,
+          "name": "like",
+          "parameters": [
+            {
+              "cidl_type": {
+                "Inject": "Env",
+              },
+              "name": "{ db }",
+            },
+            {
+              "cidl_type": {
+                "Model": "Horse",
+              },
+              "name": "horse",
+            },
+          ],
+          "return_type": {
+            "HttpResult": "Void",
+          },
+        },
+        "list": {
+          "http_verb": "GET",
+          "is_static": true,
+          "name": "list",
+          "parameters": [
+            {
+              "cidl_type": {
+                "Inject": "Env",
+              },
+              "name": "{ db }",
+            },
+          ],
+          "return_type": {
+            "HttpResult": {
+              "Array": {
+                "Model": "Horse",
+              },
+            },
+          },
+        },
+        "patch": {
+          "http_verb": "PATCH",
+          "is_static": false,
+          "name": "patch",
+          "parameters": [
+            {
+              "cidl_type": {
+                "Inject": "Env",
+              },
+              "name": "{ db }",
+            },
+            {
+              "cidl_type": {
+                "Model": "Horse",
+              },
+              "name": "horse",
+            },
+          ],
+          "return_type": {
+            "HttpResult": "Void",
+          },
+        },
+        "post": {
           "http_verb": "POST",
           "is_static": true,
           "name": "post",
@@ -76,111 +162,7 @@ exports[`actions snapshot 1`] = `
             },
           },
         },
-        {
-          "http_verb": "GET",
-          "is_static": true,
-          "name": "get",
-          "parameters": [
-            {
-              "cidl_type": {
-                "Inject": "Env",
-              },
-              "name": "{ db }",
-            },
-            {
-              "cidl_type": "Integer",
-              "name": "id",
-            },
-          ],
-          "return_type": {
-            "HttpResult": {
-              "Model": "Horse",
-            },
-          },
-        },
-        {
-          "http_verb": "GET",
-          "is_static": true,
-          "name": "list",
-          "parameters": [
-            {
-              "cidl_type": {
-                "Inject": "Env",
-              },
-              "name": "{ db }",
-            },
-          ],
-          "return_type": {
-            "HttpResult": {
-              "Array": {
-                "Model": "Horse",
-              },
-            },
-          },
-        },
-        {
-          "http_verb": "PATCH",
-          "is_static": false,
-          "name": "patch",
-          "parameters": [
-            {
-              "cidl_type": {
-                "Inject": "Env",
-              },
-              "name": "{ db }",
-            },
-            {
-              "cidl_type": {
-                "Model": "Horse",
-              },
-              "name": "horse",
-            },
-          ],
-          "return_type": {
-            "HttpResult": "Void",
-          },
-        },
-        {
-          "http_verb": "POST",
-          "is_static": false,
-          "name": "like",
-          "parameters": [
-            {
-              "cidl_type": {
-                "Inject": "Env",
-              },
-              "name": "{ db }",
-            },
-            {
-              "cidl_type": {
-                "Model": "Horse",
-              },
-              "name": "horse",
-            },
-          ],
-          "return_type": {
-            "HttpResult": "Void",
-          },
-        },
-        {
-          "http_verb": "GET",
-          "is_static": true,
-          "name": "divide",
-          "parameters": [
-            {
-              "cidl_type": "Integer",
-              "name": "a",
-            },
-            {
-              "cidl_type": "Integer",
-              "name": "b",
-            },
-          ],
-          "return_type": {
-            "HttpResult": "Integer",
-          },
-        },
-        {
+        "returnNull": {
           "http_verb": "POST",
           "is_static": true,
           "name": "returnNull",
@@ -189,7 +171,7 @@ exports[`actions snapshot 1`] = `
             "Nullable": "Void",
           },
         },
-        {
+        "returnNullArrayOrNull": {
           "http_verb": "POST",
           "is_static": true,
           "name": "returnNullArrayOrNull",
@@ -207,7 +189,7 @@ exports[`actions snapshot 1`] = `
             },
           },
         },
-      ],
+      },
       "name": "Horse",
       "navigation_properties": [
         {
@@ -216,14 +198,8 @@ exports[`actions snapshot 1`] = `
               "reference": "horseId1",
             },
           },
-          "value": {
-            "cidl_type": {
-              "Array": {
-                "Model": "Like",
-              },
-            },
-            "name": "likes",
-          },
+          "model_name": "Like",
+          "var_name": "likes",
         },
       ],
       "primary_key": {
@@ -232,7 +208,7 @@ exports[`actions snapshot 1`] = `
       },
       "source_path": "void for tests",
     },
-    {
+    "Like": {
       "attributes": [
         {
           "foreign_key_reference": "Horse",
@@ -249,8 +225,8 @@ exports[`actions snapshot 1`] = `
           },
         },
       ],
-      "data_sources": [],
-      "methods": [],
+      "data_sources": {},
+      "methods": {},
       "name": "Like",
       "navigation_properties": [
         {
@@ -259,12 +235,8 @@ exports[`actions snapshot 1`] = `
               "reference": "horseId2",
             },
           },
-          "value": {
-            "cidl_type": {
-              "Model": "Horse",
-            },
-            "name": "horse2",
-          },
+          "model_name": "Horse",
+          "var_name": "horse2",
         },
       ],
       "primary_key": {
@@ -273,7 +245,7 @@ exports[`actions snapshot 1`] = `
       },
       "source_path": "void for tests",
     },
-  ],
+  },
   "project_name": "snapshotProject",
   "version": "0.0.2",
   "wrangler_env": {

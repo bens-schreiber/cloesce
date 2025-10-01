@@ -1,7 +1,7 @@
 pub mod sql;
 
 use common::{
-    CidlSpec,
+    CloesceAst,
     wrangler::{D1Database, WranglerSpec},
 };
 use sql::generate_sql;
@@ -9,13 +9,13 @@ use sql::generate_sql;
 use anyhow::Result;
 
 pub struct D1Generator {
-    cidl: CidlSpec,
+    ast: CloesceAst,
     wrangler: WranglerSpec,
 }
 
 impl D1Generator {
-    pub fn new(cidl: CidlSpec, wrangler: WranglerSpec) -> Self {
-        Self { cidl, wrangler }
+    pub fn new(ast: CloesceAst, wrangler: WranglerSpec) -> Self {
+        Self { ast, wrangler }
     }
 
     /// Validates and updates the Wrangler spec so that D1 can be used during
@@ -29,7 +29,7 @@ impl D1Generator {
             }
 
             if d1.database_name.is_none() {
-                d1.database_name = Some(format!("{}_d1_{i}", self.cidl.project_name));
+                d1.database_name = Some(format!("{}_d1_{i}", self.ast.project_name));
             }
 
             if d1.database_id.is_none() {
@@ -41,7 +41,7 @@ impl D1Generator {
         }
 
         // Ensure a database exists (if there are even models), provide a default if not
-        if !self.cidl.models.is_empty() && res.d1_databases.is_empty() {
+        if !self.ast.models.is_empty() && res.d1_databases.is_empty() {
             res.d1_databases.push(D1Database {
                 binding: Some(String::from("D1_DB")),
                 database_name: Some(String::from("default")),
@@ -58,6 +58,6 @@ impl D1Generator {
 
     /// Transforms the Model AST into their SQL table equivalents
     pub fn sql(&self) -> Result<String> {
-        generate_sql(&self.cidl.models)
+        generate_sql(&self.ast.models)
     }
 }

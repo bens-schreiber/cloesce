@@ -1,8 +1,6 @@
-use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
+use std::collections::{BTreeMap, HashMap, VecDeque};
 
-use common::{
-    CidlType, IncludeTree, Model, NamedTypedValue, NavigationProperty, NavigationPropertyKind,
-};
+use common::{CidlType, IncludeTree, Model, NavigationPropertyKind};
 
 use anyhow::{Context, Result, anyhow, bail, ensure};
 use sea_query::{
@@ -86,106 +84,15 @@ impl<'a> JunctionTableBuilder<'a> {
     }
 }
 
-fn validate_nav_array<'a>(
-    model: &Model,
-    nav: &'a NavigationProperty,
-    model_lookup: &HashMap<&str, &Model>,
-) -> Result<&'a str> {
-    let Some(CidlType::Model(model_name)) = nav.value.cidl_type.unwrap_array() else {
-        bail!(
-            "Expected collection of Model type for navigation property {}.{}",
-            model.name,
-            nav.value.name
-        );
-    };
-
-    if !model_lookup.contains_key(model_name.as_str()) {
-        bail!(
-            "Unknown Model for navigation property {}.{} => {}?",
-            model.name,
-            nav.value.name,
-            model_name
-        );
-    }
-
-    Ok(model_name.as_str())
-}
-
-/// Validates all models, returning a lookup table of a model name to it's [Model].
-///
-/// Returns error on
-/// - Duplicate Model names
-/// - Duplicate column names
-/// - Invalid typed primary keys
-/// - Invalid SQL column type
-fn validate_models(models: &[Model]) -> Result<HashMap<&str, &Model>> {
-    let mut model_lookup = HashMap::<&str, &Model>::new();
-
-    let ensure_valid_sql_type = |model: &Model, value: &NamedTypedValue| {
-        let inner = match &value.cidl_type {
-            CidlType::Nullable(inner) if matches!(inner.as_ref(), CidlType::Void) => {
-                bail!("SQL types cannot be null, only nullable.")
-            }
-            CidlType::Nullable(inner) => inner.as_ref(),
-            other => other,
-        };
-
-        ensure!(
-            matches!(
-                inner,
-                CidlType::Integer | CidlType::Real | CidlType::Text | CidlType::Blob
-            ),
-            "Invalid SQL Type {}.{}",
-            model.name,
-            value.name
-        );
-
-        Ok(())
-    };
-
-    for model in models {
-        // Duplicate models
-        ensure!(
-            model_lookup.insert(&model.name, model).is_none(),
-            "Duplicate model name: {}",
-            model.name
-        );
-
-        let mut column_names = HashSet::new();
-        for attr in &model.attributes {
-            // Duplicate columns
-            ensure!(
-                column_names.insert(&attr.value.name),
-                "Duplicate column names {}.{}",
-                model.name,
-                attr.value.name
-            );
-
-            ensure_valid_sql_type(model, &attr.value)?;
-        }
-
-        // Validate primary key
-        ensure!(
-            !model.primary_key.cidl_type.is_nullable(),
-            "Primary key cannot be nullable"
-        );
-        ensure_valid_sql_type(model, &model.primary_key)?;
-    }
-
-    Ok(model_lookup)
-}
-
-/// Validates foreign key relationships for every [Model] in the CIDL. Returns a
+/// Validates foreign key relationships for every [Model] in the AST. Returns a
 /// SQL-safe topological ordering of the models, along with a vec of all necessary Junction tables
 ///
 /// Returns error on
-/// - Unknown foreign key models
-/// - Invalid navigation property types
+/// - Unknown or invalid foreign key references
 /// - Missing navigation property attributes
 /// - Cyclical dependencies
 fn validate_fks<'a>(
-    models: &'a [Model],
-    model_lookup: &HashMap<&str, &'a Model>,
+    model_lookup: &'a BTreeMap<String, Model>,
 ) -> Result<(Vec<&'a Model>, Vec<JunctionTable<'a>>)> {
     // Topo sort and cycle detection
     let mut in_degree = BTreeMap::<&str, usize>::new();
@@ -198,7 +105,7 @@ fn validate_fks<'a>(
     let mut model_reference_to_fk_model = HashMap::<(&str, &str), &str>::new();
     let mut unvalidated_navs = Vec::new();
 
-    for model in models {
+    for model in model_lookup.values() {
         graph.entry(&model.name).or_default();
         in_degree.entry(&model.name).or_insert(0);
 
@@ -206,15 +113,6 @@ fn validate_fks<'a>(
             let Some(fk_model) = &attr.foreign_key_reference else {
                 continue;
             };
-
-            // Validate the fk's model exists
-            ensure!(
-                model_lookup.contains_key(fk_model.as_str()),
-                "Unknown Model for foreign key {}.{} => {}?",
-                model.name,
-                attr.value.name,
-                fk_model
-            );
 
             model_reference_to_fk_model.insert((&model.name, attr.value.name.as_str()), fk_model);
 
@@ -232,56 +130,31 @@ fn validate_fks<'a>(
         for nav in &model.navigation_properties {
             match &nav.kind {
                 NavigationPropertyKind::OneToOne { reference } => {
-                    // Validate nav prop has a Model type
-                    let CidlType::Model(nav_model) = &nav.value.cidl_type else {
-                        bail!(
-                            "Expected Model type for navigation property {}.{}",
-                            model.name,
-                            nav.value.name
-                        );
-                    };
-
-                    // Validate the nav prop's model exists
-                    ensure!(
-                        model_lookup.contains_key(nav_model.as_str()),
-                        "Unknown Model for navigation property {}.{} => {}?",
-                        model.name,
-                        nav.value.name,
-                        nav_model
-                    );
-
                     // Validate the nav prop's reference is consistent
                     if let Some(&fk_model) =
                         model_reference_to_fk_model.get(&(&model.name, reference))
                     {
                         ensure!(
-                            fk_model == nav_model,
+                            fk_model == nav.model_name,
                             "Mismatched types between foreign key and One to One navigation property ({}.{}) ({})",
                             model.name,
-                            nav.value.name,
+                            nav.var_name,
                             fk_model
                         );
                     } else {
                         bail!(
                             "Navigation property {}.{} references {}.{} which does not exist.",
                             model.name,
-                            nav.value.name,
-                            nav_model,
+                            nav.var_name,
+                            nav.model_name,
                             reference
                         );
                     }
-
-                    // TODO: Revisit this. Should a user be able to decorate a One To One
-                    // navigation property, but have no foreign key for it?
-                    // ( ie, make the enum OneToOne(Option<String>) )
                 }
                 NavigationPropertyKind::OneToMany { reference: _ } => {
-                    let nav_model = validate_nav_array(model, nav, model_lookup)?;
-                    unvalidated_navs.push((&model.name, nav_model, nav));
+                    unvalidated_navs.push((&model.name, &nav.model_name, nav));
                 }
                 NavigationPropertyKind::ManyToMany { unique_id } => {
-                    validate_nav_array(model, nav, model_lookup)?;
-
                     many_to_many
                         .entry(unique_id)
                         .or_default()
@@ -307,7 +180,7 @@ fn validate_fks<'a>(
             bail!(
                 "Navigation property {}.{} references {}.{} which does not exist.",
                 model_name,
-                nav.value.name,
+                nav.var_name,
                 nav_model,
                 reference
             );
@@ -319,7 +192,7 @@ fn validate_fks<'a>(
             model_name == fk_model,
             "Mismatched types between foreign key and One to Many navigation property ({}.{}) ({}.{})",
             model_name,
-            nav.value.name,
+            nav.var_name,
             nav_model,
             reference,
         );
@@ -343,10 +216,10 @@ fn validate_fks<'a>(
             .filter_map(|(&name, &deg)| (deg == 0).then_some(name))
             .collect::<VecDeque<_>>();
 
-        let mut sorted = Vec::with_capacity(models.len());
+        let mut sorted = Vec::with_capacity(model_lookup.len());
         while let Some(model_name) = queue.pop_front() {
             sorted.push(
-                *model_lookup
+                model_lookup
                     .get(model_name)
                     .expect("model names to be validated"),
             );
@@ -363,7 +236,7 @@ fn validate_fks<'a>(
             }
         }
 
-        if sorted.len() != models.len() {
+        if sorted.len() != model_lookup.len() {
             let cyclic: Vec<&str> = in_degree
                 .iter()
                 .filter_map(|(&n, &d)| (d > 0).then_some(n))
@@ -398,13 +271,12 @@ struct ModelTree<'a> {
 /// - Invalid data source reference
 /// - Unknown model
 fn validate_data_sources<'a>(
-    models: &'a [Model],
-    model_lookup: &HashMap<&str, &'a Model>,
+    model_lookup: &'a BTreeMap<String, Model>,
 ) -> Result<Vec<ModelTree<'a>>> {
     let mut model_trees = vec![];
 
-    for model in models {
-        for ds in &model.data_sources {
+    for model in model_lookup.values() {
+        for ds in model.data_sources.values() {
             let mut alias_counter = HashMap::<String, u32>::new();
 
             let tree =
@@ -424,7 +296,7 @@ fn validate_data_sources<'a>(
         model: &'a Model,
         transition: Option<NavigationPropertyKind>,
         include_tree: &IncludeTree,
-        model_lookup: &HashMap<&str, &'a Model>,
+        model_lookup: &'a BTreeMap<String, Model>,
         alias_counter: &mut HashMap<String, u32>,
     ) -> Result<ModelTreeNode<'a>> {
         let alias = generate_alias(&model.name, alias_counter);
@@ -436,33 +308,20 @@ fn validate_data_sources<'a>(
             children: vec![],
         };
 
-        for (value, child_tree) in &include_tree.0 {
-            // Validate cidl type
-            let nav_model_name = match &value.cidl_type {
-                CidlType::Model(m) => m,
-                CidlType::Array(inner) => {
-                    if let CidlType::Model(m) = &**inner {
-                        m
-                    } else {
-                        bail!("Data Sources must be composed of model references")
-                    }
-                }
-                _ => bail!("Data Sources must be composed of model references"),
-            };
-
+        for (var_name, child_tree) in &include_tree.0 {
             // Referenced attribute must exist
             let Some(nav) = model
                 .navigation_properties
                 .iter()
-                .find(|nav| nav.value.name == value.name && nav.value.cidl_type == value.cidl_type)
+                .find(|nav| nav.var_name == *var_name)
             else {
-                bail!("Invalid reference {}.{}", model.name, value.name)
+                bail!("Invalid reference {}.{}", model.name, var_name)
             };
 
             // Validate model exists
             let child_model = model_lookup
-                .get(nav_model_name.as_str())
-                .ok_or(anyhow!("Unknown model reference {}", nav_model_name))?;
+                .get(nav.model_name.as_str())
+                .expect("model names to be validated");
 
             let child_node = dfs(
                 child_model,
@@ -494,7 +353,7 @@ fn validate_data_sources<'a>(
 fn generate_tables(
     sorted_models: &[&Model],
     many_to_many_tables: Vec<JunctionTable>,
-    model_lookup: &HashMap<&str, &Model>,
+    model_lookup: &BTreeMap<String, Model>,
 ) -> Vec<String> {
     let mut res = Vec::new();
     for &model in sorted_models {
@@ -669,12 +528,11 @@ fn generate_views(model_tree: Vec<ModelTree>) -> Vec<String> {
 
 /// Validates the Model AST, producing an equivalent sql schema of
 /// tables and views
-pub fn generate_sql(models: &[Model]) -> Result<String> {
-    let model_lookup = validate_models(models)?;
-    let (sorted_models, many_to_many_tables) = validate_fks(models, &model_lookup)?;
-    let model_tree = validate_data_sources(models, &model_lookup)?;
+pub fn generate_sql(model_lookup: &BTreeMap<String, Model>) -> Result<String> {
+    let (sorted_models, many_to_many_tables) = validate_fks(model_lookup)?;
+    let model_tree = validate_data_sources(model_lookup)?;
 
-    let tables = generate_tables(&sorted_models, many_to_many_tables, &model_lookup);
+    let tables = generate_tables(&sorted_models, many_to_many_tables, model_lookup);
     let views = generate_views(model_tree);
 
     Ok(format!("{}\n{}", tables.join("\n"), views.join("\n")))

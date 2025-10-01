@@ -1,17 +1,17 @@
 use std::path::PathBuf;
 
 use anyhow::{Context, Result};
-use common::{CidlSpec, wrangler::WranglerFormat};
+use common::{CloesceAst, wrangler::WranglerFormat};
 use insta::assert_snapshot;
 use workers::WorkersGenerator;
 
 #[test]
 fn test_generate_sql_from_cidl() -> Result<()> {
     // Arrange
-    let cidl = {
+    let ast = {
         let cidl_path = PathBuf::from("../../test_fixtures/cidl.json");
         let cidl_contents = std::fs::read_to_string(cidl_path)?;
-        serde_json::from_str::<CidlSpec>(&cidl_contents)?
+        serde_json::from_str::<CloesceAst>(&cidl_contents)?
     };
 
     let wrangler = {
@@ -23,7 +23,7 @@ fn test_generate_sql_from_cidl() -> Result<()> {
 
     // Act
     let res = WorkersGenerator::create(
-        cidl,
+        ast,
         wrangler,
         "http://foo.com/api".into(),
         &PathBuf::from("src/models.ts"),

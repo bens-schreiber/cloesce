@@ -1,4 +1,4 @@
-use common::{CidlSpec, wrangler::WranglerFormat};
+use common::{CloesceAst, wrangler::WranglerFormat};
 use d1::D1Generator;
 
 use anyhow::Result;
@@ -38,15 +38,15 @@ fn test_serialize_wrangler_spec() {
 #[test]
 fn test_generate_empty_wrangler_snap() -> Result<()> {
     // Arrange
-    let cidl = {
+    let ast = {
         let cidl_path = PathBuf::from("../../test_fixtures/cidl.json");
         let cidl_contents = std::fs::read_to_string(cidl_path)?;
-        serde_json::from_str::<CidlSpec>(&cidl_contents)?
+        serde_json::from_str::<CloesceAst>(&cidl_contents)?
     };
 
     let wrangler = WranglerFormat::Toml(toml::from_str("").unwrap());
 
-    let d1gen = D1Generator::new(cidl, wrangler.as_spec()?);
+    let d1gen = D1Generator::new(ast, wrangler.as_spec()?);
 
     // Act
     let updated_wrangler = d1gen.wrangler();

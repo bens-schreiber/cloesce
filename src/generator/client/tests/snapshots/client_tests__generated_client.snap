@@ -2,18 +2,7 @@
 source: client/tests/client_tests.rs
 expression: client
 ---
-import { HttpResult } from "cloesce";
-
-function instantiateModelArray<T extends object>(
-  data: any,
-  ctor: { new (): T }
-): T[] {
-  if (Array.isArray(data)) {
-    return data.map((x) => instantiateModelArray(x, ctor)).flat();
-  }
-  return [Object.assign(new ctor(), data)];
-}
-
+import { HttpResult, instantiateModelArray } from "cloesce";
 
 export class Horse {
   id: number;
@@ -21,11 +10,51 @@ export class Horse {
   bio: string | null;
   likes: Like[];
 
-  static async post(
-        horse: Horse
-  ): Promise<HttpResult<Horse>> {
-    const baseUrl = `http://localhost:1000/api/Horse/post`;
+  static async divide(
+        a: number,
+        b: number,
+    dataSource: "default" | "withLikes" | null = null
+  ): Promise<HttpResult<number>> {
+    const baseUrl = new URL(`http://localhost:1000/api/Horse/divide`);
+    if (dataSource) {
+      baseUrl.searchParams.append("dataSource", dataSource);
+    }
+    baseUrl.searchParams.append('a', String(a));
+    baseUrl.searchParams.append('b', String(b));
+    const res = await fetch(baseUrl, { method: "GET" });
 
+    let raw = await res.json();
+    if (!raw.ok) {
+      return raw;
+    }
+    return raw;
+  }
+  static async get(
+        id: number,
+    dataSource: "default" | "withLikes" | null = null
+  ): Promise<HttpResult<Horse>> {
+    const baseUrl = new URL(`http://localhost:1000/api/Horse/get`);
+    if (dataSource) {
+      baseUrl.searchParams.append("dataSource", dataSource);
+    }
+    baseUrl.searchParams.append('id', String(id));
+    const res = await fetch(baseUrl, { method: "GET" });
+
+    let raw = await res.json();
+    if (!raw.ok) {
+      return raw;
+    }
+    raw.data = Object.assign(new Horse(), raw.data);
+    return raw;
+  }
+  async like(
+        horse: Horse,
+    dataSource: "default" | "withLikes" | null = null
+  ): Promise<HttpResult<void>> {
+    const baseUrl = new URL(`http://localhost:1000/api/Horse/${this.id}/like`);
+    if (dataSource) {
+      baseUrl.searchParams.append("dataSource", dataSource);
+    }
     const res = await fetch(baseUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -38,54 +67,47 @@ export class Horse {
     if (!raw.ok) {
       return raw;
     }
-
-    raw.data = Object.assign(new Horse(), raw.data)
     return raw;
-
-  }
-  static async get(
-        id: number
-  ): Promise<HttpResult<Horse>> {
-    const baseUrl = `http://localhost:1000/api/Horse/get`;
-
-    const url = new URL(baseUrl);
-    url.searchParams.append('id', String(id));
-    const res = await fetch(url.toString(), {
-      method: "GET"
-    });
-
-    let raw = await res.json();
-    if (!raw.ok) {
-      return raw;
-    }
-
-    raw.data = Object.assign(new Horse(), raw.data)
-    return raw;
-
   }
   static async list(
+    dataSource: "default" | "withLikes" | null = null
   ): Promise<HttpResult<Horse[]>> {
-    const baseUrl = `http://localhost:1000/api/Horse/list`;
-
-    const url = new URL(baseUrl);
-    const res = await fetch(url.toString(), {
-      method: "GET"
-    });
+    const baseUrl = new URL(`http://localhost:1000/api/Horse/list`);
+    if (dataSource) {
+      baseUrl.searchParams.append("dataSource", dataSource);
+    }
+    const res = await fetch(baseUrl, { method: "GET" });
 
     let raw = await res.json();
     if (!raw.ok) {
       return raw;
     }
-
-    raw.data = instantiateModelArray(raw.data, Horse)
+    raw.data = instantiateModelArray(raw.data, Horse);
     return raw;
+  }
+  static async motd(
+    dataSource: "default" | "withLikes" | null = null
+  ): Promise<HttpResult<string>> {
+    const baseUrl = new URL(`http://localhost:1000/api/Horse/motd`);
+    if (dataSource) {
+      baseUrl.searchParams.append("dataSource", dataSource);
+    }
+    const res = await fetch(baseUrl, { method: "GET" });
 
+    let raw = await res.json();
+    if (!raw.ok) {
+      return raw;
+    }
+    return raw;
   }
   async patch(
-        horse: Horse
+        horse: Horse,
+    dataSource: "default" | "withLikes" | null = null
   ): Promise<HttpResult<void>> {
-    const baseUrl = `http://localhost:1000/api/Horse/${this.id}/patch`;
-
+    const baseUrl = new URL(`http://localhost:1000/api/Horse/${this.id}/patch`);
+    if (dataSource) {
+      baseUrl.searchParams.append("dataSource", dataSource);
+    }
     const res = await fetch(baseUrl, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -98,15 +120,16 @@ export class Horse {
     if (!raw.ok) {
       return raw;
     }
-
     return raw;
-
   }
-  async like(
-        horse: Horse
-  ): Promise<HttpResult<void>> {
-    const baseUrl = `http://localhost:1000/api/Horse/${this.id}/like`;
-
+  static async post(
+        horse: Horse,
+    dataSource: "default" | "withLikes" | null = null
+  ): Promise<HttpResult<Horse>> {
+    const baseUrl = new URL(`http://localhost:1000/api/Horse/post`);
+    if (dataSource) {
+      baseUrl.searchParams.append("dataSource", dataSource);
+    }
     const res = await fetch(baseUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -119,53 +142,30 @@ export class Horse {
     if (!raw.ok) {
       return raw;
     }
-
+    raw.data = Object.assign(new Horse(), raw.data);
     return raw;
-
   }
-  static async divide(
-        a: number, 
-        b: number
-  ): Promise<HttpResult<number>> {
-    const baseUrl = `http://localhost:1000/api/Horse/divide`;
-
-    const url = new URL(baseUrl);
-    url.searchParams.append('a', String(a));
-    url.searchParams.append('b', String(b));
-    const res = await fetch(url.toString(), {
-      method: "GET"
-    });
+  async refresh(
+    dataSource: "default" | "withLikes" | null = null
+  ): Promise<HttpResult<Horse>> {
+    const baseUrl = new URL(`http://localhost:1000/api/Horse/${this.id}/refresh`);
+    if (dataSource) {
+      baseUrl.searchParams.append("dataSource", dataSource);
+    }
+    const res = await fetch(baseUrl, { method: "GET" });
 
     let raw = await res.json();
     if (!raw.ok) {
       return raw;
     }
-
+    raw.data = Object.assign(new Horse(), raw.data);
     return raw;
-
-  }
-  static async motd(
-  ): Promise<HttpResult<string>> {
-    const baseUrl = `http://localhost:1000/api/Horse/motd`;
-
-    const url = new URL(baseUrl);
-    const res = await fetch(url.toString(), {
-      method: "GET"
-    });
-
-    let raw = await res.json();
-    if (!raw.ok) {
-      return raw;
-    }
-
-    return raw;
-
   }
 }
 export class Like {
   id: number;
   horseId1: number;
   horseId2: number;
-  horse2: Horse;
+  horse2: Horse | undefined;
 
 }

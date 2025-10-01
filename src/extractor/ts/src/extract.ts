@@ -12,7 +12,7 @@ import {
 
 import {
   CidlIncludeTree,
-  CidlSpec,
+  CloesceAst,
   CidlType,
   DataSource,
   Either,
@@ -52,8 +52,8 @@ export class CidlExtractor {
     public version: string,
   ) {}
 
-  extract(project: Project): Either<string, CidlSpec> {
-    let models = [];
+  extract(project: Project): Either<string, CloesceAst> {
+    const models: Record<string, Model> = {};
     for (const sourceFile of project.getSourceFiles()) {
       for (const classDecl of sourceFile.getClasses()) {
         if (!hasDecorator(classDecl, ClassDecoratorKind.D1)) continue;
@@ -62,7 +62,7 @@ export class CidlExtractor {
         if (!result.ok) {
           return left(result.value);
         }
-        models.push(result.value);
+        models[result.value.name] = result.value;
       }
     }
 
@@ -105,8 +105,8 @@ export class CidlExtractor {
     const name = classDecl.getName() ?? "<anonymous>";
     const attributes: ModelAttribute[] = [];
     const navigationProperties: NavigationProperty[] = [];
-    const dataSources: DataSource[] = [];
-    const methods: ModelMethod[] = [];
+    const dataSources: Record<string, DataSource> = {};
+    const methods: Record<string, ModelMethod> = {};
     let primary_key: NamedTypedValue | undefined = undefined;
 
     for (const prop of classDecl.getProperties()) {
@@ -167,8 +167,16 @@ export class CidlExtractor {
             );
           }
 
+          let model_name = getModelName(cidl_type);
+          if (!model_name) {
+            return left(
+              `One to One Navigation properties must hold model types ${name}.${prop.getName()}`,
+            );
+          }
+
           navigationProperties.push({
-            value: { name: prop.getName(), cidl_type },
+            var_name: prop.getName(),
+            model_name,
             kind: { OneToOne: { reference } },
           });
           break;
@@ -181,11 +189,16 @@ export class CidlExtractor {
             );
           }
 
+          let model_name = getModelName(cidl_type);
+          if (!model_name) {
+            return left(
+              `One to Many Navigation properties must hold model types ${name}.${prop.getName()}`,
+            );
+          }
+
           navigationProperties.push({
-            value: {
-              name: prop.getName(),
-              cidl_type,
-            },
+            var_name: prop.getName(),
+            model_name,
             kind: { OneToMany: { reference } },
           });
           break;
@@ -196,11 +209,16 @@ export class CidlExtractor {
             return left(
               `Many to Many navigation properties must hold a unique table ID: ${name}.${prop.getName()}`,
             );
+
+          let model_name = getModelName(cidl_type);
+          if (!model_name) {
+            return left(
+              `Many to Many Navigation properties must hold model types ${name}.${prop.getName()}`,
+            );
+          }
           navigationProperties.push({
-            value: {
-              name: prop.getName(),
-              cidl_type,
-            },
+            var_name: prop.getName(),
+            model_name,
             kind: { ManyToMany: { unique_id } },
           });
           break;
@@ -222,7 +240,10 @@ export class CidlExtractor {
             return treeRes;
           }
 
-          dataSources.push({ name: prop.getName(), tree: treeRes.value });
+          dataSources[prop.getName()] = {
+            name: prop.getName(),
+            tree: treeRes.value,
+          };
           break;
         }
       }
@@ -238,7 +259,7 @@ export class CidlExtractor {
       if (!result.ok) {
         return left(result.value);
       }
-      methods.push(result.value);
+      methods[result.value.name] = result.value;
     }
 
     return right({
@@ -371,7 +392,7 @@ export class CidlExtractor {
       return left(`Invalid include tree.`);
     }
 
-    const result: CidlIncludeTree = [];
+    const result: CidlIncludeTree = {};
     for (const prop of expr.getProperties()) {
       if (!prop.isKind(SyntaxKind.PropertyAssignment)) continue;
 
@@ -393,15 +414,9 @@ export class CidlExtractor {
         return left(`Invalid include tree type ${cidl_type} expected Model`);
       }
 
-      const ntv: NamedTypedValue = {
-        name: navProp.getName(),
-        cidl_type,
-      };
-
       // Recurse for nested includes
       const initializer = (prop as any).getInitializer?.();
-      let nestedTree: CidlIncludeTree = [];
-
+      let nestedTree: CidlIncludeTree = {};
       if (initializer?.isKind?.(SyntaxKind.ObjectLiteralExpression)) {
         const targetModel = getModelName(cidl_type);
         const targetClass = currentClass
@@ -424,7 +439,7 @@ export class CidlExtractor {
         }
       }
 
-      result.push([ntv, nestedTree]);
+      result[navProp.getName()] = nestedTree;
     }
 
     return right(result);
