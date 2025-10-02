@@ -29,7 +29,7 @@ const makeAst = (methods: Record<string, any>): CloesceAst => ({
 const makeRequest = (url: string, method?: string, body?: any) =>
   new Request(
     url,
-    method ? { method, body: body && JSON.stringify(body) } : undefined
+    method ? { method, body: body && JSON.stringify(body) } : undefined,
   );
 
 //
@@ -42,7 +42,7 @@ describe("Router Error States", () => {
     const result = _cloesceInternal.matchRoute(
       makeRequest(url),
       makeAst({}),
-      "/api"
+      "/api",
     );
 
     expect(result.value).toStrictEqual({
@@ -171,7 +171,7 @@ describe("Validate Request Error States", () => {
         return_type: null,
         parameters: [],
       },
-      null
+      null,
     );
 
     expect(result.value).toStrictEqual({
@@ -213,7 +213,7 @@ describe("Validate Request Error States", () => {
         return_type: null,
         parameters: [],
       },
-      null
+      null,
     );
 
     expect(result.value).toStrictEqual({
@@ -259,7 +259,7 @@ describe("Validate Request Error States", () => {
         ast,
         ast.models.Horse,
         ast.models.Horse.methods.neigh,
-        "0"
+        "0",
       );
 
       expect(result.value).toStrictEqual({
@@ -267,7 +267,7 @@ describe("Validate Request Error States", () => {
         status: 400,
         message: `Invalid Request Body: ${message}.`,
       });
-    }
+    },
   );
 });
 
@@ -290,8 +290,8 @@ describe("Validate Request Success States", () => {
             ? { Nullable: i.typed_value.cidl_type }
             : i.typed_value.cidl_type,
         },
-      }))
-    )
+      })),
+    ),
   );
 
   test.each(expanded)("input is accepted %#", async (arg) => {
@@ -301,7 +301,7 @@ describe("Validate Request Success States", () => {
     const request = makeRequest(
       url,
       arg.is_get ? undefined : "POST",
-      arg.is_get ? undefined : { [arg.typed_value.name]: arg.value }
+      arg.is_get ? undefined : { [arg.typed_value.name]: arg.value },
     );
     const ast = makeAst({
       neigh: {
@@ -321,7 +321,7 @@ describe("Validate Request Success States", () => {
       ast,
       ast.models.Horse,
       ast.models.Horse.methods.neigh,
-      "0"
+      "0",
     );
 
     expect(result.value).toEqual([
@@ -401,7 +401,7 @@ describe("modelsFromSql", () => {
       baseCidl,
       constructorRegistry,
       records,
-      {}
+      {},
     );
     expect(result).toEqual([]);
   });
@@ -428,7 +428,7 @@ describe("modelsFromSql", () => {
       baseCidl,
       constructorRegistry,
       records,
-      tree
+      tree,
     );
     const horse: any = result[0];
 
@@ -436,7 +436,7 @@ describe("modelsFromSql", () => {
     expect(horse.name).toBe("Thunder");
     expect(Array.isArray(horse.riders)).toBe(true);
     expect(horse.riders.map((r: any) => r.id)).toEqual(
-      expect.arrayContaining(["r1", "r2"])
+      expect.arrayContaining(["r1", "r2"]),
     );
   });
 
@@ -447,7 +447,7 @@ describe("modelsFromSql", () => {
       baseCidl,
       constructorRegistry,
       records,
-      {}
+      {},
     );
     const horse: any = result[0];
     expect(horse.id).toBe("1");
@@ -481,12 +481,12 @@ describe("modelsFromSql", () => {
       baseCidl,
       constructorRegistry,
       records,
-      tree
+      tree,
     );
     const horse: any = result[0];
     expect(horse.riders.length).toBe(2);
     expect(horse.riders.map((r: any) => r.id)).toEqual(
-      expect.arrayContaining(["r1", "r2"])
+      expect.arrayContaining(["r1", "r2"]),
     );
   });
 });
@@ -527,7 +527,7 @@ describe("methodDispatch", () => {
       makeInstanceRegistry(),
       envMeta,
       method,
-      params
+      params,
     );
 
     expect(instance.testMethod).toHaveBeenCalledWith();
@@ -548,7 +548,7 @@ describe("methodDispatch", () => {
       makeInstanceRegistry(),
       envMeta,
       method,
-      params
+      params,
     );
 
     expect(result).toStrictEqual({
@@ -568,7 +568,7 @@ describe("methodDispatch", () => {
       makeInstanceRegistry(),
       envMeta,
       method,
-      params
+      params,
     );
 
     expect(result).toStrictEqual({ ok: true, status: 200, data: "neigh" });
@@ -588,7 +588,7 @@ describe("methodDispatch", () => {
       ireg,
       envMeta,
       method,
-      params
+      params,
     );
 
     expect(instance.testMethod).toHaveBeenCalledWith(ireg.get("Env"));
@@ -609,7 +609,7 @@ describe("methodDispatch", () => {
       makeInstanceRegistry(),
       envMeta,
       method,
-      params
+      params,
     );
 
     expect(result).toStrictEqual({
@@ -633,7 +633,7 @@ describe("methodDispatch", () => {
       makeInstanceRegistry(),
       envMeta,
       method,
-      params
+      params,
     );
 
     expect(result).toStrictEqual({

@@ -39,7 +39,7 @@ export type IncludeTree<T> = T extends Primitive
 // Helpers
 export function instantiateModelArray<T extends object>(
   data: any,
-  ctor: { new (): T }
+  ctor: { new (): T },
 ): T[] {
   if (Array.isArray(data)) {
     return data.map((x) => instantiateModelArray(x, ctor)).flat();

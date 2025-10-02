@@ -27,7 +27,7 @@ describe("POST, GET a Horse", () => {
     expect(res.ok, withRes("POST should be OK", res)).toBe(true);
     expect(
       res.data.id,
-      withRes("POST response id should match input id", res)
+      withRes("POST response id should match input id", res),
     ).toBe(roach.id);
   });
 
@@ -39,7 +39,7 @@ describe("POST, GET a Horse", () => {
     expect(res.ok, withRes("GET should be OK", res)).toBe(true);
     expect(
       horse.id,
-      withRes("GET response id should match input id", res)
+      withRes("GET response id should match input id", res),
     ).toBe(roach.id);
   });
 });

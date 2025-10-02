@@ -4,7 +4,7 @@ use similar::TextDiff;
 use std::{
     fs::{self},
     panic,
-    path::PathBuf,
+    path::{Path, PathBuf},
     process::Command,
     thread,
 };
@@ -118,14 +118,14 @@ impl Fixture {
                 .arg("run")
                 .arg("generate")
                 .arg("wrangler")
-                .arg(&tmp.path())
+                .arg(tmp.path())
                 .current_dir("../../src/generator"),
             "Cargo run generate wrangler failed",
         );
         Self::read_temp_and_diff(&self.path, tmp)
     }
 
-    fn generate_d1(&self, cidl: &PathBuf) -> bool {
+    fn generate_d1(&self, cidl: &Path) -> bool {
         let cidl_path = cidl.canonicalize().unwrap();
         let tmp_sqlite = TempFile::new(&self.path.join("migrations"), "migrations.sql");
 
@@ -135,7 +135,7 @@ impl Fixture {
                 .arg("generate")
                 .arg("d1")
                 .arg(&cidl_path)
-                .arg(&tmp_sqlite.path())
+                .arg(tmp_sqlite.path())
                 .current_dir("../../src/generator"),
             "Cargo run generate d1 failed",
         );
@@ -143,7 +143,7 @@ impl Fixture {
         Self::read_temp_and_diff(&self.path.join("migrations"), tmp_sqlite).0
     }
 
-    fn generate_workers(&self, cidl: &PathBuf, wrangler: &PathBuf) -> bool {
+    fn generate_workers(&self, cidl: &Path, wrangler: &Path) -> bool {
         let cidl_path = cidl.canonicalize().unwrap();
         let wrangler_path = wrangler.canonicalize().unwrap();
         let tmp_workers = TempFile::new(&self.path, "workers.ts");
@@ -154,7 +154,7 @@ impl Fixture {
                 .arg("generate")
                 .arg("workers")
                 .arg(&cidl_path)
-                .arg(&tmp_workers.path())
+                .arg(tmp_workers.path())
                 .arg(&wrangler_path)
                 .arg(DOMAIN)
                 .current_dir("../../src/generator"),
@@ -164,7 +164,7 @@ impl Fixture {
         Self::read_temp_and_diff(&self.path, tmp_workers).0
     }
 
-    fn generate_client(&self, cidl: &PathBuf) -> bool {
+    fn generate_client(&self, cidl: &Path) -> bool {
         let cidl_path = cidl.canonicalize().unwrap();
         let tmp = TempFile::new(&self.path, "client.ts");
 
@@ -174,7 +174,7 @@ impl Fixture {
                 .arg("generate")
                 .arg("client")
                 .arg(&cidl_path)
-                .arg(&tmp.path())
+                .arg(tmp.path())
                 .arg(DOMAIN)
                 .current_dir("../../src/generator"),
             "Cargo run generate client failed",
@@ -192,7 +192,7 @@ impl Fixture {
         }
     }
 
-    fn read_temp_and_diff(path: &PathBuf, tmp: TempFile) -> (bool, PathBuf) {
+    fn read_temp_and_diff(path: &Path, tmp: TempFile) -> (bool, PathBuf) {
         let contents = fs::read(&tmp.path).expect("temp file to be readable");
         diff_file(
             path,
@@ -205,7 +205,7 @@ impl Fixture {
 /// Compares unified file diffs, creating a `.new` snapshot file if a diff is found
 ///
 /// Returns if a `.new` file created
-fn diff_file(fixture_path: &PathBuf, name: &str, new_contents: String) -> (bool, PathBuf) {
+fn diff_file(fixture_path: &Path, name: &str, new_contents: String) -> (bool, PathBuf) {
     let old_path = fixture_path.join(name);
     let new_path = old_path.with_file_name(format!(
         "snap___{}",

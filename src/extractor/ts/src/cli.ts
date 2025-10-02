@@ -103,7 +103,7 @@ function findCloesceFiles(root: string, searchPaths: string[]): string[] {
 
     if (!fs.existsSync(fullPath)) {
       console.warn(
-        `Warning: Path "${searchPath}" specified in cloesce-config.json does not exist`
+        `Warning: Path "${searchPath}" specified in cloesce-config.json does not exist`,
       );
       continue;
     }
