@@ -4,7 +4,7 @@
     "language": "TypeScript",
     "wrangler_env": {
         "name": "Env",
-        "source_path": "/Users/benjaminschreiber/projects/cloesce/tests/fixtures/horse_tinder/horse_tinder.cloesce.ts"
+        "source_path": "./horse_tinder.cloesce.ts"
     },
     "models": {
         "Horse": {
@@ -140,7 +140,7 @@
                     }
                 }
             },
-            "source_path": "/Users/benjaminschreiber/projects/cloesce/tests/fixtures/horse_tinder/horse_tinder.cloesce.ts"
+            "source_path": "./horse_tinder.cloesce.ts"
         },
         "Like": {
             "name": "Like",
@@ -177,7 +177,7 @@
             ],
             "methods": {},
             "data_sources": {},
-            "source_path": "/Users/benjaminschreiber/projects/cloesce/tests/fixtures/horse_tinder/horse_tinder.cloesce.ts"
+            "source_path": "./horse_tinder.cloesce.ts"
         }
     }
 }

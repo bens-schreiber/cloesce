@@ -134,7 +134,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: src/e2e
+        working-directory: tests/e2e
     steps:
       - name: Checkout code
         uses: actions/checkout@v4

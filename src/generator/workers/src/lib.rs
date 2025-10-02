@@ -70,10 +70,11 @@ impl WorkersGenerator {
         let models = models
             .values()
             .map(|m| {
-                rel_path(&m.source_path, workers_dir)
-                    .map(|p| format!("import {{ {} }} from \"{}\";", m.name, p))
+                let p = rel_path(&m.source_path, workers_dir)
+                    .unwrap_or_else(|_| m.source_path.clone().to_string_lossy().to_string());
+                format!("import {{ {} }} from \"{}\";", m.name, p)
             })
-            .collect::<Result<Vec<_>>>()?
+            .collect::<Vec<_>>()
             .join("\n");
 
         Ok(models)

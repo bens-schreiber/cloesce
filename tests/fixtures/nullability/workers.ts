@@ -1,7 +1,7 @@
 
 import { cloesce } from "cloesce";
 import cidl from "./cidl.json";
-import { NullabilityChecks } from "./nullability.cloesce";
+import { NullabilityChecks } from "./nullability.cloesce.ts";
 
 const constructorRegistry = {
 	NullabilityChecks: NullabilityChecks

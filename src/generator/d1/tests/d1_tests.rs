@@ -1,6 +1,6 @@
 use common::{
-    builder::{create_ast, ModelBuilder},
     CidlType, NavigationPropertyKind,
+    builder::{ModelBuilder, create_ast},
 };
 
 macro_rules! expected_str {
@@ -37,11 +37,13 @@ fn test_sqlite_table_output() {
     // Primary key, Basic attributes
     {
         // Arrange
-        let ast = create_ast(vec![ModelBuilder::new("User")
-            .id() // adds a primary key
-            .attribute("name", CidlType::nullable(CidlType::Text), None)
-            .attribute("age", CidlType::Integer, None)
-            .build()]);
+        let ast = create_ast(vec![
+            ModelBuilder::new("User")
+                .id() // adds a primary key
+                .attribute("name", CidlType::nullable(CidlType::Text), None)
+                .attribute("age", CidlType::Integer, None)
+                .build(),
+        ]);
 
         // Act
         let sql = d1::generate_sql(&ast.models).expect("gen_sqlite to work");

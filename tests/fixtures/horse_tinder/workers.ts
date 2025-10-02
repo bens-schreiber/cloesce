@@ -1,8 +1,8 @@
 
 import { cloesce } from "cloesce";
 import cidl from "./cidl.json";
-import { Horse } from "./horse_tinder.cloesce";
-import { Like } from "./horse_tinder.cloesce";
+import { Horse } from "./horse_tinder.cloesce.ts";
+import { Like } from "./horse_tinder.cloesce.ts";
 
 const constructorRegistry = {
 	Horse: Horse,

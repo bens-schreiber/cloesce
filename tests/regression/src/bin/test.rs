@@ -110,7 +110,8 @@ impl Fixture {
                 .arg("--location")
                 .arg(&self.path)
                 .arg("--out")
-                .arg(&tmp.path),
+                .arg(&tmp.path)
+                .arg("--truncateSourcePaths"),
             "Node command failed",
         );
 
@@ -160,7 +161,7 @@ impl Fixture {
                 .arg("generate")
                 .arg("workers")
                 .arg(&cidl_path)
-                .arg(tmp_workers.path())
+                .arg(&tmp_workers.path())
                 .arg(&wrangler_path)
                 .arg(DOMAIN)
                 .current_dir("../../src/generator"),

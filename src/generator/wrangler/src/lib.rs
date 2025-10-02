@@ -1,7 +1,7 @@
 use std::path::Path;
 use std::{fs::File, io::Write};
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result, anyhow};
 use serde::Deserialize;
 use serde::Serialize;
 use serde_json::Value as JsonValue;

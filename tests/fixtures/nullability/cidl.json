@@ -4,7 +4,7 @@
     "language": "TypeScript",
     "wrangler_env": {
         "name": "Env",
-        "source_path": "/Users/benjaminschreiber/projects/cloesce/tests/fixtures/nullability/nullability.cloesce.ts"
+        "source_path": "./nullability.cloesce.ts"
     },
     "models": {
         "NullabilityChecks": {
@@ -149,7 +149,7 @@
                 }
             },
             "data_sources": {},
-            "source_path": "/Users/benjaminschreiber/projects/cloesce/tests/fixtures/nullability/nullability.cloesce.ts"
+            "source_path": "./nullability.cloesce.ts"
         }
     }
 }

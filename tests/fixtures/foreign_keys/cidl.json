@@ -4,7 +4,7 @@
     "language": "TypeScript",
     "wrangler_env": {
         "name": "Env",
-        "source_path": "/Users/benjaminschreiber/projects/cloesce/tests/fixtures/foreign_keys/foreign_keys.cloesce.ts"
+        "source_path": "./foreign_keys.cloesce.ts"
     },
     "models": {
         "B": {
@@ -17,7 +17,7 @@
             "navigation_properties": [],
             "methods": {},
             "data_sources": {},
-            "source_path": "/Users/benjaminschreiber/projects/cloesce/tests/fixtures/foreign_keys/foreign_keys.cloesce.ts"
+            "source_path": "./foreign_keys.cloesce.ts"
         },
         "A": {
             "name": "A",
@@ -90,7 +90,7 @@
                     "tree": {}
                 }
             },
-            "source_path": "/Users/benjaminschreiber/projects/cloesce/tests/fixtures/foreign_keys/foreign_keys.cloesce.ts"
+            "source_path": "./foreign_keys.cloesce.ts"
         },
         "Person": {
             "name": "Person",
@@ -151,7 +151,7 @@
                     }
                 }
             },
-            "source_path": "/Users/benjaminschreiber/projects/cloesce/tests/fixtures/foreign_keys/foreign_keys.cloesce.ts"
+            "source_path": "./foreign_keys.cloesce.ts"
         },
         "Dog": {
             "name": "Dog",
@@ -171,7 +171,7 @@
             "navigation_properties": [],
             "methods": {},
             "data_sources": {},
-            "source_path": "/Users/benjaminschreiber/projects/cloesce/tests/fixtures/foreign_keys/foreign_keys.cloesce.ts"
+            "source_path": "./foreign_keys.cloesce.ts"
         },
         "Student": {
             "name": "Student",
@@ -244,7 +244,7 @@
                     }
                 }
             },
-            "source_path": "/Users/benjaminschreiber/projects/cloesce/tests/fixtures/foreign_keys/foreign_keys.cloesce.ts"
+            "source_path": "./foreign_keys.cloesce.ts"
         },
         "Course": {
             "name": "Course",
@@ -266,7 +266,7 @@
             ],
             "methods": {},
             "data_sources": {},
-            "source_path": "/Users/benjaminschreiber/projects/cloesce/tests/fixtures/foreign_keys/foreign_keys.cloesce.ts"
+            "source_path": "./foreign_keys.cloesce.ts"
         }
     }
 }

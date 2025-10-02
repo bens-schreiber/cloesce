@@ -1,6 +1,15 @@
 import fs from "node:fs";
 import path from "node:path";
-import { command, run, option, string, optional, subcommands } from "cmd-ts";
+import {
+  command,
+  run,
+  option,
+  string,
+  optional,
+  subcommands,
+  boolean,
+  flag,
+} from "cmd-ts";
 import { CidlExtractor } from "./extract.js";
 import { Project } from "ts-morph";
 
@@ -10,15 +19,17 @@ const cli = command({
   args: {
     projectName: option({
       long: "project-name",
-      short: "p",
       type: optional(string),
       description: "Project name",
     }),
     out: option({
       long: "out",
-      short: "o",
       type: optional(string),
       description: "Output path (default: <project>/.generated/cidl.json)",
+    }),
+    truncateSourcePaths: flag({
+      long: "truncateSourcePaths",
+      description: "Sets all source paths to just their file name",
     }),
     location: option({
       long: "location",
@@ -27,8 +38,13 @@ const cli = command({
       description: "Project directory (default: cwd)",
     }),
   },
-  handler: async ({ projectName, out, location }) => {
-    await runExtractor({ projectName, out, location });
+  handler: async ({ projectName, out, location, truncateSourcePaths }) => {
+    await runExtractor({
+      projectName,
+      out,
+      location,
+      truncateSourcePaths: truncateSourcePaths,
+    });
   },
 });
 
@@ -36,11 +52,12 @@ async function runExtractor({
   projectName,
   out,
   location,
+  truncateSourcePaths,
 }: {
   projectName?: string;
   out?: string;
-  printOnly?: boolean;
   location?: string;
+  truncateSourcePaths?: boolean;
 }) {
   const baseDir = location ? path.resolve(location) : process.cwd();
   const projectRoot = findProjectRoot(baseDir);
@@ -62,6 +79,15 @@ async function runExtractor({
     const result = extractor.extract(project);
     if (!result.ok) {
       throw new Error(result.value);
+    }
+    const ast = result.value;
+
+    if (truncateSourcePaths) {
+      ast.wrangler_env.source_path =
+        "./" + path.basename(ast.wrangler_env.source_path);
+      for (const model of Object.values(ast.models)) {
+        model.source_path = "./" + path.basename(model.source_path);
+      }
     }
 
     const json = JSON.stringify(result.value, null, 4);
@@ -103,7 +129,7 @@ function findCloesceFiles(root: string, searchPaths: string[]): string[] {
 
     if (!fs.existsSync(fullPath)) {
       console.warn(
-        `Warning: Path "${searchPath}" specified in cloesce-config.json does not exist`,
+        `Warning: Path "${searchPath}" specified in cloesce-config.json does not exist`
       );
       continue;
     }
