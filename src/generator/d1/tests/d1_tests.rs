@@ -1,6 +1,6 @@
 use common::{
+    builder::{create_ast, ModelBuilder},
     CidlType, NavigationPropertyKind,
-    builder::{ModelBuilder, create_ast},
 };
 
 macro_rules! expected_str {
@@ -37,13 +37,11 @@ fn test_sqlite_table_output() {
     // Primary key, Basic attributes
     {
         // Arrange
-        let ast = create_ast(vec![
-            ModelBuilder::new("User")
-                .id() // adds a primary key
-                .attribute("name", CidlType::nullable(CidlType::Text), None)
-                .attribute("age", CidlType::Integer, None)
-                .build(),
-        ]);
+        let ast = create_ast(vec![ModelBuilder::new("User")
+            .id() // adds a primary key
+            .attribute("name", CidlType::nullable(CidlType::Text), None)
+            .attribute("age", CidlType::Integer, None)
+            .build()]);
 
         // Act
         let sql = d1::generate_sql(&ast.models).expect("gen_sqlite to work");
@@ -299,7 +297,7 @@ fn test_one_to_one_nav_property_unknown_attribute_reference_error() {
     // Assert
     expected_str!(
         err,
-        "Navigation property Person.dog references Dog.dogId which does not exist."
+        "Navigation property Person.dog references Dog.dogId which does not exist or is not a foreign key to Person"
     );
 }
 
@@ -356,7 +354,7 @@ fn test_one_to_many_unresolved_reference_error() {
     // Assert
     expected_str!(
         err,
-        "Navigation property Person.dogs references Dog.personId which does not exist."
+        "Navigation property Person.dogs references Dog.personId which does not exist or is not a foreign key to Person"
     );
 }
 

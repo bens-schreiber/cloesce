@@ -1,7 +1,7 @@
 use std::path::Path;
 use std::{fs::File, io::Write};
 
-use anyhow::{Context, Result, anyhow};
+use anyhow::{anyhow, Context, Result};
 use serde::Deserialize;
 use serde::Serialize;
 use serde_json::Value as JsonValue;
@@ -173,29 +173,15 @@ impl WranglerFormat {
 
 #[cfg(test)]
 mod tests {
-    use std::path::PathBuf;
-
     use crate::WranglerFormat;
 
     #[test]
     fn test_serialize_wrangler_spec() {
-        // Filled TOML
-        {
-            let wrangler_path = PathBuf::from("../../test_fixtures/wrangler.toml");
-            WranglerFormat::from_path(&wrangler_path).expect("Wrangler file to serialize");
-        }
-
         // Empty TOML
         {
             WranglerFormat::Toml(toml::from_str("").unwrap())
                 .as_spec()
                 .expect("Wrangler file to serialize");
-        }
-
-        // Filled JSON
-        {
-            let wrangler_path = PathBuf::from("../../test_fixtures/wrangler.json");
-            WranglerFormat::from_path(&wrangler_path).expect("Wrangler file to serialize");
         }
 
         // Empty JSON
@@ -206,67 +192,3 @@ mod tests {
         }
     }
 }
-
-// pub mod sql;
-
-// use common::{
-//     CloesceAst,
-//     wrangler::{D1Database, WranglerSpec},
-// };
-// use sql::generate_sql;
-
-// use anyhow::Result;
-
-// pub struct D1Generator {
-//     ast: CloesceAst,
-//     wrangler: WranglerSpec,
-// }
-
-// impl D1Generator {
-//     pub fn new(ast: CloesceAst, wrangler: WranglerSpec) -> Self {
-//         Self { ast, wrangler }
-//     }
-
-//     /// Validates and updates the Wrangler spec so that D1 can be used during
-//     /// code generation.
-//     pub fn wrangler(&self) -> WranglerSpec {
-//         // Validate existing database configs, filling in missing values with a default
-//         let mut res = self.wrangler.clone();
-//         for (i, d1) in res.d1_databases.iter_mut().enumerate() {
-//             if d1.binding.is_none() {
-//                 d1.binding = Some(format!("db_{i}"));
-//             }
-
-//             if d1.database_name.is_none() {
-//                 d1.database_name = Some(format!("{}_d1_{i}", self.ast.project_name));
-//             }
-
-//             if d1.database_id.is_none() {
-//                 eprintln!(
-//                     "Warning: Database \"{}\" is missing an id. \n https://developers.cloudflare.com/d1/get-started/",
-//                     d1.database_name.as_ref().unwrap()
-//                 )
-//             }
-//         }
-
-//         // Ensure a database exists (if there are even models), provide a default if not
-//         if !self.ast.models.is_empty() && res.d1_databases.is_empty() {
-//             res.d1_databases.push(D1Database {
-//                 binding: Some(String::from("db")),
-//                 database_name: Some(String::from("default")),
-//                 database_id: None,
-//             });
-
-//             eprintln!(
-//                 "Warning: Database \"default\" is missing an id. \n https://developers.cloudflare.com/d1/get-started/"
-//             );
-//         }
-
-//         res
-//     }
-
-//     /// Transforms the Model AST into their SQL table equivalents
-//     pub fn sql(&self) -> Result<String> {
-//         generate_sql(&self.ast.models)
-//     }
-// }

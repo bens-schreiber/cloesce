@@ -21,7 +21,8 @@
     "test:update": "UPDATE_SNAPSHOTS=1 vitest",
     "format:fix": "prettier --write .",
     "format": "prettier --check .",
-    "build": "tsc -p tsconfig.json"
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "cmd-ts": "^0.14.1",
