@@ -49,7 +49,7 @@ enum ParameterDecoratorKind {
 export class CidlExtractor {
   constructor(
     public projectName: string,
-    public version: string,
+    public version: string
   ) {}
 
   extract(project: Project): Either<string, CloesceAst> {
@@ -72,7 +72,7 @@ export class CidlExtractor {
         return sourceFile
           .getClasses()
           .filter((classDecl) =>
-            hasDecorator(classDecl, ClassDecoratorKind.WranglerEnv),
+            hasDecorator(classDecl, ClassDecoratorKind.WranglerEnv)
           )
           .map((classDecl) => {
             return {
@@ -100,7 +100,7 @@ export class CidlExtractor {
 
   private static model(
     classDecl: ClassDeclaration,
-    sourceFile: SourceFile,
+    sourceFile: SourceFile
   ): Either<string, Model> {
     const name = classDecl.getName() ?? "<anonymous>";
     const attributes: ModelAttribute[] = [];
@@ -163,14 +163,14 @@ export class CidlExtractor {
           const reference = getDecoratorArgument(decorator, 0);
           if (!reference) {
             return left(
-              `One to One navigation properties must hold a model type ${name}.${prop.getName()}`,
+              `One to One navigation properties must hold a model type ${name}.${prop.getName()}`
             );
           }
 
           let model_name = getModelName(cidl_type);
           if (!model_name) {
             return left(
-              `One to One Navigation properties must hold model types ${name}.${prop.getName()}`,
+              `One to One Navigation properties must hold model types ${name}.${prop.getName()}`
             );
           }
 
@@ -185,14 +185,14 @@ export class CidlExtractor {
           const reference = getDecoratorArgument(decorator, 0);
           if (!reference) {
             return left(
-              `One to Many navigation properties must hold an attribute reference ${name}.${prop.getName()}`,
+              `One to Many navigation properties must hold an attribute reference ${name}.${prop.getName()}`
             );
           }
 
           let model_name = getModelName(cidl_type);
           if (!model_name) {
             return left(
-              `One to Many Navigation properties must hold model types ${name}.${prop.getName()}`,
+              `One to Many Navigation properties must hold model types ${name}.${prop.getName()}`
             );
           }
 
@@ -207,13 +207,13 @@ export class CidlExtractor {
           const unique_id = getDecoratorArgument(decorator, 0);
           if (!unique_id)
             return left(
-              `Many to Many navigation properties must hold a unique table ID: ${name}.${prop.getName()}`,
+              `Many to Many navigation properties must hold a unique table ID: ${name}.${prop.getName()}`
             );
 
           let model_name = getModelName(cidl_type);
           if (!model_name) {
             return left(
-              `Many to Many Navigation properties must hold model types ${name}.${prop.getName()}`,
+              `Many to Many Navigation properties must hold model types ${name}.${prop.getName()}`
             );
           }
           navigationProperties.push({
@@ -227,14 +227,14 @@ export class CidlExtractor {
           const initializer = prop.getInitializer();
           if (!initializer) {
             return left(
-              `Invalid Data Source initializer on model ${name}.${prop.getName()}`,
+              `Invalid Data Source initializer on model ${name}.${prop.getName()}`
             );
           }
 
           const treeRes = CidlExtractor.includeTree(
             initializer,
             classDecl,
-            sourceFile,
+            sourceFile
           );
           if (!treeRes.ok) {
             return treeRes;
@@ -285,7 +285,7 @@ export class CidlExtractor {
 
   private static cidlType(
     type: Type,
-    inject: boolean = false,
+    inject: boolean = false
   ): Either<string, CidlType> {
     // Void
     if (type.isVoid()) {
@@ -300,75 +300,71 @@ export class CidlExtractor {
     // Nullable via union
     const [unwrappedType, nullable] = unwrapNullable(type);
 
-    // Primitives
     const tyText = unwrappedType
       .getText(undefined, TypeFormatFlags.UseAliasDefinedOutsideCurrentScope)
       .split("|")[0]
-      .trim(); // trim `| null` if there
-    if (this.primTypeMap[tyText]) {
-      return right(
-        nullable
-          ? { Nullable: this.primTypeMap[tyText] }
-          : this.primTypeMap[tyText],
-      );
+      .trim();
+
+    // Primitives
+    const prim = this.primTypeMap[tyText];
+    if (prim) {
+      return right(wrapNullable(prim, nullable));
     }
 
     const generics = [
       ...unwrappedType.getAliasTypeArguments(),
       ...unwrappedType.getTypeArguments(),
     ];
+
     if (generics.length > 1) {
       return left("Multiple generics are not yet supported");
     }
 
-    if (generics.length < 1) {
-      // Inject
-      if (inject) {
-        return right({ Inject: tyText });
-      }
-
-      // Model
-      return right({ Model: tyText });
+    // No generics -> inject or model
+    if (generics.length === 0) {
+      const base = inject ? { Inject: tyText } : { Model: tyText };
+      return right(wrapNullable(base, nullable));
     }
 
+    // Single generic
     const genericTy = generics[0];
+    const symbolName = unwrappedType.getSymbol()?.getName();
+    const aliasName = unwrappedType.getAliasSymbol()?.getName();
 
-    // Promise (ignore)
-    if (unwrappedType.getSymbol()?.getName() === "Promise") {
-      return res(genericTy, nullable, (inner) => inner);
+    if (symbolName === "Promise" || aliasName === "IncludeTree") {
+      return wrapGeneric(genericTy, nullable, (inner) => inner);
     }
 
-    // Array
     if (unwrappedType.isArray()) {
-      return res(genericTy, nullable, (inner) => ({
-        Array: inner,
+      return wrapGeneric(genericTy, nullable, (inner) => ({ Array: inner }));
+    }
+
+    if (aliasName === "HttpResult") {
+      return wrapGeneric(genericTy, nullable, (inner) => ({
+        HttpResult: inner,
       }));
-    }
-
-    // HttpResult
-    if (unwrappedType.getAliasSymbol()?.getName() === "HttpResult") {
-      return res(genericTy, nullable, (inner) => ({ HttpResult: inner }));
-    }
-
-    // IncludeTree (ignore)
-    if (unwrappedType.getAliasSymbol()?.getName() === "IncludeTree") {
-      return res(genericTy, nullable, (inner) => inner);
     }
 
     return left(`Unknown symbol ${tyText}`);
 
-    function res(
+    function wrapNullable(inner: CidlType, isNullable: boolean): CidlType {
+      if (isNullable) {
+        return { Nullable: inner };
+      } else {
+        return inner;
+      }
+    }
+
+    function wrapGeneric(
       t: Type,
-      nullable: boolean,
-      wrapper: (inner: CidlType) => CidlType,
+      isNullable: boolean,
+      wrapper: (inner: CidlType) => CidlType
     ): Either<string, CidlType> {
       const res = CidlExtractor.cidlType(t, inject);
       if (!res.ok) {
         return res;
       }
-      return right(
-        nullable ? { Nullable: wrapper(res.value) } : wrapper(res.value),
-      );
+      return right(wrapNullable(wrapper(res.value), isNullable));
     }
 
     function unwrapNullable(ty: Type): [Type, boolean] {
@@ -386,7 +382,7 @@ export class CidlExtractor {
   private static includeTree(
     expr: Expression,
     currentClass: ClassDeclaration,
-    sf: SourceFile,
+    sf: SourceFile
   ): Either<string, CidlIncludeTree> {
     if (!expr.isKind || !expr.isKind(SyntaxKind.ObjectLiteralExpression)) {
       return left(`Invalid include tree.`);
@@ -399,7 +395,7 @@ export class CidlExtractor {
       const navProp = findPropertyByName(currentClass, prop.getName());
       if (!navProp) {
         console.log(
-          `  Warning: Could not find property "${prop.getName()}" in class ${currentClass.getName()}`,
+          `  Warning: Could not find property "${prop.getName()}" in class ${currentClass.getName()}`
         );
         continue;
       }
@@ -430,7 +426,7 @@ export class CidlExtractor {
           const treeRes = CidlExtractor.includeTree(
             initializer,
             targetClass,
-            sf,
+            sf
           );
           if (!treeRes.ok) {
             return treeRes;
@@ -446,13 +442,13 @@ export class CidlExtractor {
   }
 
   private static method(
-    method: MethodDeclaration,
+    method: MethodDeclaration
   ): Either<string, ModelMethod> {
     const decorators = method.getDecorators();
     const decoratorNames = decorators.map((d) => getDecoratorName(d));
 
     const httpVerb = decoratorNames.find((name) =>
-      Object.values(HttpVerb).includes(name as HttpVerb),
+      Object.values(HttpVerb).includes(name as HttpVerb)
     ) as HttpVerb;
 
     const parameters: NamedTypedValue[] = [];
@@ -507,7 +503,7 @@ function getDecoratorName(decorator: Decorator): string {
 
 function getDecoratorArgument(
   decorator: Decorator,
-  index: number,
+  index: number
 ): string | undefined {
   const args = decorator.getArguments();
   if (!args[index]) return undefined;
@@ -544,7 +540,7 @@ function getModelName(t: CidlType): string | undefined {
 
 function findPropertyByName(
   cls: ClassDeclaration,
-  name: string,
+  name: string
 ): PropertyDeclaration | undefined {
   const exactMatch = cls.getProperties().find((p) => p.getName() === name);
   return exactMatch;
@@ -552,7 +548,7 @@ function findPropertyByName(
 
 function hasDecorator(
   node: { getDecorators(): Decorator[] },
-  name: string,
+  name: string
 ): boolean {
   return node.getDecorators().some((d) => {
     const decoratorName = getDecoratorName(d);

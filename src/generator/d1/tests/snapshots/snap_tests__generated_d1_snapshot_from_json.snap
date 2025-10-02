@@ -1,8 +1,0 @@
----
-source: d1/tests/snap_tests.rs
-expression: generated_sqlite
----
-CREATE TABLE "Horse" ( "id" integer PRIMARY KEY, "name" text NOT NULL, "bio" text );
-CREATE TABLE "Like" ( "id" integer PRIMARY KEY, "horseId1" integer NOT NULL, "horseId2" integer NOT NULL, FOREIGN KEY ("horseId1") REFERENCES "Horse" ("id") ON DELETE RESTRICT ON UPDATE CASCADE, FOREIGN KEY ("horseId2") REFERENCES "Horse" ("id") ON DELETE RESTRICT ON UPDATE CASCADE );
-CREATE VIEW "Horse_default" AS SELECT "Horse"."id" AS "Horse_id", "Horse"."name" AS "Horse_name", "Horse"."bio" AS "Horse_bio", "Like"."id" AS "Like_id", "Like"."horseId1" AS "Like_horseId1", "Like"."horseId2" AS "Like_horseId2", "Horse_1"."id" AS "Horse_1_id", "Horse_1"."name" AS "Horse_1_name", "Horse_1"."bio" AS "Horse_1_bio" FROM "Horse" LEFT JOIN "Like" ON "Horse"."id" = "Like"."horseId1" LEFT JOIN "Horse" AS "Horse_1" ON "Like"."horseId2" = "Horse_1"."id";
-CREATE VIEW "Horse_withLikes" AS SELECT "Horse"."id" AS "Horse_id", "Horse"."name" AS "Horse_name", "Horse"."bio" AS "Horse_bio", "Like"."id" AS "Like_id", "Like"."horseId1" AS "Like_horseId1", "Like"."horseId2" AS "Like_horseId2" FROM "Horse" LEFT JOIN "Like" ON "Horse"."id" = "Like"."horseId1";

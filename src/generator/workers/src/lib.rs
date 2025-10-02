@@ -1,8 +1,9 @@
 use std::{collections::BTreeMap, path::Path};
 
-use common::{CloesceAst, Model, WranglerEnv, wrangler::WranglerSpec};
+use common::{CloesceAst, Model, WranglerEnv};
 
 use anyhow::{Context, Result, anyhow};
+use wrangler::WranglerSpec;
 
 pub struct WorkersGenerator;
 impl WorkersGenerator {
@@ -127,7 +128,7 @@ impl WorkersGenerator {
         Ok(format!(
             r#"
 import {{ cloesce }} from "cloesce";
-import cidl from "./cidl.json" with {{ type: "json" }};
+import cidl from "./cidl.json";
 {model_sources}
 
 {constructor_registry}

@@ -1,0 +1,171 @@
+{
+    "version": "v0.0.2",
+    "project_name": "foreign_keys",
+    "language": "TypeScript",
+    "wrangler_env": {
+        "name": "Env",
+        "source_path": "/Users/benjaminschreiber/projects/cloesce/tests/fixtures/foreign_keys/foreign_keys.cloesce.ts"
+    },
+    "models": {
+        "B": {
+            "name": "B",
+            "attributes": [],
+            "primary_key": {
+                "name": "id",
+                "cidl_type": "Integer"
+            },
+            "navigation_properties": [],
+            "methods": {},
+            "data_sources": {},
+            "source_path": "/Users/benjaminschreiber/projects/cloesce/tests/fixtures/foreign_keys/foreign_keys.cloesce.ts"
+        },
+        "A": {
+            "name": "A",
+            "attributes": [
+                {
+                    "foreign_key_reference": "B",
+                    "value": {
+                        "name": "bId",
+                        "cidl_type": "Integer"
+                    }
+                }
+            ],
+            "primary_key": {
+                "name": "id",
+                "cidl_type": "Integer"
+            },
+            "navigation_properties": [
+                {
+                    "var_name": "b",
+                    "model_name": "B",
+                    "kind": {
+                        "OneToOne": {
+                            "reference": "bId"
+                        }
+                    }
+                }
+            ],
+            "methods": {},
+            "data_sources": {
+                "default": {
+                    "name": "default",
+                    "tree": {
+                        "b": {}
+                    }
+                }
+            },
+            "source_path": "/Users/benjaminschreiber/projects/cloesce/tests/fixtures/foreign_keys/foreign_keys.cloesce.ts"
+        },
+        "Person": {
+            "name": "Person",
+            "attributes": [],
+            "primary_key": {
+                "name": "id",
+                "cidl_type": "Integer"
+            },
+            "navigation_properties": [
+                {
+                    "var_name": "dogs",
+                    "model_name": "Dog",
+                    "kind": {
+                        "OneToMany": {
+                            "reference": "personId"
+                        }
+                    }
+                }
+            ],
+            "methods": {},
+            "data_sources": {
+                "default": {
+                    "name": "default",
+                    "tree": {
+                        "dogs": {}
+                    }
+                }
+            },
+            "source_path": "/Users/benjaminschreiber/projects/cloesce/tests/fixtures/foreign_keys/foreign_keys.cloesce.ts"
+        },
+        "Dog": {
+            "name": "Dog",
+            "attributes": [
+                {
+                    "foreign_key_reference": "Person",
+                    "value": {
+                        "name": "personId",
+                        "cidl_type": "Integer"
+                    }
+                }
+            ],
+            "primary_key": {
+                "name": "id",
+                "cidl_type": "Integer"
+            },
+            "navigation_properties": [],
+            "methods": {},
+            "data_sources": {},
+            "source_path": "/Users/benjaminschreiber/projects/cloesce/tests/fixtures/foreign_keys/foreign_keys.cloesce.ts"
+        },
+        "Student": {
+            "name": "Student",
+            "attributes": [],
+            "primary_key": {
+                "name": "id",
+                "cidl_type": "Integer"
+            },
+            "navigation_properties": [
+                {
+                    "var_name": "courses",
+                    "model_name": "Course",
+                    "kind": {
+                        "ManyToMany": {
+                            "unique_id": "StudentsCourses"
+                        }
+                    }
+                }
+            ],
+            "methods": {},
+            "data_sources": {
+                "default": {
+                    "name": "default",
+                    "tree": {
+                        "courses": {
+                            "students": {}
+                        }
+                    }
+                }
+            },
+            "source_path": "/Users/benjaminschreiber/projects/cloesce/tests/fixtures/foreign_keys/foreign_keys.cloesce.ts"
+        },
+        "Course": {
+            "name": "Course",
+            "attributes": [],
+            "primary_key": {
+                "name": "id",
+                "cidl_type": "Integer"
+            },
+            "navigation_properties": [
+                {
+                    "var_name": "students",
+                    "model_name": "Student",
+                    "kind": {
+                        "ManyToMany": {
+                            "unique_id": "StudentsCourses"
+                        }
+                    }
+                }
+            ],
+            "methods": {},
+            "data_sources": {
+                "default": {
+                    "name": "default",
+                    "tree": {
+                        "students": {
+                            "courses": {}
+                        }
+                    }
+                }
+            },
+            "source_path": "/Users/benjaminschreiber/projects/cloesce/tests/fixtures/foreign_keys/foreign_keys.cloesce.ts"
+        }
+    }
+}

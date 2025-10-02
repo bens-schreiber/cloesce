@@ -18,6 +18,9 @@ export const OneToMany =
 export const OneToOne =
   (_: string): PropertyDecorator =>
   () => {};
+export const ManyToMany =
+  (_: string): PropertyDecorator =>
+  () => {};
 export const ForeignKey =
   <T>(_: T): PropertyDecorator =>
   () => {};
@@ -36,7 +39,7 @@ export type IncludeTree<T> = T extends Primitive
 // Helpers
 export function instantiateModelArray<T extends object>(
   data: any,
-  ctor: { new (): T },
+  ctor: { new (): T }
 ): T[] {
   if (Array.isArray(data)) {
     return data.map((x) => instantiateModelArray(x, ctor)).flat();

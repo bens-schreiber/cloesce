@@ -1,3 +1,6 @@
+import fs from "node:fs";
+import path from "node:path";
+
 export type Either<L, R> = { ok: false; value: L } | { ok: true; value: R };
 export function left<L>(value: L): Either<L, never> {
   return { ok: false, value };
@@ -67,7 +70,7 @@ export interface NavigationProperty {
 }
 
 export function getNavigationPropertyCidlType(
-  nav: NavigationProperty,
+  nav: NavigationProperty
 ): CidlType {
   return "OneToOne" in nav.kind
     ? { Model: nav.model_name }

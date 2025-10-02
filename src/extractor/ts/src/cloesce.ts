@@ -12,6 +12,7 @@ import {
   getNavigationPropertyCidlType,
   CidlIncludeTree,
 } from "./common.js";
+import { IncludeTree } from "./index.js";
 
 /**
  * A map of model names to their respective constructor.
@@ -37,7 +38,7 @@ class MetaContainer {
   private static instance: MetaContainer | undefined;
   private constructor(
     public readonly ast: CloesceAst,
-    public readonly constructorRegistry: ModelConstructorRegistry,
+    public readonly constructorRegistry: ModelConstructorRegistry
   ) {}
 
   static init(ast: CloesceAst, constructorRegistry: ModelConstructorRegistry) {
@@ -82,9 +83,9 @@ interface MetaWranglerEnv {
  * @returns
  */
 export function modelsFromSql<T>(
-  ctor: new () => UserDefinedModel,
+  ctor: new () => T,
   records: Record<string, any>[],
-  includeTree: Record<string, UserDefinedModel>,
+  includeTree: IncludeTree<T>
 ): T[] {
   const { ast, constructorRegistry } = MetaContainer.get();
   return _modelsFromSql(
@@ -92,7 +93,7 @@ export function modelsFromSql<T>(
     ast,
     constructorRegistry,
     records,
-    includeTree,
+    includeTree
   ) as T[];
 }
 
@@ -113,7 +114,7 @@ export async function cloesce(
   constructorRegistry: ModelConstructorRegistry,
   instanceRegistry: InstanceRegistry,
   envMeta: MetaWranglerEnv,
-  api_route: string,
+  api_route: string
 ): Promise<Response> {
   MetaContainer.init(ast, constructorRegistry);
   const d1: D1Database = instanceRegistry.get(envMeta.envName)[envMeta.dbName];
@@ -143,7 +144,7 @@ export async function cloesce(
       d1,
       model,
       id!,
-      dataSource,
+      dataSource
     );
 
     if (!successfulModel.ok) {
@@ -160,8 +161,8 @@ export async function cloesce(
       instanceRegistry,
       envMeta,
       method,
-      requestParamMap,
-    ),
+      requestParamMap
+    )
   );
 }
 
@@ -173,7 +174,7 @@ export async function cloesce(
 function matchRoute(
   request: Request,
   ast: CloesceAst,
-  api_route: string,
+  api_route: string
 ): Either<HttpResult, MatchedRoute> {
   const url = new URL(request.url);
 
@@ -225,7 +226,7 @@ async function validateRequest(
   ast: CloesceAst,
   model: Model,
   method: ModelMethod,
-  id: string | null,
+  id: string | null
 ): Promise<Either<HttpResult, [RequestParamMap, string | null]>> {
   // Error state: any missing parameter, body, or malformed input will exit with 400.
   const invalid_request = (e: string) =>
@@ -243,7 +244,7 @@ async function validateRequest(
         typeof p.cidl_type === "object" &&
         p.cidl_type !== null &&
         "Inject" in p.cidl_type
-      ),
+      )
   );
 
   // Extract data source
@@ -296,7 +297,7 @@ async function hydrateModel(
   d1: D1Database,
   model: Model,
   id: string,
-  dataSource: string | null,
+  dataSource: string | null
 ): Promise<Either<HttpResult, object>> {
   // Error state: If the D1 database has been tweaked outside of Cloesce
   // resulting in a malformed query, exit with a 500.
@@ -304,8 +305,8 @@ async function hydrateModel(
     left(
       error_state(
         500,
-        `Error in hydration query, is the database out of sync with the backend?: ${e instanceof Error ? e.message : String(e)}`,
-      ),
+        `Error in hydration query, is the database out of sync with the backend?: ${e instanceof Error ? e.message : String(e)}`
+      )
     );
 
   // Error state: If no record is found for the id, return a 404
@@ -338,7 +339,7 @@ async function hydrateModel(
     ast,
     constructorRegistry,
     records.results,
-    includeTree,
+    includeTree
   );
 
   return right(models[0]);
@@ -353,13 +354,13 @@ async function methodDispatch(
   instanceRegistry: InstanceRegistry,
   envMeta: MetaWranglerEnv,
   method: ModelMethod,
-  params: Record<string, unknown>,
+  params: Record<string, unknown>
 ): Promise<HttpResult<unknown>> {
   // Error state: Client code ran into an uncaught exception.
   const uncaughtException = (e: any) =>
     error_state(
       500,
-      `Uncaught exception in method dispatch: ${e instanceof Error ? e.message : String(e)}`,
+      `Uncaught exception in method dispatch: ${e instanceof Error ? e.message : String(e)}`
     );
 
   // For now, the only injected dependency is the wrangler env,
@@ -367,7 +368,7 @@ async function methodDispatch(
   const paramArray = method.parameters.map((p) =>
     params[p.name] == undefined
       ? instanceRegistry.get(envMeta.envName)
-      : params[p.name],
+      : params[p.name]
   );
 
   // Ensure the result is always some HttpResult
@@ -395,7 +396,7 @@ async function methodDispatch(
 function validateCidlType(
   ast: CloesceAst,
   value: unknown,
-  cidlType: CidlType,
+  cidlType: CidlType
 ): boolean {
   if (value === undefined) return false;
 
@@ -433,7 +434,7 @@ function validateCidlType(
     // Validate attributes
     if (
       !model.attributes.every((attr) =>
-        validateCidlType(ast, obj[attr.value.name], attr.value.cidl_type),
+        validateCidlType(ast, obj[attr.value.name], attr.value.cidl_type)
       )
     ) {
       return false;
@@ -479,7 +480,7 @@ function _modelsFromSql(
   ast: CloesceAst,
   constructorRegistry: ModelConstructorRegistry,
   records: Record<string, any>[],
-  includeTree: Record<string, UserDefinedModel>,
+  includeTree: Record<string, UserDefinedModel>
 ): InstantiatedUserDefinedModel[] {
   if (!records.length) return [];
 
@@ -496,7 +497,7 @@ function _modelsFromSql(
   // Create all root entities with initialized arrays
   for (const row of records) {
     const isPrefixed = Object.keys(row).some((k) =>
-      k.startsWith(`${modelName}_`),
+      k.startsWith(`${modelName}_`)
     );
     const rootId = String(isPrefixed ? row[`${modelName}_id`] : row[pkName]);
 
@@ -508,7 +509,7 @@ function _modelsFromSql(
         modelMeta,
         modelMeta.primary_key.name,
         row,
-        isPrefixed,
+        isPrefixed
       );
 
       // Assign scalar attributes
@@ -517,7 +518,7 @@ function _modelsFromSql(
           modelMeta,
           attr.value.name,
           row,
-          isPrefixed,
+          isPrefixed
         );
       }
 
@@ -536,7 +537,7 @@ function _modelsFromSql(
   // Populate navigation properties
   for (const row of records) {
     const isPrefixed = Object.keys(row).some((k) =>
-      k.startsWith(`${modelName}_`),
+      k.startsWith(`${modelName}_`)
     );
     const rootId = String(isPrefixed ? row[`${modelName}_id`] : row[pkName]);
     const existing = itemsById[rootId];
@@ -570,7 +571,7 @@ function _modelsFromSql(
           navMeta,
           row,
           includeTree[navName],
-          true,
+          true
         );
 
         if (isArray) {
@@ -578,7 +579,7 @@ function _modelsFromSql(
             existing[navName],
             nestedObj,
             `${modelMeta.name}_${navName}`,
-            navModelName,
+            navModelName
           );
         } else {
           existing[navName] = nestedObj;
@@ -601,7 +602,7 @@ function _modelsFromSql(
     meta: Model,
     attrName: string,
     row: Record<string, any>,
-    prefixed: boolean,
+    prefixed: boolean
   ) {
     return row[prefixed ? `${meta.name}_${attrName}` : attrName] ?? null;
   }
@@ -625,7 +626,7 @@ function _modelsFromSql(
     meta: Model,
     row: Record<string, any>,
     tree: Record<string, any>,
-    prefixed: boolean,
+    prefixed: boolean
   ): any {
     const instance = new constructorRegistry[meta.name]();
 
@@ -634,7 +635,7 @@ function _modelsFromSql(
       meta,
       meta.primary_key.name,
       row,
-      prefixed,
+      prefixed
     );
 
     // Assign scalar attributes
@@ -677,7 +678,7 @@ function _modelsFromSql(
             instance[navName],
             nestedObj,
             `${meta.name}_${navName}`,
-            navModelName,
+            navModelName
           );
         } else {
           instance[navName] = nestedObj;
