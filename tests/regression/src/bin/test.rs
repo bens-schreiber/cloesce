@@ -6,10 +6,16 @@ use std::{
     panic,
     path::{Path, PathBuf},
     process::Command,
+    sync::OnceLock,
     thread,
 };
 
 const DOMAIN: &str = "http://localhost:5002/api";
+
+static CHECK_MODE: OnceLock<bool> = OnceLock::new();
+fn is_check_mode() -> bool {
+    *CHECK_MODE.get_or_init(|| std::env::args().any(|arg| arg == "--check"))
+}
 
 fn main() {
     let pattern = "../fixtures/*/";
@@ -240,6 +246,10 @@ fn diff_file(fixture_path: &Path, name: &str, new_contents: String) -> (bool, Pa
                 println!("\x1b[90m{}\x1b[0m", line); // gray
             }
         }
+    }
+
+    if is_check_mode() {
+        panic!("Snapshot mismatch detected at {:?}", old_path);
     }
 
     // Wrote a diff'd file or new file
