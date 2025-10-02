@@ -10,8 +10,7 @@
     "wrangler": "^4.34.0"
   },
   "scripts": {
-    "test": "vitest",
-    "test:compile": "npx tsc --noEmit --project tsconfig.json",
+    "test": "vitest run",
     "format:fix": "prettier --write .",
     "format": "prettier --check ."
   },

@@ -85,7 +85,7 @@ interface MetaWranglerEnv {
 export function modelsFromSql<T>(
   ctor: new () => T,
   records: Record<string, any>[],
-  includeTree: IncludeTree<T>
+  includeTree: IncludeTree<T> | null
 ): T[] {
   const { ast, constructorRegistry } = MetaContainer.get();
   return _modelsFromSql(
@@ -480,7 +480,7 @@ function _modelsFromSql(
   ast: CloesceAst,
   constructorRegistry: ModelConstructorRegistry,
   records: Record<string, any>[],
-  includeTree: Record<string, UserDefinedModel>
+  includeTree: Record<string, UserDefinedModel> | null
 ): InstantiatedUserDefinedModel[] {
   if (!records.length) return [];
 

@@ -16,7 +16,7 @@ export async function startWrangler(fixturesPath: string) {
 
   runSync(
     "Applying D1 migrations",
-    "echo y | npx wrangler d1 migrations apply D1_DB",
+    "echo y | npx wrangler d1 migrations apply db",
     {
       cwd: ".generated",
     }

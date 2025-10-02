@@ -52,7 +52,7 @@
                     },
                     "parameters": [
                         {
-                            "name": "{ D1_DB }",
+                            "name": "{ db }",
                             "cidl_type": {
                                 "Inject": "Env"
                             }
@@ -74,7 +74,7 @@
                     },
                     "parameters": [
                         {
-                            "name": "{ D1_DB }",
+                            "name": "{ db }",
                             "cidl_type": {
                                 "Inject": "Env"
                             }
@@ -96,7 +96,7 @@
                     },
                     "parameters": [
                         {
-                            "name": "{ D1_DB }",
+                            "name": "{ db }",
                             "cidl_type": {
                                 "Inject": "Env"
                             }
@@ -110,7 +110,7 @@
                     "return_type": "Void",
                     "parameters": [
                         {
-                            "name": "{ D1_DB }",
+                            "name": "{ db }",
                             "cidl_type": {
                                 "Inject": "Env"
                             }

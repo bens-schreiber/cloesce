@@ -45,13 +45,49 @@
                     }
                 }
             ],
-            "methods": {},
+            "methods": {
+                "post": {
+                    "name": "post",
+                    "is_static": true,
+                    "http_verb": "POST",
+                    "return_type": {
+                        "Model": "A"
+                    },
+                    "parameters": [
+                        {
+                            "name": "{ db }",
+                            "cidl_type": {
+                                "Inject": "Env"
+                            }
+                        },
+                        {
+                            "name": "a",
+                            "cidl_type": {
+                                "Model": "A"
+                            }
+                        }
+                    ]
+                },
+                "refresh": {
+                    "name": "refresh",
+                    "is_static": false,
+                    "http_verb": "GET",
+                    "return_type": {
+                        "Model": "A"
+                    },
+                    "parameters": []
+                }
+            },
             "data_sources": {
-                "default": {
-                    "name": "default",
+                "withB": {
+                    "name": "withB",
                     "tree": {
                         "b": {}
                     }
+                },
+                "withoutB": {
+                    "name": "withoutB",
+                    "tree": {}
                 }
             },
             "source_path": "/Users/benjaminschreiber/projects/cloesce/tests/fixtures/foreign_keys/foreign_keys.cloesce.ts"
@@ -74,10 +110,42 @@
                     }
                 }
             ],
-            "methods": {},
+            "methods": {
+                "post": {
+                    "name": "post",
+                    "is_static": true,
+                    "http_verb": "POST",
+                    "return_type": {
+                        "Model": "Person"
+                    },
+                    "parameters": [
+                        {
+                            "name": "{ db }",
+                            "cidl_type": {
+                                "Inject": "Env"
+                            }
+                        },
+                        {
+                            "name": "person",
+                            "cidl_type": {
+                                "Model": "Person"
+                            }
+                        }
+                    ]
+                },
+                "refresh": {
+                    "name": "refresh",
+                    "is_static": false,
+                    "http_verb": "GET",
+                    "return_type": {
+                        "Model": "Person"
+                    },
+                    "parameters": []
+                }
+            },
             "data_sources": {
-                "default": {
-                    "name": "default",
+                "withDogs": {
+                    "name": "withDogs",
                     "tree": {
                         "dogs": {}
                     }
@@ -123,13 +191,55 @@
                     }
                 }
             ],
-            "methods": {},
+            "methods": {
+                "post": {
+                    "name": "post",
+                    "is_static": true,
+                    "http_verb": "POST",
+                    "return_type": {
+                        "Model": "Student"
+                    },
+                    "parameters": [
+                        {
+                            "name": "{ db }",
+                            "cidl_type": {
+                                "Inject": "Env"
+                            }
+                        },
+                        {
+                            "name": "student",
+                            "cidl_type": {
+                                "Model": "Student"
+                            }
+                        }
+                    ]
+                },
+                "refresh": {
+                    "name": "refresh",
+                    "is_static": false,
+                    "http_verb": "GET",
+                    "return_type": {
+                        "Model": "Student"
+                    },
+                    "parameters": []
+                }
+            },
             "data_sources": {
-                "default": {
-                    "name": "default",
+                "withCoursesStudents": {
+                    "name": "withCoursesStudents",
                     "tree": {
                         "courses": {
                             "students": {}
+                        }
+                    }
+                },
+                "withCoursesStudentsCourses": {
+                    "name": "withCoursesStudentsCourses",
+                    "tree": {
+                        "courses": {
+                            "students": {
+                                "courses": {}
+                            }
                         }
                     }
                 }
@@ -155,16 +265,7 @@
                 }
             ],
             "methods": {},
-            "data_sources": {
-                "default": {
-                    "name": "default",
-                    "tree": {
-                        "students": {
-                            "courses": {}
-                        }
-                    }
-                }
-            },
+            "data_sources": {},
             "source_path": "/Users/benjaminschreiber/projects/cloesce/tests/fixtures/foreign_keys/foreign_keys.cloesce.ts"
         }
     }

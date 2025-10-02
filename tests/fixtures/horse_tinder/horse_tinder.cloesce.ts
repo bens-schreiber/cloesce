@@ -17,7 +17,7 @@ import {
 
 @WranglerEnv
 class Env {
-  D1_DB: D1Database;
+  db: D1Database;
   motd: string;
 }
 
@@ -43,10 +43,9 @@ class Horse {
   };
 
   @POST
-  static async post(@Inject { D1_DB }: Env, horse: Horse): Promise<Horse> {
-    const records = await D1_DB.prepare(
-      "INSERT INTO Horse (id, name, bio) VALUES (?, ?, ?) RETURNING *"
-    )
+  static async post(@Inject { db }: Env, horse: Horse): Promise<Horse> {
+    const records = await db
+      .prepare("INSERT INTO Horse (id, name, bio) VALUES (?, ?, ?) RETURNING *")
       .bind(horse.id, horse.name, horse.bio)
       .all();
 
@@ -54,10 +53,9 @@ class Horse {
   }
 
   @GET
-  static async get(@Inject { D1_DB }: Env, id: number): Promise<Horse> {
-    let records = await D1_DB.prepare(
-      "SELECT * FROM Horse_default WHERE Horse_id = ?"
-    )
+  static async get(@Inject { db }: Env, id: number): Promise<Horse> {
+    let records = await db
+      .prepare("SELECT * FROM Horse_default WHERE Horse_id = ?")
       .bind(id)
       .run();
 
@@ -65,14 +63,15 @@ class Horse {
   }
 
   @GET
-  static async list(@Inject { D1_DB }: Env): Promise<Horse[]> {
-    let records = await D1_DB.prepare("SELECT * FROM Horse_default").run();
+  static async list(@Inject { db }: Env): Promise<Horse[]> {
+    let records = await db.prepare("SELECT * FROM Horse_default").run();
     return modelsFromSql(Horse, records.results, Horse.default) as Horse[];
   }
 
   @POST
-  async like(@Inject { D1_DB }: Env, horse: Horse) {
-    await D1_DB.prepare("INSERT INTO Like (horseId1, horseId2) VALUES (?, ?)")
+  async like(@Inject { db }: Env, horse: Horse) {
+    await db
+      .prepare("INSERT INTO Like (horseId1, horseId2) VALUES (?, ?)")
       .bind(this.id, horse.id)
       .run();
   }

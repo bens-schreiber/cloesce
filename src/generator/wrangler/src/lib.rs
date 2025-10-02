@@ -44,7 +44,7 @@ impl WranglerSpec {
         // Validate existing database configs, filling in missing values with a default
         for (i, d1) in self.d1_databases.iter_mut().enumerate() {
             if d1.binding.is_none() {
-                d1.binding = Some(format!("D1_DB_{i}"));
+                d1.binding = Some(format!("db_{i}"));
             }
 
             if d1.database_name.is_none() {
@@ -63,7 +63,7 @@ impl WranglerSpec {
         // Ensure a database exists (if there are even models), provide a default if not
         if self.d1_databases.is_empty() {
             self.d1_databases.push(D1Database {
-                binding: Some(String::from("D1_DB")),
+                binding: Some(String::from("db")),
                 database_name: Some(String::from("default")),
                 database_id: Some(String::from("replace_with_db_id")),
             });
@@ -234,7 +234,7 @@ mod tests {
 //         let mut res = self.wrangler.clone();
 //         for (i, d1) in res.d1_databases.iter_mut().enumerate() {
 //             if d1.binding.is_none() {
-//                 d1.binding = Some(format!("D1_DB_{i}"));
+//                 d1.binding = Some(format!("db_{i}"));
 //             }
 
 //             if d1.database_name.is_none() {
@@ -252,7 +252,7 @@ mod tests {
 //         // Ensure a database exists (if there are even models), provide a default if not
 //         if !self.ast.models.is_empty() && res.d1_databases.is_empty() {
 //             res.d1_databases.push(D1Database {
-//                 binding: Some(String::from("D1_DB")),
+//                 binding: Some(String::from("db")),
 //                 database_name: Some(String::from("default")),
 //                 database_id: None,
 //             });
