@@ -161,7 +161,7 @@ impl Fixture {
                 .arg("generate")
                 .arg("workers")
                 .arg(&cidl_path)
-                .arg(&tmp_workers.path())
+                .arg(tmp_workers.path())
                 .arg(&wrangler_path)
                 .arg(DOMAIN)
                 .current_dir("../../src/generator"),
