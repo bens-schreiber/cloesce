@@ -10,7 +10,7 @@
     "wrangler": "^4.34.0"
   },
   "scripts": {
-    "test": "vitest run --config vitest.config.ts",
+    "test": "vitest run tests/foreign_keys.test.ts && vitest run tests/horse_tinder.test.ts",
     "format:fix": "prettier --write .",
     "format": "prettier --check ."
   },
