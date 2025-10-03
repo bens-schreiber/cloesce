@@ -12,6 +12,7 @@ let wranglerProc: ChildProcess | null = null;
  * @param fixturesPath The fixture to copy
  */
 export async function startWrangler(fixturesPath: string) {
+  waitForPortFree(PORT, "localhost", 5000);
   await copyFolder(fixturesPath, ".generated");
 
   runSync(
@@ -42,7 +43,7 @@ export async function startWrangler(fixturesPath: string) {
   wranglerProc?.stdout?.pipe(process.stdout);
   wranglerProc?.stderr?.pipe(process.stderr);
 
-  await waitForPort(PORT, "localhost", PORT);
+  await waitForPortInUse(PORT, "localhost", PORT);
   console.log("Wrangler server ready ✅\n");
 }
 
@@ -96,7 +97,7 @@ async function copyFolder(src: string, dest: string) {
   }
 }
 
-function waitForPort(
+function waitForPortInUse(
   port: number,
   host: string,
   timeoutMs: number,
@@ -118,6 +119,46 @@ function waitForPort(
         socket.destroy();
         if (Date.now() - start > timeoutMs) {
           reject(new Error(`Timed out waiting for port ${port}`));
+        } else {
+          setTimeout(check, 200);
+        }
+      }
+    };
+
+    check();
+  });
+}
+
+function waitForPortFree(
+  port: number,
+  host: string,
+  timeoutMs: number,
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const start = Date.now();
+
+    const check = () => {
+      const socket = net.createConnection({ port, host });
+
+      socket.once("connect", () => {
+        // Port is in use, try again later
+        socket.destroy();
+        retry();
+      });
+
+      socket.once("error", (err: NodeJS.ErrnoException) => {
+        if (err.code === "ECONNREFUSED") {
+          // Port is free
+          resolve();
+        } else {
+          // Some other error, keep retrying
+          retry();
+        }
+      });
+
+      function retry() {
+        if (Date.now() - start > timeoutMs) {
+          reject(new Error(`Timed out waiting for port ${port} to be free`));
         } else {
           setTimeout(check, 200);
         }
