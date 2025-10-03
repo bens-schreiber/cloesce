@@ -50,17 +50,12 @@ export async function stopWrangler() {
   if (wranglerProc) {
     console.log("Stopping Wrangler...");
 
-    const exited = new Promise<void>((resolve) => {
-      wranglerProc?.once("exit", () => {
-        resolve();
-      });
-      wranglerProc?.once("close", () => {
-        resolve();
-      });
+    const closed = new Promise<void>((resolve) => {
+      wranglerProc!.once("close", () => resolve());
     });
 
     wranglerProc.kill("SIGINT");
-    await exited;
+    await closed;
 
     wranglerProc = null;
   }
