@@ -2,7 +2,7 @@ use std::{collections::BTreeMap, path::Path};
 
 use common::{CloesceAst, Model, WranglerEnv};
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result, anyhow};
 use wrangler::WranglerSpec;
 
 pub struct WorkersGenerator;
