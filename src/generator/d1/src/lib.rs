@@ -2,86 +2,198 @@ use std::collections::{BTreeMap, HashMap, VecDeque};
 
 use common::{CidlType, IncludeTree, Model, NavigationPropertyKind};
 
-use anyhow::{Context, Result, anyhow, bail, ensure};
+use anyhow::{anyhow, bail, ensure, Context, Result};
 use sea_query::{
     ColumnDef, Expr, ForeignKey, Index, IntoCondition, Query, SelectStatement, SqliteQueryBuilder,
     Table,
 };
 
-// TODO: SeaQuery forcing us to do alias everywhere is really annoying,
-// it feels like this library is a bad choice for our use case.
-fn alias(name: impl Into<String>) -> sea_query::Alias {
-    sea_query::Alias::new(name)
+/// Validates the Model AST, producing an equivalent sql schema of
+/// tables and views
+pub fn generate_sql(model_lookup: &BTreeMap<String, Model>) -> Result<String> {
+    let (sorted_models, many_to_many_tables) = validate_fks(model_lookup)?;
+    let model_tree = validate_data_sources(model_lookup)?;
+
+    let tables = generate_tables(&sorted_models, many_to_many_tables, model_lookup);
+    let views = generate_views(model_tree);
+
+    Ok(format!("{}\n{}", tables.join("\n"), views.join("\n")))
 }
 
-fn left_join_as(
-    query: &mut SelectStatement,
-    model_name: &str,
-    model_alias: &str,
-    condition: impl IntoCondition,
-) {
-    if model_name == model_alias {
-        query.left_join(alias(model_name), condition);
-    } else {
-        query.join_as(
-            sea_query::JoinType::LeftJoin,
-            alias(model_name),
-            alias(model_alias),
-            condition,
-        );
+fn generate_views(model_tree: Vec<ModelTree>) -> Vec<String> {
+    let mut views = vec![];
+
+    for tree in model_tree {
+        let mut query = Query::select();
+
+        query.from(alias(&tree.root.model.name));
+        dfs(&tree.root, &mut query);
+
+        views.push(format!(
+            "CREATE VIEW \"{}_{}\" AS {};",
+            tree.root.model.name,
+            tree.name,
+            query.to_string(SqliteQueryBuilder)
+        ))
     }
-}
 
-fn typed_column(name: &str, ty: &CidlType) -> ColumnDef {
-    let mut col = ColumnDef::new(alias(name));
-    let inner = match ty {
-        CidlType::Nullable(inner) => inner.as_ref(),
-        t => t,
-    };
+    return views;
 
-    match inner {
-        CidlType::Integer => col.integer(),
-        CidlType::Real => col.decimal(),
-        CidlType::Text => col.text(),
-        CidlType::Blob => col.blob(),
-        _ => unreachable!("column type must be validated earlier"),
-    };
-    col
-}
-
-/// Represents one side of a Many to Many junction table
-struct JunctionModel<'a> {
-    model_name: &'a str,
-    model_pk_name: &'a str,
-    model_pk_type: CidlType,
-}
-
-/// A full Many to Many table with both sides
-struct JunctionTable<'a> {
-    a: JunctionModel<'a>,
-    b: JunctionModel<'a>,
-    unique_id: &'a str,
-}
-
-#[derive(Default)]
-struct JunctionTableBuilder<'a> {
-    models: Vec<JunctionModel<'a>>,
-}
-
-impl<'a> JunctionTableBuilder<'a> {
-    fn model(&mut self, jm: JunctionModel<'a>) -> Result<()> {
-        if self.models.len() >= 2 {
-            bail!("Too many ManyToMany navigation properties for junction table");
+    fn dfs(node: &ModelTreeNode, query: &mut SelectStatement) {
+        // Primary Key
+        {
+            let pk = &node.model.primary_key.name;
+            query.expr_as(
+                Expr::col((alias(&node.alias), alias(pk))),
+                alias(format!("{}_{}", &node.alias, pk)),
+            );
         }
-        self.models.push(jm);
-        Ok(())
+
+        // Columns
+        for attr in &node.model.attributes {
+            query.expr_as(
+                Expr::col((alias(&node.alias), alias(&attr.value.name))),
+                alias(format!("{}_{}", &node.alias, attr.value.name)),
+            );
+        }
+
+        // Navigation properties
+        for child in &node.children {
+            match child.parent_transition.as_ref().unwrap() {
+                NavigationPropertyKind::OneToOne { reference } => {
+                    let nav_model_pk = &child.model.primary_key.name;
+
+                    left_join_as(
+                        query,
+                        &child.model.name,
+                        &child.alias,
+                        Expr::col((alias(&node.alias), alias(reference)))
+                            .equals((alias(&child.alias), alias(nav_model_pk))),
+                    );
+                }
+                NavigationPropertyKind::OneToMany { reference } => {
+                    let pk = &node.model.primary_key.name;
+
+                    left_join_as(
+                        query,
+                        &child.model.name,
+                        &child.alias,
+                        Expr::col((alias(&node.alias), alias(pk)))
+                            .equals((alias(&child.alias), alias(reference))),
+                    );
+                }
+                NavigationPropertyKind::ManyToMany { unique_id } => {
+                    let nav_model_pk = &child.model.primary_key;
+                    let pk = &node.model.primary_key.name;
+
+                    query.left_join(
+                        alias(unique_id),
+                        Expr::col((alias(&node.alias), alias(pk)))
+                            .equals((alias(unique_id), alias(format!("{}_{}", node.alias, pk)))),
+                    );
+
+                    left_join_as(
+                        query,
+                        &child.model.name,
+                        &child.alias,
+                        Expr::col((alias(unique_id), alias(format!("{}_{}", child.alias, pk))))
+                            .equals((alias(&child.alias), alias(&nav_model_pk.name))),
+                    );
+                }
+            }
+            dfs(child, query);
+        }
+    }
+}
+
+fn generate_tables(
+    sorted_models: &[&Model],
+    many_to_many_tables: Vec<JunctionTable>,
+    model_lookup: &BTreeMap<String, Model>,
+) -> Vec<String> {
+    let mut res = Vec::new();
+    for &model in sorted_models {
+        let mut table = Table::create();
+        table.table(alias(model.name.clone()));
+
+        // Set Primary Key
+        {
+            let mut column = typed_column(&model.primary_key.name, &model.primary_key.cidl_type);
+            column.primary_key();
+            table.col(column);
+        }
+
+        for attr in model.attributes.iter() {
+            let mut column = typed_column(&attr.value.name, &attr.value.cidl_type);
+
+            if !attr.value.cidl_type.is_nullable() {
+                column.not_null();
+            }
+
+            // Set attribute foreign key
+            if let Some(fk_model_name) = &attr.foreign_key_reference {
+                // Unwrap: safe because `validate_models` and `validate_fks` halt
+                // if the values are missing
+                let pk_name = &model_lookup
+                    .get(fk_model_name.as_str())
+                    .unwrap()
+                    .primary_key
+                    .name;
+
+                table.foreign_key(
+                    ForeignKey::create()
+                        .from(alias(model.name.clone()), alias(attr.value.name.as_str()))
+                        .to(alias(fk_model_name.clone()), alias(pk_name))
+                        .on_update(sea_query::ForeignKeyAction::Cascade)
+                        .on_delete(sea_query::ForeignKeyAction::Restrict),
+                );
+            }
+
+            table.col(column);
+        }
+
+        // Generate SQLite
+        res.push(format!("{};", table.build(SqliteQueryBuilder)));
     }
 
-    fn build(self, unique_id: &'a str) -> Result<JunctionTable<'a>> {
-        let [a, b] = <[_; 2]>::try_from(self.models)
-            .map_err(|_| anyhow!("Both models must be set for a junction table"))?;
-        Ok(JunctionTable { a, b, unique_id })
+    for JunctionTable { a, b, unique_id } in many_to_many_tables {
+        let mut table = Table::create();
+
+        // TODO: Name the junction table in some standard way
+        let col_a_name = format!("{}_{}", a.model_name, a.model_pk_name);
+        let mut col_a = typed_column(&col_a_name, &a.model_pk_type);
+
+        let col_b_name = format!("{}_{}", b.model_name, b.model_pk_name);
+        let mut col_b = typed_column(&col_b_name, &b.model_pk_type);
+
+        table
+            .table(alias(unique_id))
+            .col(col_a.not_null())
+            .col(col_b.not_null())
+            .primary_key(
+                Index::create()
+                    .col(alias(&col_a_name))
+                    .col(alias(&col_b_name)),
+            )
+            .foreign_key(
+                ForeignKey::create()
+                    .from(alias(unique_id), alias(&col_a_name))
+                    .to(alias(a.model_name), alias(a.model_pk_name))
+                    .on_update(sea_query::ForeignKeyAction::Cascade)
+                    .on_delete(sea_query::ForeignKeyAction::Restrict),
+            )
+            .foreign_key(
+                ForeignKey::create()
+                    .from(alias(unique_id), alias(&col_b_name))
+                    .to(alias(b.model_name), alias(b.model_pk_name))
+                    .on_update(sea_query::ForeignKeyAction::Cascade)
+                    .on_delete(sea_query::ForeignKeyAction::Restrict),
+            );
+
+        res.push(format!("{};", table.to_string(SqliteQueryBuilder)));
     }
+
+    res
 }
 
 /// Validates foreign key relationships for every [Model] in the AST. Returns a
@@ -352,190 +464,78 @@ fn validate_data_sources<'a>(
     }
 }
 
-fn generate_tables(
-    sorted_models: &[&Model],
-    many_to_many_tables: Vec<JunctionTable>,
-    model_lookup: &BTreeMap<String, Model>,
-) -> Vec<String> {
-    let mut res = Vec::new();
-    for &model in sorted_models {
-        let mut table = Table::create();
-        table.table(alias(model.name.clone()));
-
-        // Set Primary Key
-        {
-            let mut column = typed_column(&model.primary_key.name, &model.primary_key.cidl_type);
-            column.primary_key();
-            table.col(column);
-        }
-
-        for attr in model.attributes.iter() {
-            let mut column = typed_column(&attr.value.name, &attr.value.cidl_type);
-
-            if !attr.value.cidl_type.is_nullable() {
-                column.not_null();
-            }
-
-            // Set attribute foreign key
-            if let Some(fk_model_name) = &attr.foreign_key_reference {
-                // Unwrap: safe because `validate_models` and `validate_fks` halt
-                // if the values are missing
-                let pk_name = &model_lookup
-                    .get(fk_model_name.as_str())
-                    .unwrap()
-                    .primary_key
-                    .name;
-
-                table.foreign_key(
-                    ForeignKey::create()
-                        .from(alias(model.name.clone()), alias(attr.value.name.as_str()))
-                        .to(alias(fk_model_name.clone()), alias(pk_name))
-                        .on_update(sea_query::ForeignKeyAction::Cascade)
-                        .on_delete(sea_query::ForeignKeyAction::Restrict),
-                );
-            }
-
-            table.col(column);
-        }
-
-        // Generate SQLite
-        res.push(format!("{};", table.build(SqliteQueryBuilder)));
-    }
-
-    for JunctionTable { a, b, unique_id } in many_to_many_tables {
-        let mut table = Table::create();
-
-        // TODO: Name the junction table in some standard way
-        let col_a_name = format!("{}_{}", a.model_name, a.model_pk_name);
-        let mut col_a = typed_column(&col_a_name, &a.model_pk_type);
-
-        let col_b_name = format!("{}_{}", b.model_name, b.model_pk_name);
-        let mut col_b = typed_column(&col_b_name, &b.model_pk_type);
-
-        table
-            .table(alias(unique_id))
-            .col(col_a.not_null())
-            .col(col_b.not_null())
-            .primary_key(
-                Index::create()
-                    .col(alias(&col_a_name))
-                    .col(alias(&col_b_name)),
-            )
-            .foreign_key(
-                ForeignKey::create()
-                    .from(alias(unique_id), alias(&col_a_name))
-                    .to(alias(a.model_name), alias(a.model_pk_name))
-                    .on_update(sea_query::ForeignKeyAction::Cascade)
-                    .on_delete(sea_query::ForeignKeyAction::Restrict),
-            )
-            .foreign_key(
-                ForeignKey::create()
-                    .from(alias(unique_id), alias(&col_b_name))
-                    .to(alias(b.model_name), alias(b.model_pk_name))
-                    .on_update(sea_query::ForeignKeyAction::Cascade)
-                    .on_delete(sea_query::ForeignKeyAction::Restrict),
-            );
-
-        res.push(format!("{};", table.to_string(SqliteQueryBuilder)));
-    }
-
-    res
+// TODO: SeaQuery forcing us to do alias everywhere is really annoying,
+// it feels like this library is a bad choice for our use case.
+fn alias(name: impl Into<String>) -> sea_query::Alias {
+    sea_query::Alias::new(name)
 }
 
-fn generate_views(model_tree: Vec<ModelTree>) -> Vec<String> {
-    let mut views = vec![];
-
-    for tree in model_tree {
-        let mut query = Query::select();
-
-        query.from(alias(&tree.root.model.name));
-        dfs(&tree.root, &mut query);
-
-        views.push(format!(
-            "CREATE VIEW \"{}_{}\" AS {};",
-            tree.root.model.name,
-            tree.name,
-            query.to_string(SqliteQueryBuilder)
-        ))
-    }
-
-    return views;
-
-    fn dfs(node: &ModelTreeNode, query: &mut SelectStatement) {
-        // Primary Key
-        {
-            let pk = &node.model.primary_key.name;
-            query.expr_as(
-                Expr::col((alias(&node.alias), alias(pk))),
-                alias(format!("{}_{}", &node.alias, pk)),
-            );
-        }
-
-        // Columns
-        for attr in &node.model.attributes {
-            query.expr_as(
-                Expr::col((alias(&node.alias), alias(&attr.value.name))),
-                alias(format!("{}_{}", &node.alias, attr.value.name)),
-            );
-        }
-
-        // Navigation properties
-        for child in &node.children {
-            match child.parent_transition.as_ref().unwrap() {
-                NavigationPropertyKind::OneToOne { reference } => {
-                    let nav_model_pk = &child.model.primary_key.name;
-
-                    left_join_as(
-                        query,
-                        &child.model.name,
-                        &child.alias,
-                        Expr::col((alias(&node.alias), alias(reference)))
-                            .equals((alias(&child.alias), alias(nav_model_pk))),
-                    );
-                }
-                NavigationPropertyKind::OneToMany { reference } => {
-                    let pk = &node.model.primary_key.name;
-
-                    left_join_as(
-                        query,
-                        &child.model.name,
-                        &child.alias,
-                        Expr::col((alias(&node.alias), alias(pk)))
-                            .equals((alias(&child.alias), alias(reference))),
-                    );
-                }
-                NavigationPropertyKind::ManyToMany { unique_id } => {
-                    let nav_model_pk = &child.model.primary_key;
-                    let pk = &node.model.primary_key.name;
-
-                    query.left_join(
-                        alias(unique_id),
-                        Expr::col((alias(&node.alias), alias(pk)))
-                            .equals((alias(unique_id), alias(format!("{}_{}", node.alias, pk)))),
-                    );
-
-                    left_join_as(
-                        query,
-                        &child.model.name,
-                        &child.alias,
-                        Expr::col((alias(unique_id), alias(format!("{}_{}", child.alias, pk))))
-                            .equals((alias(&child.alias), alias(&nav_model_pk.name))),
-                    );
-                }
-            }
-            dfs(child, query);
-        }
+fn left_join_as(
+    query: &mut SelectStatement,
+    model_name: &str,
+    model_alias: &str,
+    condition: impl IntoCondition,
+) {
+    if model_name == model_alias {
+        query.left_join(alias(model_name), condition);
+    } else {
+        query.join_as(
+            sea_query::JoinType::LeftJoin,
+            alias(model_name),
+            alias(model_alias),
+            condition,
+        );
     }
 }
 
-/// Validates the Model AST, producing an equivalent sql schema of
-/// tables and views
-pub fn generate_sql(model_lookup: &BTreeMap<String, Model>) -> Result<String> {
-    let (sorted_models, many_to_many_tables) = validate_fks(model_lookup)?;
-    let model_tree = validate_data_sources(model_lookup)?;
+fn typed_column(name: &str, ty: &CidlType) -> ColumnDef {
+    let mut col = ColumnDef::new(alias(name));
+    let inner = match ty {
+        CidlType::Nullable(inner) => inner.as_ref(),
+        t => t,
+    };
 
-    let tables = generate_tables(&sorted_models, many_to_many_tables, model_lookup);
-    let views = generate_views(model_tree);
+    match inner {
+        CidlType::Integer => col.integer(),
+        CidlType::Real => col.decimal(),
+        CidlType::Text => col.text(),
+        CidlType::Blob => col.blob(),
+        _ => unreachable!("column type must be validated earlier"),
+    };
+    col
+}
 
-    Ok(format!("{}\n{}", tables.join("\n"), views.join("\n")))
+/// Represents one side of a Many to Many junction table
+struct JunctionModel<'a> {
+    model_name: &'a str,
+    model_pk_name: &'a str,
+    model_pk_type: CidlType,
+}
+
+/// A full Many to Many table with both sides
+struct JunctionTable<'a> {
+    a: JunctionModel<'a>,
+    b: JunctionModel<'a>,
+    unique_id: &'a str,
+}
+
+#[derive(Default)]
+struct JunctionTableBuilder<'a> {
+    models: Vec<JunctionModel<'a>>,
+}
+
+impl<'a> JunctionTableBuilder<'a> {
+    fn model(&mut self, jm: JunctionModel<'a>) -> Result<()> {
+        if self.models.len() >= 2 {
+            bail!("Too many ManyToMany navigation properties for junction table");
+        }
+        self.models.push(jm);
+        Ok(())
+    }
+
+    fn build(self, unique_id: &'a str) -> Result<JunctionTable<'a>> {
+        let [a, b] = <[_; 2]>::try_from(self.models)
+            .map_err(|_| anyhow!("Both models must be set for a junction table"))?;
+        Ok(JunctionTable { a, b, unique_id })
+    }
 }

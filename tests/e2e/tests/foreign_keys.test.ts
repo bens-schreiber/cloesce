@@ -1,4 +1,4 @@
-import { startWrangler, stopWrangler } from "../src/setup.js";
+import { startWrangler, stopWrangler, withRes } from "../src/setup.js";
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import {
   A,
@@ -15,10 +15,6 @@ beforeAll(async () => {
 afterAll(async () => {
   await stopWrangler();
 });
-
-function withRes(message: string, res: any): string {
-  return `${message}\n\n${JSON.stringify(res, null, 2)}`;
-}
 
 async function testRefresh<T, DS extends string | null>(
   obj: T & { refresh: (dataSource?: DS) => Promise<any> },

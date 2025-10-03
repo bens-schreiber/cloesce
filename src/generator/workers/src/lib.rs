@@ -2,7 +2,7 @@ use std::{collections::BTreeMap, path::Path};
 
 use common::{CloesceAst, Model, WranglerEnv};
 
-use anyhow::{Context, Result, anyhow};
+use anyhow::{anyhow, Context, Result};
 use wrangler::WranglerSpec;
 
 pub struct WorkersGenerator;
@@ -29,7 +29,7 @@ impl WorkersGenerator {
     }
 
     /// Generates all model source imports
-    fn link_models(models: &BTreeMap<String, Model>, workers_path: &Path) -> Result<String> {
+    fn link_models(models: &BTreeMap<String, Model>, workers_path: &Path) -> String {
         let workers_dir = workers_path
             .parent()
             .context("workers_path has no parent; cannot compute relative imports")?;
