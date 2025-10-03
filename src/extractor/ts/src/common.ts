@@ -81,8 +81,7 @@ export class ExtractorError {
   constructor(public code: ExtractorErrorCode) {}
 
   addContext(fn: (val: string | undefined) => string | undefined) {
-    this.context = fn(this.context);
-    return this;
+    this.context = fn(this.context ?? "");
   }
 }
 

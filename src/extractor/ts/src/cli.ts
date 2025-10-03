@@ -80,7 +80,7 @@ async function runExtractor({
     const result = extractor.extract(project);
     if (!result.ok) {
       console.error(formatErr(result.value));
-      return;
+      process.exit(1);
     }
     const ast = result.value;
 
@@ -107,14 +107,14 @@ async function runExtractor({
 function formatErr(e: ExtractorError): string {
   let { description, suggestion } = getErrorInfo(e.code);
   return `
-  ==== CLOESCE ERROR ====
-  Error [${ExtractorErrorCode[e.code]}]: ${description}
-  Phase: TypeScript IDL Extraction
-  Context: ${e.context}
+==== CLOESCE ERROR ====
+Error [${ExtractorErrorCode[e.code]}]: ${description}
+Phase: TypeScript IDL Extraction
+Context: ${e.context}
 
-  ${e.snippet}
+${e.snippet}
 
-  Suggested fix: ${suggestion}
+Suggested fix: ${suggestion}
   `;
 }
 

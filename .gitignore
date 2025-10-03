@@ -344,6 +344,8 @@ tmp/
 
 # ----------- CLOESCE VVV  ----------- 
 .generated
+snap__*
+tmp.*
 
 
 

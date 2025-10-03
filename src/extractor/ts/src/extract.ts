@@ -64,7 +64,7 @@ export class CidlExtractor {
 
         // Error: propogate from models
         if (!result.ok) {
-          result.value.addContext((old) => `${classDecl.getName()} ${old}`);
+          result.value.addContext((old) => `${classDecl.getName()}.${old}`);
           return result;
         }
         models[result.value.name] = result.value;
