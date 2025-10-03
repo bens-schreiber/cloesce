@@ -15,7 +15,7 @@ export async function startWrangler(fixturesPath: string) {
   runSync(
     "Applying D1 migrations",
     "echo y | npx wrangler d1 migrations apply db",
-    { cwd: ".generated" },
+    { cwd: ".generated" }
   );
   runSync("Building Wrangler", "npx wrangler --config wrangler.toml build", {
     cwd: ".generated",
@@ -29,7 +29,7 @@ export async function startWrangler(fixturesPath: string) {
       cwd: ".generated",
       stdio: "pipe",
       signal: controller.signal,
-    },
+    }
   ).once("error", () => {}); // ignore AbortError
 
   await waitForPort(PORT, "localhost", 30_000, false);
@@ -38,6 +38,7 @@ export async function startWrangler(fixturesPath: string) {
 
 export async function stopWrangler() {
   controller?.abort();
+  execSync(`pkill -9 -f "wrangler dev"`); // checkmate CI
   await fs.rm(".generated", { recursive: true, force: true });
 }
 
@@ -60,7 +61,7 @@ function waitForPort(
   port: number,
   host: string,
   timeoutMs: number,
-  shouldBeFree: boolean,
+  shouldBeFree: boolean
 ): Promise<void> {
   const start = Date.now();
 
