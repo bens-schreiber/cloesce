@@ -38,8 +38,9 @@ export async function startWrangler(fixturesPath: string) {
 
 export async function stopWrangler() {
   controller?.abort();
-  execSync(`pkill -9 -f "wrangler dev"`); // checkmate CI
+  execSync(`pkill -9 -f "wrangler dev"`, { stdio: "ignore" });
   await fs.rm(".generated", { recursive: true, force: true });
+  await waitForPort(PORT, "localhost", 30_000, true);
 }
 
 function runSync(label: string, cmd: string, opts: { cwd?: string } = {}) {
