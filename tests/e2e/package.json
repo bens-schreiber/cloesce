@@ -1,0 +1,19 @@
+{
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20250906.0",
+    "@types/node": "^24.3.1",
+    "cloesce": "file:../../src/extractor/ts",
+    "prettier": "^3.6.2",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4",
+    "wrangler": "^4.34.0",
+    "tree-kill": "^1.2.2"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "format:fix": "prettier --write .",
+    "format": "prettier --check ."
+  },
+  "type": "module"
+}

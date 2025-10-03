@@ -1,8 +1,9 @@
 use std::{collections::BTreeMap, path::Path};
 
-use common::{CloesceAst, Model, WranglerEnv, wrangler::WranglerSpec};
+use common::{CloesceAst, Model, WranglerEnv};
 
 use anyhow::{Context, Result, anyhow};
+use wrangler::WranglerSpec;
 
 pub struct WorkersGenerator;
 impl WorkersGenerator {
@@ -69,10 +70,11 @@ impl WorkersGenerator {
         let models = models
             .values()
             .map(|m| {
-                rel_path(&m.source_path, workers_dir)
-                    .map(|p| format!("import {{ {} }} from \"{}\";", m.name, p))
+                let p = rel_path(&m.source_path, workers_dir)
+                    .unwrap_or_else(|_| m.source_path.clone().to_string_lossy().to_string());
+                format!("import {{ {} }} from \"{}\";", m.name, p)
             })
-            .collect::<Result<Vec<_>>>()?
+            .collect::<Vec<_>>()
             .join("\n");
 
         Ok(models)
@@ -127,7 +129,7 @@ impl WorkersGenerator {
         Ok(format!(
             r#"
 import {{ cloesce }} from "cloesce";
-import cidl from "./cidl.json" with {{ type: "json" }};
+import cidl from "./cidl.json";
 {model_sources}
 
 {constructor_registry}

@@ -1,2 +1,0 @@
-- alias=Student model=Student transition=None
-  - alias=Course model=Course transition=Some(ManyToMany { unique_id: "StudentsCourses" })

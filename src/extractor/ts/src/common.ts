@@ -1,3 +1,6 @@
+import fs from "node:fs";
+import path from "node:path";
+
 export type Either<L, R> = { ok: false; value: L } | { ok: true; value: R };
 export function left<L>(value: L): Either<L, never> {
   return { ok: false, value };

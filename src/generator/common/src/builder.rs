@@ -3,7 +3,6 @@ use std::{collections::BTreeMap, path::PathBuf};
 use crate::{
     CidlType, CloesceAst, DataSource, HttpVerb, IncludeTree, InputLanguage, Model, ModelAttribute,
     ModelMethod, NamedTypedValue, NavigationProperty, NavigationPropertyKind, WranglerEnv,
-    wrangler::WranglerSpec,
 };
 
 pub fn create_ast(mut models: Vec<Model>) -> CloesceAst {
@@ -20,12 +19,6 @@ pub fn create_ast(mut models: Vec<Model>) -> CloesceAst {
             name: "Env".into(),
             source_path: "source.ts".into(),
         },
-    }
-}
-
-pub fn create_wrangler() -> WranglerSpec {
-    WranglerSpec {
-        d1_databases: vec![],
     }
 }
 

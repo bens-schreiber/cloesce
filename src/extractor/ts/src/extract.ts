@@ -300,75 +300,71 @@ export class CidlExtractor {
     // Nullable via union
     const [unwrappedType, nullable] = unwrapNullable(type);
 
-    // Primitives
     const tyText = unwrappedType
       .getText(undefined, TypeFormatFlags.UseAliasDefinedOutsideCurrentScope)
       .split("|")[0]
-      .trim(); // trim `| null` if there
-    if (this.primTypeMap[tyText]) {
-      return right(
-        nullable
-          ? { Nullable: this.primTypeMap[tyText] }
-          : this.primTypeMap[tyText],
-      );
+      .trim();
+
+    // Primitives
+    const prim = this.primTypeMap[tyText];
+    if (prim) {
+      return right(wrapNullable(prim, nullable));
     }
 
     const generics = [
       ...unwrappedType.getAliasTypeArguments(),
       ...unwrappedType.getTypeArguments(),
     ];
+
     if (generics.length > 1) {
       return left("Multiple generics are not yet supported");
     }
 
-    if (generics.length < 1) {
-      // Inject
-      if (inject) {
-        return right({ Inject: tyText });
-      }
-
-      // Model
-      return right({ Model: tyText });
+    // No generics -> inject or model
+    if (generics.length === 0) {
+      const base = inject ? { Inject: tyText } : { Model: tyText };
+      return right(wrapNullable(base, nullable));
     }
 
+    // Single generic
     const genericTy = generics[0];
+    const symbolName = unwrappedType.getSymbol()?.getName();
+    const aliasName = unwrappedType.getAliasSymbol()?.getName();
 
-    // Promise (ignore)
-    if (unwrappedType.getSymbol()?.getName() === "Promise") {
-      return res(genericTy, nullable, (inner) => inner);
+    if (symbolName === "Promise" || aliasName === "IncludeTree") {
+      return wrapGeneric(genericTy, nullable, (inner) => inner);
     }
 
-    // Array
     if (unwrappedType.isArray()) {
-      return res(genericTy, nullable, (inner) => ({
-        Array: inner,
+      return wrapGeneric(genericTy, nullable, (inner) => ({ Array: inner }));
+    }
+
+    if (aliasName === "HttpResult") {
+      return wrapGeneric(genericTy, nullable, (inner) => ({
+        HttpResult: inner,
       }));
-    }
-
-    // HttpResult
-    if (unwrappedType.getAliasSymbol()?.getName() === "HttpResult") {
-      return res(genericTy, nullable, (inner) => ({ HttpResult: inner }));
-    }
-
-    // IncludeTree (ignore)
-    if (unwrappedType.getAliasSymbol()?.getName() === "IncludeTree") {
-      return res(genericTy, nullable, (inner) => inner);
     }
 
     return left(`Unknown symbol ${tyText}`);
 
-    function res(
+    function wrapNullable(inner: CidlType, isNullable: boolean): CidlType {
+      if (isNullable) {
+        return { Nullable: inner };
+      } else {
+        return inner;
+      }
+    }
+
+    function wrapGeneric(
       t: Type,
-      nullable: boolean,
+      isNullable: boolean,
       wrapper: (inner: CidlType) => CidlType,
     ): Either<string, CidlType> {
       const res = CidlExtractor.cidlType(t, inject);
       if (!res.ok) {
         return res;
       }
-      return right(
-        nullable ? { Nullable: wrapper(res.value) } : wrapper(res.value),
-      );
+      return right(wrapNullable(wrapper(res.value), isNullable));
     }
 
     function unwrapNullable(ty: Type): [Type, boolean] {

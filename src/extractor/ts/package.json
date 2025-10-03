@@ -17,16 +17,12 @@
     "dist"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.json",
-    "prepare": "npm run build",
-    "prepublishOnly": "npm run build",
+    "test": "vitest",
+    "test:update": "UPDATE_SNAPSHOTS=1 vitest",
     "format:fix": "prettier --write .",
     "format": "prettier --check .",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
-    "typecheck:test": "tsc -p tsconfig.test.json --noEmit",
-    "test": "jest",
-    "test:update": "jest -u",
-    "test:watch": "jest --watch"
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "cmd-ts": "^0.14.1",
@@ -38,11 +34,7 @@
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20250906.0",
-    "@types/jest": "^29.5.14",
-    "@types/mocha": "^10.0.10",
-    "@types/node": "^22.18.1",
-    "jest": "^29.7.0",
     "prettier": "^3.6.2",
-    "ts-jest": "^29.2.5"
+    "vitest": "^3.2.4"
   }
 }

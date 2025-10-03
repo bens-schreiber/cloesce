@@ -25,7 +25,7 @@ impl ClientLanguageTypeMapper for TypeScriptMapper {
             }
             CidlType::HttpResult(inner) => self.type_name(inner),
             CidlType::Void => "void".to_string(),
-            invalid => panic!("Invalid TypeScript type, {:?}", invalid),
+            _ => panic!("Invalid type {:?}", ty),
         }
     }
 }

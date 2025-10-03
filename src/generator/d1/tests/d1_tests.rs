@@ -1,8 +1,7 @@
 use common::{
     CidlType, NavigationPropertyKind,
-    builder::{ModelBuilder, create_ast, create_wrangler},
+    builder::{ModelBuilder, create_ast},
 };
-use d1::D1Generator;
 
 macro_rules! expected_str {
     ($got:expr, $expected:expr) => {{
@@ -23,10 +22,9 @@ fn test_sqlite_table_output() {
     {
         // Arrange
         let ast = create_ast(vec![]);
-        let d1gen = D1Generator::new(ast, create_wrangler());
 
         // Act
-        let sql = d1gen.sql().expect("Empty models should succeed");
+        let sql = d1::generate_sql(&ast.models).expect("Empty models should succeed");
 
         // Assert
         assert!(
@@ -46,10 +44,9 @@ fn test_sqlite_table_output() {
                 .attribute("age", CidlType::Integer, None)
                 .build(),
         ]);
-        let d1gen = D1Generator::new(ast, create_wrangler());
 
         // Act
-        let sql = d1gen.sql().expect("gen_sqlite to work");
+        let sql = d1::generate_sql(&ast.models).expect("gen_sqlite to work");
 
         // Assert
         expected_str!(sql, "CREATE TABLE");
@@ -68,10 +65,9 @@ fn test_sqlite_table_output() {
                 .build(),
             ModelBuilder::new("Dog").id().build(),
         ]);
-        let d1gen = D1Generator::new(ast, create_wrangler());
 
         // Act
-        let sql = d1gen.sql().expect("gen_sqlite to work");
+        let sql = d1::generate_sql(&ast.models).expect("gen_sqlite to work");
 
         // Assert
         expected_str!(
@@ -97,10 +93,9 @@ fn test_sqlite_table_output() {
                 .build(),
             ModelBuilder::new("Dog").id().build(),
         ]);
-        let d1gen = D1Generator::new(ast, create_wrangler());
 
         // Act
-        let sql = d1gen.sql().expect("gen_sqlite to work");
+        let sql = d1::generate_sql(&ast.models).expect("gen_sqlite to work");
 
         // Assert
         expected_str!(
@@ -150,10 +145,9 @@ fn test_sqlite_table_output() {
                 )
                 .build(),
         ]);
-        let d1gen = D1Generator::new(ast, create_wrangler());
 
         // Act
-        let sql = d1gen.sql().expect("gen_sqlite to work");
+        let sql = d1::generate_sql(&ast.models).expect("gen_sqlite to work");
 
         // Assert: boss table
         expected_str!(sql, r#"CREATE TABLE "Boss" ( "id" integer PRIMARY KEY );"#);
@@ -202,10 +196,9 @@ fn test_sqlite_table_output() {
                 )
                 .build(),
         ]);
-        let d1gen = D1Generator::new(ast, create_wrangler());
 
         // Act
-        let sql = d1gen.sql().expect("gen_sqlite to work");
+        let sql = d1::generate_sql(&ast.models).expect("gen_sqlite to work");
 
         // Assert: Junction table exists
         expected_str!(sql, r#"CREATE TABLE "StudentsCourses""#);
@@ -247,8 +240,8 @@ fn test_cycle_detection_error() {
     ]);
 
     // Act
-    let d1gen = D1Generator::new(ast, create_wrangler());
-    let err = d1gen.sql().unwrap_err();
+
+    let err = d1::generate_sql(&ast.models).unwrap_err();
 
     // Assert
     expected_str!(err, "Cycle detected");
@@ -278,16 +271,15 @@ fn test_nullability_prevents_cycle_error() {
     ]);
 
     // Act
-    let d1gen = D1Generator::new(ast, create_wrangler());
 
     // Assert
-    d1gen.sql().expect("sqlite gen to work");
+    d1::generate_sql(&ast.models).expect("sqlite gen to work");
 }
 
 #[test]
 fn test_one_to_one_nav_property_unknown_attribute_reference_error() {
     // Arrange
-    let spec = create_ast(vec![
+    let ast = create_ast(vec![
         ModelBuilder::new("Dog").id().build(),
         ModelBuilder::new("Person")
             .id()
@@ -301,22 +293,20 @@ fn test_one_to_one_nav_property_unknown_attribute_reference_error() {
             .build(),
     ]);
 
-    let d1gen = D1Generator::new(spec, create_wrangler());
-
     // Act
-    let err = d1gen.sql().unwrap_err();
+    let err = d1::generate_sql(&ast.models).unwrap_err();
 
     // Assert
     expected_str!(
         err,
-        "Navigation property Person.dog references Dog.dogId which does not exist."
+        "Navigation property Person.dog references Dog.dogId which does not exist or is not a foreign key to Person"
     );
 }
 
 #[test]
 fn test_one_to_one_mismatched_fk_and_nav_type_error() {
     // Arrange: attribute dogId references Dog, but nav prop type is Cat -> mismatch
-    let spec = create_ast(vec![
+    let ast = create_ast(vec![
         ModelBuilder::new("Dog").id().build(),
         ModelBuilder::new("Cat").id().build(),
         ModelBuilder::new("Person")
@@ -332,10 +322,8 @@ fn test_one_to_one_mismatched_fk_and_nav_type_error() {
             .build(),
     ]);
 
-    let d1gen = D1Generator::new(spec, create_wrangler());
-
     // Act
-    let err = d1gen.sql().unwrap_err();
+    let err = d1::generate_sql(&ast.models).unwrap_err();
 
     // Assert - message includes "Mismatched types between foreign key and One to One navigation property"
     expected_str!(
@@ -348,7 +336,7 @@ fn test_one_to_one_mismatched_fk_and_nav_type_error() {
 fn test_one_to_many_unresolved_reference_error() {
     // Arrange:
     // Person declares OneToMany to Dog referencing Dog.personId, but Dog has no personId FK attr.
-    let spec = create_ast(vec![
+    let ast = create_ast(vec![
         ModelBuilder::new("Dog").id().build(), // no personId attribute
         ModelBuilder::new("Person")
             .id()
@@ -362,15 +350,13 @@ fn test_one_to_many_unresolved_reference_error() {
             .build(),
     ]);
 
-    let d1gen = D1Generator::new(spec, create_wrangler());
-
     // Act
-    let err = d1gen.sql().unwrap_err();
+    let err = d1::generate_sql(&ast.models).unwrap_err();
 
     // Assert
     expected_str!(
         err,
-        "Navigation property Person.dogs references Dog.personId which does not exist."
+        "Navigation property Person.dogs references Dog.personId which does not exist or is not a foreign key to Person"
     );
 }
 
@@ -393,8 +379,7 @@ fn test_junction_table_builder_errors() {
             ModelBuilder::new("Course").id().build(),
         ]);
 
-        let d1gen = D1Generator::new(ast, create_wrangler());
-        let err = d1gen.sql().unwrap_err();
+        let err = d1::generate_sql(&ast.models).unwrap_err();
         expected_str!(err, "Both models must be set for a junction table");
     }
 
@@ -434,8 +419,7 @@ fn test_junction_table_builder_errors() {
                 .build(),
         ]);
 
-        let d1gen = D1Generator::new(ast, create_wrangler());
-        let err = d1gen.sql().unwrap_err();
+        let err = d1::generate_sql(&ast.models).unwrap_err();
         expected_str!(
             err,
             "Too many ManyToMany navigation properties for junction table"

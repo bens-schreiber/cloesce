@@ -3,9 +3,9 @@ use std::{io::Write, path::PathBuf};
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand, command};
 
-use common::{CloesceAst, wrangler::WranglerFormat};
-use d1::D1Generator;
+use common::CloesceAst;
 use workers::WorkersGenerator;
+use wrangler::WranglerFormat;
 
 #[derive(Parser)]
 #[command(name = "generate", version = "0.0.1")]
@@ -19,7 +19,6 @@ enum Commands {
     Validate {
         cidl_path: PathBuf,
     },
-
     Generate {
         #[command(subcommand)]
         target: GenerateTarget,
@@ -28,10 +27,12 @@ enum Commands {
 
 #[derive(Subcommand)]
 enum GenerateTarget {
+    Wrangler {
+        wrangler_path: PathBuf,
+    },
     D1 {
         cidl_path: PathBuf,
         sqlite_path: PathBuf,
-        wrangler_path: Option<PathBuf>,
     },
     Workers {
         cidl_path: PathBuf,
@@ -54,52 +55,36 @@ fn main() -> Result<()> {
             println!("Ok.")
         }
         Commands::Generate { target } => match target {
+            GenerateTarget::Wrangler { wrangler_path } => {
+                let mut wrangler = WranglerFormat::from_path(&wrangler_path)
+                    .context("Failed to open wrangler file")?;
+                let mut spec = wrangler.as_spec()?;
+                spec.generate_defaults();
+
+                let wrangler_file = std::fs::OpenOptions::new()
+                    .write(true)
+                    .create(true)
+                    .truncate(true)
+                    .open(&wrangler_path)?;
+
+                wrangler
+                    .update(spec, wrangler_file)
+                    .context("Failed to update wrangler file")?;
+            }
             GenerateTarget::D1 {
                 cidl_path,
-                wrangler_path,
                 sqlite_path,
             } => {
                 let mut sqlite_file = create_file_and_dir(&sqlite_path)?;
                 let ast = ast_from_path(cidl_path)?;
                 ast.validate_types()?;
 
-                let mut wrangler = match wrangler_path {
-                    Some(ref wrangler_path) => WranglerFormat::from_path(wrangler_path)
-                        .context("Failed to open wrangler file")?,
-                    _ => {
-                        // Default to an empty TOML if the path is not given.
-                        WranglerFormat::Toml(toml::from_str("").unwrap())
-                    }
-                };
+                let generated_sqlite =
+                    d1::generate_sql(&ast.models).context("Failed to generate sqlite file")?;
 
-                let d1gen = D1Generator::new(
-                    ast,
-                    wrangler
-                        .as_spec()
-                        .context("Failed to validate Wrangler file")?,
-                );
-
-                // Update wrangler config
-                {
-                    let updated_wrangler = d1gen.wrangler();
-                    let wrangler_file = match wrangler_path {
-                        Some(wrangler_path) => std::fs::File::create(wrangler_path)?,
-
-                        // Default to an empty TOML if the path is not given.
-                        _ => std::fs::File::create("./wrangler.toml")?,
-                    };
-                    wrangler
-                        .update(&updated_wrangler, wrangler_file)
-                        .context("Failed to update wrangler file")?;
-                }
-
-                // Generate SQL
-                {
-                    let generated_sqlite = d1gen.sql().context("Failed to generate sqlite file")?;
-                    sqlite_file
-                        .write(generated_sqlite.as_bytes())
-                        .context("Failed to write to sqlite file")?;
-                }
+                sqlite_file
+                    .write(generated_sqlite.as_bytes())
+                    .context("Failed to write to sqlite file")?;
             }
             GenerateTarget::Workers {
                 cidl_path,
@@ -114,13 +99,13 @@ fn main() -> Result<()> {
                     create_file_and_dir(&workers_path).context("Failed to open workers file")?;
 
                 let wrangler = WranglerFormat::from_path(&wrangler_path)
-                    .context("Failed to open wrangler file")?
-                    .as_spec()?;
+                    .context("Failed to open wrangler file")?;
 
-                file.write(
-                    WorkersGenerator::create(ast, wrangler, domain, &workers_path)?.as_bytes(),
-                )
-                .context("Failed to write workers file")?;
+                let workers =
+                    WorkersGenerator::create(ast, wrangler.as_spec()?, domain, &workers_path)?;
+
+                file.write(workers.as_bytes())
+                    .context("Failed to write workers file")?;
             }
             GenerateTarget::Client {
                 cidl_path,

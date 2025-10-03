@@ -1,7 +1,15 @@
-#!/usr/bin/env node
 import fs from "node:fs";
 import path from "node:path";
-import { command, run, option, string, optional } from "cmd-ts";
+import {
+  command,
+  run,
+  option,
+  string,
+  optional,
+  subcommands,
+  boolean,
+  flag,
+} from "cmd-ts";
 import { CidlExtractor } from "./extract.js";
 import { Project } from "ts-morph";
 
@@ -11,68 +19,87 @@ const cli = command({
   args: {
     projectName: option({
       long: "project-name",
-      short: "p",
       type: optional(string),
       description: "Project name",
     }),
     out: option({
       long: "out",
-      short: "o",
       type: optional(string),
       description: "Output path (default: <project>/.generated/cidl.json)",
     }),
+    truncateSourcePaths: flag({
+      long: "truncateSourcePaths",
+      description: "Sets all source paths to just their file name",
+    }),
+    location: option({
+      long: "location",
+      short: "l",
+      type: optional(string),
+      description: "Project directory (default: cwd)",
+    }),
   },
-  handler: async ({ projectName, out }) => {
-    const projectRoot = findProjectRoot(process.cwd());
-    const outPath = path.resolve(projectRoot, out ?? ".generated/cidl.json");
-    fs.mkdirSync(path.dirname(outPath), { recursive: true });
-
-    // Collect cloesce files
-    const config = readCloesceConfig(projectRoot);
-    const sourcePaths = Array.isArray(config.source)
-      ? config.source
-      : [config.source];
-    const files = findCloesceFiles(projectRoot, sourcePaths);
-    if (files.length === 0) {
-      throw new Error(
-        `No ".cloesce.ts" files found in specified source path(s): ${sourcePaths.join(", ")}`,
-      );
-    }
-
-    // Setup TypeScript project for AST traversal
-    const tsconfigPath = fs.existsSync(path.join(projectRoot, "tsconfig.json"))
-      ? path.join(projectRoot, "tsconfig.json")
-      : undefined;
-    const project = new Project({
-      tsConfigFilePath: tsconfigPath,
-      compilerOptions: tsconfigPath
-        ? undefined
-        : { target: 99, lib: ["es2022", "dom"] },
+  handler: async ({ projectName, out, location, truncateSourcePaths }) => {
+    await runExtractor({
+      projectName,
+      out,
+      location,
+      truncateSourcePaths: truncateSourcePaths,
     });
-    files.forEach((f) => project.addSourceFileAtPath(f));
-
-    // Read pkg.json to set the cloesce project name
-    let cloesceProjectName =
-      projectName ?? readPackageJsonProjectName(projectRoot);
-
-    try {
-      let extractor = new CidlExtractor(cloesceProjectName, "v0.0.2");
-      const result = extractor.extract(project);
-      if (!result.ok) {
-        throw new Error(result.value);
-      }
-
-      fs.writeFileSync(outPath, JSON.stringify(result.value, null, 4));
-      console.log(`Wrote ${outPath}`);
-    } catch (err: any) {
-      console.error(" ERROR - cloesce:", err?.message ?? err);
-      process.exit(1);
-    }
   },
 });
 
+async function runExtractor({
+  projectName,
+  out,
+  location,
+  truncateSourcePaths,
+}: {
+  projectName?: string;
+  out?: string;
+  location?: string;
+  truncateSourcePaths?: boolean;
+}) {
+  const baseDir = location ? path.resolve(location) : process.cwd();
+  const projectRoot = findProjectRoot(baseDir);
+  const outPath = path.resolve(out ?? ".generated/cidl.json");
+
+  const files = findCloesceFiles(projectRoot, ["./"]);
+  const project = new Project({
+    compilerOptions: {
+      strictNullChecks: true,
+    },
+  });
+  files.forEach((f) => project.addSourceFileAtPath(f));
+
+  let cloesceProjectName =
+    projectName ?? readPackageJsonProjectName(projectRoot);
+
+  try {
+    let extractor = new CidlExtractor(cloesceProjectName, "v0.0.2");
+    const result = extractor.extract(project);
+    if (!result.ok) {
+      throw new Error(result.value);
+    }
+    const ast = result.value;
+
+    if (truncateSourcePaths) {
+      ast.wrangler_env.source_path =
+        "./" + path.basename(ast.wrangler_env.source_path);
+      for (const model of Object.values(ast.models)) {
+        model.source_path = "./" + path.basename(model.source_path);
+      }
+    }
+
+    const json = JSON.stringify(result.value, null, 4);
+    fs.mkdirSync(path.dirname(outPath), { recursive: true });
+    fs.writeFileSync(outPath, json);
+  } catch (err: any) {
+    console.error(" ERROR - cloesce:", err?.message ?? err);
+    process.exit(1);
+  }
+}
+
 function findProjectRoot(start: string) {
-  // optional: ensure output lands at the project root, not a random cwd
   let dir = start;
   for (;;) {
     if (fs.existsSync(path.join(dir, "package.json"))) return dir;
@@ -92,36 +119,6 @@ function readPackageJsonProjectName(cwd: string) {
   }
 
   return projectName;
-}
-
-type CloesceConfig = {
-  source: string | string[];
-};
-
-function readCloesceConfig(cwd: string): CloesceConfig {
-  const configPath = path.join(cwd, "cloesce-config.json");
-
-  if (!fs.existsSync(configPath)) {
-    throw new Error(
-      `No "cloesce-config.json" found in "${cwd}". Please create a cloesce-config.json with a "source" field.`,
-    );
-  }
-
-  try {
-    const config = JSON.parse(
-      fs.readFileSync(configPath, "utf8"),
-    ) as CloesceConfig;
-
-    if (!config.source) {
-      throw new Error('cloesce-config.json must contain a "source" field');
-    }
-
-    return config;
-  } catch (error) {
-    throw new Error(
-      `Failed to parse cloesce-config.json: ${error instanceof Error ? error.message : String(error)}`,
-    );
-  }
 }
 
 function findCloesceFiles(root: string, searchPaths: string[]): string[] {
@@ -147,22 +144,22 @@ function findCloesceFiles(root: string, searchPaths: string[]): string[] {
   }
 
   return files;
-}
 
-function walkDirectory(dir: string): string[] {
-  const files: string[] = [];
+  function walkDirectory(dir: string): string[] {
+    const files: string[] = [];
 
-  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-    const fullPath = path.join(dir, entry.name);
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const fullPath = path.join(dir, entry.name);
 
-    if (entry.isDirectory()) {
-      files.push(...walkDirectory(fullPath));
-    } else if (entry.isFile() && /\.cloesce\.ts$/i.test(entry.name)) {
-      files.push(fullPath);
+      if (entry.isDirectory()) {
+        files.push(...walkDirectory(fullPath));
+      } else if (entry.isFile() && /\.cloesce\.ts$/i.test(entry.name)) {
+        files.push(fullPath);
+      }
     }
-  }
 
-  return files;
+    return files;
+  }
 }
 
 run(cli, process.argv.slice(2));
