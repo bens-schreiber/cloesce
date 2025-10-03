@@ -9,7 +9,6 @@ let controller: AbortController | undefined;
  * Copies a fixture, runs migrations, builds, and starts a wrangler server.
  */
 export async function startWrangler(fixturesPath: string) {
-  await waitForPort(PORT, "localhost", 30_000, true);
   await fs.cp(fixturesPath, ".generated", { recursive: true });
 
   runSync(
@@ -39,7 +38,6 @@ export async function startWrangler(fixturesPath: string) {
 export async function stopWrangler() {
   controller?.abort();
   await fs.rm(".generated", { recursive: true, force: true });
-  await waitForPort(PORT, "localhost", 30_000, true);
 }
 
 function runSync(label: string, cmd: string, opts: { cwd?: string } = {}) {
