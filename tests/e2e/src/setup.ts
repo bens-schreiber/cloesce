@@ -19,7 +19,7 @@ export async function startWrangler(fixturesPath: string) {
     "echo y | npx wrangler d1 migrations apply db",
     {
       cwd: ".generated",
-    },
+    }
   );
 
   runSync("Building Wrangler", "npx wrangler --config wrangler.toml build", {
@@ -30,7 +30,7 @@ export async function startWrangler(fixturesPath: string) {
     `npx wrangler dev --port ${PORT} --config wrangler.toml`,
     {
       cwd: ".generated",
-    },
+    }
   );
 
   process.once("exit", () => wranglerProc?.kill());
@@ -49,7 +49,19 @@ export async function startWrangler(fixturesPath: string) {
 export async function stopWrangler() {
   if (wranglerProc) {
     console.log("Stopping Wrangler...");
+
+    const exited = new Promise<void>((resolve) => {
+      wranglerProc?.once("exit", () => {
+        resolve();
+      });
+      wranglerProc?.once("close", () => {
+        resolve();
+      });
+    });
+
     wranglerProc.kill("SIGINT");
+    await exited;
+
     wranglerProc = null;
   }
 
@@ -92,7 +104,7 @@ async function copyFolder(src: string, dest: string) {
 function waitForPort(
   port: number,
   host: string,
-  timeoutMs: number,
+  timeoutMs: number
 ): Promise<void> {
   return new Promise((resolve, reject) => {
     const start = Date.now();
