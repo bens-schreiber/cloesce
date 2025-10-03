@@ -4,8 +4,11 @@ export default defineConfig({
   test: {
     pool: "forks",
     poolOptions: {
+      threads: {
+        singleThread: true,
+      },
       forks: {
-        singleFork: true, // Ensure all tests run in a single process
+        singleFork: true,
       },
     },
   },
