@@ -25,6 +25,8 @@ pub struct WranglerSpec {
 }
 
 impl WranglerSpec {
+    /// Ensures that all required values exist or places a default
+    /// for them
     pub fn generate_defaults(&mut self) {
         // Generate default worker entry point values
         self.name = Some(self.name.clone().unwrap_or_else(|| "cloesce".to_string()));

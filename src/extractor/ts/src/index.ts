@@ -1,6 +1,5 @@
-export { cloesce } from "./cloesce.js";
+export { cloesce, modelsFromSql } from "./cloesce.js";
 export { HttpResult } from "./common.js";
-export { modelsFromSql } from "./cloesce.js";
 
 // Compiler hints
 export const D1: ClassDecorator = () => {};

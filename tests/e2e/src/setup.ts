@@ -1,5 +1,4 @@
 import { ChildProcessWithoutNullStreams, execSync, spawn } from "child_process";
-import net from "net";
 import fs from "fs/promises";
 import kill from "tree-kill";
 
@@ -12,14 +11,19 @@ let wranglerProcess: ChildProcessWithoutNullStreams;
 export async function startWrangler(fixturesPath: string) {
   await fs.cp(fixturesPath, ".generated", { recursive: true });
 
-  runSync(
+  await runCmd(
     "Applying D1 migrations",
     "echo y | npx wrangler d1 migrations apply db",
     { cwd: ".generated" },
   );
-  runSync("Building Wrangler", "npx wrangler --config wrangler.toml build", {
-    cwd: ".generated",
-  });
+
+  await runCmd(
+    "Building Wrangler",
+    "npx wrangler --config wrangler.toml build",
+    {
+      cwd: ".generated",
+    },
+  );
 
   wranglerProcess = spawn(
     "npx",
@@ -34,6 +38,9 @@ export async function startWrangler(fixturesPath: string) {
   console.log("Wrangler server ready ✅\n");
 }
 
+/**
+ * Kills the running wrangler process via `kill-tree`
+ */
 export async function stopWrangler() {
   await new Promise<void>((resolve, reject) => {
     kill(wranglerProcess.pid!, "SIGTERM", (err) => {
@@ -45,13 +52,17 @@ export async function stopWrangler() {
   await fs.rm(".generated", { recursive: true, force: true });
 }
 
-function runSync(label: string, cmd: string, opts: { cwd?: string } = {}) {
+export function withRes(message: string, res: any): string {
+  return `${message}\n\n${JSON.stringify(res, null, 2)}`;
+}
+
+async function runCmd(label: string, cmd: string, opts: { cwd?: string } = {}) {
   try {
     console.log(`${label}...`);
     execSync(cmd, { stdio: "inherit", ...opts });
     console.log("Ok ✅\n");
   } catch (err) {
     console.error(`${label} failed:`, err);
-    wranglerProcess.exit(1);
+    await stopWrangler();
   }
 }

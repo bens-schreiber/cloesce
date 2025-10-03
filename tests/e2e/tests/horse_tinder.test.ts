@@ -1,4 +1,4 @@
-import { startWrangler, stopWrangler } from "../src/setup.js";
+import { startWrangler, stopWrangler, withRes } from "../src/setup.js";
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { Horse } from "../../fixtures/horse_tinder/client.js";
 
@@ -9,10 +9,6 @@ beforeAll(async () => {
 afterAll(async () => {
   await stopWrangler();
 });
-
-function withRes(message: string, res: any): string {
-  return `${message}\n\n${JSON.stringify(res, null, 2)}`;
-}
 
 describe("POST, GET a Horse", () => {
   const roach = new Horse();
