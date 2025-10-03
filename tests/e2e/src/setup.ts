@@ -33,7 +33,7 @@ export async function startWrangler(fixturesPath: string) {
     },
   ).once("error", () => {}); // ignore AbortError
 
-  await waitForPort(PORT, "localhost", 5000, false);
+  await waitForPort(PORT, "localhost", 30_000, false);
   console.log("Wrangler server ready ✅\n");
 }
 
