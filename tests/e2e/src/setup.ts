@@ -1,72 +1,45 @@
-import { exec, execSync, ChildProcess } from "child_process";
+import { execSync, spawn } from "child_process";
 import net from "net";
-import path from "path";
 import fs from "fs/promises";
 
 const PORT = 5002;
-let wranglerProc: ChildProcess | null = null;
+let controller: AbortController | undefined;
 
 /**
- * Copies a fixture into the working directory, runs migrations, runs wrangler build, then starts
- * a wrangler server process tied to the parent processes lifetime.
- * @param fixturesPath The fixture to copy
+ * Copies a fixture, runs migrations, builds, and starts a wrangler server.
  */
 export async function startWrangler(fixturesPath: string) {
-  await waitForPortFree(PORT, "localhost", 5000);
-  await copyFolder(fixturesPath, ".generated");
+  await waitForPort(PORT, "localhost", 5000, true);
+  await fs.cp(fixturesPath, ".generated", { recursive: true });
 
   runSync(
     "Applying D1 migrations",
     "echo y | npx wrangler d1 migrations apply db",
-    {
-      cwd: ".generated",
-    },
+    { cwd: ".generated" },
   );
-
   runSync("Building Wrangler", "npx wrangler --config wrangler.toml build", {
     cwd: ".generated",
   });
 
-  wranglerProc = exec(
-    `npx wrangler dev --port ${PORT} --config wrangler.toml`,
+  controller = new AbortController();
+  spawn(
+    "npx",
+    ["wrangler", "dev", "--port", String(PORT), "--config", "wrangler.toml"],
     {
       cwd: ".generated",
+      detached: true,
+      stdio: "pipe",
+      signal: controller.signal,
     },
-  );
+  ).once("error", () => {}); // ignore AbortError
 
-  process.once("exit", () => wranglerProc?.kill());
-  process.once("SIGINT", () => {
-    wranglerProc?.kill();
-    process.exit(1);
-  });
-
-  wranglerProc?.stdout?.pipe(process.stdout);
-  wranglerProc?.stderr?.pipe(process.stderr);
-
-  await waitForPortInUse(PORT, "localhost", PORT);
+  await waitForPort(PORT, "localhost", 5000, false);
   console.log("Wrangler server ready ✅\n");
 }
 
 export async function stopWrangler() {
-  if (wranglerProc) {
-    console.log("Stopping Wrangler...");
-
-    const closed = new Promise<void>((resolve) => {
-      wranglerProc!.once("close", () => resolve());
-    });
-
-    wranglerProc.kill("SIGTERM");
-    await closed;
-
-    wranglerProc = null;
-  }
-
-  try {
-    await fs.rm(".generated", { recursive: true, force: true });
-    console.log("Deleted .generated ✅");
-  } catch (err) {
-    console.warn("Could not delete .generated:", err);
-  }
+  controller?.abort();
+  await fs.rm(".generated", { recursive: true, force: true });
 }
 
 function runSync(label: string, cmd: string, opts: { cwd?: string } = {}) {
@@ -80,89 +53,46 @@ function runSync(label: string, cmd: string, opts: { cwd?: string } = {}) {
   }
 }
 
-async function copyFolder(src: string, dest: string) {
-  await fs.mkdir(dest, { recursive: true });
-
-  for (const entry of await fs.readdir(src)) {
-    const srcPath = path.join(src, entry);
-    const destPath = path.join(dest, entry);
-    const stat = await fs.stat(srcPath);
-
-    if (stat.isFile()) {
-      await fs.copyFile(srcPath, destPath);
-    } else if (stat.isDirectory()) {
-      // Recursively copy subdirectory
-      await copyFolder(srcPath, destPath);
-    }
-  }
-}
-
-function waitForPortInUse(
+/**
+ * Waits for a port to be free or in use.
+ * @param shouldBeFree true = wait for free, false = wait for in use
+ */
+function waitForPort(
   port: number,
   host: string,
   timeoutMs: number,
+  shouldBeFree: boolean,
 ): Promise<void> {
+  const start = Date.now();
+
   return new Promise((resolve, reject) => {
-    const start = Date.now();
-
-    const check = () => {
-      const socket = net.connect({ port, host }, () => {
-        socket.destroy();
-        resolve();
-      });
-
-      socket.once("error", () => handleRetry(socket));
-      socket.once("timeout", () => handleRetry(socket));
-      socket.setTimeout(500);
-
-      function handleRetry(socket: net.Socket) {
-        socket.destroy();
-        if (Date.now() - start > timeoutMs) {
-          reject(new Error(`Timed out waiting for port ${port}`));
-        } else {
-          setTimeout(check, 200);
-        }
-      }
-    };
-
-    check();
-  });
-}
-
-function waitForPortFree(
-  port: number,
-  host: string,
-  timeoutMs: number,
-): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const start = Date.now();
-
     const check = () => {
       const socket = net.createConnection({ port, host });
+      socket.setTimeout(500);
 
       socket.once("connect", () => {
-        // Port is in use, try again later
         socket.destroy();
-        retry();
+        if (shouldBeFree) retry();
+        else resolve();
       });
 
       socket.once("error", (err: NodeJS.ErrnoException) => {
-        if (err.code === "ECONNREFUSED") {
-          // Port is free
-          resolve();
-        } else {
-          // Some other error, keep retrying
-          retry();
-        }
+        socket.destroy();
+        if (!shouldBeFree && err.code !== "ECONNREFUSED") retry();
+        else if (shouldBeFree && err.code === "ECONNREFUSED") resolve();
+        else retry();
       });
 
-      function retry() {
-        if (Date.now() - start > timeoutMs) {
-          reject(new Error(`Timed out waiting for port ${port} to be free`));
-        } else {
-          setTimeout(check, 200);
-        }
-      }
+      socket.once("timeout", () => {
+        socket.destroy();
+        retry();
+      });
+    };
+
+    const retry = () => {
+      if (Date.now() - start > timeoutMs)
+        reject(new Error(`Timed out waiting for port ${port}`));
+      else setTimeout(check, 200);
     };
 
     check();
