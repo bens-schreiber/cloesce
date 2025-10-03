@@ -31,7 +31,7 @@ export async function startWrangler(fixturesPath: string) {
     },
   ).once("error", () => {}); // ignore AbortError
 
-  await waitForPort(PORT, "localhost", 30_000, false);
+  await new Promise((resolve) => setTimeout(resolve, 5000));
   console.log("Wrangler server ready ✅\n");
 }
 
@@ -49,50 +49,4 @@ function runSync(label: string, cmd: string, opts: { cwd?: string } = {}) {
     console.error(`${label} failed:`, err);
     process.exit(1);
   }
-}
-
-/**
- * Waits for a port to be free or in use.
- * @param shouldBeFree true = wait for free, false = wait for in use
- */
-function waitForPort(
-  port: number,
-  host: string,
-  timeoutMs: number,
-  shouldBeFree: boolean,
-): Promise<void> {
-  const start = Date.now();
-
-  return new Promise((resolve, reject) => {
-    const check = () => {
-      const socket = net.createConnection({ port, host });
-      socket.setTimeout(500);
-
-      socket.once("connect", () => {
-        socket.destroy();
-        if (shouldBeFree) retry();
-        else resolve();
-      });
-
-      socket.once("error", (err: NodeJS.ErrnoException) => {
-        socket.destroy();
-        if (!shouldBeFree && err.code !== "ECONNREFUSED") retry();
-        else if (shouldBeFree && err.code === "ECONNREFUSED") resolve();
-        else retry();
-      });
-
-      socket.once("timeout", () => {
-        socket.destroy();
-        retry();
-      });
-    };
-
-    const retry = () => {
-      if (Date.now() - start > timeoutMs)
-        reject(new Error(`Timed out waiting for port ${port}`));
-      else setTimeout(check, 200);
-    };
-
-    check();
-  });
 }

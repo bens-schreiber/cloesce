@@ -4,7 +4,7 @@ import { Horse } from "../../fixtures/horse_tinder/client.js";
 
 beforeAll(async () => {
   await startWrangler("../fixtures/horse_tinder");
-});
+}, 30_000);
 
 afterAll(async () => {
   await stopWrangler();

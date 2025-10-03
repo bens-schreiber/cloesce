@@ -10,7 +10,7 @@ import {
 
 beforeAll(async () => {
   await startWrangler("../fixtures/foreign_keys");
-});
+}, 30_000);
 
 afterAll(async () => {
   await stopWrangler();

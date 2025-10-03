@@ -9,10 +9,7 @@
     "strict": true,
     "strictPropertyInitialization": false,
     "experimentalDecorators": true,
-    "emitDecoratorMetadata": true,
-    "paths": {
-      "cloesce": ["../../src/extractor/ts/src/index.ts"]
-    }
+    "emitDecoratorMetadata": true
   },
-  "include": ["../fixtures/**/*.ts", "src/**/*.ts"]
+  "include": ["src/**/*.ts"]
 }
