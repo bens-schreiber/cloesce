@@ -12,7 +12,7 @@ let wranglerProc: ChildProcess | null = null;
  * @param fixturesPath The fixture to copy
  */
 export async function startWrangler(fixturesPath: string) {
-  waitForPortFree(PORT, "localhost", 5000);
+  await waitForPortFree(PORT, "localhost", 5000);
   await copyFolder(fixturesPath, ".generated");
 
   runSync(
