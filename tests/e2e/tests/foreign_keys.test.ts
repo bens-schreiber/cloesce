@@ -8,10 +8,6 @@ import {
   Course,
 } from "../../fixtures/foreign_keys/client.js";
 
-function withRes(message: string, res: any): string {
-  return `${message}\n\n${JSON.stringify(res, null, 2)}`;
-}
-
 beforeAll(async () => {
   await startWrangler("../fixtures/foreign_keys");
 }, 30_000);
@@ -19,6 +15,10 @@ beforeAll(async () => {
 afterAll(async () => {
   await stopWrangler();
 });
+
+function withRes(message: string, res: any): string {
+  return `${message}\n\n${JSON.stringify(res, null, 2)}`;
+}
 
 async function testRefresh<T, DS extends string | null>(
   obj: T & { refresh: (dataSource?: DS) => Promise<any> },
