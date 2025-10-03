@@ -148,6 +148,7 @@ jobs:
         working-directory: src/extractor/ts
         run: |
           npm ci
+          npm build
 
       - name: Install dependencies
         run: npm ci
