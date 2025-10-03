@@ -12,6 +12,7 @@ import {
 } from "cmd-ts";
 import { CidlExtractor } from "./extract.js";
 import { Project } from "ts-morph";
+import { ExtractorError, ExtractorErrorCode, getErrorInfo } from "./common.js";
 
 const cli = command({
   name: "cloesce",
@@ -78,7 +79,8 @@ async function runExtractor({
     let extractor = new CidlExtractor(cloesceProjectName, "v0.0.2");
     const result = extractor.extract(project);
     if (!result.ok) {
-      throw new Error(result.value);
+      console.error(formatErr(result.value));
+      return;
     }
     const ast = result.value;
 
@@ -94,9 +96,26 @@ async function runExtractor({
     fs.mkdirSync(path.dirname(outPath), { recursive: true });
     fs.writeFileSync(outPath, json);
   } catch (err: any) {
-    console.error(" ERROR - cloesce:", err?.message ?? err);
+    console.error(
+      "Critical uncaught error. Submit a ticket to https://github.com/bens-schreiber/cloesce: ",
+      err?.message ?? err
+    );
     process.exit(1);
   }
+}
+
+function formatErr(e: ExtractorError): string {
+  let { description, suggestion } = getErrorInfo(e.code);
+  return `
+  ==== CLOESCE ERROR ====
+  Error [${ExtractorErrorCode[e.code]}]: ${description}
+  Phase: TypeScript IDL Extraction
+  Context: ${e.context}
+
+  ${e.snippet}
+
+  Suggested fix: ${suggestion}
+  `;
 }
 
 function findProjectRoot(start: string) {
@@ -129,7 +148,7 @@ function findCloesceFiles(root: string, searchPaths: string[]): string[] {
 
     if (!fs.existsSync(fullPath)) {
       console.warn(
-        `Warning: Path "${searchPath}" specified in cloesce-config.json does not exist`,
+        `Warning: Path "${searchPath}" specified in cloesce-config.json does not exist`
       );
       continue;
     }
