@@ -1,9 +1,11 @@
 pub mod builder;
+pub mod err;
 
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
-use anyhow::{Result, bail, ensure};
+use err::GeneratorErrorKind;
+use err::Result;
 use serde::Deserialize;
 use serde::Serialize;
 use serde_with::MapPreventDuplicates;
@@ -186,7 +188,7 @@ impl CloesceAst {
         let ensure_valid_sql_type = |model: &Model, value: &NamedTypedValue| {
             let inner = match &value.cidl_type {
                 CidlType::Nullable(inner) if matches!(inner.as_ref(), CidlType::Void) => {
-                    bail!("SQL types cannot be null, only nullable.")
+                    fail!(GeneratorErrorKind::NullSqlType)
                 }
                 CidlType::Nullable(inner) => inner.as_ref(),
                 other => other,
@@ -197,7 +199,8 @@ impl CloesceAst {
                     inner,
                     CidlType::Integer | CidlType::Real | CidlType::Text | CidlType::Blob
                 ),
-                "Invalid SQL Type {}.{}",
+                GeneratorErrorKind::InvalidSqlType,
+                "{}.{}",
                 model.name,
                 value.name
             );
@@ -209,7 +212,10 @@ impl CloesceAst {
             // Validate record
             ensure!(
                 *model_name == model.name,
-                "Model record key did not match it's model name?"
+                GeneratorErrorKind::InvalidMapping,
+                "Model record key did not match it's model name? {} : {}",
+                model_name,
+                model.name
             );
 
             // Validate PK
@@ -223,7 +229,8 @@ impl CloesceAst {
                     // Validate the fk's model exists
                     ensure!(
                         self.models.contains_key(fk_model.as_str()),
-                        "Unknown Model for foreign key {}.{} => {}?",
+                        GeneratorErrorKind::UnknownModel,
+                        "{}.{} => {}?",
                         model.name,
                         a.value.name,
                         fk_model
@@ -235,7 +242,8 @@ impl CloesceAst {
             for nav in &model.navigation_properties {
                 ensure!(
                     self.models.contains_key(nav.model_name.as_str()),
-                    "Unknown Model for navigation property on {} => {}?",
+                    GeneratorErrorKind::UnknownModel,
+                    "{} => {}?",
                     model.name,
                     nav.model_name
                 );
@@ -246,14 +254,18 @@ impl CloesceAst {
                 // Validate record
                 ensure!(
                     *method_name == method.name,
-                    "Method record key did not match it's method name?"
+                    GeneratorErrorKind::InvalidMapping,
+                    "Method record key did not match it's method name? {}: {}",
+                    method_name,
+                    method.name
                 );
 
                 // Validate return type
                 if let CidlType::Model(m) = &method.return_type {
                     ensure!(
                         self.models.contains_key(m.as_str()),
-                        "Unknown model reference on model method return type {}.{}",
+                        GeneratorErrorKind::UnknownModel,
+                        "{}.{}",
                         model.name,
                         method.name
                     );
@@ -264,8 +276,9 @@ impl CloesceAst {
                     let root_type = param.cidl_type.root_type();
 
                     if let CidlType::Void = root_type {
-                        bail!(
-                            "Method parameters cannot be void. {}.{}.{}",
+                        fail!(
+                            GeneratorErrorKind::UnexpectedVoid,
+                            "{}.{}.{}",
                             model.name,
                             method.name,
                             param.name
@@ -275,14 +288,17 @@ impl CloesceAst {
                     if let CidlType::Model(m) = root_type {
                         ensure!(
                             self.models.contains_key(m.as_str()),
-                            "Unknown model reference on model method {}.{}.{}",
+                            GeneratorErrorKind::UnknownModel,
+                            "{}.{}.{}",
                             model.name,
                             method.name,
                             param.name
                         );
 
+                        // TODO: remove this
                         if method.http_verb == HttpVerb::GET {
-                            bail!(
+                            fail!(
+                                GeneratorErrorKind::NotYetSupported,
                                 "GET Requests currently do not support model parameters {}.{}.{}",
                                 model.name,
                                 method.name,

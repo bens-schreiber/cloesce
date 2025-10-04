@@ -1,7 +1,6 @@
 use std::path::Path;
 use std::{fs::File, io::Write};
 
-use anyhow::{Context, Result, anyhow};
 use serde::Deserialize;
 use serde::Serialize;
 use serde_json::Value as JsonValue;
@@ -85,49 +84,50 @@ pub enum WranglerFormat {
 }
 
 impl WranglerFormat {
-    pub fn from_path(path: &Path) -> Result<Self> {
-        let contents = std::fs::read_to_string(path).context("Failed to open wrangler file")?;
+    pub fn from_path(path: &Path) -> Self {
+        let contents = std::fs::read_to_string(path).expect("Failed to open wrangler file");
         let extension = path
             .extension()
             .and_then(|e| e.to_str())
-            .ok_or_else(|| anyhow::anyhow!("Missing or invalid extension"))?;
+            .expect("Missing or invalid extension");
 
         match extension {
             "json" => {
-                let val: JsonValue = serde_json::from_str(contents.as_str())?;
-                Ok(WranglerFormat::Json(val))
+                let val: JsonValue =
+                    serde_json::from_str(contents.as_str()).expect("JSON to be opened");
+                WranglerFormat::Json(val)
             }
             "toml" => {
-                let val: TomlValue = toml::from_str(&contents)?;
-                Ok(WranglerFormat::Toml(val))
+                let val: TomlValue = toml::from_str(&contents).expect("Toml to be opened");
+                WranglerFormat::Toml(val)
             }
-            _ => Err(anyhow!(
-                "Unsupported Wrangler format (expected .json or .toml)"
-            )),
+            other => panic!("Unsupported wrangler file extension: {other}"),
         }
     }
 
-    pub fn update(&mut self, spec: WranglerSpec, mut wrangler_file: File) -> Result<()> {
+    pub fn update(&mut self, spec: WranglerSpec, mut wrangler_file: File) {
         match self {
             WranglerFormat::Json(val) => {
-                val["d1_databases"] = serde_json::to_value(&spec.d1_databases)?;
+                val["d1_databases"] =
+                    serde_json::to_value(&spec.d1_databases).expect("JSON to serialize");
 
                 // entrypoint + metadata (only if provided)
                 if let Some(name) = &spec.name {
-                    val["name"] = serde_json::to_value(name)?;
+                    val["name"] = serde_json::to_value(name).expect("JSON to serialize");
                 }
                 if let Some(date) = &spec.compatability_date {
-                    val["compatibility_date"] = serde_json::to_value(date)?;
+                    val["compatibility_date"] =
+                        serde_json::to_value(date).expect("JSON to serialize");
                 }
                 if let Some(main) = &spec.main {
-                    val["main"] = serde_json::to_value(main)?;
+                    val["main"] = serde_json::to_value(main).expect("JSON to serialize");
                 }
             }
             WranglerFormat::Toml(val) => {
                 if let toml::Value::Table(table) = val {
                     table.insert(
                         "d1_databases".to_string(),
-                        toml::Value::try_from(&spec.d1_databases)?,
+                        toml::Value::try_from(&spec.d1_databases).expect("TOML to serialize"),
                     );
 
                     // entrypoint + metadata (only if provided)
@@ -144,31 +144,32 @@ impl WranglerFormat {
                         table.insert("main".to_string(), toml::Value::String(main.clone()));
                     }
                 } else {
-                    return Err(anyhow!("Expected TOML root to be a table"));
+                    panic!("Expected TOML root to be a table");
                 }
             }
         }
 
         let data = match self {
-            WranglerFormat::Json(val) => serde_json::to_string_pretty(val)?,
-            WranglerFormat::Toml(val) => toml::to_string_pretty(val)?,
+            WranglerFormat::Json(val) => {
+                serde_json::to_string_pretty(val).expect("JSON to serialize")
+            }
+            WranglerFormat::Toml(val) => toml::to_string_pretty(val).expect("TOML to serialize"),
         };
 
-        wrangler_file
+        let _ = wrangler_file
             .write(data.as_bytes())
-            .context("Failed to write data to the provided wrangler path")?;
-
-        Ok(())
+            .expect("Failed to write data to the provided wrangler path");
     }
 
     /// Takes the entire Wrangler config and interprets only a [WranglerSpec]
-    pub fn as_spec(&self) -> Result<WranglerSpec> {
+    pub fn as_spec(&self) -> WranglerSpec {
         match self {
             WranglerFormat::Json(val) => {
-                serde_json::from_value(val.clone()).context("Failed to deserialize wrangler.json")
+                serde_json::from_value(val.clone()).expect("Failed to deserialize wrangler.json")
             }
-            WranglerFormat::Toml(val) => WranglerSpec::deserialize(val.clone())
-                .context("Failed to deserialize wrangler.toml"),
+            WranglerFormat::Toml(val) => {
+                WranglerSpec::deserialize(val.clone()).expect("Failed to deserialize wrangler.toml")
+            }
         }
     }
 }
@@ -181,16 +182,12 @@ mod tests {
     fn test_serialize_wrangler_spec() {
         // Empty TOML
         {
-            WranglerFormat::Toml(toml::from_str("").unwrap())
-                .as_spec()
-                .expect("Wrangler file to serialize");
+            WranglerFormat::Toml(toml::from_str("").unwrap()).as_spec();
         }
 
         // Empty JSON
         {
-            WranglerFormat::Json(serde_json::from_str("{}").unwrap())
-                .as_spec()
-                .expect("Wrangler file to serialize");
+            WranglerFormat::Json(serde_json::from_str("{}").unwrap()).as_spec();
         }
     }
 }

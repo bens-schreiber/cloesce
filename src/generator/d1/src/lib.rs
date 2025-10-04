@@ -1,8 +1,11 @@
 use std::collections::{BTreeMap, HashMap, VecDeque};
 
-use common::{CidlType, IncludeTree, Model, NavigationPropertyKind};
+use common::{
+    CidlType, IncludeTree, Model, NavigationPropertyKind, ensure,
+    err::{GeneratorErrorKind, Result},
+    fail,
+};
 
-use anyhow::{Context, Result, anyhow, bail, ensure};
 use sea_query::{
     ColumnDef, Expr, ForeignKey, Index, IntoCondition, Query, SelectStatement, SqliteQueryBuilder,
     Table,
@@ -248,14 +251,16 @@ fn validate_fks<'a>(
                     {
                         ensure!(
                             fk_model == nav.model_name,
-                            "Mismatched types between foreign key and One to One navigation property ({}.{}) ({})",
+                            GeneratorErrorKind::MismatchedNavigationPropertyTypes,
+                            "({}.{}) does not match type ({})",
                             model.name,
                             nav.var_name,
                             fk_model
                         );
                     } else {
-                        bail!(
-                            "Navigation property {}.{} references {}.{} which does not exist or is not a foreign key to {}",
+                        fail!(
+                            GeneratorErrorKind::InvalidNavigationPropertyReference,
+                            "{}.{} references {}.{} which does not exist or is not a foreign key to {}",
                             model.name,
                             nav.var_name,
                             nav.model_name,
@@ -290,8 +295,9 @@ fn validate_fks<'a>(
         // Validate the nav props reference is consistent to an attribute
         // on another model
         let Some(&fk_model) = model_reference_to_fk_model.get(&(nav_model, reference)) else {
-            bail!(
-                "Navigation property {}.{} references {}.{} which does not exist or is not a foreign key to {}",
+            fail!(
+                GeneratorErrorKind::InvalidNavigationPropertyReference,
+                "{}.{} references {}.{} which does not exist or is not a foreign key to {}",
                 model_name,
                 nav.var_name,
                 nav_model,
@@ -304,7 +310,8 @@ fn validate_fks<'a>(
         // ie, Person has many dogs, personId on dog should be an fk to Person
         ensure!(
             model_name == fk_model,
-            "Mismatched types between foreign key and One to Many navigation property ({}.{}) ({}.{})",
+            GeneratorErrorKind::MismatchedNavigationPropertyTypes,
+            "({}.{}) does not match type ({}.{})",
             model_name,
             nav.var_name,
             nav_model,
@@ -355,7 +362,11 @@ fn validate_fks<'a>(
                 .iter()
                 .filter_map(|(&n, &d)| (d > 0).then_some(n))
                 .collect();
-            bail!("Cycle detected: {}", cyclic.join(", "));
+            fail!(
+                GeneratorErrorKind::CyclicalModelDependency,
+                "{}",
+                cyclic.join(", ")
+            );
         }
 
         sorted
@@ -394,10 +405,12 @@ fn validate_data_sources<'a>(
             let mut alias_counter = HashMap::<String, u32>::new();
 
             let tree =
-                dfs(model, None, &ds.tree, model_lookup, &mut alias_counter).context(format!(
-                    "Problem found while validating data source {}.{}",
-                    model.name, ds.name
-                ))?;
+                dfs(model, None, &ds.tree, model_lookup, &mut alias_counter).map_err(|e| {
+                    e.with_context(format!(
+                        "Problem found while validating data source {}.{}",
+                        model.name, ds.name
+                    ))
+                })?;
 
             model_trees.push(ModelTree {
                 name: ds.name.clone(),
@@ -429,7 +442,12 @@ fn validate_data_sources<'a>(
                 .iter()
                 .find(|nav| nav.var_name == *var_name)
             else {
-                bail!("Invalid reference {}.{}", model.name, var_name)
+                fail!(
+                    GeneratorErrorKind::UnknownIncludeTreeReference,
+                    "{}.{}",
+                    model.name,
+                    var_name
+                )
             };
 
             // Validate model exists
@@ -527,15 +545,30 @@ struct JunctionTableBuilder<'a> {
 impl<'a> JunctionTableBuilder<'a> {
     fn model(&mut self, jm: JunctionModel<'a>) -> Result<()> {
         if self.models.len() >= 2 {
-            bail!("Too many ManyToMany navigation properties for junction table");
+            fail!(
+                GeneratorErrorKind::ExtraneousManyToManyReferences,
+                "{}, {}, {}",
+                jm.model_name,
+                self.models[0].model_name,
+                self.models[1].model_name
+            );
         }
         self.models.push(jm);
         Ok(())
     }
 
     fn build(self, unique_id: &'a str) -> Result<JunctionTable<'a>> {
-        let [a, b] = <[_; 2]>::try_from(self.models)
-            .map_err(|_| anyhow!("Both models must be set for a junction table"))?;
+        let err_context = self
+            .models
+            .first()
+            .map(|m| m.model_name)
+            .unwrap_or_default();
+        let [a, b] = <[_; 2]>::try_from(self.models).map_err(|_| {
+            GeneratorErrorKind::MissingManyToManyReference
+                .to_error()
+                .with_context(err_context)
+        })?;
+
         Ok(JunctionTable { a, b, unique_id })
     }
 }

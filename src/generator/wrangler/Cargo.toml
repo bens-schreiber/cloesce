@@ -4,7 +4,7 @@ version = "0.0.1"
 edition = "2024"
 
 [dependencies]
-anyhow = { workspace = true }
+common = { path = "../common" }
 serde = { workspace = true }
 serde_json = { workspace = true }
 toml = { workspace = true }
