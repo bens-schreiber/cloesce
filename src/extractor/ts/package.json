@@ -22,11 +22,11 @@
     "prepublishOnly": "npm run build",
     "format:fix": "prettier --write .",
     "format": "prettier --check .",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
-    "typecheck:test": "tsc -p tsconfig.test.json --noEmit",
-    "test": "jest",
-    "test:update": "jest -u",
-    "test:watch": "jest --watch"
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc --noEmit",
+    "build:wasm": "cargo build -p generator --target wasm32-wasi --release",
+    "precloesce": "npm run build && npm run build:wasm",
+    "cloesce": "node dist/cli.js"
   },
   "dependencies": {
     "cmd-ts": "^0.14.1",

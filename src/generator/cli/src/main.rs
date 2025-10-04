@@ -53,6 +53,44 @@ fn main() -> Result<()> {
             println!("Ok.")
         }
         Commands::Generate { target } => match target {
+            GenerateTarget::Wrangler { wrangler_path } => {
+                // Ensure parent directory exists
+                if let Some(parent) = wrangler_path.parent() {
+                    std::fs::create_dir_all(parent)?;
+                }
+            
+                // Determine format from extension
+                let extension = wrangler_path
+                    .extension()
+                    .and_then(|e| e.to_str())
+                    .unwrap_or("toml");
+            
+                // If file doesn't exist, create an empty template
+                if !wrangler_path.exists() {
+                    let empty_content = match extension {
+                        "json" => "{}",
+                        "toml" => "",
+                        _ => return Err(anyhow::anyhow!("Unsupported extension")),
+                    };
+                    std::fs::write(&wrangler_path, empty_content)?;
+                }
+            
+                let mut wrangler = WranglerFormat::from_path(&wrangler_path)
+                    .context("Failed to open wrangler file")?;
+                
+                let mut spec = wrangler.as_spec()?;
+                spec.generate_defaults();
+            
+                let wrangler_file = std::fs::OpenOptions::new()
+                    .write(true)
+                    .create(true)
+                    .truncate(true)
+                    .open(&wrangler_path)?;
+            
+                wrangler
+                    .update(spec, wrangler_file)
+                    .context("Failed to update wrangler file")?;
+            }
             GenerateTarget::D1 {
                 cidl_path,
                 wrangler_path,
