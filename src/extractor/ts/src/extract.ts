@@ -127,6 +127,7 @@ export class CidlExtractor {
       // Error: invalid property type
       if (!typeRes.ok) {
         typeRes.value.context = prop.getName();
+        typeRes.value.snippet = prop.getText();
         return typeRes;
       }
 
@@ -273,6 +274,7 @@ export class CidlExtractor {
 
           if (!treeRes.ok) {
             treeRes.value.addContext((old) => `${prop.getName()} ${old}`);
+            treeRes.value.snippet = prop.getText();
             return treeRes;
           }
 
@@ -286,7 +288,9 @@ export class CidlExtractor {
     }
 
     if (primary_key == undefined) {
-      return err(ExtractorErrorCode.MissingPrimaryKey);
+      return err(ExtractorErrorCode.MissingPrimaryKey, (e) => {
+        e.snippet = classDecl.getText();
+      });
     }
 
     // Process methods
@@ -431,10 +435,7 @@ export class CidlExtractor {
       !expr.isKind ||
       !expr.isKind(SyntaxKind.ObjectLiteralExpression)
     ) {
-      return err(
-        ExtractorErrorCode.InvalidIncludeTree,
-        expr ? (e) => (e.snippet = expr.getText()) : undefined
-      );
+      return err(ExtractorErrorCode.InvalidIncludeTree);
     }
 
     const result: CidlIncludeTree = {};

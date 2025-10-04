@@ -1,0 +1,7 @@
+==== CLOESCE ERROR ====
+Error [UnknownType]: Encountered an unknown or unsupported type
+Phase: TypeScript IDL Extraction
+Context: Foo.method 
+async method(valid: number): Bar<number> {}
+
+Suggested fix: Refer to the documentation on valid Cloesce TS types

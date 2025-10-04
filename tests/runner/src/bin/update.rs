@@ -3,7 +3,7 @@ use std::{fs, io};
 
 /// Updates all `snap___X` to `X` in the fixtures dir
 fn main() -> io::Result<()> {
-    let pattern = "../fixtures/*/";
+    let pattern = "../fixtures/*/**";
     let fixtures = glob(pattern)
         .expect("valid glob pattern")
         .filter_map(Result::ok)

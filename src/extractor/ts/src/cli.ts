@@ -105,17 +105,15 @@ async function runExtractor({
 }
 
 function formatErr(e: ExtractorError): string {
-  let { description, suggestion } = getErrorInfo(e.code);
-  return `
-==== CLOESCE ERROR ====
+  const { description, suggestion } = getErrorInfo(e.code);
+
+  const contextLine = e.context ? `Context: ${e.context}\n` : "";
+  const snippetLine = e.snippet ? `${e.snippet}\n\n` : "";
+
+  return `==== CLOESCE ERROR ====
 Error [${ExtractorErrorCode[e.code]}]: ${description}
 Phase: TypeScript IDL Extraction
-Context: ${e.context}
-
-${e.snippet}
-
-Suggested fix: ${suggestion}
-  `;
+${contextLine}${snippetLine}Suggested fix: ${suggestion}`;
 }
 
 function findProjectRoot(start: string) {
