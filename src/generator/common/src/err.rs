@@ -3,7 +3,16 @@ use std::fmt::Display;
 pub type Result<T> = std::result::Result<T, GeneratorError>;
 
 #[derive(Debug)]
+pub enum GeneratorPhase {
+    EarlyAstValidation,
+    D1,
+    Workers,
+}
+
+#[derive(Debug)]
 pub struct GeneratorError {
+    pub phase: GeneratorPhase,
+    pub kind: GeneratorErrorKind,
     pub description: String,
     pub suggestion: String,
     pub context: String,
@@ -13,15 +22,22 @@ impl Display for GeneratorError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "Description: {} Suggestion: {} Context: {}",
-            self.description, self.suggestion, self.context
+            "Description: {} Suggestion: {} Context: {} Kind: {:?} Phase: {:?}",
+            self.description, self.suggestion, self.context, self.kind, self.phase,
         )
     }
 }
 
 impl GeneratorError {
-    fn new(description: String, suggestion: String) -> Self {
+    fn new(
+        kind: GeneratorErrorKind,
+        phase: GeneratorPhase,
+        description: String,
+        suggestion: String,
+    ) -> Self {
         Self {
+            kind,
+            phase,
             description,
             suggestion,
             context: Default::default(),
@@ -40,6 +56,7 @@ impl GeneratorError {
     }
 }
 
+#[derive(Debug)]
 pub enum GeneratorErrorKind {
     NullSqlType,
     InvalidSqlType,
@@ -57,60 +74,76 @@ pub enum GeneratorErrorKind {
 }
 
 impl GeneratorErrorKind {
-    pub fn to_error(&self) -> GeneratorError {
-        match self {
-            GeneratorErrorKind::NullSqlType => GeneratorError::new(
-                "Model attributes cannot be literally null".into(),
-                "Remove 'null' from your Model definition.".into(),
+    pub fn to_error(self) -> GeneratorError {
+        let (description, suggestion, phase) = match self {
+            GeneratorErrorKind::NullSqlType => (
+                "Model attributes cannot be literally null",
+                "Remove 'null' from your Model definition.",
+                GeneratorPhase::EarlyAstValidation,
             ),
-            GeneratorErrorKind::InvalidSqlType => GeneratorError::new(
-                "Model attributes must be valid SQLite types: Integer, Real, Text, Blob".into(),
-                "Consider using a navigation property or creating another model.".into(),
+            GeneratorErrorKind::InvalidSqlType => (
+                "Model attributes must be valid SQLite types: Integer, Real, Text, Blob",
+                "Consider using a navigation property or creating another model.",
+                GeneratorPhase::EarlyAstValidation,
             ),
-            GeneratorErrorKind::UnknownModel => GeneratorError::new(
-                "Model attributes must be valid SQLite types: Integer, Real, Text, Blob".into(),
-                "Consider using a navigation property or creating another model.".into(),
+            GeneratorErrorKind::UnknownModel => (
+                "Model attributes must be valid SQLite types: Integer, Real, Text, Blob",
+                "Consider using a navigation property or creating another model.",
+                GeneratorPhase::EarlyAstValidation,
             ),
-            GeneratorErrorKind::UnexpectedVoid => GeneratorError::new(
-                "Void cannot be an attribute or parameter, only a return type.".into(),
-                "Remove `void`".into(),
+            GeneratorErrorKind::UnexpectedVoid => (
+                "Void cannot be an attribute or parameter, only a return type.",
+                "Remove `void`",
+                GeneratorPhase::EarlyAstValidation,
             ),
-            GeneratorErrorKind::NotYetSupported => GeneratorError::new(
-                "This feature will be supported in an upcoming Cloesce release.".into(),
-                String::default(),
+            GeneratorErrorKind::NotYetSupported => (
+                "This feature will be supported in an upcoming Cloesce release.",
+                "",
+                GeneratorPhase::EarlyAstValidation,
             ),
-            GeneratorErrorKind::InvalidMapping => {
-                GeneratorError::new("CIDL is ill-formatted".into(), String::default())
-            }
-            GeneratorErrorKind::InvalidApiDomain => GeneratorError::new(
-                "Invalid or ill-formatted API domain".into(),
-                "API's must be of the form: http://domain.com/path/to/api".into(),
+            GeneratorErrorKind::InvalidMapping => (
+                "CIDL is ill-formatted",
+                "",
+                GeneratorPhase::EarlyAstValidation,
             ),
-            GeneratorErrorKind::MismatchedNavigationPropertyTypes => GeneratorError::new(
-                "Navigation property references must match attribute types".into(),
-                "TODO: a good suggestion here".into(),
+            GeneratorErrorKind::InvalidApiDomain => (
+                "Invalid or ill-formatted API domain",
+                "API's must be of the form: http://domain.com/path/to/api",
+                GeneratorPhase::Workers,
             ),
-            GeneratorErrorKind::InvalidNavigationPropertyReference => GeneratorError::new(
-                "Navigation property references must be to foreign keys or other navigation properties".into(),
-                "TODO: a good suggestion here".into(),
+            GeneratorErrorKind::MismatchedNavigationPropertyTypes => (
+                "Navigation property references must match attribute types",
+                "TODO: a good suggestion here",
+                GeneratorPhase::D1,
             ),
-            GeneratorErrorKind::CyclicalModelDependency => GeneratorError::new(
-                "Model composition cannot be cyclical".into(),
-                "Allow a navigation property to be null".into(),
+            GeneratorErrorKind::InvalidNavigationPropertyReference => (
+                "Navigation property references must be to foreign keys or other navigation properties",
+                "TODO: a good suggestion here",
+                GeneratorPhase::D1,
             ),
-            GeneratorErrorKind::UnknownIncludeTreeReference => GeneratorError::new(
-                "Unknown reference in Include Tree definition".into(),
-                String::default(),
+            GeneratorErrorKind::CyclicalModelDependency => (
+                "Model composition cannot be cyclical",
+                "Allow a navigation property to be null",
+                GeneratorPhase::D1,
             ),
-            GeneratorErrorKind::ExtraneousManyToManyReferences => GeneratorError::new(
-                "Only two navigation properties can reference a many to many table".into(),
-                "Remove a reference".into(),
+            GeneratorErrorKind::UnknownIncludeTreeReference => (
+                "Unknown reference in Include Tree definition",
+                "",
+                GeneratorPhase::D1,
             ),
-            GeneratorErrorKind::MissingManyToManyReference => GeneratorError::new(
-                "Many to Many navigation properties must have a correlated reference on the adjacent model.".into(),
-                "TODO: a good indicator of where to add the nav prop".into()
+            GeneratorErrorKind::ExtraneousManyToManyReferences => (
+                "Only two navigation properties can reference a many to many table",
+                "Remove a reference",
+                GeneratorPhase::D1,
             ),
-        }
+            GeneratorErrorKind::MissingManyToManyReference => (
+                "Many to Many navigation properties must have a correlated reference on the adjacent model.",
+                "TODO: a good indicator of where to add the nav prop",
+                GeneratorPhase::D1,
+            ),
+        };
+
+        GeneratorError::new(self, phase, description.into(), suggestion.into())
     }
 }
 

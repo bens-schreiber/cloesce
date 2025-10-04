@@ -1,8 +1,11 @@
-use std::{io::Write, path::PathBuf};
+use std::{io::Write, panic, path::PathBuf};
 
 use clap::{Parser, Subcommand, command};
 
-use common::{CloesceAst, err::Result};
+use common::{
+    CloesceAst,
+    err::{GeneratorError, Result},
+};
 use workers::WorkersGenerator;
 use wrangler::WranglerFormat;
 
@@ -46,7 +49,44 @@ enum GenerateTarget {
     },
 }
 
-fn main() -> Result<()> {
+fn main() {
+    let result = panic::catch_unwind(cli);
+
+    if let Ok(Ok(())) = result {
+        return;
+    }
+
+    if let Ok(Err(e)) = result {
+        let GeneratorError {
+            description,
+            suggestion,
+            kind,
+            phase,
+            context,
+        } = e;
+
+        eprintln!(
+            r#"==== CLOESCE ERROR ====
+Error [{kind:?}]: {description}
+Phase: {phase:?}
+Context: {context}
+Suggested fix: {suggestion}"#
+        );
+        return;
+    }
+
+    if let Err(panic_info) = result {
+        eprintln!("==== GENERATOR PANIC CAUGHT ====");
+        let msg = panic_info
+            .downcast_ref::<&str>()
+            .copied()
+            .or_else(|| panic_info.downcast_ref::<String>().map(|s| s.as_str()))
+            .unwrap_or("Panic occurred but couldn't extract info.");
+        eprintln!("Panic info: {}", msg);
+    }
+}
+
+fn cli() -> Result<()> {
     match Cli::parse().command {
         Commands::Validate { cidl_path } => {
             let cidl = ast_from_path(cidl_path);
