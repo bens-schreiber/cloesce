@@ -6,10 +6,11 @@ import {
   Dog,
   Student,
   Course,
-} from "../../fixtures/foreign_keys/client.js";
+} from "../../fixtures/regression/foreign_keys/client.js";
 
 beforeAll(async () => {
-  await startWrangler("../fixtures/foreign_keys");
+  // NOTE: e2e is called from proj root
+  await startWrangler("../fixtures/regression/foreign_keys");
 }, 30_000);
 
 afterAll(async () => {
@@ -19,7 +20,7 @@ afterAll(async () => {
 async function testRefresh<T, DS extends string | null>(
   obj: T & { refresh: (dataSource?: DS) => Promise<any> },
   dataSources: DS[],
-  assertions: Record<string, (res: any) => void>,
+  assertions: Record<string, (res: any) => void>
 ) {
   for (const ds of dataSources) {
     it(`refresh ${ds ?? "null"}`, async () => {

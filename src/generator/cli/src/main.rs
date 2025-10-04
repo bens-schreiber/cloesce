@@ -50,43 +50,44 @@ enum GenerateTarget {
 }
 
 fn main() {
-    let result = panic::catch_unwind(cli);
+    match panic::catch_unwind(run_cli) {
+        Ok(Ok(())) => {
+            // Pass
+            std::process::exit(0);
+        }
+        Ok(Err(e)) => {
+            let GeneratorError {
+                description,
+                suggestion,
+                kind,
+                phase,
+                context,
+            } = e;
 
-    if let Ok(Ok(())) = result {
-        return;
+            eprintln!(
+                r#"==== CLOESCE ERROR ====
+    Error [{kind:?}]: {description}
+    Phase: {phase:?}
+    Context: {context}
+    Suggested fix: {suggestion}"#
+            );
+        }
+        Err(e) => {
+            eprintln!("==== GENERATOR PANIC CAUGHT ====");
+            let msg = e
+                .downcast_ref::<&str>()
+                .copied()
+                .or_else(|| e.downcast_ref::<String>().map(|s| s.as_str()))
+                .unwrap_or("Panic occurred but couldn't extract info.");
+            eprintln!("Panic info: {}", msg);
+        }
     }
 
-    if let Ok(Err(e)) = result {
-        let GeneratorError {
-            description,
-            suggestion,
-            kind,
-            phase,
-            context,
-        } = e;
-
-        eprintln!(
-            r#"==== CLOESCE ERROR ====
-Error [{kind:?}]: {description}
-Phase: {phase:?}
-Context: {context}
-Suggested fix: {suggestion}"#
-        );
-        return;
-    }
-
-    if let Err(panic_info) = result {
-        eprintln!("==== GENERATOR PANIC CAUGHT ====");
-        let msg = panic_info
-            .downcast_ref::<&str>()
-            .copied()
-            .or_else(|| panic_info.downcast_ref::<String>().map(|s| s.as_str()))
-            .unwrap_or("Panic occurred but couldn't extract info.");
-        eprintln!("Panic info: {}", msg);
-    }
+    // Fail
+    std::process::exit(1);
 }
 
-fn cli() -> Result<()> {
+fn run_cli() -> Result<()> {
     match Cli::parse().command {
         Commands::Validate { cidl_path } => {
             let cidl = ast_from_path(cidl_path);
