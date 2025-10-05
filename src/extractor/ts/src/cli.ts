@@ -98,7 +98,7 @@ async function runExtractor({
   } catch (err: any) {
     console.error(
       "Critical uncaught error. Submit a ticket to https://github.com/bens-schreiber/cloesce: ",
-      err?.message ?? err
+      err?.message ?? err,
     );
     process.exit(1);
   }
@@ -146,7 +146,7 @@ function findCloesceFiles(root: string, searchPaths: string[]): string[] {
 
     if (!fs.existsSync(fullPath)) {
       console.warn(
-        `Warning: Path "${searchPath}" specified in cloesce-config.json does not exist`
+        `Warning: Path "${searchPath}" specified in cloesce-config.json does not exist`,
       );
       continue;
     }
