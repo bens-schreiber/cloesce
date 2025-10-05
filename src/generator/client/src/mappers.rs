@@ -1,6 +1,8 @@
 use common::CidlType;
 
-use crate::ClientLanguageTypeMapper;
+pub trait ClientLanguageTypeMapper {
+    fn type_name(&self, ty: &CidlType) -> String;
+}
 
 pub struct TypeScriptMapper;
 impl ClientLanguageTypeMapper for TypeScriptMapper {

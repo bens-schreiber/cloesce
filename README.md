@@ -7,9 +7,12 @@ View the [internal documentation](https://cloesce.pages.dev)
 - `src/extractor/ts` run `npm test`
 - `src/generator` run `cargo test`
 
-### Regression / Snap Tests
+### Integration Tests
 
-- `tests/regression` run `cargo run --bin test` to generate or `cargo run --bin update` to update
+- To run the regression tests: `cargo run --bin test regression`
+- To run the pass fail extractor tests: `cargo run --bin test pass-fail extractor`
+
+Optionally, pass `--check` if new snapshots should not be created.
 
 ### E2E
 

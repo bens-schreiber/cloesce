@@ -6,10 +6,11 @@ import {
   Dog,
   Student,
   Course,
-} from "../../fixtures/foreign_keys/client.js";
+} from "../../fixtures/regression/foreign_keys/client.js";
 
 beforeAll(async () => {
-  await startWrangler("../fixtures/foreign_keys");
+  // NOTE: e2e is called from proj root
+  await startWrangler("../fixtures/regression/foreign_keys");
 }, 30_000);
 
 afterAll(async () => {

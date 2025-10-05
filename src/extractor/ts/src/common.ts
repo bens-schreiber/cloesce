@@ -1,12 +1,88 @@
-import fs from "node:fs";
-import path from "node:path";
-
 export type Either<L, R> = { ok: false; value: L } | { ok: true; value: R };
 export function left<L>(value: L): Either<L, never> {
   return { ok: false, value };
 }
 export function right<R>(value: R): Either<never, R> {
   return { ok: true, value };
+}
+
+export enum ExtractorErrorCode {
+  UnknownType,
+  MultipleGenericType,
+  InvalidIncludeTree,
+  UnknownNavigationPropertyReference,
+  InvalidNavigationPropertyReference,
+  MissingNavigationPropertyReference,
+  MissingManyToManyUniqueId,
+  MissingPrimaryKey,
+  MissingWranglerEnv,
+  TooManyWranglerEnvs,
+}
+
+const errorInfoMap: Record<
+  ExtractorErrorCode,
+  { description: string; suggestion: string }
+> = {
+  [ExtractorErrorCode.UnknownType]: {
+    description: "Encountered an unknown or unsupported type",
+    suggestion: "Refer to the documentation on valid Cloesce TS types",
+  },
+  [ExtractorErrorCode.MultipleGenericType]: {
+    description: "Cloesce does not yet support types with multiple generics",
+    suggestion:
+      "Simplify your type to use only a single generic parameter, ie Foo<T>",
+  },
+  [ExtractorErrorCode.InvalidIncludeTree]: {
+    description: "Invalid Include Tree",
+    suggestion:
+      "Include trees must only contain references to a model's navigation properties.",
+  },
+  [ExtractorErrorCode.UnknownNavigationPropertyReference]: {
+    description: "Unknown Navigation Property Reference",
+    suggestion:
+      "Verify that the navigation property reference model exists, or create a model.",
+  },
+  [ExtractorErrorCode.InvalidNavigationPropertyReference]: {
+    description: "Invalid Navigation Property Reference",
+    suggestion: "Ensure the navigation property points to a valid model field",
+  },
+  [ExtractorErrorCode.MissingNavigationPropertyReference]: {
+    description: "Missing Navigation Property Reference",
+    suggestion:
+      "Navigation properties require a foreign key model attribute reference",
+  },
+  [ExtractorErrorCode.MissingManyToManyUniqueId]: {
+    description: "Missing unique id on Many to Many navigation property",
+    suggestion:
+      "Define a unique identifier field for the Many-to-Many relationship",
+  },
+  [ExtractorErrorCode.MissingPrimaryKey]: {
+    description: "Missing primary key on a model",
+    suggestion: "Add a primary key field to your model (e.g., `id: number`)",
+  },
+  [ExtractorErrorCode.MissingWranglerEnv]: {
+    description: "Missing a wrangler environment definition in the project",
+    suggestion: "Add a @WranglerEnv class in your project.",
+  },
+  [ExtractorErrorCode.TooManyWranglerEnvs]: {
+    description: "Too many wrangler environments defined in the project",
+    suggestion: "Consolidate or remove unused @WranglerEnv's",
+  },
+};
+
+export function getErrorInfo(code: ExtractorErrorCode) {
+  return errorInfoMap[code];
+}
+
+export class ExtractorError {
+  context?: string;
+  snippet?: string;
+
+  constructor(public code: ExtractorErrorCode) {}
+
+  addContext(fn: (val: string | undefined) => string | undefined) {
+    this.context = fn(this.context ?? "");
+  }
 }
 
 export type HttpResult<T = unknown> = {

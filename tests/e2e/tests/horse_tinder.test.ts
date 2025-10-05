@@ -1,9 +1,10 @@
 import { startWrangler, stopWrangler, withRes } from "../src/setup.js";
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { Horse } from "../../fixtures/horse_tinder/client.js";
+import { Horse } from "../../fixtures/regression/horse_tinder/client.js";
 
 beforeAll(async () => {
-  await startWrangler("../fixtures/horse_tinder");
+  // NOTE: e2e is called from proj root
+  await startWrangler("../fixtures/regression/horse_tinder");
 }, 30_000);
 
 afterAll(async () => {

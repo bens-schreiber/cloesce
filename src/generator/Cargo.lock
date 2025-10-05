@@ -62,12 +62,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "anyhow"
-version = "1.0.99"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b0674a1ddeecb70197781e945de4b3b8ffb61fa939a5597bcf48503737663100"
-
-[[package]]
 name = "autocfg"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -166,14 +160,10 @@ checksum = "b94f61472cee1439c0b966b47e3aca9ae07e45d070759512cd390ea2bebc6675"
 name = "cli"
 version = "0.0.1"
 dependencies = [
- "anyhow",
  "clap",
  "client",
  "common",
  "d1",
- "serde",
- "serde_json",
- "toml",
  "workers",
  "wrangler",
 ]
@@ -182,7 +172,6 @@ dependencies = [
 name = "client"
 version = "0.0.1"
 dependencies = [
- "anyhow",
  "common",
  "handlebars",
  "serde_json",
@@ -198,7 +187,6 @@ checksum = "b05b61dc5112cbb17e4b6cd61790d9845d13888356391624cbe7e41efeac1e75"
 name = "common"
 version = "0.0.1"
 dependencies = [
- "anyhow",
  "serde",
  "serde_json",
  "serde_with",
@@ -234,12 +222,8 @@ dependencies = [
 name = "d1"
 version = "0.0.1"
 dependencies = [
- "anyhow",
  "common",
  "sea-query",
- "serde",
- "serde_json",
- "toml",
 ]
 
 [[package]]
@@ -1187,11 +1171,8 @@ checksum = "21a0236b59786fed61e2a80582dd500fe61f18b5dca67a4a067d0bc9039339cf"
 name = "workers"
 version = "0.0.1"
 dependencies = [
- "anyhow",
- "client",
  "common",
  "pathdiff",
- "serde_json",
  "wrangler",
 ]
 
@@ -1199,7 +1180,7 @@ dependencies = [
 name = "wrangler"
 version = "0.0.1"
 dependencies = [
- "anyhow",
+ "common",
  "serde",
  "serde_json",
  "toml",

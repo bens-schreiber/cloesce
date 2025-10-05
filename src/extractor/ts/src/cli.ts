@@ -12,6 +12,7 @@ import {
 } from "cmd-ts";
 import { CidlExtractor } from "./extract.js";
 import { Project } from "ts-morph";
+import { ExtractorError, ExtractorErrorCode, getErrorInfo } from "./common.js";
 
 const cli = command({
   name: "cloesce",
@@ -78,7 +79,8 @@ async function runExtractor({
     let extractor = new CidlExtractor(cloesceProjectName, "v0.0.2");
     const result = extractor.extract(project);
     if (!result.ok) {
-      throw new Error(result.value);
+      console.error(formatErr(result.value));
+      process.exit(1);
     }
     const ast = result.value;
 
@@ -94,9 +96,24 @@ async function runExtractor({
     fs.mkdirSync(path.dirname(outPath), { recursive: true });
     fs.writeFileSync(outPath, json);
   } catch (err: any) {
-    console.error(" ERROR - cloesce:", err?.message ?? err);
+    console.error(
+      "Critical uncaught error. Submit a ticket to https://github.com/bens-schreiber/cloesce: ",
+      err?.message ?? err,
+    );
     process.exit(1);
   }
+}
+
+function formatErr(e: ExtractorError): string {
+  const { description, suggestion } = getErrorInfo(e.code);
+
+  const contextLine = e.context ? `Context: ${e.context}\n` : "";
+  const snippetLine = e.snippet ? `${e.snippet}\n\n` : "";
+
+  return `==== CLOESCE ERROR ====
+Error [${ExtractorErrorCode[e.code]}]: ${description}
+Phase: TypeScript IDL Extraction
+${contextLine}${snippetLine}Suggested fix: ${suggestion}`;
 }
 
 function findProjectRoot(start: string) {

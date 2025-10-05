@@ -1,6 +1,7 @@
 use common::{
     CidlType, NavigationPropertyKind,
     builder::{ModelBuilder, create_ast},
+    err::GeneratorErrorKind,
 };
 
 macro_rules! expected_str {
@@ -244,7 +245,11 @@ fn test_cycle_detection_error() {
     let err = d1::generate_sql(&ast.models).unwrap_err();
 
     // Assert
-    expected_str!(err, "Cycle detected");
+    assert!(matches!(
+        err.kind,
+        GeneratorErrorKind::CyclicalModelDependency
+    ));
+    expected_str!(err.context, "A, B, C");
 }
 
 #[test]
@@ -297,10 +302,10 @@ fn test_one_to_one_nav_property_unknown_attribute_reference_error() {
     let err = d1::generate_sql(&ast.models).unwrap_err();
 
     // Assert
-    expected_str!(
-        err,
-        "Navigation property Person.dog references Dog.dogId which does not exist or is not a foreign key to Person"
-    );
+    assert!(matches!(
+        err.kind,
+        GeneratorErrorKind::InvalidNavigationPropertyReference
+    ))
 }
 
 #[test]
@@ -325,11 +330,11 @@ fn test_one_to_one_mismatched_fk_and_nav_type_error() {
     // Act
     let err = d1::generate_sql(&ast.models).unwrap_err();
 
-    // Assert - message includes "Mismatched types between foreign key and One to One navigation property"
-    expected_str!(
-        err,
-        "Mismatched types between foreign key and One to One navigation property"
-    );
+    // Assert
+    assert!(matches!(
+        err.kind,
+        GeneratorErrorKind::MismatchedNavigationPropertyTypes
+    ))
 }
 
 #[test]
@@ -355,8 +360,8 @@ fn test_one_to_many_unresolved_reference_error() {
 
     // Assert
     expected_str!(
-        err,
-        "Navigation property Person.dogs references Dog.personId which does not exist or is not a foreign key to Person"
+        err.context,
+        "Person.dogs references Dog.personId which does not exist or is not a foreign key to Person"
     );
 }
 
@@ -380,7 +385,10 @@ fn test_junction_table_builder_errors() {
         ]);
 
         let err = d1::generate_sql(&ast.models).unwrap_err();
-        expected_str!(err, "Both models must be set for a junction table");
+        assert!(matches!(
+            err.kind,
+            GeneratorErrorKind::MissingManyToManyReference
+        ))
     }
 
     // Too many models case: three models register the same junction id
@@ -420,9 +428,9 @@ fn test_junction_table_builder_errors() {
         ]);
 
         let err = d1::generate_sql(&ast.models).unwrap_err();
-        expected_str!(
-            err,
-            "Too many ManyToMany navigation properties for junction table"
-        );
+        assert!(matches!(
+            err.kind,
+            GeneratorErrorKind::ExtraneousManyToManyReferences
+        ))
     }
 }
