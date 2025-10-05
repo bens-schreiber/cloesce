@@ -164,9 +164,6 @@ dependencies = [
  "client",
  "common",
  "d1",
- "serde",
- "serde_json",
- "toml",
  "workers",
  "wrangler",
 ]
@@ -1174,10 +1171,8 @@ checksum = "21a0236b59786fed61e2a80582dd500fe61f18b5dca67a4a067d0bc9039339cf"
 name = "workers"
 version = "0.0.1"
 dependencies = [
- "client",
  "common",
  "pathdiff",
- "serde_json",
  "wrangler",
 ]
 

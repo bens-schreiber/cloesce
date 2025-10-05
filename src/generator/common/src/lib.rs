@@ -174,6 +174,19 @@ pub struct CloesceAst {
 }
 
 impl CloesceAst {
+    pub fn from_json(path: &std::path::Path) -> Result<CloesceAst> {
+        let cidl_contents = std::fs::read_to_string(path).map_err(|e| {
+            GeneratorErrorKind::InvalidInputFile
+                .to_error()
+                .with_context(e.to_string())
+        })?;
+        serde_json::from_str::<CloesceAst>(&cidl_contents).map_err(|e| {
+            GeneratorErrorKind::InvalidInputFile
+                .to_error()
+                .with_context(e.to_string())
+        })
+    }
+
     /// Ensures all `CidlTypes` are logically correct for the area, essentially doing
     /// the first level of semantic analysis for the generator.
     ///

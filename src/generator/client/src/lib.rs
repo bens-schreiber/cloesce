@@ -3,13 +3,9 @@ mod mappers;
 use std::{ops::Deref, sync::Arc};
 
 use common::{CidlType, CloesceAst, InputLanguage, NavigationProperty, NavigationPropertyKind};
+use mappers::{ClientLanguageTypeMapper, TypeScriptMapper};
+
 use handlebars::{Handlebars, handlebars_helper};
-
-use mappers::TypeScriptMapper;
-
-pub trait ClientLanguageTypeMapper {
-    fn type_name(&self, ty: &CidlType) -> String;
-}
 
 handlebars_helper!(is_serializable: |cidl_type: CidlType| !matches!(cidl_type.root_type(), CidlType::Inject(_)));
 handlebars_helper!(is_model: |cidl_type: CidlType| match cidl_type {

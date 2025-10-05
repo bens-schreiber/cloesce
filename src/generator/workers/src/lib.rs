@@ -114,12 +114,11 @@ impl WorkersGenerator {
     ) -> Result<String> {
         let api_route = Self::validate_domain(&domain)?;
 
-        // TODO: just hardcoding typescript for now
         let model_sources = Self::link_models(&ast.models, workers_path);
         let (constructor_registry, instance_registry) =
             Self::registries(&ast.models, &ast.wrangler_env);
 
-        // TODO: Hardcoding one database for now, in the future we need to support any amount
+        // TODO: Hardcoding one database, in the future we need to support any amount
         let db_binding = wrangler
             .d1_databases
             .first()

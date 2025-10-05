@@ -4,13 +4,13 @@ use clap::{Parser, Subcommand, command};
 
 use common::{
     CloesceAst,
-    err::{GeneratorError, Result},
+    err::{GeneratorError, GeneratorErrorKind, Result},
 };
 use workers::WorkersGenerator;
 use wrangler::WranglerFormat;
 
 #[derive(Parser)]
-#[command(name = "generate", version = "0.0.1")]
+#[command(name = "generate", version = "0.0.3")]
 struct Cli {
     #[command(subcommand)]
     command: Commands,
@@ -55,6 +55,14 @@ fn main() {
             // Pass
             std::process::exit(0);
         }
+        Ok(Err(e)) if matches!(e.kind, GeneratorErrorKind::InvalidInputFile) => {
+            let GeneratorError { context, .. } = e;
+            eprintln!(
+                r#"==== CLOESCE ERROR ====
+                Invalid generator file input: {context}
+            "#
+            )
+        }
         Ok(Err(e)) => {
             let GeneratorError {
                 description,
@@ -90,7 +98,7 @@ fn main() {
 fn run_cli() -> Result<()> {
     match Cli::parse().command {
         Commands::Validate { cidl_path } => {
-            let cidl = ast_from_path(cidl_path);
+            let cidl = CloesceAst::from_json(&cidl_path)?;
             cidl.validate_types()?;
             println!("Ok.")
         }
@@ -105,7 +113,11 @@ fn run_cli() -> Result<()> {
                     .create(true)
                     .truncate(true)
                     .open(&wrangler_path)
-                    .expect("Wrangler file to be opened");
+                    .map_err(|e| {
+                        GeneratorErrorKind::InvalidInputFile
+                            .to_error()
+                            .with_context(e.to_string())
+                    })?;
 
                 wrangler.update(spec, wrangler_file);
             }
@@ -113,8 +125,8 @@ fn run_cli() -> Result<()> {
                 cidl_path,
                 sqlite_path,
             } => {
-                let mut sqlite_file = create_file_and_dir(&sqlite_path);
-                let ast = ast_from_path(cidl_path);
+                let mut sqlite_file = create_file_and_dir(&sqlite_path)?;
+                let ast = CloesceAst::from_json(&cidl_path)?;
                 ast.validate_types()?;
 
                 let generated_sqlite = d1::generate_sql(&ast.models)?;
@@ -129,10 +141,10 @@ fn run_cli() -> Result<()> {
                 wrangler_path,
                 domain,
             } => {
-                let ast = ast_from_path(cidl_path);
+                let ast = CloesceAst::from_json(&cidl_path)?;
                 ast.validate_types()?;
 
-                let mut file = create_file_and_dir(&workers_path);
+                let mut file = create_file_and_dir(&workers_path)?;
 
                 let wrangler = WranglerFormat::from_path(&wrangler_path);
 
@@ -140,20 +152,20 @@ fn run_cli() -> Result<()> {
                     WorkersGenerator::create(ast, wrangler.as_spec(), domain, &workers_path)?;
 
                 file.write_all(workers.as_bytes())
-                    .expect("Failed to write workers file");
+                    .expect("Could not write to workers file");
             }
             GenerateTarget::Client {
                 cidl_path,
                 client_path,
                 domain,
             } => {
-                let ast = ast_from_path(cidl_path);
+                let ast = CloesceAst::from_json(&cidl_path)?;
                 ast.validate_types()?;
 
-                let mut file = create_file_and_dir(&client_path);
+                let mut file = create_file_and_dir(&client_path)?;
 
                 file.write_all(client::generate_client_api(ast, domain).as_bytes())
-                    .expect("Failed to write client file");
+                    .expect("Could not write to workers file");
             }
         },
     }
@@ -161,14 +173,17 @@ fn run_cli() -> Result<()> {
     Ok(())
 }
 
-fn create_file_and_dir(path: &PathBuf) -> std::fs::File {
+fn create_file_and_dir(path: &PathBuf) -> Result<std::fs::File> {
     if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent).expect("Failed to create parent dir");
+        std::fs::create_dir_all(parent).map_err(|e| {
+            GeneratorErrorKind::InvalidInputFile
+                .to_error()
+                .with_context(e.to_string())
+        })?;
     }
-    std::fs::File::create(path).expect("Failed to create file")
-}
-
-fn ast_from_path(cidl_path: PathBuf) -> CloesceAst {
-    let cidl_contents = std::fs::read_to_string(cidl_path).expect("Failed to read cidl file");
-    serde_json::from_str::<CloesceAst>(&cidl_contents).expect("Failed to validate cidl")
+    std::fs::File::create(path).map_err(|e| {
+        GeneratorErrorKind::InvalidInputFile
+            .to_error()
+            .with_context(e.to_string())
+    })
 }

@@ -9,7 +9,4 @@ common = { path = "../common" }
 d1 = { path = "../d1" }
 client = { path = "../client" }
 workers = { path = "../workers" }
-serde = { workspace = true }
-serde_json = { workspace = true }
-toml = { workspace = true }
 wrangler = { path = "../wrangler" }

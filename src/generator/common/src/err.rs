@@ -58,6 +58,7 @@ impl GeneratorError {
 
 #[derive(Debug)]
 pub enum GeneratorErrorKind {
+    InvalidInputFile,
     NullSqlType,
     InvalidSqlType,
     UnknownModel,
@@ -141,6 +142,9 @@ impl GeneratorErrorKind {
                 "TODO: a good indicator of where to add the nav prop",
                 GeneratorPhase::D1,
             ),
+
+            // Generic error, handeled seperately from all others
+            GeneratorErrorKind::InvalidInputFile => ("", "", GeneratorPhase::EarlyAstValidation),
         };
 
         GeneratorError::new(self, phase, description.into(), suggestion.into())
