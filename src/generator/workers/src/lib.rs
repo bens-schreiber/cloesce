@@ -1,8 +1,9 @@
-use std::{collections::HashMap, path::Path};
+use std::{collections::BTreeMap, path::Path};
 
-use common::{CidlSpec, CidlType, HttpVerb, Model, WranglerEnv, wrangler::WranglerSpec};
+use common::{CloesceAst, Model, WranglerEnv};
 
-use anyhow::{Context, Result, anyhow, bail, ensure};
+use anyhow::{Context, Result, anyhow};
+use wrangler::WranglerSpec;
 
 pub struct WorkersGenerator;
 impl WorkersGenerator {
@@ -27,71 +28,8 @@ impl WorkersGenerator {
         }
     }
 
-    /// Validates all methods contain valid types and references.
-    ///
-    /// Returns error on
-    /// - Unknown model reference on return type
-    /// - Invalid parameter type on methods
-    /// - Unknown model reference on method
-    /// -
-    fn validate_methods(models: &[Model]) -> Result<()> {
-        let mut lookup = HashMap::<&str, &Model>::new();
-
-        // TODO: We create a similiar lookup for D1 validation. It would be smart to pass that around.
-        for model in models {
-            lookup.insert(&model.name, model);
-        }
-
-        for model in models {
-            for method in &model.methods {
-                if let Some(Some(CidlType::Model(m))) =
-                    method.return_type.as_ref().map(|r| r.root_type())
-                {
-                    ensure!(
-                        lookup.contains_key(m.as_str()),
-                        "Unknown model reference on model method return type {}.{}",
-                        model.name,
-                        method.name
-                    );
-                }
-
-                for param in &method.parameters {
-                    let Some(root_type) = param.cidl_type.root_type() else {
-                        bail!(
-                            "Invalid parameter type on model method {}.{}.{}",
-                            model.name,
-                            method.name,
-                            param.name
-                        );
-                    };
-
-                    if let CidlType::Model(m) = root_type {
-                        ensure!(
-                            lookup.contains_key(m.as_str()),
-                            "Unknown model reference on model method {}.{}.{}",
-                            model.name,
-                            method.name,
-                            param.name
-                        );
-
-                        if method.http_verb == HttpVerb::GET {
-                            bail!(
-                                "GET Requests currently do not support model parameters {}.{}.{}",
-                                model.name,
-                                method.name,
-                                param.name
-                            )
-                        }
-                    }
-                }
-            }
-        }
-
-        Ok(())
-    }
-
     /// Generates all model source imports
-    fn link_models(models: &[Model], workers_path: &Path) -> Result<String> {
+    fn link_models(models: &BTreeMap<String, Model>, workers_path: &Path) -> Result<String> {
         let workers_dir = workers_path
             .parent()
             .context("workers_path has no parent; cannot compute relative imports")?;
@@ -130,21 +68,22 @@ impl WorkersGenerator {
         }
 
         let models = models
-            .iter()
-            .map(|m| -> Result<String> {
-                rel_path(&m.source_path, workers_dir)
-                    .map(|p| format!("import {{ {} }} from \"{}\";", m.name, p))
+            .values()
+            .map(|m| {
+                let p = rel_path(&m.source_path, workers_dir)
+                    .unwrap_or_else(|_| m.source_path.clone().to_string_lossy().to_string());
+                format!("import {{ {} }} from \"{}\";", m.name, p)
             })
-            .collect::<Result<Vec<_>>>()?
+            .collect::<Vec<_>>()
             .join("\n");
 
         Ok(models)
     }
 
     /// Generates the constructor registry and instance registry
-    fn registries(models: &[Model], wenv: &WranglerEnv) -> (String, String) {
+    fn registries(models: &BTreeMap<String, Model>, wenv: &WranglerEnv) -> (String, String) {
         let mut constructor_registry = Vec::new();
-        for model in models {
+        for model in models.values() {
             constructor_registry.push(format!("\t{}: {}", &model.name, &model.name));
         }
 
@@ -164,18 +103,17 @@ impl WorkersGenerator {
     }
 
     pub fn create(
-        cidl: CidlSpec,
+        ast: CloesceAst,
         wrangler: WranglerSpec,
         domain: String,
         workers_path: &Path,
     ) -> Result<String> {
-        Self::validate_methods(&cidl.models)?;
         let api_route = Self::validate_domain(&domain)?;
 
         // TODO: just hardcoding typescript for now
-        let model_sources = Self::link_models(&cidl.models, workers_path)?;
+        let model_sources = Self::link_models(&ast.models, workers_path)?;
         let (constructor_registry, instance_registry) =
-            Self::registries(&cidl.models, &cidl.wrangler_env);
+            Self::registries(&ast.models, &ast.wrangler_env);
 
         // TODO: Hardcoding one database for now, in the future we need to support any amount
         let db_binding = wrangler
@@ -185,13 +123,13 @@ impl WorkersGenerator {
             .binding
             .as_ref()
             .context("A database needs a binding to reference it in the instance container")?;
-        let env_name = &cidl.wrangler_env.name;
+        let env_name = &ast.wrangler_env.name;
 
         // TODO: Middleware function should return the DI instance registry
         Ok(format!(
             r#"
 import {{ cloesce }} from "cloesce";
-import cidl from "./cidl.json" with {{ type: "json" }};
+import cidl from "./cidl.json";
 {model_sources}
 
 {constructor_registry}
@@ -200,7 +138,7 @@ export default {{
     async fetch(request: Request, env: any, ctx: any): Promise<Response> {{
         {instance_registry}
 
-        return await cloesce(cidl, constructorRegistry, instanceRegistry, request, "/{api_route}", {{ envName: "{env_name}", dbName: "{db_binding}" }});
+        return await cloesce(request, cidl, constructorRegistry, instanceRegistry, {{ envName: "{env_name}", dbName: "{db_binding}" }},  "/{api_route}");
     }}
 }};
 "#

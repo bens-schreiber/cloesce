@@ -1,7 +1,0 @@
-// @ts-nocheck
-{
-  "compilerOptions": {
-    "rootDir": "./",
-    "strictNullChecks": true
-  }
-}

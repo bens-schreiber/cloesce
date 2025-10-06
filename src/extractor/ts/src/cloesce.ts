@@ -3,27 +3,16 @@ import {
   HttpResult,
   Either,
   ModelMethod,
-  MetaCidl,
   left,
   CidlType,
   right,
-  MetaModel,
-  CidlSpec,
+  CloesceAst,
+  isNullableType,
+  Model,
+  getNavigationPropertyCidlType,
+  CidlIncludeTree,
 } from "./common.js";
-
-/**
- * Users will create Cloesce models, which have metadata for them in the CIDL.
- * For TypeScript's purposes, these models can be anything. We can assume any
- * `UserDefinedModel` has been verified by the compiler.
- */
-type UserDefinedModel = any;
-type InstantiatedUserDefinedModel = object;
-
-/**
- * Given a request, this represents a map of each body / url  param name to
- * its actual value. Unknown, as the a request can be anything.
- */
-type RequestParamMap = Record<string, unknown>;
+import { IncludeTree } from "./index.js";
 
 /**
  * A map of model names to their respective constructor.
@@ -42,46 +31,47 @@ type ModelConstructorRegistry = Record<string, new () => UserDefinedModel>;
 type InstanceRegistry = Map<string, any>;
 
 /**
- * Singleton instance of the MetaCidl and Constructor Registry.
- * These values are guaranteed to never change throughout a programs lifetime.
+ * Singleton instances of the MetaCidl and Constructor Registry.
+ * These values are guaranteed to never change throughout a workers lifetime.
  */
 class MetaContainer {
   private static instance: MetaContainer | undefined;
   private constructor(
-    public readonly cidl: MetaCidl,
+    public readonly ast: CloesceAst,
     public readonly constructorRegistry: ModelConstructorRegistry,
   ) {}
 
-  static init(
-    rawCidl: CidlSpec,
-    constructorRegistry: ModelConstructorRegistry,
-  ): MetaContainer {
+  static init(ast: CloesceAst, constructorRegistry: ModelConstructorRegistry) {
     if (!this.instance) {
-      this.instance = new MetaContainer(
-        {
-          ...rawCidl,
-          models: Object.fromEntries(
-            rawCidl.models.map((m) => [
-              m.name,
-              {
-                ...m,
-                methods: Object.fromEntries(m.methods.map((x) => [x.name, x])),
-              },
-            ]),
-          ),
-        },
-        constructorRegistry,
-      );
+      this.instance = new MetaContainer(ast, constructorRegistry);
     }
-    return this.instance;
   }
 
   static get(): MetaContainer {
-    if (!this.instance) {
-      throw new Error("Cloesce not initialized. Call Cloesce.init() first.");
-    }
-    return this.instance;
+    return this.instance!;
   }
+}
+
+/**
+ * Users will create Cloesce models, which have metadata for them in the ast.
+ * For TypeScript's purposes, these models can be anything. We can assume any
+ * `UserDefinedModel` has been verified by the compiler.
+ */
+type UserDefinedModel = any;
+type InstantiatedUserDefinedModel = object;
+
+/**
+ * Given a request, this represents a map of each body / url  param name to
+ * its actual value. Unknown, as the a request can be anything.
+ */
+type RequestParamMap = Record<string, unknown>;
+
+/**
+ * Meta information on the wrangler env and db bindings
+ */
+interface MetaWranglerEnv {
+  envName: string;
+  dbName: string; // TODO: support many db's
 }
 
 /**
@@ -93,71 +83,68 @@ class MetaContainer {
  * @returns
  */
 export function modelsFromSql<T>(
-  ctor: new () => UserDefinedModel,
+  ctor: new () => T,
   records: Record<string, any>[],
-  includeTree: Record<string, UserDefinedModel>,
+  includeTree: IncludeTree<T> | null,
 ): T[] {
-  const { cidl, constructorRegistry } = MetaContainer.get();
+  const { ast, constructorRegistry } = MetaContainer.get();
   return _modelsFromSql(
     ctor.name,
-    cidl,
+    ast,
     constructorRegistry,
     records,
     includeTree,
   ) as T[];
 }
 
-interface MetaWranglerEnv {
-  envName: string;
-  dbName: string; // TODO: support many db's
-}
-
 /**
  * Cloesce entry point. Given a request, undergoes routing, validating,
  * hydrating, and method dispatch.
- * @param rawCidl The full unfiltered cidl
+ * @param ast The CIDL AST
  * @param constructorRegistry A mapping of user defined class names to their respective constructor
+ * @param instanceRegistry A mapping of a dependency class name to its instantiated object.
  * @param request An incoming request to the workers server
  * @param api_route The url's path to the api, e.g. api/v1/fooapi/
  * @param envMeta Meta information on the wrangler env and D1 databases
  * @returns A Response with an `HttpResult` JSON body.
  */
 export async function cloesce(
-  rawCidl: CidlSpec,
+  request: Request,
+  ast: CloesceAst,
   constructorRegistry: ModelConstructorRegistry,
   instanceRegistry: InstanceRegistry,
-  request: Request,
-  api_route: string,
   envMeta: MetaWranglerEnv,
+  api_route: string,
 ): Promise<Response> {
-  const { cidl } = MetaContainer.init(rawCidl, constructorRegistry);
+  MetaContainer.init(ast, constructorRegistry);
   const d1: D1Database = instanceRegistry.get(envMeta.envName)[envMeta.dbName];
 
   // Match the route to a model method
-  let route = matchRoute(request, api_route, cidl);
+  const route = matchRoute(request, ast, api_route);
   if (!route.ok) {
     return toResponse(route.value);
   }
-  let { modelMeta, methodMeta, id } = route.value;
+  const { method, model, id } = route.value;
 
   // Validate request body to the model method
-  let isValidRequest = await validateRequest(request, cidl, methodMeta, id);
+  const isValidRequest = await validateRequest(request, ast, model, method, id);
   if (!isValidRequest.ok) {
     return toResponse(isValidRequest.value);
   }
-  let requestParamMap = isValidRequest.value;
+  const [requestParamMap, dataSource] = isValidRequest.value;
 
   // Instantatiate the model
   let instance: object;
-  if (methodMeta.is_static) {
-    instance = constructorRegistry[modelMeta.name];
+  if (method.is_static) {
+    instance = constructorRegistry[model.name];
   } else {
-    let successfulModel = await hydrateModel(
-      cidl,
-      modelMeta,
+    const successfulModel = await hydrateModel(
+      ast,
       constructorRegistry,
       d1,
+      model,
       id!,
+      dataSource,
     );
 
     if (!successfulModel.ok) {
@@ -171,16 +158,14 @@ export async function cloesce(
   return toResponse(
     await methodDispatch(
       instance,
-      methodMeta,
-      requestParamMap,
       instanceRegistry,
       envMeta,
+      method,
+      requestParamMap,
     ),
   );
 }
 
-// TODO: In the previous version, we would walk a generated trie
-// This is more hardcode-y, and I'm not sure it will hold up to time.
 /**
  * Matches a request to a method on a model.
  * @param api_route The route from the domain to the actual API, ie https://foo.com/route/to/api => route/to/api/
@@ -188,8 +173,8 @@ export async function cloesce(
  */
 function matchRoute(
   request: Request,
+  ast: CloesceAst,
   api_route: string,
-  cidl: MetaCidl,
 ): Either<HttpResult, MatchedRoute> {
   const url = new URL(request.url);
 
@@ -210,48 +195,50 @@ function matchRoute(
   const methodName = routeParts[routeParts.length - 1];
   const id = routeParts.length === 3 ? routeParts[1] : null;
 
-  const modelMeta = cidl.models[modelName];
-  if (!modelMeta) {
+  const model = ast.models[modelName];
+  if (!model) {
     return notFound(`Unknown model ${modelName}`);
   }
 
-  const methodMeta = modelMeta.methods[methodName];
-  if (!methodMeta) {
+  const method = model.methods[methodName];
+  if (!method) {
     return notFound(`Unknown method ${modelName}.${methodName}`);
   }
 
-  if (request.method !== methodMeta.http_verb) {
+  if (request.method !== method.http_verb) {
     return notFound("Unmatched HTTP method");
   }
 
   return right({
-    modelMeta,
-    methodMeta,
+    model,
+    method,
     id,
   });
 }
 
 /**
  * Validates the request's body/search params against a ModelMethod
- * @returns 400 or a `RequestParamMap` consisting of each parameters name mapped to its value
+ * @returns 400 or a `RequestParamMap` consisting of each parameters name mapped to its value, and
+ * a data source
  */
 async function validateRequest(
   request: Request,
-  cidl: MetaCidl,
-  methodMeta: ModelMethod,
+  ast: CloesceAst,
+  model: Model,
+  method: ModelMethod,
   id: string | null,
-): Promise<Either<HttpResult, RequestParamMap>> {
+): Promise<Either<HttpResult, [RequestParamMap, string | null]>> {
   // Error state: any missing parameter, body, or malformed input will exit with 400.
   const invalid_request = (e: string) =>
     left(error_state(400, `Invalid Request Body: ${e}`));
 
-  if (!methodMeta.is_static && id == null) {
+  if (!method.is_static && id == null) {
     return invalid_request("Id's are required for instantiated methods.");
   }
 
   // Filter out any injected parameters that will not be passed
   // by the query.
-  let requiredParams = methodMeta.parameters.filter(
+  const requiredParams = method.parameters.filter(
     (p) =>
       !(
         typeof p.cidl_type === "object" &&
@@ -260,9 +247,13 @@ async function validateRequest(
       ),
   );
 
+  // Extract data source
+  const url = new URL(request.url);
+  let dataSource = url.searchParams.get("dataSource");
+
+  // Extract url or body parameters
   let requestBodyMap: RequestParamMap;
-  if (methodMeta.http_verb === "GET") {
-    const url = new URL(request.url);
+  if (method.http_verb === "GET") {
     requestBodyMap = Object.fromEntries(url.searchParams.entries());
   } else {
     try {
@@ -270,6 +261,11 @@ async function validateRequest(
     } catch {
       return invalid_request("Could not retrieve JSON body.");
     }
+  }
+
+  // Validate data source if exists
+  if (dataSource && !(dataSource in model.data_sources)) {
+    return invalid_request(`Unknown data source ${dataSource}`);
   }
 
   // Ensure all required params exist
@@ -280,91 +276,12 @@ async function validateRequest(
   // Validate all parameters type
   for (const p of requiredParams) {
     const value = requestBodyMap[p.name];
-    if (!validateCidlType(value, p.cidl_type, cidl, p.nullable)) {
+    if (!validateCidlType(ast, value, p.cidl_type)) {
       return invalid_request("Invalid parameters.");
     }
   }
 
-  return right(requestBodyMap);
-
-  function validateCidlType(
-    value: unknown,
-    cidlType: CidlType,
-    cidl: MetaCidl,
-    nullable: boolean,
-  ): boolean {
-    if (value === undefined) return false;
-
-    // TODO: consequences of null checking like this? 'null' is passed in
-    // as a string for GET requests...
-    if (value == null || value === "null") return nullable;
-
-    // Handle primitive string types with switch
-    if (typeof cidlType === "string") {
-      switch (cidlType) {
-        case "Integer":
-          return Number.isInteger(Number(value));
-        case "Real":
-          return !Number.isNaN(Number(value));
-        case "Text":
-          return typeof value === "string";
-        case "Blob":
-          return value instanceof Blob || value instanceof ArrayBuffer;
-        default:
-          return false;
-      }
-    }
-
-    // Handle object types
-    if ("Model" in cidlType) {
-      const model = cidl.models[cidlType.Model];
-      if (!model || typeof value !== "object") return false;
-      const obj = value as Record<string, unknown>;
-
-      // Validate attributes
-      if (
-        !model.attributes.every((attr) =>
-          validateCidlType(
-            obj[attr.value.name],
-            attr.value.cidl_type,
-            cidl,
-            attr.value.nullable,
-          ),
-        )
-      ) {
-        return false;
-      }
-
-      // Validate navigation properties (optional)
-      return model.navigation_properties.every((nav) => {
-        const navValue = obj[nav.value.name];
-        return (
-          navValue == null ||
-          validateCidlType(
-            navValue,
-            nav.value.cidl_type,
-            cidl,
-            nav.value.nullable,
-          )
-        );
-      });
-    }
-
-    if ("Array" in cidlType) {
-      return (
-        Array.isArray(value) &&
-        value.every((v) => validateCidlType(v, cidlType.Array, cidl, nullable))
-      );
-    }
-
-    if ("HttpResult" in cidlType) {
-      if (value === null) return cidlType.HttpResult === null;
-      if (cidlType.HttpResult === null) return false;
-      return validateCidlType(value, cidlType.HttpResult, cidl, nullable);
-    }
-
-    return false;
-  }
+  return right([requestBodyMap, dataSource]);
 }
 
 /**
@@ -375,11 +292,12 @@ async function validateRequest(
  * @returns The instantiated model on success
  */
 async function hydrateModel(
-  cidl: MetaCidl,
-  modelMeta: MetaModel,
+  ast: CloesceAst,
   constructorRegistry: ModelConstructorRegistry,
   d1: D1Database,
+  model: Model,
   id: string,
+  dataSource: string | null,
 ): Promise<Either<HttpResult, object>> {
   // Error state: If the D1 database has been tweaked outside of Cloesce
   // resulting in a malformed query, exit with a 500.
@@ -394,12 +312,11 @@ async function hydrateModel(
   // Error state: If no record is found for the id, return a 404
   const missingRecord = left(error_state(404, "Record not found"));
 
-  // TODO: We are assuming defalt DS for now
-  const pk = modelMeta.primary_key.name;
-  const hasDataSources = modelMeta.data_sources.length > 0;
-  const query = hasDataSources
-    ? `SELECT * FROM ${modelMeta.name}_default WHERE ${modelMeta.name}_${pk} = ?`
-    : `SELECT * FROM ${modelMeta.name} WHERE ${pk} = ?`;
+  const pk = model.primary_key.name;
+  const query =
+    dataSource !== null
+      ? `SELECT * FROM ${model.name}_${dataSource} WHERE ${model.name}_${pk} = ?`
+      : `SELECT * FROM ${model.name} WHERE ${pk} = ?`;
 
   // Query DB
   let records;
@@ -412,26 +329,20 @@ async function hydrateModel(
     return malformedQuery(e);
   }
 
-  // TODO: assuming default DS again
-  if (hasDataSources) {
-    let includeTree: any = new constructorRegistry[modelMeta.name]().default;
+  // Get include tree
+  const includeTree: CidlIncludeTree =
+    dataSource !== null ? model.data_sources[dataSource].tree : {};
 
-    let models: object[] = _modelsFromSql(
-      modelMeta.name,
-      cidl,
-      constructorRegistry,
-      records.results,
-      includeTree,
-    );
-    return right(models[0]);
-  }
-
-  return right(
-    Object.assign(
-      new constructorRegistry[modelMeta.name](),
-      records.results[0],
-    ),
+  // Hydrate
+  const models: object[] = _modelsFromSql(
+    model.name,
+    ast,
+    constructorRegistry,
+    records.results,
+    includeTree,
   );
+
+  return right(models[0]);
 }
 
 /**
@@ -440,10 +351,10 @@ async function hydrateModel(
  */
 async function methodDispatch(
   instance: InstantiatedUserDefinedModel,
-  methodMeta: ModelMethod,
-  params: Record<string, unknown>,
   instanceRegistry: InstanceRegistry,
   envMeta: MetaWranglerEnv,
+  method: ModelMethod,
+  params: Record<string, unknown>,
 ): Promise<HttpResult<unknown>> {
   // Error state: Client code ran into an uncaught exception.
   const uncaughtException = (e: any) =>
@@ -454,7 +365,7 @@ async function methodDispatch(
 
   // For now, the only injected dependency is the wrangler env,
   // so we will assume that is what this is
-  const paramArray = methodMeta.parameters.map((p) =>
+  const paramArray = method.parameters.map((p) =>
     params[p.name] == undefined
       ? instanceRegistry.get(envMeta.envName)
       : params[p.name],
@@ -462,7 +373,7 @@ async function methodDispatch(
 
   // Ensure the result is always some HttpResult
   const resultWrapper = (res: any): HttpResult<unknown> => {
-    const rt = methodMeta.return_type;
+    const rt = method.return_type;
 
     if (rt === null) {
       return { ok: true, status: 200 };
@@ -476,12 +387,84 @@ async function methodDispatch(
   };
 
   try {
-    return resultWrapper(
-      await (instance as any)[methodMeta.name](...paramArray),
-    );
+    return resultWrapper(await (instance as any)[method.name](...paramArray));
   } catch (e) {
     return uncaughtException(e);
   }
+}
+
+function validateCidlType(
+  ast: CloesceAst,
+  value: unknown,
+  cidlType: CidlType,
+): boolean {
+  if (value === undefined) return false;
+
+  // TODO: consequences of null checking like this? 'null' is passed in
+  // as a string for GET requests...
+  const nullable = isNullableType(cidlType);
+  if (value == null || value === "null") return nullable;
+
+  if (nullable) {
+    cidlType = (cidlType as any).Nullable; // Unwrap the nullable type
+  }
+
+  // Handle primitive string types with switch
+  if (typeof cidlType === "string") {
+    switch (cidlType) {
+      case "Integer":
+        return Number.isInteger(Number(value));
+      case "Real":
+        return !Number.isNaN(Number(value));
+      case "Text":
+        return typeof value === "string";
+      case "Blob":
+        return value instanceof Blob || value instanceof ArrayBuffer;
+      default:
+        return false;
+    }
+  }
+
+  // Handle object types
+  if ("Model" in cidlType) {
+    const model = ast.models[cidlType.Model];
+    if (!model || typeof value !== "object") return false;
+    const obj = value as Record<string, unknown>;
+
+    // Validate attributes
+    if (
+      !model.attributes.every((attr) =>
+        validateCidlType(ast, obj[attr.value.name], attr.value.cidl_type),
+      )
+    ) {
+      return false;
+    }
+
+    // Validate navigation properties
+    return model.navigation_properties.every((nav) => {
+      const navValue = obj[nav.var_name];
+
+      return (
+        navValue == null ||
+        validateCidlType(ast, navValue, getNavigationPropertyCidlType(nav))
+      );
+    });
+  }
+
+  if ("Array" in cidlType) {
+    return (
+      Array.isArray(value) &&
+      value.every((v) => validateCidlType(ast, v, cidlType.Array))
+    );
+  }
+
+  if ("HttpResult" in cidlType) {
+    if (value === null) return cidlType.HttpResult === null;
+    if (cidlType.HttpResult === null) return false;
+    return validateCidlType(ast, value, cidlType.HttpResult);
+  }
+
+  return false;
 }
 
 /**
@@ -494,15 +477,15 @@ async function methodDispatch(
  */
 function _modelsFromSql(
   modelName: string,
-  cidl: MetaCidl,
+  ast: CloesceAst,
   constructorRegistry: ModelConstructorRegistry,
   records: Record<string, any>[],
-  includeTree: Record<string, UserDefinedModel>,
+  includeTree: Record<string, UserDefinedModel> | null,
 ): InstantiatedUserDefinedModel[] {
   if (!records.length) return [];
 
-  const modelMeta = cidl.models[modelName];
-  if (!modelMeta) throw new Error(`Model ${modelName} not found in CIDL`);
+  const modelMeta = ast.models[modelName];
+  if (!modelMeta) throw new Error(`Model ${modelName} not found in ast`);
 
   const pk = modelMeta.primary_key;
   if (!pk) throw new Error(`Primary key not found for ${modelName}`);
@@ -541,9 +524,9 @@ function _modelsFromSql(
 
       // Initialize all array navigation properties
       for (const nav of modelMeta.navigation_properties) {
-        const navCidlType = nav.value.cidl_type;
+        const navCidlType = getNavigationPropertyCidlType(nav);
         if (isCidlArray(navCidlType)) {
-          instance[nav.value.name] = [];
+          instance[nav.var_name] = [];
         }
       }
 
@@ -561,8 +544,8 @@ function _modelsFromSql(
 
     // Process navigation properties
     for (const nav of modelMeta.navigation_properties) {
-      const navName = nav.value.name;
-      const navCidlType = nav.value.cidl_type;
+      const navName = nav.var_name;
+      const navCidlType = getNavigationPropertyCidlType(nav);
       let navModelName: string | undefined;
 
       if (isCidlArray(navCidlType)) {
@@ -575,7 +558,7 @@ function _modelsFromSql(
 
       if (!navModelName) continue;
 
-      const navMeta = cidl.models[navModelName];
+      const navMeta = ast.models[navModelName];
       if (!navMeta) continue;
 
       const nestedPk = navMeta.primary_key.name;
@@ -616,7 +599,7 @@ function _modelsFromSql(
   }
 
   function getCol(
-    meta: MetaModel,
+    meta: Model,
     attrName: string,
     row: Record<string, any>,
     prefixed: boolean,
@@ -628,7 +611,7 @@ function _modelsFromSql(
     seenNestedIds[key] = seenNestedIds[key] || new Set();
 
     // Get the primary key name for the nested model
-    const navMeta = cidl.models[navModelName];
+    const navMeta = ast.models[navModelName];
     const nestedPkAttr = navMeta?.primary_key;
     const nestedPkName = nestedPkAttr?.name || "id";
 
@@ -640,7 +623,7 @@ function _modelsFromSql(
   }
 
   function buildInstance(
-    meta: MetaModel,
+    meta: Model,
     row: Record<string, any>,
     tree: Record<string, any>,
     prefixed: boolean,
@@ -662,8 +645,8 @@ function _modelsFromSql(
 
     // Assign navigation properties
     for (const nav of meta.navigation_properties) {
-      const navName = nav.value.name;
-      const navCidlType = nav.value.cidl_type;
+      const navName = nav.var_name;
+      const navCidlType = getNavigationPropertyCidlType(nav);
       let navModelName: string | undefined;
 
       if (isCidlArray(navCidlType)) {
@@ -676,7 +659,7 @@ function _modelsFromSql(
 
       if (!navModelName) continue;
 
-      const navMeta = cidl.models[navModelName];
+      const navMeta = ast.models[navModelName];
       if (!navMeta) continue;
 
       const nestedPk = navMeta.primary_key;
@@ -718,8 +701,8 @@ function toResponse(r: HttpResult): Response {
 }
 
 interface MatchedRoute {
-  modelMeta: MetaModel;
-  methodMeta: ModelMethod;
+  model: Model;
+  method: ModelMethod;
   id: string | null;
 }
 

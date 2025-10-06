@@ -1,0 +1,12 @@
+CREATE TABLE "B" ( "id" integer PRIMARY KEY );
+CREATE TABLE "Course" ( "id" integer PRIMARY KEY );
+CREATE TABLE "Person" ( "id" integer PRIMARY KEY );
+CREATE TABLE "Student" ( "id" integer PRIMARY KEY );
+CREATE TABLE "A" ( "id" integer PRIMARY KEY, "bId" integer NOT NULL, FOREIGN KEY ("bId") REFERENCES "B" ("id") ON DELETE RESTRICT ON UPDATE CASCADE );
+CREATE TABLE "Dog" ( "id" integer PRIMARY KEY, "personId" integer NOT NULL, FOREIGN KEY ("personId") REFERENCES "Person" ("id") ON DELETE RESTRICT ON UPDATE CASCADE );
+CREATE TABLE "StudentsCourses" ( "Course_id" integer NOT NULL, "Student_id" integer NOT NULL, PRIMARY KEY ("Course_id", "Student_id"), FOREIGN KEY ("Course_id") REFERENCES "Course" ("id") ON DELETE RESTRICT ON UPDATE CASCADE, FOREIGN KEY ("Student_id") REFERENCES "Student" ("id") ON DELETE RESTRICT ON UPDATE CASCADE );
+CREATE VIEW "A_withB" AS SELECT "A"."id" AS "A_id", "A"."bId" AS "A_bId", "B"."id" AS "B_id" FROM "A" LEFT JOIN "B" ON "A"."bId" = "B"."id";
+CREATE VIEW "A_withoutB" AS SELECT "A"."id" AS "A_id", "A"."bId" AS "A_bId" FROM "A";
+CREATE VIEW "Person_withDogs" AS SELECT "Person"."id" AS "Person_id", "Dog"."id" AS "Dog_id", "Dog"."personId" AS "Dog_personId" FROM "Person" LEFT JOIN "Dog" ON "Person"."id" = "Dog"."personId";
+CREATE VIEW "Student_withCoursesStudents" AS SELECT "Student"."id" AS "Student_id", "Course"."id" AS "Course_id", "Student_1"."id" AS "Student_1_id" FROM "Student" LEFT JOIN "StudentsCourses" ON "Student"."id" = "StudentsCourses"."Student_id" LEFT JOIN "Course" ON "StudentsCourses"."Course_id" = "Course"."id" LEFT JOIN "StudentsCourses" ON "Course"."id" = "StudentsCourses"."Course_id" LEFT JOIN "Student" AS "Student_1" ON "StudentsCourses"."Student_1_id" = "Student_1"."id";
+CREATE VIEW "Student_withCoursesStudentsCourses" AS SELECT "Student"."id" AS "Student_id", "Course"."id" AS "Course_id", "Student_1"."id" AS "Student_1_id", "Course_1"."id" AS "Course_1_id" FROM "Student" LEFT JOIN "StudentsCourses" ON "Student"."id" = "StudentsCourses"."Student_id" LEFT JOIN "Course" ON "StudentsCourses"."Course_id" = "Course"."id" LEFT JOIN "StudentsCourses" ON "Course"."id" = "StudentsCourses"."Course_id" LEFT JOIN "Student" AS "Student_1" ON "StudentsCourses"."Student_1_id" = "Student_1"."id" LEFT JOIN "StudentsCourses" ON "Student_1"."id" = "StudentsCourses"."Student_1_id" LEFT JOIN "Course" AS "Course_1" ON "StudentsCourses"."Course_1_id" = "Course_1"."id";

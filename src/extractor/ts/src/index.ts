@@ -1,6 +1,5 @@
-export { cloesce } from "./cloesce.js";
+export { cloesce, modelsFromSql } from "./cloesce.js";
 export { HttpResult } from "./common.js";
-export { modelsFromSql } from "./cloesce.js";
 
 // Compiler hints
 export const D1: ClassDecorator = () => {};
@@ -18,6 +17,9 @@ export const OneToMany =
 export const OneToOne =
   (_: string): PropertyDecorator =>
   () => {};
+export const ManyToMany =
+  (_: string): PropertyDecorator =>
+  () => {};
 export const ForeignKey =
   <T>(_: T): PropertyDecorator =>
   () => {};
@@ -32,3 +34,14 @@ export type IncludeTree<T> = T extends Primitive
         ? IncludeTree<NonNullable<U>>
         : IncludeTree<NonNullable<T[K]>>;
     };
+
+// Helpers
+export function instantiateModelArray<T extends object>(
+  data: any,
+  ctor: { new (): T },
+): T[] {
+  if (Array.isArray(data)) {
+    return data.map((x) => instantiateModelArray(x, ctor)).flat();
+  }
+  return [Object.assign(new ctor(), data)];
+}

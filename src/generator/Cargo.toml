@@ -1,10 +1,9 @@
 [workspace]
 resolver = "3"
-members = ["cli", "common", "d1", "workers", "client"]
+members = ["cli", "common", "d1", "workers", "client", "wrangler"]
 
 [workspace.dependencies]
 anyhow = "1.0.99"
 serde = { version = "1.0.219", features = ["derive"] }
 serde_json = "1.0.143"
 toml = "0.9.5"
-insta = "1.43.1"

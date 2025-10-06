@@ -1,4 +1,5 @@
-import { Named } from "cmd-ts/dist/cjs/helpdoc.js";
+import fs from "node:fs";
+import path from "node:path";
 
 export type Either<L, R> = { ok: false; value: L } | { ok: true; value: R };
 export function left<L>(value: L): Either<L, never> {
@@ -8,31 +9,6 @@ export function right<R>(value: R): Either<never, R> {
   return { ok: true, value };
 }
 
-/**
- * A `Model` meant for Cloesce Meta Data, utilzing an map of methods.
- */
-export interface MetaModel {
-  name: string;
-  attributes: ModelAttribute[];
-  primary_key: NamedTypedValue;
-  navigation_properties: NavigationProperty[];
-  data_sources: DataSource[];
-  methods: Record<string, ModelMethod>;
-}
-
-/**
- * A `Cidl` meant for Cloesce Meta Data, utilzing an map of models.
- */
-export type MetaCidl = {
-  wrangler_env: WranglerEnv;
-  models: Record<string, MetaModel>;
-  [key: string]: unknown;
-};
-
-// --------------------------------------------------
-// V CIDL types, mirroring the Rust bindings V
-// --------------------------------------------------
-
 export type HttpResult<T = unknown> = {
   ok: boolean;
   status: number;
@@ -41,15 +17,20 @@ export type HttpResult<T = unknown> = {
 };
 
 export type CidlType =
+  | "Void"
   | "Integer"
   | "Real"
   | "Text"
   | "Blob"
-  | "D1Database"
   | { Inject: string }
   | { Model: string }
+  | { Nullable: CidlType }
   | { Array: CidlType }
-  | { HttpResult: CidlType | null };
+  | { HttpResult: CidlType };
+
+export function isNullableType(ty: CidlType): boolean {
+  return typeof ty === "object" && ty !== null && "Nullable" in ty;
+}
 
 export enum HttpVerb {
   GET = "GET",
@@ -62,7 +43,6 @@ export enum HttpVerb {
 export interface NamedTypedValue {
   name: string;
   cidl_type: CidlType;
-  nullable: boolean;
 }
 
 export interface ModelAttribute {
@@ -84,24 +64,32 @@ export type NavigationPropertyKind =
   | { ManyToMany: { unique_id: string } };
 
 export interface NavigationProperty {
-  value: NamedTypedValue;
+  var_name: string;
+  model_name: string;
   kind: NavigationPropertyKind;
+}
+
+export function getNavigationPropertyCidlType(
+  nav: NavigationProperty,
+): CidlType {
+  return "OneToOne" in nav.kind
+    ? { Model: nav.model_name }
+    : { Array: { Model: nav.model_name } };
 }
 
 export interface Model {
   name: string;
-  attributes: ModelAttribute[];
   primary_key: NamedTypedValue;
+  attributes: ModelAttribute[];
   navigation_properties: NavigationProperty[];
-  data_sources: DataSource[];
-  methods: ModelMethod[];
+  methods: Record<string, ModelMethod>;
+  data_sources: Record<string, DataSource>;
   source_path: string;
 }
 
-/**
- * The CIDL or JSON IncludeTree structure
- */
-export type CidlIncludeTree = Array<[NamedTypedValue, CidlIncludeTree]>;
+export interface CidlIncludeTree {
+  [key: string]: CidlIncludeTree;
+}
 
 export interface DataSource {
   name: string;
@@ -113,10 +101,10 @@ export interface WranglerEnv {
   source_path: string;
 }
 
-export interface CidlSpec {
+export interface CloesceAst {
   version: string;
   project_name: string;
   language: "TypeScript";
   wrangler_env: WranglerEnv;
-  models: Model[];
+  models: Record<string, Model>;
 }
