@@ -128,7 +128,7 @@ jobs:
 
       - name: Run extractor run-fail
         working-directory: tests/runner
-        run: cargo run --bin test run-fail extractor --check
+        run: cargo run --bin test run-fail --check
 
   e2e:
     name: E2E Tests
