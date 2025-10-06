@@ -6,7 +6,6 @@ https://youtu.be/kSQIpW6WkRc
 ---
 
 ## What's New (User Facing)
-*(They happen to be GitHub PRs)*
 
 - Included **primary key and CRUD handling** for IR (Intermediate Representation) file output
 - Constructed **Rust compiler** for compiling IR into Wrangler-compatible files for deployment on Cloudflare Workers
