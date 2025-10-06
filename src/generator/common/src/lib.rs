@@ -290,7 +290,7 @@ impl CloesceAst {
                 // Validate return type
                 if let CidlType::Object(o) = &method.return_type {
                     ensure!(
-                        Self::is_valid_object_ref(&self, o),
+                        self.is_valid_object_ref(o),
                         GeneratorErrorKind::UnknownObject,
                         "{}.{}",
                         model.name,
@@ -314,7 +314,7 @@ impl CloesceAst {
 
                     if let CidlType::Object(o) = root_type {
                         ensure!(
-                            Self::is_valid_object_ref(&self, o),
+                            self.is_valid_object_ref(o),
                             GeneratorErrorKind::UnknownObject,
                             "{}.{}.{}",
                             model.name,

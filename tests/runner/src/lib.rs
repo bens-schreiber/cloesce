@@ -51,8 +51,8 @@ fn diff_file(
 
     // Only print a diff if there is some dif.
     // If this is a run fail test, don't print new file diffs.
-    if !unified_diff.trim().is_empty()
-        && !(old_contents.is_empty() && matches!(opt, DiffOpts::FailOnly))
+    if !(unified_diff.trim().is_empty()
+        || old_contents.is_empty() && matches!(opt, DiffOpts::FailOnly))
     {
         for line in unified_diff.lines() {
             if line.starts_with('+') && !line.starts_with("+++") {
@@ -82,11 +82,11 @@ struct OutputFile {
 }
 
 impl OutputFile {
-    fn new(fixture_path: &PathBuf, base_name: &str) -> Self {
-        if let Some(parent) = fixture_path.parent() {
-            if !parent.exists() {
-                fs::create_dir_all(parent).unwrap();
-            }
+    fn new(fixture_path: &Path, base_name: &str) -> Self {
+        if let Some(parent) = fixture_path.parent()
+            && !parent.exists()
+        {
+            fs::create_dir_all(parent).unwrap();
         }
 
         let path = fixture_path.with_file_name(format!("out.{base_name}"));

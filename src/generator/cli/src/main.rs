@@ -1,10 +1,10 @@
 use std::{io::Write, panic, path::PathBuf};
 
-use clap::{command, Parser, Subcommand};
+use clap::{Parser, Subcommand, command};
 
 use common::{
-    err::{GeneratorError, GeneratorErrorKind, Result},
     CloesceAst,
+    err::{GeneratorError, GeneratorErrorKind, Result},
 };
 use workers::WorkersGenerator;
 use wrangler::WranglerFormat;
