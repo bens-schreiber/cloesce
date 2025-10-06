@@ -1,12 +1,13 @@
 
 import { cloesce } from "cloesce";
 import cidl from "./cidl.json";
-import { A } from "./foreign_keys.cloesce.ts";
-import { B } from "./foreign_keys.cloesce.ts";
-import { Course } from "./foreign_keys.cloesce.ts";
-import { Dog } from "./foreign_keys.cloesce.ts";
-import { Person } from "./foreign_keys.cloesce.ts";
-import { Student } from "./foreign_keys.cloesce.ts";
+import { A } from "./seed__foreign_keys.cloesce.ts";
+import { B } from "./seed__foreign_keys.cloesce.ts";
+import { Course } from "./seed__foreign_keys.cloesce.ts";
+import { Dog } from "./seed__foreign_keys.cloesce.ts";
+import { Person } from "./seed__foreign_keys.cloesce.ts";
+import { Student } from "./seed__foreign_keys.cloesce.ts";
+
 
 const constructorRegistry = {
 	A: A,

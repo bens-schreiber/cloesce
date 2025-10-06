@@ -6,44 +6,51 @@ use std::{
 
 use similar::TextDiff;
 
+pub enum DiffOpts {
+    FailOnly,
+    All,
+}
+
 // Compares unified file diffs, creating a `.new` snapshot file if a diff is found
 ///
 /// Returns if a `.new` file created
-pub fn diff_file(
-    fixture_path: &Path,
+fn diff_file(
+    fixture_id: &String,
+    out: OutputFile,
     new_contents: String,
     fail: bool,
-    check_mode: bool,
+    opt: &DiffOpts,
 ) -> (bool, PathBuf) {
     let name = if fail {
-        format!("{}_fail.out", fixture_path.file_name().unwrap().display())
+        format!("{}_{}_fail.out", fixture_id, out.base_name)
     } else {
-        fixture_path
-            .file_name()
-            .unwrap()
-            .to_string_lossy()
-            .to_string()
+        out.base_name.clone()
     };
 
-    let new_path = fixture_path.with_file_name(format!("snap___{}", name));
+    let new_path = out.path.with_file_name(format!("snap___{}", name));
+    let old_path = out.path.with_file_name(name);
 
-    let old_contents = fs::read(&fixture_path.with_file_name(name))
+    // Empty if it doesn't even exist
+    let old_contents = fs::read(&old_path)
         .map(|bytes| String::from_utf8_lossy(&bytes).into_owned())
         .unwrap_or_default();
 
-    // No changes, wrote nothing
-    if old_contents == new_contents {
-        return (false, fixture_path.to_path_buf());
+    let diff = TextDiff::from_lines(&old_contents, &new_contents);
+
+    // No changes, write nothing
+    if diff.ops().len() == 1 && matches!(diff.ops()[0].tag(), similar::DiffTag::Equal) {
+        return (false, old_path);
     }
 
-    let diff = TextDiff::from_lines(&old_contents, &new_contents);
     let unified_diff = diff
         .unified_diff()
         .context_radius(3)
-        .header(fixture_path.to_str().unwrap(), new_path.to_str().unwrap())
+        .header(old_path.to_str().unwrap(), new_path.to_str().unwrap())
         .to_string();
 
-    if !unified_diff.trim().is_empty() {
+    // Only print a diff if there is some dif.
+    // If this is a run fail test, don't print file diff if there wasnt a failure
+    if unified_diff.trim().is_empty() || matches!(opt, DiffOpts::FailOnly) && fail {
         for line in unified_diff.lines() {
             if line.starts_with('+') && !line.starts_with("+++") {
                 println!("\x1b[32m{}\x1b[0m", line); // green
@@ -57,91 +64,108 @@ pub fn diff_file(
         }
     }
 
-    if check_mode {
-        return (true, PathBuf::default());
-    }
-
-    // Wrote a diff'd file or new file
     fs::write(&new_path, new_contents).expect("path to be written");
     (true, new_path)
 }
 
-/// A temporary file inside of the fixture path
-struct TempFile {
+/// A temporary file for storing the outputs of a cloesce extractor/generator call
+struct OutputFile {
+    pub base_name: String,
     pub path: PathBuf,
 }
 
-impl TempFile {
-    fn new(fixture_path: &PathBuf, name: &str) -> Self {
-        if !fixture_path.exists() {
-            fs::create_dir_all(fixture_path).unwrap();
+impl OutputFile {
+    fn new(fixture_path: &Path, base_name: &str) -> Self {
+        if let Some(parent) = fixture_path.parent()
+            && !parent.exists()
+        {
+            fs::create_dir_all(parent).unwrap();
         }
 
-        let path = fixture_path.with_file_name(format!("tmp.{name}"));
+        let path = fixture_path.with_file_name(format!("out.{base_name}"));
 
         std::fs::File::create(&path).unwrap();
-        Self { path }
+        Self {
+            path,
+            base_name: base_name.to_string(),
+        }
     }
 
+    /// The full canonicalized path to the out file
     fn path(&self) -> PathBuf {
         self.path.canonicalize().unwrap()
     }
 }
 
-impl Drop for TempFile {
+impl Drop for OutputFile {
     fn drop(&mut self) {
         let _ = fs::remove_file(&self.path);
     }
 }
 
 pub struct Fixture {
+    /// The path of a fixture entry point, ie a seed source file
     pub path: PathBuf,
-    pub check_only: bool,
+    pub opt: DiffOpts,
+    pub fixture_id: String,
 }
 
 impl Fixture {
-    pub fn new(path: PathBuf, check_only: bool) -> Self {
-        Self { path, check_only }
+    pub fn new(path: PathBuf, opt: DiffOpts) -> Self {
+        let fixture_id = path.file_stem().unwrap().to_str().unwrap().to_owned();
+        Self {
+            fixture_id,
+            path,
+            opt,
+        }
     }
 
     pub fn extract_cidl(&self) -> Result<(bool, PathBuf), (bool, PathBuf)> {
-        let tmp = TempFile::new(&self.path, "cidl.json");
+        let out = OutputFile::new(&self.path, "cidl.json");
         let res = self.run_command(
             Command::new("node")
                 .arg("../../src/extractor/ts/dist/cli.js")
                 .arg("--location")
                 .arg(&self.path)
                 .arg("--out")
-                .arg(&tmp.path)
+                .arg(&out.path)
                 .arg("--truncateSourcePaths"),
         );
 
         match res {
-            Ok(_) => Ok(self.read_temp_and_diff(&self.path, tmp)),
-            Err(err) => Err(diff_file(&self.path, err, true, self.check_only)),
+            Ok(_) => Ok(self.read_out_and_diff(out)),
+            Err(err) => Err(self.read_fail_and_diff(out, err)),
         }
     }
 
     pub fn generate_wrangler(&self) -> Result<(bool, PathBuf), (bool, PathBuf)> {
-        let tmp = TempFile::new(&self.path, "wrangler.toml");
+        let out = OutputFile::new(&self.path, "wrangler.toml");
         let res = self.run_command(
             Command::new("cargo")
                 .arg("run")
                 .arg("generate")
                 .arg("wrangler")
-                .arg(tmp.path())
+                .arg(out.path())
                 .current_dir("../../src/generator"),
         );
 
         match res {
-            Ok(_) => Ok(self.read_temp_and_diff(&self.path, tmp)),
-            Err(err) => Err(diff_file(&self.path, err, true, self.check_only)),
+            Ok(_) => Ok(self.read_out_and_diff(out)),
+            Err(err) => Err(self.read_fail_and_diff(out, err)),
         }
     }
 
-    pub fn generate_d1(&self, cidl: &Path) -> Result<bool, bool> {
+    pub fn generate_d1(&self, cidl: &Path) -> Result<(bool, PathBuf), (bool, PathBuf)> {
         let cidl_path = cidl.canonicalize().unwrap();
-        let tmp = TempFile::new(&self.path.join("migrations"), "migrations.sql");
+
+        let out = OutputFile::new(
+            &self
+                .path
+                .parent()
+                .unwrap()
+                .join("migrations/migrations.sql"),
+            "migrations.sql",
+        );
 
         let res = self.run_command(
             Command::new("cargo")
@@ -149,15 +173,13 @@ impl Fixture {
                 .arg("generate")
                 .arg("d1")
                 .arg(&cidl_path)
-                .arg(tmp.path())
+                .arg(out.path())
                 .current_dir("../../src/generator"),
         );
 
         match res {
-            Ok(_) => Ok(self
-                .read_temp_and_diff(&self.path.join("migrations"), tmp)
-                .0),
-            Err(err) => Err(diff_file(&self.path, err, true, self.check_only).0),
+            Ok(_) => Ok(self.read_out_and_diff(out)),
+            Err(err) => Err(self.read_fail_and_diff(out, err)),
         }
     }
 
@@ -166,10 +188,10 @@ impl Fixture {
         cidl: &Path,
         wrangler: &Path,
         domain: &str,
-    ) -> Result<bool, bool> {
+    ) -> Result<(bool, PathBuf), (bool, PathBuf)> {
         let cidl_path = cidl.canonicalize().unwrap();
         let wrangler_path = wrangler.canonicalize().unwrap();
-        let tmp = TempFile::new(&self.path, "workers.ts");
+        let out = OutputFile::new(&self.path, "workers.ts");
 
         let res = self.run_command(
             Command::new("cargo")
@@ -177,21 +199,25 @@ impl Fixture {
                 .arg("generate")
                 .arg("workers")
                 .arg(&cidl_path)
-                .arg(tmp.path())
+                .arg(out.path())
                 .arg(&wrangler_path)
                 .arg(domain)
                 .current_dir("../../src/generator"),
         );
 
         match res {
-            Ok(_) => Ok(self.read_temp_and_diff(&self.path, tmp).0),
-            Err(err) => Err(diff_file(&self.path, err, true, self.check_only).0),
+            Ok(_) => Ok(self.read_out_and_diff(out)),
+            Err(err) => Err(self.read_fail_and_diff(out, err)),
         }
     }
 
-    pub fn generate_client(&self, cidl: &Path, domain: &str) -> Result<bool, bool> {
+    pub fn generate_client(
+        &self,
+        cidl: &Path,
+        domain: &str,
+    ) -> Result<(bool, PathBuf), (bool, PathBuf)> {
         let cidl_path = cidl.canonicalize().unwrap();
-        let tmp = TempFile::new(&self.path, "client.ts");
+        let out = OutputFile::new(&self.path, "client.ts");
 
         let res = self.run_command(
             Command::new("cargo")
@@ -199,14 +225,13 @@ impl Fixture {
                 .arg("generate")
                 .arg("client")
                 .arg(&cidl_path)
-                .arg(tmp.path())
+                .arg(out.path())
                 .arg(domain)
                 .current_dir("../../src/generator"),
         );
-
         match res {
-            Ok(_) => Ok(self.read_temp_and_diff(&self.path, tmp).0),
-            Err(err) => Err(diff_file(&self.path, err, true, self.check_only).0),
+            Ok(_) => Ok(self.read_out_and_diff(out)),
+            Err(err) => Err(self.read_fail_and_diff(out, err)),
         }
     }
 
@@ -218,16 +243,26 @@ impl Fixture {
             return Err(String::from_utf8_lossy(&output.stderr).to_string());
         }
 
-        return Ok(());
+        Ok(())
     }
 
-    fn read_temp_and_diff(&self, path: &Path, tmp: TempFile) -> (bool, PathBuf) {
-        let contents = fs::read(&tmp.path).expect("temp file to be readable");
+    fn read_out_and_diff(&self, out: OutputFile) -> (bool, PathBuf) {
+        let contents = fs::read(&out.path).expect("temp file to be readable");
         diff_file(
-            path,
+            &self.fixture_id,
+            out,
             String::from_utf8_lossy(&contents).to_string(),
             false,
-            self.check_only,
+            &self.opt,
         )
+    }
+
+    fn read_fail_and_diff(&self, out: OutputFile, err: String) -> (bool, PathBuf) {
+        let normalized = err
+            .find("==== CLOESCE ERROR ====")
+            .map(|pos| err[pos..].to_string())
+            .unwrap_or_else(|| err.to_string());
+
+        diff_file(&self.fixture_id, out, normalized, true, &self.opt)
     }
 }

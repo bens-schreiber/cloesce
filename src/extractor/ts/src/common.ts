@@ -99,7 +99,7 @@ export type CidlType =
   | "Text"
   | "Blob"
   | { Inject: string }
-  | { Model: string }
+  | { Object: string }
   | { Nullable: CidlType }
   | { Array: CidlType }
   | { HttpResult: CidlType };
@@ -149,8 +149,8 @@ export function getNavigationPropertyCidlType(
   nav: NavigationProperty,
 ): CidlType {
   return "OneToOne" in nav.kind
-    ? { Model: nav.model_name }
-    : { Array: { Model: nav.model_name } };
+    ? { Object: nav.model_name }
+    : { Array: { Object: nav.model_name } };
 }
 
 export interface Model {
@@ -160,6 +160,12 @@ export interface Model {
   navigation_properties: NavigationProperty[];
   methods: Record<string, ModelMethod>;
   data_sources: Record<string, DataSource>;
+  source_path: string;
+}
+
+export interface PlainOldObject {
+  name: string;
+  attributes: NamedTypedValue[];
   source_path: string;
 }
 
@@ -183,4 +189,5 @@ export interface CloesceAst {
   language: "TypeScript";
   wrangler_env: WranglerEnv;
   models: Record<string, Model>;
+  poos: Record<string, PlainOldObject>;
 }

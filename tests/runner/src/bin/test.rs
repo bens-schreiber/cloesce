@@ -1,8 +1,8 @@
 use clap::{Parser, Subcommand};
 use glob::glob;
-use runner::Fixture;
+use runner::{DiffOpts, Fixture};
 
-use std::thread;
+use std::{fs, path::PathBuf, thread};
 
 #[derive(Parser)]
 #[command(name = "test", version = "0.0.1")]
@@ -20,18 +20,7 @@ struct Cli {
 #[derive(Subcommand, Clone)]
 enum Commands {
     Regression,
-    RunFail(RunFail),
-}
-
-#[derive(Parser, Clone)]
-struct RunFail {
-    #[command(subcommand)]
-    subcommand: RunFailSubcommands,
-}
-
-#[derive(Subcommand, Clone)]
-enum RunFailSubcommands {
-    Extractor,
+    RunFail,
 }
 
 /// Runs the regression tests, passing each fixture through the entire compilation process.
@@ -39,17 +28,21 @@ fn main() {
     let cli = Cli::parse();
 
     let pattern = match &cli.command {
-        Commands::Regression => "../fixtures/regression/*/",
-        Commands::RunFail(rf) => match rf.subcommand {
-            RunFailSubcommands::Extractor => "../fixtures/run_fail/extractor/*/*.ts",
-        },
+        Commands::Regression => "../fixtures/regression/*/seed__*",
+        Commands::RunFail => "../fixtures/run_fail/*/*/*.ts",
     };
 
     let fixtures = glob(pattern)
         .expect("valid glob pattern")
         .filter_map(Result::ok)
         .filter(|p| p.is_file())
-        .map(|p| Fixture::new(p, cli.check_only))
+        .map(|p| {
+            let opt = match &cli.command {
+                Commands::Regression => DiffOpts::All,
+                Commands::RunFail => DiffOpts::FailOnly,
+            };
+            Fixture::new(p, opt)
+        })
         .collect::<Vec<_>>();
 
     // todo: thread pool
@@ -59,13 +52,7 @@ fn main() {
             let domain = cli.domain.clone();
             let command = cli.command.clone();
             thread::spawn(move || -> bool {
-                match command {
-                    Commands::Regression => run_regression(fixture, &domain),
-                    Commands::RunFail(rf) => match rf.subcommand {
-                        RunFailSubcommands::Extractor => run_extractor(fixture),
-                    },
-                }
-                .unwrap_or_else(|err| err)
+                run_integration_test(fixture, &domain, command).unwrap_or_else(|err| err)
             })
         })
         .collect();
@@ -88,19 +75,41 @@ fn main() {
     println!("No changes found.");
 }
 
-fn run_regression(fixture: Fixture, domain: &str) -> Result<bool, bool> {
-    let (cidl_changed, cidl_path) = fixture.extract_cidl().map_err(|e| e.0)?;
-    let (wrangler_changed, wrangler_path) = fixture.generate_wrangler().map_err(|e| e.0)?;
-    let d1_changed = fixture.generate_d1(&cidl_path)?;
-    let workers_changed = fixture.generate_workers(&cidl_path, &wrangler_path, &domain)?;
-    let client_changed = fixture.generate_client(&cidl_path, &domain)?;
+fn run_integration_test(fixture: Fixture, domain: &str, command: Commands) -> Result<bool, bool> {
+    let mut cleanup = Vec::new();
+
+    let mut run_step =
+        |res: Result<(bool, PathBuf), (bool, PathBuf)>| -> Result<(bool, PathBuf), bool> {
+            match res {
+                Ok((changed, path)) => {
+                    cleanup.push(path.clone());
+                    Ok((changed, path))
+                }
+                Err((err, _)) => {
+                    if matches!(command, Commands::RunFail) {
+                        for p in &cleanup {
+                            let _ = fs::remove_file(p);
+                        }
+                        return Err(err);
+                    }
+
+                    Err(err)
+                }
+            }
+        };
+
+    let (cidl_changed, cidl_path) = run_step(fixture.extract_cidl())?;
+    let (wrangler_changed, wrangler_path) = run_step(fixture.generate_wrangler())?;
+    let (d1_changed, _) = run_step(fixture.generate_d1(&cidl_path))?;
+    let (workers_changed, _) =
+        run_step(fixture.generate_workers(&cidl_path, &wrangler_path, domain))?;
+    let (client_changed, _) = run_step(fixture.generate_client(&cidl_path, domain))?;
+
+    if matches!(command, Commands::RunFail) {
+        for p in cleanup {
+            let _ = fs::remove_file(p);
+        }
+    }
 
     Ok(cidl_changed | wrangler_changed | d1_changed | workers_changed | client_changed)
-}
-
-fn run_extractor(fixture: Fixture) -> Result<bool, bool> {
-    fixture
-        .extract_cidl()
-        .map(|(changed, _path)| changed)
-        .map_err(|e| e.0)
 }

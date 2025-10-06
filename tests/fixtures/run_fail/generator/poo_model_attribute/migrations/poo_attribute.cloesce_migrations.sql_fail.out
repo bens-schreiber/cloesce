@@ -1,0 +1,5 @@
+==== CLOESCE ERROR ====
+Error [InvalidSqlType]: Model attributes must be valid SQLite types: Integer, Real, Text, Blob
+Phase: EarlyAstValidation
+Context: Foo.poo
+Suggested fix: Consider using a navigation property or creating another model.

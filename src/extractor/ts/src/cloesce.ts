@@ -425,16 +425,16 @@ function validateCidlType(
     }
   }
 
-  // Handle object types
-  if ("Model" in cidlType) {
-    const model = ast.models[cidlType.Model];
+  // Handle Models
+  if ("Object" in cidlType && ast.models[cidlType.Object]) {
+    const model = ast.models[cidlType.Object];
     if (!model || typeof value !== "object") return false;
-    const obj = value as Record<string, unknown>;
+    const valueObj = value as Record<string, unknown>;
 
     // Validate attributes
     if (
       !model.attributes.every((attr) =>
-        validateCidlType(ast, obj[attr.value.name], attr.value.cidl_type),
+        validateCidlType(ast, valueObj[attr.value.name], attr.value.cidl_type),
       )
     ) {
       return false;
@@ -442,7 +442,7 @@ function validateCidlType(
 
     // Validate navigation properties
     return model.navigation_properties.every((nav) => {
-      const navValue = obj[nav.var_name];
+      const navValue = valueObj[nav.var_name];
 
       return (
         navValue == null ||
@@ -451,10 +451,26 @@ function validateCidlType(
     });
   }
 
+  // Handle Plain Old Objects
+  if ("Object" in cidlType && ast.poos[cidlType.Object]) {
+    const poo = ast.poos[cidlType.Object];
+    if (!poo || typeof value !== "object") return false;
+    const valueObj = value as Record<string, unknown>;
+
+    // Validate attributes
+    if (
+      !poo.attributes.every((attr) =>
+        validateCidlType(ast, valueObj[attr.name], attr.cidl_type),
+      )
+    ) {
+      return false;
+    }
+  }
+
   if ("Array" in cidlType) {
+    const arr = cidlType.Array;
     return (
-      Array.isArray(value) &&
-      value.every((v) => validateCidlType(ast, v, cidlType.Array))
+      Array.isArray(value) && value.every((v) => validateCidlType(ast, v, arr))
     );
   }
 
@@ -549,11 +565,11 @@ function _modelsFromSql(
       let navModelName: string | undefined;
 
       if (isCidlArray(navCidlType)) {
-        if (isCidlModel(navCidlType.Array)) {
-          navModelName = navCidlType.Array.Model;
+        if (isCidlObject(navCidlType.Array)) {
+          navModelName = navCidlType.Array.Object;
         }
-      } else if (isCidlModel(navCidlType)) {
-        navModelName = navCidlType.Model;
+      } else if (isCidlObject(navCidlType)) {
+        navModelName = navCidlType.Object;
       }
 
       if (!navModelName) continue;
@@ -590,8 +606,8 @@ function _modelsFromSql(
 
   return Object.values(itemsById);
 
-  function isCidlModel(value: CidlType): value is { Model: string } {
-    return typeof value === "object" && value !== null && "Model" in value;
+  function isCidlObject(value: CidlType): value is { Object: string } {
+    return typeof value === "object" && value !== null && "Object" in value;
   }
 
   function isCidlArray(value: CidlType): value is { Array: CidlType } {
@@ -650,11 +666,11 @@ function _modelsFromSql(
       let navModelName: string | undefined;
 
       if (isCidlArray(navCidlType)) {
-        if (isCidlModel(navCidlType.Array)) {
-          navModelName = navCidlType.Array.Model;
+        if (isCidlObject(navCidlType.Array)) {
+          navModelName = navCidlType.Array.Object;
         }
-      } else if (isCidlModel(navCidlType)) {
-        navModelName = navCidlType.Model;
+      } else if (isCidlObject(navCidlType)) {
+        navModelName = navCidlType.Object;
       }
 
       if (!navModelName) continue;

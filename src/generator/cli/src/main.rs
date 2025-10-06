@@ -59,7 +59,7 @@ fn main() {
             let GeneratorError { context, .. } = e;
             eprintln!(
                 r#"==== CLOESCE ERROR ====
-                Invalid generator file input: {context}
+Invalid generator file input: {context}
             "#
             )
         }
@@ -74,10 +74,10 @@ fn main() {
 
             eprintln!(
                 r#"==== CLOESCE ERROR ====
-    Error [{kind:?}]: {description}
-    Phase: {phase:?}
-    Context: {context}
-    Suggested fix: {suggestion}"#
+Error [{kind:?}]: {description}
+Phase: {phase:?}
+Context: {context}
+Suggested fix: {suggestion}"#
             );
         }
         Err(e) => {

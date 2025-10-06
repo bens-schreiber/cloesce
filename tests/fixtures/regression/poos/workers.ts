@@ -1,13 +1,16 @@
 
 import { cloesce } from "cloesce";
 import cidl from "./cidl.json";
-import { Horse } from "./seed__horse_tinder.cloesce.ts";
-import { Like } from "./seed__horse_tinder.cloesce.ts";
-
+import { PooAcceptYield } from "./seed__poo.cloesce.ts";
+import { PooA } from "./seed__poo.cloesce.ts";
+import { PooB } from "./seed__poo.cloesce.ts";
+import { PooC } from "./seed__poo.cloesce.ts";
 
 const constructorRegistry = {
-	Horse: Horse,
-	Like: Like
+	PooAcceptYield: PooAcceptYield,
+	PooA: PooA,
+	PooB: PooB,
+	PooC: PooC
 };
 
 export default {
