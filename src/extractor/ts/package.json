@@ -1,24 +1,9 @@
 {
   "name": "cloesce",
+  "version": "0.0.2",
   "type": "module",
-  "bin": {
-    "cloesce": "dist/cli.js"
-  },
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
-  "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
-    },
-    "./cli": "./dist/cli.js"
-  },
-  "files": [
-    "dist"
-  ],
   "scripts": {
     "test": "vitest",
-    "test:update": "UPDATE_SNAPSHOTS=1 vitest",
     "format:fix": "prettier --write .",
     "format": "prettier --check .",
     "build": "tsc -p tsconfig.json",
@@ -36,5 +21,10 @@
     "@cloudflare/workers-types": "^4.20250906.0",
     "prettier": "^3.6.2",
     "vitest": "^3.2.4"
-  }
+  },
+  "bin": {
+    "cloesce": "./dist/cli.js"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts"
 }

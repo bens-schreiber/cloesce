@@ -60,12 +60,8 @@ impl WorkersGenerator {
             let mut rel_str = rel.to_string_lossy().replace('\\', "/");
 
             // Ensure we have a leading './' when not starting with '../' or '/'
-            if !rel_str.starts_with("../") && !rel_str.starts_with("./") {
-                rel_str = if rel_str.starts_with("/") {
-                    format!(".{}", rel_str)
-                } else {
-                    format!("./{}", rel_str)
-                }
+            if !rel_str.starts_with(['.', '/']) {
+                rel_str = format!("./{}", rel_str);
             }
 
             // If we collapsed to empty (it can happen if model sits exactly at from_dir/index)
@@ -155,8 +151,7 @@ impl WorkersGenerator {
 
         // TODO: Middleware function should return the DI instance registry
         Ok(format!(
-            r#"
-import {{ cloesce }} from "cloesce";
+            r#"import {{ cloesce }} from "cloesce";
 import cidl from "./cidl.json";
 {model_sources}
 
