@@ -7,7 +7,6 @@ use std::{
 use similar::TextDiff;
 
 pub enum DiffOpts {
-    CheckOnly,
     FailOnly,
     All,
 }
@@ -50,10 +49,8 @@ fn diff_file(
         .to_string();
 
     // Only print a diff if there is some dif.
-    // If this is a run fail test, don't print new file diffs.
-    if !(unified_diff.trim().is_empty()
-        || old_contents.is_empty() && matches!(opt, DiffOpts::FailOnly))
-    {
+    // If this is a run fail test, don't print file diff if there wasnt a failure
+    if unified_diff.trim().is_empty() || matches!(opt, DiffOpts::FailOnly) && fail {
         for line in unified_diff.lines() {
             if line.starts_with('+') && !line.starts_with("+++") {
                 println!("\x1b[32m{}\x1b[0m", line); // green
@@ -65,10 +62,6 @@ fn diff_file(
                 println!("\x1b[90m{}\x1b[0m", line); // gray
             }
         }
-    }
-
-    if matches!(opt, DiffOpts::CheckOnly) {
-        return (true, PathBuf::default());
     }
 
     fs::write(&new_path, new_contents).expect("path to be written");

@@ -1,8 +1,0 @@
-==== CLOESCE ERROR ====
-Error [UnknownNavigationPropertyReference]: Unknown Navigation Property Reference
-Phase: TypeScript IDL Extraction
-Context: Foo.foo bar
-@DataSource
-  foo: IncludeTree<Foo> = { bar: {} };
-
-Suggested fix: Verify that the navigation property reference model exists, or create a model.

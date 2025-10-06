@@ -1,8 +1,0 @@
-==== CLOESCE ERROR ====
-Error [InvalidIncludeTree]: Invalid Include Tree
-Phase: TypeScript IDL Extraction
-Context: Foo.bar 
-@DataSource
-  bar: number;
-
-Suggested fix: Include trees must only contain references to a model's navigation properties.

@@ -37,10 +37,9 @@ fn main() {
         .filter_map(Result::ok)
         .filter(|p| p.is_file())
         .map(|p| {
-            let opt = match (cli.check_only, &cli.command) {
-                (true, _) => DiffOpts::CheckOnly,
-                (false, Commands::Regression) => DiffOpts::All,
-                (false, Commands::RunFail) => DiffOpts::FailOnly,
+            let opt = match &cli.command {
+                Commands::Regression => DiffOpts::All,
+                Commands::RunFail => DiffOpts::FailOnly,
             };
             Fixture::new(p, opt)
         })
