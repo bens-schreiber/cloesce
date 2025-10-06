@@ -1,10 +1,10 @@
 use std::{io::Write, panic, path::PathBuf};
 
-use clap::{Parser, Subcommand, command};
+use clap::{command, Parser, Subcommand};
 
 use common::{
-    CloesceAst,
     err::{GeneratorError, GeneratorErrorKind, Result},
+    CloesceAst,
 };
 use workers::WorkersGenerator;
 use wrangler::WranglerFormat;
@@ -74,10 +74,10 @@ Invalid generator file input: {context}
 
             eprintln!(
                 r#"==== CLOESCE ERROR ====
-    Error [{kind:?}]: {description}
-    Phase: {phase:?}
-    Context: {context}
-    Suggested fix: {suggestion}"#
+Error [{kind:?}]: {description}
+Phase: {phase:?}
+Context: {context}
+Suggested fix: {suggestion}"#
             );
         }
         Err(e) => {
