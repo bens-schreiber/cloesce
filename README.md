@@ -10,7 +10,7 @@ View the [internal documentation](https://cloesce.pages.dev)
 ### Integration Tests
 
 - To run the regression tests: `cargo run --bin test regression`
-- To run the pass fail extractor tests: `cargo run --bin test pass-fail extractor`
+- To run the pass fail extractor tests: `cargo run --bin test run-fail`
 
 Optionally, pass `--check` if new snapshots should not be created.
 

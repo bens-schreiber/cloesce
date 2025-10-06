@@ -4,7 +4,7 @@ use clap::{Parser, Subcommand, command};
 
 use common::{
     CloesceAst,
-    err::{GeneratorError, GeneratorErrorKind, Result},
+    err::{GeneratorErrorKind, Result},
 };
 use workers::WorkersGenerator;
 use wrangler::WranglerFormat;
@@ -47,37 +47,34 @@ enum GenerateTarget {
         client_path: PathBuf,
         domain: String,
     },
+    All {
+        cidl_path: PathBuf,
+        wrangler_path: PathBuf,
+        sqlite_path: PathBuf,
+        workers_path: PathBuf,
+        client_path: PathBuf,
+        client_domain: String,
+        workers_domain: String,
+    },
 }
 
 fn main() {
     match panic::catch_unwind(run_cli) {
-        Ok(Ok(())) => {
-            // Pass
-            std::process::exit(0);
-        }
+        Ok(Ok(())) => std::process::exit(0),
         Ok(Err(e)) if matches!(e.kind, GeneratorErrorKind::InvalidInputFile) => {
-            let GeneratorError { context, .. } = e;
             eprintln!(
-                r#"==== CLOESCE ERROR ====
-Invalid generator file input: {context}
-            "#
-            )
+                "==== CLOESCE ERROR ====\nInvalid generator file input: {}\n",
+                e.context
+            );
         }
         Ok(Err(e)) => {
-            let GeneratorError {
-                description,
-                suggestion,
-                kind,
-                phase,
-                context,
-            } = e;
-
             eprintln!(
                 r#"==== CLOESCE ERROR ====
-Error [{kind:?}]: {description}
-Phase: {phase:?}
-Context: {context}
-Suggested fix: {suggestion}"#
+Error [{:?}]: {}
+Phase: {:?}
+Context: {}
+Suggested fix: {}"#,
+                e.kind, e.description, e.phase, e.context, e.suggestion
             );
         }
         Err(e) => {
@@ -91,7 +88,6 @@ Suggested fix: {suggestion}"#
         }
     }
 
-    // Fail
     std::process::exit(1);
 }
 
@@ -100,76 +96,116 @@ fn run_cli() -> Result<()> {
         Commands::Validate { cidl_path } => {
             let cidl = CloesceAst::from_json(&cidl_path)?;
             cidl.validate_types()?;
-            println!("Ok.")
+            println!("Ok.");
         }
         Commands::Generate { target } => match target {
-            GenerateTarget::Wrangler { wrangler_path } => {
-                let mut wrangler = WranglerFormat::from_path(&wrangler_path);
-                let mut spec = wrangler.as_spec();
-                spec.generate_defaults();
-
-                let wrangler_file = std::fs::OpenOptions::new()
-                    .write(true)
-                    .create(true)
-                    .truncate(true)
-                    .open(&wrangler_path)
-                    .map_err(|e| {
-                        GeneratorErrorKind::InvalidInputFile
-                            .to_error()
-                            .with_context(e.to_string())
-                    })?;
-
-                wrangler.update(spec, wrangler_file);
-            }
+            GenerateTarget::Wrangler { wrangler_path } => generate_wrangler(&wrangler_path)?,
             GenerateTarget::D1 {
                 cidl_path,
                 sqlite_path,
-            } => {
-                let mut sqlite_file = create_file_and_dir(&sqlite_path)?;
-                let ast = CloesceAst::from_json(&cidl_path)?;
-                ast.validate_types()?;
-
-                let generated_sqlite = d1::generate_sql(&ast.models)?;
-
-                sqlite_file
-                    .write_all(generated_sqlite.as_bytes())
-                    .expect("SQL file to be written");
-            }
+            } => generate_d1(&cidl_path, &sqlite_path)?,
             GenerateTarget::Workers {
                 cidl_path,
                 workers_path,
                 wrangler_path,
                 domain,
-            } => {
-                let ast = CloesceAst::from_json(&cidl_path)?;
-                ast.validate_types()?;
-
-                let mut file = create_file_and_dir(&workers_path)?;
-
-                let wrangler = WranglerFormat::from_path(&wrangler_path);
-
-                let workers =
-                    WorkersGenerator::create(ast, wrangler.as_spec(), domain, &workers_path)?;
-
-                file.write_all(workers.as_bytes())
-                    .expect("Could not write to workers file");
-            }
+            } => generate_workers(&cidl_path, &workers_path, &wrangler_path, &domain)?,
             GenerateTarget::Client {
                 cidl_path,
                 client_path,
                 domain,
+            } => generate_client(&cidl_path, &client_path, &domain)?,
+            GenerateTarget::All {
+                cidl_path,
+                wrangler_path,
+                sqlite_path,
+                workers_path,
+                client_path,
+                client_domain,
+                workers_domain,
             } => {
                 let ast = CloesceAst::from_json(&cidl_path)?;
                 ast.validate_types()?;
+                println!("✅ Validation complete.");
 
-                let mut file = create_file_and_dir(&client_path)?;
+                generate_wrangler(&wrangler_path)?;
+                println!("✅ Wrangler generated.");
 
-                file.write_all(client::generate_client_api(ast, domain).as_bytes())
-                    .expect("Could not write to workers file");
+                generate_d1(&cidl_path, &sqlite_path)?;
+                println!("✅ D1 schema generated.");
+
+                generate_workers(&cidl_path, &workers_path, &wrangler_path, &workers_domain)?;
+                println!("✅ Workers generated.");
+
+                generate_client(&cidl_path, &client_path, &client_domain)?;
+                println!("✅ Client generated.");
+
+                println!("🎉 All generation steps completed successfully!");
             }
         },
     }
 
+    Ok(())
+}
+
+fn generate_wrangler(wrangler_path: &PathBuf) -> Result<()> {
+    let mut wrangler = WranglerFormat::from_path(wrangler_path);
+    let mut spec = wrangler.as_spec();
+    spec.generate_defaults();
+
+    let wrangler_file = std::fs::OpenOptions::new()
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .open(wrangler_path)
+        .map_err(|e| {
+            GeneratorErrorKind::InvalidInputFile
+                .to_error()
+                .with_context(e.to_string())
+        })?;
+
+    wrangler.update(spec, wrangler_file);
+    Ok(())
+}
+
+fn generate_d1(cidl_path: &PathBuf, sqlite_path: &PathBuf) -> Result<()> {
+    let mut sqlite_file = create_file_and_dir(sqlite_path)?;
+    let ast = CloesceAst::from_json(cidl_path)?;
+    ast.validate_types()?;
+
+    let generated_sqlite = d1::generate_sql(&ast.models)?;
+    sqlite_file
+        .write_all(generated_sqlite.as_bytes())
+        .expect("Could not write to file");
+    Ok(())
+}
+
+fn generate_workers(
+    cidl_path: &PathBuf,
+    workers_path: &PathBuf,
+    wrangler_path: &PathBuf,
+    domain: &str,
+) -> Result<()> {
+    let ast = CloesceAst::from_json(cidl_path)?;
+    ast.validate_types()?;
+
+    let mut file = create_file_and_dir(workers_path)?;
+    let wrangler = WranglerFormat::from_path(wrangler_path);
+
+    let workers =
+        WorkersGenerator::create(ast, wrangler.as_spec(), domain.to_string(), workers_path)?;
+    file.write_all(workers.as_bytes())
+        .expect("Could not write to file");
+    Ok(())
+}
+
+fn generate_client(cidl_path: &PathBuf, client_path: &PathBuf, domain: &str) -> Result<()> {
+    let ast = CloesceAst::from_json(cidl_path)?;
+    ast.validate_types()?;
+
+    let mut file = create_file_and_dir(client_path)?;
+    file.write_all(client::generate_client_api(ast, domain.to_string()).as_bytes())
+        .expect("Could not write to file");
     Ok(())
 }
 

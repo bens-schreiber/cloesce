@@ -1,8 +1,11 @@
-compatibility_date = "2025-09-07"
+compatibility_date = "2025-10-02"
 main = ".generated/workers.ts"
 name = "example"
 
 [[d1_databases]]
-binding = "DB"
+binding = "db"
 database_id = "not_needed_for_example"
 database_name = "example"
+
+[vars]
+motd = "Horse tinder is the best!!!"

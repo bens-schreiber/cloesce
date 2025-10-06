@@ -346,6 +346,7 @@ tmp/
 .generated
 snap__*
 tmp.*
+examples/package-lock.json
 
 
 

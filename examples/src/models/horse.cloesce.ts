@@ -2,7 +2,6 @@ import { D1Database } from "@cloudflare/workers-types";
 import {
   D1,
   GET,
-  PATCH,
   POST,
   Inject,
   PrimaryKey,
@@ -22,7 +21,7 @@ class Env {
 }
 
 @D1
-class Horse {
+export class Horse {
   @PrimaryKey
   id: number;
 
@@ -78,7 +77,7 @@ class Horse {
 }
 
 @D1
-class Like {
+export class Like {
   @PrimaryKey
   id: number;
 
@@ -91,5 +90,3 @@ class Like {
   @OneToOne("horseId2")
   horse2: Horse | undefined;
 }
-
-export { Like, Horse };
