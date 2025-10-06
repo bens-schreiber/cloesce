@@ -24,7 +24,7 @@ fn diff_file(
     let new_path = out.path.with_file_name(format!("snap___{}", name));
 
     // Empty if it doesn't even exist
-    let old_contents = fs::read(&out.base_path())
+    let old_contents = fs::read(out.base_path())
         .map(|bytes| String::from_utf8_lossy(&bytes).into_owned())
         .unwrap_or_default();
 
@@ -236,7 +236,7 @@ impl Fixture {
             return Err(String::from_utf8_lossy(&output.stderr).to_string());
         }
 
-        return Ok(());
+        Ok(())
     }
 
     fn read_out_and_diff(&self, out: OutputFile) -> (bool, PathBuf) {

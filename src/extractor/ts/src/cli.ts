@@ -87,8 +87,13 @@ async function runExtractor({
     if (truncateSourcePaths) {
       ast.wrangler_env.source_path =
         "./" + path.basename(ast.wrangler_env.source_path);
+
       for (const model of Object.values(ast.models)) {
         model.source_path = "./" + path.basename(model.source_path);
+      }
+
+      for (const poo of Object.values(ast.poos)) {
+        poo.source_path = "./" + path.basename(poo.source_path);
       }
     }
 

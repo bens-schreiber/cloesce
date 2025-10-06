@@ -3,14 +3,10 @@ import { HttpResult, instantiateObjectArray } from "cloesce";
 {{#each poos}}
 export class {{this.name}} {
   {{#each this.attributes}}
-  {{value.name}}: {{get_cidl_type value.cidl_type}};
-  {{/each}}
-  {{#each this.navigation_properties}}
-  {{var_name}}: {{get_nav_cidl_type this}};
+  {{name}}: {{get_cidl_type cidl_type}};
   {{/each}}
 }
 {{/each}}
-
 {{#each models}}
 export class {{this.name}} {
   {{this.primary_key.name}}: {{get_cidl_type this.primary_key.cidl_type}};
@@ -62,10 +58,10 @@ export class {{this.name}} {
     {{#if (eq (get_cidl_type this.return_type) "void")}}
     return raw;
     {{else if (is_object_array this.return_type)}}
-    raw.data = instantiateObjectArray(raw.data, {{../name}});
+    raw.data = instantiateObjectArray(raw.data, {{object_name this.return_type}});
     return raw;
     {{else if (is_object this.return_type)}}
-    raw.data = Object.assign(new {{../name}}(), raw.data);
+    raw.data = Object.assign(new {{object_name this.return_type}}(), raw.data);
     return raw;
     {{else}}
     return raw;

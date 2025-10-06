@@ -92,8 +92,8 @@ fn run_regression(fixture: Fixture, domain: &str) -> Result<bool, bool> {
     let (cidl_changed, cidl_path) = fixture.extract_cidl().map_err(|e| e.0)?;
     let (wrangler_changed, wrangler_path) = fixture.generate_wrangler().map_err(|e| e.0)?;
     let d1_changed = fixture.generate_d1(&cidl_path)?;
-    let workers_changed = fixture.generate_workers(&cidl_path, &wrangler_path, &domain)?;
-    let client_changed = fixture.generate_client(&cidl_path, &domain)?;
+    let workers_changed = fixture.generate_workers(&cidl_path, &wrangler_path, domain)?;
+    let client_changed = fixture.generate_client(&cidl_path, domain)?;
 
     Ok(cidl_changed | wrangler_changed | d1_changed | workers_changed | client_changed)
 }

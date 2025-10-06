@@ -1,6 +1,5 @@
 import { HttpResult, instantiateObjectArray } from "cloesce";
 
-
 export class Horse {
   id: number;
   name: string;

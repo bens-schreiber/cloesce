@@ -59,7 +59,7 @@ fn main() {
             let GeneratorError { context, .. } = e;
             eprintln!(
                 r#"==== CLOESCE ERROR ====
-                Invalid generator file input: {context}
+Invalid generator file input: {context}
             "#
             )
         }

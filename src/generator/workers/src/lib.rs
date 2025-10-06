@@ -102,10 +102,18 @@ impl WorkersGenerator {
     }
 
     /// Generates the constructor registry and instance registry
-    fn registries(models: &BTreeMap<String, Model>, wenv: &WranglerEnv) -> (String, String) {
+    fn registries(
+        models: &BTreeMap<String, Model>,
+        poos: &BTreeMap<String, PlainOldObject>,
+        wenv: &WranglerEnv,
+    ) -> (String, String) {
         let mut constructor_registry = Vec::new();
         for model in models.values() {
             constructor_registry.push(format!("\t{}: {}", &model.name, &model.name));
+        }
+
+        for poo in poos.values() {
+            constructor_registry.push(format!("\t{}: {}", &poo.name, &poo.name));
         }
 
         let constructor_registry_def = {
@@ -133,7 +141,7 @@ impl WorkersGenerator {
 
         let model_sources = Self::link_models(&ast.models, &ast.poos, workers_path);
         let (constructor_registry, instance_registry) =
-            Self::registries(&ast.models, &ast.wrangler_env);
+            Self::registries(&ast.models, &ast.poos, &ast.wrangler_env);
 
         // TODO: Hardcoding one database, in the future we need to support any amount
         let db_binding = wrangler
