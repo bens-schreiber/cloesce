@@ -1,4 +1,8 @@
-use std::{io::Write, panic, path::PathBuf};
+use std::{
+    io::Write,
+    panic,
+    path::{Path, PathBuf},
+};
 
 use clap::{Parser, Subcommand, command};
 
@@ -148,7 +152,7 @@ fn run_cli() -> Result<()> {
     Ok(())
 }
 
-fn generate_wrangler(wrangler_path: &PathBuf) -> Result<()> {
+fn generate_wrangler(wrangler_path: &Path) -> Result<()> {
     let mut wrangler = WranglerFormat::from_path(wrangler_path);
     let mut spec = wrangler.as_spec();
     spec.generate_defaults();
@@ -168,7 +172,7 @@ fn generate_wrangler(wrangler_path: &PathBuf) -> Result<()> {
     Ok(())
 }
 
-fn generate_d1(cidl_path: &PathBuf, sqlite_path: &PathBuf) -> Result<()> {
+fn generate_d1(cidl_path: &Path, sqlite_path: &Path) -> Result<()> {
     let mut sqlite_file = create_file_and_dir(sqlite_path)?;
     let ast = CloesceAst::from_json(cidl_path)?;
     ast.validate_types()?;
@@ -181,9 +185,9 @@ fn generate_d1(cidl_path: &PathBuf, sqlite_path: &PathBuf) -> Result<()> {
 }
 
 fn generate_workers(
-    cidl_path: &PathBuf,
-    workers_path: &PathBuf,
-    wrangler_path: &PathBuf,
+    cidl_path: &Path,
+    workers_path: &Path,
+    wrangler_path: &Path,
     domain: &str,
 ) -> Result<()> {
     let ast = CloesceAst::from_json(cidl_path)?;
@@ -199,7 +203,7 @@ fn generate_workers(
     Ok(())
 }
 
-fn generate_client(cidl_path: &PathBuf, client_path: &PathBuf, domain: &str) -> Result<()> {
+fn generate_client(cidl_path: &Path, client_path: &Path, domain: &str) -> Result<()> {
     let ast = CloesceAst::from_json(cidl_path)?;
     ast.validate_types()?;
 
@@ -209,7 +213,7 @@ fn generate_client(cidl_path: &PathBuf, client_path: &PathBuf, domain: &str) -> 
     Ok(())
 }
 
-fn create_file_and_dir(path: &PathBuf) -> Result<std::fs::File> {
+fn create_file_and_dir(path: &Path) -> Result<std::fs::File> {
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent).map_err(|e| {
             GeneratorErrorKind::InvalidInputFile
