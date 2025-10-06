@@ -1,10 +1,10 @@
 {
     "version": "v0.0.2",
-    "project_name": "nullability",
+    "project_name": "seed__nullability.cloesce.ts",
     "language": "TypeScript",
     "wrangler_env": {
         "name": "Env",
-        "source_path": "./nullability.cloesce.ts"
+        "source_path": "./seed__nullability.cloesce.ts"
     },
     "models": {
         "NullabilityChecks": {
@@ -59,7 +59,7 @@
                     "http_verb": "POST",
                     "return_type": {
                         "Nullable": {
-                            "Model": "NullabilityChecks"
+                            "Object": "NullabilityChecks"
                         }
                     },
                     "parameters": [
@@ -67,7 +67,7 @@
                             "name": "a",
                             "cidl_type": {
                                 "Nullable": {
-                                    "Model": "NullabilityChecks"
+                                    "Object": "NullabilityChecks"
                                 }
                             }
                         }
@@ -112,7 +112,7 @@
                             "cidl_type": {
                                 "Nullable": {
                                     "Array": {
-                                        "Model": "NullabilityChecks"
+                                        "Object": "NullabilityChecks"
                                     }
                                 }
                             }
@@ -128,7 +128,7 @@
                             "HttpResult": {
                                 "Nullable": {
                                     "Array": {
-                                        "Model": "NullabilityChecks"
+                                        "Object": "NullabilityChecks"
                                     }
                                 }
                             }
@@ -149,7 +149,8 @@
                 }
             },
             "data_sources": {},
-            "source_path": "./nullability.cloesce.ts"
+            "source_path": "./seed__nullability.cloesce.ts"
         }
-    }
+    },
+    "poos": {}
 }

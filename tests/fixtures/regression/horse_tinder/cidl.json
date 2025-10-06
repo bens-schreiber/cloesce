@@ -1,10 +1,10 @@
 {
     "version": "v0.0.2",
-    "project_name": "horse_tinder",
+    "project_name": "seed__horse_tinder.cloesce.ts",
     "language": "TypeScript",
     "wrangler_env": {
         "name": "Env",
-        "source_path": "./horse_tinder.cloesce.ts"
+        "source_path": "./seed__horse_tinder.cloesce.ts"
     },
     "models": {
         "Horse": {
@@ -48,7 +48,7 @@
                     "is_static": true,
                     "http_verb": "POST",
                     "return_type": {
-                        "Model": "Horse"
+                        "Object": "Horse"
                     },
                     "parameters": [
                         {
@@ -60,7 +60,7 @@
                         {
                             "name": "horse",
                             "cidl_type": {
-                                "Model": "Horse"
+                                "Object": "Horse"
                             }
                         }
                     ]
@@ -70,7 +70,7 @@
                     "is_static": true,
                     "http_verb": "GET",
                     "return_type": {
-                        "Model": "Horse"
+                        "Object": "Horse"
                     },
                     "parameters": [
                         {
@@ -91,7 +91,7 @@
                     "http_verb": "GET",
                     "return_type": {
                         "Array": {
-                            "Model": "Horse"
+                            "Object": "Horse"
                         }
                     },
                     "parameters": [
@@ -118,7 +118,7 @@
                         {
                             "name": "horse",
                             "cidl_type": {
-                                "Model": "Horse"
+                                "Object": "Horse"
                             }
                         }
                     ]
@@ -140,7 +140,7 @@
                     }
                 }
             },
-            "source_path": "./horse_tinder.cloesce.ts"
+            "source_path": "./seed__horse_tinder.cloesce.ts"
         },
         "Like": {
             "name": "Like",
@@ -177,7 +177,8 @@
             ],
             "methods": {},
             "data_sources": {},
-            "source_path": "./horse_tinder.cloesce.ts"
+            "source_path": "./seed__horse_tinder.cloesce.ts"
         }
-    }
+    },
+    "poos": {}
 }

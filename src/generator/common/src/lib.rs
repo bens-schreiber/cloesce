@@ -31,8 +31,8 @@ pub enum CidlType {
     /// A dependency injected instance, containing a type name.
     Inject(String),
 
-    /// A Cloesce model, containing it's name
-    Model(String),
+    /// A model, or plain old object, containing the name of the class.
+    Object(String),
 
     /// An array of any type
     Array(Box<CidlType>),
@@ -150,6 +150,13 @@ pub struct Model {
     pub source_path: PathBuf,
 }
 
+#[derive(Serialize, Deserialize, Debug)]
+pub struct PlainOldObject {
+    pub name: String,
+    pub attributes: Vec<NamedTypedValue>,
+    pub source_path: PathBuf,
+}
+
 #[derive(Serialize, Deserialize)]
 pub enum InputLanguage {
     TypeScript,
@@ -171,6 +178,9 @@ pub struct CloesceAst {
 
     #[serde_as(as = "MapPreventDuplicates<_, _>")]
     pub models: BTreeMap<String, Model>,
+
+    #[serde_as(as = "MapPreventDuplicates<_, _>")]
+    pub poos: BTreeMap<String, PlainOldObject>,
 }
 
 impl CloesceAst {
@@ -185,6 +195,10 @@ impl CloesceAst {
                 .to_error()
                 .with_context(e.to_string())
         })
+    }
+
+    fn is_valid_object_ref(&self, o: &str) -> bool {
+        self.models.contains_key(o) || self.poos.contains_key(o)
     }
 
     /// Ensures all `CidlTypes` are logically correct for the area, essentially doing
@@ -242,7 +256,7 @@ impl CloesceAst {
                     // Validate the fk's model exists
                     ensure!(
                         self.models.contains_key(fk_model.as_str()),
-                        GeneratorErrorKind::UnknownModel,
+                        GeneratorErrorKind::UnknownObject,
                         "{}.{} => {}?",
                         model.name,
                         a.value.name,
@@ -255,7 +269,7 @@ impl CloesceAst {
             for nav in &model.navigation_properties {
                 ensure!(
                     self.models.contains_key(nav.model_name.as_str()),
-                    GeneratorErrorKind::UnknownModel,
+                    GeneratorErrorKind::UnknownObject,
                     "{} => {}?",
                     model.name,
                     nav.model_name
@@ -274,10 +288,10 @@ impl CloesceAst {
                 );
 
                 // Validate return type
-                if let CidlType::Model(m) = &method.return_type {
+                if let CidlType::Object(o) = &method.return_type {
                     ensure!(
-                        self.models.contains_key(m.as_str()),
-                        GeneratorErrorKind::UnknownModel,
+                        Self::is_valid_object_ref(&self, o),
+                        GeneratorErrorKind::UnknownObject,
                         "{}.{}",
                         model.name,
                         method.name
@@ -298,10 +312,10 @@ impl CloesceAst {
                         )
                     }
 
-                    if let CidlType::Model(m) = root_type {
+                    if let CidlType::Object(o) = root_type {
                         ensure!(
-                            self.models.contains_key(m.as_str()),
-                            GeneratorErrorKind::UnknownModel,
+                            Self::is_valid_object_ref(&self, o),
+                            GeneratorErrorKind::UnknownObject,
                             "{}.{}.{}",
                             model.name,
                             method.name,

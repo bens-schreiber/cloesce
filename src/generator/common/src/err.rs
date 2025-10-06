@@ -61,7 +61,7 @@ pub enum GeneratorErrorKind {
     InvalidInputFile,
     NullSqlType,
     InvalidSqlType,
-    UnknownModel,
+    UnknownObject,
     UnexpectedVoid,
     NotYetSupported,
     InvalidMapping,
@@ -87,9 +87,9 @@ impl GeneratorErrorKind {
                 "Consider using a navigation property or creating another model.",
                 GeneratorPhase::EarlyAstValidation,
             ),
-            GeneratorErrorKind::UnknownModel => (
-                "Model attributes must be valid SQLite types: Integer, Real, Text, Blob",
-                "Consider using a navigation property or creating another model.",
+            GeneratorErrorKind::UnknownObject => (
+                "Objects must be decorated appropriately as a Model or PlainOldObject",
+                "Consider using a decorator on the object.",
                 GeneratorPhase::EarlyAstValidation,
             ),
             GeneratorErrorKind::UnexpectedVoid => (

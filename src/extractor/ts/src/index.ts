@@ -3,6 +3,7 @@ export { HttpResult } from "./common.js";
 
 // Compiler hints
 export const D1: ClassDecorator = () => {};
+export const PlainOldObject: ClassDecorator = () => {};
 export const WranglerEnv: ClassDecorator = () => {};
 export const PrimaryKey: PropertyDecorator = () => {};
 export const GET: MethodDecorator = () => {};
@@ -36,12 +37,12 @@ export type IncludeTree<T> = T extends Primitive
     };
 
 // Helpers
-export function instantiateModelArray<T extends object>(
+export function instantiateObjectArray<T extends object>(
   data: any,
-  ctor: { new (): T },
+  ctor: { new (): T }
 ): T[] {
   if (Array.isArray(data)) {
-    return data.map((x) => instantiateModelArray(x, ctor)).flat();
+    return data.map((x) => instantiateObjectArray(x, ctor)).flat();
   }
   return [Object.assign(new ctor(), data)];
 }

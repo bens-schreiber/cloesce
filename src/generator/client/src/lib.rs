@@ -8,14 +8,14 @@ use mappers::{ClientLanguageTypeMapper, TypeScriptMapper};
 use handlebars::{Handlebars, handlebars_helper};
 
 handlebars_helper!(is_serializable: |cidl_type: CidlType| !matches!(cidl_type.root_type(), CidlType::Inject(_)));
-handlebars_helper!(is_model: |cidl_type: CidlType| match cidl_type {
-    CidlType::Model(_) => true,
-    CidlType::HttpResult(inner) => matches!(inner.deref(), CidlType::Model(_)),
+handlebars_helper!(is_object: |cidl_type: CidlType| match cidl_type {
+    CidlType::Object(_) => true,
+    CidlType::HttpResult(inner) => matches!(inner.deref(), CidlType::Object(_)),
     _ => false,
 });
-handlebars_helper!(is_model_array: |cidl_type: CidlType| match cidl_type {
-    CidlType::HttpResult(inner) => matches!(inner.deref(), CidlType::Array(inner2) if matches!(inner2.deref(), CidlType::Model(_))),
-    CidlType::Array(inner) => matches!(inner.deref(), CidlType::Model(_)),
+handlebars_helper!(is_object_array: |cidl_type: CidlType| match cidl_type {
+    CidlType::HttpResult(inner) => matches!(inner.deref(), CidlType::Array(inner2) if matches!(inner2.deref(), CidlType::Object(_))),
+    CidlType::Array(inner) => matches!(inner.deref(), CidlType::Object(_)),
     _ => false,
 });
 handlebars_helper!(is_one_to_one: |nav: NavigationProperty| matches!(nav.kind, NavigationPropertyKind::OneToOne {..}));
@@ -26,8 +26,8 @@ fn register_helpers(
     mapper: Arc<dyn ClientLanguageTypeMapper + Send + Sync>,
 ) {
     handlebars.register_helper("is_serializable", Box::new(is_serializable));
-    handlebars.register_helper("is_model", Box::new(is_model));
-    handlebars.register_helper("is_model_array", Box::new(is_model_array));
+    handlebars.register_helper("is_object", Box::new(is_object));
+    handlebars.register_helper("is_object_array", Box::new(is_object_array));
     handlebars.register_helper("is_one_to_one", Box::new(is_one_to_one));
     handlebars.register_helper("eq", Box::new(eq));
 
@@ -45,11 +45,11 @@ fn register_helpers(
 
                 let cidl_type = match nav.kind {
                     common::NavigationPropertyKind::OneToOne { .. } => {
-                        CidlType::Model(nav.model_name)
+                        CidlType::Object(nav.model_name)
                     }
                     common::NavigationPropertyKind::OneToMany { .. }
                     | common::NavigationPropertyKind::ManyToMany { .. } => {
-                        CidlType::array(CidlType::Model(nav.model_name))
+                        CidlType::array(CidlType::Object(nav.model_name))
                     }
                 };
 

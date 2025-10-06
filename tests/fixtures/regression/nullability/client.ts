@@ -1,4 +1,5 @@
-import { HttpResult, instantiateModelArray } from "cloesce";
+import { HttpResult, instantiateObjectArray } from "cloesce";
+
 
 export class NullabilityChecks {
   id: number;

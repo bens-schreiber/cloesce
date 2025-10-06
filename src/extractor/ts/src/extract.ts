@@ -27,6 +27,7 @@ import {
   right,
   ExtractorError,
   ExtractorErrorCode,
+  PlainOldObject,
 } from "./common.js";
 import { TypeFormatFlags } from "typescript";
 
@@ -42,6 +43,7 @@ enum AttributeDecoratorKind {
 enum ClassDecoratorKind {
   D1 = "D1",
   WranglerEnv = "WranglerEnv",
+  PlainOldObject = "PlainOldObject",
 }
 
 enum ParameterDecoratorKind {
@@ -51,23 +53,38 @@ enum ParameterDecoratorKind {
 export class CidlExtractor {
   constructor(
     public projectName: string,
-    public version: string,
+    public version: string
   ) {}
 
   extract(project: Project): Either<ExtractorError, CloesceAst> {
     const models: Record<string, Model> = {};
+    const poos: Record<string, PlainOldObject> = {};
+
     for (const sourceFile of project.getSourceFiles()) {
       for (const classDecl of sourceFile.getClasses()) {
-        if (!hasDecorator(classDecl, ClassDecoratorKind.D1)) continue;
+        if (hasDecorator(classDecl, ClassDecoratorKind.D1)) {
+          const result = CidlExtractor.model(classDecl, sourceFile);
 
-        const result = CidlExtractor.model(classDecl, sourceFile);
-
-        // Error: propogate from models
-        if (!result.ok) {
-          result.value.addContext((old) => `${classDecl.getName()}.${old}`);
-          return result;
+          // Error: propogate from models
+          if (!result.ok) {
+            result.value.addContext((old) => `${classDecl.getName()}.${old}`);
+            return result;
+          }
+          models[result.value.name] = result.value;
+          continue;
         }
-        models[result.value.name] = result.value;
+
+        if (hasDecorator(classDecl, ClassDecoratorKind.PlainOldObject)) {
+          const result = CidlExtractor.poo(classDecl, sourceFile);
+
+          // Error: propogate from models
+          if (!result.ok) {
+            result.value.addContext((old) => `${classDecl.getName()}.${old}`);
+            return result;
+          }
+          poos[result.value.name] = result.value;
+          continue;
+        }
       }
     }
 
@@ -77,7 +94,7 @@ export class CidlExtractor {
         return sourceFile
           .getClasses()
           .filter((classDecl) =>
-            hasDecorator(classDecl, ClassDecoratorKind.WranglerEnv),
+            hasDecorator(classDecl, ClassDecoratorKind.WranglerEnv)
           )
           .map((classDecl) => {
             return {
@@ -96,7 +113,7 @@ export class CidlExtractor {
     if (wranglerEnvs.length > 1) {
       return err(
         ExtractorErrorCode.TooManyWranglerEnvs,
-        (e) => (e.context = wranglerEnvs.map((w) => w.name).toString()),
+        (e) => (e.context = wranglerEnvs.map((w) => w.name).toString())
       );
     }
 
@@ -106,14 +123,15 @@ export class CidlExtractor {
       language: "TypeScript",
       wrangler_env: wranglerEnvs[0],
       models,
+      poos,
     });
   }
 
   private static model(
     classDecl: ClassDeclaration,
-    sourceFile: SourceFile,
+    sourceFile: SourceFile
   ): Either<ExtractorError, Model> {
-    const name = classDecl.getName() ?? "<anonymous>";
+    const name = classDecl.getName()!;
     const attributes: ModelAttribute[] = [];
     const navigationProperties: NavigationProperty[] = [];
     const dataSources: Record<string, DataSource> = {};
@@ -178,11 +196,11 @@ export class CidlExtractor {
               (e) => {
                 e.snippet = prop.getText();
                 e.context = prop.getName();
-              },
+              }
             );
           }
 
-          let model_name = getModelName(cidl_type);
+          let model_name = getObjectName(cidl_type);
 
           // Error: navigation properties require a model reference
           if (!model_name) {
@@ -191,7 +209,7 @@ export class CidlExtractor {
               (e) => {
                 e.snippet = prop.getText();
                 e.context = prop.getName();
-              },
+              }
             );
           }
 
@@ -211,11 +229,11 @@ export class CidlExtractor {
               (e) => {
                 e.snippet = prop.getText();
                 e.context = prop.getName();
-              },
+              }
             );
           }
 
-          let model_name = getModelName(cidl_type);
+          let model_name = getObjectName(cidl_type);
 
           // Error: navigation properties require a model reference
           if (!model_name) {
@@ -224,7 +242,7 @@ export class CidlExtractor {
               (e) => {
                 e.snippet = prop.getText();
                 e.context = prop.getName();
-              },
+              }
             );
           }
 
@@ -246,14 +264,14 @@ export class CidlExtractor {
             });
 
           // Error: navigation properties require a model reference
-          let model_name = getModelName(cidl_type);
+          let model_name = getObjectName(cidl_type);
           if (!model_name) {
             return err(
               ExtractorErrorCode.MissingNavigationPropertyReference,
               (e) => {
                 e.snippet = prop.getText();
                 e.context = prop.getName();
-              },
+              }
             );
           }
 
@@ -269,7 +287,7 @@ export class CidlExtractor {
           const treeRes = CidlExtractor.includeTree(
             initializer,
             classDecl,
-            sourceFile,
+            sourceFile
           );
 
           if (!treeRes.ok) {
@@ -314,6 +332,38 @@ export class CidlExtractor {
     });
   }
 
+  private static poo(
+    classDecl: ClassDeclaration,
+    sourceFile: SourceFile
+  ): Either<ExtractorError, PlainOldObject> {
+    const name = classDecl.getName()!;
+    const attributes: NamedTypedValue[] = [];
+
+    for (const prop of classDecl.getProperties()) {
+      const typeRes = CidlExtractor.cidlType(prop.getType());
+
+      // Error: invalid property type
+      if (!typeRes.ok) {
+        typeRes.value.context = prop.getName();
+        typeRes.value.snippet = prop.getText();
+        return typeRes;
+      }
+
+      const cidl_type = typeRes.value;
+      attributes.push({
+        name: prop.getName(),
+        cidl_type,
+      });
+      continue;
+    }
+
+    return right({
+      name,
+      attributes,
+      source_path: sourceFile.getFilePath().toString(),
+    });
+  }
+
   private static readonly primTypeMap: Record<string, CidlType> = {
     number: "Integer",
     Number: "Integer",
@@ -326,7 +376,7 @@ export class CidlExtractor {
 
   private static cidlType(
     type: Type,
-    inject: boolean = false,
+    inject: boolean = false
   ): Either<ExtractorError, CidlType> {
     // Void
     if (type.isVoid()) {
@@ -362,9 +412,9 @@ export class CidlExtractor {
       return err(ExtractorErrorCode.MultipleGenericType);
     }
 
-    // No generics -> inject or model
+    // No generics -> inject or object
     if (generics.length === 0) {
-      const base = inject ? { Inject: tyText } : { Model: tyText };
+      const base = inject ? { Inject: tyText } : { Object: tyText };
       return right(wrapNullable(base, nullable));
     }
 
@@ -401,7 +451,7 @@ export class CidlExtractor {
     function wrapGeneric(
       t: Type,
       isNullable: boolean,
-      wrapper: (inner: CidlType) => CidlType,
+      wrapper: (inner: CidlType) => CidlType
     ): Either<ExtractorError, CidlType> {
       const res = CidlExtractor.cidlType(t, inject);
 
@@ -427,7 +477,7 @@ export class CidlExtractor {
   private static includeTree(
     expr: Expression | undefined,
     currentClass: ClassDeclaration,
-    sf: SourceFile,
+    sf: SourceFile
   ): Either<ExtractorError, CidlIncludeTree> {
     // Include trees must be of the expected form
     if (
@@ -450,7 +500,7 @@ export class CidlExtractor {
           (e) => {
             e.snippet = expr.getText();
             e.context = prop.getName();
-          },
+          }
         );
       }
 
@@ -470,7 +520,7 @@ export class CidlExtractor {
           ExtractorErrorCode.InvalidNavigationPropertyReference,
           (e) => {
             ((e.snippet = navProp.getText()), (e.context = prop.getName()));
-          },
+          }
         );
       }
 
@@ -478,7 +528,7 @@ export class CidlExtractor {
       const initializer = (prop as any).getInitializer?.();
       let nestedTree: CidlIncludeTree = {};
       if (initializer?.isKind?.(SyntaxKind.ObjectLiteralExpression)) {
-        const targetModel = getModelName(cidl_type);
+        const targetModel = getObjectName(cidl_type);
         const targetClass = currentClass
           .getSourceFile()
           .getProject()
@@ -490,7 +540,7 @@ export class CidlExtractor {
           const treeRes = CidlExtractor.includeTree(
             initializer,
             targetClass,
-            sf,
+            sf
           );
 
           // Error: Propogated from `includeTree`
@@ -510,13 +560,13 @@ export class CidlExtractor {
   }
 
   private static method(
-    method: MethodDeclaration,
+    method: MethodDeclaration
   ): Either<ExtractorError, ModelMethod> {
     const decorators = method.getDecorators();
     const decoratorNames = decorators.map((d) => getDecoratorName(d));
 
     const httpVerb = decoratorNames.find((name) =>
-      Object.values(HttpVerb).includes(name as HttpVerb),
+      Object.values(HttpVerb).includes(name as HttpVerb)
     ) as HttpVerb;
 
     const parameters: NamedTypedValue[] = [];
@@ -576,7 +626,7 @@ export class CidlExtractor {
 
 function err(
   code: ExtractorErrorCode,
-  fn?: (extractorErr: ExtractorError) => void,
+  fn?: (extractorErr: ExtractorError) => void
 ): Either<ExtractorError, never> {
   let e = new ExtractorError(code);
   if (fn) {
@@ -592,7 +642,7 @@ function getDecoratorName(decorator: Decorator): string {
 
 function getDecoratorArgument(
   decorator: Decorator,
-  index: number,
+  index: number
 ): string | undefined {
   const args = decorator.getArguments();
   if (!args[index]) return undefined;
@@ -612,16 +662,16 @@ function getDecoratorArgument(
   return match ? match[1] : text;
 }
 
-function getModelName(t: CidlType): string | undefined {
+function getObjectName(t: CidlType): string | undefined {
   if (typeof t === "string") return undefined;
 
-  if ("Model" in t) {
-    return t.Model;
+  if ("Object" in t) {
+    return t.Object;
   } else if ("Array" in t) {
-    return getModelName(t.Array);
+    return getObjectName(t.Array);
   } else if ("HttpResult" in t) {
     if (t == null) return undefined;
-    return getModelName(t.HttpResult!);
+    return getObjectName(t.HttpResult!);
   }
 
   return undefined;
@@ -629,7 +679,7 @@ function getModelName(t: CidlType): string | undefined {
 
 function findPropertyByName(
   cls: ClassDeclaration,
-  name: string,
+  name: string
 ): PropertyDeclaration | undefined {
   const exactMatch = cls.getProperties().find((p) => p.getName() === name);
   return exactMatch;
@@ -637,7 +687,7 @@ function findPropertyByName(
 
 function hasDecorator(
   node: { getDecorators(): Decorator[] },
-  name: string,
+  name: string
 ): boolean {
   return node.getDecorators().some((d) => {
     const decoratorName = getDecoratorName(d);

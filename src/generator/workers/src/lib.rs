@@ -1,7 +1,7 @@
 use std::{collections::BTreeMap, path::Path};
 
 use common::{
-    CloesceAst, Model, WranglerEnv,
+    CloesceAst, Model, PlainOldObject, WranglerEnv,
     err::{GeneratorErrorKind, Result},
     fail,
 };
@@ -39,7 +39,11 @@ impl WorkersGenerator {
     }
 
     /// Generates all model source imports
-    fn link_models(models: &BTreeMap<String, Model>, workers_path: &Path) -> String {
+    fn link_models(
+        models: &BTreeMap<String, Model>,
+        poos: &BTreeMap<String, PlainOldObject>,
+        workers_path: &Path,
+    ) -> String {
         let workers_dir = workers_path
             .parent()
             .expect("workers_path has no parent; cannot compute relative imports");
@@ -72,16 +76,29 @@ impl WorkersGenerator {
             Ok(rel_str)
         }
 
-        models
+        let model_imports = models
             .values()
             .map(|m| {
                 // If the relative path is not possible, just use the file name.
-                let p = rel_path(&m.source_path, workers_dir)
+                let path = rel_path(&m.source_path, workers_dir)
                     .unwrap_or_else(|_| m.source_path.clone().to_string_lossy().to_string());
-                format!("import {{ {} }} from \"{}\";", m.name, p)
+                format!("import {{ {} }} from \"{}\";", m.name, path)
             })
             .collect::<Vec<_>>()
-            .join("\n")
+            .join("\n");
+
+        let poo_imports = poos
+            .values()
+            .map(|p| {
+                // If the relative path is not possible, just use the file name.
+                let path = rel_path(&p.source_path, workers_dir)
+                    .unwrap_or_else(|_| p.source_path.clone().to_string_lossy().to_string());
+                format!("import {{ {} }} from \"{}\";", p.name, path)
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
+
+        format!("{model_imports}\n{poo_imports}")
     }
 
     /// Generates the constructor registry and instance registry
@@ -114,7 +131,7 @@ impl WorkersGenerator {
     ) -> Result<String> {
         let api_route = Self::validate_domain(&domain)?;
 
-        let model_sources = Self::link_models(&ast.models, workers_path);
+        let model_sources = Self::link_models(&ast.models, &ast.poos, workers_path);
         let (constructor_registry, instance_registry) =
             Self::registries(&ast.models, &ast.wrangler_env);
 

@@ -39,7 +39,7 @@ fn main() {
     let cli = Cli::parse();
 
     let pattern = match &cli.command {
-        Commands::Regression => "../fixtures/regression/*/",
+        Commands::Regression => "../fixtures/regression/*/seed__*",
         Commands::RunFail(rf) => match rf.subcommand {
             RunFailSubcommands::Extractor => "../fixtures/run_fail/extractor/*/*.ts",
         },

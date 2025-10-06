@@ -1,4 +1,5 @@
-import { HttpResult, instantiateModelArray } from "cloesce";
+import { HttpResult, instantiateObjectArray } from "cloesce";
+
 
 export class Horse {
   id: number;
@@ -59,7 +60,7 @@ export class Horse {
     if (!raw.ok) {
       return raw;
     }
-    raw.data = instantiateModelArray(raw.data, Horse);
+    raw.data = instantiateObjectArray(raw.data, Horse);
     return raw;
   }
   static async post(
