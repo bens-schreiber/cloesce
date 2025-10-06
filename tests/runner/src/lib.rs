@@ -50,7 +50,7 @@ fn diff_file(
 
     // Only print a diff if there is some dif.
     // If this is a run fail test, don't print file diff if there wasnt a failure
-    if unified_diff.trim().is_empty() || matches!(opt, DiffOpts::FailOnly) && fail {
+    if (fail || !matches!(opt, DiffOpts::FailOnly)) && !unified_diff.trim().is_empty() {
         for line in unified_diff.lines() {
             if line.starts_with('+') && !line.starts_with("+++") {
                 println!("\x1b[32m{}\x1b[0m", line); // green
@@ -125,7 +125,7 @@ impl Fixture {
         let res = self.run_command(
             Command::new("node")
                 .arg("../../src/extractor/ts/dist/cli.js")
-                .arg("--location")
+                .arg("--in")
                 .arg(&self.path)
                 .arg("--out")
                 .arg(&out.path)

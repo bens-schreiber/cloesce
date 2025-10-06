@@ -46,11 +46,9 @@ function runExtractor(
   projectName: string,
   out: string,
   inp: string,
-  truncateSourcePaths: boolean
+  truncateSourcePaths: boolean,
 ) {
-  const projectRoot = findProjectRoot(inp);
-
-  const files = findCloesceFiles(projectRoot, [inp]);
+  const files = findCloesceFiles(inp, [inp]);
   const project = new Project({
     compilerOptions: {
       strictNullChecks: true,
@@ -86,7 +84,7 @@ function runExtractor(
   } catch (err: any) {
     console.error(
       "Critical uncaught error. Submit a ticket to https://github.com/bens-schreiber/cloesce: ",
-      err?.message ?? err
+      err?.message ?? err,
     );
     process.exit(1);
   }
@@ -104,26 +102,19 @@ Phase: TypeScript IDL Extraction
 ${contextLine}${snippetLine}Suggested fix: ${suggestion}`;
 }
 
-function findProjectRoot(start: string) {
-  let dir = start;
-  for (;;) {
-    if (fs.existsSync(path.join(dir, "package.json"))) return dir;
-    const parent = path.dirname(dir);
-    if (parent === dir) return start;
-    dir = parent;
-  }
-}
-
 function findCloesceFiles(root: string, searchPaths: string[]): string[] {
   const files: string[] = [];
 
   for (const searchPath of searchPaths) {
-    const fullPath = path.resolve(root, searchPath);
+    let fullPath: string;
+    if (path.isAbsolute(searchPath) || searchPath.startsWith(root)) {
+      fullPath = path.normalize(searchPath);
+    } else {
+      fullPath = path.resolve(root, searchPath);
+    }
 
     if (!fs.existsSync(fullPath)) {
-      console.warn(
-        `Warning: Path "${searchPath}" specified in cloesce-config.json does not exist`
-      );
+      console.warn(`Warning: Path "${searchPath}" does not exist`);
       continue;
     }
 

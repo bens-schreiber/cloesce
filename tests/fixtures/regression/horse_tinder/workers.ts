@@ -1,4 +1,3 @@
-
 import { cloesce } from "cloesce";
 import cidl from "./cidl.json";
 import { Horse } from "./seed__horse_tinder.cloesce.ts";

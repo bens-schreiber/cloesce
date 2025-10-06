@@ -1,4 +1,3 @@
-
 import { cloesce } from "cloesce";
 import cidl from "./cidl.json";
 import { PooAcceptYield } from "./seed__poo.cloesce.ts";
