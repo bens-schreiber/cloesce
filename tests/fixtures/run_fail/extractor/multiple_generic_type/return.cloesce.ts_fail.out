@@ -1,0 +1,7 @@
+==== CLOESCE ERROR ====
+Error [MultipleGenericType]: Cloesce does not yet support types with multiple generics
+Phase: TypeScript IDL Extraction
+Context: Foo.method 
+async method(valid: number): Bar<number, number> {}
+
+Suggested fix: Simplify your type to use only a single generic parameter, ie Foo<T>
