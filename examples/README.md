@@ -36,3 +36,6 @@ npx wrangler build
 # run wrangler
 npx wrangler dev --port 5000
 ```
+
+4. Run frontend
+- `npm run frontend`

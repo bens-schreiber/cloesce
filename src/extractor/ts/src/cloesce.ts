@@ -179,7 +179,7 @@ function matchRoute(
   const url = new URL(request.url);
 
   const notFound = (e: string) =>
-    left(error_state(404, `Path not found: ${e} ${url.pathname}`));
+    left(errorState(404, `Path not found: ${e} ${url.pathname}`));
 
   const routeParts = url.pathname
     .slice(api_route.length)
@@ -229,11 +229,11 @@ async function validateRequest(
   id: string | null,
 ): Promise<Either<HttpResult, [RequestParamMap, string | null]>> {
   // Error state: any missing parameter, body, or malformed input will exit with 400.
-  const invalid_request = (e: string) =>
-    left(error_state(400, `Invalid Request Body: ${e}`));
+  const invalidRequest = (e: string) =>
+    left(errorState(400, `Invalid Request Body: ${e}`));
 
   if (!method.is_static && id == null) {
-    return invalid_request("Id's are required for instantiated methods.");
+    return invalidRequest("Id's are required for instantiated methods.");
   }
 
   // Filter out any injected parameters that will not be passed
@@ -259,25 +259,25 @@ async function validateRequest(
     try {
       requestBodyMap = await request.json();
     } catch {
-      return invalid_request("Could not retrieve JSON body.");
+      return invalidRequest("Could not retrieve JSON body.");
     }
   }
 
   // Validate data source if exists
   if (dataSource && !(dataSource in model.data_sources)) {
-    return invalid_request(`Unknown data source ${dataSource}`);
+    return invalidRequest(`Unknown data source ${dataSource}`);
   }
 
   // Ensure all required params exist
   if (!requiredParams.every((p) => p.name in requestBodyMap)) {
-    return invalid_request(`Missing parameters.`);
+    return invalidRequest(`Missing parameters.`);
   }
 
   // Validate all parameters type
   for (const p of requiredParams) {
     const value = requestBodyMap[p.name];
     if (!validateCidlType(ast, value, p.cidl_type)) {
-      return invalid_request("Invalid parameters.");
+      return invalidRequest("Invalid parameters.");
     }
   }
 
@@ -303,20 +303,20 @@ async function hydrateModel(
   // resulting in a malformed query, exit with a 500.
   const malformedQuery = (e: any) =>
     left(
-      error_state(
+      errorState(
         500,
         `Error in hydration query, is the database out of sync with the backend?: ${e instanceof Error ? e.message : String(e)}`,
       ),
     );
 
   // Error state: If no record is found for the id, return a 404
-  const missingRecord = left(error_state(404, "Record not found"));
+  const missingRecord = left(errorState(404, "Record not found"));
 
   const pk = model.primary_key.name;
   const query =
     dataSource !== null
-      ? `SELECT * FROM ${model.name}_${dataSource} WHERE ${model.name}_${pk} = ?`
-      : `SELECT * FROM ${model.name} WHERE ${pk} = ?`;
+      ? `SELECT * FROM "${model.name}.${dataSource}" WHERE "${model.name}.${pk}" = ?`
+      : `SELECT * FROM "${model.name}" WHERE "${pk}" = ?`;
 
   // Query DB
   let records;
@@ -324,6 +324,9 @@ async function hydrateModel(
     records = await d1.prepare(query).bind(id).run();
     if (!records) {
       return missingRecord;
+    }
+    if (records.error) {
+      return malformedQuery(records.error);
     }
   } catch (e) {
     return malformedQuery(e);
@@ -342,6 +345,8 @@ async function hydrateModel(
     includeTree,
   );
 
+  console.log(JSON.stringify(models));
+
   return right(models[0]);
 }
 
@@ -358,7 +363,7 @@ async function methodDispatch(
 ): Promise<HttpResult<unknown>> {
   // Error state: Client code ran into an uncaught exception.
   const uncaughtException = (e: any) =>
-    error_state(
+    errorState(
       500,
       `Uncaught exception in method dispatch: ${e instanceof Error ? e.message : String(e)}`,
     );
@@ -491,221 +496,193 @@ function validateCidlType(
  *
  * @throws generic errors if the metadata is missing some value
  */
+// Main function that creates instances from SQL records
 function _modelsFromSql(
   modelName: string,
   ast: CloesceAst,
   constructorRegistry: ModelConstructorRegistry,
   records: Record<string, any>[],
   includeTree: Record<string, UserDefinedModel> | null,
-): InstantiatedUserDefinedModel[] {
-  if (!records.length) return [];
+): any[] {
+  const model = ast.models[modelName];
+  if (!model) return [];
 
-  const modelMeta = ast.models[modelName];
-  if (!modelMeta) throw new Error(`Model ${modelName} not found in ast`);
+  const Constructor = constructorRegistry[modelName];
+  if (!Constructor) return [];
 
-  const pk = modelMeta.primary_key;
-  if (!pk) throw new Error(`Primary key not found for ${modelName}`);
+  const pkName = model.primary_key.name;
+  const resultMap = new Map<any, any>();
 
-  const pkName = pk.name;
-  const itemsById: Record<string, any> = {};
-  const seenNestedIds: Record<string, Set<string>> = {};
+  for (const record of records) {
+    const pkValue = record[`${modelName}.${pkName}`] ?? record[pkName];
+    if (pkValue == null) continue;
 
-  // Create all root entities with initialized arrays
-  for (const row of records) {
-    const isPrefixed = Object.keys(row).some((k) =>
-      k.startsWith(`${modelName}_`),
-    );
-    const rootId = String(isPrefixed ? row[`${modelName}_id`] : row[pkName]);
+    let instance = resultMap.get(pkValue);
 
-    if (!itemsById[rootId]) {
-      const instance = new constructorRegistry[modelName]();
+    if (!instance) {
+      instance = new Constructor();
+      instance[pkName] = pkValue;
 
-      // Assign primary key
-      instance[modelMeta.primary_key.name] = getCol(
-        modelMeta,
-        modelMeta.primary_key.name,
-        row,
-        isPrefixed,
+      // Set scalar attributes
+      for (const attr of model.attributes) {
+        const attrName = attr.value.name;
+        const prefixedKey = `${modelName}.${attrName}`;
+        const nonPrefixedKey = attrName;
+
+        if (prefixedKey in record) {
+          instance[attrName] = record[prefixedKey];
+        } else if (nonPrefixedKey in record) {
+          instance[attrName] = record[nonPrefixedKey];
+        }
+      }
+
+      // Initialize ALL navigation properties at root level
+      // If not in include tree, initialize OneToMany and ManyToMany as empty arrays
+      for (const navProp of model.navigation_properties) {
+        if ("OneToMany" in navProp.kind || "ManyToMany" in navProp.kind) {
+          // Always initialize OneToMany and ManyToMany as empty arrays
+          instance[navProp.var_name] = [];
+        }
+        // OneToOne properties left as undefined unless populated
+      }
+
+      resultMap.set(pkValue, instance);
+    }
+
+    // Process navigation properties that are in the include tree
+    if (includeTree) {
+      processNavigationProperties(
+        instance,
+        model,
+        modelName,
+        includeTree,
+        record,
+        ast,
+        constructorRegistry,
       );
-
-      // Assign scalar attributes
-      for (const attr of modelMeta.attributes) {
-        instance[attr.value.name] = getCol(
-          modelMeta,
-          attr.value.name,
-          row,
-          isPrefixed,
-        );
-      }
-
-      // Initialize all array navigation properties
-      for (const nav of modelMeta.navigation_properties) {
-        const navCidlType = getNavigationPropertyCidlType(nav);
-        if (isCidlArray(navCidlType)) {
-          instance[nav.var_name] = [];
-        }
-      }
-
-      itemsById[rootId] = instance;
     }
   }
 
-  // Populate navigation properties
-  for (const row of records) {
-    const isPrefixed = Object.keys(row).some((k) =>
-      k.startsWith(`${modelName}_`),
-    );
-    const rootId = String(isPrefixed ? row[`${modelName}_id`] : row[pkName]);
-    const existing = itemsById[rootId];
+  return Array.from(resultMap.values());
+}
 
-    // Process navigation properties
-    for (const nav of modelMeta.navigation_properties) {
-      const navName = nav.var_name;
-      const navCidlType = getNavigationPropertyCidlType(nav);
-      let navModelName: string | undefined;
-
-      if (isCidlArray(navCidlType)) {
-        if (isCidlObject(navCidlType.Array)) {
-          navModelName = navCidlType.Array.Object;
-        }
-      } else if (isCidlObject(navCidlType)) {
-        navModelName = navCidlType.Object;
-      }
-
-      if (!navModelName) continue;
-
-      const navMeta = ast.models[navModelName];
-      if (!navMeta) continue;
-
-      const nestedPk = navMeta.primary_key.name;
-      const nestedId = row[`${navMeta.name}_${nestedPk}`];
-      const isArray = isCidlArray(navCidlType);
-
-      // Only process if we're supposed to include this navigation property AND there's data
-      if (includeTree?.[navName] && nestedId != null) {
-        const nestedObj = buildInstance(
-          navMeta,
-          row,
-          includeTree[navName],
-          true,
-        );
-
-        if (isArray) {
-          addUnique(
-            existing[navName],
-            nestedObj,
-            `${modelMeta.name}_${navName}`,
-            navModelName,
-          );
-        } else {
-          existing[navName] = nestedObj;
-        }
-      }
-    }
-  }
-
-  return Object.values(itemsById);
-
-  function isCidlObject(value: CidlType): value is { Object: string } {
-    return typeof value === "object" && value !== null && "Object" in value;
-  }
-
-  function isCidlArray(value: CidlType): value is { Array: CidlType } {
-    return typeof value === "object" && value !== null && "Array" in value;
-  }
-
-  function getCol(
-    meta: Model,
-    attrName: string,
-    row: Record<string, any>,
-    prefixed: boolean,
-  ) {
-    return row[prefixed ? `${meta.name}_${attrName}` : attrName] ?? null;
-  }
-
-  function addUnique(arr: any[], item: any, key: string, navModelName: string) {
-    seenNestedIds[key] = seenNestedIds[key] || new Set();
-
-    // Get the primary key name for the nested model
-    const navMeta = ast.models[navModelName];
-    const nestedPkAttr = navMeta?.primary_key;
-    const nestedPkName = nestedPkAttr?.name || "id";
-
-    const id = String(item[nestedPkName]);
-    if (!seenNestedIds[key].has(id)) {
-      arr.push(item);
-      seenNestedIds[key].add(id);
-    }
-  }
-
-  function buildInstance(
-    meta: Model,
-    row: Record<string, any>,
-    tree: Record<string, any>,
-    prefixed: boolean,
-  ): any {
-    const instance = new constructorRegistry[meta.name]();
-
-    // Assign PK
-    instance[meta.primary_key.name] = getCol(
-      meta,
-      meta.primary_key.name,
-      row,
-      prefixed,
-    );
-
-    // Assign scalar attributes
-    for (const attr of meta.attributes) {
-      instance[attr.value.name] = getCol(meta, attr.value.name, row, prefixed);
+function processNavigationProperties(
+  instance: any,
+  model: any,
+  prefix: string,
+  includeTree: Record<string, UserDefinedModel>,
+  record: Record<string, any>,
+  ast: CloesceAst,
+  constructorRegistry: ModelConstructorRegistry,
+): void {
+  for (const navProp of model.navigation_properties) {
+    if (!(navProp.var_name in includeTree)) {
+      continue;
     }
 
-    // Assign navigation properties
-    for (const nav of meta.navigation_properties) {
-      const navName = nav.var_name;
-      const navCidlType = getNavigationPropertyCidlType(nav);
-      let navModelName: string | undefined;
+    const nestedModel = ast.models[navProp.model_name];
+    if (!nestedModel) {
+      continue;
+    }
 
-      if (isCidlArray(navCidlType)) {
-        if (isCidlObject(navCidlType.Array)) {
-          navModelName = navCidlType.Array.Object;
-        }
-      } else if (isCidlObject(navCidlType)) {
-        navModelName = navCidlType.Object;
+    // Extract nested model's primary key - check both prefixed and non-prefixed
+    const nestedPkName = nestedModel.primary_key.name;
+    const prefixedNestedPkKey = `${prefix}.${navProp.var_name}.${nestedPkName}`;
+    const nonPrefixedNestedPkKey = `${navProp.var_name}.${nestedPkName}`;
+    const nestedPkValue =
+      record[prefixedNestedPkKey] ?? record[nonPrefixedNestedPkKey];
+
+    if (nestedPkValue == null) {
+      continue; // No nested object in this row
+    }
+
+    // Determine if this is OneToMany/ManyToMany or OneToOne
+    const isOneToMany =
+      "OneToMany" in navProp.kind || "ManyToMany" in navProp.kind;
+
+    // Check if we already added this nested object (for OneToMany)
+    if (isOneToMany) {
+      const navArray = instance[navProp.var_name];
+      const alreadyExists = navArray.some(
+        (item: any) => item[nestedPkName] === nestedPkValue,
+      );
+      if (alreadyExists) {
+        continue;
       }
-
-      if (!navModelName) continue;
-
-      const navMeta = ast.models[navModelName];
-      if (!navMeta) continue;
-
-      const nestedPk = navMeta.primary_key;
-      const nestedId = row[`${navMeta.name}_${nestedPk.name}`];
-      const isArray = isCidlArray(navCidlType);
-
-      // Always initialize arrays, even if empty
-      if (isArray) {
-        instance[navName] = instance[navName] || [];
-      }
-
-      if (tree?.[navName] && nestedId != null) {
-        const nestedObj = buildInstance(navMeta, row, tree[navName], true);
-        if (isArray) {
-          addUnique(
-            instance[navName],
-            nestedObj,
-            `${meta.name}_${navName}`,
-            navModelName,
-          );
-        } else {
-          instance[navName] = nestedObj;
-        }
+    } else {
+      // For OneToOne, check if already set
+      if (instance[navProp.var_name] != null) {
+        continue;
       }
     }
-    return instance;
+
+    const NestedConstructor = constructorRegistry[navProp.model_name];
+    if (!NestedConstructor) {
+      continue;
+    }
+
+    const nestedInstance = new NestedConstructor();
+    nestedInstance[nestedPkName] = nestedPkValue;
+
+    // Assign nested scalar attributes - check both prefixed and non-prefixed
+    for (const nestedAttr of nestedModel.attributes) {
+      const nestedAttrName = nestedAttr.value.name;
+      const prefixedKey = `${prefix}.${navProp.var_name}.${nestedAttrName}`;
+      const nonPrefixedKey = `${navProp.var_name}.${nestedAttrName}`;
+
+      // Check prefixed key first, then non-prefixed
+      if (prefixedKey in record) {
+        nestedInstance[nestedAttrName] = record[prefixedKey];
+      } else if (nonPrefixedKey in record) {
+        nestedInstance[nestedAttrName] = record[nonPrefixedKey];
+      }
+    }
+
+    // Initialize ALL navigation properties on the nested instance
+    // If not in include tree, initialize OneToMany and ManyToMany as empty arrays
+    const nestedIncludeTree = includeTree[navProp.var_name];
+    for (const nestedNavProp of nestedModel.navigation_properties) {
+      const isInIncludeTree =
+        nestedIncludeTree &&
+        typeof nestedIncludeTree === "object" &&
+        nestedNavProp.var_name in nestedIncludeTree;
+
+      if (
+        "OneToMany" in nestedNavProp.kind ||
+        "ManyToMany" in nestedNavProp.kind
+      ) {
+        // Always initialize OneToMany and ManyToMany as arrays (empty if not in include tree)
+        nestedInstance[nestedNavProp.var_name] = [];
+      } else if (!isInIncludeTree) {
+        // OneToOne not in include tree - leave as undefined or null
+        // Will be set during recursive processing if in include tree
+      }
+    }
+
+    // Recursively process nested navigation properties that are in the include tree
+    if (nestedIncludeTree && typeof nestedIncludeTree === "object") {
+      processNavigationProperties(
+        nestedInstance,
+        nestedModel,
+        `${prefix}.${navProp.var_name}`,
+        nestedIncludeTree,
+        record,
+        ast,
+        constructorRegistry,
+      );
+    }
+
+    // Assign the nested instance based on relationship type
+    if (isOneToMany) {
+      instance[navProp.var_name].push(nestedInstance);
+    } else {
+      // OneToOne - assign directly
+      instance[navProp.var_name] = nestedInstance;
+    }
   }
 }
 
-function error_state(status: number, message: string): HttpResult {
+function errorState(status: number, message: string): HttpResult {
   return { ok: false, status, message };
 }
 
