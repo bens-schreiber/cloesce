@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: ["main"]
+    branches: ["main", "meili/orchestration"]
   pull_request:
-    branches: ["main"]
+    branches: ["main", "meili/orchestration"]
 
 jobs:
   rust:
