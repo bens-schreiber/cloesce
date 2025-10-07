@@ -83,7 +83,7 @@ function loadCloesceConfig(root: string): CloesceConfig {
   if (fs.existsSync(configPath)) {
     try {
       const config = JSON.parse(fs.readFileSync(configPath, "utf8"));
-      console.log(`📋 Loaded config from ${configPath}`);
+      console.log(`Loaded config from ${configPath}`);
       return config;
     } catch (err) {
       console.warn(`⚠️ Failed to parse cloesce-config.json: ${err}`);
@@ -92,7 +92,7 @@ function loadCloesceConfig(root: string): CloesceConfig {
   return {};
 }
 
-function findProjectRoot(start: string): string {
+function findProjectRoot(start: string) {
   let dir = start;
   for (;;) {
     if (fs.existsSync(path.join(dir, "package.json"))) return dir;
@@ -102,7 +102,7 @@ function findProjectRoot(start: string): string {
   }
 }
 
-function readPackageJsonProjectName(cwd: string): string {
+function readPackageJsonProjectName(cwd: string) {
   const pkgPath = path.join(cwd, "package.json");
   let projectName = path.basename(cwd);
 
@@ -144,7 +144,7 @@ function findCloesceFiles(root: string, searchPaths: string[]): string[] {
     for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
       const fullPath = path.join(dir, entry.name);
 
-      if (entry.isDirectory() && !entry.name.startsWith(".") && entry.name !== "node_modules") {
+      if (entry.isDirectory()) {
         files.push(...walkDirectory(fullPath));
       } else if (entry.isFile() && /\.cloesce\.ts$/i.test(entry.name)) {
         files.push(fullPath);
@@ -268,8 +268,7 @@ async function runExtractor(opts: {
 // wasm execution
 async function runWasmCommand(config: WasmConfig, skipExtract: boolean = false) {
   const root = findProjectRoot(process.cwd());
-  const cloesceConfig = loadCloesceConfig(root);
-  const outputDir = cloesceConfig.outputDir ?? ".generated";
+  const outputDir = ".generated";
 
   // Validate CIDL was created successfully
   const cidlPath = path.join(root, outputDir, "cidl.json");
@@ -281,23 +280,12 @@ async function runWasmCommand(config: WasmConfig, skipExtract: boolean = false) 
     throw new Error(`WASM file not found. Expected at: ${WASM_PATH}`);
   }
 
-  // Update args to use configured output directory
-  const updatedArgs = config.args.map(arg => 
-    arg.startsWith("generated/") ? arg.replace("generated/", `${outputDir}/`) :
-    arg.startsWith(".generated/") ? arg.replace(".generated/", `${outputDir}/`) : arg
-  );
-
-  // Ensure output directories exist
-  for (const arg of updatedArgs) {
-    if (arg.startsWith(outputDir) && arg.includes(".")) {
-      const fullPath = path.join(root, arg);
-      fs.mkdirSync(path.dirname(fullPath), { recursive: true });
-    }
-  }
+  // Ensure output directory exists
+  fs.mkdirSync(path.join(root, outputDir), { recursive: true });
 
   const wasi = new WASI({
     version: "preview1",
-    args: [path.basename(WASM_PATH), ...updatedArgs],
+    args: [path.basename(WASM_PATH), ...config.args],
     env: { ...process.env, ...config.env } as Record<string, string>,
     preopens: { "/": root },
   });
