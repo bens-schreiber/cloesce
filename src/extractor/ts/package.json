@@ -14,7 +14,8 @@
     "./cli": "./dist/cli.js"
   },
   "files": [
-    "dist"
+    "dist",
+    "wasm"
   ],
   "scripts": {
     "test": "vitest",
