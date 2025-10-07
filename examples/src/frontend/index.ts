@@ -50,6 +50,21 @@ getElement<HTMLFormElement>("add-horse-form").addEventListener(
   }
 );
 
+// Matches
+getElement("btn-matches").addEventListener("click", async () => {
+  if (!currentUserHorse) {
+    showMessage("Set your Current User ID first!", true);
+    return;
+  }
+
+  const matches = await currentUserHorse.matches();
+  if (matches.ok) {
+    showMatches(matches.data!);
+  } else {
+    showMessage(`Error loading matches: ${matches.message}`, true);
+  }
+});
+
 // Functions
 function showView(view: "browse" | "add" | "list"): void {
   browseView.style.display = "none";
@@ -218,6 +233,27 @@ function displayAllHorses(horseData: Horse[]): void {
       `;
     })
     .join("");
+}
+
+function showMatches(matches: Horse[]): void {
+  if (matches.length === 0) {
+    horseCard.innerHTML = "<p><strong>No matches yet!</strong></p>";
+    return;
+  }
+
+  horseCard.innerHTML = `
+    <h3>💖 Your Matches</h3>
+    <ul>
+      ${matches
+        .map(
+          (horse) =>
+            `<li><strong>${horse.name}</strong> (ID: ${horse.id})<br><em>${
+              horse.bio ?? "No bio"
+            }</em></li>`
+        )
+        .join("")}
+    </ul>
+  `;
 }
 
 // Initialize
