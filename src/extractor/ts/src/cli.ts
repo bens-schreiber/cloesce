@@ -41,7 +41,12 @@ function getWasmConfigs(workersUrl: string, clientUrl: string): WasmConfig[] {
       name: "schema",
       description: "Generate database schema",
       wasmFile: "cli.wasm",
-      args: ["generate", "d1", ".generated/cidl.json", ".generated/migrations.sql"],
+      args: [
+        "generate",
+        "d1",
+        ".generated/cidl.json",
+        ".generated/migrations.sql",
+      ],
     },
     {
       name: "workers",
@@ -67,7 +72,7 @@ function getWasmConfigs(workersUrl: string, clientUrl: string): WasmConfig[] {
         ".generated/client.ts",
         clientUrl,
       ],
-    }
+    },
   ];
 }
 
@@ -165,17 +170,23 @@ async function runExtractor(opts: {
   const baseDir = opts.location ? path.resolve(opts.location) : process.cwd();
   const projectRoot = findProjectRoot(baseDir);
   const config = loadCloesceConfig(projectRoot);
-  
-  // Merge config with CLI options 
+
+  // Merge config with CLI options
   const searchPaths = config.paths ?? ["./"];
   const outputDir = config.outputDir ?? ".generated";
   const outPath = path.resolve(opts.out ?? path.join(outputDir, "cidl.json"));
-  const truncate = opts.truncateSourcePaths ?? config.truncateSourcePaths ?? false;
-  const cloesceProjectName = opts.projectName ?? config.projectName ?? readPackageJsonProjectName(projectRoot);
+  const truncate =
+    opts.truncateSourcePaths ?? config.truncateSourcePaths ?? false;
+  const cloesceProjectName =
+    opts.projectName ??
+    config.projectName ??
+    readPackageJsonProjectName(projectRoot);
 
   const files = findCloesceFiles(projectRoot, searchPaths);
   if (files.length === 0) {
-    throw new Error(`No .cloesce.ts files found in specified paths: ${searchPaths.join(", ")}`);
+    throw new Error(
+      `No .cloesce.ts files found in specified paths: ${searchPaths.join(", ")}`,
+    );
   }
 
   if (!opts.silent) {
@@ -193,7 +204,13 @@ async function runExtractor(opts: {
     // Clean the entire generated directory to ensure fresh output
     const genDir = path.dirname(outPath);
     if (fs.existsSync(genDir)) {
-      const filesToClean = ['cidl.json', 'wrangler.toml', 'workers.ts', 'client.ts', 'migrations.sql'];
+      const filesToClean = [
+        "cidl.json",
+        "wrangler.toml",
+        "workers.ts",
+        "client.ts",
+        "migrations.sql",
+      ];
       for (const file of filesToClean) {
         const filePath = path.join(genDir, file);
         if (fs.existsSync(filePath)) {
@@ -202,16 +219,16 @@ async function runExtractor(opts: {
       }
     }
     fs.mkdirSync(genDir, { recursive: true });
-    
+
     const extractor = new CidlExtractor(cloesceProjectName, "v0.0.3");
     const result = extractor.extract(project);
-    
+
     if (!result.ok) {
       process.exit(1);
     }
-    
+
     let ast = result.value;
-    
+
     // Fix models structure - convert array to object if needed
     if (Array.isArray(ast.models)) {
       const modelsObj: any = {};
@@ -222,7 +239,7 @@ async function runExtractor(opts: {
       }
       ast.models = modelsObj;
     }
-    
+
     // Fix poos structure - convert array to object if needed
     if ((ast as any).poos && Array.isArray((ast as any).poos)) {
       const poosObj: any = {};
@@ -233,28 +250,31 @@ async function runExtractor(opts: {
       }
       (ast as any).poos = poosObj;
     }
-    
+
     if (truncate) {
-      ast.wrangler_env.source_path = "./" + path.basename(ast.wrangler_env.source_path);
-      
+      ast.wrangler_env.source_path =
+        "./" + path.basename(ast.wrangler_env.source_path);
+
       for (const model of Object.values(ast.models)) {
-        (model as any).source_path = "./" + path.basename((model as any).source_path);
+        (model as any).source_path =
+          "./" + path.basename((model as any).source_path);
       }
-      
+
       if ((ast as any).poos) {
         for (const poo of Object.values((ast as any).poos)) {
-          (poo as any).source_path = "./" + path.basename((poo as any).source_path);
+          (poo as any).source_path =
+            "./" + path.basename((poo as any).source_path);
         }
       }
     }
 
     const json = JSON.stringify(ast, null, 4);
     fs.writeFileSync(outPath, json);
-    
+
     if (!opts.silent) {
       console.log(`✅ Wrote CIDL to ${outPath}`);
     }
-    
+
     return outPath;
   } catch (err: any) {
     console.error(
@@ -266,14 +286,19 @@ async function runExtractor(opts: {
 }
 
 // wasm execution
-async function runWasmCommand(config: WasmConfig, skipExtract: boolean = false) {
+async function runWasmCommand(
+  config: WasmConfig,
+  skipExtract: boolean = false,
+) {
   const root = findProjectRoot(process.cwd());
   const outputDir = ".generated";
 
   // Validate CIDL was created successfully
   const cidlPath = path.join(root, outputDir, "cidl.json");
   if (!fs.existsSync(cidlPath)) {
-    throw new Error(`CIDL file not found at ${cidlPath}. Extraction may have failed.`);
+    throw new Error(
+      `CIDL file not found at ${cidlPath}. Extraction may have failed.`,
+    );
   }
 
   if (!fs.existsSync(WASM_PATH)) {
@@ -297,7 +322,7 @@ async function runWasmCommand(config: WasmConfig, skipExtract: boolean = false) 
   });
 
   console.log(`🚀 Running: ${config.name}`);
-  
+
   try {
     wasi.start(instance);
     console.log(`✅ Completed: ${config.name}\n`);
@@ -309,7 +334,8 @@ async function runWasmCommand(config: WasmConfig, skipExtract: boolean = false) 
 // Main run command that does everything
 const runCmd = command({
   name: "run",
-  description: "Extract CIDL and run all code generators (requires --workers and --client URLs)",
+  description:
+    "Extract CIDL and run all code generators (requires --workers and --client URLs)",
   args: {
     workers: option({
       long: "workers",
@@ -326,15 +352,15 @@ const runCmd = command({
     console.log("🚀 Running complete generation pipeline...\n");
     console.log(`   Workers URL: ${args.workers}`);
     console.log(`   Client URL: ${args.client}\n`);
-    
+
     await runExtractor({ silent: false });
-    
+
     const configs = getWasmConfigs(args.workers, args.client);
-    
+
     for (const config of configs) {
       await runWasmCommand(config, true);
     }
-    
+
     console.log("🎉 Generation complete!");
   },
 });
@@ -372,13 +398,13 @@ const extractCmd = command({
 
 const router = subcommands({
   name: "cloesce",
-  cmds: { 
+  cmds: {
     run: runCmd,
     extract: extractCmd,
   },
 });
 
-run(router, process.argv.slice(2)).catch(err => {
+run(router, process.argv.slice(2)).catch((err) => {
   console.error(err);
   process.exit(1);
 });
