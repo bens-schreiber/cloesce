@@ -29,45 +29,47 @@ type WasmConfig = {
 // Wasm binary should be bundled with the package
 const WASM_PATH = path.join(__dirname, "..", "wasm", "cli.wasm");
 
-const WASM_CONFIGS: WasmConfig[] = [
-  {
-    name: "wrangler",
-    description: "Generate wrangler.toml configuration",
-    wasmFile: "cli.wasm",
-    args: ["generate", "wrangler", ".generated/wrangler.toml"],
-  },
-  {
-    name: "schema",
-    description: "Generate database schema",
-    wasmFile: "cli.wasm",
-    args: ["generate", "d1", ".generated/cidl.json", ".generated/migrations.sql"],
-  },
-  {
-    name: "workers",
-    description: "Generate workers TypeScript",
-    wasmFile: "cli.wasm",
-    args: [
-      "generate",
-      "workers",
-      ".generated/cidl.json",
-      ".generated/workers.ts",
-      ".generated/wrangler.toml",
-      "http://localhost:5002/api",
-    ],
-  },
-  {
-    name: "client",
-    description: "Generate client TypeScript",
-    wasmFile: "cli.wasm",
-    args: [
-      "generate",
-      "client",
-      ".generated/cidl.json",
-      ".generated/client.ts",
-      "http://localhost:5002/api",
-    ],
-  }
-];
+function getWasmConfigs(workersUrl: string, clientUrl: string): WasmConfig[] {
+  return [
+    {
+      name: "wrangler",
+      description: "Generate wrangler.toml configuration",
+      wasmFile: "cli.wasm",
+      args: ["generate", "wrangler", ".generated/wrangler.toml"],
+    },
+    {
+      name: "schema",
+      description: "Generate database schema",
+      wasmFile: "cli.wasm",
+      args: ["generate", "d1", ".generated/cidl.json", ".generated/migrations.sql"],
+    },
+    {
+      name: "workers",
+      description: "Generate workers TypeScript",
+      wasmFile: "cli.wasm",
+      args: [
+        "generate",
+        "workers",
+        ".generated/cidl.json",
+        ".generated/workers.ts",
+        ".generated/wrangler.toml",
+        workersUrl,
+      ],
+    },
+    {
+      name: "client",
+      description: "Generate client TypeScript",
+      wasmFile: "cli.wasm",
+      args: [
+        "generate",
+        "client",
+        ".generated/cidl.json",
+        ".generated/client.ts",
+        clientUrl,
+      ],
+    }
+  ];
+}
 
 type CloesceConfig = {
   paths?: string[];
@@ -191,8 +193,6 @@ async function runExtractor(opts: {
     // Clean the entire generated directory to ensure fresh output
     const genDir = path.dirname(outPath);
     if (fs.existsSync(genDir)) {
-      
-      // Only clean files we generate, preserve any user files
       const filesToClean = ['cidl.json', 'wrangler.toml', 'workers.ts', 'client.ts', 'migrations.sql'];
       for (const file of filesToClean) {
         const filePath = path.join(genDir, file);
@@ -203,7 +203,7 @@ async function runExtractor(opts: {
     }
     fs.mkdirSync(genDir, { recursive: true });
     
-    const extractor = new CidlExtractor(cloesceProjectName, "v0.0.2");
+    const extractor = new CidlExtractor(cloesceProjectName, "v0.0.3");
     const result = extractor.extract(project);
     
     if (!result.ok) {
@@ -321,14 +321,29 @@ async function runWasmCommand(config: WasmConfig, skipExtract: boolean = false) 
 // Main run command that does everything
 const runCmd = command({
   name: "run",
-  description: "Extract CIDL and run all code generators (main command)",
-  args: {},
-  handler: async () => {
+  description: "Extract CIDL and run all code generators (requires --workers and --client URLs)",
+  args: {
+    workers: option({
+      long: "workers",
+      type: string,
+      description: "Workers URL (e.g., http://localhost:5002/api)",
+    }),
+    client: option({
+      long: "client",
+      type: string,
+      description: "Client URL (e.g., http://localhost:50002/api)",
+    }),
+  },
+  handler: async (args) => {
     console.log("🚀 Running complete generation pipeline...\n");
+    console.log(`   Workers URL: ${args.workers}`);
+    console.log(`   Client URL: ${args.client}\n`);
     
     await runExtractor({ silent: false });
     
-    for (const config of WASM_CONFIGS) {
+    const configs = getWasmConfigs(args.workers, args.client);
+    
+    for (const config of configs) {
       await runWasmCommand(config, true);
     }
     
