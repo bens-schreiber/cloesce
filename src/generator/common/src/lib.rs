@@ -1,9 +1,11 @@
 pub mod builder;
+pub mod err;
 
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
-use anyhow::{Result, bail, ensure};
+use err::GeneratorErrorKind;
+use err::Result;
 use serde::Deserialize;
 use serde::Serialize;
 use serde_with::MapPreventDuplicates;
@@ -29,8 +31,8 @@ pub enum CidlType {
     /// A dependency injected instance, containing a type name.
     Inject(String),
 
-    /// A Cloesce model, containing it's name
-    Model(String),
+    /// A model, or plain old object, containing the name of the class.
+    Object(String),
 
     /// An array of any type
     Array(Box<CidlType>),
@@ -148,6 +150,13 @@ pub struct Model {
     pub source_path: PathBuf,
 }
 
+#[derive(Serialize, Deserialize, Debug)]
+pub struct PlainOldObject {
+    pub name: String,
+    pub attributes: Vec<NamedTypedValue>,
+    pub source_path: PathBuf,
+}
+
 #[derive(Serialize, Deserialize)]
 pub enum InputLanguage {
     TypeScript,
@@ -169,9 +178,29 @@ pub struct CloesceAst {
 
     #[serde_as(as = "MapPreventDuplicates<_, _>")]
     pub models: BTreeMap<String, Model>,
+
+    #[serde_as(as = "MapPreventDuplicates<_, _>")]
+    pub poos: BTreeMap<String, PlainOldObject>,
 }
 
 impl CloesceAst {
+    pub fn from_json(path: &std::path::Path) -> Result<CloesceAst> {
+        let cidl_contents = std::fs::read_to_string(path).map_err(|e| {
+            GeneratorErrorKind::InvalidInputFile
+                .to_error()
+                .with_context(e.to_string())
+        })?;
+        serde_json::from_str::<CloesceAst>(&cidl_contents).map_err(|e| {
+            GeneratorErrorKind::InvalidInputFile
+                .to_error()
+                .with_context(e.to_string())
+        })
+    }
+
+    fn is_valid_object_ref(&self, o: &str) -> bool {
+        self.models.contains_key(o) || self.poos.contains_key(o)
+    }
+
     /// Ensures all `CidlTypes` are logically correct for the area, essentially doing
     /// the first level of semantic analysis for the generator.
     ///
@@ -186,7 +215,7 @@ impl CloesceAst {
         let ensure_valid_sql_type = |model: &Model, value: &NamedTypedValue| {
             let inner = match &value.cidl_type {
                 CidlType::Nullable(inner) if matches!(inner.as_ref(), CidlType::Void) => {
-                    bail!("SQL types cannot be null, only nullable.")
+                    fail!(GeneratorErrorKind::NullSqlType)
                 }
                 CidlType::Nullable(inner) => inner.as_ref(),
                 other => other,
@@ -197,7 +226,8 @@ impl CloesceAst {
                     inner,
                     CidlType::Integer | CidlType::Real | CidlType::Text | CidlType::Blob
                 ),
-                "Invalid SQL Type {}.{}",
+                GeneratorErrorKind::InvalidSqlType,
+                "{}.{}",
                 model.name,
                 value.name
             );
@@ -209,7 +239,10 @@ impl CloesceAst {
             // Validate record
             ensure!(
                 *model_name == model.name,
-                "Model record key did not match it's model name?"
+                GeneratorErrorKind::InvalidMapping,
+                "Model record key did not match it's model name? {} : {}",
+                model_name,
+                model.name
             );
 
             // Validate PK
@@ -223,7 +256,8 @@ impl CloesceAst {
                     // Validate the fk's model exists
                     ensure!(
                         self.models.contains_key(fk_model.as_str()),
-                        "Unknown Model for foreign key {}.{} => {}?",
+                        GeneratorErrorKind::UnknownObject,
+                        "{}.{} => {}?",
                         model.name,
                         a.value.name,
                         fk_model
@@ -235,7 +269,8 @@ impl CloesceAst {
             for nav in &model.navigation_properties {
                 ensure!(
                     self.models.contains_key(nav.model_name.as_str()),
-                    "Unknown Model for navigation property on {} => {}?",
+                    GeneratorErrorKind::UnknownObject,
+                    "{} => {}?",
                     model.name,
                     nav.model_name
                 );
@@ -246,14 +281,18 @@ impl CloesceAst {
                 // Validate record
                 ensure!(
                     *method_name == method.name,
-                    "Method record key did not match it's method name?"
+                    GeneratorErrorKind::InvalidMapping,
+                    "Method record key did not match it's method name? {}: {}",
+                    method_name,
+                    method.name
                 );
 
                 // Validate return type
-                if let CidlType::Model(m) = &method.return_type {
+                if let CidlType::Object(o) = &method.return_type {
                     ensure!(
-                        self.models.contains_key(m.as_str()),
-                        "Unknown model reference on model method return type {}.{}",
+                        self.is_valid_object_ref(o),
+                        GeneratorErrorKind::UnknownObject,
+                        "{}.{}",
                         model.name,
                         method.name
                     );
@@ -264,25 +303,29 @@ impl CloesceAst {
                     let root_type = param.cidl_type.root_type();
 
                     if let CidlType::Void = root_type {
-                        bail!(
-                            "Method parameters cannot be void. {}.{}.{}",
+                        fail!(
+                            GeneratorErrorKind::UnexpectedVoid,
+                            "{}.{}.{}",
                             model.name,
                             method.name,
                             param.name
                         )
                     }
 
-                    if let CidlType::Model(m) = root_type {
+                    if let CidlType::Object(o) = root_type {
                         ensure!(
-                            self.models.contains_key(m.as_str()),
-                            "Unknown model reference on model method {}.{}.{}",
+                            self.is_valid_object_ref(o),
+                            GeneratorErrorKind::UnknownObject,
+                            "{}.{}.{}",
                             model.name,
                             method.name,
                             param.name
                         );
 
+                        // TODO: remove this
                         if method.http_verb == HttpVerb::GET {
-                            bail!(
+                            fail!(
+                                GeneratorErrorKind::NotYetSupported,
                                 "GET Requests currently do not support model parameters {}.{}.{}",
                                 model.name,
                                 method.name,

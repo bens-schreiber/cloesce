@@ -1,8 +1,11 @@
 use std::collections::{BTreeMap, HashMap, VecDeque};
 
-use common::{CidlType, IncludeTree, Model, NavigationPropertyKind};
+use common::{
+    CidlType, IncludeTree, Model, NavigationPropertyKind, ensure,
+    err::{GeneratorErrorKind, Result},
+    fail,
+};
 
-use anyhow::{Context, Result, anyhow, bail, ensure};
 use sea_query::{
     ColumnDef, Expr, ForeignKey, Index, IntoCondition, Query, SelectStatement, SqliteQueryBuilder,
     Table,
@@ -27,10 +30,14 @@ fn generate_views(model_tree: Vec<ModelTree>) -> Vec<String> {
         let mut query = Query::select();
 
         query.from(alias(&tree.root.model.name));
-        dfs(&tree.root, &mut query);
+        dfs(
+            &tree.root,
+            &mut query,
+            &mut vec![tree.root.model.name.clone()],
+        );
 
         views.push(format!(
-            "CREATE VIEW \"{}_{}\" AS {};",
+            "CREATE VIEW \"{}.{}\" AS {};",
             tree.root.model.name,
             tree.name,
             query.to_string(SqliteQueryBuilder)
@@ -39,13 +46,63 @@ fn generate_views(model_tree: Vec<ModelTree>) -> Vec<String> {
 
     return views;
 
-    fn dfs(node: &ModelTreeNode, query: &mut SelectStatement) {
+    /*CURRENT
+
+        CREATE VIEW "Horse_default" AS
+        SELECT
+            "Horse"."id"       AS "Horse_id",
+            "Horse"."name"     AS "Horse_name",
+            "Horse"."bio"      AS "Horse_bio",
+            "Like"."id"        AS "Like_id",
+            "Like"."horseId1"  AS "Like_horseId1",
+            "Like"."horseId2"  AS "Like_horseId2",
+            "Horse_1"."id"     AS "Horse_1_id",
+            "Horse_1"."name"   AS "Horse_1_name",
+            "Horse_1"."bio"    AS "Horse_1_bio"
+        FROM "Horse"
+        LEFT JOIN "Like"
+            ON "Horse"."id" = "Like"."horseId1"
+        LEFT JOIN "Horse" AS "Horse_1"
+            ON "Like"."horseId2" = "Horse_1"."id";
+    */
+
+    /*vNEXT
+
+        CREATE VIEW "Horse.default" AS
+        SELECT
+            -- Top-level Horse fields
+            "Horse"."id"   AS "Horse.id",
+            "Horse"."name" AS "Horse.name",
+            "Horse"."bio"  AS "Horse.bio",
+
+            -- Likes relationship
+            "Like"."id"       AS "Horse.likes.id",
+            "Like"."horseId1" AS "Horse.likes.horseId1",
+            "Like"."horseId2" AS "Horse.likes.horseId2",
+
+            -- Nested horse2 from Like
+            H2."id"   AS "Horse.likes.horse2.id",
+            H2."name" AS "Horse.likes.horse2.name",
+            H2."bio"  AS "Horse.likes.horse2.bio"
+
+        FROM "Horse"
+        LEFT JOIN "Like"
+            ON "Horse"."id" = "Like"."horseId1"
+        LEFT JOIN "Horse" AS H2
+            ON "Like"."horseId2" = H2."id";
+
+
+    */
+
+    fn dfs(node: &ModelTreeNode, query: &mut SelectStatement, path: &mut Vec<String>) {
+        let path_to_column = path.join(".");
+
         // Primary Key
         {
             let pk = &node.model.primary_key.name;
             query.expr_as(
                 Expr::col((alias(&node.alias), alias(pk))),
-                alias(format!("{}_{}", &node.alias, pk)),
+                alias(format!("{}.{}", &path_to_column, pk)),
             );
         }
 
@@ -53,13 +110,13 @@ fn generate_views(model_tree: Vec<ModelTree>) -> Vec<String> {
         for attr in &node.model.attributes {
             query.expr_as(
                 Expr::col((alias(&node.alias), alias(&attr.value.name))),
-                alias(format!("{}_{}", &node.alias, attr.value.name)),
+                alias(format!("{}.{}", &path_to_column, attr.value.name)),
             );
         }
 
         // Navigation properties
         for child in &node.children {
-            match child.parent_transition.as_ref().unwrap() {
+            match child.parent_transition_kind.as_ref().unwrap() {
                 NavigationPropertyKind::OneToOne { reference } => {
                     let nav_model_pk = &child.model.primary_key.name;
 
@@ -89,19 +146,21 @@ fn generate_views(model_tree: Vec<ModelTree>) -> Vec<String> {
                     query.left_join(
                         alias(unique_id),
                         Expr::col((alias(&node.alias), alias(pk)))
-                            .equals((alias(unique_id), alias(format!("{}_{}", node.alias, pk)))),
+                            .equals((alias(unique_id), alias(format!("{}.{}", node.alias, pk)))),
                     );
 
                     left_join_as(
                         query,
                         &child.model.name,
                         &child.alias,
-                        Expr::col((alias(unique_id), alias(format!("{}_{}", child.alias, pk))))
+                        Expr::col((alias(unique_id), alias(format!("{}.{}", child.alias, pk))))
                             .equals((alias(&child.alias), alias(&nav_model_pk.name))),
                     );
                 }
             }
-            dfs(child, query);
+            path.push(child.parent_transition_name.as_ref().unwrap().clone());
+            dfs(child, query, path);
+            path.pop();
         }
     }
 }
@@ -160,10 +219,10 @@ fn generate_tables(
         let mut table = Table::create();
 
         // TODO: Name the junction table in some standard way
-        let col_a_name = format!("{}_{}", a.model_name, a.model_pk_name);
+        let col_a_name = format!("{}.{}", a.model_name, a.model_pk_name);
         let mut col_a = typed_column(&col_a_name, &a.model_pk_type);
 
-        let col_b_name = format!("{}_{}", b.model_name, b.model_pk_name);
+        let col_b_name = format!("{}.{}", b.model_name, b.model_pk_name);
         let mut col_b = typed_column(&col_b_name, &b.model_pk_type);
 
         table
@@ -248,14 +307,16 @@ fn validate_fks<'a>(
                     {
                         ensure!(
                             fk_model == nav.model_name,
-                            "Mismatched types between foreign key and One to One navigation property ({}.{}) ({})",
+                            GeneratorErrorKind::MismatchedNavigationPropertyTypes,
+                            "({}.{}) does not match type ({})",
                             model.name,
                             nav.var_name,
                             fk_model
                         );
                     } else {
-                        bail!(
-                            "Navigation property {}.{} references {}.{} which does not exist or is not a foreign key to {}",
+                        fail!(
+                            GeneratorErrorKind::InvalidNavigationPropertyReference,
+                            "{}.{} references {}.{} which does not exist or is not a foreign key to {}",
                             model.name,
                             nav.var_name,
                             nav.model_name,
@@ -290,8 +351,9 @@ fn validate_fks<'a>(
         // Validate the nav props reference is consistent to an attribute
         // on another model
         let Some(&fk_model) = model_reference_to_fk_model.get(&(nav_model, reference)) else {
-            bail!(
-                "Navigation property {}.{} references {}.{} which does not exist or is not a foreign key to {}",
+            fail!(
+                GeneratorErrorKind::InvalidNavigationPropertyReference,
+                "{}.{} references {}.{} which does not exist or is not a foreign key to {}",
                 model_name,
                 nav.var_name,
                 nav_model,
@@ -304,7 +366,8 @@ fn validate_fks<'a>(
         // ie, Person has many dogs, personId on dog should be an fk to Person
         ensure!(
             model_name == fk_model,
-            "Mismatched types between foreign key and One to Many navigation property ({}.{}) ({}.{})",
+            GeneratorErrorKind::MismatchedNavigationPropertyTypes,
+            "({}.{}) does not match type ({}.{})",
             model_name,
             nav.var_name,
             nav_model,
@@ -355,7 +418,11 @@ fn validate_fks<'a>(
                 .iter()
                 .filter_map(|(&n, &d)| (d > 0).then_some(n))
                 .collect();
-            bail!("Cycle detected: {}", cyclic.join(", "));
+            fail!(
+                GeneratorErrorKind::CyclicalModelDependency,
+                "{}",
+                cyclic.join(", ")
+            );
         }
 
         sorted
@@ -365,7 +432,8 @@ fn validate_fks<'a>(
 }
 
 struct ModelTreeNode<'a> {
-    parent_transition: Option<NavigationPropertyKind>,
+    parent_transition_kind: Option<NavigationPropertyKind>,
+    parent_transition_name: Option<String>,
     alias: String,
     model: &'a Model,
     children: Vec<ModelTreeNode<'a>>,
@@ -393,11 +461,20 @@ fn validate_data_sources<'a>(
         for ds in model.data_sources.values() {
             let mut alias_counter = HashMap::<String, u32>::new();
 
-            let tree =
-                dfs(model, None, &ds.tree, model_lookup, &mut alias_counter).context(format!(
+            let tree = dfs(
+                model,
+                None,
+                None,
+                &ds.tree,
+                model_lookup,
+                &mut alias_counter,
+            )
+            .map_err(|e| {
+                e.with_context(format!(
                     "Problem found while validating data source {}.{}",
                     model.name, ds.name
-                ))?;
+                ))
+            })?;
 
             model_trees.push(ModelTree {
                 name: ds.name.clone(),
@@ -409,6 +486,7 @@ fn validate_data_sources<'a>(
     fn dfs<'a>(
         model: &'a Model,
         transition: Option<NavigationPropertyKind>,
+        transition_name: Option<String>,
         include_tree: &IncludeTree,
         model_lookup: &'a BTreeMap<String, Model>,
         alias_counter: &mut HashMap<String, u32>,
@@ -416,7 +494,8 @@ fn validate_data_sources<'a>(
         let alias = generate_alias(&model.name, alias_counter);
 
         let mut node = ModelTreeNode {
-            parent_transition: transition,
+            parent_transition_kind: transition,
+            parent_transition_name: transition_name,
             alias: alias.clone(),
             model,
             children: vec![],
@@ -429,7 +508,12 @@ fn validate_data_sources<'a>(
                 .iter()
                 .find(|nav| nav.var_name == *var_name)
             else {
-                bail!("Invalid reference {}.{}", model.name, var_name)
+                fail!(
+                    GeneratorErrorKind::UnknownIncludeTreeReference,
+                    "{}.{}",
+                    model.name,
+                    var_name
+                )
             };
 
             // Validate model exists
@@ -440,6 +524,7 @@ fn validate_data_sources<'a>(
             let child_node = dfs(
                 child_model,
                 Some(nav.kind.clone()),
+                Some(nav.var_name.clone()),
                 child_tree,
                 model_lookup,
                 alias_counter,
@@ -457,7 +542,7 @@ fn validate_data_sources<'a>(
         let alias = if *count == 0 {
             name.to_string()
         } else {
-            format!("{}_{}", name, count)
+            format!("{}{}", name, count)
         };
         *count += 1;
         alias
@@ -527,15 +612,30 @@ struct JunctionTableBuilder<'a> {
 impl<'a> JunctionTableBuilder<'a> {
     fn model(&mut self, jm: JunctionModel<'a>) -> Result<()> {
         if self.models.len() >= 2 {
-            bail!("Too many ManyToMany navigation properties for junction table");
+            fail!(
+                GeneratorErrorKind::ExtraneousManyToManyReferences,
+                "{}, {}, {}",
+                jm.model_name,
+                self.models[0].model_name,
+                self.models[1].model_name
+            );
         }
         self.models.push(jm);
         Ok(())
     }
 
     fn build(self, unique_id: &'a str) -> Result<JunctionTable<'a>> {
-        let [a, b] = <[_; 2]>::try_from(self.models)
-            .map_err(|_| anyhow!("Both models must be set for a junction table"))?;
+        let err_context = self
+            .models
+            .first()
+            .map(|m| m.model_name)
+            .unwrap_or_default();
+        let [a, b] = <[_; 2]>::try_from(self.models).map_err(|_| {
+            GeneratorErrorKind::MissingManyToManyReference
+                .to_error()
+                .with_context(err_context)
+        })?;
+
         Ok(JunctionTable { a, b, unique_id })
     }
 }

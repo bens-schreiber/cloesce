@@ -1,6 +1,7 @@
 use common::{
     CidlType, NavigationPropertyKind,
-    builder::{ModelBuilder, create_ast},
+    builder::{IncludeTreeBuilder, ModelBuilder, create_ast},
+    err::GeneratorErrorKind,
 };
 
 macro_rules! expected_str {
@@ -204,18 +205,227 @@ fn test_sqlite_table_output() {
         expected_str!(sql, r#"CREATE TABLE "StudentsCourses""#);
 
         // Assert: Junction table has StudentId + CourseId composite PK
-        expected_str!(sql, r#""Student_id" integer NOT NULL"#);
-        expected_str!(sql, r#""Course_id" integer NOT NULL"#);
-        expected_str!(sql, r#"PRIMARY KEY ("Course_id", "Student_id")"#);
+        expected_str!(sql, r#""Student.id" integer NOT NULL"#);
+        expected_str!(sql, r#""Course.id" integer NOT NULL"#);
+        expected_str!(sql, r#"PRIMARY KEY ("Course.id", "Student.id")"#);
 
         // Assert: FKs to Student and Course
         expected_str!(
             sql,
-            r#"FOREIGN KEY ("Student_id") REFERENCES "Student" ("id") ON DELETE RESTRICT ON UPDATE CASCADE"#
+            r#"FOREIGN KEY ("Student.id") REFERENCES "Student" ("id") ON DELETE RESTRICT ON UPDATE CASCADE"#
         );
         expected_str!(
             sql,
-            r#"FOREIGN KEY ("Course_id") REFERENCES "Course" ("id") ON DELETE RESTRICT ON UPDATE CASCADE"#
+            r#"FOREIGN KEY ("Course.id") REFERENCES "Course" ("id") ON DELETE RESTRICT ON UPDATE CASCADE"#
+        );
+    }
+}
+
+#[test]
+fn test_sqlite_view_output() {
+    // One to One
+    {
+        // Arrange
+        let ast = create_ast(vec![
+            ModelBuilder::new("Person")
+                .id()
+                .attribute("dogId", CidlType::Integer, Some("Dog".into()))
+                .nav_p(
+                    "dog",
+                    "Dog",
+                    NavigationPropertyKind::OneToOne {
+                        reference: "dogId".into(),
+                    },
+                )
+                // Data Source includes Dog nav prop
+                .data_source(
+                    "default",
+                    IncludeTreeBuilder::default().add_node("dog").build(),
+                )
+                .build(),
+            ModelBuilder::new("Dog").id().build(),
+        ]);
+
+        // Act
+        let sql = d1::generate_sql(&ast.models).expect("gen_sqlite to work");
+
+        // Assert
+        expected_str!(
+            sql,
+            r#"CREATE VIEW "Person.default" AS SELECT "Person"."id" AS "Person.id", "Person"."dogId" AS "Person.dogId", "Dog"."id" AS "Person.dog.id" FROM "Person" LEFT JOIN "Dog" ON "Person"."dogId" = "Dog"."id""#
+        )
+    }
+
+    // One to Many
+    {
+        // Arrange
+        let ast = create_ast(vec![
+            ModelBuilder::new("Dog")
+                .id()
+                .attribute("personId", CidlType::Integer, Some("Person".into()))
+                .build(),
+            ModelBuilder::new("Cat")
+                .attribute("personId", CidlType::Integer, Some("Person".into()))
+                .id()
+                .build(),
+            ModelBuilder::new("Person")
+                .id()
+                .nav_p(
+                    "dogs",
+                    "Dog",
+                    NavigationPropertyKind::OneToMany {
+                        reference: "personId".into(),
+                    },
+                )
+                .nav_p(
+                    "cats",
+                    "Cat",
+                    NavigationPropertyKind::OneToMany {
+                        reference: "personId".into(),
+                    },
+                )
+                .attribute("bossId", CidlType::Integer, Some("Boss".into()))
+                .data_source(
+                    "default",
+                    IncludeTreeBuilder::default()
+                        .add_node("dogs")
+                        .add_node("cats")
+                        .build(),
+                )
+                .build(),
+            ModelBuilder::new("Boss")
+                .id()
+                .nav_p(
+                    "persons",
+                    "Person",
+                    NavigationPropertyKind::OneToMany {
+                        reference: "bossId".into(),
+                    },
+                )
+                .data_source(
+                    "default",
+                    IncludeTreeBuilder::default()
+                        .add_with_children("persons", |b| b.add_node("dogs").add_node("cats"))
+                        .build(),
+                )
+                .build(),
+        ]);
+
+        // Act
+        let sql = d1::generate_sql(&ast.models).expect("gen_sqlite to work");
+
+        // Assert
+        expected_str!(
+            sql,
+            r#"CREATE VIEW "Person.default" AS SELECT "Person"."id" AS "Person.id", "Person"."bossId" AS "Person.bossId", "Cat"."id" AS "Person.cats.id", "Cat"."personId" AS "Person.cats.personId", "Dog"."id" AS "Person.dogs.id", "Dog"."personId" AS "Person.dogs.personId" FROM "Person" LEFT JOIN "Cat" ON "Person"."id" = "Cat"."personId" LEFT JOIN "Dog" ON "Person"."id" = "Dog"."personId";"#
+        );
+
+        expected_str!(
+            sql,
+            r#"CREATE VIEW "Boss.default" AS SELECT "Boss"."id" AS "Boss.id", "Person"."id" AS "Boss.persons.id", "Person"."bossId" AS "Boss.persons.bossId", "Cat"."id" AS "Boss.persons.cats.id", "Cat"."personId" AS "Boss.persons.cats.personId", "Dog"."id" AS "Boss.persons.dogs.id", "Dog"."personId" AS "Boss.persons.dogs.personId" FROM "Boss" LEFT JOIN "Person" ON "Boss"."id" = "Person"."bossId" LEFT JOIN "Cat" ON "Person"."id" = "Cat"."personId" LEFT JOIN "Dog" ON "Person"."id" = "Dog"."personId";"#
+        );
+    }
+
+    // Many to Many
+    {
+        // Arrange
+        let ast = create_ast(vec![
+            ModelBuilder::new("Student")
+                .id()
+                .nav_p(
+                    "courses",
+                    "Course".to_string(),
+                    NavigationPropertyKind::ManyToMany {
+                        unique_id: "StudentsCourses".into(),
+                    },
+                )
+                .data_source(
+                    "default",
+                    IncludeTreeBuilder::default().add_node("courses").build(),
+                )
+                .build(),
+            ModelBuilder::new("Course")
+                .id()
+                .nav_p(
+                    "students",
+                    "Student".to_string(),
+                    NavigationPropertyKind::ManyToMany {
+                        unique_id: "StudentsCourses".into(),
+                    },
+                )
+                .data_source(
+                    "default",
+                    IncludeTreeBuilder::default().add_node("students").build(),
+                )
+                .build(),
+        ]);
+
+        // Act
+        let sql = d1::generate_sql(&ast.models).expect("gen_sqlite to work");
+        expected_str!(sql, r#"CREATE TABLE "StudentsCourses""#);
+
+        // Assert: Many-to-many view for Student
+        expected_str!(
+            sql,
+            r#"CREATE VIEW "Student.default" AS SELECT "Student"."id" AS "Student.id", "Course"."id" AS "Student.courses.id" FROM "Student" LEFT JOIN "StudentsCourses" ON "Student"."id" = "StudentsCourses"."Student.id" LEFT JOIN "Course" ON "StudentsCourses"."Course.id" = "Course"."id";"#
+        );
+
+        // Assert: Many-to-many view for Course
+        expected_str!(
+            sql,
+            r#"CREATE VIEW "Course.default" AS SELECT "Course"."id" AS "Course.id", "Student"."id" AS "Course.students.id" FROM "Course" LEFT JOIN "StudentsCourses" ON "Course"."id" = "StudentsCourses"."Course.id" LEFT JOIN "Student" ON "StudentsCourses"."Student.id" = "Student"."id";"#
+        );
+    }
+
+    // Auto aliasing
+    {
+        // Arrange
+        let horse_model = ModelBuilder::new("Horse")
+            // Attributes
+            .id() // id is primary key
+            .attribute("name", CidlType::Text, None)
+            .attribute("bio", CidlType::nullable(CidlType::Text), None)
+            // Navigation Properties
+            .nav_p(
+                "matches",
+                "Match",
+                NavigationPropertyKind::OneToMany {
+                    reference: "horseId1".into(),
+                },
+            )
+            // Data Sources
+            .data_source(
+                "default",
+                IncludeTreeBuilder::default()
+                    .add_with_children("matches", |b| b.add_node("horse2"))
+                    .build(),
+            )
+            .build();
+
+        let match_model = ModelBuilder::new("Match")
+            // Attributes
+            .id()
+            .attribute("horseId1", CidlType::Integer, Some("Horse".into()))
+            .attribute("horseId2", CidlType::Integer, Some("Horse".into()))
+            // Navigation Properties
+            .nav_p(
+                "horse2",
+                "Horse",
+                NavigationPropertyKind::OneToOne {
+                    reference: "horseId2".into(),
+                },
+            )
+            .build();
+
+        let ast = create_ast(vec![horse_model, match_model]);
+
+        // Act
+        let sql = d1::generate_sql(&ast.models).expect("gen_sqlite to work");
+
+        // Assert
+        expected_str!(
+            sql,
+            r#"CREATE VIEW "Horse.default" AS SELECT "Horse"."id" AS "Horse.id", "Horse"."name" AS "Horse.name", "Horse"."bio" AS "Horse.bio", "Match"."id" AS "Horse.matches.id", "Match"."horseId1" AS "Horse.matches.horseId1", "Match"."horseId2" AS "Horse.matches.horseId2", "Horse1"."id" AS "Horse.matches.horse2.id", "Horse1"."name" AS "Horse.matches.horse2.name", "Horse1"."bio" AS "Horse.matches.horse2.bio" FROM "Horse" LEFT JOIN "Match" ON "Horse"."id" = "Match"."horseId1" LEFT JOIN "Horse" AS "Horse1" ON "Match"."horseId2" = "Horse1"."id";"#
         );
     }
 }
@@ -244,7 +454,11 @@ fn test_cycle_detection_error() {
     let err = d1::generate_sql(&ast.models).unwrap_err();
 
     // Assert
-    expected_str!(err, "Cycle detected");
+    assert!(matches!(
+        err.kind,
+        GeneratorErrorKind::CyclicalModelDependency
+    ));
+    expected_str!(err.context, "A, B, C");
 }
 
 #[test]
@@ -297,10 +511,10 @@ fn test_one_to_one_nav_property_unknown_attribute_reference_error() {
     let err = d1::generate_sql(&ast.models).unwrap_err();
 
     // Assert
-    expected_str!(
-        err,
-        "Navigation property Person.dog references Dog.dogId which does not exist or is not a foreign key to Person"
-    );
+    assert!(matches!(
+        err.kind,
+        GeneratorErrorKind::InvalidNavigationPropertyReference
+    ))
 }
 
 #[test]
@@ -325,11 +539,11 @@ fn test_one_to_one_mismatched_fk_and_nav_type_error() {
     // Act
     let err = d1::generate_sql(&ast.models).unwrap_err();
 
-    // Assert - message includes "Mismatched types between foreign key and One to One navigation property"
-    expected_str!(
-        err,
-        "Mismatched types between foreign key and One to One navigation property"
-    );
+    // Assert
+    assert!(matches!(
+        err.kind,
+        GeneratorErrorKind::MismatchedNavigationPropertyTypes
+    ))
 }
 
 #[test]
@@ -355,8 +569,8 @@ fn test_one_to_many_unresolved_reference_error() {
 
     // Assert
     expected_str!(
-        err,
-        "Navigation property Person.dogs references Dog.personId which does not exist or is not a foreign key to Person"
+        err.context,
+        "Person.dogs references Dog.personId which does not exist or is not a foreign key to Person"
     );
 }
 
@@ -380,7 +594,10 @@ fn test_junction_table_builder_errors() {
         ]);
 
         let err = d1::generate_sql(&ast.models).unwrap_err();
-        expected_str!(err, "Both models must be set for a junction table");
+        assert!(matches!(
+            err.kind,
+            GeneratorErrorKind::MissingManyToManyReference
+        ))
     }
 
     // Too many models case: three models register the same junction id
@@ -420,9 +637,9 @@ fn test_junction_table_builder_errors() {
         ]);
 
         let err = d1::generate_sql(&ast.models).unwrap_err();
-        expected_str!(
-            err,
-            "Too many ManyToMany navigation properties for junction table"
-        );
+        assert!(matches!(
+            err.kind,
+            GeneratorErrorKind::ExtraneousManyToManyReferences
+        ))
     }
 }

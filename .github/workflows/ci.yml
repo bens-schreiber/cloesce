@@ -80,14 +80,13 @@ jobs:
       - name: Unit tests
         run: npm test
 
-  regression:
-    name: Regression Tests
+  integration:
+    name: Integration Tests
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # Setup Node.js
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -100,7 +99,6 @@ jobs:
           npm ci
           npm run build
 
-      # Setup Rust
       - name: Setup Rust
         uses: actions-rs/toolchain@v1
         with:
@@ -124,10 +122,13 @@ jobs:
           path: target
           key: cargo-build-${{ hashFiles('**/Cargo.lock') }}
 
-      # Run the regression binary
       - name: Run regression tests
-        working-directory: tests/regression
-        run: cargo run --bin test -- --check
+        working-directory: tests/runner
+        run: cargo run --bin test regression --check
+
+      - name: Run extractor run-fail
+        working-directory: tests/runner
+        run: cargo run --bin test run-fail --check
 
   e2e:
     name: E2E Tests

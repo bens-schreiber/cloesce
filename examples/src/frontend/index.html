@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Tinder for Horses 🐴</title>
+  </head>
+  <script type="module" src="index.ts"></script>
+  <body>
+    <header>
+      <h1>🐴 Tinder for Horses</h1>
+      <p><em>Find your perfect equine match!</em></p>
+    </header>
+
+    <nav>
+      <button id="btn-browse">Browse Horses</button>
+      <button id="btn-add">Add a Horse</button>
+      <button id="btn-list">View All Horses</button>
+      <button id="btn-matches">💖 View Matches</button>
+    </nav>
+
+    <hr />
+
+    <main id="app-container">
+      <!-- Browse View -->
+      <section id="browse-view" style="display: none">
+        <h2>Find Your Match</h2>
+        <article id="horse-card">
+          <p><em>Loading horses...</em></p>
+        </article>
+        <nav>
+          <button id="btn-pass">👎 Pass</button>
+          <button id="btn-like">❤️ Like</button>
+        </nav>
+      </section>
+
+      <!-- Add Horse View -->
+      <section id="add-view" style="display: none">
+        <h2>Add a New Horse</h2>
+        <form id="add-horse-form">
+          <fieldset>
+            <legend>Horse Information</legend>
+
+            <p>
+              <label for="horse-id">
+                <strong>ID:</strong>
+                <input type="number" id="horse-id" name="id" required />
+              </label>
+            </p>
+
+            <p>
+              <label for="horse-name">
+                <strong>Name:</strong>
+                <input type="text" id="horse-name" name="name" required />
+              </label>
+            </p>
+
+            <p>
+              <label for="horse-bio">
+                <strong>Bio:</strong>
+                <textarea
+                  id="horse-bio"
+                  name="bio"
+                  rows="4"
+                  cols="50"
+                ></textarea>
+              </label>
+            </p>
+
+            <p>
+              <button type="submit">Add Horse</button>
+            </p>
+          </fieldset>
+        </form>
+      </section>
+
+      <!-- List View -->
+      <section id="list-view" style="display: none">
+        <h2>All Horses</h2>
+        <div id="horses-list">
+          <p><em>Loading...</em></p>
+        </div>
+      </section>
+
+      <!-- Messages -->
+      <aside id="messages" style="display: none">
+        <p id="message-text"></p>
+      </aside>
+    </main>
+
+    <footer>
+      <hr />
+      <p>
+        <small
+          >Current User ID:
+          <input
+            type="number"
+            id="current-user-id"
+            value="1"
+            min="1"
+            style="width: 60px"
+        /></small>
+      </p>
+    </footer>
+  </body>
+</html>

@@ -1,0 +1,10 @@
+==== CLOESCE ERROR ====
+Error [MissingPrimaryKey]: Missing primary key on a model
+Phase: TypeScript IDL Extraction
+Context: Foo.
+@D1
+class Foo {
+  id: number; // missing @PrimaryKey
+}
+
+Suggested fix: Add a primary key field to your model (e.g., `id: number`)

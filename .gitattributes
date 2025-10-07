@@ -1,2 +1,4 @@
 tests/e2e/fixtures/* linguist-generated
+package.json linguist-generated
+package-lock.json linguist-generated
 examples/* linguist-vendored

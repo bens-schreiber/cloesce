@@ -1,6 +1,8 @@
 use common::CidlType;
 
-use crate::ClientLanguageTypeMapper;
+pub trait ClientLanguageTypeMapper {
+    fn type_name(&self, ty: &CidlType) -> String;
+}
 
 pub struct TypeScriptMapper;
 impl ClientLanguageTypeMapper for TypeScriptMapper {
@@ -10,7 +12,7 @@ impl ClientLanguageTypeMapper for TypeScriptMapper {
             CidlType::Real => "number".to_string(),
             CidlType::Text => "string".to_string(),
             CidlType::Blob => "Uint8Array".to_string(),
-            CidlType::Model(name) => name.clone(),
+            CidlType::Object(name) => name.clone(),
             CidlType::Nullable(inner) => {
                 if matches!(inner.as_ref(), CidlType::Void) {
                     return "null".to_string();

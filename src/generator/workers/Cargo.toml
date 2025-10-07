@@ -4,11 +4,6 @@ version = "0.0.1"
 edition = "2024"
 
 [dependencies]
-anyhow = { workspace = true }
 common = { path = "../common" }
-client = { path = "../client" }
 wrangler = { path = "../wrangler" }
 pathdiff = { version = "0.2.3" }
-
-[dev-dependencies]
-serde_json = { workspace = true }

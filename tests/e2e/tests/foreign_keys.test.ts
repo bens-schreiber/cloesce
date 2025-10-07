@@ -6,10 +6,11 @@ import {
   Dog,
   Student,
   Course,
-} from "../../fixtures/foreign_keys/client.js";
+} from "../../fixtures/regression/foreign_keys/client.js";
 
 beforeAll(async () => {
-  await startWrangler("../fixtures/foreign_keys");
+  // NOTE: e2e is called from proj root
+  await startWrangler("../fixtures/regression/foreign_keys");
 }, 30_000);
 
 afterAll(async () => {
@@ -77,17 +78,20 @@ describe("POST and refresh Student", () => {
 
   // ********TODO: This is failing, theres an error in Many to Many that might be a pain to fix.
   // Doing this in a seperate PR
-  //
-  //
-  //   testRefresh(student, ["withCoursesStudents"], {
+  // testRefresh(
+  //   student,
+  //   ["withCoursesStudents", "withCoursesStudentsCourses", null],
+  //   {
   //     withCoursesStudents: (data) => {
   //       console.log(data);
   //       expect(data.courses.length).toBe(1);
   //       expect(data.courses[0].students).not.toBeUndefined();
-  //   withCoursesStudentsCourses: (data) => {
-  //     expect(data.courses.length).toBe(1);
-  //     expect(data.courses[0].students[0].courses).not.toBeUndefined();
-  //   },
-  //   null: (data) => expect(data.courses.length).toBe(0),
-  //   });
+  //     },
+  //     withCoursesStudentsCourses: (data) => {
+  //       expect(data.courses.length).toBe(1);
+  //       expect(data.courses[0].students[0].courses).not.toBeUndefined();
+  //     },
+  //     null: (data) => expect(data.courses.length).toBe(0),
+  //   }
+  // );
 });

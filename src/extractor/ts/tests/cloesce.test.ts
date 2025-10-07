@@ -1,6 +1,6 @@
 import { describe, test, expect, vi } from "vitest";
 import { _cloesceInternal } from "../src/cloesce";
-import { CloesceAst, HttpVerb, NamedTypedValue } from "../src/common";
+import { CloesceAst, HttpVerb, Model, NamedTypedValue } from "../src/common";
 
 const makeAst = (methods: Record<string, any>): CloesceAst => ({
   wrangler_env: {
@@ -24,6 +24,7 @@ const makeAst = (methods: Record<string, any>): CloesceAst => ({
       source_path: "",
     },
   },
+  poos: {},
 });
 
 const makeRequest = (url: string, method?: string, body?: any) =>
@@ -151,6 +152,7 @@ describe("Validate Request Error States", () => {
         version: "",
         project_name: "",
         language: "TypeScript",
+        poos: {},
       },
       {
         name: "",
@@ -193,6 +195,7 @@ describe("Validate Request Error States", () => {
         version: "",
         project_name: "",
         language: "TypeScript",
+        poos: {},
       },
       {
         name: "",
@@ -392,6 +395,7 @@ describe("modelsFromSql", () => {
     version: "",
     project_name: "",
     language: "TypeScript",
+    poos: {},
   };
 
   test("returns empty array if no records", () => {
@@ -406,19 +410,33 @@ describe("modelsFromSql", () => {
     expect(result).toEqual([]);
   });
 
+  test("handles non-prefixed columns correctly", () => {
+    const records = [{ id: "1", name: "Lightning" }];
+    const result = _cloesceInternal._modelsFromSql(
+      modelName,
+      baseCidl,
+      constructorRegistry,
+      records,
+      {},
+    );
+    const horse: any = result[0];
+    expect(horse.id).toBe("1");
+    expect(horse.name).toBe("Lightning");
+  });
+
   test("assigns scalar attributes and navigation arrays correctly", () => {
     const records = [
       {
-        Horse_id: "1",
-        Horse_name: "Thunder",
-        Rider_id: "r1",
-        Rider_nickname: "Speedy",
+        "Horse.id": "1",
+        "Horse.name": "Thunder",
+        "Horse.riders.id": "r1",
+        "Horse.riders.nickname": "Speedy",
       },
       {
-        Horse_id: "1",
-        Horse_name: "Thunder",
-        Rider_id: "r2",
-        Rider_nickname: "Flash",
+        "Horse.id": "1",
+        "Horse.name": "Thunder",
+        "Horse.riders.id": "r2",
+        "Horse.riders.nickname": "Flash",
       },
     ];
     const tree = { riders: {} };
@@ -441,7 +459,7 @@ describe("modelsFromSql", () => {
   });
 
   test("handles prefixed columns correctly", () => {
-    const records = [{ Horse_id: "1", Horse_name: "Lightning" }];
+    const records = [{ "Horse.id": "1", "Horse.name": "Lightning" }];
     const result = _cloesceInternal._modelsFromSql(
       modelName,
       baseCidl,
@@ -457,22 +475,22 @@ describe("modelsFromSql", () => {
   test("merges duplicate rows with arrays", () => {
     const records = [
       {
-        Horse_id: "1",
-        Horse_name: "hoarse",
-        Rider_id: "r1",
-        Rider_nickname: "Speedy",
+        "Horse.id": "1",
+        "Horse.name": "hoarse",
+        "Horse.riders.id": "r1",
+        "Horse.riders.nickname": "Speedy",
       },
       {
-        Horse_id: "1",
-        Horse_name: "hoarse",
-        Rider_id: "r1",
-        Rider_nickname: "Speedy",
+        "Horse.id": "1",
+        "Horse.name": "hoarse",
+        "Horse.riders.id": "r1",
+        "Horse.riders.nickname": "Speedy",
       },
       {
-        Horse_id: "1",
-        Horse_name: "hoarse",
-        Rider_id: "r2",
-        Rider_nickname: "Flash",
+        "Horse.id": "1",
+        "Horse.name": "hoarse",
+        "Horse.riders.id": "r2",
+        "Horse.riders.nickname": "Flash",
       },
     ];
     const tree = { riders: {} };
@@ -641,5 +659,159 @@ describe("methodDispatch", () => {
       status: 500,
       message: "Uncaught exception in method dispatch: stringError",
     });
+  });
+
+  test("handles recursive navigation properties", () => {
+    const modelName = "Horse";
+    const likeModelName = "Like";
+
+    const constructorRegistry = {
+      [modelName]: class {
+        id?: string;
+        name?: string;
+        bio?: string | null;
+        likes?: any[];
+      },
+      [likeModelName]: class {
+        id?: string;
+        horseId1?: string;
+        horseId2?: string;
+        horse2?: any;
+      },
+    };
+
+    const cidl: CloesceAst = {
+      wrangler_env: { name: "Env", source_path: "./" },
+      models: {
+        [modelName]: {
+          name: modelName,
+          attributes: [
+            {
+              value: { name: "name", cidl_type: "Text" },
+              foreign_key_reference: null,
+            },
+            {
+              value: { name: "bio", cidl_type: { Nullable: "Text" } },
+              foreign_key_reference: null,
+            },
+          ],
+          navigation_properties: [
+            {
+              var_name: "likes",
+              model_name: likeModelName,
+              kind: { OneToMany: { reference: "horseId1" } },
+            },
+          ],
+          primary_key: { name: "id", cidl_type: "Integer" },
+          data_sources: {},
+          methods: {},
+          source_path: "",
+        },
+        [likeModelName]: {
+          name: likeModelName,
+          attributes: [
+            {
+              value: { name: "horseId1", cidl_type: "Integer" },
+              foreign_key_reference: modelName,
+            },
+            {
+              value: { name: "horseId2", cidl_type: "Integer" },
+              foreign_key_reference: modelName,
+            },
+          ],
+          navigation_properties: [
+            {
+              var_name: "horse2",
+              model_name: modelName,
+              kind: { OneToOne: { reference: "horseId2" } },
+            },
+          ],
+          primary_key: { name: "id", cidl_type: "Integer" },
+          data_sources: {},
+          methods: {},
+          source_path: "",
+        },
+      },
+      version: "",
+      project_name: "",
+      language: "TypeScript",
+      poos: {},
+    };
+
+    // Simulate a view result with nested data: Horse -> likes (Like[]) -> horse2 (Horse)
+    const records = [
+      {
+        "Horse.id": "1",
+        "Horse.name": "Lightning",
+        "Horse.bio": "Fast horse",
+        "Horse.likes.id": "10",
+        "Horse.likes.horseId1": "1",
+        "Horse.likes.horseId2": "2",
+        "Horse.likes.horse2.id": "2",
+        "Horse.likes.horse2.name": "Thunder",
+        "Horse.likes.horse2.bio": "Strong horse",
+      },
+      {
+        "Horse.id": "1",
+        "Horse.name": "Lightning",
+        "Horse.bio": "Fast horse",
+        "Horse.likes.id": "11",
+        "Horse.likes.horseId1": "1",
+        "Horse.likes.horseId2": "3",
+        "Horse.likes.horse2.id": "3",
+        "Horse.likes.horse2.name": "Storm",
+        "Horse.likes.horse2.bio": null,
+      },
+    ];
+
+    const includeTree = {
+      likes: {
+        horse2: {},
+      },
+    };
+
+    const result = _cloesceInternal._modelsFromSql(
+      modelName,
+      cidl,
+      constructorRegistry,
+      records,
+      includeTree,
+    );
+
+    // Assertions
+    expect(result.length).toBe(1);
+
+    const horse: any = result[0];
+    expect(horse.id).toBe("1");
+    expect(horse.name).toBe("Lightning");
+    expect(horse.bio).toBe("Fast horse");
+
+    // Check likes array
+    expect(Array.isArray(horse.likes)).toBe(true);
+    expect(horse.likes.length).toBe(2);
+
+    // First like
+    const like1 = horse.likes[0];
+    expect(like1.id).toBe("10");
+    expect(like1.horseId1).toBe("1");
+    expect(like1.horseId2).toBe("2");
+
+    // Nested horse2 on first like
+    expect(like1.horse2).toBeDefined();
+    expect(like1.horse2.id).toBe("2");
+    expect(like1.horse2.name).toBe("Thunder");
+    expect(like1.horse2.bio).toBe("Strong horse");
+
+    // Second like
+    const like2 = horse.likes[1];
+    expect(like2.id).toBe("11");
+    expect(like2.horseId1).toBe("1");
+    expect(like2.horseId2).toBe("3");
+
+    // Nested horse2 on second like
+    expect(like2.horse2).toBeDefined();
+    expect(like2.horse2.id).toBe("3");
+    expect(like2.horse2.name).toBe("Storm");
+    expect(like2.horse2.bio).toBeNull();
   });
 });
