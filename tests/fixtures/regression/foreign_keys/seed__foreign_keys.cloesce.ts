@@ -190,7 +190,7 @@ export class Student {
         // Insert into join table
         await db
           .prepare(
-            "INSERT INTO StudentsCourses (Student_id, Course_id) VALUES (?, ?)"
+            "INSERT INTO StudentsCourses ([Student.id], [Course.id]) VALUES (?, ?)"
           )
           .bind(resultStudent.id, course.id)
           .run();

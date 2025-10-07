@@ -54,7 +54,7 @@ export class Horse {
   @GET
   static async get(@Inject { db }: Env, id: number): Promise<Horse> {
     let records = await db
-      .prepare("SELECT * FROM Horse_default WHERE Horse_id = ?")
+      .prepare("SELECT * FROM [Horse.default] WHERE [Horse.id] = ?")
       .bind(id)
       .run();
 
@@ -63,7 +63,7 @@ export class Horse {
 
   @GET
   static async list(@Inject { db }: Env): Promise<Horse[]> {
-    let records = await db.prepare("SELECT * FROM Horse_default").run();
+    let records = await db.prepare("SELECT * FROM [Horse.default]").run();
     return modelsFromSql(Horse, records.results, Horse.default) as Horse[];
   }
 
@@ -73,6 +73,28 @@ export class Horse {
       .prepare("INSERT INTO Like (horseId1, horseId2) VALUES (?, ?)")
       .bind(this.id, horse.id)
       .run();
+  }
+
+  @GET
+  async matches(@Inject { db }: Env): Promise<Horse[]> {
+    const records = await db
+      .prepare(
+        `
+    SELECT * FROM [Horse.default] as H1
+    WHERE
+        H1.[Horse.id] = ?
+        AND EXISTS (
+            SELECT 1
+            FROM [Horse.default] AS H2
+            WHERE H2.[Horse.id] = H1.[Horse.likes.horse2.id]
+              AND H2.[Horse.likes.horse2.id] = H1.[Horse.id]
+        );
+    `
+      )
+      .bind(this.id)
+      .run();
+
+    return modelsFromSql(Horse, records.results, null);
   }
 }
 

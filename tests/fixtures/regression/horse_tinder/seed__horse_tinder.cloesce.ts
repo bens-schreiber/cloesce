@@ -55,7 +55,7 @@ class Horse {
   @GET
   static async get(@Inject { db }: Env, id: number): Promise<Horse> {
     let records = await db
-      .prepare("SELECT * FROM Horse_default WHERE Horse_id = ?")
+      .prepare("SELECT * FROM [Horse.default] WHERE [Horse.id] = ?")
       .bind(id)
       .run();
 
@@ -64,7 +64,7 @@ class Horse {
 
   @GET
   static async list(@Inject { db }: Env): Promise<Horse[]> {
-    let records = await db.prepare("SELECT * FROM Horse_default").run();
+    let records = await db.prepare("SELECT * FROM [Horse.default]").run();
     return modelsFromSql(Horse, records.results, Horse.default) as Horse[];
   }
 
