@@ -224,14 +224,14 @@ async function runExtractor(opts: {
     }
     
     // Fix poos structure - convert array to object if needed
-    if (ast.poos && Array.isArray(ast.poos)) {
+    if ((ast as any).poos && Array.isArray((ast as any).poos)) {
       const poosObj: any = {};
-      for (const poo of ast.poos) {
+      for (const poo of (ast as any).poos) {
         if (poo.name) {
           poosObj[poo.name] = poo;
         }
       }
-      ast.poos = poosObj;
+      (ast as any).poos = poosObj;
     }
     
     if (truncate) {
@@ -241,8 +241,8 @@ async function runExtractor(opts: {
         (model as any).source_path = "./" + path.basename((model as any).source_path);
       }
       
-      if (ast.poos) {
-        for (const poo of Object.values(ast.poos)) {
+      if ((ast as any).poos) {
+        for (const poo of Object.values((ast as any).poos)) {
           (poo as any).source_path = "./" + path.basename((poo as any).source_path);
         }
       }
