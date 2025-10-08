@@ -97,31 +97,38 @@ function loadCloesceConfig(root: string): CloesceConfig {
   return {};
 }
 
-function formatErr(e: ExtractorError): string {
-  const { description, suggestion } = getErrorInfo(e.code);
+function findProjectRoot(start: string) {
+  let dir = start;
+  for (;;) {
+    if (fs.existsSync(path.join(dir, "package.json"))) return dir;
+    const parent = path.dirname(dir);
+    if (parent === dir) return start;
+    dir = parent;
+  }
+}
 
-  const contextLine = e.context ? `Context: ${e.context}\n` : "";
-  const snippetLine = e.snippet ? `${e.snippet}\n\n` : "";
+function readPackageJsonProjectName(cwd: string) {
+  const pkgPath = path.join(cwd, "package.json");
+  let projectName = path.basename(cwd);
 
-  return `==== CLOESCE ERROR ====
-Error [${ExtractorErrorCode[e.code]}]: ${description}
-Phase: TypeScript IDL Extraction
-${contextLine}${snippetLine}Suggested fix: ${suggestion}`;
+  if (fs.existsSync(pkgPath)) {
+    const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf8"));
+    projectName = pkg.name ?? projectName;
+  }
+
+  return projectName;
 }
 
 function findCloesceFiles(root: string, searchPaths: string[]): string[] {
   const files: string[] = [];
 
   for (const searchPath of searchPaths) {
-    let fullPath: string;
-    if (path.isAbsolute(searchPath) || searchPath.startsWith(root)) {
-      fullPath = path.normalize(searchPath);
-    } else {
-      fullPath = path.resolve(root, searchPath);
-    }
+    const fullPath = path.resolve(root, searchPath);
 
     if (!fs.existsSync(fullPath)) {
-      console.warn(`Warning: Path "${searchPath}" does not exist`);
+      console.warn(
+        `Warning: Path "${searchPath}" specified in cloesce-config.json does not exist`,
+      );
       continue;
     }
 
