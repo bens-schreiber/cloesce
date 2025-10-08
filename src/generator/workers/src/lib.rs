@@ -1,7 +1,7 @@
 use std::{collections::BTreeMap, path::Path};
 
 use common::{
-    CloesceAst, Model, PlainOldObject, WranglerEnv,
+    CloesceAst, Model, PlainOldObject, WranglerEnv, Middleware,
     err::{GeneratorErrorKind, Result},
     fail,
 };
@@ -42,6 +42,7 @@ impl WorkersGenerator {
     fn link_models(
         models: &BTreeMap<String, Model>,
         poos: &BTreeMap<String, PlainOldObject>,
+        middleware: &Option<Middleware>,
         workers_path: &Path,
     ) -> String {
         let workers_dir = workers_path
@@ -94,13 +95,23 @@ impl WorkersGenerator {
             .collect::<Vec<_>>()
             .join("\n");
 
-        format!("{model_imports}\n{poo_imports}")
+        let middleware_import = middleware
+            .as_ref()
+            .map(|m| {
+                let path = rel_path(&m.source_path, workers_dir)
+                    .unwrap_or_else(|_| m.source_path.clone().to_string_lossy().to_string());
+                format!("import {{ {} }} from \"{}\";", m.class_name, path)
+            })
+            .unwrap_or_default();
+
+        format!("{model_imports}\n{poo_imports}\n{middleware_import}")
     }
 
     /// Generates the constructor registry and instance registry
     fn registries(
         models: &BTreeMap<String, Model>,
         poos: &BTreeMap<String, PlainOldObject>,
+        middleware: &Option<Middleware>,
         wenv: &WranglerEnv,
     ) -> (String, String) {
         let mut constructor_registry = Vec::new();
@@ -110,6 +121,10 @@ impl WorkersGenerator {
 
         for poo in poos.values() {
             constructor_registry.push(format!("\t{}: {}", &poo.name, &poo.name));
+        }
+
+        if let Some(m) = middleware {
+            constructor_registry.push(format!("\t{}: {}", &m.class_name, &m.class_name));
         }
 
         let constructor_registry_def = {
@@ -127,6 +142,56 @@ impl WorkersGenerator {
         (constructor_registry_def, instance_registry_def)
     }
 
+    /// Generates middleware call if present
+    fn middleware_call(middleware: &Option<Middleware>, env_name: &str) -> String {
+        middleware
+            .as_ref()
+            .map(|m| {
+                // Build parameter list from the middleware method definition
+                let params: Vec<String> = m
+                    .method
+                    .parameters
+                    .iter()
+                    .map(|param| {
+                        match &param.cidl_type {
+                            common::CidlType::Inject(_) => {
+                                // For injected params, get from instance registry
+                                format!("instanceRegistry.get(\"{}\")", env_name)
+                            }
+                            _ => {
+                                // For regular params, assume they're in scope (like 'request')
+                                param.name.clone()
+                            }
+                        }
+                    })
+                    .collect();
+
+                let params_str = params.join(", ");
+
+                format!(
+                    r#"
+        // Call middleware
+        const middlewareInstance = new constructorRegistry.{}();
+        const middlewareResult = await middlewareInstance.{}({});
+        
+        // If middleware returns a Response, return it immediately
+        if (middlewareResult instanceof Response) {{
+            return middlewareResult;
+        }}
+        
+        // If middleware returns false, return 403 Forbidden
+        if (middlewareResult === false) {{
+            return new Response("Forbidden", {{ status: 403 }});
+        }}
+        
+        // If middleware returns true, continue to route handler
+"#,
+                    m.class_name, m.method.name, params_str
+                )
+            })
+            .unwrap_or_default()
+    }
+
     pub fn create(
         ast: CloesceAst,
         wrangler: WranglerSpec,
@@ -135,9 +200,12 @@ impl WorkersGenerator {
     ) -> Result<String> {
         let api_route = Self::validate_domain(&domain)?;
 
-        let model_sources = Self::link_models(&ast.models, &ast.poos, workers_path);
+        let model_sources = Self::link_models(&ast.models, &ast.poos, &ast.middleware, workers_path);
         let (constructor_registry, instance_registry) =
-            Self::registries(&ast.models, &ast.poos, &ast.wrangler_env);
+            Self::registries(&ast.models, &ast.poos, &ast.middleware, &ast.wrangler_env);
+        
+        let env_name = &ast.wrangler_env.name;
+        let middleware_call = Self::middleware_call(&ast.middleware, env_name);
 
         // TODO: Hardcoding one database, in the future we need to support any amount
         let db_binding = wrangler
@@ -147,9 +215,7 @@ impl WorkersGenerator {
             .binding
             .as_ref()
             .expect("A database needs a binding to reference it in the instance container");
-        let env_name = &ast.wrangler_env.name;
 
-        // TODO: Middleware function should return the DI instance registry
         Ok(format!(
             r#"import {{ cloesce }} from "cloesce";
 import cidl from "./cidl.json";
@@ -160,7 +226,7 @@ import cidl from "./cidl.json";
 export default {{
     async fetch(request: Request, env: any, ctx: any): Promise<Response> {{
         {instance_registry}
-
+{middleware_call}
         return await cloesce(request, cidl, constructorRegistry, instanceRegistry, {{ envName: "{env_name}", dbName: "{db_binding}" }},  "/{api_route}");
     }}
 }};

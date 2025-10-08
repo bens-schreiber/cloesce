@@ -3,9 +3,10 @@ use std::{collections::BTreeMap, path::PathBuf};
 use crate::{
     CidlType, CloesceAst, DataSource, HttpVerb, IncludeTree, InputLanguage, Model, ModelAttribute,
     ModelMethod, NamedTypedValue, NavigationProperty, NavigationPropertyKind, WranglerEnv,
+    Middleware, MiddlewareMethod,
 };
 
-pub fn create_ast(mut models: Vec<Model>) -> CloesceAst {
+pub fn create_ast(mut models: Vec<Model>, middleware: Option<Middleware>) -> CloesceAst {
     let map = models
         .drain(..)
         .map(|m| (m.name.clone(), m))
@@ -20,6 +21,23 @@ pub fn create_ast(mut models: Vec<Model>) -> CloesceAst {
             name: "Env".into(),
             source_path: "source.ts".into(),
         },
+        middleware: middleware,
+    }
+}
+
+pub fn create_middleware(
+    class_name: impl Into<String>,
+    method_name: impl Into<String>,
+    parameters: Vec<NamedTypedValue>,
+    source_path: impl Into<PathBuf>,
+) -> Middleware {
+    Middleware {
+        class_name: class_name.into(),
+        method: MiddlewareMethod {
+            name: method_name.into(),
+            parameters,
+        },
+        source_path: source_path.into(),
     }
 }
 
