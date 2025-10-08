@@ -269,5 +269,6 @@
             "source_path": "./seed__foreign_keys.cloesce.ts"
         }
     },
-    "poos": {}
+    "poos": {},
+    "middleware": null
 }

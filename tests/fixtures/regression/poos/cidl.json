@@ -99,5 +99,6 @@
             ],
             "source_path": "./seed__poo.cloesce.ts"
         }
-    }
+    },
+    "middleware": null
 }

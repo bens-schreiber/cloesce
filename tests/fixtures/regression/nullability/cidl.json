@@ -152,5 +152,6 @@
             "source_path": "./seed__nullability.cloesce.ts"
         }
     },
-    "poos": {}
+    "poos": {},
+    "middleware": null
 }
