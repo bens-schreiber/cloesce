@@ -45,20 +45,17 @@ enum ClassDecoratorKind {
   D1 = "D1",
   WranglerEnv = "WranglerEnv",
   PlainOldObject = "PlainOldObject",
+  Middleware = "Middleware",
 }
 
 enum ParameterDecoratorKind {
   Inject = "Inject",
 }
 
-enum MethodDecoratorKind {
-  Middleware = "Middleware",
-}
-
 export class CidlExtractor {
   constructor(
     public projectName: string,
-    public version: string,
+    public version: string
   ) {}
 
   extract(project: Project): Either<ExtractorError, CloesceAst> {
@@ -92,12 +89,7 @@ export class CidlExtractor {
           continue;
         }
 
-        // Check if class implements Middleware interface
-        const implementsMiddleware = classDecl
-          .getImplements()
-          .some((impl) => impl.getText() === "Middleware");
-
-        if (implementsMiddleware) {
+        if (hasDecorator(classDecl, ClassDecoratorKind.Middleware)) {
           const result = CidlExtractor.middleware(classDecl, sourceFile);
 
           // Error: propagate from middleware
@@ -114,7 +106,7 @@ export class CidlExtractor {
     if (middlewares.length > 1) {
       return err(
         ExtractorErrorCode.TooManyMiddlewares,
-        (e) => (e.context = middlewares.map((m) => m.class_name).join(", ")),
+        (e) => (e.context = middlewares.map((m) => m.class_name).join(", "))
       );
     }
 
@@ -124,7 +116,7 @@ export class CidlExtractor {
         return sourceFile
           .getClasses()
           .filter((classDecl) =>
-            hasDecorator(classDecl, ClassDecoratorKind.WranglerEnv),
+            hasDecorator(classDecl, ClassDecoratorKind.WranglerEnv)
           )
           .map((classDecl) => {
             return {
@@ -143,7 +135,7 @@ export class CidlExtractor {
     if (wranglerEnvs.length > 1) {
       return err(
         ExtractorErrorCode.TooManyWranglerEnvs,
-        (e) => (e.context = wranglerEnvs.map((w) => w.name).toString()),
+        (e) => (e.context = wranglerEnvs.map((w) => w.name).toString())
       );
     }
 
@@ -160,7 +152,7 @@ export class CidlExtractor {
 
   private static model(
     classDecl: ClassDeclaration,
-    sourceFile: SourceFile,
+    sourceFile: SourceFile
   ): Either<ExtractorError, Model> {
     const name = classDecl.getName()!;
     const attributes: ModelAttribute[] = [];
@@ -227,7 +219,7 @@ export class CidlExtractor {
               (e) => {
                 e.snippet = prop.getText();
                 e.context = prop.getName();
-              },
+              }
             );
           }
 
@@ -240,7 +232,7 @@ export class CidlExtractor {
               (e) => {
                 e.snippet = prop.getText();
                 e.context = prop.getName();
-              },
+              }
             );
           }
 
@@ -260,7 +252,7 @@ export class CidlExtractor {
               (e) => {
                 e.snippet = prop.getText();
                 e.context = prop.getName();
-              },
+              }
             );
           }
 
@@ -273,7 +265,7 @@ export class CidlExtractor {
               (e) => {
                 e.snippet = prop.getText();
                 e.context = prop.getName();
-              },
+              }
             );
           }
 
@@ -302,7 +294,7 @@ export class CidlExtractor {
               (e) => {
                 e.snippet = prop.getText();
                 e.context = prop.getName();
-              },
+              }
             );
           }
 
@@ -318,7 +310,7 @@ export class CidlExtractor {
           const treeRes = CidlExtractor.includeTree(
             initializer,
             classDecl,
-            sourceFile,
+            sourceFile
           );
 
           if (!treeRes.ok) {
@@ -365,7 +357,7 @@ export class CidlExtractor {
 
   private static poo(
     classDecl: ClassDeclaration,
-    sourceFile: SourceFile,
+    sourceFile: SourceFile
   ): Either<ExtractorError, PlainOldObject> {
     const name = classDecl.getName()!;
     const attributes: NamedTypedValue[] = [];
@@ -397,7 +389,7 @@ export class CidlExtractor {
 
   private static middleware(
     classDecl: ClassDeclaration,
-    sourceFile: SourceFile,
+    sourceFile: SourceFile
   ): Either<ExtractorError, Middleware> {
     const class_name = classDecl.getName();
     if (!class_name) {
@@ -407,31 +399,25 @@ export class CidlExtractor {
       });
     }
 
-    // Find method decorated with @Middleware
-    const middlewareMethods = classDecl
-      .getMethods()
-      .filter((m) => hasDecorator(m, MethodDecoratorKind.Middleware));
-
-    // Error: No @Middleware decorated method found
-    if (middlewareMethods.length === 0) {
+    // Find the 'handle' method specifically
+    const handleMethod = classDecl.getMethod("handle");
+    if (!handleMethod) {
       return err(ExtractorErrorCode.MissingMiddlewareMethod, (e) => {
-        e.context = class_name;
+        e.context = `${class_name} - must have a 'handle' method`;
         e.snippet = classDecl.getText();
       });
     }
 
-    // Use the first @Middleware decorated method
-    const methodDecl = middlewareMethods[0];
     const parameters: NamedTypedValue[] = [];
 
-    for (const param of methodDecl.getParameters()) {
+    for (const param of handleMethod.getParameters()) {
       // Handle injected param
       if (param.getDecorator(ParameterDecoratorKind.Inject)) {
         const typeRes = CidlExtractor.cidlType(param.getType(), true);
 
         // Error: invalid type
         if (!typeRes.ok) {
-          typeRes.value.snippet = methodDecl.getText();
+          typeRes.value.snippet = handleMethod.getText();
           typeRes.value.context = param.getName();
           return typeRes;
         }
@@ -448,7 +434,7 @@ export class CidlExtractor {
 
       // Error: invalid type
       if (!typeRes.ok) {
-        typeRes.value.snippet = methodDecl.getText();
+        typeRes.value.snippet = handleMethod.getText();
         typeRes.value.context = param.getName();
         return typeRes;
       }
@@ -462,7 +448,7 @@ export class CidlExtractor {
     return right({
       class_name,
       method: {
-        name: methodDecl.getName(),
+        name: "handle", // always "handle"
         parameters,
       },
       source_path: sourceFile.getFilePath().toString(),
@@ -481,7 +467,7 @@ export class CidlExtractor {
 
   private static cidlType(
     type: Type,
-    inject: boolean = false,
+    inject: boolean = false
   ): Either<ExtractorError, CidlType> {
     // Void
     if (type.isVoid()) {
@@ -556,7 +542,7 @@ export class CidlExtractor {
     function wrapGeneric(
       t: Type,
       isNullable: boolean,
-      wrapper: (inner: CidlType) => CidlType,
+      wrapper: (inner: CidlType) => CidlType
     ): Either<ExtractorError, CidlType> {
       const res = CidlExtractor.cidlType(t, inject);
 
@@ -582,7 +568,7 @@ export class CidlExtractor {
   private static includeTree(
     expr: Expression | undefined,
     currentClass: ClassDeclaration,
-    sf: SourceFile,
+    sf: SourceFile
   ): Either<ExtractorError, CidlIncludeTree> {
     // Include trees must be of the expected form
     if (
@@ -605,7 +591,7 @@ export class CidlExtractor {
           (e) => {
             e.snippet = expr.getText();
             e.context = prop.getName();
-          },
+          }
         );
       }
 
@@ -625,7 +611,7 @@ export class CidlExtractor {
           ExtractorErrorCode.InvalidNavigationPropertyReference,
           (e) => {
             ((e.snippet = navProp.getText()), (e.context = prop.getName()));
-          },
+          }
         );
       }
 
@@ -645,7 +631,7 @@ export class CidlExtractor {
           const treeRes = CidlExtractor.includeTree(
             initializer,
             targetClass,
-            sf,
+            sf
           );
 
           // Error: Propogated from `includeTree`
@@ -665,13 +651,13 @@ export class CidlExtractor {
   }
 
   private static method(
-    method: MethodDeclaration,
+    method: MethodDeclaration
   ): Either<ExtractorError, ModelMethod> {
     const decorators = method.getDecorators();
     const decoratorNames = decorators.map((d) => getDecoratorName(d));
 
     const httpVerb = decoratorNames.find((name) =>
-      Object.values(HttpVerb).includes(name as HttpVerb),
+      Object.values(HttpVerb).includes(name as HttpVerb)
     ) as HttpVerb;
 
     const parameters: NamedTypedValue[] = [];
@@ -731,7 +717,7 @@ export class CidlExtractor {
 
 function err(
   code: ExtractorErrorCode,
-  fn?: (extractorErr: ExtractorError) => void,
+  fn?: (extractorErr: ExtractorError) => void
 ): Either<ExtractorError, never> {
   let e = new ExtractorError(code);
   if (fn) {
@@ -747,7 +733,7 @@ function getDecoratorName(decorator: Decorator): string {
 
 function getDecoratorArgument(
   decorator: Decorator,
-  index: number,
+  index: number
 ): string | undefined {
   const args = decorator.getArguments();
   if (!args[index]) return undefined;
@@ -784,7 +770,7 @@ function getObjectName(t: CidlType): string | undefined {
 
 function findPropertyByName(
   cls: ClassDeclaration,
-  name: string,
+  name: string
 ): PropertyDeclaration | undefined {
   const exactMatch = cls.getProperties().find((p) => p.getName() === name);
   return exactMatch;
@@ -792,7 +778,7 @@ function findPropertyByName(
 
 function hasDecorator(
   node: { getDecorators(): Decorator[] },
-  name: string,
+  name: string
 ): boolean {
   return node.getDecorators().some((d) => {
     const decoratorName = getDecoratorName(d);

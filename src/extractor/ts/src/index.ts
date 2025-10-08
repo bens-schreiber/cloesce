@@ -5,6 +5,7 @@ export { HttpResult } from "./common.js";
 export const D1: ClassDecorator = () => {};
 export const PlainOldObject: ClassDecorator = () => {};
 export const WranglerEnv: ClassDecorator = () => {};
+export const Middleware: ClassDecorator = () => {};
 export const PrimaryKey: PropertyDecorator = () => {};
 export const GET: MethodDecorator = () => {};
 export const POST: MethodDecorator = () => {};
@@ -12,7 +13,6 @@ export const PUT: MethodDecorator = () => {};
 export const PATCH: MethodDecorator = () => {};
 export const DELETE: MethodDecorator = () => {};
 export const DataSource: PropertyDecorator = () => {};
-export const Middleware: MethodDecorator = () => {};
 export const OneToMany =
   (_: string): PropertyDecorator =>
   () => {};
@@ -27,11 +27,6 @@ export const ForeignKey =
   () => {};
 export const Inject: ParameterDecorator = () => {};
 
-// Middleware interface
-export interface Middleware {
-  handle(request: Request): Promise<boolean | Response>;
-}
-
 // Include Tree
 type Primitive = string | number | boolean | bigint | symbol | null | undefined;
 export type IncludeTree<T> = T extends Primitive
@@ -45,7 +40,7 @@ export type IncludeTree<T> = T extends Primitive
 // Helpers
 export function instantiateObjectArray<T extends object>(
   data: any,
-  ctor: { new (): T },
+  ctor: { new (): T }
 ): T[] {
   if (Array.isArray(data)) {
     return data.map((x) => instantiateObjectArray(x, ctor)).flat();

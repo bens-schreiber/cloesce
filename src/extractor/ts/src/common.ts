@@ -72,11 +72,11 @@ const errorInfoMap: Record<
   },
   [ExtractorErrorCode.TooManyMiddlewares]: {
     description: "Too many middleware classes defined in the project",
-    suggestion: "Only one class can implement the Middleware interface",
+    suggestion: "Only one @Middleware class is allowed per project",
   },
   [ExtractorErrorCode.MissingMiddlewareMethod]: {
-    description: "Middleware class is missing the @Middleware decorated method",
-    suggestion: "Add a method decorated with @Middleware to your middleware class",
+    description: "Middleware class must have a 'handle' method",
+    suggestion: "Add a 'handle' method to your @Middleware class",
   },
 };
 
@@ -156,7 +156,7 @@ export interface NavigationProperty {
 }
 
 export function getNavigationPropertyCidlType(
-  nav: NavigationProperty,
+  nav: NavigationProperty
 ): CidlType {
   return "OneToOne" in nav.kind
     ? { Object: nav.model_name }

@@ -1,5 +1,3 @@
-#!/usr/bin/env node
-
 import fs from "node:fs";
 import path from "node:path";
 import { command, run, option, string, optional, flag } from "cmd-ts";
@@ -46,7 +44,7 @@ function runExtractor(
   projectName: string,
   out: string,
   inp: string,
-  truncateSourcePaths: boolean,
+  truncateSourcePaths: boolean
 ) {
   const files = findCloesceFiles(inp, [inp]);
   const project = new Project({
@@ -78,7 +76,8 @@ function runExtractor(
       }
 
       if (ast.middleware) {
-        ast.middleware.source_path = "./" + path.basename(ast.middleware.source_path);
+        ast.middleware.source_path =
+          "./" + path.basename(ast.middleware.source_path);
       }
     }
 
@@ -88,7 +87,7 @@ function runExtractor(
   } catch (err: any) {
     console.error(
       "Critical uncaught error. Submit a ticket to https://github.com/bens-schreiber/cloesce: ",
-      err?.message ?? err,
+      err?.message ?? err
     );
     process.exit(1);
   }
