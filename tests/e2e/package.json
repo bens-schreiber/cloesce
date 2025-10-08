@@ -13,7 +13,8 @@
   "scripts": {
     "test": "vitest run",
     "format:fix": "prettier --write .",
-    "format": "prettier --check ."
+    "format": "prettier --check .",
+    "build": "tsc -p ../../src/extractor/ts/tsconfig.json"
   },
   "type": "module"
 }
