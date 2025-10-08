@@ -76,6 +76,10 @@ function runExtractor(
       for (const poo of Object.values(ast.poos)) {
         poo.source_path = "./" + path.basename(poo.source_path);
       }
+
+      if (ast.middleware) {
+        ast.middleware.source_path = "./" + path.basename(ast.middleware.source_path);
+      }
     }
 
     const json = JSON.stringify(result.value, null, 4);

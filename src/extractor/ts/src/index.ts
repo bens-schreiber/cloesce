@@ -12,6 +12,7 @@ export const PUT: MethodDecorator = () => {};
 export const PATCH: MethodDecorator = () => {};
 export const DELETE: MethodDecorator = () => {};
 export const DataSource: PropertyDecorator = () => {};
+export const Middleware: MethodDecorator = () => {};
 export const OneToMany =
   (_: string): PropertyDecorator =>
   () => {};
@@ -25,6 +26,11 @@ export const ForeignKey =
   <T>(_: T): PropertyDecorator =>
   () => {};
 export const Inject: ParameterDecorator = () => {};
+
+// Middleware interface
+export interface Middleware {
+  handle(request: Request): Promise<boolean | Response>;
+}
 
 // Include Tree
 type Primitive = string | number | boolean | bigint | symbol | null | undefined;

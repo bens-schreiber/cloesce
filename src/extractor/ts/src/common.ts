@@ -17,6 +17,8 @@ export enum ExtractorErrorCode {
   MissingPrimaryKey,
   MissingWranglerEnv,
   TooManyWranglerEnvs,
+  TooManyMiddlewares,
+  MissingMiddlewareMethod,
 }
 
 const errorInfoMap: Record<
@@ -67,6 +69,14 @@ const errorInfoMap: Record<
   [ExtractorErrorCode.TooManyWranglerEnvs]: {
     description: "Too many wrangler environments defined in the project",
     suggestion: "Consolidate or remove unused @WranglerEnv's",
+  },
+  [ExtractorErrorCode.TooManyMiddlewares]: {
+    description: "Too many middleware classes defined in the project",
+    suggestion: "Only one class can implement the Middleware interface",
+  },
+  [ExtractorErrorCode.MissingMiddlewareMethod]: {
+    description: "Middleware class is missing the @Middleware decorated method",
+    suggestion: "Add a method decorated with @Middleware to your middleware class",
   },
 };
 
@@ -183,6 +193,17 @@ export interface WranglerEnv {
   source_path: string;
 }
 
+export interface MiddlewareMethod {
+  name: string;
+  parameters: NamedTypedValue[];
+}
+
+export interface Middleware {
+  class_name: string;
+  method: MiddlewareMethod;
+  source_path: string;
+}
+
 export interface CloesceAst {
   version: string;
   project_name: string;
@@ -190,4 +211,5 @@ export interface CloesceAst {
   wrangler_env: WranglerEnv;
   models: Record<string, Model>;
   poos: Record<string, PlainOldObject>;
+  middleware: Middleware | null;
 }

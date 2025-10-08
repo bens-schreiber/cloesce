@@ -23,6 +23,7 @@ import {
   NamedTypedValue,
   NavigationProperty,
   WranglerEnv,
+  Middleware,
   left,
   right,
   ExtractorError,
@@ -50,6 +51,10 @@ enum ParameterDecoratorKind {
   Inject = "Inject",
 }
 
+enum MethodDecoratorKind {
+  Middleware = "Middleware",
+}
+
 export class CidlExtractor {
   constructor(
     public projectName: string,
@@ -59,6 +64,7 @@ export class CidlExtractor {
   extract(project: Project): Either<ExtractorError, CloesceAst> {
     const models: Record<string, Model> = {};
     const poos: Record<string, PlainOldObject> = {};
+    const middlewares: Middleware[] = [];
 
     for (const sourceFile of project.getSourceFiles()) {
       for (const classDecl of sourceFile.getClasses()) {
@@ -85,7 +91,31 @@ export class CidlExtractor {
           poos[result.value.name] = result.value;
           continue;
         }
+
+        // Check if class implements Middleware interface
+        const implementsMiddleware = classDecl
+          .getImplements()
+          .some((impl) => impl.getText() === "Middleware");
+
+        if (implementsMiddleware) {
+          const result = CidlExtractor.middleware(classDecl, sourceFile);
+
+          // Error: propagate from middleware
+          if (!result.ok) {
+            result.value.addContext((old) => `${classDecl.getName()}.${old}`);
+            return result;
+          }
+          middlewares.push(result.value);
+        }
       }
+    }
+
+    // Error: Only one middleware can exist
+    if (middlewares.length > 1) {
+      return err(
+        ExtractorErrorCode.TooManyMiddlewares,
+        (e) => (e.context = middlewares.map((m) => m.class_name).join(", ")),
+      );
     }
 
     const wranglerEnvs: WranglerEnv[] = project
@@ -124,6 +154,7 @@ export class CidlExtractor {
       wrangler_env: wranglerEnvs[0],
       models,
       poos,
+      middleware: middlewares.length > 0 ? middlewares[0] : null,
     });
   }
 
@@ -360,6 +391,80 @@ export class CidlExtractor {
     return right({
       name,
       attributes,
+      source_path: sourceFile.getFilePath().toString(),
+    });
+  }
+
+  private static middleware(
+    classDecl: ClassDeclaration,
+    sourceFile: SourceFile,
+  ): Either<ExtractorError, Middleware> {
+    const class_name = classDecl.getName();
+    if (!class_name) {
+      return err(ExtractorErrorCode.UnknownType, (e) => {
+        e.context = "Middleware class must have a name";
+        e.snippet = classDecl.getText();
+      });
+    }
+
+    // Find method decorated with @Middleware
+    const middlewareMethods = classDecl
+      .getMethods()
+      .filter((m) => hasDecorator(m, MethodDecoratorKind.Middleware));
+
+    // Error: No @Middleware decorated method found
+    if (middlewareMethods.length === 0) {
+      return err(ExtractorErrorCode.MissingMiddlewareMethod, (e) => {
+        e.context = class_name;
+        e.snippet = classDecl.getText();
+      });
+    }
+
+    // Use the first @Middleware decorated method
+    const methodDecl = middlewareMethods[0];
+    const parameters: NamedTypedValue[] = [];
+
+    for (const param of methodDecl.getParameters()) {
+      // Handle injected param
+      if (param.getDecorator(ParameterDecoratorKind.Inject)) {
+        const typeRes = CidlExtractor.cidlType(param.getType(), true);
+
+        // Error: invalid type
+        if (!typeRes.ok) {
+          typeRes.value.snippet = methodDecl.getText();
+          typeRes.value.context = param.getName();
+          return typeRes;
+        }
+
+        parameters.push({
+          name: param.getName(),
+          cidl_type: typeRes.value,
+        });
+        continue;
+      }
+
+      // Handle all other params
+      const typeRes = CidlExtractor.cidlType(param.getType());
+
+      // Error: invalid type
+      if (!typeRes.ok) {
+        typeRes.value.snippet = methodDecl.getText();
+        typeRes.value.context = param.getName();
+        return typeRes;
+      }
+
+      parameters.push({
+        name: param.getName(),
+        cidl_type: typeRes.value,
+      });
+    }
+
+    return right({
+      class_name,
+      method: {
+        name: methodDecl.getName(),
+        parameters,
+      },
       source_path: sourceFile.getFilePath().toString(),
     });
   }
