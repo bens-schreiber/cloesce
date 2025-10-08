@@ -5,7 +5,7 @@ import path from "node:path";
 import { command, run, option, string, optional, flag } from "cmd-ts";
 import { CidlExtractor } from "./extract.js";
 import { Project } from "ts-morph";
-import { ExtractorError, ExtractorErrorCode, getErrorInfo } from "./common.js";
+import { ExtractorError, ExtractorErrorCode, getErrorInfo } from "../common.js";
 
 const cli = command({
   name: "cloesce",
@@ -46,7 +46,7 @@ function runExtractor(
   projectName: string,
   out: string,
   inp: string,
-  truncateSourcePaths: boolean,
+  truncateSourcePaths: boolean
 ) {
   const files = findCloesceFiles(inp, [inp]);
   const project = new Project({
@@ -84,7 +84,7 @@ function runExtractor(
   } catch (err: any) {
     console.error(
       "Critical uncaught error. Submit a ticket to https://github.com/bens-schreiber/cloesce: ",
-      err?.message ?? err,
+      err?.message ?? err
     );
     process.exit(1);
   }

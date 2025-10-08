@@ -1,5 +1,5 @@
 import { describe, test, expect, vi } from "vitest";
-import { _cloesceInternal } from "../src/cloesce";
+import { _cloesceInternal } from "../src/runtime";
 import { CloesceAst, HttpVerb, Model, NamedTypedValue } from "../src/common";
 
 const makeAst = (methods: Record<string, any>): CloesceAst => ({
