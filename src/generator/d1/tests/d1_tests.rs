@@ -22,7 +22,7 @@ fn test_sqlite_table_output() {
     // Empty
     {
         // Arrange
-        let ast = create_ast(vec![]);
+        let ast = create_ast(vec![], None);
 
         // Act
         let sql = d1::generate_sql(&ast.models).expect("Empty models should succeed");
@@ -44,7 +44,7 @@ fn test_sqlite_table_output() {
                 .attribute("name", CidlType::nullable(CidlType::Text), None)
                 .attribute("age", CidlType::Integer, None)
                 .build(),
-        ]);
+        ], None);
 
         // Act
         let sql = d1::generate_sql(&ast.models).expect("gen_sqlite to work");
@@ -65,7 +65,7 @@ fn test_sqlite_table_output() {
                 .attribute("dogId", CidlType::Integer, Some("Dog".to_string()))
                 .build(),
             ModelBuilder::new("Dog").id().build(),
-        ]);
+        ], None);
 
         // Act
         let sql = d1::generate_sql(&ast.models).expect("gen_sqlite to work");
@@ -93,7 +93,7 @@ fn test_sqlite_table_output() {
                 )
                 .build(),
             ModelBuilder::new("Dog").id().build(),
-        ]);
+        ], None);
 
         // Act
         let sql = d1::generate_sql(&ast.models).expect("gen_sqlite to work");
@@ -145,7 +145,7 @@ fn test_sqlite_table_output() {
                     },
                 )
                 .build(),
-        ]);
+        ], None);
 
         // Act
         let sql = d1::generate_sql(&ast.models).expect("gen_sqlite to work");
@@ -196,7 +196,7 @@ fn test_sqlite_table_output() {
                     },
                 )
                 .build(),
-        ]);
+        ], None);
 
         // Act
         let sql = d1::generate_sql(&ast.models).expect("gen_sqlite to work");
@@ -244,7 +244,7 @@ fn test_sqlite_view_output() {
                 )
                 .build(),
             ModelBuilder::new("Dog").id().build(),
-        ]);
+        ], None);
 
         // Act
         let sql = d1::generate_sql(&ast.models).expect("gen_sqlite to work");
@@ -309,7 +309,7 @@ fn test_sqlite_view_output() {
                         .build(),
                 )
                 .build(),
-        ]);
+        ], None);
 
         // Act
         let sql = d1::generate_sql(&ast.models).expect("gen_sqlite to work");
@@ -358,7 +358,7 @@ fn test_sqlite_view_output() {
                     IncludeTreeBuilder::default().add_node("students").build(),
                 )
                 .build(),
-        ]);
+        ], None);
 
         // Act
         let sql = d1::generate_sql(&ast.models).expect("gen_sqlite to work");
@@ -417,7 +417,7 @@ fn test_sqlite_view_output() {
             )
             .build();
 
-        let ast = create_ast(vec![horse_model, match_model]);
+        let ast = create_ast(vec![horse_model, match_model], None);
 
         // Act
         let sql = d1::generate_sql(&ast.models).expect("gen_sqlite to work");
@@ -447,7 +447,7 @@ fn test_cycle_detection_error() {
             .id()
             .attribute("aId", CidlType::Integer, Some("A".to_string()))
             .build(),
-    ]);
+    ], None);
 
     // Act
 
@@ -482,7 +482,7 @@ fn test_nullability_prevents_cycle_error() {
                 Some("A".to_string()),
             )
             .build(),
-    ]);
+    ], None);
 
     // Act
 
@@ -505,7 +505,7 @@ fn test_one_to_one_nav_property_unknown_attribute_reference_error() {
                 },
             )
             .build(),
-    ]);
+    ], None);
 
     // Act
     let err = d1::generate_sql(&ast.models).unwrap_err();
@@ -534,7 +534,7 @@ fn test_one_to_one_mismatched_fk_and_nav_type_error() {
                 },
             )
             .build(),
-    ]);
+    ], None);
 
     // Act
     let err = d1::generate_sql(&ast.models).unwrap_err();
@@ -562,7 +562,7 @@ fn test_one_to_many_unresolved_reference_error() {
                 },
             )
             .build(),
-    ]);
+    ], None);
 
     // Act
     let err = d1::generate_sql(&ast.models).unwrap_err();
@@ -591,7 +591,7 @@ fn test_junction_table_builder_errors() {
                 .build(),
             // Course exists, but doesn't declare the reciprocal nav property
             ModelBuilder::new("Course").id().build(),
-        ]);
+        ], None);
 
         let err = d1::generate_sql(&ast.models).unwrap_err();
         assert!(matches!(
@@ -634,7 +634,7 @@ fn test_junction_table_builder_errors() {
                     },
                 )
                 .build(),
-        ]);
+        ], None);
 
         let err = d1::generate_sql(&ast.models).unwrap_err();
         assert!(matches!(
