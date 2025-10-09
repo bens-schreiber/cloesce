@@ -1,8 +1,9 @@
 use std::{collections::BTreeMap, path::Path};
 
 use common::{
+    CloesceAst, Model, PlainOldObject, WranglerEnv,
     err::{GeneratorErrorKind, Result},
-    fail, CloesceAst, Model, PlainOldObject, WranglerEnv,
+    fail,
 };
 
 use wrangler::WranglerSpec;
