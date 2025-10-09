@@ -213,8 +213,6 @@ async function runExtractor(opts: {
   });
   files.forEach((f) => project.addSourceFileAtPath(f));
 
-  files.forEach((f) => project.addSourceFileAtPath(f));
-
   try {
     // Clean the entire generated directory to ensure fresh output
     const genDir = path.dirname(outPath);
@@ -341,9 +339,9 @@ async function runWasmCommand(
 
   try {
     wasi.start(instance);
-    console.log(`✅ Completed: ${config.name}\n`);
+    console.log(`Completed: ${config.name}\n`);
   } catch (err) {
-    console.error(`❌ WASM execution failed for ${config.name}:`, err);
+    console.error(`WASM execution failed for ${config.name}:`, err);
   }
 }
 
