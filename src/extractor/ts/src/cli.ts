@@ -14,6 +14,7 @@ import {
 } from "cmd-ts";
 import { Project } from "ts-morph";
 import { CidlExtractor } from "./extract.js";
+import { ExtractorError, ExtractorErrorCode, getErrorInfo } from "./common.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -88,7 +89,7 @@ function loadCloesceConfig(root: string): CloesceConfig {
   if (fs.existsSync(configPath)) {
     try {
       const config = JSON.parse(fs.readFileSync(configPath, "utf8"));
-      console.log(`Loaded config from ${configPath}`);
+      console.log(`📋 Loaded config from ${configPath}`);
       return config;
     } catch (err) {
       console.warn(`⚠️ Failed to parse cloesce-config.json: ${err}`);
@@ -97,7 +98,7 @@ function loadCloesceConfig(root: string): CloesceConfig {
   return {};
 }
 
-function findProjectRoot(start: string) {
+function findProjectRoot(start: string): string {
   let dir = start;
   for (;;) {
     if (fs.existsSync(path.join(dir, "package.json"))) return dir;
@@ -107,7 +108,7 @@ function findProjectRoot(start: string) {
   }
 }
 
-function readPackageJsonProjectName(cwd: string) {
+function readPackageJsonProjectName(cwd: string): string {
   const pkgPath = path.join(cwd, "package.json");
   let projectName = path.basename(cwd);
 
@@ -121,58 +122,71 @@ function readPackageJsonProjectName(cwd: string) {
 
 function findCloesceFiles(root: string, searchPaths: string[]): string[] {
   const files: string[] = [];
-
   for (const searchPath of searchPaths) {
-    const fullPath = path.resolve(root, searchPath);
-
+    let fullPath: string;
+    
+    fullPath = path.resolve(root, searchPath);
+    
     if (!fs.existsSync(fullPath)) {
       console.warn(
-        `Warning: Path "${searchPath}" specified in cloesce-config.json does not exist`,
+        `Warning: Path "${searchPath}" does not exist`,
       );
       continue;
     }
-
     const stats = fs.statSync(fullPath);
-
     if (stats.isFile() && /\.cloesce\.ts$/i.test(fullPath)) {
       files.push(fullPath);
     } else if (stats.isDirectory()) {
       files.push(...walkDirectory(fullPath));
     }
   }
-
   return files;
-
   function walkDirectory(dir: string): string[] {
     const files: string[] = [];
-
     for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
       const fullPath = path.join(dir, entry.name);
-
-      if (entry.isDirectory()) {
+      if (
+        entry.isDirectory() &&
+        !entry.name.startsWith(".") &&
+        entry.name !== "node_modules"
+      ) {
         files.push(...walkDirectory(fullPath));
       } else if (entry.isFile() && /\.cloesce\.ts$/i.test(entry.name)) {
         files.push(fullPath);
       }
     }
-
     return files;
   }
+}
+function formatErr(e: ExtractorError): string {
+  const { description, suggestion } = getErrorInfo(e.code);
+
+  const contextLine = e.context ? `Context: ${e.context}\n` : "";
+  const snippetLine = e.snippet ? `${e.snippet}\n\n` : "";
+
+  return `==== CLOESCE ERROR ====
+Error [${ExtractorErrorCode[e.code]}]: ${description}
+Phase: TypeScript IDL Extraction
+${contextLine}${snippetLine}Suggested fix: ${suggestion}`;
 }
 
 async function runExtractor(opts: {
   projectName?: string;
   out?: string;
+  inp?: string;
   location?: string;
   truncateSourcePaths?: boolean;
   silent?: boolean;
 }) {
-  const baseDir = opts.location ? path.resolve(opts.location) : process.cwd();
+  const baseDir =
+    opts.inp || opts.location
+      ? path.resolve(opts.inp || opts.location!)
+      : process.cwd();
   const projectRoot = findProjectRoot(baseDir);
   const config = loadCloesceConfig(projectRoot);
 
   // Merge config with CLI options
-  const searchPaths = config.paths ?? ["./"];
+  const searchPaths = config.paths ?? [opts.inp || "./"];
   const outputDir = config.outputDir ?? ".generated";
   const outPath = path.resolve(opts.out ?? path.join(outputDir, "cidl.json"));
   const truncate =
@@ -224,6 +238,7 @@ async function runExtractor(opts: {
     const result = extractor.extract(project);
 
     if (!result.ok) {
+      console.error(formatErr(result.value));
       process.exit(1);
     }
 
@@ -365,7 +380,7 @@ const runCmd = command({
   },
 });
 
-// Keep extract as a separate command if we just want to run the CIDL extractor
+// Extract command with all options from both files
 const extractCmd = command({
   name: "extract",
   description: "Extract models and write cidl.json only",
@@ -377,18 +392,25 @@ const extractCmd = command({
     }),
     out: option({
       long: "out",
+      short: "o",
       type: optional(string),
-      description: "Output path (default: <project>/.generated/cidl.json)",
+      description: "Output path (default: .generated/cidl.json)",
     }),
-    truncateSourcePaths: flag({
-      long: "truncateSourcePaths",
-      description: "Sets all source paths to just their file name",
+    inp: option({
+      long: "in",
+      short: "i",
+      type: optional(string),
+      description: "Input file or directory",
     }),
     location: option({
       long: "location",
       short: "l",
       type: optional(string),
       description: "Project directory (default: cwd)",
+    }),
+    truncateSourcePaths: flag({
+      long: "truncateSourcePaths",
+      description: "Sets all source paths to just their file name",
     }),
   },
   handler: async (args) => {
