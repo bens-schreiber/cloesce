@@ -6,121 +6,113 @@ on:
   pull_request:
     branches: ["main"]
 
+env:
+  CARGO_HOME: ${{ github.workspace }}/.cargo
+  RUSTUP_HOME: ${{ github.workspace }}/.rustup
+
 jobs:
-  rust:
-    name: Generator
+  rust-build:
+    name: Rust Build
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: src/generator
+    outputs:
+      rust-target-path: ${{ steps.upload.outputs.artifact-path }}
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Install Rust
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          components: rustfmt, clippy
-          override: true
-
-      - name: Cache Cargo registry
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-          key: cargo-registry-${{ hashFiles('**/Cargo.lock') }}
-
-      - name: Cache Cargo build
-        uses: actions/cache@v3
-        with:
-          path: target
-          key: cargo-build-${{ hashFiles('**/Cargo.lock') }}
-
-      - name: Run cargo fmt
-        run: cargo fmt --all -- --check
-
-      - name: Run Clippy
-        run: cargo clippy --all-targets --all-features -- -D warnings
-
-      - name: Build crate
-        run: cargo build --all-targets
-
-      - name: Run tests
-        run: cargo test --all
-
-  extractor-ts:
-    name: extractor-ts
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: src/extractor/ts
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Use Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Prettier
-        run: npm run format
-
-      - name: TypeScript typecheck
-        run: npm run typecheck
-
-      - name: Build
-        run: npm run build
-
-      - name: Unit tests
-        run: npm test
-
-  integration:
-    name: Integration Tests
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-
-      # Build extractor-ts dependency
-      - name: Build extractor-ts
-        working-directory: src/extractor/ts
-        run: |
-          npm ci
-          npm run build
-
-      - name: Setup Rust
-        uses: actions-rs/toolchain@v1
+      # Rust setup
+      - uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
           components: rustfmt, clippy
           override: true
 
       # Cache Cargo registry
-      - name: Cache Cargo registry
-        uses: actions/cache@v3
+      - uses: actions/cache@v3
         with:
           path: |
-            ~/.cargo/registry
-            ~/.cargo/git
+            ${{ env.CARGO_HOME }}/registry
+            ${{ env.CARGO_HOME }}/git
           key: cargo-registry-${{ hashFiles('**/Cargo.lock') }}
 
       # Cache Cargo build
-      - name: Cache Cargo build
-        uses: actions/cache@v3
+      - uses: actions/cache@v3
         with:
           path: target
           key: cargo-build-${{ hashFiles('**/Cargo.lock') }}
+
+      # Lints & tests for generator + runtime
+      - run: cargo fmt --all -- --check
+      - run: cargo clippy --all-targets --all-features -- -D warnings
+      - run: cargo build --all-targets
+      - run: cargo test --all
+
+      # Build Rust runtime for frontend-ts
+      - run: cargo build --target wasm32-unknown-unknown --release
+        working-directory: src/runtime
+
+      # Upload Rust target artifacts for other jobs
+      - name: Upload Rust artifacts
+        id: upload
+        uses: actions/upload-artifact@v3
+        with:
+          name: rust-target
+          path: target
+
+  frontend-ts:
+    name: Frontend TypeScript
+    runs-on: ubuntu-latest
+    needs: rust-build
+    defaults:
+      run:
+        working-directory: src/frontend/ts
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      # Cache npm modules
+      - uses: actions/cache@v3
+        with:
+          path: ~/.npm
+          key: npm-cache-${{ hashFiles('**/package-lock.json') }}
+
+      # Download Rust artifacts
+      - uses: actions/download-artifact@v3
+        with:
+          name: rust-target
+          path: ../../target
+
+      # Frontend build
+      - run: npm ci
+      - run: npm run format
+      - run: npm run typecheck
+      - run: npm run build
+      - run: npm test
+
+  integration:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    needs: frontend-ts
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      # Download Rust artifacts
+      - uses: actions/download-artifact@v3
+        with:
+          name: rust-target
+          path: target
+
+      - name: Build frontend-ts
+        working-directory: src/frontend/ts
+        run: |
+          npm ci
+          npm run build
 
       - name: Run regression tests
         working-directory: tests/runner
@@ -133,29 +125,24 @@ jobs:
   e2e:
     name: E2E Tests
     runs-on: ubuntu-latest
+    needs: frontend-ts
     defaults:
       run:
         working-directory: tests/e2e
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Use Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: 20
 
-      - name: Build extractor dependency
-        working-directory: src/extractor/ts
+      # Build frontend-ts
+      - name: Build frontend-ts
+        working-directory: src/frontend/ts
         run: |
           npm ci
           npm run build
 
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Prettier
-        run: npm run format -- --check
-
-      - name: Run E2E tests
-        run: npm test
+      - run: npm ci
+      - run: npm run format -- --check
+      - run: npm test
