@@ -1,8 +1,11 @@
+#![allow(clippy::missing_safety_doc)]
+
 use common::Model;
 use common::NavigationPropertyKind;
 use serde_json::Map;
 use serde_json::Value;
 
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::slice;
 use std::str;
@@ -11,13 +14,38 @@ type D1Result = Vec<Map<String, serde_json::Value>>;
 type ModelMeta = HashMap<String, Model>;
 type IncludeTree = Option<Map<String, serde_json::Value>>;
 
+/// The result length of the last call to [object_relational_mapping]
 static mut RETURN_LEN: usize = 0;
 
+/// User space function to get the [RETURN_LEN]
 #[unsafe(no_mangle)]
 pub extern "C" fn get_return_len() -> usize {
     unsafe { RETURN_LEN }
 }
 
+thread_local! {
+    /// Cloesce meta data AST, intended to be imported once at WASM initializaton
+    pub static META: RefCell<ModelMeta> = RefCell::new(HashMap::new());
+}
+
+/// Sets the [META] global variable, returning 0 on success.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn set_meta_ptr(ptr: *mut u8, cap: usize) -> i32 {
+    let slice = unsafe { std::slice::from_raw_parts(ptr, cap) };
+
+    let parsed: ModelMeta = match serde_json::from_slice(slice) {
+        Ok(val) => val,
+        Err(_) => return 1,
+    };
+
+    META.with(|meta| {
+        *meta.borrow_mut() = parsed;
+    });
+
+    0
+}
+
+/// WASM memory allocation handler. A subsequent [dealloc] must be called to prevent memory leaks.
 #[unsafe(no_mangle)]
 pub extern "C" fn alloc(len: usize) -> *mut u8 {
     let mut buf = Vec::with_capacity(len);
@@ -26,22 +54,24 @@ pub extern "C" fn alloc(len: usize) -> *mut u8 {
     ptr
 }
 
+/// WASM free memory handler.
 #[unsafe(no_mangle)]
-pub extern "C" fn dealloc(ptr: *mut u8, cap: usize) {
+pub unsafe extern "C" fn dealloc(ptr: *mut u8, cap: usize) {
     unsafe {
         let _ = Vec::from_raw_parts(ptr, 0, cap);
     }
 }
 
+/// Maps ORM friendly SQL rows to a [Model]. Requires a previous call to [set_meta_ptr].
+///
+/// Panics on any error, so erroneous inputs should be determined before calling this.
+///
+/// Returns a pointer to a JSON result which needs a subsequent [dealloc] call to free.
 #[unsafe(no_mangle)]
-pub extern "C" fn object_relational_mapping(
+pub unsafe extern "C" fn object_relational_mapping(
     // Model Name
     model_name_ptr: *const u8,
     model_name_len: usize,
-
-    // Meta AST
-    meta_ptr: *const u8,
-    meta_len: usize,
 
     // SQL result rows
     rows_ptr: *const u8,
@@ -53,17 +83,16 @@ pub extern "C" fn object_relational_mapping(
 ) -> *const u8 {
     let model_name =
         unsafe { str::from_utf8(slice::from_raw_parts(model_name_ptr, model_name_len)).unwrap() };
-    let meta_json = unsafe { str::from_utf8(slice::from_raw_parts(meta_ptr, meta_len)).unwrap() };
     let rows_json = unsafe { str::from_utf8(slice::from_raw_parts(rows_ptr, rows_len)).unwrap() };
     let include_tree_json = unsafe {
         str::from_utf8(slice::from_raw_parts(include_tree_ptr, include_tree_len)).unwrap()
     };
 
-    let meta = serde_json::from_str::<ModelMeta>(&meta_json).unwrap();
-    let rows = serde_json::from_str::<D1Result>(&rows_json).unwrap();
-    let include_tree = serde_json::from_str::<IncludeTree>(&include_tree_json).unwrap();
+    let rows = serde_json::from_str::<D1Result>(rows_json).unwrap();
+    let include_tree = serde_json::from_str::<IncludeTree>(include_tree_json).unwrap();
 
-    let res = _object_relational_mapping(model_name, &meta, &rows, &include_tree);
+    let res = META
+        .with(|meta| _object_relational_mapping(model_name, &meta.borrow(), &rows, &include_tree));
     let json_str = serde_json::to_string(&res).unwrap();
 
     let mut bytes = json_str.into_bytes();
@@ -83,14 +112,14 @@ fn _object_relational_mapping(
 ) -> Vec<Value> {
     let model = match meta.get(model_name) {
         Some(m) => m,
-        None => return vec![],
+        None => panic!("Unknown model."),
     };
 
     let pk_name = &model.primary_key.name;
     let mut result_map: HashMap<Value, Value> = HashMap::new();
 
     // Scan each row for the root model (`model_name`)'s primary key
-    for row in rows.into_iter() {
+    for row in rows.iter() {
         let Some(pk_value) = row
             .get(&format!("{}.{}", model_name, pk_name))
             .or_else(|| row.get(pk_name))
@@ -160,7 +189,7 @@ fn process_navigation_properties(
 
         let nested_model = match meta.get(&nav_prop.model_name) {
             Some(m) => m,
-            None => continue,
+            None => panic!("Unknown model."),
         };
 
         // NOTE: No need to check for non prefixed keys here, we can assume a nav prop
@@ -220,11 +249,9 @@ fn process_navigation_properties(
             || matches!(nav_prop.kind, NavigationPropertyKind::ManyToMany { .. })
         {
             if let Value::Array(arr) = model_json.get_mut(&nav_prop.var_name).unwrap() {
-                let already_exists = arr.iter().any(|existing| {
-                    existing
-                        .get(nested_pk_name)
-                        .map_or(false, |v| v == nested_pk_value)
-                });
+                let already_exists = arr
+                    .iter()
+                    .any(|existing| existing.get(nested_pk_name) == Some(nested_pk_value));
 
                 if !already_exists {
                     arr.push(Value::Object(nested_model_json));

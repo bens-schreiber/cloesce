@@ -1,7 +1,7 @@
 import { describe, test, expect, vi } from "vitest";
-import { _cloesceInternal } from "../src/runtime";
+import { _cloesceInternal } from "../src/runtime/runtime";
 import { CloesceAst, HttpVerb, NamedTypedValue } from "../src/common";
-import { modelsFromSql } from "../src/runtime";
+import { modelsFromSql } from "../src/runtime/runtime";
 import { IncludeTree } from "../src";
 import fs from "fs";
 import path from "path";
@@ -34,7 +34,7 @@ const makeAst = (methods: Record<string, any>): CloesceAst => ({
 const makeRequest = (url: string, method?: string, body?: any) =>
   new Request(
     url,
-    method ? { method, body: body && JSON.stringify(body) } : undefined
+    method ? { method, body: body && JSON.stringify(body) } : undefined,
   );
 
 //
@@ -47,7 +47,7 @@ describe("Router Error States", () => {
     const result = _cloesceInternal.matchRoute(
       makeRequest(url),
       makeAst({}),
-      "/api"
+      "/api",
     );
 
     expect(result.value).toStrictEqual({
@@ -177,7 +177,7 @@ describe("Validate Request Error States", () => {
         return_type: null,
         parameters: [],
       },
-      null
+      null,
     );
 
     expect(result.value).toStrictEqual({
@@ -220,7 +220,7 @@ describe("Validate Request Error States", () => {
         return_type: null,
         parameters: [],
       },
-      null
+      null,
     );
 
     expect(result.value).toStrictEqual({
@@ -266,7 +266,7 @@ describe("Validate Request Error States", () => {
         ast,
         ast.models.Horse,
         ast.models.Horse.methods.neigh,
-        "0"
+        "0",
       );
 
       expect(result.value).toStrictEqual({
@@ -274,7 +274,7 @@ describe("Validate Request Error States", () => {
         status: 400,
         message: `Invalid Request Body: ${message}.`,
       });
-    }
+    },
   );
 });
 
@@ -297,8 +297,8 @@ describe("Validate Request Success States", () => {
             ? { Nullable: i.typed_value.cidl_type }
             : i.typed_value.cidl_type,
         },
-      }))
-    )
+      })),
+    ),
   );
 
   test.each(expanded)("input is accepted %#", async (arg) => {
@@ -308,7 +308,7 @@ describe("Validate Request Success States", () => {
     const request = makeRequest(
       url,
       arg.is_get ? undefined : "POST",
-      arg.is_get ? undefined : { [arg.typed_value.name]: arg.value }
+      arg.is_get ? undefined : { [arg.typed_value.name]: arg.value },
     );
     const ast = makeAst({
       neigh: {
@@ -328,7 +328,7 @@ describe("Validate Request Success States", () => {
       ast,
       ast.models.Horse,
       ast.models.Horse.methods.neigh,
-      "0"
+      "0",
     );
 
     expect(result.value).toEqual([
@@ -374,7 +374,7 @@ describe("methodDispatch", () => {
       makeInstanceRegistry(),
       envMeta,
       method,
-      params
+      params,
     );
 
     expect(instance.testMethod).toHaveBeenCalledWith();
@@ -395,7 +395,7 @@ describe("methodDispatch", () => {
       makeInstanceRegistry(),
       envMeta,
       method,
-      params
+      params,
     );
 
     expect(result).toStrictEqual({
@@ -415,7 +415,7 @@ describe("methodDispatch", () => {
       makeInstanceRegistry(),
       envMeta,
       method,
-      params
+      params,
     );
 
     expect(result).toStrictEqual({ ok: true, status: 200, data: "neigh" });
@@ -435,7 +435,7 @@ describe("methodDispatch", () => {
       ireg,
       envMeta,
       method,
-      params
+      params,
     );
 
     expect(instance.testMethod).toHaveBeenCalledWith(ireg.get("Env"));
@@ -456,7 +456,7 @@ describe("methodDispatch", () => {
       makeInstanceRegistry(),
       envMeta,
       method,
-      params
+      params,
     );
 
     expect(result).toStrictEqual({
@@ -480,7 +480,7 @@ describe("methodDispatch", () => {
       makeInstanceRegistry(),
       envMeta,
       method,
-      params
+      params,
     );
 
     expect(result).toStrictEqual({
@@ -501,7 +501,7 @@ describe("modelsFromSql", () => {
     // Arrange
     const wasmPath = path.resolve(
       __dirname,
-      "../../../runtime/target/wasm32-unknown-unknown/release/runtime.wasm"
+      "../../../runtime/target/wasm32-unknown-unknown/release/runtime.wasm",
     );
     const wasm = await WebAssembly.instantiate(fs.readFileSync(wasmPath), {});
 
@@ -584,7 +584,7 @@ describe("modelsFromSql", () => {
     await _cloesceInternal.RuntimeContainer.init(
       ast,
       constructorRegistry,
-      wasm.instance
+      wasm.instance,
     );
 
     // Simulate a view result with nested data: Horse -> likes (Like[]) -> horse2 (Horse)
@@ -623,7 +623,7 @@ describe("modelsFromSql", () => {
     const result = modelsFromSql(
       constructorRegistry[modelName],
       records,
-      includeTree
+      includeTree,
     );
 
     // Assert

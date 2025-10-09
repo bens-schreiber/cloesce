@@ -1,4 +1,4 @@
-export { cloesce, modelsFromSql } from "./runtime.js";
+export { cloesce, modelsFromSql } from "./runtime/runtime.js";
 export { HttpResult, Either } from "./common.js";
 
 // Compiler hints
@@ -39,7 +39,7 @@ export type IncludeTree<T> = T extends Primitive
 // Helpers
 export function instantiateObjectArray<T extends object>(
   data: any,
-  ctor: { new (): T }
+  ctor: { new (): T },
 ): T[] {
   if (Array.isArray(data)) {
     return data.map((x) => instantiateObjectArray(x, ctor)).flat();

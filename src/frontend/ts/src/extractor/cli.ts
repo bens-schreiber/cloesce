@@ -46,7 +46,7 @@ function runExtractor(
   projectName: string,
   out: string,
   inp: string,
-  truncateSourcePaths: boolean
+  truncateSourcePaths: boolean,
 ) {
   const files = findCloesceFiles(inp, [inp]);
   const project = new Project({
@@ -84,7 +84,7 @@ function runExtractor(
   } catch (err: any) {
     console.error(
       "Critical uncaught error. Submit a ticket to https://github.com/bens-schreiber/cloesce: ",
-      err?.message ?? err
+      err?.message ?? err,
     );
     process.exit(1);
   }
