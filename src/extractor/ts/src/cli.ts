@@ -1,5 +1,3 @@
-#!/usr/bin/env node
-
 import fs from "node:fs";
 import path from "node:path";
 import { command, run, option, string, optional, flag } from "cmd-ts";
@@ -75,6 +73,11 @@ function runExtractor(
 
       for (const poo of Object.values(ast.poos)) {
         poo.source_path = "./" + path.basename(poo.source_path);
+      }
+
+      if (ast.middleware) {
+        ast.middleware.source_path =
+          "./" + path.basename(ast.middleware.source_path);
       }
     }
 

@@ -23,6 +23,7 @@ import {
   NamedTypedValue,
   NavigationProperty,
   WranglerEnv,
+  Middleware,
   left,
   right,
   ExtractorError,
@@ -44,6 +45,7 @@ enum ClassDecoratorKind {
   D1 = "D1",
   WranglerEnv = "WranglerEnv",
   PlainOldObject = "PlainOldObject",
+  Middleware = "Middleware",
 }
 
 enum ParameterDecoratorKind {
@@ -59,6 +61,7 @@ export class CidlExtractor {
   extract(project: Project): Either<ExtractorError, CloesceAst> {
     const models: Record<string, Model> = {};
     const poos: Record<string, PlainOldObject> = {};
+    const middlewares: Middleware[] = [];
 
     for (const sourceFile of project.getSourceFiles()) {
       for (const classDecl of sourceFile.getClasses()) {
@@ -85,7 +88,26 @@ export class CidlExtractor {
           poos[result.value.name] = result.value;
           continue;
         }
+
+        if (hasDecorator(classDecl, ClassDecoratorKind.Middleware)) {
+          const result = CidlExtractor.middleware(classDecl, sourceFile);
+
+          // Error: propagate from middleware
+          if (!result.ok) {
+            result.value.addContext((old) => `${classDecl.getName()}.${old}`);
+            return result;
+          }
+          middlewares.push(result.value);
+        }
       }
+    }
+
+    // Error: Only one middleware can exist
+    if (middlewares.length > 1) {
+      return err(
+        ExtractorErrorCode.TooManyMiddlewares,
+        (e) => (e.context = middlewares.map((m) => m.class_name).join(", ")),
+      );
     }
 
     const wranglerEnvs: WranglerEnv[] = project
@@ -124,6 +146,7 @@ export class CidlExtractor {
       wrangler_env: wranglerEnvs[0],
       models,
       poos,
+      middleware: middlewares.length > 0 ? middlewares[0] : null,
     });
   }
 
@@ -360,6 +383,74 @@ export class CidlExtractor {
     return right({
       name,
       attributes,
+      source_path: sourceFile.getFilePath().toString(),
+    });
+  }
+
+  private static middleware(
+    classDecl: ClassDeclaration,
+    sourceFile: SourceFile,
+  ): Either<ExtractorError, Middleware> {
+    const class_name = classDecl.getName();
+    if (!class_name) {
+      return err(ExtractorErrorCode.UnknownType, (e) => {
+        e.context = "Middleware class must have a name";
+        e.snippet = classDecl.getText();
+      });
+    }
+
+    // Find the 'handle' method specifically
+    const handleMethod = classDecl.getMethod("handle");
+    if (!handleMethod) {
+      return err(ExtractorErrorCode.MissingMiddlewareMethod, (e) => {
+        e.context = `${class_name} - must have a 'handle' method`;
+        e.snippet = classDecl.getText();
+      });
+    }
+
+    const parameters: NamedTypedValue[] = [];
+
+    for (const param of handleMethod.getParameters()) {
+      // Handle injected param
+      if (param.getDecorator(ParameterDecoratorKind.Inject)) {
+        const typeRes = CidlExtractor.cidlType(param.getType(), true);
+
+        // Error: invalid type
+        if (!typeRes.ok) {
+          typeRes.value.snippet = handleMethod.getText();
+          typeRes.value.context = param.getName();
+          return typeRes;
+        }
+
+        parameters.push({
+          name: param.getName(),
+          cidl_type: typeRes.value,
+        });
+        continue;
+      }
+
+      // Handle all other params
+      const typeRes = CidlExtractor.cidlType(param.getType());
+
+      // Error: invalid type
+      if (!typeRes.ok) {
+        typeRes.value.snippet = handleMethod.getText();
+        typeRes.value.context = param.getName();
+        return typeRes;
+      }
+
+      parameters.push({
+        name: param.getName(),
+        cidl_type: typeRes.value,
+      });
+    }
+
+    return right({
+      class_name,
+      method: {
+        name: "handle", // always "handle"
+        parameters,
+      },
       source_path: sourceFile.getFilePath().toString(),
     });
   }

@@ -1,0 +1,12 @@
+==== CLOESCE ERROR ====
+Error [MissingMiddlewareMethod]: Middleware class must have a 'handle' method
+Phase: TypeScript IDL Extraction
+Context: TestMiddleWare.TestMiddleWare - must have a 'handle' method
+@Middleware
+export class TestMiddleWare {
+  async testMiddleware(): Promise<HttpResult<string>> {
+    return { ok: true, data: "test" };
+  }
+}
+
+Suggested fix: Add a 'handle' method to your @Middleware class

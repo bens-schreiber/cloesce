@@ -5,6 +5,7 @@ export { HttpResult } from "./common.js";
 export const D1: ClassDecorator = () => {};
 export const PlainOldObject: ClassDecorator = () => {};
 export const WranglerEnv: ClassDecorator = () => {};
+export const Middleware: ClassDecorator = () => {};
 export const PrimaryKey: PropertyDecorator = () => {};
 export const GET: MethodDecorator = () => {};
 export const POST: MethodDecorator = () => {};

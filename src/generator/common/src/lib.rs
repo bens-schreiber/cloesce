@@ -157,6 +157,19 @@ pub struct PlainOldObject {
     pub source_path: PathBuf,
 }
 
+#[derive(Serialize, Deserialize, Debug)]
+pub struct MiddlewareMethod {
+    pub name: String,
+    pub parameters: Vec<NamedTypedValue>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct Middleware {
+    pub class_name: String,
+    pub method: MiddlewareMethod,
+    pub source_path: PathBuf,
+}
+
 #[derive(Serialize, Deserialize)]
 pub enum InputLanguage {
     TypeScript,
@@ -181,6 +194,8 @@ pub struct CloesceAst {
 
     #[serde_as(as = "MapPreventDuplicates<_, _>")]
     pub poos: BTreeMap<String, PlainOldObject>,
+
+    pub middleware: Option<Middleware>,
 }
 
 impl CloesceAst {

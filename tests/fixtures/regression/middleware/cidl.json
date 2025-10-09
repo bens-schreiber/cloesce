@@ -1,0 +1,61 @@
+{
+    "version": "v0.0.2",
+    "project_name": "CloesceProject",
+    "language": "TypeScript",
+    "wrangler_env": {
+        "name": "Env",
+        "source_path": "./seed__middleware.cloesce.ts"
+    },
+    "models": {
+        "House": {
+            "name": "House",
+            "attributes": [
+                {
+                    "foreign_key_reference": null,
+                    "value": {
+                        "name": "name",
+                        "cidl_type": "Text"
+                    }
+                }
+            ],
+            "primary_key": {
+                "name": "id",
+                "cidl_type": "Integer"
+            },
+            "navigation_properties": [],
+            "methods": {
+                "get": {
+                    "name": "get",
+                    "is_static": true,
+                    "http_verb": "GET",
+                    "return_type": {
+                        "Object": "House"
+                    },
+                    "parameters": [
+                        {
+                            "name": "{ db }",
+                            "cidl_type": {
+                                "Inject": "Env"
+                            }
+                        },
+                        {
+                            "name": "id",
+                            "cidl_type": "Integer"
+                        }
+                    ]
+                }
+            },
+            "data_sources": {},
+            "source_path": "./seed__middleware.cloesce.ts"
+        }
+    },
+    "poos": {},
+    "middleware": {
+        "class_name": "TestMiddleWare",
+        "method": {
+            "name": "handle",
+            "parameters": []
+        },
+        "source_path": "./seed__middleware.cloesce.ts"
+    }
+}

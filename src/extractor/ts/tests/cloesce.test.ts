@@ -1,12 +1,14 @@
 import { describe, test, expect, vi } from "vitest";
 import { _cloesceInternal } from "../src/cloesce";
 import { CloesceAst, HttpVerb, Model, NamedTypedValue } from "../src/common";
+import { Middleware } from "../src";
 
 const makeAst = (methods: Record<string, any>): CloesceAst => ({
   wrangler_env: {
     name: "",
     source_path: "./",
   },
+  middleware: null,
   version: "",
   project_name: "",
   language: "TypeScript",
@@ -151,6 +153,7 @@ describe("Validate Request Error States", () => {
         wrangler_env: { name: "", source_path: "./" },
         version: "",
         project_name: "",
+        middleware: null,
         language: "TypeScript",
         poos: {},
       },
@@ -196,6 +199,7 @@ describe("Validate Request Error States", () => {
         project_name: "",
         language: "TypeScript",
         poos: {},
+        middleware: null,
       },
       {
         name: "",
@@ -396,6 +400,7 @@ describe("modelsFromSql", () => {
     project_name: "",
     language: "TypeScript",
     poos: {},
+    middleware: null,
   };
 
   test("returns empty array if no records", () => {
@@ -736,6 +741,7 @@ describe("methodDispatch", () => {
       project_name: "",
       language: "TypeScript",
       poos: {},
+      middleware: null,
     };
 
     // Simulate a view result with nested data: Horse -> likes (Like[]) -> horse2 (Horse)

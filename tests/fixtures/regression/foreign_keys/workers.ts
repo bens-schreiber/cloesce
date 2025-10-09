@@ -8,6 +8,7 @@ import { Person } from "./seed__foreign_keys.cloesce.ts";
 import { Student } from "./seed__foreign_keys.cloesce.ts";
 
 
+
 const constructorRegistry = {
 	A: A,
 	B: B,
