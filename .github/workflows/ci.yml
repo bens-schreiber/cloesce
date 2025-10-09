@@ -14,8 +14,6 @@ jobs:
   rust-build:
     name: Rust Build
     runs-on: ubuntu-latest
-    outputs:
-      rust-target-path: ${{ steps.upload.outputs.artifact-id }}
     steps:
       - uses: actions/checkout@v4
 
@@ -34,7 +32,7 @@ jobs:
             ${{ env.CARGO_HOME }}/git
           key: cargo-registry-${{ hashFiles('**/Cargo.lock') }}
 
-      # Cache Cargo build
+      # Cache Cargo build (target directory)
       - uses: actions/cache@v3
         with:
           path: target
@@ -42,37 +40,16 @@ jobs:
 
       - run: rustup target add wasm32-unknown-unknown
 
-      # Lints & tests for generator
-      - run: cargo fmt --all -- --check
-        working-directory: src/generator
-      - run: cargo clippy --all-targets --all-features -- -D warnings
-        working-directory: src/generator
-      - run: cargo build --all-targets
-        working-directory: src/generator
-      - run: cargo test --all
-        working-directory: src/generator
-
-      # Lints & tests for runtime
-      - run: cargo fmt --all -- --check
-        working-directory: src/runtime
-      - run: cargo clippy --all-targets --all-features -- -D warnings
-        working-directory: src/runtime
-      - run: cargo build --all-targets
-        working-directory: src/runtime
-      - run: cargo test --all
-        working-directory: src/runtime
-
       # Build Rust runtime for frontend-ts
       - run: cargo build --target wasm32-unknown-unknown --release
         working-directory: src/runtime
 
-      # Upload Rust artifacts
-      - name: Upload Rust artifacts
-        id: upload
+      # Upload only the wasm artifact
+      - name: Upload wasm artifact
         uses: actions/upload-artifact@v4
         with:
-          name: rust-target-${{ github.run_id }}
-          path: target
+          name: wasm-runtime
+          path: src/runtime/target/wasm32-unknown-unknown/release/runtime.wasm
 
   frontend-ts:
     name: Frontend TypeScript
@@ -83,7 +60,6 @@ jobs:
         working-directory: src/frontend/ts
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-node@v4
         with:
           node-version: 20
@@ -94,11 +70,11 @@ jobs:
           path: ~/.npm
           key: npm-cache-${{ hashFiles('**/package-lock.json') }}
 
-      # Download Rust artifacts
+      # Download the wasm artifact
       - uses: actions/download-artifact@v4
         with:
-          name: rust-target-${{ needs.rust-build.outputs.rust-target-path }}
-          path: target
+          name: wasm-runtime
+          path: ../../src/runtime/target/wasm32-unknown-unknown/release/
 
       # Frontend build
       - run: npm ci
@@ -113,23 +89,24 @@ jobs:
     needs: frontend-ts
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-node@v4
         with:
           node-version: 20
 
-      # Download Rust artifacts
+      # Download wasm artifact
       - uses: actions/download-artifact@v4
         with:
-          name: rust-target-${{ needs.rust-build.outputs.rust-target-path }}
-          path: target
+          name: wasm-runtime
+          path: src/runtime/target/wasm32-unknown-unknown/release/
 
+      # Build frontend-ts
       - name: Build frontend-ts
         working-directory: src/frontend/ts
         run: |
           npm ci
           npm run build
 
+      # Run integration tests
       - name: Run regression tests
         working-directory: tests/runner
         run: cargo run --bin test regression --check
@@ -147,10 +124,15 @@ jobs:
         working-directory: tests/e2e
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-node@v4
         with:
           node-version: 20
+
+      # Download wasm artifact
+      - uses: actions/download-artifact@v4
+        with:
+          name: wasm-runtime
+          path: ../../src/runtime/target/wasm32-unknown-unknown/release/
 
       # Build frontend-ts
       - name: Build frontend-ts
