@@ -96,11 +96,15 @@ pub unsafe extern "C" fn object_relational_mapping(
     let json_str = serde_json::to_string(&res).unwrap();
 
     let mut bytes = json_str.into_bytes();
+
+    // Shrink capacity to match length so dealloc() receives the correct allocation size
+    bytes.shrink_to_fit();
     let ptr = bytes.as_mut_ptr();
     unsafe {
         RETURN_LEN = bytes.len();
         std::mem::forget(bytes); // leak so JS can read it
     }
+
     ptr
 }
 

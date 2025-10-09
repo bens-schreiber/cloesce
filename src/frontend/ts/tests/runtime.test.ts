@@ -331,10 +331,12 @@ describe("Validate Request Success States", () => {
       "0",
     );
 
-    expect(result.value).toEqual([
-      { [arg.typed_value.name]: arg.is_get ? String(arg.value) : arg.value },
-      null,
-    ]);
+    expect(result.value).toEqual({
+      params: {
+        [arg.typed_value.name]: arg.is_get ? String(arg.value) : arg.value,
+      },
+      dataSource: null,
+    });
   });
 });
 

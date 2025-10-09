@@ -74,23 +74,30 @@ interface RuntimeWasmExports {
 }
 
 /**
- * Copies a value from TS memory to WASM memory. A subsequent `dealloc` is necessary.
+ * RAII for wasm memory
  */
-function copyToWasm(
-  str: string,
-  wasm: RuntimeWasmExports,
-): { ptr: number; len: number } {
-  const encoder = new TextEncoder();
-  const bytes = encoder.encode(str);
-  const ptr = wasm.alloc(bytes.length);
-  const mem = new Uint8Array(wasm.memory.buffer, ptr, bytes.length);
-  mem.set(bytes);
-  return { ptr, len: bytes.length };
-}
+class WasmResource {
+  constructor(
+    private wasm: RuntimeWasmExports,
+    public ptr: number,
+    public len: number,
+  ) {}
+  free() {
+    this.wasm.dealloc(this.ptr, this.len);
+  }
 
-type WasmInstance = WebAssembly.Instance & {
-  exports: RuntimeWasmExports;
-};
+  /**
+   * Copies a value from TS memory to WASM memory. A subsequent `free` is necessary.
+   */
+  static fromString(str: string, wasm: RuntimeWasmExports): WasmResource {
+    const encoder = new TextEncoder();
+    const bytes = encoder.encode(str);
+    const ptr = wasm.alloc(bytes.length);
+    const mem = new Uint8Array(wasm.memory.buffer, ptr, bytes.length);
+    mem.set(bytes);
+    return new this(wasm, ptr, bytes.length);
+  }
+}
 
 /**
  * Singleton instances of the cidl, constructor registry, and wasm binary.
@@ -109,24 +116,32 @@ class RuntimeContainer {
     constructorRegistry: ModelConstructorRegistry,
     wasm?: WebAssembly.Instance,
   ) {
-    if (!this.instance) {
-      const wasmInstance = (wasm ??
-        (await WebAssembly.instantiate(mod))) as WasmInstance;
-
-      const { ptr, len } = copyToWasm(
-        JSON.stringify(ast.models),
-        wasmInstance.exports,
-      );
-      if (wasmInstance.exports.set_meta_ptr(ptr, len) != 0) {
-        throw Error("The WASM Module failed to load due to an invalid CIDL");
-      }
-
-      this.instance = new RuntimeContainer(
-        ast,
-        constructorRegistry,
-        wasmInstance.exports,
-      );
+    if (this.instance) {
+      return;
     }
+
+    // Load WASM
+    const wasmInstance = (wasm ??
+      (await WebAssembly.instantiate(mod))) as WebAssembly.Instance & {
+      exports: RuntimeWasmExports;
+    };
+
+    const modelMeta = WasmResource.fromString(
+      JSON.stringify(ast.models),
+      wasmInstance.exports,
+    );
+
+    if (wasmInstance.exports.set_meta_ptr(modelMeta.ptr, modelMeta.len) != 0) {
+      modelMeta.free();
+      throw Error("The WASM Module failed to load due to an invalid CIDL");
+    }
+
+    // Intentionally leak `modelMeta`, it should exist for the programs lifetime.
+    this.instance = new RuntimeContainer(
+      ast,
+      constructorRegistry,
+      wasmInstance.exports,
+    );
   }
 
   static get(): RuntimeContainer {
@@ -163,7 +178,7 @@ export async function cloesce(
   if (!validation.ok) {
     return toResponse(validation.value);
   }
-  const [params, dataSource] = validation.value;
+  const { params, dataSource } = validation.value;
 
   // Instantatiate the model
   let instance: object;
@@ -210,6 +225,8 @@ function matchRoute(
 > {
   const url = new URL(request.url);
 
+  // Error state: We expect an exact request format, and expect that the model
+  // and are apart of the CIDL
   const notFound = (e: string) =>
     left(errorState(404, `Path not found: ${e} ${url.pathname}`));
 
@@ -259,7 +276,9 @@ async function validateRequest(
   model: Model,
   method: ModelMethod,
   id: string | null,
-): Promise<Either<HttpResult, [RequestParamMap, string | null]>> {
+): Promise<
+  Either<HttpResult, { params: RequestParamMap; dataSource: string | null }>
+> {
   // Error state: any missing parameter, body, or malformed input will exit with 400.
   const invalidRequest = (e: string) =>
     left(errorState(400, `Invalid Request Body: ${e}`));
@@ -284,12 +303,12 @@ async function validateRequest(
   let dataSource = url.searchParams.get("dataSource");
 
   // Extract url or body parameters
-  let requestBodyMap: RequestParamMap;
+  let params: RequestParamMap;
   if (method.http_verb === "GET") {
-    requestBodyMap = Object.fromEntries(url.searchParams.entries());
+    params = Object.fromEntries(url.searchParams.entries());
   } else {
     try {
-      requestBodyMap = await request.json();
+      params = await request.json();
     } catch {
       return invalidRequest("Could not retrieve JSON body.");
     }
@@ -301,19 +320,19 @@ async function validateRequest(
   }
 
   // Ensure all required params exist
-  if (!requiredParams.every((p) => p.name in requestBodyMap)) {
+  if (!requiredParams.every((p) => p.name in params)) {
     return invalidRequest(`Missing parameters.`);
   }
 
   // Validate all parameters type
   for (const p of requiredParams) {
-    const value = requestBodyMap[p.name];
+    const value = params[p.name];
     if (!validateCidlType(ast, value, p.cidl_type)) {
       return invalidRequest("Invalid parameters.");
     }
   }
 
-  return right([requestBodyMap, dataSource]);
+  return right({ params, dataSource });
 }
 
 /**
@@ -533,36 +552,50 @@ export function modelsFromSql<T extends object>(
 ): T[] {
   const { ast, constructorRegistry, wasm } = RuntimeContainer.get();
 
-  const modelName = copyToWasm(ctor.name, wasm);
-  const rows = copyToWasm(JSON.stringify(records), wasm);
-  const includeTreeJson = copyToWasm(JSON.stringify(includeTree), wasm);
-
-  // Invoke the ORM
-  let resPtr: number;
-  try {
-    resPtr = wasm.object_relational_mapping(
-      modelName.ptr,
-      modelName.len,
-      rows.ptr,
-      rows.len,
-      includeTreeJson.ptr,
-      includeTreeJson.len,
-    );
-  } finally {
-    wasm.dealloc(modelName.ptr, modelName.len);
-    wasm.dealloc(rows.ptr, rows.len);
-    wasm.dealloc(includeTreeJson.ptr, includeTreeJson.len);
-  }
-
-  // Parse the results as JSON
-  const resLen = wasm.get_return_len();
-  const jsonResults: any[] = JSON.parse(
-    new TextDecoder().decode(
-      new Uint8Array(wasm.memory.buffer, resPtr, resLen),
-    ),
+  const modelName = WasmResource.fromString(ctor.name, wasm);
+  const rows = WasmResource.fromString(JSON.stringify(records), wasm);
+  const includeTreeJson = WasmResource.fromString(
+    JSON.stringify(includeTree),
+    wasm,
   );
 
-  // The result that comes back is just JSON, run a DFS on each navigation property
+  // Invoke the ORM
+  const jsonResults: any[] = (() => {
+    let resPtr;
+    let resLen;
+    try {
+      resPtr = wasm.object_relational_mapping(
+        modelName.ptr,
+        modelName.len,
+        rows.ptr,
+        rows.len,
+        includeTreeJson.ptr,
+        includeTreeJson.len,
+      );
+      resLen = wasm.get_return_len();
+
+      // Parse the results as JSON
+      return JSON.parse(
+        new TextDecoder().decode(
+          new Uint8Array(wasm.memory.buffer, resPtr, resLen),
+        ),
+      );
+    } finally {
+      modelName.free();
+      rows.free();
+      includeTreeJson.free();
+
+      // Could resPtr some how be set but not resLen? Kind of a flaw
+      // in how WASM works.
+      if (resPtr && resLen) wasm.dealloc(resPtr, resLen);
+    }
+  })();
+
+  return jsonResults.map((obj: any) =>
+    instantiateDfs(obj, ast.models[ctor.name], includeTree),
+  ) as T[];
+
+  // The result that comes back is just raw JSON, run a DFS on each navigation property
   // in the include tree provided, instantiating each object via constructor registry.
   function instantiateDfs(
     m: any,
@@ -600,10 +633,6 @@ export function modelsFromSql<T extends object>(
 
     return m;
   }
-
-  return jsonResults.map((obj: any) =>
-    instantiateDfs(obj, ast.models[ctor.name], includeTree),
-  ) as T[];
 }
 
 function errorState(status: number, message: string): HttpResult {
