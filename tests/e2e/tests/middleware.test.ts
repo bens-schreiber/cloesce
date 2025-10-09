@@ -20,11 +20,11 @@ describe("Middleware Tests", () => {
     expect(res.ok, withRes("Middleware should block request", res)).toBe(false);
     expect(
       res.status,
-      withRes("Middleware should return 403 status", res)
+      withRes("Middleware should return 403 status", res),
     ).toBe(403);
     expect(
       res.data,
-      withRes("Middleware should return custom message", res)
+      withRes("Middleware should return custom message", res),
     ).toBe("Should return 403 in E2E");
   });
 
