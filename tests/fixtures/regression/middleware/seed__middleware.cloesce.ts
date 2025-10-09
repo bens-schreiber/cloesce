@@ -33,13 +33,20 @@ export class House {
 
 @Middleware
 export class TestMiddleWare {
-  async handle(): Promise<HttpResult<string>> {
+  async handle(): Promise<Response> {
     return this.testMiddleware();
   }
 
-  async testMiddleware(): Promise<HttpResult<string>> {
-    return { ok: true, data: "test" };
+  async testMiddleware(): Promise<Response> {
+    const result: HttpResult<string> = {
+      ok: false,
+      data: "Should return 403 in E2E",
+      status: 403,
+    };
+
+    return new Response(JSON.stringify(result), {
+      status: 403,
+      headers: { "Content-Type": "application/json" },
+    });
   }
 }
-
-export { House };
