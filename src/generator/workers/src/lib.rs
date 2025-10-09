@@ -1,7 +1,7 @@
 use std::{collections::BTreeMap, path::Path};
 
 use common::{
-    CloesceAst, Model, PlainOldObject, WranglerEnv, Middleware,
+    CloesceAst, Middleware, Model, PlainOldObject, WranglerEnv,
     err::{GeneratorErrorKind, Result},
     fail,
 };
@@ -200,10 +200,11 @@ impl WorkersGenerator {
     ) -> Result<String> {
         let api_route = Self::validate_domain(&domain)?;
 
-        let model_sources = Self::link_models(&ast.models, &ast.poos, &ast.middleware, workers_path);
+        let model_sources =
+            Self::link_models(&ast.models, &ast.poos, &ast.middleware, workers_path);
         let (constructor_registry, instance_registry) =
             Self::registries(&ast.models, &ast.poos, &ast.middleware, &ast.wrangler_env);
-        
+
         let env_name = &ast.wrangler_env.name;
         let middleware_call = Self::middleware_call(&ast.middleware, env_name);
 

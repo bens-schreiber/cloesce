@@ -38,13 +38,16 @@ fn test_sqlite_table_output() {
     // Primary key, Basic attributes
     {
         // Arrange
-        let ast = create_ast(vec![
-            ModelBuilder::new("User")
-                .id() // adds a primary key
-                .attribute("name", CidlType::nullable(CidlType::Text), None)
-                .attribute("age", CidlType::Integer, None)
-                .build(),
-        ], None);
+        let ast = create_ast(
+            vec![
+                ModelBuilder::new("User")
+                    .id() // adds a primary key
+                    .attribute("name", CidlType::nullable(CidlType::Text), None)
+                    .attribute("age", CidlType::Integer, None)
+                    .build(),
+            ],
+            None,
+        );
 
         // Act
         let sql = d1::generate_sql(&ast.models).expect("gen_sqlite to work");
@@ -59,13 +62,16 @@ fn test_sqlite_table_output() {
     // One to One FK's
     {
         // Arrange
-        let ast = create_ast(vec![
-            ModelBuilder::new("Person")
-                .id()
-                .attribute("dogId", CidlType::Integer, Some("Dog".to_string()))
-                .build(),
-            ModelBuilder::new("Dog").id().build(),
-        ], None);
+        let ast = create_ast(
+            vec![
+                ModelBuilder::new("Person")
+                    .id()
+                    .attribute("dogId", CidlType::Integer, Some("Dog".to_string()))
+                    .build(),
+                ModelBuilder::new("Dog").id().build(),
+            ],
+            None,
+        );
 
         // Act
         let sql = d1::generate_sql(&ast.models).expect("gen_sqlite to work");
@@ -80,20 +86,23 @@ fn test_sqlite_table_output() {
     // One to One FK's with Nav Prop
     {
         // Arrange
-        let ast = create_ast(vec![
-            ModelBuilder::new("Person")
-                .id()
-                .attribute("dogId", CidlType::Integer, Some("Dog".into()))
-                .nav_p(
-                    "dog",
-                    "Dog",
-                    NavigationPropertyKind::OneToOne {
-                        reference: "dogId".into(),
-                    },
-                )
-                .build(),
-            ModelBuilder::new("Dog").id().build(),
-        ], None);
+        let ast = create_ast(
+            vec![
+                ModelBuilder::new("Person")
+                    .id()
+                    .attribute("dogId", CidlType::Integer, Some("Dog".into()))
+                    .nav_p(
+                        "dog",
+                        "Dog",
+                        NavigationPropertyKind::OneToOne {
+                            reference: "dogId".into(),
+                        },
+                    )
+                    .build(),
+                ModelBuilder::new("Dog").id().build(),
+            ],
+            None,
+        );
 
         // Act
         let sql = d1::generate_sql(&ast.models).expect("gen_sqlite to work");
@@ -108,44 +117,47 @@ fn test_sqlite_table_output() {
     // One to Many
     {
         // Arrange
-        let ast = create_ast(vec![
-            ModelBuilder::new("Dog")
-                .id()
-                .attribute("personId", CidlType::Integer, Some("Person".into()))
-                .build(),
-            ModelBuilder::new("Cat")
-                .attribute("personId", CidlType::Integer, Some("Person".into()))
-                .id()
-                .build(),
-            ModelBuilder::new("Person")
-                .id()
-                .nav_p(
-                    "dogs",
-                    "Dog",
-                    NavigationPropertyKind::OneToMany {
-                        reference: "personId".into(),
-                    },
-                )
-                .nav_p(
-                    "cats",
-                    "Cat",
-                    NavigationPropertyKind::OneToMany {
-                        reference: "personId".into(),
-                    },
-                )
-                .attribute("bossId", CidlType::Integer, Some("Boss".into()))
-                .build(),
-            ModelBuilder::new("Boss")
-                .id()
-                .nav_p(
-                    "persons",
-                    "Person",
-                    NavigationPropertyKind::OneToMany {
-                        reference: "bossId".into(),
-                    },
-                )
-                .build(),
-        ], None);
+        let ast = create_ast(
+            vec![
+                ModelBuilder::new("Dog")
+                    .id()
+                    .attribute("personId", CidlType::Integer, Some("Person".into()))
+                    .build(),
+                ModelBuilder::new("Cat")
+                    .attribute("personId", CidlType::Integer, Some("Person".into()))
+                    .id()
+                    .build(),
+                ModelBuilder::new("Person")
+                    .id()
+                    .nav_p(
+                        "dogs",
+                        "Dog",
+                        NavigationPropertyKind::OneToMany {
+                            reference: "personId".into(),
+                        },
+                    )
+                    .nav_p(
+                        "cats",
+                        "Cat",
+                        NavigationPropertyKind::OneToMany {
+                            reference: "personId".into(),
+                        },
+                    )
+                    .attribute("bossId", CidlType::Integer, Some("Boss".into()))
+                    .build(),
+                ModelBuilder::new("Boss")
+                    .id()
+                    .nav_p(
+                        "persons",
+                        "Person",
+                        NavigationPropertyKind::OneToMany {
+                            reference: "bossId".into(),
+                        },
+                    )
+                    .build(),
+            ],
+            None,
+        );
 
         // Act
         let sql = d1::generate_sql(&ast.models).expect("gen_sqlite to work");
@@ -175,28 +187,31 @@ fn test_sqlite_table_output() {
     // Many to Many
     {
         // Arrange
-        let ast = create_ast(vec![
-            ModelBuilder::new("Student")
-                .id()
-                .nav_p(
-                    "courses",
-                    "Course",
-                    NavigationPropertyKind::ManyToMany {
-                        unique_id: "StudentsCourses".into(),
-                    },
-                )
-                .build(),
-            ModelBuilder::new("Course")
-                .id()
-                .nav_p(
-                    "students",
-                    "Student",
-                    NavigationPropertyKind::ManyToMany {
-                        unique_id: "StudentsCourses".into(),
-                    },
-                )
-                .build(),
-        ], None);
+        let ast = create_ast(
+            vec![
+                ModelBuilder::new("Student")
+                    .id()
+                    .nav_p(
+                        "courses",
+                        "Course",
+                        NavigationPropertyKind::ManyToMany {
+                            unique_id: "StudentsCourses".into(),
+                        },
+                    )
+                    .build(),
+                ModelBuilder::new("Course")
+                    .id()
+                    .nav_p(
+                        "students",
+                        "Student",
+                        NavigationPropertyKind::ManyToMany {
+                            unique_id: "StudentsCourses".into(),
+                        },
+                    )
+                    .build(),
+            ],
+            None,
+        );
 
         // Act
         let sql = d1::generate_sql(&ast.models).expect("gen_sqlite to work");
@@ -226,25 +241,28 @@ fn test_sqlite_view_output() {
     // One to One
     {
         // Arrange
-        let ast = create_ast(vec![
-            ModelBuilder::new("Person")
-                .id()
-                .attribute("dogId", CidlType::Integer, Some("Dog".into()))
-                .nav_p(
-                    "dog",
-                    "Dog",
-                    NavigationPropertyKind::OneToOne {
-                        reference: "dogId".into(),
-                    },
-                )
-                // Data Source includes Dog nav prop
-                .data_source(
-                    "default",
-                    IncludeTreeBuilder::default().add_node("dog").build(),
-                )
-                .build(),
-            ModelBuilder::new("Dog").id().build(),
-        ], None);
+        let ast = create_ast(
+            vec![
+                ModelBuilder::new("Person")
+                    .id()
+                    .attribute("dogId", CidlType::Integer, Some("Dog".into()))
+                    .nav_p(
+                        "dog",
+                        "Dog",
+                        NavigationPropertyKind::OneToOne {
+                            reference: "dogId".into(),
+                        },
+                    )
+                    // Data Source includes Dog nav prop
+                    .data_source(
+                        "default",
+                        IncludeTreeBuilder::default().add_node("dog").build(),
+                    )
+                    .build(),
+                ModelBuilder::new("Dog").id().build(),
+            ],
+            None,
+        );
 
         // Act
         let sql = d1::generate_sql(&ast.models).expect("gen_sqlite to work");
@@ -259,57 +277,60 @@ fn test_sqlite_view_output() {
     // One to Many
     {
         // Arrange
-        let ast = create_ast(vec![
-            ModelBuilder::new("Dog")
-                .id()
-                .attribute("personId", CidlType::Integer, Some("Person".into()))
-                .build(),
-            ModelBuilder::new("Cat")
-                .attribute("personId", CidlType::Integer, Some("Person".into()))
-                .id()
-                .build(),
-            ModelBuilder::new("Person")
-                .id()
-                .nav_p(
-                    "dogs",
-                    "Dog",
-                    NavigationPropertyKind::OneToMany {
-                        reference: "personId".into(),
-                    },
-                )
-                .nav_p(
-                    "cats",
-                    "Cat",
-                    NavigationPropertyKind::OneToMany {
-                        reference: "personId".into(),
-                    },
-                )
-                .attribute("bossId", CidlType::Integer, Some("Boss".into()))
-                .data_source(
-                    "default",
-                    IncludeTreeBuilder::default()
-                        .add_node("dogs")
-                        .add_node("cats")
-                        .build(),
-                )
-                .build(),
-            ModelBuilder::new("Boss")
-                .id()
-                .nav_p(
-                    "persons",
-                    "Person",
-                    NavigationPropertyKind::OneToMany {
-                        reference: "bossId".into(),
-                    },
-                )
-                .data_source(
-                    "default",
-                    IncludeTreeBuilder::default()
-                        .add_with_children("persons", |b| b.add_node("dogs").add_node("cats"))
-                        .build(),
-                )
-                .build(),
-        ], None);
+        let ast = create_ast(
+            vec![
+                ModelBuilder::new("Dog")
+                    .id()
+                    .attribute("personId", CidlType::Integer, Some("Person".into()))
+                    .build(),
+                ModelBuilder::new("Cat")
+                    .attribute("personId", CidlType::Integer, Some("Person".into()))
+                    .id()
+                    .build(),
+                ModelBuilder::new("Person")
+                    .id()
+                    .nav_p(
+                        "dogs",
+                        "Dog",
+                        NavigationPropertyKind::OneToMany {
+                            reference: "personId".into(),
+                        },
+                    )
+                    .nav_p(
+                        "cats",
+                        "Cat",
+                        NavigationPropertyKind::OneToMany {
+                            reference: "personId".into(),
+                        },
+                    )
+                    .attribute("bossId", CidlType::Integer, Some("Boss".into()))
+                    .data_source(
+                        "default",
+                        IncludeTreeBuilder::default()
+                            .add_node("dogs")
+                            .add_node("cats")
+                            .build(),
+                    )
+                    .build(),
+                ModelBuilder::new("Boss")
+                    .id()
+                    .nav_p(
+                        "persons",
+                        "Person",
+                        NavigationPropertyKind::OneToMany {
+                            reference: "bossId".into(),
+                        },
+                    )
+                    .data_source(
+                        "default",
+                        IncludeTreeBuilder::default()
+                            .add_with_children("persons", |b| b.add_node("dogs").add_node("cats"))
+                            .build(),
+                    )
+                    .build(),
+            ],
+            None,
+        );
 
         // Act
         let sql = d1::generate_sql(&ast.models).expect("gen_sqlite to work");
@@ -329,36 +350,39 @@ fn test_sqlite_view_output() {
     // Many to Many
     {
         // Arrange
-        let ast = create_ast(vec![
-            ModelBuilder::new("Student")
-                .id()
-                .nav_p(
-                    "courses",
-                    "Course".to_string(),
-                    NavigationPropertyKind::ManyToMany {
-                        unique_id: "StudentsCourses".into(),
-                    },
-                )
-                .data_source(
-                    "default",
-                    IncludeTreeBuilder::default().add_node("courses").build(),
-                )
-                .build(),
-            ModelBuilder::new("Course")
-                .id()
-                .nav_p(
-                    "students",
-                    "Student".to_string(),
-                    NavigationPropertyKind::ManyToMany {
-                        unique_id: "StudentsCourses".into(),
-                    },
-                )
-                .data_source(
-                    "default",
-                    IncludeTreeBuilder::default().add_node("students").build(),
-                )
-                .build(),
-        ], None);
+        let ast = create_ast(
+            vec![
+                ModelBuilder::new("Student")
+                    .id()
+                    .nav_p(
+                        "courses",
+                        "Course".to_string(),
+                        NavigationPropertyKind::ManyToMany {
+                            unique_id: "StudentsCourses".into(),
+                        },
+                    )
+                    .data_source(
+                        "default",
+                        IncludeTreeBuilder::default().add_node("courses").build(),
+                    )
+                    .build(),
+                ModelBuilder::new("Course")
+                    .id()
+                    .nav_p(
+                        "students",
+                        "Student".to_string(),
+                        NavigationPropertyKind::ManyToMany {
+                            unique_id: "StudentsCourses".into(),
+                        },
+                    )
+                    .data_source(
+                        "default",
+                        IncludeTreeBuilder::default().add_node("students").build(),
+                    )
+                    .build(),
+            ],
+            None,
+        );
 
         // Act
         let sql = d1::generate_sql(&ast.models).expect("gen_sqlite to work");
@@ -434,20 +458,23 @@ fn test_sqlite_view_output() {
 fn test_cycle_detection_error() {
     // Arrange
     // A -> B -> C -> A
-    let ast = create_ast(vec![
-        ModelBuilder::new("A")
-            .id()
-            .attribute("bId", CidlType::Integer, Some("B".to_string()))
-            .build(),
-        ModelBuilder::new("B")
-            .id()
-            .attribute("cId", CidlType::Integer, Some("C".to_string()))
-            .build(),
-        ModelBuilder::new("C")
-            .id()
-            .attribute("aId", CidlType::Integer, Some("A".to_string()))
-            .build(),
-    ], None);
+    let ast = create_ast(
+        vec![
+            ModelBuilder::new("A")
+                .id()
+                .attribute("bId", CidlType::Integer, Some("B".to_string()))
+                .build(),
+            ModelBuilder::new("B")
+                .id()
+                .attribute("cId", CidlType::Integer, Some("C".to_string()))
+                .build(),
+            ModelBuilder::new("C")
+                .id()
+                .attribute("aId", CidlType::Integer, Some("A".to_string()))
+                .build(),
+        ],
+        None,
+    );
 
     // Act
 
@@ -465,24 +492,27 @@ fn test_cycle_detection_error() {
 fn test_nullability_prevents_cycle_error() {
     // Arrange
     // A -> B -> C -> Nullable<A>
-    let ast = create_ast(vec![
-        ModelBuilder::new("A")
-            .id()
-            .attribute("bId", CidlType::Integer, Some("B".to_string()))
-            .build(),
-        ModelBuilder::new("B")
-            .id()
-            .attribute("cId", CidlType::Integer, Some("C".to_string()))
-            .build(),
-        ModelBuilder::new("C")
-            .id()
-            .attribute(
-                "aId",
-                CidlType::nullable(CidlType::Integer),
-                Some("A".to_string()),
-            )
-            .build(),
-    ], None);
+    let ast = create_ast(
+        vec![
+            ModelBuilder::new("A")
+                .id()
+                .attribute("bId", CidlType::Integer, Some("B".to_string()))
+                .build(),
+            ModelBuilder::new("B")
+                .id()
+                .attribute("cId", CidlType::Integer, Some("C".to_string()))
+                .build(),
+            ModelBuilder::new("C")
+                .id()
+                .attribute(
+                    "aId",
+                    CidlType::nullable(CidlType::Integer),
+                    Some("A".to_string()),
+                )
+                .build(),
+        ],
+        None,
+    );
 
     // Act
 
@@ -493,19 +523,22 @@ fn test_nullability_prevents_cycle_error() {
 #[test]
 fn test_one_to_one_nav_property_unknown_attribute_reference_error() {
     // Arrange
-    let ast = create_ast(vec![
-        ModelBuilder::new("Dog").id().build(),
-        ModelBuilder::new("Person")
-            .id()
-            .nav_p(
-                "dog",
-                "Dog",
-                NavigationPropertyKind::OneToOne {
-                    reference: "dogId".to_string(),
-                },
-            )
-            .build(),
-    ], None);
+    let ast = create_ast(
+        vec![
+            ModelBuilder::new("Dog").id().build(),
+            ModelBuilder::new("Person")
+                .id()
+                .nav_p(
+                    "dog",
+                    "Dog",
+                    NavigationPropertyKind::OneToOne {
+                        reference: "dogId".to_string(),
+                    },
+                )
+                .build(),
+        ],
+        None,
+    );
 
     // Act
     let err = d1::generate_sql(&ast.models).unwrap_err();
@@ -520,21 +553,24 @@ fn test_one_to_one_nav_property_unknown_attribute_reference_error() {
 #[test]
 fn test_one_to_one_mismatched_fk_and_nav_type_error() {
     // Arrange: attribute dogId references Dog, but nav prop type is Cat -> mismatch
-    let ast = create_ast(vec![
-        ModelBuilder::new("Dog").id().build(),
-        ModelBuilder::new("Cat").id().build(),
-        ModelBuilder::new("Person")
-            .id()
-            .attribute("dogId", CidlType::Integer, Some("Dog".into()))
-            .nav_p(
-                "dog",
-                "Cat", // incorrect: says Cat but fk points to Dog
-                NavigationPropertyKind::OneToOne {
-                    reference: "dogId".to_string(),
-                },
-            )
-            .build(),
-    ], None);
+    let ast = create_ast(
+        vec![
+            ModelBuilder::new("Dog").id().build(),
+            ModelBuilder::new("Cat").id().build(),
+            ModelBuilder::new("Person")
+                .id()
+                .attribute("dogId", CidlType::Integer, Some("Dog".into()))
+                .nav_p(
+                    "dog",
+                    "Cat", // incorrect: says Cat but fk points to Dog
+                    NavigationPropertyKind::OneToOne {
+                        reference: "dogId".to_string(),
+                    },
+                )
+                .build(),
+        ],
+        None,
+    );
 
     // Act
     let err = d1::generate_sql(&ast.models).unwrap_err();
@@ -550,19 +586,22 @@ fn test_one_to_one_mismatched_fk_and_nav_type_error() {
 fn test_one_to_many_unresolved_reference_error() {
     // Arrange:
     // Person declares OneToMany to Dog referencing Dog.personId, but Dog has no personId FK attr.
-    let ast = create_ast(vec![
-        ModelBuilder::new("Dog").id().build(), // no personId attribute
-        ModelBuilder::new("Person")
-            .id()
-            .nav_p(
-                "dogs",
-                "Dog",
-                NavigationPropertyKind::OneToMany {
-                    reference: "personId".into(),
-                },
-            )
-            .build(),
-    ], None);
+    let ast = create_ast(
+        vec![
+            ModelBuilder::new("Dog").id().build(), // no personId attribute
+            ModelBuilder::new("Person")
+                .id()
+                .nav_p(
+                    "dogs",
+                    "Dog",
+                    NavigationPropertyKind::OneToMany {
+                        reference: "personId".into(),
+                    },
+                )
+                .build(),
+        ],
+        None,
+    );
 
     // Act
     let err = d1::generate_sql(&ast.models).unwrap_err();
@@ -578,20 +617,23 @@ fn test_one_to_many_unresolved_reference_error() {
 fn test_junction_table_builder_errors() {
     // Missing second nav property case: only one side of many-to-many
     {
-        let ast = create_ast(vec![
-            ModelBuilder::new("Student")
-                .id()
-                .nav_p(
-                    "courses",
-                    "Course",
-                    NavigationPropertyKind::ManyToMany {
-                        unique_id: "OnlyOne".into(),
-                    },
-                )
-                .build(),
-            // Course exists, but doesn't declare the reciprocal nav property
-            ModelBuilder::new("Course").id().build(),
-        ], None);
+        let ast = create_ast(
+            vec![
+                ModelBuilder::new("Student")
+                    .id()
+                    .nav_p(
+                        "courses",
+                        "Course",
+                        NavigationPropertyKind::ManyToMany {
+                            unique_id: "OnlyOne".into(),
+                        },
+                    )
+                    .build(),
+                // Course exists, but doesn't declare the reciprocal nav property
+                ModelBuilder::new("Course").id().build(),
+            ],
+            None,
+        );
 
         let err = d1::generate_sql(&ast.models).unwrap_err();
         assert!(matches!(
@@ -602,39 +644,42 @@ fn test_junction_table_builder_errors() {
 
     // Too many models case: three models register the same junction id
     {
-        let ast = create_ast(vec![
-            ModelBuilder::new("A")
-                .id()
-                .nav_p(
-                    "bs",
-                    "B",
-                    NavigationPropertyKind::ManyToMany {
-                        unique_id: "TriJ".into(),
-                    },
-                )
-                .build(),
-            ModelBuilder::new("B")
-                .id()
-                .nav_p(
-                    "as",
-                    "A",
-                    NavigationPropertyKind::ManyToMany {
-                        unique_id: "TriJ".into(),
-                    },
-                )
-                .build(),
-            // Third model C tries to use the same junction id -> should error
-            ModelBuilder::new("C")
-                .id()
-                .nav_p(
-                    "as",
-                    "A",
-                    NavigationPropertyKind::ManyToMany {
-                        unique_id: "TriJ".into(),
-                    },
-                )
-                .build(),
-        ], None);
+        let ast = create_ast(
+            vec![
+                ModelBuilder::new("A")
+                    .id()
+                    .nav_p(
+                        "bs",
+                        "B",
+                        NavigationPropertyKind::ManyToMany {
+                            unique_id: "TriJ".into(),
+                        },
+                    )
+                    .build(),
+                ModelBuilder::new("B")
+                    .id()
+                    .nav_p(
+                        "as",
+                        "A",
+                        NavigationPropertyKind::ManyToMany {
+                            unique_id: "TriJ".into(),
+                        },
+                    )
+                    .build(),
+                // Third model C tries to use the same junction id -> should error
+                ModelBuilder::new("C")
+                    .id()
+                    .nav_p(
+                        "as",
+                        "A",
+                        NavigationPropertyKind::ManyToMany {
+                            unique_id: "TriJ".into(),
+                        },
+                    )
+                    .build(),
+            ],
+            None,
+        );
 
         let err = d1::generate_sql(&ast.models).unwrap_err();
         assert!(matches!(

@@ -1,9 +1,9 @@
 use std::{collections::BTreeMap, path::PathBuf};
 
 use crate::{
-    CidlType, CloesceAst, DataSource, HttpVerb, IncludeTree, InputLanguage, Model, ModelAttribute,
-    ModelMethod, NamedTypedValue, NavigationProperty, NavigationPropertyKind, WranglerEnv,
-    Middleware, MiddlewareMethod,
+    CidlType, CloesceAst, DataSource, HttpVerb, IncludeTree, InputLanguage, Middleware,
+    MiddlewareMethod, Model, ModelAttribute, ModelMethod, NamedTypedValue, NavigationProperty,
+    NavigationPropertyKind, WranglerEnv,
 };
 
 pub fn create_ast(mut models: Vec<Model>, middleware: Option<Middleware>) -> CloesceAst {
