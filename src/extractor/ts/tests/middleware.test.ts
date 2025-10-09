@@ -40,7 +40,7 @@ describe("Middleware Extraction", () => {
       expect(result.value.middleware?.method.name).toBe("handle");
       expect(result.value.middleware?.method.parameters).toHaveLength(1);
       expect(result.value.middleware?.method.parameters[0].name).toBe(
-        "request",
+        "request"
       );
     }
   });
@@ -103,15 +103,15 @@ describe("Middleware Extraction", () => {
       expect(result.value.middleware?.method.parameters).toHaveLength(3);
 
       expect(result.value.middleware?.method.parameters[0].name).toBe(
-        "request",
+        "request"
       );
       expect(result.value.middleware?.method.parameters[1].name).toBe("token");
       expect(result.value.middleware?.method.parameters[1].cidl_type).toBe(
-        "Text",
+        "Text"
       );
       expect(result.value.middleware?.method.parameters[2].name).toBe("userId");
       expect(result.value.middleware?.method.parameters[2].cidl_type).toBe(
-        "Integer",
+        "Integer"
       );
     }
   });
@@ -158,7 +158,7 @@ describe("Middleware Extraction", () => {
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.value.code).toBe(
-        ExtractorErrorCode.MissingMiddlewareMethod,
+        ExtractorErrorCode.MissingMiddlewareMethod
       );
       expect(result.value.context).toContain("AuthMiddleware");
       expect(result.value.context).toContain("handle");
