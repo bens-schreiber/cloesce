@@ -178,40 +178,40 @@ async function runExtractor(opts: {
   truncateSourcePaths?: boolean;
   silent?: boolean;
 }) {
-  const baseDir =
-    opts.inp || opts.location
-      ? path.resolve(opts.inp || opts.location!)
-      : process.cwd();
-  const projectRoot = findProjectRoot(baseDir);
+
+  // Use cwd as the base, unless inp is provided
+  const root = process.cwd();
+  
+  // Find project root for metadata (package.json, config)
+  const projectRoot = findProjectRoot(root);
   const config = loadCloesceConfig(projectRoot);
 
-  // Merge config with CLI options
-  const searchPaths = config.paths ?? [opts.inp || "./"];
+  // Determine search paths - use inp if provided, otherwise use config paths or default
+  const searchPaths = opts.inp ? [opts.inp] : (config.paths ?? [root]);
+  
   const outputDir = config.outputDir ?? ".generated";
-  const outPath = path.resolve(opts.out ?? path.join(outputDir, "cidl.json"));
-  const truncate =
-    opts.truncateSourcePaths ?? config.truncateSourcePaths ?? false;
+  const outPath = opts.out ?? path.join(outputDir, "cidl.json");
+  const truncate = opts.truncateSourcePaths ?? config.truncateSourcePaths ?? false;
   const cloesceProjectName =
-    opts.projectName ??
-    config.projectName ??
-    readPackageJsonProjectName(projectRoot);
+    opts.projectName ?? config.projectName ?? readPackageJsonProjectName(projectRoot);
 
   const files = findCloesceFiles(projectRoot, searchPaths);
+  
   if (files.length === 0) {
     throw new Error(
-      `No .cloesce.ts files found in specified paths: ${searchPaths.join(", ")}`,
+      `No .cloesce.ts files found in specified paths: ${searchPaths.join(", ")}`
     );
   }
 
-  if (!opts.silent) {
-    console.log(`🔍 Found ${files.length} .cloesce.ts files`);
-  }
+  if (!opts.silent) console.log(`🔍 Found ${files.length} .cloesce.ts files`);
 
   const project = new Project({
     compilerOptions: {
       strictNullChecks: true,
     },
   });
+  files.forEach((f) => project.addSourceFileAtPath(f));
+
   files.forEach((f) => project.addSourceFileAtPath(f));
 
   try {
