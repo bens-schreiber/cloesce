@@ -33,9 +33,8 @@ export class PooAcceptYield {
             c
       })
     });
-
     let raw = await res.json();
-    if (!raw.ok) {
+    if (!res.ok) {
       return raw;
     }
     return raw;
@@ -53,9 +52,8 @@ export class PooAcceptYield {
       body: JSON.stringify({
       })
     });
-
     let raw = await res.json();
-    if (!raw.ok) {
+    if (!res.ok) {
       return raw;
     }
     raw.data = Object.assign(new PooC(), raw.data);

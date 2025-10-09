@@ -20,7 +20,8 @@
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20250906.0",
     "prettier": "^3.6.2",
-    "vitest": "^3.2.4"
+    "vitest": "^3.2.4",
+    "vite-plugin-wasm": "^3.5.0"
   },
   "bin": {
     "cloesce": "./dist/cli.js"

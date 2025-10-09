@@ -20,9 +20,8 @@ export class A {
             a
       })
     });
-
     let raw = await res.json();
-    if (!raw.ok) {
+    if (!res.ok) {
       return raw;
     }
     raw.data = Object.assign(new A(), raw.data);
@@ -36,9 +35,8 @@ export class A {
       baseUrl.searchParams.append("dataSource", dataSource);
     }
     const res = await fetch(baseUrl, { method: "GET" });
-
     let raw = await res.json();
-    if (!raw.ok) {
+    if (!res.ok) {
       return raw;
     }
     raw.data = Object.assign(new A(), raw.data);
@@ -78,9 +76,8 @@ export class Person {
             person
       })
     });
-
     let raw = await res.json();
-    if (!raw.ok) {
+    if (!res.ok) {
       return raw;
     }
     raw.data = Object.assign(new Person(), raw.data);
@@ -94,9 +91,8 @@ export class Person {
       baseUrl.searchParams.append("dataSource", dataSource);
     }
     const res = await fetch(baseUrl, { method: "GET" });
-
     let raw = await res.json();
-    if (!raw.ok) {
+    if (!res.ok) {
       return raw;
     }
     raw.data = Object.assign(new Person(), raw.data);
@@ -122,9 +118,8 @@ export class Student {
             student
       })
     });
-
     let raw = await res.json();
-    if (!raw.ok) {
+    if (!res.ok) {
       return raw;
     }
     raw.data = Object.assign(new Student(), raw.data);
@@ -138,9 +133,8 @@ export class Student {
       baseUrl.searchParams.append("dataSource", dataSource);
     }
     const res = await fetch(baseUrl, { method: "GET" });
-
     let raw = await res.json();
-    if (!raw.ok) {
+    if (!res.ok) {
       return raw;
     }
     raw.data = Object.assign(new Student(), raw.data);

@@ -1,7 +1,4 @@
-import {
-  D1Database,
-  D1PreparedStatement,
-} from "@cloudflare/workers-types/experimental/index.js";
+import { D1Database } from "@cloudflare/workers-types/experimental/index.js";
 import {
   HttpResult,
   Either,
@@ -16,6 +13,7 @@ import {
   CidlIncludeTree,
 } from "./common.js";
 import { IncludeTree } from "./index.js";
+import mod from "../../../runtime/target/wasm32-unknown-unknown/release/runtime.wasm";
 
 /**
  * A map of model names to their respective constructor.
@@ -32,28 +30,6 @@ type ModelConstructorRegistry = Record<string, new () => UserDefinedModel>;
  * guaranteed to contain all injected model method parameters.
  */
 type InstanceRegistry = Map<string, any>;
-
-/**
- * Singleton instances of the MetaCidl and Constructor Registry.
- * These values are guaranteed to never change throughout a workers lifetime.
- */
-class MetaContainer {
-  private static instance: MetaContainer | undefined;
-  private constructor(
-    public readonly ast: CloesceAst,
-    public readonly constructorRegistry: ModelConstructorRegistry
-  ) {}
-
-  static init(ast: CloesceAst, constructorRegistry: ModelConstructorRegistry) {
-    if (!this.instance) {
-      this.instance = new MetaContainer(ast, constructorRegistry);
-    }
-  }
-
-  static get(): MetaContainer {
-    return this.instance!;
-  }
-}
 
 /**
  * Users will create Cloesce models, which have metadata for them in the ast.
@@ -77,32 +53,48 @@ interface MetaWranglerEnv {
   dbName: string; // TODO: support many db's
 }
 
-/**
- * Creates model instances given a properly formatted SQL record
- * (either a foreign-key-less model or derived from a Cloesce generated view)
- * @param ctor The type of the model
- * @param records SQL records
- * @param includeTree The include tree to use when parsing the records
- * @returns
- */
-export function modelsFromSql<T>(
-  ctor: new () => T,
-  records: Record<string, any>[],
-  includeTree: IncludeTree<T> | null
-): T[] {
-  const { ast, constructorRegistry } = MetaContainer.get();
-  return _modelsFromSql(
-    ctor.name,
-    ast,
-    constructorRegistry,
-    records,
-    includeTree
-  ) as T[];
+interface MatchedRoute {
+  model: Model;
+  method: ModelMethod;
+  id: string | null;
 }
 
 /**
- * Cloesce entry point. Given a request, undergoes routing, validating,
+ * Singleton instances of the cidl, constructor registry, and wasm binary
+ * These values are guaranteed to never change throughout a program lifetime
+ */
+class RuntimeContainer {
+  private static instance: RuntimeContainer | undefined;
+  private constructor(
+    public readonly ast: CloesceAst,
+    public readonly constructorRegistry: ModelConstructorRegistry,
+    public readonly wasm: WebAssembly.Instance
+  ) {}
+
+  static async init(
+    ast: CloesceAst,
+    constructorRegistry: ModelConstructorRegistry,
+    wasm?: WebAssembly.Instance
+  ) {
+    if (!this.instance) {
+      const wasmInstance = wasm ? wasm : await WebAssembly.instantiate(mod);
+      this.instance = new RuntimeContainer(
+        ast,
+        constructorRegistry,
+        wasmInstance
+      );
+    }
+  }
+
+  static get(): RuntimeContainer {
+    return this.instance!;
+  }
+}
+
+/**
+ * Cloesce entry point. Given a request, undergoes: routing, validating,
  * hydrating, and method dispatch.
+ *
  * @param ast The CIDL AST
  * @param constructorRegistry A mapping of user defined class names to their respective constructor
  * @param instanceRegistry A mapping of a dependency class name to its instantiated object.
@@ -119,7 +111,7 @@ export async function cloesce(
   envMeta: MetaWranglerEnv,
   api_route: string
 ): Promise<Response> {
-  MetaContainer.init(ast, constructorRegistry);
+  await RuntimeContainer.init(ast, constructorRegistry);
   const d1: D1Database = instanceRegistry.get(envMeta.envName)[envMeta.dbName];
 
   // Match the route to a model method
@@ -142,7 +134,6 @@ export async function cloesce(
     instance = constructorRegistry[model.name];
   } else {
     const successfulModel = await hydrateModel(
-      ast,
       constructorRegistry,
       d1,
       model,
@@ -295,7 +286,6 @@ async function validateRequest(
  * @returns The instantiated model on success
  */
 async function hydrateModel(
-  ast: CloesceAst,
   constructorRegistry: ModelConstructorRegistry,
   d1: D1Database,
   model: Model,
@@ -340,15 +330,11 @@ async function hydrateModel(
     dataSource !== null ? model.data_sources[dataSource].tree : {};
 
   // Hydrate
-  const models: object[] = _modelsFromSql(
-    model.name,
-    ast,
-    constructorRegistry,
+  const models: object[] = modelsFromSql(
+    constructorRegistry[model.name],
     records.results,
     includeTree
   );
-
-  console.log(JSON.stringify(models));
 
   return right(models[0]);
 }
@@ -492,197 +478,101 @@ function validateCidlType(
 }
 
 /**
- * Actual implementation of sql to model mapping.
+ * Creates model instances given a properly formatted SQL record, being either:
  *
- * TODO: If we don't want to write this in every language, would it be possible to create a
- * single WASM binary for this method?
+ *  1. Flat, relationship-less (ex: id, name, location, ...)
+ *  2. `DataSource` formatted (ex: Horse.id, Horse.name, Horse.rider, ...)
  *
- * @throws generic errors if the metadata is missing some value
+ * @param ctor The type of the model
+ * @param records SQL records
+ * @param includeTree The include tree to use when parsing the records
+ * @returns An instantiated array of `T`, containing one or more objects.
  */
-// Main function that creates instances from SQL records
-function _modelsFromSql(
-  modelName: string,
-  ast: CloesceAst,
-  constructorRegistry: ModelConstructorRegistry,
+export function modelsFromSql<T extends object>(
+  ctor: new () => T,
   records: Record<string, any>[],
-  includeTree: Record<string, UserDefinedModel> | null
-): any[] {
-  const model = ast.models[modelName];
-  if (!model) return [];
+  includeTree: IncludeTree<T> | null
+): T[] {
+  const { ast, constructorRegistry, wasm } = RuntimeContainer.get();
+  const { memory, alloc, dealloc, object_relational_mapping, get_return_len } =
+    wasm.exports as any;
 
-  const Constructor = constructorRegistry[modelName];
-  if (!Constructor) return [];
-
-  const pkName = model.primary_key.name;
-  const resultMap = new Map<any, any>();
-
-  for (const record of records) {
-    const pkValue = record[`${modelName}.${pkName}`] ?? record[pkName];
-    if (pkValue == null) continue;
-
-    let instance = resultMap.get(pkValue);
-
-    if (!instance) {
-      instance = new Constructor();
-      instance[pkName] = pkValue;
-
-      // Set scalar attributes
-      for (const attr of model.attributes) {
-        const attrName = attr.value.name;
-        const prefixedKey = `${modelName}.${attrName}`;
-        const nonPrefixedKey = attrName;
-
-        if (prefixedKey in record) {
-          instance[attrName] = record[prefixedKey];
-        } else if (nonPrefixedKey in record) {
-          instance[attrName] = record[nonPrefixedKey];
-        }
-      }
-
-      // Initialize ALL navigation properties at root level
-      // If not in include tree, initialize OneToMany and ManyToMany as empty arrays
-      for (const navProp of model.navigation_properties) {
-        if ("OneToMany" in navProp.kind || "ManyToMany" in navProp.kind) {
-          // Always initialize OneToMany and ManyToMany as empty arrays
-          instance[navProp.var_name] = [];
-        }
-        // OneToOne properties left as undefined unless populated
-      }
-
-      resultMap.set(pkValue, instance);
-    }
-
-    // Process navigation properties that are in the include tree
-    if (includeTree) {
-      processNavigationProperties(
-        instance,
-        model,
-        modelName,
-        includeTree,
-        record,
-        ast,
-        constructorRegistry
-      );
-    }
+  function copyToWasm(str: string) {
+    const encoder = new TextEncoder();
+    const bytes = encoder.encode(str);
+    const ptr = alloc(bytes.length);
+    const mem = new Uint8Array(memory.buffer, ptr, bytes.length);
+    mem.set(bytes);
+    return { ptr, len: bytes.length };
   }
 
-  return Array.from(resultMap.values());
-}
+  const modelName = copyToWasm(ctor.name);
+  const meta = copyToWasm(JSON.stringify(ast.models));
+  const rows = copyToWasm(JSON.stringify(records));
+  const includeTreeJson = copyToWasm(JSON.stringify(includeTree));
 
-function processNavigationProperties(
-  instance: any,
-  model: any,
-  prefix: string,
-  includeTree: Record<string, UserDefinedModel>,
-  record: Record<string, any>,
-  ast: CloesceAst,
-  constructorRegistry: ModelConstructorRegistry
-): void {
-  for (const navProp of model.navigation_properties) {
-    if (!(navProp.var_name in includeTree)) {
-      continue;
+  const resPtr = object_relational_mapping(
+    modelName.ptr,
+    modelName.len,
+    meta.ptr,
+    meta.len,
+    rows.ptr,
+    rows.len,
+    includeTreeJson.ptr,
+    includeTreeJson.len
+  );
+
+  const resLen = get_return_len();
+
+  dealloc(modelName);
+  dealloc(meta);
+  dealloc(rows);
+  dealloc(includeTreeJson);
+
+  const result: any[] = JSON.parse(
+    new TextDecoder().decode(new Uint8Array(memory.buffer, resPtr, resLen))
+  );
+
+  function instantiateRecursively(
+    m: any,
+    meta: Model,
+    includeTree: IncludeTree<any> | null
+  ) {
+    m = Object.assign(new constructorRegistry[meta.name](), m);
+
+    if (!includeTree) {
+      return m;
     }
 
-    const nestedModel = ast.models[navProp.model_name];
-    if (!nestedModel) {
-      continue;
-    }
+    for (const navProp of meta.navigation_properties) {
+      const nestedIncludeTree = includeTree[navProp.var_name];
+      if (!nestedIncludeTree) continue;
 
-    // Extract nested model's primary key - check both prefixed and non-prefixed
-    const nestedPkName = nestedModel.primary_key.name;
-    const prefixedNestedPkKey = `${prefix}.${navProp.var_name}.${nestedPkName}`;
-    const nonPrefixedNestedPkKey = `${navProp.var_name}.${nestedPkName}`;
-    const nestedPkValue =
-      record[prefixedNestedPkKey] ?? record[nonPrefixedNestedPkKey];
+      const nestedMeta = ast.models[navProp.model_name];
+      const value = m[navProp.var_name];
 
-    if (nestedPkValue == null) {
-      continue; // No nested object in this row
-    }
-
-    // Determine if this is OneToMany/ManyToMany or OneToOne
-    const isOneToMany =
-      "OneToMany" in navProp.kind || "ManyToMany" in navProp.kind;
-
-    // Check if we already added this nested object (for OneToMany)
-    if (isOneToMany) {
-      const navArray = instance[navProp.var_name];
-      const alreadyExists = navArray.some(
-        (item: any) => item[nestedPkName] === nestedPkValue
-      );
-      if (alreadyExists) {
-        continue;
+      // One to Many, Many to Many
+      if (Array.isArray(value)) {
+        m[navProp.var_name] = value.map((child: any) =>
+          instantiateRecursively(child, nestedMeta, nestedIncludeTree)
+        );
       }
-    } else {
-      // For OneToOne, check if already set
-      if (instance[navProp.var_name] != null) {
-        continue;
-      }
-    }
-
-    const NestedConstructor = constructorRegistry[navProp.model_name];
-    if (!NestedConstructor) {
-      continue;
-    }
-
-    const nestedInstance = new NestedConstructor();
-    nestedInstance[nestedPkName] = nestedPkValue;
-
-    // Assign nested scalar attributes - check both prefixed and non-prefixed
-    for (const nestedAttr of nestedModel.attributes) {
-      const nestedAttrName = nestedAttr.value.name;
-      const prefixedKey = `${prefix}.${navProp.var_name}.${nestedAttrName}`;
-      const nonPrefixedKey = `${navProp.var_name}.${nestedAttrName}`;
-
-      // Check prefixed key first, then non-prefixed
-      if (prefixedKey in record) {
-        nestedInstance[nestedAttrName] = record[prefixedKey];
-      } else if (nonPrefixedKey in record) {
-        nestedInstance[nestedAttrName] = record[nonPrefixedKey];
+      // One to one
+      else if (value) {
+        m[navProp.var_name] = instantiateRecursively(
+          value,
+          nestedMeta,
+          nestedIncludeTree
+        );
       }
     }
 
-    // Initialize ALL navigation properties on the nested instance
-    // If not in include tree, initialize OneToMany and ManyToMany as empty arrays
-    const nestedIncludeTree = includeTree[navProp.var_name];
-    for (const nestedNavProp of nestedModel.navigation_properties) {
-      const isInIncludeTree =
-        nestedIncludeTree &&
-        typeof nestedIncludeTree === "object" &&
-        nestedNavProp.var_name in nestedIncludeTree;
-
-      if (
-        "OneToMany" in nestedNavProp.kind ||
-        "ManyToMany" in nestedNavProp.kind
-      ) {
-        // Always initialize OneToMany and ManyToMany as arrays (empty if not in include tree)
-        nestedInstance[nestedNavProp.var_name] = [];
-      } else if (!isInIncludeTree) {
-        // OneToOne not in include tree - leave as undefined or null
-        // Will be set during recursive processing if in include tree
-      }
-    }
-
-    // Recursively process nested navigation properties that are in the include tree
-    if (nestedIncludeTree && typeof nestedIncludeTree === "object") {
-      processNavigationProperties(
-        nestedInstance,
-        nestedModel,
-        `${prefix}.${navProp.var_name}`,
-        nestedIncludeTree,
-        record,
-        ast,
-        constructorRegistry
-      );
-    }
-
-    // Assign the nested instance based on relationship type
-    if (isOneToMany) {
-      instance[navProp.var_name].push(nestedInstance);
-    } else {
-      // OneToOne - assign directly
-      instance[navProp.var_name] = nestedInstance;
-    }
+    return m;
   }
+
+  return result.map((obj: any) =>
+    instantiateRecursively(obj, ast.models[ctor.name], includeTree)
+  ) as T[];
 }
 
 function errorState(status: number, message: string): HttpResult {
@@ -696,19 +586,12 @@ function toResponse(r: HttpResult): Response {
   });
 }
 
-interface MatchedRoute {
-  model: Model;
-  method: ModelMethod;
-  id: string | null;
-}
-
 /**
- * Each individual state of the `cloesce` function for testing purposes.
+ * For testing purposes
  */
 export const _cloesceInternal = {
   matchRoute,
   validateRequest,
-  hydrateModel,
   methodDispatch,
-  _modelsFromSql,
+  RuntimeContainer,
 };

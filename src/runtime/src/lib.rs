@@ -66,12 +66,13 @@ pub extern "C" fn object_relational_mapping(
     let res = _object_relational_mapping(model_name, &meta, &rows, &include_tree);
     let json_str = serde_json::to_string(&res).unwrap();
 
-    let bytes = json_str.into_bytes();
+    let mut bytes = json_str.into_bytes();
+    let ptr = bytes.as_mut_ptr();
     unsafe {
         RETURN_LEN = bytes.len();
+        std::mem::forget(bytes); // leak so JS can read it
     }
-
-    return bytes.as_ptr();
+    ptr
 }
 
 fn _object_relational_mapping(
@@ -169,6 +170,9 @@ fn process_navigation_properties(
         let Some(nested_pk_value) = row.get(&prefixed_key) else {
             continue;
         };
+        if nested_pk_value.is_null() {
+            continue;
+        }
 
         // Build nested JSON object
         let mut nested_model_json = serde_json::Map::new();

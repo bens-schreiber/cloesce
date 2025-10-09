@@ -1,9 +1,8 @@
 use std::{collections::BTreeMap, path::Path};
 
 use common::{
-    CloesceAst, Model, PlainOldObject, WranglerEnv,
     err::{GeneratorErrorKind, Result},
-    fail,
+    fail, CloesceAst, Model, PlainOldObject, WranglerEnv,
 };
 
 use wrangler::WranglerSpec;
@@ -161,7 +160,25 @@ export default {{
     async fetch(request: Request, env: any, ctx: any): Promise<Response> {{
         {instance_registry}
 
-        return await cloesce(request, cidl, constructorRegistry, instanceRegistry, {{ envName: "{env_name}", dbName: "{db_binding}" }},  "/{api_route}");
+        try {{
+            return await cloesce(
+                request, 
+                cidl, 
+                constructorRegistry, 
+                instanceRegistry, 
+                {{ envName: "{env_name}", dbName: "{db_binding}" }},  
+                "/{api_route}"
+            );
+        }} catch(e: any) {{
+            return new Response(JSON.stringify({{
+                ok: false,
+                status: 500,
+                message: e.toString()
+            }}), {{
+                status: 500,
+                headers: {{ "Content-Type": "application/json" }},
+              }});
+        }}
     }}
 }};
 "#
