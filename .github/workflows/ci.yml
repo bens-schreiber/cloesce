@@ -40,6 +40,8 @@ jobs:
           path: target
           key: cargo-build-${{ hashFiles('**/Cargo.lock') }}
 
+      - run: rustup target add wasm32-unknown-unknown
+
       # Lints & tests for generator
       - run: cargo fmt --all -- --check
         working-directory: src/generator
