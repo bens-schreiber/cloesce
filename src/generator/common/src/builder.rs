@@ -21,7 +21,7 @@ pub fn create_ast(mut models: Vec<Model>, middleware: Option<Middleware>) -> Clo
             name: "Env".into(),
             source_path: "source.ts".into(),
         },
-        middleware: middleware,
+        middleware,
     }
 }
 
