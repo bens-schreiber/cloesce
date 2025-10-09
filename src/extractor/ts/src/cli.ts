@@ -195,7 +195,8 @@ async function runExtractor(opts: {
     config.projectName ??
     readPackageJsonProjectName(projectRoot);
 
-  const files = findCloesceFiles(projectRoot, searchPaths);
+  // Find files - pass root (cwd) and let findCloesceFiles resolve the paths
+  const files = findCloesceFiles(root, searchPaths);
 
   if (files.length === 0) {
     throw new Error(
