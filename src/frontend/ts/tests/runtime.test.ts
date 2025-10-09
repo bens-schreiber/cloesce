@@ -499,10 +499,7 @@ describe("modelsFromSql", () => {
   // does plentiful unit tests inside of the Rust project
   test("handles recursive navigation properties", async () => {
     // Arrange
-    const wasmPath = path.resolve(
-      __dirname,
-      "../../../runtime/target/wasm32-unknown-unknown/release/runtime.wasm",
-    );
+    const wasmPath = path.resolve("./dist/runtime.wasm");
     const wasm = await WebAssembly.instantiate(fs.readFileSync(wasmPath), {});
 
     const modelName = "Horse";

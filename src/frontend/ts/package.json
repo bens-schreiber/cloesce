@@ -6,7 +6,7 @@
     "test": "vitest",
     "format:fix": "prettier --write .",
     "format": "prettier --check .",
-    "build": "tsc -p tsconfig.json",
+    "build": "tsc -p tsconfig.json && cp ../../runtime/target/wasm32-unknown-unknown/release/runtime.wasm ./dist/runtime.wasm ",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
@@ -26,6 +26,9 @@
   "bin": {
     "cloesce": "./dist/cli.js"
   },
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts"
+  "files": [
+    "dist/**/*"
+  ],
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts"
 }
