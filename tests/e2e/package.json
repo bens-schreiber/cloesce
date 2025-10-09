@@ -16,5 +16,8 @@
     "format:fix": "prettier --write .",
     "format": "prettier --check ."
   },
-  "type": "module"
+  "type": "module",
+  "optionalDependencies": {
+    "@rollup/rollup-linux-x64-gnu": "*"
+  }
 }
