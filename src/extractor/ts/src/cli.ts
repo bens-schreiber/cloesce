@@ -89,10 +89,10 @@ function loadCloesceConfig(root: string): CloesceConfig {
   if (fs.existsSync(configPath)) {
     try {
       const config = JSON.parse(fs.readFileSync(configPath, "utf8"));
-      console.log(`📋 Loaded config from ${configPath}`);
+      console.log(`Loaded config from ${configPath}`);
       return config;
     } catch (err) {
-      console.warn(`⚠️ Failed to parse cloesce-config.json: ${err}`);
+      console.warn(`Failed to parse cloesce-config.json: ${err}`);
     }
   }
   return {};
@@ -272,10 +272,10 @@ async function runExtractor(opts: {
     fs.writeFileSync(outPath, json);
 
     if (!opts.silent) {
-      console.log(`✅ Wrote CIDL to ${outPath}`);
+      console.log(`Wrote CIDL to ${outPath}`);
     }
 
-    return outPath;
+    return { outPath, projectName: cloesceProjectName };
   } catch (err: any) {
     console.error(
       "Critical uncaught error. Submit a ticket to https://github.com/bens-schreiber/cloesce: ",
@@ -293,20 +293,11 @@ async function runWasmCommand(
   const root = findProjectRoot(process.cwd());
   const outputDir = ".generated";
 
-  // Validate CIDL was created successfully
-  const cidlPath = path.join(root, outputDir, "cidl.json");
-  if (!fs.existsSync(cidlPath)) {
-    throw new Error(
-      `CIDL file not found at ${cidlPath}. Extraction may have failed.`,
-    );
+  // We need to create a wrangler.toml file if it doesn't exist
+  const wranglerPath = path.join(root, outputDir, "wrangler.toml");
+  if (!fs.existsSync(wranglerPath)) {
+    fs.writeFileSync(wranglerPath, "");
   }
-
-  if (!fs.existsSync(WASM_PATH)) {
-    throw new Error(`WASM file not found. Expected at: ${WASM_PATH}`);
-  }
-
-  // Ensure output directory exists
-  fs.mkdirSync(path.join(root, outputDir), { recursive: true });
 
   const wasi = new WASI({
     version: "preview1",
