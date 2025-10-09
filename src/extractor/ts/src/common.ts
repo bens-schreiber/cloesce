@@ -156,7 +156,7 @@ export interface NavigationProperty {
 }
 
 export function getNavigationPropertyCidlType(
-  nav: NavigationProperty
+  nav: NavigationProperty,
 ): CidlType {
   return "OneToOne" in nav.kind
     ? { Object: nav.model_name }

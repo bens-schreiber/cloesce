@@ -38,7 +38,7 @@ class MetaContainer {
   private static instance: MetaContainer | undefined;
   private constructor(
     public readonly ast: CloesceAst,
-    public readonly constructorRegistry: ModelConstructorRegistry
+    public readonly constructorRegistry: ModelConstructorRegistry,
   ) {}
 
   static init(ast: CloesceAst, constructorRegistry: ModelConstructorRegistry) {
@@ -85,7 +85,7 @@ interface MetaWranglerEnv {
 export function modelsFromSql<T>(
   ctor: new () => T,
   records: Record<string, any>[],
-  includeTree: IncludeTree<T> | null
+  includeTree: IncludeTree<T> | null,
 ): T[] {
   const { ast, constructorRegistry } = MetaContainer.get();
   return _modelsFromSql(
@@ -93,7 +93,7 @@ export function modelsFromSql<T>(
     ast,
     constructorRegistry,
     records,
-    includeTree
+    includeTree,
   ) as T[];
 }
 
@@ -114,7 +114,7 @@ export async function cloesce(
   constructorRegistry: ModelConstructorRegistry,
   instanceRegistry: InstanceRegistry,
   envMeta: MetaWranglerEnv,
-  api_route: string
+  api_route: string,
 ): Promise<Response> {
   MetaContainer.init(ast, constructorRegistry);
   const d1: D1Database = instanceRegistry.get(envMeta.envName)[envMeta.dbName];
@@ -144,7 +144,7 @@ export async function cloesce(
       d1,
       model,
       id!,
-      dataSource
+      dataSource,
     );
 
     if (!successfulModel.ok) {
@@ -161,8 +161,8 @@ export async function cloesce(
       instanceRegistry,
       envMeta,
       method,
-      requestParamMap
-    )
+      requestParamMap,
+    ),
   );
 }
 
@@ -174,7 +174,7 @@ export async function cloesce(
 function matchRoute(
   request: Request,
   ast: CloesceAst,
-  api_route: string
+  api_route: string,
 ): Either<HttpResult, MatchedRoute> {
   const url = new URL(request.url);
 
@@ -226,7 +226,7 @@ async function validateRequest(
   ast: CloesceAst,
   model: Model,
   method: ModelMethod,
-  id: string | null
+  id: string | null,
 ): Promise<Either<HttpResult, [RequestParamMap, string | null]>> {
   // Error state: any missing parameter, body, or malformed input will exit with 400.
   const invalidRequest = (e: string) =>
@@ -244,7 +244,7 @@ async function validateRequest(
         typeof p.cidl_type === "object" &&
         p.cidl_type !== null &&
         "Inject" in p.cidl_type
-      )
+      ),
   );
 
   // Extract data source
@@ -297,7 +297,7 @@ async function hydrateModel(
   d1: D1Database,
   model: Model,
   id: string,
-  dataSource: string | null
+  dataSource: string | null,
 ): Promise<Either<HttpResult, object>> {
   // Error state: If the D1 database has been tweaked outside of Cloesce
   // resulting in a malformed query, exit with a 500.
@@ -305,8 +305,8 @@ async function hydrateModel(
     left(
       errorState(
         500,
-        `Error in hydration query, is the database out of sync with the backend?: ${e instanceof Error ? e.message : String(e)}`
-      )
+        `Error in hydration query, is the database out of sync with the backend?: ${e instanceof Error ? e.message : String(e)}`,
+      ),
     );
 
   // Error state: If no record is found for the id, return a 404
@@ -342,7 +342,7 @@ async function hydrateModel(
     ast,
     constructorRegistry,
     records.results,
-    includeTree
+    includeTree,
   );
 
   console.log(JSON.stringify(models));
@@ -359,13 +359,13 @@ async function methodDispatch(
   instanceRegistry: InstanceRegistry,
   envMeta: MetaWranglerEnv,
   method: ModelMethod,
-  params: Record<string, unknown>
+  params: Record<string, unknown>,
 ): Promise<HttpResult<unknown>> {
   // Error state: Client code ran into an uncaught exception.
   const uncaughtException = (e: any) =>
     errorState(
       500,
-      `Uncaught exception in method dispatch: ${e instanceof Error ? e.message : String(e)}`
+      `Uncaught exception in method dispatch: ${e instanceof Error ? e.message : String(e)}`,
     );
 
   // For now, the only injected dependency is the wrangler env,
@@ -373,7 +373,7 @@ async function methodDispatch(
   const paramArray = method.parameters.map((p) =>
     params[p.name] == undefined
       ? instanceRegistry.get(envMeta.envName)
-      : params[p.name]
+      : params[p.name],
   );
 
   // Ensure the result is always some HttpResult
@@ -401,7 +401,7 @@ async function methodDispatch(
 function validateCidlType(
   ast: CloesceAst,
   value: unknown,
-  cidlType: CidlType
+  cidlType: CidlType,
 ): boolean {
   if (value === undefined) return false;
 
@@ -439,7 +439,7 @@ function validateCidlType(
     // Validate attributes
     if (
       !model.attributes.every((attr) =>
-        validateCidlType(ast, valueObj[attr.value.name], attr.value.cidl_type)
+        validateCidlType(ast, valueObj[attr.value.name], attr.value.cidl_type),
       )
     ) {
       return false;
@@ -465,7 +465,7 @@ function validateCidlType(
     // Validate attributes
     if (
       !poo.attributes.every((attr) =>
-        validateCidlType(ast, valueObj[attr.name], attr.cidl_type)
+        validateCidlType(ast, valueObj[attr.name], attr.cidl_type),
       )
     ) {
       return false;
@@ -502,7 +502,7 @@ function _modelsFromSql(
   ast: CloesceAst,
   constructorRegistry: ModelConstructorRegistry,
   records: Record<string, any>[],
-  includeTree: Record<string, UserDefinedModel> | null
+  includeTree: Record<string, UserDefinedModel> | null,
 ): any[] {
   const model = ast.models[modelName];
   if (!model) return [];
@@ -558,7 +558,7 @@ function _modelsFromSql(
         includeTree,
         record,
         ast,
-        constructorRegistry
+        constructorRegistry,
       );
     }
   }
@@ -573,7 +573,7 @@ function processNavigationProperties(
   includeTree: Record<string, UserDefinedModel>,
   record: Record<string, any>,
   ast: CloesceAst,
-  constructorRegistry: ModelConstructorRegistry
+  constructorRegistry: ModelConstructorRegistry,
 ): void {
   for (const navProp of model.navigation_properties) {
     if (!(navProp.var_name in includeTree)) {
@@ -604,7 +604,7 @@ function processNavigationProperties(
     if (isOneToMany) {
       const navArray = instance[navProp.var_name];
       const alreadyExists = navArray.some(
-        (item: any) => item[nestedPkName] === nestedPkValue
+        (item: any) => item[nestedPkName] === nestedPkValue,
       );
       if (alreadyExists) {
         continue;
@@ -668,7 +668,7 @@ function processNavigationProperties(
         nestedIncludeTree,
         record,
         ast,
-        constructorRegistry
+        constructorRegistry,
       );
     }
 
