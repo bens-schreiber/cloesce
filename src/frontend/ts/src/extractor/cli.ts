@@ -5,7 +5,7 @@ import path from "node:path";
 import { command, run, option, string, optional, flag } from "cmd-ts";
 import { CidlExtractor } from "./extract.js";
 import { Project } from "ts-morph";
-import { ExtractorError, ExtractorErrorCode, getErrorInfo } from "./common.js";
+import { ExtractorError, ExtractorErrorCode, getErrorInfo } from "../common.js";
 
 const cli = command({
   name: "cloesce",

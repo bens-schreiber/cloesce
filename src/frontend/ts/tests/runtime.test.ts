@@ -1,6 +1,10 @@
 import { describe, test, expect, vi } from "vitest";
-import { _cloesceInternal } from "../src/cloesce";
-import { CloesceAst, HttpVerb, Model, NamedTypedValue } from "../src/common";
+import { _cloesceInternal } from "../src/runtime/runtime";
+import { CloesceAst, HttpVerb, NamedTypedValue } from "../src/common";
+import { modelsFromSql } from "../src/runtime/runtime";
+import { IncludeTree } from "../src";
+import fs from "fs";
+import path from "path";
 
 const makeAst = (methods: Record<string, any>): CloesceAst => ({
   wrangler_env: {
@@ -327,185 +331,12 @@ describe("Validate Request Success States", () => {
       "0",
     );
 
-    expect(result.value).toEqual([
-      { [arg.typed_value.name]: arg.is_get ? String(arg.value) : arg.value },
-      null,
-    ]);
-  });
-});
-
-//
-// modelsFromSql Tests
-//
-
-describe("modelsFromSql", () => {
-  const modelName = "Horse";
-  const nestedModelName = "Rider";
-
-  const constructorRegistry = {
-    [modelName]: class {
-      id?: string;
-      name?: string;
-      riders?: any[];
-    },
-    [nestedModelName]: class {
-      id?: string;
-      nickname?: string;
-    },
-  };
-
-  const baseCidl: CloesceAst = {
-    wrangler_env: { name: "Env", source_path: "./" },
-    models: {
-      [modelName]: {
-        name: modelName,
-        attributes: [
-          {
-            value: { name: "name", cidl_type: { Nullable: "Text" } },
-            foreign_key_reference: null,
-          },
-        ],
-        navigation_properties: [
-          {
-            var_name: "riders",
-            model_name: nestedModelName,
-            kind: { OneToMany: { reference: "id" } },
-          },
-        ],
-        primary_key: { name: "id", cidl_type: "Integer" },
-        data_sources: {},
-        methods: {},
-        source_path: "",
+    expect(result.value).toEqual({
+      params: {
+        [arg.typed_value.name]: arg.is_get ? String(arg.value) : arg.value,
       },
-      [nestedModelName]: {
-        name: nestedModelName,
-        attributes: [
-          {
-            value: { name: "nickname", cidl_type: { Nullable: "Text" } },
-            foreign_key_reference: null,
-          },
-        ],
-        primary_key: { name: "id", cidl_type: "Integer" },
-        navigation_properties: [],
-        data_sources: {},
-        methods: {},
-        source_path: "",
-      },
-    },
-    version: "",
-    project_name: "",
-    language: "TypeScript",
-    poos: {},
-  };
-
-  test("returns empty array if no records", () => {
-    const records: any[] = [];
-    const result = _cloesceInternal._modelsFromSql(
-      modelName,
-      baseCidl,
-      constructorRegistry,
-      records,
-      {},
-    );
-    expect(result).toEqual([]);
-  });
-
-  test("handles non-prefixed columns correctly", () => {
-    const records = [{ id: "1", name: "Lightning" }];
-    const result = _cloesceInternal._modelsFromSql(
-      modelName,
-      baseCidl,
-      constructorRegistry,
-      records,
-      {},
-    );
-    const horse: any = result[0];
-    expect(horse.id).toBe("1");
-    expect(horse.name).toBe("Lightning");
-  });
-
-  test("assigns scalar attributes and navigation arrays correctly", () => {
-    const records = [
-      {
-        "Horse.id": "1",
-        "Horse.name": "Thunder",
-        "Horse.riders.id": "r1",
-        "Horse.riders.nickname": "Speedy",
-      },
-      {
-        "Horse.id": "1",
-        "Horse.name": "Thunder",
-        "Horse.riders.id": "r2",
-        "Horse.riders.nickname": "Flash",
-      },
-    ];
-    const tree = { riders: {} };
-
-    const result = _cloesceInternal._modelsFromSql(
-      modelName,
-      baseCidl,
-      constructorRegistry,
-      records,
-      tree,
-    );
-    const horse: any = result[0];
-
-    expect(horse.id).toBe("1");
-    expect(horse.name).toBe("Thunder");
-    expect(Array.isArray(horse.riders)).toBe(true);
-    expect(horse.riders.map((r: any) => r.id)).toEqual(
-      expect.arrayContaining(["r1", "r2"]),
-    );
-  });
-
-  test("handles prefixed columns correctly", () => {
-    const records = [{ "Horse.id": "1", "Horse.name": "Lightning" }];
-    const result = _cloesceInternal._modelsFromSql(
-      modelName,
-      baseCidl,
-      constructorRegistry,
-      records,
-      {},
-    );
-    const horse: any = result[0];
-    expect(horse.id).toBe("1");
-    expect(horse.name).toBe("Lightning");
-  });
-
-  test("merges duplicate rows with arrays", () => {
-    const records = [
-      {
-        "Horse.id": "1",
-        "Horse.name": "hoarse",
-        "Horse.riders.id": "r1",
-        "Horse.riders.nickname": "Speedy",
-      },
-      {
-        "Horse.id": "1",
-        "Horse.name": "hoarse",
-        "Horse.riders.id": "r1",
-        "Horse.riders.nickname": "Speedy",
-      },
-      {
-        "Horse.id": "1",
-        "Horse.name": "hoarse",
-        "Horse.riders.id": "r2",
-        "Horse.riders.nickname": "Flash",
-      },
-    ];
-    const tree = { riders: {} };
-    const result = _cloesceInternal._modelsFromSql(
-      modelName,
-      baseCidl,
-      constructorRegistry,
-      records,
-      tree,
-    );
-    const horse: any = result[0];
-    expect(horse.riders.length).toBe(2);
-    expect(horse.riders.map((r: any) => r.id)).toEqual(
-      expect.arrayContaining(["r1", "r2"]),
-    );
+      dataSource: null,
+    });
   });
 });
 
@@ -660,8 +491,19 @@ describe("methodDispatch", () => {
       message: "Uncaught exception in method dispatch: stringError",
     });
   });
+});
 
-  test("handles recursive navigation properties", () => {
+//
+// modelsFromSql Tests
+//
+describe("modelsFromSql", () => {
+  // We are really just testing the recursive instantiation here, modelsFromSql
+  // does plentiful unit tests inside of the Rust project
+  test("handles recursive navigation properties", async () => {
+    // Arrange
+    const wasmPath = path.resolve("./dist/runtime.wasm");
+    const wasm = await WebAssembly.instantiate(fs.readFileSync(wasmPath), {});
+
     const modelName = "Horse";
     const likeModelName = "Like";
 
@@ -680,7 +522,7 @@ describe("methodDispatch", () => {
       },
     };
 
-    const cidl: CloesceAst = {
+    const ast: CloesceAst = {
       wrangler_env: { name: "Env", source_path: "./" },
       models: {
         [modelName]: {
@@ -738,6 +580,12 @@ describe("methodDispatch", () => {
       poos: {},
     };
 
+    await _cloesceInternal.RuntimeContainer.init(
+      ast,
+      constructorRegistry,
+      wasm.instance,
+    );
+
     // Simulate a view result with nested data: Horse -> likes (Like[]) -> horse2 (Horse)
     const records = [
       {
@@ -764,21 +612,20 @@ describe("methodDispatch", () => {
       },
     ];
 
-    const includeTree = {
+    const includeTree: IncludeTree<any> = {
       likes: {
         horse2: {},
       },
     };
 
-    const result = _cloesceInternal._modelsFromSql(
-      modelName,
-      cidl,
-      constructorRegistry,
+    // Act
+    const result = modelsFromSql(
+      constructorRegistry[modelName],
       records,
       includeTree,
     );
 
-    // Assertions
+    // Assert
     expect(result.length).toBe(1);
 
     const horse: any = result[0];
@@ -786,29 +633,24 @@ describe("methodDispatch", () => {
     expect(horse.name).toBe("Lightning");
     expect(horse.bio).toBe("Fast horse");
 
-    // Check likes array
     expect(Array.isArray(horse.likes)).toBe(true);
     expect(horse.likes.length).toBe(2);
 
-    // First like
     const like1 = horse.likes[0];
     expect(like1.id).toBe("10");
     expect(like1.horseId1).toBe("1");
     expect(like1.horseId2).toBe("2");
 
-    // Nested horse2 on first like
     expect(like1.horse2).toBeDefined();
     expect(like1.horse2.id).toBe("2");
     expect(like1.horse2.name).toBe("Thunder");
     expect(like1.horse2.bio).toBe("Strong horse");
 
-    // Second like
     const like2 = horse.likes[1];
     expect(like2.id).toBe("11");
     expect(like2.horseId1).toBe("1");
     expect(like2.horseId2).toBe("3");
 
-    // Nested horse2 on second like
     expect(like2.horse2).toBeDefined();
     expect(like2.horse2.id).toBe("3");
     expect(like2.horse2.name).toBe("Storm");

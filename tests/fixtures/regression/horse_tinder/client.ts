@@ -16,9 +16,8 @@ export class Horse {
     }
     baseUrl.searchParams.append('id', String(id));
     const res = await fetch(baseUrl, { method: "GET" });
-
     let raw = await res.json();
-    if (!raw.ok) {
+    if (!res.ok) {
       return raw;
     }
     raw.data = Object.assign(new Horse(), raw.data);
@@ -39,9 +38,8 @@ export class Horse {
             horse
       })
     });
-
     let raw = await res.json();
-    if (!raw.ok) {
+    if (!res.ok) {
       return raw;
     }
     return raw;
@@ -54,9 +52,8 @@ export class Horse {
       baseUrl.searchParams.append("dataSource", dataSource);
     }
     const res = await fetch(baseUrl, { method: "GET" });
-
     let raw = await res.json();
-    if (!raw.ok) {
+    if (!res.ok) {
       return raw;
     }
     raw.data = instantiateObjectArray(raw.data, Horse);
@@ -77,9 +74,8 @@ export class Horse {
             horse
       })
     });
-
     let raw = await res.json();
-    if (!raw.ok) {
+    if (!res.ok) {
       return raw;
     }
     raw.data = Object.assign(new Horse(), raw.data);

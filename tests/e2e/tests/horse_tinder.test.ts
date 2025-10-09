@@ -73,7 +73,10 @@ describe("List tests", () => {
         .sort((a, b) => a.id - b.id)
         .map((h) => ({ ...h }));
 
-    expect(normalize(res.data)).toEqual(normalize(allHorses));
+    expect(
+      normalize(res.data),
+      withRes("Expected to be deeply equal", res),
+    ).toEqual(normalize(allHorses));
   });
 });
 

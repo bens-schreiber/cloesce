@@ -50,9 +50,8 @@ export class {{this.name}} {
       })
     });
     {{/if}}
-
     let raw = await res.json();
-    if (!raw.ok) {
+    if (!res.ok) {
       return raw;
     }
     {{#if (eq (get_cidl_type this.return_type) "void")}}

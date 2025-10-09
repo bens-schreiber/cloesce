@@ -6,7 +6,7 @@
     "test": "vitest",
     "format:fix": "prettier --write .",
     "format": "prettier --check .",
-    "build": "tsc -p tsconfig.json",
+    "build": "tsc -p tsconfig.json && cp ../../runtime/target/wasm32-unknown-unknown/release/runtime.wasm ./dist/runtime.wasm ",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
@@ -20,11 +20,15 @@
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20250906.0",
     "prettier": "^3.6.2",
-    "vitest": "^3.2.4"
+    "vitest": "^3.2.4",
+    "vite-plugin-wasm": "^3.5.0"
   },
   "bin": {
     "cloesce": "./dist/cli.js"
   },
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts"
+  "files": [
+    "dist/**/*"
+  ],
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts"
 }

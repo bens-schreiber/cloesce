@@ -10,7 +10,6 @@ import {
   ManyToMany,
   IncludeTree,
   GET,
-  HttpResult,
   Inject,
   modelsFromSql,
 } from "cloesce";
@@ -172,7 +171,7 @@ export class Student {
       .bind(student.id)
       .all();
 
-    let resultStudent = modelsFromSql(
+    const resultStudent = modelsFromSql(
       Student,
       records.results,
       null

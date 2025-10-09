@@ -53,7 +53,7 @@ export async function stopWrangler() {
 }
 
 export function withRes(message: string, res: any): string {
-  return `${message}\n\n${JSON.stringify(res, null, 2)}`;
+  return `${message}\n\n${JSON.stringify(res)}`;
 }
 
 async function runCmd(label: string, cmd: string, opts: { cwd?: string } = {}) {

@@ -22,9 +22,8 @@ export class NullabilityChecks {
             b
       })
     });
-
     let raw = await res.json();
-    if (!raw.ok) {
+    if (!res.ok) {
       return raw;
     }
     return raw;
@@ -44,9 +43,8 @@ export class NullabilityChecks {
             a
       })
     });
-
     let raw = await res.json();
-    if (!raw.ok) {
+    if (!res.ok) {
       return raw;
     }
     return raw;
@@ -64,9 +62,8 @@ export class NullabilityChecks {
       body: JSON.stringify({
       })
     });
-
     let raw = await res.json();
-    if (!raw.ok) {
+    if (!res.ok) {
       return raw;
     }
     return raw;
@@ -86,9 +83,8 @@ export class NullabilityChecks {
             a
       })
     });
-
     let raw = await res.json();
-    if (!raw.ok) {
+    if (!res.ok) {
       return raw;
     }
     return raw;
@@ -110,9 +106,8 @@ export class NullabilityChecks {
             b
       })
     });
-
     let raw = await res.json();
-    if (!raw.ok) {
+    if (!res.ok) {
       return raw;
     }
     return raw;
