@@ -124,13 +124,11 @@ function findCloesceFiles(root: string, searchPaths: string[]): string[] {
   const files: string[] = [];
   for (const searchPath of searchPaths) {
     let fullPath: string;
-    
+
     fullPath = path.resolve(root, searchPath);
-    
+
     if (!fs.existsSync(fullPath)) {
-      console.warn(
-        `Warning: Path "${searchPath}" does not exist`,
-      );
+      console.warn(`Warning: Path "${searchPath}" does not exist`);
       continue;
     }
     const stats = fs.statSync(fullPath);
@@ -178,28 +176,30 @@ async function runExtractor(opts: {
   truncateSourcePaths?: boolean;
   silent?: boolean;
 }) {
-
   // Use cwd as the base, unless inp is provided
   const root = process.cwd();
-  
+
   // Find project root for metadata (package.json, config)
   const projectRoot = findProjectRoot(root);
   const config = loadCloesceConfig(projectRoot);
 
   // Determine search paths - use inp if provided, otherwise use config paths or default
   const searchPaths = opts.inp ? [opts.inp] : (config.paths ?? [root]);
-  
+
   const outputDir = config.outputDir ?? ".generated";
   const outPath = opts.out ?? path.join(outputDir, "cidl.json");
-  const truncate = opts.truncateSourcePaths ?? config.truncateSourcePaths ?? false;
+  const truncate =
+    opts.truncateSourcePaths ?? config.truncateSourcePaths ?? false;
   const cloesceProjectName =
-    opts.projectName ?? config.projectName ?? readPackageJsonProjectName(projectRoot);
+    opts.projectName ??
+    config.projectName ??
+    readPackageJsonProjectName(projectRoot);
 
   const files = findCloesceFiles(projectRoot, searchPaths);
-  
+
   if (files.length === 0) {
     throw new Error(
-      `No .cloesce.ts files found in specified paths: ${searchPaths.join(", ")}`
+      `No .cloesce.ts files found in specified paths: ${searchPaths.join(", ")}`,
     );
   }
 
