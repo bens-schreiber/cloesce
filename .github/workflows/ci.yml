@@ -15,7 +15,7 @@ jobs:
     name: Rust Build
     runs-on: ubuntu-latest
     outputs:
-      rust-target-path: ${{ steps.upload.outputs.artifact-path }}
+      rust-target-path: ${{ steps.upload.outputs.artifact-id }}
     steps:
       - uses: actions/checkout@v4
 
@@ -50,12 +50,12 @@ jobs:
       - run: cargo build --target wasm32-unknown-unknown --release
         working-directory: src/runtime
 
-      # Upload Rust target artifacts for other jobs
+      # Upload Rust artifacts
       - name: Upload Rust artifacts
         id: upload
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
-          name: rust-target
+          name: rust-target-${{ github.run_id }}
           path: target
 
   frontend-ts:
@@ -79,10 +79,10 @@ jobs:
           key: npm-cache-${{ hashFiles('**/package-lock.json') }}
 
       # Download Rust artifacts
-      - uses: actions/download-artifact@v3
+      - uses: actions/download-artifact@v4
         with:
-          name: rust-target
-          path: ../../target
+          name: rust-target-${{ needs.rust-build.outputs.rust-target-path }}
+          path: target
 
       # Frontend build
       - run: npm ci
@@ -103,9 +103,9 @@ jobs:
           node-version: 20
 
       # Download Rust artifacts
-      - uses: actions/download-artifact@v3
+      - uses: actions/download-artifact@v4
         with:
-          name: rust-target
+          name: rust-target-${{ needs.rust-build.outputs.rust-target-path }}
           path: target
 
       - name: Build frontend-ts
