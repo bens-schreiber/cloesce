@@ -28,7 +28,6 @@ jobs:
           components: rustfmt, clippy
           override: true
 
-      # Cache Cargo registry and build artifacts
       - uses: actions/cache@v3
         with:
           path: |
@@ -40,8 +39,7 @@ jobs:
 
       - run: rustup target add wasm32-unknown-unknown
 
-      # --- Build Rust projects with Clippy & Format check ---
-      - name: Check & Build WASM Runtime
+      - name: Check & Build & Test WASM Runtime
         working-directory: src/runtime
         run: |
           cargo fmt -- --check
@@ -49,7 +47,7 @@ jobs:
           cargo build --target wasm32-unknown-unknown --release
           cargo test
 
-      - name: Check & Build Rust Generator
+      - name: Check & Build & Test Generator
         working-directory: src/generator
         run: |
           cargo fmt -- --check
@@ -62,14 +60,12 @@ jobs:
         with:
           node-version: 20
 
-      # Cache npm modules
       - uses: actions/cache@v3
         with:
           path: ~/.npm
           key: npm-cache-${{ hashFiles('**/package-lock.json') }}
 
-      # --- Frontend Build & Checks ---
-      - name: Frontend Build & Checks
+      - name: Check & Build & Test Frontend TS
         working-directory: src/frontend/ts
         run: |
           npm ci
@@ -83,15 +79,14 @@ jobs:
         working-directory: tests/runner
         run: cargo run --bin test regression --check
 
-      - name: Run-Fail
+      - name: Run-Fail Tests
         working-directory: tests/runner
         run: cargo run --bin test run-fail --check
 
       # --- E2E Tests ---
-      - name: E2E Tests
+      - name: Check & Test E2E
         working-directory: tests/e2e
         run: |
           npm install
-          npm run build
           npm run format -- --check
           npm test
