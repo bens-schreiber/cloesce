@@ -57,7 +57,7 @@ jobs:
     needs: rust-build
     defaults:
       run:
-        working-directory: src/frontend/ts/test
+        working-directory: src/frontend/ts/tests
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -74,7 +74,7 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: wasm-runtime
-          path: ../../../runtime/target/wasm32-unknown-unknown/release/
+          path: ../../../../runtime/target/wasm32-unknown-unknown/release/
 
       # Frontend build
       - run: npm ci
