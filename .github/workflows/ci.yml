@@ -146,6 +146,6 @@ jobs:
           npm ci
           npm run build
 
-      - run: npm ci
+      - run: npm install
       - run: npm run format -- --check
       - run: npm test
