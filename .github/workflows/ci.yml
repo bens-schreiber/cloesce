@@ -74,7 +74,7 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: wasm-runtime
-          path: ../../../../runtime/target/wasm32-unknown-unknown/release/
+          path: src/runtime/target/wasm32-unknown-unknown/release/runtime.wasm
 
       # Frontend build
       - run: npm ci
