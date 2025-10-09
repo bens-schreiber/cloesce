@@ -70,7 +70,7 @@ jobs:
           path: ~/.npm
           key: npm-cache-${{ hashFiles('**/package-lock.json') }}
 
-      # Download the wasm artifact
+      # Download wasm artifact
       - uses: actions/download-artifact@v4
         with:
           name: wasm-runtime
@@ -97,7 +97,7 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: wasm-runtime
-          path: src/runtime/target/wasm32-unknown-unknown/release/
+          path: ${{ github.workspace }}/src/runtime/target/wasm32-unknown-unknown/release/
 
       # Build frontend-ts
       - name: Build frontend-ts
@@ -105,6 +105,11 @@ jobs:
         run: |
           npm ci
           npm run build
+
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
 
       # Run integration tests
       - name: Run regression tests
@@ -132,7 +137,7 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: wasm-runtime
-          path: ../../src/runtime/target/wasm32-unknown-unknown/release/
+          path: ${{ github.workspace }}/src/runtime/target/wasm32-unknown-unknown/release/
 
       # Build frontend-ts
       - name: Build frontend-ts
