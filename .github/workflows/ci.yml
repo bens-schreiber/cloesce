@@ -40,11 +40,25 @@ jobs:
           path: target
           key: cargo-build-${{ hashFiles('**/Cargo.lock') }}
 
-      # Lints & tests for generator + runtime
+      # Lints & tests for generator
       - run: cargo fmt --all -- --check
+        working-directory: src/generator
       - run: cargo clippy --all-targets --all-features -- -D warnings
+        working-directory: src/generator
       - run: cargo build --all-targets
+        working-directory: src/generator
       - run: cargo test --all
+        working-directory: src/generator
+
+      # Lints & tests for runtime
+      - run: cargo fmt --all -- --check
+        working-directory: src/runtime
+      - run: cargo clippy --all-targets --all-features -- -D warnings
+        working-directory: src/runtime
+      - run: cargo build --all-targets
+        working-directory: src/runtime
+      - run: cargo test --all
+        working-directory: src/runtime
 
       # Build Rust runtime for frontend-ts
       - run: cargo build --target wasm32-unknown-unknown --release
