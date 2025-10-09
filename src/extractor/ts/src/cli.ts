@@ -125,12 +125,18 @@ function findCloesceFiles(root: string, searchPaths: string[]): string[] {
   for (const searchPath of searchPaths) {
     let fullPath: string;
 
-    fullPath = path.resolve(root, searchPath);
+    // Handle absolute paths and paths that already start with root
+    if (path.isAbsolute(searchPath) || searchPath.startsWith(root)) {
+      fullPath = path.normalize(searchPath);
+    } else {
+      fullPath = path.resolve(root, searchPath);
+    }
 
     if (!fs.existsSync(fullPath)) {
       console.warn(`Warning: Path "${searchPath}" does not exist`);
       continue;
     }
+
     const stats = fs.statSync(fullPath);
     if (stats.isFile() && /\.cloesce\.ts$/i.test(fullPath)) {
       files.push(fullPath);
@@ -139,6 +145,7 @@ function findCloesceFiles(root: string, searchPaths: string[]): string[] {
     }
   }
   return files;
+
   function walkDirectory(dir: string): string[] {
     const files: string[] = [];
     for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -156,6 +163,7 @@ function findCloesceFiles(root: string, searchPaths: string[]): string[] {
     return files;
   }
 }
+
 function formatErr(e: ExtractorError): string {
   const { description, suggestion } = getErrorInfo(e.code);
 
@@ -176,14 +184,11 @@ async function runExtractor(opts: {
   truncateSourcePaths?: boolean;
   silent?: boolean;
 }) {
-  // Use cwd as the base, unless inp is provided
   const root = process.cwd();
 
-  // Find project root for metadata (package.json, config)
   const projectRoot = findProjectRoot(root);
   const config = loadCloesceConfig(projectRoot);
 
-  // Determine search paths - use inp if provided, otherwise use config paths or default
   const searchPaths = opts.inp ? [opts.inp] : (config.paths ?? [root]);
 
   const outputDir = config.outputDir ?? ".generated";
@@ -195,7 +200,6 @@ async function runExtractor(opts: {
     config.projectName ??
     readPackageJsonProjectName(projectRoot);
 
-  // Find files - pass root (cwd) and let findCloesceFiles resolve the paths
   const files = findCloesceFiles(root, searchPaths);
 
   if (files.length === 0) {
@@ -204,7 +208,7 @@ async function runExtractor(opts: {
     );
   }
 
-  if (!opts.silent) console.log(`🔍 Found ${files.length} .cloesce.ts files`);
+  if (!opts.silent) console.log(`Found ${files.length} .cloesce.ts files`);
 
   const project = new Project({
     compilerOptions: {
@@ -214,25 +218,6 @@ async function runExtractor(opts: {
   files.forEach((f) => project.addSourceFileAtPath(f));
 
   try {
-    // Clean the entire generated directory to ensure fresh output
-    const genDir = path.dirname(outPath);
-    if (fs.existsSync(genDir)) {
-      const filesToClean = [
-        "cidl.json",
-        "wrangler.toml",
-        "workers.ts",
-        "client.ts",
-        "migrations.sql",
-      ];
-      for (const file of filesToClean) {
-        const filePath = path.join(genDir, file);
-        if (fs.existsSync(filePath)) {
-          fs.unlinkSync(filePath);
-        }
-      }
-    }
-    fs.mkdirSync(genDir, { recursive: true });
-
     const extractor = new CidlExtractor(cloesceProjectName, "v0.0.3");
     const result = extractor.extract(project);
 
@@ -283,6 +268,7 @@ async function runExtractor(opts: {
     }
 
     const json = JSON.stringify(ast, null, 4);
+    fs.mkdirSync(path.dirname(outPath), { recursive: true });
     fs.writeFileSync(outPath, json);
 
     if (!opts.silent) {
@@ -335,7 +321,7 @@ async function runWasmCommand(
     wasi_snapshot_preview1: wasi.wasiImport,
   });
 
-  console.log(`🚀 Running: ${config.name}`);
+  console.log(`Running: ${config.name}`);
 
   try {
     wasi.start(instance);
@@ -363,7 +349,7 @@ const runCmd = command({
     }),
   },
   handler: async (args) => {
-    console.log("🚀 Running complete generation pipeline...\n");
+    console.log("   Running complete generation pipeline...\n");
     console.log(`   Workers URL: ${args.workers}`);
     console.log(`   Client URL: ${args.client}\n`);
 
@@ -375,7 +361,7 @@ const runCmd = command({
       await runWasmCommand(config, true);
     }
 
-    console.log("🎉 Generation complete!");
+    console.log("Generation complete!");
   },
 });
 
