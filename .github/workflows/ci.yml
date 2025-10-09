@@ -12,7 +12,7 @@ env:
 
 jobs:
   ci:
-    name: Full Build & Test
+    name: Check & Build & Test
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -47,6 +47,7 @@ jobs:
           cargo fmt -- --check
           cargo clippy --all-targets --all-features -- -D warnings
           cargo build --target wasm32-unknown-unknown --release
+          cargo test
 
       - name: Check & Build Rust Generator
         working-directory: src/generator
@@ -54,6 +55,7 @@ jobs:
           cargo fmt -- --check
           cargo clippy --all-targets --all-features -- -D warnings
           cargo build --release
+          cargo test
 
       # --- Node Setup ---
       - uses: actions/setup-node@v4
@@ -76,15 +78,7 @@ jobs:
           npm run build
           npm test
 
-      # --- Rust Integration Tests ---
-      - name: Runtime Tests
-        working-directory: tests/runner
-        run: cargo run --bin test runtime --check
-
-      - name: Generator Tests
-        working-directory: tests/runner
-        run: cargo run --bin test generator --check
-
+      # --- Integration Tests ---
       - name: Regression Tests
         working-directory: tests/runner
         run: cargo run --bin test regression --check
