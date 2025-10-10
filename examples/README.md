@@ -4,15 +4,7 @@ v0.0.3 is the official "launch" of Cloesce as npm now orchestrates
 the TypeScript and Rust logic and the package is now released onto npm
 
 1. Run extractor:
-- Run `npm install cloesce`
-- Make a default cloesce-config.json in the root project directory
-
-Ex:
-{
-  "source": "./src",
-  "workersUrl": "http://localhost:5002/api",
-  "clientUrl": "http://localhost:5002/api"
-}
+- Run `npm install`
 
 2. Run generators
 - cloesce run
