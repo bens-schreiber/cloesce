@@ -3,10 +3,10 @@
 v0.0.3 is the official "launch" of Cloesce as npm now orchestrates
 the TypeScript and Rust logic and the package is now released onto npm
 
-1. Run extractor:
+1. Install npm package (do this in the examples dir):
 - Run `npm install`
 
-2. Run generators
+2. Run npm package:
 - cloesce run
 
 3. Wrangle' it
