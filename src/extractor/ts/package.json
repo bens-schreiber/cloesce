@@ -4,7 +4,6 @@
   "description": "A tool to extract and compile TypeScript code into something wrangler can consume and deploy for D1 Databases and Cloudflare Workers",
   "type": "module",
   "license": "Apache-2.0",
-
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
@@ -17,7 +16,6 @@
   "bin": {
     "cloesce": "./dist/cli.js"
   },
-
   "files": [
     "dist/**",
     "wasm/**",
@@ -25,8 +23,9 @@
     "LICENSE"
   ],
   "sideEffects": false,
-  "engines": { "node": ">=18.17" },
-
+  "engines": {
+    "node": ">=18.17"
+  },
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc --noEmit",
@@ -35,7 +34,6 @@
     "format:fix": "prettier --write .",
     "prepublishOnly": "npm run typecheck && npm run build && npm run test"
   },
-
   "dependencies": {
     "cmd-ts": "^0.14.1",
     "ts-morph": "^22.0.0"
@@ -48,11 +46,16 @@
     "vitest": "^3.2.4",
     "wrangler": "^4.34.0"
   },
-
   "repository": {
     "type": "git",
     "url": "git+https://github.com/bens-schreiber/cloesce.git"
   },
   "homepage": "https://github.com/bens-schreiber/cloesce",
-  "keywords": ["cloudflare", "workers", "d1", "orm", "cli"]
+  "keywords": [
+    "cloudflare",
+    "workers",
+    "d1",
+    "orm",
+    "cli"
+  ]
 }
