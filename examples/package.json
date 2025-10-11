@@ -8,8 +8,8 @@
     "frontend": "vite ./src/frontend"
   },
   "dependencies": {
-    "wrangler": "^4.34.0",
-    "cloesce": "file:../src/extractor/ts"
+    "cloesce": "^0.0.3",
+    "wrangler": "^4.34.0"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20250906.0",
