@@ -207,21 +207,21 @@ async function runWasmCommand(config: WasmConfig) {
     fs.writeFileSync(wranglerPath, "");
   }
 
-  const wasiArgs = config.args.map(arg => {
+  const wasiArgs = config.args.map((arg) => {
     // Skip URLs for http:// and stuff
     if (/^[a-zA-Z]+:\/\//.test(arg)) {
       return arg;
     }
-    
+
     // If it looks like a file path, convert it to Unix style beause WASI expects that
-    if (arg.includes(path.sep) || arg.includes('/')) {
+    if (arg.includes(path.sep) || arg.includes("/")) {
       // Convert to relative path from root
-      const relativePath = path.isAbsolute(arg) 
+      const relativePath = path.isAbsolute(arg)
         ? path.relative(root, arg)
         : arg;
       // Convert Windows separators to Unix and ensure leading slash
-      const unixPath = relativePath.replace(/\\/g, '/');
-      return unixPath.startsWith('/') ? unixPath : '/' + unixPath;
+      const unixPath = relativePath.replace(/\\/g, "/");
+      return unixPath.startsWith("/") ? unixPath : "/" + unixPath;
     }
     return arg;
   });
