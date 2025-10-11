@@ -27,7 +27,7 @@ type WasmConfig = {
   env?: Record<string, string>;
 };
 
-const WASM_PATH = path.join(__dirname, "..", "dist", "cli.wasm");
+const WASM_PATH = path.join(__dirname, "cli.wasm");
 
 type CloesceConfig = {
   paths?: string[];
@@ -200,17 +200,35 @@ async function runExtractor(opts: {
 
 async function runWasmCommand(config: WasmConfig) {
   const root = process.cwd();
-  const outputDir = ".generated";
 
-  const wranglerPath = path.join(root, outputDir, "wrangler.toml");
+  // Look for wrangler.toml in the root directory
+  const wranglerPath = path.join(root, "wrangler.toml");
   if (!fs.existsSync(wranglerPath)) {
-    fs.mkdirSync(path.dirname(wranglerPath), { recursive: true });
     fs.writeFileSync(wranglerPath, "");
   }
 
+  const wasiArgs = config.args.map(arg => {
+    // Skip URLs for http:// and stuff
+    if (/^[a-zA-Z]+:\/\//.test(arg)) {
+      return arg;
+    }
+    
+    // If it looks like a file path, convert it to Unix style beause WASI expects that
+    if (arg.includes(path.sep) || arg.includes('/')) {
+      // Convert to relative path from root
+      const relativePath = path.isAbsolute(arg) 
+        ? path.relative(root, arg)
+        : arg;
+      // Convert Windows separators to Unix and ensure leading slash
+      const unixPath = relativePath.replace(/\\/g, '/');
+      return unixPath.startsWith('/') ? unixPath : '/' + unixPath;
+    }
+    return arg;
+  });
+
   const wasi = new WASI({
     version: "preview1",
-    args: [path.basename(WASM_PATH), ...config.args],
+    args: [path.basename(WASM_PATH), ...wasiArgs],
     env: { ...process.env, ...config.env } as Record<string, string>,
     preopens: { "/": root },
   });
@@ -250,8 +268,7 @@ const runCmd = command({
 
     await runExtractor({ debug: args.debug });
 
-    // in case the user wants to dump their generated files somewhere else
-    // we should allow them to define that directory in the config
+    const root = process.cwd();
     const outputDir = config.outputDir ?? ".generated";
 
     const allConfig: WasmConfig = {
@@ -261,7 +278,7 @@ const runCmd = command({
         "generate",
         "all",
         path.join(outputDir, "cidl.json"),
-        path.join(outputDir, "wrangler.toml"),
+        path.join(root, "wrangler.toml"),
         path.join(outputDir, "migrations.sql"),
         path.join(outputDir, "workers.ts"),
         path.join(outputDir, "client.ts"),
@@ -280,13 +297,12 @@ const wranglerCmd = command({
   description: "Generate wrangler.toml configuration",
   args: {},
   handler: async () => {
-    const config = loadCloesceConfig(process.cwd());
-    const outputDir = config.outputDir ?? ".generated";
+    const root = process.cwd();
 
     await runWasmCommand({
       name: "wrangler",
       wasmFile: "cli.wasm",
-      args: ["generate", "wrangler", path.join(outputDir, "wrangler.toml")],
+      args: ["generate", "wrangler", path.join(root, "wrangler.toml")],
     });
   },
 });
@@ -318,6 +334,7 @@ const workersCmd = command({
   args: {},
   handler: async () => {
     const config = loadCloesceConfig(process.cwd());
+    const root = process.cwd();
     const outputDir = config.outputDir ?? ".generated";
 
     if (!config.workersUrl) {
@@ -333,7 +350,7 @@ const workersCmd = command({
         "workers",
         path.join(outputDir, "cidl.json"),
         path.join(outputDir, "workers.ts"),
-        path.join(outputDir, "wrangler.toml"),
+        path.join(root, "wrangler.toml"),
         config.workersUrl,
       ],
     });
