@@ -6,156 +6,88 @@ on:
   pull_request:
     branches: ["main"]
 
+env:
+  CARGO_HOME: ${{ github.workspace }}/.cargo
+  RUSTUP_HOME: ${{ github.workspace }}/.rustup
+
 jobs:
-  rust:
-    name: Generator
+  ci:
+    name: Check & Build & Test
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: src/generator
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+        shell: bash
 
-      - name: Install Rust
-        uses: actions-rs/toolchain@v1
+    steps:
+      - uses: actions/checkout@v4
+
+      # --- Rust Setup ---
+      - uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
           components: rustfmt, clippy
           override: true
 
-      - name: Cache Cargo registry
-        uses: actions/cache@v3
+      - uses: actions/cache@v3
         with:
           path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-          key: cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+            ${{ env.CARGO_HOME }}/registry
+            ${{ env.CARGO_HOME }}/git
+            src/runtime/target
+            src/generator/target
+          key: cargo-${{ hashFiles('**/Cargo.lock') }}
 
-      - name: Cache Cargo build
-        uses: actions/cache@v3
-        with:
-          path: target
-          key: cargo-build-${{ hashFiles('**/Cargo.lock') }}
+      - run: rustup target add wasm32-unknown-unknown
 
-      - name: Run cargo fmt
-        run: cargo fmt --all -- --check
+      - name: Check & Build & Test WASM Runtime
+        working-directory: src/runtime
+        run: |
+          cargo fmt -- --check
+          cargo clippy --all-targets --all-features -- -D warnings
+          cargo build --target wasm32-unknown-unknown --release
+          cargo test
 
-      - name: Run Clippy
-        run: cargo clippy --all-targets --all-features -- -D warnings
+      - name: Check & Build & Test Generator
+        working-directory: src/generator
+        run: |
+          cargo fmt -- --check
+          cargo clippy --all-targets --all-features -- -D warnings
+          cargo build --release
+          cargo build --target wasm32-unknown-unknown --release
+          cargo test
 
-      - name: Build crate
-        run: cargo build --all-targets
-
-      - name: Run tests
-        run: cargo test --all
-
-  extractor-ts:
-    name: extractor-ts
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: src/extractor/ts
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Use Node.js
-        uses: actions/setup-node@v4
+      # --- Node Setup ---
+      - uses: actions/setup-node@v4
         with:
           node-version: 20
 
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Prettier
-        run: npm run format
-
-      - name: TypeScript typecheck
-        run: npm run typecheck
-
-      - name: Build
-        run: npm run build
-
-      - name: Unit tests
-        run: npm test
-
-  integration:
-    name: Integration Tests
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/cache@v3
         with:
-          node-version: 20
+          path: ~/.npm
+          key: npm-cache-${{ hashFiles('**/package-lock.json') }}
 
-      # Build extractor-ts dependency
-      - name: Build extractor-ts
-        working-directory: src/extractor/ts
+      - name: Check & Build & Test Frontend TS
+        working-directory: src/frontend/ts
         run: |
           npm ci
+          npm run format -- --check
+          npm run typecheck
           npm run build
+          npm test
 
-      - name: Setup Rust
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          components: rustfmt, clippy
-          override: true
-
-      # Cache Cargo registry
-      - name: Cache Cargo registry
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-          key: cargo-registry-${{ hashFiles('**/Cargo.lock') }}
-
-      # Cache Cargo build
-      - name: Cache Cargo build
-        uses: actions/cache@v3
-        with:
-          path: target
-          key: cargo-build-${{ hashFiles('**/Cargo.lock') }}
-
-      - name: Run regression tests
+      # --- Integration Tests ---
+      - name: Regression Tests
         working-directory: tests/runner
         run: cargo run --bin test regression --check
 
-      - name: Run extractor run-fail
+      - name: Run-Fail Tests
         working-directory: tests/runner
         run: cargo run --bin test run-fail --check
 
-  e2e:
-    name: E2E Tests
-    runs-on: ubuntu-latest
-    defaults:
-      run:
+      # --- E2E Tests ---
+      - name: Check & Test E2E
         working-directory: tests/e2e
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Use Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-
-      - name: Build extractor dependency
-        working-directory: src/extractor/ts
         run: |
-          npm ci
-          npm run build
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Prettier
-        run: npm run format -- --check
-
-      - name: Run E2E tests
-        run: npm test
+          npm install
+          npm run format -- --check
+          npm test

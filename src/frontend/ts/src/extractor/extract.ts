@@ -28,7 +28,7 @@ import {
   ExtractorError,
   ExtractorErrorCode,
   PlainOldObject,
-} from "./common.js";
+} from "../common.js";
 import { TypeFormatFlags } from "typescript";
 
 enum AttributeDecoratorKind {

@@ -18,6 +18,24 @@ export default {
             ["Env", env]
         ]);
 
-        return await cloesce(request, cidl, constructorRegistry, instanceRegistry, { envName: "Env", dbName: "db" },  "/api");
+        try {
+            return await cloesce(
+                request, 
+                cidl, 
+                constructorRegistry, 
+                instanceRegistry, 
+                { envName: "Env", dbName: "db" },  
+                "/api"
+            );
+        } catch(e: any) {
+            return new Response(JSON.stringify({
+                ok: false,
+                status: 500,
+                message: e.toString()
+            }), {
+                status: 500,
+                headers: { "Content-Type": "application/json" },
+              });
+        }
     }
 };

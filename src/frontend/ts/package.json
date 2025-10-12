@@ -1,0 +1,63 @@
+{
+  "name": "cloesce",
+  "version": "0.0.4",
+  "description": "A tool to extract and compile TypeScript code into something wrangler can consume and deploy for D1 Databases and Cloudflare Workers",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "license": "Apache-2.0",
+  "scripts": {
+    "test": "vitest",
+    "format:fix": "prettier --write .",
+    "format": "prettier --check .",
+    "typecheck": "tsc --noEmit",
+    "build": "tsc -p tsconfig.json && npm run copy-rs-runtime-wasm && npm run copy-generator-wasm",
+    "copy-rs-runtime-wasm": "cp ../../runtime/target/wasm32-unknown-unknown/release/runtime.wasm ./dist/runtime.wasm",
+    "copy-generator-wasm": "cp ../../generator/target/wasm32-unknown-unknown/release/cli.wasm ./dist/generator.wasm"
+  },
+  "dependencies": {
+    "cmd-ts": "^0.14.1",
+    "prettier": "^3.6.2",
+    "ts-morph": "^22.0.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.6.0",
+    "wrangler": "^4.34.0"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20250906.0",
+    "prettier": "^3.6.2",
+    "vitest": "^3.2.4",
+    "vite-plugin-wasm": "^3.5.0"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./cli": "./dist/cli.js"
+  },
+  "bin": {
+    "cloesce": "./dist/cli.js"
+  },
+  "files": [
+    "dist/**/*",
+    "README.md",
+    "LICENSE"
+  ],
+  "sideEffects": false,
+  "engines": {
+    "node": ">=18.17"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/bens-schreiber/cloesce.git"
+  },
+  "homepage": "https://github.com/bens-schreiber/cloesce",
+  "keywords": [
+    "cloudflare",
+    "workers",
+    "d1",
+    "orm",
+    "cli"
+  ]
+}
