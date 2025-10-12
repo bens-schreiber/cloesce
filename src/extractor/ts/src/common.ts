@@ -17,6 +17,7 @@ export enum ExtractorErrorCode {
   MissingPrimaryKey,
   MissingWranglerEnv,
   TooManyWranglerEnvs,
+  MissingFile,
 }
 
 const errorInfoMap: Record<
@@ -67,6 +68,10 @@ const errorInfoMap: Record<
   [ExtractorErrorCode.TooManyWranglerEnvs]: {
     description: "Too many wrangler environments defined in the project",
     suggestion: "Consolidate or remove unused @WranglerEnv's",
+  },
+  [ExtractorErrorCode.MissingFile]: {
+    description: "A specified input file could not be found",
+    suggestion: "Verify the input file path is correct",
   },
 };
 
