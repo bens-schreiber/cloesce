@@ -56,7 +56,7 @@ const cmds = subcommands({
 
         if (!config.workersUrl || !config.clientUrl) {
           console.error(
-            "Error: `workersUrl` and `clientUrl` must be defined in cloesce.config.json"
+            "Error: `workersUrl` and `clientUrl` must be defined in cloesce.config.json",
           );
           process.exit(1);
         }
@@ -135,7 +135,7 @@ const cmds = subcommands({
 
         if (!config.workersUrl) {
           console.error(
-            "Error: workersUrl must be defined in cloesce-config.json"
+            "Error: workersUrl must be defined in cloesce-config.json",
           );
           process.exit(1);
         }
@@ -165,7 +165,7 @@ const cmds = subcommands({
 
         if (!config.clientUrl) {
           console.error(
-            "Error: clientUrl must be defined in cloesce-config.json"
+            "Error: clientUrl must be defined in cloesce-config.json",
           );
           process.exit(1);
         }
@@ -302,7 +302,7 @@ async function extract(opts: {
   } catch (err: any) {
     console.error(
       "Critical uncaught error. Submit a ticket to https://github.com/bens-schreiber/cloesce: ",
-      err?.message ?? err
+      err?.message ?? err,
     );
     process.exit(1);
   }
@@ -358,7 +358,7 @@ async function generate(config: WasmConfig) {
 
 function loadCloesceConfig(
   root: string,
-  debug: boolean = false
+  debug: boolean = false,
 ): CloesceConfig {
   const configPath = path.join(root, "cloesce.config.json");
   if (fs.existsSync(configPath)) {
@@ -388,7 +388,7 @@ function readPackageJsonProjectName(cwd: string): string {
 function findCloesceProject(
   root: string,
   searchPaths: string[],
-  project: Project
+  project: Project,
 ): void {
   for (const searchPath of searchPaths) {
     let fullPath: string;
