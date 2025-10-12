@@ -125,6 +125,7 @@ impl Fixture {
         let res = self.run_command(
             Command::new("node")
                 .arg("../../src/frontend/ts/dist/extractor/cli.js")
+                .arg("extract")
                 .arg("--in")
                 .arg(&self.path)
                 .arg("--out")

@@ -1,13 +1,14 @@
-# Example Cloesce TypeScript Project v0.0.2
+# Example Cloesce TypeScript Project v0.0.3
 
-v0.0.3 is the official "launch" of Cloesce as npm now orchestrates
-the TypeScript and Rust logic and the package is now released onto npm
+v0.0.3 is a bare bones pre-alpha version of cloesce.
 
 1. Install npm package (do this in the examples dir):
+
 - Run `npm install`
 
-2. Run npm package:
-- npx cloesce run
+2. Compile cloesce
+
+- `cloesce compile`
 
 3. Wrangle' it
 
@@ -24,4 +25,5 @@ npx wrangler dev --port 5000
 ```
 
 4. Run frontend
+
 - `npm run frontend`

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+
 import { WASI } from "node:wasi";
 import fs from "node:fs";
 import path from "node:path";
@@ -18,6 +19,7 @@ import { ExtractorError, ExtractorErrorCode, getErrorInfo } from "../common.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+const GENERATOR_WASM_PATH = path.join(__dirname, "generator.wasm");
 
 type WasmConfig = {
   name: string;
@@ -26,8 +28,6 @@ type WasmConfig = {
   args: string[];
   env?: Record<string, string>;
 };
-
-const WASM_PATH = path.join(__dirname, "cli.wasm");
 
 type CloesceConfig = {
   paths?: string[];
@@ -38,87 +38,197 @@ type CloesceConfig = {
   clientUrl?: string;
 };
 
-function loadCloesceConfig(
-  root: string,
-  debug: boolean = false
-): CloesceConfig {
-  const configPath = path.join(root, "cloesce-config.json");
-  if (fs.existsSync(configPath)) {
-    try {
-      const config = JSON.parse(fs.readFileSync(configPath, "utf8"));
-      if (debug) console.log(`Loaded config from ${configPath}`);
-      return config;
-    } catch (err) {
-      console.warn(`Failed to parse cloesce-config.json: ${err}`);
-    }
-  }
-  return {};
-}
+const cmds = subcommands({
+  name: "cloesce",
+  cmds: {
+    compile: command({
+      name: "compile",
+      description: "Run through the full compilation process.",
+      args: {
+        debug: flag({
+          long: "debug",
+          short: "d",
+          description: "Show debug output",
+        }),
+      },
+      handler: async (args) => {
+        const config = loadCloesceConfig(process.cwd(), args.debug);
 
-function readPackageJsonProjectName(cwd: string): string {
-  const pkgPath = path.join(cwd, "package.json");
-  let projectName = path.basename(cwd);
+        if (!config.workersUrl || !config.clientUrl) {
+          console.error(
+            "Error: `workersUrl` and `clientUrl` must be defined in cloesce.config.json"
+          );
+          process.exit(1);
+        }
 
-  if (fs.existsSync(pkgPath)) {
-    const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf8"));
-    projectName = pkg.name ?? projectName;
-  }
+        // Creates a `cidl.json` file. Exits the process on failure.
+        await extract({ debug: args.debug });
 
-  return projectName;
-}
+        const root = process.cwd();
+        const outputDir = config.outputDir ?? ".generated";
 
-function findCloesceProject(
-  root: string,
-  searchPaths: string[],
-  project: Project
-): void {
-  for (const searchPath of searchPaths) {
-    let fullPath: string;
+        const allConfig: WasmConfig = {
+          name: "all",
+          wasmFile: "generator.wasm",
+          args: [
+            "generate",
+            "all",
+            path.join(outputDir, "cidl.json"),
+            path.join(root, "wrangler.toml"),
+            path.join(outputDir, "migrations.sql"),
+            path.join(outputDir, "workers.ts"),
+            path.join(outputDir, "client.ts"),
+            config.clientUrl,
+            config.workersUrl,
+          ],
+        };
 
-    if (path.isAbsolute(searchPath) || searchPath.startsWith(root)) {
-      fullPath = path.normalize(searchPath);
-    } else {
-      fullPath = path.resolve(root, searchPath);
-    }
+        // Runs a generator command. Exits the process on failure.
+        await generate(allConfig);
+      },
+    }),
 
-    if (!fs.existsSync(fullPath)) {
-      console.warn(`Warning: Path "${searchPath}" does not exist`);
-      continue;
-    }
+    wrangler: command({
+      name: "wrangler",
+      description: "Generate wrangler.toml configuration",
+      args: {},
+      handler: async () => {
+        const root = process.cwd();
 
-    const stats = fs.statSync(fullPath);
-    if (stats.isFile() && /\.cloesce\.ts$/i.test(fullPath)) {
-      project.addSourceFileAtPath(fullPath);
-    } else if (stats.isDirectory()) {
-      walkDirectory(fullPath, project);
-    }
-  }
+        await generate({
+          name: "wrangler",
+          wasmFile: "generator.wasm",
+          args: ["generate", "wrangler", path.join(root, "wrangler.toml")],
+        });
+      },
+    }),
 
-  function walkDirectory(dir: string, project: Project): void {
-    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-      const fullPath = path.join(dir, entry.name);
-      if (entry.isDirectory() && !entry.name.startsWith(".")) {
-        walkDirectory(fullPath, project);
-      } else if (entry.isFile() && /\.cloesce\.ts$/i.test(entry.name)) {
-        project.addSourceFileAtPath(fullPath);
-      }
-    }
-  }
-}
+    d1: command({
+      name: "d1",
+      description: "Generate database schema",
+      args: {},
+      handler: async () => {
+        const config = loadCloesceConfig(process.cwd());
+        const outputDir = config.outputDir ?? ".generated";
 
-function formatErr(e: ExtractorError): string {
-  const { description, suggestion } = getErrorInfo(e.code);
+        await generate({
+          name: "d1",
+          wasmFile: "generator.wasm",
+          args: [
+            "generate",
+            "d1",
+            path.join(outputDir, "cidl.json"),
+            path.join(outputDir, "migrations.sql"),
+          ],
+        });
+      },
+    }),
 
-  const contextLine = e.context ? `Context: ${e.context}\n` : "";
-  const snippetLine = e.snippet ? `${e.snippet}\n\n` : "";
+    workers: command({
+      name: "workers",
+      description: "Generate workers TypeScript",
+      args: {},
+      handler: async () => {
+        const config = loadCloesceConfig(process.cwd());
+        const root = process.cwd();
+        const outputDir = config.outputDir ?? ".generated";
 
-  return `==== CLOESCE ERROR ====
-Error [${ExtractorErrorCode[e.code]}]: ${description}
-Phase: TypeScript IDL Extraction
-${contextLine}${snippetLine}Suggested fix: ${suggestion}`;
-}
+        if (!config.workersUrl) {
+          console.error(
+            "Error: workersUrl must be defined in cloesce-config.json"
+          );
+          process.exit(1);
+        }
 
-async function runExtractor(opts: {
+        await generate({
+          name: "workers",
+          wasmFile: "generator.wasm",
+          args: [
+            "generate",
+            "workers",
+            path.join(outputDir, "cidl.json"),
+            path.join(outputDir, "workers.ts"),
+            path.join(root, "wrangler.toml"),
+            config.workersUrl,
+          ],
+        });
+      },
+    }),
+
+    client: command({
+      name: "client",
+      description: "Generate client TypeScript",
+      args: {},
+      handler: async () => {
+        const config = loadCloesceConfig(process.cwd());
+        const outputDir = config.outputDir ?? ".generated";
+
+        if (!config.clientUrl) {
+          console.error(
+            "Error: clientUrl must be defined in cloesce-config.json"
+          );
+          process.exit(1);
+        }
+
+        await generate({
+          name: "client",
+          wasmFile: "generator.wasm",
+          args: [
+            "generate",
+            "client",
+            path.join(outputDir, "cidl.json"),
+            path.join(outputDir, "client.ts"),
+            config.clientUrl,
+          ],
+        });
+      },
+    }),
+
+    extract: command({
+      name: "extract",
+      description: "Extract models and write cidl.json only",
+      args: {
+        projectName: option({
+          long: "project-name",
+          type: optional(string),
+          description: "Project name",
+        }),
+        out: option({
+          long: "out",
+          short: "o",
+          type: optional(string),
+          description: "Output path (default: .generated/cidl.json)",
+        }),
+        inp: option({
+          long: "in",
+          short: "i",
+          type: optional(string),
+          description: "Input file or directory",
+        }),
+        location: option({
+          long: "location",
+          short: "l",
+          type: optional(string),
+          description: "Project directory (default: cwd)",
+        }),
+        truncateSourcePaths: flag({
+          long: "truncateSourcePaths",
+          description: "Sets all source paths to just their file name",
+        }),
+        debug: flag({
+          long: "debug",
+          short: "d",
+          description: "Show debug output",
+        }),
+      },
+      handler: async (args) => {
+        await extract({ ...args });
+      },
+    }),
+  },
+});
+
+async function extract(opts: {
   projectName?: string;
   out?: string;
   inp?: string;
@@ -198,7 +308,7 @@ async function runExtractor(opts: {
   }
 }
 
-async function runWasmCommand(config: WasmConfig) {
+async function generate(config: WasmConfig) {
   const root = process.cwd();
 
   // Look for wrangler.toml in the root directory
@@ -228,12 +338,12 @@ async function runWasmCommand(config: WasmConfig) {
 
   const wasi = new WASI({
     version: "preview1",
-    args: [path.basename(WASM_PATH), ...wasiArgs],
+    args: [path.basename(GENERATOR_WASM_PATH), ...wasiArgs],
     env: { ...process.env, ...config.env } as Record<string, string>,
     preopens: { "/": root },
   });
 
-  const bytes = fs.readFileSync(WASM_PATH);
+  const bytes = fs.readFileSync(GENERATOR_WASM_PATH);
   const mod = await WebAssembly.compile(bytes);
   const instance = await WebAssembly.instantiate(mod, {
     wasi_snapshot_preview1: wasi.wasiImport,
@@ -246,199 +356,87 @@ async function runWasmCommand(config: WasmConfig) {
   }
 }
 
-const runCmd = command({
-  name: "run",
-  description: "Extract CIDL and run all code generators",
-  args: {
-    debug: flag({
-      long: "debug",
-      short: "d",
-      description: "Show debug output",
-    }),
-  },
-  handler: async (args) => {
-    const config = loadCloesceConfig(process.cwd(), args.debug);
+function loadCloesceConfig(
+  root: string,
+  debug: boolean = false
+): CloesceConfig {
+  const configPath = path.join(root, "cloesce.config.json");
+  if (fs.existsSync(configPath)) {
+    try {
+      const config = JSON.parse(fs.readFileSync(configPath, "utf8"));
+      if (debug) console.log(`Loaded config from ${configPath}`);
+      return config;
+    } catch (err) {
+      console.warn(`Failed to parse cloesce.config.json: ${err}`);
+    }
+  }
+  return {};
+}
 
-    if (!config.workersUrl || !config.clientUrl) {
-      console.error(
-        "Error: workersUrl and clientUrl must be defined in cloesce-config.json"
-      );
-      process.exit(1);
+function readPackageJsonProjectName(cwd: string): string {
+  const pkgPath = path.join(cwd, "package.json");
+  let projectName = path.basename(cwd);
+
+  if (fs.existsSync(pkgPath)) {
+    const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf8"));
+    projectName = pkg.name ?? projectName;
+  }
+
+  return projectName;
+}
+
+function findCloesceProject(
+  root: string,
+  searchPaths: string[],
+  project: Project
+): void {
+  for (const searchPath of searchPaths) {
+    let fullPath: string;
+
+    if (path.isAbsolute(searchPath) || searchPath.startsWith(root)) {
+      fullPath = path.normalize(searchPath);
+    } else {
+      fullPath = path.resolve(root, searchPath);
     }
 
-    await runExtractor({ debug: args.debug });
-
-    const root = process.cwd();
-    const outputDir = config.outputDir ?? ".generated";
-
-    const allConfig: WasmConfig = {
-      name: "all",
-      wasmFile: "cli.wasm",
-      args: [
-        "generate",
-        "all",
-        path.join(outputDir, "cidl.json"),
-        path.join(root, "wrangler.toml"),
-        path.join(outputDir, "migrations.sql"),
-        path.join(outputDir, "workers.ts"),
-        path.join(outputDir, "client.ts"),
-        config.clientUrl,
-        config.workersUrl,
-      ],
-    };
-
-    await runWasmCommand(allConfig);
-  },
-});
-
-// In case the user wants to run individual steps we should probably allow them
-const wranglerCmd = command({
-  name: "wrangler",
-  description: "Generate wrangler.toml configuration",
-  args: {},
-  handler: async () => {
-    const root = process.cwd();
-
-    await runWasmCommand({
-      name: "wrangler",
-      wasmFile: "cli.wasm",
-      args: ["generate", "wrangler", path.join(root, "wrangler.toml")],
-    });
-  },
-});
-
-const d1Cmd = command({
-  name: "d1",
-  description: "Generate database schema",
-  args: {},
-  handler: async () => {
-    const config = loadCloesceConfig(process.cwd());
-    const outputDir = config.outputDir ?? ".generated";
-
-    await runWasmCommand({
-      name: "d1",
-      wasmFile: "cli.wasm",
-      args: [
-        "generate",
-        "d1",
-        path.join(outputDir, "cidl.json"),
-        path.join(outputDir, "migrations.sql"),
-      ],
-    });
-  },
-});
-
-const workersCmd = command({
-  name: "workers",
-  description: "Generate workers TypeScript",
-  args: {},
-  handler: async () => {
-    const config = loadCloesceConfig(process.cwd());
-    const root = process.cwd();
-    const outputDir = config.outputDir ?? ".generated";
-
-    if (!config.workersUrl) {
-      console.error("Error: workersUrl must be defined in cloesce-config.json");
-      process.exit(1);
+    if (!fs.existsSync(fullPath)) {
+      console.warn(`Warning: Path "${searchPath}" does not exist`);
+      continue;
     }
 
-    await runWasmCommand({
-      name: "workers",
-      wasmFile: "cli.wasm",
-      args: [
-        "generate",
-        "workers",
-        path.join(outputDir, "cidl.json"),
-        path.join(outputDir, "workers.ts"),
-        path.join(root, "wrangler.toml"),
-        config.workersUrl,
-      ],
-    });
-  },
-});
-
-const clientCmd = command({
-  name: "client",
-  description: "Generate client TypeScript",
-  args: {},
-  handler: async () => {
-    const config = loadCloesceConfig(process.cwd());
-    const outputDir = config.outputDir ?? ".generated";
-
-    if (!config.clientUrl) {
-      console.error("Error: clientUrl must be defined in cloesce-config.json");
-      process.exit(1);
+    const stats = fs.statSync(fullPath);
+    if (stats.isFile() && /\.cloesce\.ts$/i.test(fullPath)) {
+      project.addSourceFileAtPath(fullPath);
+    } else if (stats.isDirectory()) {
+      walkDirectory(fullPath, project);
     }
+  }
 
-    await runWasmCommand({
-      name: "client",
-      wasmFile: "cli.wasm",
-      args: [
-        "generate",
-        "client",
-        path.join(outputDir, "cidl.json"),
-        path.join(outputDir, "client.ts"),
-        config.clientUrl,
-      ],
-    });
-  },
-});
+  function walkDirectory(dir: string, project: Project): void {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const fullPath = path.join(dir, entry.name);
+      if (entry.isDirectory() && !entry.name.startsWith(".")) {
+        walkDirectory(fullPath, project);
+      } else if (entry.isFile() && /\.cloesce\.ts$/i.test(entry.name)) {
+        project.addSourceFileAtPath(fullPath);
+      }
+    }
+  }
+}
 
-const extractCmd = command({
-  name: "extract",
-  description: "Extract models and write cidl.json only",
-  args: {
-    projectName: option({
-      long: "project-name",
-      type: optional(string),
-      description: "Project name",
-    }),
-    out: option({
-      long: "out",
-      short: "o",
-      type: optional(string),
-      description: "Output path (default: .generated/cidl.json)",
-    }),
-    inp: option({
-      long: "in",
-      short: "i",
-      type: optional(string),
-      description: "Input file or directory",
-    }),
-    location: option({
-      long: "location",
-      short: "l",
-      type: optional(string),
-      description: "Project directory (default: cwd)",
-    }),
-    truncateSourcePaths: flag({
-      long: "truncateSourcePaths",
-      description: "Sets all source paths to just their file name",
-    }),
-    debug: flag({
-      long: "debug",
-      short: "d",
-      description: "Show debug output",
-    }),
-  },
-  handler: async (args) => {
-    await runExtractor({ ...args });
-  },
-});
+function formatErr(e: ExtractorError): string {
+  const { description, suggestion } = getErrorInfo(e.code);
 
-const router = subcommands({
-  name: "cloesce",
-  cmds: {
-    run: runCmd,
-    extract: extractCmd,
-    wrangler: wranglerCmd,
-    d1: d1Cmd,
-    workers: workersCmd,
-    client: clientCmd,
-  },
-});
+  const contextLine = e.context ? `Context: ${e.context}\n` : "";
+  const snippetLine = e.snippet ? `${e.snippet}\n\n` : "";
 
-run(router, process.argv.slice(2)).catch((err) => {
+  return `==== CLOESCE ERROR ====
+Error [${ExtractorErrorCode[e.code]}]: ${description}
+Phase: TypeScript IDL Extraction
+${contextLine}${snippetLine}Suggested fix: ${suggestion}`;
+}
+
+run(cmds, process.argv.slice(2)).catch((err) => {
   console.error(err);
   process.exit(1);
 });

@@ -10,9 +10,12 @@
     "test": "vitest",
     "format:fix": "prettier --write .",
     "format": "prettier --check .",
-    "build": "tsc -p tsconfig.json && cp ../../runtime/target/wasm32-unknown-unknown/release/runtime.wasm ./dist/runtime.wasm ",
     "typecheck": "tsc --noEmit",
-    "prepublishOnly": "npm run typecheck && npm run build && npm run test"
+
+    "build": "tsc -p tsconfig.json && npm run copy-rs-runtime-wasm && npm run copy-generator-wasm",
+
+    "copy-rs-runtime-wasm": "cp ../../runtime/target/wasm32-unknown-unknown/release/runtime.wasm ./dist/runtime.wasm",
+    "copy-generator-wasm": "cp ../../generator/target/wasm32-unknown-unknown/release/cli.wasm ./dist/generator.wasm"
   },
   "dependencies": {
     "cmd-ts": "^0.14.1",
@@ -38,11 +41,7 @@
   "bin": {
     "cloesce": "./dist/cli.js"
   },
-  "files": [
-    "dist/**/*",
-    "README.md",
-    "LICENSE"
-  ],
+  "files": ["dist/**/*", "README.md", "LICENSE"],
   "sideEffects": false,
   "engines": {
     "node": ">=18.17"
@@ -52,11 +51,5 @@
     "url": "git+https://github.com/bens-schreiber/cloesce.git"
   },
   "homepage": "https://github.com/bens-schreiber/cloesce",
-  "keywords": [
-    "cloudflare",
-    "workers",
-    "d1",
-    "orm",
-    "cli"
-  ]
+  "keywords": ["cloudflare", "workers", "d1", "orm", "cli"]
 }
