@@ -7,7 +7,7 @@ the TypeScript and Rust logic and the package is now released onto npm
 - Run `npm install`
 
 2. Run npm package:
-- cloesce run
+- npx cloesce run
 
 3. Wrangle' it
 
