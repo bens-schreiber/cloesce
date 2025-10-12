@@ -1,27 +1,13 @@
 # Example Cloesce TypeScript Project v0.0.2
 
-v0.0.2 is a super bare bones version of Cloesce. To get a project running:
+v0.0.3 is the official "launch" of Cloesce as npm now orchestrates
+the TypeScript and Rust logic and the package is now released onto npm
 
-1. Run extractor:
+1. Install npm package (do this in the examples dir):
+- Run `npm install`
 
-- Go into `src/extractor/ts` and `npm run build`, ensuring that `src/extractor/ts/dist/cli.js` is executable.
-- Run `cloesce` in `examples` to generate the CIDL
-
-2. Run generators
-
-```bash
-cd src/generator
-
-cargo run generate all \
-  ../../examples/.generated/cidl.json \
-  ../../examples/wrangler.toml \
-  ../../examples/.generated/migrations/seed.sql \
-  ../../examples/.generated/workers.ts \
-  ../../examples/.generated/client.ts \
-  http://localhost:5173/api \
-  http://localhost:5000/api 
-
-```
+2. Run npm package:
+- npx cloesce run
 
 3. Wrangle' it
 

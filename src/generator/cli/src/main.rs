@@ -130,21 +130,21 @@ fn run_cli() -> Result<()> {
             } => {
                 let ast = CloesceAst::from_json(&cidl_path)?;
                 ast.validate_types()?;
-                println!("✅ Validation complete.");
+                println!("Validation complete.");
 
                 generate_wrangler(&wrangler_path)?;
-                println!("✅ Wrangler generated.");
+                println!("Wrangler generated.");
 
                 generate_d1(&cidl_path, &sqlite_path)?;
-                println!("✅ D1 schema generated.");
+                println!("D1 schema generated.");
 
                 generate_workers(&cidl_path, &workers_path, &wrangler_path, &workers_domain)?;
-                println!("✅ Workers generated.");
+                println!("Workers generated.");
 
                 generate_client(&cidl_path, &client_path, &client_domain)?;
-                println!("✅ Client generated.");
+                println!("Client generated.");
 
-                println!("🎉 All generation steps completed successfully!");
+                println!("All generation steps completed successfully!");
             }
         },
     }
