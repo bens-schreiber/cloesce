@@ -5,6 +5,7 @@ import { modelsFromSql } from "../src/runtime/runtime";
 import { IncludeTree } from "../src";
 import fs from "fs";
 import path from "path";
+import { beforeEach } from "node:test";
 
 const makeAst = (methods: Record<string, any>): CloesceAst => ({
   wrangler_env: {
@@ -36,6 +37,13 @@ const makeRequest = (url: string, method?: string, body?: any) =>
     url,
     method ? { method, body: body && JSON.stringify(body) } : undefined,
   );
+
+// Mock the wasm file
+beforeEach(() => {
+  vi.mock("../runtime.wasm", () => ({
+    default: new ArrayBuffer(0),
+  }));
+});
 
 //
 // Router Tests

@@ -6,7 +6,6 @@ name = "example"
 binding = "db"
 database_id = "not_needed_for_example"
 database_name = "example"
-migrations_dir = ".generated/migrations"
 
 [vars]
 motd = "Horse tinder is the best!!!"

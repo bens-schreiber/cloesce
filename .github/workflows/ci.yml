@@ -38,6 +38,7 @@ jobs:
           key: cargo-${{ hashFiles('**/Cargo.lock') }}
 
       - run: rustup target add wasm32-unknown-unknown
+      - run: rustup target add wasm32-wasip1
 
       - name: Check & Build & Test WASM Runtime
         working-directory: src/runtime
@@ -53,7 +54,7 @@ jobs:
           cargo fmt -- --check
           cargo clippy --all-targets --all-features -- -D warnings
           cargo build --release
-          cargo build --target wasm32-unknown-unknown --release
+          cargo build --target wasm32-wasip1 --release
           cargo test
 
       # --- Node Setup ---

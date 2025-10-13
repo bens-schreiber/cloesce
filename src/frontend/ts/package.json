@@ -1,6 +1,6 @@
 {
   "name": "cloesce",
-  "version": "0.0.4",
+  "version": "0.0.3-fix.3",
   "description": "A tool to extract and compile TypeScript code into something wrangler can consume and deploy for D1 Databases and Cloudflare Workers",
   "type": "module",
   "main": "./dist/index.js",
@@ -13,18 +13,17 @@
     "typecheck": "tsc --noEmit",
     "build": "tsc -p tsconfig.json && npm run copy-rs-runtime-wasm && npm run copy-generator-wasm",
     "copy-rs-runtime-wasm": "cp ../../runtime/target/wasm32-unknown-unknown/release/runtime.wasm ./dist/runtime.wasm",
-    "copy-generator-wasm": "cp ../../generator/target/wasm32-unknown-unknown/release/cli.wasm ./dist/generator.wasm"
+    "copy-generator-wasm": "cp ../../generator/target/wasm32-wasip1/release/cli.wasm ./dist/generator.wasm"
   },
   "dependencies": {
     "cmd-ts": "^0.14.1",
-    "prettier": "^3.6.2",
     "ts-morph": "^22.0.0",
-    "ts-node": "^10.9.2",
-    "typescript": "^5.6.0",
     "wrangler": "^4.34.0"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20250906.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.6.0",
     "prettier": "^3.6.2",
     "vitest": "^3.2.4",
     "vite-plugin-wasm": "^3.5.0"
@@ -34,10 +33,10 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
-    "./cli": "./dist/cli.js"
+    "./cli": "./dist/extractor/cli.js"
   },
   "bin": {
-    "cloesce": "./dist/cli.js"
+    "cloesce": "dist/extractor/cli.js"
   },
   "files": [
     "dist/**/*",
