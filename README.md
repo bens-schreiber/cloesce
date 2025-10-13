@@ -16,10 +16,10 @@ Note that this version is very unstable (ie, it passes our set of happy-path tes
 
 1. NPM
 
-- Create an NPM project with the `cloesce` pkg:
+- Create an NPM project and install cloesce
 
-```json
-    "cloesce": "^0.0.3-fix.2",
+```sh
+npm install cloesce@fix
 ```
 
 2. TypeScript
@@ -85,7 +85,6 @@ name = "example"
 binding = "db"
 database_id = "..."
 database_name = "example"
-migrations_dir = ".generated/migrations"
 ```
 
 ## A Simple Model
