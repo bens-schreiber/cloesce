@@ -1,9 +1,8 @@
 #!/usr/bin/env node
-
 import { WASI } from "node:wasi";
 import fs from "node:fs";
+import { readFile } from "fs/promises";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 import {
   command,
   run,
@@ -16,10 +15,6 @@ import {
 import { Project } from "ts-morph";
 import { CidlExtractor } from "./extract.js";
 import { ExtractorError, ExtractorErrorCode, getErrorInfo } from "../common.js";
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const GENERATOR_WASM_PATH = path.join(__dirname, "generator.wasm");
 
 type WasmConfig = {
   name: string;
@@ -75,7 +70,7 @@ const cmds = subcommands({
             "all",
             path.join(outputDir, "cidl.json"),
             path.join(root, "wrangler.toml"),
-            path.join(outputDir, "migrations.sql"),
+            path.join(root, "migrations/migrations.sql"),
             path.join(outputDir, "workers.ts"),
             path.join(outputDir, "client.ts"),
             config.clientUrl,
@@ -109,6 +104,7 @@ const cmds = subcommands({
       args: {},
       handler: async () => {
         const config = loadCloesceConfig(process.cwd());
+        const root = process.cwd();
         const outputDir = config.outputDir ?? ".generated";
 
         await generate({
@@ -118,7 +114,7 @@ const cmds = subcommands({
             "generate",
             "d1",
             path.join(outputDir, "cidl.json"),
-            path.join(outputDir, "migrations.sql"),
+            path.join(root, "migrations/migrations.sql"),
           ],
         });
       },
@@ -318,12 +314,12 @@ async function generate(config: WasmConfig) {
   }
 
   const wasiArgs = config.args.map((arg) => {
-    // Skip URLs for http:// and stuff
+    // Skip URLs
     if (/^[a-zA-Z]+:\/\//.test(arg)) {
       return arg;
     }
 
-    // If it looks like a file path, convert it to Unix style beause WASI expects that
+    // Convert file path it to Unix style
     if (arg.includes(path.sep) || arg.includes("/")) {
       // Convert to relative path from root
       const relativePath = path.isAbsolute(arg)
@@ -338,14 +334,16 @@ async function generate(config: WasmConfig) {
 
   const wasi = new WASI({
     version: "preview1",
-    args: [path.basename(GENERATOR_WASM_PATH), ...wasiArgs],
+    args: ["generate", ...wasiArgs],
     env: { ...process.env, ...config.env } as Record<string, string>,
     preopens: { "/": root },
   });
 
-  const bytes = fs.readFileSync(GENERATOR_WASM_PATH);
-  const mod = await WebAssembly.compile(bytes);
-  const instance = await WebAssembly.instantiate(mod, {
+  // Since `generator.wasm` is a binary and not a library, it must be
+  // manually read
+  const wasm = await readFile(new URL("../generator.wasm", import.meta.url));
+  const mod = await WebAssembly.compile(new Uint8Array(wasm));
+  let instance = await WebAssembly.instantiate(mod, {
     wasi_snapshot_preview1: wasi.wasiImport,
   });
 

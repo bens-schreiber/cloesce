@@ -347,6 +347,7 @@ tmp/
 snap__*
 tmp.*
 examples/package-lock.json
+examples/migrations
 
 
 

@@ -15,7 +15,7 @@ import {
 import { IncludeTree } from "../index.js";
 
 // Requires the rust runtime binary to have been built
-import mod from "../../dist/runtime.wasm";
+import mod from "../runtime.wasm";
 
 /**
  * Map of model names to their respective constructor.
