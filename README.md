@@ -96,6 +96,13 @@ Suprisingly, it's pretty compact. A basic scalar model (being, without foreign k
 ```ts
 // horse.cloesce.ts
 
+import {
+  D1,
+  GET,
+  POST,
+  PrimaryKey,
+} from "cloesce/backend";
+
 @D1
 export class Horse {
   @PrimaryKey
@@ -138,6 +145,8 @@ In order to interact with your database, you will need to define a WranglerEnv
 
 ```ts
 // horse.cloesce.ts
+
+import { WranglerEnv } from "cloesce/backend";
 
 @WranglerEnv
 export class Env {
