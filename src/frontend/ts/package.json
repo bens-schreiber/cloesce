@@ -1,6 +1,6 @@
 {
   "name": "cloesce",
-  "version": "0.0.4",
+  "version": "0.0.3-fix.3",
   "description": "A tool to extract and compile TypeScript code into something wrangler can consume and deploy for D1 Databases and Cloudflare Workers",
   "type": "module",
   "main": "./dist/index.js",
@@ -36,7 +36,7 @@
     "./cli": "./dist/extractor/cli.js"
   },
   "bin": {
-    "cloesce": "./dist/extractor/cli.js"
+    "cloesce": "dist/extractor/cli.js"
   },
   "files": [
     "dist/**/*",

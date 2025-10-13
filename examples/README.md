@@ -8,7 +8,7 @@ v0.0.3 is a bare bones pre-alpha version of cloesce.
 
 2. Compile cloesce
 
-- `cloesce compile`
+- `npx cloesce compile`
 
 3. Wrangle' it
 
