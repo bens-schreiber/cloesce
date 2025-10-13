@@ -54,7 +54,7 @@ jobs:
           cargo fmt -- --check
           cargo clippy --all-targets --all-features -- -D warnings
           cargo build --release
-          cargo build --target wasm32-unknown-unknown --release
+          cargo build --target wasm32-wasip1 --release
           cargo test
 
       # --- Node Setup ---
