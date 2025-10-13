@@ -19,7 +19,7 @@ Note that this version is very unstable (ie, it passes our set of happy-path tes
 - Create an NPM project and install cloesce
 
 ```sh
-npm i cloesce@0.0.3-fix.3
+npm i cloesce@0.0.3-fix.6
 ```
 
 2. TypeScript
@@ -42,13 +42,13 @@ npm i cloesce@0.0.3-fix.3
 
 3. Cloesce Config
 
-- Create a `cloesce.config.json` with the following values:
+- Create a `cloesce.config.json` with the following keys:
 
 ```json
 {
   "source": "./src", // or whatever src you want
-  "workersUrl": "http://localhost:5002/api", // or whatever url you want
-  "clientUrl": "http://localhost:5002/api"
+  "workersUrl": "http://localhost:5000/api", // or whatever url you want
+  "clientUrl": "http://localhost:5173/api" // or whatever url you want
 }
 ```
 
@@ -114,17 +114,14 @@ export class Horse {
 - `@PrimaryKey` sets the SQL primary key. All models require a primary key.
 - `@POST` reveals the method as an API endpoint with the `POST` HTTP Verb.
 
-After running `cloesce run`, you will get a fully generated project that can be ran with:
+After running `npx cloesce compile`, you will get a fully generated project that can be ran with:
 
 ```sh
 # migrate wrangler
-npx wrangler d1 migrations apply proj-name
-
-# build
-npx wrangler build
+npx wrangler d1 migrations apply db-name
 
 # run wrangler
-npx wrangler dev --port 5000
+npx wrangler dev
 ```
 
 Note the output in the `.generated/` dir:

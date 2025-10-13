@@ -1,6 +1,6 @@
 {
   "name": "cloesce",
-  "version": "0.0.3-fix.5",
+  "version": "0.0.3-fix.6",
   "description": "A tool to extract and compile TypeScript code into something wrangler can consume and deploy for D1 Databases and Cloudflare Workers",
   "type": "module",
   "license": "Apache-2.0",
@@ -9,10 +9,9 @@
     "format:fix": "prettier --write .",
     "format": "prettier --check .",
     "typecheck": "tsc --noEmit",
-    "build": "tsc -p tsconfig.json && npm run copy-rs-runtime-wasm && npm run copy-generator-wasm && npm run copy-readme-license",
+    "build": "tsc -p tsconfig.json && npm run copy-rs-runtime-wasm && npm run copy-generator-wasm",
     "copy-rs-runtime-wasm": "cp ../../runtime/target/wasm32-unknown-unknown/release/runtime.wasm ./dist/runtime.wasm",
-    "copy-generator-wasm": "cp ../../generator/target/wasm32-wasip1/release/cli.wasm ./dist/generator.wasm",
-    "copy-readme-license": "cp ../../../README.md ./dist/README.md && cp ../../../LICENSE ./dist/LICENSE"
+    "copy-generator-wasm": "cp ../../generator/target/wasm32-wasip1/release/cli.wasm ./dist/generator.wasm"
   },
   "dependencies": {
     "cmd-ts": "^0.14.1",
