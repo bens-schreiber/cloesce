@@ -9,9 +9,10 @@
     "format:fix": "prettier --write .",
     "format": "prettier --check .",
     "typecheck": "tsc --noEmit",
-    "build": "tsc -p tsconfig.json && npm run copy-rs-runtime-wasm && npm run copy-generator-wasm",
+    "build": "tsc -p tsconfig.json && npm run copy-rs-runtime-wasm && npm run copy-generator-wasm && npm run copy-readme-license",
     "copy-rs-runtime-wasm": "cp ../../runtime/target/wasm32-unknown-unknown/release/runtime.wasm ./dist/runtime.wasm",
-    "copy-generator-wasm": "cp ../../generator/target/wasm32-wasip1/release/cli.wasm ./dist/generator.wasm"
+    "copy-generator-wasm": "cp ../../generator/target/wasm32-wasip1/release/cli.wasm ./dist/generator.wasm",
+    "copy-readme-license": "cp ../../../README.md ./dist/README.md && cp ../../../LICENSE ./dist/LICENSE"
   },
   "dependencies": {
     "cmd-ts": "^0.14.1",
@@ -46,9 +47,7 @@
     }
   },
   "files": [
-    "dist/**/*",
-    "../../README.md",
-    "../../LICENSE"
+    "dist/**/*"
   ],
   "sideEffects": false,
   "engines": {
