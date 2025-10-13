@@ -1,5 +1,5 @@
 {
   "source": "./src",
-  "workersUrl": "http://localhost:5002/api",
-  "clientUrl": "http://localhost:5002/api"
+  "workersUrl": "http://localhost:5000/api",
+  "clientUrl": "http://localhost:5173/api"
 }

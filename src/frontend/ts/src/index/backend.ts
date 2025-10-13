@@ -1,5 +1,5 @@
-export { cloesce, modelsFromSql } from "./runtime/runtime.js";
-export { HttpResult, Either } from "./common.js";
+export { cloesce, modelsFromSql } from "../runtime/runtime.js";
+export type { HttpResult, Either } from "../common.js";
 
 // Compiler hints
 export const D1: ClassDecorator = () => {};
@@ -35,14 +35,3 @@ export type IncludeTree<T> = T extends Primitive
         ? IncludeTree<NonNullable<U>>
         : IncludeTree<NonNullable<T[K]>>;
     };
-
-// Helpers
-export function instantiateObjectArray<T extends object>(
-  data: any,
-  ctor: { new (): T },
-): T[] {
-  if (Array.isArray(data)) {
-    return data.map((x) => instantiateObjectArray(x, ctor)).flat();
-  }
-  return [Object.assign(new ctor(), data)];
-}

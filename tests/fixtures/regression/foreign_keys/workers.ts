@@ -1,4 +1,4 @@
-import { cloesce } from "cloesce";
+import { cloesce } from "cloesce/backend";
 import cidl from "./cidl.json";
 import { A } from "./seed__foreign_keys.cloesce.ts";
 import { B } from "./seed__foreign_keys.cloesce.ts";

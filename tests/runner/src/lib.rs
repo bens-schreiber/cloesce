@@ -124,7 +124,7 @@ impl Fixture {
         let out = OutputFile::new(&self.path, "cidl.json");
         let res = self.run_command(
             Command::new("node")
-                .arg("../../src/frontend/ts/dist/extractor/cli.js")
+                .arg("../../src/frontend/ts/dist/cli.js")
                 .arg("extract")
                 .arg("--in")
                 .arg(&self.path)

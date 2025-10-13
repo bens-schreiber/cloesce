@@ -1,4 +1,4 @@
-import { HttpResult, instantiateObjectArray } from "cloesce";
+import { HttpResult, instantiateObjectArray } from "cloesce/client";
 
 export class Horse {
   id: number;

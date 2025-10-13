@@ -5,7 +5,7 @@ import {
   WranglerEnv,
   Inject,
   PlainOldObject,
-} from "cloesce";
+} from "cloesce/backend";
 type D1Database = {};
 
 @PlainOldObject

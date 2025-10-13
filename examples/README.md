@@ -16,9 +16,6 @@ v0.0.3 is a bare bones pre-alpha version of cloesce.
 # migrate wrangler
 echo y | npx wrangler d1 migrations apply example
 
-# build
-npx wrangler build
-
 # run wrangler
 npx wrangler dev --port 5000
 ```

@@ -151,7 +151,7 @@ impl WorkersGenerator {
 
         // TODO: Middleware function should return the DI instance registry
         Ok(format!(
-            r#"import {{ cloesce }} from "cloesce";
+            r#"import {{ cloesce }} from "cloesce/backend";
 import cidl from "./cidl.json";
 {model_sources}
 
