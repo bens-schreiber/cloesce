@@ -1,14 +1,13 @@
 {
   "name": "examples",
   "version": "0.0.3",
-  "description": "A basic Cloesce Typescript project",
+  "description": "A basic Cloesce project",
   "type": "module",
   "scripts": {
-    "backend": "sh generate.sh",
     "frontend": "vite ./src/frontend"
   },
   "dependencies": {
-    "cloesce": "^0.0.3-fix.1",
+    "cloesce": "^0.0.3-fix.2",
     "wrangler": "^4.34.0"
   },
   "devDependencies": {
