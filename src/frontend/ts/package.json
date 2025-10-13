@@ -1,6 +1,6 @@
 {
   "name": "cloesce",
-  "version": "0.0.3-fix.4",
+  "version": "0.0.3-fix.5",
   "description": "A tool to extract and compile TypeScript code into something wrangler can consume and deploy for D1 Databases and Cloudflare Workers",
   "type": "module",
   "license": "Apache-2.0",
@@ -39,10 +39,16 @@
   "bin": {
     "cloesce": "dist/cli.js"
   },
+  "typesVersions": {
+    "*": {
+      "backend": ["dist/index/backend.d.ts"],
+      "client": ["dist/index/client.d.ts"]
+    }
+  },
   "files": [
     "dist/**/*",
-    "README.md",
-    "LICENSE"
+    "../../README.md",
+    "../../LICENSE"
   ],
   "sideEffects": false,
   "engines": {
