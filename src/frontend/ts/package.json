@@ -41,8 +41,12 @@
   },
   "typesVersions": {
     "*": {
-      "backend": ["dist/index/backend.d.ts"],
-      "client": ["dist/index/client.d.ts"]
+      "backend": [
+        "dist/index/backend.d.ts"
+      ],
+      "client": [
+        "dist/index/client.d.ts"
+      ]
     }
   },
   "files": [
