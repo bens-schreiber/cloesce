@@ -95,23 +95,27 @@ A model is a type which represents a database table, database view, backend api,
 Suprisingly, it's pretty compact. A basic scalar model (being, without foreign keys) looks like this:
 
 ```ts
-// horse.cloesce.ts <---- needs a .cloesce.ts !!!
+// horse.cloesce.ts
 
-@D1 // Expresses that this is a D1 table. Note `Horse` must be exported for the linker.
+@D1
 export class Horse {
-  @PrimaryKey // All models need a PK!
+  @PrimaryKey
   id: number;
 
-  name: string | null; // Attributes can be nullable
+  name: string | null;
 
-  @POST // Denotes a workers endpoint
+  @POST
   async neigh(): Promise<string> {
     return `i am ${this.name}, this is my horse noise`;
   }
 }
 ```
 
-After running `cloesce run` with a properly set up project, you will get a fully generated project that can be ran with:
+- `@D1` denotes that this is a SQL Table
+- `@PrimaryKey` sets the SQL primary key. All models require a primary key.
+- `@POST` reveals the method as an API endpoint with the `POST` HTTP Verb.
+
+After running `cloesce run`, you will get a fully generated project that can be ran with:
 
 ```sh
 # migrate wrangler
@@ -209,7 +213,7 @@ export class A {
 }
 ```
 
-In `v0.0.3`, there are no defaults, only very explicit decisons. Because of that, navigation properties won't exist at runtime unless you tell them to. Cloesce does this via `DataSources`, which describe the foreign key dependencies you wish to include. All scalar properties are included by default and cannot be excluded.
+In `v0.0.3`, there are no defaults, only very explicit decisons. Because of that, navigation properties won't exist at runtime unless you tell them to. Cloesce does this via a `DataSource`, which describes the foreign key dependencies you wish to include. All scalar properties are included by default and cannot be excluded.
 
 ```ts
 @D1
@@ -236,7 +240,7 @@ export class A {
 }
 ```
 
-Datasources are just SQL views and can be invoked in your queries, aliased in such a way that its identical to object properties. The frontend chooses which datasource to use, with each one being generated as an option. `null` is also a valid option, meaning no joins will occur.
+Datasources are just SQL views and can be invoked in your queries. They are aliased in such a way that its identical to object properties. The frontend chooses which datasource to use in it's API client. `null` is a valid option, meaning no joins will occur.
 
 ```ts
 @D1
@@ -273,7 +277,7 @@ Note: In later versions, nearly all of the code from the example above won't be 
 
 ### One to Many
 
-Cloesce supports models with `1:M` relationships as well.
+Cloesce supports models with `1:M` relationships:
 
 ```ts
 @D1
@@ -282,7 +286,7 @@ export class Person {
   id: number;
 
   @OneToMany("personId") // directly references the FK on Dog
-  dogs: Dog[]; // we don't need `| undefined` because it'll just be empty if not included
+  dogs: Dog[];
 
   @DataSource
   static readonly default: IncludeTree<Person> = {
@@ -305,8 +309,9 @@ export class Dog {
   @ForeignKey(Person)
   personId: number;
 
-  @OneToOne("personId") // optional navigation property, not needed
-  person: Person | undefined; // note: this is a circular relationship!
+  // optional navigation property, not needed.
+  @OneToOne("personId")
+  person: Person | undefined;
 }
 ```
 
@@ -340,7 +345,7 @@ Simple non-model objects can be returned and serialized from a model method:
 
 ```ts
 @PlainOldObject
-export class CatResult {
+export class CatStuff {
     catFacts: string[],
     catNames: string[],
 }
@@ -351,7 +356,7 @@ export class Cat {
     id: number;
 
     @GET
-    async query(): Promise<CatWrapper> {
+    async query(): Promise<CatStuff> {
         return {
             catFacts: ["cats r cool"],
             catNames: ["reginald"]
@@ -365,10 +370,11 @@ export class Cat {
 Methods can return any kind of status code via the `HttpResult` wrapper:
 
 ```ts
-
+@D1
 class Foo {
     ...
 
+    @GET
     async foo(): Promise<HttpResult<number>> {
         return { ok: false, status: 500, message: "divided by 0"};
     }
