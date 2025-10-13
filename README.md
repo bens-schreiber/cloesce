@@ -1,6 +1,6 @@
 # cloesce (experimental, `v0.0.3`)
 
-Cloesce is a full stack compiler for the Cloudflare developer platform, allowing class definitions in high level languages (currently, only TypeScript, later, Python and Rust) to serve as the metadata basis for databases, backend REST APIs, frontend API client, and Cloudflare infrastructure (currently, D1 and Workers, later, R2, Durable Objects and KV).
+Cloesce is a full stack compiler for the Cloudflare developer platform, allowing class definitions in high level languages to serve as the metadata basis for databases, a backend REST API, a frontend API client, and Cloudflare infrastructure.
 
 Cloesce is working towards an alpha MVP (v0.1.0), with the general milestones being [here](https://cloesce.pages.dev/schreiber/v0.1.0_milestones/).
 
