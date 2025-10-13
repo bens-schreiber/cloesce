@@ -1,4 +1,4 @@
-import { cloesce } from "cloesce";
+import { cloesce } from "cloesce/backend";
 import cidl from "./cidl.json";
 import { PooAcceptYield } from "./seed__poo.cloesce.ts";
 import { PooA } from "./seed__poo.cloesce.ts";

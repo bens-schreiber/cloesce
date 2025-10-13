@@ -1,4 +1,4 @@
-import { D1, POST, PrimaryKey, WranglerEnv, Inject } from "cloesce";
+import { D1, POST, PrimaryKey, WranglerEnv, Inject } from "cloesce/backend";
 type HttpResult<T = unknown> = {};
 type D1Database = {};
 

@@ -12,7 +12,7 @@ import {
   getNavigationPropertyCidlType,
   CidlIncludeTree,
 } from "../common.js";
-import { IncludeTree } from "../index.js";
+import { IncludeTree } from "../index/backend.js";
 
 // Requires the rust runtime binary to have been built
 import mod from "../runtime.wasm";

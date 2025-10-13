@@ -12,7 +12,7 @@ import {
   GET,
   Inject,
   modelsFromSql,
-} from "cloesce";
+} from "cloesce/backend";
 
 import { D1Database } from "@cloudflare/workers-types";
 

@@ -1,10 +1,8 @@
 {
   "name": "cloesce",
-  "version": "0.0.3-fix.3",
+  "version": "0.0.3-fix.4",
   "description": "A tool to extract and compile TypeScript code into something wrangler can consume and deploy for D1 Databases and Cloudflare Workers",
   "type": "module",
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
   "license": "Apache-2.0",
   "scripts": {
     "test": "vitest",
@@ -29,14 +27,17 @@
     "vite-plugin-wasm": "^3.5.0"
   },
   "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
+    "./client": {
+      "types": "./dist/index/client.d.ts",
+      "import": "./dist/index/client.js"
     },
-    "./cli": "./dist/extractor/cli.js"
+    "./backend": {
+      "types": "./dist/index/backend.d.ts",
+      "import": "./dist/index/backend.js"
+    }
   },
   "bin": {
-    "cloesce": "dist/extractor/cli.js"
+    "cloesce": "dist/cli.js"
   },
   "files": [
     "dist/**/*",

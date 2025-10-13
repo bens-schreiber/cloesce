@@ -13,8 +13,8 @@ import {
   string,
 } from "cmd-ts";
 import { Project } from "ts-morph";
-import { CidlExtractor } from "./extract.js";
-import { ExtractorError, ExtractorErrorCode, getErrorInfo } from "../common.js";
+import { CidlExtractor } from "./extractor/extract.js";
+import { ExtractorError, ExtractorErrorCode, getErrorInfo } from "./common.js";
 
 type WasmConfig = {
   name: string;
@@ -59,7 +59,6 @@ const cmds = subcommands({
         // Creates a `cidl.json` file. Exits the process on failure.
         await extract({ debug: args.debug });
 
-        const root = process.cwd();
         const outputDir = config.outputDir ?? ".generated";
 
         const allConfig: WasmConfig = {
@@ -69,8 +68,8 @@ const cmds = subcommands({
             "generate",
             "all",
             path.join(outputDir, "cidl.json"),
-            path.join(root, "wrangler.toml"),
-            path.join(root, "migrations/migrations.sql"),
+            "wrangler.toml",
+            "migrations/migrations.sql",
             path.join(outputDir, "workers.ts"),
             path.join(outputDir, "client.ts"),
             config.clientUrl,
@@ -88,12 +87,10 @@ const cmds = subcommands({
       description: "Generate wrangler.toml configuration",
       args: {},
       handler: async () => {
-        const root = process.cwd();
-
         await generate({
           name: "wrangler",
           wasmFile: "generator.wasm",
-          args: ["generate", "wrangler", path.join(root, "wrangler.toml")],
+          args: ["generate", "wrangler", "wrangler.toml"],
         });
       },
     }),
@@ -104,7 +101,6 @@ const cmds = subcommands({
       args: {},
       handler: async () => {
         const config = loadCloesceConfig(process.cwd());
-        const root = process.cwd();
         const outputDir = config.outputDir ?? ".generated";
 
         await generate({
@@ -114,7 +110,7 @@ const cmds = subcommands({
             "generate",
             "d1",
             path.join(outputDir, "cidl.json"),
-            path.join(root, "migrations/migrations.sql"),
+            "migrations/migrations.sql",
           ],
         });
       },
@@ -126,12 +122,11 @@ const cmds = subcommands({
       args: {},
       handler: async () => {
         const config = loadCloesceConfig(process.cwd());
-        const root = process.cwd();
         const outputDir = config.outputDir ?? ".generated";
 
         if (!config.workersUrl) {
           console.error(
-            "Error: workersUrl must be defined in cloesce-config.json",
+            "Error: workersUrl must be defined in cloesce.config.json",
           );
           process.exit(1);
         }
@@ -144,7 +139,7 @@ const cmds = subcommands({
             "workers",
             path.join(outputDir, "cidl.json"),
             path.join(outputDir, "workers.ts"),
-            path.join(root, "wrangler.toml"),
+            "wrangler.toml",
             config.workersUrl,
           ],
         });
@@ -313,35 +308,14 @@ async function generate(config: WasmConfig) {
     fs.writeFileSync(wranglerPath, "");
   }
 
-  const wasiArgs = config.args.map((arg) => {
-    // Skip URLs
-    if (/^[a-zA-Z]+:\/\//.test(arg)) {
-      return arg;
-    }
-
-    // Convert file path it to Unix style
-    if (arg.includes(path.sep) || arg.includes("/")) {
-      // Convert to relative path from root
-      const relativePath = path.isAbsolute(arg)
-        ? path.relative(root, arg)
-        : arg;
-      // Convert Windows separators to Unix and ensure leading slash
-      const unixPath = relativePath.replace(/\\/g, "/");
-      return unixPath.startsWith("/") ? unixPath : "/" + unixPath;
-    }
-    return arg;
-  });
-
   const wasi = new WASI({
     version: "preview1",
-    args: ["generate", ...wasiArgs],
+    args: ["generate", ...config.args],
     env: { ...process.env, ...config.env } as Record<string, string>,
-    preopens: { "/": root },
+    preopens: { ".": root },
   });
 
-  // Since `generator.wasm` is a binary and not a library, it must be
-  // manually read
-  const wasm = await readFile(new URL("../generator.wasm", import.meta.url));
+  const wasm = await readFile(new URL("./generator.wasm", import.meta.url));
   const mod = await WebAssembly.compile(new Uint8Array(wasm));
   let instance = await WebAssembly.instantiate(mod, {
     wasi_snapshot_preview1: wasi.wasiImport,

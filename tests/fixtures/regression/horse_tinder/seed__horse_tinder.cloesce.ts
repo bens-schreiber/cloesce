@@ -13,7 +13,7 @@ import {
   DataSource,
   modelsFromSql,
   WranglerEnv,
-} from "cloesce";
+} from "cloesce/backend";
 
 @WranglerEnv
 class Env {
