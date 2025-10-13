@@ -19,7 +19,7 @@ Note that this version is very unstable (ie, it passes our set of happy-path tes
 - Create an NPM project and install cloesce
 
 ```sh
-npm install cloesce@fix
+npm i cloesce@0.0.3-fix.3
 ```
 
 2. TypeScript
