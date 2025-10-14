@@ -46,26 +46,19 @@ class Horse {
   static async post(@Inject { db }: Env, horse: Horse): Promise<Horse> {
     const orm = Orm.fromD1(db);
     await orm.insert(Horse, horse, null);
-    return horse;
+    return (await orm.get(Horse, horse.id, null)).value;
   }
 
   @GET
   static async get(@Inject { db }: Env, id: number): Promise<Horse> {
-    let records = await db
-      .prepare("SELECT * FROM [Horse.default] WHERE [Horse.id] = ?")
-      .bind(id)
-      .run();
-
-    const res = Orm.fromSql(Horse, records.results, Horse.default);
-    return res.value[0];
+    const orm = Orm.fromD1(db);
+    return (await orm.get(Horse, id, "default")).value;
   }
 
   @GET
   static async list(@Inject { db }: Env): Promise<Horse[]> {
-    let records = await db.prepare("SELECT * FROM [Horse.default]").run();
-
-    const res = Orm.fromSql(Horse, records.results, Horse.default);
-    return res.value;
+    const orm = Orm.fromD1(db);
+    return (await orm.list(Horse, "default")).value;
   }
 
   @POST

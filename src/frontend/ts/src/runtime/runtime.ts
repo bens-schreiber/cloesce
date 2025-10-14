@@ -206,7 +206,7 @@ export function invokeWasm<T>(
 export function fromSql<T extends object>(
   ctor: new () => T,
   records: Record<string, any>[],
-  includeTree: IncludeTree<T> | null,
+  includeTree: IncludeTree<T> | CidlIncludeTree | null,
 ): Either<string, T[]> {
   const { ast, constructorRegistry, wasm } = RuntimeContainer.get();
   const args = [

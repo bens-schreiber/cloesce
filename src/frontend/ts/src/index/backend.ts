@@ -45,6 +45,10 @@ export type IncludeTree<T> = T extends Primitive
         : IncludeTree<NonNullable<T[K]>>;
     };
 
+type KeysOfType<T, U> = {
+  [K in keyof T]: T[K] extends U ? K : never;
+}[keyof T];
+
 /**
  * ORM functions which use metadata to translate arguments to valid SQL queries.
  */
@@ -178,5 +182,94 @@ export class Orm {
     }
 
     return right(undefined);
+  }
+
+  /**
+   * Returns a query of the form `SELECT * FROM [Model.DataSource]`
+   */
+  static listQuery<T extends object>(
+    ctor: new () => T,
+    includeTree: KeysOfType<T, IncludeTree<T>> | null,
+  ): string {
+    if (includeTree) {
+      return `SELECT * FROM [${ctor.name}.${includeTree.toString()}]`;
+    }
+
+    return `SELECT * FROM [${ctor.name}]`;
+  }
+
+  /**
+   * Returns a query of the form `SELECT * FROM [Model.DataSource] WHERE [Model.PrimaryKey] = ?`.
+   * Requires the id parameter to be bound (use db.prepare().bind)
+   */
+  static getQuery<T extends object>(
+    ctor: new () => T,
+    includeTree: KeysOfType<T, IncludeTree<T>> | null,
+  ): string {
+    const { ast } = RuntimeContainer.get();
+    if (includeTree) {
+      return `${this.listQuery(ctor, includeTree)} WHERE [${ctor.name}.${ast.models[ctor.name].primary_key.name}] = ?`;
+    }
+
+    return `${this.listQuery(ctor, includeTree)} WHERE [${ast.models[ctor.name].primary_key.name}] = ?`;
+  }
+
+  /**
+   * Executes a query of the form `SELECT * FROM [Model.DataSource]`, returning all results
+   * as instantiated models.
+   */
+  async list<T extends object>(
+    ctor: new () => T,
+    includeTreeKey: KeysOfType<T, IncludeTree<T>> | null,
+  ): Promise<Either<string, T[]>> {
+    const q = Orm.listQuery(ctor, includeTreeKey);
+    const res = await this.db.prepare(q).run();
+
+    if (!res.success) {
+      return left(res.error ?? "D1 failed but no error was returned.");
+    }
+
+    const { ast } = RuntimeContainer.get();
+    const includeTree =
+      includeTreeKey === null
+        ? null
+        : ast.models[ctor.name].data_sources[includeTreeKey.toString()].tree;
+
+    const fromSqlRes = fromSql<T>(ctor, res.results, includeTree);
+    if (!fromSqlRes.ok) {
+      return fromSqlRes;
+    }
+
+    return right(fromSqlRes.value);
+  }
+
+  /**
+   * Executes a query of the form `SELECT * FROM [Model.DataSource] WHERE [Model.PrimaryKey] = ?`
+   * returning all results as instantiated models.
+   */
+  async get<T extends object>(
+    ctor: new () => T,
+    id: any,
+    includeTreeKey: KeysOfType<T, IncludeTree<T>> | null,
+  ): Promise<Either<string, T>> {
+    const q = Orm.getQuery(ctor, includeTreeKey);
+    const res = await this.db.prepare(q).bind(id).run();
+
+    if (!res.success) {
+      return left(res.error ?? "D1 failed but no error was returned.");
+    }
+
+    const { ast } = RuntimeContainer.get();
+    const includeTree =
+      includeTreeKey === null
+        ? null
+        : ast.models[ctor.name].data_sources[includeTreeKey.toString()].tree;
+
+    const fromSqlRes = fromSql<T>(ctor, res.results, includeTree);
+    if (!fromSqlRes.ok) {
+      return fromSqlRes;
+    }
+
+    return right(fromSqlRes.value[0]);
   }
 }
