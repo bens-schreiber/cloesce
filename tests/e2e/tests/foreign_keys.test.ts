@@ -20,7 +20,7 @@ afterAll(async () => {
 async function testRefresh<T, DS extends string | null>(
   obj: T & { refresh: (dataSource?: DS) => Promise<any> },
   dataSources: DS[],
-  assertions: Record<string, (res: any) => void>,
+  assertions: Record<string, (res: any) => void>
 ) {
   for (const ds of dataSources) {
     it(`refresh ${ds ?? "null"}`, async () => {
@@ -33,7 +33,13 @@ async function testRefresh<T, DS extends string | null>(
 }
 
 describe("POST and refresh A", () => {
-  const a = Object.assign(new A(), { id: 1, bId: 10 });
+  const a = Object.assign(new A(), {
+    id: 1,
+    bId: 10,
+    b: {
+      id: 10,
+    },
+  });
 
   it("POST A", async () => {
     const res = await A.post(a);

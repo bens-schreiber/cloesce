@@ -44,7 +44,8 @@ class Horse {
 
   @POST
   static async post(@Inject { db }: Env, horse: Horse): Promise<Horse> {
-    await db.prepare(Orm.insert(Horse, horse, null).value).run();
+    const orm = Orm.fromD1(db);
+    await orm.insert(Horse, horse, null);
     return horse;
   }
 

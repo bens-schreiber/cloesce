@@ -1,4 +1,7 @@
-import { D1Database } from "@cloudflare/workers-types/experimental/index.js";
+import {
+  D1Database,
+  D1Result,
+} from "@cloudflare/workers-types/experimental/index.js";
 import {
   HttpResult,
   Either,
@@ -96,7 +99,7 @@ interface RuntimeWasmExports {
 /**
  * RAII for wasm memory
  */
-class WasmResource {
+export class WasmResource {
   constructor(
     private wasm: RuntimeWasmExports,
     public ptr: number,
@@ -123,7 +126,7 @@ class WasmResource {
  * Singleton instances of the cidl, constructor registry, and wasm binary.
  * These values are guaranteed to never change throughout a program lifetime.
  */
-class RuntimeContainer {
+export class RuntimeContainer {
   private static instance: RuntimeContainer | undefined;
   private constructor(
     public readonly ast: CloesceAst,
@@ -170,123 +173,97 @@ class RuntimeContainer {
 }
 
 /**
- * Namespace for all Cloesce provided ORM primitives
+ * Helper for invoking the WASM runtime
  */
-export class Orm {
-  private static invokeWasm<T>(
-    fn: (...args: number[]) => boolean,
-    args: WasmResource[],
-    wasm: RuntimeWasmExports,
-  ): Either<string, T> {
-    let resPtr: number | undefined;
-    let resLen: number | undefined;
+export function invokeWasm<T>(
+  fn: (...args: number[]) => boolean,
+  args: WasmResource[],
+  wasm: RuntimeWasmExports,
+): Either<string, T> {
+  let resPtr: number | undefined;
+  let resLen: number | undefined;
 
-    try {
-      const failed = fn(...args.flatMap((a) => [a.ptr, a.len]));
-      resPtr = wasm.get_return_ptr();
-      resLen = wasm.get_return_len();
+  try {
+    const failed = fn(...args.flatMap((a) => [a.ptr, a.len]));
+    resPtr = wasm.get_return_ptr();
+    resLen = wasm.get_return_len();
 
-      const result = new TextDecoder().decode(
-        new Uint8Array(wasm.memory.buffer, resPtr, resLen),
-      );
+    const result = new TextDecoder().decode(
+      new Uint8Array(wasm.memory.buffer, resPtr, resLen),
+    );
 
-      return failed ? left(result) : right(result as T);
-    } finally {
-      args.forEach((a) => a.free());
-      if (resPtr && resLen) wasm.dealloc(resPtr, resLen);
-    }
+    return failed ? left(result) : right(result as T);
+  } finally {
+    args.forEach((a) => a.free());
+    if (resPtr && resLen) wasm.dealloc(resPtr, resLen);
   }
+}
 
-  static fromSql<T extends object>(
-    ctor: new () => T,
-    records: Record<string, any>[],
-    includeTree: IncludeTree<T> | null,
-  ): Either<string, T[]> {
-    const { ast, constructorRegistry, wasm } = RuntimeContainer.get();
-    const args = [
-      WasmResource.fromString(ctor.name, wasm),
-      WasmResource.fromString(JSON.stringify(records), wasm),
-      WasmResource.fromString(JSON.stringify(includeTree), wasm),
-    ];
+/**
+ * Calls the WASM runtime function `object_relational_mapping` to turn a row of SQL records into
+ * an instantiated object.
+ */
+export function fromSql<T extends object>(
+  ctor: new () => T,
+  records: Record<string, any>[],
+  includeTree: IncludeTree<T> | null,
+): Either<string, T[]> {
+  const { ast, constructorRegistry, wasm } = RuntimeContainer.get();
+  const args = [
+    WasmResource.fromString(ctor.name, wasm),
+    WasmResource.fromString(JSON.stringify(records), wasm),
+    WasmResource.fromString(JSON.stringify(includeTree), wasm),
+  ];
 
-    const jsonResults = this.invokeWasm<string>(
-      wasm.object_relational_mapping,
-      args,
-      wasm,
-    );
-    if (!jsonResults.ok) return jsonResults;
+  const jsonResults = invokeWasm<string>(
+    wasm.object_relational_mapping,
+    args,
+    wasm,
+  );
+  if (!jsonResults.ok) return jsonResults;
 
-    const parsed: any[] = JSON.parse(jsonResults.value);
-    return right(
-      parsed.map((obj: any) =>
-        instantiateDepthFirst(obj, ast.models[ctor.name], includeTree),
-      ) as T[],
-    );
+  const parsed: any[] = JSON.parse(jsonResults.value);
+  return right(
+    parsed.map((obj: any) =>
+      instantiateDepthFirst(obj, ast.models[ctor.name], includeTree),
+    ) as T[],
+  );
 
-    function instantiateDepthFirst(
-      m: any,
-      meta: Model,
-      includeTree: IncludeTree<any> | null,
-    ) {
-      m = Object.assign(new constructorRegistry[meta.name](), m);
+  function instantiateDepthFirst(
+    m: any,
+    meta: Model,
+    includeTree: IncludeTree<any> | null,
+  ) {
+    m = Object.assign(new constructorRegistry[meta.name](), m);
 
-      if (!includeTree) {
-        return m;
-      }
-
-      for (const navProp of meta.navigation_properties) {
-        const nestedIncludeTree = includeTree[navProp.var_name];
-        if (!nestedIncludeTree) continue;
-
-        const nestedMeta = ast.models[navProp.model_name];
-        const value = m[navProp.var_name];
-
-        // One to Many, Many to Many
-        if (Array.isArray(value)) {
-          m[navProp.var_name] = value.map((child: any) =>
-            instantiateDepthFirst(child, nestedMeta, nestedIncludeTree),
-          );
-        }
-        // One to one
-        else if (value) {
-          m[navProp.var_name] = instantiateDepthFirst(
-            value,
-            nestedMeta,
-            nestedIncludeTree,
-          );
-        }
-      }
-
+    if (!includeTree) {
       return m;
     }
-  }
 
-  static insert<T extends object>(
-    ctor: new () => T,
-    newModel: T,
-    includeTree: IncludeTree<T> | null,
-  ): Either<string, never> {
-    const { wasm } = RuntimeContainer.get();
-    const args = [
-      WasmResource.fromString(ctor.name, wasm),
-      WasmResource.fromString(JSON.stringify(newModel), wasm),
-      WasmResource.fromString(JSON.stringify(includeTree), wasm),
-    ];
-    return this.invokeWasm(wasm.insert_model, args, wasm);
-  }
+    for (const navProp of meta.navigation_properties) {
+      const nestedIncludeTree = includeTree[navProp.var_name];
+      if (!nestedIncludeTree) continue;
 
-  static update<T extends object>(
-    ctor: new () => T,
-    updatedModel: Partial<T>,
-    includeTree: IncludeTree<T> | null,
-  ): Either<string, string> {
-    const { wasm } = RuntimeContainer.get();
-    const args = [
-      WasmResource.fromString(ctor.name, wasm),
-      WasmResource.fromString(JSON.stringify(updatedModel), wasm),
-      WasmResource.fromString(JSON.stringify(includeTree), wasm),
-    ];
-    return this.invokeWasm(wasm.update_model, args, wasm);
+      const nestedMeta = ast.models[navProp.model_name];
+      const value = m[navProp.var_name];
+
+      // One to Many, Many to Many
+      if (Array.isArray(value)) {
+        m[navProp.var_name] = value.map((child: any) =>
+          instantiateDepthFirst(child, nestedMeta, nestedIncludeTree),
+        );
+      }
+      // One to one
+      else if (value) {
+        m[navProp.var_name] = instantiateDepthFirst(
+          value,
+          nestedMeta,
+          nestedIncludeTree,
+        );
+      }
+    }
+
+    return m;
   }
 }
 
@@ -528,7 +505,7 @@ async function hydrateModel(
     dataSource !== null ? model.data_sources[dataSource].tree : {};
 
   // Hydrate
-  const models: object[] = Orm.fromSql(
+  const models: object[] = fromSql(
     constructorRegistry[model.name],
     records.results,
     includeTree,

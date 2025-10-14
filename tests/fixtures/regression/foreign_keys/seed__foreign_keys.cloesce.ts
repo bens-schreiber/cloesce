@@ -49,28 +49,9 @@ export class A {
 
   @POST
   static async post(@Inject { db }: Env, a: A): Promise<A> {
-    // Insert B
-    let b;
-    if (a.bId) {
-      const bRecords = await db
-        .prepare("INSERT INTO B (id) VALUES (?) RETURNING *")
-        .bind(a.bId)
-        .all();
-
-      const res = Orm.fromSql(B, bRecords.results, null);
-      b = res.value[0] as B;
-    }
-
-    // Insert A
-    const records = await db
-      .prepare("INSERT INTO A (id, bId) VALUES (?, ?) RETURNING *")
-      .bind(a.id, a.bId)
-      .all();
-
-    let resultA = Orm.fromSql(A, records.results, null).value[0] as A;
-    resultA.b = b;
-
-    return resultA;
+    const orm = Orm.fromD1(db);
+    await orm.insert(A, a, A.withB);
+    return a;
   }
 
   @GET
@@ -97,34 +78,9 @@ export class Person {
 
   @POST
   static async post(@Inject { db }: Env, person: Person): Promise<Person> {
-    // Insert Person
-    const records = await db
-      .prepare("INSERT INTO Person (id) VALUES (?) RETURNING *")
-      .bind(person.id)
-      .all();
-
-    let resultPerson = Orm.fromSql(Person, records.results, null)
-      .value[0] as Person;
-
-    // Insert Dogs if provided
-    if (person.dogs?.length) {
-      for (const dog of person.dogs) {
-        await db
-          .prepare("INSERT INTO Dog (id, personId) VALUES (?, ?)")
-          .bind(dog.id, resultPerson.id)
-          .run();
-      }
-
-      // Attach the inserted dogs
-      resultPerson.dogs = person.dogs.map((d) => ({
-        ...d,
-        personId: resultPerson.id,
-      }));
-    } else {
-      resultPerson.dogs = [];
-    }
-
-    return resultPerson;
+    const orm = Orm.fromD1(db);
+    await orm.insert(Person, person, Person.withDogs);
+    return person;
   }
 
   @GET
@@ -163,39 +119,9 @@ export class Student {
 
   @POST
   static async post(@Inject { db }: Env, student: Student): Promise<Student> {
-    // Insert Student
-    const records = await db
-      .prepare("INSERT INTO Student (id) VALUES (?) RETURNING *")
-      .bind(student.id)
-      .all();
-
-    const resultStudent = Orm.fromSql(Student, records.results, null)
-      .value[0] as Student;
-
-    // Insert Courses and the join table if courses provided
-    if (student.courses?.length) {
-      for (const course of student.courses) {
-        // Insert course if not already existing
-        await db
-          .prepare("INSERT OR IGNORE INTO Course (id) VALUES (?)")
-          .bind(course.id)
-          .run();
-
-        // Insert into join table
-        await db
-          .prepare(
-            "INSERT INTO StudentsCourses ([Student.id], [Course.id]) VALUES (?, ?)"
-          )
-          .bind(resultStudent.id, course.id)
-          .run();
-      }
-
-      resultStudent.courses = student.courses;
-    } else {
-      resultStudent.courses = [];
-    }
-
-    return resultStudent;
+    const orm = Orm.fromD1(db);
+    await orm.insert(Student, student, Student.withCoursesStudents);
+    return student;
   }
 
   @GET
