@@ -11,7 +11,7 @@ import {
   IncludeTree,
   GET,
   Inject,
-  modelsFromSql,
+  Orm,
 } from "cloesce/backend";
 
 import { D1Database } from "@cloudflare/workers-types";
@@ -57,7 +57,8 @@ export class A {
         .bind(a.bId)
         .all();
 
-      b = modelsFromSql(B, bRecords.results, null)[0] as B;
+      const res = Orm.fromSql(B, bRecords.results, null);
+      b = res.value[0] as B;
     }
 
     // Insert A
@@ -66,7 +67,7 @@ export class A {
       .bind(a.id, a.bId)
       .all();
 
-    let resultA = modelsFromSql(A, records.results, null)[0] as A;
+    let resultA = Orm.fromSql(A, records.results, null).value[0] as A;
     resultA.b = b;
 
     return resultA;
@@ -102,11 +103,8 @@ export class Person {
       .bind(person.id)
       .all();
 
-    let resultPerson = modelsFromSql(
-      Person,
-      records.results,
-      null
-    )[0] as Person;
+    let resultPerson = Orm.fromSql(Person, records.results, null)
+      .value[0] as Person;
 
     // Insert Dogs if provided
     if (person.dogs?.length) {
@@ -171,11 +169,8 @@ export class Student {
       .bind(student.id)
       .all();
 
-    const resultStudent = modelsFromSql(
-      Student,
-      records.results,
-      null
-    )[0] as Student;
+    const resultStudent = Orm.fromSql(Student, records.results, null)
+      .value[0] as Student;
 
     // Insert Courses and the join table if courses provided
     if (student.courses?.length) {

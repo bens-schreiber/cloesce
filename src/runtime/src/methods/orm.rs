@@ -75,7 +75,7 @@ pub fn object_relational_mapping(
         }
     }
 
-    return Ok(result_map.into_values().collect());
+    Ok(result_map.into_values().collect())
 }
 
 fn process_navigation_properties(

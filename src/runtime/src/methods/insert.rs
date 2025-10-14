@@ -1,4 +1,5 @@
-use common::NavigationPropertyKind::{ManyToMany, OneToMany, OneToOne};
+use common::NavigationPropertyKind;
+use common::NavigationPropertyKind::{ManyToMany, OneToMany};
 use sea_query::InsertStatement;
 use sea_query::SqliteQueryBuilder;
 use serde_json::Map;
@@ -56,11 +57,12 @@ fn topo_ordered_inserts(
     )?;
 
     // Scalar properties
+    // TODO: We can try to infer a foreign key's ID through some context stack.
     for attr in &model.attributes {
-        let value = new_model.get(&attr.value.name).expect(&format!(
+        let value = new_model.get(&attr.value.name).ok_or(&format!(
             "Attribute {} to exist on new model",
             attr.value.name
-        ));
+        ))?;
 
         push_scalar_value(
             value,
@@ -77,17 +79,35 @@ fn topo_ordered_inserts(
     insert.values_panic(scalar_vals);
 
     // Navigation properties, using the include tree as a guide
-    let mut jcts = vec![];
     if let Some(include_tree) = include_tree {
-        for nav in &model.navigation_properties {
+        let (one_to_ones, others): (Vec<_>, Vec<_>) = model
+            .navigation_properties
+            .iter()
+            .partition(|n| matches!(n.kind, NavigationPropertyKind::OneToOne { .. }));
+
+        // One to One table must be created before this table
+        for nav in one_to_ones {
+            let Some(Value::Object(nav_model)) = new_model.get(&nav.var_name) else {
+                continue;
+            };
+            let Some(Value::Object(nested_tree)) = include_tree.get(&nav.var_name) else {
+                continue;
+            };
+
+            topo_ordered_inserts(&nav.model_name, meta, nav_model, Some(nested_tree), acc)?;
+        }
+
+        acc.push(insert);
+
+        let mut jcts = vec![];
+
+        // One to Many tables must be created after this table
+        for nav in others {
             let Some(Value::Object(nested_tree)) = include_tree.get(&nav.var_name) else {
                 continue;
             };
 
             match (&nav.kind, new_model.get(&nav.var_name)) {
-                (OneToOne { .. }, Some(Value::Object(nav_model))) => {
-                    topo_ordered_inserts(&nav.model_name, meta, nav_model, Some(nested_tree), acc)?;
-                }
                 (OneToMany { .. }, Some(Value::Array(nav_models))) => {
                     for nav_model in nav_models.iter().filter_map(|v| v.as_object()) {
                         topo_ordered_inserts(
@@ -158,10 +178,12 @@ fn topo_ordered_inserts(
                 }
             }
         }
+
+        acc.append(&mut jcts);
+        return Ok(());
     }
 
     acc.push(insert);
-    acc.append(&mut jcts);
     Ok(())
 }
 
@@ -440,6 +462,100 @@ INSERT INTO "Horse" ("id", "personId") VALUES (3, 1);"#
             res,
             r#"INSERT INTO "PersonsHorses" ("Person.id", "Horse.id") VALUES (1, 1);
 INSERT INTO "PersonsHorses" ("Person.id", "Horse.id") VALUES (1, 2);"#
+        );
+    }
+
+    #[test]
+    fn topological_ordering_is_correct() {
+        // Arrange
+        let ast_person = ModelBuilder::new("Person")
+            .id()
+            .attribute("horseId", CidlType::Integer, Some("Horse".into()))
+            .nav_p(
+                "horse",
+                "Horse",
+                NavigationPropertyKind::OneToOne {
+                    reference: "horseId".to_string(),
+                },
+            )
+            .build();
+
+        let ast_horse = ModelBuilder::new("Horse")
+            .id()
+            .attribute("personId", CidlType::Integer, Some("Person".into()))
+            .nav_p(
+                "awards",
+                "Award",
+                NavigationPropertyKind::OneToMany {
+                    reference: "horseId".to_string(),
+                },
+            )
+            .build();
+
+        let ast_award = ModelBuilder::new("Award")
+            .id()
+            .attribute("horseId", CidlType::Integer, Some("Horse".into()))
+            .attribute("title", CidlType::Text, None)
+            .build();
+
+        let mut meta = std::collections::HashMap::new();
+        meta.insert(ast_person.name.clone(), ast_person);
+        meta.insert(ast_horse.name.clone(), ast_horse);
+        meta.insert(ast_award.name.clone(), ast_award);
+
+        let new_model = json!({
+            "id": 1,
+            "horseId": 10,
+            "horse": {
+                "id": 10,
+                "personId": 1,
+                "awards": [
+                    { "id": 100, "horseId": 10, "title": "Fastest Horse" },
+                    { "id": 101, "horseId": 10, "title": "Strongest Horse" }
+                ]
+            }
+        });
+
+        let include_tree = json!({
+            "horse": {
+                "awards": {}
+            }
+        });
+
+        // Act
+        let res = insert_model(
+            "Person",
+            &meta,
+            new_model.as_object().unwrap().clone(),
+            Some(&include_tree.as_object().unwrap().clone()),
+        )
+        .unwrap();
+
+        // Assert
+        let inserts: Vec<_> = res
+            .lines()
+            .filter(|line| line.starts_with("INSERT"))
+            .collect();
+
+        assert!(
+            inserts[0].contains("INSERT INTO \"Horse\""),
+            "Expected Horse inserted first, got {}",
+            inserts[0]
+        );
+        assert!(
+            inserts[1].contains("INSERT INTO \"Award\""),
+            "Expected Award inserted third, got {}",
+            inserts[1]
+        );
+        assert!(
+            inserts[2].contains("INSERT INTO \"Award\""),
+            "Expected another Award insert, got {}",
+            inserts[2]
+        );
+        assert!(
+            inserts[3].contains("INSERT INTO \"Person\""),
+            "Expected Person inserted second, got {}",
+            inserts[3]
         );
     }
 }

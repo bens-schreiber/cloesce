@@ -11,7 +11,7 @@ import {
   ForeignKey,
   IncludeTree,
   DataSource,
-  modelsFromSql,
+  Orm,
   WranglerEnv,
 } from "cloesce/backend";
 
@@ -44,12 +44,8 @@ class Horse {
 
   @POST
   static async post(@Inject { db }: Env, horse: Horse): Promise<Horse> {
-    const records = await db
-      .prepare("INSERT INTO Horse (id, name, bio) VALUES (?, ?, ?) RETURNING *")
-      .bind(horse.id, horse.name, horse.bio)
-      .all();
-
-    return modelsFromSql(Horse, records.results, Horse.default)[0] as Horse;
+    await db.prepare(Orm.insert(Horse, horse, null).value).run();
+    return horse;
   }
 
   @GET
@@ -59,17 +55,22 @@ class Horse {
       .bind(id)
       .run();
 
-    return modelsFromSql(Horse, records.results, Horse.default)[0] as Horse;
+    const res = Orm.fromSql(Horse, records.results, Horse.default);
+    return res.value[0];
   }
 
   @GET
   static async list(@Inject { db }: Env): Promise<Horse[]> {
     let records = await db.prepare("SELECT * FROM [Horse.default]").run();
-    return modelsFromSql(Horse, records.results, Horse.default) as Horse[];
+
+    const res = Orm.fromSql(Horse, records.results, Horse.default);
+    return res.value;
   }
 
   @POST
   async like(@Inject { db }: Env, horse: Horse) {
+    // TODO: Revisit this. If we wanted to use `Orm.insert` we'd have to specify
+    // the Like id, when we'd rather have that auto generate.
     await db
       .prepare("INSERT INTO Like (horseId1, horseId2) VALUES (?, ?)")
       .bind(this.id, horse.id)

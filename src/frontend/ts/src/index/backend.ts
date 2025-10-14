@@ -1,4 +1,4 @@
-export { cloesce, modelsFromSql } from "../runtime/runtime.js";
+export { cloesce, Orm } from "../runtime/runtime.js";
 export type { HttpResult, Either } from "../common.js";
 
 // Compiler hints
