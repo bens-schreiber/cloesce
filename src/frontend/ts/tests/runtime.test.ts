@@ -1,11 +1,11 @@
 import { describe, test, expect, vi } from "vitest";
 import { _cloesceInternal } from "../src/runtime/runtime";
 import { CloesceAst, HttpVerb, NamedTypedValue } from "../src/common";
-import { modelsFromSql } from "../src/runtime/runtime";
-import { IncludeTree } from "../src";
+import { fromSql } from "../src/runtime/runtime";
 import fs from "fs";
 import path from "path";
 import { beforeEach } from "node:test";
+import { IncludeTree } from "../src/index/backend";
 
 const makeAst = (methods: Record<string, any>): CloesceAst => ({
   wrangler_env: {
@@ -627,16 +627,16 @@ describe("modelsFromSql", () => {
     };
 
     // Act
-    const result = modelsFromSql(
+    const result = fromSql(
       constructorRegistry[modelName],
       records,
       includeTree,
     );
 
     // Assert
-    expect(result.length).toBe(1);
+    expect(result.value.length).toBe(1);
 
-    const horse: any = result[0];
+    const horse: any = result.value[0];
     expect(horse.id).toBe("1");
     expect(horse.name).toBe("Lightning");
     expect(horse.bio).toBe("Fast horse");
