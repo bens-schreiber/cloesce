@@ -4,6 +4,7 @@ mod methods;
 
 use common::Model;
 
+use methods::insert::InsertModel;
 use serde_json::Map;
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -170,7 +171,7 @@ pub unsafe extern "C" fn insert_model(
     };
 
     let res = META.with(|meta| {
-        methods::insert::insert_model(model_name, &meta.borrow(), new_model, include_tree.as_ref())
+        InsertModel::query(model_name, &meta.borrow(), new_model, include_tree.as_ref())
     });
     match res {
         Ok(res) => {
