@@ -109,7 +109,7 @@ Traverse: Dog (Person.dogs)
 Scope (add)=> { Person.id: 1, Person.dogs.id }
 
 Traverse: Person (Root)
-Scope (add)=> { Person.id: 1}
+Scope (add)=> { Person.id: 1, Person.dogs.id }
 
 
 => Model {
@@ -123,7 +123,7 @@ Scope (add)=> { Person.id: 1}
 }
 ```
 
-Note: If person has many dogs, each time a dog is traversed, it will overwrite path `Person.dogs.id`'s value' in the scope. This is fine, because the id will only be relevant for that specific dogs tree traversal
+Note: If person has many dogs, each time a dog is traversed, it will overwrite path `Person.dogs.id`'s value' in the scope. This is fine, because the id will only be relevant for that specific dogs tree traversal.
 
 ### M:M
 
