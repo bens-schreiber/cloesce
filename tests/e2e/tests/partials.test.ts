@@ -11,13 +11,33 @@ afterAll(async () => {
   await stopWrangler();
 });
 
-describe("POST partial Dog", () => {
-  it("POST", async () => {
+describe("POST Dog", () => {
+  it("Partial", async () => {
     const res = await Dog.post({
       name: "fido",
-      age: 1,
+      age: 100,
     });
 
     expect(res.ok, withRes("POST should be OK", res)).toBe(true);
+    expect(res.data).toEqual({
+      id: 1,
+      name: "fido",
+      age: 100,
+    });
+  });
+
+  it("Full", async () => {
+    const res = await Dog.post({
+      id: 2,
+      name: "fido",
+      age: 100,
+    });
+
+    expect(res.ok, withRes("POST should be OK", res)).toBe(true);
+    expect(res.data).toEqual({
+      id: 2,
+      name: "fido",
+      age: 100,
+    });
   });
 });

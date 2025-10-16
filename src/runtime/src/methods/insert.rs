@@ -30,40 +30,45 @@ impl<'a> InsertModel<'a> {
         new_model: Map<String, Value>,
         include_tree: Option<&IncludeTree>,
     ) -> Result<String, String> {
-        let mut generator = Self {
-            meta,
-            context: HashMap::default(),
-            acc: Vec::default(),
+        let insert_stmts = {
+            let mut generator = Self {
+                meta,
+                context: HashMap::default(),
+                acc: Vec::default(),
+            };
+
+            generator.dfs(
+                None,
+                model_name,
+                &new_model,
+                include_tree,
+                model_name.to_string(),
+            )?;
+
+            generator
+                .acc
+                .drain(..)
+                .map(|stmt| format!("{stmt};"))
+                .collect::<Vec<_>>()
+                .join("\n")
         };
 
-        generator.accumulate(
-            None,
-            model_name,
-            &new_model,
-            include_tree,
-            model_name.to_string(),
-        )?;
-
-        let topo_sorted_inserts = generator
-            .acc
-            .drain(..)
-            .map(|stmt| format!("{stmt};"))
-            .collect::<Vec<_>>()
-            .join("\n");
-
-        // Yield the root models ID, either from the variable table or the explicit value
-        let select_root_id = {
+        let select_root_id_stmt = {
             // unwrap: root model is guaranteed to exist if we've gotten this far
             let model = meta.get(model_name).unwrap();
             let root_id_path = format!("{}.{}", model.name, model.primary_key.name);
 
+            // The root id is either a value, or a variable in the temp table.
             match new_model.get(&model.primary_key.name) {
                 Some(value) => Query::select()
-                    .expr(match model.primary_key.cidl_type {
-                        CidlType::Integer => Expr::val(value.as_i64().unwrap()),
-                        CidlType::Real => Expr::val(value.as_f64().unwrap()),
-                        _ => Expr::val(value.as_str().unwrap()),
-                    })
+                    .expr_as(
+                        match model.primary_key.cidl_type {
+                            CidlType::Integer => Expr::val(value.as_i64().unwrap()),
+                            CidlType::Real => Expr::val(value.as_f64().unwrap()),
+                            _ => Expr::val(value.as_str().unwrap()),
+                        },
+                        alias(VARIABLES_TABLE_COL_ID),
+                    )
                     .to_owned(),
                 None => Query::select()
                     .from(alias(VARIABLES_TABLE_NAME))
@@ -76,17 +81,15 @@ impl<'a> InsertModel<'a> {
             .to_string(SqliteQueryBuilder)
         };
 
-        // Remove everything from the variable table
-        let remove_vars = VariablesTable::remove();
+        let remove_vars_stmt = VariablesTable::delete_all();
 
         Ok(format!(
             "{}\n{};\n{};",
-            topo_sorted_inserts, select_root_id, remove_vars
+            insert_stmts, select_root_id_stmt, remove_vars_stmt
         ))
     }
 
-    /// Recursive entrypoint for [InsertModel]
-    fn accumulate(
+    fn dfs(
         &mut self,
         parent_model_name: Option<&String>,
         model_name: &str,
@@ -120,7 +123,7 @@ impl<'a> InsertModel<'a> {
             }
         };
 
-        // Add all scalars, attempt to add FK's from value or context
+        // Scalar attributes; attempt to retrieve FK's by value or context
         let mut fks_to_resolve = HashMap::default();
         {
             // Cheating here. If this model is depends on another, it's dependency will have been inserted
@@ -144,7 +147,12 @@ impl<'a> InsertModel<'a> {
                         let path_key = parent_id_path.as_ref().unwrap();
 
                         let ctx = self.context.get(path_key).unwrap();
-                        builder.use_var(ctx, &attr.value.name, &attr.value.cidl_type, path_key)?;
+                        builder.push_val_ctx(
+                            ctx,
+                            &attr.value.name,
+                            &attr.value.cidl_type,
+                            path_key,
+                        )?;
                     }
                     (None, None) => {
                         // A value was not provided and cannot be inferred.
@@ -185,7 +193,7 @@ impl<'a> InsertModel<'a> {
                 };
 
                 // Recursively handle nested inserts
-                self.accumulate(
+                self.dfs(
                     Some(&model.name),
                     &nav.model_name,
                     nav_model,
@@ -199,7 +207,7 @@ impl<'a> InsertModel<'a> {
                 if let Some(ntv) = fks_to_resolve.remove(reference)
                     && let Some(ctx) = self.context.get(&path_key)
                 {
-                    builder.use_var(ctx, &ntv.name, &nav_pk.cidl_type, &path_key)?;
+                    builder.push_val_ctx(ctx, &ntv.name, &nav_pk.cidl_type, &path_key)?;
                 }
             }
 
@@ -215,7 +223,7 @@ impl<'a> InsertModel<'a> {
                 match (&nav.kind, new_model.get(&nav.var_name)) {
                     (OneToMany { .. }, Some(Value::Array(nav_models))) => {
                         for nav_model in nav_models.iter().filter_map(|v| v.as_object()) {
-                            self.accumulate(
+                            self.dfs(
                                 Some(&model.name),
                                 &nav.model_name,
                                 nav_model,
@@ -226,7 +234,7 @@ impl<'a> InsertModel<'a> {
                     }
                     (ManyToMany { unique_id }, Some(Value::Array(nav_models))) => {
                         for nav_model in nav_models.iter().filter_map(|v| v.as_object()) {
-                            self.accumulate(
+                            self.dfs(
                                 Some(&model.name),
                                 &nav.model_name,
                                 nav_model,
@@ -270,7 +278,7 @@ impl<'a> InsertModel<'a> {
                             let mut jct_builder = InsertBuilder::new(unique_id);
                             vars_to_use.sort_by_key(|(name, _, _, _)| name.clone());
                             for (var_name, cidl_type, var_ctx, path) in vars_to_use {
-                                jct_builder.use_var(var_ctx, &var_name, cidl_type, &path)?;
+                                jct_builder.push_val_ctx(var_ctx, &var_name, cidl_type, &path)?;
                             }
 
                             self.acc.push(jct_builder.build());
@@ -289,8 +297,7 @@ impl<'a> InsertModel<'a> {
         Ok(())
     }
 
-    /// Inserts the current [InsertBuilder] table, updating the graph context to include
-    /// the tables id.
+    /// Inserts the [InsertBuilder], updating the graph context to include the tables id.
     ///
     /// Returns an error if foreign key values exist that can not be resolved.
     fn insert_table(
@@ -302,9 +309,17 @@ impl<'a> InsertModel<'a> {
         new_model: &Map<String, Value>,
         builder: InsertBuilder,
     ) -> Result<(), String> {
+        if !fks_to_resolve.is_empty() {
+            return Err(format!(
+                "Missing foreign key definitions for {}, got: {}",
+                model.name,
+                serde_json::to_string(new_model).unwrap()
+            ));
+        }
+
         self.acc.push(builder.build());
 
-        // Add this tables primary key to the context so dependents can resolve it
+        // Add this models primary key to the context so dependents can resolve it
         match pk {
             None => {
                 let id_path = format!("{path}.{}", model.primary_key.name);
@@ -318,14 +333,6 @@ impl<'a> InsertModel<'a> {
             }
         }
 
-        if !fks_to_resolve.is_empty() {
-            return Err(format!(
-                "Missing foreign key definitions for {}, got: {}",
-                model.name,
-                serde_json::to_string(new_model).unwrap()
-            ));
-        }
-
         Ok(())
     }
 }
@@ -334,17 +341,22 @@ const VARIABLES_TABLE_NAME: &str = "_cloesce_tmp";
 const VARIABLES_TABLE_COL_PATH: &str = "path";
 const VARIABLES_TABLE_COL_ID: &str = "id";
 
-/// A cloesce-shipped table that helps with storing temporary
-/// values needed for complex insertions.
+/// A cloesce-shipped table that for storing temporary SQL
+/// values, needed for complex insertions.
+///
+/// Unfortunately, D1 supports only read-only CTE's, so this temp table is
+/// the only option available to us.
+///
+/// See https://github.com/bens-schreiber/cloesce/blob/schreiber/orm-ctes/src/runtime/src/methods/insert.rs
+/// for a CTE based soltuion if that ever changes.
 struct VariablesTable;
 impl VariablesTable {
-    fn remove() -> String {
+    fn delete_all() -> String {
         Query::delete()
             .from_table(alias(VARIABLES_TABLE_NAME))
             .to_string(SqliteQueryBuilder)
     }
 
-    /// Inserts or replaces the id at the path.
     fn insert_rowid(path: &str) -> String {
         let mut insert = Query::insert();
         insert.into_table(alias(VARIABLES_TABLE_NAME));
@@ -386,6 +398,9 @@ impl InsertBuilder {
         }
     }
 
+    /// Adds a column and value to the insert statement.
+    ///
+    /// Returns an error if the value does not match the meta type.
     fn push_val(
         &mut self,
         var_name: &str,
@@ -396,7 +411,8 @@ impl InsertBuilder {
         push_scalar_value(value, cidl_type, &self.model_name, var_name, &mut self.vals)
     }
 
-    fn use_var(
+    /// Adds a column and value using the graph context.
+    fn push_val_ctx(
         &mut self,
         ctx: &GraphContext,
         var_name: &str,

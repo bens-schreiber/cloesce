@@ -14,7 +14,7 @@ export async function startWrangler(fixturesPath: string) {
   await runCmd(
     "Applying D1 migrations",
     "echo y | npx wrangler d1 migrations apply db",
-    { cwd: ".generated" }
+    { cwd: ".generated" },
   );
 
   await runCmd(
@@ -22,7 +22,7 @@ export async function startWrangler(fixturesPath: string) {
     "npx wrangler --config wrangler.toml build",
     {
       cwd: ".generated",
-    }
+    },
   );
 
   wranglerProcess = spawn(
@@ -31,7 +31,7 @@ export async function startWrangler(fixturesPath: string) {
     {
       cwd: ".generated",
       stdio: "pipe",
-    }
+    },
   );
 
   await new Promise((resolve) => setTimeout(resolve, 5000));
