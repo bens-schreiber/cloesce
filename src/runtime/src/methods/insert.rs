@@ -2,8 +2,8 @@ use std::collections::HashMap;
 
 use common::NavigationPropertyKind::{ManyToMany, OneToMany};
 use common::{CidlType, Model, NamedTypedValue, NavigationPropertyKind};
-use sea_query::{Alias, DeleteStatement, SimpleExpr, SqliteQueryBuilder, SubQueryStatement};
-use sea_query::{Expr, InsertStatement, Query};
+use sea_query::{Alias, InsertStatement, SimpleExpr, SqliteQueryBuilder, SubQueryStatement};
+use sea_query::{Expr, Query};
 use serde_json::Map;
 use serde_json::Value;
 
@@ -30,8 +30,6 @@ impl<'a> InsertModel<'a> {
         new_model: Map<String, Value>,
         include_tree: Option<&IncludeTree>,
     ) -> Result<String, String> {
-        let remove_vars = VariablesTable::remove().to_string(SqliteQueryBuilder);
-
         let mut generator = Self {
             meta,
             context: HashMap::default(),
@@ -53,7 +51,38 @@ impl<'a> InsertModel<'a> {
             .collect::<Vec<_>>()
             .join("\n");
 
-        Ok(format!("{}\n{};", topo_sorted_inserts, remove_vars))
+        // Yield the root models ID, either from the variable table or the explicit value
+        let select_root_id = {
+            // unwrap: root model is guaranteed to exist if we've gotten this far
+            let model = meta.get(model_name).unwrap();
+            let root_id_path = format!("{}.{}", model.name, model.primary_key.name);
+
+            match new_model.get(&model.primary_key.name) {
+                Some(value) => Query::select()
+                    .expr(match model.primary_key.cidl_type {
+                        CidlType::Integer => Expr::val(value.as_i64().unwrap()),
+                        CidlType::Real => Expr::val(value.as_f64().unwrap()),
+                        _ => Expr::val(value.as_str().unwrap()),
+                    })
+                    .to_owned(),
+                None => Query::select()
+                    .from(alias(VARIABLES_TABLE_NAME))
+                    .column(alias(VARIABLES_TABLE_COL_ID))
+                    .and_where(
+                        Expr::col(alias(VARIABLES_TABLE_COL_PATH)).eq(Expr::val(root_id_path)),
+                    )
+                    .to_owned(),
+            }
+            .to_string(SqliteQueryBuilder)
+        };
+
+        // Remove everything from the variable table
+        let remove_vars = VariablesTable::remove();
+
+        Ok(format!(
+            "{}\n{};\n{};",
+            topo_sorted_inserts, select_root_id, remove_vars
+        ))
     }
 
     /// Recursive entrypoint for [InsertModel]
@@ -309,15 +338,15 @@ const VARIABLES_TABLE_COL_ID: &str = "id";
 /// values needed for complex insertions.
 struct VariablesTable;
 impl VariablesTable {
-    fn remove() -> DeleteStatement {
+    fn remove() -> String {
         Query::delete()
             .from_table(alias(VARIABLES_TABLE_NAME))
-            .to_owned()
+            .to_string(SqliteQueryBuilder)
     }
 
     /// Inserts or replaces the id at the path.
     fn insert_rowid(path: &str) -> String {
-        let mut insert = InsertStatement::new();
+        let mut insert = Query::insert();
         insert.into_table(alias(VARIABLES_TABLE_NAME));
         insert.columns(vec![alias("path"), alias("id")]);
         insert.values_panic(vec![
@@ -445,7 +474,8 @@ mod test {
         expected_str!(
             res,
             r#"INSERT INTO "Horse" ("id", "color", "age", "address") VALUES (1, 'brown', 7, null)"#
-        )
+        );
+        expected_str!(res, "SELECT 1");
     }
 
     #[test]
@@ -473,6 +503,7 @@ mod test {
             res,
             r#"INSERT INTO "Note" ("id", "content") VALUES (5, null)"#
         );
+        expected_str!(res, "SELECT 5");
     }
 
     #[test]
@@ -513,6 +544,7 @@ mod test {
 
         // Assert
         expected_str!(res, r#"INSERT INTO "Person" ("id") VALUES (1)"#);
+        expected_str!(res, "SELECT 1");
     }
 
     #[test]
@@ -562,6 +594,7 @@ mod test {
             r#"INSERT INTO "Person" ("id", "horseId") VALUES (1, 1)"#
         );
         expected_str!(res, r#"INSERT INTO "Horse" ("id") VALUES (1)"#);
+        expected_str!(res, r#"SELECT 1"#);
     }
 
     #[test]
@@ -625,6 +658,7 @@ mod test {
 INSERT INTO "Horse" ("id", "personId") VALUES (2, 1);
 INSERT INTO "Horse" ("id", "personId") VALUES (3, 1);"#
         );
+        expected_str!(res, "SELECT 1");
     }
 
     #[test]
@@ -680,9 +714,9 @@ INSERT INTO "Horse" ("id", "personId") VALUES (3, 1);"#
 INSERT INTO "Horse" ("id") VALUES (1);
 INSERT INTO "PersonsHorses" ("Horse.id", "Person.id") VALUES (1, 1);
 INSERT INTO "Horse" ("id") VALUES (2);
-INSERT INTO "PersonsHorses" ("Horse.id", "Person.id") VALUES (2, 1);
-DELETE FROM "_cloesce_tmp""#
+INSERT INTO "PersonsHorses" ("Horse.id", "Person.id") VALUES (2, 1);"#
         );
+        expected_str!(res, "SELECT 1");
     }
 
     #[test]
@@ -804,7 +838,10 @@ DELETE FROM "_cloesce_tmp""#
             lines[1],
             "REPLACE INTO \"_cloesce_tmp\" (\"path\", \"id\") VALUES ('Person.id', last_insert_rowid());"
         );
-        expected_str!(lines[2], "DELETE FROM \"_cloesce_tmp\"");
+        expected_str!(
+            lines[2],
+            r#"SELECT "id" FROM "_cloesce_tmp" WHERE "path" = 'Person.id';"#
+        );
     }
 
     #[test]
@@ -852,7 +889,9 @@ DELETE FROM "_cloesce_tmp""#
             r#"INSERT INTO "Horse" DEFAULT VALUES;
 REPLACE INTO "_cloesce_tmp" ("path", "id") VALUES ('Person.horse.id', last_insert_rowid());
 INSERT INTO "Person" ("horseId") VALUES ((SELECT "id" FROM "_cloesce_tmp" WHERE "path" = 'Person.horse.id'));
-REPLACE INTO "_cloesce_tmp" ("path", "id") VALUES ('Person.id', last_insert_rowid());"#
+REPLACE INTO "_cloesce_tmp" ("path", "id") VALUES ('Person.id', last_insert_rowid());
+SELECT "id" FROM "_cloesce_tmp" WHERE "path" = 'Person.id';
+"#
         );
     }
 
@@ -907,7 +946,9 @@ REPLACE INTO "_cloesce_tmp" ("path", "id") VALUES ('Person.id', last_insert_rowi
             r#"INSERT INTO "Person" DEFAULT VALUES;
 REPLACE INTO "_cloesce_tmp" ("path", "id") VALUES ('Person.id', last_insert_rowid());
 INSERT INTO "Horse" ("personId") VALUES ((SELECT "id" FROM "_cloesce_tmp" WHERE "path" = 'Person.id'));
-REPLACE INTO "_cloesce_tmp" ("path", "id") VALUES ('Person.horses.id', last_insert_rowid());"#
+REPLACE INTO "_cloesce_tmp" ("path", "id") VALUES ('Person.horses.id', last_insert_rowid());
+SELECT "id" FROM "_cloesce_tmp" WHERE "path" = 'Person.id';
+"#
         );
     }
 
@@ -962,7 +1003,8 @@ REPLACE INTO "_cloesce_tmp" ("path", "id") VALUES ('Person.horses.id', last_inse
 INSERT INTO "PersonsHorses" ("Horse.id", "Person.id") VALUES ((SELECT "id" FROM "_cloesce_tmp" WHERE "path" = 'Person.horses.id'), (SELECT "id" FROM "_cloesce_tmp" WHERE "path" = 'Person.id'));
 INSERT INTO "Horse" DEFAULT VALUES;
 REPLACE INTO "_cloesce_tmp" ("path", "id") VALUES ('Person.horses.id', last_insert_rowid());
-INSERT INTO "PersonsHorses" ("Horse.id", "Person.id") VALUES ((SELECT "id" FROM "_cloesce_tmp" WHERE "path" = 'Person.horses.id'), (SELECT "id" FROM "_cloesce_tmp" WHERE "path" = 'Person.id'));"#
+INSERT INTO "PersonsHorses" ("Horse.id", "Person.id") VALUES ((SELECT "id" FROM "_cloesce_tmp" WHERE "path" = 'Person.horses.id'), (SELECT "id" FROM "_cloesce_tmp" WHERE "path" = 'Person.id'));
+SELECT "id" FROM "_cloesce_tmp" WHERE "path" = 'Person.id';"#
         );
     }
 }

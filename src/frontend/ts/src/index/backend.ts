@@ -75,7 +75,7 @@ export class Orm {
   static fromSql<T extends object>(
     ctor: new () => T,
     records: Record<string, any>[],
-    includeTree: IncludeTree<T> | null,
+    includeTree: IncludeTree<T> | null
   ): Either<string, T[]> {
     return fromSql(ctor, records, includeTree);
   }
@@ -96,7 +96,7 @@ export class Orm {
   static insertQuery<T extends object>(
     ctor: new () => T,
     newModel: T,
-    includeTree: IncludeTree<T> | null,
+    includeTree: IncludeTree<T> | null
   ): Either<string, string> {
     const { wasm } = RuntimeContainer.get();
     const args = [
@@ -119,7 +119,7 @@ export class Orm {
   static updateQuery<T extends object>(
     ctor: new () => T,
     updatedModel: Partial<T>,
-    includeTree: IncludeTree<T> | null,
+    includeTree: IncludeTree<T> | null
   ): Either<string, string> {
     const { wasm } = RuntimeContainer.get();
     const args = [
@@ -137,24 +137,49 @@ export class Orm {
    * @param ctor A model constructor.
    * @param newModel The new model to insert.
    * @param includeTree An include tree describing which foreign keys to join.
-   * @returns An error string, or nothing.
+   * @returns An error string, or the primary key of the inserted model.
    */
   async insert<T extends object>(
     ctor: new () => T,
     newModel: T,
-    includeTree: IncludeTree<T> | null,
-  ): Promise<Either<string, undefined>> {
+    includeTree: IncludeTree<T> | null
+  ): Promise<Either<string, any>> {
     let insertQueryRes = Orm.insertQuery(ctor, newModel, includeTree);
     if (!insertQueryRes.ok) {
       return insertQueryRes;
     }
 
-    let d1Res = await this.db.prepare(insertQueryRes.value).run();
-    if (!d1Res.success) {
-      return left(d1Res.error ?? "D1 failed, but no error was returned.");
+    // Split the query into individual statements.
+    const statements = insertQueryRes.value
+      .split(";")
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0);
+
+    // One of these statements is a "SELECT", which is the root model id stmt.
+    let selectIndex: number;
+    for (let i = statements.length - 1; i >= 0; i--) {
+      if (/^SELECT/i.test(statements[i])) {
+        selectIndex = i;
+        break;
+      }
     }
 
-    return right(undefined);
+    // Execute all statements in a batch.
+    const batchRes = await this.db.batch(
+      statements.map((s) => this.db.prepare(s))
+    );
+
+    if (!batchRes.every((r) => r.success)) {
+      const failed = batchRes.find((r) => !r.success);
+      return left(
+        failed?.error ?? "D1 batch failed, but no error was returned."
+      );
+    }
+
+    // Return the result of the SELECT statement
+    const selectResult = batchRes[selectIndex!].results[0] as { id: any };
+
+    return right(selectResult.id);
   }
 
   /**
@@ -169,7 +194,7 @@ export class Orm {
   async update<T extends object>(
     ctor: new () => T,
     updatedModel: Partial<T>,
-    includeTree: IncludeTree<T> | null,
+    includeTree: IncludeTree<T> | null
   ): Promise<Either<string, undefined>> {
     let updateQueryRes = Orm.updateQuery(ctor, updatedModel, includeTree);
     if (!updateQueryRes.ok) {
@@ -189,7 +214,7 @@ export class Orm {
    */
   static listQuery<T extends object>(
     ctor: new () => T,
-    includeTree: KeysOfType<T, IncludeTree<T>> | null,
+    includeTree: KeysOfType<T, IncludeTree<T>> | null
   ): string {
     if (includeTree) {
       return `SELECT * FROM [${ctor.name}.${includeTree.toString()}]`;
@@ -204,7 +229,7 @@ export class Orm {
    */
   static getQuery<T extends object>(
     ctor: new () => T,
-    includeTree: KeysOfType<T, IncludeTree<T>> | null,
+    includeTree: KeysOfType<T, IncludeTree<T>> | null
   ): string {
     const { ast } = RuntimeContainer.get();
     if (includeTree) {
@@ -220,7 +245,7 @@ export class Orm {
    */
   async list<T extends object>(
     ctor: new () => T,
-    includeTreeKey: KeysOfType<T, IncludeTree<T>> | null,
+    includeTreeKey: KeysOfType<T, IncludeTree<T>> | null
   ): Promise<Either<string, T[]>> {
     const q = Orm.listQuery(ctor, includeTreeKey);
     const res = await this.db.prepare(q).run();
@@ -250,7 +275,7 @@ export class Orm {
   async get<T extends object>(
     ctor: new () => T,
     id: any,
-    includeTreeKey: KeysOfType<T, IncludeTree<T>> | null,
+    includeTreeKey: KeysOfType<T, IncludeTree<T>> | null
   ): Promise<Either<string, T>> {
     const q = Orm.getQuery(ctor, includeTreeKey);
     const res = await this.db.prepare(q).bind(id).run();

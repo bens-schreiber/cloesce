@@ -9,6 +9,7 @@ export function right<R>(value: R): Either<never, R> {
 export enum ExtractorErrorCode {
   UnknownType,
   MultipleGenericType,
+  InvalidPartialType,
   InvalidIncludeTree,
   UnknownNavigationPropertyReference,
   InvalidNavigationPropertyReference,
@@ -26,6 +27,10 @@ const errorInfoMap: Record<
 > = {
   [ExtractorErrorCode.UnknownType]: {
     description: "Encountered an unknown or unsupported type",
+    suggestion: "Refer to the documentation on valid Cloesce TS types",
+  },
+  [ExtractorErrorCode.InvalidPartialType]: {
+    description: "Partial types must only contain a model or plain old object",
     suggestion: "Refer to the documentation on valid Cloesce TS types",
   },
   [ExtractorErrorCode.MultipleGenericType]: {
@@ -105,6 +110,7 @@ export type CidlType =
   | "Blob"
   | { Inject: string }
   | { Object: string }
+  | { Partial: string }
   | { Nullable: CidlType }
   | { Array: CidlType }
   | { HttpResult: CidlType };

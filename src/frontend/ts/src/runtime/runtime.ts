@@ -445,7 +445,10 @@ async function validateRequest(
   // Validate all parameters type
   for (const p of requiredParams) {
     const value = params[p.name];
-    if (!validateCidlType(ast, value, p.cidl_type)) {
+    const isPartial =
+      typeof p.cidl_type !== "string" && "Partial" in p.cidl_type;
+
+    if (!validateCidlType(ast, value, p.cidl_type, isPartial)) {
       return invalidRequest("Invalid parameters.");
     }
   }
@@ -566,8 +569,9 @@ function validateCidlType(
   ast: CloesceAst,
   value: unknown,
   cidlType: CidlType,
+  is_partial: boolean,
 ): boolean {
-  if (value === undefined) return false;
+  if (value === undefined) return is_partial;
 
   // TODO: consequences of null checking like this? 'null' is passed in
   // as a string for GET requests...
@@ -595,15 +599,27 @@ function validateCidlType(
   }
 
   // Handle Models
-  if ("Object" in cidlType && ast.models[cidlType.Object]) {
-    const model = ast.models[cidlType.Object];
+  let cidlTypeAccessor =
+    "Partial" in cidlType
+      ? cidlType.Partial
+      : "Object" in cidlType
+        ? cidlType.Object
+        : undefined;
+
+  if (cidlTypeAccessor && ast.models[cidlTypeAccessor]) {
+    const model = ast.models[cidlTypeAccessor];
     if (!model || typeof value !== "object") return false;
     const valueObj = value as Record<string, unknown>;
 
     // Validate attributes
     if (
       !model.attributes.every((attr) =>
-        validateCidlType(ast, valueObj[attr.value.name], attr.value.cidl_type),
+        validateCidlType(
+          ast,
+          valueObj[attr.value.name],
+          attr.value.cidl_type,
+          is_partial,
+        ),
       )
     ) {
       return false;
@@ -615,21 +631,26 @@ function validateCidlType(
 
       return (
         navValue == null ||
-        validateCidlType(ast, navValue, getNavigationPropertyCidlType(nav))
+        validateCidlType(
+          ast,
+          navValue,
+          getNavigationPropertyCidlType(nav),
+          is_partial,
+        )
       );
     });
   }
 
   // Handle Plain Old Objects
-  if ("Object" in cidlType && ast.poos[cidlType.Object]) {
-    const poo = ast.poos[cidlType.Object];
+  if (cidlTypeAccessor && ast.poos[cidlTypeAccessor]) {
+    const poo = ast.poos[cidlTypeAccessor];
     if (!poo || typeof value !== "object") return false;
     const valueObj = value as Record<string, unknown>;
 
     // Validate attributes
     if (
       !poo.attributes.every((attr) =>
-        validateCidlType(ast, valueObj[attr.name], attr.cidl_type),
+        validateCidlType(ast, valueObj[attr.name], attr.cidl_type, is_partial),
       )
     ) {
       return false;
@@ -639,14 +660,15 @@ function validateCidlType(
   if ("Array" in cidlType) {
     const arr = cidlType.Array;
     return (
-      Array.isArray(value) && value.every((v) => validateCidlType(ast, v, arr))
+      Array.isArray(value) &&
+      value.every((v) => validateCidlType(ast, v, arr, is_partial))
     );
   }
 
   if ("HttpResult" in cidlType) {
     if (value === null) return cidlType.HttpResult === null;
     if (cidlType.HttpResult === null) return false;
-    return validateCidlType(ast, value, cidlType.HttpResult);
+    return validateCidlType(ast, value, cidlType.HttpResult, is_partial);
   }
 
   return false;
