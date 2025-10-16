@@ -1,4 +1,4 @@
-# Context Aware ORM Insertions
+# Context Aware ORM Insertions + Partial Objects
 
 ## Objective
 
@@ -200,3 +200,7 @@ With that, all a developer has to do to insert a model is:
 let model = ...;
 orm.insert(model, data_source);
 ```
+
+## Partial
+
+Since the ORM can insert partial objects, we need some way for Cloesce to recognize that an object is partial (don't reject it from the request validator stage if it's missing some values). To this end, I added the `Partial` grammar to the CIDL, and then updated the extractor and TS runtime to use it accordingly.

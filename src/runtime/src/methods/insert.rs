@@ -7,9 +7,9 @@ use sea_query::{Expr, Query};
 use serde_json::Map;
 use serde_json::Value;
 
+use crate::methods::{alias, push_scalar_value};
 use crate::IncludeTree;
 use crate::ModelMeta;
-use crate::methods::{alias, push_scalar_value};
 
 pub struct InsertModel<'a> {
     meta: &'a ModelMeta,
@@ -452,7 +452,7 @@ impl InsertBuilder {
 mod test {
     use std::collections::HashMap;
 
-    use common::{CidlType, NavigationPropertyKind, builder::ModelBuilder};
+    use common::{builder::ModelBuilder, CidlType, NavigationPropertyKind};
     use serde_json::json;
 
     use crate::{expected_str, methods::insert::InsertModel};
@@ -895,7 +895,7 @@ INSERT INTO "PersonsHorses" ("Horse.id", "Person.id") VALUES (2, 1);"#
             "Person",
             &meta,
             new_person.as_object().unwrap().clone(),
-            Some(&include_tree.as_object().unwrap()),
+            Some(include_tree.as_object().unwrap()),
         )
         .unwrap();
 
@@ -952,7 +952,7 @@ SELECT "id" FROM "_cloesce_tmp" WHERE "path" = 'Person.id';
             "Person",
             &meta,
             new_person.as_object().unwrap().clone(),
-            Some(&include_tree.as_object().unwrap()),
+            Some(include_tree.as_object().unwrap()),
         )
         .unwrap();
 
@@ -1005,7 +1005,7 @@ SELECT "id" FROM "_cloesce_tmp" WHERE "path" = 'Person.id';
             "Person",
             &meta,
             new_person.as_object().unwrap().clone(),
-            Some(&include_tree.as_object().unwrap()),
+            Some(include_tree.as_object().unwrap()),
         )
         .unwrap();
 
