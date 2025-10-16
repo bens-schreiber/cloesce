@@ -63,12 +63,15 @@ class Horse {
 
   @POST
   async like(@Inject { db }: Env, horse: Horse) {
-    // TODO: Revisit this. If we wanted to use `Orm.insert` we'd have to specify
-    // the Like id, when we'd rather have that auto generate.
-    await db
-      .prepare("INSERT INTO Like (horseId1, horseId2) VALUES (?, ?)")
-      .bind(this.id, horse.id)
-      .run();
+    const orm = Orm.fromD1(db);
+    await orm.insert(
+      Like,
+      {
+        horseId1: this.id,
+        horseId2: horse.id,
+      },
+      null
+    );
   }
 }
 

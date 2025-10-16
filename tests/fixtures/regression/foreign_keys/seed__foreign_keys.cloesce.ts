@@ -96,9 +96,6 @@ export class Dog {
 
   @ForeignKey(Person)
   personId: number;
-
-  @ForeignKey(Person)
-  personId2: number;
 }
 //#endregion
 
