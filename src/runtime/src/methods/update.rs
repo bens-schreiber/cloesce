@@ -70,6 +70,10 @@ fn topo_ordered_updates(
         )?;
     }
 
+    if columns.is_empty() {
+        return Ok(());
+    }
+
     update.values(columns.into_iter().zip(scalar_values));
 
     // Check updated nav props
@@ -114,6 +118,32 @@ mod test {
     use serde_json::json;
 
     use crate::{expected_str, methods::update::update_model};
+
+    #[test]
+    fn empty() {
+        // Arrange
+        let ast_model = ModelBuilder::new("Horse").id().build();
+
+        // Act
+        let mut model_meta = HashMap::new();
+        model_meta.insert(ast_model.name.clone(), ast_model);
+
+        let updated_model = json!({
+            // empty
+        });
+
+        // Assert
+        let res = update_model(
+            "Horse",
+            &model_meta,
+            updated_model.as_object().unwrap().clone(),
+            None,
+        )
+        .unwrap();
+
+        // Act
+        expected_str!(res, "");
+    }
 
     #[test]
     fn scalar_models() {

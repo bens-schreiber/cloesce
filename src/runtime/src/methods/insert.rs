@@ -7,9 +7,9 @@ use sea_query::{Expr, Query};
 use serde_json::Map;
 use serde_json::Value;
 
-use crate::methods::{alias, push_scalar_value};
 use crate::IncludeTree;
 use crate::ModelMeta;
+use crate::methods::{alias, push_scalar_value};
 
 pub struct InsertModel<'a> {
     meta: &'a ModelMeta,
@@ -452,7 +452,7 @@ impl InsertBuilder {
 mod test {
     use std::collections::HashMap;
 
-    use common::{builder::ModelBuilder, CidlType, NavigationPropertyKind};
+    use common::{CidlType, NavigationPropertyKind, builder::ModelBuilder};
     use serde_json::json;
 
     use crate::{expected_str, methods::insert::InsertModel};
