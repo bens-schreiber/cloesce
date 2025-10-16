@@ -9,16 +9,18 @@ let model = ...;
 orm.insert(model, data_source);
 ```
 
-This naive insertion is relatively simple to implement, which I've done in WASM using meta data and the provided include tree as a guide. However, when a developer wants to insert a value, they _usually don't_ know the primary key of that value (why would they when PK's can be auto generated?).
+Given a model that is completely filled out (all values are present), this isn't too bad of an algorithm to make. However, when a developer wants to insert a model into the database, they _usually don't_ know the primary key of that model (why would they when PK's can be auto generated?).
 
-This could be resolved by quering the max id before hand:
+A potential solution to this is finding the last id inserted:
 
 ```ts
 let max_id = db.query("SELECT MAX(id) from ...");
 let model =  { id: max_id + 1, ...};
 ```
 
-but we've added an extra DB query and more code just to insert our value. Further, when models have FK relationships (such as Person has many Dogs), we would have to get new id's for each one of those values. As the complexity of the model grows, as does the complexity for the insert query, having to prefetch and calculate ID's beforehand. We'd end up with something like:
+I'm not a fan of this as we've added an extra DB query and more code just to insert our value.
+
+Further, when models have complicated relationships (such as Person has many Dogs), we would have to get new id's for every single model. As the complexity of the model grows, as does the complexity for the insert query, having to prefetch and calculate ID's beforehan. We'd end up with something like:
 
 ```ts
 let max_person_id = ...
@@ -49,29 +51,41 @@ let model = {
 Orm.insert(model, data_source);
 ```
 
-This sucks. Insert should really be as simple as just _insert the model_.
+This sucks. Insert should really be as simple as _insert the model_.
 
 ## Giving inserts context
 
-We would like to make both ID's and FK ID's completely optional, and attempt to infer what they should be from the surrounding context. Sounds simple.
+Ideally, primary keys and foreign keys are completely optional. We should just be able to either:
 
-When we traverse a model as a tree, we must do so in topological order, such that dependencies are inserted before dependents. A dependency will always have a primary key that the dependent references. So, we need a way to propogate information (primary key values) from the dependency to the dependent.
+1. infer foreign keys from the surrounding context
+2. assert that a missing primary key is a generated primary key, and keep that in our context.
 
-My approach was to use dynamic scoping (just as some compilers do), essentially a map with the keys being the exact path we've traversed to get to some value, and the value being either generated (which we will discuss later), or provided as a value in the original model that is being inserted.
+This algorithm can get tricky. Note that insertions must occur in topological order, meaning that dependencies are inserted before dependents. For my implementation, I won't topo sort models beforehand, but instead traverse the models in a depth first tree-like manner such that the insertions (an accumulated list) are in topo order.
+
+For this to work, we need a way to propogate information from a parent node to a child note, as well as from a child node to a parent node.
+
+My approach was to use dynamic scoping (just as some compilers do). This is just a map with the keys being the exact path we've traversed to get to some value, and the value being either generated (which we will discuss later), or provided in the original model that is being inserted.
+
+We will use this dynamic scope context to fill any missing values in the model. Of course, models can be ill-formatted and we might be unable to infer a value, in which case we just yield an error.
 
 ### 1:1
 
-In the case of `Person` has a `Dog`, where `Person` does not know the `Dog's` id, we must traverse the insertions in the order `Dog, Person` (as `Person` is dependent on `Dog` existing). Note that I do not topo sort before hand for this implementation, and instead do a depth first traversal. So, we need to insert in the order of `Dog, Person`, but we are traversing in the order `Person, Dog`. That means, `Dog's ID` must **propogate upwards** to `Person`. Since we know the exact path it takes to get from `Person` to `Dog`, the scope looks like:
+In the case of `Person` has a `Dog`, where `Person` does not know the `Dog's` id, we are traversing in a depth first order `Person -> Dog`, and inserting in a topological order `Dog -> Person`. Traversal wise, `Dog's ID` must **propogate upwards** to `Person`.
+
+Again, for our dynamic scope, each key is the path that we have traversed, which uses the metadata to name values as if they were objects.
 
 ```
 Init:
 Scope = {}
 
-Traverse: Dog
-Scope (add)=> { Person.dog.id: 1 }
+Traverse: Person (Root)
+Scope (add) => { Person.id: <some value> }
 
-Traverse: Person
-Scope = { Person.dog.id: 1 }
+Traverse: Dog (Person.dog)
+Scope (add)=> { Person.dog.id: 1, Person.id: <some value> }
+
+Traverse: Person (Root)
+Scope = { Person.dog.id: 1, Person.id: <some value>}
 
 
 => Model {
@@ -88,11 +102,14 @@ In the case of `Person` has many `Dogs`, where `Dog` does not know the `Person's
 Init:
 Scope = {}
 
-Traverse: Person
+Traverse: Person (Root)
 Scope (add)=> { Person.id: 1}
 
-Traverse: Dog
-Scope = { Person.id: 1 }
+Traverse: Dog (Person.dogs)
+Scope (add)=> { Person.id: 1, Person.dogs.id }
+
+Traverse: Person (Root)
+Scope (add)=> { Person.id: 1}
 
 
 => Model {
@@ -105,6 +122,8 @@ Scope = { Person.id: 1 }
     ]
 }
 ```
+
+Note: If person has many dogs, each time a dog is traversed, it will overwrite path `Person.dogs.id`'s value' in the scope. This is fine, because the id will only be relevant for that specific dogs tree traversal
 
 ### M:M
 
