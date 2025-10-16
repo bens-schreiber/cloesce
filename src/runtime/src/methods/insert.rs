@@ -1,9 +1,12 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use common::NavigationPropertyKind::{ManyToMany, OneToMany};
 use common::{CidlType, Model, NamedTypedValue, NavigationPropertyKind};
-use sea_query::{Alias, SimpleExpr, SqliteQueryBuilder, SubQueryStatement, TableDropStatement};
-use sea_query::{ColumnDef, Expr, InsertStatement, Query, TableCreateStatement};
+use sea_query::{
+    Alias, CommonTableExpression, SelectStatement, SimpleExpr, SqliteQueryBuilder,
+    SubQueryStatement, WithQuery,
+};
+use sea_query::{InsertStatement, Query};
 use serde_json::Map;
 use serde_json::Value;
 
@@ -11,13 +14,13 @@ use crate::IncludeTree;
 use crate::ModelMeta;
 use crate::methods::{alias, push_scalar_value};
 
-#[derive(Default)]
-pub struct InsertModel {
-    context: HashMap<String, GraphContext>,
-    acc: Vec<String>,
+pub struct InsertModel<'a> {
+    context: HashSet<String>,
+    with_query: WithQuery,
+    meta: &'a ModelMeta,
 }
 
-impl InsertModel {
+impl<'a> InsertModel<'a> {
     /// Given a model, traverses topological order accumulating insert statements.
     ///
     /// Allows for empty primary keys and foreign keys, inferring the value is auto generated
@@ -26,17 +29,17 @@ impl InsertModel {
     /// Returns a string of SQL statements, or a descriptive error string.
     pub fn query(
         model_name: &str,
-        meta: &ModelMeta,
+        meta: &'a ModelMeta,
         new_model: Map<String, Value>,
         include_tree: Option<&IncludeTree>,
     ) -> Result<String, String> {
-        // TODO: we don't always need a variables table
-        let insert_var_table = VariablesTable::create().to_string(SqliteQueryBuilder);
-        let drop_var_table = VariablesTable::drop().to_string(SqliteQueryBuilder);
-
-        let mut generator = Self::default();
-        generator.accumulate(
+        let mut generator = Self {
+            context: HashSet::default(),
+            with_query: WithQuery::new(),
             meta,
+        };
+
+        generator.accumulate(
             None,
             model_name,
             &new_model,
@@ -44,30 +47,29 @@ impl InsertModel {
             model_name.to_string(),
         )?;
 
-        let topo_sorted_inserts = generator
-            .acc
-            .drain(..)
-            .map(|stmt| format!("{stmt};"))
-            .collect::<Vec<_>>()
-            .join("\n");
+        let model = meta.get(model_name).unwrap();
 
-        Ok(format!(
-            "{};\n{}\n{};",
-            insert_var_table, topo_sorted_inserts, drop_var_table
-        ))
+        Ok(generator
+            .with_query
+            .query(
+                SelectStatement::new()
+                    .column(alias(format!("{}_{}", model_name, model.primary_key.name)))
+                    .from(alias(model_name))
+                    .to_owned(),
+            )
+            .to_string(SqliteQueryBuilder))
     }
 
     /// Recursive entrypoint for [InsertModel]
     fn accumulate(
         &mut self,
-        meta: &ModelMeta,
         parent_model_name: Option<&String>,
         model_name: &str,
         new_model: &Map<String, Value>,
         include_tree: Option<&IncludeTree>,
         path: String,
     ) -> Result<(), String> {
-        let model = match meta.get(model_name) {
+        let model = match self.meta.get(model_name) {
             Some(m) => m,
             None => return Err(format!("Unknown model {model_name}")),
         };
@@ -94,226 +96,176 @@ impl InsertModel {
         };
 
         // Add all scalars, attempt to add FK's from value or context
-        let mut fks_to_resolve = self.resolve_scalars(
-            meta,
-            parent_model_name,
-            model,
-            &path,
-            new_model,
-            &mut builder,
-        )?;
+        let mut fks_to_resolve = HashMap::<&str, &NamedTypedValue>::new();
+        {
+            // Cheating a little here. If this model is depends on another, it's dependency will have been inserted
+            // before this model. Thus, it's parent pk has been inserted into the context under this path, which
+            // follows the form Model.attr or Model.attr.<N>
+            let parent_id_path = parent_model_name.map(|parent_model_name| {
+                let base = path.split('_').next().unwrap_or(&path);
+                format!(
+                    "{}_{}",
+                    base,
+                    self.meta.get(parent_model_name).unwrap().primary_key.name
+                )
+            });
+
+            for attr in &model.attributes {
+                match (new_model.get(&attr.value.name), &attr.foreign_key_reference) {
+                    (Some(value), _) => {
+                        // A value was provided in `new_model`
+                        builder.push_val(&attr.value.name, value, &attr.value.cidl_type)?;
+                    }
+                    (None, Some(fk_model)) if Some(fk_model) == parent_model_name => {
+                        // A value was not provided, but the context contained one
+                        let path_key = parent_id_path.as_ref().unwrap();
+                        builder.use_var(&attr.value.name, path_key, &model.primary_key.name)?;
+                    }
+                    (None, None) => {
+                        // A value was not provided and cannot be inferred.
+                        return Err(format!(
+                            "Missing attribute {} on {}: {}",
+                            attr.value.name,
+                            model.name,
+                            serde_json::to_string(&new_model).unwrap()
+                        ));
+                    }
+                    _ => {
+                        // Delay resolving the FK until we've explored all navigation properties
+                        // and expanded the context
+                        fks_to_resolve.insert(&attr.value.name, &attr.value);
+                    }
+                };
+            }
+        };
 
         // Navigation properties, using the include tree as a traversal guide
         if let Some(include_tree) = include_tree {
-            self.recurse_navs_insert(
-                pk,
-                model,
-                new_model,
-                meta,
-                include_tree,
-                &mut fks_to_resolve,
-                &path,
-                builder,
-            )?;
+            let (one_to_ones, others): (Vec<_>, Vec<_>) = model
+                .navigation_properties
+                .iter()
+                .partition(|n| matches!(n.kind, NavigationPropertyKind::OneToOne { .. }));
+
+            // This table is dependent on it's 1:1 references, so they must be traversed before
+            // table insertion
+            for nav in one_to_ones {
+                let Some(Value::Object(nav_model)) = new_model.get(&nav.var_name) else {
+                    continue;
+                };
+                let Some(Value::Object(nested_tree)) = include_tree.get(&nav.var_name) else {
+                    continue;
+                };
+                let NavigationPropertyKind::OneToOne { reference } = &nav.kind else {
+                    continue;
+                };
+
+                // Recursively handle nested inserts
+                self.accumulate(
+                    Some(&model.name),
+                    &nav.model_name,
+                    nav_model,
+                    Some(nested_tree),
+                    format!("{path}_{}", nav.var_name),
+                )?;
+
+                // Resolve deferred foreign key values with the updated context
+                let nav_pk = &self.meta.get(&nav.model_name).unwrap().primary_key;
+                let path_key = format!("{path}_{}_{}", nav.var_name, nav_pk.name);
+                if let Some(ntv) = fks_to_resolve.remove(reference.as_str())
+                    && self.context.contains(&path_key)
+                {
+                    builder.use_var(&ntv.name, &path_key, &nav_pk.name)?;
+                }
+            }
+
+            // 1:M and M:M should be inserted _after_ this table
+            self.insert_table(&path, model, &fks_to_resolve, new_model, builder)?;
+
+            for nav in others {
+                let Some(Value::Object(nested_tree)) = include_tree.get(&nav.var_name) else {
+                    continue;
+                };
+
+                match (&nav.kind, new_model.get(&nav.var_name)) {
+                    (OneToMany { .. }, Some(Value::Array(nav_models))) => {
+                        for (i, nav_model) in
+                            nav_models.iter().filter_map(|v| v.as_object()).enumerate()
+                        {
+                            self.accumulate(
+                                Some(&model.name),
+                                &nav.model_name,
+                                nav_model,
+                                Some(nested_tree),
+                                format!("{path}_{}_{i}", nav.var_name),
+                            )?;
+                        }
+                    }
+                    (ManyToMany { unique_id }, Some(Value::Array(nav_models))) => {
+                        for (i, nav_model) in
+                            nav_models.iter().filter_map(|v| v.as_object()).enumerate()
+                        {
+                            self.accumulate(
+                                Some(&model.name),
+                                &nav.model_name,
+                                nav_model,
+                                Some(nested_tree),
+                                format!("{path}_{}_{i}", nav.var_name),
+                            )?;
+
+                            let mut vars_to_use: Vec<(String, String, &String)> = vec![];
+
+                            // Find the M:M dependencies id from context
+                            {
+                                let nav_pk = &self.meta.get(&nav.model_name).unwrap().primary_key;
+                                let path_key =
+                                    format!("{path}_{}_{i}_{}", nav.var_name, nav_pk.name);
+                                self.context.get(&path_key).ok_or(format!(
+                                    "Expected many to many model to contain an ID, got {}\n{:?}",
+                                    serde_json::to_string(new_model).unwrap(),
+                                    self.context.iter().collect::<Vec<_>>()
+                                ))?;
+
+                                vars_to_use.push((
+                                    format!("{}_{}", nav.model_name, nav_pk.name),
+                                    path_key,
+                                    &nav_pk.name,
+                                ));
+                            }
+
+                            // Get this models ID
+                            vars_to_use.push((
+                                format!("{}_{}", model.name, model.primary_key.name),
+                                format!("{path}_{}", model.primary_key.name),
+                                &model.primary_key.name,
+                            ));
+
+                            // Add the jct tables cols+vals
+                            let mut jct_builder = InsertBuilder::new(unique_id);
+                            vars_to_use.sort_by_key(|(name, _, _)| name.clone());
+                            for (var_name, path, pk_name) in vars_to_use {
+                                jct_builder.use_var(&var_name, &path, pk_name)?;
+                            }
+
+                            // TODO: We could do some kind of union all setup instead of
+                            // CTE's for each M:M
+                            self.with_query.cte(
+                                CommonTableExpression::new()
+                                    .query::<InsertStatement>(jct_builder.build(None))
+                                    .table_name(alias(format!("{unique_id}_{i}")))
+                                    .to_owned(),
+                            );
+                        }
+                    }
+                    _ => {
+                        // Ignore
+                    }
+                }
+            }
+
             return Ok(());
         }
 
-        self.insert_table(pk, &path, model, &fks_to_resolve, &new_model, builder)?;
-        Ok(())
-    }
-
-    /// Iterates all scalar properties, requiring non-fk's to be present.
-    ///
-    /// If a foreign key value is missing, tries to retrieve it from the context.
-    ///
-    /// Returns a map of foreign keys that cannot find a value.
-    fn resolve_scalars<'a>(
-        &mut self,
-        meta: &ModelMeta,
-        parent_model_name: Option<&String>,
-        model: &'a Model,
-        path: &str,
-        new_model: &Map<String, Value>,
-        builder: &mut InsertBuilder,
-    ) -> Result<HashMap<&'a str, &'a NamedTypedValue>, String> {
-        let mut fks_to_resolve = HashMap::<&str, &NamedTypedValue>::new();
-
-        // Cheating here. If this model is depends on another, it's dependency will have been inserted
-        // before this model. Thus, it's parent pk has been inserted into the context under this path.
-        let parent_id_path = if let Some(parent_model_name) = parent_model_name {
-            Some(format!(
-                "{}.{}",
-                path.rsplit_once('.').map(|(h, _)| h).unwrap_or(path),
-                meta.get(parent_model_name).unwrap().primary_key.name
-            ))
-        } else {
-            None
-        };
-
-        for attr in &model.attributes {
-            match (new_model.get(&attr.value.name), &attr.foreign_key_reference) {
-                (Some(value), _) => {
-                    // A value was provided in `new_model`
-                    builder.push_val(&attr.value.name, value, &attr.value.cidl_type)?;
-                }
-                (None, Some(fk_model)) if Some(fk_model) == parent_model_name.as_deref() => {
-                    // A value was not provided, but the context contained one
-                    let path_key = parent_id_path.as_ref().unwrap();
-
-                    let ctx = self.context.get(path_key).unwrap();
-                    builder.use_var(ctx, &attr.value.name, &attr.value.cidl_type, &path_key)?;
-                }
-                (None, None) => {
-                    // A value was not provided and cannot be inferred.
-                    return Err(format!(
-                        "Missing attribute {} on {}: {}",
-                        attr.value.name,
-                        model.name,
-                        serde_json::to_string(&new_model).unwrap()
-                    ));
-                }
-                _ => {
-                    // Delay resolving the FK until we've explored all navigation properties
-                    // and expanded the context
-                    fks_to_resolve.insert(&attr.value.name, &attr.value);
-                }
-            };
-        }
-
-        Ok(fks_to_resolve)
-    }
-
-    /// Iterates through all navigation properties, first recursing through 1:1 values, then
-    /// inserting the current table, then iterating through dependent 1:M / M:M values.
-    fn recurse_navs_insert(
-        &mut self,
-        pk: Option<&Value>,
-        model: &Model,
-        new_model: &Map<String, Value>,
-        meta: &ModelMeta,
-        include_tree: &IncludeTree,
-        fks_to_resolve: &mut HashMap<&str, &NamedTypedValue>,
-        path: &str,
-        mut builder: InsertBuilder,
-    ) -> Result<(), String> {
-        let (one_to_ones, others): (Vec<_>, Vec<_>) = model
-            .navigation_properties
-            .iter()
-            .partition(|n| matches!(n.kind, NavigationPropertyKind::OneToOne { .. }));
-
-        // This table is dependent on it's 1:1 references, so they must be traversed before
-        // table insertion
-        for nav in one_to_ones {
-            let Some(Value::Object(nav_model)) = new_model.get(&nav.var_name) else {
-                continue;
-            };
-            let Some(Value::Object(nested_tree)) = include_tree.get(&nav.var_name) else {
-                continue;
-            };
-            let NavigationPropertyKind::OneToOne { reference } = &nav.kind else {
-                continue;
-            };
-
-            // Recursively handle nested inserts
-            self.accumulate(
-                meta,
-                Some(&model.name),
-                &nav.model_name,
-                nav_model,
-                Some(nested_tree),
-                format!("{path}.{}", nav.var_name),
-            )?;
-
-            // Resolve deferred foreign key values with the updated context
-            let nav_pk = &meta.get(&nav.model_name).unwrap().primary_key;
-            let path_key = format!("{path}.{}.{}", nav.var_name, nav_pk.name);
-            if let Some(ntv) = fks_to_resolve.remove(reference.as_str())
-                && let Some(ctx) = self.context.get(&path_key)
-            {
-                builder.use_var(ctx, &ntv.name, &nav_pk.cidl_type, &path_key)?;
-            }
-        }
-
-        // 1:M and M:M should be inserted _after_ this table
-        self.insert_table(pk, &path, model, &fks_to_resolve, &new_model, builder)?;
-
-        for nav in others {
-            let Some(Value::Object(nested_tree)) = include_tree.get(&nav.var_name) else {
-                continue;
-            };
-
-            match (&nav.kind, new_model.get(&nav.var_name)) {
-                (OneToMany { .. }, Some(Value::Array(nav_models))) => {
-                    for nav_model in nav_models.iter().filter_map(|v| v.as_object()) {
-                        self.accumulate(
-                            meta,
-                            Some(&model.name),
-                            &nav.model_name,
-                            nav_model,
-                            Some(nested_tree),
-                            format!("{path}.{}", nav.var_name),
-                        )?;
-                    }
-                }
-                (ManyToMany { unique_id }, Some(Value::Array(nav_models))) => {
-                    for nav_model in nav_models.iter().filter_map(|v| v.as_object()) {
-                        self.accumulate(
-                            meta,
-                            Some(&model.name),
-                            &nav.model_name,
-                            nav_model,
-                            Some(nested_tree),
-                            format!("{path}.{}", nav.var_name),
-                        )?;
-
-                        let mut vars_to_use: Vec<(String, &CidlType, &GraphContext, String)> =
-                            vec![];
-
-                        // Find the 1:M dependencies id from context
-                        {
-                            let nav_pk = &meta.get(&nav.model_name).unwrap().primary_key;
-                            let path_key = format!("{path}.{}.{}", nav.var_name, nav_pk.name);
-                            let ctx = self.context.get(&path_key).ok_or(format!(
-                                "Expected many to many model to contain an ID, got {}",
-                                serde_json::to_string(new_model).unwrap()
-                            ))?;
-
-                            vars_to_use.push((
-                                format!("{}.{}", nav.model_name, nav_pk.name),
-                                &nav_pk.cidl_type,
-                                ctx,
-                                path_key,
-                            ));
-                        }
-
-                        // Get this models ID
-                        let this_ctx = &match pk {
-                            Some(val) => GraphContext::Value(val.clone()),
-                            None => GraphContext::Variable,
-                        };
-                        vars_to_use.push((
-                            format!("{}.{}", model.name, model.primary_key.name),
-                            &model.primary_key.cidl_type,
-                            this_ctx,
-                            format!("{path}.{}", model.primary_key.name),
-                        ));
-
-                        // Add the jct tables cols+vals
-                        let mut jct_builder = InsertBuilder::new(&unique_id);
-                        vars_to_use.sort_by_key(|(name, _, _, _)| name.clone());
-                        for (var_name, cidl_type, var_ctx, path) in vars_to_use {
-                            jct_builder.use_var(&var_ctx, &var_name, cidl_type, &path)?;
-                        }
-
-                        self.acc.push(jct_builder.build());
-                    }
-                }
-                _ => {
-                    // Ignore
-                }
-            }
-        }
-
+        self.insert_table(&path, model, &fks_to_resolve, new_model, builder)?;
         Ok(())
     }
 
@@ -323,28 +275,20 @@ impl InsertModel {
     /// Returns an error if foreign key values exist that can not be resolved.
     fn insert_table(
         &mut self,
-        pk: Option<&Value>,
         path: &str,
         model: &Model,
         fks_to_resolve: &HashMap<&str, &NamedTypedValue>,
         new_model: &Map<String, Value>,
         builder: InsertBuilder,
     ) -> Result<(), String> {
-        self.acc.push(builder.build());
-
-        // Add this tables primary key to the context so dependents can resolve it
-        match pk {
-            None => {
-                let id_path = format!("{path}.{}", model.primary_key.name);
-                self.acc.push(VariablesTable::insert_rowid(&id_path));
-                self.context.insert(id_path, GraphContext::Variable);
-            }
-            Some(val) => {
-                let id_path = format!("{path}.{}", model.primary_key.name);
-                self.context
-                    .insert(id_path, GraphContext::Value(val.clone()));
-            }
-        }
+        let id_path = format!("{path}_{}", model.primary_key.name);
+        self.with_query.cte(
+            CommonTableExpression::new()
+                .query::<InsertStatement>(builder.build(Some(&model.primary_key.name)))
+                .table_name(alias(&id_path))
+                .to_owned(),
+        );
+        self.context.insert(id_path);
 
         if !fks_to_resolve.is_empty() {
             return Err(format!(
@@ -356,54 +300,6 @@ impl InsertModel {
 
         Ok(())
     }
-}
-
-// A temporary table for resolving primary keys during insertion.
-// TODO: We could also use CTE's. Just didn't feel like figuring out SeaQuery crap.
-const VARIABLES_TABLE_NAME: &str = "tmp_paths";
-const VARIABLES_TABLE_COL_PATH: &str = "path";
-const VARIABLES_TABLE_COL_ID: &str = "id";
-struct VariablesTable;
-impl VariablesTable {
-    fn create() -> TableCreateStatement {
-        TableCreateStatement::new()
-            .table(alias(VARIABLES_TABLE_NAME))
-            .temporary()
-            .col(
-                ColumnDef::new(VARIABLES_TABLE_COL_PATH)
-                    .primary_key()
-                    .text(),
-            )
-            .col(ColumnDef::new(VARIABLES_TABLE_COL_ID).integer())
-            .to_owned()
-    }
-
-    fn drop() -> TableDropStatement {
-        TableDropStatement::new()
-            .table(alias(VARIABLES_TABLE_NAME))
-            .to_owned()
-    }
-
-    fn insert_rowid(path: &str) -> String {
-        let mut insert = InsertStatement::new();
-        insert.into_table(alias(VARIABLES_TABLE_NAME));
-        insert.columns(vec![alias("path"), alias("id")]);
-        insert.values_panic(vec![
-            Expr::val(path).into(),
-            Expr::cust("last_insert_rowid()"),
-        ]);
-        insert.replace();
-        insert.to_string(SqliteQueryBuilder)
-    }
-}
-
-#[derive(Debug)]
-enum GraphContext {
-    // Auto generated, stored in the variables table.
-    Variable,
-
-    // An actual supplied value from the `new_model`
-    Value(Value),
 }
 
 struct InsertBuilder {
@@ -435,40 +331,32 @@ impl InsertBuilder {
         push_scalar_value(value, cidl_type, &self.model_name, var_name, &mut self.vals)
     }
 
-    fn use_var(
-        &mut self,
-        ctx: &GraphContext,
-        var_name: &str,
-        cidl_type: &CidlType,
-        path: &str,
-    ) -> Result<(), String> {
-        match ctx {
-            GraphContext::Variable => {
-                self.cols.push(alias(var_name));
+    fn use_var(&mut self, var_name: &str, path: &str, pk_name: &String) -> Result<(), String> {
+        self.cols.push(alias(var_name));
+        self.vals.push(SimpleExpr::SubQuery(
+            None,
+            Box::new(SubQueryStatement::SelectStatement(
+                Query::select()
+                    .column(alias(pk_name))
+                    .from(alias(path))
+                    .to_owned(),
+            )),
+        ));
 
-                let subquery = SubQueryStatement::SelectStatement(
-                    Query::select()
-                        .from(alias(VARIABLES_TABLE_NAME))
-                        .column(alias(VARIABLES_TABLE_COL_ID))
-                        .and_where(Expr::col(alias(VARIABLES_TABLE_COL_PATH)).eq(path))
-                        .to_owned(),
-                );
-
-                self.vals
-                    .push(SimpleExpr::SubQuery(None, Box::new(subquery)));
-            }
-            GraphContext::Value(v) => {
-                self.push_val(var_name, v, cidl_type)?;
-            }
-        }
         Ok(())
     }
 
-    fn build(mut self) -> String {
+    fn build(mut self, pk_name: Option<&String>) -> InsertStatement {
         self.insert.columns(self.cols);
         self.insert.values_panic(self.vals);
         self.insert.or_default_values();
-        self.insert.to_string(SqliteQueryBuilder)
+        if let Some(pk_name) = pk_name {
+            self.insert.returning_col(alias(pk_name));
+        } else {
+            self.insert.returning_all();
+        }
+
+        self.insert
     }
 }
 
@@ -690,9 +578,7 @@ mod test {
         expected_str!(res, r#"INSERT INTO "Person" ("id") VALUES (1)"#);
         expected_str!(
             res,
-            r#"INSERT INTO "Horse" ("id", "personId") VALUES (1, 1);
-INSERT INTO "Horse" ("id", "personId") VALUES (2, 1);
-INSERT INTO "Horse" ("id", "personId") VALUES (3, 1);"#
+            "WITH \"Person_id\" AS (INSERT INTO \"Person\" (\"id\") VALUES (1) RETURNING \"id\") , \"Person_horses_0_id\" AS (INSERT INTO \"Horse\" (\"id\", \"personId\") VALUES (1, 1) RETURNING \"id\") , \"Person_horses_1_id\" AS (INSERT INTO \"Horse\" (\"id\", \"personId\") VALUES (2, 1) RETURNING \"id\") , \"Person_horses_2_id\" AS (INSERT INTO \"Horse\" (\"id\", \"personId\") VALUES (3, 1) RETURNING \"id\") SELECT \"Person_id\" FROM \"Person\""
         );
     }
 
@@ -745,12 +631,7 @@ INSERT INTO "Horse" ("id", "personId") VALUES (3, 1);"#
         // Assert
         expected_str!(
             res,
-            r#"INSERT INTO "Person" ("id") VALUES (1);
-INSERT INTO "Horse" ("id") VALUES (1);
-INSERT INTO "PersonsHorses" ("Horse.id", "Person.id") VALUES (1, 1);
-INSERT INTO "Horse" ("id") VALUES (2);
-INSERT INTO "PersonsHorses" ("Horse.id", "Person.id") VALUES (2, 1);
-DROP TABLE "tmp_paths";"#
+            "WITH \"Person_id\" AS (INSERT INTO \"Person\" (\"id\") VALUES (1) RETURNING \"id\") , \"Person_horses_0_id\" AS (INSERT INTO \"Horse\" (\"id\") VALUES (1) RETURNING \"id\") , \"PersonsHorses_0\" AS (INSERT INTO \"PersonsHorses\" (\"Horse_id\", \"Person_id\") VALUES ((SELECT \"id\" FROM \"Person_horses_0_id\"), (SELECT \"id\" FROM \"Person_id\")) RETURNING *) , \"Person_horses_1_id\" AS (INSERT INTO \"Horse\" (\"id\") VALUES (2) RETURNING \"id\") , \"PersonsHorses_1\" AS (INSERT INTO \"PersonsHorses\" (\"Horse_id\", \"Person_id\") VALUES ((SELECT \"id\" FROM \"Person_horses_1_id\"), (SELECT \"id\" FROM \"Person_id\")) RETURNING *) SELECT \"Person_id\" FROM \"Person\""
         );
     }
 
@@ -821,30 +702,9 @@ DROP TABLE "tmp_paths";"#
         .unwrap();
 
         // Assert
-        let inserts: Vec<_> = res
-            .lines()
-            .filter(|line| line.starts_with("INSERT"))
-            .collect();
-
-        assert!(
-            inserts[0].contains("INSERT INTO \"Horse\""),
-            "Expected Horse inserted first, got {}",
-            inserts[0]
-        );
-        assert!(
-            inserts[1].contains("INSERT INTO \"Award\""),
-            "Expected Award inserted third, got {}",
-            inserts[1]
-        );
-        assert!(
-            inserts[2].contains("INSERT INTO \"Award\""),
-            "Expected another Award insert, got {}",
-            inserts[2]
-        );
-        assert!(
-            inserts[3].contains("INSERT INTO \"Person\""),
-            "Expected Person inserted second, got {}",
-            inserts[3]
+        expected_str!(
+            res,
+            r#"WITH "Person_horse_id" AS (INSERT INTO "Horse" ("id", "personId") VALUES (10, 1) RETURNING "id") , "Person_horse_awards_0_id" AS (INSERT INTO "Award" ("id", "horseId", "title") VALUES (100, 10, 'Fastest Horse') RETURNING "id") , "Person_horse_awards_1_id" AS (INSERT INTO "Award" ("id", "horseId", "title") VALUES (101, 10, 'Strongest Horse') RETURNING "id") , "Person_id" AS (INSERT INTO "Person" ("id", "horseId") VALUES (1, 10) RETURNING "id") SELECT "#
         );
     }
 
@@ -867,14 +727,10 @@ DROP TABLE "tmp_paths";"#
         .unwrap();
 
         // Assert
-        let lines = res.split("\n").collect::<Vec<_>>();
-        expected_str!(lines[0], "CREATE TEMPORARY TABLE");
-        expected_str!(lines[1], "INSERT INTO \"Person\" DEFAULT VALUES;");
         expected_str!(
-            lines[2],
-            "REPLACE INTO \"tmp_paths\" (\"path\", \"id\") VALUES ('Person.id', last_insert_rowid());"
-        );
-        expected_str!(lines[3], "DROP TABLE \"tmp_paths\"")
+            res,
+            r#"WITH "Person_id" AS (INSERT INTO "Person" DEFAULT VALUES RETURNING "id") SELECT "Person_id" FROM "Person""#
+        )
     }
 
     #[test]
@@ -919,11 +775,7 @@ DROP TABLE "tmp_paths";"#
         // Assert
         expected_str!(
             res,
-            r#"
-INSERT INTO "Horse" DEFAULT VALUES;
-REPLACE INTO "tmp_paths" ("path", "id") VALUES ('Person.horse.id', last_insert_rowid());
-INSERT INTO "Person" ("horseId") VALUES ((SELECT "id" FROM "tmp_paths" WHERE "path" = 'Person.horse.id'));
-REPLACE INTO "tmp_paths" ("path", "id") VALUES ('Person.id', last_insert_rowid());"#
+            r#"WITH "Person_horse_id" AS (INSERT INTO "Horse" DEFAULT VALUES RETURNING "id") , "Person_id" AS (INSERT INTO "Person" ("horseId") VALUES ((SELECT "id" FROM "Person_horse_id")) RETURNING "id") SELECT "Person_id" FROM "Person""#
         );
     }
 
@@ -975,12 +827,7 @@ REPLACE INTO "tmp_paths" ("path", "id") VALUES ('Person.id', last_insert_rowid()
         // Assert
         expected_str!(
             res,
-            r#"CREATE TEMPORARY TABLE "tmp_paths" ( "path" text PRIMARY KEY, "id" integer );
-INSERT INTO "Person" DEFAULT VALUES;
-REPLACE INTO "tmp_paths" ("path", "id") VALUES ('Person.id', last_insert_rowid());
-INSERT INTO "Horse" ("personId") VALUES ((SELECT "id" FROM "tmp_paths" WHERE "path" = 'Person.id'));
-REPLACE INTO "tmp_paths" ("path", "id") VALUES ('Person.horses.id', last_insert_rowid());
-DROP TABLE "tmp_paths";"#
+            "WITH \"Person_id\" AS (INSERT INTO \"Person\" DEFAULT VALUES RETURNING \"id\") , \"Person_horses_0_id\" AS (INSERT INTO \"Horse\" (\"personId\") VALUES ((SELECT \"id\" FROM \"Person_id\")) RETURNING \"id\") SELECT \"Person_id\" FROM \"Person\""
         );
     }
 
@@ -1028,14 +875,7 @@ DROP TABLE "tmp_paths";"#
         // Assert
         expected_str!(
             res,
-            r#"INSERT INTO "Person" DEFAULT VALUES;
-REPLACE INTO "tmp_paths" ("path", "id") VALUES ('Person.id', last_insert_rowid());
-INSERT INTO "Horse" DEFAULT VALUES;
-REPLACE INTO "tmp_paths" ("path", "id") VALUES ('Person.horses.id', last_insert_rowid());
-INSERT INTO "PersonsHorses" ("Horse.id", "Person.id") VALUES ((SELECT "id" FROM "tmp_paths" WHERE "path" = 'Person.horses.id'), (SELECT "id" FROM "tmp_paths" WHERE "path" = 'Person.id'));
-INSERT INTO "Horse" DEFAULT VALUES;
-REPLACE INTO "tmp_paths" ("path", "id") VALUES ('Person.horses.id', last_insert_rowid());
-INSERT INTO "PersonsHorses" ("Horse.id", "Person.id") VALUES ((SELECT "id" FROM "tmp_paths" WHERE "path" = 'Person.horses.id'), (SELECT "id" FROM "tmp_paths" WHERE "path" = 'Person.id'));"#
+            "WITH \"Person_id\" AS (INSERT INTO \"Person\" DEFAULT VALUES RETURNING \"id\") , \"Person_horses_0_id\" AS (INSERT INTO \"Horse\" DEFAULT VALUES RETURNING \"id\") , \"PersonsHorses_0\" AS (INSERT INTO \"PersonsHorses\" (\"Horse_id\", \"Person_id\") VALUES ((SELECT \"id\" FROM \"Person_horses_0_id\"), (SELECT \"id\" FROM \"Person_id\")) RETURNING *) , \"Person_horses_1_id\" AS (INSERT INTO \"Horse\" DEFAULT VALUES RETURNING \"id\") , \"PersonsHorses_1\" AS (INSERT INTO \"PersonsHorses\" (\"Horse_id\", \"Person_id\") VALUES ((SELECT \"id\" FROM \"Person_horses_1_id\"), (SELECT \"id\" FROM \"Person_id\")) RETURNING *) SELECT \"Person_id\" FROM \"Person\""
         );
     }
 }
