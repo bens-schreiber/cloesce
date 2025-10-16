@@ -1,9 +1,9 @@
 use std::collections::{BTreeMap, HashMap, VecDeque};
 
 use common::{
-    CidlType, IncludeTree, Model, NavigationPropertyKind, ensure,
+    ensure,
     err::{GeneratorErrorKind, Result},
-    fail,
+    fail, CidlType, IncludeTree, Model, NavigationPropertyKind,
 };
 
 use sea_query::{
