@@ -78,11 +78,7 @@ impl InsertModel {
         let pk = new_model.get(&model.primary_key.name);
         match pk {
             Some(val) => {
-                builder.push_scalar_value(
-                    &model.primary_key.name,
-                    val,
-                    &model.primary_key.cidl_type,
-                )?;
+                builder.push_val(&model.primary_key.name, val, &model.primary_key.cidl_type)?;
             }
             None if matches!(model.primary_key.cidl_type, CidlType::Integer) => {
                 // Generated
@@ -158,7 +154,7 @@ impl InsertModel {
             match (new_model.get(&attr.value.name), &attr.foreign_key_reference) {
                 (Some(value), _) => {
                     // A value was provided in `new_model`
-                    builder.push_scalar_value(&attr.value.name, value, &attr.value.cidl_type)?;
+                    builder.push_val(&attr.value.name, value, &attr.value.cidl_type)?;
                 }
                 (None, Some(fk_model)) if Some(fk_model) == parent_model_name.as_deref() => {
                     // A value was not provided, but the context contained one
@@ -259,7 +255,7 @@ impl InsertModel {
                         )?;
                     }
                 }
-                (ManyToMany { .. }, Some(Value::Array(nav_models))) => {
+                (ManyToMany { unique_id }, Some(Value::Array(nav_models))) => {
                     for nav_model in nav_models.iter().filter_map(|v| v.as_object()) {
                         self.accumulate(
                             meta,
@@ -269,6 +265,47 @@ impl InsertModel {
                             Some(nested_tree),
                             format!("{path}.{}", nav.var_name),
                         )?;
+
+                        let mut vars_to_use: Vec<(String, &CidlType, &GraphContext, String)> =
+                            vec![];
+
+                        // Find the 1:M dependencies id from context
+                        {
+                            let nav_pk = &meta.get(&nav.model_name).unwrap().primary_key;
+                            let path_key = format!("{path}.{}.{}", nav.var_name, nav_pk.name);
+                            let ctx = self.context.get(&path_key).ok_or(format!(
+                                "Expected many to many model to contain an ID, got {}",
+                                serde_json::to_string(new_model).unwrap()
+                            ))?;
+
+                            vars_to_use.push((
+                                format!("{}.{}", nav.model_name, nav_pk.name),
+                                &nav_pk.cidl_type,
+                                ctx,
+                                path_key,
+                            ));
+                        }
+
+                        // Get this models ID
+                        let this_ctx = &match pk {
+                            Some(val) => GraphContext::Value(val.clone()),
+                            None => GraphContext::Variable,
+                        };
+                        vars_to_use.push((
+                            format!("{}.{}", model.name, model.primary_key.name),
+                            &model.primary_key.cidl_type,
+                            this_ctx,
+                            format!("{path}.{}", model.primary_key.name),
+                        ));
+
+                        // Add the jct tables cols+vals
+                        let mut jct_builder = InsertBuilder::new(&unique_id);
+                        vars_to_use.sort_by_key(|(name, _, _, _)| name.clone());
+                        for (var_name, cidl_type, var_ctx, path) in vars_to_use {
+                            jct_builder.use_var(&var_ctx, &var_name, cidl_type, &path)?;
+                        }
+
+                        self.acc.push(jct_builder.build());
                     }
                 }
                 _ => {
@@ -322,6 +359,7 @@ impl InsertModel {
 }
 
 // A temporary table for resolving primary keys during insertion.
+// TODO: We could also use CTE's. Just didn't feel like figuring out SeaQuery crap.
 const VARIABLES_TABLE_NAME: &str = "tmp_paths";
 const VARIABLES_TABLE_COL_PATH: &str = "path";
 const VARIABLES_TABLE_COL_ID: &str = "id";
@@ -354,6 +392,7 @@ impl VariablesTable {
             Expr::val(path).into(),
             Expr::cust("last_insert_rowid()"),
         ]);
+        insert.replace();
         insert.to_string(SqliteQueryBuilder)
     }
 }
@@ -379,14 +418,14 @@ impl InsertBuilder {
         let mut insert = InsertStatement::new();
         insert.into_table(alias(model_name));
         Self {
-            model_name: model_name.to_string(),
             insert,
+            model_name: model_name.to_string(),
             cols: Vec::default(),
             vals: Vec::default(),
         }
     }
 
-    fn push_scalar_value(
+    fn push_val(
         &mut self,
         var_name: &str,
         value: &Value,
@@ -419,8 +458,7 @@ impl InsertBuilder {
                     .push(SimpleExpr::SubQuery(None, Box::new(subquery)));
             }
             GraphContext::Value(v) => {
-                self.cols.push(alias(var_name));
-                self.push_scalar_value(var_name, v, cidl_type)?;
+                self.push_val(var_name, v, cidl_type)?;
             }
         }
         Ok(())
@@ -658,60 +696,63 @@ INSERT INTO "Horse" ("id", "personId") VALUES (3, 1);"#
         );
     }
 
-    //     #[test]
-    //     fn many_to_many() {
-    //         // Arrange
-    //         let ast_person = ModelBuilder::new("Person")
-    //             .id()
-    //             .nav_p(
-    //                 "horses",
-    //                 "Horse",
-    //                 NavigationPropertyKind::ManyToMany {
-    //                     unique_id: "PersonsHorses".to_string(),
-    //                 },
-    //             )
-    //             .build();
-    //         let ast_horse = ModelBuilder::new("Horse").id().build();
+    #[test]
+    fn many_to_many() {
+        // Arrange
+        let ast_person = ModelBuilder::new("Person")
+            .id()
+            .nav_p(
+                "horses",
+                "Horse",
+                NavigationPropertyKind::ManyToMany {
+                    unique_id: "PersonsHorses".to_string(),
+                },
+            )
+            .build();
+        let ast_horse = ModelBuilder::new("Horse").id().build();
 
-    //         let new_model = json!({
-    //             "id": 1,
-    //             "horses": [
-    //                 {
-    //                     "id": 1,
-    //                     "personId": 1
-    //                 },
-    //                 {
-    //                     "id": 2,
-    //                     "personId": 1
-    //                 },
-    //             ]
-    //         });
+        let new_model = json!({
+            "id": 1,
+            "horses": [
+                {
+                    "id": 1,
+                    "personId": 1
+                },
+                {
+                    "id": 2,
+                    "personId": 1
+                },
+            ]
+        });
 
-    //         let include_tree = json!({
-    //             "horses": {}
-    //         });
+        let include_tree = json!({
+            "horses": {}
+        });
 
-    //         let mut model_meta = HashMap::new();
-    //         model_meta.insert(ast_horse.name.clone(), ast_horse);
-    //         model_meta.insert(ast_person.name.clone(), ast_person);
+        let mut model_meta = HashMap::new();
+        model_meta.insert(ast_horse.name.clone(), ast_horse);
+        model_meta.insert(ast_person.name.clone(), ast_person);
 
-    //         // Act
-    //         let res = insert_model(
-    //             "Person",
-    //             &model_meta,
-    //             new_model.as_object().unwrap().clone(),
-    //             Some(&include_tree.as_object().unwrap().clone()),
-    //         )
-    //         .unwrap();
+        // Act
+        let res = InsertModel::query(
+            "Person",
+            &model_meta,
+            new_model.as_object().unwrap().clone(),
+            Some(&include_tree.as_object().unwrap().clone()),
+        )
+        .unwrap();
 
-    //         // Assert
-    //         expected_str!(res, r#"INSERT INTO "Person" ("id") VALUES (1)"#);
-    //         expected_str!(
-    //             res,
-    //             r#"INSERT INTO "PersonsHorses" ("Person.id", "Horse.id") VALUES (1, 1);
-    // INSERT INTO "PersonsHorses" ("Person.id", "Horse.id") VALUES (1, 2);"#
-    //         );
-    //     }
+        // Assert
+        expected_str!(
+            res,
+            r#"INSERT INTO "Person" ("id") VALUES (1);
+INSERT INTO "Horse" ("id") VALUES (1);
+INSERT INTO "PersonsHorses" ("Horse.id", "Person.id") VALUES (1, 1);
+INSERT INTO "Horse" ("id") VALUES (2);
+INSERT INTO "PersonsHorses" ("Horse.id", "Person.id") VALUES (2, 1);
+DROP TABLE "tmp_paths";"#
+        );
+    }
 
     #[test]
     fn topological_ordering_is_correct() {
@@ -831,7 +872,7 @@ INSERT INTO "Horse" ("id", "personId") VALUES (3, 1);"#
         expected_str!(lines[1], "INSERT INTO \"Person\" DEFAULT VALUES;");
         expected_str!(
             lines[2],
-            "INSERT INTO \"tmp_paths\" (\"path\", \"id\") VALUES ('Person.id', last_insert_rowid());"
+            "REPLACE INTO \"tmp_paths\" (\"path\", \"id\") VALUES ('Person.id', last_insert_rowid());"
         );
         expected_str!(lines[3], "DROP TABLE \"tmp_paths\"")
     }
@@ -880,9 +921,9 @@ INSERT INTO "Horse" ("id", "personId") VALUES (3, 1);"#
             res,
             r#"
 INSERT INTO "Horse" DEFAULT VALUES;
-INSERT INTO "tmp_paths" ("path", "id") VALUES ('Person.horse.id', last_insert_rowid());
+REPLACE INTO "tmp_paths" ("path", "id") VALUES ('Person.horse.id', last_insert_rowid());
 INSERT INTO "Person" ("horseId") VALUES ((SELECT "id" FROM "tmp_paths" WHERE "path" = 'Person.horse.id'));
-INSERT INTO "tmp_paths" ("path", "id") VALUES ('Person.id', last_insert_rowid());"#
+REPLACE INTO "tmp_paths" ("path", "id") VALUES ('Person.id', last_insert_rowid());"#
         );
     }
 
@@ -936,10 +977,65 @@ INSERT INTO "tmp_paths" ("path", "id") VALUES ('Person.id', last_insert_rowid())
             res,
             r#"CREATE TEMPORARY TABLE "tmp_paths" ( "path" text PRIMARY KEY, "id" integer );
 INSERT INTO "Person" DEFAULT VALUES;
-INSERT INTO "tmp_paths" ("path", "id") VALUES ('Person.id', last_insert_rowid());
+REPLACE INTO "tmp_paths" ("path", "id") VALUES ('Person.id', last_insert_rowid());
 INSERT INTO "Horse" ("personId") VALUES ((SELECT "id" FROM "tmp_paths" WHERE "path" = 'Person.id'));
-INSERT INTO "tmp_paths" ("path", "id") VALUES ('Person.horses.id', last_insert_rowid());
+REPLACE INTO "tmp_paths" ("path", "id") VALUES ('Person.horses.id', last_insert_rowid());
 DROP TABLE "tmp_paths";"#
+        );
+    }
+
+    #[test]
+    fn missing_many_to_many_pk_fk_autogenerates() {
+        // Arrange
+        let person = ModelBuilder::new("Person")
+            .id()
+            .nav_p(
+                "horses",
+                "Horse",
+                NavigationPropertyKind::ManyToMany {
+                    unique_id: "PersonsHorses".to_string(),
+                },
+            )
+            .build();
+
+        let horse = ModelBuilder::new("Horse").id().build();
+
+        let mut meta = std::collections::HashMap::new();
+        meta.insert(person.name.clone(), person);
+        meta.insert(horse.name.clone(), horse);
+
+        // new_person has no pk, horses array has no pks
+        let new_person = json!({
+            "horses": [
+                {}, // empty horse
+                {}  // another empty horse
+            ]
+        });
+
+        let include_tree = json!({
+            "horses": {}
+        });
+
+        // Act
+        let res = InsertModel::query(
+            "Person",
+            &meta,
+            new_person.as_object().unwrap().clone(),
+            Some(&include_tree.as_object().unwrap()),
+        )
+        .unwrap();
+
+        // Assert
+        expected_str!(
+            res,
+            r#"INSERT INTO "Person" DEFAULT VALUES;
+REPLACE INTO "tmp_paths" ("path", "id") VALUES ('Person.id', last_insert_rowid());
+INSERT INTO "Horse" DEFAULT VALUES;
+REPLACE INTO "tmp_paths" ("path", "id") VALUES ('Person.horses.id', last_insert_rowid());
+INSERT INTO "PersonsHorses" ("Horse.id", "Person.id") VALUES ((SELECT "id" FROM "tmp_paths" WHERE "path" = 'Person.horses.id'), (SELECT "id" FROM "tmp_paths" WHERE "path" = 'Person.id'));
+INSERT INTO "Horse" DEFAULT VALUES;
+REPLACE INTO "tmp_paths" ("path", "id") VALUES ('Person.horses.id', last_insert_rowid());
+INSERT INTO "PersonsHorses" ("Horse.id", "Person.id") VALUES ((SELECT "id" FROM "tmp_paths" WHERE "path" = 'Person.horses.id'), (SELECT "id" FROM "tmp_paths" WHERE "path" = 'Person.id'));"#
         );
     }
 }
