@@ -4,7 +4,7 @@ mod methods;
 
 use common::Model;
 
-use methods::insert::InsertModel;
+use methods::upsert::UpsertModel;
 use serde_json::Map;
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -133,7 +133,7 @@ pub unsafe extern "C" fn object_relational_mapping(
 ///
 /// Returns 0 on pass 1 on fail. Stores result in [RETURN_PTR].
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn insert_model(
+pub unsafe extern "C" fn upsert_model(
     // Model Name
     model_name_ptr: *const u8,
     model_name_len: usize,
@@ -171,7 +171,7 @@ pub unsafe extern "C" fn insert_model(
     };
 
     let res = META.with(|meta| {
-        InsertModel::query(model_name, &meta.borrow(), new_model, include_tree.as_ref())
+        UpsertModel::query(model_name, &meta.borrow(), new_model, include_tree.as_ref())
     });
     match res {
         Ok(res) => {
@@ -180,71 +180,6 @@ pub unsafe extern "C" fn insert_model(
         }
         Err(e) => {
             yield_result(e.into_bytes());
-            1
-        }
-    }
-}
-
-/// Creates an update statement for the given model. Requires a previous call to [set_meta_ptr].
-///
-/// Panics on any error.
-///
-/// Returns a pointer to a JSON result which needs a subsequent [dealloc] call to free.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn update_model(
-    // Model Name
-    model_name_ptr: *const u8,
-    model_name_len: usize,
-
-    // New Model
-    updated_model_ptr: *const u8,
-    updated_model_len: usize,
-
-    // Include Tree
-    include_tree_ptr: *const u8,
-    include_tree_len: usize,
-) -> i32 {
-    let model_name =
-        unsafe { str::from_utf8(slice::from_raw_parts(model_name_ptr, model_name_len)).unwrap() };
-    let new_model_json = unsafe {
-        str::from_utf8(slice::from_raw_parts(updated_model_ptr, updated_model_len)).unwrap()
-    };
-    let include_tree_json = unsafe {
-        str::from_utf8(slice::from_raw_parts(include_tree_ptr, include_tree_len)).unwrap()
-    };
-
-    let updated_model = match serde_json::from_str::<Map<String, serde_json::Value>>(new_model_json)
-    {
-        Ok(updated_model) => updated_model,
-        Err(e) => {
-            yield_error(e);
-            return 1;
-        }
-    };
-    let include_tree = match serde_json::from_str::<Option<IncludeTree>>(include_tree_json) {
-        Ok(include_tree) => include_tree,
-        Err(e) => {
-            yield_error(e);
-            return 1;
-        }
-    };
-
-    let res = META.with(|meta| {
-        methods::update::update_model(
-            model_name,
-            &meta.borrow(),
-            updated_model,
-            include_tree.as_ref(),
-        )
-    });
-
-    match res {
-        Ok(res) => {
-            yield_result(res.into_bytes());
-            0
-        }
-        Err(e) => {
-            yield_error(e);
             1
         }
     }

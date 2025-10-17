@@ -1,6 +1,5 @@
-pub mod insert;
 pub mod orm;
-pub mod update;
+pub mod upsert;
 
 use common::CidlType;
 use sea_query::{Expr, SimpleExpr};
@@ -25,16 +24,16 @@ fn alias(name: impl Into<String>) -> sea_query::Alias {
     sea_query::Alias::new(name)
 }
 
-fn push_scalar_value(
+/// Validates that a JSON input follows the CIDL type, returning
+/// a SeaQuery [SimpleExpr] value
+fn validate_json_to_cidl(
     value: &Value,
     cidl_type: &CidlType,
     model_name: &str,
     attr_name: &str,
-    scalar_vals: &mut Vec<SimpleExpr>,
-) -> Result<(), String> {
+) -> Result<SimpleExpr, String> {
     if matches!(cidl_type, CidlType::Nullable(_)) && value.is_null() {
-        scalar_vals.push(SimpleExpr::Custom("null".into()));
-        return Ok(());
+        return Ok(SimpleExpr::Custom("null".into()));
     }
 
     match cidl_type.root_type() {
@@ -46,7 +45,7 @@ fn push_scalar_value(
                 ));
             }
 
-            scalar_vals.push(Expr::val(value.as_i64().unwrap()).into());
+            Ok(Expr::val(value.as_i64().unwrap()).into())
         }
         CidlType::Real => {
             if !matches!(value, Value::Number(_)) {
@@ -56,7 +55,7 @@ fn push_scalar_value(
                 ));
             }
 
-            scalar_vals.push(Expr::val(value.as_f64().unwrap()).into());
+            Ok(Expr::val(value.as_f64().unwrap()).into())
         }
         CidlType::Text | CidlType::Blob => {
             if !matches!(value, Value::String(_)) {
@@ -66,12 +65,10 @@ fn push_scalar_value(
                 ));
             }
 
-            scalar_vals.push(Expr::val(value.as_str().unwrap()).into())
+            Ok(Expr::val(value.as_str().unwrap()).into())
         }
         _ => {
             unreachable!("Invalid CIDL");
         }
     }
-
-    Ok(())
 }
