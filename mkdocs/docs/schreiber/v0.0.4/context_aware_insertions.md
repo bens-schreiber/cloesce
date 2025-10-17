@@ -223,3 +223,12 @@ orm.insert(model, data_source);
 ## Partial
 
 Since the ORM can insert partial objects, we need some way for Cloesce to recognize that an object is partial (don't reject it from the request validator stage if it's missing some values). To this end, I added the `Partial` grammar to the CIDL, and then updated the extractor and TS runtime to use it accordingly.
+
+## Upserts
+
+Originally, I had thought we needed two ORM functions: `insert` and `update`. However, it also seems likely that developers will want to update an existing model by adding a dependent table. To make this easier, I've combined both functions into a single `upsert`, which is capable of inferring your intention just by the context given, arriving at these scenarios:
+
+1. A model is missing a primary key, so this model must be inserted.
+2. A model has a primary key, but is missing some attributes, so this must be an update.
+3. A model has a primary key, and has all of its attributes, so this must be an upsert (try to insert, on conflict update non-pks).
+4. Skill issue (ill formatted model, yield an error)

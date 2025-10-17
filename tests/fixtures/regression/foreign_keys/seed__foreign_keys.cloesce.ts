@@ -50,7 +50,7 @@ export class A {
   @POST
   static async post(@Inject { db }: Env, a: A): Promise<A> {
     const orm = Orm.fromD1(db);
-    await orm.insert(A, a, A.withB);
+    await orm.upsert(A, a, A.withB);
     return (await orm.get(A, a.id, "withB")).value;
   }
 
@@ -79,7 +79,7 @@ export class Person {
   @POST
   static async post(@Inject { db }: Env, person: Person): Promise<Person> {
     const orm = Orm.fromD1(db);
-    await orm.insert(Person, person, Person.withDogs);
+    await orm.upsert(Person, person, Person.withDogs);
     return (await orm.get(Person, person.id, "withDogs")).value;
   }
 
@@ -120,7 +120,7 @@ export class Student {
   @POST
   static async post(@Inject { db }: Env, student: Student): Promise<Student> {
     const orm = Orm.fromD1(db);
-    await orm.insert(Student, student, Student.withCoursesStudents);
+    await orm.upsert(Student, student, Student.withCoursesStudents);
     return student;
     // return (await orm.get(Student, student.id, "withCoursesStudents")).value;
   }

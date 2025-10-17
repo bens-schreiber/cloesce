@@ -77,20 +77,11 @@ interface RuntimeWasmExports {
     include_tree_len: number,
   ): boolean;
 
-  insert_model(
+  upsert_model(
     model_name_ptr: number,
     model_name_len: number,
     new_model_ptr: number,
     new_model_len: number,
-    include_tree_ptr: number,
-    include_tree_len: number,
-  ): boolean;
-
-  update_model(
-    model_name_ptr: number,
-    model_name_len: number,
-    updated_model_ptr: number,
-    updated_model_len: number,
     include_tree_ptr: number,
     include_tree_len: number,
   ): boolean;

@@ -45,7 +45,7 @@ class Horse {
   @POST
   static async post(@Inject { db }: Env, horse: Horse): Promise<Horse> {
     const orm = Orm.fromD1(db);
-    await orm.insert(Horse, horse, null);
+    await orm.upsert(Horse, horse, null);
     return (await orm.get(Horse, horse.id, null)).value;
   }
 
@@ -64,7 +64,7 @@ class Horse {
   @POST
   async like(@Inject { db }: Env, horse: Horse) {
     const orm = Orm.fromD1(db);
-    await orm.insert(
+    await orm.upsert(
       Like,
       {
         horseId1: this.id,

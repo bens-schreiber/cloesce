@@ -8,7 +8,7 @@ import {
 } from "../runtime/runtime.js";
 
 export { cloesce } from "../runtime/runtime.js";
-export type { HttpResult, Either } from "../common.js";
+export type { HttpResult, Either, DeepPartial } from "../common.js";
 
 // Compiler hints
 export const D1: ClassDecorator = () => {};
@@ -93,7 +93,7 @@ export class Orm {
    * @param includeTree An include tree describing which foreign keys to join.
    * @returns Either an error string, or the insert query string.
    */
-  static insertQuery<T extends object>(
+  static upsertQuery<T extends object>(
     ctor: new () => T,
     newModel: T,
     includeTree: IncludeTree<T> | null,
@@ -104,53 +104,62 @@ export class Orm {
       WasmResource.fromString(JSON.stringify(newModel), wasm),
       WasmResource.fromString(JSON.stringify(includeTree), wasm),
     ];
-    return invokeWasm(wasm.insert_model, args, wasm);
+    return invokeWasm(wasm.upsert_model, args, wasm);
   }
 
   /**
-   * Returns a SQL query to update a model. Uses an IncludeTree as a guide for
-   * foreign key relationships, only updating the explicitly stated pattern in the tree.
+   * Executes an "upsert" query, adding or augmenting a model in the database.
+   * If a model's primary key is not defined in `newModel`, the query is assumed to be an insert.
+   * If a model's primary key _is_ defined, but some attributes are missing, the query is assumed to be an update.
+   * Finally, if the primary key is defined, but all attributes are included, a SQLite upsert will be performed.
+   *
+   * Capable of inferring foreign keys from the surrounding context of the model. A missing primary key is allowed
+   * only if the primary key is an integer, in which case it will be auto incremented and assigned.
+   *
+   * ### Inserting a new Model
+   * ```ts
+   * const model = {name: "julio", lastname: "pumpkin"};
+   * const idRes = await orm.upsert(Person, model, null);
+   * ```
+   *
+   * ### Updating an existing model
+   * ```ts
+   * const model =  {id: 1, name: "timothy"};
+   * const idRes = await orm.upsert(Person, model, null);
+   * // (in db)=> {id: 1, name: "timothy", lastname: "pumpkin"}
+   * ```
+   *
+   * ### Upserting a model
+   * ```ts
+   * // (assume a Person already exists)
+   * const model = {
+   *  id: 1,
+   *  lastname: "burger", // updates last name
+   *  dog: {
+   *    name: "fido" // insert dog relationship
+   *  }
+   * };
+   * const idRes = await orm.upsert(Person, model, null);
+   * // (in db)=> Person: {id: 1, dogId: 1 ...}  ; Dog: {id: 1, name: "fido"}
+   * ```
    *
    * @param ctor A model constructor.
-   * @param updatedModel Updated values to insert. Non-updated values can be left undefined.
-   * @param includeTree An include tree describing which foreign keys to join.
-   * @returns Either an error string, or the insert query string.
-   */
-  static updateQuery<T extends object>(
-    ctor: new () => T,
-    updatedModel: Partial<T>,
-    includeTree: IncludeTree<T> | null,
-  ): Either<string, string> {
-    const { wasm } = RuntimeContainer.get();
-    const args = [
-      WasmResource.fromString(ctor.name, wasm),
-      WasmResource.fromString(JSON.stringify(updatedModel), wasm),
-      WasmResource.fromString(JSON.stringify(includeTree), wasm),
-    ];
-    return invokeWasm(wasm.update_model, args, wasm);
-  }
-
-  /**
-   * Executes an insert query on the database, using an IncludeTree as a guide for foreign key
-   * relationships, only updating the explicitly stated pattern in the tree.
-   *
-   * @param ctor A model constructor.
-   * @param newModel The new model to insert.
+   * @param newModel The new or augmented model.
    * @param includeTree An include tree describing which foreign keys to join.
    * @returns An error string, or the primary key of the inserted model.
    */
-  async insert<T extends object>(
+  async upsert<T extends object>(
     ctor: new () => T,
     newModel: T,
     includeTree: IncludeTree<T> | null,
   ): Promise<Either<string, any>> {
-    let insertQueryRes = Orm.insertQuery(ctor, newModel, includeTree);
-    if (!insertQueryRes.ok) {
-      return insertQueryRes;
+    let upsertQueryRes = Orm.upsertQuery(ctor, newModel, includeTree);
+    if (!upsertQueryRes.ok) {
+      return upsertQueryRes;
     }
 
     // Split the query into individual statements.
-    const statements = insertQueryRes.value
+    const statements = upsertQueryRes.value
       .split(";")
       .map((s) => s.trim())
       .filter((s) => s.length > 0);
@@ -180,33 +189,6 @@ export class Orm {
     const selectResult = batchRes[selectIndex!].results[0] as { id: any };
 
     return right(selectResult.id);
-  }
-
-  /**
-   * Executes an update query on the database, using an IncludeTree as a guide for foreign key
-   * relationships, only updating the explicitly stated pattern in the tree.
-   *
-   * @param ctor A model constructor.
-   * @param updatedModel Updated values to insert. Non-updated values can be left undefined.
-   * @param includeTree An include tree describing which foreign keys to join.
-   * @returns An error string, or nothing.
-   */
-  async update<T extends object>(
-    ctor: new () => T,
-    updatedModel: Partial<T>,
-    includeTree: IncludeTree<T> | null,
-  ): Promise<Either<string, undefined>> {
-    let updateQueryRes = Orm.updateQuery(ctor, updatedModel, includeTree);
-    if (!updateQueryRes.ok) {
-      return updateQueryRes;
-    }
-
-    let d1Res = await this.db.prepare(updateQueryRes.value).run();
-    if (!d1Res.success) {
-      return left(d1Res.error ?? "D1 failed, but no error was returned.");
-    }
-
-    return right(undefined);
   }
 
   /**

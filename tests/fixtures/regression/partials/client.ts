@@ -1,4 +1,4 @@
-import { HttpResult, instantiateObjectArray } from "cloesce/client";
+import { HttpResult, instantiateObjectArray, DeepPartial } from "cloesce/client";
 
 export class Dog {
   id: number;
@@ -6,7 +6,7 @@ export class Dog {
   age: number;
 
   static async post(
-        dog: Partial<Dog>,
+        dog: DeepPartial<Dog>,
     dataSource: null = null
   ): Promise<HttpResult<Dog>> {
     const baseUrl = new URL(`http://localhost:5002/api/Dog/post`);

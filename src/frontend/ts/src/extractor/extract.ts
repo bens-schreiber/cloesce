@@ -423,14 +423,14 @@ export class CidlExtractor {
     const symbolName = unwrappedType.getSymbol()?.getName();
     const aliasName = unwrappedType.getAliasSymbol()?.getName();
 
-    if (aliasName === "Partial") {
+    if (aliasName === "DeepPartial") {
       const [_, genericTyNullable] = unwrapNullable(genericTy);
       const genericTyGenerics = [
         ...genericTy.getAliasTypeArguments(),
         ...genericTy.getTypeArguments(),
       ];
 
-      // Expect partials to be of the exact form Partial<Model>
+      // Expect partials to be of the exact form DeepPartial<Model>
       if (
         genericTyNullable ||
         genericTy.isUnion() ||
