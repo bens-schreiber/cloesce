@@ -423,6 +423,38 @@ export class CidlExtractor {
     const symbolName = unwrappedType.getSymbol()?.getName();
     const aliasName = unwrappedType.getAliasSymbol()?.getName();
 
+    if (aliasName === "DeepPartial") {
+      const [_, genericTyNullable] = unwrapNullable(genericTy);
+      const genericTyGenerics = [
+        ...genericTy.getAliasTypeArguments(),
+        ...genericTy.getTypeArguments(),
+      ];
+
+      // Expect partials to be of the exact form DeepPartial<Model>
+      if (
+        genericTyNullable ||
+        genericTy.isUnion() ||
+        genericTyGenerics.length > 0
+      ) {
+        return err(ExtractorErrorCode.InvalidPartialType);
+      }
+
+      return right(
+        wrapNullable(
+          {
+            Partial: genericTy
+              .getText(
+                undefined,
+                TypeFormatFlags.UseAliasDefinedOutsideCurrentScope,
+              )
+              .split("|")[0]
+              .trim(),
+          },
+          nullable,
+        ),
+      );
+    }
+
     if (symbolName === "Promise" || aliasName === "IncludeTree") {
       return wrapGeneric(genericTy, nullable, (inner) => inner);
     }

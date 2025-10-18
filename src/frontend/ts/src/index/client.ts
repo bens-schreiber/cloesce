@@ -1,4 +1,4 @@
-export type { HttpResult, Either } from "../common.js";
+export type { HttpResult, Either, DeepPartial } from "../common.js";
 
 // Helpers
 export function instantiateObjectArray<T extends object>(

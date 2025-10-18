@@ -1,3 +1,10 @@
+/// A partial type whose object keys may be partial as well
+export type DeepPartial<T> = T extends (infer U)[]
+  ? DeepPartial<U>[] // handle arrays specially
+  : T extends object
+    ? { [K in keyof T]?: DeepPartial<T[K]> }
+    : T;
+
 export type Either<L, R> = { ok: false; value: L } | { ok: true; value: R };
 export function left<L>(value: L): Either<L, never> {
   return { ok: false, value };
@@ -9,6 +16,7 @@ export function right<R>(value: R): Either<never, R> {
 export enum ExtractorErrorCode {
   UnknownType,
   MultipleGenericType,
+  InvalidPartialType,
   InvalidIncludeTree,
   UnknownNavigationPropertyReference,
   InvalidNavigationPropertyReference,
@@ -26,6 +34,10 @@ const errorInfoMap: Record<
 > = {
   [ExtractorErrorCode.UnknownType]: {
     description: "Encountered an unknown or unsupported type",
+    suggestion: "Refer to the documentation on valid Cloesce TS types",
+  },
+  [ExtractorErrorCode.InvalidPartialType]: {
+    description: "Partial types must only contain a model or plain old object",
     suggestion: "Refer to the documentation on valid Cloesce TS types",
   },
   [ExtractorErrorCode.MultipleGenericType]: {
@@ -105,6 +117,7 @@ export type CidlType =
   | "Blob"
   | { Inject: string }
   | { Object: string }
+  | { Partial: string }
   | { Nullable: CidlType }
   | { Array: CidlType }
   | { HttpResult: CidlType };

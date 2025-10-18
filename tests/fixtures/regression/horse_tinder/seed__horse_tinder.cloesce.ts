@@ -11,7 +11,7 @@ import {
   ForeignKey,
   IncludeTree,
   DataSource,
-  modelsFromSql,
+  Orm,
   WranglerEnv,
 } from "cloesce/backend";
 
@@ -44,36 +44,34 @@ class Horse {
 
   @POST
   static async post(@Inject { db }: Env, horse: Horse): Promise<Horse> {
-    const records = await db
-      .prepare("INSERT INTO Horse (id, name, bio) VALUES (?, ?, ?) RETURNING *")
-      .bind(horse.id, horse.name, horse.bio)
-      .all();
-
-    return modelsFromSql(Horse, records.results, Horse.default)[0] as Horse;
+    const orm = Orm.fromD1(db);
+    await orm.upsert(Horse, horse, null);
+    return (await orm.get(Horse, horse.id, null)).value;
   }
 
   @GET
   static async get(@Inject { db }: Env, id: number): Promise<Horse> {
-    let records = await db
-      .prepare("SELECT * FROM [Horse.default] WHERE [Horse.id] = ?")
-      .bind(id)
-      .run();
-
-    return modelsFromSql(Horse, records.results, Horse.default)[0] as Horse;
+    const orm = Orm.fromD1(db);
+    return (await orm.get(Horse, id, "default")).value;
   }
 
   @GET
   static async list(@Inject { db }: Env): Promise<Horse[]> {
-    let records = await db.prepare("SELECT * FROM [Horse.default]").run();
-    return modelsFromSql(Horse, records.results, Horse.default) as Horse[];
+    const orm = Orm.fromD1(db);
+    return (await orm.list(Horse, "default")).value;
   }
 
   @POST
   async like(@Inject { db }: Env, horse: Horse) {
-    await db
-      .prepare("INSERT INTO Like (horseId1, horseId2) VALUES (?, ?)")
-      .bind(this.id, horse.id)
-      .run();
+    const orm = Orm.fromD1(db);
+    await orm.upsert(
+      Like,
+      {
+        horseId1: this.id,
+        horseId2: horse.id,
+      },
+      null
+    );
   }
 }
 

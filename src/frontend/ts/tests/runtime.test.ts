@@ -1,11 +1,11 @@
 import { describe, test, expect, vi } from "vitest";
 import { _cloesceInternal } from "../src/runtime/runtime";
 import { CloesceAst, HttpVerb, NamedTypedValue } from "../src/common";
-import { modelsFromSql } from "../src/runtime/runtime";
-import { IncludeTree } from "../src";
+import { fromSql } from "../src/runtime/runtime";
 import fs from "fs";
 import path from "path";
 import { beforeEach } from "node:test";
+import { IncludeTree } from "../src/index/backend";
 
 const makeAst = (methods: Record<string, any>): CloesceAst => ({
   wrangler_env: {
@@ -17,10 +17,10 @@ const makeAst = (methods: Record<string, any>): CloesceAst => ({
   language: "TypeScript",
   models: {
     Horse: {
-      name: "",
+      name: "Horse",
       attributes: [],
       primary_key: {
-        name: "void",
+        name: "_id",
         cidl_type: "Integer",
       },
       navigation_properties: [],
@@ -287,17 +287,25 @@ describe("Validate Request Error States", () => {
 });
 
 describe("Validate Request Success States", () => {
-  const input: { typed_value: NamedTypedValue; value: string }[] = [
+  const input: { typed_value: NamedTypedValue; value: any }[] = [
     { typed_value: { name: "id", cidl_type: "Integer" }, value: "1" },
     { typed_value: { name: "lastName", cidl_type: "Text" }, value: "pumpkin" },
     { typed_value: { name: "gpa", cidl_type: "Real" }, value: "4.0" },
+    {
+      typed_value: { name: "horse", cidl_type: { Object: "Horse" } },
+      value: { _id: 1 },
+    },
+    {
+      typed_value: { name: "horse", cidl_type: { Partial: "Horse" } },
+      value: {},
+    },
   ];
 
   const expanded = input.flatMap((i) =>
     [true, false].flatMap((is_get) =>
       [true, false].map((nullable) => ({
         ...i,
-        is_get,
+        is_get: is_get && typeof i.typed_value.cidl_type === "string", // TODO: rm when models can be in GET req
         value: nullable ? null : i.value,
         typed_value: {
           ...i.typed_value,
@@ -336,7 +344,7 @@ describe("Validate Request Success States", () => {
       ast,
       ast.models.Horse,
       ast.models.Horse.methods.neigh,
-      "0",
+      null,
     );
 
     expect(result.value).toEqual({
@@ -627,16 +635,16 @@ describe("modelsFromSql", () => {
     };
 
     // Act
-    const result = modelsFromSql(
+    const result = fromSql(
       constructorRegistry[modelName],
       records,
       includeTree,
     );
 
     // Assert
-    expect(result.length).toBe(1);
+    expect(result.value.length).toBe(1);
 
-    const horse: any = result[0];
+    const horse: any = result.value[0];
     expect(horse.id).toBe("1");
     expect(horse.name).toBe("Lightning");
     expect(horse.bio).toBe("Fast horse");

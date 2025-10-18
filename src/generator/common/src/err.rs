@@ -63,6 +63,7 @@ pub enum GeneratorErrorKind {
     InvalidSqlType,
     UnknownObject,
     UnexpectedVoid,
+    UnexpectedPartialReturn,
     NotYetSupported,
     InvalidMapping,
     InvalidApiDomain,
@@ -95,6 +96,11 @@ impl GeneratorErrorKind {
             GeneratorErrorKind::UnexpectedVoid => (
                 "Void cannot be an attribute or parameter, only a return type.",
                 "Remove `void`",
+                GeneratorPhase::EarlyAstValidation,
+            ),
+            GeneratorErrorKind::UnexpectedPartialReturn => (
+                "Methods cannot return a partial value.",
+                "Try using a Plain Old Object instead",
                 GeneratorPhase::EarlyAstValidation,
             ),
             GeneratorErrorKind::NotYetSupported => (

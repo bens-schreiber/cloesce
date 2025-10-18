@@ -34,6 +34,11 @@ pub enum CidlType {
     /// A model, or plain old object, containing the name of the class.
     Object(String),
 
+    /// A part of a model or plain object, containing the name of the class.
+    ///
+    /// Only valid as a method argument.
+    Partial(String),
+
     /// An array of any type
     Array(Box<CidlType>),
 
@@ -288,49 +293,64 @@ impl CloesceAst {
                 );
 
                 // Validate return type
-                if let CidlType::Object(o) = &method.return_type {
-                    ensure!(
-                        self.is_valid_object_ref(o),
-                        GeneratorErrorKind::UnknownObject,
-                        "{}.{}",
-                        model.name,
-                        method.name
-                    );
+                match &method.return_type {
+                    CidlType::Object(o) => {
+                        ensure!(
+                            self.is_valid_object_ref(o),
+                            GeneratorErrorKind::UnknownObject,
+                            "{}.{}",
+                            model.name,
+                            method.name
+                        );
+                    }
+                    CidlType::Partial(_) => {
+                        fail!(
+                            GeneratorErrorKind::UnexpectedPartialReturn,
+                            "{}.{}",
+                            model.name,
+                            method.name,
+                        )
+                    }
+                    _ => {}
                 }
 
                 // Validate method params
                 for param in &method.parameters {
                     let root_type = param.cidl_type.root_type();
 
-                    if let CidlType::Void = root_type {
-                        fail!(
-                            GeneratorErrorKind::UnexpectedVoid,
-                            "{}.{}.{}",
-                            model.name,
-                            method.name,
-                            param.name
-                        )
-                    }
-
-                    if let CidlType::Object(o) = root_type {
-                        ensure!(
-                            self.is_valid_object_ref(o),
-                            GeneratorErrorKind::UnknownObject,
-                            "{}.{}.{}",
-                            model.name,
-                            method.name,
-                            param.name
-                        );
-
-                        // TODO: remove this
-                        if method.http_verb == HttpVerb::GET {
+                    match root_type {
+                        CidlType::Void => {
                             fail!(
-                                GeneratorErrorKind::NotYetSupported,
-                                "GET Requests currently do not support model parameters {}.{}.{}",
+                                GeneratorErrorKind::UnexpectedVoid,
+                                "{}.{}.{}",
                                 model.name,
                                 method.name,
                                 param.name
                             )
+                        }
+                        CidlType::Object(o) | CidlType::Partial(o) => {
+                            ensure!(
+                                self.is_valid_object_ref(o),
+                                GeneratorErrorKind::UnknownObject,
+                                "{}.{}.{}",
+                                model.name,
+                                method.name,
+                                param.name
+                            );
+
+                            // TODO: remove this
+                            if method.http_verb == HttpVerb::GET {
+                                fail!(
+                                    GeneratorErrorKind::NotYetSupported,
+                                    "GET Requests currently do not support model parameters {}.{}.{}",
+                                    model.name,
+                                    method.name,
+                                    param.name
+                                )
+                            }
+                        }
+                        _ => {
+                            // Ignore
                         }
                     }
                 }

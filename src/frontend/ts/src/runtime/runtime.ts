@@ -1,4 +1,7 @@
-import { D1Database } from "@cloudflare/workers-types/experimental/index.js";
+import {
+  D1Database,
+  D1Result,
+} from "@cloudflare/workers-types/experimental/index.js";
 import {
   HttpResult,
   Either,
@@ -60,9 +63,11 @@ interface MetaWranglerEnv {
 interface RuntimeWasmExports {
   memory: WebAssembly.Memory;
   get_return_len(): number;
+  get_return_ptr(): number;
   set_meta_ptr(ptr: number, len: number): number;
   alloc(len: number): number;
   dealloc(ptr: number, len: number): void;
+
   object_relational_mapping(
     model_name_ptr: number,
     model_name_len: number,
@@ -70,13 +75,22 @@ interface RuntimeWasmExports {
     sql_rows_len: number,
     include_tree_ptr: number,
     include_tree_len: number,
-  ): number;
+  ): boolean;
+
+  upsert_model(
+    model_name_ptr: number,
+    model_name_len: number,
+    new_model_ptr: number,
+    new_model_len: number,
+    include_tree_ptr: number,
+    include_tree_len: number,
+  ): boolean;
 }
 
 /**
  * RAII for wasm memory
  */
-class WasmResource {
+export class WasmResource {
   constructor(
     private wasm: RuntimeWasmExports,
     public ptr: number,
@@ -103,7 +117,7 @@ class WasmResource {
  * Singleton instances of the cidl, constructor registry, and wasm binary.
  * These values are guaranteed to never change throughout a program lifetime.
  */
-class RuntimeContainer {
+export class RuntimeContainer {
   private static instance: RuntimeContainer | undefined;
   private constructor(
     public readonly ast: CloesceAst,
@@ -146,6 +160,101 @@ class RuntimeContainer {
 
   static get(): RuntimeContainer {
     return this.instance!;
+  }
+}
+
+/**
+ * Helper for invoking the WASM runtime
+ */
+export function invokeWasm<T>(
+  fn: (...args: number[]) => boolean,
+  args: WasmResource[],
+  wasm: RuntimeWasmExports,
+): Either<string, T> {
+  let resPtr: number | undefined;
+  let resLen: number | undefined;
+
+  try {
+    const failed = fn(...args.flatMap((a) => [a.ptr, a.len]));
+    resPtr = wasm.get_return_ptr();
+    resLen = wasm.get_return_len();
+
+    const result = new TextDecoder().decode(
+      new Uint8Array(wasm.memory.buffer, resPtr, resLen),
+    );
+
+    return failed ? left(result) : right(result as T);
+  } finally {
+    args.forEach((a) => a.free());
+    if (resPtr && resLen) wasm.dealloc(resPtr, resLen);
+  }
+}
+
+/**
+ * Calls the WASM runtime function `object_relational_mapping` to turn a row of SQL records into
+ * an instantiated object.
+ */
+export function fromSql<T extends object>(
+  ctor: new () => T,
+  records: Record<string, any>[],
+  includeTree: IncludeTree<T> | CidlIncludeTree | null,
+): Either<string, T[]> {
+  const { ast, constructorRegistry, wasm } = RuntimeContainer.get();
+  const args = [
+    WasmResource.fromString(ctor.name, wasm),
+    WasmResource.fromString(JSON.stringify(records), wasm),
+    WasmResource.fromString(JSON.stringify(includeTree), wasm),
+  ];
+
+  const jsonResults = invokeWasm<string>(
+    wasm.object_relational_mapping,
+    args,
+    wasm,
+  );
+  if (!jsonResults.ok) return jsonResults;
+
+  const parsed: any[] = JSON.parse(jsonResults.value);
+  return right(
+    parsed.map((obj: any) =>
+      instantiateDepthFirst(obj, ast.models[ctor.name], includeTree),
+    ) as T[],
+  );
+
+  function instantiateDepthFirst(
+    m: any,
+    meta: Model,
+    includeTree: IncludeTree<any> | null,
+  ) {
+    m = Object.assign(new constructorRegistry[meta.name](), m);
+
+    if (!includeTree) {
+      return m;
+    }
+
+    for (const navProp of meta.navigation_properties) {
+      const nestedIncludeTree = includeTree[navProp.var_name];
+      if (!nestedIncludeTree) continue;
+
+      const nestedMeta = ast.models[navProp.model_name];
+      const value = m[navProp.var_name];
+
+      // One to Many, Many to Many
+      if (Array.isArray(value)) {
+        m[navProp.var_name] = value.map((child: any) =>
+          instantiateDepthFirst(child, nestedMeta, nestedIncludeTree),
+        );
+      }
+      // One to one
+      else if (value) {
+        m[navProp.var_name] = instantiateDepthFirst(
+          value,
+          nestedMeta,
+          nestedIncludeTree,
+        );
+      }
+    }
+
+    return m;
   }
 }
 
@@ -327,7 +436,10 @@ async function validateRequest(
   // Validate all parameters type
   for (const p of requiredParams) {
     const value = params[p.name];
-    if (!validateCidlType(ast, value, p.cidl_type)) {
+    const isPartial =
+      typeof p.cidl_type !== "string" && "Partial" in p.cidl_type;
+
+    if (!validateCidlType(ast, value, p.cidl_type, isPartial)) {
       return invalidRequest("Invalid parameters.");
     }
   }
@@ -387,11 +499,11 @@ async function hydrateModel(
     dataSource !== null ? model.data_sources[dataSource].tree : {};
 
   // Hydrate
-  const models: object[] = modelsFromSql(
+  const models: object[] = fromSql(
     constructorRegistry[model.name],
     records.results,
     includeTree,
-  );
+  ).value as object[];
 
   return right(models[0]);
 }
@@ -448,8 +560,9 @@ function validateCidlType(
   ast: CloesceAst,
   value: unknown,
   cidlType: CidlType,
+  is_partial: boolean,
 ): boolean {
-  if (value === undefined) return false;
+  if (value === undefined) return is_partial;
 
   // TODO: consequences of null checking like this? 'null' is passed in
   // as a string for GET requests...
@@ -477,15 +590,27 @@ function validateCidlType(
   }
 
   // Handle Models
-  if ("Object" in cidlType && ast.models[cidlType.Object]) {
-    const model = ast.models[cidlType.Object];
+  let cidlTypeAccessor =
+    "Partial" in cidlType
+      ? cidlType.Partial
+      : "Object" in cidlType
+        ? cidlType.Object
+        : undefined;
+
+  if (cidlTypeAccessor && ast.models[cidlTypeAccessor]) {
+    const model = ast.models[cidlTypeAccessor];
     if (!model || typeof value !== "object") return false;
     const valueObj = value as Record<string, unknown>;
 
     // Validate attributes
     if (
       !model.attributes.every((attr) =>
-        validateCidlType(ast, valueObj[attr.value.name], attr.value.cidl_type),
+        validateCidlType(
+          ast,
+          valueObj[attr.value.name],
+          attr.value.cidl_type,
+          is_partial,
+        ),
       )
     ) {
       return false;
@@ -497,21 +622,26 @@ function validateCidlType(
 
       return (
         navValue == null ||
-        validateCidlType(ast, navValue, getNavigationPropertyCidlType(nav))
+        validateCidlType(
+          ast,
+          navValue,
+          getNavigationPropertyCidlType(nav),
+          is_partial,
+        )
       );
     });
   }
 
   // Handle Plain Old Objects
-  if ("Object" in cidlType && ast.poos[cidlType.Object]) {
-    const poo = ast.poos[cidlType.Object];
+  if (cidlTypeAccessor && ast.poos[cidlTypeAccessor]) {
+    const poo = ast.poos[cidlTypeAccessor];
     if (!poo || typeof value !== "object") return false;
     const valueObj = value as Record<string, unknown>;
 
     // Validate attributes
     if (
       !poo.attributes.every((attr) =>
-        validateCidlType(ast, valueObj[attr.name], attr.cidl_type),
+        validateCidlType(ast, valueObj[attr.name], attr.cidl_type, is_partial),
       )
     ) {
       return false;
@@ -521,118 +651,18 @@ function validateCidlType(
   if ("Array" in cidlType) {
     const arr = cidlType.Array;
     return (
-      Array.isArray(value) && value.every((v) => validateCidlType(ast, v, arr))
+      Array.isArray(value) &&
+      value.every((v) => validateCidlType(ast, v, arr, is_partial))
     );
   }
 
   if ("HttpResult" in cidlType) {
     if (value === null) return cidlType.HttpResult === null;
     if (cidlType.HttpResult === null) return false;
-    return validateCidlType(ast, value, cidlType.HttpResult);
+    return validateCidlType(ast, value, cidlType.HttpResult, is_partial);
   }
 
   return false;
-}
-
-/**
- * Creates model instances given a properly formatted SQL record, being either:
- *
- *  1. Flat, relationship-less (ex: id, name, location, ...)
- *  2. `DataSource` formatted (ex: Horse.id, Horse.name, Horse.rider, ...)
- *
- * @param ctor The type of the model
- * @param records SQL records
- * @param includeTree The include tree to use when parsing the records
- * @returns An instantiated array of `T`, containing one or more objects.
- */
-export function modelsFromSql<T extends object>(
-  ctor: new () => T,
-  records: Record<string, any>[],
-  includeTree: IncludeTree<T> | null,
-): T[] {
-  const { ast, constructorRegistry, wasm } = RuntimeContainer.get();
-
-  const modelName = WasmResource.fromString(ctor.name, wasm);
-  const rows = WasmResource.fromString(JSON.stringify(records), wasm);
-  const includeTreeJson = WasmResource.fromString(
-    JSON.stringify(includeTree),
-    wasm,
-  );
-
-  // Invoke the ORM
-  const jsonResults: any[] = (() => {
-    let resPtr;
-    let resLen;
-    try {
-      resPtr = wasm.object_relational_mapping(
-        modelName.ptr,
-        modelName.len,
-        rows.ptr,
-        rows.len,
-        includeTreeJson.ptr,
-        includeTreeJson.len,
-      );
-      resLen = wasm.get_return_len();
-
-      // Parse the results as JSON
-      return JSON.parse(
-        new TextDecoder().decode(
-          new Uint8Array(wasm.memory.buffer, resPtr, resLen),
-        ),
-      );
-    } finally {
-      modelName.free();
-      rows.free();
-      includeTreeJson.free();
-
-      // Could resPtr some how be set but not resLen? Kind of a flaw
-      // in how WASM works.
-      if (resPtr && resLen) wasm.dealloc(resPtr, resLen);
-    }
-  })();
-
-  return jsonResults.map((obj: any) =>
-    instantiateDfs(obj, ast.models[ctor.name], includeTree),
-  ) as T[];
-
-  // The result that comes back is just raw JSON, run a DFS on each navigation property
-  // in the include tree provided, instantiating each object via constructor registry.
-  function instantiateDfs(
-    m: any,
-    meta: Model,
-    includeTree: IncludeTree<any> | null,
-  ) {
-    m = Object.assign(new constructorRegistry[meta.name](), m);
-
-    if (!includeTree) {
-      return m;
-    }
-
-    for (const navProp of meta.navigation_properties) {
-      const nestedIncludeTree = includeTree[navProp.var_name];
-      if (!nestedIncludeTree) continue;
-
-      const nestedMeta = ast.models[navProp.model_name];
-      const value = m[navProp.var_name];
-
-      // One to Many, Many to Many
-      if (Array.isArray(value)) {
-        m[navProp.var_name] = value.map((child: any) =>
-          instantiateDfs(child, nestedMeta, nestedIncludeTree),
-        );
-      }
-      // One to one
-      else if (value) {
-        m[navProp.var_name] = instantiateDfs(
-          value,
-          nestedMeta,
-          nestedIncludeTree,
-        );
-      }
-    }
-
-    return m;
-  }
 }
 
 function errorState(status: number, message: string): HttpResult {

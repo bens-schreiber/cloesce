@@ -1,4 +1,4 @@
-import { HttpResult, instantiateObjectArray } from "cloesce/client";
+import { HttpResult, instantiateObjectArray, DeepPartial } from "cloesce/client";
 
 export class PooA {
   name: string;

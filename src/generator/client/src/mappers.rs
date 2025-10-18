@@ -27,6 +27,7 @@ impl ClientLanguageTypeMapper for TypeScriptMapper {
             }
             CidlType::HttpResult(inner) => self.type_name(inner),
             CidlType::Void => "void".to_string(),
+            CidlType::Partial(name) => format!("DeepPartial<{name}>"),
             _ => panic!("Invalid type {:?}", ty),
         }
     }

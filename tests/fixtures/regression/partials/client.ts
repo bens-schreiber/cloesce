@@ -1,0 +1,30 @@
+import { HttpResult, instantiateObjectArray, DeepPartial } from "cloesce/client";
+
+export class Dog {
+  id: number;
+  name: string;
+  age: number;
+
+  static async post(
+        dog: DeepPartial<Dog>,
+    dataSource: null = null
+  ): Promise<HttpResult<Dog>> {
+    const baseUrl = new URL(`http://localhost:5002/api/Dog/post`);
+    if (dataSource) {
+      baseUrl.searchParams.append("dataSource", dataSource);
+    }
+    const res = await fetch(baseUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+            dog
+      })
+    });
+    let raw = await res.json();
+    if (!res.ok) {
+      return raw;
+    }
+    raw.data = Object.assign(new Dog(), raw.data);
+    return raw;
+  }
+}

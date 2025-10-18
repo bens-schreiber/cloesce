@@ -1,5 +1,5 @@
 -- Models
-CREATE TABLE "NullabilityChecks" ( "id" integer PRIMARY KEY, "notNullableString" text NOT NULL, "nullableString" text );
+CREATE TABLE "Dog" ( "id" integer PRIMARY KEY, "name" text NOT NULL, "age" integer NOT NULL );
 
 -- Views / Data Sources
 

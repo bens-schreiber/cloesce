@@ -8,7 +8,7 @@ use common::{
 
 use sea_query::{
     ColumnDef, Expr, ForeignKey, Index, IntoCondition, Query, SelectStatement, SqliteQueryBuilder,
-    Table,
+    Table, TableCreateStatement,
 };
 
 /// Validates the Model AST, producing an equivalent sql schema of
@@ -17,10 +17,26 @@ pub fn generate_sql(model_lookup: &BTreeMap<String, Model>) -> Result<String> {
     let (sorted_models, many_to_many_tables) = validate_fks(model_lookup)?;
     let model_tree = validate_data_sources(model_lookup)?;
 
-    let tables = generate_tables(&sorted_models, many_to_many_tables, model_lookup);
-    let views = generate_views(model_tree);
+    let tables = generate_tables(&sorted_models, many_to_many_tables, model_lookup).join("\n");
+    let views = generate_views(model_tree).join("\n");
 
-    Ok(format!("{}\n{}", tables.join("\n"), views.join("\n")))
+    // A table of temporary values useful in ORM functions.
+    let cloesce_tmp = TableCreateStatement::new()
+        .table(alias("_cloesce_tmp"))
+        .col(ColumnDef::new_with_type(alias("path"), sea_query::ColumnType::Text).primary_key())
+        .col(ColumnDef::new_with_type(alias("id"), sea_query::ColumnType::Integer).not_null())
+        .to_string(SqliteQueryBuilder);
+
+    Ok(format!(
+        r#"-- Models
+{tables}
+
+-- Views / Data Sources
+{views}
+
+-- Cloesce
+{cloesce_tmp};"#
+    ))
 }
 
 fn generate_views(model_tree: Vec<ModelTree>) -> Vec<String> {

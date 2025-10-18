@@ -19,22 +19,6 @@ macro_rules! expected_str {
 
 #[test]
 fn test_sqlite_table_output() {
-    // Empty
-    {
-        // Arrange
-        let ast = create_ast(vec![]);
-
-        // Act
-        let sql = d1::generate_sql(&ast.models).expect("Empty models should succeed");
-
-        // Assert
-        assert!(
-            sql.trim().is_empty(),
-            "Expected empty SQL output for empty CIDL, got: {}",
-            sql
-        );
-    }
-
     // Primary key, Basic attributes
     {
         // Arrange
