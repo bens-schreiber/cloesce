@@ -1,15 +1,15 @@
 #![allow(clippy::missing_safety_doc)]
-
-mod methods;
+mod orm;
+mod upsert;
 
 use common::Model;
 
-use methods::upsert::UpsertModel;
 use serde_json::Map;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::slice;
 use std::str;
+use upsert::UpsertModel;
 
 type D1Result = Vec<Map<String, serde_json::Value>>;
 type ModelMeta = HashMap<String, Model>;
@@ -112,7 +112,7 @@ pub unsafe extern "C" fn object_relational_mapping(
     };
 
     let res = META.with(|meta| {
-        methods::orm::object_relational_mapping(model_name, &meta.borrow(), &rows, &include_tree)
+        orm::object_relational_mapping(model_name, &meta.borrow(), &rows, &include_tree)
     });
     match res {
         Ok(res) => {

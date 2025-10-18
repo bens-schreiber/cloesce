@@ -176,7 +176,7 @@ mod tests {
     use serde_json::{Map, Value, json};
     use std::collections::HashMap;
 
-    use crate::methods::orm::object_relational_mapping;
+    use crate::orm::object_relational_mapping;
 
     #[test]
     fn no_records_returns_empty() {
