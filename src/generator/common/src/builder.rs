@@ -57,7 +57,6 @@ pub struct ModelBuilder {
     primary_key: Option<NamedTypedValue>,
     methods: BTreeMap<String, ModelMethod>,
     data_sources: BTreeMap<String, DataSource>,
-    source_path: Option<PathBuf>,
 }
 
 impl ModelBuilder {
@@ -68,7 +67,6 @@ impl ModelBuilder {
             navigation_properties: Vec::new(),
             methods: BTreeMap::new(),
             data_sources: BTreeMap::new(),
-            source_path: None,
             primary_key: None,
         }
     }
@@ -147,11 +145,6 @@ impl ModelBuilder {
         self
     }
 
-    pub fn source_path(mut self, path: impl Into<PathBuf>) -> Self {
-        self.source_path = Some(path.into());
-        self
-    }
-
     pub fn build(self) -> Model {
         Model {
             name: self.name,
@@ -159,7 +152,8 @@ impl ModelBuilder {
             navigation_properties: self.navigation_properties,
             methods: self.methods,
             data_sources: self.data_sources,
-            source_path: self.source_path.unwrap_or_default(),
+            source_path: PathBuf::default(),
+            cruds: vec![],
             primary_key: self.primary_key.unwrap(),
         }
     }

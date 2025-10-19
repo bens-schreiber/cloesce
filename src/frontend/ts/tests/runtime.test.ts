@@ -25,6 +25,7 @@ const makeAst = (methods: Record<string, any>): CloesceAst => ({
       },
       navigation_properties: [],
       data_sources: {},
+      cruds: [],
       methods,
       source_path: "",
     },
@@ -35,7 +36,7 @@ const makeAst = (methods: Record<string, any>): CloesceAst => ({
 const makeRequest = (url: string, method?: string, body?: any) =>
   new Request(
     url,
-    method ? { method, body: body && JSON.stringify(body) } : undefined,
+    method ? { method, body: body && JSON.stringify(body) } : undefined
   );
 
 // Mock the wasm file
@@ -55,7 +56,7 @@ describe("Router Error States", () => {
     const result = _cloesceInternal.matchRoute(
       makeRequest(url),
       makeAst({}),
-      "/api",
+      "/api"
     );
 
     expect(result.value).toStrictEqual({
@@ -175,6 +176,7 @@ describe("Validate Request Error States", () => {
         attributes: [],
         navigation_properties: [],
         methods: {},
+        cruds: [],
         data_sources: {},
         source_path: "",
       },
@@ -185,7 +187,7 @@ describe("Validate Request Error States", () => {
         return_type: null,
         parameters: [],
       },
-      null,
+      null
     );
 
     expect(result.value).toStrictEqual({
@@ -218,6 +220,7 @@ describe("Validate Request Error States", () => {
         attributes: [],
         navigation_properties: [],
         methods: {},
+        cruds: [],
         data_sources: {},
         source_path: "",
       },
@@ -228,7 +231,7 @@ describe("Validate Request Error States", () => {
         return_type: null,
         parameters: [],
       },
-      null,
+      null
     );
 
     expect(result.value).toStrictEqual({
@@ -274,7 +277,7 @@ describe("Validate Request Error States", () => {
         ast,
         ast.models.Horse,
         ast.models.Horse.methods.neigh,
-        "0",
+        "0"
       );
 
       expect(result.value).toStrictEqual({
@@ -282,7 +285,7 @@ describe("Validate Request Error States", () => {
         status: 400,
         message: `Invalid Request Body: ${message}.`,
       });
-    },
+    }
   );
 });
 
@@ -313,8 +316,8 @@ describe("Validate Request Success States", () => {
             ? { Nullable: i.typed_value.cidl_type }
             : i.typed_value.cidl_type,
         },
-      })),
-    ),
+      }))
+    )
   );
 
   test.each(expanded)("input is accepted %#", async (arg) => {
@@ -324,7 +327,7 @@ describe("Validate Request Success States", () => {
     const request = makeRequest(
       url,
       arg.is_get ? undefined : "POST",
-      arg.is_get ? undefined : { [arg.typed_value.name]: arg.value },
+      arg.is_get ? undefined : { [arg.typed_value.name]: arg.value }
     );
     const ast = makeAst({
       neigh: {
@@ -344,7 +347,7 @@ describe("Validate Request Success States", () => {
       ast,
       ast.models.Horse,
       ast.models.Horse.methods.neigh,
-      null,
+      null
     );
 
     expect(result.value).toEqual({
@@ -392,7 +395,7 @@ describe("methodDispatch", () => {
       makeInstanceRegistry(),
       envMeta,
       method,
-      params,
+      params
     );
 
     expect(instance.testMethod).toHaveBeenCalledWith();
@@ -413,7 +416,7 @@ describe("methodDispatch", () => {
       makeInstanceRegistry(),
       envMeta,
       method,
-      params,
+      params
     );
 
     expect(result).toStrictEqual({
@@ -433,7 +436,7 @@ describe("methodDispatch", () => {
       makeInstanceRegistry(),
       envMeta,
       method,
-      params,
+      params
     );
 
     expect(result).toStrictEqual({ ok: true, status: 200, data: "neigh" });
@@ -453,7 +456,7 @@ describe("methodDispatch", () => {
       ireg,
       envMeta,
       method,
-      params,
+      params
     );
 
     expect(instance.testMethod).toHaveBeenCalledWith(ireg.get("Env"));
@@ -474,7 +477,7 @@ describe("methodDispatch", () => {
       makeInstanceRegistry(),
       envMeta,
       method,
-      params,
+      params
     );
 
     expect(result).toStrictEqual({
@@ -498,7 +501,7 @@ describe("methodDispatch", () => {
       makeInstanceRegistry(),
       envMeta,
       method,
-      params,
+      params
     );
 
     expect(result).toStrictEqual({
@@ -563,6 +566,7 @@ describe("modelsFromSql", () => {
           primary_key: { name: "id", cidl_type: "Integer" },
           data_sources: {},
           methods: {},
+          cruds: [],
           source_path: "",
         },
         [likeModelName]: {
@@ -587,6 +591,7 @@ describe("modelsFromSql", () => {
           primary_key: { name: "id", cidl_type: "Integer" },
           data_sources: {},
           methods: {},
+          cruds: [],
           source_path: "",
         },
       },
@@ -599,7 +604,7 @@ describe("modelsFromSql", () => {
     await _cloesceInternal.RuntimeContainer.init(
       ast,
       constructorRegistry,
-      wasm.instance,
+      wasm.instance
     );
 
     // Simulate a view result with nested data: Horse -> likes (Like[]) -> horse2 (Horse)
@@ -638,7 +643,7 @@ describe("modelsFromSql", () => {
     const result = fromSql(
       constructorRegistry[modelName],
       records,
-      includeTree,
+      includeTree
     );
 
     // Assert

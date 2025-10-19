@@ -2,6 +2,7 @@ pub mod builder;
 pub mod err;
 
 use std::collections::BTreeMap;
+use std::collections::HashSet;
 use std::path::PathBuf;
 
 use err::GeneratorErrorKind;
@@ -139,6 +140,15 @@ pub struct NavigationProperty {
     pub kind: NavigationPropertyKind,
 }
 
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone, Copy)]
+pub enum CrudKind {
+    POST,
+    PATCH,
+    LIST,
+    GET,
+    // TODO: delete?
+}
+
 #[serde_as]
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Model {
@@ -149,6 +159,8 @@ pub struct Model {
 
     #[serde_as(as = "MapPreventDuplicates<_, _>")]
     pub methods: BTreeMap<String, ModelMethod>,
+
+    pub cruds: Vec<CrudKind>,
 
     #[serde_as(as = "MapPreventDuplicates<_, _>")]
     pub data_sources: BTreeMap<String, DataSource>,
@@ -354,6 +366,18 @@ impl CloesceAst {
                         }
                     }
                 }
+            }
+
+            // Validate crud methods
+            let mut cruds = HashSet::new();
+            for crud in &model.cruds {
+                ensure!(
+                    cruds.insert(crud),
+                    GeneratorErrorKind::DuplicateKey,
+                    "{} contains duplicate CRUD method {:?}",
+                    model.name,
+                    crud,
+                );
             }
         }
 

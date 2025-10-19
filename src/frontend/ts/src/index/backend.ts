@@ -1,5 +1,5 @@
 import { D1Database } from "@cloudflare/workers-types/experimental/index.js";
-import { Either, left, right } from "../common.js";
+import { CrudKind, Either, left, right } from "../common.js";
 import {
   RuntimeContainer,
   WasmResource,
@@ -34,6 +34,9 @@ export const ForeignKey =
   <T>(_: T): PropertyDecorator =>
   () => {};
 export const Inject: ParameterDecorator = () => {};
+export const CRUD =
+  (_kinds: CrudKind[]): ClassDecorator =>
+  () => {};
 
 // Include Tree
 type Primitive = string | number | boolean | bigint | symbol | null | undefined;
@@ -75,7 +78,7 @@ export class Orm {
   static fromSql<T extends object>(
     ctor: new () => T,
     records: Record<string, any>[],
-    includeTree: IncludeTree<T> | null,
+    includeTree: IncludeTree<T> | null
   ): Either<string, T[]> {
     return fromSql(ctor, records, includeTree);
   }
@@ -96,7 +99,7 @@ export class Orm {
   static upsertQuery<T extends object>(
     ctor: new () => T,
     newModel: T,
-    includeTree: IncludeTree<T> | null,
+    includeTree: IncludeTree<T> | null
   ): Either<string, string> {
     const { wasm } = RuntimeContainer.get();
     const args = [
@@ -151,7 +154,7 @@ export class Orm {
   async upsert<T extends object>(
     ctor: new () => T,
     newModel: T,
-    includeTree: IncludeTree<T> | null,
+    includeTree: IncludeTree<T> | null
   ): Promise<Either<string, any>> {
     let upsertQueryRes = Orm.upsertQuery(ctor, newModel, includeTree);
     if (!upsertQueryRes.ok) {
@@ -175,13 +178,13 @@ export class Orm {
 
     // Execute all statements in a batch.
     const batchRes = await this.db.batch(
-      statements.map((s) => this.db.prepare(s)),
+      statements.map((s) => this.db.prepare(s))
     );
 
     if (!batchRes.every((r) => r.success)) {
       const failed = batchRes.find((r) => !r.success);
       return left(
-        failed?.error ?? "D1 batch failed, but no error was returned.",
+        failed?.error ?? "D1 batch failed, but no error was returned."
       );
     }
 
@@ -196,7 +199,7 @@ export class Orm {
    */
   static listQuery<T extends object>(
     ctor: new () => T,
-    includeTree: KeysOfType<T, IncludeTree<T>> | null,
+    includeTree: KeysOfType<T, IncludeTree<T>> | null
   ): string {
     if (includeTree) {
       return `SELECT * FROM [${ctor.name}.${includeTree.toString()}]`;
@@ -211,7 +214,7 @@ export class Orm {
    */
   static getQuery<T extends object>(
     ctor: new () => T,
-    includeTree: KeysOfType<T, IncludeTree<T>> | null,
+    includeTree: KeysOfType<T, IncludeTree<T>> | null
   ): string {
     const { ast } = RuntimeContainer.get();
     if (includeTree) {
@@ -227,7 +230,7 @@ export class Orm {
    */
   async list<T extends object>(
     ctor: new () => T,
-    includeTreeKey: KeysOfType<T, IncludeTree<T>> | null,
+    includeTreeKey: KeysOfType<T, IncludeTree<T>> | null
   ): Promise<Either<string, T[]>> {
     const q = Orm.listQuery(ctor, includeTreeKey);
     const res = await this.db.prepare(q).run();
@@ -257,7 +260,7 @@ export class Orm {
   async get<T extends object>(
     ctor: new () => T,
     id: any,
-    includeTreeKey: KeysOfType<T, IncludeTree<T>> | null,
+    includeTreeKey: KeysOfType<T, IncludeTree<T>> | null
   ): Promise<Either<string, T>> {
     const q = Orm.getQuery(ctor, includeTreeKey);
     const res = await this.db.prepare(q).bind(id).run();

@@ -164,12 +164,14 @@ export interface NavigationProperty {
 }
 
 export function getNavigationPropertyCidlType(
-  nav: NavigationProperty,
+  nav: NavigationProperty
 ): CidlType {
   return "OneToOne" in nav.kind
     ? { Object: nav.model_name }
     : { Array: { Object: nav.model_name } };
 }
+
+export type CrudKind = "POST" | "PATCH" | "GET" | "LIST";
 
 export interface Model {
   name: string;
@@ -177,6 +179,7 @@ export interface Model {
   attributes: ModelAttribute[];
   navigation_properties: NavigationProperty[];
   methods: Record<string, ModelMethod>;
+  cruds: CrudKind[];
   data_sources: Record<string, DataSource>;
   source_path: string;
 }
