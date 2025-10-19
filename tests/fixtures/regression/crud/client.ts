@@ -21,7 +21,7 @@ export class CrudHaver {
     return raw;
   }
   static async post(obj: DeepPartial<CrudHaver>, dataSource: null = null): Promise<HttpResult<CrudHaver>> {
-    const baseUrl = new URL(`http://localhost:5002/api/CrudHaver/post`);
+    const baseUrl = new URL(`http://localhost:5002/api/CrudHaver/POST`);
     baseUrl.searchParams.append("dataSource", String(dataSource));
 
     const res = await fetch(baseUrl, {
@@ -39,13 +39,15 @@ export class CrudHaver {
     return raw;
   }
   async patch(dataSource: null = null): Promise<HttpResult<void>> {
-    const baseUrl = new URL(`http://localhost:5002/api/CrudHaver/patch`);
+    const baseUrl = new URL(`http://localhost:5002/api/CrudHaver/PATCH`);
     baseUrl.searchParams.append("dataSource", String(dataSource));
 
     const res = await fetch(baseUrl, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(this)
+      body: {
+        obj: JSON.stringify(this)
+      }
     });
 
     let raw = await res.json();
@@ -57,7 +59,7 @@ export class CrudHaver {
     return raw;
   }
   static async get(id: number, dataSource: null = null): Promise<HttpResult<CrudHaver>> {
-    const baseUrl = new URL(`http://localhost:5002/api/CrudHaver/get`);
+    const baseUrl = new URL(`http://localhost:5002/api/CrudHaver/GET`);
     baseUrl.searchParams.append("dataSource", String(dataSource));
     baseUrl.searchParams.append("id", String(id));
 
@@ -72,7 +74,7 @@ export class CrudHaver {
     return raw;
   }
   static async list(dataSource: null = null): Promise<HttpResult<CrudHaver[]>> {
-    const baseUrl = new URL(`http://localhost:5002/api/CrudHaver/list`);
+    const baseUrl = new URL(`http://localhost:5002/api/CrudHaver/LIST`);
     baseUrl.searchParams.append("dataSource", String(dataSource));
 
     const res = await fetch(baseUrl, { method: "GET" });

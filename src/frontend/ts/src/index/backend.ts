@@ -1,11 +1,7 @@
 import { D1Database } from "@cloudflare/workers-types/experimental/index.js";
 import { CrudKind, Either, left, right } from "../common.js";
-import {
-  RuntimeContainer,
-  WasmResource,
-  fromSql,
-  invokeWasm,
-} from "../runtime/runtime.js";
+import { RuntimeContainer } from "../runtime/runtime.js";
+import { WasmResource, fromSql, invokeRuntimeWasm } from "../runtime/wasm.js";
 
 export { cloesce } from "../runtime/runtime.js";
 export type { HttpResult, Either, DeepPartial } from "../common.js";
@@ -107,7 +103,7 @@ export class Orm {
       WasmResource.fromString(JSON.stringify(newModel), wasm),
       WasmResource.fromString(JSON.stringify(includeTree), wasm),
     ];
-    return invokeWasm(wasm.upsert_model, args, wasm);
+    return invokeRuntimeWasm(wasm.upsert_model, args, wasm);
   }
 
   /**

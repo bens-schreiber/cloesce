@@ -1,7 +1,4 @@
-import {
-  D1Database,
-  D1Result,
-} from "@cloudflare/workers-types/experimental/index.js";
+import { D1Database } from "@cloudflare/workers-types/experimental/index.js";
 import {
   HttpResult,
   Either,
@@ -15,10 +12,8 @@ import {
   getNavigationPropertyCidlType,
   CidlIncludeTree,
 } from "../common.js";
-import { IncludeTree } from "../index/backend.js";
-
-// Requires the rust runtime binary to have been built
-import mod from "../runtime.wasm";
+import { RuntimeWasmExports, fromSql, loadRuntimeWasm } from "./wasm.js";
+import { CrudWrapper } from "./crud.js";
 
 /**
  * Map of model names to their respective constructor.
@@ -58,62 +53,6 @@ interface MetaWranglerEnv {
 }
 
 /**
- * WASM ABI
- */
-interface RuntimeWasmExports {
-  memory: WebAssembly.Memory;
-  get_return_len(): number;
-  get_return_ptr(): number;
-  set_meta_ptr(ptr: number, len: number): number;
-  alloc(len: number): number;
-  dealloc(ptr: number, len: number): void;
-
-  object_relational_mapping(
-    model_name_ptr: number,
-    model_name_len: number,
-    sql_rows_ptr: number,
-    sql_rows_len: number,
-    include_tree_ptr: number,
-    include_tree_len: number
-  ): boolean;
-
-  upsert_model(
-    model_name_ptr: number,
-    model_name_len: number,
-    new_model_ptr: number,
-    new_model_len: number,
-    include_tree_ptr: number,
-    include_tree_len: number
-  ): boolean;
-}
-
-/**
- * RAII for wasm memory
- */
-export class WasmResource {
-  constructor(
-    private wasm: RuntimeWasmExports,
-    public ptr: number,
-    public len: number
-  ) {}
-  free() {
-    this.wasm.dealloc(this.ptr, this.len);
-  }
-
-  /**
-   * Copies a value from TS memory to WASM memory. A subsequent `free` is necessary.
-   */
-  static fromString(str: string, wasm: RuntimeWasmExports): WasmResource {
-    const encoder = new TextEncoder();
-    const bytes = encoder.encode(str);
-    const ptr = wasm.alloc(bytes.length);
-    const mem = new Uint8Array(wasm.memory.buffer, ptr, bytes.length);
-    mem.set(bytes);
-    return new this(wasm, ptr, bytes.length);
-  }
-}
-
-/**
  * Singleton instances of the cidl, constructor registry, and wasm binary.
  * These values are guaranteed to never change throughout a program lifetime.
  */
@@ -134,127 +73,12 @@ export class RuntimeContainer {
       return;
     }
 
-    // Load WASM
-    const wasmInstance = (wasm ??
-      (await WebAssembly.instantiate(mod))) as WebAssembly.Instance & {
-      exports: RuntimeWasmExports;
-    };
-
-    const modelMeta = WasmResource.fromString(
-      JSON.stringify(ast.models),
-      wasmInstance.exports
-    );
-
-    if (wasmInstance.exports.set_meta_ptr(modelMeta.ptr, modelMeta.len) != 0) {
-      modelMeta.free();
-      throw Error("The WASM Module failed to load due to an invalid CIDL");
-    }
-
-    // Intentionally leak `modelMeta`, it should exist for the programs lifetime.
-    this.instance = new RuntimeContainer(
-      ast,
-      constructorRegistry,
-      wasmInstance.exports
-    );
+    const wasmAbi = await loadRuntimeWasm(ast, wasm);
+    this.instance = new RuntimeContainer(ast, constructorRegistry, wasmAbi);
   }
 
   static get(): RuntimeContainer {
     return this.instance!;
-  }
-}
-
-/**
- * Helper for invoking the WASM runtime
- */
-export function invokeWasm<T>(
-  fn: (...args: number[]) => boolean,
-  args: WasmResource[],
-  wasm: RuntimeWasmExports
-): Either<string, T> {
-  let resPtr: number | undefined;
-  let resLen: number | undefined;
-
-  try {
-    const failed = fn(...args.flatMap((a) => [a.ptr, a.len]));
-    resPtr = wasm.get_return_ptr();
-    resLen = wasm.get_return_len();
-
-    const result = new TextDecoder().decode(
-      new Uint8Array(wasm.memory.buffer, resPtr, resLen)
-    );
-
-    return failed ? left(result) : right(result as T);
-  } finally {
-    args.forEach((a) => a.free());
-    if (resPtr && resLen) wasm.dealloc(resPtr, resLen);
-  }
-}
-
-/**
- * Calls the WASM runtime function `object_relational_mapping` to turn a row of SQL records into
- * an instantiated object.
- */
-export function fromSql<T extends object>(
-  ctor: new () => T,
-  records: Record<string, any>[],
-  includeTree: IncludeTree<T> | CidlIncludeTree | null
-): Either<string, T[]> {
-  const { ast, constructorRegistry, wasm } = RuntimeContainer.get();
-  const args = [
-    WasmResource.fromString(ctor.name, wasm),
-    WasmResource.fromString(JSON.stringify(records), wasm),
-    WasmResource.fromString(JSON.stringify(includeTree), wasm),
-  ];
-
-  const jsonResults = invokeWasm<string>(
-    wasm.object_relational_mapping,
-    args,
-    wasm
-  );
-  if (!jsonResults.ok) return jsonResults;
-
-  const parsed: any[] = JSON.parse(jsonResults.value);
-  return right(
-    parsed.map((obj: any) =>
-      instantiateDepthFirst(obj, ast.models[ctor.name], includeTree)
-    ) as T[]
-  );
-
-  function instantiateDepthFirst(
-    m: any,
-    meta: Model,
-    includeTree: IncludeTree<any> | null
-  ) {
-    m = Object.assign(new constructorRegistry[meta.name](), m);
-
-    if (!includeTree) {
-      return m;
-    }
-
-    for (const navProp of meta.navigation_properties) {
-      const nestedIncludeTree = includeTree[navProp.var_name];
-      if (!nestedIncludeTree) continue;
-
-      const nestedMeta = ast.models[navProp.model_name];
-      const value = m[navProp.var_name];
-
-      // One to Many, Many to Many
-      if (Array.isArray(value)) {
-        m[navProp.var_name] = value.map((child: any) =>
-          instantiateDepthFirst(child, nestedMeta, nestedIncludeTree)
-        );
-      }
-      // One to one
-      else if (value) {
-        m[navProp.var_name] = instantiateDepthFirst(
-          value,
-          nestedMeta,
-          nestedIncludeTree
-        );
-      }
-    }
-
-    return m;
   }
 }
 
@@ -275,25 +99,28 @@ export async function cloesce(
   await RuntimeContainer.init(ast, constructorRegistry);
   const d1: D1Database = instanceRegistry.get(envMeta.envName)[envMeta.dbName];
 
-  // Match the route to a model method
+  //#region Match the route to a model method
   const route = matchRoute(request, ast, api_route);
   if (!route.ok) {
     return toResponse(route.value);
   }
   const { method, model, id } = route.value;
+  //#endregion
 
-  // Validate request body to the model method
+  //#region Validate request body to the model method
   const validation = await validateRequest(request, ast, model, method, id);
   if (!validation.ok) {
     return toResponse(validation.value);
   }
   const { params, dataSource } = validation.value;
+  //#endregion
 
-  // Instantatiate the model
-  let instance: object;
-  if (method.is_static) {
-    instance = constructorRegistry[model.name];
-  } else {
+  //#region Instantatiate the model
+  const instance = await (async () => {
+    if (method.is_static) {
+      return right(new CrudWrapper(d1, constructorRegistry[model.name]));
+    }
+
     const hydratedModel = await hydrateModel(
       constructorRegistry,
       d1,
@@ -303,16 +130,27 @@ export async function cloesce(
     );
 
     if (!hydratedModel.ok) {
-      return toResponse(hydratedModel.value);
+      return hydratedModel;
     }
 
-    instance = hydratedModel.value;
+    return right(new CrudWrapper(d1, hydratedModel.value));
+  })();
+  if (!instance.ok) {
+    return toResponse(instance.value);
   }
+  //#endregion
 
-  // Dispatch a method on the model and return the result
+  //#region Dispatch a method on the model
   return toResponse(
-    await methodDispatch(instance, instanceRegistry, envMeta, method, params)
+    await methodDispatch(
+      instance.value,
+      instanceRegistry,
+      envMeta,
+      method,
+      params
+    )
   );
+  //#endregion
 }
 
 /**
@@ -358,7 +196,9 @@ function matchRoute(
     return notFound(`Unknown model ${modelName}`);
   }
 
-  const method = model.methods[methodName];
+  const method =
+    model.methods[methodName] ??
+    CrudWrapper.getModelMethod(methodName, model.name);
   if (!method) {
     return notFound(`Unknown method ${modelName}.${methodName}`);
   }
@@ -516,7 +356,7 @@ async function hydrateModel(
  * @returns 500 on an uncaught client error, 200 with a result body on success
  */
 async function methodDispatch(
-  instance: object,
+  instance: CrudWrapper,
   instanceRegistry: InstanceRegistry,
   envMeta: MetaWranglerEnv,
   method: ModelMethod,
@@ -553,7 +393,8 @@ async function methodDispatch(
   };
 
   try {
-    return resultWrapper(await (instance as any)[method.name](...paramArray));
+    const res = await instance.interceptCrud(method.name)(...paramArray);
+    return resultWrapper(res);
   } catch (e) {
     return uncaughtException(e);
   }
