@@ -1,0 +1,38 @@
+{
+    "version": "v0.0.3",
+    "project_name": "runner",
+    "language": "TypeScript",
+    "wrangler_env": {
+        "name": "Env",
+        "source_path": "./seed__crud.cloesce.ts"
+    },
+    "models": {
+        "CrudHaver": {
+            "name": "CrudHaver",
+            "attributes": [],
+            "primary_key": {
+                "name": "id",
+                "cidl_type": "Integer"
+            },
+            "navigation_properties": [],
+            "methods": {
+                "notCrud": {
+                    "name": "notCrud",
+                    "is_static": false,
+                    "http_verb": "POST",
+                    "return_type": "Void",
+                    "parameters": []
+                }
+            },
+            "cruds": [
+                "POST",
+                "PATCH",
+                "GET",
+                "LIST"
+            ],
+            "data_sources": {},
+            "source_path": "./seed__crud.cloesce.ts"
+        }
+    },
+    "poos": {}
+}

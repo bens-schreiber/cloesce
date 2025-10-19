@@ -54,6 +54,7 @@
                     ]
                 }
             },
+            "cruds": [],
             "data_sources": {},
             "source_path": "./seed__partial.cloesce.ts"
         }

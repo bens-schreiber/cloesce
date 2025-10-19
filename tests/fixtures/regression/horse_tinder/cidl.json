@@ -124,6 +124,7 @@
                     ]
                 }
             },
+            "cruds": [],
             "data_sources": {
                 "default": {
                     "name": "default",
@@ -176,6 +177,7 @@
                 }
             ],
             "methods": {},
+            "cruds": [],
             "data_sources": {},
             "source_path": "./seed__horse_tinder.cloesce.ts"
         }

@@ -11,9 +11,7 @@ export class Horse {
     dataSource: "default" | "withLikes" | null = null
   ): Promise<HttpResult<Horse>> {
     const baseUrl = new URL(`http://localhost:5002/api/Horse/get`);
-    if (dataSource) {
-      baseUrl.searchParams.append("dataSource", dataSource);
-    }
+    baseUrl.searchParams.append("dataSource", String(dataSource));
     baseUrl.searchParams.append('id', String(id));
     const res = await fetch(baseUrl, { method: "GET" });
     let raw = await res.json();
@@ -28,9 +26,7 @@ export class Horse {
     dataSource: "default" | "withLikes" | null = null
   ): Promise<HttpResult<void>> {
     const baseUrl = new URL(`http://localhost:5002/api/Horse/${this.id}/like`);
-    if (dataSource) {
-      baseUrl.searchParams.append("dataSource", dataSource);
-    }
+    baseUrl.searchParams.append("dataSource", String(dataSource));
     const res = await fetch(baseUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -48,9 +44,7 @@ export class Horse {
     dataSource: "default" | "withLikes" | null = null
   ): Promise<HttpResult<Horse[]>> {
     const baseUrl = new URL(`http://localhost:5002/api/Horse/list`);
-    if (dataSource) {
-      baseUrl.searchParams.append("dataSource", dataSource);
-    }
+    baseUrl.searchParams.append("dataSource", String(dataSource));
     const res = await fetch(baseUrl, { method: "GET" });
     let raw = await res.json();
     if (!res.ok) {
@@ -64,9 +58,7 @@ export class Horse {
     dataSource: "default" | "withLikes" | null = null
   ): Promise<HttpResult<Horse>> {
     const baseUrl = new URL(`http://localhost:5002/api/Horse/post`);
-    if (dataSource) {
-      baseUrl.searchParams.append("dataSource", dataSource);
-    }
+    baseUrl.searchParams.append("dataSource", String(dataSource));
     const res = await fetch(baseUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },

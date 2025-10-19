@@ -74,7 +74,7 @@ interface RuntimeWasmExports {
     sql_rows_ptr: number,
     sql_rows_len: number,
     include_tree_ptr: number,
-    include_tree_len: number,
+    include_tree_len: number
   ): boolean;
 
   upsert_model(
@@ -83,7 +83,7 @@ interface RuntimeWasmExports {
     new_model_ptr: number,
     new_model_len: number,
     include_tree_ptr: number,
-    include_tree_len: number,
+    include_tree_len: number
   ): boolean;
 }
 
@@ -94,7 +94,7 @@ export class WasmResource {
   constructor(
     private wasm: RuntimeWasmExports,
     public ptr: number,
-    public len: number,
+    public len: number
   ) {}
   free() {
     this.wasm.dealloc(this.ptr, this.len);
@@ -122,13 +122,13 @@ export class RuntimeContainer {
   private constructor(
     public readonly ast: CloesceAst,
     public readonly constructorRegistry: ModelConstructorRegistry,
-    public readonly wasm: RuntimeWasmExports,
+    public readonly wasm: RuntimeWasmExports
   ) {}
 
   static async init(
     ast: CloesceAst,
     constructorRegistry: ModelConstructorRegistry,
-    wasm?: WebAssembly.Instance,
+    wasm?: WebAssembly.Instance
   ) {
     if (this.instance) {
       return;
@@ -142,7 +142,7 @@ export class RuntimeContainer {
 
     const modelMeta = WasmResource.fromString(
       JSON.stringify(ast.models),
-      wasmInstance.exports,
+      wasmInstance.exports
     );
 
     if (wasmInstance.exports.set_meta_ptr(modelMeta.ptr, modelMeta.len) != 0) {
@@ -154,7 +154,7 @@ export class RuntimeContainer {
     this.instance = new RuntimeContainer(
       ast,
       constructorRegistry,
-      wasmInstance.exports,
+      wasmInstance.exports
     );
   }
 
@@ -169,7 +169,7 @@ export class RuntimeContainer {
 export function invokeWasm<T>(
   fn: (...args: number[]) => boolean,
   args: WasmResource[],
-  wasm: RuntimeWasmExports,
+  wasm: RuntimeWasmExports
 ): Either<string, T> {
   let resPtr: number | undefined;
   let resLen: number | undefined;
@@ -180,7 +180,7 @@ export function invokeWasm<T>(
     resLen = wasm.get_return_len();
 
     const result = new TextDecoder().decode(
-      new Uint8Array(wasm.memory.buffer, resPtr, resLen),
+      new Uint8Array(wasm.memory.buffer, resPtr, resLen)
     );
 
     return failed ? left(result) : right(result as T);
@@ -197,7 +197,7 @@ export function invokeWasm<T>(
 export function fromSql<T extends object>(
   ctor: new () => T,
   records: Record<string, any>[],
-  includeTree: IncludeTree<T> | CidlIncludeTree | null,
+  includeTree: IncludeTree<T> | CidlIncludeTree | null
 ): Either<string, T[]> {
   const { ast, constructorRegistry, wasm } = RuntimeContainer.get();
   const args = [
@@ -209,21 +209,21 @@ export function fromSql<T extends object>(
   const jsonResults = invokeWasm<string>(
     wasm.object_relational_mapping,
     args,
-    wasm,
+    wasm
   );
   if (!jsonResults.ok) return jsonResults;
 
   const parsed: any[] = JSON.parse(jsonResults.value);
   return right(
     parsed.map((obj: any) =>
-      instantiateDepthFirst(obj, ast.models[ctor.name], includeTree),
-    ) as T[],
+      instantiateDepthFirst(obj, ast.models[ctor.name], includeTree)
+    ) as T[]
   );
 
   function instantiateDepthFirst(
     m: any,
     meta: Model,
-    includeTree: IncludeTree<any> | null,
+    includeTree: IncludeTree<any> | null
   ) {
     m = Object.assign(new constructorRegistry[meta.name](), m);
 
@@ -241,7 +241,7 @@ export function fromSql<T extends object>(
       // One to Many, Many to Many
       if (Array.isArray(value)) {
         m[navProp.var_name] = value.map((child: any) =>
-          instantiateDepthFirst(child, nestedMeta, nestedIncludeTree),
+          instantiateDepthFirst(child, nestedMeta, nestedIncludeTree)
         );
       }
       // One to one
@@ -249,7 +249,7 @@ export function fromSql<T extends object>(
         m[navProp.var_name] = instantiateDepthFirst(
           value,
           nestedMeta,
-          nestedIncludeTree,
+          nestedIncludeTree
         );
       }
     }
@@ -270,7 +270,7 @@ export async function cloesce(
   constructorRegistry: ModelConstructorRegistry,
   instanceRegistry: InstanceRegistry,
   envMeta: MetaWranglerEnv,
-  api_route: string,
+  api_route: string
 ): Promise<Response> {
   await RuntimeContainer.init(ast, constructorRegistry);
   const d1: D1Database = instanceRegistry.get(envMeta.envName)[envMeta.dbName];
@@ -299,7 +299,7 @@ export async function cloesce(
       d1,
       model,
       id!,
-      dataSource,
+      dataSource
     );
 
     if (!hydratedModel.ok) {
@@ -311,7 +311,7 @@ export async function cloesce(
 
   // Dispatch a method on the model and return the result
   return toResponse(
-    await methodDispatch(instance, instanceRegistry, envMeta, method, params),
+    await methodDispatch(instance, instanceRegistry, envMeta, method, params)
   );
 }
 
@@ -323,7 +323,7 @@ export async function cloesce(
 function matchRoute(
   request: Request,
   ast: CloesceAst,
-  api_route: string,
+  api_route: string
 ): Either<
   HttpResult,
   {
@@ -384,7 +384,7 @@ async function validateRequest(
   ast: CloesceAst,
   model: Model,
   method: ModelMethod,
-  id: string | null,
+  id: string | null
 ): Promise<
   Either<HttpResult, { params: RequestParamMap; dataSource: string | null }>
 > {
@@ -404,12 +404,15 @@ async function validateRequest(
         typeof p.cidl_type === "object" &&
         p.cidl_type !== null &&
         "Inject" in p.cidl_type
-      ),
+      )
   );
 
   // Extract data source
   const url = new URL(request.url);
   let dataSource = url.searchParams.get("dataSource");
+  if (dataSource === "null") {
+    dataSource = null;
+  }
 
   // Extract url or body parameters
   let params: RequestParamMap;
@@ -459,7 +462,7 @@ async function hydrateModel(
   d1: D1Database,
   model: Model,
   id: string,
-  dataSource: string | null,
+  dataSource: string | null
 ): Promise<Either<HttpResult, object>> {
   // Error state: If the D1 database has been tweaked outside of Cloesce
   // resulting in a malformed query, exit with a 500.
@@ -467,8 +470,8 @@ async function hydrateModel(
     left(
       errorState(
         500,
-        `Error in hydration query, is the database out of sync with the backend?: ${e instanceof Error ? e.message : String(e)}`,
-      ),
+        `Error in hydration query, is the database out of sync with the backend?: ${e instanceof Error ? e.message : String(e)}`
+      )
     );
 
   // Error state: If no record is found for the id, return a 404
@@ -502,7 +505,7 @@ async function hydrateModel(
   const models: object[] = fromSql(
     constructorRegistry[model.name],
     records.results,
-    includeTree,
+    includeTree
   ).value as object[];
 
   return right(models[0]);
@@ -517,13 +520,13 @@ async function methodDispatch(
   instanceRegistry: InstanceRegistry,
   envMeta: MetaWranglerEnv,
   method: ModelMethod,
-  params: Record<string, unknown>,
+  params: Record<string, unknown>
 ): Promise<HttpResult<unknown>> {
   // Error state: Client code ran into an uncaught exception.
   const uncaughtException = (e: any) =>
     errorState(
       500,
-      `Uncaught exception in method dispatch: ${e instanceof Error ? e.message : String(e)}`,
+      `Uncaught exception in method dispatch: ${e instanceof Error ? e.message : String(e)}`
     );
 
   // For now, the only injected dependency is the wrangler env,
@@ -531,7 +534,7 @@ async function methodDispatch(
   const paramArray = method.parameters.map((p) =>
     params[p.name] == undefined
       ? instanceRegistry.get(envMeta.envName)
-      : params[p.name],
+      : params[p.name]
   );
 
   // Ensure the result is always some HttpResult
@@ -560,12 +563,12 @@ function validateCidlType(
   ast: CloesceAst,
   value: unknown,
   cidlType: CidlType,
-  is_partial: boolean,
+  is_partial: boolean
 ): boolean {
   if (value === undefined) return is_partial;
 
   // TODO: consequences of null checking like this? 'null' is passed in
-  // as a string for GET requests...
+  // as a string for GET requests
   const nullable = isNullableType(cidlType);
   if (value == null || value === "null") return nullable;
 
@@ -609,8 +612,8 @@ function validateCidlType(
           ast,
           valueObj[attr.value.name],
           attr.value.cidl_type,
-          is_partial,
-        ),
+          is_partial
+        )
       )
     ) {
       return false;
@@ -626,7 +629,7 @@ function validateCidlType(
           ast,
           navValue,
           getNavigationPropertyCidlType(nav),
-          is_partial,
+          is_partial
         )
       );
     });
@@ -641,7 +644,7 @@ function validateCidlType(
     // Validate attributes
     if (
       !poo.attributes.every((attr) =>
-        validateCidlType(ast, valueObj[attr.name], attr.cidl_type, is_partial),
+        validateCidlType(ast, valueObj[attr.name], attr.cidl_type, is_partial)
       )
     ) {
       return false;
