@@ -1,7 +1,7 @@
-# Common runtime (ensure wasm is installed, `rustup target add wasm32-unknown-unknown`)
-cd ./runtime
+# ORM (ensure wasm is installed, `rustup target add wasm32-unknown-unknown`)
+cd ./frontend/orm
 cargo build --target wasm32-unknown-unknown --release
-cd ..
+cd ../..
 
 # Generator (ensure wasi is installed, `rustup target add wasm32-wasip1`)
 cd ./generator

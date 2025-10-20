@@ -9,8 +9,8 @@
     "format:fix": "prettier --write .",
     "format": "prettier --check .",
     "typecheck": "tsc --noEmit",
-    "build": "tsc -p tsconfig.json && npm run copy-rs-runtime-wasm && npm run copy-generator-wasm",
-    "copy-rs-runtime-wasm": "cp ../../runtime/target/wasm32-unknown-unknown/release/runtime.wasm ./dist/runtime.wasm",
+    "build": "tsc -p tsconfig.json && npm run copy-rs-orm-wasm && npm run copy-generator-wasm",
+    "copy-rs-orm-wasm": "cp ../orm/target/wasm32-unknown-unknown/release/orm.wasm ./dist/orm.wasm",
     "copy-generator-wasm": "cp ../../generator/target/wasm32-wasip1/release/cli.wasm ./dist/generator.wasm"
   },
   "dependencies": {
@@ -27,12 +27,12 @@
   },
   "exports": {
     "./client": {
-      "types": "./dist/index/client.d.ts",
-      "import": "./dist/index/client.js"
+      "types": "./dist/ui/client.d.ts",
+      "import": "./dist/ui/client.js"
     },
     "./backend": {
-      "types": "./dist/index/backend.d.ts",
-      "import": "./dist/index/backend.js"
+      "types": "./dist/ui/backend.d.ts",
+      "import": "./dist/ui/backend.js"
     }
   },
   "bin": {
@@ -41,10 +41,10 @@
   "typesVersions": {
     "*": {
       "backend": [
-        "dist/index/backend.d.ts"
+        "dist/ui/backend.d.ts"
       ],
       "client": [
-        "dist/index/client.d.ts"
+        "dist/ui/client.d.ts"
       ]
     }
   },

@@ -10,9 +10,7 @@ export class A {
     dataSource: "withB" | "withoutB" | null = null
   ): Promise<HttpResult<A>> {
     const baseUrl = new URL(`http://localhost:5002/api/A/post`);
-    if (dataSource) {
-      baseUrl.searchParams.append("dataSource", dataSource);
-    }
+    baseUrl.searchParams.append("dataSource", String(dataSource));
     const res = await fetch(baseUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -31,9 +29,7 @@ export class A {
     dataSource: "withB" | "withoutB" | null = null
   ): Promise<HttpResult<A>> {
     const baseUrl = new URL(`http://localhost:5002/api/A/${this.id}/refresh`);
-    if (dataSource) {
-      baseUrl.searchParams.append("dataSource", dataSource);
-    }
+    baseUrl.searchParams.append("dataSource", String(dataSource));
     const res = await fetch(baseUrl, { method: "GET" });
     let raw = await res.json();
     if (!res.ok) {
@@ -66,9 +62,7 @@ export class Person {
     dataSource: "withDogs" | null = null
   ): Promise<HttpResult<Person>> {
     const baseUrl = new URL(`http://localhost:5002/api/Person/post`);
-    if (dataSource) {
-      baseUrl.searchParams.append("dataSource", dataSource);
-    }
+    baseUrl.searchParams.append("dataSource", String(dataSource));
     const res = await fetch(baseUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -87,9 +81,7 @@ export class Person {
     dataSource: "withDogs" | null = null
   ): Promise<HttpResult<Person>> {
     const baseUrl = new URL(`http://localhost:5002/api/Person/${this.id}/refresh`);
-    if (dataSource) {
-      baseUrl.searchParams.append("dataSource", dataSource);
-    }
+    baseUrl.searchParams.append("dataSource", String(dataSource));
     const res = await fetch(baseUrl, { method: "GET" });
     let raw = await res.json();
     if (!res.ok) {
@@ -108,9 +100,7 @@ export class Student {
     dataSource: "withCoursesStudents" | "withCoursesStudentsCourses" | null = null
   ): Promise<HttpResult<Student>> {
     const baseUrl = new URL(`http://localhost:5002/api/Student/post`);
-    if (dataSource) {
-      baseUrl.searchParams.append("dataSource", dataSource);
-    }
+    baseUrl.searchParams.append("dataSource", String(dataSource));
     const res = await fetch(baseUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -129,9 +119,7 @@ export class Student {
     dataSource: "withCoursesStudents" | "withCoursesStudentsCourses" | null = null
   ): Promise<HttpResult<Student>> {
     const baseUrl = new URL(`http://localhost:5002/api/Student/${this.id}/refresh`);
-    if (dataSource) {
-      baseUrl.searchParams.append("dataSource", dataSource);
-    }
+    baseUrl.searchParams.append("dataSource", String(dataSource));
     const res = await fetch(baseUrl, { method: "GET" });
     let raw = await res.json();
     if (!res.ok) {

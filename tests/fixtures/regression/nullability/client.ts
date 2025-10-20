@@ -11,9 +11,7 @@ export class NullabilityChecks {
     dataSource: null = null
   ): Promise<HttpResult<string[] | null>> {
     const baseUrl = new URL(`http://localhost:5002/api/NullabilityChecks/${this.id}/arrayTypes`);
-    if (dataSource) {
-      baseUrl.searchParams.append("dataSource", dataSource);
-    }
+    baseUrl.searchParams.append("dataSource", String(dataSource));
     const res = await fetch(baseUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -33,9 +31,7 @@ export class NullabilityChecks {
     dataSource: null = null
   ): Promise<HttpResult<NullabilityChecks[] | null | null>> {
     const baseUrl = new URL(`http://localhost:5002/api/NullabilityChecks/${this.id}/httpResultTypes`);
-    if (dataSource) {
-      baseUrl.searchParams.append("dataSource", dataSource);
-    }
+    baseUrl.searchParams.append("dataSource", String(dataSource));
     const res = await fetch(baseUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -53,9 +49,7 @@ export class NullabilityChecks {
     dataSource: null = null
   ): Promise<HttpResult<void>> {
     const baseUrl = new URL(`http://localhost:5002/api/NullabilityChecks/${this.id}/injectableTypes`);
-    if (dataSource) {
-      baseUrl.searchParams.append("dataSource", dataSource);
-    }
+    baseUrl.searchParams.append("dataSource", String(dataSource));
     const res = await fetch(baseUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -73,9 +67,7 @@ export class NullabilityChecks {
     dataSource: null = null
   ): Promise<HttpResult<NullabilityChecks | null>> {
     const baseUrl = new URL(`http://localhost:5002/api/NullabilityChecks/${this.id}/modelTypes`);
-    if (dataSource) {
-      baseUrl.searchParams.append("dataSource", dataSource);
-    }
+    baseUrl.searchParams.append("dataSource", String(dataSource));
     const res = await fetch(baseUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -95,9 +87,7 @@ export class NullabilityChecks {
     dataSource: null = null
   ): Promise<HttpResult<number>> {
     const baseUrl = new URL(`http://localhost:5002/api/NullabilityChecks/${this.id}/primitiveTypes`);
-    if (dataSource) {
-      baseUrl.searchParams.append("dataSource", dataSource);
-    }
+    baseUrl.searchParams.append("dataSource", String(dataSource));
     const res = await fetch(baseUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },

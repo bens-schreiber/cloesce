@@ -1,17 +1,20 @@
-import { describe, test, expect, vi } from "vitest";
-import { _cloesceInternal } from "../src/runtime/runtime";
-import { CloesceAst, HttpVerb, NamedTypedValue } from "../src/common";
-import { fromSql } from "../src/runtime/runtime";
+import { describe, test, expect, vi, beforeEach } from "vitest";
+import { _cloesceInternal } from "../src/router/router";
+import {
+  CloesceAst,
+  HttpVerb,
+  Model,
+  NULL_DATA_SOURCE,
+  NamedTypedValue,
+} from "../src/common";
+import { IncludeTree } from "../src/ui/backend";
+import { CrudContext } from "../src/router/crud";
+import { fromSql } from "../src/router/wasm";
 import fs from "fs";
 import path from "path";
-import { beforeEach } from "node:test";
-import { IncludeTree } from "../src/index/backend";
 
 const makeAst = (methods: Record<string, any>): CloesceAst => ({
-  wrangler_env: {
-    name: "",
-    source_path: "./",
-  },
+  wrangler_env: { name: "", source_path: "./" },
   version: "",
   project_name: "",
   language: "TypeScript",
@@ -19,12 +22,10 @@ const makeAst = (methods: Record<string, any>): CloesceAst => ({
     Horse: {
       name: "Horse",
       attributes: [],
-      primary_key: {
-        name: "_id",
-        cidl_type: "Integer",
-      },
+      primary_key: { name: "_id", cidl_type: "Integer" },
       navigation_properties: [],
       data_sources: {},
+      cruds: [],
       methods,
       source_path: "",
     },
@@ -33,31 +34,24 @@ const makeAst = (methods: Record<string, any>): CloesceAst => ({
 });
 
 const makeRequest = (url: string, method?: string, body?: any) =>
-  new Request(
-    url,
-    method ? { method, body: body && JSON.stringify(body) } : undefined,
-  );
+  new Request(url, {
+    method,
+    body: body && JSON.stringify(body),
+  });
 
-// Mock the wasm file
 beforeEach(() => {
-  vi.mock("../runtime.wasm", () => ({
-    default: new ArrayBuffer(0),
-  }));
+  vi.mock("../orm.wasm", () => ({ default: new ArrayBuffer(0) }));
 });
 
-//
-// Router Tests
-//
-
 describe("Router Error States", () => {
-  test("Router returns 404 on route missing model, method", () => {
-    const url = "http://foo.com/api";
+  const baseUrl = "http://foo.com/api";
+
+  test("404 on route missing model/method", () => {
     const result = _cloesceInternal.matchRoute(
-      makeRequest(url),
+      makeRequest(baseUrl),
       makeAst({}),
       "/api",
     );
-
     expect(result.value).toStrictEqual({
       ok: false,
       status: 404,
@@ -65,12 +59,13 @@ describe("Router Error States", () => {
     });
   });
 
-  test("Router returns 404 on unknown model", () => {
-    const url = "http://foo.com/api/Dog/woof";
-    const ast = makeAst({});
-
-    const result = _cloesceInternal.matchRoute(makeRequest(url), ast, "/api");
-
+  test("404 on unknown model", () => {
+    const url = `${baseUrl}/Dog/woof`;
+    const result = _cloesceInternal.matchRoute(
+      makeRequest(url),
+      makeAst({}),
+      "/api",
+    );
     expect(result.value).toStrictEqual({
       ok: false,
       status: 404,
@@ -78,12 +73,13 @@ describe("Router Error States", () => {
     });
   });
 
-  test("Router returns 404 on unknown method", () => {
-    const url = "http://foo.com/api/Horse/neigh";
-    const ast = makeAst({});
-
-    const result = _cloesceInternal.matchRoute(makeRequest(url), ast, "/api");
-
+  test("404 on unknown method", () => {
+    const url = `${baseUrl}/Horse/neigh`;
+    const result = _cloesceInternal.matchRoute(
+      makeRequest(url),
+      makeAst({}),
+      "/api",
+    );
     expect(result.value).toStrictEqual({
       ok: false,
       status: 404,
@@ -91,8 +87,8 @@ describe("Router Error States", () => {
     });
   });
 
-  test("Router returns 404 on mismatched HTTP verb", () => {
-    const url = "http://foo.com/api/Horse/0/neigh";
+  test("404 on mismatched HTTP verb", () => {
+    const url = `${baseUrl}/Horse/0/neigh`;
     const ast = makeAst({
       neigh: {
         name: "",
@@ -102,9 +98,7 @@ describe("Router Error States", () => {
         parameters: [],
       },
     });
-
     const result = _cloesceInternal.matchRoute(makeRequest(url), ast, "/api");
-
     expect(result.value).toStrictEqual({
       ok: false,
       status: 404,
@@ -125,10 +119,9 @@ describe("Router Success States", () => {
   };
   const ast = makeAst(methods);
 
-  test("Router returns model on static route", () => {
+  test("returns model on static route", () => {
     const url = "http://foo.com/api/Horse/neigh";
     const result = _cloesceInternal.matchRoute(makeRequest(url), ast, "/api");
-
     expect(result.value).toStrictEqual({
       model: ast.models.Horse,
       method: ast.models.Horse.methods.neigh,
@@ -136,10 +129,9 @@ describe("Router Success States", () => {
     });
   });
 
-  test("Router returns model on instantiated route", () => {
+  test("returns model on instantiated route", () => {
     const url = "http://foo.com/api/Horse/0/neigh";
     const result = _cloesceInternal.matchRoute(makeRequest(url), ast, "/api");
-
     expect(result.value).toStrictEqual({
       model: ast.models.Horse,
       method: ast.models.Horse.methods.neigh,
@@ -148,36 +140,31 @@ describe("Router Success States", () => {
   });
 });
 
-//
-// Validate Request Tests
-//
-
 describe("Validate Request Error States", () => {
-  test("Instantiated methods require id", async () => {
-    const request = makeRequest("http://foo.com/api/Horse/0/neigh");
+  const emptyAst: CloesceAst = {
+    models: {},
+    wrangler_env: { name: "", source_path: "./" },
+    version: "",
+    project_name: "",
+    language: "TypeScript",
+    poos: {},
+  };
+  const emptyModel: Model = {
+    name: "",
+    primary_key: { name: "", cidl_type: "Void" },
+    attributes: [],
+    navigation_properties: [],
+    methods: {},
+    cruds: [],
+    data_sources: {},
+    source_path: "",
+  };
 
+  test("instantiated methods require id", async () => {
     const result = await _cloesceInternal.validateRequest(
-      request,
-      {
-        models: {},
-        wrangler_env: { name: "", source_path: "./" },
-        version: "",
-        project_name: "",
-        language: "TypeScript",
-        poos: {},
-      },
-      {
-        name: "",
-        primary_key: {
-          name: "",
-          cidl_type: "Void",
-        },
-        attributes: [],
-        navigation_properties: [],
-        methods: {},
-        data_sources: {},
-        source_path: "",
-      },
+      makeRequest("http://foo.com/api/Horse/0/neigh"),
+      emptyAst,
+      emptyModel,
       {
         name: "",
         is_static: false,
@@ -196,31 +183,11 @@ describe("Validate Request Error States", () => {
     });
   });
 
-  test("Non-GET requests require JSON body", async () => {
-    const request = makeRequest("http://foo.com/api/Horse/0/neigh");
-
+  test("non-GET requests require JSON body", async () => {
     const result = await _cloesceInternal.validateRequest(
-      request,
-      {
-        models: {},
-        wrangler_env: { name: "", source_path: "./" },
-        version: "",
-        project_name: "",
-        language: "TypeScript",
-        poos: {},
-      },
-      {
-        name: "",
-        primary_key: {
-          name: "",
-          cidl_type: "Void",
-        },
-        attributes: [],
-        navigation_properties: [],
-        methods: {},
-        data_sources: {},
-        source_path: "",
-      },
+      makeRequest("http://foo.com/api/Horse/0/neigh"),
+      emptyAst,
+      emptyModel,
       {
         name: "",
         is_static: true,
@@ -238,7 +205,7 @@ describe("Validate Request Error States", () => {
     });
   });
 
-  const paramTests = [
+  test.each([
     { method: HttpVerb.POST, body: {}, message: "Missing parameters" },
     {
       method: HttpVerb.POST,
@@ -250,44 +217,39 @@ describe("Validate Request Error States", () => {
       query: "id=notNumber",
       message: "Invalid parameters",
     },
-  ];
+  ])("invalid params: $message", async ({ method, body, query, message }) => {
+    const url = query
+      ? `http://foo.com/api/Horse/neigh?${query}`
+      : "http://foo.com/api/Horse/neigh";
+    const request = makeRequest(url, method, body);
+    const ast = makeAst({
+      neigh: {
+        name: "neigh",
+        is_static: true,
+        http_verb: method,
+        return_type: null,
+        parameters: [{ name: "id", cidl_type: "Integer", nullable: false }],
+      },
+    });
 
-  test.each(paramTests)(
-    "Request validation: $message",
-    async ({ method, body, query, message }) => {
-      const url = query
-        ? `http://foo.com/api/Horse/neigh?${query}`
-        : "http://foo.com/api/Horse/neigh";
-      const request = makeRequest(url, method, body);
-      const ast = makeAst({
-        neigh: {
-          name: "neigh",
-          is_static: true,
-          http_verb: method,
-          return_type: null,
-          parameters: [{ name: "id", cidl_type: "Integer", nullable: false }],
-        },
-      });
+    const result = await _cloesceInternal.validateRequest(
+      request,
+      ast,
+      ast.models.Horse,
+      ast.models.Horse.methods.neigh,
+      "0",
+    );
 
-      const result = await _cloesceInternal.validateRequest(
-        request,
-        ast,
-        ast.models.Horse,
-        ast.models.Horse.methods.neigh,
-        "0",
-      );
-
-      expect(result.value).toStrictEqual({
-        ok: false,
-        status: 400,
-        message: `Invalid Request Body: ${message}.`,
-      });
-    },
-  );
+    expect(result.value).toStrictEqual({
+      ok: false,
+      status: 400,
+      message: `Invalid Request Body: ${message}.`,
+    });
+  });
 });
 
 describe("Validate Request Success States", () => {
-  const input: { typed_value: NamedTypedValue; value: any }[] = [
+  const inputs: { typed_value: NamedTypedValue; value: any }[] = [
     { typed_value: { name: "id", cidl_type: "Integer" }, value: "1" },
     { typed_value: { name: "lastName", cidl_type: "Text" }, value: "pumpkin" },
     { typed_value: { name: "gpa", cidl_type: "Real" }, value: "4.0" },
@@ -301,11 +263,11 @@ describe("Validate Request Success States", () => {
     },
   ];
 
-  const expanded = input.flatMap((i) =>
-    [true, false].flatMap((is_get) =>
+  const expanded = inputs.flatMap((i) =>
+    [true, false].flatMap((isGet) =>
       [true, false].map((nullable) => ({
         ...i,
-        is_get: is_get && typeof i.typed_value.cidl_type === "string", // TODO: rm when models can be in GET req
+        isGet: isGet && typeof i.typed_value.cidl_type === "string",
         value: nullable ? null : i.value,
         typed_value: {
           ...i.typed_value,
@@ -317,20 +279,20 @@ describe("Validate Request Success States", () => {
     ),
   );
 
-  test.each(expanded)("input is accepted %#", async (arg) => {
-    const url = arg.is_get
+  test.each(expanded)("accepts valid input %#", async (arg) => {
+    const url = arg.isGet
       ? `http://foo.com/api/Horse/neigh?${arg.typed_value.name}=${arg.value}`
       : "http://foo.com/api/Horse/neigh";
     const request = makeRequest(
       url,
-      arg.is_get ? undefined : "POST",
-      arg.is_get ? undefined : { [arg.typed_value.name]: arg.value },
+      arg.isGet ? undefined : "POST",
+      arg.isGet ? undefined : { [arg.typed_value.name]: arg.value },
     );
     const ast = makeAst({
       neigh: {
         name: "neigh",
         is_static: true,
-        http_verb: arg.is_get ? HttpVerb.GET : HttpVerb.POST,
+        http_verb: arg.isGet ? HttpVerb.GET : HttpVerb.POST,
         return_type: null,
         parameters: [
           arg.typed_value,
@@ -349,16 +311,13 @@ describe("Validate Request Success States", () => {
 
     expect(result.value).toEqual({
       params: {
-        [arg.typed_value.name]: arg.is_get ? String(arg.value) : arg.value,
+        [arg.typed_value.name]: arg.isGet ? String(arg.value) : arg.value,
+        dataSource: arg.isGet ? undefined : NULL_DATA_SOURCE,
       },
-      dataSource: null,
+      dataSource: NULL_DATA_SOURCE,
     });
   });
 });
-
-//
-// methodDispatch Tests
-//
 
 describe("methodDispatch", () => {
   const makeMethod = (overrides: Partial<any> = {}) => ({
@@ -370,138 +329,105 @@ describe("methodDispatch", () => {
     ...overrides,
   });
 
-  const makeMockD1 = (): any => ({
+  const makeMockD1 = () => ({
     prepare: vi.fn(),
     batch: vi.fn(),
     exec: vi.fn(),
     withSession: vi.fn(),
     dump: vi.fn(),
   });
-
   const envMeta = { envName: "Env", dbName: "db" };
+  const makeRegistry = () => new Map([["Env", { db: makeMockD1() }]]);
 
-  const makeInstanceRegistry = () => new Map([["Env", { db: makeMockD1() }]]);
-
-  test("returns 200 with no data when return_type is null", async () => {
+  test("returns 200 with no data when return_type null", async () => {
     const instance = { testMethod: vi.fn().mockResolvedValue("ignored") };
-    const method = makeMethod({ return_type: null });
-    const params = {};
-
     const result = await _cloesceInternal.methodDispatch(
-      instance,
-      makeInstanceRegistry(),
+      CrudContext.fromInstance(makeMockD1(), instance, vi.fn()),
+      makeRegistry(),
       envMeta,
-      method,
-      params,
+      makeMethod(),
+      {},
     );
-
-    expect(instance.testMethod).toHaveBeenCalledWith();
+    expect(instance.testMethod).toHaveBeenCalled();
     expect(result).toStrictEqual({ ok: true, status: 200 });
   });
 
-  test("wraps result in HttpResult when return_type is { HttpResult }", async () => {
+  test("wraps result when return_type { HttpResult }", async () => {
     const instance = {
       testMethod: vi
         .fn()
-        .mockResolvedValue({ ok: true, status: 200, data: "already wrapped" }),
+        .mockResolvedValue({ ok: true, status: 200, data: "wrapped" }),
     };
-    const method = makeMethod({ return_type: { HttpResult: null } });
-    const params = {};
-
     const result = await _cloesceInternal.methodDispatch(
-      instance,
-      makeInstanceRegistry(),
+      CrudContext.fromInstance(makeMockD1(), instance, vi.fn()),
+      makeRegistry(),
       envMeta,
-      method,
-      params,
+      makeMethod({ return_type: { HttpResult: null } }),
+      {},
     );
-
-    expect(result).toStrictEqual({
-      ok: true,
-      status: 200,
-      data: "already wrapped",
-    });
+    expect(result).toStrictEqual({ ok: true, status: 200, data: "wrapped" });
   });
 
-  test("wraps raw value when return_type is a value type", async () => {
+  test("wraps raw value when return_type is value type", async () => {
     const instance = { testMethod: vi.fn().mockResolvedValue("neigh") };
-    const method = makeMethod({ return_type: "Text" });
-    const params = {};
-
     const result = await _cloesceInternal.methodDispatch(
-      instance,
-      makeInstanceRegistry(),
+      CrudContext.fromInstance(makeMockD1(), instance, vi.fn()),
+      makeRegistry(),
       envMeta,
-      method,
-      params,
+      makeMethod({ return_type: "Text" }),
+      {},
     );
-
     expect(result).toStrictEqual({ ok: true, status: 200, data: "neigh" });
   });
 
-  test("supplies d1 as default param when missing in params", async () => {
+  test("injects default d1 param", async () => {
     const instance = { testMethod: vi.fn().mockResolvedValue("used d1") };
-    const method = makeMethod({
-      return_type: "Text",
-      parameters: [{ name: "database" }],
-    });
-    const params = {};
-    let ireg = makeInstanceRegistry();
-
+    const ireg = makeRegistry();
     const result = await _cloesceInternal.methodDispatch(
-      instance,
+      CrudContext.fromInstance(makeMockD1(), instance, vi.fn()),
       ireg,
       envMeta,
-      method,
-      params,
+      makeMethod({ return_type: "Text", parameters: [{ name: "database" }] }),
+      {},
     );
-
     expect(instance.testMethod).toHaveBeenCalledWith(ireg.get("Env"));
     expect(result).toStrictEqual({ ok: true, status: 200, data: "used d1" });
   });
 
-  test("returns 500 on thrown Error", async () => {
-    const instance = {
+  test("handles thrown errors", async () => {
+    const errInstance = {
       testMethod: vi.fn().mockImplementation(() => {
         throw new Error("boom");
       }),
     };
-    const method = makeMethod({ return_type: "Text" });
-    const params = {};
-
-    const result = await _cloesceInternal.methodDispatch(
-      instance,
-      makeInstanceRegistry(),
-      envMeta,
-      method,
-      params,
-    );
-
-    expect(result).toStrictEqual({
-      ok: false,
-      status: 500,
-      message: "Uncaught exception in method dispatch: boom",
-    });
-  });
-
-  test("returns 500 on thrown non-Error value", async () => {
-    const instance = {
+    const strInstance = {
       testMethod: vi.fn().mockImplementation(() => {
         throw "stringError";
       }),
     };
+    const ctx = CrudContext.fromInstance(makeMockD1(), errInstance, vi.fn());
     const method = makeMethod({ return_type: "Text" });
-    const params = {};
-
-    const result = await _cloesceInternal.methodDispatch(
-      instance,
-      makeInstanceRegistry(),
+    const result1 = await _cloesceInternal.methodDispatch(
+      ctx,
+      makeRegistry(),
       envMeta,
       method,
-      params,
+      {},
+    );
+    const result2 = await _cloesceInternal.methodDispatch(
+      CrudContext.fromInstance(makeMockD1(), strInstance, vi.fn()),
+      makeRegistry(),
+      envMeta,
+      method,
+      {},
     );
 
-    expect(result).toStrictEqual({
+    expect(result1).toStrictEqual({
+      ok: false,
+      status: 500,
+      message: "Uncaught exception in method dispatch: boom",
+    });
+    expect(result2).toStrictEqual({
       ok: false,
       status: 500,
       message: "Uncaught exception in method dispatch: stringError",
@@ -509,21 +435,16 @@ describe("methodDispatch", () => {
   });
 });
 
-//
-// modelsFromSql Tests
-//
 describe("modelsFromSql", () => {
-  // We are really just testing the recursive instantiation here, modelsFromSql
-  // does plentiful unit tests inside of the Rust project
   test("handles recursive navigation properties", async () => {
-    // Arrange
-    const wasmPath = path.resolve("./dist/runtime.wasm");
-    const wasm = await WebAssembly.instantiate(fs.readFileSync(wasmPath), {});
+    const wasm = await WebAssembly.instantiate(
+      fs.readFileSync(path.resolve("./dist/orm.wasm")),
+      {},
+    );
 
     const modelName = "Horse";
     const likeModelName = "Like";
-
-    const constructorRegistry = {
+    const ctor = {
       [modelName]: class {
         id?: string;
         name?: string;
@@ -563,6 +484,7 @@ describe("modelsFromSql", () => {
           primary_key: { name: "id", cidl_type: "Integer" },
           data_sources: {},
           methods: {},
+          cruds: [],
           source_path: "",
         },
         [likeModelName]: {
@@ -587,6 +509,7 @@ describe("modelsFromSql", () => {
           primary_key: { name: "id", cidl_type: "Integer" },
           data_sources: {},
           methods: {},
+          cruds: [],
           source_path: "",
         },
       },
@@ -596,13 +519,8 @@ describe("modelsFromSql", () => {
       poos: {},
     };
 
-    await _cloesceInternal.RuntimeContainer.init(
-      ast,
-      constructorRegistry,
-      wasm.instance,
-    );
+    await _cloesceInternal.RuntimeContainer.init(ast, ctor, wasm.instance);
 
-    // Simulate a view result with nested data: Horse -> likes (Like[]) -> horse2 (Horse)
     const records = [
       {
         "Horse.id": "1",
@@ -628,48 +546,29 @@ describe("modelsFromSql", () => {
       },
     ];
 
-    const includeTree: IncludeTree<any> = {
-      likes: {
-        horse2: {},
-      },
-    };
+    const includeTree: IncludeTree<any> = { likes: { horse2: {} } };
+    const result = fromSql(ctor[modelName], records, includeTree);
 
-    // Act
-    const result = fromSql(
-      constructorRegistry[modelName],
-      records,
-      includeTree,
-    );
-
-    // Assert
     expect(result.value.length).toBe(1);
-
     const horse: any = result.value[0];
-    expect(horse.id).toBe("1");
-    expect(horse.name).toBe("Lightning");
-    expect(horse.bio).toBe("Fast horse");
-
-    expect(Array.isArray(horse.likes)).toBe(true);
-    expect(horse.likes.length).toBe(2);
-
-    const like1 = horse.likes[0];
-    expect(like1.id).toBe("10");
-    expect(like1.horseId1).toBe("1");
-    expect(like1.horseId2).toBe("2");
-
-    expect(like1.horse2).toBeDefined();
-    expect(like1.horse2.id).toBe("2");
-    expect(like1.horse2.name).toBe("Thunder");
-    expect(like1.horse2.bio).toBe("Strong horse");
-
-    const like2 = horse.likes[1];
-    expect(like2.id).toBe("11");
-    expect(like2.horseId1).toBe("1");
-    expect(like2.horseId2).toBe("3");
-
-    expect(like2.horse2).toBeDefined();
-    expect(like2.horse2.id).toBe("3");
-    expect(like2.horse2.name).toBe("Storm");
-    expect(like2.horse2.bio).toBeNull();
+    expect(horse).toMatchObject({
+      id: "1",
+      name: "Lightning",
+      bio: "Fast horse",
+      likes: [
+        {
+          id: "10",
+          horseId1: "1",
+          horseId2: "2",
+          horse2: { id: "2", name: "Thunder", bio: "Strong horse" },
+        },
+        {
+          id: "11",
+          horseId1: "1",
+          horseId2: "3",
+          horse2: { id: "3", name: "Storm", bio: null },
+        },
+      ],
+    });
   });
 });

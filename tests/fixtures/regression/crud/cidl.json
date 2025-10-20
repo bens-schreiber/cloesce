@@ -1,0 +1,132 @@
+{
+    "version": "v0.0.3",
+    "project_name": "runner",
+    "language": "TypeScript",
+    "wrangler_env": {
+        "name": "Env",
+        "source_path": "./seed__crud.cloesce.ts"
+    },
+    "models": {
+        "CrudHaver": {
+            "name": "CrudHaver",
+            "attributes": [
+                {
+                    "foreign_key_reference": null,
+                    "value": {
+                        "name": "name",
+                        "cidl_type": "Text"
+                    }
+                }
+            ],
+            "primary_key": {
+                "name": "id",
+                "cidl_type": "Integer"
+            },
+            "navigation_properties": [],
+            "methods": {
+                "notCrud": {
+                    "name": "notCrud",
+                    "is_static": false,
+                    "http_verb": "POST",
+                    "return_type": "Void",
+                    "parameters": []
+                }
+            },
+            "cruds": [
+                "POST",
+                "PATCH",
+                "GET",
+                "LIST"
+            ],
+            "data_sources": {},
+            "source_path": "./seed__crud.cloesce.ts"
+        },
+        "Parent": {
+            "name": "Parent",
+            "attributes": [
+                {
+                    "foreign_key_reference": "Child",
+                    "value": {
+                        "name": "favoriteChildId",
+                        "cidl_type": {
+                            "Nullable": "Integer"
+                        }
+                    }
+                }
+            ],
+            "primary_key": {
+                "name": "id",
+                "cidl_type": "Integer"
+            },
+            "navigation_properties": [
+                {
+                    "var_name": "favoriteChild",
+                    "model_name": "Child",
+                    "kind": {
+                        "OneToOne": {
+                            "reference": "favoriteChildId"
+                        }
+                    }
+                },
+                {
+                    "var_name": "children",
+                    "model_name": "Child",
+                    "kind": {
+                        "OneToMany": {
+                            "reference": "parentId"
+                        }
+                    }
+                }
+            ],
+            "methods": {},
+            "cruds": [
+                "POST",
+                "PATCH",
+                "GET",
+                "LIST"
+            ],
+            "data_sources": {
+                "withChildren": {
+                    "name": "withChildren",
+                    "tree": {
+                        "favoriteChild": {},
+                        "children": {}
+                    }
+                }
+            },
+            "source_path": "./seed__crud.cloesce.ts"
+        },
+        "Child": {
+            "name": "Child",
+            "attributes": [
+                {
+                    "foreign_key_reference": "Parent",
+                    "value": {
+                        "name": "parentId",
+                        "cidl_type": "Integer"
+                    }
+                }
+            ],
+            "primary_key": {
+                "name": "id",
+                "cidl_type": "Integer"
+            },
+            "navigation_properties": [
+                {
+                    "var_name": "parent",
+                    "model_name": "Parent",
+                    "kind": {
+                        "OneToOne": {
+                            "reference": "parentId"
+                        }
+                    }
+                }
+            ],
+            "methods": {},
+            "cruds": [],
+            "data_sources": {},
+            "source_path": "./seed__crud.cloesce.ts"
+        }
+    },
+    "poos": {}
+}

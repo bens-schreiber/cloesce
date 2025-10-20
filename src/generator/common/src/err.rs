@@ -64,6 +64,7 @@ pub enum GeneratorErrorKind {
     UnknownObject,
     UnexpectedVoid,
     UnexpectedPartialReturn,
+    DuplicateKey,
     NotYetSupported,
     InvalidMapping,
     InvalidApiDomain,
@@ -101,6 +102,11 @@ impl GeneratorErrorKind {
             GeneratorErrorKind::UnexpectedPartialReturn => (
                 "Methods cannot return a partial value.",
                 "Try using a Plain Old Object instead",
+                GeneratorPhase::EarlyAstValidation,
+            ),
+            GeneratorErrorKind::DuplicateKey => (
+                "A duplicate key was found in a set",
+                "Remove any duplicate values",
                 GeneratorPhase::EarlyAstValidation,
             ),
             GeneratorErrorKind::NotYetSupported => (

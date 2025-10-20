@@ -9,11 +9,10 @@ use serde_json::Value;
 
 use crate::IncludeTree;
 use crate::ModelMeta;
-use crate::methods::{alias, validate_json_to_cidl};
 
 pub struct UpsertModel<'a> {
     meta: &'a ModelMeta,
-    context: HashMap<String, GraphContext>,
+    context: HashMap<String, Option<Value>>,
     acc: Vec<String>,
 }
 
@@ -98,7 +97,7 @@ impl<'a> UpsertModel<'a> {
         new_model: &Map<String, Value>,
         include_tree: Option<&IncludeTree>,
         path: String,
-    ) -> Result<(), String> {
+    ) -> Result<String, String> {
         let model = match self.meta.get(model_name) {
             Some(m) => m,
             None => return Err(format!("Unknown model {model_name}")),
@@ -126,67 +125,15 @@ impl<'a> UpsertModel<'a> {
             }
         };
 
-        // Scalar attributes; attempt to retrieve FK's by value or context
-        let mut fks_to_resolve = HashMap::default();
-        {
-            // Cheating here. If this model is depends on another, it's dependency will have been inserted
-            // before this model. Thus, it's parent pk has been inserted into the context under this path.
-            let parent_id_path = parent_model_name.map(|p| {
-                format!(
-                    "{}.{}",
-                    path.rsplit_once('.').map(|(h, _)| h).unwrap_or(&path),
-                    self.meta.get(p).unwrap().primary_key.name
-                )
-            });
+        let (one_to_ones, others): (Vec<_>, Vec<_>) = model
+            .navigation_properties
+            .iter()
+            .partition(|n| matches!(n.kind, NavigationPropertyKind::OneToOne { .. }));
 
-            for attr in &model.attributes {
-                match (new_model.get(&attr.value.name), &attr.foreign_key_reference) {
-                    (Some(value), _) => {
-                        // A value was provided in `new_model`
-                        builder.push_val(&attr.value.name, value, &attr.value.cidl_type)?;
-                    }
-                    (None, Some(fk_model)) if Some(fk_model) == parent_model_name => {
-                        // A value was not provided, but the context contained one
-                        let path_key = parent_id_path.as_ref().unwrap();
-
-                        let ctx = self.context.get(path_key).unwrap();
-                        builder.push_val_ctx(
-                            ctx,
-                            &attr.value.name,
-                            &attr.value.cidl_type,
-                            path_key,
-                        )?;
-                    }
-                    (None, None) if pk.is_none() => {
-                        // This is an insert only query, which cannot have missing attributes.
-                        return Err(format!(
-                            "Missing attribute {} on {}: {}",
-                            attr.value.name,
-                            model.name,
-                            serde_json::to_string(&new_model).unwrap()
-                        ));
-                    }
-                    (None, None) => {
-                        // Safely ignore the missing attribute.
-                    }
-                    _ => {
-                        // Delay resolving the FK until we've explored all navigation properties
-                        // and expanded the context
-                        fks_to_resolve.insert(&attr.value.name, &attr.value);
-                    }
-                };
-            }
-        }
-
-        // Navigation properties, using the include tree as a traversal guide
+        // This table is dependent on it's 1:1 references, so they must be traversed before
+        // table insertion (granted the include tree references them).
+        let mut nav_ref_to_path = HashMap::new();
         if let Some(include_tree) = include_tree {
-            let (one_to_ones, others): (Vec<_>, Vec<_>) = model
-                .navigation_properties
-                .iter()
-                .partition(|n| matches!(n.kind, NavigationPropertyKind::OneToOne { .. }));
-
-            // This table is dependent on it's 1:1 references, so they must be traversed before
-            // table insertion
             for nav in one_to_ones {
                 let Some(Value::Object(nav_model)) = new_model.get(&nav.var_name) else {
                     continue;
@@ -197,30 +144,75 @@ impl<'a> UpsertModel<'a> {
                 let NavigationPropertyKind::OneToOne { reference } = &nav.kind else {
                     continue;
                 };
-
                 // Recursively handle nested inserts
-                self.dfs(
-                    Some(&model.name),
-                    &nav.model_name,
-                    nav_model,
-                    Some(nested_tree),
-                    format!("{path}.{}", nav.var_name),
-                )?;
 
-                // Resolve deferred foreign key values with the updated context
-                let nav_pk = &self.meta.get(&nav.model_name).unwrap().primary_key;
-                let path_key = format!("{path}.{}.{}", nav.var_name, nav_pk.name);
-                if let Some(ntv) = fks_to_resolve.remove(reference)
-                    && let Some(ctx) = self.context.get(&path_key)
-                {
-                    builder.push_val_ctx(ctx, &ntv.name, &nav_pk.cidl_type, &path_key)?;
-                }
+                nav_ref_to_path.insert(
+                    reference,
+                    self.dfs(
+                        Some(&model.name),
+                        &nav.model_name,
+                        nav_model,
+                        Some(nested_tree),
+                        format!("{path}.{}", nav.var_name),
+                    )?,
+                );
             }
+        }
 
-            // After this tables dependencies have been resolved, insert this table, and traverse to resolve
-            // tables dependent on this one
-            self.upsert_table(pk, &path, model, &fks_to_resolve, new_model, builder)?;
+        // Scalar attributes; attempt to retrieve FK's by value or context
+        {
+            // If this model is depends on another, it's dependency will have been inserted
+            // before this model. Thus, it's parent pk has been inserted into the context under this path:
+            let parent_id_path = parent_model_name.map(|p| {
+                format!(
+                    "{}.{}",
+                    path.rsplit_once('.').map(|(h, _)| h).unwrap_or(&path),
+                    self.meta.get(p).unwrap().primary_key.name
+                )
+            });
 
+            for attr in &model.attributes {
+                let path_key = nav_ref_to_path
+                    .get(&attr.value.name)
+                    .or(parent_id_path.as_ref());
+
+                match (new_model.get(&attr.value.name), &attr.foreign_key_reference) {
+                    (Some(value), _) => {
+                        // A value was provided in `new_model`
+                        builder.push_val(&attr.value.name, value, &attr.value.cidl_type)?;
+                    }
+                    (None, Some(_)) if path_key.is_some() => {
+                        let path_key = path_key.unwrap();
+                        let ctx = self.context.get(path_key).unwrap();
+                        builder.push_val_ctx(
+                            ctx,
+                            &attr.value.name,
+                            &attr.value.cidl_type,
+                            path_key,
+                        )?;
+                    }
+                    (None, None) if pk.is_some() => {
+                        // PK is provided, but an attribute is missing. Assume
+                        // this must be an update query.
+                    }
+                    _ => {
+                        // This is an insert or upsert which cannot have missing attributes.
+                        return Err(format!(
+                            "Missing attribute {} on {}: {}",
+                            attr.value.name,
+                            model.name,
+                            serde_json::to_string(&new_model).unwrap()
+                        ));
+                    }
+                };
+            }
+        }
+
+        // All dependencies haev been resolved by this point.
+        let id_path = self.upsert_table(pk, &path, model, builder)?;
+
+        // Traverse navigation properties, using the include tree as a guide
+        if let Some(include_tree) = include_tree {
             for nav in others {
                 let Some(Value::Object(nested_tree)) = include_tree.get(&nav.var_name) else {
                     continue;
@@ -248,7 +240,7 @@ impl<'a> UpsertModel<'a> {
                                 format!("{path}.{}", nav.var_name),
                             )?;
 
-                            self.insert_jct(&path, nav, unique_id, new_model, model, pk)?;
+                            self.insert_jct(&path, nav, unique_id, new_model, model)?;
                         }
                     }
                     _ => {
@@ -256,12 +248,9 @@ impl<'a> UpsertModel<'a> {
                     }
                 }
             }
-
-            return Ok(());
         }
 
-        self.upsert_table(pk, &path, model, &fks_to_resolve, new_model, builder)?;
-        Ok(())
+        Ok(id_path)
     }
 
     /// Inserts a M:M junction table, consisting of the passed in models
@@ -273,59 +262,51 @@ impl<'a> UpsertModel<'a> {
         unique_id: &str,
         new_model: &Map<String, Value>,
         model: &Model,
-        pk: Option<&Value>,
     ) -> Result<(), String> {
-        let mut vars_to_use: Vec<(String, &CidlType, &GraphContext, String)> = vec![];
+        let nav_meta = self.meta.get(&nav.model_name).unwrap();
+        let nav_pk = &nav_meta.primary_key;
 
-        // Find the M:M dependencies id from context
-        {
-            let nav_pk = &self.meta.get(&nav.model_name).unwrap().primary_key;
-            let path_key = format!("{path}.{}.{}", nav.var_name, nav_pk.name);
-            let ctx = self.context.get(&path_key).ok_or(format!(
-                "Expected many to many model to contain an ID, got {}",
-                serde_json::to_string(new_model).unwrap()
-            ))?;
-
-            vars_to_use.push((
+        // Resolve both sides of the M:M relationship
+        let pairs = [
+            (
                 format!("{}.{}", nav.model_name, nav_pk.name),
                 &nav_pk.cidl_type,
-                ctx,
-                path_key,
-            ));
+                format!("{path}.{}.{}", nav.var_name, nav_pk.name),
+            ),
+            (
+                format!("{}.{}", model.name, model.primary_key.name),
+                &model.primary_key.cidl_type,
+                format!("{path}.{}", model.primary_key.name),
+            ),
+        ];
+
+        // Collect column/value pairs from context
+        let mut entries = Vec::new();
+        for (var_name, cidl_type, path_key) in pairs {
+            let ctx_value = self.context.get(&path_key).ok_or(format!(
+                "Expected many to many model to contain an ID, got {}",
+                serde_json::to_string(new_model).unwrap(),
+            ))?;
+
+            let value = match ctx_value {
+                Some(v) => validate_json_to_cidl(v, cidl_type, unique_id, &var_name)?,
+                None => UpsertBuilder::value_from_ctx(&path_key),
+            };
+            entries.push((var_name, value));
         }
 
-        // Get this models ID
-        let this_ctx = &match pk {
-            Some(val) => GraphContext::Value(val.clone()),
-            None => GraphContext::Variable,
-        };
-        vars_to_use.push((
-            format!("{}.{}", model.name, model.primary_key.name),
-            &model.primary_key.cidl_type,
-            this_ctx,
-            format!("{path}.{}", model.primary_key.name),
-        ));
+        // Sort columns to ensure deterministic SQL
+        entries.sort_by(|a, b| a.0.cmp(&b.0));
 
-        // Add the jct tables cols+vals
-        let mut jct_insert = Query::insert();
-        jct_insert.into_table(alias(unique_id));
-        jct_insert.on_conflict(OnConflict::new().do_nothing().to_owned());
-        let mut jct_cols = vec![];
-        let mut jct_vals = vec![];
-        vars_to_use.sort_by_key(|(name, _, _, _)| name.clone());
-        for (var_name, cidl_type, var_ctx, path) in vars_to_use {
-            jct_cols.push(alias(&var_name));
-            jct_vals.push(match var_ctx {
-                GraphContext::Variable => UpsertBuilder::value_from_ctx(&path),
-                GraphContext::Value(value) => {
-                    validate_json_to_cidl(value, cidl_type, unique_id, &var_name)?
-                }
-            })
-        }
-        jct_insert.columns(jct_cols);
-        jct_insert.values_panic(jct_vals);
+        // Build INSERT
+        let mut insert = Query::insert();
+        insert
+            .into_table(alias(unique_id))
+            .on_conflict(OnConflict::new().do_nothing().to_owned())
+            .columns(entries.iter().map(|(col, _)| alias(col)))
+            .values_panic(entries.into_iter().map(|(_, val)| val));
 
-        self.acc.push(jct_insert.to_string(SqliteQueryBuilder));
+        self.acc.push(insert.to_string(SqliteQueryBuilder));
         Ok(())
     }
 
@@ -337,35 +318,23 @@ impl<'a> UpsertModel<'a> {
         pk: Option<&Value>,
         path: &str,
         model: &Model,
-        fks_to_resolve: &HashMap<&String, &NamedTypedValue>,
-        new_model: &Map<String, Value>,
         builder: UpsertBuilder,
-    ) -> Result<(), String> {
-        if !fks_to_resolve.is_empty() {
-            return Err(format!(
-                "Missing foreign key definitions for {}, got: {}",
-                model.name,
-                serde_json::to_string(new_model).unwrap()
-            ));
-        }
-
+    ) -> Result<String, String> {
         self.acc.push(builder.build()?);
+        let id_path = format!("{path}.{}", model.primary_key.name);
 
         // Add this models primary key to the context so dependents can resolve it
         match pk {
             None => {
-                let id_path = format!("{path}.{}", model.primary_key.name);
                 self.acc.push(VariablesTable::insert_rowid(&id_path));
-                self.context.insert(id_path, GraphContext::Variable);
+                self.context.insert(id_path.clone(), None);
             }
             Some(val) => {
-                let id_path = format!("{path}.{}", model.primary_key.name);
-                self.context
-                    .insert(id_path, GraphContext::Value(val.clone()));
+                self.context.insert(id_path.clone(), Some(val.clone()));
             }
         }
 
-        Ok(())
+        Ok(id_path)
     }
 }
 
@@ -390,25 +359,16 @@ impl VariablesTable {
     }
 
     fn insert_rowid(path: &str) -> String {
-        let mut insert = Query::insert();
-        insert.into_table(alias(VARIABLES_TABLE_NAME));
-        insert.columns(vec![alias("path"), alias("id")]);
-        insert.values_panic(vec![
-            Expr::val(path).into(),
-            Expr::cust("last_insert_rowid()"),
-        ]);
-        insert.replace();
-        insert.to_string(SqliteQueryBuilder)
+        Query::insert()
+            .into_table(alias(VARIABLES_TABLE_NAME))
+            .columns(vec![alias("path"), alias("id")])
+            .values_panic(vec![
+                Expr::val(path).into(),
+                Expr::cust("last_insert_rowid()"),
+            ])
+            .replace()
+            .to_string(SqliteQueryBuilder)
     }
-}
-
-#[derive(Debug)]
-enum GraphContext {
-    // Auto generated, stored in the variables table.
-    Variable,
-
-    // An actual supplied value from the `new_model`
-    Value(Value),
 }
 
 struct UpsertBuilder<'a> {
@@ -459,17 +419,17 @@ impl<'a> UpsertBuilder<'a> {
     /// Adds a column and value using the graph context.
     fn push_val_ctx(
         &mut self,
-        ctx: &GraphContext,
+        ctx: &Option<Value>,
         var_name: &str,
         cidl_type: &CidlType,
         path: &str,
     ) -> Result<(), String> {
         match ctx {
-            GraphContext::Variable => {
+            None => {
                 self.cols.push(alias(var_name));
                 self.vals.push(Self::value_from_ctx(path));
             }
-            GraphContext::Value(v) => {
+            Some(v) => {
                 self.push_val(var_name, v, cidl_type)?;
             }
         }
@@ -509,9 +469,10 @@ impl<'a> UpsertBuilder<'a> {
             };
 
             let mut update = Query::update();
-            update.table(alias(self.model_name));
-            update.values(self.cols.into_iter().zip(self.vals));
-            update.and_where(Expr::col(alias(&self.pk_ntv.name)).eq(pk_expr));
+            update
+                .table(alias(self.model_name))
+                .values(self.cols.into_iter().zip(self.vals))
+                .and_where(Expr::col(alias(&self.pk_ntv.name)).eq(pk_expr));
 
             return Ok(update.to_string(SqliteQueryBuilder));
         }
@@ -527,9 +488,11 @@ impl<'a> UpsertBuilder<'a> {
                 vals.push(pk_expr);
             }
 
-            insert.columns(cols);
-            insert.values_panic(vals);
-            insert.or_default_values().to_owned()
+            insert
+                .columns(cols)
+                .values_panic(vals)
+                .or_default_values()
+                .to_owned()
         };
 
         // Some id exists, and some column is being inserted, so this must be an upsert (either insert or update).
@@ -545,6 +508,59 @@ impl<'a> UpsertBuilder<'a> {
     }
 }
 
+fn alias(name: impl Into<String>) -> sea_query::Alias {
+    sea_query::Alias::new(name)
+}
+
+/// Validates that a JSON input follows the CIDL type, returning
+/// a SeaQuery [SimpleExpr] value
+fn validate_json_to_cidl(
+    value: &Value,
+    cidl_type: &CidlType,
+    model_name: &str,
+    attr_name: &str,
+) -> Result<SimpleExpr, String> {
+    if matches!(cidl_type, CidlType::Nullable(_)) && value.is_null() {
+        return Ok(SimpleExpr::Custom("null".into()));
+    }
+
+    match cidl_type.root_type() {
+        CidlType::Integer => {
+            if !matches!(value, Value::Number(_)) {
+                return Err(format!(
+                    "Expected an integer type for {}.{}",
+                    model_name, attr_name
+                ));
+            }
+
+            Ok(Expr::val(value.as_i64().unwrap()).into())
+        }
+        CidlType::Real => {
+            if !matches!(value, Value::Number(_)) {
+                return Err(format!(
+                    "Expected an real type for {}.{}",
+                    model_name, attr_name
+                ));
+            }
+
+            Ok(Expr::val(value.as_f64().unwrap()).into())
+        }
+        CidlType::Text | CidlType::Blob => {
+            if !matches!(value, Value::String(_)) {
+                return Err(format!(
+                    "Expected an real type for {}.{}",
+                    model_name, attr_name
+                ));
+            }
+
+            Ok(Expr::val(value.as_str().unwrap()).into())
+        }
+        _ => {
+            unreachable!("Invalid CIDL");
+        }
+    }
+}
+
 #[cfg(test)]
 mod test {
     use std::collections::HashMap;
@@ -552,7 +568,22 @@ mod test {
     use common::{CidlType, NavigationPropertyKind, builder::ModelBuilder};
     use serde_json::json;
 
-    use crate::{expected_str, methods::upsert::UpsertModel};
+    use crate::upsert::UpsertModel;
+
+    #[cfg(test)]
+    #[macro_export]
+    macro_rules! expected_str {
+        ($got:expr, $expected:expr) => {{
+            let got_val = &$got;
+            let expected_val = &$expected;
+            assert!(
+                got_val.to_string().contains(&expected_val.to_string()),
+                "Expected: \n`{}`, \n\ngot:\n{:?}",
+                expected_val,
+                got_val
+            );
+        }};
+    }
 
     #[test]
     fn upsert_scalar_model() {

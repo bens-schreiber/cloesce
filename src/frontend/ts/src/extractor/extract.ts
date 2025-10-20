@@ -1,4 +1,5 @@
 import {
+  Node as MorphNode,
   Project,
   Type,
   SourceFile,
@@ -28,6 +29,7 @@ import {
   ExtractorError,
   ExtractorErrorCode,
   PlainOldObject,
+  CrudKind,
 } from "../common.js";
 import { TypeFormatFlags } from "typescript";
 
@@ -136,8 +138,18 @@ export class CidlExtractor {
     const navigationProperties: NavigationProperty[] = [];
     const dataSources: Record<string, DataSource> = {};
     const methods: Record<string, ModelMethod> = {};
+    let cruds: CrudKind[] = [];
     let primary_key: NamedTypedValue | undefined = undefined;
 
+    // Extract crud methods
+    const crudDecorator = classDecl
+      .getDecorators()
+      .find((d) => getDecoratorName(d) === "CRUD");
+    if (crudDecorator) {
+      cruds = getCrudKinds(crudDecorator);
+    }
+
+    // Iterate attribtutes
     for (const prop of classDecl.getProperties()) {
       const decorators = prop.getDecorators();
       const typeRes = CidlExtractor.cidlType(prop.getType());
@@ -327,6 +339,7 @@ export class CidlExtractor {
       primary_key,
       navigation_properties: navigationProperties,
       methods,
+      cruds,
       data_sources: dataSources,
       source_path: sourceFile.getFilePath().toString(),
     });
@@ -681,17 +694,11 @@ function getDecoratorArgument(
 
   const arg = args[index] as any;
 
-  // Identifier
   if (arg.getKind?.() === SyntaxKind.Identifier) {
     return arg.getText();
   }
 
-  // String literal
-  const text = arg.getText?.();
-  if (!text) return undefined;
-
-  const match = text.match(/^['"](.*)['"]$/);
-  return match ? match[1] : text;
+  return arg.getLiteralValue();
 }
 
 function getObjectName(t: CidlType): string | undefined {
@@ -707,6 +714,24 @@ function getObjectName(t: CidlType): string | undefined {
   }
 
   return undefined;
+}
+
+function getCrudKinds(d: Decorator): CrudKind[] {
+  const arg = d.getArguments()[0];
+  if (!arg) return [];
+
+  if (MorphNode.isArrayLiteralExpression(arg)) {
+    return arg
+      .getElements()
+      .map(
+        (e) =>
+          (MorphNode.isStringLiteral(e)
+            ? e.getLiteralValue()
+            : e.getText()) as CrudKind,
+      );
+  }
+
+  return [];
 }
 
 function findPropertyByName(

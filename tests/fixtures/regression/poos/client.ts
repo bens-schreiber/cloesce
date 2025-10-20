@@ -21,9 +21,7 @@ export class PooAcceptYield {
     dataSource: null = null
   ): Promise<HttpResult<void>> {
     const baseUrl = new URL(`http://localhost:5002/api/PooAcceptYield/${this.id}/acceptPoos`);
-    if (dataSource) {
-      baseUrl.searchParams.append("dataSource", dataSource);
-    }
+    baseUrl.searchParams.append("dataSource", String(dataSource));
     const res = await fetch(baseUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -43,9 +41,7 @@ export class PooAcceptYield {
     dataSource: null = null
   ): Promise<HttpResult<PooC>> {
     const baseUrl = new URL(`http://localhost:5002/api/PooAcceptYield/${this.id}/yieldPoo`);
-    if (dataSource) {
-      baseUrl.searchParams.append("dataSource", dataSource);
-    }
+    baseUrl.searchParams.append("dataSource", String(dataSource));
     const res = await fetch(baseUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },

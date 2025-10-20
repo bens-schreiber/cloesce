@@ -1,13 +1,9 @@
 import { D1Database } from "@cloudflare/workers-types/experimental/index.js";
-import { Either, left, right } from "../common.js";
-import {
-  RuntimeContainer,
-  WasmResource,
-  fromSql,
-  invokeWasm,
-} from "../runtime/runtime.js";
+import { CrudKind, Either, left, right } from "../common.js";
+import { RuntimeContainer } from "../router/router.js";
+import { WasmResource, fromSql, invokeOrmWasm } from "../router/wasm.js";
 
-export { cloesce } from "../runtime/runtime.js";
+export { cloesce } from "../router/router.js";
 export type { HttpResult, Either, DeepPartial } from "../common.js";
 
 // Compiler hints
@@ -31,9 +27,12 @@ export const ManyToMany =
   (_: string): PropertyDecorator =>
   () => {};
 export const ForeignKey =
-  <T>(_: T): PropertyDecorator =>
+  <T>(_: T | string): PropertyDecorator =>
   () => {};
 export const Inject: ParameterDecorator = () => {};
+export const CRUD =
+  (_kinds: CrudKind[]): ClassDecorator =>
+  () => {};
 
 // Include Tree
 type Primitive = string | number | boolean | bigint | symbol | null | undefined;
@@ -104,7 +103,7 @@ export class Orm {
       WasmResource.fromString(JSON.stringify(newModel), wasm),
       WasmResource.fromString(JSON.stringify(includeTree), wasm),
     ];
-    return invokeWasm(wasm.upsert_model, args, wasm);
+    return invokeOrmWasm(wasm.upsert_model, args, wasm);
   }
 
   /**

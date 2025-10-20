@@ -16,6 +16,7 @@
             },
             "navigation_properties": [],
             "methods": {},
+            "cruds": [],
             "data_sources": {},
             "source_path": "./seed__foreign_keys.cloesce.ts"
         },
@@ -78,6 +79,7 @@
                     "parameters": []
                 }
             },
+            "cruds": [],
             "data_sources": {
                 "withB": {
                     "name": "withB",
@@ -143,6 +145,7 @@
                     "parameters": []
                 }
             },
+            "cruds": [],
             "data_sources": {
                 "withDogs": {
                     "name": "withDogs",
@@ -170,6 +173,7 @@
             },
             "navigation_properties": [],
             "methods": {},
+            "cruds": [],
             "data_sources": {},
             "source_path": "./seed__foreign_keys.cloesce.ts"
         },
@@ -224,6 +228,7 @@
                     "parameters": []
                 }
             },
+            "cruds": [],
             "data_sources": {
                 "withCoursesStudents": {
                     "name": "withCoursesStudents",
@@ -265,6 +270,7 @@
                 }
             ],
             "methods": {},
+            "cruds": [],
             "data_sources": {},
             "source_path": "./seed__foreign_keys.cloesce.ts"
         }
