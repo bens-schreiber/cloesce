@@ -1,5 +1,5 @@
 import { describe, test, expect, vi, beforeEach } from "vitest";
-import { _cloesceInternal } from "../src/runtime/runtime";
+import { _cloesceInternal } from "../src/router/router";
 import {
   CloesceAst,
   HttpVerb,
@@ -7,9 +7,9 @@ import {
   NULL_DATA_SOURCE,
   NamedTypedValue,
 } from "../src/common";
-import { IncludeTree } from "../src/index/backend";
-import { CrudContext } from "../src/runtime/crud";
-import { fromSql } from "../src/runtime/wasm";
+import { IncludeTree } from "../src/ui/backend";
+import { CrudContext } from "../src/router/crud";
+import { fromSql } from "../src/router/wasm";
 import fs from "fs";
 import path from "path";
 
@@ -40,7 +40,7 @@ const makeRequest = (url: string, method?: string, body?: any) =>
   });
 
 beforeEach(() => {
-  vi.mock("../runtime.wasm", () => ({ default: new ArrayBuffer(0) }));
+  vi.mock("../orm.wasm", () => ({ default: new ArrayBuffer(0) }));
 });
 
 describe("Router Error States", () => {
@@ -438,7 +438,7 @@ describe("methodDispatch", () => {
 describe("modelsFromSql", () => {
   test("handles recursive navigation properties", async () => {
     const wasm = await WebAssembly.instantiate(
-      fs.readFileSync(path.resolve("./dist/runtime.wasm")),
+      fs.readFileSync(path.resolve("./dist/orm.wasm")),
       {},
     );
 

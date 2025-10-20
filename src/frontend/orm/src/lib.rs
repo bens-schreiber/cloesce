@@ -198,10 +198,6 @@ fn yield_result(mut bytes: Vec<u8>) {
 }
 
 fn yield_error(e: impl ToString) {
-    let bytes = format!(
-        "Encountered an issue in the WASM ORM runtime: {}",
-        e.to_string()
-    )
-    .into_bytes();
+    let bytes = format!("Encountered an issue in the WASM ORM: {}", e.to_string()).into_bytes();
     yield_result(bytes);
 }

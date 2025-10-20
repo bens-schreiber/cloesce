@@ -6,16 +6,16 @@ import {
   left,
   right,
 } from "../common";
-import { IncludeTree } from "../index/backend";
-import { RuntimeContainer } from "./runtime";
+import { IncludeTree } from "../ui/backend";
+import { RuntimeContainer } from "./router";
 
-// Requires the rust runtime binary to have been built
-import mod from "../runtime.wasm";
+// Requires the ORM binary to have been built
+import mod from "../orm.wasm";
 
 /**
  * WASM ABI
  */
-export interface RuntimeWasmExports {
+export interface OrmWasmExports {
   memory: WebAssembly.Memory;
   get_return_len(): number;
   get_return_ptr(): number;
@@ -47,7 +47,7 @@ export interface RuntimeWasmExports {
  */
 export class WasmResource {
   constructor(
-    private wasm: RuntimeWasmExports,
+    private wasm: OrmWasmExports,
     public ptr: number,
     public len: number,
   ) {}
@@ -58,7 +58,7 @@ export class WasmResource {
   /**
    * Copies a value from TS memory to WASM memory. A subsequent `free` is necessary.
    */
-  static fromString(str: string, wasm: RuntimeWasmExports): WasmResource {
+  static fromString(str: string, wasm: OrmWasmExports): WasmResource {
     const encoder = new TextEncoder();
     const bytes = encoder.encode(str);
     const ptr = wasm.alloc(bytes.length);
@@ -68,14 +68,14 @@ export class WasmResource {
   }
 }
 
-export async function loadRuntimeWasm(
+export async function loadOrmWasm(
   ast: CloesceAst,
   wasm?: WebAssembly.Instance,
-): Promise<RuntimeWasmExports> {
+): Promise<OrmWasmExports> {
   // Load WASM
   const wasmInstance = (wasm ??
     (await WebAssembly.instantiate(mod))) as WebAssembly.Instance & {
-    exports: RuntimeWasmExports;
+    exports: OrmWasmExports;
   };
 
   const modelMeta = WasmResource.fromString(
@@ -92,13 +92,10 @@ export async function loadRuntimeWasm(
   return wasmInstance.exports;
 }
 
-/**
- * Helper for invoking the WASM runtime
- */
-export function invokeRuntimeWasm<T>(
+export function invokeOrmWasm<T>(
   fn: (...args: number[]) => boolean,
   args: WasmResource[],
-  wasm: RuntimeWasmExports,
+  wasm: OrmWasmExports,
 ): Either<string, T> {
   let resPtr: number | undefined;
   let resLen: number | undefined;
@@ -135,7 +132,7 @@ export function fromSql<T extends object>(
     WasmResource.fromString(JSON.stringify(includeTree), wasm),
   ];
 
-  const jsonResults = invokeRuntimeWasm<string>(
+  const jsonResults = invokeOrmWasm<string>(
     wasm.object_relational_mapping,
     args,
     wasm,

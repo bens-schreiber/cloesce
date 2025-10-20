@@ -7,7 +7,7 @@ import {
   ModelMethod,
   NULL_DATA_SOURCE,
 } from "../common";
-import { Orm } from "../index/backend";
+import { Orm } from "../ui/backend";
 
 /**
  * A wrapper for Model Instances, containing definitions for built-in CRUD methods.

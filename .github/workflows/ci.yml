@@ -33,15 +33,15 @@ jobs:
           path: |
             ${{ env.CARGO_HOME }}/registry
             ${{ env.CARGO_HOME }}/git
-            src/runtime/target
+            src/orm/target
             src/generator/target
           key: cargo-${{ hashFiles('**/Cargo.lock') }}
 
       - run: rustup target add wasm32-unknown-unknown
       - run: rustup target add wasm32-wasip1
 
-      - name: Check & Build & Test WASM Runtime
-        working-directory: src/runtime
+      - name: Check & Build & Test ORM
+        working-directory: src/frontend/orm
         run: |
           cargo fmt -- --check
           cargo clippy --all-targets --all-features -- -D warnings

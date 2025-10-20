@@ -12,7 +12,7 @@ import {
   getNavigationPropertyCidlType,
   NULL_DATA_SOURCE,
 } from "../common.js";
-import { RuntimeWasmExports, fromSql, loadRuntimeWasm } from "./wasm.js";
+import { OrmWasmExports, fromSql, loadOrmWasm } from "./wasm.js";
 import { CrudContext } from "./crud.js";
 
 /**
@@ -54,7 +54,7 @@ export class RuntimeContainer {
   private constructor(
     public readonly ast: CloesceAst,
     public readonly constructorRegistry: ModelConstructorRegistry,
-    public readonly wasm: RuntimeWasmExports,
+    public readonly wasm: OrmWasmExports,
   ) {}
 
   static async init(
@@ -66,7 +66,7 @@ export class RuntimeContainer {
       return;
     }
 
-    const wasmAbi = await loadRuntimeWasm(ast, wasm);
+    const wasmAbi = await loadOrmWasm(ast, wasm);
     this.instance = new RuntimeContainer(ast, constructorRegistry, wasmAbi);
   }
 
