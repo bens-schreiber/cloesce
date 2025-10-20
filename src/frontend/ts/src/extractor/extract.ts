@@ -694,17 +694,11 @@ function getDecoratorArgument(
 
   const arg = args[index] as any;
 
-  // Identifier
   if (arg.getKind?.() === SyntaxKind.Identifier) {
     return arg.getText();
   }
 
-  // String literal
-  const text = arg.getText?.();
-  if (!text) return undefined;
-
-  const match = text.match(/^['"](.*)['"]$/);
-  return match ? match[1] : text;
+  return arg.getLiteralValue();
 }
 
 function getObjectName(t: CidlType): string | undefined {

@@ -27,7 +27,7 @@ export const ManyToMany =
   (_: string): PropertyDecorator =>
   () => {};
 export const ForeignKey =
-  <T>(_: T): PropertyDecorator =>
+  <T>(_: T | string): PropertyDecorator =>
   () => {};
 export const Inject: ParameterDecorator = () => {};
 export const CRUD =

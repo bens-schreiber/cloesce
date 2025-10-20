@@ -1,10 +1,14 @@
 import { cloesce } from "cloesce/backend";
 import cidl from "./cidl.json";
+import { Child } from "./seed__crud.cloesce.ts";
 import { CrudHaver } from "./seed__crud.cloesce.ts";
+import { Parent } from "./seed__crud.cloesce.ts";
 
 
 const constructorRegistry = {
-	CrudHaver: CrudHaver
+	Child: Child,
+	CrudHaver: CrudHaver,
+	Parent: Parent
 };
 
 export default {
