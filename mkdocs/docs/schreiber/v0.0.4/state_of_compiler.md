@@ -1,23 +1,6 @@
 # v0.0.4 State of the Compiler
 
-Dumping system design as of v0.0.4 here. Cloesce is broken up into two main parts, each with their own sub-domains:
-
-- Frontend
-
-  1. Driver
-  2. UI (backend + client)
-  3. Extractor
-  4. Router
-  5. ORM (WASM ABI)
-
-- Generator
-
-  1. CLI
-  2. D1 / Sqlite
-  3. Wrangler
-  4. Workers
-  5. Client API
-  6. WASI Artifact
+Dumping system design as of v0.0.4 here. Cloesce is broken up into two main parts, each with their own sub-domains.
 
 ## Frontend
 
