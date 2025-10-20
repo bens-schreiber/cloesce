@@ -2,6 +2,7 @@ import { HttpResult, instantiateObjectArray, DeepPartial } from "cloesce/client"
 
 export class CrudHaver {
   id: number;
+  name: string;
 
   async notCrud(
     dataSource: null = null
@@ -27,7 +28,9 @@ export class CrudHaver {
     const res = await fetch(baseUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(obj)
+      body: JSON.stringify({
+        obj
+      })
     });
 
     let raw = await res.json();
@@ -39,15 +42,15 @@ export class CrudHaver {
     return raw;
   }
   async patch(dataSource: null = null): Promise<HttpResult<void>> {
-    const baseUrl = new URL(`http://localhost:5002/api/CrudHaver/PATCH`);
+    const baseUrl = new URL(`http://localhost:5002/api/CrudHaver/${this.id}/PATCH`);
     baseUrl.searchParams.append("dataSource", String(dataSource));
 
     const res = await fetch(baseUrl, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: {
-        obj: JSON.stringify(this)
-      }
+      body: JSON.stringify({
+        obj: this
+      })
     });
 
     let raw = await res.json();

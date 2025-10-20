@@ -1,5 +1,5 @@
 -- Models
-CREATE TABLE "CrudHaver" ( "id" integer PRIMARY KEY );
+CREATE TABLE "CrudHaver" ( "id" integer PRIMARY KEY, "name" text NOT NULL );
 
 -- Views / Data Sources
 

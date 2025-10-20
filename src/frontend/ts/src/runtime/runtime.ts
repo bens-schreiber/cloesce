@@ -10,7 +10,6 @@ import {
   isNullableType,
   Model,
   getNavigationPropertyCidlType,
-  CidlIncludeTree,
 } from "../common.js";
 import { RuntimeWasmExports, fromSql, loadRuntimeWasm } from "./wasm.js";
 import { CrudWrapper } from "./crud.js";
@@ -118,7 +117,13 @@ export async function cloesce(
   //#region Instantatiate the model
   const instance = await (async () => {
     if (method.is_static) {
-      return right(new CrudWrapper(d1, constructorRegistry[model.name]));
+      return right(
+        new CrudWrapper(
+          d1,
+          constructorRegistry[model.name],
+          constructorRegistry[model.name]
+        )
+      );
     }
 
     const hydratedModel = await hydrateModel(
@@ -133,7 +138,9 @@ export async function cloesce(
       return hydratedModel;
     }
 
-    return right(new CrudWrapper(d1, hydratedModel.value));
+    return right(
+      new CrudWrapper(d1, hydratedModel.value, constructorRegistry[model.name])
+    );
   })();
   if (!instance.ok) {
     return toResponse(instance.value);
@@ -226,7 +233,7 @@ async function validateRequest(
   method: ModelMethod,
   id: string | null
 ): Promise<
-  Either<HttpResult, { params: RequestParamMap; dataSource: string | null }>
+  Either<HttpResult, { params: RequestParamMap; dataSource: string }>
 > {
   // Error state: any missing parameter, body, or malformed input will exit with 400.
   const invalidRequest = (e: string) =>
@@ -247,27 +254,23 @@ async function validateRequest(
       )
   );
 
-  // Extract data source
-  const url = new URL(request.url);
-  let dataSource = url.searchParams.get("dataSource");
-  if (dataSource === "null") {
-    dataSource = null;
-  }
-
   // Extract url or body parameters
-  let params: RequestParamMap;
+  const url = new URL(request.url);
+  const dataSource = url.searchParams.get("dataSource") ?? "null";
+  let params: RequestParamMap = {};
   if (method.http_verb === "GET") {
     params = Object.fromEntries(url.searchParams.entries());
   } else {
     try {
       params = await request.json();
+      params["dataSource"] = dataSource;
     } catch {
       return invalidRequest("Could not retrieve JSON body.");
     }
   }
 
   // Validate data source if exists
-  if (dataSource && !(dataSource in model.data_sources)) {
+  if (dataSource !== "null" && !(dataSource in model.data_sources)) {
     return invalidRequest(`Unknown data source ${dataSource}`);
   }
 
@@ -302,7 +305,7 @@ async function hydrateModel(
   d1: D1Database,
   model: Model,
   id: string,
-  dataSource: string | null
+  dataSource: string
 ): Promise<Either<HttpResult, object>> {
   // Error state: If the D1 database has been tweaked outside of Cloesce
   // resulting in a malformed query, exit with a 500.
@@ -319,7 +322,7 @@ async function hydrateModel(
 
   const pk = model.primary_key.name;
   const query =
-    dataSource !== null
+    dataSource !== "null"
       ? `SELECT * FROM "${model.name}.${dataSource}" WHERE "${model.name}.${pk}" = ?`
       : `SELECT * FROM "${model.name}" WHERE "${pk}" = ?`;
 
@@ -337,15 +340,11 @@ async function hydrateModel(
     return malformedQuery(e);
   }
 
-  // Get include tree
-  const includeTree: CidlIncludeTree =
-    dataSource !== null ? model.data_sources[dataSource].tree : {};
-
   // Hydrate
   const models: object[] = fromSql(
     constructorRegistry[model.name],
     records.results,
-    includeTree
+    model.data_sources[dataSource]?.tree ?? {}
   ).value as object[];
 
   return right(models[0]);

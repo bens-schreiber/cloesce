@@ -26,7 +26,7 @@ export class {{this.name}} {
     {{/each}}
     dataSource: {{#each ../data_sources}}"{{name}}" | {{/each}}null = null
   ): Promise<HttpResult<{{get_cidl_type this.return_type}}>> {
-    const baseUrl = new URL(`{{../../domain}}/{{#if this.is_static}}{{../name}}/{{this.name}}{{else}}{{../name}}/${this.id}/{{this.name}}{{/if}}`);
+    const baseUrl = new URL(`{{../../domain}}/{{#if this.is_static}}{{../name}}/{{this.name}}{{else}}{{../name}}/${this.{{../primary_key.name}}}/{{this.name}}{{/if}}`);
     baseUrl.searchParams.append("dataSource", String(dataSource));
     {{#if (eq this.http_verb "GET")}}
       {{#each this.parameters}}
@@ -74,7 +74,9 @@ export class {{this.name}} {
     const res = await fetch(baseUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(obj)
+      body: JSON.stringify({
+        obj
+      })
     });
 
     let raw = await res.json();
@@ -88,15 +90,15 @@ export class {{this.name}} {
   {{/if}}
   {{#if (crud_name this "PATCH")}}
   async patch(dataSource: {{#each ../data_sources}}"{{name}}" | {{/each}}null = null): Promise<HttpResult<void>> {
-    const baseUrl = new URL(`{{../../domain}}/{{../name}}/PATCH`);
+    const baseUrl = new URL(`{{../../domain}}/{{../name}}/${this.{{../primary_key.name}}}/PATCH`);
     baseUrl.searchParams.append("dataSource", String(dataSource));
 
     const res = await fetch(baseUrl, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: {
-        obj: JSON.stringify(this)
-      }
+      body: JSON.stringify({
+        obj: this
+      })
     });
 
     let raw = await res.json();

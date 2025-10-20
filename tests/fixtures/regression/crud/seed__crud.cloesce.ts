@@ -11,6 +11,7 @@ export class Env {
 export class CrudHaver {
   @PrimaryKey
   id: number;
+  name: string;
 
   @POST
   async notCrud(): Promise<void> {}

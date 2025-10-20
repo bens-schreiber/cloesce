@@ -5,7 +5,8 @@ import { Orm } from "../index/backend";
 export class CrudWrapper {
   public constructor(
     public d1: D1Database,
-    public instance: any
+    public instance: any | undefined,
+    public ctor: new () => object
   ) {}
 
   static getModelMethod(s: string, modelName: string): ModelMethod | undefined {
@@ -14,7 +15,7 @@ export class CrudWrapper {
         name: "POST",
         is_static: true,
         http_verb: HttpVerb.POST,
-        return_type: { Object: modelName },
+        return_type: { HttpResult: { Object: modelName } },
         parameters: [
           {
             name: "obj",
@@ -30,7 +31,7 @@ export class CrudWrapper {
         name: "PATCH",
         is_static: false,
         http_verb: HttpVerb.PATCH,
-        return_type: { Object: modelName },
+        return_type: { HttpResult: { Object: modelName } },
         parameters: [
           {
             name: "obj",
@@ -59,21 +60,22 @@ export class CrudWrapper {
     return map[methodName];
   }
 
-  async upsert(
-    obj: object,
-    dataSource: string | null
-  ): Promise<HttpResult<unknown>> {
+  async upsert(obj: object, dataSource: string): Promise<HttpResult<unknown>> {
+    const normalizedDs = dataSource === "null" ? null : dataSource;
+    const includeTree = normalizedDs ? (this.ctor as any)[normalizedDs] : null;
+
+    // Upsert
     const orm = Orm.fromD1(this.d1);
-    const ds = dataSource ? this.instance[dataSource] : null;
-    const upsertRes = await orm.upsert(this.instance, obj, ds);
+    const upsertRes = await orm.upsert(this.ctor, obj, includeTree);
     if (!upsertRes.ok) {
       return { ok: false, status: 500, data: upsertRes.value }; // TODO: better status code?
     }
 
+    // Get
     const getRes = await orm.get(
-      this.instance,
+      this.ctor,
       upsertRes.value,
-      dataSource as any
+      normalizedDs as any
     );
     if (!getRes.ok) {
       return { ok: false, status: 500, data: getRes.value };

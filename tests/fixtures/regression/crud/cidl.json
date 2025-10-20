@@ -9,7 +9,15 @@
     "models": {
         "CrudHaver": {
             "name": "CrudHaver",
-            "attributes": [],
+            "attributes": [
+                {
+                    "foreign_key_reference": null,
+                    "value": {
+                        "name": "name",
+                        "cidl_type": "Text"
+                    }
+                }
+            ],
             "primary_key": {
                 "name": "id",
                 "cidl_type": "Integer"
