@@ -203,9 +203,9 @@ function matchRoute(
     return notFound(`Unknown model ${modelName}`);
   }
 
+  // Get the method as a direct model method or a CRUD method
   const method =
-    model.methods[methodName] ??
-    CrudWrapper.getModelMethod(methodName, model.name);
+    model.methods[methodName] ?? CrudWrapper.getModelMethod(methodName, model);
   if (!method) {
     return notFound(`Unknown method ${modelName}.${methodName}`);
   }
