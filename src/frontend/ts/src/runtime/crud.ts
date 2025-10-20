@@ -1,14 +1,39 @@
 import { D1Database } from "@cloudflare/workers-types/experimental";
-import { CrudKind, HttpResult, HttpVerb, Model, ModelMethod } from "../common";
+import {
+  CrudKind,
+  HttpResult,
+  HttpVerb,
+  Model,
+  ModelMethod,
+  NULL_DATA_SOURCE,
+} from "../common";
 import { Orm } from "../index/backend";
 
-export class CrudWrapper {
-  public constructor(
-    public d1: D1Database,
-    public instance: any | undefined,
-    public ctor: new () => object
+/**
+ * A wrapper for Model Instances, containing definitions for built-in CRUD methods.
+ */
+export class CrudContext {
+  private constructor(
+    private d1: D1Database,
+    private instance: object | undefined,
+    private ctor: new () => object,
   ) {}
 
+  static fromInstance(
+    d1: D1Database,
+    instance: any,
+    ctor: new () => object,
+  ): CrudContext {
+    return new this(d1, instance, ctor);
+  }
+
+  static fromCtor(d1: D1Database, ctor: new () => object): CrudContext {
+    return new this(d1, undefined, ctor);
+  }
+
+  /**
+   * Returns a CRUD Model Method if the method is a built-in CRUD method.
+   */
   static getModelMethod(s: string, model: Model): ModelMethod | undefined {
     if (!model.cruds.includes(s as CrudKind)) {
       return undefined;
@@ -78,6 +103,10 @@ export class CrudWrapper {
     }[s] as ModelMethod | undefined;
   }
 
+  /**
+   * Invokes a method on the instance, intercepting built-in CRUD methods and injecting
+   * a default definition.
+   */
   interceptCrud(methodName: string): Function {
     const map: Record<string, Function> = {
       POST: this.upsert.bind(this),
@@ -86,59 +115,49 @@ export class CrudWrapper {
       LIST: this.list.bind(this),
     };
 
-    const fn = this.instance[methodName];
-    if (fn) {
-      return fn.bind(this.instance);
-    }
-
-    return map[methodName];
+    const fn = this.instance && (this.instance as any)[methodName];
+    return fn ? fn.bind(this.instance) : map[methodName];
   }
 
   async upsert(obj: object, dataSource: string): Promise<HttpResult<unknown>> {
-    const normalizedDs = dataSource === "null" ? null : dataSource;
+    const normalizedDs = normalizeDs(dataSource);
     const includeTree = normalizedDs ? (this.ctor as any)[normalizedDs] : null;
 
     // Upsert
     const orm = Orm.fromD1(this.d1);
-    const upsertRes = await orm.upsert(this.ctor, obj, includeTree);
-    if (!upsertRes.ok) {
-      return { ok: false, status: 500, data: upsertRes.value }; // TODO: better status code?
+    const upsert = await orm.upsert(this.ctor, obj, includeTree);
+    if (!upsert.ok) {
+      return { ok: false, status: 500, data: upsert.value }; // TODO: better status code?
     }
 
     // Get
-    const getRes = await orm.get(
-      this.ctor,
-      upsertRes.value,
-      normalizedDs as any
-    );
-    if (!getRes.ok) {
-      return { ok: false, status: 500, data: getRes.value };
-    }
-
-    return { ok: true, status: 200, data: getRes.value };
+    const get = await orm.get(this.ctor, upsert.value, normalizedDs as any);
+    return get.ok
+      ? { ok: true, status: 200, data: get.value }
+      : { ok: false, status: 500, data: get.value };
   }
 
   async get(id: any, dataSource: string): Promise<HttpResult<unknown>> {
-    const normalizedDs = dataSource === "null" ? null : dataSource;
+    const normalizedDs = normalizeDs(dataSource);
 
     const orm = Orm.fromD1(this.d1);
-    const getRes = await orm.get(this.ctor, id, normalizedDs as any);
-    if (!getRes.ok) {
-      return { ok: false, status: 500, data: getRes.value };
-    }
-
-    return { ok: true, status: 200, data: getRes.value };
+    const res = await orm.get(this.ctor, id, normalizedDs as any);
+    return res.ok
+      ? { ok: true, status: 200, data: res.value }
+      : { ok: false, status: 500, data: res.value };
   }
 
   async list(dataSource: string): Promise<HttpResult<unknown>> {
-    const normalizedDs = dataSource === "null" ? null : dataSource;
+    const normalizedDs = normalizeDs(dataSource);
 
     const orm = Orm.fromD1(this.d1);
-    const list = await orm.list(this.ctor, normalizedDs as any);
-    if (!list.ok) {
-      return { ok: false, status: 500, data: list.value };
-    }
-
-    return { ok: true, status: 200, data: list.value };
+    const res = await orm.list(this.ctor, normalizedDs as any);
+    return res.ok
+      ? { ok: true, status: 200, data: res.value }
+      : { ok: false, status: 500, data: res.value };
   }
+}
+
+function normalizeDs(ds: string): string | null {
+  return ds === NULL_DATA_SOURCE ? null : ds;
 }

@@ -52,7 +52,7 @@ describe("Basic", () => {
         const res = await CrudHaver.post({ name: m });
         expect(res.ok, withRes("POST should be OK", res)).toBe(true);
         expect(res.data.name).toEqual(m);
-      })
+      }),
     );
   });
 
@@ -61,7 +61,7 @@ describe("Basic", () => {
     expect(res.ok, withRes("LIST should be OK", res)).toBe(true);
     expect(res.data.length, withRes("Should be 4 ites", res)).toBe(4); // including the one from the prev test
     models.forEach((m) =>
-      expect(res.data.map((d: CrudHaver) => d.name)).toContain(m)
+      expect(res.data.map((d: CrudHaver) => d.name)).toContain(m),
     );
   });
 });
@@ -74,7 +74,7 @@ describe("Parent with children", () => {
         favoriteChildId: null,
         children: [{}, {}, {}], // should be able to leave blank, creating 3 children
       },
-      "withChildren"
+      "withChildren",
     );
 
     expect(res.ok, withRes("POST should be OK", res)).toBe(true);

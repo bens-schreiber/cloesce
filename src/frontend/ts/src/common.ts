@@ -164,7 +164,7 @@ export interface NavigationProperty {
 }
 
 export function getNavigationPropertyCidlType(
-  nav: NavigationProperty
+  nav: NavigationProperty,
 ): CidlType {
   return "OneToOne" in nav.kind
     ? { Object: nav.model_name }
@@ -194,6 +194,7 @@ export interface CidlIncludeTree {
   [key: string]: CidlIncludeTree;
 }
 
+export const NULL_DATA_SOURCE = "null";
 export interface DataSource {
   name: string;
   tree: CidlIncludeTree;

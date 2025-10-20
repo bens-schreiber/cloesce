@@ -29,7 +29,7 @@ export interface RuntimeWasmExports {
     sql_rows_ptr: number,
     sql_rows_len: number,
     include_tree_ptr: number,
-    include_tree_len: number
+    include_tree_len: number,
   ): boolean;
 
   upsert_model(
@@ -38,7 +38,7 @@ export interface RuntimeWasmExports {
     new_model_ptr: number,
     new_model_len: number,
     include_tree_ptr: number,
-    include_tree_len: number
+    include_tree_len: number,
   ): boolean;
 }
 
@@ -49,7 +49,7 @@ export class WasmResource {
   constructor(
     private wasm: RuntimeWasmExports,
     public ptr: number,
-    public len: number
+    public len: number,
   ) {}
   free() {
     this.wasm.dealloc(this.ptr, this.len);
@@ -70,7 +70,7 @@ export class WasmResource {
 
 export async function loadRuntimeWasm(
   ast: CloesceAst,
-  wasm?: WebAssembly.Instance
+  wasm?: WebAssembly.Instance,
 ): Promise<RuntimeWasmExports> {
   // Load WASM
   const wasmInstance = (wasm ??
@@ -80,7 +80,7 @@ export async function loadRuntimeWasm(
 
   const modelMeta = WasmResource.fromString(
     JSON.stringify(ast.models),
-    wasmInstance.exports
+    wasmInstance.exports,
   );
 
   if (wasmInstance.exports.set_meta_ptr(modelMeta.ptr, modelMeta.len) != 0) {
@@ -98,7 +98,7 @@ export async function loadRuntimeWasm(
 export function invokeRuntimeWasm<T>(
   fn: (...args: number[]) => boolean,
   args: WasmResource[],
-  wasm: RuntimeWasmExports
+  wasm: RuntimeWasmExports,
 ): Either<string, T> {
   let resPtr: number | undefined;
   let resLen: number | undefined;
@@ -109,7 +109,7 @@ export function invokeRuntimeWasm<T>(
     resLen = wasm.get_return_len();
 
     const result = new TextDecoder().decode(
-      new Uint8Array(wasm.memory.buffer, resPtr, resLen)
+      new Uint8Array(wasm.memory.buffer, resPtr, resLen),
     );
 
     return failed ? left(result) : right(result as T);
@@ -126,7 +126,7 @@ export function invokeRuntimeWasm<T>(
 export function fromSql<T extends object>(
   ctor: new () => T,
   records: Record<string, any>[],
-  includeTree: IncludeTree<T> | CidlIncludeTree | null
+  includeTree: IncludeTree<T> | CidlIncludeTree | null,
 ): Either<string, T[]> {
   const { ast, constructorRegistry, wasm } = RuntimeContainer.get();
   const args = [
@@ -138,21 +138,21 @@ export function fromSql<T extends object>(
   const jsonResults = invokeRuntimeWasm<string>(
     wasm.object_relational_mapping,
     args,
-    wasm
+    wasm,
   );
   if (!jsonResults.ok) return jsonResults;
 
   const parsed: any[] = JSON.parse(jsonResults.value);
   return right(
     parsed.map((obj: any) =>
-      instantiateDepthFirst(obj, ast.models[ctor.name], includeTree)
-    ) as T[]
+      instantiateDepthFirst(obj, ast.models[ctor.name], includeTree),
+    ) as T[],
   );
 
   function instantiateDepthFirst(
     m: any,
     meta: Model,
-    includeTree: IncludeTree<any> | null
+    includeTree: IncludeTree<any> | null,
   ) {
     m = Object.assign(new constructorRegistry[meta.name](), m);
 
@@ -170,7 +170,7 @@ export function fromSql<T extends object>(
       // One to Many, Many to Many
       if (Array.isArray(value)) {
         m[navProp.var_name] = value.map((child: any) =>
-          instantiateDepthFirst(child, nestedMeta, nestedIncludeTree)
+          instantiateDepthFirst(child, nestedMeta, nestedIncludeTree),
         );
       }
       // One to one
@@ -178,7 +178,7 @@ export function fromSql<T extends object>(
         m[navProp.var_name] = instantiateDepthFirst(
           value,
           nestedMeta,
-          nestedIncludeTree
+          nestedIncludeTree,
         );
       }
     }

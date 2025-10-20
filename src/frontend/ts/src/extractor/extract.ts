@@ -55,7 +55,7 @@ enum ParameterDecoratorKind {
 export class CidlExtractor {
   constructor(
     public projectName: string,
-    public version: string
+    public version: string,
   ) {}
 
   extract(project: Project): Either<ExtractorError, CloesceAst> {
@@ -96,7 +96,7 @@ export class CidlExtractor {
         return sourceFile
           .getClasses()
           .filter((classDecl) =>
-            hasDecorator(classDecl, ClassDecoratorKind.WranglerEnv)
+            hasDecorator(classDecl, ClassDecoratorKind.WranglerEnv),
           )
           .map((classDecl) => {
             return {
@@ -115,7 +115,7 @@ export class CidlExtractor {
     if (wranglerEnvs.length > 1) {
       return err(
         ExtractorErrorCode.TooManyWranglerEnvs,
-        (e) => (e.context = wranglerEnvs.map((w) => w.name).toString())
+        (e) => (e.context = wranglerEnvs.map((w) => w.name).toString()),
       );
     }
 
@@ -131,7 +131,7 @@ export class CidlExtractor {
 
   private static model(
     classDecl: ClassDeclaration,
-    sourceFile: SourceFile
+    sourceFile: SourceFile,
   ): Either<ExtractorError, Model> {
     const name = classDecl.getName()!;
     const attributes: ModelAttribute[] = [];
@@ -208,7 +208,7 @@ export class CidlExtractor {
               (e) => {
                 e.snippet = prop.getText();
                 e.context = prop.getName();
-              }
+              },
             );
           }
 
@@ -221,7 +221,7 @@ export class CidlExtractor {
               (e) => {
                 e.snippet = prop.getText();
                 e.context = prop.getName();
-              }
+              },
             );
           }
 
@@ -241,7 +241,7 @@ export class CidlExtractor {
               (e) => {
                 e.snippet = prop.getText();
                 e.context = prop.getName();
-              }
+              },
             );
           }
 
@@ -254,7 +254,7 @@ export class CidlExtractor {
               (e) => {
                 e.snippet = prop.getText();
                 e.context = prop.getName();
-              }
+              },
             );
           }
 
@@ -283,7 +283,7 @@ export class CidlExtractor {
               (e) => {
                 e.snippet = prop.getText();
                 e.context = prop.getName();
-              }
+              },
             );
           }
 
@@ -299,7 +299,7 @@ export class CidlExtractor {
           const treeRes = CidlExtractor.includeTree(
             initializer,
             classDecl,
-            sourceFile
+            sourceFile,
           );
 
           if (!treeRes.ok) {
@@ -347,7 +347,7 @@ export class CidlExtractor {
 
   private static poo(
     classDecl: ClassDeclaration,
-    sourceFile: SourceFile
+    sourceFile: SourceFile,
   ): Either<ExtractorError, PlainOldObject> {
     const name = classDecl.getName()!;
     const attributes: NamedTypedValue[] = [];
@@ -389,7 +389,7 @@ export class CidlExtractor {
 
   private static cidlType(
     type: Type,
-    inject: boolean = false
+    inject: boolean = false,
   ): Either<ExtractorError, CidlType> {
     // Void
     if (type.isVoid()) {
@@ -458,13 +458,13 @@ export class CidlExtractor {
             Partial: genericTy
               .getText(
                 undefined,
-                TypeFormatFlags.UseAliasDefinedOutsideCurrentScope
+                TypeFormatFlags.UseAliasDefinedOutsideCurrentScope,
               )
               .split("|")[0]
               .trim(),
           },
-          nullable
-        )
+          nullable,
+        ),
       );
     }
 
@@ -496,7 +496,7 @@ export class CidlExtractor {
     function wrapGeneric(
       t: Type,
       isNullable: boolean,
-      wrapper: (inner: CidlType) => CidlType
+      wrapper: (inner: CidlType) => CidlType,
     ): Either<ExtractorError, CidlType> {
       const res = CidlExtractor.cidlType(t, inject);
 
@@ -522,7 +522,7 @@ export class CidlExtractor {
   private static includeTree(
     expr: Expression | undefined,
     currentClass: ClassDeclaration,
-    sf: SourceFile
+    sf: SourceFile,
   ): Either<ExtractorError, CidlIncludeTree> {
     // Include trees must be of the expected form
     if (
@@ -545,7 +545,7 @@ export class CidlExtractor {
           (e) => {
             e.snippet = expr.getText();
             e.context = prop.getName();
-          }
+          },
         );
       }
 
@@ -565,7 +565,7 @@ export class CidlExtractor {
           ExtractorErrorCode.InvalidNavigationPropertyReference,
           (e) => {
             ((e.snippet = navProp.getText()), (e.context = prop.getName()));
-          }
+          },
         );
       }
 
@@ -585,7 +585,7 @@ export class CidlExtractor {
           const treeRes = CidlExtractor.includeTree(
             initializer,
             targetClass,
-            sf
+            sf,
           );
 
           // Error: Propogated from `includeTree`
@@ -605,13 +605,13 @@ export class CidlExtractor {
   }
 
   private static method(
-    method: MethodDeclaration
+    method: MethodDeclaration,
   ): Either<ExtractorError, ModelMethod> {
     const decorators = method.getDecorators();
     const decoratorNames = decorators.map((d) => getDecoratorName(d));
 
     const httpVerb = decoratorNames.find((name) =>
-      Object.values(HttpVerb).includes(name as HttpVerb)
+      Object.values(HttpVerb).includes(name as HttpVerb),
     ) as HttpVerb;
 
     const parameters: NamedTypedValue[] = [];
@@ -671,7 +671,7 @@ export class CidlExtractor {
 
 function err(
   code: ExtractorErrorCode,
-  fn?: (extractorErr: ExtractorError) => void
+  fn?: (extractorErr: ExtractorError) => void,
 ): Either<ExtractorError, never> {
   let e = new ExtractorError(code);
   if (fn) {
@@ -687,7 +687,7 @@ function getDecoratorName(decorator: Decorator): string {
 
 function getDecoratorArgument(
   decorator: Decorator,
-  index: number
+  index: number,
 ): string | undefined {
   const args = decorator.getArguments();
   if (!args[index]) return undefined;
@@ -727,7 +727,7 @@ function getCrudKinds(d: Decorator): CrudKind[] {
         (e) =>
           (MorphNode.isStringLiteral(e)
             ? e.getLiteralValue()
-            : e.getText()) as CrudKind
+            : e.getText()) as CrudKind,
       );
   }
 
@@ -736,7 +736,7 @@ function getCrudKinds(d: Decorator): CrudKind[] {
 
 function findPropertyByName(
   cls: ClassDeclaration,
-  name: string
+  name: string,
 ): PropertyDeclaration | undefined {
   const exactMatch = cls.getProperties().find((p) => p.getName() === name);
   return exactMatch;
@@ -744,7 +744,7 @@ function findPropertyByName(
 
 function hasDecorator(
   node: { getDecorators(): Decorator[] },
-  name: string
+  name: string,
 ): boolean {
   return node.getDecorators().some((d) => {
     const decoratorName = getDecoratorName(d);
