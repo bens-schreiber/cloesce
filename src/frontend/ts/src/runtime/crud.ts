@@ -28,7 +28,7 @@ export class CrudContext {
   }
 
   static fromCtor(d1: D1Database, ctor: new () => object): CrudContext {
-    return new this(d1, undefined, ctor);
+    return new this(d1, ctor, ctor);
   }
 
   /**
