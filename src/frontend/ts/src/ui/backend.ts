@@ -1,10 +1,16 @@
 import { D1Database } from "@cloudflare/workers-types/experimental/index.js";
-import { CrudKind, Either, HttpResult, left, right } from "../common.js";
+import { CrudKind, Either, KeysOfType, left, right } from "../common.js";
 import { RuntimeContainer } from "../router/router.js";
 import { WasmResource, fromSql, invokeOrmWasm } from "../router/wasm.js";
 
 export { cloesce } from "../router/router.js";
-export type { HttpResult, Either, DeepPartial } from "../common.js";
+export type {
+  HttpResult,
+  Either,
+  DeepPartial,
+  InstanceRegistry,
+} from "../common.js";
+export { CloesceApp } from "../common.js";
 
 // Compiler hints
 export const D1: ClassDecorator = () => {};
@@ -43,61 +49,6 @@ export type IncludeTree<T> = T extends Primitive
         ? IncludeTree<NonNullable<U>>
         : IncludeTree<NonNullable<T[K]>>;
     };
-
-/**
- * Dependency injection container, mapping an object type name to an instance of that object.
- *
- * Comes with the WranglerEnv and Request by default.
- */
-export type InstanceRegistry = Map<string, any>;
-export type MiddlewareFn = (
-  request: Request,
-  env: any,
-  ir: InstanceRegistry,
-) => Promise<HttpResult | undefined>;
-
-type KeysOfType<T, U> = {
-  [K in keyof T]: T[K] extends U ? (K extends string ? K : never) : never;
-}[keyof T];
-
-/**
- * A container for middleware. If an instance is exported from `app.cloesce.ts`, it will be used in the
- * appropriate location, with global middleware happening before any routing occurs.
- */
-export class CloesceApp {
-  public global: MiddlewareFn[] = [];
-  public model: Map<string, MiddlewareFn[]> = new Map();
-  public method: Map<string, Map<string, MiddlewareFn[]>> = new Map();
-
-  public useGlobal(m: MiddlewareFn) {
-    this.global.push(m);
-  }
-
-  public useModel<T>(ctor: new () => T, m: MiddlewareFn) {
-    if (this.model.has(ctor.name)) {
-      this.model.get(ctor.name)!.push(m);
-    } else {
-      this.model.set(ctor.name, [m]);
-    }
-  }
-
-  public useMethod<T>(
-    ctor: new () => T,
-    method: KeysOfType<T, (...args: any) => any>,
-    m: MiddlewareFn,
-  ) {
-    if (!this.method.has(ctor.name)) {
-      this.method.set(ctor.name, new Map());
-    }
-
-    const methods = this.method.get(ctor.name)!;
-    if (!methods.has(method)) {
-      methods.set(method, []);
-    }
-
-    methods.get(method)!.push(m);
-  }
-}
 
 /**
  * ORM functions which use metadata to translate arguments to valid SQL queries.

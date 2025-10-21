@@ -11,10 +11,11 @@ import {
   Model,
   getNavigationPropertyCidlType,
   NULL_DATA_SOURCE,
+  CloesceApp,
+  InstanceRegistry,
 } from "../common.js";
 import { OrmWasmExports, fromSql, loadOrmWasm } from "./wasm.js";
 import { CrudContext } from "./crud.js";
-import { CloesceApp, InstanceRegistry } from "../ui/backend.js";
 
 /**
  * Map of model names to their respective constructor.

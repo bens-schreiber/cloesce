@@ -30,6 +30,7 @@ import {
   ExtractorErrorCode,
   PlainOldObject,
   CrudKind,
+  CloesceApp,
 } from "../common.js";
 import { TypeFormatFlags } from "typescript";
 
@@ -46,6 +47,7 @@ enum ClassDecoratorKind {
   D1 = "D1",
   WranglerEnv = "WranglerEnv",
   PlainOldObject = "PlainOldObject",
+  CRUD = "CRUD",
 }
 
 enum ParameterDecoratorKind {
@@ -154,7 +156,7 @@ export class CidlExtractor {
     };
 
     const typeText = getTypeText();
-    if (typeText === "CloesceApp") {
+    if (typeText === CloesceApp.name) {
       return right(sourceFile.getFilePath().toString());
     }
 
@@ -176,7 +178,7 @@ export class CidlExtractor {
     // Extract crud methods
     const crudDecorator = classDecl
       .getDecorators()
-      .find((d) => getDecoratorName(d) === "CRUD");
+      .find((d) => getDecoratorName(d) === ClassDecoratorKind.CRUD);
     if (crudDecorator) {
       cruds = getCrudKinds(crudDecorator);
     }
