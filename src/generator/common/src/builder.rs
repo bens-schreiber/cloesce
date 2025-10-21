@@ -15,11 +15,12 @@ pub fn create_ast(mut models: Vec<Model>) -> CloesceAst {
         project_name: "test".to_string(),
         language: InputLanguage::TypeScript,
         models: map,
-        poos: BTreeMap::default(), // TODO: if tests cover PlainOldObjects, add to `create_ast`
+        poos: BTreeMap::default(),
         wrangler_env: WranglerEnv {
             name: "Env".into(),
             source_path: "source.ts".into(),
         },
+        app_source: None,
     }
 }
 

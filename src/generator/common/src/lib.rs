@@ -9,8 +9,8 @@ use err::GeneratorErrorKind;
 use err::Result;
 use serde::Deserialize;
 use serde::Serialize;
-use serde_with::MapPreventDuplicates;
 use serde_with::serde_as;
+use serde_with::MapPreventDuplicates;
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
 pub enum CidlType {
@@ -198,6 +198,8 @@ pub struct CloesceAst {
 
     #[serde_as(as = "MapPreventDuplicates<_, _>")]
     pub poos: BTreeMap<String, PlainOldObject>,
+
+    pub app_source: Option<PathBuf>,
 }
 
 impl CloesceAst {

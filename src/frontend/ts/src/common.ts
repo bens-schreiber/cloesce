@@ -14,6 +14,7 @@ export function right<R>(value: R): Either<never, R> {
 }
 
 export enum ExtractorErrorCode {
+  AppMissingDefaultExport,
   UnknownType,
   MultipleGenericType,
   InvalidPartialType,
@@ -32,6 +33,10 @@ const errorInfoMap: Record<
   ExtractorErrorCode,
   { description: string; suggestion: string }
 > = {
+  [ExtractorErrorCode.AppMissingDefaultExport]: {
+    description: "app.cloesce.ts does not export a CloesceApp by default",
+    suggestion: "Export an instantiated CloesceApp in app.cloesce.ts",
+  },
   [ExtractorErrorCode.UnknownType]: {
     description: "Encountered an unknown or unsupported type",
     suggestion: "Refer to the documentation on valid Cloesce TS types",
@@ -164,7 +169,7 @@ export interface NavigationProperty {
 }
 
 export function getNavigationPropertyCidlType(
-  nav: NavigationProperty,
+  nav: NavigationProperty
 ): CidlType {
   return "OneToOne" in nav.kind
     ? { Object: nav.model_name }
@@ -212,4 +217,5 @@ export interface CloesceAst {
   wrangler_env: WranglerEnv;
   models: Record<string, Model>;
   poos: Record<string, PlainOldObject>;
+  app_source: string | null;
 }

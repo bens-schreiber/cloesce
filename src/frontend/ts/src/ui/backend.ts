@@ -1,5 +1,5 @@
 import { D1Database } from "@cloudflare/workers-types/experimental/index.js";
-import { CrudKind, Either, left, right } from "../common.js";
+import { CrudKind, Either, HttpResult, left, right } from "../common.js";
 import { RuntimeContainer } from "../router/router.js";
 import { WasmResource, fromSql, invokeOrmWasm } from "../router/wasm.js";
 
@@ -44,6 +44,30 @@ export type IncludeTree<T> = T extends Primitive
         : IncludeTree<NonNullable<T[K]>>;
     };
 
+/**
+ * Dependency injection container, mapping an object type name to an instance of that object.
+ *
+ * Comes with the WranglerEnv and Request by default.
+ */
+export type InstanceRegistry = Map<string, any>;
+export type GlobalMiddleware = (
+  request: Request,
+  env: any,
+  ir: InstanceRegistry
+) => Promise<HttpResult | undefined>;
+
+/**
+ * A container for middleware. If an instance is exported from `app.cloesce.ts`, it will be used in the
+ * appropriate location, with global middleware happening before any routing occurs.
+ */
+export class CloesceApp {
+  public globalMiddleware: GlobalMiddleware[] = [];
+
+  public use(m: GlobalMiddleware) {
+    this.globalMiddleware.push(m);
+  }
+}
+
 type KeysOfType<T, U> = {
   [K in keyof T]: T[K] extends U ? K : never;
 }[keyof T];
@@ -74,7 +98,7 @@ export class Orm {
   static fromSql<T extends object>(
     ctor: new () => T,
     records: Record<string, any>[],
-    includeTree: IncludeTree<T> | null,
+    includeTree: IncludeTree<T> | null
   ): Either<string, T[]> {
     return fromSql(ctor, records, includeTree);
   }
@@ -95,7 +119,7 @@ export class Orm {
   static upsertQuery<T extends object>(
     ctor: new () => T,
     newModel: T,
-    includeTree: IncludeTree<T> | null,
+    includeTree: IncludeTree<T> | null
   ): Either<string, string> {
     const { wasm } = RuntimeContainer.get();
     const args = [
@@ -150,7 +174,7 @@ export class Orm {
   async upsert<T extends object>(
     ctor: new () => T,
     newModel: T,
-    includeTree: IncludeTree<T> | null,
+    includeTree: IncludeTree<T> | null
   ): Promise<Either<string, any>> {
     let upsertQueryRes = Orm.upsertQuery(ctor, newModel, includeTree);
     if (!upsertQueryRes.ok) {
@@ -174,13 +198,13 @@ export class Orm {
 
     // Execute all statements in a batch.
     const batchRes = await this.db.batch(
-      statements.map((s) => this.db.prepare(s)),
+      statements.map((s) => this.db.prepare(s))
     );
 
     if (!batchRes.every((r) => r.success)) {
       const failed = batchRes.find((r) => !r.success);
       return left(
-        failed?.error ?? "D1 batch failed, but no error was returned.",
+        failed?.error ?? "D1 batch failed, but no error was returned."
       );
     }
 
@@ -195,7 +219,7 @@ export class Orm {
    */
   static listQuery<T extends object>(
     ctor: new () => T,
-    includeTree: KeysOfType<T, IncludeTree<T>> | null,
+    includeTree: KeysOfType<T, IncludeTree<T>> | null
   ): string {
     if (includeTree) {
       return `SELECT * FROM [${ctor.name}.${includeTree.toString()}]`;
@@ -210,7 +234,7 @@ export class Orm {
    */
   static getQuery<T extends object>(
     ctor: new () => T,
-    includeTree: KeysOfType<T, IncludeTree<T>> | null,
+    includeTree: KeysOfType<T, IncludeTree<T>> | null
   ): string {
     const { ast } = RuntimeContainer.get();
     if (includeTree) {
@@ -226,7 +250,7 @@ export class Orm {
    */
   async list<T extends object>(
     ctor: new () => T,
-    includeTreeKey: KeysOfType<T, IncludeTree<T>> | null,
+    includeTreeKey: KeysOfType<T, IncludeTree<T>> | null
   ): Promise<Either<string, T[]>> {
     const q = Orm.listQuery(ctor, includeTreeKey);
     const res = await this.db.prepare(q).run();
@@ -256,7 +280,7 @@ export class Orm {
   async get<T extends object>(
     ctor: new () => T,
     id: any,
-    includeTreeKey: KeysOfType<T, IncludeTree<T>> | null,
+    includeTreeKey: KeysOfType<T, IncludeTree<T>> | null
   ): Promise<Either<string, T>> {
     const q = Orm.getQuery(ctor, includeTreeKey);
     const res = await this.db.prepare(q).bind(id).run();

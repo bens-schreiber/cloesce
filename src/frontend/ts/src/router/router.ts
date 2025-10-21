@@ -14,6 +14,7 @@ import {
 } from "../common.js";
 import { OrmWasmExports, fromSql, loadOrmWasm } from "./wasm.js";
 import { CrudContext } from "./crud.js";
+import { CloesceApp } from "../ui/backend.js";
 
 /**
  * Map of model names to their respective constructor.
@@ -54,13 +55,13 @@ export class RuntimeContainer {
   private constructor(
     public readonly ast: CloesceAst,
     public readonly constructorRegistry: ModelConstructorRegistry,
-    public readonly wasm: OrmWasmExports,
+    public readonly wasm: OrmWasmExports
   ) {}
 
   static async init(
     ast: CloesceAst,
     constructorRegistry: ModelConstructorRegistry,
-    wasm?: WebAssembly.Instance,
+    wasm?: WebAssembly.Instance
   ) {
     if (this.instance) {
       return;
@@ -83,14 +84,30 @@ export class RuntimeContainer {
  */
 export async function cloesce(
   request: Request,
+  env: any,
   ast: CloesceAst,
+  app: CloesceApp,
   constructorRegistry: ModelConstructorRegistry,
-  instanceRegistry: InstanceRegistry,
   envMeta: MetaWranglerEnv,
-  apiRoute: string,
+  apiRoute: string
 ): Promise<Response> {
+  //#region Initialization
+  const ir: InstanceRegistry = new Map();
+  ir.set(envMeta.envName, env);
+  ir.set("Request", request);
+
   await RuntimeContainer.init(ast, constructorRegistry);
-  const d1: D1Database = instanceRegistry.get(envMeta.envName)[envMeta.dbName];
+  const d1: D1Database = env[envMeta.dbName]; // TODO: multiple dbs
+  //#endregion
+
+  //#region Global Middleware
+  for (const m of app.globalMiddleware) {
+    const res = await m(request, env, ir);
+    if (res) {
+      return toResponse(res);
+    }
+  }
+  //#endregion
 
   //#region Match the route to a model method
   const route = matchRoute(request, ast, apiRoute);
@@ -119,7 +136,7 @@ export async function cloesce(
       d1,
       model,
       id!,
-      dataSource,
+      dataSource
     );
 
     if (!hydratedModel.ok) {
@@ -130,8 +147,8 @@ export async function cloesce(
       CrudContext.fromInstance(
         d1,
         hydratedModel.value,
-        constructorRegistry[model.name],
-      ),
+        constructorRegistry[model.name]
+      )
     );
   })();
   if (!crudCtx.ok) {
@@ -139,15 +156,7 @@ export async function cloesce(
   }
   //#endregion
 
-  return toResponse(
-    await methodDispatch(
-      crudCtx.value,
-      instanceRegistry,
-      envMeta,
-      method,
-      params,
-    ),
-  );
+  return toResponse(await methodDispatch(crudCtx.value, ir, method, params));
 }
 
 /**
@@ -158,7 +167,7 @@ export async function cloesce(
 function matchRoute(
   request: Request,
   ast: CloesceAst,
-  apiRoute: string,
+  apiRoute: string
 ): Either<
   HttpResult,
   {
@@ -221,7 +230,7 @@ async function validateRequest(
   ast: CloesceAst,
   model: Model,
   method: ModelMethod,
-  id: string | null,
+  id: string | null
 ): Promise<
   Either<HttpResult, { params: RequestParamMap; dataSource: string }>
 > {
@@ -241,7 +250,7 @@ async function validateRequest(
         typeof p.cidl_type === "object" &&
         p.cidl_type !== null &&
         "Inject" in p.cidl_type
-      ),
+      )
   );
 
   // Extract url or body parameters
@@ -295,7 +304,7 @@ async function hydrateModel(
   d1: D1Database,
   model: Model,
   id: string,
-  dataSource: string,
+  dataSource: string
 ): Promise<Either<HttpResult, object>> {
   // Error state: If the D1 database has been tweaked outside of Cloesce
   // resulting in a malformed query, exit with a 500.
@@ -303,8 +312,8 @@ async function hydrateModel(
     left(
       errorState(
         500,
-        `Error in hydration query, is the database out of sync with the backend?: ${e instanceof Error ? e.message : String(e)}`,
-      ),
+        `Error in hydration query, is the database out of sync with the backend?: ${e instanceof Error ? e.message : String(e)}`
+      )
     );
 
   // Error state: If no record is found for the id, return a 404
@@ -334,7 +343,7 @@ async function hydrateModel(
   const models: object[] = fromSql(
     constructorRegistry[model.name],
     records.results,
-    model.data_sources[dataSource]?.tree ?? {},
+    model.data_sources[dataSource]?.tree ?? {}
   ).value as object[];
 
   return right(models[0]);
@@ -347,24 +356,36 @@ async function hydrateModel(
 async function methodDispatch(
   crudCtx: CrudContext,
   instanceRegistry: InstanceRegistry,
-  envMeta: MetaWranglerEnv,
   method: ModelMethod,
-  params: Record<string, unknown>,
+  params: Record<string, unknown>
 ): Promise<HttpResult<unknown>> {
   // Error state: Client code ran into an uncaught exception.
   const uncaughtException = (e: any) =>
     errorState(
       500,
-      `Uncaught exception in method dispatch: ${e instanceof Error ? e.message : String(e)}`,
+      `Uncaught exception in method dispatch: ${e instanceof Error ? e.message : String(e)}`
     );
 
-  // For now, the only injected dependency is the wrangler env,
-  // so we will assume that is what this is
-  const paramArray = method.parameters.map((p) =>
-    params[p.name] == undefined
-      ? instanceRegistry.get(envMeta.envName)
-      : params[p.name],
-  );
+  const paramArray = [];
+  for (const param of method.parameters) {
+    if (params[param.name]) {
+      paramArray.push(params[param.name]);
+      continue;
+    }
+
+    // Injected type
+    const injected = instanceRegistry.get((param.cidl_type as any)["Inject"]);
+    if (!injected) {
+      // Error state: Injected parameters cannot be found at compile time, only at runtime.
+      // If a injected reference does not exist, throw a 500.
+      return errorState(
+        500,
+        `An injected parameter was missing from the instance registry: ${JSON.stringify(param.cidl_type)}`
+      );
+    }
+
+    paramArray.push(injected);
+  }
 
   // Ensure the result is always some HttpResult
   const resultWrapper = (res: any): HttpResult<unknown> => {
@@ -393,7 +414,7 @@ function validateCidlType(
   ast: CloesceAst,
   value: unknown,
   cidlType: CidlType,
-  isPartial: boolean,
+  isPartial: boolean
 ): boolean {
   if (value === undefined) return isPartial;
 
@@ -442,8 +463,8 @@ function validateCidlType(
           ast,
           valueObj[attr.value.name],
           attr.value.cidl_type,
-          isPartial,
-        ),
+          isPartial
+        )
       )
     ) {
       return false;
@@ -459,7 +480,7 @@ function validateCidlType(
           ast,
           navValue,
           getNavigationPropertyCidlType(nav),
-          isPartial,
+          isPartial
         )
       );
     });
@@ -474,7 +495,7 @@ function validateCidlType(
     // Validate attributes
     if (
       !poo.attributes.every((attr) =>
-        validateCidlType(ast, valueObj[attr.name], attr.cidl_type, isPartial),
+        validateCidlType(ast, valueObj[attr.name], attr.cidl_type, isPartial)
       )
     ) {
       return false;

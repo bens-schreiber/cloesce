@@ -1,0 +1,28 @@
+{
+    "version": "v0.0.3",
+    "project_name": "runner",
+    "language": "TypeScript",
+    "wrangler_env": {
+        "name": "Env",
+        "source_path": "./seed__app.cloesce.ts"
+    },
+    "models": {
+        "Model": {
+            "name": "Model",
+            "attributes": [],
+            "primary_key": {
+                "name": "id",
+                "cidl_type": "Integer"
+            },
+            "navigation_properties": [],
+            "methods": {},
+            "cruds": [
+                "POST"
+            ],
+            "data_sources": {},
+            "source_path": "./seed__app.cloesce.ts"
+        }
+    },
+    "poos": {},
+    "app_source": "./seed__app.cloesce.ts"
+}

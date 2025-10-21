@@ -1,9 +1,11 @@
-use std::{collections::BTreeMap, path::Path};
+use std::{
+    collections::BTreeMap,
+    path::{Path, PathBuf},
+};
 
 use common::{
-    CloesceAst, Model, PlainOldObject, WranglerEnv,
     err::{GeneratorErrorKind, Result},
-    fail,
+    fail, CloesceAst, Model, PlainOldObject,
 };
 
 use wrangler::WranglerSpec;
@@ -38,10 +40,11 @@ impl WorkersGenerator {
         }
     }
 
-    /// Generates all model source imports
-    fn link_models(
+    /// Generates all model source imports as well as the Cloesce App
+    fn link(
         models: &BTreeMap<String, Model>,
         poos: &BTreeMap<String, PlainOldObject>,
+        app_source: Option<&PathBuf>,
         workers_path: &Path,
     ) -> String {
         let workers_dir = workers_path
@@ -94,15 +97,23 @@ impl WorkersGenerator {
             .collect::<Vec<_>>()
             .join("\n");
 
-        format!("{model_imports}\n{poo_imports}")
+        let app_import = match app_source {
+            Some(p) => {
+                let path = rel_path(p, workers_dir)
+                    .unwrap_or_else(|_| p.clone().to_string_lossy().to_string());
+                format!("import app from \"{path}\"")
+            }
+            None => "const app = new CloesceApp()".into(),
+        };
+
+        format!("{model_imports}\n{poo_imports}\n{app_import}")
     }
 
-    /// Generates the constructor registry and instance registry
-    fn registries(
+    /// Generates the constructor registry
+    fn registry(
         models: &BTreeMap<String, Model>,
         poos: &BTreeMap<String, PlainOldObject>,
-        wenv: &WranglerEnv,
-    ) -> (String, String) {
+    ) -> String {
         let mut constructor_registry = Vec::new();
         for model in models.values() {
             constructor_registry.push(format!("\t{}: {}", &model.name, &model.name));
@@ -117,14 +128,7 @@ impl WorkersGenerator {
             format!("const constructorRegistry = {{\n{}\n}};", body)
         };
 
-        let instance_registry_def = format!(
-            "const instanceRegistry = new Map([
-            [\"{}\", env]
-        ]);",
-            wenv.name
-        );
-
-        (constructor_registry_def, instance_registry_def)
+        constructor_registry_def
     }
 
     pub fn create(
@@ -135,9 +139,13 @@ impl WorkersGenerator {
     ) -> Result<String> {
         let api_route = Self::validate_domain(&domain)?;
 
-        let model_sources = Self::link_models(&ast.models, &ast.poos, workers_path);
-        let (constructor_registry, instance_registry) =
-            Self::registries(&ast.models, &ast.poos, &ast.wrangler_env);
+        let linked_sources = Self::link(
+            &ast.models,
+            &ast.poos,
+            ast.app_source.as_ref(),
+            workers_path,
+        );
+        let constructor_registry = Self::registry(&ast.models, &ast.poos);
 
         // TODO: Hardcoding one database, in the future we need to support any amount
         let db_binding = wrangler
@@ -151,38 +159,37 @@ impl WorkersGenerator {
 
         // TODO: Middleware function should return the DI instance registry
         Ok(format!(
-            r#"import {{ cloesce }} from "cloesce/backend";
+            r#"import {{ cloesce, CloesceApp }} from "cloesce/backend";
 import cidl from "./cidl.json";
-{model_sources}
-
+{linked_sources}
 {constructor_registry}
 
-export default {{
-    async fetch(request: Request, env: any, ctx: any): Promise<Response> {{
-        {instance_registry}
-
-        try {{
-            return await cloesce(
-                request, 
-                cidl, 
-                constructorRegistry, 
-                instanceRegistry, 
-                {{ envName: "{env_name}", dbName: "{db_binding}" }},  
-                "/{api_route}"
-            );
-        }} catch(e: any) {{
-            return new Response(JSON.stringify({{
-                ok: false,
-                status: 500,
-                message: e.toString()
-            }}), {{
-                status: 500,
-                headers: {{ "Content-Type": "application/json" }},
-              }});
-        }}
+async function fetch(request: Request, env: any, ctx: any): Promise<Response> {{
+    try {{
+        const envMeta = {{ envName: "{env_name}", dbName: "{db_binding}" }};
+        const apiRoute = "/{api_route}";
+        return await cloesce(
+            request, 
+            env,
+            cidl, 
+            app,
+            constructorRegistry, 
+            envMeta,  
+            apiRoute
+        );
+    }} catch(e: any) {{
+        return new Response(JSON.stringify({{
+            ok: false,
+            status: 500,
+            message: e.toString()
+        }}), {{
+            status: 500,
+            headers: {{ "Content-Type": "application/json" }},
+            }});
     }}
-}};
-"#
+}}
+
+export default {{fetch}};"#
         ))
     }
 }
