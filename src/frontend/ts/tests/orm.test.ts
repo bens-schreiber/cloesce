@@ -31,6 +31,7 @@ const makeAst = (methods: Record<string, any>): CloesceAst => ({
     },
   },
   poos: {},
+  app_source: null,
 });
 
 const makeRequest = (url: string, method?: string, body?: any) =>
@@ -50,7 +51,7 @@ describe("Router Error States", () => {
     const result = _cloesceInternal.matchRoute(
       makeRequest(baseUrl),
       makeAst({}),
-      "/api",
+      "/api"
     );
     expect(result.value).toStrictEqual({
       ok: false,
@@ -64,7 +65,7 @@ describe("Router Error States", () => {
     const result = _cloesceInternal.matchRoute(
       makeRequest(url),
       makeAst({}),
-      "/api",
+      "/api"
     );
     expect(result.value).toStrictEqual({
       ok: false,
@@ -78,7 +79,7 @@ describe("Router Error States", () => {
     const result = _cloesceInternal.matchRoute(
       makeRequest(url),
       makeAst({}),
-      "/api",
+      "/api"
     );
     expect(result.value).toStrictEqual({
       ok: false,
@@ -148,6 +149,7 @@ describe("Validate Request Error States", () => {
     project_name: "",
     language: "TypeScript",
     poos: {},
+    app_source: null,
   };
   const emptyModel: Model = {
     name: "",
@@ -172,7 +174,7 @@ describe("Validate Request Error States", () => {
         return_type: null,
         parameters: [],
       },
-      null,
+      null
     );
 
     expect(result.value).toStrictEqual({
@@ -195,7 +197,7 @@ describe("Validate Request Error States", () => {
         return_type: null,
         parameters: [],
       },
-      null,
+      null
     );
 
     expect(result.value).toStrictEqual({
@@ -237,7 +239,7 @@ describe("Validate Request Error States", () => {
       ast,
       ast.models.Horse,
       ast.models.Horse.methods.neigh,
-      "0",
+      "0"
     );
 
     expect(result.value).toStrictEqual({
@@ -275,8 +277,8 @@ describe("Validate Request Success States", () => {
             ? { Nullable: i.typed_value.cidl_type }
             : i.typed_value.cidl_type,
         },
-      })),
-    ),
+      }))
+    )
   );
 
   test.each(expanded)("accepts valid input %#", async (arg) => {
@@ -286,7 +288,7 @@ describe("Validate Request Success States", () => {
     const request = makeRequest(
       url,
       arg.isGet ? undefined : "POST",
-      arg.isGet ? undefined : { [arg.typed_value.name]: arg.value },
+      arg.isGet ? undefined : { [arg.typed_value.name]: arg.value }
     );
     const ast = makeAst({
       neigh: {
@@ -306,7 +308,7 @@ describe("Validate Request Success States", () => {
       ast,
       ast.models.Horse,
       ast.models.Horse.methods.neigh,
-      null,
+      null
     );
 
     expect(result.value).toEqual({
@@ -336,7 +338,7 @@ describe("methodDispatch", () => {
     withSession: vi.fn(),
     dump: vi.fn(),
   });
-  const envMeta = { envName: "Env", dbName: "db" };
+
   const makeRegistry = () => new Map([["Env", { db: makeMockD1() }]]);
 
   test("returns 200 with no data when return_type null", async () => {
@@ -344,9 +346,8 @@ describe("methodDispatch", () => {
     const result = await _cloesceInternal.methodDispatch(
       CrudContext.fromInstance(makeMockD1(), instance, vi.fn()),
       makeRegistry(),
-      envMeta,
       makeMethod(),
-      {},
+      {}
     );
     expect(instance.testMethod).toHaveBeenCalled();
     expect(result).toStrictEqual({ ok: true, status: 200 });
@@ -361,9 +362,8 @@ describe("methodDispatch", () => {
     const result = await _cloesceInternal.methodDispatch(
       CrudContext.fromInstance(makeMockD1(), instance, vi.fn()),
       makeRegistry(),
-      envMeta,
       makeMethod({ return_type: { HttpResult: null } }),
-      {},
+      {}
     );
     expect(result).toStrictEqual({ ok: true, status: 200, data: "wrapped" });
   });
@@ -373,9 +373,8 @@ describe("methodDispatch", () => {
     const result = await _cloesceInternal.methodDispatch(
       CrudContext.fromInstance(makeMockD1(), instance, vi.fn()),
       makeRegistry(),
-      envMeta,
       makeMethod({ return_type: "Text" }),
-      {},
+      {}
     );
     expect(result).toStrictEqual({ ok: true, status: 200, data: "neigh" });
   });
@@ -386,9 +385,11 @@ describe("methodDispatch", () => {
     const result = await _cloesceInternal.methodDispatch(
       CrudContext.fromInstance(makeMockD1(), instance, vi.fn()),
       ireg,
-      envMeta,
-      makeMethod({ return_type: "Text", parameters: [{ name: "database" }] }),
-      {},
+      makeMethod({
+        return_type: "Text",
+        parameters: [{ name: "database", cidl_type: { Inject: "Env" } }],
+      }),
+      {}
     );
     expect(instance.testMethod).toHaveBeenCalledWith(ireg.get("Env"));
     expect(result).toStrictEqual({ ok: true, status: 200, data: "used d1" });
@@ -410,16 +411,14 @@ describe("methodDispatch", () => {
     const result1 = await _cloesceInternal.methodDispatch(
       ctx,
       makeRegistry(),
-      envMeta,
       method,
-      {},
+      {}
     );
     const result2 = await _cloesceInternal.methodDispatch(
       CrudContext.fromInstance(makeMockD1(), strInstance, vi.fn()),
       makeRegistry(),
-      envMeta,
       method,
-      {},
+      {}
     );
 
     expect(result1).toStrictEqual({
@@ -439,7 +438,7 @@ describe("modelsFromSql", () => {
   test("handles recursive navigation properties", async () => {
     const wasm = await WebAssembly.instantiate(
       fs.readFileSync(path.resolve("./dist/orm.wasm")),
-      {},
+      {}
     );
 
     const modelName = "Horse";
@@ -517,6 +516,7 @@ describe("modelsFromSql", () => {
       project_name: "",
       language: "TypeScript",
       poos: {},
+      app_source: null,
     };
 
     await _cloesceInternal.RuntimeContainer.init(ast, ctor, wasm.instance);
