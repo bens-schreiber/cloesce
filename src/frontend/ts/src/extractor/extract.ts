@@ -30,6 +30,7 @@ import {
   ExtractorErrorCode,
   PlainOldObject,
   CrudKind,
+  CloesceApp,
 } from "../common.js";
 import { TypeFormatFlags } from "typescript";
 
@@ -46,6 +47,7 @@ enum ClassDecoratorKind {
   D1 = "D1",
   WranglerEnv = "WranglerEnv",
   PlainOldObject = "PlainOldObject",
+  CRUD = "CRUD",
 }
 
 enum ParameterDecoratorKind {
@@ -61,8 +63,22 @@ export class CidlExtractor {
   extract(project: Project): Either<ExtractorError, CloesceAst> {
     const models: Record<string, Model> = {};
     const poos: Record<string, PlainOldObject> = {};
+    const wranglerEnvs: WranglerEnv[] = [];
+    let app_source: string | null = null;
 
     for (const sourceFile of project.getSourceFiles()) {
+      if (
+        sourceFile.getBaseName() === "app.cloesce.ts" ||
+        sourceFile.getBaseName() === "seed__app.cloesce.ts" // hardcoding for tests
+      ) {
+        const app = CidlExtractor.app(sourceFile);
+        if (!app.ok) {
+          return app;
+        }
+
+        app_source = app.value;
+      }
+
       for (const classDecl of sourceFile.getClasses()) {
         if (hasDecorator(classDecl, ClassDecoratorKind.D1)) {
           const result = CidlExtractor.model(classDecl, sourceFile);
@@ -87,24 +103,15 @@ export class CidlExtractor {
           poos[result.value.name] = result.value;
           continue;
         }
+
+        if (hasDecorator(classDecl, ClassDecoratorKind.WranglerEnv)) {
+          wranglerEnvs.push({
+            name: classDecl.getName(),
+            source_path: sourceFile.getFilePath().toString(),
+          } as WranglerEnv);
+        }
       }
     }
-
-    const wranglerEnvs: WranglerEnv[] = project
-      .getSourceFiles()
-      .flatMap((sourceFile) => {
-        return sourceFile
-          .getClasses()
-          .filter((classDecl) =>
-            hasDecorator(classDecl, ClassDecoratorKind.WranglerEnv),
-          )
-          .map((classDecl) => {
-            return {
-              name: classDecl.getName(),
-              source_path: sourceFile.getFilePath().toString(),
-            } as WranglerEnv;
-          });
-      });
 
     // Error: A wrangler environment is required
     if (wranglerEnvs.length < 1) {
@@ -126,7 +133,34 @@ export class CidlExtractor {
       wrangler_env: wranglerEnvs[0],
       models,
       poos,
+      app_source,
     });
+  }
+
+  private static app(sourceFile: SourceFile): Either<ExtractorError, string> {
+    const symbol = sourceFile.getDefaultExportSymbol();
+    const decl = symbol?.getDeclarations()[0];
+
+    if (!decl) {
+      return err(ExtractorErrorCode.AppMissingDefaultExport);
+    }
+
+    const getTypeText = (): string | undefined => {
+      if (MorphNode.isExportAssignment(decl)) {
+        return decl.getExpression()?.getType().getText();
+      }
+      if (MorphNode.isVariableDeclaration(decl)) {
+        return decl.getInitializer()?.getType().getText();
+      }
+      return undefined;
+    };
+
+    const typeText = getTypeText();
+    if (typeText === CloesceApp.name) {
+      return right(sourceFile.getFilePath().toString());
+    }
+
+    return err(ExtractorErrorCode.AppMissingDefaultExport);
   }
 
   private static model(
@@ -144,7 +178,7 @@ export class CidlExtractor {
     // Extract crud methods
     const crudDecorator = classDecl
       .getDecorators()
-      .find((d) => getDecoratorName(d) === "CRUD");
+      .find((d) => getDecoratorName(d) === ClassDecoratorKind.CRUD);
     if (crudDecorator) {
       cruds = getCrudKinds(crudDecorator);
     }

@@ -14,6 +14,7 @@ export function right<R>(value: R): Either<never, R> {
 }
 
 export enum ExtractorErrorCode {
+  AppMissingDefaultExport,
   UnknownType,
   MultipleGenericType,
   InvalidPartialType,
@@ -32,6 +33,10 @@ const errorInfoMap: Record<
   ExtractorErrorCode,
   { description: string; suggestion: string }
 > = {
+  [ExtractorErrorCode.AppMissingDefaultExport]: {
+    description: "app.cloesce.ts does not export a CloesceApp by default",
+    suggestion: "Export an instantiated CloesceApp in app.cloesce.ts",
+  },
   [ExtractorErrorCode.UnknownType]: {
     description: "Encountered an unknown or unsupported type",
     suggestion: "Refer to the documentation on valid Cloesce TS types",
@@ -108,6 +113,61 @@ export type HttpResult<T = unknown> = {
   data?: T;
   message?: string;
 };
+
+/**
+ * Dependency injection container, mapping an object type name to an instance of that object.
+ *
+ * Comes with the WranglerEnv and Request by default.
+ */
+export type InstanceRegistry = Map<string, any>;
+export type MiddlewareFn = (
+  request: Request,
+  env: any,
+  ir: InstanceRegistry,
+) => Promise<HttpResult | undefined>;
+
+export type KeysOfType<T, U> = {
+  [K in keyof T]: T[K] extends U ? (K extends string ? K : never) : never;
+}[keyof T];
+
+/**
+ * A container for middleware. If an instance is exported from `app.cloesce.ts`, it will be used in the
+ * appropriate location, with global middleware happening before any routing occurs.
+ */
+export class CloesceApp {
+  public global: MiddlewareFn[] = [];
+  public model: Map<string, MiddlewareFn[]> = new Map();
+  public method: Map<string, Map<string, MiddlewareFn[]>> = new Map();
+
+  public useGlobal(m: MiddlewareFn) {
+    this.global.push(m);
+  }
+
+  public useModel<T>(ctor: new () => T, m: MiddlewareFn) {
+    if (this.model.has(ctor.name)) {
+      this.model.get(ctor.name)!.push(m);
+    } else {
+      this.model.set(ctor.name, [m]);
+    }
+  }
+
+  public useMethod<T>(
+    ctor: new () => T,
+    method: KeysOfType<T, (...args: any) => any>,
+    m: MiddlewareFn,
+  ) {
+    if (!this.method.has(ctor.name)) {
+      this.method.set(ctor.name, new Map());
+    }
+
+    const methods = this.method.get(ctor.name)!;
+    if (!methods.has(method)) {
+      methods.set(method, []);
+    }
+
+    methods.get(method)!.push(m);
+  }
+}
 
 export type CidlType =
   | "Void"
@@ -212,4 +272,5 @@ export interface CloesceAst {
   wrangler_env: WranglerEnv;
   models: Record<string, Model>;
   poos: Record<string, PlainOldObject>;
+  app_source: string | null;
 }

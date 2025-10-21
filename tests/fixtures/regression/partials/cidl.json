@@ -59,5 +59,6 @@
             "source_path": "./seed__partial.cloesce.ts"
         }
     },
-    "poos": {}
+    "poos": {},
+    "app_source": null
 }

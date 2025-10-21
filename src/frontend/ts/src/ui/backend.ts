@@ -1,10 +1,16 @@
 import { D1Database } from "@cloudflare/workers-types/experimental/index.js";
-import { CrudKind, Either, left, right } from "../common.js";
+import { CrudKind, Either, KeysOfType, left, right } from "../common.js";
 import { RuntimeContainer } from "../router/router.js";
 import { WasmResource, fromSql, invokeOrmWasm } from "../router/wasm.js";
 
 export { cloesce } from "../router/router.js";
-export type { HttpResult, Either, DeepPartial } from "../common.js";
+export type {
+  HttpResult,
+  Either,
+  DeepPartial,
+  InstanceRegistry,
+} from "../common.js";
+export { CloesceApp } from "../common.js";
 
 // Compiler hints
 export const D1: ClassDecorator = () => {};
@@ -43,10 +49,6 @@ export type IncludeTree<T> = T extends Primitive
         ? IncludeTree<NonNullable<U>>
         : IncludeTree<NonNullable<T[K]>>;
     };
-
-type KeysOfType<T, U> = {
-  [K in keyof T]: T[K] extends U ? K : never;
-}[keyof T];
 
 /**
  * ORM functions which use metadata to translate arguments to valid SQL queries.

@@ -1,15 +1,11 @@
 import { cloesce, CloesceApp } from "cloesce/backend";
 import cidl from "./cidl.json";
-import { PooAcceptYield } from "./seed__poo.cloesce.ts";
-import { PooA } from "./seed__poo.cloesce.ts";
-import { PooB } from "./seed__poo.cloesce.ts";
-import { PooC } from "./seed__poo.cloesce.ts";
-const app = new CloesceApp()
+import { Model } from "./seed__app.cloesce.ts";
+import { InjectedThing } from "./seed__app.cloesce.ts";
+import app from "./seed__app.cloesce.ts"
 const constructorRegistry = {
-	PooAcceptYield: PooAcceptYield,
-	PooA: PooA,
-	PooB: PooB,
-	PooC: PooC
+	Model: Model,
+	InjectedThing: InjectedThing
 };
 
 async function fetch(request: Request, env: any, ctx: any): Promise<Response> {

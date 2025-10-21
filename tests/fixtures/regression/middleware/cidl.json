@@ -1,0 +1,63 @@
+{
+    "version": "v0.0.3",
+    "project_name": "runner",
+    "language": "TypeScript",
+    "wrangler_env": {
+        "name": "Env",
+        "source_path": "./seed__app.cloesce.ts"
+    },
+    "models": {
+        "Model": {
+            "name": "Model",
+            "attributes": [],
+            "primary_key": {
+                "name": "id",
+                "cidl_type": "Integer"
+            },
+            "navigation_properties": [],
+            "methods": {
+                "blockedMethod": {
+                    "name": "blockedMethod",
+                    "is_static": true,
+                    "http_verb": "GET",
+                    "return_type": "Void",
+                    "parameters": []
+                },
+                "getInjectedThing": {
+                    "name": "getInjectedThing",
+                    "is_static": true,
+                    "http_verb": "GET",
+                    "return_type": {
+                        "Object": "InjectedThing"
+                    },
+                    "parameters": [
+                        {
+                            "name": "thing",
+                            "cidl_type": {
+                                "Inject": "InjectedThing"
+                            }
+                        }
+                    ]
+                }
+            },
+            "cruds": [
+                "POST"
+            ],
+            "data_sources": {},
+            "source_path": "./seed__app.cloesce.ts"
+        }
+    },
+    "poos": {
+        "InjectedThing": {
+            "name": "InjectedThing",
+            "attributes": [
+                {
+                    "name": "value",
+                    "cidl_type": "Text"
+                }
+            ],
+            "source_path": "./seed__app.cloesce.ts"
+        }
+    },
+    "app_source": "./seed__app.cloesce.ts"
+}

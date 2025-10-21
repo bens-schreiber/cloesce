@@ -270,6 +270,10 @@ async function extract(opts: {
       ast.wrangler_env.source_path =
         "./" + path.basename(ast.wrangler_env.source_path);
 
+      if (ast.app_source) {
+        ast.app_source = "./" + path.basename(ast.app_source);
+      }
+
       for (const model of Object.values(ast.models)) {
         (model as any).source_path =
           "./" + path.basename((model as any).source_path);

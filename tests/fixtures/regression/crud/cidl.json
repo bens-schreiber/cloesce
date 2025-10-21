@@ -128,5 +128,6 @@
             "source_path": "./seed__crud.cloesce.ts"
         }
     },
-    "poos": {}
+    "poos": {},
+    "app_source": null
 }

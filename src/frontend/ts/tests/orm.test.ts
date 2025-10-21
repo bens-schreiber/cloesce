@@ -31,6 +31,7 @@ const makeAst = (methods: Record<string, any>): CloesceAst => ({
     },
   },
   poos: {},
+  app_source: null,
 });
 
 const makeRequest = (url: string, method?: string, body?: any) =>
@@ -148,6 +149,7 @@ describe("Validate Request Error States", () => {
     project_name: "",
     language: "TypeScript",
     poos: {},
+    app_source: null,
   };
   const emptyModel: Model = {
     name: "",
@@ -336,7 +338,7 @@ describe("methodDispatch", () => {
     withSession: vi.fn(),
     dump: vi.fn(),
   });
-  const envMeta = { envName: "Env", dbName: "db" };
+
   const makeRegistry = () => new Map([["Env", { db: makeMockD1() }]]);
 
   test("returns 200 with no data when return_type null", async () => {
@@ -344,7 +346,6 @@ describe("methodDispatch", () => {
     const result = await _cloesceInternal.methodDispatch(
       CrudContext.fromInstance(makeMockD1(), instance, vi.fn()),
       makeRegistry(),
-      envMeta,
       makeMethod(),
       {},
     );
@@ -361,7 +362,6 @@ describe("methodDispatch", () => {
     const result = await _cloesceInternal.methodDispatch(
       CrudContext.fromInstance(makeMockD1(), instance, vi.fn()),
       makeRegistry(),
-      envMeta,
       makeMethod({ return_type: { HttpResult: null } }),
       {},
     );
@@ -373,7 +373,6 @@ describe("methodDispatch", () => {
     const result = await _cloesceInternal.methodDispatch(
       CrudContext.fromInstance(makeMockD1(), instance, vi.fn()),
       makeRegistry(),
-      envMeta,
       makeMethod({ return_type: "Text" }),
       {},
     );
@@ -386,8 +385,10 @@ describe("methodDispatch", () => {
     const result = await _cloesceInternal.methodDispatch(
       CrudContext.fromInstance(makeMockD1(), instance, vi.fn()),
       ireg,
-      envMeta,
-      makeMethod({ return_type: "Text", parameters: [{ name: "database" }] }),
+      makeMethod({
+        return_type: "Text",
+        parameters: [{ name: "database", cidl_type: { Inject: "Env" } }],
+      }),
       {},
     );
     expect(instance.testMethod).toHaveBeenCalledWith(ireg.get("Env"));
@@ -410,14 +411,12 @@ describe("methodDispatch", () => {
     const result1 = await _cloesceInternal.methodDispatch(
       ctx,
       makeRegistry(),
-      envMeta,
       method,
       {},
     );
     const result2 = await _cloesceInternal.methodDispatch(
       CrudContext.fromInstance(makeMockD1(), strInstance, vi.fn()),
       makeRegistry(),
-      envMeta,
       method,
       {},
     );
@@ -517,6 +516,7 @@ describe("modelsFromSql", () => {
       project_name: "",
       language: "TypeScript",
       poos: {},
+      app_source: null,
     };
 
     await _cloesceInternal.RuntimeContainer.init(ast, ctor, wasm.instance);

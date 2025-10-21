@@ -1,10 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { startWrangler, stopWrangler, withRes } from "../src/setup";
-import {
-  CrudHaver,
-  Parent,
-  Child,
-} from "../../fixtures/regression/crud/client";
+import { CrudHaver, Parent } from "../../fixtures/regression/crud/client";
 
 beforeAll(async () => {
   // NOTE: e2e is called from proj root
