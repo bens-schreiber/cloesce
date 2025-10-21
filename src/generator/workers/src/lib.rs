@@ -4,8 +4,9 @@ use std::{
 };
 
 use common::{
+    CloesceAst, Model, PlainOldObject,
     err::{GeneratorErrorKind, Result},
-    fail, CloesceAst, Model, PlainOldObject,
+    fail,
 };
 
 use wrangler::WranglerSpec;
