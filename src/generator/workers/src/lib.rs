@@ -123,12 +123,10 @@ impl WorkersGenerator {
             constructor_registry.push(format!("\t{}: {}", &poo.name, &poo.name));
         }
 
-        let constructor_registry_def = {
-            let body = constructor_registry.join(",\n");
-            format!("const constructorRegistry = {{\n{}\n}};", body)
-        };
-
-        constructor_registry_def
+        format!(
+            "const constructorRegistry = {{\n{}\n}};",
+            constructor_registry.join(",\n")
+        )
     }
 
     pub fn create(
