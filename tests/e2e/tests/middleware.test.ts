@@ -20,3 +20,21 @@ describe("Global Middleware", () => {
     expect(res.data).toBeUndefined();
   });
 });
+
+describe("Model + Method Middleware", () => {
+  it("Rejects method", async () => {
+    const res = await Model.blockedMethod();
+    expect(res.ok).toBe(false);
+    expect(res.status).toBe(401);
+    expect(res.message).toBe("Blocked method");
+    expect(res.data).toBeUndefined();
+  });
+
+  it("Model middleware passes injected dep", async () => {
+    const res = await Model.getInjectedThing();
+    expect(res.ok).toBe(true);
+    expect(res.data).toEqual({
+      value: "hello world",
+    });
+  });
+});

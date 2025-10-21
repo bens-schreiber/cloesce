@@ -15,7 +15,31 @@
                 "cidl_type": "Integer"
             },
             "navigation_properties": [],
-            "methods": {},
+            "methods": {
+                "blockedMethod": {
+                    "name": "blockedMethod",
+                    "is_static": true,
+                    "http_verb": "GET",
+                    "return_type": "Void",
+                    "parameters": []
+                },
+                "getInjectedThing": {
+                    "name": "getInjectedThing",
+                    "is_static": true,
+                    "http_verb": "GET",
+                    "return_type": {
+                        "Object": "InjectedThing"
+                    },
+                    "parameters": [
+                        {
+                            "name": "thing",
+                            "cidl_type": {
+                                "Inject": "InjectedThing"
+                            }
+                        }
+                    ]
+                }
+            },
             "cruds": [
                 "POST"
             ],
@@ -23,6 +47,17 @@
             "source_path": "./seed__app.cloesce.ts"
         }
     },
-    "poos": {},
+    "poos": {
+        "InjectedThing": {
+            "name": "InjectedThing",
+            "attributes": [
+                {
+                    "name": "value",
+                    "cidl_type": "Text"
+                }
+            ],
+            "source_path": "./seed__app.cloesce.ts"
+        }
+    },
     "app_source": "./seed__app.cloesce.ts"
 }
