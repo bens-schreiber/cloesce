@@ -5,7 +5,7 @@ use std::{ops::Deref, sync::Arc};
 use common::{CidlType, CloesceAst, InputLanguage, NavigationProperty, NavigationPropertyKind};
 use mappers::{ClientLanguageTypeMapper, TypeScriptMapper};
 
-use handlebars::{handlebars_helper, Handlebars};
+use handlebars::{Handlebars, handlebars_helper};
 
 handlebars_helper!(is_serializable: |cidl_type: CidlType| !matches!(cidl_type.root_type(), CidlType::Inject(_)));
 handlebars_helper!(is_object: |cidl_type: CidlType| match cidl_type {
