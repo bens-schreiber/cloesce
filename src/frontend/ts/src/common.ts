@@ -187,7 +187,7 @@ export type CidlType =
   | "Real"
   | "Text"
   | "Blob"
-  | "DataSource"
+  | { DataSource: string }
   | { Inject: string }
   | { Object: string }
   | { Partial: string }

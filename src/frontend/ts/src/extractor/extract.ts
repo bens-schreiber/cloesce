@@ -375,7 +375,7 @@ export class CidlExtractor {
 
     // Process methods
     for (const m of classDecl.getMethods()) {
-      const result = CidlExtractor.method(m);
+      const result = CidlExtractor.method(name, m);
       if (!result.ok) {
         result.value.addContext((prev) => `${m.getName()} ${prev}`);
         return left(result.value);
@@ -492,7 +492,17 @@ export class CidlExtractor {
     const aliasName = unwrappedType.getAliasSymbol()?.getName();
 
     if (aliasName === "DataSourceOf") {
-      return right(wrapNullable("DataSource", nullable));
+      return right(
+        wrapNullable(
+          {
+            DataSource: genericTy.getText(
+              undefined,
+              TypeFormatFlags.UseAliasDefinedOutsideCurrentScope,
+            ),
+          },
+          nullable,
+        ),
+      );
     }
 
     if (aliasName === "DeepPartial") {
@@ -664,6 +674,7 @@ export class CidlExtractor {
   }
 
   private static method(
+    modelName: string,
     method: MethodDeclaration,
   ): Either<ExtractorError, ModelMethod> {
     const decorators = method.getDecorators();
@@ -705,7 +716,8 @@ export class CidlExtractor {
         return typeRes;
       }
 
-      if (getRootType(typeRes.value) === "DataSource") {
+      const rootType = getRootType(typeRes.value);
+      if (typeof rootType !== "string" && "DataSource" in rootType) {
         needsDataSource = false;
       }
 
@@ -727,7 +739,7 @@ export class CidlExtractor {
     if (needsDataSource) {
       parameters.push({
         name: "__dataSource",
-        cidl_type: "DataSource",
+        cidl_type: { DataSource: modelName },
       });
     }
 
@@ -760,7 +772,7 @@ export class CidlExtractor {
           },
           {
             name: "dataSource",
-            cidl_type: "DataSource",
+            cidl_type: { DataSource: modelName },
           },
         ],
       },
@@ -776,7 +788,7 @@ export class CidlExtractor {
           },
           {
             name: "dataSource",
-            cidl_type: "DataSource",
+            cidl_type: { DataSource: modelName },
           },
         ],
       },
@@ -788,7 +800,7 @@ export class CidlExtractor {
         parameters: [
           {
             name: "dataSource",
-            cidl_type: "DataSource",
+            cidl_type: { DataSource: modelName },
           },
         ],
       },

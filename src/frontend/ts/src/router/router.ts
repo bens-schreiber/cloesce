@@ -285,7 +285,7 @@ async function validateRequest(
 
   // Validate data source if exists
   const dataSourceParam = requiredParams.find(
-    (p) => p.cidl_type === "DataSource",
+    (p) => typeof p.cidl_type === "object" && "DataSource" in p.cidl_type,
   );
   const dataSource = dataSourceParam
     ? (params[dataSourceParam.name] as string)
@@ -443,7 +443,6 @@ function validateCidlType(
         return Number.isInteger(Number(value));
       case "Real":
         return !Number.isNaN(Number(value));
-      case "DataSource":
       case "Text":
         return typeof value === "string";
       case "Blob":
@@ -451,6 +450,11 @@ function validateCidlType(
       default:
         return false;
     }
+  }
+
+  // Handle Data Sources
+  if ("DataSource" in cidlType) {
+    return typeof value === "string";
   }
 
   // Handle Models

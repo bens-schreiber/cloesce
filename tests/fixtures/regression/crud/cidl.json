@@ -32,7 +32,9 @@
                     "parameters": [
                         {
                             "name": "__dataSource",
-                            "cidl_type": "DataSource"
+                            "cidl_type": {
+                                "DataSource": "CrudHaver"
+                            }
                         }
                     ]
                 },
@@ -54,7 +56,9 @@
                         },
                         {
                             "name": "dataSource",
-                            "cidl_type": "DataSource"
+                            "cidl_type": {
+                                "DataSource": "CrudHaver"
+                            }
                         }
                     ]
                 },
@@ -74,7 +78,9 @@
                         },
                         {
                             "name": "dataSource",
-                            "cidl_type": "DataSource"
+                            "cidl_type": {
+                                "DataSource": "CrudHaver"
+                            }
                         }
                     ]
                 },
@@ -92,7 +98,9 @@
                     "parameters": [
                         {
                             "name": "dataSource",
-                            "cidl_type": "DataSource"
+                            "cidl_type": {
+                                "DataSource": "CrudHaver"
+                            }
                         }
                     ]
                 }
@@ -156,7 +164,9 @@
                         },
                         {
                             "name": "dataSource",
-                            "cidl_type": "DataSource"
+                            "cidl_type": {
+                                "DataSource": "Parent"
+                            }
                         }
                     ]
                 },
@@ -176,7 +186,9 @@
                         },
                         {
                             "name": "dataSource",
-                            "cidl_type": "DataSource"
+                            "cidl_type": {
+                                "DataSource": "Parent"
+                            }
                         }
                     ]
                 },
@@ -194,7 +206,9 @@
                     "parameters": [
                         {
                             "name": "dataSource",
-                            "cidl_type": "DataSource"
+                            "cidl_type": {
+                                "DataSource": "Parent"
+                            }
                         }
                     ]
                 }

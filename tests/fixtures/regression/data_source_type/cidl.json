@@ -7,6 +7,35 @@
         "source_path": "./seed__ds.cloesce.ts"
     },
     "models": {
+        "NoDs": {
+            "name": "NoDs",
+            "attributes": [],
+            "primary_key": {
+                "name": "id",
+                "cidl_type": "Integer"
+            },
+            "navigation_properties": [],
+            "methods": {},
+            "data_sources": {},
+            "source_path": "./seed__ds.cloesce.ts"
+        },
+        "OneDs": {
+            "name": "OneDs",
+            "attributes": [],
+            "primary_key": {
+                "name": "id",
+                "cidl_type": "Integer"
+            },
+            "navigation_properties": [],
+            "methods": {},
+            "data_sources": {
+                "default": {
+                    "name": "default",
+                    "tree": {}
+                }
+            },
+            "source_path": "./seed__ds.cloesce.ts"
+        },
         "Foo": {
             "name": "Foo",
             "attributes": [],
@@ -24,7 +53,21 @@
                     "parameters": [
                         {
                             "name": "customDs",
-                            "cidl_type": "DataSource"
+                            "cidl_type": {
+                                "DataSource": "Foo"
+                            }
+                        },
+                        {
+                            "name": "oneDs",
+                            "cidl_type": {
+                                "DataSource": "OneDs"
+                            }
+                        },
+                        {
+                            "name": "noDs",
+                            "cidl_type": {
+                                "DataSource": "NoDs"
+                            }
                         }
                     ]
                 }
@@ -38,6 +81,19 @@
             "source_path": "./seed__ds.cloesce.ts"
         }
     },
-    "poos": {},
+    "poos": {
+        "Poo": {
+            "name": "Poo",
+            "attributes": [
+                {
+                    "name": "ds",
+                    "cidl_type": {
+                        "DataSource": "Foo"
+                    }
+                }
+            ],
+            "source_path": "./seed__ds.cloesce.ts"
+        }
+    },
     "app_source": null
 }

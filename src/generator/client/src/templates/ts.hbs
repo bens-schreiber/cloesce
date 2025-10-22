@@ -22,7 +22,7 @@ export class {{this.name}} {
   {{#if this.is_static}}static {{/if}}async {{this.name}}(
     {{#each this.parameters}}
       {{#if (is_serializable cidl_type)}}
-        {{name}}: {{get_cidl_type cidl_type ../../this}},
+        {{name}}: {{get_cidl_type cidl_type}},
       {{/if}}
     {{/each}}
   ): Promise<HttpResult<{{get_cidl_type this.return_type}}>> {

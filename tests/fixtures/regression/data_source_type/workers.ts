@@ -1,10 +1,15 @@
 import { cloesce, CloesceApp } from "cloesce/backend";
 import cidl from "./cidl.json";
 import { Foo } from "./seed__ds.cloesce.ts";
-
+import { NoDs } from "./seed__ds.cloesce.ts";
+import { OneDs } from "./seed__ds.cloesce.ts";
+import { Poo } from "./seed__ds.cloesce.ts";
 const app = new CloesceApp()
 const constructorRegistry = {
-	Foo: Foo
+	Foo: Foo,
+	NoDs: NoDs,
+	OneDs: OneDs,
+	Poo: Poo
 };
 
 async function fetch(request: Request, env: any, ctx: any): Promise<Response> {

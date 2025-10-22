@@ -1,12 +1,12 @@
-use common::{CidlType, Model};
+use common::{CidlType, CloesceAst};
 
 pub trait ClientLanguageTypeMapper {
-    fn type_name(&self, ty: &CidlType, model: Option<&Model>) -> String;
+    fn type_name(&self, ty: &CidlType, ast: &CloesceAst) -> String;
 }
 
 pub struct TypeScriptMapper;
 impl ClientLanguageTypeMapper for TypeScriptMapper {
-    fn type_name(&self, ty: &CidlType, model: Option<&Model>) -> String {
+    fn type_name(&self, ty: &CidlType, ast: &CloesceAst) -> String {
         match ty {
             CidlType::Integer => "number".to_string(),
             CidlType::Real => "number".to_string(),
@@ -18,18 +18,20 @@ impl ClientLanguageTypeMapper for TypeScriptMapper {
                     return "null".to_string();
                 }
 
-                let inner_ts = self.type_name(inner, model);
+                let inner_ts = self.type_name(inner, ast);
                 format!("{} | null", inner_ts)
             }
             CidlType::Array(inner) => {
-                let inner_ts = self.type_name(inner, model);
+                let inner_ts = self.type_name(inner, ast);
                 format!("{}[]", inner_ts)
             }
-            CidlType::HttpResult(inner) => self.type_name(inner, model),
+            CidlType::HttpResult(inner) => self.type_name(inner, ast),
             CidlType::Void => "void".to_string(),
             CidlType::Partial(name) => format!("DeepPartial<{name}>"),
-            CidlType::DataSource => {
-                let mut ds = model
+            CidlType::DataSource(model_name) => {
+                let mut ds = ast
+                    .models
+                    .get(model_name)
                     .unwrap()
                     .data_sources
                     .keys()

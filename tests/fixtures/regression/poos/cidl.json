@@ -42,7 +42,9 @@
                         },
                         {
                             "name": "__dataSource",
-                            "cidl_type": "DataSource"
+                            "cidl_type": {
+                                "DataSource": "PooAcceptYield"
+                            }
                         }
                     ]
                 },
@@ -56,7 +58,9 @@
                     "parameters": [
                         {
                             "name": "__dataSource",
-                            "cidl_type": "DataSource"
+                            "cidl_type": {
+                                "DataSource": "PooAcceptYield"
+                            }
                         }
                     ]
                 }

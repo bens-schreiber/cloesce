@@ -78,7 +78,9 @@
                     "parameters": [
                         {
                             "name": "__dataSource",
-                            "cidl_type": "DataSource"
+                            "cidl_type": {
+                                "DataSource": "A"
+                            }
                         }
                     ]
                 }
@@ -148,7 +150,9 @@
                     "parameters": [
                         {
                             "name": "__dataSource",
-                            "cidl_type": "DataSource"
+                            "cidl_type": {
+                                "DataSource": "Person"
+                            }
                         }
                     ]
                 }
@@ -234,7 +238,9 @@
                     "parameters": [
                         {
                             "name": "__dataSource",
-                            "cidl_type": "DataSource"
+                            "cidl_type": {
+                                "DataSource": "Student"
+                            }
                         }
                     ]
                 }

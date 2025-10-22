@@ -131,7 +131,7 @@ impl WorkersGenerator {
     }
 
     pub fn create(
-        ast: CloesceAst,
+        ast: &CloesceAst,
         wrangler: WranglerSpec,
         domain: String,
         workers_path: &Path,

@@ -62,6 +62,7 @@ pub enum GeneratorErrorKind {
     NullSqlType,
     InvalidSqlType,
     UnknownObject,
+    UnknownDataSourceReference,
     UnexpectedVoid,
     UnexpectedPartialReturn,
     MissingOrExtraneousDataSource,
@@ -92,6 +93,11 @@ impl GeneratorErrorKind {
             GeneratorErrorKind::UnknownObject => (
                 "Objects must be decorated appropriately as a Model or PlainOldObject",
                 "Consider using a decorator on the object.",
+                GeneratorPhase::EarlyAstValidation,
+            ),
+            GeneratorErrorKind::UnknownDataSourceReference => (
+                "Data sources must reference a model",
+                "",
                 GeneratorPhase::EarlyAstValidation,
             ),
             GeneratorErrorKind::UnexpectedVoid => (

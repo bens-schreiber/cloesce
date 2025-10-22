@@ -39,8 +39,8 @@ pub enum CidlType {
     /// Only valid as a method argument.
     Partial(String),
 
-    /// data source(s) of some model
-    DataSource,
+    /// A data source of some model
+    DataSource(String),
 
     /// An array of any type
     Array(Box<CidlType>),
@@ -322,8 +322,19 @@ impl CloesceAst {
                 // Validate method params
                 let mut ds = 0;
                 for param in &method.parameters {
-                    if matches!(param.cidl_type, CidlType::DataSource) {
-                        ds += 1;
+                    if let CidlType::DataSource(model_name) = &param.cidl_type {
+                        ensure!(
+                            self.models.contains_key(model_name),
+                            GeneratorErrorKind::UnknownDataSourceReference,
+                            "{}.{} data source references {}",
+                            model.name,
+                            method.name,
+                            model_name
+                        );
+
+                        if *model_name == model.name {
+                            ds += 1;
+                        }
                     }
 
                     let root_type = param.cidl_type.root_type();

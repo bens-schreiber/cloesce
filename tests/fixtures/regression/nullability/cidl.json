@@ -53,7 +53,9 @@
                         },
                         {
                             "name": "__dataSource",
-                            "cidl_type": "DataSource"
+                            "cidl_type": {
+                                "DataSource": "NullabilityChecks"
+                            }
                         }
                     ]
                 },
@@ -77,7 +79,9 @@
                         },
                         {
                             "name": "__dataSource",
-                            "cidl_type": "DataSource"
+                            "cidl_type": {
+                                "DataSource": "NullabilityChecks"
+                            }
                         }
                     ]
                 },
@@ -97,7 +101,9 @@
                         },
                         {
                             "name": "__dataSource",
-                            "cidl_type": "DataSource"
+                            "cidl_type": {
+                                "DataSource": "NullabilityChecks"
+                            }
                         }
                     ]
                 },
@@ -131,7 +137,9 @@
                         },
                         {
                             "name": "__dataSource",
-                            "cidl_type": "DataSource"
+                            "cidl_type": {
+                                "DataSource": "NullabilityChecks"
+                            }
                         }
                     ]
                 },
@@ -163,7 +171,9 @@
                         },
                         {
                             "name": "__dataSource",
-                            "cidl_type": "DataSource"
+                            "cidl_type": {
+                                "DataSource": "NullabilityChecks"
+                            }
                         }
                     ]
                 }

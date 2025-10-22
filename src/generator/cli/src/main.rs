@@ -98,8 +98,7 @@ Suggested fix: {}"#,
 fn run_cli() -> Result<()> {
     match Cli::parse().command {
         Commands::Validate { cidl_path } => {
-            let cidl = CloesceAst::from_json(&cidl_path)?;
-            cidl.validate_types()?;
+            validate_cidl(&cidl_path)?;
             println!("Ok.");
         }
         Commands::Generate { target } => match target {
@@ -107,18 +106,27 @@ fn run_cli() -> Result<()> {
             GenerateTarget::D1 {
                 cidl_path,
                 sqlite_path,
-            } => generate_d1(&cidl_path, &sqlite_path)?,
+            } => {
+                let ast = validate_cidl(&cidl_path)?;
+                generate_d1(&ast, &sqlite_path)?
+            }
             GenerateTarget::Workers {
                 cidl_path,
                 workers_path,
                 wrangler_path,
                 domain,
-            } => generate_workers(&cidl_path, &workers_path, &wrangler_path, &domain)?,
+            } => {
+                let ast = validate_cidl(&cidl_path)?;
+                generate_workers(&ast, &workers_path, &wrangler_path, &domain)?
+            }
             GenerateTarget::Client {
                 cidl_path,
                 client_path,
                 domain,
-            } => generate_client(&cidl_path, &client_path, &domain)?,
+            } => {
+                let ast = validate_cidl(&cidl_path)?;
+                generate_client(&ast, &client_path, &domain)?
+            }
             GenerateTarget::All {
                 cidl_path,
                 wrangler_path,
@@ -135,13 +143,13 @@ fn run_cli() -> Result<()> {
                 generate_wrangler(&wrangler_path)?;
                 println!("Wrangler generated.");
 
-                generate_d1(&cidl_path, &sqlite_path)?;
+                generate_d1(&ast, &sqlite_path)?;
                 println!("D1 schema generated.");
 
-                generate_workers(&cidl_path, &workers_path, &wrangler_path, &workers_domain)?;
+                generate_workers(&ast, &workers_path, &wrangler_path, &workers_domain)?;
                 println!("Workers generated.");
 
-                generate_client(&cidl_path, &client_path, &client_domain)?;
+                generate_client(&ast, &client_path, &client_domain)?;
                 println!("Client generated.");
 
                 println!("All generation steps completed successfully!");
@@ -150,6 +158,12 @@ fn run_cli() -> Result<()> {
     }
 
     Ok(())
+}
+
+fn validate_cidl(cidl_path: &Path) -> Result<CloesceAst> {
+    let ast = CloesceAst::from_json(cidl_path)?;
+    ast.validate_types()?;
+    Ok(ast)
 }
 
 fn generate_wrangler(wrangler_path: &Path) -> Result<()> {
@@ -172,10 +186,8 @@ fn generate_wrangler(wrangler_path: &Path) -> Result<()> {
     Ok(())
 }
 
-fn generate_d1(cidl_path: &Path, sqlite_path: &Path) -> Result<()> {
+fn generate_d1(ast: &CloesceAst, sqlite_path: &Path) -> Result<()> {
     let mut sqlite_file = create_file_and_dir(sqlite_path)?;
-    let ast = CloesceAst::from_json(cidl_path)?;
-    ast.validate_types()?;
 
     let generated_sqlite = d1::generate_sql(&ast.models)?;
     sqlite_file
@@ -185,14 +197,11 @@ fn generate_d1(cidl_path: &Path, sqlite_path: &Path) -> Result<()> {
 }
 
 fn generate_workers(
-    cidl_path: &Path,
+    ast: &CloesceAst,
     workers_path: &Path,
     wrangler_path: &Path,
     domain: &str,
 ) -> Result<()> {
-    let ast = CloesceAst::from_json(cidl_path)?;
-    ast.validate_types()?;
-
     let mut file = create_file_and_dir(workers_path)?;
     let wrangler = WranglerFormat::from_path(wrangler_path);
 
@@ -203,10 +212,7 @@ fn generate_workers(
     Ok(())
 }
 
-fn generate_client(cidl_path: &Path, client_path: &Path, domain: &str) -> Result<()> {
-    let ast = CloesceAst::from_json(cidl_path)?;
-    ast.validate_types()?;
-
+fn generate_client(ast: &CloesceAst, client_path: &Path, domain: &str) -> Result<()> {
     let mut file = create_file_and_dir(client_path)?;
     file.write_all(client::generate_client_api(ast, domain.to_string()).as_bytes())
         .expect("Could not write to file");

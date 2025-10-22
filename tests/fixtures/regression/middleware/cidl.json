@@ -57,7 +57,9 @@
                         },
                         {
                             "name": "dataSource",
-                            "cidl_type": "DataSource"
+                            "cidl_type": {
+                                "DataSource": "Model"
+                            }
                         }
                     ]
                 }
