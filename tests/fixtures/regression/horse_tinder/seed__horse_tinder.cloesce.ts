@@ -16,7 +16,7 @@ import {
 } from "cloesce/backend";
 
 @WranglerEnv
-class Env {
+export class Env {
   db: D1Database;
   motd: string;
 }

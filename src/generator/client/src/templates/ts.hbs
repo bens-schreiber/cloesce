@@ -7,6 +7,7 @@ export class {{this.name}} {
   {{/each}}
 }
 {{/each}}
+
 {{#each models}}
 export class {{this.name}} {
   {{this.primary_key.name}}: {{get_cidl_type this.primary_key.cidl_type}};
@@ -21,13 +22,11 @@ export class {{this.name}} {
   {{#if this.is_static}}static {{/if}}async {{this.name}}(
     {{#each this.parameters}}
       {{#if (is_serializable cidl_type)}}
-        {{name}}: {{get_cidl_type cidl_type}},
+        {{name}}: {{get_cidl_type cidl_type ../../this}},
       {{/if}}
     {{/each}}
-    dataSource: {{#each ../data_sources}}"{{name}}" | {{/each}}null = null
   ): Promise<HttpResult<{{get_cidl_type this.return_type}}>> {
     const baseUrl = new URL(`{{../../domain}}/{{#if this.is_static}}{{../name}}/{{this.name}}{{else}}{{../name}}/${this.{{../primary_key.name}}}/{{this.name}}{{/if}}`);
-    baseUrl.searchParams.append("dataSource", String(dataSource));
     {{#if (eq this.http_verb "GET")}}
       {{#each this.parameters}}
         {{#if (is_serializable cidl_type)}}
@@ -64,85 +63,6 @@ export class {{this.name}} {
     return raw;
     {{/if}}
   }
-  {{/each}}
-  {{#each this.cruds}}
-  {{#if (crud_name this "POST")}}
-  static async post(obj: DeepPartial<{{../name}}>, dataSource: {{#each ../data_sources}}"{{name}}" | {{/each}}null = null): Promise<HttpResult<{{../name}}>> {
-    const baseUrl = new URL(`{{../../domain}}/{{../name}}/POST`);
-    baseUrl.searchParams.append("dataSource", String(dataSource));
-
-    const res = await fetch(baseUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        obj
-      })
-    });
-
-    let raw = await res.json();
-    if (!res.ok) {
-      return raw;
-    }
-
-    raw.data = Object.assign(new {{../name}}(), raw.data);
-    return raw;
-  }
-  {{/if}}
-  {{#if (crud_name this "PATCH")}}
-  async patch(dataSource: {{#each ../data_sources}}"{{name}}" | {{/each}}null = null): Promise<HttpResult<void>> {
-    const baseUrl = new URL(`{{../../domain}}/{{../name}}/${this.{{../primary_key.name}}}/PATCH`);
-    baseUrl.searchParams.append("dataSource", String(dataSource));
-
-    const res = await fetch(baseUrl, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        obj: this
-      })
-    });
-
-    let raw = await res.json();
-    if (!res.ok) {
-      return raw;
-    }
-
-    Object.assign(this, raw.data);
-    return raw;
-  }
-  {{/if}}
-  {{#if (crud_name this "GET")}}
-  static async get({{../primary_key.name}}: {{get_cidl_type ../primary_key.cidl_type}}, dataSource: {{#each ../data_sources}}"{{name}}" | {{/each}}null = null): Promise<HttpResult<{{../name}}>> {
-    const baseUrl = new URL(`{{../../domain}}/{{../name}}/GET`);
-    baseUrl.searchParams.append("dataSource", String(dataSource));
-    baseUrl.searchParams.append("{{../primary_key.name}}", String({{../primary_key.name}}));
-
-    const res = await fetch(baseUrl, { method: "GET" });
-
-    let raw = await res.json();
-    if (!res.ok) {
-      return raw;
-    }
-
-    raw.data = Object.assign(new {{../name}}(), raw.data);
-    return raw;
-  }
-  {{/if}}
-  {{#if (crud_name this "LIST")}}
-  static async list(dataSource: {{#each ../data_sources}}"{{name}}" | {{/each}}null = null): Promise<HttpResult<{{../name}}[]>> {
-    const baseUrl = new URL(`{{../../domain}}/{{../name}}/LIST`);
-    baseUrl.searchParams.append("dataSource", String(dataSource));
-
-    const res = await fetch(baseUrl, { method: "GET" });
-
-    let raw = await res.json();
-    if (!res.ok) {
-      return raw;
-    }
-
-    raw.data = instantiateObjectArray(raw.data, {{../name}});
-    return raw;
-  }
-  {{/if}}
   {{/each}}
 }
 {{/each}}

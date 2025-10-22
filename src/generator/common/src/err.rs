@@ -64,7 +64,7 @@ pub enum GeneratorErrorKind {
     UnknownObject,
     UnexpectedVoid,
     UnexpectedPartialReturn,
-    DuplicateKey,
+    MissingOrExtraneousDataSource,
     NotYetSupported,
     InvalidMapping,
     InvalidApiDomain,
@@ -104,9 +104,9 @@ impl GeneratorErrorKind {
                 "Try using a Plain Old Object instead",
                 GeneratorPhase::EarlyAstValidation,
             ),
-            GeneratorErrorKind::DuplicateKey => (
-                "A duplicate key was found in a set",
-                "Remove any duplicate values",
+            GeneratorErrorKind::MissingOrExtraneousDataSource => (
+                "All instantiated methods must have one data source parameter.",
+                "Add a data source parameter, or remove extras.",
                 GeneratorPhase::EarlyAstValidation,
             ),
             GeneratorErrorKind::NotYetSupported => (

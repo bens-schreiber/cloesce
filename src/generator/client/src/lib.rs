@@ -3,7 +3,7 @@ mod mappers;
 use std::{ops::Deref, sync::Arc};
 
 use common::{
-    CidlType, CloesceAst, CrudKind, InputLanguage, NavigationProperty, NavigationPropertyKind,
+    CidlType, CloesceAst, InputLanguage, Model, NavigationProperty, NavigationPropertyKind,
 };
 use mappers::{ClientLanguageTypeMapper, TypeScriptMapper};
 
@@ -25,7 +25,6 @@ handlebars_helper!(object_name: |cidl_type: CidlType| match cidl_type.root_type(
     CidlType::Object(name) => name.clone(),
     _ => panic!("Not an object")
 });
-handlebars_helper!(crud_name: |crud: CrudKind, kind: str| format!("{crud:?}") == kind);
 handlebars_helper!(eq: |a: str, b: str| a == b);
 
 fn register_helpers(
@@ -37,7 +36,6 @@ fn register_helpers(
     handlebars.register_helper("is_object_array", Box::new(is_object_array));
     handlebars.register_helper("is_one_to_one", Box::new(is_one_to_one));
     handlebars.register_helper("object_name", Box::new(object_name));
-    handlebars.register_helper("crud_name", Box::new(crud_name));
     handlebars.register_helper("eq", Box::new(eq));
 
     let mapper1 = mapper.clone();
@@ -62,7 +60,7 @@ fn register_helpers(
                     }
                 };
 
-                let rendered = mapper1.type_name(&cidl_type);
+                let rendered = mapper1.type_name(&cidl_type, None);
                 out.write(&rendered)?;
                 Ok(())
             },
@@ -81,7 +79,11 @@ fn register_helpers(
                 let cidl_type: CidlType =
                     serde_json::from_value(h.param(0).unwrap().value().clone()).unwrap();
 
-                let rendered = mapper2.type_name(&cidl_type);
+                let model: Option<Model> = h
+                    .param(1)
+                    .map(|p| serde_json::from_value(p.value().clone()).unwrap());
+
+                let rendered = mapper2.type_name(&cidl_type, model.as_ref());
                 out.write(&rendered)?;
                 Ok(())
             },

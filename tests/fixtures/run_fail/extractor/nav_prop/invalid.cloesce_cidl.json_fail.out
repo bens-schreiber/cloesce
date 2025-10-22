@@ -1,8 +1,8 @@
 ==== CLOESCE ERROR ====
-Error [InvalidNavigationPropertyReference]: Invalid Navigation Property Reference
+Error [DataSourceMissingStatic]: Data Sources must be declared as static
 Phase: TypeScript IDL Extraction
-Context: Foo.foo id
+Context: Foo.foo
 @DataSource
   foo: IncludeTree<Foo> = { id: {} };
 
-Suggested fix: Ensure the navigation property points to a valid model field
+Suggested fix: Declare your data source as `static readonly`

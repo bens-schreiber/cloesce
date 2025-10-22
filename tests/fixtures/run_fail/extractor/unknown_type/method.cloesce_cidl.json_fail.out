@@ -2,6 +2,6 @@
 Error [UnknownType]: Encountered an unknown or unsupported type
 Phase: TypeScript IDL Extraction
 Context: Foo.method bad
-async method(valid: number, bad: Bar<number>) {}
+method(valid: number, bad: Bar<number>) {}
 
 Suggested fix: Refer to the documentation on valid Cloesce TS types

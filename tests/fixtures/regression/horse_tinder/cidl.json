@@ -120,11 +120,14 @@
                             "cidl_type": {
                                 "Object": "Horse"
                             }
+                        },
+                        {
+                            "name": "__dataSource",
+                            "cidl_type": "DataSource"
                         }
                     ]
                 }
             },
-            "cruds": [],
             "data_sources": {
                 "default": {
                     "name": "default",
@@ -177,7 +180,6 @@
                 }
             ],
             "methods": {},
-            "cruds": [],
             "data_sources": {},
             "source_path": "./seed__horse_tinder.cloesce.ts"
         }

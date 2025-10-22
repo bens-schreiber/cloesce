@@ -1,12 +1,6 @@
 import { describe, test, expect, vi, beforeEach } from "vitest";
 import { _cloesceInternal } from "../src/router/router";
-import {
-  CloesceAst,
-  HttpVerb,
-  Model,
-  NULL_DATA_SOURCE,
-  NamedTypedValue,
-} from "../src/common";
+import { CloesceAst, HttpVerb, Model, NamedTypedValue } from "../src/common";
 import { IncludeTree } from "../src/ui/backend";
 import { CrudContext } from "../src/router/crud";
 import { fromSql } from "../src/router/wasm";
@@ -25,7 +19,6 @@ const makeAst = (methods: Record<string, any>): CloesceAst => ({
       primary_key: { name: "_id", cidl_type: "Integer" },
       navigation_properties: [],
       data_sources: {},
-      cruds: [],
       methods,
       source_path: "",
     },
@@ -157,7 +150,6 @@ describe("Validate Request Error States", () => {
     attributes: [],
     navigation_properties: [],
     methods: {},
-    cruds: [],
     data_sources: {},
     source_path: "",
   };
@@ -314,9 +306,8 @@ describe("Validate Request Success States", () => {
     expect(result.value).toEqual({
       params: {
         [arg.typed_value.name]: arg.isGet ? String(arg.value) : arg.value,
-        dataSource: arg.isGet ? undefined : NULL_DATA_SOURCE,
       },
-      dataSource: NULL_DATA_SOURCE,
+      dataSource: null,
     });
   });
 });
@@ -483,7 +474,6 @@ describe("modelsFromSql", () => {
           primary_key: { name: "id", cidl_type: "Integer" },
           data_sources: {},
           methods: {},
-          cruds: [],
           source_path: "",
         },
         [likeModelName]: {
@@ -508,7 +498,6 @@ describe("modelsFromSql", () => {
           primary_key: { name: "id", cidl_type: "Integer" },
           data_sources: {},
           methods: {},
-          cruds: [],
           source_path: "",
         },
       },

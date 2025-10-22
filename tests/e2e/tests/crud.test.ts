@@ -27,12 +27,13 @@ describe("Basic", () => {
 
   it("PATCH", async () => {
     model.name = "julio";
-    const res = await model.patch();
+    const res = await CrudHaver.patch(model);
     expect(res.ok, withRes("PATCH should be OK", res)).toBe(true);
-    expect(model).toEqual({
+    expect(res.data).toEqual({
       id: 1,
       name: "julio",
     });
+    model = res.data;
   });
 
   it("GET a model", async () => {
@@ -89,10 +90,10 @@ describe("Parent with children", () => {
 
   it("PATCH", async () => {
     model.favoriteChildId = model.children[0].id;
-    const res = await model.patch("withChildren");
+    const res = await Parent.patch(model, "withChildren");
 
     expect(res.ok, withRes("PATCH should be OK", res)).toBe(true);
-    expect(model, withRes("Data should be equal", res)).toEqual({
+    expect(res.data, withRes("Data should be equal", res)).toEqual({
       id: 1,
       favoriteChildId: 1,
       favoriteChild: {
@@ -105,6 +106,8 @@ describe("Parent with children", () => {
         { id: 3, parentId: 1 },
       ],
     });
+
+    model = res.data;
   });
 
   it("GET", async () => {

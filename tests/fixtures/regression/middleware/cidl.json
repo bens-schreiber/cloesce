@@ -38,11 +38,30 @@
                             }
                         }
                     ]
+                },
+                "post": {
+                    "name": "post",
+                    "is_static": true,
+                    "http_verb": "POST",
+                    "return_type": {
+                        "HttpResult": {
+                            "Object": "Model"
+                        }
+                    },
+                    "parameters": [
+                        {
+                            "name": "obj",
+                            "cidl_type": {
+                                "Partial": "Model"
+                            }
+                        },
+                        {
+                            "name": "dataSource",
+                            "cidl_type": "DataSource"
+                        }
+                    ]
                 }
             },
-            "cruds": [
-                "POST"
-            ],
             "data_sources": {},
             "source_path": "./seed__app.cloesce.ts"
         }

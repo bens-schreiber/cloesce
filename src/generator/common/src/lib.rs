@@ -2,7 +2,6 @@ pub mod builder;
 pub mod err;
 
 use std::collections::BTreeMap;
-use std::collections::HashSet;
 use std::path::PathBuf;
 
 use err::GeneratorErrorKind;
@@ -39,6 +38,9 @@ pub enum CidlType {
     ///
     /// Only valid as a method argument.
     Partial(String),
+
+    /// data source(s) of some model
+    DataSource,
 
     /// An array of any type
     Array(Box<CidlType>),
@@ -140,15 +142,6 @@ pub struct NavigationProperty {
     pub kind: NavigationPropertyKind,
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone, Copy)]
-pub enum CrudKind {
-    POST,
-    PATCH,
-    LIST,
-    GET,
-    // TODO: delete?
-}
-
 #[serde_as]
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Model {
@@ -159,8 +152,6 @@ pub struct Model {
 
     #[serde_as(as = "MapPreventDuplicates<_, _>")]
     pub methods: BTreeMap<String, ModelMethod>,
-
-    pub cruds: Vec<CrudKind>,
 
     #[serde_as(as = "MapPreventDuplicates<_, _>")]
     pub data_sources: BTreeMap<String, DataSource>,
@@ -329,7 +320,12 @@ impl CloesceAst {
                 }
 
                 // Validate method params
+                let mut ds = 0;
                 for param in &method.parameters {
+                    if matches!(param.cidl_type, CidlType::DataSource) {
+                        ds += 1;
+                    }
+
                     let root_type = param.cidl_type.root_type();
 
                     match root_type {
@@ -368,18 +364,16 @@ impl CloesceAst {
                         }
                     }
                 }
-            }
 
-            // Validate crud methods
-            let mut cruds = HashSet::new();
-            for crud in &model.cruds {
-                ensure!(
-                    cruds.insert(crud),
-                    GeneratorErrorKind::DuplicateKey,
-                    "{} contains duplicate CRUD method {:?}",
-                    model.name,
-                    crud,
-                );
+                if !method.is_static {
+                    ensure!(
+                        ds == 1,
+                        GeneratorErrorKind::MissingOrExtraneousDataSource,
+                        "Instantiated methods require one data source: {}.{}",
+                        model.name,
+                        method.name,
+                    )
+                }
             }
         }
 

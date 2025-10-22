@@ -39,6 +39,10 @@
                             "cidl_type": {
                                 "Object": "PooC"
                             }
+                        },
+                        {
+                            "name": "__dataSource",
+                            "cidl_type": "DataSource"
                         }
                     ]
                 },
@@ -49,10 +53,14 @@
                     "return_type": {
                         "Object": "PooC"
                     },
-                    "parameters": []
+                    "parameters": [
+                        {
+                            "name": "__dataSource",
+                            "cidl_type": "DataSource"
+                        }
+                    ]
                 }
             },
-            "cruds": [],
             "data_sources": {},
             "source_path": "./seed__poo.cloesce.ts"
         }

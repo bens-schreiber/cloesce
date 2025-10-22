@@ -55,7 +55,7 @@ export class A {
   }
 
   @GET
-  async refresh(): Promise<A> {
+  refresh(): A {
     return this;
   }
 }
@@ -84,7 +84,7 @@ export class Person {
   }
 
   @GET
-  async refresh(): Promise<Person> {
+  refresh(): Person {
     return this;
   }
 }
@@ -126,7 +126,7 @@ export class Student {
   }
 
   @GET
-  async refresh(): Promise<Student> {
+  refresh(): Student {
     return this;
   }
 }

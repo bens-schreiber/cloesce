@@ -1,9 +1,9 @@
 // @ts-nocheck
 
 @D1
-class Foo {
+export class Foo {
   @PrimaryKey
   id: number;
 
-  async method(valid: number): Bar<number, number> {} // invalid return type
+  method(valid: number): Bar<number, number> {} // invalid return type
 }

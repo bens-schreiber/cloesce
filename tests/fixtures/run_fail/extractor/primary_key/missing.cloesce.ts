@@ -1,6 +1,6 @@
 // @ts-nocheck
 
 @D1
-class Foo {
+export class Foo {
   id: number; // missing @PrimaryKey
 }

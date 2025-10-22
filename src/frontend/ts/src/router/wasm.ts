@@ -5,9 +5,9 @@ import {
   Model,
   left,
   right,
-} from "../common";
-import { IncludeTree } from "../ui/backend";
-import { RuntimeContainer } from "./router";
+} from "../common.js";
+import { IncludeTree } from "../ui/backend.js";
+import { RuntimeContainer } from "./router.js";
 
 // Requires the ORM binary to have been built
 import mod from "../orm.wasm";

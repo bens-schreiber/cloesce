@@ -3,7 +3,7 @@ Error [MissingPrimaryKey]: Missing primary key on a model
 Phase: TypeScript IDL Extraction
 Context: Foo.
 @D1
-class Foo {
+export class Foo {
   id: number; // missing @PrimaryKey
 }
 

@@ -50,6 +50,11 @@ export type IncludeTree<T> = T extends Primitive
         : IncludeTree<NonNullable<T[K]>>;
     };
 
+// Data Source Type
+export type DataSourceOf<T extends object> =
+  | KeysOfType<T, IncludeTree<T>>
+  | "none";
+
 /**
  * ORM functions which use metadata to translate arguments to valid SQL queries.
  */

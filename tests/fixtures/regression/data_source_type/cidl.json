@@ -1,0 +1,43 @@
+{
+    "version": "v0.0.3",
+    "project_name": "runner",
+    "language": "TypeScript",
+    "wrangler_env": {
+        "name": "Env",
+        "source_path": "./seed__ds.cloesce.ts"
+    },
+    "models": {
+        "Foo": {
+            "name": "Foo",
+            "attributes": [],
+            "primary_key": {
+                "name": "id",
+                "cidl_type": "Integer"
+            },
+            "navigation_properties": [],
+            "methods": {
+                "bar": {
+                    "name": "bar",
+                    "is_static": false,
+                    "http_verb": "POST",
+                    "return_type": "Void",
+                    "parameters": [
+                        {
+                            "name": "customDs",
+                            "cidl_type": "DataSource"
+                        }
+                    ]
+                }
+            },
+            "data_sources": {
+                "baz": {
+                    "name": "baz",
+                    "tree": {}
+                }
+            },
+            "source_path": "./seed__ds.cloesce.ts"
+        }
+    },
+    "poos": {},
+    "app_source": null
+}

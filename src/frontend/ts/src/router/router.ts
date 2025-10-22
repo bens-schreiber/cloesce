@@ -10,7 +10,7 @@ import {
   isNullableType,
   Model,
   getNavigationPropertyCidlType,
-  NULL_DATA_SOURCE,
+  NO_DATA_SOURCE,
   CloesceApp,
   InstanceRegistry,
 } from "../common.js";
@@ -143,8 +143,8 @@ export async function cloesce(
       constructorRegistry,
       d1,
       model,
-      id!,
-      dataSource,
+      id!, // id must exist after matchRoute
+      dataSource!, // ds must exist after validateRequest
     );
 
     if (!hydratedModel.ok) {
@@ -210,9 +210,7 @@ function matchRoute(
     return notFound(`Unknown model ${modelName}`);
   }
 
-  // Get the method as a direct model method or a CRUD method
-  const method =
-    model.methods[methodName] ?? CrudContext.getModelMethod(methodName, model);
+  const method = model.methods[methodName];
   if (!method) {
     return notFound(`Unknown method ${modelName}.${methodName}`);
   }
@@ -240,7 +238,7 @@ async function validateRequest(
   method: ModelMethod,
   id: string | null,
 ): Promise<
-  Either<HttpResult, { params: RequestParamMap; dataSource: string }>
+  Either<HttpResult, { params: RequestParamMap; dataSource: string | null }>
 > {
   // Error state: any missing parameter, body, or malformed input will exit with 400.
   const invalidRequest = (e: string) =>
@@ -253,32 +251,20 @@ async function validateRequest(
   // Filter out any injected parameters that will not be passed
   // by the query.
   const requiredParams = method.parameters.filter(
-    (p) =>
-      !(
-        typeof p.cidl_type === "object" &&
-        p.cidl_type !== null &&
-        "Inject" in p.cidl_type
-      ),
+    (p) => !(typeof p.cidl_type === "object" && "Inject" in p.cidl_type),
   );
 
   // Extract url or body parameters
   const url = new URL(request.url);
-  const dataSource = url.searchParams.get("dataSource") ?? NULL_DATA_SOURCE;
   let params: RequestParamMap = {};
   if (method.http_verb === "GET") {
     params = Object.fromEntries(url.searchParams.entries());
   } else {
     try {
       params = await request.json();
-      params.dataSource = dataSource;
     } catch {
       return invalidRequest("Could not retrieve JSON body.");
     }
-  }
-
-  // Validate data source if exists
-  if (dataSource !== NULL_DATA_SOURCE && !(dataSource in model.data_sources)) {
-    return invalidRequest(`Unknown data source ${dataSource}`);
   }
 
   // Ensure all required params exist
@@ -295,6 +281,21 @@ async function validateRequest(
     if (!validateCidlType(ast, value, p.cidl_type, isPartial)) {
       return invalidRequest("Invalid parameters.");
     }
+  }
+
+  // Validate data source if exists
+  const dataSourceParam = requiredParams.find(
+    (p) => p.cidl_type === "DataSource",
+  );
+  const dataSource = dataSourceParam
+    ? (params[dataSourceParam.name] as string)
+    : null;
+  if (
+    dataSource &&
+    dataSource !== NO_DATA_SOURCE &&
+    !(dataSource in model.data_sources)
+  ) {
+    return invalidRequest(`Unknown data source ${dataSource}`);
   }
 
   return right({ params, dataSource });
@@ -329,7 +330,7 @@ async function hydrateModel(
 
   const pk = model.primary_key.name;
   const query =
-    dataSource !== NULL_DATA_SOURCE
+    dataSource !== NO_DATA_SOURCE
       ? `SELECT * FROM "${model.name}.${dataSource}" WHERE "${model.name}.${pk}" = ?`
       : `SELECT * FROM "${model.name}" WHERE "${pk}" = ?`;
 
@@ -429,7 +430,7 @@ function validateCidlType(
   // TODO: consequences of null checking like this? 'null' is passed in
   // as a string for GET requests
   const nullable = isNullableType(cidlType);
-  if (value == null || value === NULL_DATA_SOURCE) return nullable;
+  if (value == null || value === "null") return nullable;
 
   if (nullable) {
     cidlType = (cidlType as any).Nullable; // Unwrap the nullable type
@@ -442,6 +443,7 @@ function validateCidlType(
         return Number.isInteger(Number(value));
       case "Real":
         return !Number.isNaN(Number(value));
+      case "DataSource":
       case "Text":
         return typeof value === "string";
       case "Blob":

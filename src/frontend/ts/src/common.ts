@@ -14,9 +14,11 @@ export function right<R>(value: R): Either<never, R> {
 }
 
 export enum ExtractorErrorCode {
+  MissingExport,
   AppMissingDefaultExport,
   UnknownType,
   MultipleGenericType,
+  DataSourceMissingStatic,
   InvalidPartialType,
   InvalidIncludeTree,
   UnknownNavigationPropertyReference,
@@ -33,6 +35,10 @@ const errorInfoMap: Record<
   ExtractorErrorCode,
   { description: string; suggestion: string }
 > = {
+  [ExtractorErrorCode.MissingExport]: {
+    description: "All Cloesce types must be exported.",
+    suggestion: "Add `export` to the class definition.",
+  },
   [ExtractorErrorCode.AppMissingDefaultExport]: {
     description: "app.cloesce.ts does not export a CloesceApp by default",
     suggestion: "Export an instantiated CloesceApp in app.cloesce.ts",
@@ -49,6 +55,10 @@ const errorInfoMap: Record<
     description: "Cloesce does not yet support types with multiple generics",
     suggestion:
       "Simplify your type to use only a single generic parameter, ie Foo<T>",
+  },
+  [ExtractorErrorCode.DataSourceMissingStatic]: {
+    description: "Data Sources must be declared as static",
+    suggestion: "Declare your data source as `static readonly`",
   },
   [ExtractorErrorCode.InvalidIncludeTree]: {
     description: "Invalid Include Tree",
@@ -169,12 +179,15 @@ export class CloesceApp {
   }
 }
 
+export type CrudKind = "POST" | "PATCH" | "GET" | "LIST";
+
 export type CidlType =
   | "Void"
   | "Integer"
   | "Real"
   | "Text"
   | "Blob"
+  | "DataSource"
   | { Inject: string }
   | { Object: string }
   | { Partial: string }
@@ -231,15 +244,12 @@ export function getNavigationPropertyCidlType(
     : { Array: { Object: nav.model_name } };
 }
 
-export type CrudKind = "POST" | "PATCH" | "GET" | "LIST";
-
 export interface Model {
   name: string;
   primary_key: NamedTypedValue;
   attributes: ModelAttribute[];
   navigation_properties: NavigationProperty[];
   methods: Record<string, ModelMethod>;
-  cruds: CrudKind[];
   data_sources: Record<string, DataSource>;
   source_path: string;
 }
@@ -254,7 +264,7 @@ export interface CidlIncludeTree {
   [key: string]: CidlIncludeTree;
 }
 
-export const NULL_DATA_SOURCE = "null";
+export const NO_DATA_SOURCE = "none";
 export interface DataSource {
   name: string;
   tree: CidlIncludeTree;

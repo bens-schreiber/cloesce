@@ -29,15 +29,96 @@
                     "is_static": false,
                     "http_verb": "POST",
                     "return_type": "Void",
-                    "parameters": []
+                    "parameters": [
+                        {
+                            "name": "__dataSource",
+                            "cidl_type": "DataSource"
+                        }
+                    ]
+                },
+                "post": {
+                    "name": "post",
+                    "is_static": true,
+                    "http_verb": "POST",
+                    "return_type": {
+                        "HttpResult": {
+                            "Object": "CrudHaver"
+                        }
+                    },
+                    "parameters": [
+                        {
+                            "name": "obj",
+                            "cidl_type": {
+                                "Partial": "CrudHaver"
+                            }
+                        },
+                        {
+                            "name": "dataSource",
+                            "cidl_type": "DataSource"
+                        }
+                    ]
+                },
+                "patch": {
+                    "name": "patch",
+                    "is_static": true,
+                    "http_verb": "PATCH",
+                    "return_type": {
+                        "HttpResult": {
+                            "Object": "CrudHaver"
+                        }
+                    },
+                    "parameters": [
+                        {
+                            "name": "obj",
+                            "cidl_type": {
+                                "Partial": "CrudHaver"
+                            }
+                        },
+                        {
+                            "name": "dataSource",
+                            "cidl_type": "DataSource"
+                        }
+                    ]
+                },
+                "get": {
+                    "name": "get",
+                    "is_static": true,
+                    "http_verb": "GET",
+                    "return_type": {
+                        "HttpResult": {
+                            "Object": "CrudHaver"
+                        }
+                    },
+                    "parameters": [
+                        {
+                            "name": "id",
+                            "cidl_type": "Integer"
+                        },
+                        {
+                            "name": "dataSource",
+                            "cidl_type": "DataSource"
+                        }
+                    ]
+                },
+                "list": {
+                    "name": "list",
+                    "is_static": true,
+                    "http_verb": "GET",
+                    "return_type": {
+                        "HttpResult": {
+                            "Array": {
+                                "Object": "CrudHaver"
+                            }
+                        }
+                    },
+                    "parameters": [
+                        {
+                            "name": "dataSource",
+                            "cidl_type": "DataSource"
+                        }
+                    ]
                 }
             },
-            "cruds": [
-                "POST",
-                "PATCH",
-                "GET",
-                "LIST"
-            ],
             "data_sources": {},
             "source_path": "./seed__crud.cloesce.ts"
         },
@@ -78,13 +159,90 @@
                     }
                 }
             ],
-            "methods": {},
-            "cruds": [
-                "POST",
-                "PATCH",
-                "GET",
-                "LIST"
-            ],
+            "methods": {
+                "post": {
+                    "name": "post",
+                    "is_static": true,
+                    "http_verb": "POST",
+                    "return_type": {
+                        "HttpResult": {
+                            "Object": "Parent"
+                        }
+                    },
+                    "parameters": [
+                        {
+                            "name": "obj",
+                            "cidl_type": {
+                                "Partial": "Parent"
+                            }
+                        },
+                        {
+                            "name": "dataSource",
+                            "cidl_type": "DataSource"
+                        }
+                    ]
+                },
+                "patch": {
+                    "name": "patch",
+                    "is_static": true,
+                    "http_verb": "PATCH",
+                    "return_type": {
+                        "HttpResult": {
+                            "Object": "Parent"
+                        }
+                    },
+                    "parameters": [
+                        {
+                            "name": "obj",
+                            "cidl_type": {
+                                "Partial": "Parent"
+                            }
+                        },
+                        {
+                            "name": "dataSource",
+                            "cidl_type": "DataSource"
+                        }
+                    ]
+                },
+                "get": {
+                    "name": "get",
+                    "is_static": true,
+                    "http_verb": "GET",
+                    "return_type": {
+                        "HttpResult": {
+                            "Object": "Parent"
+                        }
+                    },
+                    "parameters": [
+                        {
+                            "name": "id",
+                            "cidl_type": "Integer"
+                        },
+                        {
+                            "name": "dataSource",
+                            "cidl_type": "DataSource"
+                        }
+                    ]
+                },
+                "list": {
+                    "name": "list",
+                    "is_static": true,
+                    "http_verb": "GET",
+                    "return_type": {
+                        "HttpResult": {
+                            "Array": {
+                                "Object": "Parent"
+                            }
+                        }
+                    },
+                    "parameters": [
+                        {
+                            "name": "dataSource",
+                            "cidl_type": "DataSource"
+                        }
+                    ]
+                }
+            },
             "data_sources": {
                 "withChildren": {
                     "name": "withChildren",
@@ -123,7 +281,6 @@
                 }
             ],
             "methods": {},
-            "cruds": [],
             "data_sources": {},
             "source_path": "./seed__crud.cloesce.ts"
         }

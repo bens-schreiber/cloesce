@@ -11,6 +11,7 @@ export class PooC {
   a: PooA;
   b: PooB;
 }
+
 export class PooAcceptYield {
   id: number;
 
@@ -18,17 +19,17 @@ export class PooAcceptYield {
         a: PooA,
         b: PooB,
         c: PooC,
-    dataSource: null = null
+        __dataSource: "none" = "none",
   ): Promise<HttpResult<void>> {
     const baseUrl = new URL(`http://localhost:5002/api/PooAcceptYield/${this.id}/acceptPoos`);
-    baseUrl.searchParams.append("dataSource", String(dataSource));
     const res = await fetch(baseUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
             a, 
             b, 
-            c
+            c, 
+            __dataSource
       })
     });
     let raw = await res.json();
@@ -38,14 +39,14 @@ export class PooAcceptYield {
     return raw;
   }
   async yieldPoo(
-    dataSource: null = null
+        __dataSource: "none" = "none",
   ): Promise<HttpResult<PooC>> {
     const baseUrl = new URL(`http://localhost:5002/api/PooAcceptYield/${this.id}/yieldPoo`);
-    baseUrl.searchParams.append("dataSource", String(dataSource));
     const res = await fetch(baseUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
+            __dataSource
       })
     });
     let raw = await res.json();

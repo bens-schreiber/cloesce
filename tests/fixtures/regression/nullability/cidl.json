@@ -50,6 +50,10 @@
                             "cidl_type": {
                                 "Nullable": "Text"
                             }
+                        },
+                        {
+                            "name": "__dataSource",
+                            "cidl_type": "DataSource"
                         }
                     ]
                 },
@@ -70,6 +74,10 @@
                                     "Object": "NullabilityChecks"
                                 }
                             }
+                        },
+                        {
+                            "name": "__dataSource",
+                            "cidl_type": "DataSource"
                         }
                     ]
                 },
@@ -86,6 +94,10 @@
                                     "Inject": "Env"
                                 }
                             }
+                        },
+                        {
+                            "name": "__dataSource",
+                            "cidl_type": "DataSource"
                         }
                     ]
                 },
@@ -116,6 +128,10 @@
                                     }
                                 }
                             }
+                        },
+                        {
+                            "name": "__dataSource",
+                            "cidl_type": "DataSource"
                         }
                     ]
                 },
@@ -144,11 +160,14 @@
                                     }
                                 }
                             }
+                        },
+                        {
+                            "name": "__dataSource",
+                            "cidl_type": "DataSource"
                         }
                     ]
                 }
             },
-            "cruds": [],
             "data_sources": {},
             "source_path": "./seed__nullability.cloesce.ts"
         }
