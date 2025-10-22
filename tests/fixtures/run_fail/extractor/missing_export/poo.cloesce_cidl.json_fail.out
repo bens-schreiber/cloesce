@@ -1,0 +1,8 @@
+==== CLOESCE ERROR ====
+Error [MissingExport]: All Cloesce types must be exported.
+Phase: TypeScript IDL Extraction
+Context: Poo
+@PlainOldObject
+class Poo {}
+
+Suggested fix: Add `export` to the class definition.

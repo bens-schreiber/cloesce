@@ -27,12 +27,10 @@ export class Model {
   id: number;
 
   @GET
-  static async blockedMethod() {}
+  static blockedMethod() {}
 
   @GET
-  static async getInjectedThing(
-    @Inject thing: InjectedThing
-  ): Promise<InjectedThing> {
+  static getInjectedThing(@Inject thing: InjectedThing): InjectedThing {
     return thing;
   }
 }

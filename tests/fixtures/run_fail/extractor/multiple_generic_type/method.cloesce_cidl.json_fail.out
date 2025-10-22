@@ -2,6 +2,6 @@
 Error [MultipleGenericType]: Cloesce does not yet support types with multiple generics
 Phase: TypeScript IDL Extraction
 Context: Foo.method bad
-async method(valid: number, bad: Bar<number, number>) {}
+method(valid: number, bad: Bar<number, number>) {}
 
 Suggested fix: Simplify your type to use only a single generic parameter, ie Foo<T>

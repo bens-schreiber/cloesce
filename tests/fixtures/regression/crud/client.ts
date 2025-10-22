@@ -1,5 +1,6 @@
 import { HttpResult, instantiateObjectArray, DeepPartial } from "cloesce/client";
 
+
 export class Child {
   id: number;
   parentId: number;
@@ -10,15 +11,43 @@ export class CrudHaver {
   id: number;
   name: string;
 
+  static async get(
+        id: number,
+        dataSource: "none" = "none",
+  ): Promise<HttpResult<CrudHaver>> {
+    const baseUrl = new URL(`http://localhost:5002/api/CrudHaver/get`);
+    baseUrl.searchParams.append('id', String(id));
+    baseUrl.searchParams.append('dataSource', String(dataSource));
+    const res = await fetch(baseUrl, { method: "GET" });
+    let raw = await res.json();
+    if (!res.ok) {
+      return raw;
+    }
+    raw.data = Object.assign(new CrudHaver(), raw.data);
+    return raw;
+  }
+  static async list(
+        dataSource: "none" = "none",
+  ): Promise<HttpResult<CrudHaver[]>> {
+    const baseUrl = new URL(`http://localhost:5002/api/CrudHaver/list`);
+    baseUrl.searchParams.append('dataSource', String(dataSource));
+    const res = await fetch(baseUrl, { method: "GET" });
+    let raw = await res.json();
+    if (!res.ok) {
+      return raw;
+    }
+    raw.data = instantiateObjectArray(raw.data, CrudHaver);
+    return raw;
+  }
   async notCrud(
-    dataSource: null = null
+        __dataSource: "none" = "none",
   ): Promise<HttpResult<void>> {
     const baseUrl = new URL(`http://localhost:5002/api/CrudHaver/${this.id}/notCrud`);
-    baseUrl.searchParams.append("dataSource", String(dataSource));
     const res = await fetch(baseUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
+            __dataSource
       })
     });
     let raw = await res.json();
@@ -27,73 +56,24 @@ export class CrudHaver {
     }
     return raw;
   }
-  static async post(obj: DeepPartial<CrudHaver>, dataSource: null = null): Promise<HttpResult<CrudHaver>> {
-    const baseUrl = new URL(`http://localhost:5002/api/CrudHaver/POST`);
-    baseUrl.searchParams.append("dataSource", String(dataSource));
-
+  static async post(
+        obj: DeepPartial<CrudHaver>,
+        dataSource: "none" = "none",
+  ): Promise<HttpResult<CrudHaver>> {
+    const baseUrl = new URL(`http://localhost:5002/api/CrudHaver/post`);
     const res = await fetch(baseUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        obj
+            obj, 
+            dataSource
       })
     });
-
     let raw = await res.json();
     if (!res.ok) {
       return raw;
     }
-
     raw.data = Object.assign(new CrudHaver(), raw.data);
-    return raw;
-  }
-  async patch(dataSource: null = null): Promise<HttpResult<void>> {
-    const baseUrl = new URL(`http://localhost:5002/api/CrudHaver/${this.id}/PATCH`);
-    baseUrl.searchParams.append("dataSource", String(dataSource));
-
-    const res = await fetch(baseUrl, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        obj: this
-      })
-    });
-
-    let raw = await res.json();
-    if (!res.ok) {
-      return raw;
-    }
-
-    Object.assign(this, raw.data);
-    return raw;
-  }
-  static async get(id: number, dataSource: null = null): Promise<HttpResult<CrudHaver>> {
-    const baseUrl = new URL(`http://localhost:5002/api/CrudHaver/GET`);
-    baseUrl.searchParams.append("dataSource", String(dataSource));
-    baseUrl.searchParams.append("id", String(id));
-
-    const res = await fetch(baseUrl, { method: "GET" });
-
-    let raw = await res.json();
-    if (!res.ok) {
-      return raw;
-    }
-
-    raw.data = Object.assign(new CrudHaver(), raw.data);
-    return raw;
-  }
-  static async list(dataSource: null = null): Promise<HttpResult<CrudHaver[]>> {
-    const baseUrl = new URL(`http://localhost:5002/api/CrudHaver/LIST`);
-    baseUrl.searchParams.append("dataSource", String(dataSource));
-
-    const res = await fetch(baseUrl, { method: "GET" });
-
-    let raw = await res.json();
-    if (!res.ok) {
-      return raw;
-    }
-
-    raw.data = instantiateObjectArray(raw.data, CrudHaver);
     return raw;
   }
 }
@@ -103,73 +83,52 @@ export class Parent {
   favoriteChild: Child | undefined;
   children: Child[];
 
-  static async post(obj: DeepPartial<Parent>, dataSource: "withChildren" | null = null): Promise<HttpResult<Parent>> {
-    const baseUrl = new URL(`http://localhost:5002/api/Parent/POST`);
-    baseUrl.searchParams.append("dataSource", String(dataSource));
-
+  static async get(
+        id: number,
+        dataSource: "withChildren" |"none" = "none",
+  ): Promise<HttpResult<Parent>> {
+    const baseUrl = new URL(`http://localhost:5002/api/Parent/get`);
+    baseUrl.searchParams.append('id', String(id));
+    baseUrl.searchParams.append('dataSource', String(dataSource));
+    const res = await fetch(baseUrl, { method: "GET" });
+    let raw = await res.json();
+    if (!res.ok) {
+      return raw;
+    }
+    raw.data = Object.assign(new Parent(), raw.data);
+    return raw;
+  }
+  static async list(
+        dataSource: "withChildren" |"none" = "none",
+  ): Promise<HttpResult<Parent[]>> {
+    const baseUrl = new URL(`http://localhost:5002/api/Parent/list`);
+    baseUrl.searchParams.append('dataSource', String(dataSource));
+    const res = await fetch(baseUrl, { method: "GET" });
+    let raw = await res.json();
+    if (!res.ok) {
+      return raw;
+    }
+    raw.data = instantiateObjectArray(raw.data, Parent);
+    return raw;
+  }
+  static async post(
+        obj: DeepPartial<Parent>,
+        dataSource: "withChildren" |"none" = "none",
+  ): Promise<HttpResult<Parent>> {
+    const baseUrl = new URL(`http://localhost:5002/api/Parent/post`);
     const res = await fetch(baseUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        obj
+            obj, 
+            dataSource
       })
     });
-
     let raw = await res.json();
     if (!res.ok) {
       return raw;
     }
-
     raw.data = Object.assign(new Parent(), raw.data);
-    return raw;
-  }
-  async patch(dataSource: "withChildren" | null = null): Promise<HttpResult<void>> {
-    const baseUrl = new URL(`http://localhost:5002/api/Parent/${this.id}/PATCH`);
-    baseUrl.searchParams.append("dataSource", String(dataSource));
-
-    const res = await fetch(baseUrl, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        obj: this
-      })
-    });
-
-    let raw = await res.json();
-    if (!res.ok) {
-      return raw;
-    }
-
-    Object.assign(this, raw.data);
-    return raw;
-  }
-  static async get(id: number, dataSource: "withChildren" | null = null): Promise<HttpResult<Parent>> {
-    const baseUrl = new URL(`http://localhost:5002/api/Parent/GET`);
-    baseUrl.searchParams.append("dataSource", String(dataSource));
-    baseUrl.searchParams.append("id", String(id));
-
-    const res = await fetch(baseUrl, { method: "GET" });
-
-    let raw = await res.json();
-    if (!res.ok) {
-      return raw;
-    }
-
-    raw.data = Object.assign(new Parent(), raw.data);
-    return raw;
-  }
-  static async list(dataSource: "withChildren" | null = null): Promise<HttpResult<Parent[]>> {
-    const baseUrl = new URL(`http://localhost:5002/api/Parent/LIST`);
-    baseUrl.searchParams.append("dataSource", String(dataSource));
-
-    const res = await fetch(baseUrl, { method: "GET" });
-
-    let raw = await res.json();
-    if (!res.ok) {
-      return raw;
-    }
-
-    raw.data = instantiateObjectArray(raw.data, Parent);
     return raw;
   }
 }

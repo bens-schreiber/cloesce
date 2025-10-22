@@ -1,5 +1,6 @@
 import { HttpResult, instantiateObjectArray, DeepPartial } from "cloesce/client";
 
+
 export class Dog {
   id: number;
   name: string;
@@ -7,10 +8,8 @@ export class Dog {
 
   static async post(
         dog: DeepPartial<Dog>,
-    dataSource: null = null
   ): Promise<HttpResult<Dog>> {
     const baseUrl = new URL(`http://localhost:5002/api/Dog/post`);
-    baseUrl.searchParams.append("dataSource", String(dataSource));
     const res = await fetch(baseUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },

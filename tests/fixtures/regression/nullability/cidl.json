@@ -50,6 +50,12 @@
                             "cidl_type": {
                                 "Nullable": "Text"
                             }
+                        },
+                        {
+                            "name": "__dataSource",
+                            "cidl_type": {
+                                "DataSource": "NullabilityChecks"
+                            }
                         }
                     ]
                 },
@@ -70,6 +76,12 @@
                                     "Object": "NullabilityChecks"
                                 }
                             }
+                        },
+                        {
+                            "name": "__dataSource",
+                            "cidl_type": {
+                                "DataSource": "NullabilityChecks"
+                            }
                         }
                     ]
                 },
@@ -85,6 +97,12 @@
                                 "Nullable": {
                                     "Inject": "Env"
                                 }
+                            }
+                        },
+                        {
+                            "name": "__dataSource",
+                            "cidl_type": {
+                                "DataSource": "NullabilityChecks"
                             }
                         }
                     ]
@@ -116,6 +134,12 @@
                                     }
                                 }
                             }
+                        },
+                        {
+                            "name": "__dataSource",
+                            "cidl_type": {
+                                "DataSource": "NullabilityChecks"
+                            }
                         }
                     ]
                 },
@@ -144,11 +168,16 @@
                                     }
                                 }
                             }
+                        },
+                        {
+                            "name": "__dataSource",
+                            "cidl_type": {
+                                "DataSource": "NullabilityChecks"
+                            }
                         }
                     ]
                 }
             },
-            "cruds": [],
             "data_sources": {},
             "source_path": "./seed__nullability.cloesce.ts"
         }

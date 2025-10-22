@@ -16,7 +16,6 @@
             },
             "navigation_properties": [],
             "methods": {},
-            "cruds": [],
             "data_sources": {},
             "source_path": "./seed__foreign_keys.cloesce.ts"
         },
@@ -76,10 +75,16 @@
                     "return_type": {
                         "Object": "A"
                     },
-                    "parameters": []
+                    "parameters": [
+                        {
+                            "name": "__dataSource",
+                            "cidl_type": {
+                                "DataSource": "A"
+                            }
+                        }
+                    ]
                 }
             },
-            "cruds": [],
             "data_sources": {
                 "withB": {
                     "name": "withB",
@@ -142,10 +147,16 @@
                     "return_type": {
                         "Object": "Person"
                     },
-                    "parameters": []
+                    "parameters": [
+                        {
+                            "name": "__dataSource",
+                            "cidl_type": {
+                                "DataSource": "Person"
+                            }
+                        }
+                    ]
                 }
             },
-            "cruds": [],
             "data_sources": {
                 "withDogs": {
                     "name": "withDogs",
@@ -173,7 +184,6 @@
             },
             "navigation_properties": [],
             "methods": {},
-            "cruds": [],
             "data_sources": {},
             "source_path": "./seed__foreign_keys.cloesce.ts"
         },
@@ -225,10 +235,16 @@
                     "return_type": {
                         "Object": "Student"
                     },
-                    "parameters": []
+                    "parameters": [
+                        {
+                            "name": "__dataSource",
+                            "cidl_type": {
+                                "DataSource": "Student"
+                            }
+                        }
+                    ]
                 }
             },
-            "cruds": [],
             "data_sources": {
                 "withCoursesStudents": {
                     "name": "withCoursesStudents",
@@ -270,7 +286,6 @@
                 }
             ],
             "methods": {},
-            "cruds": [],
             "data_sources": {},
             "source_path": "./seed__foreign_keys.cloesce.ts"
         }

@@ -29,8 +29,8 @@ import {
   ExtractorError,
   ExtractorErrorCode,
   PlainOldObject,
-  CrudKind,
   CloesceApp,
+  CrudKind,
 } from "../common.js";
 import { TypeFormatFlags } from "typescript";
 
@@ -80,12 +80,18 @@ export class CidlExtractor {
       }
 
       for (const classDecl of sourceFile.getClasses()) {
+        const notExportedErr = err(ExtractorErrorCode.MissingExport, (e) => {
+          e.context = classDecl.getName();
+          e.snippet = classDecl.getText();
+        });
+
         if (hasDecorator(classDecl, ClassDecoratorKind.D1)) {
+          if (!classDecl.isExported()) return notExportedErr;
           const result = CidlExtractor.model(classDecl, sourceFile);
 
           // Error: propogate from models
           if (!result.ok) {
-            result.value.addContext((old) => `${classDecl.getName()}.${old}`);
+            result.value.addContext((prev) => `${classDecl.getName()}.${prev}`);
             return result;
           }
           models[result.value.name] = result.value;
@@ -93,11 +99,12 @@ export class CidlExtractor {
         }
 
         if (hasDecorator(classDecl, ClassDecoratorKind.PlainOldObject)) {
+          if (!classDecl.isExported()) return notExportedErr;
           const result = CidlExtractor.poo(classDecl, sourceFile);
 
           // Error: propogate from models
           if (!result.ok) {
-            result.value.addContext((old) => `${classDecl.getName()}.${old}`);
+            result.value.addContext((prev) => `${classDecl.getName()}.${prev}`);
             return result;
           }
           poos[result.value.name] = result.value;
@@ -105,6 +112,7 @@ export class CidlExtractor {
         }
 
         if (hasDecorator(classDecl, ClassDecoratorKind.WranglerEnv)) {
+          if (!classDecl.isExported()) return notExportedErr;
           wranglerEnvs.push({
             name: classDecl.getName(),
             source_path: sourceFile.getFilePath().toString(),
@@ -329,6 +337,14 @@ export class CidlExtractor {
           break;
         }
         case AttributeDecoratorKind.DataSource: {
+          // Error: data sources must be static
+          if (!prop.isStatic()) {
+            return err(ExtractorErrorCode.DataSourceMissingStatic, (e) => {
+              e.snippet = prop.getText();
+              e.context = prop.getName();
+            });
+          }
+
           const initializer = prop.getInitializer();
           const treeRes = CidlExtractor.includeTree(
             initializer,
@@ -337,7 +353,7 @@ export class CidlExtractor {
           );
 
           if (!treeRes.ok) {
-            treeRes.value.addContext((old) => `${prop.getName()} ${old}`);
+            treeRes.value.addContext((prev) => `${prop.getName()} ${prev}`);
             treeRes.value.snippet = prop.getText();
             return treeRes;
           }
@@ -359,12 +375,19 @@ export class CidlExtractor {
 
     // Process methods
     for (const m of classDecl.getMethods()) {
-      const result = CidlExtractor.method(m);
+      const result = CidlExtractor.method(name, m);
       if (!result.ok) {
-        result.value.addContext((old) => `${m.getName()} ${old}`);
+        result.value.addContext((prev) => `${m.getName()} ${prev}`);
         return left(result.value);
       }
       methods[result.value.name] = result.value;
+    }
+
+    // Add CRUD methods
+    for (const crud of cruds) {
+      // TODO: This overwrites any exisiting impl-- is that what we want?
+      const crudMethod = CidlExtractor.crudMethod(crud, primary_key, name);
+      methods[crudMethod.name] = crudMethod;
     }
 
     return right({
@@ -373,7 +396,6 @@ export class CidlExtractor {
       primary_key,
       navigation_properties: navigationProperties,
       methods,
-      cruds,
       data_sources: dataSources,
       source_path: sourceFile.getFilePath().toString(),
     });
@@ -418,7 +440,6 @@ export class CidlExtractor {
     String: "Text",
     boolean: "Integer",
     Boolean: "Integer",
-    Date: "Text",
   };
 
   private static cidlType(
@@ -469,6 +490,20 @@ export class CidlExtractor {
     const genericTy = generics[0];
     const symbolName = unwrappedType.getSymbol()?.getName();
     const aliasName = unwrappedType.getAliasSymbol()?.getName();
+
+    if (aliasName === "DataSourceOf") {
+      return right(
+        wrapNullable(
+          {
+            DataSource: genericTy.getText(
+              undefined,
+              TypeFormatFlags.UseAliasDefinedOutsideCurrentScope,
+            ),
+          },
+          nullable,
+        ),
+      );
+    }
 
     if (aliasName === "DeepPartial") {
       const [_, genericTyNullable] = unwrapNullable(genericTy);
@@ -639,6 +674,7 @@ export class CidlExtractor {
   }
 
   private static method(
+    modelName: string,
     method: MethodDeclaration,
   ): Either<ExtractorError, ModelMethod> {
     const decorators = method.getDecorators();
@@ -648,6 +684,7 @@ export class CidlExtractor {
       Object.values(HttpVerb).includes(name as HttpVerb),
     ) as HttpVerb;
 
+    let needsDataSource = !method.isStatic();
     const parameters: NamedTypedValue[] = [];
 
     for (const param of method.getParameters()) {
@@ -679,6 +716,11 @@ export class CidlExtractor {
         return typeRes;
       }
 
+      const rootType = getRootType(typeRes.value);
+      if (typeof rootType !== "string" && "DataSource" in rootType) {
+        needsDataSource = false;
+      }
+
       parameters.push({
         name: param.getName(),
         cidl_type: typeRes.value,
@@ -693,6 +735,14 @@ export class CidlExtractor {
       return typeRes;
     }
 
+    // Sugaring: add data source
+    if (needsDataSource) {
+      parameters.push({
+        name: "__dataSource",
+        cidl_type: { DataSource: modelName },
+      });
+    }
+
     return right({
       name: method.getName(),
       is_static: method.isStatic(),
@@ -700,6 +750,61 @@ export class CidlExtractor {
       return_type: typeRes.value,
       parameters,
     });
+  }
+
+  private static crudMethod(
+    crud: CrudKind,
+    primaryKey: NamedTypedValue,
+    modelName: string,
+  ): ModelMethod {
+    // TODO: Should this impementation be in some JSON project file s.t. other
+    // langs can use it?
+    return {
+      POST: {
+        name: "post",
+        is_static: true,
+        http_verb: HttpVerb.POST,
+        return_type: { HttpResult: { Object: modelName } },
+        parameters: [
+          {
+            name: "obj",
+            cidl_type: { Partial: modelName },
+          },
+          {
+            name: "dataSource",
+            cidl_type: { DataSource: modelName },
+          },
+        ],
+      },
+      GET: {
+        name: "get",
+        is_static: true,
+        http_verb: HttpVerb.GET,
+        return_type: { HttpResult: { Object: modelName } },
+        parameters: [
+          {
+            name: "id",
+            cidl_type: primaryKey.cidl_type,
+          },
+          {
+            name: "dataSource",
+            cidl_type: { DataSource: modelName },
+          },
+        ],
+      },
+      LIST: {
+        name: "list",
+        is_static: true,
+        http_verb: HttpVerb.GET,
+        return_type: { HttpResult: { Array: { Object: modelName } } },
+        parameters: [
+          {
+            name: "dataSource",
+            cidl_type: { DataSource: modelName },
+          },
+        ],
+      },
+    }[crud] as ModelMethod;
   }
 }
 
@@ -735,16 +840,30 @@ function getDecoratorArgument(
   return arg.getLiteralValue();
 }
 
-function getObjectName(t: CidlType): string | undefined {
-  if (typeof t === "string") return undefined;
+export function getRootType(t: CidlType): CidlType {
+  if (typeof t === "string") {
+    return t;
+  }
 
-  if ("Object" in t) {
-    return t.Object;
-  } else if ("Array" in t) {
-    return getObjectName(t.Array);
-  } else if ("HttpResult" in t) {
-    if (t == null) return undefined;
-    return getObjectName(t.HttpResult!);
+  if ("Nullable" in t) {
+    return getRootType(t.Nullable);
+  }
+
+  if ("Array" in t) {
+    return getRootType(t.Array);
+  }
+
+  if ("HttpResult" in t) {
+    return getRootType(t.HttpResult);
+  }
+
+  return t;
+}
+
+function getObjectName(t: CidlType): string | undefined {
+  const root = getRootType(t);
+  if (typeof root !== "string" && "Object" in root) {
+    return root["Object"];
   }
 
   return undefined;

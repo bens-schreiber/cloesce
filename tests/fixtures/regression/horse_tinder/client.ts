@@ -1,5 +1,6 @@
 import { HttpResult, instantiateObjectArray, DeepPartial } from "cloesce/client";
 
+
 export class Horse {
   id: number;
   name: string;
@@ -8,10 +9,8 @@ export class Horse {
 
   static async get(
         id: number,
-    dataSource: "default" | "withLikes" | null = null
   ): Promise<HttpResult<Horse>> {
     const baseUrl = new URL(`http://localhost:5002/api/Horse/get`);
-    baseUrl.searchParams.append("dataSource", String(dataSource));
     baseUrl.searchParams.append('id', String(id));
     const res = await fetch(baseUrl, { method: "GET" });
     let raw = await res.json();
@@ -23,15 +22,15 @@ export class Horse {
   }
   async like(
         horse: Horse,
-    dataSource: "default" | "withLikes" | null = null
+        __dataSource: "default" |"withLikes" |"none" = "none",
   ): Promise<HttpResult<void>> {
     const baseUrl = new URL(`http://localhost:5002/api/Horse/${this.id}/like`);
-    baseUrl.searchParams.append("dataSource", String(dataSource));
     const res = await fetch(baseUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-            horse
+            horse, 
+            __dataSource
       })
     });
     let raw = await res.json();
@@ -41,10 +40,8 @@ export class Horse {
     return raw;
   }
   static async list(
-    dataSource: "default" | "withLikes" | null = null
   ): Promise<HttpResult<Horse[]>> {
     const baseUrl = new URL(`http://localhost:5002/api/Horse/list`);
-    baseUrl.searchParams.append("dataSource", String(dataSource));
     const res = await fetch(baseUrl, { method: "GET" });
     let raw = await res.json();
     if (!res.ok) {
@@ -55,10 +52,8 @@ export class Horse {
   }
   static async post(
         horse: Horse,
-    dataSource: "default" | "withLikes" | null = null
   ): Promise<HttpResult<Horse>> {
     const baseUrl = new URL(`http://localhost:5002/api/Horse/post`);
-    baseUrl.searchParams.append("dataSource", String(dataSource));
     const res = await fetch(baseUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },

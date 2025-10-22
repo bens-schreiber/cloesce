@@ -154,7 +154,6 @@ impl ModelBuilder {
             methods: self.methods,
             data_sources: self.data_sources,
             source_path: PathBuf::default(),
-            cruds: vec![],
             primary_key: self.primary_key.unwrap(),
         }
     }

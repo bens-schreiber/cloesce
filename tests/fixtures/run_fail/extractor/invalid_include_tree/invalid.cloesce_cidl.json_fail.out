@@ -1,8 +1,8 @@
 ==== CLOESCE ERROR ====
-Error [InvalidIncludeTree]: Invalid Include Tree
+Error [DataSourceMissingStatic]: Data Sources must be declared as static
 Phase: TypeScript IDL Extraction
-Context: Foo.bar 
+Context: Foo.bar
 @DataSource
   bar: number;
 
-Suggested fix: Include trees must only contain references to a model's navigation properties.
+Suggested fix: Declare your data source as `static readonly`
