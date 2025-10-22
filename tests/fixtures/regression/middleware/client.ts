@@ -3,6 +3,7 @@ import { HttpResult, instantiateObjectArray, DeepPartial } from "cloesce/client"
 export class InjectedThing {
   value: string;
 }
+
 export class Model {
   id: number;
 

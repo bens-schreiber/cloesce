@@ -56,26 +56,6 @@ export class CrudHaver {
     }
     return raw;
   }
-  static async patch(
-        obj: DeepPartial<CrudHaver>,
-        dataSource: "none" = "none",
-  ): Promise<HttpResult<CrudHaver>> {
-    const baseUrl = new URL(`http://localhost:5002/api/CrudHaver/patch`);
-    const res = await fetch(baseUrl, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-            obj, 
-            dataSource
-      })
-    });
-    let raw = await res.json();
-    if (!res.ok) {
-      return raw;
-    }
-    raw.data = Object.assign(new CrudHaver(), raw.data);
-    return raw;
-  }
   static async post(
         obj: DeepPartial<CrudHaver>,
         dataSource: "none" = "none",
@@ -129,26 +109,6 @@ export class Parent {
       return raw;
     }
     raw.data = instantiateObjectArray(raw.data, Parent);
-    return raw;
-  }
-  static async patch(
-        obj: DeepPartial<Parent>,
-        dataSource: "withChildren" |"none" = "none",
-  ): Promise<HttpResult<Parent>> {
-    const baseUrl = new URL(`http://localhost:5002/api/Parent/patch`);
-    const res = await fetch(baseUrl, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-            obj, 
-            dataSource
-      })
-    });
-    let raw = await res.json();
-    if (!res.ok) {
-      return raw;
-    }
-    raw.data = Object.assign(new Parent(), raw.data);
     return raw;
   }
   static async post(

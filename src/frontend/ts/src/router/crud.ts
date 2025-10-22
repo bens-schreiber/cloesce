@@ -31,7 +31,6 @@ export class CrudContext {
   interceptCrud(methodName: string): Function {
     const map: Record<string, Function> = {
       post: this.upsert.bind(this),
-      patch: this.upsert.bind(this),
       get: this.get.bind(this),
       list: this.list.bind(this),
     };

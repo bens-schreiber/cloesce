@@ -58,28 +58,6 @@
                         }
                     ]
                 },
-                "patch": {
-                    "name": "patch",
-                    "is_static": true,
-                    "http_verb": "PATCH",
-                    "return_type": {
-                        "HttpResult": {
-                            "Object": "CrudHaver"
-                        }
-                    },
-                    "parameters": [
-                        {
-                            "name": "obj",
-                            "cidl_type": {
-                                "Partial": "CrudHaver"
-                            }
-                        },
-                        {
-                            "name": "dataSource",
-                            "cidl_type": "DataSource"
-                        }
-                    ]
-                },
                 "get": {
                     "name": "get",
                     "is_static": true,
@@ -164,28 +142,6 @@
                     "name": "post",
                     "is_static": true,
                     "http_verb": "POST",
-                    "return_type": {
-                        "HttpResult": {
-                            "Object": "Parent"
-                        }
-                    },
-                    "parameters": [
-                        {
-                            "name": "obj",
-                            "cidl_type": {
-                                "Partial": "Parent"
-                            }
-                        },
-                        {
-                            "name": "dataSource",
-                            "cidl_type": "DataSource"
-                        }
-                    ]
-                },
-                "patch": {
-                    "name": "patch",
-                    "is_static": true,
-                    "http_verb": "PATCH",
                     "return_type": {
                         "HttpResult": {
                             "Object": "Parent"

@@ -179,7 +179,7 @@ export class CloesceApp {
   }
 }
 
-export type CrudKind = "POST" | "PATCH" | "GET" | "LIST";
+export type CrudKind = "POST" | "GET" | "LIST";
 
 export type CidlType =
   | "Void"
