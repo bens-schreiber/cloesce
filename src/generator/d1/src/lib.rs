@@ -62,70 +62,32 @@ fn generate_views(model_tree: Vec<ModelTree>) -> Vec<String> {
 
     return views;
 
-    /*CURRENT
-
-        CREATE VIEW "Horse_default" AS
-        SELECT
-            "Horse"."id"       AS "Horse_id",
-            "Horse"."name"     AS "Horse_name",
-            "Horse"."bio"      AS "Horse_bio",
-            "Like"."id"        AS "Like_id",
-            "Like"."horseId1"  AS "Like_horseId1",
-            "Like"."horseId2"  AS "Like_horseId2",
-            "Horse_1"."id"     AS "Horse_1_id",
-            "Horse_1"."name"   AS "Horse_1_name",
-            "Horse_1"."bio"    AS "Horse_1_bio"
-        FROM "Horse"
-        LEFT JOIN "Like"
-            ON "Horse"."id" = "Like"."horseId1"
-        LEFT JOIN "Horse" AS "Horse_1"
-            ON "Like"."horseId2" = "Horse_1"."id";
-    */
-
-    /*vNEXT
-
-        CREATE VIEW "Horse.default" AS
-        SELECT
-            -- Top-level Horse fields
-            "Horse"."id"   AS "Horse.id",
-            "Horse"."name" AS "Horse.name",
-            "Horse"."bio"  AS "Horse.bio",
-
-            -- Likes relationship
-            "Like"."id"       AS "Horse.likes.id",
-            "Like"."horseId1" AS "Horse.likes.horseId1",
-            "Like"."horseId2" AS "Horse.likes.horseId2",
-
-            -- Nested horse2 from Like
-            H2."id"   AS "Horse.likes.horse2.id",
-            H2."name" AS "Horse.likes.horse2.name",
-            H2."bio"  AS "Horse.likes.horse2.bio"
-
-        FROM "Horse"
-        LEFT JOIN "Like"
-            ON "Horse"."id" = "Like"."horseId1"
-        LEFT JOIN "Horse" AS H2
-            ON "Like"."horseId2" = H2."id";
-
-
-    */
-
     fn dfs(node: &ModelTreeNode, query: &mut SelectStatement, path: &mut Vec<String>) {
         let path_to_column = path.join(".");
 
         // Primary Key
         {
             let pk = &node.model.primary_key.name;
-            query.expr_as(
-                Expr::col((alias(&node.alias), alias(pk))),
-                alias(format!("{}.{}", &path_to_column, pk)),
-            );
+            let col = if matches!(
+                node.parent_transition_kind,
+                Some(NavigationPropertyKind::ManyToMany { .. })
+            ) {
+                // M:M pk is in the form "UniqueIdN.ModelName.PrimaryKeyName"
+                Expr::col((
+                    alias(node.many_to_many_alias.as_ref().unwrap()),
+                    alias(format!("{}.{}", node.model.name, pk)),
+                ))
+            } else {
+                Expr::col((alias(&node.model_alias), alias(pk)))
+            };
+
+            query.expr_as(col, alias(format!("{}.{}", &path_to_column, pk)));
         }
 
         // Columns
         for attr in &node.model.attributes {
             query.expr_as(
-                Expr::col((alias(&node.alias), alias(&attr.value.name))),
+                Expr::col((alias(&node.model_alias), alias(&attr.value.name))),
                 alias(format!("{}.{}", &path_to_column, attr.value.name)),
             );
         }
@@ -139,9 +101,9 @@ fn generate_views(model_tree: Vec<ModelTree>) -> Vec<String> {
                     left_join_as(
                         query,
                         &child.model.name,
-                        &child.alias,
-                        Expr::col((alias(&node.alias), alias(reference)))
-                            .equals((alias(&child.alias), alias(nav_model_pk))),
+                        &child.model_alias,
+                        Expr::col((alias(&node.model_alias), alias(reference)))
+                            .equals((alias(&child.model_alias), alias(nav_model_pk))),
                     );
                 }
                 NavigationPropertyKind::OneToMany { reference } => {
@@ -150,27 +112,34 @@ fn generate_views(model_tree: Vec<ModelTree>) -> Vec<String> {
                     left_join_as(
                         query,
                         &child.model.name,
-                        &child.alias,
-                        Expr::col((alias(&node.alias), alias(pk)))
-                            .equals((alias(&child.alias), alias(reference))),
+                        &child.model_alias,
+                        Expr::col((alias(&node.model_alias), alias(pk)))
+                            .equals((alias(&child.model_alias), alias(reference))),
                     );
                 }
                 NavigationPropertyKind::ManyToMany { unique_id } => {
                     let nav_model_pk = &child.model.primary_key;
                     let pk = &node.model.primary_key.name;
 
-                    query.left_join(
-                        alias(unique_id),
-                        Expr::col((alias(&node.alias), alias(pk)))
-                            .equals((alias(unique_id), alias(format!("{}.{}", node.alias, pk)))),
+                    left_join_as(
+                        query,
+                        unique_id,
+                        child.many_to_many_alias.as_ref().unwrap(),
+                        Expr::col((alias(&node.model_alias), alias(pk))).equals((
+                            alias(child.many_to_many_alias.as_ref().unwrap()),
+                            alias(format!("{}.{}", node.model.name, pk)),
+                        )),
                     );
 
                     left_join_as(
                         query,
                         &child.model.name,
-                        &child.alias,
-                        Expr::col((alias(unique_id), alias(format!("{}.{}", child.alias, pk))))
-                            .equals((alias(&child.alias), alias(&nav_model_pk.name))),
+                        &child.model_alias,
+                        Expr::col((
+                            alias(child.many_to_many_alias.as_ref().unwrap()),
+                            alias(format!("{}.{}", child.model.name, pk)),
+                        ))
+                        .equals((alias(&child.model_alias), alias(&nav_model_pk.name))),
                     );
                 }
             }
@@ -450,7 +419,14 @@ fn validate_fks<'a>(
 struct ModelTreeNode<'a> {
     parent_transition_kind: Option<NavigationPropertyKind>,
     parent_transition_name: Option<String>,
-    alias: String,
+
+    /// The alias of the associated [Model], being some form of
+    /// "ModelName" + N, where N is how many times the model occurs in the tree.
+    model_alias: String,
+
+    /// The alias of the associated many to many table if it exists, being
+    /// some form of "UniqueId" + N, where N is how many times the model occurs in the tree.
+    many_to_many_alias: Option<String>,
     model: &'a Model,
     children: Vec<ModelTreeNode<'a>>,
 }
@@ -507,13 +483,20 @@ fn validate_data_sources<'a>(
         model_lookup: &'a BTreeMap<String, Model>,
         alias_counter: &mut HashMap<String, u32>,
     ) -> Result<ModelTreeNode<'a>> {
-        let alias = generate_alias(&model.name, alias_counter);
+        let model_alias = generate_alias(&model.name, alias_counter);
+        let many_to_many_alias = transition.clone().and_then(|m| match &m {
+            NavigationPropertyKind::ManyToMany { unique_id } => {
+                Some(generate_alias(unique_id, alias_counter))
+            }
+            _ => None,
+        });
 
         let mut node = ModelTreeNode {
             parent_transition_kind: transition,
             parent_transition_name: transition_name,
-            alias: alias.clone(),
+            model_alias: model_alias.clone(),
             model,
+            many_to_many_alias,
             children: vec![],
         };
 

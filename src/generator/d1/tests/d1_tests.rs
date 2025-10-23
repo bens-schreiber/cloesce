@@ -324,7 +324,7 @@ fn test_sqlite_view_output() {
                     },
                 )
                 .data_source(
-                    "default",
+                    "withCourses",
                     IncludeTreeBuilder::default().add_node("courses").build(),
                 )
                 .build(),
@@ -338,7 +338,7 @@ fn test_sqlite_view_output() {
                     },
                 )
                 .data_source(
-                    "default",
+                    "withStudents",
                     IncludeTreeBuilder::default().add_node("students").build(),
                 )
                 .build(),
@@ -351,13 +351,13 @@ fn test_sqlite_view_output() {
         // Assert: Many-to-many view for Student
         expected_str!(
             sql,
-            r#"CREATE VIEW "Student.default" AS SELECT "Student"."id" AS "Student.id", "Course"."id" AS "Student.courses.id" FROM "Student" LEFT JOIN "StudentsCourses" ON "Student"."id" = "StudentsCourses"."Student.id" LEFT JOIN "Course" ON "StudentsCourses"."Course.id" = "Course"."id";"#
+            r#"CREATE VIEW "Course.withStudents" AS SELECT "Course"."id" AS "Course.id", "StudentsCourses"."Student.id" AS "Course.students.id" FROM "Course" LEFT JOIN "StudentsCourses" ON "Course"."id" = "StudentsCourses"."Course.id" LEFT JOIN "Student" ON "StudentsCourses"."Student.id" = "Student"."id";"#
         );
 
         // Assert: Many-to-many view for Course
         expected_str!(
             sql,
-            r#"CREATE VIEW "Course.default" AS SELECT "Course"."id" AS "Course.id", "Student"."id" AS "Course.students.id" FROM "Course" LEFT JOIN "StudentsCourses" ON "Course"."id" = "StudentsCourses"."Course.id" LEFT JOIN "Student" ON "StudentsCourses"."Student.id" = "Student"."id";"#
+            r#"CREATE VIEW "Student.withCourses" AS SELECT "Student"."id" AS "Student.id", "StudentsCourses"."Course.id" AS "Student.courses.id" FROM "Student" LEFT JOIN "StudentsCourses" ON "Student"."id" = "StudentsCourses"."Student.id" LEFT JOIN "Course" ON "StudentsCourses"."Course.id" = "Course"."id";"#
         );
     }
 

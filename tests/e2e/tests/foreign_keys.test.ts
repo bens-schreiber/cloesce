@@ -81,22 +81,19 @@ describe("POST and refresh Student", () => {
     expect(res.data.courses.length).toBe(1);
   });
 
-  //   // ********TODO: This is failing, theres an error in Many to Many that might be a pain to fix.
-  //   // Doing this in a seperate PR
-  //   // testRefresh(
-  //   //   student,
-  //   //   ["withCoursesStudents", "withCoursesStudentsCourses", null],
-  //   //   {
-  //   //     withCoursesStudents: (data) => {
-  //   //       console.log(data);
-  //   //       expect(data.courses.length).toBe(1);
-  //   //       expect(data.courses[0].students).not.toBeUndefined();
-  //   //     },
-  //   //     withCoursesStudentsCourses: (data) => {
-  //   //       expect(data.courses.length).toBe(1);
-  //   //       expect(data.courses[0].students[0].courses).not.toBeUndefined();
-  //   //     },
-  //   //     null: (data) => expect(data.courses.length).toBe(0),
-  //   //   }
-  //   // );
+  testRefresh(
+    student,
+    ["withCoursesStudents", "withCoursesStudentsCourses", "none"],
+    {
+      withCoursesStudents: (data) => {
+        expect(data.courses.length).toBe(1);
+        expect(data.courses[0].students).not.toBeUndefined();
+      },
+      withCoursesStudentsCourses: (data) => {
+        expect(data.courses.length).toBe(1);
+        expect(data.courses[0].students[0].courses).not.toBeUndefined();
+      },
+      none: (data) => expect(data.courses.length).toBe(0),
+    },
+  );
 });
