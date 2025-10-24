@@ -64,7 +64,7 @@ This algorithm can get tricky. Note that insertions must occur in topological or
 
 For this to work, we need a way to propogate information from a parent node to a child note, as well as from a child node to a parent node.
 
-My approach was to use dynamic scoping (just as some compilers do). This is just a map with the keys being the exact path we've traversed to get to some value, and the value being either generated (which we will discuss later), or provided in the original model that is being inserted.
+My approach was to create a static single assignment container. This is just a map with the keys being the exact path we've traversed to get to some value, and the value being either generated (which we will discuss later), or provided in the original model that is being inserted.
 
 We will use this dynamic scope context to fill any missing values in the model. Of course, models can be ill-formatted and we might be unable to infer a value, in which case we just yield an error.
 
