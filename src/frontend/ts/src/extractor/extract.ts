@@ -9,6 +9,7 @@ import {
   ClassDeclaration,
   Decorator,
   Expression,
+  Scope,
 } from "ts-morph";
 
 import {
@@ -113,6 +114,15 @@ export class CidlExtractor {
 
         if (hasDecorator(classDecl, ClassDecoratorKind.WranglerEnv)) {
           if (!classDecl.isExported()) return notExportedErr;
+
+          // Error: invalid attribute modifier
+          for (const prop of classDecl.getProperties()) {
+            const modifierRes = checkAttributeModifier(prop);
+            if (modifierRes) {
+              return modifierRes;
+            }
+          }
+
           wranglerEnvs.push({
             name: classDecl.getName(),
             source_path: sourceFile.getFilePath().toString(),
@@ -203,8 +213,15 @@ export class CidlExtractor {
         return typeRes;
       }
 
+      const checkModifierRes = checkAttributeModifier(prop);
+
       // No decorators means this is a standard attribute
       if (decorators.length === 0) {
+        // Error: invalid attribute modifier
+        if (checkModifierRes !== undefined) {
+          return checkModifierRes;
+        }
+
         const cidl_type = typeRes.value;
         attributes.push({
           foreign_key_reference: null,
@@ -219,6 +236,14 @@ export class CidlExtractor {
       // TODO: Limiting to one decorator. Can't get too fancy on us.
       const decorator = decorators[0];
       const name = getDecoratorName(decorator);
+
+      // Error: invalid attribute modifier
+      if (
+        checkModifierRes !== undefined &&
+        name !== AttributeDecoratorKind.DataSource
+      ) {
+        return checkModifierRes;
+      }
 
       // Process decorators
       const cidl_type = typeRes.value;
@@ -375,7 +400,18 @@ export class CidlExtractor {
 
     // Process methods
     for (const m of classDecl.getMethods()) {
-      const result = CidlExtractor.method(name, m);
+      const httpVerb = m
+        .getDecorators()
+        .map((d) => getDecoratorName(d))
+        .find((name) =>
+          Object.values(HttpVerb).includes(name as HttpVerb),
+        ) as HttpVerb;
+
+      if (!httpVerb) {
+        continue;
+      }
+
+      const result = CidlExtractor.method(name, m, httpVerb);
       if (!result.ok) {
         result.value.addContext((prev) => `${m.getName()} ${prev}`);
         return left(result.value);
@@ -416,6 +452,12 @@ export class CidlExtractor {
         typeRes.value.context = prop.getName();
         typeRes.value.snippet = prop.getText();
         return typeRes;
+      }
+
+      // Error: invalid attribute modifier
+      const modifierRes = checkAttributeModifier(prop);
+      if (modifierRes) {
+        return modifierRes;
       }
 
       const cidl_type = typeRes.value;
@@ -676,13 +718,15 @@ export class CidlExtractor {
   private static method(
     modelName: string,
     method: MethodDeclaration,
+    httpVerb: HttpVerb,
   ): Either<ExtractorError, ModelMethod> {
-    const decorators = method.getDecorators();
-    const decoratorNames = decorators.map((d) => getDecoratorName(d));
-
-    const httpVerb = decoratorNames.find((name) =>
-      Object.values(HttpVerb).includes(name as HttpVerb),
-    ) as HttpVerb;
+    // Error: invalid method scope, must be public
+    if (method.getScope() != Scope.Public) {
+      return err(ExtractorErrorCode.InvalidApiMethodModifier, (e) => {
+        e.context = method.getName();
+        e.snippet = method.getText();
+      });
+    }
 
     let needsDataSource = !method.isStatic();
     const parameters: NamedTypedValue[] = [];
@@ -840,7 +884,7 @@ function getDecoratorArgument(
   return arg.getLiteralValue();
 }
 
-export function getRootType(t: CidlType): CidlType {
+function getRootType(t: CidlType): CidlType {
   if (typeof t === "string") {
     return t;
   }
@@ -903,4 +947,16 @@ function hasDecorator(
     const decoratorName = getDecoratorName(d);
     return decoratorName === name || decoratorName.endsWith("." + name);
   });
+}
+
+function checkAttributeModifier(
+  prop: PropertyDeclaration,
+): Either<ExtractorError, never> | undefined {
+  // Error: attributes must be just 'public'
+  if (prop.getScope() != Scope.Public || prop.isReadonly() || prop.isStatic()) {
+    return err(ExtractorErrorCode.InvalidAttributeModifier, (e) => {
+      e.context = prop.getName();
+      e.snippet = prop.getText();
+    });
+  }
 }
