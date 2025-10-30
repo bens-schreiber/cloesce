@@ -2,10 +2,15 @@ pub mod builder;
 pub mod err;
 
 use std::collections::BTreeMap;
+use std::collections::VecDeque;
+use std::hash::Hash;
+use std::hash::Hasher;
 use std::path::PathBuf;
 
 use err::GeneratorErrorKind;
 use err::Result;
+use indexmap::IndexMap;
+use rustc_hash::FxHasher;
 use serde::Deserialize;
 use serde::Serialize;
 use serde_with::MapPreventDuplicates;
@@ -108,6 +113,7 @@ pub struct NamedTypedValue {
 pub struct ModelAttribute {
     pub value: NamedTypedValue,
     pub foreign_key_reference: Option<String>,
+    pub hash: Option<u64>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -126,9 +132,10 @@ pub struct IncludeTree(pub BTreeMap<String, IncludeTree>);
 pub struct DataSource {
     pub name: String,
     pub tree: IncludeTree,
+    pub hash: Option<u64>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, Hash)]
 pub enum NavigationPropertyKind {
     OneToOne { reference: String },
     OneToMany { reference: String },
@@ -140,6 +147,7 @@ pub struct NavigationProperty {
     pub var_name: String,
     pub model_name: String,
     pub kind: NavigationPropertyKind,
+    pub hash: Option<u64>,
 }
 
 #[serde_as]
@@ -155,7 +163,9 @@ pub struct Model {
 
     #[serde_as(as = "MapPreventDuplicates<_, _>")]
     pub data_sources: BTreeMap<String, DataSource>,
+
     pub source_path: PathBuf,
+    pub hash: Option<u64>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -184,13 +194,14 @@ pub struct CloesceAst {
     pub language: InputLanguage,
     pub wrangler_env: WranglerEnv,
 
-    #[serde_as(as = "MapPreventDuplicates<_, _>")]
-    pub models: BTreeMap<String, Model>,
+    // TODO: MapPreventDuplicates is not supported for IndexMap
+    pub models: IndexMap<String, Model>,
 
     #[serde_as(as = "MapPreventDuplicates<_, _>")]
     pub poos: BTreeMap<String, PlainOldObject>,
 
     pub app_source: Option<PathBuf>,
+    pub hash: Option<u64>,
 }
 
 impl CloesceAst {
@@ -389,5 +400,80 @@ impl CloesceAst {
         }
 
         Ok(())
+    }
+
+    /// Traverses the AST setting the `hash` field as a merkle hash, meaning a parents hash depends on it's childrens hashes.
+    ///
+    /// TODO: It would be neat if this could be done while deserializing.
+    /// It could also be combined with [Self::validate_types] for less O(n) traversals.
+    pub fn set_merkle_hash(&mut self) {
+        if self.hash.is_some() {
+            // If the root is hashed, it's safe to assume all children are hashed.
+            // No work to be done.
+            return;
+        }
+
+        let mut root_h = FxHasher::default();
+        for model in self.models.values_mut() {
+            let mut model_h = FxHasher::default();
+            model_h.write(b"Model");
+            model.primary_key.hash(&mut model_h);
+            model.name.hash(&mut model_h);
+
+            for attr in model.attributes.iter_mut() {
+                let attr_h = {
+                    let mut h = FxHasher::default();
+                    h.write(b"ModelAttribute");
+                    attr.value.hash(&mut h);
+                    attr.foreign_key_reference.hash(&mut h);
+                    h.finish()
+                };
+
+                attr.hash = Some(attr_h);
+                model_h.write_u64(attr_h);
+            }
+
+            for ds in model.data_sources.values_mut() {
+                let ds_h = {
+                    let mut h = FxHasher::default();
+                    h.write(b"ModelDataSource");
+                    ds.name.hash(&mut h);
+
+                    let mut q = VecDeque::new();
+                    q.push_back(&ds.tree);
+                    while let Some(n) = q.pop_front() {
+                        for (k, v) in &n.0 {
+                            k.hash(&mut h);
+                            q.push_back(v);
+                        }
+                    }
+
+                    h.finish()
+                };
+
+                ds.hash = Some(ds_h);
+                model_h.write_u64(ds_h);
+            }
+
+            for nav in model.navigation_properties.iter_mut() {
+                let nav_h = {
+                    let mut h = FxHasher::default();
+                    h.write(b"ModelNavigationProperty");
+                    nav.model_name.hash(&mut h);
+                    nav.var_name.hash(&mut h);
+                    nav.kind.hash(&mut h);
+                    h.finish()
+                };
+
+                nav.hash = Some(nav_h);
+                model_h.write_u64(nav_h);
+            }
+
+            let model_h_finished = model_h.finish();
+            model.hash = Some(model_h_finished);
+            root_h.write_u64(model_h_finished);
+        }
+
+        self.hash = Some(root_h.finish())
     }
 }

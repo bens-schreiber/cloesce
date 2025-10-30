@@ -1,5 +1,7 @@
 use std::{collections::BTreeMap, path::PathBuf};
 
+use indexmap::IndexMap;
+
 use crate::{
     CidlType, CloesceAst, DataSource, HttpVerb, IncludeTree, InputLanguage, Model, ModelAttribute,
     ModelMethod, NamedTypedValue, NavigationProperty, NavigationPropertyKind, WranglerEnv,
@@ -9,7 +11,7 @@ pub fn create_ast(mut models: Vec<Model>) -> CloesceAst {
     let map = models
         .drain(..)
         .map(|m| (m.name.clone(), m))
-        .collect::<BTreeMap<String, Model>>();
+        .collect::<IndexMap<String, Model>>();
     CloesceAst {
         version: "1.0".to_string(),
         project_name: "test".to_string(),
@@ -21,6 +23,7 @@ pub fn create_ast(mut models: Vec<Model>) -> CloesceAst {
             source_path: "source.ts".into(),
         },
         app_source: None,
+        hash: None,
     }
 }
 
@@ -84,6 +87,7 @@ impl ModelBuilder {
                 cidl_type,
             },
             foreign_key_reference: foreign_key,
+            hash: None,
         });
         self
     }
@@ -98,6 +102,7 @@ impl ModelBuilder {
             var_name: var_name.into(),
             model_name: model_name.into(),
             kind: foreign_key,
+            hash: None,
         });
         self
     }
@@ -141,6 +146,7 @@ impl ModelBuilder {
             DataSource {
                 name: name.into(),
                 tree,
+                hash: None,
             },
         );
         self
@@ -155,6 +161,7 @@ impl ModelBuilder {
             data_sources: self.data_sources,
             source_path: PathBuf::default(),
             primary_key: self.primary_key.unwrap(),
+            hash: None,
         }
     }
 }
