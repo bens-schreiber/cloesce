@@ -60,7 +60,7 @@ We will support two main commands: `cloesce compile -- migrations add <name>` an
 
 Adding migrations will add a file in the format `migrations/<DATE>_<NAME>.sql` to a top level project directory. When ran, a full semantic analysis of the CIDL will occur, then producing a SQL file. A key difference is that D1 generation will no longer take just the CIDL as an input, but also the _last migrated_ CIDL, which will be stored under `migrations/<DATE>_<NAME>.json`. A diffing algorithm will occur, and only the changes will generate some kind of SQL code, be it adding a table/view, dropping a table/view, alerting a table/view, etc.
 
-The `migrations update` command will take the most recent migration, and modify it with respect to the most recently generated CIDL, and the last migrated CIDL, replacing the most recent migration under the same name with a new date. This helps in the development process, where models might be modified frequently, but creating an entire new migration isn't really necessary because there may not be any real data in some hosted database, or the migration was created locally and hasn't been pushed upstream.
+The `migrations update` command will take the most recent migration, and modify it with respect to the most recently generated CIDL, replacing the artifacts with a new date. This helps in the development process, where models might be modified frequently, but creating an entire new migration isn't really necessary because there may not be any real data in some hosted database, or the migration was created locally and hasn't been pushed upstream.
 
 With this in mind, the process to get a Cloesce project up and running would look like:
 
@@ -71,13 +71,13 @@ wrangler d1 migrations apply <DB_NAME>
 # or
 
 cloesce compile -- migrations update
-wrangler d1 reset <DB_NAME>
+wrangler d1 reset <DB_NAME>             # might be necessary
 wrangler d1 migrations apply <DB_NAME>
 ```
 
 ## AST Change Detection Algorithm
 
-SQL generation will have to be shifted to compute changes (additions, removals or refactors) between two CIDL's model AST's. But how do we actually diff two ASTs? We will try to do a structural hashing of the AST, similiar to a Merkle Tree.
+SQL generation will have to be shifted from additions only to track refactors and removals, given some working CIDL and some past CIDL (could be empty if not exists). But how do we actually diff two ASTs? We will try to do a structural hashing of the AST, similiar to a Merkle Tree.
 
 First, let's determine what nodes of the AST are valuable for a hash:
 
@@ -88,9 +88,9 @@ First, let's determine what nodes of the AST are valuable for a hash:
 - Data source include trees
 - Many to Many navigation properties
 
-Thus, hashes will be stored on Models, Data Sources, Attributes and Navigation Properties. At compile time, we will hash the AST we are working on. Note that we will do semantic analysis on the AST by the time any migrations are being computed, so if someone renames a model `Dog` to `Cat` it's assured that there will be no invalid `Dog` references laying around. After semantic analysis, we can then traverse the models to find diffs between the working tree, and the last stored migration's tree. If a top level diff is equivalent, then no changes have been made. If a value is missing, then we know it has been either renamed or dropped-- we'll always assume dropped since we don't have the metadata to know if it has been renamed (this is a problem, see below section). If a value does not exist in the last AST, it's been added. Finally, if a value has a different hash, we will compare the values of those nodes, and recursively repeat the process for any child nodes.
+Thus, hashes will be stored on Models, Data Sources, Attributes and Navigation Properties. At compile time, we will hash the AST we are working on. Note that we will do semantic analysis on the AST by the time any migrations are being computed, so if someone renames a model `Dog` to `Cat` it's assured that there will be no invalid `Dog` references laying around. After semantic analysis, we can then traverse the models to find diffs between the working tree, and the last stored migration's tree. If a top level diff is equivalent, then no changes have been made. If a value is missing, then we know it has been either renamed or dropped (this is a problem, see below section). If a value does not exist in the last AST, it's been added. If the hashes differ, then we can manually compute all possible diffs.
 
-All diffs will be moved into their own intermediate structure grouped by the model. Then, we will topologically traverse these changes. This is kind of tricky, because dropped tables will have to occur last, but the order of them has to be with respect to the previous AST. For example, if in AST 1:
+During traversal, we will store diffs in a map under their model's name. Then, we will topologically traverse these changes. This is kind of tricky, because dropped tables will have to occur last, but the order of them has to be with respect to the previous AST. For example, if in AST 1:
 
 ```
 Boss has a Person who has a Dog (name, age)
