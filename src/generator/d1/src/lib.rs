@@ -1,7 +1,7 @@
 use std::collections::{BTreeMap, HashMap, VecDeque};
 
 use common::{
-    CidlType, CloesceAst, IncludeTree, Model, NavigationPropertyKind, ensure,
+    CidlType, CloesceAst, IncludeTree, Model, ModelAttribute, NavigationPropertyKind, ensure,
     err::{GeneratorErrorKind, Result},
     fail,
 };
@@ -12,9 +12,20 @@ use sea_query::{
     Table,
 };
 
-pub enum DiffKind {
-    Refactor,
-    Addition,
+pub enum MigrationsDilemma<'a> {
+    RenameOrDropModel {
+        name: String,
+        options: Vec<&'a String>,
+    },
+    RenameOrDropAttribute {
+        name: String,
+        options: Vec<&'a String>,
+    },
+}
+
+pub trait MigrationsIntent {
+    /// A potentially blocking call to await some response to the given [MigrationDilemma]
+    fn ask<'a>(&'a self, dilemma: MigrationsDilemma<'a>) -> Option<&'a String>;
 }
 
 pub struct D1Generator;
@@ -29,7 +40,11 @@ impl D1Generator {
     /// Runs semantic analysis on the AST, raising a [GeneratorError] on invalid grammar.
     ///
     /// Uses the last migrated [CloesceAst] to produce a new migrated SQL schema.
-    pub fn migrate_ast(ast: &mut CloesceAst, lm_ast: Option<&CloesceAst>) -> Result<String> {
+    pub fn migrate_ast(
+        ast: &mut CloesceAst,
+        lm_ast: Option<&CloesceAst>,
+        intent: Box<dyn MigrationsIntent>,
+    ) -> Result<String> {
         let many_to_many_tables = validate_fks(&mut ast.models)?;
         let model_tree = validate_data_sources(&ast.models)?;
 
@@ -40,10 +55,19 @@ impl D1Generator {
             return Ok(String::default());
         }
 
-        let table = MigrateModelTables::make_migrations(ast, lm_ast, many_to_many_tables);
+        let table = MigrateModelTables::make_migrations(ast, lm_ast, many_to_many_tables, intent);
         let view = MigrateDataSources::make_migrations(model_tree, ast, lm_ast);
 
-        Ok(format!("{table}\n{view}"))
+        Ok(format!(
+            r#"PRAGMA foreign_keys = OFF;
+
+{table}
+{view}
+
+PRAGMA foreign_keys = ON;
+PRAGMA foreign_keys_check
+"#
+        ))
     }
 }
 
@@ -278,6 +302,7 @@ impl MigrateModelTables {
                 table.col(column);
             }
 
+            // Attributes
             for attr in model.attributes.iter() {
                 let mut column = typed_column(&attr.value.name, &attr.value.cidl_type);
 
@@ -351,17 +376,118 @@ impl MigrateModelTables {
         res
     }
 
-    fn alter(
-        sorted_models: &[&Model],
-        model_lookup: &IndexMap<String, Model>,
-        lm_lookup: &IndexMap<String, Model>,
-    ) -> Vec<String> {
-        Vec::default()
+    fn alter(models: &[(&Model, &Model)], intent: &Box<dyn MigrationsIntent>) -> Vec<String> {
+        let mut res = vec![];
+        let mut full_rebuilds = vec![];
+
+        'models: for &(model, lm_model) in models {
+            if model.primary_key.cidl_type != lm_model.primary_key.cidl_type
+                || model.primary_key.name != lm_model.primary_key.name
+            {
+                full_rebuilds.push((model, lm_model));
+                continue;
+            }
+
+            let mut lm_model_attr_lookup = lm_model
+                .attributes
+                .iter()
+                .map(|a| (a.value.name.clone(), a))
+                .collect::<HashMap<String, &ModelAttribute>>();
+
+            let mut deferred_add_columns = HashMap::<&String, &ModelAttribute>::new();
+
+            for attr in &model.attributes {
+                if let Some(lm_attr) = lm_model_attr_lookup.remove(&attr.value.name) {
+                    if attr.hash == lm_attr.hash {
+                        continue;
+                    }
+
+                    if attr.foreign_key_reference != lm_attr.foreign_key_reference {
+                        full_rebuilds.push((model, lm_model));
+                        continue 'models;
+                    }
+
+                    // TODO: warnings
+                    if attr.value.cidl_type != lm_attr.value.cidl_type {
+                        // Column must be dropped and remade
+                        {
+                            let mut alter = Table::alter();
+                            alter.table(alias(&model.name));
+                            alter.drop_column(alias(&lm_attr.value.name));
+                            res.push(format!("{};", alter.to_string(SqliteQueryBuilder)));
+                        }
+
+                        {
+                            let mut alter = Table::alter();
+                            alter.table(alias(&model.name));
+
+                            let col = typed_column(&attr.value.name, &attr.value.cidl_type);
+                            alter.add_column(col);
+                            res.push(format!("{};", alter.to_string(SqliteQueryBuilder)));
+                        }
+                    } else if attr.value.name != lm_attr.value.name {
+                        let mut alter = Table::alter();
+                        alter.table(alias(&model.name));
+                        alter.rename_column(alias(&lm_attr.value.name), alias(&attr.value.name));
+                        res.push(format!("{};", alter.to_string(SqliteQueryBuilder)));
+                    }
+
+                    continue;
+                }
+
+                deferred_add_columns.insert(&attr.value.name, &attr);
+            }
+
+            // `lm_model_attr_lookup` now contains only unreferenced columns, which
+            // are to be dropped if not intended for renaming
+            for lm_attr in lm_model_attr_lookup.values() {
+                let mut alter = Table::alter();
+                alter.table(alias(&model.name));
+
+                let rename_options = deferred_add_columns
+                    .values()
+                    .filter(|ma| ma.value.cidl_type == lm_attr.value.cidl_type)
+                    .map(|ma| &ma.value.name)
+                    .collect::<Vec<_>>();
+
+                if rename_options.len() > 0 {
+                    let solution = intent.ask(MigrationsDilemma::RenameOrDropAttribute {
+                        name: format!("{}.{}", model.name, lm_attr.value.name),
+                        options: rename_options,
+                    });
+
+                    if let Some(solution) = solution {
+                        alter.rename_column(alias(&lm_attr.value.name), alias(solution));
+                        res.push(format!("{};", alter.to_string(SqliteQueryBuilder)));
+                        deferred_add_columns.remove(solution);
+                        continue;
+                    }
+                }
+
+                // This is _not_ a rename, drop.
+                alter.drop_column(alias(&lm_attr.value.name));
+                res.push(format!("{};", alter.to_string(SqliteQueryBuilder)));
+            }
+
+            // Finally, add the remaining columns
+            for attr in deferred_add_columns.values() {
+                let mut alter = Table::alter();
+                alter.table(alias(&model.name));
+
+                let col = typed_column(&attr.value.name, &attr.value.cidl_type);
+                alter.add_column(col);
+                res.push(format!("{};", alter.to_string(SqliteQueryBuilder)));
+            }
+        }
+
+        for model in full_rebuilds {}
+
+        res
     }
 
     /// Takes in a vec of last migrated models and deletes all of their m2m tables and tables.
     /// The last migrated models should be sorted topologically in insert order.
-    fn drop(sorted_lm_models: &[&Model]) -> Vec<String> {
+    fn drop(sorted_lm_models: &[&Model], intent: &Box<dyn MigrationsIntent>) -> Vec<String> {
         let mut res = vec![];
 
         // The reverse of insert order
@@ -399,6 +525,7 @@ impl MigrateModelTables {
         ast: &CloesceAst,
         lm_ast: Option<&CloesceAst>,
         mut many_to_many_tables: HashMap<String, JunctionTable>,
+        intent: Box<dyn MigrationsIntent>,
     ) -> String {
         let Some(lm_ast) = lm_ast else {
             // No previous migration, insert naively.
@@ -412,21 +539,19 @@ impl MigrateModelTables {
 
         let (sorted_create_models, alter_models, sorted_drop_lms) = {
             let mut inserts = vec![];
-            let mut alerts = vec![];
+            let mut alters = vec![];
             let mut drops = vec![];
 
             for model in ast.models.values() {
                 match lm_ast.models.get(&model.name) {
-                    Some(lm_model) => {
-                        if lm_model.hash == model.hash {
-                            // No changes have been made
-                            continue;
-                        }
-
-                        alerts.push(model);
+                    Some(lm_model) if lm_model.hash != model.hash => {
+                        alters.push((model, lm_model));
                     }
                     None => {
                         inserts.push(model);
+                    }
+                    _ => {
+                        // No change, skip
                     }
                 }
             }
@@ -447,7 +572,7 @@ impl MigrateModelTables {
                 }
             }
 
-            (inserts, alerts, drops)
+            (inserts, alters, drops)
         };
 
         let create_stmts = Self::create(
@@ -455,18 +580,18 @@ impl MigrateModelTables {
             &ast.models,
             many_to_many_tables.into_values().collect(),
         );
-        let drop_stmts = Self::drop(&sorted_drop_lms);
-        // let alter_stmts = Self::alter(&alter_models, model_lookup, lm_lookup)
+        let drop_stmts = Self::drop(&sorted_drop_lms, &intent);
+        let alter_stmts = Self::alter(&alter_models, &intent);
 
         let mut sql_stmt = String::new();
-
         for (title, stmts) in [
-            ("--- New Models\n", &create_stmts),
-            // ("--- Altered Models\n", &alter_stmts),
-            ("--- Dropped Models\n", &drop_stmts),
+            ("--- New Models", &create_stmts),
+            ("--- Altered Models", &alter_stmts),
+            ("--- Dropped Models", &drop_stmts),
         ] {
             if !stmts.is_empty() {
                 sql_stmt.push_str(title);
+                sql_stmt.push('\n');
                 sql_stmt.push_str(&stmts.join("\n"));
                 sql_stmt.push('\n');
             }

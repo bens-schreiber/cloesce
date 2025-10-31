@@ -1,9 +1,11 @@
+use std::collections::HashMap;
+
 use common::{
     CidlType, NavigationPropertyKind,
     builder::{IncludeTreeBuilder, ModelBuilder, create_ast},
 };
 
-use d1::D1Generator;
+use d1::{D1Generator, MigrationsIntent};
 use sqlx::SqlitePool;
 
 macro_rules! expected_str {
@@ -32,31 +34,53 @@ async fn exists_in_db(db: &SqlitePool, name: &str) -> bool {
         > 0
 }
 
+#[derive(Default)]
+struct MockMigrationsIntent {
+    answers: HashMap<String, Option<String>>,
+}
+
+impl MigrationsIntent for MockMigrationsIntent {
+    fn ask<'a>(&'a self, dilemma: d1::MigrationsDilemma<'a>) -> Option<&'a String> {
+        match &dilemma {
+            d1::MigrationsDilemma::RenameOrDropModel { name, .. }
+            | d1::MigrationsDilemma::RenameOrDropAttribute { name, .. } => {
+                self.answers.get(name).unwrap().as_ref()
+            }
+        }
+    }
+}
+
 #[sqlx::test]
 async fn migrate_models_scalars(db: SqlitePool) {
     let mut empty_ast = create_ast(vec![]);
     empty_ast.set_merkle_hash();
 
-    // Insert
+    // Create
     let ast = {
         // Arrange
         let mut ast = create_ast(vec![
             ModelBuilder::new("User")
-                .id() // adds a primary key
+                .id()
                 .attribute("name", CidlType::nullable(CidlType::Text), None)
                 .attribute("age", CidlType::Integer, None)
+                .attribute("address", CidlType::Text, None)
                 .build(),
         ]);
 
         // Act
-        let sql =
-            D1Generator::migrate_ast(&mut ast, Some(&empty_ast)).expect("generate_sql to work");
+        let sql = D1Generator::migrate_ast(
+            &mut ast,
+            Some(&empty_ast),
+            Box::new(MockMigrationsIntent::default()),
+        )
+        .expect("generate_sql to work");
 
         // Assert
         expected_str!(sql, "CREATE TABLE IF NOT EXISTS");
         expected_str!(sql, "\"id\" integer PRIMARY KEY");
         expected_str!(sql, "\"name\" text");
         expected_str!(sql, "\"age\" integer NOT NULL");
+        expected_str!(sql, "\"address\" text NOT NULL");
 
         sqlx::query(&sql)
             .execute(&db)
@@ -67,11 +91,60 @@ async fn migrate_models_scalars(db: SqlitePool) {
         ast
     };
 
+    // Alter
+    let changed_ast = {
+        // Arrange
+        let mut changed_ast = create_ast(vec![
+            ModelBuilder::new("User")
+                .id()
+                .attribute("first_name", CidlType::nullable(CidlType::Text), None) // changed name
+                .attribute("age", CidlType::Text, None) // changed type
+                .attribute("favorite_color", CidlType::Text, None) // added column
+                // dropped column "address"
+                .build(),
+        ]);
+        changed_ast.set_merkle_hash();
+
+        let mut intent = MockMigrationsIntent::default();
+        intent
+            .answers
+            .insert("User.name".into(), Some("first_name".into()));
+        intent.answers.insert("User.address".into(), None);
+
+        // Act
+        let sql = D1Generator::migrate_ast(&mut changed_ast, Some(&ast), Box::new(intent))
+            .expect("generate_sql to work");
+
+        // Assert
+        expected_str!(
+            sql,
+            "ALTER TABLE \"User\" RENAME COLUMN \"name\" TO \"first_name\""
+        );
+        expected_str!(
+            sql,
+            r#"ALTER TABLE "User" DROP COLUMN "age";
+ALTER TABLE "User" ADD COLUMN "age" text"#
+        );
+        expected_str!(sql, "ALTER TABLE \"User\" DROP COLUMN \"address\"");
+
+        sqlx::query(&sql)
+            .execute(&db)
+            .await
+            .expect("Alter table queries to work");
+        assert!(exists_in_db(&db, "User").await);
+
+        changed_ast
+    };
+
     // Drop
     {
         // Act
-        let sql =
-            D1Generator::migrate_ast(&mut empty_ast, Some(&ast)).expect("generate_sql to work");
+        let sql = D1Generator::migrate_ast(
+            &mut empty_ast,
+            Some(&changed_ast),
+            Box::new(MockMigrationsIntent::default()),
+        )
+        .expect("generate_sql to work");
 
         // Assert
         expected_str!(sql, "DROP TABLE IF EXISTS \"User\"");
@@ -112,8 +185,12 @@ async fn migrate_models_one_to_one(db: SqlitePool) {
         ast.set_merkle_hash();
 
         // Act
-        let sql =
-            D1Generator::migrate_ast(&mut ast, Some(&empty_ast)).expect("generate_sql to work");
+        let sql = D1Generator::migrate_ast(
+            &mut ast,
+            Some(&empty_ast),
+            Box::new(MockMigrationsIntent::default()),
+        )
+        .expect("generate_sql to work");
 
         // Assert
         expected_str!(
@@ -139,8 +216,12 @@ async fn migrate_models_one_to_one(db: SqlitePool) {
     // Drop
     {
         // Act
-        let sql =
-            D1Generator::migrate_ast(&mut empty_ast, Some(&ast)).expect("generate_sql to work");
+        let sql = D1Generator::migrate_ast(
+            &mut empty_ast,
+            Some(&ast),
+            Box::new(MockMigrationsIntent::default()),
+        )
+        .expect("generate_sql to work");
 
         // Assert
         sqlx::query(&sql)
