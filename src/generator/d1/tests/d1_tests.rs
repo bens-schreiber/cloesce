@@ -48,11 +48,19 @@ struct MockMigrationsIntent {
 }
 
 impl MigrationsIntent for MockMigrationsIntent {
-    fn ask<'a>(&'a self, dilemma: d1::MigrationsDilemma<'a>) -> Option<&'a String> {
+    fn ask(&self, dilemma: d1::MigrationsDilemma) -> Option<usize> {
         match &dilemma {
-            d1::MigrationsDilemma::RenameOrDropModel { name, .. }
-            | d1::MigrationsDilemma::RenameOrDropAttribute { name, .. } => {
-                self.answers.get(name).unwrap().as_ref()
+            d1::MigrationsDilemma::RenameOrDropModel { name, options }
+            | d1::MigrationsDilemma::RenameOrDropAttribute { name, options } => {
+                let ans = self.answers.get(name).unwrap().clone();
+                ans.map(|a| {
+                    options
+                        .iter()
+                        .enumerate()
+                        .find(|(_, o)| ***o == a)
+                        .unwrap()
+                        .0
+                })
             }
         }
     }
@@ -96,54 +104,12 @@ async fn migrate_models_scalars(db: SqlitePool) {
         ast
     };
 
-    // Alter
-    let changed_ast = {
-        // Arrange
-        let mut changed_ast = create_ast(vec![
-            ModelBuilder::new("User")
-                .id()
-                .attribute("first_name", CidlType::nullable(CidlType::Text), None) // changed name
-                .attribute("age", CidlType::Text, None) // changed type
-                .attribute("favorite_color", CidlType::Text, None) // added column
-                // dropped column "address"
-                .build(),
-        ]);
-        changed_ast.set_merkle_hash();
-
-        let mut intent = MockMigrationsIntent::default();
-        intent
-            .answers
-            .insert("User.name".into(), Some("first_name".into()));
-        intent.answers.insert("User.address".into(), None);
-
-        // Act
-        let sql = D1Generator::migrate_ast(&mut changed_ast, Some(&ast), Box::new(intent))
-            .expect("migrate ast to work");
-
-        // Assert
-        expected_str!(
-            sql,
-            "ALTER TABLE \"User\" RENAME COLUMN \"name\" TO \"first_name\""
-        );
-        expected_str!(
-            sql,
-            r#"ALTER TABLE "User" DROP COLUMN "age";
-ALTER TABLE "User" ADD COLUMN "age" text"#
-        );
-        expected_str!(sql, "ALTER TABLE \"User\" DROP COLUMN \"address\"");
-
-        query(&db, &sql).await.expect("Alter table queries to work");
-        assert!(exists_in_db(&db, "User").await);
-
-        changed_ast
-    };
-
     // Drop
     {
         // Act
         let sql = D1Generator::migrate_ast(
             &mut empty_ast,
-            Some(&changed_ast),
+            Some(&ast),
             Box::new(MockMigrationsIntent::default()),
         )
         .expect("migrate ast to work");
@@ -456,7 +422,166 @@ async fn migrate_models_many_to_many(db: SqlitePool) {
             .execute(&db)
             .await
             .expect("Select query to work");
+
+        ast
     };
+
+    // Drop
+    {
+        // Act
+        let sql = D1Generator::migrate_ast(
+            &mut empty_ast,
+            Some(&ast),
+            Box::new(MockMigrationsIntent::default()),
+        )
+        .expect("migrate ast to work");
+
+        // Assert
+        query(&db, &sql).await.expect("Drop tables query to work");
+        assert!(!exists_in_db(&db, "StudentsCourses").await);
+    }
+}
+
+#[sqlx::test]
+async fn migrate_with_alterations(db: SqlitePool) {
+    let mut base_ast = {
+        let mut ast = create_ast(vec![
+            ModelBuilder::new("User")
+                .id()
+                .attribute("name", CidlType::nullable(CidlType::Text), None)
+                .attribute("age", CidlType::Integer, None)
+                .attribute("address", CidlType::Text, None)
+                .build(),
+        ]);
+
+        let sql =
+            D1Generator::migrate_ast(&mut ast, None, Box::new(MockMigrationsIntent::default()))
+                .expect("migrate ast to work");
+        query(&db, &sql)
+            .await
+            .expect("Create table queries to work");
+
+        ast
+    };
+
+    // Changes without Rebuild
+    base_ast = {
+        // Arrange
+        let mut new = create_ast(vec![
+            ModelBuilder::new("User")
+                .id()
+                .attribute("first_name", CidlType::nullable(CidlType::Text), None) // changed name
+                .attribute("age", CidlType::Text, None) // changed type
+                .attribute("favorite_color", CidlType::Text, None) // added column
+                // dropped column "address"
+                .build(),
+        ]);
+        new.set_merkle_hash();
+
+        let mut intent = MockMigrationsIntent::default();
+        intent
+            .answers
+            .insert("User.name".into(), Some("first_name".into()));
+        intent.answers.insert("User.address".into(), None);
+
+        // Act
+        let sql = D1Generator::migrate_ast(&mut new, Some(&base_ast), Box::new(intent))
+            .expect("migrate ast to work");
+
+        // Assert
+        expected_str!(
+            sql,
+            "ALTER TABLE \"User\" RENAME COLUMN \"name\" TO \"first_name\""
+        );
+        expected_str!(
+            sql,
+            r#"ALTER TABLE "User" DROP COLUMN "age";
+ALTER TABLE "User" ADD COLUMN "age" text"#
+        );
+        expected_str!(sql, "ALTER TABLE \"User\" DROP COLUMN \"address\"");
+
+        query(&db, &sql).await.expect("Alter table queries to work");
+        assert!(exists_in_db(&db, "User").await);
+
+        new
+    };
+
+    // Rebuild: Primary Key
+    base_ast = {
+        // Arrange
+        let mut new = create_ast(vec![
+            ModelBuilder::new("User")
+                .id()
+                .attribute("first_name", CidlType::nullable(CidlType::Text), None)
+                .attribute("age", CidlType::Text, None)
+                .attribute("favorite_color", CidlType::Text, None)
+                .build(),
+        ]);
+        new.models[0].primary_key.cidl_type = CidlType::Text; // new PK type
+        new.set_merkle_hash();
+
+        // Act
+        let sql = D1Generator::migrate_ast(
+            &mut new,
+            Some(&base_ast),
+            Box::new(MockMigrationsIntent::default()),
+        )
+        .expect("migrate ast to work");
+
+        // Assert
+        expected_str!(sql, r#"ALTER TABLE "User" RENAME TO "User_"#);
+        expected_str!(
+            sql,
+            r#"CREATE TABLE IF NOT EXISTS "User" ( "id" text PRIMARY KEY, "first_name" text, "age" text NOT NULL, "favorite_color" text NOT NULL );"#
+        );
+        expected_str!(
+            sql,
+            r#"INSERT INTO "User" ("first_name", "age", "favorite_color", "id") SELECT "first_name", "age", "favorite_color", CAST("id" AS text) FROM "User"#
+        );
+        expected_str!(sql, r#"DROP TABLE "User_"#);
+
+        query(&db, &sql).await.expect("Alter table queries to work");
+        assert!(exists_in_db(&db, "User").await);
+
+        new
+    };
+
+    // Rebuild: Foreign Key
+    {
+        // Arrange
+        let mut new = create_ast(vec![
+            ModelBuilder::new("Dog").id().build(), // added Dog
+            ModelBuilder::new("User")
+                .id()
+                .attribute("first_name", CidlType::nullable(CidlType::Text), None)
+                .attribute("age", CidlType::Text, None)
+                .attribute("favorite_color", CidlType::Text, None)
+                .attribute("dog_id", CidlType::Integer, Some("Dog".into())) // added Dog FK
+                .build(),
+        ]);
+        new.models[1].primary_key.cidl_type = CidlType::Text;
+        new.set_merkle_hash();
+
+        // Act
+        let sql = D1Generator::migrate_ast(
+            &mut new,
+            Some(&base_ast),
+            Box::new(MockMigrationsIntent::default()),
+        )
+        .expect("migrate ast to work");
+
+        // Assert
+        expected_str!(sql, r#"ALTER TABLE "User" RENAME TO "User_"#);
+        expected_str!(
+            sql,
+            r#"INSERT INTO "User" ("first_name", "age", "favorite_color", "dog_id", "id") SELECT "first_name", "age", "favorite_color", 0, "id" FROM "User_"#
+        );
+        expected_str!(sql, r#"DROP TABLE "User_"#);
+
+        query(&db, &sql).await.expect("Alter table queries to work");
+        assert!(exists_in_db(&db, "User").await);
+        assert!(exists_in_db(&db, "Dog").await);
+    }
 }
 
 #[sqlx::test]

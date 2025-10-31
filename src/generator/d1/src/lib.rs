@@ -8,25 +8,9 @@ use common::{
 
 use indexmap::IndexMap;
 use sea_query::{
-    ColumnDef, Expr, ForeignKey, Index, IntoCondition, Query, SelectStatement, SqliteQueryBuilder,
-    Table,
+    ColumnDef, Expr, ForeignKey, Index, IntoCondition, Query, SchemaStatementBuilder,
+    SelectStatement, SqliteQueryBuilder, Table,
 };
-
-pub enum MigrationsDilemma<'a> {
-    RenameOrDropModel {
-        name: String,
-        options: Vec<&'a String>,
-    },
-    RenameOrDropAttribute {
-        name: String,
-        options: Vec<&'a String>,
-    },
-}
-
-pub trait MigrationsIntent {
-    /// A potentially blocking call to await some response to the given [MigrationDilemma]
-    fn ask<'a>(&'a self, dilemma: MigrationsDilemma<'a>) -> Option<&'a String>;
-}
 
 pub struct D1Generator;
 impl D1Generator {
@@ -62,6 +46,21 @@ impl D1Generator {
     }
 }
 
+pub enum MigrationsDilemma<'a> {
+    RenameOrDropModel {
+        name: String,
+        options: &'a Vec<&'a String>,
+    },
+    RenameOrDropAttribute {
+        name: String,
+        options: &'a Vec<&'a String>,
+    },
+}
+
+pub trait MigrationsIntent {
+    /// A potentially blocking call to await some response to the given [MigrationDilemma]
+    fn ask(&self, dilemma: MigrationsDilemma) -> Option<usize>;
+}
 struct MigrateDataSources;
 impl MigrateDataSources {
     /// Takes in a list of [ModelTree] and returns a list of `CREATE VIEW` statements
@@ -274,28 +273,28 @@ struct MigrateModelTables;
 impl MigrateModelTables {
     /// Takes in a vec of models and naively inserts all of them.
     fn create(
-        sorted_models: &Vec<&Model>,
+        sorted_models: Vec<&Model>,
         model_lookup: &IndexMap<String, Model>,
         many_to_many_tables: Vec<JunctionTable>,
     ) -> Vec<String> {
-        let mut res = Vec::new();
+        let mut res = vec![];
 
-        for &model in sorted_models {
+        for model in sorted_models {
             let mut table = Table::create();
-            table.table(alias(model.name.clone()));
+            table.table(alias(&model.name));
             table.if_not_exists();
 
             // Set Primary Key
             {
                 let mut column =
-                    typed_column(&model.primary_key.name, &model.primary_key.cidl_type);
+                    typed_column(&model.primary_key.name, &model.primary_key.cidl_type, false);
                 column.primary_key();
                 table.col(column);
             }
 
             // Attributes
             for attr in model.attributes.iter() {
-                let mut column = typed_column(&attr.value.name, &attr.value.cidl_type);
+                let mut column = typed_column(&attr.value.name, &attr.value.cidl_type, false);
 
                 if !attr.value.cidl_type.is_nullable() {
                     column.not_null();
@@ -323,8 +322,7 @@ impl MigrateModelTables {
                 table.col(column);
             }
 
-            // Generate SQLite
-            res.push(format!("{};", table.build(SqliteQueryBuilder)));
+            res.push(to_sqlite(table));
         }
 
         for JunctionTable { a, b, unique_id } in many_to_many_tables {
@@ -332,10 +330,10 @@ impl MigrateModelTables {
 
             // TODO: Name the junction table in some standard way
             let col_a_name = format!("{}.{}", a.model_name, a.model_pk_name);
-            let mut col_a = typed_column(&col_a_name, &a.model_pk_type);
+            let mut col_a = typed_column(&col_a_name, &a.model_pk_type, false);
 
             let col_b_name = format!("{}.{}", b.model_name, b.model_pk_name);
-            let mut col_b = typed_column(&col_b_name, &b.model_pk_type);
+            let mut col_b = typed_column(&col_b_name, &b.model_pk_type, false);
 
             table
                 .table(alias(&unique_id))
@@ -362,21 +360,62 @@ impl MigrateModelTables {
                         .on_delete(sea_query::ForeignKeyAction::Restrict),
                 );
 
-            res.push(format!("{};", table.to_string(SqliteQueryBuilder)));
+            res.push(to_sqlite(table));
         }
 
         res
     }
 
-    fn alter(models: &[(&Model, &Model)], intent: &Box<dyn MigrationsIntent>) -> Vec<String> {
-        let mut res = vec!["PRAGMA foreign_keys = OFF;".into()];
-        let mut full_rebuilds = vec![];
+    /// Generates a sequence of alter statements from a models last migration.
+    ///
+    /// Some alterations cannot occur in SQLite without dropping the table, in which a
+    /// full rebuild and copy of data will occur.
+    ///
+    /// Poses a [MigrationsDilemma::RenameOrDropModel], determining if a dropped model is
+    /// actually just a rename. If that is the case, removes from `drop` and `add` lists, undergoing
+    /// table alteration on the (model, last migrated model) pair.
+    fn alter<'a>(
+        mut alter_models: Vec<(&'a Model, &'a Model)>,
+        sorted_drop_lms: &mut Vec<&'a Model>,
+        sorted_create_models: &mut Vec<&'a Model>,
+        model_lookup: &IndexMap<String, Model>,
+        intent: &Box<dyn MigrationsIntent>,
+    ) -> Vec<String> {
+        let mut res = vec![];
+        let mut rebuilds = vec![];
 
-        'models: for &(model, lm_model) in models {
+        // It's possible drops were meant to be a rename.
+        // TODO: We can do some kind of similarity test between models to discard
+        // obvious non-solutions
+        if !sorted_drop_lms.is_empty() && !sorted_create_models.is_empty() {
+            sorted_drop_lms.retain(|lm_model| {
+                let solution = intent.ask(MigrationsDilemma::RenameOrDropModel {
+                    name: lm_model.name.clone(),
+                    options: &sorted_create_models.iter().map(|m| &m.name).collect(),
+                });
+
+                let Some(solution) = solution else {
+                    return true;
+                };
+
+                alter_models.push((sorted_create_models.remove(solution), lm_model));
+                false
+            });
+        }
+
+        'models: for (model, lm_model) in alter_models {
+            let mut stmts = vec![];
+
+            if model.name != lm_model.name {
+                let mut rename = Table::rename();
+                rename.table(alias(&lm_model.name), alias(&model.name));
+                stmts.push(to_sqlite(rename));
+            }
+
             if model.primary_key.cidl_type != lm_model.primary_key.cidl_type
                 || model.primary_key.name != lm_model.primary_key.name
             {
-                full_rebuilds.push((model, lm_model));
+                rebuilds.push((model, lm_model));
                 continue;
             }
 
@@ -389,45 +428,55 @@ impl MigrateModelTables {
             let mut deferred_add_columns = HashMap::<&String, &ModelAttribute>::new();
 
             for attr in &model.attributes {
-                if let Some(lm_attr) = lm_model_attr_lookup.remove(&attr.value.name) {
-                    if attr.hash == lm_attr.hash {
-                        continue;
-                    }
-
-                    if attr.foreign_key_reference != lm_attr.foreign_key_reference {
-                        full_rebuilds.push((model, lm_model));
+                let Some(lm_attr) = lm_model_attr_lookup.remove(&attr.value.name) else {
+                    // Column is new
+                    if attr.foreign_key_reference.is_some() {
+                        // Cannot alter the table to add a FK. Rebuild.
+                        rebuilds.push((model, lm_model));
                         continue 'models;
                     }
 
-                    // TODO: warnings
-                    if attr.value.cidl_type != lm_attr.value.cidl_type {
-                        // Column must be dropped and remade
-                        {
-                            let mut alter = Table::alter();
-                            alter.table(alias(&model.name));
-                            alter.drop_column(alias(&lm_attr.value.name));
-                            res.push(format!("{};", alter.to_string(SqliteQueryBuilder)));
-                        }
+                    deferred_add_columns.insert(&attr.value.name, &attr);
+                    continue;
+                };
 
-                        {
-                            let mut alter = Table::alter();
-                            alter.table(alias(&model.name));
-
-                            let col = typed_column(&attr.value.name, &attr.value.cidl_type);
-                            alter.add_column(col);
-                            res.push(format!("{};", alter.to_string(SqliteQueryBuilder)));
-                        }
-                    } else if attr.value.name != lm_attr.value.name {
-                        let mut alter = Table::alter();
-                        alter.table(alias(&model.name));
-                        alter.rename_column(alias(&lm_attr.value.name), alias(&attr.value.name));
-                        res.push(format!("{};", alter.to_string(SqliteQueryBuilder)));
-                    }
-
+                if attr.hash == lm_attr.hash {
+                    // No diff.
                     continue;
                 }
 
-                deferred_add_columns.insert(&attr.value.name, &attr);
+                if attr.foreign_key_reference != lm_attr.foreign_key_reference {
+                    // Foreign keys cannot be altered in SQLite, defer for a full rebuild.
+                    rebuilds.push((model, lm_model));
+                    continue 'models;
+                }
+
+                // TODO: warnings
+                if attr.value.cidl_type != lm_attr.value.cidl_type {
+                    // Drop the last migrated column
+                    {
+                        let mut alter = Table::alter();
+                        alter.table(alias(&model.name));
+                        alter.drop_column(alias(&lm_attr.value.name));
+                        stmts.push(to_sqlite(alter));
+                    }
+
+                    // Add the new column
+                    {
+                        let mut alter = Table::alter();
+                        alter.table(alias(&model.name));
+
+                        let col = typed_column(&attr.value.name, &attr.value.cidl_type, true);
+                        alter.add_column(col);
+                        stmts.push(to_sqlite(alter));
+                    }
+                } else if attr.value.name != lm_attr.value.name {
+                    // Rename the column
+                    let mut alter = Table::alter();
+                    alter.table(alias(&model.name));
+                    alter.rename_column(alias(&lm_attr.value.name), alias(&attr.value.name));
+                    stmts.push(to_sqlite(alter));
+                }
             }
 
             // `lm_model_attr_lookup` now contains only unreferenced columns, which
@@ -445,43 +494,140 @@ impl MigrateModelTables {
                 if rename_options.len() > 0 {
                     let solution = intent.ask(MigrationsDilemma::RenameOrDropAttribute {
                         name: format!("{}.{}", model.name, lm_attr.value.name),
-                        options: rename_options,
+                        options: &rename_options,
                     });
 
                     if let Some(solution) = solution {
-                        alter.rename_column(alias(&lm_attr.value.name), alias(solution));
-                        res.push(format!("{};", alter.to_string(SqliteQueryBuilder)));
-                        deferred_add_columns.remove(solution);
+                        let option = &rename_options[solution];
+                        alter.rename_column(alias(&lm_attr.value.name), alias(*option));
+                        stmts.push(to_sqlite(alter));
+                        deferred_add_columns.remove(option);
                         continue;
                     }
                 }
 
                 // This is _not_ a rename, drop.
                 alter.drop_column(alias(&lm_attr.value.name));
-                res.push(format!("{};", alter.to_string(SqliteQueryBuilder)));
+                stmts.push(to_sqlite(alter));
             }
 
-            // Finally, add the remaining columns
+            // Add the remaining deferred columns
             for attr in deferred_add_columns.values() {
                 let mut alter = Table::alter();
                 alter.table(alias(&model.name));
 
-                let col = typed_column(&attr.value.name, &attr.value.cidl_type);
+                let col = typed_column(&attr.value.name, &attr.value.cidl_type, true);
                 alter.add_column(col);
-                res.push(format!("{};", alter.to_string(SqliteQueryBuilder)));
+                stmts.push(to_sqlite(alter));
+            }
+
+            // Append to the result
+            res.extend(stmts);
+        }
+
+        if !rebuilds.is_empty() {
+            res.push("PRAGMA foreign_keys = OFF;".into());
+        }
+
+        for (model, lm_model) in &rebuilds {
+            // Rename the last migrated model to "name_hash"
+            {
+                let mut rename = Table::rename();
+                rename.table(
+                    alias(&lm_model.name),
+                    alias(format!("{}_{}", lm_model.name, lm_model.hash.unwrap())),
+                );
+                res.push(to_sqlite(rename));
+            }
+
+            // Create the new model
+            let create_stmts = Self::create(vec![model], model_lookup, vec![]);
+            for stmt in create_stmts {
+                res.push(stmt);
+            }
+
+            // Copy the data from the old table
+            let lm_attr_lookup = lm_model
+                .attributes
+                .iter()
+                .map(|a| (&a.value.name, &a.value))
+                .chain(std::iter::once((
+                    &lm_model.primary_key.name,
+                    &lm_model.primary_key,
+                )))
+                .collect::<HashMap<_, _>>();
+
+            let columns = model
+                .attributes
+                .iter()
+                .map(|a| &a.value)
+                .chain(std::iter::once(&model.primary_key))
+                .collect::<Vec<_>>();
+
+            let insert = Query::insert()
+                .into_table(alias(&model.name))
+                .columns(columns.iter().map(|a| alias(&a.name)))
+                .select_from(
+                    Query::select()
+                        .from(alias(format!(
+                            "{}_{}",
+                            lm_model.name,
+                            lm_model.hash.unwrap()
+                        )))
+                        .exprs(columns.iter().map(|model_c| {
+                            let Some(lm_c) = lm_attr_lookup.get(&model_c.name) else {
+                                // Column is new, use a default value
+                                return Expr::value(sql_default(&model_c.cidl_type));
+                            };
+
+                            let col = Expr::col(alias(&lm_c.name));
+                            if lm_c.cidl_type == model_c.cidl_type {
+                                // Column directly transfers to the new table
+                                col.into()
+                            } else {
+                                // Column type changed, cast
+                                let sql_type = match &model_c.cidl_type.root_type() {
+                                    CidlType::Integer => "integer",
+                                    CidlType::Real => "real",
+                                    CidlType::Text => "text",
+                                    CidlType::Blob => "blob",
+                                    _ => unreachable!(),
+                                };
+
+                                col.cast_as(sql_type)
+                            }
+                        }))
+                        .to_owned(),
+                )
+                .unwrap()
+                .to_owned();
+
+            res.push(format!("{};", insert.to_string(SqliteQueryBuilder)));
+
+            // Drop the old table
+            {
+                let mut drop = Table::drop();
+                drop.table(alias(format!(
+                    "{}_{}",
+                    lm_model.name,
+                    lm_model.hash.unwrap()
+                )));
+
+                res.push(to_sqlite(drop));
             }
         }
 
-        for model in full_rebuilds {}
+        if !rebuilds.is_empty() {
+            res.push("PRAGMA foreign_keys = ON;".into());
+            res.push("PRAGMA foreign_keys_check;".into());
+        }
 
-        res.push("PRAGMA foreign_keys = ON;".into());
-        res.push("PRAGMA foreign_keys_check;".into());
-        res
+        return res;
     }
 
     /// Takes in a vec of last migrated models and deletes all of their m2m tables and tables.
     /// The last migrated models should be sorted topologically in insert order.
-    fn drop(sorted_lm_models: &[&Model], intent: &Box<dyn MigrationsIntent>) -> Vec<String> {
+    fn drop(sorted_lm_models: Vec<&Model>) -> Vec<String> {
         let mut res = vec![];
 
         // The reverse of insert order
@@ -524,58 +670,60 @@ impl MigrateModelTables {
         let Some(lm_ast) = lm_ast else {
             // No previous migration, insert naively.
             return Self::create(
-                &ast.models.values().collect(),
+                ast.models.values().collect(),
                 &ast.models,
                 many_to_many_tables.into_values().collect(),
             )
             .join("\n");
         };
 
-        let (sorted_create_models, alter_models, sorted_drop_lms) = {
-            let mut inserts = vec![];
-            let mut alters = vec![];
-            let mut drops = vec![];
+        let mut sorted_create_models = vec![];
+        let mut alter_models = vec![];
+        let mut sorted_drop_lms = vec![];
 
-            for model in ast.models.values() {
-                match lm_ast.models.get(&model.name) {
-                    Some(lm_model) if lm_model.hash != model.hash => {
-                        alters.push((model, lm_model));
-                    }
-                    None => {
-                        inserts.push(model);
-                    }
-                    _ => {
-                        // No change, skip
-                    }
+        for model in ast.models.values() {
+            match lm_ast.models.get(&model.name) {
+                Some(lm_model) if lm_model.hash != model.hash => {
+                    alter_models.push((model, lm_model));
+                }
+                None => {
+                    sorted_create_models.push(model);
+                }
+                _ => {
+                    // No change, skip
                 }
             }
+        }
 
-            for lm_model in lm_ast.models.values() {
-                if ast.models.get(&lm_model.name).is_none() {
-                    drops.push(lm_model);
+        for lm_model in lm_ast.models.values() {
+            if ast.models.get(&lm_model.name).is_none() {
+                sorted_drop_lms.push(lm_model);
+                continue;
+            }
+
+            for nav in &lm_model.navigation_properties {
+                let NavigationPropertyKind::ManyToMany { unique_id } = &nav.kind else {
                     continue;
-                }
+                };
 
-                for nav in &lm_model.navigation_properties {
-                    let NavigationPropertyKind::ManyToMany { unique_id } = &nav.kind else {
-                        continue;
-                    };
-
-                    // This table already exists and does not need to be added.
-                    many_to_many_tables.remove(unique_id.as_str());
-                }
+                // This table already exists and does not need to be added.
+                many_to_many_tables.remove(unique_id.as_str());
             }
+        }
 
-            (inserts, alters, drops)
-        };
-
+        let alter_stmts = Self::alter(
+            alter_models,
+            &mut sorted_drop_lms,
+            &mut sorted_create_models,
+            &ast.models,
+            &intent,
+        );
         let create_stmts = Self::create(
-            &sorted_create_models,
+            sorted_create_models,
             &ast.models,
             many_to_many_tables.into_values().collect(),
         );
-        let drop_stmts = Self::drop(&sorted_drop_lms, &intent);
-        let alter_stmts = Self::alter(&alter_models, &intent);
+        let drop_stmts = Self::drop(sorted_drop_lms);
 
         let mut sql_stmt = String::new();
         for (title, stmts) in [
@@ -933,12 +1081,31 @@ fn left_join_as(
     }
 }
 
-fn typed_column(name: &str, ty: &CidlType) -> ColumnDef {
+fn sql_default(ty: &CidlType) -> sea_query::Value {
+    if ty.is_nullable() {
+        return sea_query::Value::Int(None);
+    }
+
+    match ty {
+        CidlType::Integer => sea_query::Value::Int(Some(0i32)),
+        CidlType::Text => sea_query::Value::String(Some(Box::new("".into()))),
+        CidlType::Real => sea_query::Value::Float(Some(0.0)),
+        CidlType::Blob => sea_query::Value::Bytes(Some(Box::new(vec![]))),
+        _ => unreachable!(),
+    }
+}
+
+// TODO: User made default types
+fn typed_column(name: &str, ty: &CidlType, with_default: bool) -> ColumnDef {
     let mut col = ColumnDef::new(alias(name));
     let inner = match ty {
         CidlType::Nullable(inner) => inner.as_ref(),
         t => t,
     };
+
+    if with_default {
+        col.default(sql_default(ty));
+    }
 
     match inner {
         CidlType::Integer => col.integer(),
@@ -1002,4 +1169,8 @@ impl JunctionTableBuilder {
             unique_id: unique_id.to_string(),
         })
     }
+}
+
+fn to_sqlite(builder: impl SchemaStatementBuilder) -> String {
+    format!("{};", builder.to_string(SqliteQueryBuilder))
 }
