@@ -58,16 +58,7 @@ impl D1Generator {
         let table = MigrateModelTables::make_migrations(ast, lm_ast, many_to_many_tables, intent);
         let view = MigrateDataSources::make_migrations(model_tree, ast, lm_ast);
 
-        Ok(format!(
-            r#"PRAGMA foreign_keys = OFF;
-
-{table}
-{view}
-
-PRAGMA foreign_keys = ON;
-PRAGMA foreign_keys_check
-"#
-        ))
+        Ok(format!("{table}\n{view}"))
     }
 }
 
@@ -348,6 +339,7 @@ impl MigrateModelTables {
 
             table
                 .table(alias(&unique_id))
+                .if_not_exists()
                 .col(col_a.not_null())
                 .col(col_b.not_null())
                 .primary_key(
@@ -377,7 +369,7 @@ impl MigrateModelTables {
     }
 
     fn alter(models: &[(&Model, &Model)], intent: &Box<dyn MigrationsIntent>) -> Vec<String> {
-        let mut res = vec![];
+        let mut res = vec!["PRAGMA foreign_keys = OFF;".into()];
         let mut full_rebuilds = vec![];
 
         'models: for &(model, lm_model) in models {
@@ -482,6 +474,8 @@ impl MigrateModelTables {
 
         for model in full_rebuilds {}
 
+        res.push("PRAGMA foreign_keys = ON;".into());
+        res.push("PRAGMA foreign_keys_check;".into());
         res
     }
 
