@@ -7,4 +7,4 @@ CREATE TABLE IF NOT EXISTS "Child" ( "id" integer PRIMARY KEY, "parentId" intege
 CREATE VIEW IF NOT EXISTS "Parent.withChildren" AS SELECT "Parent"."id" AS "Parent.id", "Parent"."favoriteChildId" AS "Parent.favoriteChildId", "Child"."id" AS "Parent.children.id", "Child"."parentId" AS "Parent.children.parentId", "Child1"."id" AS "Parent.favoriteChild.id", "Child1"."parentId" AS "Parent.favoriteChild.parentId" FROM "Parent" LEFT JOIN "Child" ON "Parent"."id" = "Child"."parentId" LEFT JOIN "Child" AS "Child1" ON "Parent"."favoriteChildId" = "Child1"."id";
 
 --- Cloesce Temporary Table
-CREATE TABLE "_cloesce_tmp" ( "path" text PRIMARY KEY, "id" integer NOT NULL )
+CREATE TABLE "_cloesce_tmp" ( "path" text PRIMARY KEY, "id" integer NOT NULL );

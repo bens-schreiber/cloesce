@@ -28,7 +28,7 @@ fn main() {
     let cli = Cli::parse();
 
     let pattern = match &cli.command {
-        Commands::Regression => "../fixtures/regression/crud/seed__*",
+        Commands::Regression => "../fixtures/regression/*/seed__*",
         Commands::RunFail => "../fixtures/run_fail/*/*/*.ts",
     };
 

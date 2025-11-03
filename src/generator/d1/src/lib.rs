@@ -47,17 +47,19 @@ impl D1Generator {
         let tables = MigrateTables::make_migrations(ast, lm_ast, many_to_many_tables, intent);
         let views = MigrateViews::make_migrations(model_tree, ast, lm_ast);
         if lm_ast.is_none() {
-            let cloesce_tmp = Table::create()
-                .table(alias("_cloesce_tmp"))
-                .col(
-                    ColumnDef::new_with_type(alias("path"), sea_query::ColumnType::Text)
-                        .primary_key(),
-                )
-                .col(
-                    ColumnDef::new_with_type(alias("id"), sea_query::ColumnType::Integer)
-                        .not_null(),
-                )
-                .to_string(SqliteQueryBuilder);
+            let cloesce_tmp = to_sqlite(
+                Table::create()
+                    .table(alias("_cloesce_tmp"))
+                    .col(
+                        ColumnDef::new_with_type(alias("path"), sea_query::ColumnType::Text)
+                            .primary_key(),
+                    )
+                    .col(
+                        ColumnDef::new_with_type(alias("id"), sea_query::ColumnType::Integer)
+                            .not_null(),
+                    )
+                    .to_owned(),
+            );
 
             return Ok(format!(
                 "{tables}\n{views}\n--- Cloesce Temporary Table\n{cloesce_tmp}"
