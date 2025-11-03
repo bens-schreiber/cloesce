@@ -9,6 +9,7 @@ use common::{
     fail,
 };
 
+use indexmap::IndexMap;
 use wrangler::WranglerSpec;
 
 pub struct WorkersGenerator;
@@ -43,7 +44,7 @@ impl WorkersGenerator {
 
     /// Generates all model source imports as well as the Cloesce App
     fn link(
-        models: &BTreeMap<String, Model>,
+        models: &IndexMap<String, Model>,
         poos: &BTreeMap<String, PlainOldObject>,
         app_source: Option<&PathBuf>,
         workers_path: &Path,
@@ -112,7 +113,7 @@ impl WorkersGenerator {
 
     /// Generates the constructor registry
     fn registry(
-        models: &BTreeMap<String, Model>,
+        models: &IndexMap<String, Model>,
         poos: &BTreeMap<String, PlainOldObject>,
     ) -> String {
         let mut constructor_registry = Vec::new();

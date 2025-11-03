@@ -5,6 +5,8 @@ edition = "2024"
 
 [dependencies]
 clap = { version = "4.5.46", features = ["derive"] }
+chrono = "0.4"
+inquire = "0.9.1"
 common = { path = "../common" }
 d1 = { path = "../d1" }
 client = { path = "../client" }

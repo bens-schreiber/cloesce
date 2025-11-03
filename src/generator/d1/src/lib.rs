@@ -15,19 +15,21 @@ use sea_query::{
 pub struct D1Generator;
 impl D1Generator {
     /// Runs semantic analysis on the AST, raising a [GeneratorError] on invalid grammar.
+    ///
+    /// Sorts [CloesceAst::models] to be in topo insertion order.
     pub fn validate_ast(ast: &mut CloesceAst) -> Result<()> {
         Self::validate_fks(&mut ast.models)?;
         Self::validate_data_sources(&ast.models)?;
         Ok(())
     }
 
-    /// Runs semantic analysis on the AST, raising a [GeneratorError] on invalid grammar.
+    /// Runs [Self::validate_ast] producing a [GeneratorError] on invalid AST grammar.
     ///
     /// Uses the last migrated [CloesceAst] to produce a new migrated SQL schema.
     ///
     /// Some migration scenarios require user intervention through a [MigrationsIntent], which
     /// can be blocking.
-    pub fn migrate_ast(
+    pub fn migrate(
         ast: &mut CloesceAst,
         lm_ast: Option<&CloesceAst>,
         intent: &dyn MigrationsIntent,
@@ -344,17 +346,20 @@ impl D1Generator {
 
 pub enum MigrationsDilemma<'a> {
     RenameOrDropModel {
-        name: String,
+        model_name: String,
         options: &'a Vec<&'a String>,
     },
     RenameOrDropAttribute {
-        name: String,
+        model_name: String,
+        attribute_name: String,
         options: &'a Vec<&'a String>,
     },
 }
 
 pub trait MigrationsIntent {
     /// A potentially blocking call to await some response to the given [MigrationDilemma]
+    ///
+    /// Returns None if the model should be dropped, Some if an option presented should be selected.
     fn ask(&self, dilemma: MigrationsDilemma) -> Option<usize>;
 }
 
@@ -796,7 +801,8 @@ impl MigrateTables {
 
                 if !rename_options.is_empty() {
                     let solution = intent.ask(MigrationsDilemma::RenameOrDropAttribute {
-                        name: format!("{}.{}", model.name, lm_attr.value.name),
+                        model_name: model.name.clone(),
+                        attribute_name: lm_attr.value.name.clone(),
                         options: &rename_options,
                     });
 
@@ -1028,7 +1034,7 @@ impl MigrateTables {
         if !sorted_drop_lms.is_empty() && !sorted_create_models.is_empty() {
             sorted_drop_lms.retain(|lm_model| {
                 let solution = intent.ask(MigrationsDilemma::RenameOrDropModel {
-                    name: lm_model.name.clone(),
+                    model_name: lm_model.name.clone(),
                     options: &sorted_create_models.iter().map(|m| &m.name).collect(),
                 });
 

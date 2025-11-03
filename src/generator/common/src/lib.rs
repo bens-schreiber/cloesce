@@ -218,6 +218,10 @@ impl CloesceAst {
         })
     }
 
+    pub fn to_json(&self) -> String {
+        serde_json::to_string(self).expect("serialize self to work")
+    }
+
     fn is_valid_object_ref(&self, o: &str) -> bool {
         self.models.contains_key(o) || self.poos.contains_key(o)
     }

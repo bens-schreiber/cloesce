@@ -4,14 +4,61 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use chrono::Local;
 use clap::{Parser, Subcommand, command};
 
 use common::{
     CloesceAst,
     err::{GeneratorErrorKind, Result},
 };
+use d1::{D1Generator, MigrationsDilemma, MigrationsIntent};
+use inquire::Select;
 use workers::WorkersGenerator;
 use wrangler::WranglerFormat;
+
+struct MigrationsCli;
+impl MigrationsIntent for MigrationsCli {
+    fn ask(&self, dilemma: MigrationsDilemma) -> Option<usize> {
+        match dilemma {
+            MigrationsDilemma::RenameOrDropModel {
+                model_name,
+                options,
+            } => Self::rename_or_drop(&model_name, options, "model"),
+            MigrationsDilemma::RenameOrDropAttribute {
+                model_name,
+                attribute_name,
+                options,
+            } => {
+                let target = format!("{model_name}.{attribute_name}");
+                Self::rename_or_drop(&target, options, "attribute")
+            }
+        }
+    }
+}
+
+impl MigrationsCli {
+    fn rename_or_drop(target: &str, options: &Vec<&String>, kind: &str) -> Option<usize> {
+        let question = format!("Did you intend to rename or drop {kind} \"{target}\"?");
+        let Ok(choice) = Select::new(&question, vec!["Rename", "Drop"]).prompt() else {
+            println!("Aborting migrations.");
+            std::process::abort();
+        };
+
+        if choice == "Drop" {
+            println!("Dropping {target}");
+            return None;
+        }
+
+        let rename_prompt = format!("Select a {kind} to rename \"{target}\" to:");
+        let Ok(Some(opt)) = Select::new(&rename_prompt, options.to_vec()).raw_prompt_skippable()
+        else {
+            println!("Aborting migrations.");
+            std::process::abort();
+        };
+
+        Some(opt.index)
+    }
+}
 
 #[derive(Parser)]
 #[command(name = "generate", version = "0.0.3")]
@@ -29,16 +76,18 @@ enum Commands {
         #[command(subcommand)]
         target: GenerateTarget,
     },
+    Migrate {
+        name: String,
+        last_migrated_cidl_path: Option<PathBuf>,
+        cidl_path: PathBuf,
+        migrations_dir: PathBuf,
+    },
 }
 
 #[derive(Subcommand)]
 enum GenerateTarget {
     Wrangler {
         wrangler_path: PathBuf,
-    },
-    D1 {
-        cidl_path: PathBuf,
-        sqlite_path: PathBuf,
     },
     Workers {
         cidl_path: PathBuf,
@@ -54,7 +103,6 @@ enum GenerateTarget {
     All {
         cidl_path: PathBuf,
         wrangler_path: PathBuf,
-        sqlite_path: PathBuf,
         workers_path: PathBuf,
         client_path: PathBuf,
         client_domain: String,
@@ -101,15 +149,35 @@ fn run_cli() -> Result<()> {
             validate_cidl(&cidl_path)?;
             println!("Ok.");
         }
+        Commands::Migrate {
+            name,
+            last_migrated_cidl_path,
+            cidl_path,
+            migrations_dir,
+        } => {
+            let migration_prefix = format!("{}-{name}", Local::now().format("%Y%m%d%H%M%S"));
+            let mut migrated_sql_file =
+                create_file_and_dir(&migrations_dir.join(format!("{migration_prefix}.sql")))?;
+            let mut migrated_cidl_file =
+                create_file_and_dir(&migrations_dir.join(format!("{migration_prefix}.json")))?;
+
+            // TODO: should we forgo any validation on the last migrated AST?
+            let lm_ast = last_migrated_cidl_path
+                .map(|lm_path| validate_cidl(&lm_path))
+                .transpose()?;
+
+            let mut ast = validate_cidl(&cidl_path)?;
+            let generated_sql = D1Generator::migrate(&mut ast, lm_ast.as_ref(), &MigrationsCli)?;
+
+            migrated_sql_file
+                .write_all(generated_sql.as_bytes())
+                .expect("Could not write to file");
+            migrated_cidl_file
+                .write_all(ast.to_json().as_bytes())
+                .expect("Could not write to file");
+        }
         Commands::Generate { target } => match target {
             GenerateTarget::Wrangler { wrangler_path } => generate_wrangler(&wrangler_path)?,
-            GenerateTarget::D1 {
-                cidl_path,
-                sqlite_path,
-            } => {
-                let ast = validate_cidl(&cidl_path)?;
-                generate_d1(&ast, &sqlite_path)?
-            }
             GenerateTarget::Workers {
                 cidl_path,
                 workers_path,
@@ -130,21 +198,15 @@ fn run_cli() -> Result<()> {
             GenerateTarget::All {
                 cidl_path,
                 wrangler_path,
-                sqlite_path,
                 workers_path,
                 client_path,
                 client_domain,
                 workers_domain,
             } => {
-                let ast = CloesceAst::from_json(&cidl_path)?;
-                ast.validate_types()?;
-                println!("Validation complete.");
+                let ast = validate_cidl(&cidl_path)?;
 
                 generate_wrangler(&wrangler_path)?;
                 println!("Wrangler generated.");
-
-                generate_d1(&ast, &sqlite_path)?;
-                println!("D1 schema generated.");
 
                 generate_workers(&ast, &workers_path, &wrangler_path, &workers_domain)?;
                 println!("Workers generated.");
@@ -161,8 +223,15 @@ fn run_cli() -> Result<()> {
 }
 
 fn validate_cidl(cidl_path: &Path) -> Result<CloesceAst> {
-    let ast = CloesceAst::from_json(cidl_path)?;
+    let mut ast = CloesceAst::from_json(cidl_path)?;
     ast.validate_types()?;
+    D1Generator::validate_ast(&mut ast)?;
+    ast.set_merkle_hash();
+    println!("Validation complete.");
+
+    std::fs::write(cidl_path, ast.to_json()).expect("write cidl to work");
+    println!("Updated cidl");
+
     Ok(ast)
 }
 
@@ -183,16 +252,6 @@ fn generate_wrangler(wrangler_path: &Path) -> Result<()> {
         })?;
 
     wrangler.update(spec, wrangler_file);
-    Ok(())
-}
-
-fn generate_d1(ast: &CloesceAst, sqlite_path: &Path) -> Result<()> {
-    let mut sqlite_file = create_file_and_dir(sqlite_path)?;
-
-    let generated_sqlite = d1::generate_sql(&ast.models)?;
-    sqlite_file
-        .write_all(generated_sqlite.as_bytes())
-        .expect("Could not write to file");
     Ok(())
 }
 

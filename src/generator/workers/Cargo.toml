@@ -7,3 +7,4 @@ edition = "2024"
 common = { path = "../common" }
 wrangler = { path = "../wrangler" }
 pathdiff = { version = "0.2.3" }
+indexmap = { workspace = true }
