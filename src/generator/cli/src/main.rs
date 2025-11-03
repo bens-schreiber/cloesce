@@ -77,10 +77,10 @@ enum Commands {
         target: GenerateTarget,
     },
     Migrate {
-        last_migrated_cidl_path: Option<PathBuf>,
         cidl_path: PathBuf,
         migrated_cidl_path: PathBuf,
         migrated_sql_path: PathBuf,
+        last_migrated_cidl_path: Option<PathBuf>,
     },
 }
 
@@ -154,10 +154,10 @@ fn run_cli() -> Result<()> {
             println!("Ok.");
         }
         Commands::Migrate {
-            last_migrated_cidl_path,
             cidl_path,
             migrated_cidl_path,
             migrated_sql_path,
+            last_migrated_cidl_path,
         } => {
             let mut migrated_cidl_file = create_file_and_dir(&migrated_cidl_path)?;
             let mut migrated_sql_file = create_file_and_dir(&migrated_sql_path)?;
@@ -171,10 +171,10 @@ fn run_cli() -> Result<()> {
             let generated_sql = D1Generator::migrate(&mut ast, lm_ast.as_ref(), &MigrationsCli)?;
 
             migrated_cidl_file
-                .write_all(generated_sql.as_bytes())
+                .write_all(ast.to_json().as_bytes())
                 .expect("Could not write to file");
             migrated_sql_file
-                .write_all(ast.to_json().as_bytes())
+                .write_all(generated_sql.as_bytes())
                 .expect("Could not write to file");
         }
         Commands::Generate { target } => match target {
@@ -228,10 +228,13 @@ fn run_cli() -> Result<()> {
 fn validate_cidl(pre_cidl_path: &Path, cidl_path: &Path) -> Result<CloesceAst> {
     let mut ast = CloesceAst::from_json(pre_cidl_path)?;
     ast.validate_types()?;
-    D1Generator::validate_ast(&mut ast)?;
     ast.set_merkle_hash();
+    D1Generator::validate_ast(&mut ast)?;
 
-    std::fs::write(&cidl_path, ast.to_json()).expect("file to be written");
+    let mut cidl_file = create_file_and_dir(cidl_path)?;
+    cidl_file
+        .write(ast.to_json().as_bytes())
+        .expect("file to be written");
 
     Ok(ast)
 }

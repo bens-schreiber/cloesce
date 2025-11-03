@@ -219,7 +219,7 @@ impl CloesceAst {
     }
 
     pub fn to_json(&self) -> String {
-        serde_json::to_string(self).expect("serialize self to work")
+        serde_json::to_string_pretty(self).expect("serialize self to work")
     }
 
     fn is_valid_object_ref(&self, o: &str) -> bool {

@@ -144,12 +144,13 @@ impl Fixture {
 
     pub fn validate_cidl(&self, pre_cidl: &Path) -> TestResult {
         let out = OutputFile::new(&self.path, "cidl.json");
+        let pre_cidl_path = pre_cidl.canonicalize().unwrap();
         let res = self.run_command(
             Command::new("cargo")
                 .arg("run")
                 .arg("validate")
-                .arg(pre_cidl)
-                .arg(&out.path)
+                .arg(&pre_cidl_path)
+                .arg(&out.path())
                 .current_dir("../../src/generator"),
         );
 
@@ -220,20 +221,22 @@ impl Fixture {
     }
 
     pub fn migrate(&self, cidl: &Path) -> (TestResult, TestResult) {
-        let migrated_sql = OutputFile::new(
-            &self.path.parent().unwrap().join("migrations/Initial.sql"),
-            "Initial.sql",
-        );
         let migrated_cidl = OutputFile::new(
             &self.path.parent().unwrap().join("migrations/Initial.json"),
             "Initial.json",
         );
+        let migrated_sql = OutputFile::new(
+            &self.path.parent().unwrap().join("migrations/Initial.sql"),
+            "Initial.sql",
+        );
+
+        let cidl_path = cidl.canonicalize().unwrap();
 
         let res = self.run_command(
             Command::new("cargo")
                 .arg("run")
                 .arg("migrate")
-                .arg(&cidl)
+                .arg(&cidl_path)
                 .arg(&migrated_cidl.path())
                 .arg(&migrated_sql.path())
                 .current_dir("../../src/generator"),

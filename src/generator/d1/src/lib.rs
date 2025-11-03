@@ -46,6 +46,23 @@ impl D1Generator {
 
         let tables = MigrateTables::make_migrations(ast, lm_ast, many_to_many_tables, intent);
         let views = MigrateViews::make_migrations(model_tree, ast, lm_ast);
+        if lm_ast.is_none() {
+            let cloesce_tmp = Table::create()
+                .table(alias("_cloesce_tmp"))
+                .col(
+                    ColumnDef::new_with_type(alias("path"), sea_query::ColumnType::Text)
+                        .primary_key(),
+                )
+                .col(
+                    ColumnDef::new_with_type(alias("id"), sea_query::ColumnType::Integer)
+                        .not_null(),
+                )
+                .to_string(SqliteQueryBuilder);
+
+            return Ok(format!(
+                "{tables}\n{views}\n--- Cloesce Temporary Table\n{cloesce_tmp}"
+            ));
+        }
 
         Ok(format!("{tables}\n{views}"))
     }
@@ -571,12 +588,12 @@ impl MigrateViews {
         if !drop_stmts.is_empty() {
             res.push_str("--- Dropped and Refactored Data Sources\n");
             res.push_str(&drop_stmts.join("\n"));
-            res.push('\n');
+            res.push_str("\n");
         }
         if !create_stmts.is_empty() {
             res.push_str("--- New Data Sources\n");
             res.push_str(&create_stmts.join("\n"));
-            res.push('\n');
+            res.push_str("\n");
         }
 
         res
@@ -983,12 +1000,14 @@ impl MigrateTables {
     ) -> String {
         let Some(lm_ast) = lm_ast else {
             // No previous migration, insert naively.
-            return Self::create(
+            let stmts = Self::create(
                 ast.models.values().collect(),
                 &ast.models,
                 many_to_many_tables.into_values().collect(),
             )
             .join("\n");
+
+            return format!("--- New Models\n{stmts}\n");
         };
 
         let mut sorted_create_models = vec![];
@@ -1051,6 +1070,10 @@ impl MigrateTables {
         for (title, stmts) in [
             ("Dropped Models", &Self::drop(sorted_drop_lms)),
             (
+                "Altered Models",
+                &Self::alter(alter_models, &ast.models, intent),
+            ),
+            (
                 "New Models",
                 &Self::create(
                     sorted_create_models,
@@ -1058,17 +1081,14 @@ impl MigrateTables {
                     many_to_many_tables.into_values().collect(),
                 ),
             ),
-            (
-                "Altered Models",
-                &Self::alter(alter_models, &ast.models, intent),
-            ),
         ] {
-            if !stmts.is_empty() {
-                res.push_str(&format!("--- {title}"));
-                res.push('\n');
-                res.push_str(&stmts.join("\n"));
-                res.push('\n');
+            if stmts.is_empty() {
+                continue;
             }
+
+            res.push_str(&format!("--- {title}\n"));
+            res.push_str(&stmts.join("\n"));
+            res.push_str("\n");
         }
 
         res
