@@ -98,12 +98,19 @@ fn run_integration_test(fixture: Fixture, domain: &str, command: Commands) -> Re
             }
         };
 
-    let (cidl_changed, cidl_path) = run_step(fixture.extract_cidl())?;
+    let (pre_cidl_changed, pre_cidl_path) = run_step(fixture.extract_cidl())?;
+    let (cidl_changed, cidl_path) = run_step(fixture.validate_cidl(&pre_cidl_path))?;
     let (wrangler_changed, wrangler_path) = run_step(fixture.generate_wrangler())?;
-    let (d1_changed, _) = run_step(fixture.generate_d1(&cidl_path))?;
     let (workers_changed, _) =
         run_step(fixture.generate_workers(&cidl_path, &wrangler_path, domain))?;
     let (client_changed, _) = run_step(fixture.generate_client(&cidl_path, domain))?;
+    let migrations_changed = {
+        let (s1, s2) = fixture.migrate(&cidl_path);
+        let (migrated_cidl_changed, _) = run_step(s1)?;
+        let (migrated_sql_changed, _) = run_step(s2)?;
+
+        migrated_cidl_changed | migrated_sql_changed
+    };
 
     if matches!(command, Commands::RunFail) {
         for p in cleanup {
@@ -111,5 +118,10 @@ fn run_integration_test(fixture: Fixture, domain: &str, command: Commands) -> Re
         }
     }
 
-    Ok(cidl_changed | wrangler_changed | d1_changed | workers_changed | client_changed)
+    Ok(pre_cidl_changed
+        | cidl_changed
+        | wrangler_changed
+        | workers_changed
+        | client_changed
+        | migrations_changed)
 }

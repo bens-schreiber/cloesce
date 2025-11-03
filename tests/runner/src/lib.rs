@@ -20,7 +20,7 @@ fn diff_file(
     new_contents: String,
     fail: bool,
     opt: &DiffOpts,
-) -> (bool, PathBuf) {
+) -> TestOutput {
     let name = if fail {
         format!("{}_{}_fail.out", fixture_id, out.base_name)
     } else {
@@ -103,6 +103,9 @@ impl Drop for OutputFile {
     }
 }
 
+type TestOutput = (bool, PathBuf);
+type TestResult = Result<TestOutput, TestOutput>;
+
 pub struct Fixture {
     /// The path of a fixture entry point, ie a seed source file
     pub path: PathBuf,
@@ -120,8 +123,8 @@ impl Fixture {
         }
     }
 
-    pub fn extract_cidl(&self) -> Result<(bool, PathBuf), (bool, PathBuf)> {
-        let out = OutputFile::new(&self.path, "cidl.json");
+    pub fn extract_cidl(&self) -> TestResult {
+        let out = OutputFile::new(&self.path, "cidl.pre.json");
         let res = self.run_command(
             Command::new("node")
                 .arg("../../src/frontend/ts/dist/cli.js")
@@ -139,7 +142,24 @@ impl Fixture {
         }
     }
 
-    pub fn generate_wrangler(&self) -> Result<(bool, PathBuf), (bool, PathBuf)> {
+    pub fn validate_cidl(&self, pre_cidl: &Path) -> TestResult {
+        let out = OutputFile::new(&self.path, "cidl.json");
+        let res = self.run_command(
+            Command::new("cargo")
+                .arg("run")
+                .arg("validate")
+                .arg(pre_cidl)
+                .arg(&out.path)
+                .current_dir("../../src/generator"),
+        );
+
+        match res {
+            Ok(_) => Ok(self.read_out_and_diff(out)),
+            Err(err) => Err(self.read_fail_and_diff(out, err)),
+        }
+    }
+
+    pub fn generate_wrangler(&self) -> TestResult {
         let out = OutputFile::new(&self.path, "wrangler.toml");
         let res = self.run_command(
             Command::new("cargo")
@@ -156,40 +176,7 @@ impl Fixture {
         }
     }
 
-    pub fn generate_d1(&self, cidl: &Path) -> Result<(bool, PathBuf), (bool, PathBuf)> {
-        let cidl_path = cidl.canonicalize().unwrap();
-
-        let out = OutputFile::new(
-            &self
-                .path
-                .parent()
-                .unwrap()
-                .join("migrations/migrations.sql"),
-            "migrations.sql",
-        );
-
-        let res = self.run_command(
-            Command::new("cargo")
-                .arg("run")
-                .arg("generate")
-                .arg("d1")
-                .arg(&cidl_path)
-                .arg(out.path())
-                .current_dir("../../src/generator"),
-        );
-
-        match res {
-            Ok(_) => Ok(self.read_out_and_diff(out)),
-            Err(err) => Err(self.read_fail_and_diff(out, err)),
-        }
-    }
-
-    pub fn generate_workers(
-        &self,
-        cidl: &Path,
-        wrangler: &Path,
-        domain: &str,
-    ) -> Result<(bool, PathBuf), (bool, PathBuf)> {
+    pub fn generate_workers(&self, cidl: &Path, wrangler: &Path, domain: &str) -> TestResult {
         let cidl_path = cidl.canonicalize().unwrap();
         let wrangler_path = wrangler.canonicalize().unwrap();
         let out = OutputFile::new(&self.path, "workers.ts");
@@ -212,11 +199,7 @@ impl Fixture {
         }
     }
 
-    pub fn generate_client(
-        &self,
-        cidl: &Path,
-        domain: &str,
-    ) -> Result<(bool, PathBuf), (bool, PathBuf)> {
+    pub fn generate_client(&self, cidl: &Path, domain: &str) -> TestResult {
         let cidl_path = cidl.canonicalize().unwrap();
         let out = OutputFile::new(&self.path, "client.ts");
 
@@ -236,6 +219,39 @@ impl Fixture {
         }
     }
 
+    pub fn migrate(&self, cidl: &Path) -> (TestResult, TestResult) {
+        let migrated_sql = OutputFile::new(
+            &self.path.parent().unwrap().join("migrations/Initial.sql"),
+            "Initial.sql",
+        );
+        let migrated_cidl = OutputFile::new(
+            &self.path.parent().unwrap().join("migrations/Initial.json"),
+            "Initial.json",
+        );
+
+        let res = self.run_command(
+            Command::new("cargo")
+                .arg("run")
+                .arg("migrate")
+                .arg(&cidl)
+                .arg(&migrated_cidl.path())
+                .arg(&migrated_sql.path())
+                .current_dir("../../src/generator"),
+        );
+
+        let cidl_res = match &res {
+            Ok(_) => Ok(self.read_out_and_diff(migrated_cidl)),
+            Err(err) => Err(self.read_fail_and_diff(migrated_cidl, err.clone())),
+        };
+
+        let sql_res = match res {
+            Ok(_) => Ok(self.read_out_and_diff(migrated_sql)),
+            Err(err) => Err(self.read_fail_and_diff(migrated_sql, err)),
+        };
+
+        (cidl_res, sql_res)
+    }
+
     /// Returns the error given by the command on failure
     fn run_command(&self, command: &mut Command) -> Result<(), String> {
         let output = command.output().expect("Failed to execute command");
@@ -247,7 +263,7 @@ impl Fixture {
         Ok(())
     }
 
-    fn read_out_and_diff(&self, out: OutputFile) -> (bool, PathBuf) {
+    fn read_out_and_diff(&self, out: OutputFile) -> TestOutput {
         let contents = fs::read(&out.path).expect("temp file to be readable");
         diff_file(
             &self.fixture_id,
@@ -258,7 +274,7 @@ impl Fixture {
         )
     }
 
-    fn read_fail_and_diff(&self, out: OutputFile, err: String) -> (bool, PathBuf) {
+    fn read_fail_and_diff(&self, out: OutputFile, err: String) -> TestOutput {
         let normalized = err
             .find("==== CLOESCE ERROR ====")
             .map(|pos| err[pos..].to_string())

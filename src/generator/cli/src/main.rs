@@ -4,7 +4,6 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use chrono::Local;
 use clap::{Parser, Subcommand, command};
 
 use common::{
@@ -70,6 +69,7 @@ struct Cli {
 #[derive(Subcommand)]
 enum Commands {
     Validate {
+        pre_cidl_path: PathBuf,
         cidl_path: PathBuf,
     },
     Generate {
@@ -77,10 +77,10 @@ enum Commands {
         target: GenerateTarget,
     },
     Migrate {
-        name: String,
         last_migrated_cidl_path: Option<PathBuf>,
         cidl_path: PathBuf,
-        migrations_dir: PathBuf,
+        migrated_cidl_path: PathBuf,
+        migrated_sql_path: PathBuf,
     },
 }
 
@@ -101,6 +101,7 @@ enum GenerateTarget {
         domain: String,
     },
     All {
+        pre_cidl_path: PathBuf,
         cidl_path: PathBuf,
         wrangler_path: PathBuf,
         workers_path: PathBuf,
@@ -145,34 +146,34 @@ Suggested fix: {}"#,
 
 fn run_cli() -> Result<()> {
     match Cli::parse().command {
-        Commands::Validate { cidl_path } => {
-            validate_cidl(&cidl_path)?;
+        Commands::Validate {
+            pre_cidl_path,
+            cidl_path,
+        } => {
+            validate_cidl(&pre_cidl_path, &cidl_path)?;
             println!("Ok.");
         }
         Commands::Migrate {
-            name,
             last_migrated_cidl_path,
             cidl_path,
-            migrations_dir,
+            migrated_cidl_path,
+            migrated_sql_path,
         } => {
-            let migration_prefix = format!("{}-{name}", Local::now().format("%Y%m%d%H%M%S"));
-            let mut migrated_sql_file =
-                create_file_and_dir(&migrations_dir.join(format!("{migration_prefix}.sql")))?;
-            let mut migrated_cidl_file =
-                create_file_and_dir(&migrations_dir.join(format!("{migration_prefix}.json")))?;
+            let mut migrated_cidl_file = create_file_and_dir(&migrated_cidl_path)?;
+            let mut migrated_sql_file = create_file_and_dir(&migrated_sql_path)?;
 
-            // TODO: should we forgo any validation on the last migrated AST?
+            // TODO: should we validate the cidls?
             let lm_ast = last_migrated_cidl_path
-                .map(|lm_path| validate_cidl(&lm_path))
+                .map(|p| CloesceAst::from_json(&p))
                 .transpose()?;
+            let mut ast = CloesceAst::from_json(&cidl_path)?;
 
-            let mut ast = validate_cidl(&cidl_path)?;
             let generated_sql = D1Generator::migrate(&mut ast, lm_ast.as_ref(), &MigrationsCli)?;
 
-            migrated_sql_file
+            migrated_cidl_file
                 .write_all(generated_sql.as_bytes())
                 .expect("Could not write to file");
-            migrated_cidl_file
+            migrated_sql_file
                 .write_all(ast.to_json().as_bytes())
                 .expect("Could not write to file");
         }
@@ -184,7 +185,7 @@ fn run_cli() -> Result<()> {
                 wrangler_path,
                 domain,
             } => {
-                let ast = validate_cidl(&cidl_path)?;
+                let ast = CloesceAst::from_json(&cidl_path)?;
                 generate_workers(&ast, &workers_path, &wrangler_path, &domain)?
             }
             GenerateTarget::Client {
@@ -192,10 +193,11 @@ fn run_cli() -> Result<()> {
                 client_path,
                 domain,
             } => {
-                let ast = validate_cidl(&cidl_path)?;
+                let ast = CloesceAst::from_json(&cidl_path)?;
                 generate_client(&ast, &client_path, &domain)?
             }
             GenerateTarget::All {
+                pre_cidl_path,
                 cidl_path,
                 wrangler_path,
                 workers_path,
@@ -203,7 +205,8 @@ fn run_cli() -> Result<()> {
                 client_domain,
                 workers_domain,
             } => {
-                let ast = validate_cidl(&cidl_path)?;
+                let ast = validate_cidl(&pre_cidl_path, &cidl_path)?;
+                println!("Validation complete.");
 
                 generate_wrangler(&wrangler_path)?;
                 println!("Wrangler generated.");
@@ -222,15 +225,13 @@ fn run_cli() -> Result<()> {
     Ok(())
 }
 
-fn validate_cidl(cidl_path: &Path) -> Result<CloesceAst> {
-    let mut ast = CloesceAst::from_json(cidl_path)?;
+fn validate_cidl(pre_cidl_path: &Path, cidl_path: &Path) -> Result<CloesceAst> {
+    let mut ast = CloesceAst::from_json(pre_cidl_path)?;
     ast.validate_types()?;
     D1Generator::validate_ast(&mut ast)?;
     ast.set_merkle_hash();
-    println!("Validation complete.");
 
-    std::fs::write(cidl_path, ast.to_json()).expect("write cidl to work");
-    println!("Updated cidl");
+    std::fs::write(&cidl_path, ast.to_json()).expect("file to be written");
 
     Ok(ast)
 }
