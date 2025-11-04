@@ -3,7 +3,16 @@ import { WASI } from "node:wasi";
 import fs from "node:fs";
 import { readFile } from "fs/promises";
 import path from "node:path";
-import { command, run, subcommands, flag, string, positional } from "cmd-ts";
+import {
+  command,
+  run,
+  subcommands,
+  flag,
+  string,
+  positional,
+  option,
+  optional,
+} from "cmd-ts";
 import { Project } from "ts-morph";
 import { CidlExtractor } from "./extractor/extract.js";
 import { ExtractorError, ExtractorErrorCode, getErrorInfo } from "./common.js";
@@ -72,6 +81,47 @@ const cmds = subcommands({
 
         // Runs a generator command. Exits the process on failure.
         await generate(allConfig);
+      },
+    }),
+
+    extract: command({
+      name: "extract",
+      description: "Extract models and write cidl.pre.json",
+      args: {
+        projectName: option({
+          long: "project-name",
+          type: optional(string),
+          description: "Project name",
+        }),
+        out: option({
+          long: "out",
+          short: "o",
+          type: optional(string),
+        }),
+        inp: option({
+          long: "in",
+          short: "i",
+          type: optional(string),
+          description: "Input file or directory",
+        }),
+        location: option({
+          long: "location",
+          short: "l",
+          type: optional(string),
+          description: "Project directory (default: cwd)",
+        }),
+        truncateSourcePaths: flag({
+          long: "truncateSourcePaths",
+          description: "Sets all source paths to just their file name",
+        }),
+        debug: flag({
+          long: "debug",
+          short: "d",
+          description: "Show debug output",
+        }),
+      },
+      handler: async (args) => {
+        await extract({ ...args });
       },
     }),
 
@@ -146,6 +196,7 @@ const cmds = subcommands({
 
 async function extract(opts: {
   projectName?: string;
+  out?: string;
   inp?: string;
   truncateSourcePaths?: boolean;
   debug?: boolean;
@@ -156,7 +207,7 @@ async function extract(opts: {
 
   const searchPaths = opts.inp ? [opts.inp] : (config.paths ?? [root]);
   const outputDir = config.outputDir ?? ".generated";
-  const outPath = path.join(outputDir, "cidl.pre.json");
+  const outPath = opts.out ?? path.join(outputDir, "cidl.pre.json");
   const truncate =
     opts.truncateSourcePaths ?? config.truncateSourcePaths ?? false;
   const cloesceProjectName =

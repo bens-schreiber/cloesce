@@ -132,7 +132,7 @@ impl Fixture {
                 .arg("--in")
                 .arg(&self.path)
                 .arg("--out")
-                .arg(&out.path)
+                .arg(out.path())
                 .arg("--truncateSourcePaths"),
         );
 
@@ -235,7 +235,7 @@ impl Fixture {
         let res = self.run_command(
             Command::new("cargo")
                 .arg("run")
-                .arg("migrate")
+                .arg("migrations")
                 .arg(&cidl_path)
                 .arg(migrated_cidl.path())
                 .arg(migrated_sql.path())
