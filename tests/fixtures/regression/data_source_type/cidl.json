@@ -1,4 +1,5 @@
 {
+  "hash": 6349253276655467602,
   "version": "v0.0.3",
   "project_name": "runner",
   "language": "TypeScript",
@@ -8,6 +9,7 @@
   },
   "models": {
     "Foo": {
+      "hash": 5030820420179718148,
       "name": "Foo",
       "primary_key": {
         "name": "id",
@@ -45,15 +47,15 @@
       },
       "data_sources": {
         "baz": {
+          "hash": 4655990743320231733,
           "name": "baz",
-          "tree": {},
-          "hash": 4655990743320231733
+          "tree": {}
         }
       },
-      "source_path": "./seed__ds.cloesce.ts",
-      "hash": 5030820420179718148
+      "source_path": "./seed__ds.cloesce.ts"
     },
     "NoDs": {
+      "hash": 13267258502866568209,
       "name": "NoDs",
       "primary_key": {
         "name": "id",
@@ -63,10 +65,10 @@
       "navigation_properties": [],
       "methods": {},
       "data_sources": {},
-      "source_path": "./seed__ds.cloesce.ts",
-      "hash": 13267258502866568209
+      "source_path": "./seed__ds.cloesce.ts"
     },
     "OneDs": {
+      "hash": 12534124635817757359,
       "name": "OneDs",
       "primary_key": {
         "name": "id",
@@ -77,13 +79,12 @@
       "methods": {},
       "data_sources": {
         "default": {
+          "hash": 11774770494344376574,
           "name": "default",
-          "tree": {},
-          "hash": 11774770494344376574
+          "tree": {}
         }
       },
-      "source_path": "./seed__ds.cloesce.ts",
-      "hash": 12534124635817757359
+      "source_path": "./seed__ds.cloesce.ts"
     }
   },
   "poos": {
@@ -100,6 +101,5 @@
       "source_path": "./seed__ds.cloesce.ts"
     }
   },
-  "app_source": null,
-  "hash": 10526699382971220501
+  "app_source": null
 }

@@ -6,8 +6,8 @@ use std::{
 
 use clap::{Parser, Subcommand, command};
 
-use common::{
-    CloesceAst,
+use ast::{
+    CloesceAst, MigrationsAst,
     err::{GeneratorErrorKind, Result},
 };
 use d1::{D1Generator, MigrationsDilemma, MigrationsIntent};
@@ -117,13 +117,12 @@ fn run_cli() -> Result<()> {
             let mut migrated_cidl_file = create_file_and_dir(&migrated_cidl_path)?;
             let mut migrated_sql_file = create_file_and_dir(&migrated_sql_path)?;
 
-            // TODO: should we validate the cidls?
             let lm_ast = last_migrated_cidl_path
-                .map(|p| CloesceAst::from_json(&p))
+                .map(|p| MigrationsAst::from_json(&p))
                 .transpose()?;
-            let mut ast = CloesceAst::from_json(&cidl_path)?;
+            let ast = MigrationsAst::from_json(&cidl_path)?;
 
-            let generated_sql = D1Generator::migrate(&mut ast, lm_ast.as_ref(), &MigrationsCli)?;
+            let generated_sql = D1Generator::migrate(&ast, lm_ast.as_ref(), &MigrationsCli);
 
             migrated_cidl_file
                 .write_all(ast.to_json().as_bytes())
@@ -255,9 +254,8 @@ impl MigrationsCli {
 
 fn validate_cidl(pre_cidl_path: &Path, cidl_path: &Path) -> Result<CloesceAst> {
     let mut ast = CloesceAst::from_json(pre_cidl_path)?;
-    ast.validate_types()?;
+    ast.semantic_analysis()?;
     ast.set_merkle_hash();
-    D1Generator::validate_ast(&mut ast)?;
 
     let mut cidl_file = create_file_and_dir(cidl_path)?;
     cidl_file

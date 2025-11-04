@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["cli", "common", "d1", "workers", "client", "wrangler"]
+members = ["cli", "ast", "d1", "workers", "client", "wrangler"]
 
 [workspace.dependencies]
 indexmap = { version = "2.12.0", features = ["serde"] }

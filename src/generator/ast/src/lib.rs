@@ -2,6 +2,7 @@ pub mod builder;
 pub mod err;
 
 use std::collections::BTreeMap;
+use std::collections::HashMap;
 use std::collections::VecDeque;
 use std::hash::Hash;
 use std::hash::Hasher;
@@ -111,9 +112,11 @@ pub struct NamedTypedValue {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ModelAttribute {
+    #[serde(default)]
+    pub hash: u64,
+
     pub value: NamedTypedValue,
     pub foreign_key_reference: Option<String>,
-    pub hash: Option<u64>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -130,9 +133,11 @@ pub struct IncludeTree(pub BTreeMap<String, IncludeTree>);
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct DataSource {
+    #[serde(default)]
+    pub hash: u64,
+
     pub name: String,
     pub tree: IncludeTree,
-    pub hash: Option<u64>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Hash)]
@@ -144,15 +149,20 @@ pub enum NavigationPropertyKind {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct NavigationProperty {
+    #[serde(default)]
+    pub hash: u64,
+
     pub var_name: String,
     pub model_name: String,
     pub kind: NavigationPropertyKind,
-    pub hash: Option<u64>,
 }
 
 #[serde_as]
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Model {
+    #[serde(default)]
+    pub hash: u64,
+
     pub name: String,
     pub primary_key: NamedTypedValue,
     pub attributes: Vec<ModelAttribute>,
@@ -165,7 +175,6 @@ pub struct Model {
     pub data_sources: BTreeMap<String, DataSource>,
 
     pub source_path: PathBuf,
-    pub hash: Option<u64>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -189,6 +198,9 @@ pub struct WranglerEnv {
 #[serde_as]
 #[derive(Serialize, Deserialize)]
 pub struct CloesceAst {
+    #[serde(default)]
+    pub hash: u64,
+
     pub version: String,
     pub project_name: String,
     pub language: InputLanguage,
@@ -201,17 +213,16 @@ pub struct CloesceAst {
     pub poos: BTreeMap<String, PlainOldObject>,
 
     pub app_source: Option<PathBuf>,
-    pub hash: Option<u64>,
 }
 
 impl CloesceAst {
-    pub fn from_json(path: &std::path::Path) -> Result<CloesceAst> {
+    pub fn from_json(path: &std::path::Path) -> Result<Self> {
         let cidl_contents = std::fs::read_to_string(path).map_err(|e| {
             GeneratorErrorKind::InvalidInputFile
                 .to_error()
                 .with_context(e.to_string())
         })?;
-        serde_json::from_str::<CloesceAst>(&cidl_contents).map_err(|e| {
+        serde_json::from_str::<Self>(&cidl_contents).map_err(|e| {
             GeneratorErrorKind::InvalidInputFile
                 .to_error()
                 .with_context(e.to_string())
@@ -219,15 +230,41 @@ impl CloesceAst {
     }
 
     pub fn to_json(&self) -> String {
+        assert!(self.hash != 0u64);
         serde_json::to_string_pretty(self).expect("serialize self to work")
     }
 
-    fn is_valid_object_ref(&self, o: &str) -> bool {
-        self.models.contains_key(o) || self.poos.contains_key(o)
+    pub fn to_migrations_json(self) -> String {
+        assert!(self.hash != 0u64);
+        let Self { hash, models, .. } = self;
+
+        let migrations_models: IndexMap<String, MigrationsModel> = models
+            .into_iter()
+            .map(|(name, model)| {
+                let m = MigrationsModel {
+                    hash: model.hash,
+                    name: model.name,
+                    primary_key: model.primary_key,
+                    attributes: model.attributes,
+                    navigation_properties: model.navigation_properties,
+                    methods: model.methods,
+                    data_sources: model.data_sources,
+                };
+                (name, m)
+            })
+            .collect();
+
+        let migrations_ast = MigrationsAst {
+            hash,
+            models: migrations_models,
+        };
+
+        serde_json::to_string_pretty(&migrations_ast).expect("serialize migrations ast to work")
     }
 
-    /// Ensures all `CidlTypes` are logically correct for the area, essentially doing
-    /// the first level of semantic analysis for the generator.
+    /// Analyzes the grammar of the AST, yielding a [GeneratorErrorKind] on failure.
+    ///
+    /// Sorts models topologically in SQL insertion order.
     ///
     /// Returns error on
     /// - Model attributes with invalid SQL types
@@ -236,7 +273,12 @@ impl CloesceAst {
     /// - Unknown navigation property model references
     /// - Unknown model references in method parameters
     /// - Invalid method parameter types
-    pub fn validate_types(&self) -> Result<()> {
+    /// - Unknown or invalid foreign key references
+    /// - Missing navigation property attributes
+    /// - Cyclical dependencies
+    /// - Invalid data source type
+    /// - Invalid data source reference
+    pub fn semantic_analysis(&mut self) -> Result<()> {
         let ensure_valid_sql_type = |model: &Model, value: &NamedTypedValue| {
             let inner = match &value.cidl_type {
                 CidlType::Nullable(inner) if matches!(inner.as_ref(), CidlType::Void) => {
@@ -260,8 +302,22 @@ impl CloesceAst {
             Ok(())
         };
 
+        let is_valid_object_ref = |o| self.models.contains_key(o) || self.poos.contains_key(o);
+
+        // Topo sort and cycle detection
+        let mut in_degree = BTreeMap::<&str, usize>::new();
+        let mut graph = BTreeMap::<&str, Vec<&str>>::new();
+
+        // Maps a model name and a foreign key reference to the model it is referencing
+        // Ie, Person.dogId => { (Person, dogId): "Dog" }
+        let mut model_reference_to_fk_model = HashMap::<(&str, &str), &str>::new();
+        let mut unvalidated_navs = Vec::new();
+
+        // Maps a m2m unique id to the models that reference the id
+        let mut m2m = HashMap::<&String, Vec<&String>>::new();
+
+        // Validate Models
         for (model_name, model) in &self.models {
-            // Validate record
             ensure!(
                 *model_name == model.name,
                 GeneratorErrorKind::InvalidMapping,
@@ -269,6 +325,9 @@ impl CloesceAst {
                 model_name,
                 model.name
             );
+
+            graph.entry(&model.name).or_default();
+            in_degree.entry(&model.name).or_insert(0);
 
             // Validate PK
             ensure_valid_sql_type(model, &model.primary_key)?;
@@ -287,6 +346,18 @@ impl CloesceAst {
                         a.value.name,
                         fk_model
                     );
+
+                    model_reference_to_fk_model
+                        .insert((&model.name, a.value.name.as_str()), fk_model);
+
+                    // Nullable FK's do not constrain table creation order, and thus
+                    // can be left out of the topo sort
+                    if !a.value.cidl_type.is_nullable() {
+                        // One To One: Person has a Dog ..(sql)=> Person has a fk to Dog
+                        // Dog must come before Person
+                        graph.entry(fk_model).or_default().push(&model.name);
+                        in_degree.entry(&model.name).and_modify(|d| *d += 1);
+                    }
                 }
             }
 
@@ -299,6 +370,75 @@ impl CloesceAst {
                     model.name,
                     nav.model_name
                 );
+
+                match &nav.kind {
+                    NavigationPropertyKind::OneToOne { reference } => {
+                        // Validate the nav prop's reference is consistent
+                        if let Some(&fk_model) =
+                            model_reference_to_fk_model.get(&(&model.name, reference))
+                        {
+                            ensure!(
+                                fk_model == nav.model_name,
+                                GeneratorErrorKind::MismatchedNavigationPropertyTypes,
+                                "({}.{}) does not match type ({})",
+                                model.name,
+                                nav.var_name,
+                                fk_model
+                            );
+                        } else {
+                            fail!(
+                                GeneratorErrorKind::InvalidNavigationPropertyReference,
+                                "{}.{} references {}.{} which does not exist or is not a foreign key to {}",
+                                model.name,
+                                nav.var_name,
+                                nav.model_name,
+                                reference,
+                                model.name
+                            );
+                        }
+                    }
+                    NavigationPropertyKind::OneToMany { reference: _ } => {
+                        unvalidated_navs.push((&model.name, &nav.model_name, nav));
+                    }
+                    NavigationPropertyKind::ManyToMany { unique_id } => {
+                        m2m.entry(unique_id).or_default().push(&model.name);
+                    }
+                }
+            }
+
+            // Validate Data Sources (BFS)
+            for ds in model.data_sources.values() {
+                let mut q = VecDeque::new();
+                q.push_back((&ds.tree, model));
+
+                while let Some((node, parent_model)) = q.pop_front() {
+                    for (var_name, child) in &node.0 {
+                        let Some(model_name) = parent_model
+                            .navigation_properties
+                            .iter()
+                            .find(|nav| nav.var_name == *var_name)
+                            .map(|nav| &nav.model_name)
+                        else {
+                            fail!(
+                                GeneratorErrorKind::UnknownIncludeTreeReference,
+                                "{}.{}",
+                                model.name,
+                                var_name
+                            );
+                        };
+
+                        let Some(child_model) = self.models.get(model_name) else {
+                            fail!(
+                                GeneratorErrorKind::UnknownObject,
+                                "{} => {}?",
+                                model.name,
+                                model_name
+                            );
+                        };
+
+                        q.push_back((child, child_model));
+                    }
+                }
             }
 
             // Validate methods
@@ -316,7 +456,7 @@ impl CloesceAst {
                 match &method.return_type {
                     CidlType::Object(o) => {
                         ensure!(
-                            self.is_valid_object_ref(o),
+                            is_valid_object_ref(o),
                             GeneratorErrorKind::UnknownObject,
                             "{}.{}",
                             model.name,
@@ -366,7 +506,7 @@ impl CloesceAst {
                         }
                         CidlType::Object(o) | CidlType::Partial(o) => {
                             ensure!(
-                                self.is_valid_object_ref(o),
+                                is_valid_object_ref(o),
                                 GeneratorErrorKind::UnknownObject,
                                 "{}.{}.{}",
                                 model.name,
@@ -403,15 +543,118 @@ impl CloesceAst {
             }
         }
 
+        // Validate 1:M nav props
+        for (model_name, nav_model, nav) in unvalidated_navs {
+            let NavigationPropertyKind::OneToMany { reference } = &nav.kind else {
+                continue;
+            };
+
+            // Validate the nav props reference is consistent to an attribute
+            // on another model
+            let Some(&fk_model) = model_reference_to_fk_model.get(&(nav_model, reference)) else {
+                fail!(
+                    GeneratorErrorKind::InvalidNavigationPropertyReference,
+                    "{}.{} references {}.{} which does not exist or is not a foreign key to {}",
+                    model_name,
+                    nav.var_name,
+                    nav_model,
+                    reference,
+                    model_name
+                );
+            };
+
+            // The types should reference one another
+            // ie, Person has many dogs, personId on dog should be an fk to Person
+            ensure!(
+                model_name == fk_model,
+                GeneratorErrorKind::MismatchedNavigationPropertyTypes,
+                "({}.{}) does not match type ({}.{})",
+                model_name,
+                nav.var_name,
+                nav_model,
+                reference,
+            );
+
+            // One To Many: Person has many Dogs (sql)=> Dog has an fk to  Person
+            // Person must come before Dog in topo order
+            graph.entry(model_name).or_default().push(nav_model);
+            *in_degree.entry(nav_model).or_insert(0) += 1;
+        }
+
+        // Validate M:M
+        for (unique_id, jcts) in m2m {
+            if jcts.len() < 2 {
+                fail!(
+                    GeneratorErrorKind::MissingManyToManyReference,
+                    "Missing junction table for many to many table {}",
+                    unique_id
+                );
+            }
+
+            if jcts.len() > 2 {
+                let joined = jcts
+                    .iter()
+                    .map(|s| s.as_str())
+                    .collect::<Vec<_>>()
+                    .join(",");
+                fail!(
+                    GeneratorErrorKind::ExtraneousManyToManyReferences,
+                    "Many To Many Table {unique_id} {joined}",
+                );
+            }
+        }
+
+        // Kahn's algorithm
+        let rank = {
+            let mut queue = in_degree
+                .iter()
+                .filter_map(|(&name, &deg)| (deg == 0).then_some(name))
+                .collect::<VecDeque<_>>();
+
+            let mut rank = HashMap::with_capacity(self.models.len());
+            let mut counter = 0usize;
+
+            while let Some(model_name) = queue.pop_front() {
+                rank.insert(model_name.to_string(), counter);
+                counter += 1;
+
+                if let Some(adjs) = graph.get(model_name) {
+                    for adj in adjs {
+                        let deg = in_degree.get_mut(adj).expect("model names to be validated");
+                        *deg -= 1;
+
+                        if *deg == 0 {
+                            queue.push_back(adj);
+                        }
+                    }
+                }
+            }
+
+            if rank.len() != self.models.len() {
+                let cyclic: Vec<&str> = in_degree
+                    .iter()
+                    .filter_map(|(&n, &d)| (d > 0).then_some(n))
+                    .collect();
+                fail!(
+                    GeneratorErrorKind::CyclicalModelDependency,
+                    "{}",
+                    cyclic.join(", ")
+                );
+            }
+
+            rank
+        };
+
+        // Sort models by SQL insertion order
+        self.models
+            .sort_by_key(|k, _| rank.get(k.as_str()).unwrap());
+
         Ok(())
     }
 
     /// Traverses the AST setting the `hash` field as a merkle hash, meaning a parents hash depends on it's childrens hashes.
-    ///
-    /// TODO: It would be neat if this could be done while deserializing.
-    /// It could also be combined with [Self::validate_types] for less O(n) traversals.
     pub fn set_merkle_hash(&mut self) {
-        if self.hash.is_some() {
+        if self.hash != 0u64 {
             // If the root is hashed, it's safe to assume all children are hashed.
             // No work to be done.
             return;
@@ -433,7 +676,7 @@ impl CloesceAst {
                     h.finish()
                 };
 
-                attr.hash = Some(attr_h);
+                attr.hash = attr_h;
                 model_h.write_u64(attr_h);
             }
 
@@ -443,19 +686,18 @@ impl CloesceAst {
                     h.write(b"ModelDataSource");
                     ds.name.hash(&mut h);
 
-                    let mut q = VecDeque::new();
-                    q.push_back(&ds.tree);
-                    while let Some(n) = q.pop_front() {
-                        for (k, v) in &n.0 {
-                            k.hash(&mut h);
-                            q.push_back(v);
+                    fn dfs(node: &IncludeTree, h: &mut FxHasher) {
+                        for (k, v) in &node.0 {
+                            dfs(v, h);
+                            k.hash(h);
                         }
                     }
 
+                    dfs(&ds.tree, &mut h);
                     h.finish()
                 };
 
-                ds.hash = Some(ds_h);
+                ds.hash = ds_h;
                 model_h.write_u64(ds_h);
             }
 
@@ -469,15 +711,57 @@ impl CloesceAst {
                     h.finish()
                 };
 
-                nav.hash = Some(nav_h);
+                nav.hash = nav_h;
                 model_h.write_u64(nav_h);
             }
 
             let model_h_finished = model_h.finish();
-            model.hash = Some(model_h_finished);
+            model.hash = model_h_finished;
             root_h.write_u64(model_h_finished);
         }
 
-        self.hash = Some(root_h.finish())
+        self.hash = root_h.finish();
+    }
+}
+
+/// A subset of [Model] suited for migrations.
+///
+/// Assumed that the tree is semantically valid.
+#[derive(Serialize, Deserialize)]
+pub struct MigrationsModel {
+    pub hash: u64,
+    pub name: String,
+    pub primary_key: NamedTypedValue,
+    pub attributes: Vec<ModelAttribute>,
+    pub navigation_properties: Vec<NavigationProperty>,
+    pub methods: BTreeMap<String, ModelMethod>,
+    pub data_sources: BTreeMap<String, DataSource>,
+}
+
+/// A subset of [CloesceAst] suited for migrations.
+///
+/// Assumed that the tree is semantically valid.
+#[derive(Serialize, Deserialize)]
+pub struct MigrationsAst {
+    pub hash: u64,
+    pub models: IndexMap<String, MigrationsModel>,
+}
+
+impl MigrationsAst {
+    pub fn from_json(path: &std::path::Path) -> Result<Self> {
+        let contents = std::fs::read_to_string(path).map_err(|e| {
+            GeneratorErrorKind::InvalidInputFile
+                .to_error()
+                .with_context(e.to_string())
+        })?;
+        serde_json::from_str::<Self>(&contents).map_err(|e| {
+            GeneratorErrorKind::InvalidInputFile
+                .to_error()
+                .with_context(e.to_string())
+        })
+    }
+
+    pub fn to_json(&self) -> String {
+        serde_json::to_string_pretty(self).expect("serialize self to work")
     }
 }

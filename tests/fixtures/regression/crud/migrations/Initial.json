@@ -1,13 +1,8 @@
 {
-  "version": "v0.0.3",
-  "project_name": "runner",
-  "language": "TypeScript",
-  "wrangler_env": {
-    "name": "Env",
-    "source_path": "./seed__crud.cloesce.ts"
-  },
+  "hash": 16421409948170331623,
   "models": {
     "CrudHaver": {
+      "hash": 5296265612493794740,
       "name": "CrudHaver",
       "primary_key": {
         "name": "id",
@@ -15,12 +10,12 @@
       },
       "attributes": [
         {
+          "hash": 5774566402684976635,
           "value": {
             "name": "name",
             "cidl_type": "Text"
           },
-          "foreign_key_reference": null,
-          "hash": 5774566402684976635
+          "foreign_key_reference": null
         }
       ],
       "navigation_properties": [],
@@ -106,11 +101,10 @@
           ]
         }
       },
-      "data_sources": {},
-      "source_path": "./seed__crud.cloesce.ts",
-      "hash": 5296265612493794740
+      "data_sources": {}
     },
     "Parent": {
+      "hash": 2227587015254295074,
       "name": "Parent",
       "primary_key": {
         "name": "id",
@@ -118,36 +112,36 @@
       },
       "attributes": [
         {
+          "hash": 14989327449096656069,
           "value": {
             "name": "favoriteChildId",
             "cidl_type": {
               "Nullable": "Integer"
             }
           },
-          "foreign_key_reference": "Child",
-          "hash": 14989327449096656069
+          "foreign_key_reference": "Child"
         }
       ],
       "navigation_properties": [
         {
+          "hash": 10900103892837471402,
           "var_name": "favoriteChild",
           "model_name": "Child",
           "kind": {
             "OneToOne": {
               "reference": "favoriteChildId"
             }
-          },
-          "hash": 10900103892837471402
+          }
         },
         {
+          "hash": 15999549826759912293,
           "var_name": "children",
           "model_name": "Child",
           "kind": {
             "OneToMany": {
               "reference": "parentId"
             }
-          },
-          "hash": 15999549826759912293
+          }
         }
       ],
       "methods": {
@@ -220,18 +214,17 @@
       },
       "data_sources": {
         "withChildren": {
+          "hash": 8308376731714560896,
           "name": "withChildren",
           "tree": {
             "children": {},
             "favoriteChild": {}
-          },
-          "hash": 8308376731714560896
+          }
         }
-      },
-      "source_path": "./seed__crud.cloesce.ts",
-      "hash": 2227587015254295074
+      }
     },
     "Child": {
+      "hash": 9682775697977483777,
       "name": "Child",
       "primary_key": {
         "name": "id",
@@ -239,33 +232,28 @@
       },
       "attributes": [
         {
+          "hash": 9359384940981507483,
           "value": {
             "name": "parentId",
             "cidl_type": "Integer"
           },
-          "foreign_key_reference": "Parent",
-          "hash": 9359384940981507483
+          "foreign_key_reference": "Parent"
         }
       ],
       "navigation_properties": [
         {
+          "hash": 112683149846054066,
           "var_name": "parent",
           "model_name": "Parent",
           "kind": {
             "OneToOne": {
               "reference": "parentId"
             }
-          },
-          "hash": 112683149846054066
+          }
         }
       ],
       "methods": {},
-      "data_sources": {},
-      "source_path": "./seed__crud.cloesce.ts",
-      "hash": 9682775697977483777
+      "data_sources": {}
     }
-  },
-  "poos": {},
-  "app_source": null,
-  "hash": 16421409948170331623
+  }
 }

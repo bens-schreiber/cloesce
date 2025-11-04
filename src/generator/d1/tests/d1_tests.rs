@@ -1,12 +1,12 @@
 use std::collections::HashMap;
 
-use common::{
-    CidlType, NavigationPropertyKind,
+use ast::{
+    CidlType, CloesceAst, MigrationsAst, MigrationsModel, NavigationPropertyKind,
     builder::{IncludeTreeBuilder, ModelBuilder, create_ast},
-    err::GeneratorErrorKind,
 };
 
 use d1::{D1Generator, MigrationsIntent};
+use indexmap::IndexMap;
 use sqlx::SqlitePool;
 
 macro_rules! expected_str {
@@ -35,11 +35,43 @@ async fn exists_in_db(db: &SqlitePool, name: &str) -> bool {
         > 0
 }
 
-pub async fn query(db: &SqlitePool, sql: &str) -> Result<(), sqlx::Error> {
+async fn query(db: &SqlitePool, sql: &str) -> Result<(), sqlx::Error> {
     let tx = db.begin().await?;
     sqlx::query(sql).execute(db).await?;
     tx.commit().await?;
     Ok(())
+}
+
+fn as_migration(ast: CloesceAst) -> MigrationsAst {
+    let CloesceAst { hash, models, .. } = ast;
+
+    // Convert each full Model → MigrationsModel
+    let migrations_models: IndexMap<String, MigrationsModel> = models
+        .into_iter()
+        .map(|(name, model)| {
+            let m = MigrationsModel {
+                hash: model.hash,
+                name: model.name,
+                primary_key: model.primary_key,
+                attributes: model.attributes,
+                navigation_properties: model.navigation_properties,
+                methods: model.methods,
+                data_sources: model.data_sources,
+            };
+            (name, m)
+        })
+        .collect();
+
+    MigrationsAst {
+        hash,
+        models: migrations_models,
+    }
+}
+
+fn empty_migration() -> MigrationsAst {
+    let mut empty_ast = create_ast(vec![]);
+    empty_ast.set_merkle_hash();
+    as_migration(empty_ast)
 }
 
 #[derive(Default)]
@@ -68,25 +100,26 @@ impl MigrationsIntent for MockMigrationsIntent {
 
 #[sqlx::test]
 async fn migrate_models_scalars(db: SqlitePool) {
-    let mut empty_ast = create_ast(vec![]);
-    empty_ast.set_merkle_hash();
+    let empty_ast = empty_migration();
 
     // Create
     let ast = {
         // Arrange
-        let mut ast = create_ast(vec![
-            ModelBuilder::new("User")
-                .id()
-                .attribute("name", CidlType::nullable(CidlType::Text), None)
-                .attribute("age", CidlType::Integer, None)
-                .attribute("address", CidlType::Text, None)
-                .build(),
-        ]);
+        let ast = {
+            let mut ast = create_ast(vec![
+                ModelBuilder::new("User")
+                    .id()
+                    .attribute("name", CidlType::nullable(CidlType::Text), None)
+                    .attribute("age", CidlType::Integer, None)
+                    .attribute("address", CidlType::Text, None)
+                    .build(),
+            ]);
+            ast.set_merkle_hash();
+            as_migration(ast)
+        };
 
         // Act
-        let sql =
-            D1Generator::migrate(&mut ast, Some(&empty_ast), &MockMigrationsIntent::default())
-                .expect("migrate ast to work");
+        let sql = D1Generator::migrate(&ast, Some(&empty_ast), &MockMigrationsIntent::default());
 
         // Assert
         expected_str!(sql, "CREATE TABLE IF NOT EXISTS");
@@ -104,9 +137,7 @@ async fn migrate_models_scalars(db: SqlitePool) {
     // Drop
     {
         // Act
-        let sql =
-            D1Generator::migrate(&mut empty_ast, Some(&ast), &MockMigrationsIntent::default())
-                .expect("migrate ast to work");
+        let sql = D1Generator::migrate(&empty_ast, Some(&ast), &MockMigrationsIntent::default());
 
         // Assert
         expected_str!(sql, "DROP TABLE IF EXISTS \"User\"");
@@ -118,36 +149,36 @@ async fn migrate_models_scalars(db: SqlitePool) {
 
 #[sqlx::test]
 async fn migrate_models_one_to_one(db: SqlitePool) {
-    let mut empty_ast = create_ast(vec![]);
-    empty_ast.set_merkle_hash();
+    let empty_ast = empty_migration();
 
     // Create
     let ast = {
         // Arrange
-        let mut ast = create_ast(vec![
-            ModelBuilder::new("Person")
-                .id()
-                .attribute("dogId", CidlType::Integer, Some("Dog".into()))
-                .nav_p(
-                    "dog",
-                    "Dog",
-                    NavigationPropertyKind::OneToOne {
-                        reference: "dogId".into(),
-                    },
-                )
-                .data_source(
-                    "default",
-                    IncludeTreeBuilder::default().add_node("dog").build(),
-                )
-                .build(),
-            ModelBuilder::new("Dog").id().build(),
-        ]);
-        ast.set_merkle_hash();
+        let ast = {
+            let mut ast = create_ast(vec![
+                ModelBuilder::new("Person")
+                    .id()
+                    .attribute("dogId", CidlType::Integer, Some("Dog".into()))
+                    .nav_p(
+                        "dog",
+                        "Dog",
+                        NavigationPropertyKind::OneToOne {
+                            reference: "dogId".into(),
+                        },
+                    )
+                    .data_source(
+                        "default",
+                        IncludeTreeBuilder::default().add_node("dog").build(),
+                    )
+                    .build(),
+                ModelBuilder::new("Dog").id().build(),
+            ]);
+            ast.set_merkle_hash();
+            as_migration(ast)
+        };
 
         // Act
-        let sql =
-            D1Generator::migrate(&mut ast, Some(&empty_ast), &MockMigrationsIntent::default())
-                .expect("migrate ast to work");
+        let sql = D1Generator::migrate(&ast, Some(&empty_ast), &MockMigrationsIntent::default());
 
         // Assert
         expected_str!(
@@ -175,9 +206,7 @@ async fn migrate_models_one_to_one(db: SqlitePool) {
     // Drop
     {
         // Act
-        let sql =
-            D1Generator::migrate(&mut empty_ast, Some(&ast), &MockMigrationsIntent::default())
-                .expect("migrate ast to work");
+        let sql = D1Generator::migrate(&empty_ast, Some(&ast), &MockMigrationsIntent::default());
 
         // Assert
         query(&db, &sql).await.expect("Drop query to work");
@@ -190,69 +219,69 @@ async fn migrate_models_one_to_one(db: SqlitePool) {
 
 #[sqlx::test]
 async fn migrate_models_one_to_many(db: SqlitePool) {
-    let mut empty_ast = create_ast(vec![]);
-    empty_ast.set_merkle_hash();
+    let empty_ast = empty_migration();
 
     // Create
     let ast = {
         // Arrange
-        let mut ast = create_ast(vec![
-            ModelBuilder::new("Dog")
-                .id()
-                .attribute("personId", CidlType::Integer, Some("Person".into()))
-                .build(),
-            ModelBuilder::new("Cat")
-                .attribute("personId", CidlType::Integer, Some("Person".into()))
-                .id()
-                .build(),
-            ModelBuilder::new("Person")
-                .id()
-                .nav_p(
-                    "dogs",
-                    "Dog",
-                    NavigationPropertyKind::OneToMany {
-                        reference: "personId".into(),
-                    },
-                )
-                .nav_p(
-                    "cats",
-                    "Cat",
-                    NavigationPropertyKind::OneToMany {
-                        reference: "personId".into(),
-                    },
-                )
-                .attribute("bossId", CidlType::Integer, Some("Boss".into()))
-                .data_source(
-                    "default",
-                    IncludeTreeBuilder::default()
-                        .add_node("dogs")
-                        .add_node("cats")
-                        .build(),
-                )
-                .build(),
-            ModelBuilder::new("Boss")
-                .id()
-                .nav_p(
-                    "persons",
-                    "Person",
-                    NavigationPropertyKind::OneToMany {
-                        reference: "bossId".into(),
-                    },
-                )
-                .data_source(
-                    "default",
-                    IncludeTreeBuilder::default()
-                        .add_with_children("persons", |b| b.add_node("dogs").add_node("cats"))
-                        .build(),
-                )
-                .build(),
-        ]);
-        ast.set_merkle_hash();
+        let ast = {
+            let mut ast = create_ast(vec![
+                ModelBuilder::new("Dog")
+                    .id()
+                    .attribute("personId", CidlType::Integer, Some("Person".into()))
+                    .build(),
+                ModelBuilder::new("Cat")
+                    .attribute("personId", CidlType::Integer, Some("Person".into()))
+                    .id()
+                    .build(),
+                ModelBuilder::new("Person")
+                    .id()
+                    .nav_p(
+                        "dogs",
+                        "Dog",
+                        NavigationPropertyKind::OneToMany {
+                            reference: "personId".into(),
+                        },
+                    )
+                    .nav_p(
+                        "cats",
+                        "Cat",
+                        NavigationPropertyKind::OneToMany {
+                            reference: "personId".into(),
+                        },
+                    )
+                    .attribute("bossId", CidlType::Integer, Some("Boss".into()))
+                    .data_source(
+                        "default",
+                        IncludeTreeBuilder::default()
+                            .add_node("dogs")
+                            .add_node("cats")
+                            .build(),
+                    )
+                    .build(),
+                ModelBuilder::new("Boss")
+                    .id()
+                    .nav_p(
+                        "persons",
+                        "Person",
+                        NavigationPropertyKind::OneToMany {
+                            reference: "bossId".into(),
+                        },
+                    )
+                    .data_source(
+                        "default",
+                        IncludeTreeBuilder::default()
+                            .add_with_children("persons", |b| b.add_node("dogs").add_node("cats"))
+                            .build(),
+                    )
+                    .build(),
+            ]);
+            ast.set_merkle_hash();
+            as_migration(ast)
+        };
 
         // Act
-        let sql =
-            D1Generator::migrate(&mut ast, Some(&empty_ast), &MockMigrationsIntent::default())
-                .expect("migrate ast to work");
+        let sql = D1Generator::migrate(&ast, Some(&empty_ast), &MockMigrationsIntent::default());
 
         // Assert
         expected_str!(
@@ -274,11 +303,11 @@ async fn migrate_models_one_to_many(db: SqlitePool) {
 
         expected_str!(
             sql,
-            r#"CREATE VIEW IF NOT EXISTS "Person.default" AS SELECT "Person"."id" AS "Person.id", "Person"."bossId" AS "Person.bossId", "Cat"."id" AS "Person.cats.id", "Cat"."personId" AS "Person.cats.personId", "Dog"."id" AS "Person.dogs.id", "Dog"."personId" AS "Person.dogs.personId" FROM "Person" LEFT JOIN "Cat" ON "Person"."id" = "Cat"."personId" LEFT JOIN "Dog" ON "Person"."id" = "Dog"."personId";"#
+            r#"CREATE VIEW IF NOT EXISTS "Person.default" AS SELECT "Person"."id" AS "Person.id", "Person"."bossId" AS "Person.bossId", "Dog"."id" AS "Person.dogs.id", "Dog"."personId" AS "Person.dogs.personId", "Cat"."id" AS "Person.cats.id", "Cat"."personId" AS "Person.cats.personId" FROM "Person" LEFT JOIN "Dog" ON "Person"."id" = "Dog"."personId" LEFT JOIN "Cat" ON "Person"."id" = "Cat"."personId";"#
         );
         expected_str!(
             sql,
-            r#"CREATE VIEW IF NOT EXISTS "Boss.default" AS SELECT "Boss"."id" AS "Boss.id", "Person"."id" AS "Boss.persons.id", "Person"."bossId" AS "Boss.persons.bossId", "Cat"."id" AS "Boss.persons.cats.id", "Cat"."personId" AS "Boss.persons.cats.personId", "Dog"."id" AS "Boss.persons.dogs.id", "Dog"."personId" AS "Boss.persons.dogs.personId" FROM "Boss" LEFT JOIN "Person" ON "Boss"."id" = "Person"."bossId" LEFT JOIN "Cat" ON "Person"."id" = "Cat"."personId" LEFT JOIN "Dog" ON "Person"."id" = "Dog"."personId";"#
+            r#"CREATE VIEW IF NOT EXISTS "Boss.default" AS SELECT "Boss"."id" AS "Boss.id", "Person"."id" AS "Boss.persons.id", "Person"."bossId" AS "Boss.persons.bossId", "Dog"."id" AS "Boss.persons.dogs.id", "Dog"."personId" AS "Boss.persons.dogs.personId", "Cat"."id" AS "Boss.persons.cats.id", "Cat"."personId" AS "Boss.persons.cats.personId" FROM "Boss" LEFT JOIN "Person" ON "Boss"."id" = "Person"."bossId" LEFT JOIN "Dog" ON "Person"."id" = "Dog"."personId" LEFT JOIN "Cat" ON "Person"."id" = "Cat"."personId";"#
         );
 
         query(&db, &sql).await.expect("Insert query to work");
@@ -305,9 +334,7 @@ async fn migrate_models_one_to_many(db: SqlitePool) {
     // Drop
     {
         // Act
-        let sql =
-            D1Generator::migrate(&mut empty_ast, Some(&ast), &MockMigrationsIntent::default())
-                .expect("migrate ast to work");
+        let sql = D1Generator::migrate(&empty_ast, Some(&ast), &MockMigrationsIntent::default());
 
         query(&db, &sql).await.expect("Drop tables query to work");
         assert!(!exists_in_db(&db, "Boss").await);
@@ -321,48 +348,48 @@ async fn migrate_models_one_to_many(db: SqlitePool) {
 
 #[sqlx::test]
 async fn migrate_models_many_to_many(db: SqlitePool) {
-    let mut empty_ast = create_ast(vec![]);
-    empty_ast.set_merkle_hash();
+    let empty_ast = empty_migration();
 
     // Create
     let ast = {
         // Arrange
-        let mut ast = create_ast(vec![
-            ModelBuilder::new("Student")
-                .id()
-                .nav_p(
-                    "courses",
-                    "Course".to_string(),
-                    NavigationPropertyKind::ManyToMany {
-                        unique_id: "StudentsCourses".into(),
-                    },
-                )
-                .data_source(
-                    "withCourses",
-                    IncludeTreeBuilder::default().add_node("courses").build(),
-                )
-                .build(),
-            ModelBuilder::new("Course")
-                .id()
-                .nav_p(
-                    "students",
-                    "Student".to_string(),
-                    NavigationPropertyKind::ManyToMany {
-                        unique_id: "StudentsCourses".into(),
-                    },
-                )
-                .data_source(
-                    "withStudents",
-                    IncludeTreeBuilder::default().add_node("students").build(),
-                )
-                .build(),
-        ]);
-        ast.set_merkle_hash();
+        let ast = {
+            let mut ast = create_ast(vec![
+                ModelBuilder::new("Student")
+                    .id()
+                    .nav_p(
+                        "courses",
+                        "Course".to_string(),
+                        NavigationPropertyKind::ManyToMany {
+                            unique_id: "StudentsCourses".into(),
+                        },
+                    )
+                    .data_source(
+                        "withCourses",
+                        IncludeTreeBuilder::default().add_node("courses").build(),
+                    )
+                    .build(),
+                ModelBuilder::new("Course")
+                    .id()
+                    .nav_p(
+                        "students",
+                        "Student".to_string(),
+                        NavigationPropertyKind::ManyToMany {
+                            unique_id: "StudentsCourses".into(),
+                        },
+                    )
+                    .data_source(
+                        "withStudents",
+                        IncludeTreeBuilder::default().add_node("students").build(),
+                    )
+                    .build(),
+            ]);
+            ast.set_merkle_hash();
+            as_migration(ast)
+        };
 
         // Act
-        let sql =
-            D1Generator::migrate(&mut ast, Some(&empty_ast), &MockMigrationsIntent::default())
-                .expect("migrate ast to work");
+        let sql = D1Generator::migrate(&ast, Some(&empty_ast), &MockMigrationsIntent::default());
 
         // Assert
         expected_str!(sql, r#"CREATE TABLE IF NOT EXISTS "StudentsCourses""#);
@@ -408,9 +435,7 @@ async fn migrate_models_many_to_many(db: SqlitePool) {
     // Drop
     {
         // Act
-        let sql =
-            D1Generator::migrate(&mut empty_ast, Some(&ast), &MockMigrationsIntent::default())
-                .expect("migrate ast to work");
+        let sql = D1Generator::migrate(&empty_ast, Some(&ast), &MockMigrationsIntent::default());
 
         // Assert
         query(&db, &sql).await.expect("Drop tables query to work");
@@ -421,17 +446,16 @@ async fn migrate_models_many_to_many(db: SqlitePool) {
 #[sqlx::test]
 async fn migrate_with_alterations(db: SqlitePool) {
     let mut base_ast = {
-        let mut ast = create_ast(vec![
+        let ast = as_migration(create_ast(vec![
             ModelBuilder::new("User")
                 .id()
                 .attribute("name", CidlType::nullable(CidlType::Text), None)
                 .attribute("age", CidlType::Integer, None)
                 .attribute("address", CidlType::Text, None)
                 .build(),
-        ]);
+        ]));
 
-        let sql = D1Generator::migrate(&mut ast, None, &MockMigrationsIntent::default())
-            .expect("migrate ast to work");
+        let sql = D1Generator::migrate(&ast, None, &MockMigrationsIntent::default());
         query(&db, &sql)
             .await
             .expect("Create table queries to work");
@@ -442,16 +466,19 @@ async fn migrate_with_alterations(db: SqlitePool) {
     // Changes without Rebuild
     base_ast = {
         // Arrange
-        let mut new = create_ast(vec![
-            ModelBuilder::new("User")
-                .id()
-                .attribute("first_name", CidlType::nullable(CidlType::Text), None) // changed name
-                .attribute("age", CidlType::Text, None) // changed type
-                .attribute("favorite_color", CidlType::Text, None) // added column
-                // dropped column "address"
-                .build(),
-        ]);
-        new.set_merkle_hash();
+        let new = {
+            let mut ast = create_ast(vec![
+                ModelBuilder::new("User")
+                    .id()
+                    .attribute("first_name", CidlType::nullable(CidlType::Text), None) // changed name
+                    .attribute("age", CidlType::Text, None) // changed type
+                    .attribute("favorite_color", CidlType::Text, None) // added column
+                    // dropped column "address"
+                    .build(),
+            ]);
+            ast.set_merkle_hash();
+            as_migration(ast)
+        };
 
         let mut intent = MockMigrationsIntent::default();
         intent.answers.insert(
@@ -463,8 +490,7 @@ async fn migrate_with_alterations(db: SqlitePool) {
             .insert(("User".into(), Some("address".into())), None);
 
         // Act
-        let sql =
-            D1Generator::migrate(&mut new, Some(&base_ast), &intent).expect("migrate ast to work");
+        let sql = D1Generator::migrate(&new, Some(&base_ast), &intent);
 
         // Assert
         expected_str!(
@@ -487,20 +513,22 @@ ALTER TABLE "User" ADD COLUMN "age" text"#
     // Rebuild: Primary Key
     base_ast = {
         // Arrange
-        let mut new = create_ast(vec![
-            ModelBuilder::new("User")
-                .id()
-                .attribute("first_name", CidlType::nullable(CidlType::Text), None)
-                .attribute("age", CidlType::Text, None)
-                .attribute("favorite_color", CidlType::Text, None)
-                .build(),
-        ]);
-        new.models[0].primary_key.cidl_type = CidlType::Text; // new PK type
-        new.set_merkle_hash();
+        let new = {
+            let mut ast = create_ast(vec![
+                ModelBuilder::new("User")
+                    .id()
+                    .attribute("first_name", CidlType::nullable(CidlType::Text), None)
+                    .attribute("age", CidlType::Text, None)
+                    .attribute("favorite_color", CidlType::Text, None)
+                    .build(),
+            ]);
+            ast.models[0].primary_key.cidl_type = CidlType::Text; // new PK type
+            ast.set_merkle_hash();
+            as_migration(ast)
+        };
 
         // Act
-        let sql = D1Generator::migrate(&mut new, Some(&base_ast), &MockMigrationsIntent::default())
-            .expect("migrate ast to work");
+        let sql = D1Generator::migrate(&new, Some(&base_ast), &MockMigrationsIntent::default());
 
         // Assert
         expected_str!(sql, r#"ALTER TABLE "User" RENAME TO "User_"#);
@@ -523,22 +551,24 @@ ALTER TABLE "User" ADD COLUMN "age" text"#
     // Rebuild: Foreign Key
     {
         // Arrange
-        let mut new = create_ast(vec![
-            ModelBuilder::new("Dog").id().build(), // added Dog
-            ModelBuilder::new("User")
-                .id()
-                .attribute("first_name", CidlType::nullable(CidlType::Text), None)
-                .attribute("age", CidlType::Text, None)
-                .attribute("favorite_color", CidlType::Text, None)
-                .attribute("dog_id", CidlType::Integer, Some("Dog".into())) // added Dog FK
-                .build(),
-        ]);
-        new.models[1].primary_key.cidl_type = CidlType::Text;
-        new.set_merkle_hash();
+        let new = {
+            let mut ast = create_ast(vec![
+                ModelBuilder::new("Dog").id().build(), // added Dog
+                ModelBuilder::new("User")
+                    .id()
+                    .attribute("first_name", CidlType::nullable(CidlType::Text), None)
+                    .attribute("age", CidlType::Text, None)
+                    .attribute("favorite_color", CidlType::Text, None)
+                    .attribute("dog_id", CidlType::Integer, Some("Dog".into())) // added Dog FK
+                    .build(),
+            ]);
+            ast.models[1].primary_key.cidl_type = CidlType::Text;
+            ast.set_merkle_hash();
+            as_migration(ast)
+        };
 
         // Act
-        let sql = D1Generator::migrate(&mut new, Some(&base_ast), &MockMigrationsIntent::default())
-            .expect("migrate ast to work");
+        let sql = D1Generator::migrate(&new, Some(&base_ast), &MockMigrationsIntent::default());
 
         // Assert
         expected_str!(sql, r#"ALTER TABLE "User" RENAME TO "User_"#);
@@ -593,8 +623,7 @@ async fn views_auto_alias(db: SqlitePool) {
     ast.set_merkle_hash();
 
     // Act
-    let sql = D1Generator::migrate(&mut ast, None, &MockMigrationsIntent::default())
-        .expect("migrate ast to work");
+    let sql = D1Generator::migrate(&as_migration(ast), None, &MockMigrationsIntent::default());
 
     // Assert
     expected_str!(
@@ -607,222 +636,4 @@ async fn views_auto_alias(db: SqlitePool) {
         .execute(&db)
         .await
         .expect("Select query to work");
-}
-
-#[test]
-fn test_cycle_detection_error() {
-    // Arrange
-    // A -> B -> C -> A
-    let mut ast = create_ast(vec![
-        ModelBuilder::new("A")
-            .id()
-            .attribute("bId", CidlType::Integer, Some("B".to_string()))
-            .build(),
-        ModelBuilder::new("B")
-            .id()
-            .attribute("cId", CidlType::Integer, Some("C".to_string()))
-            .build(),
-        ModelBuilder::new("C")
-            .id()
-            .attribute("aId", CidlType::Integer, Some("A".to_string()))
-            .build(),
-    ]);
-    ast.set_merkle_hash();
-
-    // Act
-
-    let err = D1Generator::migrate(&mut ast, None, &MockMigrationsIntent::default()).unwrap_err();
-
-    // Assert
-    assert!(matches!(
-        err.kind,
-        GeneratorErrorKind::CyclicalModelDependency
-    ));
-    expected_str!(err.context, "A, B, C");
-}
-
-#[test]
-fn test_nullability_prevents_cycle_error() {
-    // Arrange
-    // A -> B -> C -> Nullable<A>
-    let mut ast = create_ast(vec![
-        ModelBuilder::new("A")
-            .id()
-            .attribute("bId", CidlType::Integer, Some("B".to_string()))
-            .build(),
-        ModelBuilder::new("B")
-            .id()
-            .attribute("cId", CidlType::Integer, Some("C".to_string()))
-            .build(),
-        ModelBuilder::new("C")
-            .id()
-            .attribute(
-                "aId",
-                CidlType::nullable(CidlType::Integer),
-                Some("A".to_string()),
-            )
-            .build(),
-    ]);
-
-    // Act
-
-    // Assert
-    D1Generator::migrate(&mut ast, None, &MockMigrationsIntent::default())
-        .expect("migrate ast to work");
-}
-
-#[test]
-fn test_one_to_one_nav_property_unknown_attribute_reference_error() {
-    // Arrange
-    let mut ast = create_ast(vec![
-        ModelBuilder::new("Dog").id().build(),
-        ModelBuilder::new("Person")
-            .id()
-            .nav_p(
-                "dog",
-                "Dog",
-                NavigationPropertyKind::OneToOne {
-                    reference: "dogId".to_string(),
-                },
-            )
-            .build(),
-    ]);
-
-    // Act
-    let err = D1Generator::migrate(&mut ast, None, &MockMigrationsIntent::default()).unwrap_err();
-
-    // Assert
-    assert!(matches!(
-        err.kind,
-        GeneratorErrorKind::InvalidNavigationPropertyReference
-    ));
-}
-
-#[test]
-fn test_one_to_one_mismatched_fk_and_nav_type_error() {
-    // Arrange: attribute dogId references Dog, but nav prop type is Cat -> mismatch
-    let mut ast = create_ast(vec![
-        ModelBuilder::new("Dog").id().build(),
-        ModelBuilder::new("Cat").id().build(),
-        ModelBuilder::new("Person")
-            .id()
-            .attribute("dogId", CidlType::Integer, Some("Dog".into()))
-            .nav_p(
-                "dog",
-                "Cat", // incorrect: says Cat but fk points to Dog
-                NavigationPropertyKind::OneToOne {
-                    reference: "dogId".to_string(),
-                },
-            )
-            .build(),
-    ]);
-
-    // Act
-    let err = D1Generator::migrate(&mut ast, None, &MockMigrationsIntent::default()).unwrap_err();
-
-    // Assert
-    assert!(matches!(
-        err.kind,
-        GeneratorErrorKind::MismatchedNavigationPropertyTypes
-    ));
-}
-
-#[test]
-fn test_one_to_many_unresolved_reference_error() {
-    // Arrange:
-    // Person declares OneToMany to Dog referencing Dog.personId, but Dog has no personId FK attr.
-    let mut ast = create_ast(vec![
-        ModelBuilder::new("Dog").id().build(), // no personId attribute
-        ModelBuilder::new("Person")
-            .id()
-            .nav_p(
-                "dogs",
-                "Dog",
-                NavigationPropertyKind::OneToMany {
-                    reference: "personId".into(),
-                },
-            )
-            .build(),
-    ]);
-
-    // Act
-    let err = D1Generator::migrate(&mut ast, None, &MockMigrationsIntent::default()).unwrap_err();
-
-    // Assert
-    expected_str!(
-        err.context,
-        "Person.dogs references Dog.personId which does not exist or is not a foreign key to Person"
-    );
-}
-
-#[test]
-fn test_junction_table_builder_errors() {
-    // Missing second nav property case: only one side of many-to-many
-    {
-        let mut ast = create_ast(vec![
-            ModelBuilder::new("Student")
-                .id()
-                .nav_p(
-                    "courses",
-                    "Course",
-                    NavigationPropertyKind::ManyToMany {
-                        unique_id: "OnlyOne".into(),
-                    },
-                )
-                .build(),
-            // Course exists, but doesn't declare the reciprocal nav property
-            ModelBuilder::new("Course").id().build(),
-        ]);
-
-        let err =
-            D1Generator::migrate(&mut ast, None, &MockMigrationsIntent::default()).unwrap_err();
-        assert!(matches!(
-            err.kind,
-            GeneratorErrorKind::MissingManyToManyReference
-        ));
-    }
-
-    // Too many models case: three models register the same junction id
-    {
-        let mut ast = create_ast(vec![
-            ModelBuilder::new("A")
-                .id()
-                .nav_p(
-                    "bs",
-                    "B",
-                    NavigationPropertyKind::ManyToMany {
-                        unique_id: "TriJ".into(),
-                    },
-                )
-                .build(),
-            ModelBuilder::new("B")
-                .id()
-                .nav_p(
-                    "as",
-                    "A",
-                    NavigationPropertyKind::ManyToMany {
-                        unique_id: "TriJ".into(),
-                    },
-                )
-                .build(),
-            // Third model C tries to use the same junction id -> should error
-            ModelBuilder::new("C")
-                .id()
-                .nav_p(
-                    "as",
-                    "A",
-                    NavigationPropertyKind::ManyToMany {
-                        unique_id: "TriJ".into(),
-                    },
-                )
-                .build(),
-        ]);
-
-        let err =
-            D1Generator::migrate(&mut ast, None, &MockMigrationsIntent::default()).unwrap_err();
-        assert!(matches!(
-            err.kind,
-            GeneratorErrorKind::ExtraneousManyToManyReferences
-        ));
-    }
 }

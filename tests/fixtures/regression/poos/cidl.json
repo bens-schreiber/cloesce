@@ -1,4 +1,5 @@
 {
+  "hash": 18302944908339792316,
   "version": "v0.0.3",
   "project_name": "runner",
   "language": "TypeScript",
@@ -8,6 +9,7 @@
   },
   "models": {
     "PooAcceptYield": {
+      "hash": 13918985504312867645,
       "name": "PooAcceptYield",
       "primary_key": {
         "name": "id",
@@ -66,8 +68,7 @@
         }
       },
       "data_sources": {},
-      "source_path": "./seed__poo.cloesce.ts",
-      "hash": 13918985504312867645
+      "source_path": "./seed__poo.cloesce.ts"
     }
   },
   "poos": {
@@ -114,6 +115,5 @@
       "source_path": "./seed__poo.cloesce.ts"
     }
   },
-  "app_source": null,
-  "hash": 18302944908339792316
+  "app_source": null
 }

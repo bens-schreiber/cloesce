@@ -83,6 +83,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "ast"
+version = "0.0.1"
+dependencies = [
+ "hex",
+ "indexmap 2.12.0",
+ "rustc-hash",
+ "serde",
+ "serde_json",
+ "serde_with",
+ "toml",
+]
+
+[[package]]
 name = "atoi"
 version = "2.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -232,9 +245,9 @@ checksum = "b94f61472cee1439c0b966b47e3aca9ae07e45d070759512cd390ea2bebc6675"
 name = "cli"
 version = "0.0.1"
 dependencies = [
+ "ast",
  "clap",
  "client",
- "common",
  "d1",
  "workers",
  "wrangler",
@@ -244,7 +257,7 @@ dependencies = [
 name = "client"
 version = "0.0.1"
 dependencies = [
- "common",
+ "ast",
  "handlebars",
  "serde_json",
 ]
@@ -254,19 +267,6 @@ name = "colorchoice"
 version = "1.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b05b61dc5112cbb17e4b6cd61790d9845d13888356391624cbe7e41efeac1e75"
-
-[[package]]
-name = "common"
-version = "0.0.1"
-dependencies = [
- "hex",
- "indexmap 2.12.0",
- "rustc-hash",
- "serde",
- "serde_json",
- "serde_with",
- "toml",
-]
 
 [[package]]
 name = "concurrent-queue"
@@ -342,7 +342,7 @@ dependencies = [
 name = "d1"
 version = "0.0.1"
 dependencies = [
- "common",
+ "ast",
  "indexmap 2.12.0",
  "sea-query",
  "sqlx",
@@ -2536,7 +2536,7 @@ checksum = "21a0236b59786fed61e2a80582dd500fe61f18b5dca67a4a067d0bc9039339cf"
 name = "workers"
 version = "0.0.1"
 dependencies = [
- "common",
+ "ast",
  "indexmap 2.12.0",
  "pathdiff",
  "wrangler",
@@ -2546,7 +2546,6 @@ dependencies = [
 name = "wrangler"
 version = "0.0.1"
 dependencies = [
- "common",
  "serde",
  "serde_json",
  "toml",

@@ -1,4 +1,5 @@
 {
+  "hash": 13896337731609429158,
   "version": "v0.0.3",
   "project_name": "runner",
   "language": "TypeScript",
@@ -8,6 +9,7 @@
   },
   "models": {
     "Model": {
+      "hash": 598144920838359046,
       "name": "Model",
       "primary_key": {
         "name": "id",
@@ -65,8 +67,7 @@
         }
       },
       "data_sources": {},
-      "source_path": "./seed__app.cloesce.ts",
-      "hash": 598144920838359046
+      "source_path": "./seed__app.cloesce.ts"
     }
   },
   "poos": {
@@ -81,6 +82,5 @@
       "source_path": "./seed__app.cloesce.ts"
     }
   },
-  "app_source": "./seed__app.cloesce.ts",
-  "hash": 13896337731609429158
+  "app_source": "./seed__app.cloesce.ts"
 }

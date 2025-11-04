@@ -1,4 +1,5 @@
 {
+  "hash": 11505330283879565005,
   "version": "v0.0.3",
   "project_name": "runner",
   "language": "TypeScript",
@@ -8,6 +9,7 @@
   },
   "models": {
     "B": {
+      "hash": 6294104789386767043,
       "name": "B",
       "primary_key": {
         "name": "id",
@@ -17,10 +19,10 @@
       "navigation_properties": [],
       "methods": {},
       "data_sources": {},
-      "source_path": "./seed__foreign_keys.cloesce.ts",
-      "hash": 6294104789386767043
+      "source_path": "./seed__foreign_keys.cloesce.ts"
     },
     "Course": {
+      "hash": 5418376037924256986,
       "name": "Course",
       "primary_key": {
         "name": "id",
@@ -29,22 +31,22 @@
       "attributes": [],
       "navigation_properties": [
         {
+          "hash": 7522322899197762685,
           "var_name": "students",
           "model_name": "Student",
           "kind": {
             "ManyToMany": {
               "unique_id": "StudentsCourses"
             }
-          },
-          "hash": 7522322899197762685
+          }
         }
       ],
       "methods": {},
       "data_sources": {},
-      "source_path": "./seed__foreign_keys.cloesce.ts",
-      "hash": 5418376037924256986
+      "source_path": "./seed__foreign_keys.cloesce.ts"
     },
     "Person": {
+      "hash": 9738043568918276035,
       "name": "Person",
       "primary_key": {
         "name": "id",
@@ -53,14 +55,14 @@
       "attributes": [],
       "navigation_properties": [
         {
+          "hash": 14619809136778017828,
           "var_name": "dogs",
           "model_name": "Dog",
           "kind": {
             "OneToMany": {
               "reference": "personId"
             }
-          },
-          "hash": 14619809136778017828
+          }
         }
       ],
       "methods": {
@@ -105,17 +107,17 @@
       },
       "data_sources": {
         "withDogs": {
+          "hash": 11013912170547516633,
           "name": "withDogs",
           "tree": {
             "dogs": {}
-          },
-          "hash": 11013912170547516633
+          }
         }
       },
-      "source_path": "./seed__foreign_keys.cloesce.ts",
-      "hash": 9738043568918276035
+      "source_path": "./seed__foreign_keys.cloesce.ts"
     },
     "Student": {
+      "hash": 16702929639147618453,
       "name": "Student",
       "primary_key": {
         "name": "id",
@@ -124,14 +126,14 @@
       "attributes": [],
       "navigation_properties": [
         {
+          "hash": 16503297458927537581,
           "var_name": "courses",
           "model_name": "Course",
           "kind": {
             "ManyToMany": {
               "unique_id": "StudentsCourses"
             }
-          },
-          "hash": 16503297458927537581
+          }
         }
       ],
       "methods": {
@@ -176,15 +178,16 @@
       },
       "data_sources": {
         "withCoursesStudents": {
+          "hash": 15362216910619578223,
           "name": "withCoursesStudents",
           "tree": {
             "courses": {
               "students": {}
             }
-          },
-          "hash": 13237789887771525932
+          }
         },
         "withCoursesStudentsCourses": {
+          "hash": 16584024046484066689,
           "name": "withCoursesStudentsCourses",
           "tree": {
             "courses": {
@@ -192,14 +195,13 @@
                 "courses": {}
               }
             }
-          },
-          "hash": 16584024046484066689
+          }
         }
       },
-      "source_path": "./seed__foreign_keys.cloesce.ts",
-      "hash": 10202770578895942492
+      "source_path": "./seed__foreign_keys.cloesce.ts"
     },
     "A": {
+      "hash": 12099806380270748571,
       "name": "A",
       "primary_key": {
         "name": "id",
@@ -207,24 +209,24 @@
       },
       "attributes": [
         {
+          "hash": 17839369392057298877,
           "value": {
             "name": "bId",
             "cidl_type": "Integer"
           },
-          "foreign_key_reference": "B",
-          "hash": 17839369392057298877
+          "foreign_key_reference": "B"
         }
       ],
       "navigation_properties": [
         {
+          "hash": 13359034780033624503,
           "var_name": "b",
           "model_name": "B",
           "kind": {
             "OneToOne": {
               "reference": "bId"
             }
-          },
-          "hash": 13359034780033624503
+          }
         }
       ],
       "methods": {
@@ -269,22 +271,22 @@
       },
       "data_sources": {
         "withB": {
+          "hash": 451073249129749226,
           "name": "withB",
           "tree": {
             "b": {}
-          },
-          "hash": 451073249129749226
+          }
         },
         "withoutB": {
+          "hash": 15416663048272091191,
           "name": "withoutB",
-          "tree": {},
-          "hash": 15416663048272091191
+          "tree": {}
         }
       },
-      "source_path": "./seed__foreign_keys.cloesce.ts",
-      "hash": 12099806380270748571
+      "source_path": "./seed__foreign_keys.cloesce.ts"
     },
     "Dog": {
+      "hash": 9257794273236604936,
       "name": "Dog",
       "primary_key": {
         "name": "id",
@@ -292,22 +294,20 @@
       },
       "attributes": [
         {
+          "hash": 6417117313588463867,
           "value": {
             "name": "personId",
             "cidl_type": "Integer"
           },
-          "foreign_key_reference": "Person",
-          "hash": 6417117313588463867
+          "foreign_key_reference": "Person"
         }
       ],
       "navigation_properties": [],
       "methods": {},
       "data_sources": {},
-      "source_path": "./seed__foreign_keys.cloesce.ts",
-      "hash": 9257794273236604936
+      "source_path": "./seed__foreign_keys.cloesce.ts"
     }
   },
   "poos": {},
-  "app_source": null,
-  "hash": 685330380817275118
+  "app_source": null
 }

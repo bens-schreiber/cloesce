@@ -1,13 +1,8 @@
 {
-  "version": "v0.0.3",
-  "project_name": "runner",
-  "language": "TypeScript",
-  "wrangler_env": {
-    "name": "Env",
-    "source_path": "./seed__ds.cloesce.ts"
-  },
+  "hash": 6349253276655467602,
   "models": {
     "Foo": {
+      "hash": 5030820420179718148,
       "name": "Foo",
       "primary_key": {
         "name": "id",
@@ -45,15 +40,14 @@
       },
       "data_sources": {
         "baz": {
+          "hash": 4655990743320231733,
           "name": "baz",
-          "tree": {},
-          "hash": 4655990743320231733
+          "tree": {}
         }
-      },
-      "source_path": "./seed__ds.cloesce.ts",
-      "hash": 5030820420179718148
+      }
     },
     "NoDs": {
+      "hash": 13267258502866568209,
       "name": "NoDs",
       "primary_key": {
         "name": "id",
@@ -62,11 +56,10 @@
       "attributes": [],
       "navigation_properties": [],
       "methods": {},
-      "data_sources": {},
-      "source_path": "./seed__ds.cloesce.ts",
-      "hash": 13267258502866568209
+      "data_sources": {}
     },
     "OneDs": {
+      "hash": 12534124635817757359,
       "name": "OneDs",
       "primary_key": {
         "name": "id",
@@ -77,29 +70,11 @@
       "methods": {},
       "data_sources": {
         "default": {
+          "hash": 11774770494344376574,
           "name": "default",
-          "tree": {},
-          "hash": 11774770494344376574
+          "tree": {}
         }
-      },
-      "source_path": "./seed__ds.cloesce.ts",
-      "hash": 12534124635817757359
+      }
     }
-  },
-  "poos": {
-    "Poo": {
-      "name": "Poo",
-      "attributes": [
-        {
-          "name": "ds",
-          "cidl_type": {
-            "DataSource": "Foo"
-          }
-        }
-      ],
-      "source_path": "./seed__ds.cloesce.ts"
-    }
-  },
-  "app_source": null,
-  "hash": 10526699382971220501
+  }
 }

@@ -5,7 +5,7 @@ CREATE TABLE IF NOT EXISTS "Person" ( "id" integer PRIMARY KEY );
 CREATE TABLE IF NOT EXISTS "Student" ( "id" integer PRIMARY KEY );
 CREATE TABLE IF NOT EXISTS "A" ( "id" integer PRIMARY KEY, "bId" integer NOT NULL, FOREIGN KEY ("bId") REFERENCES "B" ("id") ON DELETE RESTRICT ON UPDATE CASCADE );
 CREATE TABLE IF NOT EXISTS "Dog" ( "id" integer PRIMARY KEY, "personId" integer NOT NULL, FOREIGN KEY ("personId") REFERENCES "Person" ("id") ON DELETE RESTRICT ON UPDATE CASCADE );
-CREATE TABLE IF NOT EXISTS "StudentsCourses" ( "Course.id" integer NOT NULL, "Student.id" integer NOT NULL, PRIMARY KEY ("Course.id", "Student.id"), FOREIGN KEY ("Course.id") REFERENCES "Course" ("id") ON DELETE RESTRICT ON UPDATE CASCADE, FOREIGN KEY ("Student.id") REFERENCES "Student" ("id") ON DELETE RESTRICT ON UPDATE CASCADE );
+CREATE TABLE IF NOT EXISTS "StudentsCourses" ( "Student.id" integer NOT NULL, "Course.id" integer NOT NULL, PRIMARY KEY ("Student.id", "Course.id"), FOREIGN KEY ("Student.id") REFERENCES "Student" ("id") ON DELETE RESTRICT ON UPDATE CASCADE, FOREIGN KEY ("Course.id") REFERENCES "Course" ("id") ON DELETE RESTRICT ON UPDATE CASCADE );
 
 --- New Data Sources
 CREATE VIEW IF NOT EXISTS "Person.withDogs" AS SELECT "Person"."id" AS "Person.id", "Dog"."id" AS "Person.dogs.id", "Dog"."personId" AS "Person.dogs.personId" FROM "Person" LEFT JOIN "Dog" ON "Person"."id" = "Dog"."personId";

@@ -1,4 +1,5 @@
 {
+  "hash": 4846770590421999872,
   "version": "v0.0.3",
   "project_name": "runner",
   "language": "TypeScript",
@@ -8,6 +9,7 @@
   },
   "models": {
     "NullabilityChecks": {
+      "hash": 12779594012490832041,
       "name": "NullabilityChecks",
       "primary_key": {
         "name": "id",
@@ -15,22 +17,22 @@
       },
       "attributes": [
         {
+          "hash": 5387430967312361113,
           "value": {
             "name": "notNullableString",
             "cidl_type": "Text"
           },
-          "foreign_key_reference": null,
-          "hash": 5387430967312361113
+          "foreign_key_reference": null
         },
         {
+          "hash": 7880481338775788177,
           "value": {
             "name": "nullableString",
             "cidl_type": {
               "Nullable": "Text"
             }
           },
-          "foreign_key_reference": null,
-          "hash": 7880481338775788177
+          "foreign_key_reference": null
         }
       ],
       "navigation_properties": [],
@@ -181,11 +183,9 @@
         }
       },
       "data_sources": {},
-      "source_path": "./seed__nullability.cloesce.ts",
-      "hash": 12779594012490832041
+      "source_path": "./seed__nullability.cloesce.ts"
     }
   },
   "poos": {},
-  "app_source": null,
-  "hash": 4846770590421999872
+  "app_source": null
 }

@@ -1,13 +1,8 @@
 {
-  "version": "v0.0.3",
-  "project_name": "runner",
-  "language": "TypeScript",
-  "wrangler_env": {
-    "name": "Env",
-    "source_path": "./seed__app.cloesce.ts"
-  },
+  "hash": 13896337731609429158,
   "models": {
     "Model": {
+      "hash": 598144920838359046,
       "name": "Model",
       "primary_key": {
         "name": "id",
@@ -64,23 +59,7 @@
           ]
         }
       },
-      "data_sources": {},
-      "source_path": "./seed__app.cloesce.ts",
-      "hash": 598144920838359046
+      "data_sources": {}
     }
-  },
-  "poos": {
-    "InjectedThing": {
-      "name": "InjectedThing",
-      "attributes": [
-        {
-          "name": "value",
-          "cidl_type": "Text"
-        }
-      ],
-      "source_path": "./seed__app.cloesce.ts"
-    }
-  },
-  "app_source": "./seed__app.cloesce.ts",
-  "hash": 13896337731609429158
+  }
 }

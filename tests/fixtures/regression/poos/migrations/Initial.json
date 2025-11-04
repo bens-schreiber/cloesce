@@ -1,13 +1,8 @@
 {
-  "version": "v0.0.3",
-  "project_name": "runner",
-  "language": "TypeScript",
-  "wrangler_env": {
-    "name": "Env",
-    "source_path": "./seed__poo.cloesce.ts"
-  },
+  "hash": 18302944908339792316,
   "models": {
     "PooAcceptYield": {
+      "hash": 13918985504312867645,
       "name": "PooAcceptYield",
       "primary_key": {
         "name": "id",
@@ -65,55 +60,7 @@
           ]
         }
       },
-      "data_sources": {},
-      "source_path": "./seed__poo.cloesce.ts",
-      "hash": 13918985504312867645
+      "data_sources": {}
     }
-  },
-  "poos": {
-    "PooA": {
-      "name": "PooA",
-      "attributes": [
-        {
-          "name": "name",
-          "cidl_type": "Text"
-        },
-        {
-          "name": "major",
-          "cidl_type": "Text"
-        }
-      ],
-      "source_path": "./seed__poo.cloesce.ts"
-    },
-    "PooB": {
-      "name": "PooB",
-      "attributes": [
-        {
-          "name": "color",
-          "cidl_type": "Text"
-        }
-      ],
-      "source_path": "./seed__poo.cloesce.ts"
-    },
-    "PooC": {
-      "name": "PooC",
-      "attributes": [
-        {
-          "name": "a",
-          "cidl_type": {
-            "Object": "PooA"
-          }
-        },
-        {
-          "name": "b",
-          "cidl_type": {
-            "Object": "PooB"
-          }
-        }
-      ],
-      "source_path": "./seed__poo.cloesce.ts"
-    }
-  },
-  "app_source": null,
-  "hash": 18302944908339792316
+  }
 }

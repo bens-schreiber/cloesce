@@ -1,13 +1,8 @@
 {
-  "version": "v0.0.3",
-  "project_name": "runner",
-  "language": "TypeScript",
-  "wrangler_env": {
-    "name": "Env",
-    "source_path": "./seed__partial.cloesce.ts"
-  },
+  "hash": 6266598453096649310,
   "models": {
     "Dog": {
+      "hash": 13091719692277049822,
       "name": "Dog",
       "primary_key": {
         "name": "id",
@@ -15,20 +10,20 @@
       },
       "attributes": [
         {
+          "hash": 5774566402684976635,
           "value": {
             "name": "name",
             "cidl_type": "Text"
           },
-          "foreign_key_reference": null,
-          "hash": 5774566402684976635
+          "foreign_key_reference": null
         },
         {
+          "hash": 3365517128407119927,
           "value": {
             "name": "age",
             "cidl_type": "Integer"
           },
-          "foreign_key_reference": null,
-          "hash": 3365517128407119927
+          "foreign_key_reference": null
         }
       ],
       "navigation_properties": [],
@@ -56,12 +51,7 @@
           ]
         }
       },
-      "data_sources": {},
-      "source_path": "./seed__partial.cloesce.ts",
-      "hash": 13091719692277049822
+      "data_sources": {}
     }
-  },
-  "poos": {},
-  "app_source": null,
-  "hash": 6266598453096649310
+  }
 }

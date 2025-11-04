@@ -3,7 +3,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use common::{
+use ast::{
     CloesceAst, Model, PlainOldObject,
     err::{GeneratorErrorKind, Result},
     fail,

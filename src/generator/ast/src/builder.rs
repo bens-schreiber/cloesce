@@ -23,7 +23,7 @@ pub fn create_ast(mut models: Vec<Model>) -> CloesceAst {
             source_path: "source.ts".into(),
         },
         app_source: None,
-        hash: None,
+        hash: 0,
     }
 }
 
@@ -87,7 +87,7 @@ impl ModelBuilder {
                 cidl_type,
             },
             foreign_key_reference: foreign_key,
-            hash: None,
+            hash: 0,
         });
         self
     }
@@ -102,7 +102,7 @@ impl ModelBuilder {
             var_name: var_name.into(),
             model_name: model_name.into(),
             kind: foreign_key,
-            hash: None,
+            hash: 0,
         });
         self
     }
@@ -146,7 +146,7 @@ impl ModelBuilder {
             DataSource {
                 name: name.into(),
                 tree,
-                hash: None,
+                hash: 0,
             },
         );
         self
@@ -161,7 +161,7 @@ impl ModelBuilder {
             data_sources: self.data_sources,
             source_path: PathBuf::default(),
             primary_key: self.primary_key.unwrap(),
-            hash: None,
+            hash: 0,
         }
     }
 }

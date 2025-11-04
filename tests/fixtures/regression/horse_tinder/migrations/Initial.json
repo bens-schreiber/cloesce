@@ -1,13 +1,8 @@
 {
-  "version": "v0.0.3",
-  "project_name": "runner",
-  "language": "TypeScript",
-  "wrangler_env": {
-    "name": "Env",
-    "source_path": "./seed__horse_tinder.cloesce.ts"
-  },
+  "hash": 13343537148286750095,
   "models": {
     "Horse": {
+      "hash": 2176589803233511034,
       "name": "Horse",
       "primary_key": {
         "name": "id",
@@ -15,34 +10,34 @@
       },
       "attributes": [
         {
+          "hash": 5774566402684976635,
           "value": {
             "name": "name",
             "cidl_type": "Text"
           },
-          "foreign_key_reference": null,
-          "hash": 5774566402684976635
+          "foreign_key_reference": null
         },
         {
+          "hash": 6906485333841346234,
           "value": {
             "name": "bio",
             "cidl_type": {
               "Nullable": "Text"
             }
           },
-          "foreign_key_reference": null,
-          "hash": 6906485333841346234
+          "foreign_key_reference": null
         }
       ],
       "navigation_properties": [
         {
+          "hash": 8622586494915120333,
           "var_name": "likes",
           "model_name": "Like",
           "kind": {
             "OneToMany": {
               "reference": "horseId1"
             }
-          },
-          "hash": 8622586494915120333
+          }
         }
       ],
       "methods": {
@@ -135,26 +130,25 @@
       },
       "data_sources": {
         "default": {
+          "hash": 9804131625780589811,
           "name": "default",
           "tree": {
             "likes": {
               "horse2": {}
             }
-          },
-          "hash": 11490949954172675919
+          }
         },
         "withLikes": {
+          "hash": 3746572724182981912,
           "name": "withLikes",
           "tree": {
             "likes": {}
-          },
-          "hash": 3746572724182981912
+          }
         }
-      },
-      "source_path": "./seed__horse_tinder.cloesce.ts",
-      "hash": 12924905885738200125
+      }
     },
     "Like": {
+      "hash": 14509074532401779292,
       "name": "Like",
       "primary_key": {
         "name": "id",
@@ -162,41 +156,36 @@
       },
       "attributes": [
         {
+          "hash": 4854163086161148575,
           "value": {
             "name": "horseId1",
             "cidl_type": "Integer"
           },
-          "foreign_key_reference": "Horse",
-          "hash": 4854163086161148575
+          "foreign_key_reference": "Horse"
         },
         {
+          "hash": 6539715335795530220,
           "value": {
             "name": "horseId2",
             "cidl_type": "Integer"
           },
-          "foreign_key_reference": "Horse",
-          "hash": 6539715335795530220
+          "foreign_key_reference": "Horse"
         }
       ],
       "navigation_properties": [
         {
+          "hash": 16105777593012263721,
           "var_name": "horse2",
           "model_name": "Horse",
           "kind": {
             "OneToOne": {
               "reference": "horseId2"
             }
-          },
-          "hash": 16105777593012263721
+          }
         }
       ],
       "methods": {},
-      "data_sources": {},
-      "source_path": "./seed__horse_tinder.cloesce.ts",
-      "hash": 14509074532401779292
+      "data_sources": {}
     }
-  },
-  "poos": {},
-  "app_source": null,
-  "hash": 14007583425644294143
+  }
 }
