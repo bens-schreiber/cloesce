@@ -150,7 +150,7 @@ impl Fixture {
                 .arg("run")
                 .arg("validate")
                 .arg(&pre_cidl_path)
-                .arg(&out.path())
+                .arg(out.path())
                 .current_dir("../../src/generator"),
         );
 
@@ -237,8 +237,8 @@ impl Fixture {
                 .arg("run")
                 .arg("migrate")
                 .arg(&cidl_path)
-                .arg(&migrated_cidl.path())
-                .arg(&migrated_sql.path())
+                .arg(migrated_cidl.path())
+                .arg(migrated_sql.path())
                 .current_dir("../../src/generator"),
         );
 

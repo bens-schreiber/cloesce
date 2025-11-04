@@ -261,7 +261,7 @@ fn validate_cidl(pre_cidl_path: &Path, cidl_path: &Path) -> Result<CloesceAst> {
 
     let mut cidl_file = create_file_and_dir(cidl_path)?;
     cidl_file
-        .write(ast.to_json().as_bytes())
+        .write_all(ast.to_json().as_bytes())
         .expect("file to be written");
 
     Ok(ast)

@@ -590,12 +590,12 @@ impl MigrateViews {
         if !drop_stmts.is_empty() {
             res.push_str("--- Dropped and Refactored Data Sources\n");
             res.push_str(&drop_stmts.join("\n"));
-            res.push_str("\n");
+            res.push('\n');
         }
         if !create_stmts.is_empty() {
             res.push_str("--- New Data Sources\n");
             res.push_str(&create_stmts.join("\n"));
-            res.push_str("\n");
+            res.push('\n');
         }
 
         res
@@ -1090,7 +1090,7 @@ impl MigrateTables {
 
             res.push_str(&format!("--- {title}\n"));
             res.push_str(&stmts.join("\n"));
-            res.push_str("\n");
+            res.push('\n');
         }
 
         res
