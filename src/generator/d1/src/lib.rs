@@ -250,8 +250,9 @@ impl D1Generator {
     }
 
     /// Validates all data sources, ensuring types and references check out.
-    /// Returns an intermediate [ModelTree] which houses both the models and their
-    /// SQL correct aliases (Foo vs Foo1 vs Foo2).
+    ///
+    /// Returns an intermediate [ModelTree] which contains both the models and their
+    /// non-conflicting aliases (Foo vs Foo1 vs Foo2).
     ///
     /// Returns error on
     /// - Invalid data source type
@@ -266,15 +267,7 @@ impl D1Generator {
             for ds in model.data_sources.values() {
                 let mut alias_counter = HashMap::<String, u32>::new();
 
-                let tree = dfs(
-                    model,
-                    None,
-                    None,
-                    &ds.tree,
-                    model_lookup,
-                    &mut alias_counter,
-                )
-                .map_err(|e| {
+                let tree = dfs(model, &ds.tree, model_lookup, &mut alias_counter).map_err(|e| {
                     e.with_context(format!(
                         "Problem found while validating data source {}.{}",
                         model.name, ds.name
@@ -291,26 +284,15 @@ impl D1Generator {
 
         fn dfs<'a>(
             model: &'a Model,
-            transition: Option<NavigationPropertyKind>,
-            transition_name: Option<String>,
             include_tree: &IncludeTree,
             model_lookup: &'a IndexMap<String, Model>,
             alias_counter: &mut HashMap<String, u32>,
         ) -> Result<ModelTreeNode<'a>> {
             let model_alias = generate_alias(&model.name, alias_counter);
-            let many_to_many_alias = transition.clone().and_then(|m| match &m {
-                NavigationPropertyKind::ManyToMany { unique_id } => {
-                    Some(generate_alias(unique_id, alias_counter))
-                }
-                _ => None,
-            });
 
             let mut node = ModelTreeNode {
-                parent_transition_kind: transition,
-                parent_transition_name: transition_name,
                 model_alias: model_alias.clone(),
                 model,
-                many_to_many_alias,
                 children: vec![],
             };
 
@@ -334,15 +316,20 @@ impl D1Generator {
                     .get(nav.model_name.as_str())
                     .expect("model names to be validated");
 
-                let child_node = dfs(
-                    child_model,
-                    Some(nav.kind.clone()),
-                    Some(nav.var_name.clone()),
-                    child_tree,
-                    model_lookup,
-                    alias_counter,
-                )?;
-                node.children.push(child_node);
+                let child = dfs(child_model, child_tree, model_lookup, alias_counter)?;
+
+                let m2m_alias = if let NavigationPropertyKind::ManyToMany { unique_id } = &nav.kind
+                {
+                    Some(generate_alias(unique_id, alias_counter))
+                } else {
+                    None
+                };
+                node.children.push(ModelTreeNodeChild {
+                    child,
+                    kind: nav.kind.clone(),
+                    var_name: nav.var_name.clone(),
+                    m2m_alias,
+                });
             }
 
             Ok(node)
@@ -394,7 +381,12 @@ impl MigrateViews {
             let mut query = Query::select();
             query.from(alias(&root_model.name));
 
-            dfs(&tree.root, &mut query, &mut vec![root_model.name.clone()]);
+            dfs(
+                &tree.root,
+                &mut query,
+                &mut vec![root_model.name.clone()],
+                None,
+            );
 
             res.push(format!(
                 "CREATE VIEW IF NOT EXISTS \"{}.{}\" AS {};",
@@ -406,19 +398,21 @@ impl MigrateViews {
 
         return res;
 
-        fn dfs(node: &ModelTreeNode, query: &mut SelectStatement, path: &mut Vec<String>) {
+        fn dfs(
+            node: &ModelTreeNode,
+            query: &mut SelectStatement,
+            path: &mut Vec<String>,
+            m2m_alias: Option<&String>,
+        ) {
             let path_to_column = path.join(".");
+            let pk = &node.model.primary_key.name;
 
             // Primary Key
             {
-                let pk = &node.model.primary_key.name;
-                let col = if matches!(
-                    node.parent_transition_kind,
-                    Some(NavigationPropertyKind::ManyToMany { .. })
-                ) {
+                let col = if let Some(m2m_alias) = m2m_alias {
                     // M:M pk is in the form "UniqueIdN.ModelName.PrimaryKeyName"
                     Expr::col((
-                        alias(node.many_to_many_alias.as_ref().unwrap()),
+                        alias(m2m_alias),
                         alias(format!("{}.{}", node.model.name, pk)),
                     ))
                 } else {
@@ -426,7 +420,7 @@ impl MigrateViews {
                 };
 
                 query.expr_as(col, alias(format!("{}.{}", &path_to_column, pk)));
-            }
+            };
 
             // Columns
             for attr in &node.model.attributes {
@@ -437,11 +431,16 @@ impl MigrateViews {
             }
 
             // Navigation properties
-            for child in &node.children {
-                match child.parent_transition_kind.as_ref().unwrap() {
+            for ModelTreeNodeChild {
+                child,
+                kind,
+                var_name,
+                m2m_alias,
+            } in &node.children
+            {
+                match kind {
                     NavigationPropertyKind::OneToOne { reference } => {
                         let nav_model_pk = &child.model.primary_key.name;
-
                         left_join_as(
                             query,
                             &child.model.name,
@@ -451,8 +450,6 @@ impl MigrateViews {
                         );
                     }
                     NavigationPropertyKind::OneToMany { reference } => {
-                        let pk = &node.model.primary_key.name;
-
                         left_join_as(
                             query,
                             &child.model.name,
@@ -464,13 +461,14 @@ impl MigrateViews {
                     NavigationPropertyKind::ManyToMany { unique_id } => {
                         let nav_model_pk = &child.model.primary_key;
                         let pk = &node.model.primary_key.name;
+                        let m2m_alias = m2m_alias.as_ref().unwrap();
 
                         left_join_as(
                             query,
                             unique_id,
-                            child.many_to_many_alias.as_ref().unwrap(),
+                            m2m_alias,
                             Expr::col((alias(&node.model_alias), alias(pk))).equals((
-                                alias(child.many_to_many_alias.as_ref().unwrap()),
+                                alias(m2m_alias),
                                 alias(format!("{}.{}", node.model.name, pk)),
                             )),
                         );
@@ -480,15 +478,16 @@ impl MigrateViews {
                             &child.model.name,
                             &child.model_alias,
                             Expr::col((
-                                alias(child.many_to_many_alias.as_ref().unwrap()),
+                                alias(m2m_alias),
                                 alias(format!("{}.{}", child.model.name, pk)),
                             ))
                             .equals((alias(&child.model_alias), alias(&nav_model_pk.name))),
                         );
                     }
                 }
-                path.push(child.parent_transition_name.as_ref().unwrap().clone());
-                dfs(child, query, path);
+
+                path.push(var_name.clone());
+                dfs(child, query, path, m2m_alias.as_ref());
                 path.pop();
             }
         }
@@ -514,7 +513,8 @@ impl MigrateViews {
 
     /// Returns a list of dropped data sources, along with a list of data sources that need to created.
     ///
-    /// If a data source is altered in any way, it will be dropped and added to the create list.
+    /// NOTE: If a data source is altered in any way, it will be dropped and added to the create list.
+    /// Views don't contain data so I don't see a problem with this (@ben schreiber)
     fn drop<'a>(
         model_trees: Vec<ModelTree<'a>>,
         ast: &CloesceAst,
@@ -570,8 +570,6 @@ impl MigrateViews {
     /// Given a vector of all model trees in the new AST, and the last migrated AST's lookup table,
     /// produces a sequence of SQL queries `CREATE`-ing and `DROP`-ing the last migrated AST to
     /// sync with the new.
-    ///
-    /// TODO: Doesn't produce `ALTER` statements in favor of just dropping the view and creating it again.
     fn make_migrations(
         all_model_trees: Vec<ModelTree>,
         ast: &CloesceAst,
@@ -1097,19 +1095,23 @@ impl MigrateTables {
     }
 }
 
-struct ModelTreeNode<'a> {
-    parent_transition_kind: Option<NavigationPropertyKind>,
-    parent_transition_name: Option<String>,
+struct ModelTreeNodeChild<'a> {
+    child: ModelTreeNode<'a>,
+    kind: NavigationPropertyKind,
+    var_name: String,
 
+    /// The alias of the associated many to many table if it exists, being
+    /// some form of "UniqueId" + N, where N is how many times the model occurs in the tree.
+    m2m_alias: Option<String>,
+}
+
+struct ModelTreeNode<'a> {
     /// The alias of the associated [Model], being some form of
     /// "ModelName" + N, where N is how many times the model occurs in the tree.
     model_alias: String,
 
-    /// The alias of the associated many to many table if it exists, being
-    /// some form of "UniqueId" + N, where N is how many times the model occurs in the tree.
-    many_to_many_alias: Option<String>,
     model: &'a Model,
-    children: Vec<ModelTreeNode<'a>>,
+    children: Vec<ModelTreeNodeChild<'a>>,
 }
 
 /// A tree of models derived from a [Model]'s data source include tree.
