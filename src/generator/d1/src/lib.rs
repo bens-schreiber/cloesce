@@ -34,7 +34,7 @@ impl D1Generator {
         lm_ast: Option<&CloesceAst>,
         intent: &dyn MigrationsIntent,
     ) -> Result<String> {
-        let many_to_many_tables = Self::validate_fks(&mut ast.models)?;
+        let jct_lookup = Self::validate_fks(&mut ast.models)?;
         let model_tree = Self::validate_data_sources(&ast.models)?;
 
         if let Some(lm_ast) = lm_ast
@@ -44,7 +44,7 @@ impl D1Generator {
             return Ok(String::default());
         }
 
-        let tables = MigrateTables::make_migrations(ast, lm_ast, many_to_many_tables, intent);
+        let tables = MigrateTables::make_migrations(ast, lm_ast, jct_lookup, intent);
         let views = MigrateViews::make_migrations(model_tree, ast, lm_ast);
         if lm_ast.is_none() {
             let cloesce_tmp = to_sqlite(
@@ -86,7 +86,7 @@ impl D1Generator {
         let mut in_degree = BTreeMap::<&str, usize>::new();
         let mut graph = BTreeMap::<&str, Vec<&str>>::new();
 
-        let mut many_to_many = HashMap::<&String, JunctionTableBuilder>::new();
+        let mut m2m = HashMap::<&String, JunctionTableBuilder>::new();
 
         // Maps a model name and a foreign key reference to the model it is referencing
         // Ie, Person.dogId => { (Person, dogId): "Dog" }
@@ -147,14 +147,11 @@ impl D1Generator {
                         unvalidated_navs.push((&model.name, &nav.model_name, nav));
                     }
                     NavigationPropertyKind::ManyToMany { unique_id } => {
-                        many_to_many
-                            .entry(unique_id)
-                            .or_default()
-                            .model(JunctionModel {
-                                model_name: model.name.clone(),
-                                model_pk_name: model.primary_key.name.clone(),
-                                model_pk_type: model.primary_key.cidl_type.clone(),
-                            })?;
+                        m2m.entry(unique_id).or_default().model(JunctionModel {
+                            name: model.name.clone(),
+                            pk_name: model.primary_key.name.clone(),
+                            pk_type: model.primary_key.cidl_type.clone(),
+                        })?;
                     }
                 }
             }
@@ -199,7 +196,7 @@ impl D1Generator {
         }
 
         // Validate M:M
-        let many_to_many_tables: HashMap<String, JunctionTable> = many_to_many
+        let jcts: HashMap<String, JunctionTable> = m2m
             .drain()
             .map(|(unique_id, v)| Ok((unique_id.to_owned(), v.build(unique_id)?)))
             .collect::<Result<_>>()?;
@@ -246,7 +243,7 @@ impl D1Generator {
         };
         model_lookup.sort_by_key(|k, _| rank.get(k.as_str()).unwrap());
 
-        Ok(many_to_many_tables)
+        Ok(jcts)
     }
 
     /// Validates all data sources, ensuring types and references check out.
@@ -288,10 +285,10 @@ impl D1Generator {
             model_lookup: &'a IndexMap<String, Model>,
             alias_counter: &mut HashMap<String, u32>,
         ) -> Result<ModelTreeNode<'a>> {
-            let model_alias = generate_alias(&model.name, alias_counter);
+            let alias = generate_alias(&model.name, alias_counter);
 
             let mut node = ModelTreeNode {
-                model_alias: model_alias.clone(),
+                alias: alias.clone(),
                 model,
                 children: vec![],
             };
@@ -316,14 +313,15 @@ impl D1Generator {
                     .get(nav.model_name.as_str())
                     .expect("model names to be validated");
 
-                let child = dfs(child_model, child_tree, model_lookup, alias_counter)?;
-
                 let m2m_alias = if let NavigationPropertyKind::ManyToMany { unique_id } = &nav.kind
                 {
                     Some(generate_alias(unique_id, alias_counter))
                 } else {
                     None
                 };
+
+                let child = dfs(child_model, child_tree, model_lookup, alias_counter)?;
+
                 node.children.push(ModelTreeNodeChild {
                     child,
                     kind: nav.kind.clone(),
@@ -416,7 +414,7 @@ impl MigrateViews {
                         alias(format!("{}.{}", node.model.name, pk)),
                     ))
                 } else {
-                    Expr::col((alias(&node.model_alias), alias(pk)))
+                    Expr::col((alias(&node.alias), alias(pk)))
                 };
 
                 query.expr_as(col, alias(format!("{}.{}", &path_to_column, pk)));
@@ -425,7 +423,7 @@ impl MigrateViews {
             // Columns
             for attr in &node.model.attributes {
                 query.expr_as(
-                    Expr::col((alias(&node.model_alias), alias(&attr.value.name))),
+                    Expr::col((alias(&node.alias), alias(&attr.value.name))),
                     alias(format!("{}.{}", &path_to_column, attr.value.name)),
                 );
             }
@@ -444,18 +442,18 @@ impl MigrateViews {
                         left_join_as(
                             query,
                             &child.model.name,
-                            &child.model_alias,
-                            Expr::col((alias(&node.model_alias), alias(reference)))
-                                .equals((alias(&child.model_alias), alias(nav_model_pk))),
+                            &child.alias,
+                            Expr::col((alias(&node.alias), alias(reference)))
+                                .equals((alias(&child.alias), alias(nav_model_pk))),
                         );
                     }
                     NavigationPropertyKind::OneToMany { reference } => {
                         left_join_as(
                             query,
                             &child.model.name,
-                            &child.model_alias,
-                            Expr::col((alias(&node.model_alias), alias(pk)))
-                                .equals((alias(&child.model_alias), alias(reference))),
+                            &child.alias,
+                            Expr::col((alias(&node.alias), alias(pk)))
+                                .equals((alias(&child.alias), alias(reference))),
                         );
                     }
                     NavigationPropertyKind::ManyToMany { unique_id } => {
@@ -467,7 +465,7 @@ impl MigrateViews {
                             query,
                             unique_id,
                             m2m_alias,
-                            Expr::col((alias(&node.model_alias), alias(pk))).equals((
+                            Expr::col((alias(&node.alias), alias(pk))).equals((
                                 alias(m2m_alias),
                                 alias(format!("{}.{}", node.model.name, pk)),
                             )),
@@ -476,12 +474,12 @@ impl MigrateViews {
                         left_join_as(
                             query,
                             &child.model.name,
-                            &child.model_alias,
+                            &child.alias,
                             Expr::col((
                                 alias(m2m_alias),
                                 alias(format!("{}.{}", child.model.name, pk)),
                             ))
-                            .equals((alias(&child.model_alias), alias(&nav_model_pk.name))),
+                            .equals((alias(&child.alias), alias(&nav_model_pk.name))),
                         );
                     }
                 }
@@ -520,11 +518,12 @@ impl MigrateViews {
         ast: &CloesceAst,
         lm_lookup: &IndexMap<String, Model>,
     ) -> (Vec<String>, Vec<ModelTree<'a>>) {
+        const DROP_VIEW: &str = "DROP VIEW IF EXISTS";
         let mut res = vec![];
 
         for lm_model in lm_lookup.values() {
             match ast.models.get(&lm_model.name) {
-                // Model exists from last migration
+                // Model was changed from last migration
                 Some(model) if model.hash != lm_model.hash => {
                     for lm_ds in lm_model.data_sources.values() {
                         let changed = model
@@ -533,20 +532,14 @@ impl MigrateViews {
                             .is_none_or(|ds| ds.hash != lm_ds.hash);
 
                         if changed {
-                            res.push(format!(
-                                "DROP VIEW IF EXISTS \"{}.{}\";",
-                                lm_model.name, lm_ds.name
-                            ));
+                            res.push(format!("{DROP_VIEW} \"{}.{}\";", lm_model.name, lm_ds.name));
                         }
                     }
                 }
                 // Last migration model was removed entirely
                 None => {
                     for lm_ds in lm_model.data_sources.values() {
-                        res.push(format!(
-                            "DROP VIEW IF EXISTS \"{}.{}\";",
-                            lm_model.name, lm_ds.name
-                        ));
+                        res.push(format!("{DROP_VIEW} \"{}.{}\";", lm_model.name, lm_ds.name));
                     }
                 }
                 // Last migration model unchanged
@@ -578,7 +571,7 @@ impl MigrateViews {
         let (drop_stmts, create_model_trees) = if let Some(lm_ast) = lm_ast {
             Self::drop(all_model_trees, ast, &lm_ast.models)
         } else {
-            // No last migration, insert all
+            // No last migration: create all
             (Vec::default(), all_model_trees)
         };
 
@@ -607,7 +600,7 @@ impl MigrateTables {
     fn create(
         sorted_models: Vec<&Model>,
         model_lookup: &IndexMap<String, Model>,
-        many_to_many_tables: Vec<JunctionTable>,
+        jcts: Vec<JunctionTable>,
     ) -> Vec<String> {
         let mut res = vec![];
 
@@ -657,15 +650,14 @@ impl MigrateTables {
             res.push(to_sqlite(table));
         }
 
-        for JunctionTable { a, b, unique_id } in many_to_many_tables {
+        for JunctionTable { a, b, unique_id } in jcts {
             let mut table = Table::create();
 
-            // TODO: Name the junction table in some standard way
-            let col_a_name = format!("{}.{}", a.model_name, a.model_pk_name);
-            let mut col_a = typed_column(&col_a_name, &a.model_pk_type, false);
+            let col_a_name = format!("{}.{}", a.name, a.pk_name);
+            let mut col_a = typed_column(&col_a_name, &a.pk_type, false);
 
-            let col_b_name = format!("{}.{}", b.model_name, b.model_pk_name);
-            let mut col_b = typed_column(&col_b_name, &b.model_pk_type, false);
+            let col_b_name = format!("{}.{}", b.name, b.pk_name);
+            let mut col_b = typed_column(&col_b_name, &b.pk_type, false);
 
             table
                 .table(alias(&unique_id))
@@ -680,14 +672,14 @@ impl MigrateTables {
                 .foreign_key(
                     ForeignKey::create()
                         .from(alias(&unique_id), alias(&col_a_name))
-                        .to(alias(a.model_name), alias(a.model_pk_name))
+                        .to(alias(a.name), alias(a.pk_name))
                         .on_update(sea_query::ForeignKeyAction::Cascade)
                         .on_delete(sea_query::ForeignKeyAction::Restrict),
                 )
                 .foreign_key(
                     ForeignKey::create()
                         .from(alias(&unique_id), alias(&col_b_name))
-                        .to(alias(b.model_name), alias(b.model_pk_name))
+                        .to(alias(b.name), alias(b.pk_name))
                         .on_update(sea_query::ForeignKeyAction::Cascade)
                         .on_delete(sea_query::ForeignKeyAction::Restrict),
                 );
@@ -703,6 +695,8 @@ impl MigrateTables {
     /// Some alterations cannot occur in SQLite without dropping the table, in which a
     /// full rebuild and copy of data will occur.
     ///
+    /// TODO: Sophisticated warnings and logs about alteration choices
+    ///
     /// Poses a [MigrationsDilemma::RenameOrDropModel], determining if a dropped model is
     /// actually just a rename. If that is the case, removes from `drop` and `add` lists, undergoing
     /// table alteration on the (model, last migrated model) pair.
@@ -711,6 +705,10 @@ impl MigrateTables {
         model_lookup: &IndexMap<String, Model>,
         intent: &dyn MigrationsIntent,
     ) -> Vec<String> {
+        const PRAGMA_FK_OFF: &str = "PRAGMA foreign_keys = OFF;";
+        const PRAGMA_FK_ON: &str = "PRAGMA foreign_keys = ON;";
+        const PRAGMA_FK_CHECK: &str = "PRAGMA foreign_keys_check;";
+
         let mut res = vec![];
         let mut rebuilds = vec![];
 
@@ -764,7 +762,6 @@ impl MigrateTables {
                 }
 
                 // Type mismatch
-                // TODO: warnings
                 if attr.value.cidl_type != lm_attr.value.cidl_type {
                     // Drop the last migrated column
                     {
@@ -852,9 +849,10 @@ impl MigrateTables {
         }
 
         if !rebuilds.is_empty() {
-            res.push("PRAGMA foreign_keys = OFF;".into());
+            res.push(PRAGMA_FK_OFF.into());
         }
 
+        // Full model rebuilds
         for (model, lm_model) in &rebuilds {
             // Rename the last migrated model to "name_hash"
             {
@@ -950,8 +948,8 @@ impl MigrateTables {
         }
 
         if !rebuilds.is_empty() {
-            res.push("PRAGMA foreign_keys = ON;".into());
-            res.push("PRAGMA foreign_keys_check;".into());
+            res.push(PRAGMA_FK_ON.into());
+            res.push(PRAGMA_FK_CHECK.into());
         }
 
         res
@@ -995,7 +993,7 @@ impl MigrateTables {
     fn make_migrations(
         ast: &CloesceAst,
         lm_ast: Option<&CloesceAst>,
-        mut many_to_many_tables: HashMap<String, JunctionTable>,
+        mut jct_lookup: HashMap<String, JunctionTable>,
         intent: &dyn MigrationsIntent,
     ) -> String {
         let Some(lm_ast) = lm_ast else {
@@ -1003,83 +1001,83 @@ impl MigrateTables {
             let stmts = Self::create(
                 ast.models.values().collect(),
                 &ast.models,
-                many_to_many_tables.into_values().collect(),
+                jct_lookup.into_values().collect(),
             )
             .join("\n");
 
             return format!("--- New Models\n{stmts}\n");
         };
 
-        let mut sorted_create_models = vec![];
-        let mut alter_models = vec![];
-        let mut sorted_drop_lms = vec![];
+        // Partition all models into three sets, discarding the rest.
+        let (creates, alters, drops) = {
+            let mut creates = vec![];
+            let mut alters = vec![];
+            let mut drops = vec![];
 
-        // Partition altered and newly created models
-        for model in ast.models.values() {
-            match lm_ast.models.get(&model.name) {
-                Some(lm_model) if lm_model.hash != model.hash => {
-                    alter_models.push((model, lm_model));
-                }
-                None => {
-                    sorted_create_models.push(model);
-                }
-                _ => {
-                    // No change, skip
+            // Altered and newly created models
+            for model in ast.models.values() {
+                match lm_ast.models.get(&model.name) {
+                    Some(lm_model) if lm_model.hash != model.hash => {
+                        alters.push((model, lm_model));
+                    }
+                    None => {
+                        creates.push(model);
+                    }
+                    _ => {
+                        // No change, skip
+                    }
                 }
             }
-        }
 
-        // Partition dropped models
-        for lm_model in lm_ast.models.values() {
-            if ast.models.get(&lm_model.name).is_none() {
-                sorted_drop_lms.push(lm_model);
-                continue;
-            }
-
-            for nav in &lm_model.navigation_properties {
-                let NavigationPropertyKind::ManyToMany { unique_id } = &nav.kind else {
+            // Dropped models
+            for lm_model in lm_ast.models.values() {
+                if ast.models.get(&lm_model.name).is_none() {
+                    drops.push(lm_model);
                     continue;
-                };
+                }
 
-                // This table already exists and does not need to be added.
-                many_to_many_tables.remove(unique_id.as_str());
+                for nav in &lm_model.navigation_properties {
+                    let NavigationPropertyKind::ManyToMany { unique_id } = &nav.kind else {
+                        continue;
+                    };
+
+                    // This table already exists and does not need to be added.
+                    jct_lookup.remove(unique_id.as_str());
+                }
             }
-        }
 
-        // It's possible drops were meant to be a rename.
-        //
-        // TODO: We can do some kind of similarity test between models to discard
-        // obvious non-solutions
-        if !sorted_drop_lms.is_empty() && !sorted_create_models.is_empty() {
-            sorted_drop_lms.retain(|lm_model| {
-                let solution = intent.ask(MigrationsDilemma::RenameOrDropModel {
-                    model_name: lm_model.name.clone(),
-                    options: &sorted_create_models.iter().map(|m| &m.name).collect(),
+            // It's possible drops were meant to be a rename.
+            //
+            // TODO: We can do some kind of similarity test between models to discard
+            // obvious non-solutions
+            if !drops.is_empty() && !creates.is_empty() {
+                drops.retain(|lm_model| {
+                    // Blocking input for intentions
+                    let solution = intent.ask(MigrationsDilemma::RenameOrDropModel {
+                        model_name: lm_model.name.clone(),
+                        options: &creates.iter().map(|m| &m.name).collect(),
+                    });
+
+                    let Some(solution) = solution else {
+                        return true;
+                    };
+
+                    alters.push((creates.remove(solution), lm_model));
+                    false
                 });
+            }
 
-                let Some(solution) = solution else {
-                    return true;
-                };
+            (creates, alters, drops)
+        };
 
-                alter_models.push((sorted_create_models.remove(solution), lm_model));
-                false
-            });
-        }
-
+        // Build query
         let mut res = String::new();
         for (title, stmts) in [
-            ("Dropped Models", &Self::drop(sorted_drop_lms)),
-            (
-                "Altered Models",
-                &Self::alter(alter_models, &ast.models, intent),
-            ),
+            ("Dropped Models", &Self::drop(drops)),
+            ("Altered Models", &Self::alter(alters, &ast.models, intent)),
             (
                 "New Models",
-                &Self::create(
-                    sorted_create_models,
-                    &ast.models,
-                    many_to_many_tables.into_values().collect(),
-                ),
+                &Self::create(creates, &ast.models, jct_lookup.into_values().collect()),
             ),
         ] {
             if stmts.is_empty() {
@@ -1108,8 +1106,7 @@ struct ModelTreeNodeChild<'a> {
 struct ModelTreeNode<'a> {
     /// The alias of the associated [Model], being some form of
     /// "ModelName" + N, where N is how many times the model occurs in the tree.
-    model_alias: String,
-
+    alias: String,
     model: &'a Model,
     children: Vec<ModelTreeNodeChild<'a>>,
 }
@@ -1123,9 +1120,9 @@ struct ModelTree<'a> {
 
 /// Represents one side of a Many to Many junction table
 struct JunctionModel {
-    model_name: String,
-    model_pk_name: String,
-    model_pk_type: CidlType,
+    name: String,
+    pk_name: String,
+    pk_type: CidlType,
 }
 
 /// A full Many to Many table with both sides
@@ -1146,9 +1143,9 @@ impl JunctionTableBuilder {
             fail!(
                 GeneratorErrorKind::ExtraneousManyToManyReferences,
                 "{}, {}, {}",
-                jm.model_name,
-                self.models[0].model_name,
-                self.models[1].model_name
+                jm.name,
+                self.models[0].name,
+                self.models[1].name
             );
         }
         self.models.push(jm);
@@ -1159,7 +1156,7 @@ impl JunctionTableBuilder {
         let err_context = self
             .models
             .first()
-            .map(|m| m.model_name.clone())
+            .map(|m| m.name.clone())
             .unwrap_or_default();
         let [a, b] = <[_; 2]>::try_from(self.models).map_err(|_| {
             GeneratorErrorKind::MissingManyToManyReference
