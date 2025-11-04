@@ -172,8 +172,8 @@ fn process_navigation_properties(
 
 #[cfg(test)]
 mod tests {
-    use common::{builder::ModelBuilder, CidlType, NavigationPropertyKind};
-    use serde_json::{json, Map, Value};
+    use common::{CidlType, NavigationPropertyKind, builder::ModelBuilder};
+    use serde_json::{Map, Value, json};
     use std::collections::HashMap;
 
     use crate::orm::object_relational_mapping;
