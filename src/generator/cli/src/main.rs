@@ -1,5 +1,5 @@
 use std::{
-    io::Write,
+    io::{self, Write},
     panic,
     path::{Path, PathBuf},
 };
@@ -11,53 +11,8 @@ use common::{
     err::{GeneratorErrorKind, Result},
 };
 use d1::{D1Generator, MigrationsDilemma, MigrationsIntent};
-use inquire::Select;
 use workers::WorkersGenerator;
 use wrangler::WranglerFormat;
-
-struct MigrationsCli;
-impl MigrationsIntent for MigrationsCli {
-    fn ask(&self, dilemma: MigrationsDilemma) -> Option<usize> {
-        match dilemma {
-            MigrationsDilemma::RenameOrDropModel {
-                model_name,
-                options,
-            } => Self::rename_or_drop(&model_name, options, "model"),
-            MigrationsDilemma::RenameOrDropAttribute {
-                model_name,
-                attribute_name,
-                options,
-            } => {
-                let target = format!("{model_name}.{attribute_name}");
-                Self::rename_or_drop(&target, options, "attribute")
-            }
-        }
-    }
-}
-
-impl MigrationsCli {
-    fn rename_or_drop(target: &str, options: &Vec<&String>, kind: &str) -> Option<usize> {
-        let question = format!("Did you intend to rename or drop {kind} \"{target}\"?");
-        let Ok(choice) = Select::new(&question, vec!["Rename", "Drop"]).prompt() else {
-            println!("Aborting migrations.");
-            std::process::abort();
-        };
-
-        if choice == "Drop" {
-            println!("Dropping {target}");
-            return None;
-        }
-
-        let rename_prompt = format!("Select a {kind} to rename \"{target}\" to:");
-        let Ok(Some(opt)) = Select::new(&rename_prompt, options.to_vec()).raw_prompt_skippable()
-        else {
-            println!("Aborting migrations.");
-            std::process::abort();
-        };
-
-        Some(opt.index)
-    }
-}
 
 #[derive(Parser)]
 #[command(name = "generate", version = "0.0.3")]
@@ -76,7 +31,7 @@ enum Commands {
         #[command(subcommand)]
         target: GenerateTarget,
     },
-    Migrate {
+    Migrations {
         cidl_path: PathBuf,
         migrated_cidl_path: PathBuf,
         migrated_sql_path: PathBuf,
@@ -153,7 +108,7 @@ fn run_cli() -> Result<()> {
             validate_cidl(&pre_cidl_path, &cidl_path)?;
             println!("Ok.");
         }
-        Commands::Migrate {
+        Commands::Migrations {
             cidl_path,
             migrated_cidl_path,
             migrated_sql_path,
@@ -223,6 +178,79 @@ fn run_cli() -> Result<()> {
     }
 
     Ok(())
+}
+
+struct MigrationsCli;
+impl MigrationsIntent for MigrationsCli {
+    fn ask(&self, dilemma: MigrationsDilemma) -> Option<usize> {
+        match dilemma {
+            MigrationsDilemma::RenameOrDropModel {
+                model_name,
+                options,
+            } => Self::rename_or_drop(&model_name, options, "model"),
+            MigrationsDilemma::RenameOrDropAttribute {
+                model_name,
+                attribute_name,
+                options,
+            } => {
+                let target = format!("{model_name}.{attribute_name}");
+                Self::rename_or_drop(&target, options, "attribute")
+            }
+        }
+    }
+}
+
+impl MigrationsCli {
+    fn rename_or_drop(target: &str, options: &[&String], kind: &str) -> Option<usize> {
+        println!("Did you intend to rename or drop {kind} \"{target}\"?");
+        println!("  [r] Rename");
+        println!("  [d] Drop");
+        print!("> ");
+        io::stdout().flush().unwrap();
+
+        let mut line = String::new();
+        if io::stdin().read_line(&mut line).is_err() {
+            eprintln!("Error reading input. Aborting migrations.");
+            std::process::abort();
+        }
+
+        match line.trim().to_lowercase().as_str() {
+            "d" | "drop" => {
+                println!("Dropping {target}");
+                None
+            }
+            "r" | "rename" => {
+                println!("Select a {kind} to rename \"{target}\" to:");
+                for (i, opt) in options.iter().enumerate() {
+                    println!("  [{i}] {opt}");
+                }
+                print!("> ");
+                io::stdout().flush().unwrap();
+
+                let mut input = String::new();
+                if io::stdin().read_line(&mut input).is_err() {
+                    eprintln!("Error reading input. Aborting migrations.");
+                    std::process::abort();
+                }
+
+                let idx = input.trim().parse::<usize>().unwrap_or_else(|_| {
+                    eprintln!("Invalid selection. Aborting migrations.");
+                    std::process::abort();
+                });
+
+                if idx >= options.len() {
+                    eprintln!("Index out of range. Aborting migrations.");
+                    std::process::abort();
+                }
+
+                Some(idx)
+            }
+            _ => {
+                eprintln!("Invalid option. Aborting migrations.");
+                std::process::abort();
+            }
+        }
+    }
 }
 
 fn validate_cidl(pre_cidl_path: &Path, cidl_path: &Path) -> Result<CloesceAst> {

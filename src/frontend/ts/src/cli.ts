@@ -3,15 +3,7 @@ import { WASI } from "node:wasi";
 import fs from "node:fs";
 import { readFile } from "fs/promises";
 import path from "node:path";
-import {
-  command,
-  run,
-  subcommands,
-  flag,
-  option,
-  optional,
-  string,
-} from "cmd-ts";
+import { command, run, subcommands, flag, string, positional } from "cmd-ts";
 import { Project } from "ts-morph";
 import { CidlExtractor } from "./extractor/extract.js";
 import { ExtractorError, ExtractorErrorCode, getErrorInfo } from "./common.js";
@@ -31,6 +23,7 @@ type CloesceConfig = {
   outputDir?: string;
   workersUrl?: string;
   clientUrl?: string;
+  migrationsPath?: string;
 };
 
 const cmds = subcommands({
@@ -51,7 +44,7 @@ const cmds = subcommands({
 
         if (!config.workersUrl || !config.clientUrl) {
           console.error(
-            "Error: `workersUrl` and `clientUrl` must be defined in cloesce.config.json",
+            "Error: `workersUrl` and `clientUrl` must be defined in cloesce.config.json"
           );
           process.exit(1);
         }
@@ -67,9 +60,9 @@ const cmds = subcommands({
           args: [
             "generate",
             "all",
+            path.join(outputDir, "cidl.pre.json"),
             path.join(outputDir, "cidl.json"),
             "wrangler.toml",
-            "migrations/migrations.sql",
             path.join(outputDir, "workers.ts"),
             path.join(outputDir, "client.ts"),
             config.clientUrl,
@@ -82,130 +75,11 @@ const cmds = subcommands({
       },
     }),
 
-    wrangler: command({
-      name: "wrangler",
-      description: "Generate wrangler.toml configuration",
-      args: {},
-      handler: async () => {
-        await generate({
-          name: "wrangler",
-          wasmFile: "generator.wasm",
-          args: ["generate", "wrangler", "wrangler.toml"],
-        });
-      },
-    }),
-
-    d1: command({
-      name: "d1",
-      description: "Generate database schema",
-      args: {},
-      handler: async () => {
-        const config = loadCloesceConfig(process.cwd());
-        const outputDir = config.outputDir ?? ".generated";
-
-        await generate({
-          name: "d1",
-          wasmFile: "generator.wasm",
-          args: [
-            "generate",
-            "d1",
-            path.join(outputDir, "cidl.json"),
-            "migrations/migrations.sql",
-          ],
-        });
-      },
-    }),
-
-    workers: command({
-      name: "workers",
-      description: "Generate workers TypeScript",
-      args: {},
-      handler: async () => {
-        const config = loadCloesceConfig(process.cwd());
-        const outputDir = config.outputDir ?? ".generated";
-
-        if (!config.workersUrl) {
-          console.error(
-            "Error: workersUrl must be defined in cloesce.config.json",
-          );
-          process.exit(1);
-        }
-
-        await generate({
-          name: "workers",
-          wasmFile: "generator.wasm",
-          args: [
-            "generate",
-            "workers",
-            path.join(outputDir, "cidl.json"),
-            path.join(outputDir, "workers.ts"),
-            "wrangler.toml",
-            config.workersUrl,
-          ],
-        });
-      },
-    }),
-
-    client: command({
-      name: "client",
-      description: "Generate client TypeScript",
-      args: {},
-      handler: async () => {
-        const config = loadCloesceConfig(process.cwd());
-        const outputDir = config.outputDir ?? ".generated";
-
-        if (!config.clientUrl) {
-          console.error(
-            "Error: clientUrl must be defined in cloesce-config.json",
-          );
-          process.exit(1);
-        }
-
-        await generate({
-          name: "client",
-          wasmFile: "generator.wasm",
-          args: [
-            "generate",
-            "client",
-            path.join(outputDir, "cidl.json"),
-            path.join(outputDir, "client.ts"),
-            config.clientUrl,
-          ],
-        });
-      },
-    }),
-
-    extract: command({
-      name: "extract",
-      description: "Extract models and write cidl.json only",
+    migrate: command({
+      name: "migrate",
+      description: "Creates a database migration.",
       args: {
-        projectName: option({
-          long: "project-name",
-          type: optional(string),
-          description: "Project name",
-        }),
-        out: option({
-          long: "out",
-          short: "o",
-          type: optional(string),
-          description: "Output path (default: .generated/cidl.json)",
-        }),
-        inp: option({
-          long: "in",
-          short: "i",
-          type: optional(string),
-          description: "Input file or directory",
-        }),
-        location: option({
-          long: "location",
-          short: "l",
-          type: optional(string),
-          description: "Project directory (default: cwd)",
-        }),
-        truncateSourcePaths: flag({
-          long: "truncateSourcePaths",
-          description: "Sets all source paths to just their file name",
-        }),
+        name: positional({ type: string, displayName: "name" }),
         debug: flag({
           long: "debug",
           short: "d",
@@ -213,7 +87,58 @@ const cmds = subcommands({
         }),
       },
       handler: async (args) => {
-        await extract({ ...args });
+        const config = loadCloesceConfig(process.cwd(), args.debug);
+
+        const cidlPath = path.join(
+          config.outputDir ?? ".generated",
+          "cidl.json"
+        );
+        if (!fs.existsSync(cidlPath)) {
+          console.error(
+            "Err: No cloesce file found, have you ran `cloesce compile`?"
+          );
+          process.exit(1);
+        }
+
+        const migrationsPath = "./migrations";
+        if (!fs.existsSync(migrationsPath)) {
+          fs.mkdirSync(migrationsPath);
+        }
+
+        const migrationPrefix = path.join(
+          migrationsPath,
+          `${timestamp()}_${args.name}`
+        );
+        let wasmArgs = [
+          "migrations",
+          cidlPath,
+          `${migrationPrefix}.json`,
+          `${migrationPrefix}.sql`,
+        ];
+
+        // Add last migration if exists
+        {
+          const files = fs.readdirSync(migrationsPath);
+          const jsonFiles = files.filter((f) => f.endsWith(".json"));
+
+          // Sort descending by filename
+          jsonFiles.sort((a, b) =>
+            b.localeCompare(a, undefined, { numeric: true })
+          );
+
+          if (jsonFiles.length > 0) {
+            wasmArgs.push(path.join(migrationsPath, jsonFiles[0]));
+          }
+        }
+
+        const migrateConfig: WasmConfig = {
+          name: "migrations",
+          wasmFile: "generator.wasm",
+          args: wasmArgs,
+        };
+
+        // Runs a generator command. Exits the process on failure.
+        await generate(migrateConfig);
       },
     }),
   },
@@ -221,7 +146,6 @@ const cmds = subcommands({
 
 async function extract(opts: {
   projectName?: string;
-  out?: string;
   inp?: string;
   truncateSourcePaths?: boolean;
   debug?: boolean;
@@ -232,7 +156,7 @@ async function extract(opts: {
 
   const searchPaths = opts.inp ? [opts.inp] : (config.paths ?? [root]);
   const outputDir = config.outputDir ?? ".generated";
-  const outPath = opts.out ?? path.join(outputDir, "cidl.json");
+  const outPath = path.join(outputDir, "cidl.pre.json");
   const truncate =
     opts.truncateSourcePaths ?? config.truncateSourcePaths ?? false;
   const cloesceProjectName =
@@ -297,7 +221,7 @@ async function extract(opts: {
   } catch (err: any) {
     console.error(
       "Critical uncaught error. Submit a ticket to https://github.com/bens-schreiber/cloesce: ",
-      err?.message ?? err,
+      err?.message ?? err
     );
     process.exit(1);
   }
@@ -334,7 +258,7 @@ async function generate(config: WasmConfig) {
 
 function loadCloesceConfig(
   root: string,
-  debug: boolean = false,
+  debug: boolean = false
 ): CloesceConfig {
   const configPath = path.join(root, "cloesce.config.json");
   if (fs.existsSync(configPath)) {
@@ -347,6 +271,19 @@ function loadCloesceConfig(
     }
   }
   return {};
+}
+
+function timestamp(): string {
+  const d = new Date();
+  return (
+    d.getFullYear().toString() +
+    String(d.getMonth() + 1).padStart(2, "0") +
+    String(d.getDate()).padStart(2, "0") +
+    "T" +
+    String(d.getHours()).padStart(2, "0") +
+    String(d.getMinutes()).padStart(2, "0") +
+    String(d.getSeconds()).padStart(2, "0")
+  );
 }
 
 function readPackageJsonProjectName(cwd: string): string {
@@ -364,7 +301,7 @@ function readPackageJsonProjectName(cwd: string): string {
 function findCloesceProject(
   root: string,
   searchPaths: string[],
-  project: Project,
+  project: Project
 ): void {
   for (const searchPath of searchPaths) {
     let fullPath: string;

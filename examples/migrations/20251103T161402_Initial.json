@@ -1,0 +1,232 @@
+{
+  "version": "v0.0.3",
+  "project_name": "examples",
+  "language": "TypeScript",
+  "wrangler_env": {
+    "name": "Env",
+    "source_path": "/Users/benjaminschreiber/projects/cloesce/examples/src/models/horse.cloesce.ts"
+  },
+  "models": {
+    "Horse": {
+      "name": "Horse",
+      "primary_key": {
+        "name": "id",
+        "cidl_type": "Integer"
+      },
+      "attributes": [
+        {
+          "value": {
+            "name": "name",
+            "cidl_type": "Text"
+          },
+          "foreign_key_reference": null,
+          "hash": 1153465351
+        },
+        {
+          "value": {
+            "name": "bio",
+            "cidl_type": {
+              "Nullable": "Text"
+            }
+          },
+          "foreign_key_reference": null,
+          "hash": 1081537831
+        }
+      ],
+      "navigation_properties": [
+        {
+          "var_name": "likes",
+          "model_name": "Like",
+          "kind": {
+            "OneToMany": {
+              "reference": "horseId1"
+            }
+          },
+          "hash": 2570171470
+        }
+      ],
+      "methods": {
+        "get": {
+          "name": "get",
+          "is_static": true,
+          "http_verb": "GET",
+          "return_type": {
+            "HttpResult": {
+              "Object": "Horse"
+            }
+          },
+          "parameters": [
+            {
+              "name": "id",
+              "cidl_type": "Integer"
+            },
+            {
+              "name": "dataSource",
+              "cidl_type": {
+                "DataSource": "Horse"
+              }
+            }
+          ]
+        },
+        "like": {
+          "name": "like",
+          "is_static": false,
+          "http_verb": "POST",
+          "return_type": "Void",
+          "parameters": [
+            {
+              "name": "{ db }",
+              "cidl_type": {
+                "Inject": "Env"
+              }
+            },
+            {
+              "name": "horse",
+              "cidl_type": {
+                "Object": "Horse"
+              }
+            },
+            {
+              "name": "__dataSource",
+              "cidl_type": {
+                "DataSource": "Horse"
+              }
+            }
+          ]
+        },
+        "list": {
+          "name": "list",
+          "is_static": true,
+          "http_verb": "GET",
+          "return_type": {
+            "HttpResult": {
+              "Array": {
+                "Object": "Horse"
+              }
+            }
+          },
+          "parameters": [
+            {
+              "name": "dataSource",
+              "cidl_type": {
+                "DataSource": "Horse"
+              }
+            }
+          ]
+        },
+        "matches": {
+          "name": "matches",
+          "is_static": false,
+          "http_verb": "GET",
+          "return_type": {
+            "Array": {
+              "Object": "Horse"
+            }
+          },
+          "parameters": [
+            {
+              "name": "{ db }",
+              "cidl_type": {
+                "Inject": "Env"
+              }
+            },
+            {
+              "name": "__dataSource",
+              "cidl_type": {
+                "DataSource": "Horse"
+              }
+            }
+          ]
+        },
+        "post": {
+          "name": "post",
+          "is_static": true,
+          "http_verb": "POST",
+          "return_type": {
+            "HttpResult": {
+              "Object": "Horse"
+            }
+          },
+          "parameters": [
+            {
+              "name": "obj",
+              "cidl_type": {
+                "Partial": "Horse"
+              }
+            },
+            {
+              "name": "dataSource",
+              "cidl_type": {
+                "DataSource": "Horse"
+              }
+            }
+          ]
+        }
+      },
+      "data_sources": {
+        "default": {
+          "name": "default",
+          "tree": {
+            "likes": {
+              "horse2": {}
+            }
+          },
+          "hash": 1883553585
+        },
+        "withLikes": {
+          "name": "withLikes",
+          "tree": {
+            "likes": {}
+          },
+          "hash": 3840396315
+        }
+      },
+      "source_path": "/Users/benjaminschreiber/projects/cloesce/examples/src/models/horse.cloesce.ts",
+      "hash": 3935276479
+    },
+    "Like": {
+      "name": "Like",
+      "primary_key": {
+        "name": "id",
+        "cidl_type": "Integer"
+      },
+      "attributes": [
+        {
+          "value": {
+            "name": "horseId1",
+            "cidl_type": "Integer"
+          },
+          "foreign_key_reference": "Horse",
+          "hash": 3102592533
+        },
+        {
+          "value": {
+            "name": "horseId2",
+            "cidl_type": "Integer"
+          },
+          "foreign_key_reference": "Horse",
+          "hash": 1434448106
+        }
+      ],
+      "navigation_properties": [
+        {
+          "var_name": "horse2",
+          "model_name": "Horse",
+          "kind": {
+            "OneToOne": {
+              "reference": "horseId2"
+            }
+          },
+          "hash": 2037094087
+        }
+      ],
+      "methods": {},
+      "data_sources": {},
+      "source_path": "/Users/benjaminschreiber/projects/cloesce/examples/src/models/horse.cloesce.ts",
+      "hash": 359914738
+    }
+  },
+  "poos": {},
+  "app_source": null,
+  "hash": 2868422362
+}
