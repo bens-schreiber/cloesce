@@ -1,13 +1,8 @@
 {
-  "version": "v0.0.3",
-  "project_name": "examples",
-  "language": "TypeScript",
-  "wrangler_env": {
-    "name": "Env",
-    "source_path": "/Users/benjaminschreiber/projects/cloesce/examples/src/models/horse.cloesce.ts"
-  },
+  "hash": 3590342402,
   "models": {
     "Horse": {
+      "hash": 3597736862,
       "name": "Horse",
       "primary_key": {
         "name": "id",
@@ -15,34 +10,34 @@
       },
       "attributes": [
         {
+          "hash": 1153465351,
           "value": {
             "name": "name",
             "cidl_type": "Text"
           },
-          "foreign_key_reference": null,
-          "hash": 1153465351
+          "foreign_key_reference": null
         },
         {
+          "hash": 1081537831,
           "value": {
             "name": "bio",
             "cidl_type": {
               "Nullable": "Text"
             }
           },
-          "foreign_key_reference": null,
-          "hash": 1081537831
+          "foreign_key_reference": null
         }
       ],
       "navigation_properties": [
         {
+          "hash": 2570171470,
           "var_name": "likes",
           "model_name": "Like",
           "kind": {
             "OneToMany": {
               "reference": "horseId1"
             }
-          },
-          "hash": 2570171470
+          }
         }
       ],
       "methods": {
@@ -165,26 +160,25 @@
       },
       "data_sources": {
         "default": {
+          "hash": 3878327916,
           "name": "default",
           "tree": {
             "likes": {
               "horse2": {}
             }
-          },
-          "hash": 1883553585
+          }
         },
         "withLikes": {
+          "hash": 3840396315,
           "name": "withLikes",
           "tree": {
             "likes": {}
-          },
-          "hash": 3840396315
+          }
         }
-      },
-      "source_path": "/Users/benjaminschreiber/projects/cloesce/examples/src/models/horse.cloesce.ts",
-      "hash": 3935276479
+      }
     },
     "Like": {
+      "hash": 359914738,
       "name": "Like",
       "primary_key": {
         "name": "id",
@@ -192,41 +186,36 @@
       },
       "attributes": [
         {
+          "hash": 3102592533,
           "value": {
             "name": "horseId1",
             "cidl_type": "Integer"
           },
-          "foreign_key_reference": "Horse",
-          "hash": 3102592533
+          "foreign_key_reference": "Horse"
         },
         {
+          "hash": 1434448106,
           "value": {
             "name": "horseId2",
             "cidl_type": "Integer"
           },
-          "foreign_key_reference": "Horse",
-          "hash": 1434448106
+          "foreign_key_reference": "Horse"
         }
       ],
       "navigation_properties": [
         {
+          "hash": 2037094087,
           "var_name": "horse2",
           "model_name": "Horse",
           "kind": {
             "OneToOne": {
               "reference": "horseId2"
             }
-          },
-          "hash": 2037094087
+          }
         }
       ],
       "methods": {},
-      "data_sources": {},
-      "source_path": "/Users/benjaminschreiber/projects/cloesce/examples/src/models/horse.cloesce.ts",
-      "hash": 359914738
+      "data_sources": {}
     }
-  },
-  "poos": {},
-  "app_source": null,
-  "hash": 2868422362
+  }
 }

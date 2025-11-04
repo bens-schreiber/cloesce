@@ -54,7 +54,11 @@ class Dog {
 
 Currently, Cloesce undergoes a compilation process which generates SQL code along with all other output code with the `cloesce compile` command. All SQL code goes into `.generated/migrations/migrations.sql`. Being under the `.generated` directory, it's not expected for this code to be apart of the git commit history. So, in this newer version, what should we do with the generated SQL code? When should we generate it?
 
-Because of the constraints imposed by D1 and Wrangler (being, migrations must be pure SQL, no logic like in Entity Framework), the design we will go for in this migrations engine will be **forward migrations only**. That means migrations can only be added, not removed. In order to make this work as intended, SQL generation will be decoupled from compilation (though SQL semantic analysis will still occur during compilation).
+It will be important to seperate migrations from the compiler. Not every compilation of Cloesce inherently means a SQL table has changed (one could refactor/add/delete methods, POOs, etc). On top of this, changing a SQLite schema once committed is not trivial, as it requires careful manipulation of the tables and data inside of them.
+
+Seperating these processes requires some refactors to the codebase. We will create another intermediate representation, a `cidl.pre.json`, a raw CIDL handed off from the extractor. The compilation process will focus only on validating this raw form, augmenting it so that it may be easily used for migrations (sorting models by insertion order, and undergoing the hash process needed for change detection (see next section)). Compilation will then produce a `cidl.json` on top of it's current artifacts.
+
+Because of the constraints imposed by D1 and Wrangler (being, migrations must be pure SQL, no logic like in Entity Framework), it's easiest to add a **forward migrations only** engine. That means migrations can only be added, not removed.
 
 We will support two main commands: `cloesce compile -- migrations add <name>` and `cloesce compile -- migrations update`.
 
@@ -77,7 +81,7 @@ wrangler d1 migrations apply <DB_NAME>
 
 ## AST Change Detection Algorithm
 
-SQL generation will have to be shifted from additions only to track refactors and removals, given some working CIDL and some past CIDL (could be empty if not exists). But how do we actually diff two ASTs? We will try to do a structural hashing of the AST, similiar to a Merkle Tree.
+SQL generation will have to be shifted from additions only to track refactors and removals, given some working CIDL and some past CIDL (could be empty if not exists). But how do we actually diff two ASTs? We will try to do a structural hashing of the AST, creating a Merkle Tree.
 
 First, let's determine what nodes of the AST are valuable for a hash:
 
@@ -88,23 +92,15 @@ First, let's determine what nodes of the AST are valuable for a hash:
 - Data source include trees
 - Many to Many navigation properties
 
-Thus, hashes will be stored on Models, Data Sources, Attributes and Navigation Properties. At compile time, we will hash the AST we are working on. Note that we will do semantic analysis on the AST by the time any migrations are being computed, so if someone renames a model `Dog` to `Cat` it's assured that there will be no invalid `Dog` references laying around. After semantic analysis, we can then traverse the models to find diffs between the working tree, and the last stored migration's tree. If a top level diff is equivalent, then no changes have been made. If a value is missing, then we know it has been either renamed or dropped (this is a problem, see below section). If a value does not exist in the last AST, it's been added. If the hashes differ, then we can manually compute all possible diffs.
+Thus, hashes will be needed for Models, Data Sources, Attributes and Navigation Properties. Where should we store these hashes? It's easiest to add a hash property to each part of the current CIDL Rust code, however, the full CIDL isn't really necessary for migrations. Thus, a secondary AST called a `MigrationsAst` will be created that is a subset of the `CloesceAst`, containing only the values we'd want to serialize for a migration. Rust's Serde helps out here, because we can read a `cidl.json` as a `MigrationsAst` despite it having extraneous fields.
 
-During traversal, we will store diffs in a map under their model's name. Then, we will topologically traverse these changes. This is kind of tricky, because dropped tables will have to occur last, but the order of them has to be with respect to the previous AST. For example, if in AST 1:
+The process for change detection will be as follows:
 
-```
-Boss has a Person who has a Dog (name, age)
-```
-
-And in AST 2:
-
-```
-Dog (name)
-```
-
-We would need to modify Dog, then drop Boss, then drop Person. Of course, AST 2 does _not even know about Boss or Person_, so we have to sort the first AST topologically (backwards from insertion order which would be `Person -> Boss`), then sort the second, and merge the sorted orders. This should be as simple as traversing the first sorted AST, grabbing what is necessary, and then appending that list to the end of our second list.
-
-For diffing Include Trees, I think for now we'll spare ourselves the work and just completely regenerate the tree each time.
+- During compilation, after semantic analysis succeeds, merkle hash the `CloesceAst` (parents hashes are composed of childrens hashes recursively)
+- Save this hashed structure as `cidl.json`
+- When a migration is ran, read the last migration as a `MigrationsAst` (which could be None), and read the current `cidl.json` as a `MigrationsAst`
+- Then, traverse the trees and compare hashes. If there is no previous migration, everything is different, and we would then produce a full diff composed of only insert queries. If there are differences, the engine will determine how to handle them.
+- Finally, save the output as a serialized `MigrationsAst`, which contains only the necessary values we need for migrations.
 
 ## The Renaming Problem
 
