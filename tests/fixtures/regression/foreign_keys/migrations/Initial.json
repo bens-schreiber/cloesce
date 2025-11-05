@@ -10,7 +10,6 @@
       },
       "attributes": [],
       "navigation_properties": [],
-      "methods": {},
       "data_sources": {}
     },
     "Course": {
@@ -33,7 +32,6 @@
           }
         }
       ],
-      "methods": {},
       "data_sources": {}
     },
     "Person": {
@@ -56,46 +54,6 @@
           }
         }
       ],
-      "methods": {
-        "post": {
-          "name": "post",
-          "is_static": true,
-          "http_verb": "POST",
-          "return_type": {
-            "Object": "Person"
-          },
-          "parameters": [
-            {
-              "name": "{ db }",
-              "cidl_type": {
-                "Inject": "Env"
-              }
-            },
-            {
-              "name": "person",
-              "cidl_type": {
-                "Object": "Person"
-              }
-            }
-          ]
-        },
-        "refresh": {
-          "name": "refresh",
-          "is_static": false,
-          "http_verb": "GET",
-          "return_type": {
-            "Object": "Person"
-          },
-          "parameters": [
-            {
-              "name": "__dataSource",
-              "cidl_type": {
-                "DataSource": "Person"
-              }
-            }
-          ]
-        }
-      },
       "data_sources": {
         "withDogs": {
           "hash": 11013912170547516633,
@@ -126,46 +84,6 @@
           }
         }
       ],
-      "methods": {
-        "post": {
-          "name": "post",
-          "is_static": true,
-          "http_verb": "POST",
-          "return_type": {
-            "Object": "Student"
-          },
-          "parameters": [
-            {
-              "name": "{ db }",
-              "cidl_type": {
-                "Inject": "Env"
-              }
-            },
-            {
-              "name": "student",
-              "cidl_type": {
-                "Object": "Student"
-              }
-            }
-          ]
-        },
-        "refresh": {
-          "name": "refresh",
-          "is_static": false,
-          "http_verb": "GET",
-          "return_type": {
-            "Object": "Student"
-          },
-          "parameters": [
-            {
-              "name": "__dataSource",
-              "cidl_type": {
-                "DataSource": "Student"
-              }
-            }
-          ]
-        }
-      },
       "data_sources": {
         "withCoursesStudents": {
           "hash": 15362216910619578223,
@@ -218,46 +136,6 @@
           }
         }
       ],
-      "methods": {
-        "post": {
-          "name": "post",
-          "is_static": true,
-          "http_verb": "POST",
-          "return_type": {
-            "Object": "A"
-          },
-          "parameters": [
-            {
-              "name": "{ db }",
-              "cidl_type": {
-                "Inject": "Env"
-              }
-            },
-            {
-              "name": "a",
-              "cidl_type": {
-                "Object": "A"
-              }
-            }
-          ]
-        },
-        "refresh": {
-          "name": "refresh",
-          "is_static": false,
-          "http_verb": "GET",
-          "return_type": {
-            "Object": "A"
-          },
-          "parameters": [
-            {
-              "name": "__dataSource",
-              "cidl_type": {
-                "DataSource": "A"
-              }
-            }
-          ]
-        }
-      },
       "data_sources": {
         "withB": {
           "hash": 451073249129749226,
@@ -291,7 +169,6 @@
         }
       ],
       "navigation_properties": [],
-      "methods": {},
       "data_sources": {}
     }
   }

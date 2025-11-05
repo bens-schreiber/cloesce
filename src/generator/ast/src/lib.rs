@@ -14,8 +14,8 @@ use indexmap::IndexMap;
 use rustc_hash::FxHasher;
 use serde::Deserialize;
 use serde::Serialize;
-use serde_with::MapPreventDuplicates;
 use serde_with::serde_as;
+use serde_with::MapPreventDuplicates;
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
 pub enum CidlType {
@@ -247,7 +247,6 @@ impl CloesceAst {
                     primary_key: model.primary_key,
                     attributes: model.attributes,
                     navigation_properties: model.navigation_properties,
-                    methods: model.methods,
                     data_sources: model.data_sources,
                 };
                 (name, m)
@@ -734,7 +733,6 @@ pub struct MigrationsModel {
     pub primary_key: NamedTypedValue,
     pub attributes: Vec<ModelAttribute>,
     pub navigation_properties: Vec<NavigationProperty>,
-    pub methods: BTreeMap<String, ModelMethod>,
     pub data_sources: BTreeMap<String, DataSource>,
 }
 

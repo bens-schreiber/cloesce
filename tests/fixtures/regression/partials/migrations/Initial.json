@@ -27,30 +27,6 @@
         }
       ],
       "navigation_properties": [],
-      "methods": {
-        "post": {
-          "name": "post",
-          "is_static": true,
-          "http_verb": "POST",
-          "return_type": {
-            "Object": "Dog"
-          },
-          "parameters": [
-            {
-              "name": "{ db }",
-              "cidl_type": {
-                "Inject": "Env"
-              }
-            },
-            {
-              "name": "dog",
-              "cidl_type": {
-                "Partial": "Dog"
-              }
-            }
-          ]
-        }
-      },
       "data_sources": {}
     }
   }
