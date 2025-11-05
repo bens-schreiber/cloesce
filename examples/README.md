@@ -1,8 +1,6 @@
-# Example Cloesce TypeScript Project v0.0.3
+# Example Cloesce TypeScript Project v0.0.4
 
-v0.0.3 is a bare bones pre-alpha version of cloesce.
-
-1. Install npm package (do this in the examples dir):
+1. Install npm package (in the examples dir):
 
 - Run `npm install`
 
