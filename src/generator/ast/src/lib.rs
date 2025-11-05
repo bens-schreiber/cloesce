@@ -14,8 +14,8 @@ use indexmap::IndexMap;
 use rustc_hash::FxHasher;
 use serde::Deserialize;
 use serde::Serialize;
-use serde_with::serde_as;
 use serde_with::MapPreventDuplicates;
+use serde_with::serde_as;
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
 pub enum CidlType {
