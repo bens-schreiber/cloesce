@@ -55,7 +55,6 @@ fn as_migration(ast: CloesceAst) -> MigrationsAst {
                 primary_key: model.primary_key,
                 attributes: model.attributes,
                 navigation_properties: model.navigation_properties,
-                methods: model.methods,
                 data_sources: model.data_sources,
             };
             (name, m)

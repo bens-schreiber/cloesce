@@ -10,34 +10,6 @@
       },
       "attributes": [],
       "navigation_properties": [],
-      "methods": {
-        "bar": {
-          "name": "bar",
-          "is_static": false,
-          "http_verb": "POST",
-          "return_type": "Void",
-          "parameters": [
-            {
-              "name": "customDs",
-              "cidl_type": {
-                "DataSource": "Foo"
-              }
-            },
-            {
-              "name": "oneDs",
-              "cidl_type": {
-                "DataSource": "OneDs"
-              }
-            },
-            {
-              "name": "noDs",
-              "cidl_type": {
-                "DataSource": "NoDs"
-              }
-            }
-          ]
-        }
-      },
       "data_sources": {
         "baz": {
           "hash": 4655990743320231733,
@@ -55,7 +27,6 @@
       },
       "attributes": [],
       "navigation_properties": [],
-      "methods": {},
       "data_sources": {}
     },
     "OneDs": {
@@ -67,7 +38,6 @@
       },
       "attributes": [],
       "navigation_properties": [],
-      "methods": {},
       "data_sources": {
         "default": {
           "hash": 11774770494344376574,

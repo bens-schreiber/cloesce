@@ -1,8 +1,8 @@
 {
-  "hash": 13343537148286750095,
+  "hash": 3590342402,
   "models": {
     "Horse": {
-      "hash": 2176589803233511034,
+      "hash": 3597736862,
       "name": "Horse",
       "primary_key": {
         "name": "id",
@@ -10,7 +10,7 @@
       },
       "attributes": [
         {
-          "hash": 5774566402684976635,
+          "hash": 1153465351,
           "value": {
             "name": "name",
             "cidl_type": "Text"
@@ -18,7 +18,7 @@
           "foreign_key_reference": null
         },
         {
-          "hash": 6906485333841346234,
+          "hash": 1081537831,
           "value": {
             "name": "bio",
             "cidl_type": {
@@ -30,7 +30,7 @@
       ],
       "navigation_properties": [
         {
-          "hash": 8622586494915120333,
+          "hash": 2570171470,
           "var_name": "likes",
           "model_name": "Like",
           "kind": {
@@ -42,7 +42,7 @@
       ],
       "data_sources": {
         "default": {
-          "hash": 9804131625780589811,
+          "hash": 3878327916,
           "name": "default",
           "tree": {
             "likes": {
@@ -51,7 +51,7 @@
           }
         },
         "withLikes": {
-          "hash": 3746572724182981912,
+          "hash": 3840396315,
           "name": "withLikes",
           "tree": {
             "likes": {}
@@ -60,7 +60,7 @@
       }
     },
     "Like": {
-      "hash": 14509074532401779292,
+      "hash": 359914738,
       "name": "Like",
       "primary_key": {
         "name": "id",
@@ -68,7 +68,7 @@
       },
       "attributes": [
         {
-          "hash": 4854163086161148575,
+          "hash": 3102592533,
           "value": {
             "name": "horseId1",
             "cidl_type": "Integer"
@@ -76,7 +76,7 @@
           "foreign_key_reference": "Horse"
         },
         {
-          "hash": 6539715335795530220,
+          "hash": 1434448106,
           "value": {
             "name": "horseId2",
             "cidl_type": "Integer"
@@ -86,7 +86,7 @@
       ],
       "navigation_properties": [
         {
-          "hash": 16105777593012263721,
+          "hash": 2037094087,
           "var_name": "horse2",
           "model_name": "Horse",
           "kind": {

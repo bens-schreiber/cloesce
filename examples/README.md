@@ -8,11 +8,7 @@
 
 - `npx cloesce compile`
 
-3. Migrate
-
-- `npx cloesce migrate Initial`
-
-4. Wrangle' it
+3. Wrangle' it
 
 ```bash
 # migrate wrangler
@@ -22,6 +18,6 @@ echo y | npx wrangler d1 migrations apply example
 npx wrangler dev --port 5000
 ```
 
-5. Run frontend
+4. Run frontend
 
 - `npm run frontend`

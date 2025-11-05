@@ -19,88 +19,6 @@
         }
       ],
       "navigation_properties": [],
-      "methods": {
-        "get": {
-          "name": "get",
-          "is_static": true,
-          "http_verb": "GET",
-          "return_type": {
-            "HttpResult": {
-              "Object": "CrudHaver"
-            }
-          },
-          "parameters": [
-            {
-              "name": "id",
-              "cidl_type": "Integer"
-            },
-            {
-              "name": "dataSource",
-              "cidl_type": {
-                "DataSource": "CrudHaver"
-              }
-            }
-          ]
-        },
-        "list": {
-          "name": "list",
-          "is_static": true,
-          "http_verb": "GET",
-          "return_type": {
-            "HttpResult": {
-              "Array": {
-                "Object": "CrudHaver"
-              }
-            }
-          },
-          "parameters": [
-            {
-              "name": "dataSource",
-              "cidl_type": {
-                "DataSource": "CrudHaver"
-              }
-            }
-          ]
-        },
-        "notCrud": {
-          "name": "notCrud",
-          "is_static": false,
-          "http_verb": "POST",
-          "return_type": "Void",
-          "parameters": [
-            {
-              "name": "__dataSource",
-              "cidl_type": {
-                "DataSource": "CrudHaver"
-              }
-            }
-          ]
-        },
-        "post": {
-          "name": "post",
-          "is_static": true,
-          "http_verb": "POST",
-          "return_type": {
-            "HttpResult": {
-              "Object": "CrudHaver"
-            }
-          },
-          "parameters": [
-            {
-              "name": "obj",
-              "cidl_type": {
-                "Partial": "CrudHaver"
-              }
-            },
-            {
-              "name": "dataSource",
-              "cidl_type": {
-                "DataSource": "CrudHaver"
-              }
-            }
-          ]
-        }
-      },
       "data_sources": {}
     },
     "Parent": {
@@ -144,74 +62,6 @@
           }
         }
       ],
-      "methods": {
-        "get": {
-          "name": "get",
-          "is_static": true,
-          "http_verb": "GET",
-          "return_type": {
-            "HttpResult": {
-              "Object": "Parent"
-            }
-          },
-          "parameters": [
-            {
-              "name": "id",
-              "cidl_type": "Integer"
-            },
-            {
-              "name": "dataSource",
-              "cidl_type": {
-                "DataSource": "Parent"
-              }
-            }
-          ]
-        },
-        "list": {
-          "name": "list",
-          "is_static": true,
-          "http_verb": "GET",
-          "return_type": {
-            "HttpResult": {
-              "Array": {
-                "Object": "Parent"
-              }
-            }
-          },
-          "parameters": [
-            {
-              "name": "dataSource",
-              "cidl_type": {
-                "DataSource": "Parent"
-              }
-            }
-          ]
-        },
-        "post": {
-          "name": "post",
-          "is_static": true,
-          "http_verb": "POST",
-          "return_type": {
-            "HttpResult": {
-              "Object": "Parent"
-            }
-          },
-          "parameters": [
-            {
-              "name": "obj",
-              "cidl_type": {
-                "Partial": "Parent"
-              }
-            },
-            {
-              "name": "dataSource",
-              "cidl_type": {
-                "DataSource": "Parent"
-              }
-            }
-          ]
-        }
-      },
       "data_sources": {
         "withChildren": {
           "hash": 8308376731714560896,
@@ -252,7 +102,6 @@
           }
         }
       ],
-      "methods": {},
       "data_sources": {}
     }
   }
