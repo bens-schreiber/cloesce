@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
-use common::NavigationPropertyKind::{ManyToMany, OneToMany};
-use common::{CidlType, Model, NamedTypedValue, NavigationProperty, NavigationPropertyKind};
+use ast::NavigationPropertyKind::{ManyToMany, OneToMany};
+use ast::{CidlType, Model, NamedTypedValue, NavigationProperty, NavigationPropertyKind};
 use sea_query::{Alias, OnConflict, SimpleExpr, SqliteQueryBuilder, SubQueryStatement};
 use sea_query::{Expr, Query};
 use serde_json::Map;
@@ -565,7 +565,7 @@ fn validate_json_to_cidl(
 mod test {
     use std::collections::HashMap;
 
-    use common::{CidlType, NavigationPropertyKind, builder::ModelBuilder};
+    use ast::{CidlType, NavigationPropertyKind, builder::ModelBuilder};
     use serde_json::json;
 
     use crate::upsert::UpsertModel;

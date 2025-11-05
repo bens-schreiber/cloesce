@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
-use common::Model;
-use common::NavigationPropertyKind;
+use ast::Model;
+use ast::NavigationPropertyKind;
 use serde_json::Map;
 use serde_json::Value;
 
@@ -172,7 +172,7 @@ fn process_navigation_properties(
 
 #[cfg(test)]
 mod tests {
-    use common::{CidlType, NavigationPropertyKind, builder::ModelBuilder};
+    use ast::{CidlType, NavigationPropertyKind, builder::ModelBuilder};
     use serde_json::{Map, Value, json};
     use std::collections::HashMap;
 

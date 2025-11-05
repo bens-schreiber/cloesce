@@ -2,7 +2,7 @@
 mod orm;
 mod upsert;
 
-use common::Model;
+use ast::Model;
 
 use serde_json::Map;
 use std::cell::RefCell;

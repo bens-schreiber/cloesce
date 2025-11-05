@@ -1,4 +1,4 @@
-use common::{CidlType, CloesceAst};
+use ast::{CidlType, CloesceAst};
 
 pub trait ClientLanguageTypeMapper {
     fn type_name(&self, ty: &CidlType, ast: &CloesceAst) -> String;

@@ -1,0 +1,63 @@
+{
+    "version": "v0.0.3",
+    "project_name": "runner",
+    "language": "TypeScript",
+    "wrangler_env": {
+        "name": "Env",
+        "source_path": "./seed__partial.cloesce.ts"
+    },
+    "models": {
+        "Dog": {
+            "name": "Dog",
+            "attributes": [
+                {
+                    "foreign_key_reference": null,
+                    "value": {
+                        "name": "name",
+                        "cidl_type": "Text"
+                    }
+                },
+                {
+                    "foreign_key_reference": null,
+                    "value": {
+                        "name": "age",
+                        "cidl_type": "Integer"
+                    }
+                }
+            ],
+            "primary_key": {
+                "name": "id",
+                "cidl_type": "Integer"
+            },
+            "navigation_properties": [],
+            "methods": {
+                "post": {
+                    "name": "post",
+                    "is_static": true,
+                    "http_verb": "POST",
+                    "return_type": {
+                        "Object": "Dog"
+                    },
+                    "parameters": [
+                        {
+                            "name": "{ db }",
+                            "cidl_type": {
+                                "Inject": "Env"
+                            }
+                        },
+                        {
+                            "name": "dog",
+                            "cidl_type": {
+                                "Partial": "Dog"
+                            }
+                        }
+                    ]
+                }
+            },
+            "data_sources": {},
+            "source_path": "./seed__partial.cloesce.ts"
+        }
+    },
+    "poos": {},
+    "app_source": null
+}

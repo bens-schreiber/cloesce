@@ -1,20 +1,20 @@
 import { cloesce, CloesceApp } from "cloesce/backend";
 import cidl from "./cidl.json";
-import { A } from "./seed__foreign_keys.cloesce.ts";
 import { B } from "./seed__foreign_keys.cloesce.ts";
 import { Course } from "./seed__foreign_keys.cloesce.ts";
-import { Dog } from "./seed__foreign_keys.cloesce.ts";
 import { Person } from "./seed__foreign_keys.cloesce.ts";
 import { Student } from "./seed__foreign_keys.cloesce.ts";
+import { A } from "./seed__foreign_keys.cloesce.ts";
+import { Dog } from "./seed__foreign_keys.cloesce.ts";
 
 const app = new CloesceApp()
 const constructorRegistry = {
-	A: A,
 	B: B,
 	Course: Course,
-	Dog: Dog,
 	Person: Person,
-	Student: Student
+	Student: Student,
+	A: A,
+	Dog: Dog
 };
 
 async function fetch(request: Request, env: any, ctx: any): Promise<Response> {

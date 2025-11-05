@@ -8,9 +8,10 @@ import {
   run,
   subcommands,
   flag,
+  string,
+  positional,
   option,
   optional,
-  string,
 } from "cmd-ts";
 import { Project } from "ts-morph";
 import { CidlExtractor } from "./extractor/extract.js";
@@ -31,6 +32,7 @@ type CloesceConfig = {
   outputDir?: string;
   workersUrl?: string;
   clientUrl?: string;
+  migrationsPath?: string;
 };
 
 const cmds = subcommands({
@@ -67,9 +69,9 @@ const cmds = subcommands({
           args: [
             "generate",
             "all",
+            path.join(outputDir, "cidl.pre.json"),
             path.join(outputDir, "cidl.json"),
             "wrangler.toml",
-            "migrations/migrations.sql",
             path.join(outputDir, "workers.ts"),
             path.join(outputDir, "client.ts"),
             config.clientUrl,
@@ -82,102 +84,9 @@ const cmds = subcommands({
       },
     }),
 
-    wrangler: command({
-      name: "wrangler",
-      description: "Generate wrangler.toml configuration",
-      args: {},
-      handler: async () => {
-        await generate({
-          name: "wrangler",
-          wasmFile: "generator.wasm",
-          args: ["generate", "wrangler", "wrangler.toml"],
-        });
-      },
-    }),
-
-    d1: command({
-      name: "d1",
-      description: "Generate database schema",
-      args: {},
-      handler: async () => {
-        const config = loadCloesceConfig(process.cwd());
-        const outputDir = config.outputDir ?? ".generated";
-
-        await generate({
-          name: "d1",
-          wasmFile: "generator.wasm",
-          args: [
-            "generate",
-            "d1",
-            path.join(outputDir, "cidl.json"),
-            "migrations/migrations.sql",
-          ],
-        });
-      },
-    }),
-
-    workers: command({
-      name: "workers",
-      description: "Generate workers TypeScript",
-      args: {},
-      handler: async () => {
-        const config = loadCloesceConfig(process.cwd());
-        const outputDir = config.outputDir ?? ".generated";
-
-        if (!config.workersUrl) {
-          console.error(
-            "Error: workersUrl must be defined in cloesce.config.json",
-          );
-          process.exit(1);
-        }
-
-        await generate({
-          name: "workers",
-          wasmFile: "generator.wasm",
-          args: [
-            "generate",
-            "workers",
-            path.join(outputDir, "cidl.json"),
-            path.join(outputDir, "workers.ts"),
-            "wrangler.toml",
-            config.workersUrl,
-          ],
-        });
-      },
-    }),
-
-    client: command({
-      name: "client",
-      description: "Generate client TypeScript",
-      args: {},
-      handler: async () => {
-        const config = loadCloesceConfig(process.cwd());
-        const outputDir = config.outputDir ?? ".generated";
-
-        if (!config.clientUrl) {
-          console.error(
-            "Error: clientUrl must be defined in cloesce-config.json",
-          );
-          process.exit(1);
-        }
-
-        await generate({
-          name: "client",
-          wasmFile: "generator.wasm",
-          args: [
-            "generate",
-            "client",
-            path.join(outputDir, "cidl.json"),
-            path.join(outputDir, "client.ts"),
-            config.clientUrl,
-          ],
-        });
-      },
-    }),
-
     extract: command({
       name: "extract",
-      description: "Extract models and write cidl.json only",
+      description: "Extract models and write cidl.pre.json",
       args: {
         projectName: option({
           long: "project-name",
@@ -188,7 +97,6 @@ const cmds = subcommands({
           long: "out",
           short: "o",
           type: optional(string),
-          description: "Output path (default: .generated/cidl.json)",
         }),
         inp: option({
           long: "in",
@@ -216,6 +124,73 @@ const cmds = subcommands({
         await extract({ ...args });
       },
     }),
+
+    migrate: command({
+      name: "migrate",
+      description: "Creates a database migration.",
+      args: {
+        name: positional({ type: string, displayName: "name" }),
+        debug: flag({
+          long: "debug",
+          short: "d",
+          description: "Show debug output",
+        }),
+      },
+      handler: async (args) => {
+        const config = loadCloesceConfig(process.cwd(), args.debug);
+
+        const cidlPath = path.join(
+          config.outputDir ?? ".generated",
+          "cidl.json",
+        );
+        if (!fs.existsSync(cidlPath)) {
+          console.error(
+            "Err: No cloesce file found, have you ran `cloesce compile`?",
+          );
+          process.exit(1);
+        }
+
+        const migrationsPath = "./migrations";
+        if (!fs.existsSync(migrationsPath)) {
+          fs.mkdirSync(migrationsPath);
+        }
+
+        const migrationPrefix = path.join(
+          migrationsPath,
+          `${timestamp()}_${args.name}`,
+        );
+        let wasmArgs = [
+          "migrations",
+          cidlPath,
+          `${migrationPrefix}.json`,
+          `${migrationPrefix}.sql`,
+        ];
+
+        // Add last migration if exists
+        {
+          const files = fs.readdirSync(migrationsPath);
+          const jsonFiles = files.filter((f) => f.endsWith(".json"));
+
+          // Sort descending by filename
+          jsonFiles.sort((a, b) =>
+            b.localeCompare(a, undefined, { numeric: true }),
+          );
+
+          if (jsonFiles.length > 0) {
+            wasmArgs.push(path.join(migrationsPath, jsonFiles[0]));
+          }
+        }
+
+        const migrateConfig: WasmConfig = {
+          name: "migrations",
+          wasmFile: "generator.wasm",
+          args: wasmArgs,
+        };
+
+        // Runs a generator command. Exits the process on failure.
+        await generate(migrateConfig);
+      },
+    }),
   },
 });
 
@@ -232,7 +207,7 @@ async function extract(opts: {
 
   const searchPaths = opts.inp ? [opts.inp] : (config.paths ?? [root]);
   const outputDir = config.outputDir ?? ".generated";
-  const outPath = opts.out ?? path.join(outputDir, "cidl.json");
+  const outPath = opts.out ?? path.join(outputDir, "cidl.pre.json");
   const truncate =
     opts.truncateSourcePaths ?? config.truncateSourcePaths ?? false;
   const cloesceProjectName =
@@ -347,6 +322,19 @@ function loadCloesceConfig(
     }
   }
   return {};
+}
+
+function timestamp(): string {
+  const d = new Date();
+  return (
+    d.getFullYear().toString() +
+    String(d.getMonth() + 1).padStart(2, "0") +
+    String(d.getDate()).padStart(2, "0") +
+    "T" +
+    String(d.getHours()).padStart(2, "0") +
+    String(d.getMinutes()).padStart(2, "0") +
+    String(d.getSeconds()).padStart(2, "0")
+  );
 }
 
 function readPackageJsonProjectName(cwd: string): string {

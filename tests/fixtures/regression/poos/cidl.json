@@ -1,117 +1,119 @@
 {
-    "version": "v0.0.3",
-    "project_name": "runner",
-    "language": "TypeScript",
-    "wrangler_env": {
-        "name": "Env",
-        "source_path": "./seed__poo.cloesce.ts"
-    },
-    "models": {
-        "PooAcceptYield": {
-            "name": "PooAcceptYield",
-            "attributes": [],
-            "primary_key": {
-                "name": "id",
-                "cidl_type": "Integer"
+  "hash": 18302944908339792316,
+  "version": "v0.0.3",
+  "project_name": "runner",
+  "language": "TypeScript",
+  "wrangler_env": {
+    "name": "Env",
+    "source_path": "./seed__poo.cloesce.ts"
+  },
+  "models": {
+    "PooAcceptYield": {
+      "hash": 13918985504312867645,
+      "name": "PooAcceptYield",
+      "primary_key": {
+        "name": "id",
+        "cidl_type": "Integer"
+      },
+      "attributes": [],
+      "navigation_properties": [],
+      "methods": {
+        "acceptPoos": {
+          "name": "acceptPoos",
+          "is_static": false,
+          "http_verb": "POST",
+          "return_type": "Void",
+          "parameters": [
+            {
+              "name": "a",
+              "cidl_type": {
+                "Object": "PooA"
+              }
             },
-            "navigation_properties": [],
-            "methods": {
-                "acceptPoos": {
-                    "name": "acceptPoos",
-                    "is_static": false,
-                    "http_verb": "POST",
-                    "return_type": "Void",
-                    "parameters": [
-                        {
-                            "name": "a",
-                            "cidl_type": {
-                                "Object": "PooA"
-                            }
-                        },
-                        {
-                            "name": "b",
-                            "cidl_type": {
-                                "Object": "PooB"
-                            }
-                        },
-                        {
-                            "name": "c",
-                            "cidl_type": {
-                                "Object": "PooC"
-                            }
-                        },
-                        {
-                            "name": "__dataSource",
-                            "cidl_type": {
-                                "DataSource": "PooAcceptYield"
-                            }
-                        }
-                    ]
-                },
-                "yieldPoo": {
-                    "name": "yieldPoo",
-                    "is_static": false,
-                    "http_verb": "POST",
-                    "return_type": {
-                        "Object": "PooC"
-                    },
-                    "parameters": [
-                        {
-                            "name": "__dataSource",
-                            "cidl_type": {
-                                "DataSource": "PooAcceptYield"
-                            }
-                        }
-                    ]
-                }
+            {
+              "name": "b",
+              "cidl_type": {
+                "Object": "PooB"
+              }
             },
-            "data_sources": {},
-            "source_path": "./seed__poo.cloesce.ts"
-        }
-    },
-    "poos": {
-        "PooA": {
-            "name": "PooA",
-            "attributes": [
-                {
-                    "name": "name",
-                    "cidl_type": "Text"
-                },
-                {
-                    "name": "major",
-                    "cidl_type": "Text"
-                }
-            ],
-            "source_path": "./seed__poo.cloesce.ts"
+            {
+              "name": "c",
+              "cidl_type": {
+                "Object": "PooC"
+              }
+            },
+            {
+              "name": "__dataSource",
+              "cidl_type": {
+                "DataSource": "PooAcceptYield"
+              }
+            }
+          ]
         },
-        "PooB": {
-            "name": "PooB",
-            "attributes": [
-                {
-                    "name": "color",
-                    "cidl_type": "Text"
-                }
-            ],
-            "source_path": "./seed__poo.cloesce.ts"
-        },
-        "PooC": {
-            "name": "PooC",
-            "attributes": [
-                {
-                    "name": "a",
-                    "cidl_type": {
-                        "Object": "PooA"
-                    }
-                },
-                {
-                    "name": "b",
-                    "cidl_type": {
-                        "Object": "PooB"
-                    }
-                }
-            ],
-            "source_path": "./seed__poo.cloesce.ts"
+        "yieldPoo": {
+          "name": "yieldPoo",
+          "is_static": false,
+          "http_verb": "POST",
+          "return_type": {
+            "Object": "PooC"
+          },
+          "parameters": [
+            {
+              "name": "__dataSource",
+              "cidl_type": {
+                "DataSource": "PooAcceptYield"
+              }
+            }
+          ]
         }
+      },
+      "data_sources": {},
+      "source_path": "./seed__poo.cloesce.ts"
+    }
+  },
+  "poos": {
+    "PooA": {
+      "name": "PooA",
+      "attributes": [
+        {
+          "name": "name",
+          "cidl_type": "Text"
+        },
+        {
+          "name": "major",
+          "cidl_type": "Text"
+        }
+      ],
+      "source_path": "./seed__poo.cloesce.ts"
     },
-    "app_source": null
+    "PooB": {
+      "name": "PooB",
+      "attributes": [
+        {
+          "name": "color",
+          "cidl_type": "Text"
+        }
+      ],
+      "source_path": "./seed__poo.cloesce.ts"
+    },
+    "PooC": {
+      "name": "PooC",
+      "attributes": [
+        {
+          "name": "a",
+          "cidl_type": {
+            "Object": "PooA"
+          }
+        },
+        {
+          "name": "b",
+          "cidl_type": {
+            "Object": "PooB"
+          }
+        }
+      ],
+      "source_path": "./seed__poo.cloesce.ts"
+    }
+  },
+  "app_source": null
 }

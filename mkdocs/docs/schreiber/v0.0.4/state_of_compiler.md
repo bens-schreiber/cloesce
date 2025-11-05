@@ -1,6 +1,6 @@
 # v0.0.4 State of the Compiler
 
-Dumping system design as of v0.0.4 here. Cloesce is broken up into two main parts, each with their own sub-domains.
+Dumping system design as of v0.0.4 here. Cloesce is broken up into three main parts, each with their own sub-domains.
 
 ## Frontend
 
@@ -120,15 +120,15 @@ Because these functions are essential to the function of Cloesce, we categorize 
 
 ## Generator
 
-The Generator layer of Cloesce (or backend layer) is responsible for semantic analysis of the CIDL, along with producing final the compiled forms (being: SQLite, Wrangler.toml/jsonc, and HLL files) that form a Cloesce program.
+The Generator layer of Cloesce (or backend layer) is responsible for semantic analysis of the CIDL, along with producing final the compiled forms (being: Wrangler.toml/jsonc, and HLL files) that form a Cloesce program. Note that SQLite generation, while apart of the generator codebase, is seperated into Migrations. It's intake is a `cidl.pre.json` file, which is an unvalidated, unsorted and unhashed CIDL.
 
 ### CLI
 
 The Generator's main point of interaction is through it's CLI, exposing commands to generate each domain of the Generator, as well as commands to generate all domains sequentially (the compilation process). The CLI is also responsible for outputting errors in a readable fashion.
 
-### Shallow Semantic Analysis
+### Semantic Analysis
 
-The CIDL enables an expressive grammar of nullability, arrays, void types, models, partials, etc, which could produce an illogical expression. As shown in the diagram in the Driver section, the generator is responsible for conducting semantic analysis of the CIDL.Before any specific domain of the Generator is compiled, analysis will catch:
+The CIDL enables an expressive grammar of nullability, arrays, void types, models, partials, etc, which could produce an illogical expression. As shown in the diagram in the Driver section, the generator is responsible for conducting semantic analysis of the CIDL. Before any specific domain of the Generator is compiled, analysis will catch:
 
 1. Model attributes with invalid SQL types (can't map to SQL column)
 2. Primary keys with invalid SQL types
@@ -136,19 +136,12 @@ The CIDL enables an expressive grammar of nullability, arrays, void types, model
 4. Unknown navigation property references (model does not exist)
 5. Unknown model references
 6. Invalid parameter types (such as a `void` typed parameter)
+7. Unknown or invalid foreign key references
+8. Missing navigation property attributes
+9. Cyclical dependencies
+10. Invalid data sources (types, references)
 
-### D1 / Sqlite + Full Semantic Analysis
-
-After validation, the first stage in the generator is Sqlite generation, as it performs an in-depth analysis of the foreign keys / navigation properties of models. Analysis will catch:
-
-1. Unknown or invalid foreign key references
-2. Missing navigation property attributes
-3. Cyclical dependencies
-4. Invalid data sources (types, references)
-
-Unlike the validation stage, this validation work is not seperated, but instead done at the same time as the actual compilation to SQLite runs, so as to avoid extra work.
-
-The primary goal of SQLite generation is to transform a CIDL Model into an actual SQL table, considering all of its foreign key dependencies (be it 1:1, 1:M or M:M). Along with this, Cloesce utilizes "DataSources" which are essentially SQL views which describe how tables should be joined in data hydration. Data sources are expressed as graphs (which may be cyclical) so as to avoid infinite inclusion of models (ex: Person has many Persons results in a chain of `Person: { persons: [ {persons: []}...]}`). The link [here](../v0.0.2/thoughts_fks_v0.0.2.md) dives into foreign keys more.
+After semantic analysis, a full `cidl.json` sits in memory until it's dumped to the `.generated` file at the end of the compilation process.
 
 ### Wrangler
 
@@ -161,3 +154,13 @@ One of the most powerful parts of Cloesce is it's ability to create a transparen
 ### WASI Artifact
 
 Currently, in an effort to not compile the Generator to several different operating systems and create a CI/CD pipeline to manage them, Cloesce compiles the Generator to WASI, creating a universal binary that can be easily shipped and downloaded by the Driver. We may or may not stick with this in the future, but it's certainly the easiest way to go about publishing the binary.
+
+## Migrations
+
+In v0.0.4, we moved SQLite compilation outside of the normal code generation process. Instead, it lives in it's own migration engine.
+
+The primary goal of SQLite generation is to transform a CIDL Model into an actual SQL table, considering all of its foreign key dependencies (be it 1:1, 1:M or M:M). Along with this, Cloesce utilizes "DataSources" which are essentially SQL views which describe how tables should be joined in data hydration. Data sources are expressed as graphs (which may be cyclical) so as to avoid infinite inclusion of models (ex: Person has many Persons results in a chain of `Person: { persons: [ {persons: []}...]}`). The link [here](../v0.0.2/thoughts_fks_v0.0.2.md) dives into foreign keys more.
+
+The migrations engine adds on to SQLite generation by supporting the evolution of models in the database. Models can be altered, deleted, or added, with each migration being a snapshot of some saved database state. Adding a migraton does not remove all data, but transfers from one snapshot to another (via `CREATE`, `ALTER` and `DROP` statements).
+
+See [this link](./thoughts_migrations.md) for a detailed analysis of the migrations engine.

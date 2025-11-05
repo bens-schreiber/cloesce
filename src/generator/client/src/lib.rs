@@ -2,7 +2,7 @@ mod mappers;
 
 use std::{ops::Deref, sync::Arc};
 
-use common::{CidlType, CloesceAst, InputLanguage, NavigationProperty, NavigationPropertyKind};
+use ast::{CidlType, CloesceAst, InputLanguage, NavigationProperty, NavigationPropertyKind};
 use mappers::{ClientLanguageTypeMapper, TypeScriptMapper};
 
 use handlebars::{Handlebars, handlebars_helper};
@@ -50,11 +50,9 @@ fn register_helpers<'a>(
                     serde_json::from_value(h.param(0).unwrap().value().clone()).unwrap();
 
                 let cidl_type = match nav.kind {
-                    common::NavigationPropertyKind::OneToOne { .. } => {
-                        CidlType::Object(nav.model_name)
-                    }
-                    common::NavigationPropertyKind::OneToMany { .. }
-                    | common::NavigationPropertyKind::ManyToMany { .. } => {
+                    NavigationPropertyKind::OneToOne { .. } => CidlType::Object(nav.model_name),
+                    NavigationPropertyKind::OneToMany { .. }
+                    | NavigationPropertyKind::ManyToMany { .. } => {
                         CidlType::array(CidlType::Object(nav.model_name))
                     }
                 };

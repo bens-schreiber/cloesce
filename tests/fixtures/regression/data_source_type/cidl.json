@@ -1,99 +1,105 @@
 {
-    "version": "v0.0.3",
-    "project_name": "runner",
-    "language": "TypeScript",
-    "wrangler_env": {
-        "name": "Env",
-        "source_path": "./seed__ds.cloesce.ts"
-    },
-    "models": {
-        "NoDs": {
-            "name": "NoDs",
-            "attributes": [],
-            "primary_key": {
-                "name": "id",
-                "cidl_type": "Integer"
+  "hash": 6349253276655467602,
+  "version": "v0.0.3",
+  "project_name": "runner",
+  "language": "TypeScript",
+  "wrangler_env": {
+    "name": "Env",
+    "source_path": "./seed__ds.cloesce.ts"
+  },
+  "models": {
+    "Foo": {
+      "hash": 5030820420179718148,
+      "name": "Foo",
+      "primary_key": {
+        "name": "id",
+        "cidl_type": "Integer"
+      },
+      "attributes": [],
+      "navigation_properties": [],
+      "methods": {
+        "bar": {
+          "name": "bar",
+          "is_static": false,
+          "http_verb": "POST",
+          "return_type": "Void",
+          "parameters": [
+            {
+              "name": "customDs",
+              "cidl_type": {
+                "DataSource": "Foo"
+              }
             },
-            "navigation_properties": [],
-            "methods": {},
-            "data_sources": {},
-            "source_path": "./seed__ds.cloesce.ts"
-        },
-        "OneDs": {
-            "name": "OneDs",
-            "attributes": [],
-            "primary_key": {
-                "name": "id",
-                "cidl_type": "Integer"
+            {
+              "name": "oneDs",
+              "cidl_type": {
+                "DataSource": "OneDs"
+              }
             },
-            "navigation_properties": [],
-            "methods": {},
-            "data_sources": {
-                "default": {
-                    "name": "default",
-                    "tree": {}
-                }
-            },
-            "source_path": "./seed__ds.cloesce.ts"
-        },
-        "Foo": {
-            "name": "Foo",
-            "attributes": [],
-            "primary_key": {
-                "name": "id",
-                "cidl_type": "Integer"
-            },
-            "navigation_properties": [],
-            "methods": {
-                "bar": {
-                    "name": "bar",
-                    "is_static": false,
-                    "http_verb": "POST",
-                    "return_type": "Void",
-                    "parameters": [
-                        {
-                            "name": "customDs",
-                            "cidl_type": {
-                                "DataSource": "Foo"
-                            }
-                        },
-                        {
-                            "name": "oneDs",
-                            "cidl_type": {
-                                "DataSource": "OneDs"
-                            }
-                        },
-                        {
-                            "name": "noDs",
-                            "cidl_type": {
-                                "DataSource": "NoDs"
-                            }
-                        }
-                    ]
-                }
-            },
-            "data_sources": {
-                "baz": {
-                    "name": "baz",
-                    "tree": {}
-                }
-            },
-            "source_path": "./seed__ds.cloesce.ts"
+            {
+              "name": "noDs",
+              "cidl_type": {
+                "DataSource": "NoDs"
+              }
+            }
+          ]
         }
-    },
-    "poos": {
-        "Poo": {
-            "name": "Poo",
-            "attributes": [
-                {
-                    "name": "ds",
-                    "cidl_type": {
-                        "DataSource": "Foo"
-                    }
-                }
-            ],
-            "source_path": "./seed__ds.cloesce.ts"
+      },
+      "data_sources": {
+        "baz": {
+          "hash": 4655990743320231733,
+          "name": "baz",
+          "tree": {}
         }
+      },
+      "source_path": "./seed__ds.cloesce.ts"
     },
-    "app_source": null
+    "NoDs": {
+      "hash": 13267258502866568209,
+      "name": "NoDs",
+      "primary_key": {
+        "name": "id",
+        "cidl_type": "Integer"
+      },
+      "attributes": [],
+      "navigation_properties": [],
+      "methods": {},
+      "data_sources": {},
+      "source_path": "./seed__ds.cloesce.ts"
+    },
+    "OneDs": {
+      "hash": 12534124635817757359,
+      "name": "OneDs",
+      "primary_key": {
+        "name": "id",
+        "cidl_type": "Integer"
+      },
+      "attributes": [],
+      "navigation_properties": [],
+      "methods": {},
+      "data_sources": {
+        "default": {
+          "hash": 11774770494344376574,
+          "name": "default",
+          "tree": {}
+        }
+      },
+      "source_path": "./seed__ds.cloesce.ts"
+    }
+  },
+  "poos": {
+    "Poo": {
+      "name": "Poo",
+      "attributes": [
+        {
+          "name": "ds",
+          "cidl_type": {
+            "DataSource": "Foo"
+          }
+        }
+      ],
+      "source_path": "./seed__ds.cloesce.ts"
+    }
+  },
+  "app_source": null
 }

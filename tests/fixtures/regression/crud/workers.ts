@@ -1,14 +1,14 @@
 import { cloesce, CloesceApp } from "cloesce/backend";
 import cidl from "./cidl.json";
-import { Child } from "./seed__crud.cloesce.ts";
 import { CrudHaver } from "./seed__crud.cloesce.ts";
 import { Parent } from "./seed__crud.cloesce.ts";
+import { Child } from "./seed__crud.cloesce.ts";
 
 const app = new CloesceApp()
 const constructorRegistry = {
-	Child: Child,
 	CrudHaver: CrudHaver,
-	Parent: Parent
+	Parent: Parent,
+	Child: Child
 };
 
 async function fetch(request: Request, env: any, ctx: any): Promise<Response> {

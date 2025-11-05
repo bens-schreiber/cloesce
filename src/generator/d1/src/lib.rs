@@ -1,550 +1,836 @@
-use std::collections::{BTreeMap, HashMap, VecDeque};
+use std::collections::HashMap;
 
-use common::{
-    CidlType, IncludeTree, Model, NavigationPropertyKind, ensure,
-    err::{GeneratorErrorKind, Result},
-    fail,
+use ast::{
+    CidlType, DataSource, IncludeTree, MigrationsAst, MigrationsModel, ModelAttribute,
+    NavigationPropertyKind,
 };
 
+use indexmap::IndexMap;
 use sea_query::{
-    ColumnDef, Expr, ForeignKey, Index, IntoCondition, Query, SelectStatement, SqliteQueryBuilder,
-    Table, TableCreateStatement,
+    ColumnDef, Expr, ForeignKey, Index, IntoCondition, Query, SchemaStatementBuilder,
+    SelectStatement, SqliteQueryBuilder, Table,
 };
 
-/// Validates the Model AST, producing an equivalent sql schema of
-/// tables and views
-pub fn generate_sql(model_lookup: &BTreeMap<String, Model>) -> Result<String> {
-    let (sorted_models, many_to_many_tables) = validate_fks(model_lookup)?;
-    let model_tree = validate_data_sources(model_lookup)?;
+pub struct D1Generator;
+impl D1Generator {
+    /// Uses the last migrated [MigrationsAst] to produce a new migrated SQL schema.
+    ///
+    /// Some migration scenarios require user intervention through a [MigrationsIntent], which
+    /// can be blocking.
+    pub fn migrate(
+        ast: &MigrationsAst,
+        lm_ast: Option<&MigrationsAst>,
+        intent: &dyn MigrationsIntent,
+    ) -> String {
+        if let Some(lm_ast) = lm_ast
+            && lm_ast.hash == ast.hash
+        {
+            // No work to be done
+            return String::default();
+        }
 
-    let tables = generate_tables(&sorted_models, many_to_many_tables, model_lookup).join("\n");
-    let views = generate_views(model_tree).join("\n");
+        let tables = MigrateTables::make_migrations(ast, lm_ast, intent);
+        let views = MigrateViews::make_migrations(ast, lm_ast);
+        if lm_ast.is_none() {
+            let cloesce_tmp = to_sqlite(
+                Table::create()
+                    .table(alias("_cloesce_tmp"))
+                    .col(
+                        ColumnDef::new_with_type(alias("path"), sea_query::ColumnType::Text)
+                            .primary_key(),
+                    )
+                    .col(
+                        ColumnDef::new_with_type(alias("id"), sea_query::ColumnType::Integer)
+                            .not_null(),
+                    )
+                    .to_owned(),
+            );
 
-    // A table of temporary values useful in ORM functions.
-    let cloesce_tmp = TableCreateStatement::new()
-        .table(alias("_cloesce_tmp"))
-        .col(ColumnDef::new_with_type(alias("path"), sea_query::ColumnType::Text).primary_key())
-        .col(ColumnDef::new_with_type(alias("id"), sea_query::ColumnType::Integer).not_null())
-        .to_string(SqliteQueryBuilder);
+            return format!("{tables}\n{views}\n--- Cloesce Temporary Table\n{cloesce_tmp}");
+        }
 
-    Ok(format!(
-        r#"-- Models
-{tables}
-
--- Views / Data Sources
-{views}
-
--- Cloesce
-{cloesce_tmp};"#
-    ))
+        format!("{tables}\n{views}")
+    }
 }
 
-fn generate_views(model_tree: Vec<ModelTree>) -> Vec<String> {
-    let mut views = vec![];
+pub enum MigrationsDilemma<'a> {
+    RenameOrDropModel {
+        model_name: String,
+        options: &'a Vec<&'a String>,
+    },
+    RenameOrDropAttribute {
+        model_name: String,
+        attribute_name: String,
+        options: &'a Vec<&'a String>,
+    },
+}
 
-    for tree in model_tree {
-        let mut query = Query::select();
+pub trait MigrationsIntent {
+    /// A potentially blocking call to await some response to the given [MigrationDilemma]
+    ///
+    /// Returns None if the model should be dropped, Some if an option presented should be selected.
+    fn ask(&self, dilemma: MigrationsDilemma) -> Option<usize>;
+}
 
-        query.from(alias(&tree.root.model.name));
-        dfs(
-            &tree.root,
-            &mut query,
-            &mut vec![tree.root.model.name.clone()],
-        );
+struct MigrateViews;
+impl MigrateViews {
+    /// Takes in a list of [ModelTree] and returns a list of `CREATE VIEW` statements
+    /// derived from their respective tree.
+    fn create(
+        models: Vec<(&MigrationsModel, Vec<&DataSource>)>,
+        model_lookup: &IndexMap<String, MigrationsModel>,
+    ) -> Vec<String> {
+        let mut res = vec![];
 
-        views.push(format!(
-            "CREATE VIEW \"{}.{}\" AS {};",
-            tree.root.model.name,
-            tree.name,
-            query.to_string(SqliteQueryBuilder)
-        ))
-    }
+        for (model, ds) in models {
+            for d in ds {
+                let mut query = Query::select();
+                query.from(alias(&model.name));
 
-    return views;
+                let mut alias_counter = HashMap::<String, u32>::new();
+                let model_alias = generate_alias(&model.name, &mut alias_counter);
+                dfs(
+                    model,
+                    &d.tree,
+                    &mut query,
+                    &mut vec![model.name.clone()],
+                    model_alias,
+                    None,
+                    &mut alias_counter,
+                    model_lookup,
+                );
 
-    fn dfs(node: &ModelTreeNode, query: &mut SelectStatement, path: &mut Vec<String>) {
-        let path_to_column = path.join(".");
-
-        // Primary Key
-        {
-            let pk = &node.model.primary_key.name;
-            let col = if matches!(
-                node.parent_transition_kind,
-                Some(NavigationPropertyKind::ManyToMany { .. })
-            ) {
-                // M:M pk is in the form "UniqueIdN.ModelName.PrimaryKeyName"
-                Expr::col((
-                    alias(node.many_to_many_alias.as_ref().unwrap()),
-                    alias(format!("{}.{}", node.model.name, pk)),
+                res.push(format!(
+                    "CREATE VIEW IF NOT EXISTS \"{}.{}\" AS {};",
+                    model.name,
+                    d.name,
+                    query.to_string(SqliteQueryBuilder)
                 ))
-            } else {
-                Expr::col((alias(&node.model_alias), alias(pk)))
+            }
+        }
+
+        return res;
+
+        #[allow(clippy::too_many_arguments)]
+        fn dfs(
+            model: &MigrationsModel,
+            tree: &IncludeTree,
+            query: &mut SelectStatement,
+            path: &mut Vec<String>,
+            model_alias: String,
+            m2m_alias: Option<&String>,
+            alias_counter: &mut HashMap<String, u32>,
+            model_lookup: &IndexMap<String, MigrationsModel>,
+        ) {
+            let path_to_column = path.join(".");
+            let pk = &model.primary_key.name;
+
+            // Primary Key
+            {
+                let col = if let Some(m2m_alias) = m2m_alias {
+                    // M:M pk is in the form "UniqueIdN.ModelName.PrimaryKeyName"
+                    Expr::col((alias(m2m_alias), alias(format!("{}.{}", model.name, pk))))
+                } else {
+                    Expr::col((alias(&model_alias), alias(pk)))
+                };
+
+                query.expr_as(col, alias(format!("{}.{}", &path_to_column, pk)));
             };
 
-            query.expr_as(col, alias(format!("{}.{}", &path_to_column, pk)));
-        }
-
-        // Columns
-        for attr in &node.model.attributes {
-            query.expr_as(
-                Expr::col((alias(&node.model_alias), alias(&attr.value.name))),
-                alias(format!("{}.{}", &path_to_column, attr.value.name)),
-            );
-        }
-
-        // Navigation properties
-        for child in &node.children {
-            match child.parent_transition_kind.as_ref().unwrap() {
-                NavigationPropertyKind::OneToOne { reference } => {
-                    let nav_model_pk = &child.model.primary_key.name;
-
-                    left_join_as(
-                        query,
-                        &child.model.name,
-                        &child.model_alias,
-                        Expr::col((alias(&node.model_alias), alias(reference)))
-                            .equals((alias(&child.model_alias), alias(nav_model_pk))),
-                    );
-                }
-                NavigationPropertyKind::OneToMany { reference } => {
-                    let pk = &node.model.primary_key.name;
-
-                    left_join_as(
-                        query,
-                        &child.model.name,
-                        &child.model_alias,
-                        Expr::col((alias(&node.model_alias), alias(pk)))
-                            .equals((alias(&child.model_alias), alias(reference))),
-                    );
-                }
-                NavigationPropertyKind::ManyToMany { unique_id } => {
-                    let nav_model_pk = &child.model.primary_key;
-                    let pk = &node.model.primary_key.name;
-
-                    left_join_as(
-                        query,
-                        unique_id,
-                        child.many_to_many_alias.as_ref().unwrap(),
-                        Expr::col((alias(&node.model_alias), alias(pk))).equals((
-                            alias(child.many_to_many_alias.as_ref().unwrap()),
-                            alias(format!("{}.{}", node.model.name, pk)),
-                        )),
-                    );
-
-                    left_join_as(
-                        query,
-                        &child.model.name,
-                        &child.model_alias,
-                        Expr::col((
-                            alias(child.many_to_many_alias.as_ref().unwrap()),
-                            alias(format!("{}.{}", child.model.name, pk)),
-                        ))
-                        .equals((alias(&child.model_alias), alias(&nav_model_pk.name))),
-                    );
-                }
-            }
-            path.push(child.parent_transition_name.as_ref().unwrap().clone());
-            dfs(child, query, path);
-            path.pop();
-        }
-    }
-}
-
-fn generate_tables(
-    sorted_models: &[&Model],
-    many_to_many_tables: Vec<JunctionTable>,
-    model_lookup: &BTreeMap<String, Model>,
-) -> Vec<String> {
-    let mut res = Vec::new();
-    for &model in sorted_models {
-        let mut table = Table::create();
-        table.table(alias(model.name.clone()));
-
-        // Set Primary Key
-        {
-            let mut column = typed_column(&model.primary_key.name, &model.primary_key.cidl_type);
-            column.primary_key();
-            table.col(column);
-        }
-
-        for attr in model.attributes.iter() {
-            let mut column = typed_column(&attr.value.name, &attr.value.cidl_type);
-
-            if !attr.value.cidl_type.is_nullable() {
-                column.not_null();
-            }
-
-            // Set attribute foreign key
-            if let Some(fk_model_name) = &attr.foreign_key_reference {
-                // Unwrap: safe because `validate_models` and `validate_fks` halt
-                // if the values are missing
-                let pk_name = &model_lookup
-                    .get(fk_model_name.as_str())
-                    .unwrap()
-                    .primary_key
-                    .name;
-
-                table.foreign_key(
-                    ForeignKey::create()
-                        .from(alias(model.name.clone()), alias(attr.value.name.as_str()))
-                        .to(alias(fk_model_name.clone()), alias(pk_name))
-                        .on_update(sea_query::ForeignKeyAction::Cascade)
-                        .on_delete(sea_query::ForeignKeyAction::Restrict),
+            // Columns
+            for attr in &model.attributes {
+                query.expr_as(
+                    Expr::col((alias(&model_alias), alias(&attr.value.name))),
+                    alias(format!("{}.{}", &path_to_column, attr.value.name)),
                 );
             }
 
-            table.col(column);
+            // Navigation properties
+            for nav in &model.navigation_properties {
+                let Some(child_tree) = tree.0.get(&nav.var_name) else {
+                    continue;
+                };
+
+                let child = model_lookup.get(&nav.model_name).unwrap();
+                let child_alias = generate_alias(&child.name, alias_counter);
+                let mut child_m2m_alias = None;
+
+                match &nav.kind {
+                    NavigationPropertyKind::OneToOne { reference } => {
+                        let nav_model_pk = &child.primary_key.name;
+                        left_join_as(
+                            query,
+                            &child.name,
+                            &child_alias,
+                            Expr::col((alias(&model_alias), alias(reference)))
+                                .equals((alias(&child_alias), alias(nav_model_pk))),
+                        );
+                    }
+                    NavigationPropertyKind::OneToMany { reference } => {
+                        left_join_as(
+                            query,
+                            &child.name,
+                            &child_alias,
+                            Expr::col((alias(&model_alias), alias(pk)))
+                                .equals((alias(&child_alias), alias(reference))),
+                        );
+                    }
+                    NavigationPropertyKind::ManyToMany { unique_id } => {
+                        let nav_model_pk = &child.primary_key;
+                        let pk = &model.primary_key.name;
+                        let m2m_alias = generate_alias(unique_id, alias_counter);
+
+                        left_join_as(
+                            query,
+                            unique_id,
+                            &m2m_alias,
+                            Expr::col((alias(&model_alias), alias(pk))).equals((
+                                alias(&m2m_alias),
+                                alias(format!("{}.{}", model.name, pk)),
+                            )),
+                        );
+
+                        left_join_as(
+                            query,
+                            &child.name,
+                            &child_alias,
+                            Expr::col((alias(&m2m_alias), alias(format!("{}.{}", child.name, pk))))
+                                .equals((alias(&child_alias), alias(&nav_model_pk.name))),
+                        );
+
+                        child_m2m_alias = Some(m2m_alias);
+                    }
+                }
+
+                path.push(nav.var_name.clone());
+                dfs(
+                    child,
+                    child_tree,
+                    query,
+                    path,
+                    child_alias,
+                    child_m2m_alias.as_ref(),
+                    alias_counter,
+                    model_lookup,
+                );
+                path.pop();
+            }
         }
 
-        // Generate SQLite
-        res.push(format!("{};", table.build(SqliteQueryBuilder)));
-    }
-
-    for JunctionTable { a, b, unique_id } in many_to_many_tables {
-        let mut table = Table::create();
-
-        // TODO: Name the junction table in some standard way
-        let col_a_name = format!("{}.{}", a.model_name, a.model_pk_name);
-        let mut col_a = typed_column(&col_a_name, &a.model_pk_type);
-
-        let col_b_name = format!("{}.{}", b.model_name, b.model_pk_name);
-        let mut col_b = typed_column(&col_b_name, &b.model_pk_type);
-
-        table
-            .table(alias(unique_id))
-            .col(col_a.not_null())
-            .col(col_b.not_null())
-            .primary_key(
-                Index::create()
-                    .col(alias(&col_a_name))
-                    .col(alias(&col_b_name)),
-            )
-            .foreign_key(
-                ForeignKey::create()
-                    .from(alias(unique_id), alias(&col_a_name))
-                    .to(alias(a.model_name), alias(a.model_pk_name))
-                    .on_update(sea_query::ForeignKeyAction::Cascade)
-                    .on_delete(sea_query::ForeignKeyAction::Restrict),
-            )
-            .foreign_key(
-                ForeignKey::create()
-                    .from(alias(unique_id), alias(&col_b_name))
-                    .to(alias(b.model_name), alias(b.model_pk_name))
-                    .on_update(sea_query::ForeignKeyAction::Cascade)
-                    .on_delete(sea_query::ForeignKeyAction::Restrict),
-            );
-
-        res.push(format!("{};", table.to_string(SqliteQueryBuilder)));
-    }
-
-    res
-}
-
-/// Validates foreign key relationships for every [Model] in the AST. Returns a
-/// SQL-safe topological ordering of the models, along with a vec of all necessary Junction tables
-///
-/// Returns error on
-/// - Unknown or invalid foreign key references
-/// - Missing navigation property attributes
-/// - Cyclical dependencies
-fn validate_fks<'a>(
-    model_lookup: &'a BTreeMap<String, Model>,
-) -> Result<(Vec<&'a Model>, Vec<JunctionTable<'a>>)> {
-    // Topo sort and cycle detection
-    let mut in_degree = BTreeMap::<&str, usize>::new();
-    let mut graph = BTreeMap::<&str, Vec<&str>>::new();
-
-    let mut many_to_many = HashMap::<&String, JunctionTableBuilder>::new();
-
-    // Maps a model name and a foreign key reference to the model it is referencing
-    // Ie, Person.dogId => { (Person, dogId): "Dog" }
-    let mut model_reference_to_fk_model = HashMap::<(&str, &str), &str>::new();
-    let mut unvalidated_navs = Vec::new();
-
-    for model in model_lookup.values() {
-        graph.entry(&model.name).or_default();
-        in_degree.entry(&model.name).or_insert(0);
-
-        for attr in &model.attributes {
-            let Some(fk_model) = &attr.foreign_key_reference else {
-                continue;
+        fn generate_alias(name: &str, alias_counter: &mut HashMap<String, u32>) -> String {
+            let count = alias_counter.entry(name.to_string()).or_default();
+            let alias = if *count == 0 {
+                name.to_string()
+            } else {
+                format!("{}{}", name, count)
             };
-
-            model_reference_to_fk_model.insert((&model.name, attr.value.name.as_str()), fk_model);
-
-            // Nullable FK's do not constrain table creation order, and thus
-            // can be left out of the topo sort
-            if !attr.value.cidl_type.is_nullable() {
-                // One To One: Person has a Dog ..(sql)=> Person has a fk to Dog
-                // Dog must come before Person
-                graph.entry(fk_model).or_default().push(&model.name);
-                in_degree.entry(&model.name).and_modify(|d| *d += 1);
-            }
+            *count += 1;
+            alias
         }
 
-        // Validate navigation property types
-        for nav in &model.navigation_properties {
-            match &nav.kind {
-                NavigationPropertyKind::OneToOne { reference } => {
-                    // Validate the nav prop's reference is consistent
-                    if let Some(&fk_model) =
-                        model_reference_to_fk_model.get(&(&model.name, reference))
-                    {
-                        ensure!(
-                            fk_model == nav.model_name,
-                            GeneratorErrorKind::MismatchedNavigationPropertyTypes,
-                            "({}.{}) does not match type ({})",
-                            model.name,
-                            nav.var_name,
-                            fk_model
-                        );
-                    } else {
-                        fail!(
-                            GeneratorErrorKind::InvalidNavigationPropertyReference,
-                            "{}.{} references {}.{} which does not exist or is not a foreign key to {}",
-                            model.name,
-                            nav.var_name,
-                            nav.model_name,
-                            reference,
-                            model.name
-                        );
-                    }
-                }
-                NavigationPropertyKind::OneToMany { reference: _ } => {
-                    unvalidated_navs.push((&model.name, &nav.model_name, nav));
-                }
-                NavigationPropertyKind::ManyToMany { unique_id } => {
-                    many_to_many
-                        .entry(unique_id)
-                        .or_default()
-                        .model(JunctionModel {
-                            model_name: &model.name,
-                            model_pk_name: &model.primary_key.name,
-                            model_pk_type: model.primary_key.cidl_type.clone(),
-                        })?;
-                }
+        fn left_join_as(
+            query: &mut SelectStatement,
+            model_name: &str,
+            model_alias: &str,
+            condition: impl IntoCondition,
+        ) {
+            if model_name == model_alias {
+                query.left_join(alias(model_name), condition);
+            } else {
+                query.join_as(
+                    sea_query::JoinType::LeftJoin,
+                    alias(model_name),
+                    alias(model_alias),
+                    condition,
+                );
             }
         }
     }
 
-    // Validate 1:M nav props
-    for (model_name, nav_model, nav) in unvalidated_navs {
-        let NavigationPropertyKind::OneToMany { reference } = &nav.kind else {
-            continue;
-        };
+    /// If a data source is altered in any way, it will be dropped and added to the create list.
+    /// Views don't contain data so I don't see a problem with this (@ben schreiber)
+    ///
+    /// Returns a list of dropped data source queries, along with a list of data sources that need to created.
+    fn drop_alter<'a>(
+        ast: &MigrationsAst,
+        lm_lookup: &'a IndexMap<String, MigrationsModel>,
+    ) -> (Vec<String>, Vec<(&'a MigrationsModel, Vec<&'a DataSource>)>) {
+        const DROP_VIEW: &str = "DROP VIEW IF EXISTS";
+        let mut drops = vec![];
+        let mut creates = HashMap::<&String, Vec<&DataSource>>::new();
 
-        // Validate the nav props reference is consistent to an attribute
-        // on another model
-        let Some(&fk_model) = model_reference_to_fk_model.get(&(nav_model, reference)) else {
-            fail!(
-                GeneratorErrorKind::InvalidNavigationPropertyReference,
-                "{}.{} references {}.{} which does not exist or is not a foreign key to {}",
-                model_name,
-                nav.var_name,
-                nav_model,
-                reference,
-                model_name
-            );
-        };
+        for lm_model in lm_lookup.values() {
+            match ast.models.get(&lm_model.name) {
+                // Model was changed from last migration
+                Some(model) if model.hash != lm_model.hash => {
+                    for lm_ds in lm_model.data_sources.values() {
+                        let changed = model
+                            .data_sources
+                            .get(&lm_ds.name)
+                            .is_none_or(|ds| ds.hash != lm_ds.hash);
 
-        // The types should reference one another
-        // ie, Person has many dogs, personId on dog should be an fk to Person
-        ensure!(
-            model_name == fk_model,
-            GeneratorErrorKind::MismatchedNavigationPropertyTypes,
-            "({}.{}) does not match type ({}.{})",
-            model_name,
-            nav.var_name,
-            nav_model,
-            reference,
-        );
+                        // Data Source was changed from last migration
+                        if changed {
+                            drops
+                                .push(format!("{DROP_VIEW} \"{}.{}\";", lm_model.name, lm_ds.name));
 
-        // One To Many: Person has many Dogs (sql)=> Dog has an fk to  Person
-        // Person must come before Dog in topo order
-        graph.entry(model_name).or_default().push(nav_model);
-        *in_degree.entry(nav_model).or_insert(0) += 1;
-    }
-
-    // Validate M:M
-    let many_to_many_tables: Vec<JunctionTable> = many_to_many
-        .drain()
-        .map(|(unique_id, v)| v.build(unique_id))
-        .collect::<Result<_>>()?;
-
-    // Kahn's algorithm
-    let topo_sorted = {
-        let mut queue = in_degree
-            .iter()
-            .filter_map(|(&name, &deg)| (deg == 0).then_some(name))
-            .collect::<VecDeque<_>>();
-
-        let mut sorted = Vec::with_capacity(model_lookup.len());
-        while let Some(model_name) = queue.pop_front() {
-            sorted.push(
-                model_lookup
-                    .get(model_name)
-                    .expect("model names to be validated"),
-            );
-
-            if let Some(adjs) = graph.get(model_name) {
-                for adj in adjs {
-                    let deg = in_degree.get_mut(adj).expect("model names to be validated");
-                    *deg -= 1;
-
-                    if *deg == 0 {
-                        queue.push_back(adj);
+                            creates.entry(&lm_model.name).or_default().push(lm_ds);
+                        }
                     }
                 }
+                // Last migration model was removed entirely
+                None => {
+                    for lm_ds in lm_model.data_sources.values() {
+                        drops.push(format!("{DROP_VIEW} \"{}.{}\";", lm_model.name, lm_ds.name));
+                    }
+                }
+                // Last migration model unchanged
+                _ => {}
             }
         }
 
-        if sorted.len() != model_lookup.len() {
-            let cyclic: Vec<&str> = in_degree
-                .iter()
-                .filter_map(|(&n, &d)| (d > 0).then_some(n))
-                .collect();
-            fail!(
-                GeneratorErrorKind::CyclicalModelDependency,
-                "{}",
-                cyclic.join(", ")
-            );
-        }
+        (
+            drops,
+            creates
+                .drain()
+                .map(|(k, v)| (lm_lookup.get(k).unwrap(), v))
+                .collect::<Vec<_>>(),
+        )
+    }
 
-        sorted
-    };
+    /// Given a vector of all model trees in the new AST, and the last migrated AST's lookup table,
+    /// produces a sequence of SQL queries `CREATE`-ing and `DROP`-ing the last migrated AST to
+    /// sync with the new.
+    fn make_migrations(ast: &MigrationsAst, lm_ast: Option<&MigrationsAst>) -> String {
+        let (drop_stmts, creates) = if let Some(lm_ast) = lm_ast {
+            let (drops, mut creates) = Self::drop_alter(ast, &lm_ast.models);
 
-    Ok((topo_sorted, many_to_many_tables))
-}
+            for model in ast.models.values() {
+                if lm_ast.models.contains_key(&model.name) {
+                    continue;
+                }
 
-struct ModelTreeNode<'a> {
-    parent_transition_kind: Option<NavigationPropertyKind>,
-    parent_transition_name: Option<String>,
+                creates.push((model, model.data_sources.values().collect::<Vec<_>>()));
+            }
 
-    /// The alias of the associated [Model], being some form of
-    /// "ModelName" + N, where N is how many times the model occurs in the tree.
-    model_alias: String,
-
-    /// The alias of the associated many to many table if it exists, being
-    /// some form of "UniqueId" + N, where N is how many times the model occurs in the tree.
-    many_to_many_alias: Option<String>,
-    model: &'a Model,
-    children: Vec<ModelTreeNode<'a>>,
-}
-
-struct ModelTree<'a> {
-    name: String,
-    root: ModelTreeNode<'a>,
-}
-
-/// Validates all data sources, ensuring types and references check out.
-/// Returns an intermediate [ModelTree] which houses both the models and their
-/// SQL correct aliases (Foo vs Foo1 vs Foo2).
-///
-/// Returns error on
-/// - Invalid data source type
-/// - Invalid data source reference
-/// - Unknown model
-fn validate_data_sources<'a>(
-    model_lookup: &'a BTreeMap<String, Model>,
-) -> Result<Vec<ModelTree<'a>>> {
-    let mut model_trees = vec![];
-
-    for model in model_lookup.values() {
-        for ds in model.data_sources.values() {
-            let mut alias_counter = HashMap::<String, u32>::new();
-
-            let tree = dfs(
-                model,
-                None,
-                None,
-                &ds.tree,
-                model_lookup,
-                &mut alias_counter,
+            (drops, creates)
+        } else {
+            // No last migration: create all
+            (
+                Vec::default(),
+                ast.models
+                    .iter()
+                    .map(|(_, m)| (m, m.data_sources.values().collect()))
+                    .collect::<Vec<_>>(),
             )
-            .map_err(|e| {
-                e.with_context(format!(
-                    "Problem found while validating data source {}.{}",
-                    model.name, ds.name
-                ))
-            })?;
-
-            model_trees.push(ModelTree {
-                name: ds.name.clone(),
-                root: tree,
-            })
-        }
-    }
-
-    fn dfs<'a>(
-        model: &'a Model,
-        transition: Option<NavigationPropertyKind>,
-        transition_name: Option<String>,
-        include_tree: &IncludeTree,
-        model_lookup: &'a BTreeMap<String, Model>,
-        alias_counter: &mut HashMap<String, u32>,
-    ) -> Result<ModelTreeNode<'a>> {
-        let model_alias = generate_alias(&model.name, alias_counter);
-        let many_to_many_alias = transition.clone().and_then(|m| match &m {
-            NavigationPropertyKind::ManyToMany { unique_id } => {
-                Some(generate_alias(unique_id, alias_counter))
-            }
-            _ => None,
-        });
-
-        let mut node = ModelTreeNode {
-            parent_transition_kind: transition,
-            parent_transition_name: transition_name,
-            model_alias: model_alias.clone(),
-            model,
-            many_to_many_alias,
-            children: vec![],
         };
 
-        for (var_name, child_tree) in &include_tree.0 {
-            // Referenced attribute must exist
-            let Some(nav) = model
+        let create_stmts = Self::create(creates, &ast.models);
+
+        let mut res = String::new();
+        if !drop_stmts.is_empty() {
+            res.push_str("--- Dropped and Refactored Data Sources\n");
+            res.push_str(&drop_stmts.join("\n"));
+            res.push('\n');
+        }
+        if !create_stmts.is_empty() {
+            res.push_str("--- New Data Sources\n");
+            res.push_str(&create_stmts.join("\n"));
+            res.push('\n');
+        }
+
+        res
+    }
+}
+
+struct MigrateTables;
+impl MigrateTables {
+    /// Takes in a list of models and junction tables, generating a list
+    /// of naive insert queries.
+    fn create(
+        sorted_models: Vec<&MigrationsModel>,
+        model_lookup: &IndexMap<String, MigrationsModel>,
+        jcts: HashMap<&String, (&MigrationsModel, &MigrationsModel)>,
+    ) -> Vec<String> {
+        let mut res = vec![];
+
+        for model in sorted_models {
+            let mut table = Table::create();
+            table.table(alias(&model.name));
+            table.if_not_exists();
+
+            // Set Primary Key
+            {
+                let mut column =
+                    typed_column(&model.primary_key.name, &model.primary_key.cidl_type, false);
+                column.primary_key();
+                table.col(column);
+            }
+
+            // Attributes
+            for attr in model.attributes.iter() {
+                let mut column = typed_column(&attr.value.name, &attr.value.cidl_type, false);
+
+                if !attr.value.cidl_type.is_nullable() {
+                    column.not_null();
+                }
+
+                // Set attribute foreign key
+                if let Some(fk_model_name) = &attr.foreign_key_reference {
+                    // Unwrap: safe because `validate_models` and `validate_fks` halt
+                    // if the values are missing
+                    let pk_name = &model_lookup
+                        .get(fk_model_name.as_str())
+                        .unwrap()
+                        .primary_key
+                        .name;
+
+                    table.foreign_key(
+                        ForeignKey::create()
+                            .from(alias(model.name.clone()), alias(attr.value.name.as_str()))
+                            .to(alias(fk_model_name.clone()), alias(pk_name))
+                            .on_update(sea_query::ForeignKeyAction::Cascade)
+                            .on_delete(sea_query::ForeignKeyAction::Restrict),
+                    );
+                }
+
+                table.col(column);
+            }
+
+            res.push(to_sqlite(table));
+        }
+
+        for (id, (a, b)) in jcts {
+            let mut table = Table::create();
+
+            let col_a_name = format!("{}.{}", a.name, a.primary_key.name);
+            let mut col_a = typed_column(&col_a_name, &a.primary_key.cidl_type, false);
+
+            let col_b_name = format!("{}.{}", b.name, b.primary_key.name);
+            let mut col_b = typed_column(&col_b_name, &b.primary_key.cidl_type, false);
+
+            table
+                .table(alias(id))
+                .if_not_exists()
+                .col(col_a.not_null())
+                .col(col_b.not_null())
+                .primary_key(
+                    Index::create()
+                        .col(alias(&col_a_name))
+                        .col(alias(&col_b_name)),
+                )
+                .foreign_key(
+                    ForeignKey::create()
+                        .from(alias(id), alias(&col_a_name))
+                        .to(alias(&a.name), alias(&a.primary_key.name))
+                        .on_update(sea_query::ForeignKeyAction::Cascade)
+                        .on_delete(sea_query::ForeignKeyAction::Restrict),
+                )
+                .foreign_key(
+                    ForeignKey::create()
+                        .from(alias(id), alias(&col_b_name))
+                        .to(alias(&b.name), alias(&b.primary_key.name))
+                        .on_update(sea_query::ForeignKeyAction::Cascade)
+                        .on_delete(sea_query::ForeignKeyAction::Restrict),
+                );
+
+            res.push(to_sqlite(table));
+        }
+
+        res
+    }
+
+    /// Generates a sequence of alter statements from a models last migration.
+    ///
+    /// Some alterations cannot occur in SQLite without dropping the table, in which a
+    /// full rebuild and copy of data will occur.
+    ///
+    /// TODO: Sophisticated warnings and logs about alteration choices
+    ///
+    /// Poses a [MigrationsDilemma::RenameOrDropModel], determining if a dropped model is
+    /// actually just a rename. If that is the case, removes from `drop` and `add` lists, undergoing
+    /// table alteration on the (model, last migrated model) pair.
+    fn alter<'a>(
+        alter_models: Vec<(&'a MigrationsModel, &'a MigrationsModel)>,
+        model_lookup: &IndexMap<String, MigrationsModel>,
+        intent: &dyn MigrationsIntent,
+    ) -> Vec<String> {
+        const PRAGMA_FK_OFF: &str = "PRAGMA foreign_keys = OFF;";
+        const PRAGMA_FK_ON: &str = "PRAGMA foreign_keys = ON;";
+        const PRAGMA_FK_CHECK: &str = "PRAGMA foreign_keys_check;";
+
+        let mut res = vec![];
+        let mut rebuilds = vec![];
+
+        'models: for (model, lm_model) in alter_models {
+            let mut stmts = vec![];
+
+            // Rename table
+            if model.name != lm_model.name {
+                let mut rename = Table::rename();
+                rename.table(alias(&lm_model.name), alias(&model.name));
+                stmts.push(to_sqlite(rename));
+            }
+
+            // Alter primary key, requires rebuild.
+            if model.primary_key.cidl_type != lm_model.primary_key.cidl_type
+                || model.primary_key.name != lm_model.primary_key.name
+            {
+                rebuilds.push((model, lm_model));
+                continue;
+            }
+
+            let mut lm_model_attr_lookup = lm_model
+                .attributes
+                .iter()
+                .map(|a| (a.value.name.clone(), a))
+                .collect::<HashMap<String, &ModelAttribute>>();
+            let mut deferred_add_columns = HashMap::<&String, &ModelAttribute>::new();
+
+            for attr in &model.attributes {
+                let Some(lm_attr) = lm_model_attr_lookup.remove(&attr.value.name) else {
+                    // Column is new
+                    if attr.foreign_key_reference.is_some() {
+                        // Cannot alter the table to add a FK. Rebuild.
+                        rebuilds.push((model, lm_model));
+                        continue 'models;
+                    }
+
+                    deferred_add_columns.insert(&attr.value.name, attr);
+                    continue;
+                };
+
+                // No diff.
+                if attr.hash == lm_attr.hash {
+                    continue;
+                }
+
+                // Foreign keys cannot be altered in SQLite, defer for a full rebuild.
+                if attr.foreign_key_reference != lm_attr.foreign_key_reference {
+                    rebuilds.push((model, lm_model));
+                    continue 'models;
+                }
+
+                // Type mismatch
+                if attr.value.cidl_type != lm_attr.value.cidl_type {
+                    // Drop the last migrated column
+                    {
+                        stmts.push(to_sqlite(
+                            Table::alter()
+                                .table(alias(&model.name))
+                                .drop_column(alias(&lm_attr.value.name))
+                                .to_owned(),
+                        ));
+                    }
+
+                    // Add new
+                    {
+                        stmts.push(to_sqlite(
+                            Table::alter()
+                                .table(alias(&model.name))
+                                .add_column(typed_column(
+                                    &attr.value.name,
+                                    &attr.value.cidl_type,
+                                    true,
+                                ))
+                                .to_owned(),
+                        ));
+                    }
+
+                    continue;
+                }
+
+                // Rename
+                if attr.value.name != lm_attr.value.name {
+                    stmts.push(to_sqlite(
+                        Table::alter()
+                            .table(alias(&model.name))
+                            .rename_column(alias(&lm_attr.value.name), alias(&attr.value.name))
+                            .to_owned(),
+                    ));
+                }
+            }
+
+            // `lm_model_attr_lookup` now contains only unreferenced columns, which
+            // are to be dropped if not intended for renaming
+            for lm_attr in lm_model_attr_lookup.values() {
+                let mut alter = Table::alter();
+                alter.table(alias(&model.name));
+
+                let rename_options = deferred_add_columns
+                    .values()
+                    .filter(|ma| ma.value.cidl_type == lm_attr.value.cidl_type)
+                    .map(|ma| &ma.value.name)
+                    .collect::<Vec<_>>();
+
+                if !rename_options.is_empty() {
+                    let solution = intent.ask(MigrationsDilemma::RenameOrDropAttribute {
+                        model_name: model.name.clone(),
+                        attribute_name: lm_attr.value.name.clone(),
+                        options: &rename_options,
+                    });
+
+                    if let Some(solution) = solution {
+                        let option = &rename_options[solution];
+                        alter.rename_column(alias(&lm_attr.value.name), alias(*option));
+                        stmts.push(to_sqlite(alter));
+                        deferred_add_columns.remove(option);
+                        continue;
+                    }
+                }
+
+                // _not_ a rename, drop.
+                alter.drop_column(alias(&lm_attr.value.name));
+                stmts.push(to_sqlite(alter));
+            }
+
+            // Add the remaining deferred columns
+            for attr in deferred_add_columns.values() {
+                stmts.push(to_sqlite(
+                    Table::alter()
+                        .table(alias(&model.name))
+                        .add_column(typed_column(&attr.value.name, &attr.value.cidl_type, true))
+                        .to_owned(),
+                ));
+            }
+
+            // Add all alter statements to the result
+            res.extend(stmts);
+        }
+
+        if !rebuilds.is_empty() {
+            res.push(PRAGMA_FK_OFF.into());
+        }
+
+        // Full model rebuilds
+        for (model, lm_model) in &rebuilds {
+            // Rename the last migrated model to "name_hash"
+            {
+                res.push(to_sqlite(
+                    Table::rename()
+                        .table(
+                            alias(&lm_model.name),
+                            alias(format!("{}_{}", lm_model.name, lm_model.hash)),
+                        )
+                        .to_owned(),
+                ));
+            }
+
+            // Create the new model
+            {
+                let create_stmts = Self::create(vec![model], model_lookup, HashMap::default()); // todo: m2ms
+                for stmt in create_stmts {
+                    res.push(stmt);
+                }
+            }
+
+            // Copy the data from the old table
+            {
+                let lm_attr_lookup = lm_model
+                    .attributes
+                    .iter()
+                    .map(|a| (&a.value.name, &a.value))
+                    .chain(std::iter::once((
+                        &lm_model.primary_key.name,
+                        &lm_model.primary_key,
+                    )))
+                    .collect::<HashMap<_, _>>();
+
+                let columns = model
+                    .attributes
+                    .iter()
+                    .map(|a| &a.value)
+                    .chain(std::iter::once(&model.primary_key))
+                    .collect::<Vec<_>>();
+
+                let insert = Query::insert()
+                    .into_table(alias(&model.name))
+                    .columns(columns.iter().map(|a| alias(&a.name)))
+                    .select_from(
+                        Query::select()
+                            .from(alias(format!("{}_{}", lm_model.name, lm_model.hash)))
+                            .exprs(columns.iter().map(|model_c| {
+                                let Some(lm_c) = lm_attr_lookup.get(&model_c.name) else {
+                                    // Column is new, use a default value
+                                    return Expr::value(sql_default(&model_c.cidl_type));
+                                };
+
+                                let col = Expr::col(alias(&lm_c.name));
+                                if lm_c.cidl_type == model_c.cidl_type {
+                                    // Column directly transfers to the new table
+                                    col.into()
+                                } else {
+                                    // Column type changed, cast
+                                    let sql_type = match &model_c.cidl_type.root_type() {
+                                        CidlType::Integer => "integer",
+                                        CidlType::Real => "real",
+                                        CidlType::Text => "text",
+                                        CidlType::Blob => "blob",
+                                        _ => unreachable!(),
+                                    };
+
+                                    col.cast_as(sql_type)
+                                }
+                            }))
+                            .to_owned(),
+                    )
+                    .unwrap()
+                    .to_owned();
+
+                res.push(format!("{};", insert.to_string(SqliteQueryBuilder)));
+            }
+
+            // Drop the old table
+            {
+                res.push(to_sqlite(
+                    Table::drop()
+                        .table(alias(format!("{}_{}", lm_model.name, lm_model.hash)))
+                        .to_owned(),
+                ));
+            }
+        }
+
+        if !rebuilds.is_empty() {
+            res.push(PRAGMA_FK_ON.into());
+            res.push(PRAGMA_FK_CHECK.into());
+        }
+
+        res
+    }
+
+    /// Takes in a vec of last migrated models and deletes all of their m2m tables and tables.
+    fn drop(sorted_lm_models: Vec<&MigrationsModel>) -> Vec<String> {
+        let mut res = vec![];
+
+        // Insertion order is dependency before dependent, drop order
+        // is dependent before dependency (reverse of insertion)
+        for &model in sorted_lm_models.iter().rev() {
+            // Drop M2M's
+            for m2m_id in model
                 .navigation_properties
                 .iter()
-                .find(|nav| nav.var_name == *var_name)
-            else {
-                fail!(
-                    GeneratorErrorKind::UnknownIncludeTreeReference,
-                    "{}.{}",
-                    model.name,
-                    var_name
-                )
-            };
+                .filter_map(|n| match &n.kind {
+                    NavigationPropertyKind::ManyToMany { unique_id } => Some(unique_id),
+                    _ => None,
+                })
+            {
+                res.push(to_sqlite(
+                    Table::drop().table(alias(m2m_id)).if_exists().to_owned(),
+                ));
+            }
 
-            // Validate model exists
-            let child_model = model_lookup
-                .get(nav.model_name.as_str())
-                .expect("model names to be validated");
-
-            let child_node = dfs(
-                child_model,
-                Some(nav.kind.clone()),
-                Some(nav.var_name.clone()),
-                child_tree,
-                model_lookup,
-                alias_counter,
-            )?;
-            node.children.push(child_node);
+            // Drop table
+            res.push(to_sqlite(
+                Table::drop()
+                    .table(alias(&model.name))
+                    .if_exists()
+                    .to_owned(),
+            ));
         }
 
-        Ok(node)
+        res
     }
 
-    return Ok(model_trees);
+    /// Given an AST and the last migrated AST, produces a sequence of SQL queries `CREATE`-ing, `DROP`-ing
+    /// and `ALTER`-ing the last migrated AST to sync with the new.
+    fn make_migrations(
+        ast: &MigrationsAst,
+        lm_ast: Option<&MigrationsAst>,
+        intent: &dyn MigrationsIntent,
+    ) -> String {
+        let _empty = IndexMap::default();
+        let lm_models = lm_ast.map(|a| &a.models).unwrap_or(&_empty);
 
-    fn generate_alias(name: &str, alias_counter: &mut HashMap<String, u32>) -> String {
-        let count = alias_counter.entry(name.to_string()).or_default();
-        let alias = if *count == 0 {
-            name.to_string()
-        } else {
-            format!("{}{}", name, count)
+        // Partition all models into three sets, discarding the rest.
+        let (creates, create_jcts, alters, drops) = {
+            let mut creates = vec![];
+            let mut create_m2ms = HashMap::new();
+            let mut alters = vec![];
+            let mut drops = vec![];
+
+            // Altered and newly created models
+            for model in ast.models.values() {
+                match lm_models.get(&model.name) {
+                    Some(lm_model) if lm_model.hash != model.hash => {
+                        alters.push((model, lm_model));
+                    }
+                    None => {
+                        for nav in &model.navigation_properties {
+                            let NavigationPropertyKind::ManyToMany { unique_id } = &nav.kind else {
+                                continue;
+                            };
+
+                            let jct_model = ast.models.get(&nav.model_name).unwrap();
+                            create_m2ms.insert(
+                                unique_id,
+                                if jct_model.name > model.name {
+                                    (jct_model, model)
+                                } else {
+                                    (model, jct_model)
+                                },
+                            );
+                        }
+
+                        creates.push(model);
+                    }
+                    _ => {
+                        // No change, skip
+                    }
+                }
+            }
+
+            // Dropped models
+            for lm_model in lm_models.values() {
+                if ast.models.get(&lm_model.name).is_none() {
+                    drops.push(lm_model);
+                    continue;
+                }
+            }
+
+            // It's possible drops were meant to be a rename.
+            //
+            // TODO: We can do some kind of similarity test between models to discard
+            // obvious non-solutions
+            if !drops.is_empty() && !creates.is_empty() {
+                drops.retain(|lm_model| {
+                    // Blocking input for intentions
+                    let solution = intent.ask(MigrationsDilemma::RenameOrDropModel {
+                        model_name: lm_model.name.clone(),
+                        options: &creates.iter().map(|m| &m.name).collect(),
+                    });
+
+                    let Some(solution) = solution else {
+                        return true;
+                    };
+
+                    alters.push((creates.remove(solution), lm_model));
+                    false
+                });
+            }
+
+            (creates, create_m2ms, alters, drops)
         };
-        *count += 1;
-        alias
+
+        // Build query
+        let mut res = String::new();
+        for (title, stmts) in [
+            ("Dropped Models", &Self::drop(drops)),
+            ("Altered Models", &Self::alter(alters, &ast.models, intent)),
+            (
+                "New Models",
+                &Self::create(creates, &ast.models, create_jcts),
+            ),
+        ] {
+            if stmts.is_empty() {
+                continue;
+            }
+
+            res.push_str(&format!("--- {title}\n"));
+            res.push_str(&stmts.join("\n"));
+            res.push('\n');
+        }
+
+        res
     }
 }
 
@@ -554,30 +840,31 @@ fn alias(name: impl Into<String>) -> sea_query::Alias {
     sea_query::Alias::new(name)
 }
 
-fn left_join_as(
-    query: &mut SelectStatement,
-    model_name: &str,
-    model_alias: &str,
-    condition: impl IntoCondition,
-) {
-    if model_name == model_alias {
-        query.left_join(alias(model_name), condition);
-    } else {
-        query.join_as(
-            sea_query::JoinType::LeftJoin,
-            alias(model_name),
-            alias(model_alias),
-            condition,
-        );
+// TODO: User made default types
+fn sql_default(ty: &CidlType) -> sea_query::Value {
+    if ty.is_nullable() {
+        return sea_query::Value::Int(None);
+    }
+
+    match ty {
+        CidlType::Integer => sea_query::Value::Int(Some(0i32)),
+        CidlType::Text => sea_query::Value::String(Some(Box::new("".into()))),
+        CidlType::Real => sea_query::Value::Float(Some(0.0)),
+        CidlType::Blob => sea_query::Value::Bytes(Some(Box::new(vec![]))),
+        _ => unreachable!(),
     }
 }
 
-fn typed_column(name: &str, ty: &CidlType) -> ColumnDef {
+fn typed_column(name: &str, ty: &CidlType, with_default: bool) -> ColumnDef {
     let mut col = ColumnDef::new(alias(name));
     let inner = match ty {
         CidlType::Nullable(inner) => inner.as_ref(),
         t => t,
     };
+
+    if with_default {
+        col.default(sql_default(ty));
+    }
 
     match inner {
         CidlType::Integer => col.integer(),
@@ -589,52 +876,6 @@ fn typed_column(name: &str, ty: &CidlType) -> ColumnDef {
     col
 }
 
-/// Represents one side of a Many to Many junction table
-struct JunctionModel<'a> {
-    model_name: &'a str,
-    model_pk_name: &'a str,
-    model_pk_type: CidlType,
-}
-
-/// A full Many to Many table with both sides
-struct JunctionTable<'a> {
-    a: JunctionModel<'a>,
-    b: JunctionModel<'a>,
-    unique_id: &'a str,
-}
-
-#[derive(Default)]
-struct JunctionTableBuilder<'a> {
-    models: Vec<JunctionModel<'a>>,
-}
-
-impl<'a> JunctionTableBuilder<'a> {
-    fn model(&mut self, jm: JunctionModel<'a>) -> Result<()> {
-        if self.models.len() >= 2 {
-            fail!(
-                GeneratorErrorKind::ExtraneousManyToManyReferences,
-                "{}, {}, {}",
-                jm.model_name,
-                self.models[0].model_name,
-                self.models[1].model_name
-            );
-        }
-        self.models.push(jm);
-        Ok(())
-    }
-
-    fn build(self, unique_id: &'a str) -> Result<JunctionTable<'a>> {
-        let err_context = self
-            .models
-            .first()
-            .map(|m| m.model_name)
-            .unwrap_or_default();
-        let [a, b] = <[_; 2]>::try_from(self.models).map_err(|_| {
-            GeneratorErrorKind::MissingManyToManyReference
-                .to_error()
-                .with_context(err_context)
-        })?;
-
-        Ok(JunctionTable { a, b, unique_id })
-    }
+fn to_sqlite(builder: impl SchemaStatementBuilder) -> String {
+    format!("{};", builder.to_string(SqliteQueryBuilder))
 }

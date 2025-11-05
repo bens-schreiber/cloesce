@@ -9,6 +9,7 @@ export type {
   Either,
   DeepPartial,
   InstanceRegistry,
+  CrudKind,
 } from "../common.js";
 export { CloesceApp } from "../common.js";
 

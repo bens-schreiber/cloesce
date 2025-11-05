@@ -4,8 +4,7 @@ pub type Result<T> = std::result::Result<T, GeneratorError>;
 
 #[derive(Debug)]
 pub enum GeneratorPhase {
-    EarlyAstValidation,
-    D1,
+    ModelSemanticAnalysis,
     Workers,
 }
 
@@ -83,47 +82,47 @@ impl GeneratorErrorKind {
             GeneratorErrorKind::NullSqlType => (
                 "Model attributes cannot be literally null",
                 "Remove 'null' from your Model definition.",
-                GeneratorPhase::EarlyAstValidation,
+                GeneratorPhase::ModelSemanticAnalysis,
             ),
             GeneratorErrorKind::InvalidSqlType => (
                 "Model attributes must be valid SQLite types: Integer, Real, Text, Blob",
                 "Consider using a navigation property or creating another model.",
-                GeneratorPhase::EarlyAstValidation,
+                GeneratorPhase::ModelSemanticAnalysis,
             ),
             GeneratorErrorKind::UnknownObject => (
                 "Objects must be decorated appropriately as a Model or PlainOldObject",
                 "Consider using a decorator on the object.",
-                GeneratorPhase::EarlyAstValidation,
+                GeneratorPhase::ModelSemanticAnalysis,
             ),
             GeneratorErrorKind::UnknownDataSourceReference => (
                 "Data sources must reference a model",
                 "",
-                GeneratorPhase::EarlyAstValidation,
+                GeneratorPhase::ModelSemanticAnalysis,
             ),
             GeneratorErrorKind::UnexpectedVoid => (
                 "Void cannot be an attribute or parameter, only a return type.",
                 "Remove `void`",
-                GeneratorPhase::EarlyAstValidation,
+                GeneratorPhase::ModelSemanticAnalysis,
             ),
             GeneratorErrorKind::UnexpectedPartialReturn => (
                 "Methods cannot return a partial value.",
                 "Try using a Plain Old Object instead",
-                GeneratorPhase::EarlyAstValidation,
+                GeneratorPhase::ModelSemanticAnalysis,
             ),
             GeneratorErrorKind::MissingOrExtraneousDataSource => (
                 "All instantiated methods must have one data source parameter.",
                 "Add a data source parameter, or remove extras.",
-                GeneratorPhase::EarlyAstValidation,
+                GeneratorPhase::ModelSemanticAnalysis,
             ),
             GeneratorErrorKind::NotYetSupported => (
                 "This feature will be supported in an upcoming Cloesce release.",
                 "",
-                GeneratorPhase::EarlyAstValidation,
+                GeneratorPhase::ModelSemanticAnalysis,
             ),
             GeneratorErrorKind::InvalidMapping => (
                 "CIDL is ill-formatted",
                 "",
-                GeneratorPhase::EarlyAstValidation,
+                GeneratorPhase::ModelSemanticAnalysis,
             ),
             GeneratorErrorKind::InvalidApiDomain => (
                 "Invalid or ill-formatted API domain",
@@ -133,36 +132,36 @@ impl GeneratorErrorKind {
             GeneratorErrorKind::MismatchedNavigationPropertyTypes => (
                 "Navigation property references must match attribute types",
                 "TODO: a good suggestion here",
-                GeneratorPhase::D1,
+                GeneratorPhase::ModelSemanticAnalysis,
             ),
             GeneratorErrorKind::InvalidNavigationPropertyReference => (
                 "Navigation property references must be to foreign keys or other navigation properties",
                 "TODO: a good suggestion here",
-                GeneratorPhase::D1,
+                GeneratorPhase::ModelSemanticAnalysis,
             ),
             GeneratorErrorKind::CyclicalModelDependency => (
                 "Model composition cannot be cyclical",
                 "Allow a navigation property to be null",
-                GeneratorPhase::D1,
+                GeneratorPhase::ModelSemanticAnalysis,
             ),
             GeneratorErrorKind::UnknownIncludeTreeReference => (
                 "Unknown reference in Include Tree definition",
                 "",
-                GeneratorPhase::D1,
+                GeneratorPhase::ModelSemanticAnalysis,
             ),
             GeneratorErrorKind::ExtraneousManyToManyReferences => (
                 "Only two navigation properties can reference a many to many table",
                 "Remove a reference",
-                GeneratorPhase::D1,
+                GeneratorPhase::ModelSemanticAnalysis,
             ),
             GeneratorErrorKind::MissingManyToManyReference => (
                 "Many to Many navigation properties must have a correlated reference on the adjacent model.",
                 "TODO: a good indicator of where to add the nav prop",
-                GeneratorPhase::D1,
+                GeneratorPhase::ModelSemanticAnalysis,
             ),
 
             // Generic error, handeled seperately from all others
-            GeneratorErrorKind::InvalidInputFile => ("", "", GeneratorPhase::EarlyAstValidation),
+            GeneratorErrorKind::InvalidInputFile => ("", "", GeneratorPhase::ModelSemanticAnalysis),
         };
 
         GeneratorError::new(self, phase, description.into(), suggestion.into())

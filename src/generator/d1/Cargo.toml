@@ -4,5 +4,9 @@ version = "0.0.1"
 edition = "2024"
 
 [dependencies]
-common = { path = "../common" }
+ast = { path = "../ast" }
+indexmap = { workspace = true }
 sea-query = "0.32.7"
+
+[dev-dependencies]
+sqlx = { version = "0.8", features = ["sqlite", "runtime-tokio"] }
