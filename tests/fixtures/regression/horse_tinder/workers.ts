@@ -4,7 +4,7 @@ import cidl from "./cidl.json";
 import { Horse } from "./seed__horse_tinder.cloesce.ts";
 import { Like } from "./seed__horse_tinder.cloesce.ts";
 
-const app = new CloesceApp()
+const app = new CloesceApp();
 const constructorRegistry = {
 	Horse: Horse,
 	Like: Like

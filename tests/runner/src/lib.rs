@@ -147,6 +147,7 @@ impl Fixture {
         let pre_cidl_path = pre_cidl.canonicalize().unwrap();
         let res = self.run_command(
             Command::new("cargo")
+                .arg("--quiet")
                 .arg("run")
                 .arg("validate")
                 .arg(&pre_cidl_path)
@@ -164,6 +165,7 @@ impl Fixture {
         let out = OutputFile::new(&self.path, "wrangler.toml");
         let res = self.run_command(
             Command::new("cargo")
+                .arg("--quiet")
                 .arg("run")
                 .arg("generate")
                 .arg("wrangler")
@@ -184,6 +186,7 @@ impl Fixture {
 
         let res = self.run_command(
             Command::new("cargo")
+                .arg("--quiet")
                 .arg("run")
                 .arg("generate")
                 .arg("workers")
@@ -206,6 +209,7 @@ impl Fixture {
 
         let res = self.run_command(
             Command::new("cargo")
+                .arg("--quiet")
                 .arg("run")
                 .arg("generate")
                 .arg("client")
@@ -234,6 +238,7 @@ impl Fixture {
 
         let res = self.run_command(
             Command::new("cargo")
+                .arg("--quiet")
                 .arg("run")
                 .arg("migrations")
                 .arg(&cidl_path)

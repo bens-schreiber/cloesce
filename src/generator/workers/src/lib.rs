@@ -105,7 +105,7 @@ impl WorkersGenerator {
                     .unwrap_or_else(|_| p.clone().to_string_lossy().to_string());
                 format!("import app from \"{path}\"")
             }
-            None => "const app = new CloesceApp()".into(),
+            None => "const app = new CloesceApp();".into(),
         };
 
         format!("{model_imports}\n{poo_imports}\n{app_import}")
