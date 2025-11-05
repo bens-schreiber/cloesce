@@ -105,7 +105,7 @@ impl WorkersGenerator {
                     .unwrap_or_else(|_| p.clone().to_string_lossy().to_string());
                 format!("import app from \"{path}\"")
             }
-            None => "const app = new CloesceApp()".into(),
+            None => "const app = new CloesceApp();".into(),
         };
 
         format!("{model_imports}\n{poo_imports}\n{app_import}")
@@ -159,7 +159,8 @@ impl WorkersGenerator {
 
         // TODO: Middleware function should return the DI instance registry
         Ok(format!(
-            r#"import {{ cloesce, CloesceApp }} from "cloesce/backend";
+            r#"// GENERATED CODE. DO NOT MODIFY.
+import {{ cloesce, CloesceApp }} from "cloesce/backend";
 import cidl from "./cidl.json";
 {linked_sources}
 {constructor_registry}

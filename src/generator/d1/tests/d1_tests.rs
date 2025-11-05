@@ -585,6 +585,129 @@ ALTER TABLE "User" ADD COLUMN "age" text"#
 }
 
 #[sqlx::test]
+async fn migrate_alter_drop_m2m(db: SqlitePool) {
+    // Arrange
+    let m2m_ast = {
+        let mut ast = create_ast(vec![
+            ModelBuilder::new("Student")
+                .id()
+                .nav_p(
+                    "courses",
+                    "Course",
+                    NavigationPropertyKind::ManyToMany {
+                        unique_id: "StudentsCourses".into(),
+                    },
+                )
+                .build(),
+            ModelBuilder::new("Course")
+                .id()
+                .nav_p(
+                    "students",
+                    "Student",
+                    NavigationPropertyKind::ManyToMany {
+                        unique_id: "StudentsCourses".into(),
+                    },
+                )
+                .build(),
+        ]);
+        ast.set_merkle_hash();
+        let migration = as_migration(ast);
+
+        let sql = D1Generator::migrate(&migration, None, &MockMigrationsIntent::default());
+        query(&db, &sql)
+            .await
+            .expect("Create table queries to work");
+        assert!(exists_in_db(&db, "StudentsCourses").await);
+
+        migration
+    };
+
+    let no_m2m_ast = {
+        let mut ast = create_ast(vec![
+            ModelBuilder::new("Student").id().build(),
+            ModelBuilder::new("Course").id().build(),
+        ]);
+        ast.set_merkle_hash();
+        as_migration(ast)
+    };
+
+    // Act
+    let sql = D1Generator::migrate(
+        &no_m2m_ast,
+        Some(&m2m_ast),
+        &MockMigrationsIntent::default(),
+    );
+
+    // Assert
+    query(&db, &sql)
+        .await
+        .expect("Create table queries to work");
+
+    assert!(!exists_in_db(&db, "StudentsCourses").await)
+}
+
+#[sqlx::test]
+async fn migrate_alter_add_m2m(db: SqlitePool) {
+    // Arrange
+    let no_m2m_ast = {
+        let mut ast = create_ast(vec![
+            ModelBuilder::new("Student").id().build(),
+            ModelBuilder::new("Course").id().build(),
+        ]);
+        ast.set_merkle_hash();
+        let migration = as_migration(ast);
+
+        let sql = D1Generator::migrate(&migration, None, &MockMigrationsIntent::default());
+        query(&db, &sql)
+            .await
+            .expect("Create table queries to work");
+
+        migration
+    };
+
+    let m2m_ast = {
+        let mut ast = create_ast(vec![
+            ModelBuilder::new("Student")
+                .id()
+                .nav_p(
+                    "courses",
+                    "Course",
+                    NavigationPropertyKind::ManyToMany {
+                        unique_id: "StudentsCourses".into(),
+                    },
+                )
+                .build(),
+            ModelBuilder::new("Course")
+                .id()
+                .nav_p(
+                    "students",
+                    "Student",
+                    NavigationPropertyKind::ManyToMany {
+                        unique_id: "StudentsCourses".into(),
+                    },
+                )
+                .build(),
+        ]);
+        ast.set_merkle_hash();
+        as_migration(ast)
+    };
+
+    // Act
+    let sql = D1Generator::migrate(
+        &m2m_ast,
+        Some(&no_m2m_ast),
+        &MockMigrationsIntent::default(),
+    );
+
+    // Assert
+    query(&db, &sql)
+        .await
+        .expect("Create table queries to work");
+
+    assert!(exists_in_db(&db, "StudentsCourses").await)
+}
+
+#[sqlx::test]
 async fn views_auto_alias(db: SqlitePool) {
     // Arrange
     let horse_model = ModelBuilder::new("Horse")

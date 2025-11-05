@@ -1,3 +1,5 @@
+// GENERATED CODE. DO NOT MODIFY.
+
 import { HttpResult, instantiateObjectArray, DeepPartial } from "cloesce/client";
 
 export class Poo {

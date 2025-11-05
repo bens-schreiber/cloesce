@@ -5,6 +5,7 @@ use std::{
 };
 
 use clap::{Parser, Subcommand, command};
+use tracing_subscriber::FmtSubscriber;
 
 use ast::{
     CloesceAst, MigrationsAst,
@@ -67,32 +68,41 @@ enum GenerateTarget {
 }
 
 fn main() {
+    let subscriber = FmtSubscriber::builder().finish();
+
+    tracing::subscriber::set_global_default(subscriber)
+        .expect("Failed to set global default subscriber");
+
     match panic::catch_unwind(run_cli) {
         Ok(Ok(())) => std::process::exit(0),
         Ok(Err(e)) if matches!(e.kind, GeneratorErrorKind::InvalidInputFile) => {
-            eprintln!(
+            tracing::error!(
                 "==== CLOESCE ERROR ====\nInvalid generator file input: {}\n",
                 e.context
             );
         }
         Ok(Err(e)) => {
-            eprintln!(
+            tracing::error!(
                 r#"==== CLOESCE ERROR ====
 Error [{:?}]: {}
 Phase: {:?}
 Context: {}
 Suggested fix: {}"#,
-                e.kind, e.description, e.phase, e.context, e.suggestion
+                e.kind,
+                e.description,
+                e.phase,
+                e.context,
+                e.suggestion
             );
         }
         Err(e) => {
-            eprintln!("==== GENERATOR PANIC CAUGHT ====");
+            tracing::error!("==== GENERATOR PANIC CAUGHT ====");
             let msg = e
                 .downcast_ref::<&str>()
                 .copied()
                 .or_else(|| e.downcast_ref::<String>().map(|s| s.as_str()))
                 .unwrap_or("Panic occurred but couldn't extract info.");
-            eprintln!("Panic info: {}", msg);
+            tracing::error!("Panic info: {}", msg);
         }
     }
 
@@ -106,7 +116,7 @@ fn run_cli() -> Result<()> {
             cidl_path,
         } => {
             validate_cidl(&pre_cidl_path, &cidl_path)?;
-            println!("Ok.");
+            tracing::info!("Validation OK.");
         }
         Commands::Migrations {
             cidl_path,
@@ -114,6 +124,8 @@ fn run_cli() -> Result<()> {
             migrated_sql_path,
             last_migrated_cidl_path,
         } => {
+            tracing::info!("Starting migration ({})", migrated_sql_path.display());
+
             let mut migrated_cidl_file = create_file_and_dir(&migrated_cidl_path)?;
             let mut migrated_sql_file = create_file_and_dir(&migrated_sql_path)?;
 
@@ -130,6 +142,8 @@ fn run_cli() -> Result<()> {
             migrated_sql_file
                 .write_all(generated_sql.as_bytes())
                 .expect("Could not write to file");
+
+            tracing::info!("Finished migration.");
         }
         Commands::Generate { target } => match target {
             GenerateTarget::Wrangler { wrangler_path } => generate_wrangler(&wrangler_path)?,
@@ -160,18 +174,9 @@ fn run_cli() -> Result<()> {
                 workers_domain,
             } => {
                 let ast = validate_cidl(&pre_cidl_path, &cidl_path)?;
-                println!("Validation complete.");
-
                 generate_wrangler(&wrangler_path)?;
-                println!("Wrangler generated.");
-
                 generate_workers(&ast, &workers_path, &wrangler_path, &workers_domain)?;
-                println!("Workers generated.");
-
                 generate_client(&ast, &client_path, &client_domain)?;
-                println!("Client generated.");
-
-                println!("All generation steps completed successfully!");
             }
         },
     }
@@ -228,24 +233,24 @@ impl MigrationsCli {
 
                 let mut input = String::new();
                 if io::stdin().read_line(&mut input).is_err() {
-                    eprintln!("Error reading input. Aborting migrations.");
+                    tracing::error!("Error reading input. Aborting migrations.");
                     std::process::abort();
                 }
 
                 let idx = input.trim().parse::<usize>().unwrap_or_else(|_| {
-                    eprintln!("Invalid selection. Aborting migrations.");
+                    tracing::error!("Invalid selection. Aborting migrations.");
                     std::process::abort();
                 });
 
                 if idx >= options.len() {
-                    eprintln!("Index out of range. Aborting migrations.");
+                    tracing::error!("Index out of range. Aborting migrations.");
                     std::process::abort();
                 }
 
                 Some(idx)
             }
             _ => {
-                eprintln!("Invalid option. Aborting migrations.");
+                tracing::error!("Invalid option. Aborting migrations.");
                 std::process::abort();
             }
         }

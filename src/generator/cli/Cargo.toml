@@ -10,3 +10,5 @@ d1 = { path = "../d1" }
 client = { path = "../client" }
 workers = { path = "../workers" }
 wrangler = { path = "../wrangler" }
+tracing-subscriber = "0.3.20"
+tracing = { workspace = true }

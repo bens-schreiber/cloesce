@@ -7,6 +7,7 @@ edition = "2024"
 ast = { path = "../ast" }
 indexmap = { workspace = true }
 sea-query = "0.32.7"
+tracing = { workspace = true }
 
 [dev-dependencies]
 sqlx = { version = "0.8", features = ["sqlite", "runtime-tokio"] }
