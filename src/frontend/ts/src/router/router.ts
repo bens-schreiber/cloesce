@@ -258,8 +258,7 @@ async function validateRequest(
   const url = new URL(request.url);
   let params: RequestParamMap = {};
   if (method.http_verb === "GET") {
-    const url = new URL(request.url);
-    params = parseUrlParams(url.searchParams);
+    params = Object.fromEntries(url.searchParams.entries());
   } else {
     try {
       params = await request.json();
