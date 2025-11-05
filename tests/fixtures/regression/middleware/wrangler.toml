@@ -1,5 +1,5 @@
 compatibility_date = "2025-10-02"
-main = ".generated/workers.ts"
+main = "workers.ts"
 name = "cloesce"
 
 [[d1_databases]]

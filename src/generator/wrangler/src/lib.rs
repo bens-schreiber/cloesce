@@ -41,7 +41,7 @@ impl WranglerSpec {
         self.main = Some(
             self.main
                 .clone()
-                .unwrap_or_else(|| ".generated/workers.ts".to_string()),
+                .unwrap_or_else(|| "workers.ts".to_string()),
         );
 
         // Validate existing database configs, filling in missing values with a default
