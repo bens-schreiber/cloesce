@@ -1,0 +1,66 @@
+{
+  "hash": 18302944908339792316,
+  "models": {
+    "PooAcceptYield": {
+      "hash": 13918985504312867645,
+      "name": "PooAcceptYield",
+      "primary_key": {
+        "name": "id",
+        "cidl_type": "Integer"
+      },
+      "attributes": [],
+      "navigation_properties": [],
+      "methods": {
+        "acceptPoos": {
+          "name": "acceptPoos",
+          "is_static": false,
+          "http_verb": "POST",
+          "return_type": "Void",
+          "parameters": [
+            {
+              "name": "a",
+              "cidl_type": {
+                "Object": "PooA"
+              }
+            },
+            {
+              "name": "b",
+              "cidl_type": {
+                "Object": "PooB"
+              }
+            },
+            {
+              "name": "c",
+              "cidl_type": {
+                "Object": "PooC"
+              }
+            },
+            {
+              "name": "__dataSource",
+              "cidl_type": {
+                "DataSource": "PooAcceptYield"
+              }
+            }
+          ]
+        },
+        "yieldPoo": {
+          "name": "yieldPoo",
+          "is_static": false,
+          "http_verb": "POST",
+          "return_type": {
+            "Object": "PooC"
+          },
+          "parameters": [
+            {
+              "name": "__dataSource",
+              "cidl_type": {
+                "DataSource": "PooAcceptYield"
+              }
+            }
+          ]
+        }
+      },
+      "data_sources": {}
+    }
+  }
+}

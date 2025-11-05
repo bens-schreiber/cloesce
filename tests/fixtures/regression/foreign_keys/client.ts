@@ -1,4 +1,5 @@
-import { HttpResult, instantiateObjectArray } from "cloesce/client";
+import { HttpResult, instantiateObjectArray, DeepPartial } from "cloesce/client";
+
 
 export class A {
   id: number;
@@ -7,12 +8,8 @@ export class A {
 
   static async post(
         a: A,
-    dataSource: "withB" | "withoutB" | null = null
   ): Promise<HttpResult<A>> {
     const baseUrl = new URL(`http://localhost:5002/api/A/post`);
-    if (dataSource) {
-      baseUrl.searchParams.append("dataSource", dataSource);
-    }
     const res = await fetch(baseUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -28,12 +25,10 @@ export class A {
     return raw;
   }
   async refresh(
-    dataSource: "withB" | "withoutB" | null = null
+        __dataSource: "withB" |"withoutB" |"none" = "none",
   ): Promise<HttpResult<A>> {
     const baseUrl = new URL(`http://localhost:5002/api/A/${this.id}/refresh`);
-    if (dataSource) {
-      baseUrl.searchParams.append("dataSource", dataSource);
-    }
+    baseUrl.searchParams.append('__dataSource', String(__dataSource));
     const res = await fetch(baseUrl, { method: "GET" });
     let raw = await res.json();
     if (!res.ok) {
@@ -63,12 +58,8 @@ export class Person {
 
   static async post(
         person: Person,
-    dataSource: "withDogs" | null = null
   ): Promise<HttpResult<Person>> {
     const baseUrl = new URL(`http://localhost:5002/api/Person/post`);
-    if (dataSource) {
-      baseUrl.searchParams.append("dataSource", dataSource);
-    }
     const res = await fetch(baseUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -84,12 +75,10 @@ export class Person {
     return raw;
   }
   async refresh(
-    dataSource: "withDogs" | null = null
+        __dataSource: "withDogs" |"none" = "none",
   ): Promise<HttpResult<Person>> {
     const baseUrl = new URL(`http://localhost:5002/api/Person/${this.id}/refresh`);
-    if (dataSource) {
-      baseUrl.searchParams.append("dataSource", dataSource);
-    }
+    baseUrl.searchParams.append('__dataSource', String(__dataSource));
     const res = await fetch(baseUrl, { method: "GET" });
     let raw = await res.json();
     if (!res.ok) {
@@ -105,12 +94,8 @@ export class Student {
 
   static async post(
         student: Student,
-    dataSource: "withCoursesStudents" | "withCoursesStudentsCourses" | null = null
   ): Promise<HttpResult<Student>> {
     const baseUrl = new URL(`http://localhost:5002/api/Student/post`);
-    if (dataSource) {
-      baseUrl.searchParams.append("dataSource", dataSource);
-    }
     const res = await fetch(baseUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -126,12 +111,10 @@ export class Student {
     return raw;
   }
   async refresh(
-    dataSource: "withCoursesStudents" | "withCoursesStudentsCourses" | null = null
+        __dataSource: "withCoursesStudents" |"withCoursesStudentsCourses" |"none" = "none",
   ): Promise<HttpResult<Student>> {
     const baseUrl = new URL(`http://localhost:5002/api/Student/${this.id}/refresh`);
-    if (dataSource) {
-      baseUrl.searchParams.append("dataSource", dataSource);
-    }
+    baseUrl.searchParams.append('__dataSource', String(__dataSource));
     const res = await fetch(baseUrl, { method: "GET" });
     let raw = await res.json();
     if (!res.ok) {

@@ -1,9 +1,10 @@
 // @ts-nocheck
 
 @D1
-class Foo {
+export class Foo {
   @PrimaryKey
   id: number;
 
-  async method(valid: number, bad: Bar<number>) {} // invalid param
+  @POST
+  method(valid: number, bad: Bar<number>) {} // invalid param
 }

@@ -2,7 +2,7 @@ mod mappers;
 
 use std::{ops::Deref, sync::Arc};
 
-use common::{CidlType, CloesceAst, InputLanguage, NavigationProperty, NavigationPropertyKind};
+use ast::{CidlType, CloesceAst, InputLanguage, NavigationProperty, NavigationPropertyKind};
 use mappers::{ClientLanguageTypeMapper, TypeScriptMapper};
 
 use handlebars::{Handlebars, handlebars_helper};
@@ -25,9 +25,10 @@ handlebars_helper!(object_name: |cidl_type: CidlType| match cidl_type.root_type(
 });
 handlebars_helper!(eq: |a: str, b: str| a == b);
 
-fn register_helpers(
-    handlebars: &mut Handlebars<'_>,
+fn register_helpers<'a>(
+    handlebars: &mut Handlebars<'a>,
     mapper: Arc<dyn ClientLanguageTypeMapper + Send + Sync>,
+    ast: &'a CloesceAst,
 ) {
     handlebars.register_helper("is_serializable", Box::new(is_serializable));
     handlebars.register_helper("is_object", Box::new(is_object));
@@ -49,16 +50,14 @@ fn register_helpers(
                     serde_json::from_value(h.param(0).unwrap().value().clone()).unwrap();
 
                 let cidl_type = match nav.kind {
-                    common::NavigationPropertyKind::OneToOne { .. } => {
-                        CidlType::Object(nav.model_name)
-                    }
-                    common::NavigationPropertyKind::OneToMany { .. }
-                    | common::NavigationPropertyKind::ManyToMany { .. } => {
+                    NavigationPropertyKind::OneToOne { .. } => CidlType::Object(nav.model_name),
+                    NavigationPropertyKind::OneToMany { .. }
+                    | NavigationPropertyKind::ManyToMany { .. } => {
                         CidlType::array(CidlType::Object(nav.model_name))
                     }
                 };
 
-                let rendered = mapper1.type_name(&cidl_type);
+                let rendered = mapper1.type_name(&cidl_type, ast);
                 out.write(&rendered)?;
                 Ok(())
             },
@@ -77,7 +76,7 @@ fn register_helpers(
                 let cidl_type: CidlType =
                     serde_json::from_value(h.param(0).unwrap().value().clone()).unwrap();
 
-                let rendered = mapper2.type_name(&cidl_type);
+                let rendered = mapper2.type_name(&cidl_type, ast);
                 out.write(&rendered)?;
                 Ok(())
             },
@@ -87,7 +86,7 @@ fn register_helpers(
 
 const TYPESCRIPT_TEMPLATE: &str = include_str!("./templates/ts.hbs");
 
-pub fn generate_client_api(ast: CloesceAst, domain: String) -> String {
+pub fn generate_client_api(ast: &CloesceAst, domain: String) -> String {
     let template = match ast.language {
         InputLanguage::TypeScript => TYPESCRIPT_TEMPLATE,
     };
@@ -100,9 +99,9 @@ pub fn generate_client_api(ast: CloesceAst, domain: String) -> String {
     handlebars
         .register_template_string("models", template)
         .unwrap();
-    register_helpers(&mut handlebars, mapper);
+    register_helpers(&mut handlebars, mapper, ast);
 
-    let mut context = serde_json::to_value(&ast).unwrap();
+    let mut context = serde_json::to_value(ast).unwrap();
     if let serde_json::Value::Object(ref mut map) = context {
         map.insert("domain".to_string(), serde_json::Value::String(domain));
     }

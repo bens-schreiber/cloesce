@@ -1,8 +1,0 @@
-==== CLOESCE ERROR ====
-Error [InvalidNavigationPropertyReference]: Invalid Navigation Property Reference
-Phase: TypeScript IDL Extraction
-Context: Foo.foo id
-@DataSource
-  foo: IncludeTree<Foo> = { id: {} };
-
-Suggested fix: Ensure the navigation property points to a valid model field

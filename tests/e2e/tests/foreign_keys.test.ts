@@ -17,23 +17,28 @@ afterAll(async () => {
   await stopWrangler();
 });
 
-async function testRefresh<T, DS extends string | null>(
-  obj: T & { refresh: (dataSource?: DS) => Promise<any> },
-  dataSources: DS[],
+async function testRefresh<T>(
+  obj: T & { refresh: (dataSource: any) => Promise<any> },
+  dataSources: any[],
   assertions: Record<string, (res: any) => void>,
 ) {
   for (const ds of dataSources) {
-    it(`refresh ${ds ?? "null"}`, async () => {
+    it(`refresh ${ds}`, async () => {
       const res = await obj.refresh(ds);
       expect(res.ok, withRes("Expected refresh to work", res)).toBe(true);
-      const key = ds === null ? "null" : ds;
-      assertions[key]?.(res.data);
+      assertions[ds]?.(res.data);
     });
   }
 }
 
 describe("POST and refresh A", () => {
-  const a = Object.assign(new A(), { id: 1, bId: 10 });
+  const a = Object.assign(new A(), {
+    id: 1,
+    bId: 10,
+    b: {
+      id: 10,
+    },
+  });
 
   it("POST A", async () => {
     const res = await A.post(a);
@@ -41,10 +46,10 @@ describe("POST and refresh A", () => {
     expect(res.data.id, withRes("POST id should match input", res)).toBe(a.id);
   });
 
-  testRefresh(a, ["withB", "withoutB", null], {
+  testRefresh(a, ["withB", "withoutB", "none"], {
     withB: (data) => expect(data.b).not.toBeUndefined(),
     withoutB: (data) => expect(data.b).toBeUndefined(),
-    null: () => {},
+    none: () => {},
   });
 });
 
@@ -60,9 +65,9 @@ describe("POST and refresh Person", () => {
     expect(res.data.dogs.length).toBe(1);
   });
 
-  testRefresh(person, ["withDogs", null], {
+  testRefresh(person, ["withDogs", "none"], {
     withDogs: (data) => expect(data.dogs.length).toBe(1),
-    null: (data) => expect(data.dogs.length).toBe(0),
+    none: (data) => expect(data.dogs.length).toBe(0),
   });
 });
 
@@ -76,22 +81,19 @@ describe("POST and refresh Student", () => {
     expect(res.data.courses.length).toBe(1);
   });
 
-  // ********TODO: This is failing, theres an error in Many to Many that might be a pain to fix.
-  // Doing this in a seperate PR
-  // testRefresh(
-  //   student,
-  //   ["withCoursesStudents", "withCoursesStudentsCourses", null],
-  //   {
-  //     withCoursesStudents: (data) => {
-  //       console.log(data);
-  //       expect(data.courses.length).toBe(1);
-  //       expect(data.courses[0].students).not.toBeUndefined();
-  //     },
-  //     withCoursesStudentsCourses: (data) => {
-  //       expect(data.courses.length).toBe(1);
-  //       expect(data.courses[0].students[0].courses).not.toBeUndefined();
-  //     },
-  //     null: (data) => expect(data.courses.length).toBe(0),
-  //   }
-  // );
+  testRefresh(
+    student,
+    ["withCoursesStudents", "withCoursesStudentsCourses", "none"],
+    {
+      withCoursesStudents: (data) => {
+        expect(data.courses.length).toBe(1);
+        expect(data.courses[0].students).not.toBeUndefined();
+      },
+      withCoursesStudentsCourses: (data) => {
+        expect(data.courses.length).toBe(1);
+        expect(data.courses[0].students[0].courses).not.toBeUndefined();
+      },
+      none: (data) => expect(data.courses.length).toBe(0),
+    },
+  );
 });

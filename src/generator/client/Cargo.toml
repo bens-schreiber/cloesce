@@ -4,6 +4,6 @@ version = "0.0.1"
 edition = "2024"
 
 [dependencies]
-common = { path = "../common" }
+ast = { path = "../ast" }
 handlebars = "6.3.2"
 serde_json = { workspace = true }

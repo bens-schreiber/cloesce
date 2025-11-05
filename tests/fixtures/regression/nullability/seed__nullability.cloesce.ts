@@ -3,7 +3,7 @@ type HttpResult<T = unknown> = {};
 type D1Database = {};
 
 @WranglerEnv
-class Env {
+export class Env {
   db: D1Database;
 }
 
@@ -16,35 +16,30 @@ export class NullabilityChecks {
   nullableString: string | null;
 
   @POST
-  async primitiveTypes(
-    a: number | null,
-    b: string | null
-  ): Promise<boolean | null> {
+  primitiveTypes(a: number | null, b: string | null): boolean | null {
     return null;
   }
 
   @POST
-  async modelTypes(
-    a: NullabilityChecks | null
-  ): Promise<NullabilityChecks | null> {
+  modelTypes(a: NullabilityChecks | null): NullabilityChecks | null {
     return null;
   }
 
   @POST
-  async injectableTypes(@Inject env: Env | null) {}
+  injectableTypes(@Inject env: Env | null) {}
 
   @POST
-  async arrayTypes(
+  arrayTypes(
     a: number[] | null,
     b: NullabilityChecks[] | null
-  ): Promise<string[] | null> {
+  ): string[] | null {
     return null;
   }
 
   @POST
-  async httpResultTypes(
+  httpResultTypes(
     a: HttpResult<number | null> | null
-  ): Promise<HttpResult<NullabilityChecks[] | null> | null> {
+  ): HttpResult<NullabilityChecks[] | null> | null {
     return null;
   }
 }

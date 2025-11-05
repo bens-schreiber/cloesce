@@ -1,7 +1,7 @@
 // @ts-nocheck
 
 @D1
-class Foo {
+export class Foo {
   @PrimaryKey
   id: number;
 }

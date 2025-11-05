@@ -1,0 +1,295 @@
+{
+    "version": "v0.0.3",
+    "project_name": "runner",
+    "language": "TypeScript",
+    "wrangler_env": {
+        "name": "Env",
+        "source_path": "./seed__foreign_keys.cloesce.ts"
+    },
+    "models": {
+        "B": {
+            "name": "B",
+            "attributes": [],
+            "primary_key": {
+                "name": "id",
+                "cidl_type": "Integer"
+            },
+            "navigation_properties": [],
+            "methods": {},
+            "data_sources": {},
+            "source_path": "./seed__foreign_keys.cloesce.ts"
+        },
+        "A": {
+            "name": "A",
+            "attributes": [
+                {
+                    "foreign_key_reference": "B",
+                    "value": {
+                        "name": "bId",
+                        "cidl_type": "Integer"
+                    }
+                }
+            ],
+            "primary_key": {
+                "name": "id",
+                "cidl_type": "Integer"
+            },
+            "navigation_properties": [
+                {
+                    "var_name": "b",
+                    "model_name": "B",
+                    "kind": {
+                        "OneToOne": {
+                            "reference": "bId"
+                        }
+                    }
+                }
+            ],
+            "methods": {
+                "post": {
+                    "name": "post",
+                    "is_static": true,
+                    "http_verb": "POST",
+                    "return_type": {
+                        "Object": "A"
+                    },
+                    "parameters": [
+                        {
+                            "name": "{ db }",
+                            "cidl_type": {
+                                "Inject": "Env"
+                            }
+                        },
+                        {
+                            "name": "a",
+                            "cidl_type": {
+                                "Object": "A"
+                            }
+                        }
+                    ]
+                },
+                "refresh": {
+                    "name": "refresh",
+                    "is_static": false,
+                    "http_verb": "GET",
+                    "return_type": {
+                        "Object": "A"
+                    },
+                    "parameters": [
+                        {
+                            "name": "__dataSource",
+                            "cidl_type": {
+                                "DataSource": "A"
+                            }
+                        }
+                    ]
+                }
+            },
+            "data_sources": {
+                "withB": {
+                    "name": "withB",
+                    "tree": {
+                        "b": {}
+                    }
+                },
+                "withoutB": {
+                    "name": "withoutB",
+                    "tree": {}
+                }
+            },
+            "source_path": "./seed__foreign_keys.cloesce.ts"
+        },
+        "Person": {
+            "name": "Person",
+            "attributes": [],
+            "primary_key": {
+                "name": "id",
+                "cidl_type": "Integer"
+            },
+            "navigation_properties": [
+                {
+                    "var_name": "dogs",
+                    "model_name": "Dog",
+                    "kind": {
+                        "OneToMany": {
+                            "reference": "personId"
+                        }
+                    }
+                }
+            ],
+            "methods": {
+                "post": {
+                    "name": "post",
+                    "is_static": true,
+                    "http_verb": "POST",
+                    "return_type": {
+                        "Object": "Person"
+                    },
+                    "parameters": [
+                        {
+                            "name": "{ db }",
+                            "cidl_type": {
+                                "Inject": "Env"
+                            }
+                        },
+                        {
+                            "name": "person",
+                            "cidl_type": {
+                                "Object": "Person"
+                            }
+                        }
+                    ]
+                },
+                "refresh": {
+                    "name": "refresh",
+                    "is_static": false,
+                    "http_verb": "GET",
+                    "return_type": {
+                        "Object": "Person"
+                    },
+                    "parameters": [
+                        {
+                            "name": "__dataSource",
+                            "cidl_type": {
+                                "DataSource": "Person"
+                            }
+                        }
+                    ]
+                }
+            },
+            "data_sources": {
+                "withDogs": {
+                    "name": "withDogs",
+                    "tree": {
+                        "dogs": {}
+                    }
+                }
+            },
+            "source_path": "./seed__foreign_keys.cloesce.ts"
+        },
+        "Dog": {
+            "name": "Dog",
+            "attributes": [
+                {
+                    "foreign_key_reference": "Person",
+                    "value": {
+                        "name": "personId",
+                        "cidl_type": "Integer"
+                    }
+                }
+            ],
+            "primary_key": {
+                "name": "id",
+                "cidl_type": "Integer"
+            },
+            "navigation_properties": [],
+            "methods": {},
+            "data_sources": {},
+            "source_path": "./seed__foreign_keys.cloesce.ts"
+        },
+        "Student": {
+            "name": "Student",
+            "attributes": [],
+            "primary_key": {
+                "name": "id",
+                "cidl_type": "Integer"
+            },
+            "navigation_properties": [
+                {
+                    "var_name": "courses",
+                    "model_name": "Course",
+                    "kind": {
+                        "ManyToMany": {
+                            "unique_id": "StudentsCourses"
+                        }
+                    }
+                }
+            ],
+            "methods": {
+                "post": {
+                    "name": "post",
+                    "is_static": true,
+                    "http_verb": "POST",
+                    "return_type": {
+                        "Object": "Student"
+                    },
+                    "parameters": [
+                        {
+                            "name": "{ db }",
+                            "cidl_type": {
+                                "Inject": "Env"
+                            }
+                        },
+                        {
+                            "name": "student",
+                            "cidl_type": {
+                                "Object": "Student"
+                            }
+                        }
+                    ]
+                },
+                "refresh": {
+                    "name": "refresh",
+                    "is_static": false,
+                    "http_verb": "GET",
+                    "return_type": {
+                        "Object": "Student"
+                    },
+                    "parameters": [
+                        {
+                            "name": "__dataSource",
+                            "cidl_type": {
+                                "DataSource": "Student"
+                            }
+                        }
+                    ]
+                }
+            },
+            "data_sources": {
+                "withCoursesStudents": {
+                    "name": "withCoursesStudents",
+                    "tree": {
+                        "courses": {
+                            "students": {}
+                        }
+                    }
+                },
+                "withCoursesStudentsCourses": {
+                    "name": "withCoursesStudentsCourses",
+                    "tree": {
+                        "courses": {
+                            "students": {
+                                "courses": {}
+                            }
+                        }
+                    }
+                }
+            },
+            "source_path": "./seed__foreign_keys.cloesce.ts"
+        },
+        "Course": {
+            "name": "Course",
+            "attributes": [],
+            "primary_key": {
+                "name": "id",
+                "cidl_type": "Integer"
+            },
+            "navigation_properties": [
+                {
+                    "var_name": "students",
+                    "model_name": "Student",
+                    "kind": {
+                        "ManyToMany": {
+                            "unique_id": "StudentsCourses"
+                        }
+                    }
+                }
+            ],
+            "methods": {},
+            "data_sources": {},
+            "source_path": "./seed__foreign_keys.cloesce.ts"
+        }
+    },
+    "poos": {},
+    "app_source": null
+}

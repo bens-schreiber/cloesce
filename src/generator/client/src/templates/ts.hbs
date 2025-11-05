@@ -1,4 +1,4 @@
-import { HttpResult, instantiateObjectArray } from "cloesce/client";
+import { HttpResult, instantiateObjectArray, DeepPartial } from "cloesce/client";
 
 function serializeToUrlParams(params: URLSearchParams, key: string, value: any): void {
   if (value === null || value === undefined) {
@@ -29,6 +29,7 @@ export class {{this.name}} {
   {{/each}}
 }
 {{/each}}
+
 {{#each models}}
 export class {{this.name}} {
   {{this.primary_key.name}}: {{get_cidl_type this.primary_key.cidl_type}};
@@ -46,12 +47,8 @@ export class {{this.name}} {
         {{name}}: {{get_cidl_type cidl_type}},
       {{/if}}
     {{/each}}
-    dataSource: {{#each ../data_sources}}"{{name}}" | {{/each}}null = null
   ): Promise<HttpResult<{{get_cidl_type this.return_type}}>> {
-    const baseUrl = new URL(`{{../../domain}}/{{#if this.is_static}}{{../name}}/{{this.name}}{{else}}{{../name}}/${this.id}/{{this.name}}{{/if}}`);
-    if (dataSource) {
-      baseUrl.searchParams.append("dataSource", dataSource);
-    }
+    const baseUrl = new URL(`{{../../domain}}/{{#if this.is_static}}{{../name}}/{{this.name}}{{else}}{{../name}}/${this.{{../primary_key.name}}}/{{this.name}}{{/if}}`);
     {{#if (eq this.http_verb "GET")}}
       {{#each this.parameters}}
         {{#if (is_serializable cidl_type)}}

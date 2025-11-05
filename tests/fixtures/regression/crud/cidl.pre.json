@@ -1,0 +1,260 @@
+{
+    "version": "v0.0.3",
+    "project_name": "runner",
+    "language": "TypeScript",
+    "wrangler_env": {
+        "name": "Env",
+        "source_path": "./seed__crud.cloesce.ts"
+    },
+    "models": {
+        "CrudHaver": {
+            "name": "CrudHaver",
+            "attributes": [
+                {
+                    "foreign_key_reference": null,
+                    "value": {
+                        "name": "name",
+                        "cidl_type": "Text"
+                    }
+                }
+            ],
+            "primary_key": {
+                "name": "id",
+                "cidl_type": "Integer"
+            },
+            "navigation_properties": [],
+            "methods": {
+                "notCrud": {
+                    "name": "notCrud",
+                    "is_static": false,
+                    "http_verb": "POST",
+                    "return_type": "Void",
+                    "parameters": [
+                        {
+                            "name": "__dataSource",
+                            "cidl_type": {
+                                "DataSource": "CrudHaver"
+                            }
+                        }
+                    ]
+                },
+                "post": {
+                    "name": "post",
+                    "is_static": true,
+                    "http_verb": "POST",
+                    "return_type": {
+                        "HttpResult": {
+                            "Object": "CrudHaver"
+                        }
+                    },
+                    "parameters": [
+                        {
+                            "name": "obj",
+                            "cidl_type": {
+                                "Partial": "CrudHaver"
+                            }
+                        },
+                        {
+                            "name": "dataSource",
+                            "cidl_type": {
+                                "DataSource": "CrudHaver"
+                            }
+                        }
+                    ]
+                },
+                "get": {
+                    "name": "get",
+                    "is_static": true,
+                    "http_verb": "GET",
+                    "return_type": {
+                        "HttpResult": {
+                            "Object": "CrudHaver"
+                        }
+                    },
+                    "parameters": [
+                        {
+                            "name": "id",
+                            "cidl_type": "Integer"
+                        },
+                        {
+                            "name": "dataSource",
+                            "cidl_type": {
+                                "DataSource": "CrudHaver"
+                            }
+                        }
+                    ]
+                },
+                "list": {
+                    "name": "list",
+                    "is_static": true,
+                    "http_verb": "GET",
+                    "return_type": {
+                        "HttpResult": {
+                            "Array": {
+                                "Object": "CrudHaver"
+                            }
+                        }
+                    },
+                    "parameters": [
+                        {
+                            "name": "dataSource",
+                            "cidl_type": {
+                                "DataSource": "CrudHaver"
+                            }
+                        }
+                    ]
+                }
+            },
+            "data_sources": {},
+            "source_path": "./seed__crud.cloesce.ts"
+        },
+        "Parent": {
+            "name": "Parent",
+            "attributes": [
+                {
+                    "foreign_key_reference": "Child",
+                    "value": {
+                        "name": "favoriteChildId",
+                        "cidl_type": {
+                            "Nullable": "Integer"
+                        }
+                    }
+                }
+            ],
+            "primary_key": {
+                "name": "id",
+                "cidl_type": "Integer"
+            },
+            "navigation_properties": [
+                {
+                    "var_name": "favoriteChild",
+                    "model_name": "Child",
+                    "kind": {
+                        "OneToOne": {
+                            "reference": "favoriteChildId"
+                        }
+                    }
+                },
+                {
+                    "var_name": "children",
+                    "model_name": "Child",
+                    "kind": {
+                        "OneToMany": {
+                            "reference": "parentId"
+                        }
+                    }
+                }
+            ],
+            "methods": {
+                "post": {
+                    "name": "post",
+                    "is_static": true,
+                    "http_verb": "POST",
+                    "return_type": {
+                        "HttpResult": {
+                            "Object": "Parent"
+                        }
+                    },
+                    "parameters": [
+                        {
+                            "name": "obj",
+                            "cidl_type": {
+                                "Partial": "Parent"
+                            }
+                        },
+                        {
+                            "name": "dataSource",
+                            "cidl_type": {
+                                "DataSource": "Parent"
+                            }
+                        }
+                    ]
+                },
+                "get": {
+                    "name": "get",
+                    "is_static": true,
+                    "http_verb": "GET",
+                    "return_type": {
+                        "HttpResult": {
+                            "Object": "Parent"
+                        }
+                    },
+                    "parameters": [
+                        {
+                            "name": "id",
+                            "cidl_type": "Integer"
+                        },
+                        {
+                            "name": "dataSource",
+                            "cidl_type": {
+                                "DataSource": "Parent"
+                            }
+                        }
+                    ]
+                },
+                "list": {
+                    "name": "list",
+                    "is_static": true,
+                    "http_verb": "GET",
+                    "return_type": {
+                        "HttpResult": {
+                            "Array": {
+                                "Object": "Parent"
+                            }
+                        }
+                    },
+                    "parameters": [
+                        {
+                            "name": "dataSource",
+                            "cidl_type": {
+                                "DataSource": "Parent"
+                            }
+                        }
+                    ]
+                }
+            },
+            "data_sources": {
+                "withChildren": {
+                    "name": "withChildren",
+                    "tree": {
+                        "favoriteChild": {},
+                        "children": {}
+                    }
+                }
+            },
+            "source_path": "./seed__crud.cloesce.ts"
+        },
+        "Child": {
+            "name": "Child",
+            "attributes": [
+                {
+                    "foreign_key_reference": "Parent",
+                    "value": {
+                        "name": "parentId",
+                        "cidl_type": "Integer"
+                    }
+                }
+            ],
+            "primary_key": {
+                "name": "id",
+                "cidl_type": "Integer"
+            },
+            "navigation_properties": [
+                {
+                    "var_name": "parent",
+                    "model_name": "Parent",
+                    "kind": {
+                        "OneToOne": {
+                            "reference": "parentId"
+                        }
+                    }
+                }
+            ],
+            "methods": {},
+            "data_sources": {},
+            "source_path": "./seed__crud.cloesce.ts"
+        }
+    },
+    "poos": {},
+    "app_source": null
+}

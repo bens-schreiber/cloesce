@@ -1,8 +1,8 @@
 // @ts-nocheck
 
 @WranglerEnv
-class Env {}
+export class Env {}
 
 // duplicate...
 @WranglerEnv
-class Env2 {}
+export class Env2 {}
