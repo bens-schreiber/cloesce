@@ -28,35 +28,40 @@ impl WranglerSpec {
     /// for them
     pub fn generate_defaults(&mut self) {
         // Generate default worker entry point values
-        self.name = Some(self.name.clone().unwrap_or_else(|| "cloesce".to_string()));
+        self.name = Some(self.name.clone().unwrap_or_else(|| {
+            tracing::warn!("Set a default worker name \"cloesce\"");
+            "cloesce".to_string()
+        }));
 
-        self.compatability_date = Some(
-            self.compatability_date
-                .clone()
-                .unwrap_or_else(|| "2025-10-02".to_string()),
-        );
+        self.compatability_date = Some(self.compatability_date.clone().unwrap_or_else(|| {
+            tracing::warn!("Set a default compatability date.");
+            "2025-10-02".to_string()
+        }));
 
         self.main = Some(
             self.main
                 .clone()
-                .unwrap_or_else(|| "workers.ts".to_string()),
+                .unwrap_or_else(|| ".generated/workers.ts".to_string()),
         );
 
         // Validate existing database configs, filling in missing values with a default
         for (i, d1) in self.d1_databases.iter_mut().enumerate() {
-            if d1.binding.is_none() {
-                d1.binding = Some(format!("db_{i}"));
+            if d1.database_name.is_none() {
+                d1.database_name = Some(format!("Cloesce_d1_{i}"));
+                tracing::warn!("Created a default database Cloesce_d1_{i}")
             }
 
-            if d1.database_name.is_none() {
-                d1.database_name = Some(format!("{}_d1_{i}", "Cloesce"));
+            if d1.binding.is_none() {
+                d1.binding = Some(format!("db_{i}"));
+                tracing::warn!("Created a default database binding db_{i}")
             }
 
             if d1.database_id.is_none() {
                 d1.database_id = Some("replace_with_db_id".into());
 
-                eprintln!(
-                    "Warning: Database \"default\" is missing an id. \n https://developers.cloudflare.com/d1/get-started/"
+                tracing::warn!(
+                    "Database {} is missing an id. See https://developers.cloudflare.com/d1/get-started/",
+                    d1.database_name.as_ref().unwrap()
                 );
             }
         }
@@ -69,8 +74,8 @@ impl WranglerSpec {
                 database_id: Some(String::from("replace_with_db_id")),
             });
 
-            eprintln!(
-                "Warning: Database \"default\" is missing an id. \n https://developers.cloudflare.com/d1/get-started/"
+            tracing::warn!(
+                "Database \"default\" is missing an id. See https://developers.cloudflare.com/d1/get-started/"
             );
         }
     }

@@ -1,3 +1,4 @@
+// GENERATED CODE. DO NOT MODIFY.
 import { cloesce, CloesceApp } from "cloesce/backend";
 import cidl from "./cidl.json";
 import { CrudHaver } from "./seed__crud.cloesce.ts";

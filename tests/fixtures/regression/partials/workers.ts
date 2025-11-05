@@ -1,3 +1,4 @@
+// GENERATED CODE. DO NOT MODIFY.
 import { cloesce, CloesceApp } from "cloesce/backend";
 import cidl from "./cidl.json";
 import { Dog } from "./seed__partial.cloesce.ts";

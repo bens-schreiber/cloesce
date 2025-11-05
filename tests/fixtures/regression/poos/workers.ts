@@ -1,3 +1,4 @@
+// GENERATED CODE. DO NOT MODIFY.
 import { cloesce, CloesceApp } from "cloesce/backend";
 import cidl from "./cidl.json";
 import { PooAcceptYield } from "./seed__poo.cloesce.ts";

@@ -105,7 +105,13 @@ impl MigrateViews {
                     model.name,
                     d.name,
                     query.to_string(SqliteQueryBuilder)
-                ))
+                ));
+
+                tracing::info!(
+                    "Created data source \"{}\" for model \"{}\"",
+                    d.name,
+                    model.name
+                );
             }
         }
 
@@ -275,6 +281,12 @@ impl MigrateViews {
                                 .push(format!("{DROP_VIEW} \"{}.{}\";", lm_model.name, lm_ds.name));
 
                             creates.entry(&lm_model.name).or_default().push(lm_ds);
+
+                            tracing::info!(
+                                "Altered data source \"{}\" for model \"{}\"",
+                                lm_ds.name,
+                                model.name
+                            );
                         }
                     }
                 }
@@ -282,6 +294,12 @@ impl MigrateViews {
                 None => {
                     for lm_ds in lm_model.data_sources.values() {
                         drops.push(format!("{DROP_VIEW} \"{}.{}\";", lm_model.name, lm_ds.name));
+
+                        tracing::info!(
+                            "Dropped data source \"{}\" from model \"{}\"",
+                            lm_ds.name,
+                            lm_model.name
+                        );
                     }
                 }
                 // Last migration model unchanged
@@ -422,6 +440,7 @@ impl MigrateTables {
             }
 
             res.push(to_sqlite(table));
+            tracing::info!("Created table \"{}\"", model.name);
         }
 
         for (id, (a, b)) in jcts {
@@ -459,6 +478,12 @@ impl MigrateTables {
                 );
 
             res.push(to_sqlite(table));
+            tracing::info!(
+                "Created junction table \"{}\" between models \"{}\" \"{}\"",
+                id,
+                a.name,
+                b.name
+            );
         }
 
         res
@@ -498,6 +523,8 @@ impl MigrateTables {
                                 .table(alias(&lm_model.name), alias(&model.name))
                                 .to_owned(),
                         ));
+
+                        tracing::info!("Renamed table \"{}\" to \"{}\"", lm_model.name, model.name);
                     }
                     AlterKind::AddColumn { attr } => {
                         needs_rename_intent.insert(&attr.value.name, attr);
@@ -526,6 +553,16 @@ impl MigrateTables {
                                     .to_owned(),
                             ));
                         }
+
+                        tracing::info!(
+                            "Altered column type of \"{}.{:?}\" to {:?}",
+                            lm_model.name,
+                            lm_attr.value.cidl_type,
+                            attr.value.cidl_type
+                        );
+                        tracing::warn!(
+                            "Altering column types drops the previous column. Data can be lost."
+                        );
                     }
                     AlterKind::DropColumn { lm_attr } => {
                         needs_drop_intent.push(lm_attr);
@@ -551,6 +588,12 @@ impl MigrateTables {
                         );
 
                         res.extend(Self::create(vec![], model_lookup, jcts));
+                        tracing::warn!(
+                            "Created a many to many table \"{}\" between models: \"{}\" \"{}\"",
+                            unique_id,
+                            model.name,
+                            join.name
+                        );
                     }
                     AlterKind::DropManyToMany { unique_id } => {
                         if !visited_m2ms.insert(unique_id) {
@@ -560,6 +603,8 @@ impl MigrateTables {
                         res.push(to_sqlite(
                             Table::drop().table(alias(unique_id)).if_exists().to_owned(),
                         ));
+
+                        tracing::info!("Dropped a many to many table \"{}\"", unique_id,);
                     }
                     AlterKind::RebuildTable => {
                         let has_fk_col = model
@@ -662,6 +707,11 @@ impl MigrateTables {
                             res.push(PRAGMA_FK_ON.into());
                             res.push(PRAGMA_FK_CHECK.into());
                         }
+
+                        tracing::warn!(
+                            "Rebuilt a table \"{}\" by moving data to the new version.",
+                            lm_model.name
+                        );
                     }
                 }
             }
@@ -692,6 +742,14 @@ impl MigrateTables {
 
                         // Remove from the rename pool
                         needs_rename_intent.remove(option);
+
+                        tracing::info!(
+                            "Renamed a column \"{}.{}\" to \"{}.{}\"",
+                            lm_model.name,
+                            lm_attr.value.name,
+                            model.name,
+                            option
+                        );
                         continue;
                     }
                 }
@@ -699,6 +757,7 @@ impl MigrateTables {
                 // Drop
                 alter.drop_column(alias(&lm_attr.value.name));
                 res.push(to_sqlite(alter));
+                tracing::info!("Dropped a column \"{}.{}\"", model.name, lm_attr.value.name);
             }
 
             // Add column
@@ -713,6 +772,7 @@ impl MigrateTables {
                         ))
                         .to_owned(),
                 ));
+                tracing::info!("Added a column \"{}.{}\"", model.name, add_attr.value.name);
             }
         }
 
@@ -827,6 +887,7 @@ impl MigrateTables {
                 res.push(to_sqlite(
                     Table::drop().table(alias(m2m_id)).if_exists().to_owned(),
                 ));
+                tracing::info!("Dropped a many to many table \"{}\"", m2m_id);
             }
 
             // Drop table
@@ -836,6 +897,7 @@ impl MigrateTables {
                     .if_exists()
                     .to_owned(),
             ));
+            tracing::info!("Dropped a table \"{}\"", model.name);
         }
 
         res
