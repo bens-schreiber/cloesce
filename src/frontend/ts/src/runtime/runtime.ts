@@ -305,7 +305,8 @@ async function validateRequest(
   // Extract url or body parameters
   let params: RequestParamMap;
   if (method.http_verb === "GET") {
-    params = Object.fromEntries(url.searchParams.entries());
+    const url = new URL(request.url);
+    params = parseUrlParams(url.searchParams);
   } else {
     try {
       params = await request.json();
@@ -633,6 +634,59 @@ export function modelsFromSql<T extends object>(
 
     return m;
   }
+}
+
+function parseUrlParams(searchParams: URLSearchParams): RequestParamMap {
+  const params: RequestParamMap = {};
+  
+  for (const [key, value] of searchParams.entries()) {
+    // Handle arrays: key[] or key[index]
+    const arrayMatch = key.match(/^(.+?)\[(\d*)\]$/);
+    if (arrayMatch) {
+      const [, paramName, index] = arrayMatch;
+      if (!params[paramName]) params[paramName] = [];
+      if (index) {
+        (params[paramName] as any[])[parseInt(index)] = parseValue(value);
+      } else {
+        (params[paramName] as any[]).push(parseValue(value));
+      }
+      continue;
+    }
+    
+    // Handle objects: key[prop] or key[index][prop]
+    const objectMatch = key.match(/^(.+?)\[(.+?)\](?:\[(.+?)\])?$/);
+    if (objectMatch) {
+      const [, paramName, prop1, prop2] = objectMatch;
+      
+      if (prop2) {
+        // Nested: key[index][prop]
+        if (!params[paramName]) params[paramName] = [];
+        const index = parseInt(prop1);
+        if (!(params[paramName] as any[])[index]) {
+          (params[paramName] as any[])[index] = {};
+        }
+        (params[paramName] as any[])[index][prop2] = parseValue(value);
+      } else {
+        // Simple: key[prop]
+        if (!params[paramName]) params[paramName] = {};
+        (params[paramName] as any)[prop1] = parseValue(value);
+      }
+      continue;
+    }
+    
+    // Simple parameter
+    params[key] = parseValue(value);
+  }
+  
+  return params;
+}
+
+function parseValue(value: string): any {
+  if (value === 'null') return null;
+  if (value === 'true') return true;
+  if (value === 'false') return false;
+  if (!isNaN(Number(value)) && value !== '') return Number(value);
+  return value;
 }
 
 function errorState(status: number, message: string): HttpResult {
