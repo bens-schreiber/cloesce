@@ -11,7 +11,8 @@ impl ClientLanguageTypeMapper for TypeScriptMapper {
             CidlType::Integer => "number".to_string(),
             CidlType::Real => "number".to_string(),
             CidlType::Text => "string".to_string(),
-            CidlType::Blob => "Uint8Array".to_string(),
+            CidlType::Boolean => "boolean".to_string(),
+            CidlType::DateIso => "Date".to_string(),
             CidlType::Object(name) => name.clone(),
             CidlType::Nullable(inner) => {
                 if matches!(inner.as_ref(), CidlType::Void) {

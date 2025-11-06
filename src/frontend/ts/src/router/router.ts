@@ -445,8 +445,11 @@ function validateCidlType(
         return !Number.isNaN(Number(value));
       case "Text":
         return typeof value === "string";
-      case "Blob":
-        return value instanceof Blob || value instanceof ArrayBuffer;
+      case "Boolean":
+        return typeof value === "boolean";
+      case "DateIso":
+        const date = new Date(value as string);
+        return !isNaN(date.getTime());
       default:
         return false;
     }

@@ -680,10 +680,11 @@ impl MigrateTables {
                                                 // Column type changed, cast
                                                 let sql_type = match &model_c.cidl_type.root_type()
                                                 {
-                                                    CidlType::Integer => "integer",
+                                                    CidlType::Integer | CidlType::Boolean => {
+                                                        "integer"
+                                                    }
                                                     CidlType::Real => "real",
-                                                    CidlType::Text => "text",
-                                                    CidlType::Blob => "blob",
+                                                    CidlType::Text | CidlType::DateIso => "text",
                                                     _ => unreachable!(),
                                                 };
 
@@ -1022,7 +1023,6 @@ fn sql_default(ty: &CidlType) -> sea_query::Value {
         CidlType::Integer => sea_query::Value::Int(Some(0i32)),
         CidlType::Text => sea_query::Value::String(Some(Box::new("".into()))),
         CidlType::Real => sea_query::Value::Float(Some(0.0)),
-        CidlType::Blob => sea_query::Value::Bytes(Some(Box::new(vec![]))),
         _ => unreachable!(),
     }
 }
@@ -1039,10 +1039,9 @@ fn typed_column(name: &str, ty: &CidlType, with_default: bool) -> ColumnDef {
     }
 
     match inner {
-        CidlType::Integer => col.integer(),
+        CidlType::Integer | CidlType::Boolean => col.integer(),
         CidlType::Real => col.decimal(),
-        CidlType::Text => col.text(),
-        CidlType::Blob => col.blob(),
+        CidlType::Text | CidlType::DateIso => col.text(),
         _ => unreachable!("column type must be validated earlier"),
     };
     col

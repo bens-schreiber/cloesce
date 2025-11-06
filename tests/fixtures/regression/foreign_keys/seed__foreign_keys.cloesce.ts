@@ -10,11 +10,10 @@ import {
   ManyToMany,
   IncludeTree,
   GET,
-  Inject,
   Orm,
 } from "cloesce/backend";
-
 import { D1Database } from "@cloudflare/workers-types";
+type Integer = number & { __kind: "Integer" };
 
 @WranglerEnv
 export class Env {
@@ -25,16 +24,16 @@ export class Env {
 @D1
 export class B {
   @PrimaryKey
-  id: number;
+  id: Integer;
 }
 
 @D1
 export class A {
   @PrimaryKey
-  id: number;
+  id: Integer;
 
   @ForeignKey(B)
-  bId: number;
+  bId: Integer;
 
   @OneToOne("bId")
   b: B | undefined;
@@ -66,7 +65,7 @@ export class A {
 @D1
 export class Person {
   @PrimaryKey
-  id: number;
+  id: Integer;
 
   @OneToMany("personId")
   dogs: Dog[];
@@ -92,10 +91,10 @@ export class Person {
 @D1
 export class Dog {
   @PrimaryKey
-  id: number;
+  id: Integer;
 
   @ForeignKey(Person)
-  personId: number;
+  personId: Integer;
 }
 //#endregion
 
@@ -103,7 +102,7 @@ export class Dog {
 @D1
 export class Student {
   @PrimaryKey
-  id: number;
+  id: Integer;
 
   @ManyToMany("StudentsCourses")
   courses: Course[];
@@ -134,7 +133,7 @@ export class Student {
 @D1
 export class Course {
   @PrimaryKey
-  id: number;
+  id: Integer;
 
   @ManyToMany("StudentsCourses")
   students: Student[];

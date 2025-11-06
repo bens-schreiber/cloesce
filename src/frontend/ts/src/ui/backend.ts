@@ -57,6 +57,12 @@ export type DataSourceOf<T extends object> =
   | "none";
 
 /**
+ * A JavaScript `number` that signals to Cloesce the SQL table type
+ * should be of Integer
+ */
+export type Integer = number & { __kind: "Integer" };
+
+/**
  * ORM functions which use metadata to translate arguments to valid SQL queries.
  */
 export class Orm {

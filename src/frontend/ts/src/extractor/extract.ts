@@ -476,12 +476,14 @@ export class CidlExtractor {
   }
 
   private static readonly primTypeMap: Record<string, CidlType> = {
-    number: "Integer",
-    Number: "Integer",
+    number: "Real",
+    Number: "Real",
+    Integer: "Integer",
     string: "Text",
     String: "Text",
-    boolean: "Integer",
-    Boolean: "Integer",
+    boolean: "Boolean",
+    Boolean: "Boolean",
+    Date: "DateIso",
   };
 
   private static cidlType(
@@ -500,7 +502,6 @@ export class CidlExtractor {
 
     // Nullable via union
     const [unwrappedType, nullable] = unwrapNullable(type);
-
     const tyText = unwrappedType
       .getText(undefined, TypeFormatFlags.UseAliasDefinedOutsideCurrentScope)
       .split("|")[0]

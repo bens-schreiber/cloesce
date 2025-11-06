@@ -525,7 +525,7 @@ fn validate_json_to_cidl(
     }
 
     match cidl_type.root_type() {
-        CidlType::Integer => {
+        CidlType::Integer | CidlType::Boolean => {
             if !matches!(value, Value::Number(_)) {
                 return Err(format!(
                     "Expected an integer type for {}.{}",
@@ -545,7 +545,7 @@ fn validate_json_to_cidl(
 
             Ok(Expr::val(value.as_f64().unwrap()).into())
         }
-        CidlType::Text | CidlType::Blob => {
+        CidlType::Text | CidlType::DateIso => {
             if !matches!(value, Value::String(_)) {
                 return Err(format!(
                     "Expected an real type for {}.{}",
@@ -565,7 +565,7 @@ fn validate_json_to_cidl(
 mod test {
     use std::collections::HashMap;
 
-    use ast::{CidlType, NavigationPropertyKind, builder::ModelBuilder};
+    use ast::{builder::ModelBuilder, CidlType, NavigationPropertyKind};
     use serde_json::json;
 
     use crate::upsert::UpsertModel;

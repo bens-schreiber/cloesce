@@ -271,8 +271,10 @@ async function extract(opts: {
     return { outPath, projectName: cloesceProjectName };
   } catch (err: any) {
     console.error(
-      "Critical uncaught error. Submit a ticket to https://github.com/bens-schreiber/cloesce: ",
-      err?.message ?? err,
+      "Critical uncaught error in generator. \nSubmit a ticket to https://github.com/bens-schreiber/cloesce\n\n",
+      err?.message ?? "No error message.",
+      "\n",
+      err?.stack ?? "No error stack.",
     );
     process.exit(1);
   }

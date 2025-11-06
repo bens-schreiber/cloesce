@@ -199,6 +199,8 @@ export type CidlType =
   | "Real"
   | "Text"
   | "Blob"
+  | "DateIso"
+  | "Boolean"
   | { DataSource: string }
   | { Inject: string }
   | { Object: string }

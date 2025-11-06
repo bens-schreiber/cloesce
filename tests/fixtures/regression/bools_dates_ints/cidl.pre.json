@@ -1,0 +1,87 @@
+{
+    "version": "v0.0.3",
+    "project_name": "runner",
+    "language": "TypeScript",
+    "wrangler_env": {
+        "name": "Env",
+        "source_path": "./seed__bools_dates_ints.cloesce.ts"
+    },
+    "models": {
+        "Weather": {
+            "name": "Weather",
+            "attributes": [
+                {
+                    "foreign_key_reference": null,
+                    "value": {
+                        "name": "date",
+                        "cidl_type": "DateIso"
+                    }
+                },
+                {
+                    "foreign_key_reference": null,
+                    "value": {
+                        "name": "isRaining",
+                        "cidl_type": "Boolean"
+                    }
+                }
+            ],
+            "primary_key": {
+                "name": "id",
+                "cidl_type": "Integer"
+            },
+            "navigation_properties": [],
+            "methods": {
+                "post": {
+                    "name": "post",
+                    "is_static": true,
+                    "http_verb": "POST",
+                    "return_type": {
+                        "HttpResult": {
+                            "Object": "Weather"
+                        }
+                    },
+                    "parameters": [
+                        {
+                            "name": "obj",
+                            "cidl_type": {
+                                "Partial": "Weather"
+                            }
+                        },
+                        {
+                            "name": "dataSource",
+                            "cidl_type": {
+                                "DataSource": "Weather"
+                            }
+                        }
+                    ]
+                },
+                "get": {
+                    "name": "get",
+                    "is_static": true,
+                    "http_verb": "GET",
+                    "return_type": {
+                        "HttpResult": {
+                            "Object": "Weather"
+                        }
+                    },
+                    "parameters": [
+                        {
+                            "name": "id",
+                            "cidl_type": "Integer"
+                        },
+                        {
+                            "name": "dataSource",
+                            "cidl_type": {
+                                "DataSource": "Weather"
+                            }
+                        }
+                    ]
+                }
+            },
+            "data_sources": {},
+            "source_path": "./seed__bools_dates_ints.cloesce.ts"
+        }
+    },
+    "poos": {},
+    "app_source": null
+}

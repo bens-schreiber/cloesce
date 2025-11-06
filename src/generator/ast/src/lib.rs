@@ -31,8 +31,11 @@ pub enum CidlType {
     /// SQLite string
     Text,
 
-    /// SQLite large structured data
-    Blob,
+    /// (SQL equivalent to Integer)
+    Boolean,
+
+    /// An ISO Date string (SQL equivalent to Text)
+    DateIso,
 
     /// A dependency injected instance, containing a type name.
     Inject(String),
@@ -290,7 +293,11 @@ impl CloesceAst {
             ensure!(
                 matches!(
                     inner,
-                    CidlType::Integer | CidlType::Real | CidlType::Text | CidlType::Blob
+                    CidlType::Integer
+                        | CidlType::Real
+                        | CidlType::Text
+                        | CidlType::Boolean
+                        | CidlType::DateIso
                 ),
                 GeneratorErrorKind::InvalidSqlType,
                 "{}.{}",
