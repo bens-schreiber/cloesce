@@ -11,6 +11,7 @@ import {
   DataSource,
   Orm,
   WranglerEnv,
+  Inject,
 } from "cloesce/backend";
 type Integer = number & { __kind: "Integer" };
 
