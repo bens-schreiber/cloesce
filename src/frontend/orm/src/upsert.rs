@@ -565,7 +565,7 @@ fn validate_json_to_cidl(
 mod test {
     use std::collections::HashMap;
 
-    use ast::{builder::ModelBuilder, CidlType, NavigationPropertyKind};
+    use ast::{CidlType, NavigationPropertyKind, builder::ModelBuilder};
     use serde_json::json;
 
     use crate::upsert::UpsertModel;
