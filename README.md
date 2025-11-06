@@ -415,6 +415,77 @@ static async get(
 ): Promise<HttpResult<CrudHaver>>
 ```
 
+### Middleware
+
+Cloesce supports middleware at the global level (before routing to a model+method), the model level (before hydration) and the method level (before hydration). Middleware also exposes read/write access to the dependency injection instance that all models use.
+
+Middleware is capable of exiting from the Cloesce Router early with an HTTP Result.
+
+An example of all levels of middleware is below.
+
+```ts
+import {
+  CloesceApp,
+  WranglerEnv,
+  D1,
+  PrimaryKey,
+  CRUD,
+  Inject,
+  PlainOldObject,
+  GET,
+} from "cloesce/backend";
+import { D1Database } from "@cloudflare/workers-types";
+
+@PlainOldObject
+export class InjectedThing {
+  value: string;
+}
+
+@WranglerEnv
+export class Env {
+  db: D1Database;
+}
+
+@D1
+@CRUD(["POST"])
+export class Model {
+  @PrimaryKey
+  id: number;
+
+  @GET
+  static blockedMethod() {}
+
+  @GET
+  static getInjectedThing(@Inject thing: InjectedThing): InjectedThing {
+    return thing;
+  }
+}
+
+// Middleware instance
+const app: CloesceApp = new CloesceApp();
+
+app.useGlobal((request: Request, env, ir) => {
+  if (request.method === "POST") {
+    return { ok: false, status: 401, message: "POST methods aren't allowed." };
+  }
+});
+
+app.useModel(Model, (request, env, ir) => {
+  ir.set(InjectedThing.name, {
+    value: "hello world",
+  });
+});
+
+app.useMethod(Model, "blockedMethod", (request, env, ir) => {
+  return { ok: false, status: 401, message: "Blocked method" };
+});
+
+// Must export instance for Cloesce to pick it up
+export default app;
+```
+
+With this middleware, all POST methods will be blocked, and all methods for the model `Model` will be able to inject `InjectedThing`. Additionally, on the method level, `blockedMethod` will return a 401.
+
 ### Plain Old Objects
 
 Simple non-model objects can be returned and serialized from a model method:
