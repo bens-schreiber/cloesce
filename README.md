@@ -2,7 +2,7 @@
 
 Cloesce is a full stack compiler for the Cloudflare developer platform, allowing class definitions in high level languages to serve as a metadata basis to create a database schema, backend REST API, frontend API client, and Cloudflare infrastructure (as of v0.0.4, D1 + Workers).
 
-Cloesce is working towards an alpha MVP (v0.1.0), with the general milestones being [here](https://cloesce.pages.dev/schreiber/v0.1.0_milestones/).
+Cloesce is working towards a stable alpha MVP (v0.1.0), with the general milestones being [here](https://cloesce.pages.dev/schreiber/v0.1.0_milestones/).
 
 Internal documentation going over design decisions and general thoughts for each milestone can be found [here](https://cloesce.pages.dev/).
 
@@ -148,6 +148,19 @@ Note the output in `migrations`, ex after running `npx cloesce migrate Initial`
 - `<date>_Initial.json` contains all model information necessary from SQL
 - `<date>_Initial.sql` contains the acual SQL migrations. In this early version of Cloesce, it's important to check migrations every time.
 
+#### Supported Column Types
+
+Model columns must directly map to SQLite columns. The supported TypeScript types are:
+
+- `number` => `Real` not null
+- `string` => `Text` not null
+- `boolean` and `Boolean` => `Integer` not null
+- `Integer` => `Integer` not null
+- `Date` => `Text` (ISO formatted) not null
+- `N | null` => `N` (nullable)
+
+Blob types will be added in v0.0.5 when R2 support is added.
+
 ## Features
 
 ### Wrangler Environment
@@ -155,8 +168,6 @@ Note the output in `migrations`, ex after running `npx cloesce migrate Initial`
 In order to interact with your database, you will need to define a WranglerEnv
 
 ```ts
-// horse.cloesce.ts
-
 import { WranglerEnv } from "cloesce/backend";
 
 @WranglerEnv
@@ -421,21 +432,9 @@ Cloesce supports middleware at the global level (before routing to a model+metho
 
 Middleware is capable of exiting from the Cloesce Router early with an HTTP Result.
 
-An example of all levels of middleware is below.
+An example of all levels of middleware is below. All middleware must be defined in the file `app.cloesce.ts`.
 
 ```ts
-import {
-  CloesceApp,
-  WranglerEnv,
-  D1,
-  PrimaryKey,
-  CRUD,
-  Inject,
-  PlainOldObject,
-  GET,
-} from "cloesce/backend";
-import { D1Database } from "@cloudflare/workers-types";
-
 @PlainOldObject
 export class InjectedThing {
   value: string;
@@ -480,7 +479,7 @@ app.useMethod(Model, "blockedMethod", (request, env, ir) => {
   return { ok: false, status: 401, message: "Blocked method" };
 });
 
-// Must export instance for Cloesce to pick it up
+// Exporting the instance is required
 export default app;
 ```
 
