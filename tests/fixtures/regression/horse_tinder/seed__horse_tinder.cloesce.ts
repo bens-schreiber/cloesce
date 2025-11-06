@@ -2,9 +2,7 @@ import { D1Database } from "@cloudflare/workers-types";
 import {
   D1,
   GET,
-  PATCH,
   POST,
-  Inject,
   PrimaryKey,
   OneToMany,
   OneToOne,
@@ -13,7 +11,9 @@ import {
   DataSource,
   Orm,
   WranglerEnv,
+  Inject,
 } from "cloesce/backend";
+type Integer = number & { __kind: "Integer" };
 
 @WranglerEnv
 export class Env {
@@ -24,7 +24,7 @@ export class Env {
 @D1
 class Horse {
   @PrimaryKey
-  id: number;
+  id: Integer;
 
   name: string;
   bio: string | null;
@@ -50,7 +50,7 @@ class Horse {
   }
 
   @GET
-  static async get(@Inject { db }: Env, id: number): Promise<Horse> {
+  static async get(@Inject { db }: Env, id: Integer): Promise<Horse> {
     const orm = Orm.fromD1(db);
     return (await orm.get(Horse, id, "default")).value;
   }
@@ -78,13 +78,13 @@ class Horse {
 @D1
 class Like {
   @PrimaryKey
-  id: number;
+  id: Integer;
 
   @ForeignKey(Horse)
-  horseId1: number;
+  horseId1: Integer;
 
   @ForeignKey(Horse)
-  horseId2: number;
+  horseId2: Integer;
 
   @OneToOne("horseId2")
   horse2: Horse | undefined;

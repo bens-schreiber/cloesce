@@ -37,7 +37,7 @@
                     "name": "primitiveTypes",
                     "is_static": false,
                     "http_verb": "POST",
-                    "return_type": "Integer",
+                    "return_type": "Boolean",
                     "parameters": [
                         {
                             "name": "a",

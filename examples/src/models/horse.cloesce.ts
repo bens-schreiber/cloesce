@@ -13,9 +13,8 @@ import {
   WranglerEnv,
   Orm,
   CRUD,
+  Integer,
 } from "cloesce/backend";
-
-// TODO: Updated to v0.0.4 which hasn't released to NPM yet
 
 @WranglerEnv
 export class Env {
@@ -27,7 +26,7 @@ export class Env {
 @CRUD(["GET", "LIST", "POST"])
 export class Horse {
   @PrimaryKey
-  id: number;
+  id: Integer;
 
   name: string;
   bio: string | null;
@@ -84,13 +83,13 @@ export class Horse {
 @D1
 export class Like {
   @PrimaryKey
-  id: number;
+  id: Integer;
 
   @ForeignKey(Horse)
-  horseId1: number;
+  horseId1: Integer;
 
   @ForeignKey(Horse)
-  horseId2: number;
+  horseId2: Integer;
 
   @OneToOne("horseId2")
   horse2: Horse | undefined;

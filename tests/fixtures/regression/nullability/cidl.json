@@ -1,5 +1,5 @@
 {
-  "hash": 4846770590421999872,
+  "hash": 10361364691045731291,
   "version": "v0.0.3",
   "project_name": "runner",
   "language": "TypeScript",
@@ -9,7 +9,7 @@
   },
   "models": {
     "NullabilityChecks": {
-      "hash": 12779594012490832041,
+      "hash": 3976757330464425461,
       "name": "NullabilityChecks",
       "primary_key": {
         "name": "id",
@@ -25,7 +25,7 @@
           "foreign_key_reference": null
         },
         {
-          "hash": 7880481338775788177,
+          "hash": 15344237499420552175,
           "value": {
             "name": "nullableString",
             "cidl_type": {
@@ -159,7 +159,7 @@
           "name": "primitiveTypes",
           "is_static": false,
           "http_verb": "POST",
-          "return_type": "Integer",
+          "return_type": "Boolean",
           "parameters": [
             {
               "name": "a",

@@ -15,6 +15,9 @@ struct Cli {
 
     #[command(subcommand)]
     command: Commands,
+
+    #[arg(long, default_value = "*", global = true)]
+    fixture: String,
 }
 
 #[derive(Subcommand, Clone)]
@@ -28,8 +31,8 @@ fn main() {
     let cli = Cli::parse();
 
     let pattern = match &cli.command {
-        Commands::Regression => "../fixtures/regression/*/seed__*",
-        Commands::RunFail => "../fixtures/run_fail/*/*/*.ts",
+        Commands::Regression => &format!("../fixtures/regression/{}/seed__*", cli.fixture),
+        Commands::RunFail => &format!("../fixtures/run_fail/*/{}/*.ts", cli.fixture),
     };
 
     let fixtures = glob(pattern)

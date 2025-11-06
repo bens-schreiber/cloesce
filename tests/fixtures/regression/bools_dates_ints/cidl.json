@@ -1,0 +1,91 @@
+{
+  "hash": 17097008485444420876,
+  "version": "v0.0.3",
+  "project_name": "runner",
+  "language": "TypeScript",
+  "wrangler_env": {
+    "name": "Env",
+    "source_path": "./seed__bools_dates_ints.cloesce.ts"
+  },
+  "models": {
+    "Weather": {
+      "hash": 15419486100592067894,
+      "name": "Weather",
+      "primary_key": {
+        "name": "id",
+        "cidl_type": "Integer"
+      },
+      "attributes": [
+        {
+          "hash": 3799822671517854410,
+          "value": {
+            "name": "date",
+            "cidl_type": "DateIso"
+          },
+          "foreign_key_reference": null
+        },
+        {
+          "hash": 13732298516080320688,
+          "value": {
+            "name": "isRaining",
+            "cidl_type": "Boolean"
+          },
+          "foreign_key_reference": null
+        }
+      ],
+      "navigation_properties": [],
+      "methods": {
+        "get": {
+          "name": "get",
+          "is_static": true,
+          "http_verb": "GET",
+          "return_type": {
+            "HttpResult": {
+              "Object": "Weather"
+            }
+          },
+          "parameters": [
+            {
+              "name": "id",
+              "cidl_type": "Integer"
+            },
+            {
+              "name": "dataSource",
+              "cidl_type": {
+                "DataSource": "Weather"
+              }
+            }
+          ]
+        },
+        "post": {
+          "name": "post",
+          "is_static": true,
+          "http_verb": "POST",
+          "return_type": {
+            "HttpResult": {
+              "Object": "Weather"
+            }
+          },
+          "parameters": [
+            {
+              "name": "obj",
+              "cidl_type": {
+                "Partial": "Weather"
+              }
+            },
+            {
+              "name": "dataSource",
+              "cidl_type": {
+                "DataSource": "Weather"
+              }
+            }
+          ]
+        }
+      },
+      "data_sources": {},
+      "source_path": "./seed__bools_dates_ints.cloesce.ts"
+    }
+  },
+  "poos": {},
+  "app_source": null
+}

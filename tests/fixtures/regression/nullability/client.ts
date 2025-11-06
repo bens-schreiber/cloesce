@@ -88,7 +88,7 @@ export class NullabilityChecks {
         a: number | null,
         b: string | null,
         __dataSource: "none" = "none",
-  ): Promise<HttpResult<number>> {
+  ): Promise<HttpResult<boolean>> {
     const baseUrl = new URL(`http://localhost:5002/api/NullabilityChecks/${this.id}/primitiveTypes`);
     const res = await fetch(baseUrl, {
       method: "POST",

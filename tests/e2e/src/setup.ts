@@ -34,6 +34,18 @@ export async function startWrangler(fixturesPath: string) {
     },
   );
 
+  wranglerProcess.stdout.on("data", (data) => {
+    console.log(`[wrangler stdout]: ${data}`);
+  });
+
+  wranglerProcess.stderr.on("data", (data) => {
+    console.error(`[wrangler stderr]: ${data}`);
+  });
+
+  wranglerProcess.on("exit", (code) => {
+    console.log(`⚠️ Wrangler process exited with code ${code}`);
+  });
+
   await new Promise((resolve) => setTimeout(resolve, 5000));
   console.log("Wrangler server ready ✅\n");
 }

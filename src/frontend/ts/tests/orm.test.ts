@@ -248,6 +248,10 @@ describe("Validate Request Success States", () => {
     { typed_value: { name: "lastName", cidl_type: "Text" }, value: "pumpkin" },
     { typed_value: { name: "gpa", cidl_type: "Real" }, value: "4.0" },
     {
+      typed_value: { name: "date", cidl_type: "DateIso" },
+      value: new Date(Date.now()).toISOString(),
+    },
+    {
       typed_value: { name: "horse", cidl_type: { Object: "Horse" } },
       value: { _id: 1 },
     },

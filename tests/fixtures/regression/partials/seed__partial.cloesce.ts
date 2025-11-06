@@ -8,6 +8,7 @@ import {
   WranglerEnv,
   DeepPartial,
 } from "cloesce/backend";
+type Integer = number & { __kind: "Integer" };
 
 @WranglerEnv
 export class Env {
@@ -17,10 +18,10 @@ export class Env {
 @D1
 export class Dog {
   @PrimaryKey
-  id: number;
+  id: Integer;
 
   name: string;
-  age: number;
+  age: Integer;
 
   @POST
   static async post(@Inject { db }: Env, dog: DeepPartial<Dog>): Promise<Dog> {
