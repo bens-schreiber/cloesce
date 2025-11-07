@@ -94,12 +94,12 @@ impl GeneratorErrorKind {
                 GeneratorPhase::ModelSemanticAnalysis,
             ),
             GeneratorErrorKind::InvalidSqlType => (
-                "Model attributes must be valid SQLite types: Integer, Real, Text, Blob",
+                "Model attributes must be valid SQLite types: Integer, Real, Text",
                 "Consider using a navigation property or creating another model.",
                 GeneratorPhase::ModelSemanticAnalysis,
             ),
             GeneratorErrorKind::UnknownObject => (
-                "Objects must be decorated appropriately as a Model or PlainOldObject",
+                "Objects must be decorated appropriately as a Model, PlainOldObject, or Inject",
                 "Consider using a decorator on the object.",
                 GeneratorPhase::ModelSemanticAnalysis,
             ),
