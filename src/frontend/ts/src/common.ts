@@ -1,9 +1,9 @@
 /// A partial type whose object keys may be partial as well
-export type DeepPartial<T> = T extends (infer U)[]
+export type DeepPartial<T> = (T extends (infer U)[]
   ? DeepPartial<U>[] // handle arrays specially
   : T extends object
     ? { [K in keyof T]?: DeepPartial<T[K]> }
-    : T;
+    : T) & { __brand?: "Partial" };
 
 export type Either<L, R> = { ok: false; value: L } | { ok: true; value: R };
 export function left<L>(value: L): Either<L, never> {

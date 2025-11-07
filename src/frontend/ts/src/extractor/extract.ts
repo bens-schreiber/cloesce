@@ -155,7 +155,7 @@ export class CidlExtractor {
     });
   }
 
-  private static app(sourceFile: SourceFile): Either<ExtractorError, string> {
+  static app(sourceFile: SourceFile): Either<ExtractorError, string> {
     const symbol = sourceFile.getDefaultExportSymbol();
     const decl = symbol?.getDeclarations()[0];
 
@@ -181,7 +181,7 @@ export class CidlExtractor {
     return err(ExtractorErrorCode.AppMissingDefaultExport);
   }
 
-  private static model(
+  static model(
     classDecl: ClassDeclaration,
     sourceFile: SourceFile,
   ): Either<ExtractorError, Model> {
@@ -437,7 +437,7 @@ export class CidlExtractor {
     });
   }
 
-  private static poo(
+  static poo(
     classDecl: ClassDeclaration,
     sourceFile: SourceFile,
   ): Either<ExtractorError, PlainOldObject> {
@@ -486,7 +486,7 @@ export class CidlExtractor {
     Date: "DateIso",
   };
 
-  private static cidlType(
+  static cidlType(
     type: Type,
     inject: boolean = false,
   ): Either<ExtractorError, CidlType> {
@@ -621,17 +621,25 @@ export class CidlExtractor {
     }
 
     function unwrapNullable(ty: Type): [Type, boolean] {
-      if (ty.isUnion()) {
-        const nonNull = ty.getUnionTypes().filter((t) => !t.isNull());
-        if (nonNull.length === 1) {
-          return [nonNull[0], true];
-        }
+      if (!ty.isUnion()) return [ty, false];
+
+      const unions = ty.getUnionTypes();
+      const nonNulls = unions.filter((t) => !t.isNull() && !t.isUndefined());
+      const hasNullable = nonNulls.length < unions.length;
+
+      // Booleans seperate into [null, true, false] from the `getUnionTypes` call
+      if (
+        nonNulls.length === 2 &&
+        nonNulls.every((t) => t.isBooleanLiteral())
+      ) {
+        return [nonNulls[0].getApparentType(), hasNullable];
       }
-      return [ty, false];
+
+      return [nonNulls[0] ?? ty, hasNullable];
     }
   }
 
-  private static includeTree(
+  static includeTree(
     expr: Expression | undefined,
     currentClass: ClassDeclaration,
     sf: SourceFile,
@@ -716,7 +724,7 @@ export class CidlExtractor {
     return right(result);
   }
 
-  private static method(
+  static method(
     modelName: string,
     method: MethodDeclaration,
     httpVerb: HttpVerb,
@@ -760,9 +768,7 @@ export class CidlExtractor {
         typeRes.value.context = param.getName();
         return typeRes;
       }
-
-      const rootType = getRootType(typeRes.value);
-      if (typeof rootType !== "string" && "DataSource" in rootType) {
+      if (typeof typeRes.value !== "string" && "DataSource" in typeRes.value) {
         needsDataSource = false;
       }
 
@@ -797,7 +803,7 @@ export class CidlExtractor {
     });
   }
 
-  private static crudMethod(
+  static crudMethod(
     crud: CrudKind,
     primaryKey: NamedTypedValue,
     modelName: string,

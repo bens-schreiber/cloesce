@@ -159,7 +159,9 @@
           "name": "primitiveTypes",
           "is_static": false,
           "http_verb": "POST",
-          "return_type": "Boolean",
+          "return_type": {
+            "Nullable": "Boolean"
+          },
           "parameters": [
             {
               "name": "a",

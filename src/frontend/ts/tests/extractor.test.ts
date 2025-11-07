@@ -1,0 +1,137 @@
+import { describe, test, expect, vi, beforeEach } from "vitest";
+import { Project, ts } from "ts-morph";
+import { CidlExtractor } from "../src/extractor/extract";
+import { CidlType } from "../src/common";
+
+function cloesceProject(): Project {
+  const project = new Project({
+    compilerOptions: {
+      strict: true,
+    },
+  });
+
+  project.addSourceFileAtPath("./src/common.ts");
+  project.addSourceFileAtPath("./src/ui/backend.ts");
+  return project;
+}
+
+describe("CIDL Type", () => {
+  test("Primitives", () => {
+    // Arrange
+    const project = cloesceProject();
+
+    const sourceFile = project.createSourceFile(
+      "test.ts",
+      `
+      class Foo {
+        isReal: number;
+        isInteger: Integer;
+        isBool: boolean;
+        isDateIso: Date;
+      }
+      `,
+    );
+
+    const attributes = sourceFile
+      .getClass("Foo")!
+      .getProperties()
+      .map((p) => p.getType());
+
+    // Act
+    const cidlTypes = attributes.map((a) => {
+      const res = CidlExtractor.cidlType(a);
+      expect(res.ok).toBe(true);
+      return res.value as CidlType;
+    });
+
+    // Assert
+    expect(cidlTypes).toStrictEqual([
+      "Real",
+      "Integer",
+      "Boolean",
+      "DateIso",
+    ] as CidlType[]);
+  });
+
+  test("Nullablility", () => {
+    // Arrange
+    const project = cloesceProject();
+    const sourceFile = project.createSourceFile(
+      "test.ts",
+      `
+      import { Integer } from "./src/ui/backend";
+
+        class Foo {
+          isNull: null,
+          isReal: number | null;
+          isInteger: Integer | null;
+          isBool: boolean | null;
+          isDateIso: Date | null;
+        }
+        `,
+    );
+
+    const attributes = sourceFile
+      .getClass("Foo")!
+      .getProperties()
+      .map((p) => p.getType());
+
+    // Act
+    const cidlTypes = attributes.map((a) => {
+      const res = CidlExtractor.cidlType(a);
+      expect(res.ok).toBe(true);
+      return res.value as CidlType;
+    });
+
+    // Assert
+    expect(cidlTypes).toStrictEqual([
+      { Nullable: "Void" },
+      { Nullable: "Real" },
+      { Nullable: "Integer" },
+      { Nullable: "Boolean" },
+      { Nullable: "DateIso" },
+    ] as CidlType[]);
+  });
+
+  test("Generics", () => {
+    // Arrange
+    const project = cloesceProject();
+    const sourceFile = project.createSourceFile(
+      "test.ts",
+      `
+      import { DataSourceOf, DeepPartial } from "./src/ui/backend";
+
+      class Bar {}
+
+      class Foo {
+        ds: DataSourceOf<Bar>;
+        partial: DeepPartial<Bar>;
+        promise: Promise<Bar>;
+        arr: Bar[];
+        res: HttpResult<Bar>;
+      }
+        `,
+    );
+
+    const attributes = sourceFile
+      .getClass("Foo")!
+      .getProperties()
+      .map((p) => p.getType());
+
+    // Act
+    const cidlTypes = attributes.map((a) => {
+      const res = CidlExtractor.cidlType(a);
+      expect(res.ok).toBe(true);
+      return res.value as CidlType;
+    });
+
+    // Assert
+    expect(cidlTypes).toStrictEqual([
+      { DataSource: "Bar" },
+      { Partial: "Bar" },
+      { Object: "Bar" },
+      { Array: { Object: "Bar" } },
+      { HttpResult: { Object: "Bar" } },
+    ] as CidlType[]);
+  });
+});

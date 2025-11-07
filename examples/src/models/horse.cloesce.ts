@@ -14,6 +14,7 @@ import {
   Orm,
   CRUD,
   Integer,
+  DataSourceOf,
 } from "cloesce/backend";
 
 @WranglerEnv
@@ -45,7 +46,7 @@ export class Horse {
   };
 
   @POST
-  async like(@Inject { db }: Env, horse: Horse) {
+  async like(@Inject { db }: Env, horse: Horse, ds: DataSourceOf<Horse>) {
     await db
       .prepare("INSERT INTO Like (horseId1, horseId2) VALUES (?, ?)")
       .bind(this.id, horse.id)

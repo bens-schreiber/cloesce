@@ -52,15 +52,16 @@ export type IncludeTree<T> = T extends Primitive
     };
 
 // Data Source Type
-export type DataSourceOf<T extends object> =
+export type DataSourceOf<T extends object> = (
   | KeysOfType<T, IncludeTree<T>>
-  | "none";
+  | "none"
+) & { __brand?: "DataSource" };
 
 /**
  * A JavaScript `number` that signals to Cloesce the SQL table type
  * should be of Integer
  */
-export type Integer = number & { __kind: "Integer" };
+export type Integer = number & { __brand?: "Integer" };
 
 /**
  * ORM functions which use metadata to translate arguments to valid SQL queries.
