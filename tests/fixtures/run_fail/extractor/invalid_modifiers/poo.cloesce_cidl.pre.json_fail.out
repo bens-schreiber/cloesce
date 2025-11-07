@@ -5,3 +5,5 @@ Context: Foo.a
 private a: number;
 
 Suggested fix: Change the attribute modifier to just `public`
+
+

@@ -25,6 +25,42 @@ fn cloesce_serializes_to_migrations() {
 }
 
 #[test]
+fn null_primary_key() {
+    // Arrange
+    let mut model = ModelBuilder::new("Dog").id().build();
+    model.primary_key.cidl_type = CidlType::nullable(CidlType::Integer);
+
+    let mut ast = create_ast(vec![model]);
+
+    // Act
+    let err = ast.semantic_analysis().unwrap_err();
+
+    // Assert
+    assert!(matches!(err.kind, GeneratorErrorKind::NullPrimaryKey));
+}
+
+#[test]
+fn mismatched_foreign_keys() {
+    // Arrange
+    let mut ast = create_ast(vec![
+        ModelBuilder::new("Person")
+            .id()
+            .attribute("dogId", CidlType::Text, Some("Dog".into()))
+            .build(),
+        ModelBuilder::new("Dog").id().build(),
+    ]);
+
+    // Act
+    let err = ast.semantic_analysis().unwrap_err();
+
+    // Assert
+    assert!(matches!(
+        err.kind,
+        GeneratorErrorKind::MismatchedForeignKeyTypes
+    ));
+}
+
+#[test]
 fn cycle_detection_error() {
     // Arrange
     // A -> B -> C -> A

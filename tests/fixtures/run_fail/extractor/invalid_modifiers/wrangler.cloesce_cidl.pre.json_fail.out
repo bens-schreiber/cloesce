@@ -5,3 +5,5 @@ Context: bar
 private bar: number;
 
 Suggested fix: Change the attribute modifier to just `public`
+
+

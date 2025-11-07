@@ -5,3 +5,5 @@ Context: Foo.bad
 bad: Bar<number>;
 
 Suggested fix: Refer to the documentation on valid Cloesce TS types
+
+

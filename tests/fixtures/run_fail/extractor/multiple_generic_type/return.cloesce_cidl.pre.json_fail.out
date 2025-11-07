@@ -6,3 +6,5 @@ Context: Foo.method
   method(valid: number): Bar<number, number> {}
 
 Suggested fix: Simplify your type to use only a single generic parameter, ie Foo<T>
+
+

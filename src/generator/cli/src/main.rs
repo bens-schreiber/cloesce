@@ -76,23 +76,22 @@ fn main() {
     match panic::catch_unwind(run_cli) {
         Ok(Ok(())) => std::process::exit(0),
         Ok(Err(e)) if matches!(e.kind, GeneratorErrorKind::InvalidInputFile) => {
-            tracing::error!(
+            eprintln!(
                 "==== CLOESCE ERROR ====\nInvalid generator file input: {}\n",
                 e.context
             );
         }
         Ok(Err(e)) => {
-            tracing::error!(
-                r#"==== CLOESCE ERROR ====
+            eprintln!(
+                r#"
+==== CLOESCE ERROR ====
 Error [{:?}]: {}
 Phase: {:?}
 Context: {}
-Suggested fix: {}"#,
-                e.kind,
-                e.description,
-                e.phase,
-                e.context,
-                e.suggestion
+Suggested fix: {}
+
+"#,
+                e.kind, e.description, e.phase, e.context, e.suggestion
             );
         }
         Err(e) => {

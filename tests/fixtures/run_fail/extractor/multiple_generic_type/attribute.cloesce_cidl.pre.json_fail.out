@@ -5,3 +5,5 @@ Context: Foo.bad
 bad: Bar<number, number>;
 
 Suggested fix: Simplify your type to use only a single generic parameter, ie Foo<T>
+
+

@@ -6,3 +6,5 @@ Context: Foo.bar
   bar: Bar;
 
 Suggested fix: Navigation properties require a foreign key model attribute reference
+
+

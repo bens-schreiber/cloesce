@@ -6,3 +6,5 @@ Context: Foo.foo
   foo: IncludeTree<Foo> = { id: {} };
 
 Suggested fix: Declare your data source as `static readonly`
+
+

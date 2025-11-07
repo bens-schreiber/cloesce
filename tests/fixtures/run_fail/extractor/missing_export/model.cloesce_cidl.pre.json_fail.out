@@ -6,3 +6,5 @@ Context: Model
 class Model {}
 
 Suggested fix: Add `export` to the class definition.
+
+

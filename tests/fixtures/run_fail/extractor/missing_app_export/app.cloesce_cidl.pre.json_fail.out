@@ -2,3 +2,5 @@
 Error [AppMissingDefaultExport]: app.cloesce.ts does not export a CloesceApp by default
 Phase: TypeScript IDL Extraction
 Suggested fix: Export an instantiated CloesceApp in app.cloesce.ts
+
+

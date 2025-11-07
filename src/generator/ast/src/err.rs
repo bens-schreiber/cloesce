@@ -59,6 +59,7 @@ impl GeneratorError {
 pub enum GeneratorErrorKind {
     InvalidInputFile,
     NullSqlType,
+    NullPrimaryKey,
     InvalidSqlType,
     UnknownObject,
     UnknownDataSourceReference,
@@ -68,6 +69,7 @@ pub enum GeneratorErrorKind {
     NotYetSupported,
     InvalidMapping,
     InvalidApiDomain,
+    MismatchedForeignKeyTypes,
     MismatchedNavigationPropertyTypes,
     InvalidNavigationPropertyReference,
     CyclicalModelDependency,
@@ -82,6 +84,11 @@ impl GeneratorErrorKind {
             GeneratorErrorKind::NullSqlType => (
                 "Model attributes cannot be literally null",
                 "Remove 'null' from your Model definition.",
+                GeneratorPhase::ModelSemanticAnalysis,
+            ),
+            GeneratorErrorKind::NullPrimaryKey => (
+                "Primary keys cannot be nullable",
+                "Remove 'null' from the primary key definition",
                 GeneratorPhase::ModelSemanticAnalysis,
             ),
             GeneratorErrorKind::InvalidSqlType => (
@@ -128,6 +135,11 @@ impl GeneratorErrorKind {
                 "Invalid or ill-formatted API domain",
                 "API's must be of the form: http://domain.com/path/to/api",
                 GeneratorPhase::Workers,
+            ),
+            GeneratorErrorKind::MismatchedForeignKeyTypes => (
+                "Mismatched foreign keys",
+                "Foreign keys must be the same type as their reference",
+                GeneratorPhase::ModelSemanticAnalysis,
             ),
             GeneratorErrorKind::MismatchedNavigationPropertyTypes => (
                 "Navigation property references must match attribute types",

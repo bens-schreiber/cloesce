@@ -6,3 +6,5 @@ Context: Foo.bar
   bar: number;
 
 Suggested fix: Declare your data source as `static readonly`
+
+

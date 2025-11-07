@@ -336,32 +336,52 @@ impl CloesceAst {
             in_degree.entry(&model.name).or_insert(0);
 
             // Validate PK
+            ensure!(
+                !model.primary_key.cidl_type.is_nullable(),
+                GeneratorErrorKind::NullPrimaryKey,
+                "{}.{}",
+                model.name,
+                model.primary_key.name
+            );
             ensure_valid_sql_type(model, &model.primary_key)?;
 
             // Validate attributes
             for a in &model.attributes {
                 ensure_valid_sql_type(model, &a.value)?;
 
-                if let Some(fk_model) = &a.foreign_key_reference {
-                    // Validate the fk's model exists
+                if let Some(fk_model_name) = &a.foreign_key_reference {
+                    let Some(fk_model) = self.models.get(fk_model_name.as_str()) else {
+                        fail!(
+                            GeneratorErrorKind::UnknownObject,
+                            "{}.{} => {}?",
+                            model.name,
+                            a.value.name,
+                            fk_model_name
+                        );
+                    };
+
+                    // Validate the types are equal
                     ensure!(
-                        self.models.contains_key(fk_model.as_str()),
-                        GeneratorErrorKind::UnknownObject,
-                        "{}.{} => {}?",
+                        *a.value.cidl_type.root_type() == fk_model.primary_key.cidl_type,
+                        GeneratorErrorKind::MismatchedForeignKeyTypes,
+                        "{}.{} ({:?}) != {}.{} ({:?})",
                         model.name,
                         a.value.name,
-                        fk_model
+                        a.value.cidl_type,
+                        fk_model_name,
+                        fk_model.primary_key.name,
+                        fk_model.primary_key.cidl_type
                     );
 
                     model_reference_to_fk_model
-                        .insert((&model.name, a.value.name.as_str()), fk_model);
+                        .insert((&model.name, a.value.name.as_str()), fk_model_name);
 
                     // Nullable FK's do not constrain table creation order, and thus
                     // can be left out of the topo sort
                     if !a.value.cidl_type.is_nullable() {
                         // One To One: Person has a Dog ..(sql)=> Person has a fk to Dog
                         // Dog must come before Person
-                        graph.entry(fk_model).or_default().push(&model.name);
+                        graph.entry(fk_model_name).or_default().push(&model.name);
                         in_degree.entry(&model.name).and_modify(|d| *d += 1);
                     }
                 }

@@ -6,3 +6,5 @@ Context: Poo
 class Poo {}
 
 Suggested fix: Add `export` to the class definition.
+
+

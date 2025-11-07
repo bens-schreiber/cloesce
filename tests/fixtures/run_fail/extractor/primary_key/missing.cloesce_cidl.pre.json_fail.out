@@ -8,3 +8,5 @@ export class Foo {
 }
 
 Suggested fix: Add a primary key field to your model (e.g., `id: number`)
+
+

@@ -6,3 +6,5 @@ Context: Foo.id
   private id: number;
 
 Suggested fix: Change the attribute modifier to just `public`
+
+
