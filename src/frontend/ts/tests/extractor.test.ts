@@ -1,5 +1,5 @@
-import { describe, test, expect, vi, beforeEach } from "vitest";
-import { Project, ts } from "ts-morph";
+import { describe, test, expect } from "vitest";
+import { Project } from "ts-morph";
 import { CidlExtractor } from "../src/extractor/extract";
 import { CidlType } from "../src/common";
 
@@ -29,7 +29,7 @@ describe("CIDL Type", () => {
         isBool: boolean;
         isDateIso: Date;
       }
-      `,
+      `
     );
 
     const attributes = sourceFile
@@ -68,7 +68,7 @@ describe("CIDL Type", () => {
           isBool: boolean | null;
           isDateIso: Date | null;
         }
-        `,
+        `
     );
 
     const attributes = sourceFile
@@ -110,7 +110,7 @@ describe("CIDL Type", () => {
         arr: Bar[];
         res: HttpResult<Bar>;
       }
-        `,
+        `
     );
 
     const attributes = sourceFile
@@ -133,5 +133,27 @@ describe("CIDL Type", () => {
       { Array: { Object: "Bar" } },
       { HttpResult: { Object: "Bar" } },
     ] as CidlType[]);
+  });
+});
+
+describe("Middleware", () => {
+  test("Finds app export", () => {
+    // Arrange
+    const project = cloesceProject();
+    const sourceFile = project.createSourceFile(
+      "test.ts",
+      `
+    import { CloesceApp } from "./src/ui/backend";
+    const app = new CloesceApp();
+    export default app;
+  `
+    );
+
+    // Act
+    const res = CidlExtractor.app(sourceFile);
+
+    // Assert
+    console.log(res.value);
+    expect(res.ok).toBe(true);
   });
 });
