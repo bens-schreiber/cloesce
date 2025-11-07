@@ -2608,6 +2608,7 @@ dependencies = [
 name = "wrangler"
 version = "0.0.1"
 dependencies = [
+ "ast",
  "serde",
  "serde_json",
  "toml",

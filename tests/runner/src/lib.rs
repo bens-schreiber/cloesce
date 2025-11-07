@@ -161,7 +161,8 @@ impl Fixture {
         }
     }
 
-    pub fn generate_wrangler(&self) -> TestResult {
+    pub fn generate_wrangler(&self, cidl: &Path) -> TestResult {
+        let cidl_path = cidl.canonicalize().unwrap();
         let out = OutputFile::new(&self.path, "wrangler.toml");
         let res = self.run_command(
             Command::new("cargo")
@@ -169,6 +170,7 @@ impl Fixture {
                 .arg("run")
                 .arg("generate")
                 .arg("wrangler")
+                .arg(cidl_path)
                 .arg(out.path())
                 .current_dir("../../src/generator"),
         );

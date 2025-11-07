@@ -5,7 +5,8 @@
   "language": "TypeScript",
   "wrangler_env": {
     "name": "Env",
-    "source_path": "./seed__partial.cloesce.ts"
+    "source_path": "./seed__partial.cloesce.ts",
+    "db_binding": "db"
   },
   "models": {
     "Dog": {

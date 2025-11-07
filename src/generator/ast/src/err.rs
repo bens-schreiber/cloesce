@@ -6,6 +6,7 @@ pub type Result<T> = std::result::Result<T, GeneratorError>;
 pub enum GeneratorPhase {
     ModelSemanticAnalysis,
     Workers,
+    Wrangler,
 }
 
 #[derive(Debug)]
@@ -76,6 +77,7 @@ pub enum GeneratorErrorKind {
     UnknownIncludeTreeReference,
     ExtraneousManyToManyReferences,
     MissingManyToManyReference,
+    InconsistentDatabaseBinding,
 }
 
 impl GeneratorErrorKind {
@@ -170,6 +172,11 @@ impl GeneratorErrorKind {
                 "Many to Many navigation properties must have a correlated reference on the adjacent model.",
                 "TODO: a good indicator of where to add the nav prop",
                 GeneratorPhase::ModelSemanticAnalysis,
+            ),
+            GeneratorErrorKind::InconsistentDatabaseBinding => (
+                "Wrangler file definitions must be consistent with the WranglerEnv definition",
+                "Change your WranglerEnv's database binding to match the Wrangler file",
+                GeneratorPhase::Wrangler,
             ),
 
             // Generic error, handeled seperately from all others

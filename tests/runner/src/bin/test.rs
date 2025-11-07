@@ -103,7 +103,7 @@ fn run_integration_test(fixture: Fixture, domain: &str, command: Commands) -> Re
 
     let (pre_cidl_changed, pre_cidl_path) = run_step(fixture.extract_cidl())?;
     let (cidl_changed, cidl_path) = run_step(fixture.validate_cidl(&pre_cidl_path))?;
-    let (wrangler_changed, wrangler_path) = run_step(fixture.generate_wrangler())?;
+    let (wrangler_changed, wrangler_path) = run_step(fixture.generate_wrangler(&cidl_path))?;
     let (workers_changed, _) =
         run_step(fixture.generate_workers(&cidl_path, &wrangler_path, domain))?;
     let (client_changed, _) = run_step(fixture.generate_client(&cidl_path, domain))?;

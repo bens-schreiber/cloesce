@@ -4,12 +4,12 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use clap::{Parser, Subcommand, command};
+use clap::{command, Parser, Subcommand};
 use tracing_subscriber::FmtSubscriber;
 
 use ast::{
-    CloesceAst, MigrationsAst,
     err::{GeneratorErrorKind, Result},
+    CloesceAst, MigrationsAst,
 };
 use d1::{D1Generator, MigrationsDilemma, MigrationsIntent};
 use workers::WorkersGenerator;
@@ -43,6 +43,7 @@ enum Commands {
 #[derive(Subcommand)]
 enum GenerateTarget {
     Wrangler {
+        cidl_path: PathBuf,
         wrangler_path: PathBuf,
     },
     Workers {
@@ -145,7 +146,13 @@ fn run_cli() -> Result<()> {
             tracing::info!("Finished migration.");
         }
         Commands::Generate { target } => match target {
-            GenerateTarget::Wrangler { wrangler_path } => generate_wrangler(&wrangler_path)?,
+            GenerateTarget::Wrangler {
+                cidl_path,
+                wrangler_path,
+            } => {
+                let ast = CloesceAst::from_json(&cidl_path)?;
+                generate_wrangler(&wrangler_path, &ast)?;
+            }
             GenerateTarget::Workers {
                 cidl_path,
                 workers_path,
@@ -173,7 +180,7 @@ fn run_cli() -> Result<()> {
                 workers_domain,
             } => {
                 let ast = validate_cidl(&pre_cidl_path, &cidl_path)?;
-                generate_wrangler(&wrangler_path)?;
+                generate_wrangler(&wrangler_path, &ast)?;
                 generate_workers(&ast, &workers_path, &wrangler_path, &workers_domain)?;
                 generate_client(&ast, &client_path, &client_domain)?;
             }
@@ -269,10 +276,11 @@ fn validate_cidl(pre_cidl_path: &Path, cidl_path: &Path) -> Result<CloesceAst> {
     Ok(ast)
 }
 
-fn generate_wrangler(wrangler_path: &Path) -> Result<()> {
+fn generate_wrangler(wrangler_path: &Path, ast: &CloesceAst) -> Result<()> {
     let mut wrangler = WranglerFormat::from_path(wrangler_path);
     let mut spec = wrangler.as_spec();
     spec.generate_defaults();
+    spec.validate_bindings(ast)?;
 
     let wrangler_file = std::fs::OpenOptions::new()
         .write(true)

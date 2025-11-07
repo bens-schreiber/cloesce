@@ -196,6 +196,7 @@ pub enum InputLanguage {
 pub struct WranglerEnv {
     pub name: String,
     pub source_path: PathBuf,
+    pub db_binding: String,
 }
 
 #[serde_as]

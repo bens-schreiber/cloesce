@@ -53,7 +53,7 @@ const cmds = subcommands({
 
         if (!config.workersUrl || !config.clientUrl) {
           console.error(
-            "Error: `workersUrl` and `clientUrl` must be defined in cloesce.config.json"
+            "Error: `workersUrl` and `clientUrl` must be defined in cloesce.config.json",
           );
           process.exit(1);
         }
@@ -141,11 +141,11 @@ const cmds = subcommands({
 
         const cidlPath = path.join(
           config.outputDir ?? ".generated",
-          "cidl.json"
+          "cidl.json",
         );
         if (!fs.existsSync(cidlPath)) {
           console.error(
-            "Err: No cloesce file found, have you ran `cloesce compile`?"
+            "Err: No cloesce file found, have you ran `cloesce compile`?",
           );
           process.exit(1);
         }
@@ -157,7 +157,7 @@ const cmds = subcommands({
 
         const migrationPrefix = path.join(
           migrationsPath,
-          `${timestamp()}_${args.name}`
+          `${timestamp()}_${args.name}`,
         );
         let wasmArgs = [
           "migrations",
@@ -173,7 +173,7 @@ const cmds = subcommands({
 
           // Sort descending by filename
           jsonFiles.sort((a, b) =>
-            b.localeCompare(a, undefined, { numeric: true })
+            b.localeCompare(a, undefined, { numeric: true }),
           );
 
           if (jsonFiles.length > 0) {
@@ -274,7 +274,7 @@ async function extract(opts: {
       "Critical uncaught error in generator. \nSubmit a ticket to https://github.com/bens-schreiber/cloesce\n\n",
       err?.message ?? "No error message.",
       "\n",
-      err?.stack ?? "No error stack."
+      err?.stack ?? "No error stack.",
     );
     process.exit(1);
   }
@@ -311,7 +311,7 @@ async function generate(config: WasmConfig) {
 
 function loadCloesceConfig(
   root: string,
-  debug: boolean = false
+  debug: boolean = false,
 ): CloesceConfig {
   const configPath = path.join(root, "cloesce.config.json");
   if (fs.existsSync(configPath)) {
@@ -354,7 +354,7 @@ function readPackageJsonProjectName(cwd: string): string {
 function findCloesceProject(
   root: string,
   searchPaths: string[],
-  project: Project
+  project: Project,
 ): void {
   for (const searchPath of searchPaths) {
     let fullPath: string;

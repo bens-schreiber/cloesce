@@ -28,6 +28,7 @@ export enum ExtractorErrorCode {
   MissingNavigationPropertyReference,
   MissingManyToManyUniqueId,
   MissingPrimaryKey,
+  MissingDatabaseBinding,
   MissingWranglerEnv,
   TooManyWranglerEnvs,
   MissingFile,
@@ -99,6 +100,10 @@ const errorInfoMap: Record<
   [ExtractorErrorCode.MissingPrimaryKey]: {
     description: "Missing primary key on a model",
     suggestion: "Add a primary key field to your model (e.g., `id: number`)",
+  },
+  [ExtractorErrorCode.MissingDatabaseBinding]: {
+    description: "Missing a database binding in the WranglerEnv definition",
+    suggestion: "Add a `D1Database` to your WranglerEnv",
   },
   [ExtractorErrorCode.MissingWranglerEnv]: {
     description: "Missing a wrangler environment definition in the project",
@@ -287,6 +292,7 @@ export interface DataSource {
 export interface WranglerEnv {
   name: string;
   source_path: string;
+  db_binding: string;
 }
 
 export interface CloesceAst {

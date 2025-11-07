@@ -29,7 +29,7 @@ describe("CIDL Type", () => {
         isBool: boolean;
         isDateIso: Date;
       }
-      `
+      `,
     );
 
     const attributes = sourceFile
@@ -68,7 +68,7 @@ describe("CIDL Type", () => {
           isBool: boolean | null;
           isDateIso: Date | null;
         }
-        `
+        `,
     );
 
     const attributes = sourceFile
@@ -110,7 +110,7 @@ describe("CIDL Type", () => {
         arr: Bar[];
         res: HttpResult<Bar>;
       }
-        `
+        `,
     );
 
     const attributes = sourceFile
@@ -146,7 +146,7 @@ describe("Middleware", () => {
     import { CloesceApp } from "./src/ui/backend";
     const app = new CloesceApp();
     export default app;
-  `
+  `,
     );
 
     // Act
@@ -154,6 +154,30 @@ describe("Middleware", () => {
 
     // Assert
     console.log(res.value);
+    expect(res.ok).toBe(true);
+  });
+});
+
+describe("WranglerEnv", () => {
+  test("Finds D1 Database", () => {
+    // Arrange
+    const project = cloesceProject();
+    const sourceFile = project.createSourceFile(
+      "test.ts",
+      `
+       import { D1Database } from "@cloudflare/workers-types/experimental/index.js";
+        @WranglerEnv
+        class Env {
+          db: D1Database;
+        }
+      `,
+    );
+
+    // Act
+    const classDecl = sourceFile.getClass("Env")!;
+    const res = CidlExtractor.env(classDecl, sourceFile);
+
+    // Assert
     expect(res.ok).toBe(true);
   });
 });

@@ -4,7 +4,8 @@
     "language": "TypeScript",
     "wrangler_env": {
         "name": "Env",
-        "source_path": "./seed__nullability.cloesce.ts"
+        "source_path": "./seed__nullability.cloesce.ts",
+        "db_binding": "db"
     },
     "models": {
         "NullabilityChecks": {
