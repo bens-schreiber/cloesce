@@ -1,9 +1,9 @@
 ==== CLOESCE ERROR ====
 Error [InvalidDataSourceDefinition]: Data Sources must be explicitly typed as a static Include Tree
 Phase: TypeScript IDL Extraction
-Context: Foo.foo
+Context: Foo.bar
 @DataSource
-  foo: IncludeTree<Foo> = { id: {} };
+  static readonly bar: number = 1;
 
 Suggested fix: Declare your data source as `static readonly _: IncludeTree<Model>`
 

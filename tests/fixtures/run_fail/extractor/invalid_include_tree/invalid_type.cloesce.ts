@@ -6,5 +6,5 @@ export class Foo {
   id: number;
 
   @DataSource
-  bar: number; // invalid data source type
+  static readonly bar: number = 1;
 }
