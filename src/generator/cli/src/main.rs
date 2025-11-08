@@ -29,35 +29,6 @@ enum Commands {
         cidl_path: PathBuf,
     },
     Generate {
-        #[command(subcommand)]
-        target: GenerateTarget,
-    },
-    Migrations {
-        cidl_path: PathBuf,
-        migrated_cidl_path: PathBuf,
-        migrated_sql_path: PathBuf,
-        last_migrated_cidl_path: Option<PathBuf>,
-    },
-}
-
-#[derive(Subcommand)]
-enum GenerateTarget {
-    Wrangler {
-        cidl_path: PathBuf,
-        wrangler_path: PathBuf,
-    },
-    Workers {
-        cidl_path: PathBuf,
-        workers_path: PathBuf,
-        wrangler_path: PathBuf,
-        domain: String,
-    },
-    Client {
-        cidl_path: PathBuf,
-        client_path: PathBuf,
-        domain: String,
-    },
-    All {
         pre_cidl_path: PathBuf,
         cidl_path: PathBuf,
         wrangler_path: PathBuf,
@@ -65,6 +36,12 @@ enum GenerateTarget {
         client_path: PathBuf,
         client_domain: String,
         workers_domain: String,
+    },
+    Migrations {
+        cidl_path: PathBuf,
+        migrated_cidl_path: PathBuf,
+        migrated_sql_path: PathBuf,
+        last_migrated_cidl_path: Option<PathBuf>,
     },
 }
 
@@ -146,49 +123,21 @@ fn run_cli() -> Result<()> {
 
             tracing::info!("Finished migration.");
         }
-        Commands::Generate { target } => match target {
-            GenerateTarget::Wrangler {
-                cidl_path,
-                wrangler_path,
-            } => {
-                let ast = CloesceAst::from_json(&cidl_path)?;
-                generate_wrangler(&wrangler_path, &ast)?;
-                write_cidl(ast, &cidl_path)?;
-            }
-            GenerateTarget::Workers {
-                cidl_path,
-                workers_path,
-                wrangler_path,
-                domain,
-            } => {
-                let mut ast = CloesceAst::from_json(&cidl_path)?;
-                generate_workers(&mut ast, &workers_path, &wrangler_path, &domain)?;
-                write_cidl(ast, &cidl_path)?;
-            }
-            GenerateTarget::Client {
-                cidl_path,
-                client_path,
-                domain,
-            } => {
-                let ast = CloesceAst::from_json(&cidl_path)?;
-                generate_client(&ast, &client_path, &domain)?
-            }
-            GenerateTarget::All {
-                pre_cidl_path,
-                cidl_path,
-                wrangler_path,
-                workers_path,
-                client_path,
-                client_domain,
-                workers_domain,
-            } => {
-                let mut ast = validate_cidl(&pre_cidl_path)?;
-                generate_wrangler(&wrangler_path, &ast)?;
-                generate_workers(&mut ast, &workers_path, &wrangler_path, &workers_domain)?;
-                generate_client(&ast, &client_path, &client_domain)?;
-                write_cidl(ast, &cidl_path)?;
-            }
-        },
+        Commands::Generate {
+            pre_cidl_path,
+            cidl_path,
+            wrangler_path,
+            workers_path,
+            client_path,
+            client_domain,
+            workers_domain,
+        } => {
+            let mut ast = validate_cidl(&pre_cidl_path)?;
+            generate_wrangler(&wrangler_path, &ast)?;
+            generate_workers(&mut ast, &workers_path, &wrangler_path, &workers_domain)?;
+            generate_client(&ast, &client_path, &client_domain)?;
+            write_cidl(ast, &cidl_path)?;
+        }
     }
 
     Ok(())

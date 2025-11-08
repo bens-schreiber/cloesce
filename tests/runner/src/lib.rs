@@ -124,88 +124,62 @@ impl Fixture {
         }
     }
 
-    pub fn validate_cidl(&self, pre_cidl: &Path) -> TestResult {
-        let out = OutputFile::new(&self.path, "cidl.json");
-        let pre_cidl_path = pre_cidl.canonicalize().unwrap();
-        let res = self.run_command(
-            Command::new("cargo")
-                .arg("--quiet")
-                .arg("run")
-                .arg("validate")
-                .arg(&pre_cidl_path)
-                .arg(out.path())
-                .current_dir("../../src/generator"),
-        );
+    /// On all success, returns the cidl, else returns the failed file.
+    pub fn generate_all(
+        &self,
+        pre_cidl: &Path,
+        client_domain: &str,
+        workers_domain: &str,
+    ) -> TestResult {
+        let pre_cidl_canon = pre_cidl.canonicalize().unwrap();
 
-        match res {
-            Ok(_) => Ok(self.read_out_and_diff(out)),
-            Err(err) => Err(self.read_fail_and_diff(out, err)),
-        }
-    }
+        let cidl_out = OutputFile::new(&self.path, "cidl.json");
+        let wrangler_out = OutputFile::new(&self.path, "wrangler.toml");
+        let workers_out = OutputFile::new(&self.path, "workers.ts");
+        let client_out = OutputFile::new(&self.path, "client.ts");
 
-    pub fn generate_wrangler(&self, cidl: &Path) -> TestResult {
-        let cidl_path = cidl.canonicalize().unwrap();
-        let out = OutputFile::new(&self.path, "wrangler.toml");
-        let res = self.run_command(
+        let cmd = self.run_command(
             Command::new("cargo")
                 .arg("--quiet")
                 .arg("run")
                 .arg("generate")
-                .arg("wrangler")
-                .arg(cidl_path)
-                .arg(out.path())
+                .arg(&pre_cidl_canon)
+                .arg(cidl_out.path())
+                .arg(wrangler_out.path())
+                .arg(workers_out.path())
+                .arg(client_out.path())
+                .arg(client_domain)
+                .arg(workers_domain)
                 .current_dir("../../src/generator"),
         );
 
-        match res {
-            Ok(_) => Ok(self.read_out_and_diff(out)),
-            Err(err) => Err(self.read_fail_and_diff(out, err)),
+        let cidl_path = {
+            match &cmd {
+                Ok(_) => {
+                    let (diff, path) = self.read_out_and_diff(cidl_out);
+                    if diff {
+                        return Ok((diff, path));
+                    }
+
+                    path
+                }
+                Err(err) => return Err(self.read_fail_and_diff(cidl_out, err.clone())),
+            }
+        };
+
+        for out in [wrangler_out, workers_out, client_out] {
+            match &cmd {
+                Ok(_) => {
+                    let (diff, path) = self.read_out_and_diff(out);
+                    if diff {
+                        return Ok((diff, path));
+                    }
+                }
+                Err(err) => return Err(self.read_fail_and_diff(out, err.clone())),
+            }
         }
-    }
 
-    pub fn generate_workers(&self, cidl: &Path, wrangler: &Path, domain: &str) -> TestResult {
-        let cidl_path = cidl.canonicalize().unwrap();
-        let wrangler_path = wrangler.canonicalize().unwrap();
-        let out = OutputFile::new(&self.path, "workers.ts");
-
-        let res = self.run_command(
-            Command::new("cargo")
-                .arg("--quiet")
-                .arg("run")
-                .arg("generate")
-                .arg("workers")
-                .arg(&cidl_path)
-                .arg(out.path())
-                .arg(&wrangler_path)
-                .arg(domain)
-                .current_dir("../../src/generator"),
-        );
-
-        match res {
-            Ok(_) => Ok(self.read_out_and_diff(out)),
-            Err(err) => Err(self.read_fail_and_diff(out, err)),
-        }
-    }
-
-    pub fn generate_client(&self, cidl: &Path, domain: &str) -> TestResult {
-        let cidl_path = cidl.canonicalize().unwrap();
-        let out = OutputFile::new(&self.path, "client.ts");
-
-        let res = self.run_command(
-            Command::new("cargo")
-                .arg("--quiet")
-                .arg("run")
-                .arg("generate")
-                .arg("client")
-                .arg(&cidl_path)
-                .arg(out.path())
-                .arg(domain)
-                .current_dir("../../src/generator"),
-        );
-        match res {
-            Ok(_) => Ok(self.read_out_and_diff(out)),
-            Err(err) => Err(self.read_fail_and_diff(out, err)),
-        }
+        Ok((false, cidl_path))
     }
 
     pub fn migrate(&self, cidl: &Path) -> (TestResult, TestResult) {
