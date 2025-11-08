@@ -1,3 +1,5 @@
+mod fmt;
+
 use std::collections::{HashMap, HashSet};
 
 use ast::{
@@ -46,10 +48,12 @@ impl D1Generator {
                     .to_owned(),
             );
 
-            return format!("{tables}\n{views}\n--- Cloesce Temporary Table\n{cloesce_tmp}");
+            return fmt::beautify(format!(
+                "{tables}\n{views}\n--- Cloesce Temporary Table\n{cloesce_tmp}"
+            ));
         }
 
-        format!("{tables}\n{views}")
+        fmt::beautify(format!("{tables}\n{views}"))
     }
 }
 
@@ -93,7 +97,7 @@ impl MigrateViews {
                     model,
                     &d.tree,
                     &mut query,
-                    &mut vec![model.name.clone()],
+                    &mut vec![],
                     model_alias,
                     None,
                     &mut alias_counter,
@@ -128,7 +132,14 @@ impl MigrateViews {
             alias_counter: &mut HashMap<String, u32>,
             model_lookup: &IndexMap<String, MigrationsModel>,
         ) {
-            let path_to_column = path.join(".");
+            let join_path = |member: &str| {
+                if path.is_empty() {
+                    member.to_string()
+                } else {
+                    format!("{}.{}", path.join("."), member)
+                }
+            };
+
             let pk = &model.primary_key.name;
 
             // Primary Key
@@ -140,14 +151,14 @@ impl MigrateViews {
                     Expr::col((alias(&model_alias), alias(pk)))
                 };
 
-                query.expr_as(col, alias(format!("{}.{}", &path_to_column, pk)));
+                query.expr_as(col, alias(join_path(pk)));
             };
 
             // Columns
             for attr in &model.attributes {
                 query.expr_as(
                     Expr::col((alias(&model_alias), alias(&attr.value.name))),
-                    alias(format!("{}.{}", &path_to_column, attr.value.name)),
+                    alias(join_path(&attr.value.name)),
                 );
             }
 
@@ -349,12 +360,10 @@ impl MigrateViews {
         if !drop_stmts.is_empty() {
             res.push_str("--- Dropped and Refactored Data Sources\n");
             res.push_str(&drop_stmts.join("\n"));
-            res.push('\n');
         }
         if !create_stmts.is_empty() {
             res.push_str("--- New Data Sources\n");
             res.push_str(&create_stmts.join("\n"));
-            res.push('\n');
         }
 
         res
@@ -1000,7 +1009,6 @@ impl MigrateTables {
 
             res.push_str(&format!("--- {title}\n"));
             res.push_str(&stmts.join("\n"));
-            res.push('\n');
         }
 
         res

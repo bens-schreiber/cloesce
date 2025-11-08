@@ -331,7 +331,7 @@ async function hydrateModel(
   const pk = model.primary_key.name;
   const query =
     dataSource !== NO_DATA_SOURCE
-      ? `SELECT * FROM "${model.name}.${dataSource}" WHERE "${model.name}.${pk}" = ?`
+      ? `SELECT * FROM "${model.name}.${dataSource}" WHERE "${pk}" = ?`
       : `SELECT * FROM "${model.name}" WHERE "${pk}" = ?`;
 
   // Query DB

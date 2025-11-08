@@ -122,7 +122,6 @@ export class Student {
     const orm = Orm.fromD1(db);
     await orm.upsert(Student, student, Student.withCoursesStudents);
     return student;
-    // return (await orm.get(Student, student.id, "withCoursesStudents")).value;
   }
 
   @GET

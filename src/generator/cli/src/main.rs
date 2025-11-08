@@ -4,12 +4,12 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use clap::{command, Parser, Subcommand};
+use clap::{Parser, Subcommand, command};
 use tracing_subscriber::FmtSubscriber;
 
 use ast::{
-    err::{GeneratorErrorKind, Result},
     CloesceAst, MigrationsAst,
+    err::{GeneratorErrorKind, Result},
 };
 use d1::{D1Generator, MigrationsDilemma, MigrationsIntent};
 use workers::WorkersGenerator;

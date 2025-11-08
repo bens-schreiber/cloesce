@@ -229,7 +229,7 @@ export class Orm {
   ): string {
     const { ast } = RuntimeContainer.get();
     if (includeTree) {
-      return `${this.listQuery(ctor, includeTree)} WHERE [${ctor.name}.${ast.models[ctor.name].primary_key.name}] = ?`;
+      return `${this.listQuery(ctor, includeTree)} WHERE [${ast.models[ctor.name].primary_key.name}] = ?`;
     }
 
     return `${this.listQuery(ctor, includeTree)} WHERE [${ast.models[ctor.name].primary_key.name}] = ?`;

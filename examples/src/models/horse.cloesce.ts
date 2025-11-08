@@ -60,12 +60,12 @@ export class Horse {
         `
     SELECT * FROM [Horse.default] as H1
     WHERE
-        H1.[Horse.id] = ?
+        H1.[id] = ?
         AND EXISTS (
             SELECT 1
             FROM [Horse.default] AS H2
-            WHERE H2.[Horse.id] = H1.[Horse.likes.horse2.id]
-              AND H2.[Horse.likes.horse2.id] = H1.[Horse.id]
+            WHERE H2.[id] = H1.[likes.horse2.id]
+              AND H2.[likes.horse2.id] = H1.[id]
         );
     `
       )

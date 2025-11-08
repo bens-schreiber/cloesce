@@ -9,15 +9,16 @@ use d1::{D1Generator, MigrationsIntent};
 use indexmap::IndexMap;
 use sqlx::SqlitePool;
 
+/// Compares two strings disregarding tabs, amount of spaces, and amount of newlines.
+/// Ensures that some expr is present in another expr.
 macro_rules! expected_str {
     ($got:expr, $expected:expr) => {{
-        let got_val = &$got;
-        let expected_val = &$expected;
+        let clean = |s: &str| s.chars().filter(|c| !c.is_whitespace()).collect::<String>();
         assert!(
-            got_val.to_string().contains(&expected_val.to_string()),
-            "Expected: \n`{}`, \n\ngot:\n{:?}",
-            expected_val,
-            got_val
+            clean(&$got.to_string()).contains(&clean(&$expected.to_string())),
+            "Expected:\n`{}`\n\ngot:\n`{}`",
+            $expected,
+            $got
         );
     }};
 }
@@ -186,7 +187,16 @@ async fn migrate_models_one_to_one(db: SqlitePool) {
         );
         expected_str!(
             sql,
-            r#"CREATE VIEW IF NOT EXISTS "Person.default" AS SELECT "Person"."id" AS "Person.id", "Person"."dogId" AS "Person.dogId", "Dog"."id" AS "Person.dog.id" FROM "Person" LEFT JOIN "Dog" ON "Person"."dogId" = "Dog"."id""#
+            r#"
+CREATE VIEW IF NOT EXISTS "Person.default" AS
+SELECT
+  "Person"."id" AS "id",
+  "Person"."dogId" AS "dogId",
+  "Dog"."id" AS "dog.id"
+FROM
+  "Person"
+  LEFT JOIN "Dog" ON "Person"."dogId" = "Dog"."id";
+"#
         );
 
         query(&db, &sql).await.expect("Insert query to work");
@@ -302,11 +312,39 @@ async fn migrate_models_one_to_many(db: SqlitePool) {
 
         expected_str!(
             sql,
-            r#"CREATE VIEW IF NOT EXISTS "Person.default" AS SELECT "Person"."id" AS "Person.id", "Person"."bossId" AS "Person.bossId", "Dog"."id" AS "Person.dogs.id", "Dog"."personId" AS "Person.dogs.personId", "Cat"."id" AS "Person.cats.id", "Cat"."personId" AS "Person.cats.personId" FROM "Person" LEFT JOIN "Dog" ON "Person"."id" = "Dog"."personId" LEFT JOIN "Cat" ON "Person"."id" = "Cat"."personId";"#
+            r#"
+CREATE VIEW IF NOT EXISTS "Person.default" AS
+SELECT
+  "Person"."id" AS "id",
+  "Person"."bossId" AS "bossId",
+  "Dog"."id" AS "dogs.id",
+  "Dog"."personId" AS "dogs.personId",
+  "Cat"."id" AS "cats.id",
+  "Cat"."personId" AS "cats.personId"
+FROM
+  "Person"
+  LEFT JOIN "Dog" ON "Person"."id" = "Dog"."personId"
+  LEFT JOIN "Cat" ON "Person"."id" = "Cat"."personId";
+"#
         );
         expected_str!(
             sql,
-            r#"CREATE VIEW IF NOT EXISTS "Boss.default" AS SELECT "Boss"."id" AS "Boss.id", "Person"."id" AS "Boss.persons.id", "Person"."bossId" AS "Boss.persons.bossId", "Dog"."id" AS "Boss.persons.dogs.id", "Dog"."personId" AS "Boss.persons.dogs.personId", "Cat"."id" AS "Boss.persons.cats.id", "Cat"."personId" AS "Boss.persons.cats.personId" FROM "Boss" LEFT JOIN "Person" ON "Boss"."id" = "Person"."bossId" LEFT JOIN "Dog" ON "Person"."id" = "Dog"."personId" LEFT JOIN "Cat" ON "Person"."id" = "Cat"."personId";"#
+            r#"
+CREATE VIEW IF NOT EXISTS "Boss.default" AS
+SELECT
+    "Boss"."id" AS "id",
+    "Person"."id" AS "persons.id",
+    "Person"."bossId" AS "persons.bossId",
+    "Dog"."id" AS "persons.dogs.id",
+    "Dog"."personId" AS "persons.dogs.personId",
+    "Cat"."id" AS "persons.cats.id",
+    "Cat"."personId" AS "persons.cats.personId"
+FROM
+    "Boss"
+    LEFT JOIN "Person" ON "Boss"."id" = "Person"."bossId"
+    LEFT JOIN "Dog" ON "Person"."id" = "Dog"."personId"
+    LEFT JOIN "Cat" ON "Person"."id" = "Cat"."personId";
+"#
         );
 
         query(&db, &sql).await.expect("Insert query to work");
@@ -406,12 +444,30 @@ async fn migrate_models_many_to_many(db: SqlitePool) {
 
         expected_str!(
             sql,
-            r#"CREATE VIEW IF NOT EXISTS "Course.withStudents" AS SELECT "Course"."id" AS "Course.id", "StudentsCourses"."Student.id" AS "Course.students.id" FROM "Course" LEFT JOIN "StudentsCourses" ON "Course"."id" = "StudentsCourses"."Course.id" LEFT JOIN "Student" ON "StudentsCourses"."Student.id" = "Student"."id";"#
+            r#"
+CREATE VIEW IF NOT EXISTS "Student.withCourses" AS
+SELECT
+  "Student"."id" AS "id",
+  "StudentsCourses"."Course.id" AS "courses.id"
+FROM
+  "Student"
+  LEFT JOIN "StudentsCourses" ON "Student"."id" = "StudentsCourses"."Student.id"
+  LEFT JOIN "Course" ON "StudentsCourses"."Course.id" = "Course"."id";
+"#
         );
 
         expected_str!(
             sql,
-            r#"CREATE VIEW IF NOT EXISTS "Student.withCourses" AS SELECT "Student"."id" AS "Student.id", "StudentsCourses"."Course.id" AS "Student.courses.id" FROM "Student" LEFT JOIN "StudentsCourses" ON "Student"."id" = "StudentsCourses"."Student.id" LEFT JOIN "Course" ON "StudentsCourses"."Course.id" = "Course"."id";"#
+            r#"
+CREATE VIEW IF NOT EXISTS "Course.withStudents" AS
+SELECT
+    "Course"."id" AS "id",
+    "StudentsCourses"."Student.id" AS "students.id"
+FROM
+    "Course"
+    LEFT JOIN "StudentsCourses" ON "Course"."id" = "StudentsCourses"."Course.id"
+    LEFT JOIN "Student" ON "StudentsCourses"."Student.id" = "Student"."id";
+"#
         );
 
         query(&db, &sql).await.expect("Insert tables query to work");
@@ -498,7 +554,8 @@ async fn migrate_with_alterations(db: SqlitePool) {
         );
         expected_str!(
             sql,
-            r#"ALTER TABLE "User" DROP COLUMN "age";
+            r#"
+ALTER TABLE "User" DROP COLUMN "age";
 ALTER TABLE "User" ADD COLUMN "age" text"#
         );
         expected_str!(sql, "ALTER TABLE \"User\" DROP COLUMN \"address\"");
@@ -750,7 +807,7 @@ async fn views_auto_alias(db: SqlitePool) {
     // Assert
     expected_str!(
         sql,
-        r#"CREATE VIEW IF NOT EXISTS "Horse.default" AS SELECT "Horse"."id" AS "Horse.id", "Horse"."name" AS "Horse.name", "Horse"."bio" AS "Horse.bio", "Match"."id" AS "Horse.matches.id", "Match"."horseId1" AS "Horse.matches.horseId1", "Match"."horseId2" AS "Horse.matches.horseId2", "Horse1"."id" AS "Horse.matches.horse2.id", "Horse1"."name" AS "Horse.matches.horse2.name", "Horse1"."bio" AS "Horse.matches.horse2.bio" FROM "Horse" LEFT JOIN "Match" ON "Horse"."id" = "Match"."horseId1" LEFT JOIN "Horse" AS "Horse1" ON "Match"."horseId2" = "Horse1"."id";"#
+        r#"CREATE VIEW IF NOT EXISTS "Horse.default" AS SELECT "Horse"."id" AS "id", "Horse"."name" AS "name", "Horse"."bio" AS "bio", "Match"."id" AS "matches.id", "Match"."horseId1" AS "matches.horseId1", "Match"."horseId2" AS "matches.horseId2", "Horse1"."id" AS "matches.horse2.id", "Horse1"."name" AS "matches.horse2.name", "Horse1"."bio" AS "matches.horse2.bio" FROM "Horse" LEFT JOIN "Match" ON "Horse"."id" = "Match"."horseId1" LEFT JOIN "Horse" AS "Horse1" ON "Match"."horseId2" = "Horse1"."id";"#
     );
 
     query(&db, &sql).await.expect("create to work");
