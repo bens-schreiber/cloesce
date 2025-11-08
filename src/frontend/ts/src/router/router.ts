@@ -48,13 +48,13 @@ export class RuntimeContainer {
   private constructor(
     public readonly ast: CloesceAst,
     public readonly constructorRegistry: ModelConstructorRegistry,
-    public readonly wasm: OrmWasmExports
+    public readonly wasm: OrmWasmExports,
   ) {}
 
   static async init(
     ast: CloesceAst,
     constructorRegistry: ModelConstructorRegistry,
-    wasm?: WebAssembly.Instance
+    wasm?: WebAssembly.Instance,
   ) {
     if (this.instance) return;
     const wasmAbi = await loadOrmWasm(ast, wasm);
@@ -79,7 +79,7 @@ export async function cloesce(
   app: CloesceApp,
   constructorRegistry: ModelConstructorRegistry,
   envMeta: MetaWranglerEnv,
-  apiRoute: string
+  apiRoute: string,
 ): Promise<Response> {
   //#region Initialization
   const ir: InstanceRegistry = new Map();
@@ -144,7 +144,7 @@ export async function cloesce(
       d1,
       model,
       id!, // id must exist after matchRoute
-      dataSource! // ds must exist after validateRequest
+      dataSource!, // ds must exist after validateRequest
     );
 
     if (!hydratedModel.ok) {
@@ -155,8 +155,8 @@ export async function cloesce(
       CrudContext.fromInstance(
         d1,
         hydratedModel.value,
-        constructorRegistry[model.name]
-      )
+        constructorRegistry[model.name],
+      ),
     );
   })();
   if (!crudCtx.ok) {
@@ -175,7 +175,7 @@ export async function cloesce(
 function matchRoute(
   request: Request,
   ast: CloesceAst,
-  apiRoute: string
+  apiRoute: string,
 ): Either<
   HttpResult,
   {
@@ -236,7 +236,7 @@ async function validateRequest(
   ast: CloesceAst,
   model: Model,
   method: ModelMethod,
-  id: string | null
+  id: string | null,
 ): Promise<
   Either<HttpResult, { params: RequestParamMap; dataSource: string | null }>
 > {
@@ -251,7 +251,7 @@ async function validateRequest(
   // Filter out any injected parameters that will not be passed
   // by the query.
   const requiredParams = method.parameters.filter(
-    (p) => !(typeof p.cidl_type === "object" && "Inject" in p.cidl_type)
+    (p) => !(typeof p.cidl_type === "object" && "Inject" in p.cidl_type),
   );
 
   // Extract url or body parameters
@@ -285,7 +285,7 @@ async function validateRequest(
 
   // Validate data source if exists
   const dataSourceParam = requiredParams.find(
-    (p) => typeof p.cidl_type === "object" && "DataSource" in p.cidl_type
+    (p) => typeof p.cidl_type === "object" && "DataSource" in p.cidl_type,
   );
   const dataSource = dataSourceParam
     ? (params[dataSourceParam.name] as string)
@@ -313,7 +313,7 @@ async function hydrateModel(
   d1: D1Database,
   model: Model,
   id: string,
-  dataSource: string
+  dataSource: string,
 ): Promise<Either<HttpResult, object>> {
   // Error state: If the D1 database has been tweaked outside of Cloesce
   // resulting in a malformed query, exit with a 500.
@@ -321,8 +321,8 @@ async function hydrateModel(
     left(
       errorState(
         500,
-        `Error in hydration query, is the database out of sync with the backend?: ${e instanceof Error ? e.message : String(e)}`
-      )
+        `Error in hydration query, is the database out of sync with the backend?: ${e instanceof Error ? e.message : String(e)}`,
+      ),
     );
 
   // Error state: If no record is found for the id, return a 404
@@ -352,7 +352,7 @@ async function hydrateModel(
   const models: object[] = mapSql(
     constructorRegistry[model.name],
     records.results,
-    model.data_sources[dataSource]?.tree ?? {}
+    model.data_sources[dataSource]?.tree ?? {},
   ).value as object[];
 
   return right(models[0]);
@@ -366,13 +366,13 @@ async function methodDispatch(
   crudCtx: CrudContext,
   instanceRegistry: InstanceRegistry,
   method: ModelMethod,
-  params: Record<string, unknown>
+  params: Record<string, unknown>,
 ): Promise<HttpResult<unknown>> {
   // Error state: Client code ran into an uncaught exception.
   const uncaughtException = (e: any) =>
     errorState(
       500,
-      `Uncaught exception in method dispatch: ${e instanceof Error ? e.message : String(e)}`
+      `Uncaught exception in method dispatch: ${e instanceof Error ? e.message : String(e)}`,
     );
 
   const paramArray = [];
@@ -389,7 +389,7 @@ async function methodDispatch(
       // If a injected reference does not exist, throw a 500.
       return errorState(
         500,
-        `An injected parameter was missing from the instance registry: ${JSON.stringify(param.cidl_type)}`
+        `An injected parameter was missing from the instance registry: ${JSON.stringify(param.cidl_type)}`,
       );
     }
 
@@ -423,7 +423,7 @@ function validateCidlType(
   ast: CloesceAst,
   value: unknown,
   cidlType: CidlType,
-  isPartial: boolean
+  isPartial: boolean,
 ): boolean {
   if (value === undefined) return isPartial;
 
@@ -480,8 +480,8 @@ function validateCidlType(
           ast,
           valueObj[attr.value.name],
           attr.value.cidl_type,
-          isPartial
-        )
+          isPartial,
+        ),
       )
     ) {
       return false;
@@ -497,7 +497,7 @@ function validateCidlType(
           ast,
           navValue,
           getNavigationPropertyCidlType(nav),
-          isPartial
+          isPartial,
         )
       );
     });
@@ -512,7 +512,7 @@ function validateCidlType(
     // Validate attributes
     if (
       !poo.attributes.every((attr) =>
-        validateCidlType(ast, valueObj[attr.name], attr.cidl_type, isPartial)
+        validateCidlType(ast, valueObj[attr.name], attr.cidl_type, isPartial),
       )
     ) {
       return false;

@@ -276,7 +276,7 @@ export type InstanceRegistry = Map<string, any>;
 export type MiddlewareFn = (
   request: Request,
   env: any,
-  ir: InstanceRegistry
+  ir: InstanceRegistry,
 ) => Promise<HttpResult | undefined>;
 
 export type KeysOfType<T, U> = {
@@ -382,7 +382,7 @@ export class CloesceApp {
   public useMethod<T>(
     ctor: new () => T,
     method: KeysOfType<T, (...args: any) => any>,
-    m: MiddlewareFn
+    m: MiddlewareFn,
   ) {
     if (!this.method.has(ctor.name)) {
       this.method.set(ctor.name, new Map());
@@ -457,7 +457,7 @@ export interface NavigationProperty {
 }
 
 export function getNavigationPropertyCidlType(
-  nav: NavigationProperty
+  nav: NavigationProperty,
 ): CidlType {
   return "OneToOne" in nav.kind
     ? { Object: nav.model_name }

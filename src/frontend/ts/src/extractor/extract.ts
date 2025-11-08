@@ -58,7 +58,7 @@ enum ParameterDecoratorKind {
 export class CidlExtractor {
   constructor(
     public projectName: string,
-    public version: string
+    public version: string,
   ) {}
 
   extract(project: Project): Either<ExtractorError, CloesceAst> {
@@ -140,7 +140,7 @@ export class CidlExtractor {
     if (wranglerEnvs.length > 1) {
       return err(
         ExtractorErrorCode.TooManyWranglerEnvs,
-        (e) => (e.context = wranglerEnvs.map((w) => w.name).toString())
+        (e) => (e.context = wranglerEnvs.map((w) => w.name).toString()),
       );
     }
 
@@ -173,7 +173,7 @@ export class CidlExtractor {
       }
       return type?.getText(
         undefined,
-        TypeFormatFlags.UseAliasDefinedOutsideCurrentScope
+        TypeFormatFlags.UseAliasDefinedOutsideCurrentScope,
       );
     };
 
@@ -187,7 +187,7 @@ export class CidlExtractor {
 
   static model(
     classDecl: ClassDeclaration,
-    sourceFile: SourceFile
+    sourceFile: SourceFile,
   ): Either<ExtractorError, Model> {
     const name = classDecl.getName()!;
     const attributes: ModelAttribute[] = [];
@@ -279,7 +279,7 @@ export class CidlExtractor {
               (e) => {
                 e.snippet = prop.getText();
                 e.context = prop.getName();
-              }
+              },
             );
           }
 
@@ -292,7 +292,7 @@ export class CidlExtractor {
               (e) => {
                 e.snippet = prop.getText();
                 e.context = prop.getName();
-              }
+              },
             );
           }
 
@@ -312,7 +312,7 @@ export class CidlExtractor {
               (e) => {
                 e.snippet = prop.getText();
                 e.context = prop.getName();
-              }
+              },
             );
           }
 
@@ -325,7 +325,7 @@ export class CidlExtractor {
               (e) => {
                 e.snippet = prop.getText();
                 e.context = prop.getName();
-              }
+              },
             );
           }
 
@@ -354,7 +354,7 @@ export class CidlExtractor {
               (e) => {
                 e.snippet = prop.getText();
                 e.context = prop.getName();
-              }
+              },
             );
           }
 
@@ -371,7 +371,7 @@ export class CidlExtractor {
               .getType()
               .getText(
                 undefined,
-                TypeFormatFlags.UseAliasDefinedOutsideCurrentScope
+                TypeFormatFlags.UseAliasDefinedOutsideCurrentScope,
               ) === `IncludeTree<${name}>`;
 
           // Error: data sources must be static include trees
@@ -387,7 +387,7 @@ export class CidlExtractor {
           const treeRes = CidlExtractor.includeTree(
             initializer,
             classDecl,
-            sourceFile
+            sourceFile,
           );
 
           if (!treeRes.ok) {
@@ -417,7 +417,7 @@ export class CidlExtractor {
         .getDecorators()
         .map((d) => getDecoratorName(d))
         .find((name) =>
-          Object.values(HttpVerb).includes(name as HttpVerb)
+          Object.values(HttpVerb).includes(name as HttpVerb),
         ) as HttpVerb;
 
       if (!httpVerb) {
@@ -446,7 +446,7 @@ export class CidlExtractor {
 
   static poo(
     classDecl: ClassDeclaration,
-    sourceFile: SourceFile
+    sourceFile: SourceFile,
   ): Either<ExtractorError, PlainOldObject> {
     const name = classDecl.getName()!;
     const attributes: NamedTypedValue[] = [];
@@ -484,7 +484,7 @@ export class CidlExtractor {
 
   static env(
     classDecl: ClassDeclaration,
-    sourceFile: SourceFile
+    sourceFile: SourceFile,
   ): Either<ExtractorError, WranglerEnv> {
     const binding = classDecl.getProperties().find((p) => {
       return (
@@ -492,7 +492,7 @@ export class CidlExtractor {
           .getType()
           .getText(
             undefined,
-            TypeFormatFlags.UseAliasDefinedOutsideCurrentScope
+            TypeFormatFlags.UseAliasDefinedOutsideCurrentScope,
           ) === "D1Database"
       );
     });
@@ -521,7 +521,7 @@ export class CidlExtractor {
 
   static cidlType(
     type: Type,
-    inject: boolean = false
+    inject: boolean = false,
   ): Either<ExtractorError, CidlType> {
     // Void
     if (type.isVoid()) {
@@ -573,11 +573,11 @@ export class CidlExtractor {
           {
             DataSource: genericTy.getText(
               undefined,
-              TypeFormatFlags.UseAliasDefinedOutsideCurrentScope
+              TypeFormatFlags.UseAliasDefinedOutsideCurrentScope,
             ),
           },
-          nullable
-        )
+          nullable,
+        ),
       );
     }
 
@@ -603,13 +603,13 @@ export class CidlExtractor {
             Partial: genericTy
               .getText(
                 undefined,
-                TypeFormatFlags.UseAliasDefinedOutsideCurrentScope
+                TypeFormatFlags.UseAliasDefinedOutsideCurrentScope,
               )
               .split("|")[0]
               .trim(),
           },
-          nullable
-        )
+          nullable,
+        ),
       );
     }
 
@@ -641,7 +641,7 @@ export class CidlExtractor {
     function wrapGeneric(
       t: Type,
       isNullable: boolean,
-      wrapper: (inner: CidlType) => CidlType
+      wrapper: (inner: CidlType) => CidlType,
     ): Either<ExtractorError, CidlType> {
       const res = CidlExtractor.cidlType(t, inject);
 
@@ -675,7 +675,7 @@ export class CidlExtractor {
   static includeTree(
     expr: Expression | undefined,
     currentClass: ClassDeclaration,
-    sf: SourceFile
+    sf: SourceFile,
   ): Either<ExtractorError, CidlIncludeTree> {
     // Include trees must be of the expected form
     if (
@@ -698,7 +698,7 @@ export class CidlExtractor {
           (e) => {
             e.snippet = expr.getText();
             e.context = prop.getName();
-          }
+          },
         );
       }
 
@@ -718,7 +718,7 @@ export class CidlExtractor {
           ExtractorErrorCode.InvalidNavigationPropertyReference,
           (e) => {
             ((e.snippet = navProp.getText()), (e.context = prop.getName()));
-          }
+          },
         );
       }
 
@@ -738,7 +738,7 @@ export class CidlExtractor {
           const treeRes = CidlExtractor.includeTree(
             initializer,
             targetClass,
-            sf
+            sf,
           );
 
           // Error: Propogated from `includeTree`
@@ -760,7 +760,7 @@ export class CidlExtractor {
   static method(
     modelName: string,
     method: MethodDeclaration,
-    httpVerb: HttpVerb
+    httpVerb: HttpVerb,
   ): Either<ExtractorError, ModelMethod> {
     // Error: invalid method scope, must be public
     if (method.getScope() != Scope.Public) {
@@ -839,7 +839,7 @@ export class CidlExtractor {
 
 function err(
   code: ExtractorErrorCode,
-  fn?: (extractorErr: ExtractorError) => void
+  fn?: (extractorErr: ExtractorError) => void,
 ): Either<ExtractorError, never> {
   let e = new ExtractorError(code);
   if (fn) {
@@ -855,7 +855,7 @@ function getDecoratorName(decorator: Decorator): string {
 
 function getDecoratorArgument(
   decorator: Decorator,
-  index: number
+  index: number,
 ): string | undefined {
   const args = decorator.getArguments();
   if (!args[index]) return undefined;
@@ -909,7 +909,7 @@ function setCrudKinds(d: Decorator, cruds: Set<CrudKind>) {
       cruds.add(
         (MorphNode.isStringLiteral(a)
           ? a.getLiteralValue()
-          : a.getText()) as CrudKind
+          : a.getText()) as CrudKind,
       );
     }
   }
@@ -917,7 +917,7 @@ function setCrudKinds(d: Decorator, cruds: Set<CrudKind>) {
 
 function findPropertyByName(
   cls: ClassDeclaration,
-  name: string
+  name: string,
 ): PropertyDeclaration | undefined {
   const exactMatch = cls.getProperties().find((p) => p.getName() === name);
   return exactMatch;
@@ -925,7 +925,7 @@ function findPropertyByName(
 
 function hasDecorator(
   node: { getDecorators(): Decorator[] },
-  name: string
+  name: string,
 ): boolean {
   return node.getDecorators().some((d) => {
     const decoratorName = getDecoratorName(d);
@@ -934,7 +934,7 @@ function hasDecorator(
 }
 
 function checkAttributeModifier(
-  prop: PropertyDeclaration
+  prop: PropertyDeclaration,
 ): Either<ExtractorError, never> | undefined {
   // Error: attributes must be just 'public'
   if (prop.getScope() != Scope.Public || prop.isReadonly() || prop.isStatic()) {

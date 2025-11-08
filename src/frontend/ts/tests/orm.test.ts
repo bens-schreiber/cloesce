@@ -49,7 +49,7 @@ describe("Router Error States", () => {
     const result = _cloesceInternal.matchRoute(
       makeRequest(baseUrl),
       makeAst({}),
-      "/api"
+      "/api",
     );
     expect(result.value).toStrictEqual({
       ok: false,
@@ -63,7 +63,7 @@ describe("Router Error States", () => {
     const result = _cloesceInternal.matchRoute(
       makeRequest(url),
       makeAst({}),
-      "/api"
+      "/api",
     );
     expect(result.value).toStrictEqual({
       ok: false,
@@ -77,7 +77,7 @@ describe("Router Error States", () => {
     const result = _cloesceInternal.matchRoute(
       makeRequest(url),
       makeAst({}),
-      "/api"
+      "/api",
     );
     expect(result.value).toStrictEqual({
       ok: false,
@@ -176,7 +176,7 @@ describe("Validate Request Error States", () => {
         return_type: null,
         parameters: [],
       },
-      null
+      null,
     );
 
     expect(result.value).toStrictEqual({
@@ -199,7 +199,7 @@ describe("Validate Request Error States", () => {
         return_type: null,
         parameters: [],
       },
-      null
+      null,
     );
 
     expect(result.value).toStrictEqual({
@@ -241,7 +241,7 @@ describe("Validate Request Error States", () => {
       ast,
       ast.models.Horse,
       ast.models.Horse.methods.neigh,
-      "0"
+      "0",
     );
 
     expect(result.value).toStrictEqual({
@@ -283,8 +283,8 @@ describe("Validate Request Success States", () => {
             ? { Nullable: i.typed_value.cidl_type }
             : i.typed_value.cidl_type,
         },
-      }))
-    )
+      })),
+    ),
   );
 
   test.each(expanded)("accepts valid input %#", async (arg) => {
@@ -294,7 +294,7 @@ describe("Validate Request Success States", () => {
     const request = makeRequest(
       url,
       arg.isGet ? undefined : "POST",
-      arg.isGet ? undefined : { [arg.typed_value.name]: arg.value }
+      arg.isGet ? undefined : { [arg.typed_value.name]: arg.value },
     );
     const ast = makeAst({
       neigh: {
@@ -314,7 +314,7 @@ describe("Validate Request Success States", () => {
       ast,
       ast.models.Horse,
       ast.models.Horse.methods.neigh,
-      null
+      null,
     );
 
     expect(result.value).toEqual({
@@ -352,7 +352,7 @@ describe("methodDispatch", () => {
       CrudContext.fromInstance(makeMockD1(), instance, vi.fn()),
       makeRegistry(),
       makeMethod(),
-      {}
+      {},
     );
     expect(instance.testMethod).toHaveBeenCalled();
     expect(result).toStrictEqual({ ok: true, status: 200 });
@@ -368,7 +368,7 @@ describe("methodDispatch", () => {
       CrudContext.fromInstance(makeMockD1(), instance, vi.fn()),
       makeRegistry(),
       makeMethod({ return_type: { HttpResult: null } }),
-      {}
+      {},
     );
     expect(result).toStrictEqual({ ok: true, status: 200, data: "wrapped" });
   });
@@ -379,7 +379,7 @@ describe("methodDispatch", () => {
       CrudContext.fromInstance(makeMockD1(), instance, vi.fn()),
       makeRegistry(),
       makeMethod({ return_type: "Text" }),
-      {}
+      {},
     );
     expect(result).toStrictEqual({ ok: true, status: 200, data: "neigh" });
   });
@@ -394,7 +394,7 @@ describe("methodDispatch", () => {
         return_type: "Text",
         parameters: [{ name: "database", cidl_type: { Inject: "Env" } }],
       }),
-      {}
+      {},
     );
     expect(instance.testMethod).toHaveBeenCalledWith(ireg.get("Env"));
     expect(result).toStrictEqual({ ok: true, status: 200, data: "used d1" });
@@ -417,13 +417,13 @@ describe("methodDispatch", () => {
       ctx,
       makeRegistry(),
       method,
-      {}
+      {},
     );
     const result2 = await _cloesceInternal.methodDispatch(
       CrudContext.fromInstance(makeMockD1(), strInstance, vi.fn()),
       makeRegistry(),
       method,
-      {}
+      {},
     );
 
     expect(result1).toStrictEqual({
@@ -443,7 +443,7 @@ describe("modelsFromSql", () => {
   test("handles recursive navigation properties", async () => {
     const wasm = await WebAssembly.instantiate(
       fs.readFileSync(path.resolve("./dist/orm.wasm")),
-      {}
+      {},
     );
 
     const modelName = "Horse";

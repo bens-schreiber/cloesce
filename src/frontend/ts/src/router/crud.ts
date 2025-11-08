@@ -9,13 +9,13 @@ export class CrudContext {
   private constructor(
     private d1: D1Database,
     private instance: object | undefined,
-    private ctor: new () => object
+    private ctor: new () => object,
   ) {}
 
   static fromInstance(
     d1: D1Database,
     instance: any,
-    ctor: new () => object
+    ctor: new () => object,
   ): CrudContext {
     return new this(d1, instance, ctor);
   }
