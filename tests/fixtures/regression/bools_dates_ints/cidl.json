@@ -85,8 +85,8 @@
       },
       "data_sources": {},
       "cruds": [
-        "SAVE",
-        "GET"
+        "GET",
+        "SAVE"
       ],
       "source_path": "./seed__bools_dates_ints.cloesce.ts"
     }

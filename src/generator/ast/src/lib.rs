@@ -3,7 +3,6 @@ pub mod err;
 
 use std::collections::BTreeMap;
 use std::collections::HashMap;
-use std::collections::HashSet;
 use std::collections::VecDeque;
 use std::hash::Hash;
 use std::hash::Hasher;
@@ -189,7 +188,7 @@ pub struct Model {
     #[serde_as(as = "MapPreventDuplicates<_, _>")]
     pub data_sources: BTreeMap<String, DataSource>,
 
-    pub cruds: HashSet<CrudKind>,
+    pub cruds: Vec<CrudKind>,
 
     pub source_path: PathBuf,
 }

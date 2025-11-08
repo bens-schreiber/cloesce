@@ -42,9 +42,9 @@
             },
             "data_sources": {},
             "cruds": [
-                "SAVE",
                 "GET",
-                "LIST"
+                "LIST",
+                "SAVE"
             ],
             "source_path": "./seed__crud.cloesce.ts"
         },
@@ -96,9 +96,9 @@
                 }
             },
             "cruds": [
-                "SAVE",
                 "GET",
-                "LIST"
+                "LIST",
+                "SAVE"
             ],
             "source_path": "./seed__crud.cloesce.ts"
         },

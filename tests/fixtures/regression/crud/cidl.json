@@ -111,8 +111,8 @@
       },
       "data_sources": {},
       "cruds": [
-        "LIST",
         "GET",
+        "LIST",
         "SAVE"
       ],
       "source_path": "./seed__crud.cloesce.ts"
@@ -237,9 +237,9 @@
         }
       },
       "cruds": [
+        "GET",
         "LIST",
-        "SAVE",
-        "GET"
+        "SAVE"
       ],
       "source_path": "./seed__crud.cloesce.ts"
     },
