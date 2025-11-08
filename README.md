@@ -17,8 +17,7 @@ Internal documentation going over design decisions and general thoughts for each
 - Create an NPM project and install cloesce
 
 ```sh
-# check https://www.npmjs.com/package/cloesce/v/0.0.4-unstable.0?activeTab=versions for the most recent patch
-npm i cloesce@0.0.4-unstable.2
+npm i cloesce@0.0.4-unstable.3
 ```
 
 2. TypeScript
