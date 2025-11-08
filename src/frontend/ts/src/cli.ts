@@ -63,12 +63,11 @@ const cmds = subcommands({
 
         const outputDir = config.outputDir ?? ".generated";
 
-        const allConfig: WasmConfig = {
-          name: "all",
+        const generateConfig: WasmConfig = {
+          name: "generate",
           wasmFile: "generator.wasm",
           args: [
             "generate",
-            "all",
             path.join(outputDir, "cidl.pre.json"),
             path.join(outputDir, "cidl.json"),
             "wrangler.toml",
@@ -80,7 +79,7 @@ const cmds = subcommands({
         };
 
         // Runs a generator command. Exits the process on failure.
-        await generate(allConfig);
+        await generate(generateConfig);
       },
     }),
 

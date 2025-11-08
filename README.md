@@ -17,7 +17,7 @@ Internal documentation going over design decisions and general thoughts for each
 - Create an NPM project and install cloesce
 
 ```sh
-npm i cloesce@0.0.4-unstable.3
+npm i cloesce@0.0.4-unstable.5
 ```
 
 2. TypeScript
@@ -341,15 +341,15 @@ export class Like {
 If you wanted to find all horses that like one another, a valid SQL query using the `default` data source would look like:
 
 ```sql
-SELECT * FROM [Horse.default] as H1
+SELECT *
+FROM [Horse.default]
 WHERE
-    H1.[id] = ?
-    AND EXISTS (
-        SELECT 1
-        FROM [Horse.default] AS H2
-        WHERE H2.[id] = H1.[likes.horse2.id]
-          AND H2.[likes.horse2.id] = H1.[id]
-    );
+  [likes.horse2.id] = ?
+  AND [id] IN (
+    SELECT [likes.horse2.id]
+    FROM [Horse.default]
+    WHERE [id] = ?
+  );
 ```
 
 The actual generated view for `default` looks like:
