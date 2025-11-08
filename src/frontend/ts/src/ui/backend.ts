@@ -43,24 +43,25 @@ export const CRUD =
 
 // Include Tree
 type Primitive = string | number | boolean | bigint | symbol | null | undefined;
-export type IncludeTree<T> = T extends Primitive
+export type IncludeTree<T> = (T extends Primitive
   ? never
   : {
       [K in keyof T]?: T[K] extends (infer U)[]
         ? IncludeTree<NonNullable<U>>
         : IncludeTree<NonNullable<T[K]>>;
-    };
+    }) & { __brand?: "IncludeTree" };
 
 // Data Source Type
-export type DataSourceOf<T extends object> =
+export type DataSourceOf<T extends object> = (
   | KeysOfType<T, IncludeTree<T>>
-  | "none";
+  | "none"
+) & { __brand?: "DataSource" };
 
 /**
  * A JavaScript `number` that signals to Cloesce the SQL table type
  * should be of Integer
  */
-export type Integer = number & { __kind: "Integer" };
+export type Integer = number & { __brand?: "Integer" };
 
 /**
  * ORM functions which use metadata to translate arguments to valid SQL queries.
@@ -228,7 +229,7 @@ export class Orm {
   ): string {
     const { ast } = RuntimeContainer.get();
     if (includeTree) {
-      return `${this.listQuery(ctor, includeTree)} WHERE [${ctor.name}.${ast.models[ctor.name].primary_key.name}] = ?`;
+      return `${this.listQuery(ctor, includeTree)} WHERE [${ast.models[ctor.name].primary_key.name}] = ?`;
     }
 
     return `${this.listQuery(ctor, includeTree)} WHERE [${ast.models[ctor.name].primary_key.name}] = ?`;

@@ -1,8 +1,0 @@
-==== CLOESCE ERROR ====
-Error [MissingExport]: All Cloesce types must be exported.
-Phase: TypeScript IDL Extraction
-Context: Model
-@D1
-class Model {}
-
-Suggested fix: Add `export` to the class definition.

@@ -266,7 +266,7 @@ async function extract(opts: {
     fs.mkdirSync(path.dirname(outPath), { recursive: true });
     fs.writeFileSync(outPath, json);
 
-    console.log(`CIDL generated successfully at ${outPath}`);
+    console.log(`CIDL extracted to ${outPath}`);
 
     return { outPath, projectName: cloesceProjectName };
   } catch (err: any) {
@@ -396,10 +396,13 @@ function formatErr(e: ExtractorError): string {
   const contextLine = e.context ? `Context: ${e.context}\n` : "";
   const snippetLine = e.snippet ? `${e.snippet}\n\n` : "";
 
-  return `==== CLOESCE ERROR ====
+  return `
+==== CLOESCE ERROR ====
 Error [${ExtractorErrorCode[e.code]}]: ${description}
 Phase: TypeScript IDL Extraction
-${contextLine}${snippetLine}Suggested fix: ${suggestion}`;
+${contextLine}${snippetLine}Suggested fix: ${suggestion}
+
+`;
 }
 
 run(cmds, process.argv.slice(2)).catch((err) => {

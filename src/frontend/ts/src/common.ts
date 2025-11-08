@@ -1,9 +1,10 @@
-/// A partial type whose object keys may be partial as well
-export type DeepPartial<T> = T extends (infer U)[]
-  ? DeepPartial<U>[] // handle arrays specially
+type DeepPartialInner<T> = T extends (infer U)[]
+  ? DeepPartialInner<U>[]
   : T extends object
-    ? { [K in keyof T]?: DeepPartial<T[K]> }
-    : T;
+    ? { [K in keyof T]?: DeepPartialInner<T[K]> }
+    : T | (null extends T ? null : never);
+
+export type DeepPartial<T> = DeepPartialInner<T> & { __brand?: "Partial" };
 
 export type Either<L, R> = { ok: false; value: L } | { ok: true; value: R };
 export function left<L>(value: L): Either<L, never> {
@@ -18,7 +19,7 @@ export enum ExtractorErrorCode {
   AppMissingDefaultExport,
   UnknownType,
   MultipleGenericType,
-  DataSourceMissingStatic,
+  InvalidDataSourceDefinition,
   InvalidPartialType,
   InvalidIncludeTree,
   InvalidAttributeModifier,
@@ -28,6 +29,7 @@ export enum ExtractorErrorCode {
   MissingNavigationPropertyReference,
   MissingManyToManyUniqueId,
   MissingPrimaryKey,
+  MissingDatabaseBinding,
   MissingWranglerEnv,
   TooManyWranglerEnvs,
   MissingFile,
@@ -58,9 +60,11 @@ const errorInfoMap: Record<
     suggestion:
       "Simplify your type to use only a single generic parameter, ie Foo<T>",
   },
-  [ExtractorErrorCode.DataSourceMissingStatic]: {
-    description: "Data Sources must be declared as static",
-    suggestion: "Declare your data source as `static readonly`",
+  [ExtractorErrorCode.InvalidDataSourceDefinition]: {
+    description:
+      "Data Sources must be explicitly typed as a static Include Tree",
+    suggestion:
+      "Declare your data source as `static readonly _: IncludeTree<Model>`",
   },
   [ExtractorErrorCode.InvalidIncludeTree]: {
     description: "Invalid Include Tree",
@@ -99,6 +103,10 @@ const errorInfoMap: Record<
   [ExtractorErrorCode.MissingPrimaryKey]: {
     description: "Missing primary key on a model",
     suggestion: "Add a primary key field to your model (e.g., `id: number`)",
+  },
+  [ExtractorErrorCode.MissingDatabaseBinding]: {
+    description: "Missing a database binding in the WranglerEnv definition",
+    suggestion: "Add a `D1Database` to your WranglerEnv",
   },
   [ExtractorErrorCode.MissingWranglerEnv]: {
     description: "Missing a wrangler environment definition in the project",
@@ -287,6 +295,7 @@ export interface DataSource {
 export interface WranglerEnv {
   name: string;
   source_path: string;
+  db_binding: string;
 }
 
 export interface CloesceAst {

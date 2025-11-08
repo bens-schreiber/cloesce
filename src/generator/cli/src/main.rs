@@ -43,6 +43,7 @@ enum Commands {
 #[derive(Subcommand)]
 enum GenerateTarget {
     Wrangler {
+        cidl_path: PathBuf,
         wrangler_path: PathBuf,
     },
     Workers {
@@ -76,23 +77,22 @@ fn main() {
     match panic::catch_unwind(run_cli) {
         Ok(Ok(())) => std::process::exit(0),
         Ok(Err(e)) if matches!(e.kind, GeneratorErrorKind::InvalidInputFile) => {
-            tracing::error!(
+            eprintln!(
                 "==== CLOESCE ERROR ====\nInvalid generator file input: {}\n",
                 e.context
             );
         }
         Ok(Err(e)) => {
-            tracing::error!(
-                r#"==== CLOESCE ERROR ====
+            eprintln!(
+                r#"
+==== CLOESCE ERROR ====
 Error [{:?}]: {}
 Phase: {:?}
 Context: {}
-Suggested fix: {}"#,
-                e.kind,
-                e.description,
-                e.phase,
-                e.context,
-                e.suggestion
+Suggested fix: {}
+
+"#,
+                e.kind, e.description, e.phase, e.context, e.suggestion
             );
         }
         Err(e) => {
@@ -146,7 +146,13 @@ fn run_cli() -> Result<()> {
             tracing::info!("Finished migration.");
         }
         Commands::Generate { target } => match target {
-            GenerateTarget::Wrangler { wrangler_path } => generate_wrangler(&wrangler_path)?,
+            GenerateTarget::Wrangler {
+                cidl_path,
+                wrangler_path,
+            } => {
+                let ast = CloesceAst::from_json(&cidl_path)?;
+                generate_wrangler(&wrangler_path, &ast)?;
+            }
             GenerateTarget::Workers {
                 cidl_path,
                 workers_path,
@@ -174,7 +180,7 @@ fn run_cli() -> Result<()> {
                 workers_domain,
             } => {
                 let ast = validate_cidl(&pre_cidl_path, &cidl_path)?;
-                generate_wrangler(&wrangler_path)?;
+                generate_wrangler(&wrangler_path, &ast)?;
                 generate_workers(&ast, &workers_path, &wrangler_path, &workers_domain)?;
                 generate_client(&ast, &client_path, &client_domain)?;
             }
@@ -270,10 +276,11 @@ fn validate_cidl(pre_cidl_path: &Path, cidl_path: &Path) -> Result<CloesceAst> {
     Ok(ast)
 }
 
-fn generate_wrangler(wrangler_path: &Path) -> Result<()> {
+fn generate_wrangler(wrangler_path: &Path, ast: &CloesceAst) -> Result<()> {
     let mut wrangler = WranglerFormat::from_path(wrangler_path);
     let mut spec = wrangler.as_spec();
     spec.generate_defaults();
+    spec.validate_bindings(ast)?;
 
     let wrangler_file = std::fs::OpenOptions::new()
         .write(true)

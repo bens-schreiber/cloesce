@@ -5,7 +5,8 @@
   "language": "TypeScript",
   "wrangler_env": {
     "name": "Env",
-    "source_path": "./seed__crud.cloesce.ts"
+    "source_path": "./seed__crud.cloesce.ts",
+    "db_binding": "db"
   },
   "models": {
     "CrudHaver": {

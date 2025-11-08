@@ -113,8 +113,6 @@ export class CidlExtractor {
         }
 
         if (hasDecorator(classDecl, ClassDecoratorKind.WranglerEnv)) {
-          if (!classDecl.isExported()) return notExportedErr;
-
           // Error: invalid attribute modifier
           for (const prop of classDecl.getProperties()) {
             const modifierRes = checkAttributeModifier(prop);
@@ -123,10 +121,12 @@ export class CidlExtractor {
             }
           }
 
-          wranglerEnvs.push({
-            name: classDecl.getName(),
-            source_path: sourceFile.getFilePath().toString(),
-          } as WranglerEnv);
+          const result = CidlExtractor.env(classDecl, sourceFile);
+          if (!result.ok) {
+            return result;
+          }
+
+          wranglerEnvs.push(result.value);
         }
       }
     }
@@ -155,7 +155,7 @@ export class CidlExtractor {
     });
   }
 
-  private static app(sourceFile: SourceFile): Either<ExtractorError, string> {
+  static app(sourceFile: SourceFile): Either<ExtractorError, string> {
     const symbol = sourceFile.getDefaultExportSymbol();
     const decl = symbol?.getDeclarations()[0];
 
@@ -164,13 +164,17 @@ export class CidlExtractor {
     }
 
     const getTypeText = (): string | undefined => {
+      let type = undefined;
       if (MorphNode.isExportAssignment(decl)) {
-        return decl.getExpression()?.getType().getText();
+        type = decl.getExpression()?.getType();
       }
       if (MorphNode.isVariableDeclaration(decl)) {
-        return decl.getInitializer()?.getType().getText();
+        type = decl.getInitializer()?.getType();
       }
-      return undefined;
+      return type?.getText(
+        undefined,
+        TypeFormatFlags.UseAliasDefinedOutsideCurrentScope,
+      );
     };
 
     const typeText = getTypeText();
@@ -181,7 +185,7 @@ export class CidlExtractor {
     return err(ExtractorErrorCode.AppMissingDefaultExport);
   }
 
-  private static model(
+  static model(
     classDecl: ClassDeclaration,
     sourceFile: SourceFile,
   ): Either<ExtractorError, Model> {
@@ -235,19 +239,19 @@ export class CidlExtractor {
 
       // TODO: Limiting to one decorator. Can't get too fancy on us.
       const decorator = decorators[0];
-      const name = getDecoratorName(decorator);
+      const decoratorName = getDecoratorName(decorator);
 
       // Error: invalid attribute modifier
       if (
         checkModifierRes !== undefined &&
-        name !== AttributeDecoratorKind.DataSource
+        decoratorName !== AttributeDecoratorKind.DataSource
       ) {
         return checkModifierRes;
       }
 
-      // Process decorators
+      // Process decorator
       const cidl_type = typeRes.value;
-      switch (name) {
+      switch (decoratorName) {
         case AttributeDecoratorKind.PrimaryKey: {
           primary_key = {
             name: prop.getName(),
@@ -362,15 +366,24 @@ export class CidlExtractor {
           break;
         }
         case AttributeDecoratorKind.DataSource: {
-          // Error: data sources must be static
-          if (!prop.isStatic()) {
-            return err(ExtractorErrorCode.DataSourceMissingStatic, (e) => {
+          const isIncludeTree =
+            prop
+              .getType()
+              .getText(
+                undefined,
+                TypeFormatFlags.UseAliasDefinedOutsideCurrentScope,
+              ) === `IncludeTree<${name}>`;
+
+          // Error: data sources must be static include trees
+          if (!prop.isStatic() || !isIncludeTree) {
+            return err(ExtractorErrorCode.InvalidDataSourceDefinition, (e) => {
               e.snippet = prop.getText();
               e.context = prop.getName();
             });
           }
 
           const initializer = prop.getInitializer();
+
           const treeRes = CidlExtractor.includeTree(
             initializer,
             classDecl,
@@ -437,7 +450,7 @@ export class CidlExtractor {
     });
   }
 
-  private static poo(
+  static poo(
     classDecl: ClassDeclaration,
     sourceFile: SourceFile,
   ): Either<ExtractorError, PlainOldObject> {
@@ -475,6 +488,32 @@ export class CidlExtractor {
     });
   }
 
+  static env(
+    classDecl: ClassDeclaration,
+    sourceFile: SourceFile,
+  ): Either<ExtractorError, WranglerEnv> {
+    const binding = classDecl.getProperties().find((p) => {
+      return (
+        p
+          .getType()
+          .getText(
+            undefined,
+            TypeFormatFlags.UseAliasDefinedOutsideCurrentScope,
+          ) === "D1Database"
+      );
+    });
+
+    if (!binding) {
+      return err(ExtractorErrorCode.MissingDatabaseBinding);
+    }
+
+    return right({
+      name: classDecl.getName()!,
+      source_path: sourceFile.getFilePath().toString(),
+      db_binding: binding.getName(),
+    });
+  }
+
   private static readonly primTypeMap: Record<string, CidlType> = {
     number: "Real",
     Number: "Real",
@@ -486,7 +525,7 @@ export class CidlExtractor {
     Date: "DateIso",
   };
 
-  private static cidlType(
+  static cidlType(
     type: Type,
     inject: boolean = false,
   ): Either<ExtractorError, CidlType> {
@@ -621,17 +660,25 @@ export class CidlExtractor {
     }
 
     function unwrapNullable(ty: Type): [Type, boolean] {
-      if (ty.isUnion()) {
-        const nonNull = ty.getUnionTypes().filter((t) => !t.isNull());
-        if (nonNull.length === 1) {
-          return [nonNull[0], true];
-        }
+      if (!ty.isUnion()) return [ty, false];
+
+      const unions = ty.getUnionTypes();
+      const nonNulls = unions.filter((t) => !t.isNull() && !t.isUndefined());
+      const hasNullable = nonNulls.length < unions.length;
+
+      // Booleans seperate into [null, true, false] from the `getUnionTypes` call
+      if (
+        nonNulls.length === 2 &&
+        nonNulls.every((t) => t.isBooleanLiteral())
+      ) {
+        return [nonNulls[0].getApparentType(), hasNullable];
       }
-      return [ty, false];
+
+      return [nonNulls[0] ?? ty, hasNullable];
     }
   }
 
-  private static includeTree(
+  static includeTree(
     expr: Expression | undefined,
     currentClass: ClassDeclaration,
     sf: SourceFile,
@@ -716,7 +763,7 @@ export class CidlExtractor {
     return right(result);
   }
 
-  private static method(
+  static method(
     modelName: string,
     method: MethodDeclaration,
     httpVerb: HttpVerb,
@@ -760,9 +807,7 @@ export class CidlExtractor {
         typeRes.value.context = param.getName();
         return typeRes;
       }
-
-      const rootType = getRootType(typeRes.value);
-      if (typeof rootType !== "string" && "DataSource" in rootType) {
+      if (typeof typeRes.value !== "string" && "DataSource" in typeRes.value) {
         needsDataSource = false;
       }
 
@@ -797,7 +842,7 @@ export class CidlExtractor {
     });
   }
 
-  private static crudMethod(
+  static crudMethod(
     crud: CrudKind,
     primaryKey: NamedTypedValue,
     modelName: string,

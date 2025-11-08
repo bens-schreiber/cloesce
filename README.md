@@ -17,8 +17,7 @@ Internal documentation going over design decisions and general thoughts for each
 - Create an NPM project and install cloesce
 
 ```sh
-# check https://www.npmjs.com/package/cloesce/v/0.0.4-unstable.0?activeTab=versions for the most recent patch
-npm i cloesce@0.0.4-unstable.2
+npm i cloesce@0.0.4-unstable.3
 ```
 
 2. TypeScript
@@ -267,7 +266,7 @@ export class Person {
 }
 ```
 
-Data sources are just SQL views and can be invoked in your queries. They are aliased in such a way that its similiar to object properties. The frontend chooses which datasource to use in it's API client. `null` is a valid option, meaning no joins will occur.
+Data sources are just SQL views and can be invoked in your queries. They are aliased in such a way that its similiar to object properties. The frontend chooses which datasource to use in it's API client (all instantiated methods have an implicit DataSource parameter). `null` is a valid option, meaning no joins will occur.
 
 ```ts
 @D1
@@ -289,7 +288,7 @@ export class Person {
   @GET
   static async get(id: number, @Inject env: WranglerEnv): Promise<Person> {
     let records = await env.db
-      .prepare("SELECT * FROM [Person.default] WHERE [Person.id] = ?") // Person.default is the SQL view generated from the IncludeTree
+      .prepare("SELECT * FROM [Person.default] WHERE [id] = ?") // Person.default is the SQL view generated from the IncludeTree
       .bind(id)
       .run();
 
@@ -299,7 +298,97 @@ export class Person {
 }
 ```
 
-Note that the `get` code can be simplified using CRUD methods or ORM primitives.
+Note that the `get` code can be simplified using CRUD methods or the ORM primitive `get`.
+
+#### View Aliasing
+
+The generated views will always be aliased so that they can be accessed in an object like notation. For example, given some `Horse` that has a relationship with `Like`:
+
+```ts
+@D1
+export class Horse {
+  @PrimaryKey
+  id: Integer;
+
+  name: string;
+  bio: string | null;
+
+  @OneToMany("horseId1")
+  likes: Like[];
+
+  @DataSource
+  static readonly default: IncludeTree<Horse> = {
+    likes: { horse2: {} },
+  };
+}
+
+@D1
+export class Like {
+  @PrimaryKey
+  id: Integer;
+
+  @ForeignKey(Horse)
+  horseId1: Integer;
+
+  @ForeignKey(Horse)
+  horseId2: Integer;
+
+  @OneToOne("horseId2")
+  horse2: Horse | undefined;
+}
+```
+
+If you wanted to find all horses that like one another, a valid SQL query using the `default` data source would look like:
+
+```sql
+SELECT * FROM [Horse.default] as H1
+WHERE
+    H1.[id] = ?
+    AND EXISTS (
+        SELECT 1
+        FROM [Horse.default] AS H2
+        WHERE H2.[id] = H1.[likes.horse2.id]
+          AND H2.[likes.horse2.id] = H1.[id]
+    );
+```
+
+The actual generated view for `default` looks like:
+
+```sql
+CREATE VIEW IF NOT EXISTS "Horse.default" AS
+SELECT
+    "Horse"."id"          AS "id",
+    "Horse"."name"        AS "name",
+    "Horse"."bio"         AS "bio",
+    "Like"."id"           AS "likes.id",
+    "Like"."horseId1"     AS "likes.horseId1",
+    "Like"."horseId2"     AS "likes.horseId2",
+    "Horse1"."id"         AS "likes.horse2.id",
+    "Horse1"."name"       AS "likes.horse2.name",
+    "Horse1"."bio"        AS "likes.horse2.bio"
+FROM
+    "Horse"
+LEFT JOIN
+    "Like" ON "Horse"."id" = "Like"."horseId1"
+LEFT JOIN
+    "Horse" AS "Horse1" ON "Like"."horseId2" = "Horse1"."id";
+```
+
+#### DataSourceOf<T>
+
+If it is important to determine what data source the frontend called the instantiated method with, the type `DataSourceOf<T>` allows explicit data source parameters:
+
+```ts
+@D1
+class Foo {
+  ...
+
+  @POST
+  bar(ds: DataSourceOf<Foo>) {
+    // ds = "DataSource1" | "DataSource2" | ... | "none"
+  }
+}
+```
 
 ### One to Many
 

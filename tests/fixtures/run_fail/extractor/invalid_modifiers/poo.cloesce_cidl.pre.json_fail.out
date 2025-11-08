@@ -1,7 +1,0 @@
-==== CLOESCE ERROR ====
-Error [InvalidAttributeModifier]: Attributes can only be public on a Model, Plain Old Object or Wrangler Environment
-Phase: TypeScript IDL Extraction
-Context: Foo.a
-private a: number;
-
-Suggested fix: Change the attribute modifier to just `public`

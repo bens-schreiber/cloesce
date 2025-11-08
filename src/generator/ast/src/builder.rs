@@ -21,6 +21,7 @@ pub fn create_ast(mut models: Vec<Model>) -> CloesceAst {
         wrangler_env: WranglerEnv {
             name: "Env".into(),
             source_path: "source.ts".into(),
+            db_binding: "db".into(),
         },
         app_source: None,
         hash: 0,
