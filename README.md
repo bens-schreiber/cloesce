@@ -267,7 +267,7 @@ export class Person {
 }
 ```
 
-Data sources are just SQL views and can be invoked in your queries. They are aliased in such a way that its similiar to object properties. The frontend chooses which datasource to use in it's API client. `null` is a valid option, meaning no joins will occur.
+Data sources are just SQL views and can be invoked in your queries. They are aliased in such a way that its similiar to object properties. The frontend chooses which datasource to use in it's API client (all instantiated methods have an implicit DataSource parameter). `null` is a valid option, meaning no joins will occur.
 
 ```ts
 @D1
@@ -300,6 +300,20 @@ export class Person {
 ```
 
 Note that the `get` code can be simplified using CRUD methods or ORM primitives.
+
+If it is important to determine what data source the frontend called the instantiated method with, the type `DataSourceOf<T>` allows explicit data source parameters:
+
+```ts
+@D1
+class Foo {
+  ...
+
+  @POST
+  bar(ds: DataSourceOf<Foo>) {
+    // ds = "DataSource1" | "DataSource2" | ... | "none"
+  }
+}
+```
 
 ### One to Many
 
