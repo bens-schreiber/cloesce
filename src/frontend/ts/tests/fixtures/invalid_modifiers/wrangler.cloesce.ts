@@ -2,6 +2,6 @@
 // InvalidAttributeModifier
 
 @WranglerEnv
-export class {
+export class Foo {
   private bar: number;
 }

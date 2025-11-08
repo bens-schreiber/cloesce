@@ -7,7 +7,7 @@
     "frontend": "vite ./src/frontend"
   },
   "dependencies": {
-    "cloesce": "../src/frontend/ts",
+    "cloesce": "^0.0.4-unstable.2",
     "wrangler": "^4.34.0"
   },
   "devDependencies": {
