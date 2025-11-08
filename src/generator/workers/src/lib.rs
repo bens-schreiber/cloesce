@@ -4,7 +4,7 @@ use std::{
 };
 
 use ast::{
-    CloesceAst, Model, PlainOldObject,
+    CidlType, CloesceAst, HttpVerb, Model, ModelMethod, NamedTypedValue, PlainOldObject,
     err::{GeneratorErrorKind, Result},
     fail,
 };
@@ -131,8 +131,74 @@ impl WorkersGenerator {
         )
     }
 
+    /// Inserts CRUD methods into the AST
+    pub fn cruds(ast: &mut CloesceAst) {
+        for model in ast.models.values_mut() {
+            for crud in model.cruds.iter() {
+                let method = match crud {
+                    ast::CrudKind::GET => ModelMethod {
+                        name: "get".into(),
+                        is_static: true,
+                        http_verb: HttpVerb::GET,
+                        return_type: CidlType::http(CidlType::Object(model.name.clone())),
+                        parameters: vec![
+                            NamedTypedValue {
+                                name: model.primary_key.name.clone(),
+                                cidl_type: model.primary_key.cidl_type.clone(),
+                            },
+                            NamedTypedValue {
+                                name: "__datasource".into(),
+                                cidl_type: CidlType::DataSource(model.name.clone()),
+                            },
+                        ],
+                    },
+                    ast::CrudKind::LIST => ModelMethod {
+                        name: "list".into(),
+                        is_static: true,
+                        http_verb: HttpVerb::GET,
+                        return_type: CidlType::http(CidlType::array(CidlType::Object(
+                            model.name.clone(),
+                        ))),
+                        parameters: vec![NamedTypedValue {
+                            name: "__datasource".into(),
+                            cidl_type: CidlType::DataSource(model.name.clone()),
+                        }],
+                    },
+                    ast::CrudKind::SAVE => ModelMethod {
+                        name: "save".into(),
+                        is_static: true,
+                        http_verb: HttpVerb::POST,
+                        return_type: CidlType::http(CidlType::Object(model.name.clone())),
+                        parameters: vec![
+                            NamedTypedValue {
+                                name: "model".into(),
+                                cidl_type: CidlType::Partial(model.name.clone()),
+                            },
+                            NamedTypedValue {
+                                name: "__datasource".into(),
+                                cidl_type: CidlType::DataSource(model.name.clone()),
+                            },
+                        ],
+                    },
+                };
+
+                if model.methods.contains_key(&method.name) {
+                    // Don't overwrite an existing method
+                    tracing::warn!(
+                        "Found an overwritten CRUD method {}.{}, skipping.",
+                        model.name,
+                        method.name
+                    );
+                    continue;
+                }
+
+                model.methods.insert(method.name.clone(), method);
+            }
+        }
+    }
+
     pub fn create(
-        ast: &CloesceAst,
+        ast: &mut CloesceAst,
         wrangler: WranglerSpec,
         domain: String,
         workers_path: &Path,
@@ -146,6 +212,8 @@ impl WorkersGenerator {
             workers_path,
         );
         let constructor_registry = Self::registry(&ast.models, &ast.poos);
+
+        Self::cruds(ast);
 
         // TODO: Hardcoding one database, in the future we need to support any amount
         let db_binding = wrangler

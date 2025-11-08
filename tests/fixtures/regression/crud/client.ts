@@ -15,11 +15,11 @@ export class CrudHaver {
 
   static async get(
         id: number,
-        dataSource: "none" = "none",
+        __datasource: "none" = "none",
   ): Promise<HttpResult<CrudHaver>> {
     const baseUrl = new URL(`http://localhost:5002/api/CrudHaver/get`);
     baseUrl.searchParams.append('id', String(id));
-    baseUrl.searchParams.append('dataSource', String(dataSource));
+    baseUrl.searchParams.append('__datasource', String(__datasource));
     const res = await fetch(baseUrl, { method: "GET" });
     let raw = await res.json();
     if (!res.ok) {
@@ -29,10 +29,10 @@ export class CrudHaver {
     return raw;
   }
   static async list(
-        dataSource: "none" = "none",
+        __datasource: "none" = "none",
   ): Promise<HttpResult<CrudHaver[]>> {
     const baseUrl = new URL(`http://localhost:5002/api/CrudHaver/list`);
-    baseUrl.searchParams.append('dataSource', String(dataSource));
+    baseUrl.searchParams.append('__datasource', String(__datasource));
     const res = await fetch(baseUrl, { method: "GET" });
     let raw = await res.json();
     if (!res.ok) {
@@ -58,17 +58,17 @@ export class CrudHaver {
     }
     return raw;
   }
-  static async post(
-        obj: DeepPartial<CrudHaver>,
-        dataSource: "none" = "none",
+  static async save(
+        model: DeepPartial<CrudHaver>,
+        __datasource: "none" = "none",
   ): Promise<HttpResult<CrudHaver>> {
-    const baseUrl = new URL(`http://localhost:5002/api/CrudHaver/post`);
+    const baseUrl = new URL(`http://localhost:5002/api/CrudHaver/save`);
     const res = await fetch(baseUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-            obj, 
-            dataSource
+            model, 
+            __datasource
       })
     });
     let raw = await res.json();
@@ -87,11 +87,11 @@ export class Parent {
 
   static async get(
         id: number,
-        dataSource: "withChildren" |"none" = "none",
+        __datasource: "withChildren" |"none" = "none",
   ): Promise<HttpResult<Parent>> {
     const baseUrl = new URL(`http://localhost:5002/api/Parent/get`);
     baseUrl.searchParams.append('id', String(id));
-    baseUrl.searchParams.append('dataSource', String(dataSource));
+    baseUrl.searchParams.append('__datasource', String(__datasource));
     const res = await fetch(baseUrl, { method: "GET" });
     let raw = await res.json();
     if (!res.ok) {
@@ -101,10 +101,10 @@ export class Parent {
     return raw;
   }
   static async list(
-        dataSource: "withChildren" |"none" = "none",
+        __datasource: "withChildren" |"none" = "none",
   ): Promise<HttpResult<Parent[]>> {
     const baseUrl = new URL(`http://localhost:5002/api/Parent/list`);
-    baseUrl.searchParams.append('dataSource', String(dataSource));
+    baseUrl.searchParams.append('__datasource', String(__datasource));
     const res = await fetch(baseUrl, { method: "GET" });
     let raw = await res.json();
     if (!res.ok) {
@@ -113,17 +113,17 @@ export class Parent {
     raw.data = instantiateObjectArray(raw.data, Parent);
     return raw;
   }
-  static async post(
-        obj: DeepPartial<Parent>,
-        dataSource: "withChildren" |"none" = "none",
+  static async save(
+        model: DeepPartial<Parent>,
+        __datasource: "withChildren" |"none" = "none",
   ): Promise<HttpResult<Parent>> {
-    const baseUrl = new URL(`http://localhost:5002/api/Parent/post`);
+    const baseUrl = new URL(`http://localhost:5002/api/Parent/save`);
     const res = await fetch(baseUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-            obj, 
-            dataSource
+            model, 
+            __datasource
       })
     });
     let raw = await res.json();

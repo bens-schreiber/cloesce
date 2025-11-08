@@ -115,7 +115,8 @@ fn run_cli() -> Result<()> {
             pre_cidl_path,
             cidl_path,
         } => {
-            validate_cidl(&pre_cidl_path, &cidl_path)?;
+            let ast = validate_cidl(&pre_cidl_path)?;
+            write_cidl(ast, &cidl_path)?;
             tracing::info!("Validation OK.");
         }
         Commands::Migrations {
@@ -126,8 +127,8 @@ fn run_cli() -> Result<()> {
         } => {
             tracing::info!("Starting migration ({})", migrated_sql_path.display());
 
-            let mut migrated_cidl_file = create_file_and_dir(&migrated_cidl_path)?;
-            let mut migrated_sql_file = create_file_and_dir(&migrated_sql_path)?;
+            let mut migrated_cidl_file = open_file_or_create(&migrated_cidl_path)?;
+            let mut migrated_sql_file = open_file_or_create(&migrated_sql_path)?;
 
             let lm_ast = last_migrated_cidl_path
                 .map(|p| MigrationsAst::from_json(&p))
@@ -152,6 +153,7 @@ fn run_cli() -> Result<()> {
             } => {
                 let ast = CloesceAst::from_json(&cidl_path)?;
                 generate_wrangler(&wrangler_path, &ast)?;
+                write_cidl(ast, &cidl_path)?;
             }
             GenerateTarget::Workers {
                 cidl_path,
@@ -159,8 +161,9 @@ fn run_cli() -> Result<()> {
                 wrangler_path,
                 domain,
             } => {
-                let ast = CloesceAst::from_json(&cidl_path)?;
-                generate_workers(&ast, &workers_path, &wrangler_path, &domain)?
+                let mut ast = CloesceAst::from_json(&cidl_path)?;
+                generate_workers(&mut ast, &workers_path, &wrangler_path, &domain)?;
+                write_cidl(ast, &cidl_path)?;
             }
             GenerateTarget::Client {
                 cidl_path,
@@ -179,10 +182,11 @@ fn run_cli() -> Result<()> {
                 client_domain,
                 workers_domain,
             } => {
-                let ast = validate_cidl(&pre_cidl_path, &cidl_path)?;
+                let mut ast = validate_cidl(&pre_cidl_path)?;
                 generate_wrangler(&wrangler_path, &ast)?;
-                generate_workers(&ast, &workers_path, &wrangler_path, &workers_domain)?;
+                generate_workers(&mut ast, &workers_path, &wrangler_path, &workers_domain)?;
                 generate_client(&ast, &client_path, &client_domain)?;
+                write_cidl(ast, &cidl_path)?;
             }
         },
     }
@@ -263,17 +267,21 @@ impl MigrationsCli {
     }
 }
 
-fn validate_cidl(pre_cidl_path: &Path, cidl_path: &Path) -> Result<CloesceAst> {
+fn validate_cidl(pre_cidl_path: &Path) -> Result<CloesceAst> {
     let mut ast = CloesceAst::from_json(pre_cidl_path)?;
     ast.semantic_analysis()?;
     ast.set_merkle_hash();
 
-    let mut cidl_file = create_file_and_dir(cidl_path)?;
+    Ok(ast)
+}
+
+fn write_cidl(ast: CloesceAst, cidl_path: &Path) -> Result<()> {
+    let mut cidl_file = open_file_or_create(cidl_path)?;
     cidl_file
         .write_all(ast.to_json().as_bytes())
         .expect("file to be written");
 
-    Ok(ast)
+    Ok(())
 }
 
 fn generate_wrangler(wrangler_path: &Path, ast: &CloesceAst) -> Result<()> {
@@ -298,12 +306,12 @@ fn generate_wrangler(wrangler_path: &Path, ast: &CloesceAst) -> Result<()> {
 }
 
 fn generate_workers(
-    ast: &CloesceAst,
+    ast: &mut CloesceAst,
     workers_path: &Path,
     wrangler_path: &Path,
     domain: &str,
 ) -> Result<()> {
-    let mut file = create_file_and_dir(workers_path)?;
+    let mut file = open_file_or_create(workers_path)?;
     let wrangler = WranglerFormat::from_path(wrangler_path);
 
     let workers =
@@ -314,13 +322,21 @@ fn generate_workers(
 }
 
 fn generate_client(ast: &CloesceAst, client_path: &Path, domain: &str) -> Result<()> {
-    let mut file = create_file_and_dir(client_path)?;
+    let mut file = open_file_or_create(client_path)?;
     file.write_all(client::generate_client_api(ast, domain.to_string()).as_bytes())
         .expect("Could not write to file");
     Ok(())
 }
 
-fn create_file_and_dir(path: &Path) -> Result<std::fs::File> {
+fn open_file_or_create(path: &Path) -> Result<std::fs::File> {
+    if path.exists() {
+        std::fs::File::open(path).map_err(|e| {
+            GeneratorErrorKind::InvalidInputFile
+                .to_error()
+                .with_context(e.to_string())
+        })?;
+    }
+
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent).map_err(|e| {
             GeneratorErrorKind::InvalidInputFile

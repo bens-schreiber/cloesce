@@ -30,17 +30,17 @@ export class Model {
     raw.data = Object.assign(new InjectedThing(), raw.data);
     return raw;
   }
-  static async post(
-        obj: DeepPartial<Model>,
-        dataSource: "none" = "none",
+  static async save(
+        model: DeepPartial<Model>,
+        __datasource: "none" = "none",
   ): Promise<HttpResult<Model>> {
-    const baseUrl = new URL(`http://localhost:5002/api/Model/post`);
+    const baseUrl = new URL(`http://localhost:5002/api/Model/save`);
     const res = await fetch(baseUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-            obj, 
-            dataSource
+            model, 
+            __datasource
       })
     });
     let raw = await res.json();

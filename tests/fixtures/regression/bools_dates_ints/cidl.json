@@ -51,15 +51,15 @@
               "cidl_type": "Integer"
             },
             {
-              "name": "dataSource",
+              "name": "__datasource",
               "cidl_type": {
                 "DataSource": "Weather"
               }
             }
           ]
         },
-        "post": {
-          "name": "post",
+        "save": {
+          "name": "save",
           "is_static": true,
           "http_verb": "POST",
           "return_type": {
@@ -69,13 +69,13 @@
           },
           "parameters": [
             {
-              "name": "obj",
+              "name": "model",
               "cidl_type": {
                 "Partial": "Weather"
               }
             },
             {
-              "name": "dataSource",
+              "name": "__datasource",
               "cidl_type": {
                 "DataSource": "Weather"
               }
@@ -84,6 +84,10 @@
         }
       },
       "data_sources": {},
+      "cruds": [
+        "SAVE",
+        "GET"
+      ],
       "source_path": "./seed__bools_dates_ints.cloesce.ts"
     }
   },

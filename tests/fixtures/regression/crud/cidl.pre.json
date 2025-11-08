@@ -38,75 +38,14 @@
                             }
                         }
                     ]
-                },
-                "post": {
-                    "name": "post",
-                    "is_static": true,
-                    "http_verb": "POST",
-                    "return_type": {
-                        "HttpResult": {
-                            "Object": "CrudHaver"
-                        }
-                    },
-                    "parameters": [
-                        {
-                            "name": "obj",
-                            "cidl_type": {
-                                "Partial": "CrudHaver"
-                            }
-                        },
-                        {
-                            "name": "dataSource",
-                            "cidl_type": {
-                                "DataSource": "CrudHaver"
-                            }
-                        }
-                    ]
-                },
-                "get": {
-                    "name": "get",
-                    "is_static": true,
-                    "http_verb": "GET",
-                    "return_type": {
-                        "HttpResult": {
-                            "Object": "CrudHaver"
-                        }
-                    },
-                    "parameters": [
-                        {
-                            "name": "id",
-                            "cidl_type": "Integer"
-                        },
-                        {
-                            "name": "dataSource",
-                            "cidl_type": {
-                                "DataSource": "CrudHaver"
-                            }
-                        }
-                    ]
-                },
-                "list": {
-                    "name": "list",
-                    "is_static": true,
-                    "http_verb": "GET",
-                    "return_type": {
-                        "HttpResult": {
-                            "Array": {
-                                "Object": "CrudHaver"
-                            }
-                        }
-                    },
-                    "parameters": [
-                        {
-                            "name": "dataSource",
-                            "cidl_type": {
-                                "DataSource": "CrudHaver"
-                            }
-                        }
-                    ]
                 }
             },
             "data_sources": {},
+            "cruds": [
+                "SAVE",
+                "GET",
+                "LIST"
+            ],
             "source_path": "./seed__crud.cloesce.ts"
         },
         "Parent": {
@@ -146,74 +85,7 @@
                     }
                 }
             ],
-            "methods": {
-                "post": {
-                    "name": "post",
-                    "is_static": true,
-                    "http_verb": "POST",
-                    "return_type": {
-                        "HttpResult": {
-                            "Object": "Parent"
-                        }
-                    },
-                    "parameters": [
-                        {
-                            "name": "obj",
-                            "cidl_type": {
-                                "Partial": "Parent"
-                            }
-                        },
-                        {
-                            "name": "dataSource",
-                            "cidl_type": {
-                                "DataSource": "Parent"
-                            }
-                        }
-                    ]
-                },
-                "get": {
-                    "name": "get",
-                    "is_static": true,
-                    "http_verb": "GET",
-                    "return_type": {
-                        "HttpResult": {
-                            "Object": "Parent"
-                        }
-                    },
-                    "parameters": [
-                        {
-                            "name": "id",
-                            "cidl_type": "Integer"
-                        },
-                        {
-                            "name": "dataSource",
-                            "cidl_type": {
-                                "DataSource": "Parent"
-                            }
-                        }
-                    ]
-                },
-                "list": {
-                    "name": "list",
-                    "is_static": true,
-                    "http_verb": "GET",
-                    "return_type": {
-                        "HttpResult": {
-                            "Array": {
-                                "Object": "Parent"
-                            }
-                        }
-                    },
-                    "parameters": [
-                        {
-                            "name": "dataSource",
-                            "cidl_type": {
-                                "DataSource": "Parent"
-                            }
-                        }
-                    ]
-                }
-            },
+            "methods": {},
             "data_sources": {
                 "withChildren": {
                     "name": "withChildren",
@@ -223,6 +95,11 @@
                     }
                 }
             },
+            "cruds": [
+                "SAVE",
+                "GET",
+                "LIST"
+            ],
             "source_path": "./seed__crud.cloesce.ts"
         },
         "Child": {
@@ -253,6 +130,7 @@
             ],
             "methods": {},
             "data_sources": {},
+            "cruds": [],
             "source_path": "./seed__crud.cloesce.ts"
         }
     },

@@ -3,6 +3,7 @@ pub mod err;
 
 use std::collections::BTreeMap;
 use std::collections::HashMap;
+use std::collections::HashSet;
 use std::collections::VecDeque;
 use std::hash::Hash;
 use std::hash::Hasher;
@@ -96,6 +97,10 @@ impl CidlType {
     pub fn null() -> CidlType {
         CidlType::Nullable(Box::new(CidlType::Void))
     }
+
+    pub fn http(cidl_type: CidlType) -> CidlType {
+        CidlType::HttpResult(Box::new(cidl_type))
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
@@ -160,6 +165,13 @@ pub struct NavigationProperty {
     pub kind: NavigationPropertyKind,
 }
 
+#[derive(Serialize, Deserialize, Hash, PartialEq, Eq, Debug)]
+pub enum CrudKind {
+    GET,
+    LIST,
+    SAVE,
+}
+
 #[serde_as]
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Model {
@@ -176,6 +188,8 @@ pub struct Model {
 
     #[serde_as(as = "MapPreventDuplicates<_, _>")]
     pub data_sources: BTreeMap<String, DataSource>,
+
+    pub cruds: HashSet<CrudKind>,
 
     pub source_path: PathBuf,
 }

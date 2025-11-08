@@ -53,6 +53,7 @@
           "tree": {}
         }
       },
+      "cruds": [],
       "source_path": "./seed__ds.cloesce.ts"
     },
     "NoDs": {
@@ -66,6 +67,7 @@
       "navigation_properties": [],
       "methods": {},
       "data_sources": {},
+      "cruds": [],
       "source_path": "./seed__ds.cloesce.ts"
     },
     "OneDs": {
@@ -85,6 +87,7 @@
           "tree": {}
         }
       },
+      "cruds": [],
       "source_path": "./seed__ds.cloesce.ts"
     }
   },

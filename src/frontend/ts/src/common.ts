@@ -153,7 +153,7 @@ export type InstanceRegistry = Map<string, any>;
 export type MiddlewareFn = (
   request: Request,
   env: any,
-  ir: InstanceRegistry,
+  ir: InstanceRegistry
 ) => Promise<HttpResult | undefined>;
 
 export type KeysOfType<T, U> = {
@@ -184,7 +184,7 @@ export class CloesceApp {
   public useMethod<T>(
     ctor: new () => T,
     method: KeysOfType<T, (...args: any) => any>,
-    m: MiddlewareFn,
+    m: MiddlewareFn
   ) {
     if (!this.method.has(ctor.name)) {
       this.method.set(ctor.name, new Map());
@@ -199,7 +199,7 @@ export class CloesceApp {
   }
 }
 
-export type CrudKind = "POST" | "GET" | "LIST";
+export type CrudKind = "SAVE" | "GET" | "LIST";
 
 export type CidlType =
   | "Void"
@@ -259,7 +259,7 @@ export interface NavigationProperty {
 }
 
 export function getNavigationPropertyCidlType(
-  nav: NavigationProperty,
+  nav: NavigationProperty
 ): CidlType {
   return "OneToOne" in nav.kind
     ? { Object: nav.model_name }
@@ -273,6 +273,7 @@ export interface Model {
   navigation_properties: NavigationProperty[];
   methods: Record<string, ModelMethod>;
   data_sources: Record<string, DataSource>;
+  cruds: CrudKind[];
   source_path: string;
 }
 

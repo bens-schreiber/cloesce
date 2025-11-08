@@ -67,6 +67,7 @@
                 }
             },
             "data_sources": {},
+            "cruds": [],
             "source_path": "./seed__poo.cloesce.ts"
         }
     },

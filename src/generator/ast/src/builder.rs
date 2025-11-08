@@ -1,4 +1,7 @@
-use std::{collections::BTreeMap, path::PathBuf};
+use std::{
+    collections::{BTreeMap, HashSet},
+    path::PathBuf,
+};
 
 use indexmap::IndexMap;
 
@@ -162,6 +165,7 @@ impl ModelBuilder {
             data_sources: self.data_sources,
             source_path: PathBuf::default(),
             primary_key: self.primary_key.unwrap(),
+            cruds: HashSet::default(),
             hash: 0,
         }
     }

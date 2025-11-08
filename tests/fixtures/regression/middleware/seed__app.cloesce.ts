@@ -22,7 +22,7 @@ export class Env {
 }
 
 @D1
-@CRUD(["POST"])
+@CRUD(["SAVE"])
 export class Model {
   @PrimaryKey
   id: Integer;

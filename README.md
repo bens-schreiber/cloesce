@@ -494,10 +494,12 @@ class Horse {
 
 ### CRUD Methods
 
-Generic GET, POST, PATCH (and in a future version, DEL) boilerplate methods do not need to be copied around. Cloesce supports CRUD generation, a syntactic sugar that adds the methods to the compiler output.
+Generic `GET, POST, PATCH` (and in a future version, DEL) boilerplate methods do not need to be copied around. Cloesce supports CRUD generation, a syntactic sugar that adds the methods to the compiler output.
+
+The `SAVE` method is an `upsert`, meaning it both inserts and updates in the same query.
 
 ```ts
-@CRUD(["POST", "GET", "LIST"])
+@CRUD(["SAVE", "GET", "LIST"])
 @D1
 export class CrudHaver {
   @PrimaryKey

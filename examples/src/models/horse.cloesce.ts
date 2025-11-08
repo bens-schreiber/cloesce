@@ -23,7 +23,7 @@ export class Env {
 }
 
 @D1
-@CRUD(["GET", "LIST", "POST"])
+@CRUD(["GET", "LIST", "SAVE"])
 export class Horse {
   @PrimaryKey
   id: Integer;

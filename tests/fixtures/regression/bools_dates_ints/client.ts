@@ -10,11 +10,11 @@ export class Weather {
 
   static async get(
         id: number,
-        dataSource: "none" = "none",
+        __datasource: "none" = "none",
   ): Promise<HttpResult<Weather>> {
     const baseUrl = new URL(`http://localhost:5002/api/Weather/get`);
     baseUrl.searchParams.append('id', String(id));
-    baseUrl.searchParams.append('dataSource', String(dataSource));
+    baseUrl.searchParams.append('__datasource', String(__datasource));
     const res = await fetch(baseUrl, { method: "GET" });
     let raw = await res.json();
     if (!res.ok) {
@@ -23,17 +23,17 @@ export class Weather {
     raw.data = Object.assign(new Weather(), raw.data);
     return raw;
   }
-  static async post(
-        obj: DeepPartial<Weather>,
-        dataSource: "none" = "none",
+  static async save(
+        model: DeepPartial<Weather>,
+        __datasource: "none" = "none",
   ): Promise<HttpResult<Weather>> {
-    const baseUrl = new URL(`http://localhost:5002/api/Weather/post`);
+    const baseUrl = new URL(`http://localhost:5002/api/Weather/save`);
     const res = await fetch(baseUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-            obj, 
-            dataSource
+            model, 
+            __datasource
       })
     });
     let raw = await res.json();
