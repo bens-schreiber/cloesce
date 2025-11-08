@@ -292,7 +292,7 @@ export class Person {
       .bind(id)
       .run();
 
-    let persons = Orm.fromSql(Person, records.results, Person.default);
+    let persons = Orm.mapSql(Person, records.results, Person.default);
     return persons.value[0];
   }
 }

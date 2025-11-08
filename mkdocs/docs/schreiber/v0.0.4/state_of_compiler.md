@@ -56,7 +56,7 @@ The exported ORM class allows the invocation of:
 
 Through it's interface:
 
-- `fromSql`
+- `mapSql`
 - `upsertQuery`
 
 The ORM class also provides wrappers to make querying D1 as simple as possible:

@@ -71,7 +71,7 @@ export class Horse {
       .bind(this.id)
       .run();
 
-    const res = Orm.fromSql(Horse, records.results, Horse.withLikes);
+    const res = Orm.mapSql(Horse, records.results, Horse.withLikes);
     if (res.ok) {
       return res.value;
     }

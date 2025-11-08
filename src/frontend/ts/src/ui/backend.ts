@@ -1,7 +1,11 @@
 import { D1Database } from "@cloudflare/workers-types/experimental/index.js";
 import { CrudKind, Either, KeysOfType, left, right } from "../common.js";
 import { RuntimeContainer } from "../router/router.js";
-import { WasmResource, fromSql, invokeOrmWasm } from "../router/wasm.js";
+import {
+  WasmResource,
+  mapSql as mapSql,
+  invokeOrmWasm,
+} from "../router/wasm.js";
 
 export { cloesce } from "../router/router.js";
 export type {
@@ -86,12 +90,12 @@ export class Orm {
    * @param includeTree Include tree to define the relationships to join.
    * @returns
    */
-  static fromSql<T extends object>(
+  static mapSql<T extends object>(
     ctor: new () => T,
     records: Record<string, any>[],
     includeTree: IncludeTree<T> | null
   ): Either<string, T[]> {
-    return fromSql(ctor, records, includeTree);
+    return mapSql(ctor, records, includeTree);
   }
 
   /**
@@ -256,7 +260,7 @@ export class Orm {
         ? null
         : ast.models[ctor.name].data_sources[includeTreeKey.toString()].tree;
 
-    const fromSqlRes = fromSql<T>(ctor, res.results, includeTree);
+    const fromSqlRes = mapSql<T>(ctor, res.results, includeTree);
     if (!fromSqlRes.ok) {
       return fromSqlRes;
     }
@@ -286,7 +290,7 @@ export class Orm {
         ? null
         : ast.models[ctor.name].data_sources[includeTreeKey.toString()].tree;
 
-    const fromSqlRes = fromSql<T>(ctor, res.results, includeTree);
+    const fromSqlRes = mapSql<T>(ctor, res.results, includeTree);
     if (!fromSqlRes.ok) {
       return fromSqlRes;
     }
