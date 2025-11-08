@@ -8,7 +8,7 @@ use serde::Serialize;
 use serde_json::Value as JsonValue;
 use toml::Value as TomlValue;
 
-use ast::{err::Result, CloesceAst};
+use ast::{CloesceAst, err::Result};
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
 pub struct D1Database {
