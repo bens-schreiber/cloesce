@@ -8,7 +8,7 @@ use serde::Serialize;
 use serde_json::Value as JsonValue;
 use toml::Value as TomlValue;
 
-use ast::{CloesceAst, err::Result};
+use ast::{err::Result, CloesceAst};
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
 pub struct D1Database {
@@ -20,7 +20,7 @@ pub struct D1Database {
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
 pub struct WranglerSpec {
     pub name: Option<String>,
-    pub compatability_date: Option<String>,
+    pub compatibility_date: Option<String>,
     pub main: Option<String>,
 
     #[serde(default)]
@@ -37,8 +37,8 @@ impl WranglerSpec {
             "cloesce".to_string()
         }));
 
-        self.compatability_date = Some(self.compatability_date.clone().unwrap_or_else(|| {
-            tracing::warn!("Set a default compatability date.");
+        self.compatibility_date = Some(self.compatibility_date.clone().unwrap_or_else(|| {
+            tracing::warn!("Set a default compatibility date.");
             "2025-10-02".to_string()
         }));
 
@@ -142,8 +142,8 @@ impl WranglerFormat {
                 if let Some(name) = &spec.name {
                     val["name"] = serde_json::to_value(name).expect("JSON to serialize");
                 }
-                if let Some(date) = &spec.compatability_date {
-                    val["compatability_date"] =
+                if let Some(date) = &spec.compatibility_date {
+                    val["compatibility_date"] =
                         serde_json::to_value(date).expect("JSON to serialize");
                 }
                 if let Some(main) = &spec.main {
@@ -161,7 +161,7 @@ impl WranglerFormat {
                     if let Some(name) = &spec.name {
                         table.insert("name".to_string(), toml::Value::String(name.clone()));
                     }
-                    if let Some(date) = &spec.compatability_date {
+                    if let Some(date) = &spec.compatibility_date {
                         table.insert(
                             "compatibility_date".to_string(),
                             toml::Value::String(date.clone()),

@@ -249,7 +249,7 @@ export class CidlExtractor {
         return checkModifierRes;
       }
 
-      // Process decorators
+      // Process decorator
       const cidl_type = typeRes.value;
       switch (decoratorName) {
         case AttributeDecoratorKind.PrimaryKey: {

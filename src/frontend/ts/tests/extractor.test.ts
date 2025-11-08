@@ -1,7 +1,7 @@
 import { describe, test, expect } from "vitest";
 import { Project } from "ts-morph";
 import { CidlExtractor } from "../src/extractor/extract";
-import { CidlType } from "../src/common";
+import { CidlType, DataSource, Model } from "../src/common";
 
 function cloesceProject(): Project {
   const project = new Project({
@@ -101,7 +101,9 @@ describe("CIDL Type", () => {
       `
       import { DataSourceOf, DeepPartial } from "./src/ui/backend";
 
-      class Bar {}
+      class Bar {
+        a: number;
+      }
 
       class Foo {
         ds: DataSourceOf<Bar>;
@@ -179,5 +181,38 @@ describe("WranglerEnv", () => {
 
     // Assert
     expect(res.ok).toBe(true);
+  });
+});
+
+describe("Data Source", () => {
+  test("Finds Include Tree", () => {
+    // Arrange
+    const project = cloesceProject();
+    const sourceFile = project.createSourceFile(
+      "test.ts",
+      `
+      import { IncludeTree } from "./src/ui/backend";
+      @D1
+      class Foo {
+      @PrimaryKey
+      id: number;
+
+      @DataSource
+      static readonly default: IncludeTree<Foo> = {};
+      }
+      `,
+    );
+
+    // Act
+    const classDecl = sourceFile.getClass("Foo")!;
+    const res = CidlExtractor.model(classDecl, sourceFile);
+
+    // Assert
+    expect(res.ok).toBe(true);
+
+    expect((res.value as Model).data_sources["default"]).toStrictEqual({
+      name: "default",
+      tree: {},
+    } as DataSource);
   });
 });

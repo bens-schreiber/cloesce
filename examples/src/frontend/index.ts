@@ -172,7 +172,6 @@ async function likeCurrentHorse(): Promise<void> {
 async function addNewHorse(form: HTMLFormElement): Promise<void> {
   const formData = new FormData(form);
   const horse = {
-    id: parseInt(formData.get("id") as string),
     name: formData.get("name") as string,
     bio: (formData.get("bio") as string) || null,
   } as Horse;

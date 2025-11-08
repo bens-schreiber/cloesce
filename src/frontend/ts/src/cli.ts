@@ -266,7 +266,7 @@ async function extract(opts: {
     fs.mkdirSync(path.dirname(outPath), { recursive: true });
     fs.writeFileSync(outPath, json);
 
-    console.log(`CIDL generated successfully at ${outPath}`);
+    console.log(`CIDL extracted to ${outPath}`);
 
     return { outPath, projectName: cloesceProjectName };
   } catch (err: any) {

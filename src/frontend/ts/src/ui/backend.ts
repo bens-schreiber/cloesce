@@ -43,13 +43,13 @@ export const CRUD =
 
 // Include Tree
 type Primitive = string | number | boolean | bigint | symbol | null | undefined;
-export type IncludeTree<T> = T extends Primitive
+export type IncludeTree<T> = (T extends Primitive
   ? never
   : {
       [K in keyof T]?: T[K] extends (infer U)[]
         ? IncludeTree<NonNullable<U>>
         : IncludeTree<NonNullable<T[K]>>;
-    };
+    }) & { __brand?: "IncludeTree" };
 
 // Data Source Type
 export type DataSourceOf<T extends object> = (
