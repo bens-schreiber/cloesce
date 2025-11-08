@@ -6,21 +6,10 @@ use std::{
 
 use similar::TextDiff;
 
-pub enum DiffOpts {
-    FailOnly,
-    All,
-}
-
 // Compares unified file diffs, creating a `.new` snapshot file if a diff is found
 ///
 /// Returns if a `.new` file created
-fn diff_file(
-    fixture_id: &String,
-    out: OutputFile,
-    new_contents: String,
-    fail: bool,
-    opt: &DiffOpts,
-) -> TestOutput {
+fn diff_file(fixture_id: &String, out: OutputFile, new_contents: String, fail: bool) -> TestOutput {
     let name = if fail {
         format!("{}_{}_fail.out", fixture_id, out.base_name)
     } else {
@@ -48,9 +37,7 @@ fn diff_file(
         .header(old_path.to_str().unwrap(), new_path.to_str().unwrap())
         .to_string();
 
-    // Only print a diff if there is some dif.
-    // If this is a run fail test, don't print file diff if there wasnt a failure
-    if (fail || !matches!(opt, DiffOpts::FailOnly)) && !unified_diff.trim().is_empty() {
+    if !unified_diff.trim().is_empty() {
         for line in unified_diff.lines() {
             if line.starts_with('+') && !line.starts_with("+++") {
                 println!("\x1b[32m{}\x1b[0m", line); // green
@@ -109,18 +96,13 @@ type TestResult = Result<TestOutput, TestOutput>;
 pub struct Fixture {
     /// The path of a fixture entry point, ie a seed source file
     pub path: PathBuf,
-    pub opt: DiffOpts,
     pub fixture_id: String,
 }
 
 impl Fixture {
-    pub fn new(path: PathBuf, opt: DiffOpts) -> Self {
+    pub fn new(path: PathBuf) -> Self {
         let fixture_id = path.file_stem().unwrap().to_str().unwrap().to_owned();
-        Self {
-            fixture_id,
-            path,
-            opt,
-        }
+        Self { fixture_id, path }
     }
 
     pub fn extract_cidl(&self) -> TestResult {
@@ -280,7 +262,6 @@ impl Fixture {
             out,
             String::from_utf8_lossy(&contents).to_string(),
             false,
-            &self.opt,
         )
     }
 
@@ -290,6 +271,6 @@ impl Fixture {
             .map(|pos| err[pos..].to_string())
             .unwrap_or_else(|| err.to_string());
 
-        diff_file(&self.fixture_id, out, normalized, true, &self.opt)
+        diff_file(&self.fixture_id, out, normalized, true)
     }
 }

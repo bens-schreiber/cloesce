@@ -81,10 +81,6 @@ jobs:
         working-directory: tests/runner
         run: cargo run --bin test regression --check
 
-      - name: Run-Fail Tests
-        working-directory: tests/runner
-        run: cargo run --bin test run-fail --check
-
       # --- E2E Tests ---
       - name: Check & Test E2E
         working-directory: tests/e2e
