@@ -27,6 +27,7 @@ export class {{this.name}} {
         {{name}}: {{get_cidl_type cidl_type}},
       {{/if}}
     {{/each}}
+    fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<{{get_cidl_type this.return_type}}>> {
     const baseUrl = new URL(`{{../../domain}}/{{#if this.is_static}}{{../name}}/{{this.name}}{{else}}{{../name}}/${this.{{../primary_key.name}}}/{{this.name}}{{/if}}`);
     {{#if (eq this.http_verb "GET")}}
@@ -35,9 +36,9 @@ export class {{this.name}} {
     baseUrl.searchParams.append('{{name}}', String({{name}}));
         {{/if}}
       {{/each}}
-    const res = await fetch(baseUrl, { method: "GET" });
+    const res = await fetchImpl(baseUrl, { method: "GET" });
     {{else}}
-    const res = await fetch(baseUrl, {
+    const res = await fetchImpl(baseUrl, {
       method: "{{this.http_verb}}",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

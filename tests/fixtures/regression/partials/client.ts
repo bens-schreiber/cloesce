@@ -10,9 +10,10 @@ export class Dog {
 
   static async post(
         dog: DeepPartial<Dog>,
+    fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Dog>> {
     const baseUrl = new URL(`http://localhost:5002/api/Dog/post`);
-    const res = await fetch(baseUrl, {
+    const res = await fetchImpl(baseUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
