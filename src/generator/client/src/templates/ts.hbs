@@ -30,12 +30,23 @@ export class {{this.name}} {
   ): Promise<HttpResult<{{get_cidl_type this.return_type}}>> {
     const baseUrl = new URL(`{{../../domain}}/{{#if this.is_static}}{{../name}}/{{this.name}}{{else}}{{../name}}/${this.{{../primary_key.name}}}/{{this.name}}{{/if}}`);
     {{#if (eq this.http_verb "GET")}}
+      const __append = (k: string, v: any) => {
+        const val = v instanceof Date ? v.toISOString() : String(v);
+        baseUrl.searchParams.append(k, val);
+      };
       {{#each this.parameters}}
         {{#if (is_serializable cidl_type)}}
-    baseUrl.searchParams.append('{{name}}', String({{name}}));
+      if ({{name}} !== undefined && {{name}} !== null) {
+        if (Array.isArray({{name}})) {
+          for (const __item of {{name}}) __append('{{name}}', __item); // repeated key: ?ids=1&ids=2
+          // If you prefer bracket syntax, use: __append('{{name}}[]', __item)
+        } else {
+          __append('{{name}}', {{name}});
+        }
+      }
         {{/if}}
       {{/each}}
-    const res = await fetch(baseUrl, { method: "GET" });
+      const res = await fetch(baseUrl, { method: "GET" });
     {{else}}
     const res = await fetch(baseUrl, {
       method: "{{this.http_verb}}",
