@@ -253,12 +253,48 @@ async function validateRequest(
   const requiredParams = method.parameters.filter(
     (p) => !(typeof p.cidl_type === "object" && "Inject" in p.cidl_type),
   );
-
-  // Extract url or body parameters
   const url = new URL(request.url);
   let params: RequestParamMap = {};
+
   if (method.http_verb === "GET") {
-    params = Object.fromEntries(url.searchParams.entries());
+    const sp: URLSearchParams = url.searchParams;
+    params = {};
+
+    const uniqueKeys = new Set<string>();
+    for (const [k] of sp.entries()) uniqueKeys.add(k);
+
+    // Keep this narrow: input is string, output can be any (unknown)
+    const coerce = (v: string): unknown => {
+      if (v === "null") return null;
+      if (v === "true") return true;
+      if (v === "false") return false;
+      // If you want number coercion, uncomment:
+      // const n = Number(v);
+      // if (!Number.isNaN(n) && v.trim() !== "") return n;
+      return v;
+    };
+
+    for (const rawKey of uniqueKeys) {
+      const isBracket = rawKey.endsWith("[]");
+      const key = isBracket ? rawKey.slice(0, -2) : rawKey;
+
+      // getAll always returns string[]
+      const values: string[] = sp.getAll(rawKey);
+
+      if (values.length > 1 || isBracket) {
+        // repeated keys or bracket syntax → array
+        params[key] = values.map((v: string) => coerce(v));
+      } else {
+        const single: string | undefined = values[0];
+
+        // Optional: comma-separated list → array
+        if (single !== undefined && single.indexOf(",") !== -1) {
+          params[key] = single.split(",").map((s: string) => coerce(s));
+        } else {
+          params[key] = single === undefined ? undefined : coerce(single);
+        }
+      }
+    }
   } else {
     try {
       params = await request.json();
