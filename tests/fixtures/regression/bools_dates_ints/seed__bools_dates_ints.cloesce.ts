@@ -8,7 +8,7 @@ export class Env {
 }
 
 @D1
-@CRUD(["POST", "GET"])
+@CRUD(["SAVE", "GET"])
 export class Weather {
   @PrimaryKey
   id: Integer;

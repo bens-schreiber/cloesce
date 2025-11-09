@@ -120,7 +120,7 @@ export function invokeOrmWasm<T>(
  * Calls `object_relational_mapping` to turn a row of SQL records into
  * an instantiated object.
  */
-export function fromSql<T extends object>(
+export function mapSql<T extends object>(
   ctor: new () => T,
   records: Record<string, any>[],
   includeTree: IncludeTree<T> | CidlIncludeTree | null,

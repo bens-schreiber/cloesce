@@ -43,7 +43,7 @@
               "cidl_type": "Integer"
             },
             {
-              "name": "dataSource",
+              "name": "__datasource",
               "cidl_type": {
                 "DataSource": "CrudHaver"
               }
@@ -63,7 +63,7 @@
           },
           "parameters": [
             {
-              "name": "dataSource",
+              "name": "__datasource",
               "cidl_type": {
                 "DataSource": "CrudHaver"
               }
@@ -84,8 +84,8 @@
             }
           ]
         },
-        "post": {
-          "name": "post",
+        "save": {
+          "name": "save",
           "is_static": true,
           "http_verb": "POST",
           "return_type": {
@@ -95,13 +95,13 @@
           },
           "parameters": [
             {
-              "name": "obj",
+              "name": "model",
               "cidl_type": {
                 "Partial": "CrudHaver"
               }
             },
             {
-              "name": "dataSource",
+              "name": "__datasource",
               "cidl_type": {
                 "DataSource": "CrudHaver"
               }
@@ -110,6 +110,11 @@
         }
       },
       "data_sources": {},
+      "cruds": [
+        "GET",
+        "LIST",
+        "SAVE"
+      ],
       "source_path": "./seed__crud.cloesce.ts"
     },
     "Parent": {
@@ -169,7 +174,7 @@
               "cidl_type": "Integer"
             },
             {
-              "name": "dataSource",
+              "name": "__datasource",
               "cidl_type": {
                 "DataSource": "Parent"
               }
@@ -189,15 +194,15 @@
           },
           "parameters": [
             {
-              "name": "dataSource",
+              "name": "__datasource",
               "cidl_type": {
                 "DataSource": "Parent"
               }
             }
           ]
         },
-        "post": {
-          "name": "post",
+        "save": {
+          "name": "save",
           "is_static": true,
           "http_verb": "POST",
           "return_type": {
@@ -207,13 +212,13 @@
           },
           "parameters": [
             {
-              "name": "obj",
+              "name": "model",
               "cidl_type": {
                 "Partial": "Parent"
               }
             },
             {
-              "name": "dataSource",
+              "name": "__datasource",
               "cidl_type": {
                 "DataSource": "Parent"
               }
@@ -231,6 +236,11 @@
           }
         }
       },
+      "cruds": [
+        "GET",
+        "LIST",
+        "SAVE"
+      ],
       "source_path": "./seed__crud.cloesce.ts"
     },
     "Child": {
@@ -264,6 +274,7 @@
       ],
       "methods": {},
       "data_sources": {},
+      "cruds": [],
       "source_path": "./seed__crud.cloesce.ts"
     }
   },

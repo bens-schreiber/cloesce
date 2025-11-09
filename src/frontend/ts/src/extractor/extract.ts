@@ -191,10 +191,10 @@ export class CidlExtractor {
   ): Either<ExtractorError, Model> {
     const name = classDecl.getName()!;
     const attributes: ModelAttribute[] = [];
-    const navigationProperties: NavigationProperty[] = [];
-    const dataSources: Record<string, DataSource> = {};
+    const navigation_properties: NavigationProperty[] = [];
+    const data_sources: Record<string, DataSource> = {};
     const methods: Record<string, ModelMethod> = {};
-    let cruds: CrudKind[] = [];
+    const cruds: Set<CrudKind> = new Set<CrudKind>();
     let primary_key: NamedTypedValue | undefined = undefined;
 
     // Extract crud methods
@@ -202,7 +202,7 @@ export class CidlExtractor {
       .getDecorators()
       .find((d) => getDecoratorName(d) === ClassDecoratorKind.CRUD);
     if (crudDecorator) {
-      cruds = getCrudKinds(crudDecorator);
+      setCrudKinds(crudDecorator, cruds);
     }
 
     // Iterate attribtutes
@@ -296,7 +296,7 @@ export class CidlExtractor {
             );
           }
 
-          navigationProperties.push({
+          navigation_properties.push({
             var_name: prop.getName(),
             model_name,
             kind: { OneToOne: { reference } },
@@ -329,7 +329,7 @@ export class CidlExtractor {
             );
           }
 
-          navigationProperties.push({
+          navigation_properties.push({
             var_name: prop.getName(),
             model_name,
             kind: { OneToMany: { reference } },
@@ -358,7 +358,7 @@ export class CidlExtractor {
             );
           }
 
-          navigationProperties.push({
+          navigation_properties.push({
             var_name: prop.getName(),
             model_name,
             kind: { ManyToMany: { unique_id } },
@@ -396,7 +396,7 @@ export class CidlExtractor {
             return treeRes;
           }
 
-          dataSources[prop.getName()] = {
+          data_sources[prop.getName()] = {
             name: prop.getName(),
             tree: treeRes.value,
           };
@@ -432,20 +432,14 @@ export class CidlExtractor {
       methods[result.value.name] = result.value;
     }
 
-    // Add CRUD methods
-    for (const crud of cruds) {
-      // TODO: This overwrites any exisiting impl-- is that what we want?
-      const crudMethod = CidlExtractor.crudMethod(crud, primary_key, name);
-      methods[crudMethod.name] = crudMethod;
-    }
-
     return right({
       name,
       attributes,
       primary_key,
-      navigation_properties: navigationProperties,
+      navigation_properties,
       methods,
-      data_sources: dataSources,
+      data_sources,
+      cruds: Array.from(cruds).sort(),
       source_path: sourceFile.getFilePath().toString(),
     });
   }
@@ -841,61 +835,6 @@ export class CidlExtractor {
       parameters,
     });
   }
-
-  static crudMethod(
-    crud: CrudKind,
-    primaryKey: NamedTypedValue,
-    modelName: string,
-  ): ModelMethod {
-    // TODO: Should this impementation be in some JSON project file s.t. other
-    // langs can use it?
-    return {
-      POST: {
-        name: "post",
-        is_static: true,
-        http_verb: HttpVerb.POST,
-        return_type: { HttpResult: { Object: modelName } },
-        parameters: [
-          {
-            name: "obj",
-            cidl_type: { Partial: modelName },
-          },
-          {
-            name: "dataSource",
-            cidl_type: { DataSource: modelName },
-          },
-        ],
-      },
-      GET: {
-        name: "get",
-        is_static: true,
-        http_verb: HttpVerb.GET,
-        return_type: { HttpResult: { Object: modelName } },
-        parameters: [
-          {
-            name: "id",
-            cidl_type: primaryKey.cidl_type,
-          },
-          {
-            name: "dataSource",
-            cidl_type: { DataSource: modelName },
-          },
-        ],
-      },
-      LIST: {
-        name: "list",
-        is_static: true,
-        http_verb: HttpVerb.GET,
-        return_type: { HttpResult: { Array: { Object: modelName } } },
-        parameters: [
-          {
-            name: "dataSource",
-            cidl_type: { DataSource: modelName },
-          },
-        ],
-      },
-    }[crud] as ModelMethod;
-  }
 }
 
 function err(
@@ -959,22 +898,21 @@ function getObjectName(t: CidlType): string | undefined {
   return undefined;
 }
 
-function getCrudKinds(d: Decorator): CrudKind[] {
+function setCrudKinds(d: Decorator, cruds: Set<CrudKind>) {
   const arg = d.getArguments()[0];
-  if (!arg) return [];
-
-  if (MorphNode.isArrayLiteralExpression(arg)) {
-    return arg
-      .getElements()
-      .map(
-        (e) =>
-          (MorphNode.isStringLiteral(e)
-            ? e.getLiteralValue()
-            : e.getText()) as CrudKind,
-      );
+  if (!arg) {
+    return;
   }
 
-  return [];
+  if (MorphNode.isArrayLiteralExpression(arg)) {
+    for (const a of arg.getElements()) {
+      cruds.add(
+        (MorphNode.isStringLiteral(a)
+          ? a.getLiteralValue()
+          : a.getText()) as CrudKind,
+      );
+    }
+  }
 }
 
 function findPropertyByName(

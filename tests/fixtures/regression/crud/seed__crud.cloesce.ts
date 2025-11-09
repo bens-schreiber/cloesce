@@ -18,7 +18,7 @@ export class Env {
   db: D1Database;
 }
 
-@CRUD(["POST", "GET", "LIST"])
+@CRUD(["SAVE", "GET", "LIST"])
 @D1
 export class CrudHaver {
   @PrimaryKey
@@ -29,7 +29,7 @@ export class CrudHaver {
   async notCrud(): Promise<void> {}
 }
 
-@CRUD(["POST", "GET", "LIST"])
+@CRUD(["SAVE", "GET", "LIST"])
 @D1
 export class Parent {
   @PrimaryKey

@@ -177,7 +177,7 @@ async function addNewHorse(form: HTMLFormElement): Promise<void> {
   } as Horse;
 
   try {
-    const result = await Horse.post(horse);
+    const result = await Horse.save(horse);
     if (result.ok) {
       showMessage(`${horse.name} added successfully!`);
       form.reset();

@@ -162,6 +162,7 @@ impl ModelBuilder {
             data_sources: self.data_sources,
             source_path: PathBuf::default(),
             primary_key: self.primary_key.unwrap(),
+            cruds: vec![],
             hash: 0,
         }
     }

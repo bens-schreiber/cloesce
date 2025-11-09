@@ -20,6 +20,7 @@
       "navigation_properties": [],
       "methods": {},
       "data_sources": {},
+      "cruds": [],
       "source_path": "./seed__foreign_keys.cloesce.ts"
     },
     "Course": {
@@ -44,6 +45,7 @@
       ],
       "methods": {},
       "data_sources": {},
+      "cruds": [],
       "source_path": "./seed__foreign_keys.cloesce.ts"
     },
     "Person": {
@@ -115,6 +117,7 @@
           }
         }
       },
+      "cruds": [],
       "source_path": "./seed__foreign_keys.cloesce.ts"
     },
     "Student": {
@@ -199,6 +202,7 @@
           }
         }
       },
+      "cruds": [],
       "source_path": "./seed__foreign_keys.cloesce.ts"
     },
     "A": {
@@ -284,6 +288,7 @@
           "tree": {}
         }
       },
+      "cruds": [],
       "source_path": "./seed__foreign_keys.cloesce.ts"
     },
     "Dog": {
@@ -306,6 +311,7 @@
       "navigation_properties": [],
       "methods": {},
       "data_sources": {},
+      "cruds": [],
       "source_path": "./seed__foreign_keys.cloesce.ts"
     }
   },

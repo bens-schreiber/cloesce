@@ -31,55 +31,12 @@
                 "cidl_type": "Integer"
             },
             "navigation_properties": [],
-            "methods": {
-                "post": {
-                    "name": "post",
-                    "is_static": true,
-                    "http_verb": "POST",
-                    "return_type": {
-                        "HttpResult": {
-                            "Object": "Weather"
-                        }
-                    },
-                    "parameters": [
-                        {
-                            "name": "obj",
-                            "cidl_type": {
-                                "Partial": "Weather"
-                            }
-                        },
-                        {
-                            "name": "dataSource",
-                            "cidl_type": {
-                                "DataSource": "Weather"
-                            }
-                        }
-                    ]
-                },
-                "get": {
-                    "name": "get",
-                    "is_static": true,
-                    "http_verb": "GET",
-                    "return_type": {
-                        "HttpResult": {
-                            "Object": "Weather"
-                        }
-                    },
-                    "parameters": [
-                        {
-                            "name": "id",
-                            "cidl_type": "Integer"
-                        },
-                        {
-                            "name": "dataSource",
-                            "cidl_type": {
-                                "DataSource": "Weather"
-                            }
-                        }
-                    ]
-                }
-            },
+            "methods": {},
             "data_sources": {},
+            "cruds": [
+                "GET",
+                "SAVE"
+            ],
             "source_path": "./seed__bools_dates_ints.cloesce.ts"
         }
     },

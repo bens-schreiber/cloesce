@@ -3,12 +3,16 @@ import { _cloesceInternal } from "../src/router/router";
 import { CloesceAst, HttpVerb, Model, NamedTypedValue } from "../src/common";
 import { IncludeTree } from "../src/ui/backend";
 import { CrudContext } from "../src/router/crud";
-import { fromSql } from "../src/router/wasm";
+import { mapSql } from "../src/router/wasm";
 import fs from "fs";
 import path from "path";
 
 const makeAst = (methods: Record<string, any>): CloesceAst => ({
-  wrangler_env: { name: "", source_path: "./" },
+  wrangler_env: {
+    name: "",
+    source_path: "./",
+    db_binding: "",
+  },
   version: "",
   project_name: "",
   language: "TypeScript",
@@ -21,6 +25,7 @@ const makeAst = (methods: Record<string, any>): CloesceAst => ({
       data_sources: {},
       methods,
       source_path: "",
+      cruds: [],
     },
   },
   poos: {},
@@ -137,7 +142,11 @@ describe("Router Success States", () => {
 describe("Validate Request Error States", () => {
   const emptyAst: CloesceAst = {
     models: {},
-    wrangler_env: { name: "", source_path: "./" },
+    wrangler_env: {
+      name: "",
+      source_path: "./",
+      db_binding: "",
+    },
     version: "",
     project_name: "",
     language: "TypeScript",
@@ -152,6 +161,7 @@ describe("Validate Request Error States", () => {
     methods: {},
     data_sources: {},
     source_path: "",
+    cruds: [],
   };
 
   test("instantiated methods require id", async () => {
@@ -454,7 +464,11 @@ describe("modelsFromSql", () => {
     };
 
     const ast: CloesceAst = {
-      wrangler_env: { name: "Env", source_path: "./" },
+      wrangler_env: {
+        name: "Env",
+        source_path: "./",
+        db_binding: "",
+      },
       models: {
         [modelName]: {
           name: modelName,
@@ -478,6 +492,7 @@ describe("modelsFromSql", () => {
           primary_key: { name: "id", cidl_type: "Integer" },
           data_sources: {},
           methods: {},
+          cruds: [],
           source_path: "",
         },
         [likeModelName]: {
@@ -502,6 +517,7 @@ describe("modelsFromSql", () => {
           primary_key: { name: "id", cidl_type: "Integer" },
           data_sources: {},
           methods: {},
+          cruds: [],
           source_path: "",
         },
       },
@@ -540,7 +556,7 @@ describe("modelsFromSql", () => {
     ];
 
     const includeTree: IncludeTree<any> = { likes: { horse2: {} } };
-    const result = fromSql(ctor[modelName], records, includeTree);
+    const result = mapSql(ctor[modelName], records, includeTree);
 
     expect(result.value.length).toBe(1);
     const horse: any = result.value[0];

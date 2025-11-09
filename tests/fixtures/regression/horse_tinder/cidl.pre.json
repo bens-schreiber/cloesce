@@ -147,6 +147,7 @@
                     }
                 }
             },
+            "cruds": [],
             "source_path": "./seed__horse_tinder.cloesce.ts"
         },
         "Like": {
@@ -184,6 +185,7 @@
             ],
             "methods": {},
             "data_sources": {},
+            "cruds": [],
             "source_path": "./seed__horse_tinder.cloesce.ts"
         }
     },

@@ -14,7 +14,7 @@ import {
   CloesceApp,
   InstanceRegistry,
 } from "../common.js";
-import { OrmWasmExports, fromSql, loadOrmWasm } from "./wasm.js";
+import { OrmWasmExports, mapSql, loadOrmWasm } from "./wasm.js";
 import { CrudContext } from "./crud.js";
 
 /**
@@ -349,7 +349,7 @@ async function hydrateModel(
   }
 
   // Hydrate
-  const models: object[] = fromSql(
+  const models: object[] = mapSql(
     constructorRegistry[model.name],
     records.results,
     model.data_sources[dataSource]?.tree ?? {},

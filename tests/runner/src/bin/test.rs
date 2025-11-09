@@ -70,25 +70,12 @@ fn main() {
 }
 fn run_integration_test(fixture: Fixture, domain: &str) -> Result<bool, bool> {
     let (pre_cidl_changed, pre_cidl_path) = fixture.extract_cidl().map_err(|(e, _)| e)?;
-    let (cidl_changed, cidl_path) = fixture.validate_cidl(&pre_cidl_path).map_err(|(e, _)| e)?;
-    let (wrangler_changed, wrangler_path) =
-        fixture.generate_wrangler(&cidl_path).map_err(|(e, _)| e)?;
-    let (workers_changed, _) = fixture
-        .generate_workers(&cidl_path, &wrangler_path, domain)
+    let (generated_changed, cidl_path) = fixture
+        .generate_all(&pre_cidl_path, domain, domain)
         .map_err(|(e, _)| e)?;
-    let (client_changed, _) = fixture
-        .generate_client(&cidl_path, domain)
-        .map_err(|(e, _)| e)?;
-
     let (s1, s2) = fixture.migrate(&cidl_path);
     let (migrated_cidl_changed, _) = s1.map_err(|(e, _)| e)?;
     let (migrated_sql_changed, _) = s2.map_err(|(e, _)| e)?;
 
-    Ok(pre_cidl_changed
-        | cidl_changed
-        | wrangler_changed
-        | workers_changed
-        | client_changed
-        | migrated_cidl_changed
-        | migrated_sql_changed)
+    Ok(pre_cidl_changed | generated_changed | migrated_cidl_changed | migrated_sql_changed)
 }

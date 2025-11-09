@@ -17,7 +17,7 @@ Internal documentation going over design decisions and general thoughts for each
 - Create an NPM project and install cloesce
 
 ```sh
-npm i cloesce@0.0.4-unstable.3
+npm i cloesce@0.0.4-unstable.5
 ```
 
 2. TypeScript
@@ -292,7 +292,7 @@ export class Person {
       .bind(id)
       .run();
 
-    let persons = Orm.fromSql(Person, records.results, Person.default);
+    let persons = Orm.mapSql(Person, records.results, Person.default);
     return persons.value[0];
   }
 }
@@ -341,15 +341,15 @@ export class Like {
 If you wanted to find all horses that like one another, a valid SQL query using the `default` data source would look like:
 
 ```sql
-SELECT * FROM [Horse.default] as H1
+SELECT *
+FROM [Horse.default]
 WHERE
-    H1.[id] = ?
-    AND EXISTS (
-        SELECT 1
-        FROM [Horse.default] AS H2
-        WHERE H2.[id] = H1.[likes.horse2.id]
-          AND H2.[likes.horse2.id] = H1.[id]
-    );
+  [likes.horse2.id] = ?
+  AND [id] IN (
+    SELECT [likes.horse2.id]
+    FROM [Horse.default]
+    WHERE [id] = ?
+  );
 ```
 
 The actual generated view for `default` looks like:
@@ -494,10 +494,12 @@ class Horse {
 
 ### CRUD Methods
 
-Generic GET, POST, PATCH (and in a future version, DEL) boilerplate methods do not need to be copied around. Cloesce supports CRUD generation, a syntactic sugar that adds the methods to the compiler output.
+Generic `GET, POST, PATCH` (and in a future version, DEL) boilerplate methods do not need to be copied around. Cloesce supports CRUD generation, a syntactic sugar that adds the methods to the compiler output.
+
+The `SAVE` method is an `upsert`, meaning it both inserts and updates in the same query.
 
 ```ts
-@CRUD(["POST", "GET", "LIST"])
+@CRUD(["SAVE", "GET", "LIST"])
 @D1
 export class CrudHaver {
   @PrimaryKey
