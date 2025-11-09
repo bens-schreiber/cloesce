@@ -628,9 +628,10 @@ class Foo {
 ## Integration Tests
 
 - Regression tests: `cargo run --bin test regression`
-- Pass fail extractor tests: `cargo run --bin test run-fail`
 
 Optionally, pass `--check` if new snapshots should not be created.
+
+To target a specific fixture, pass `--fixture folder_name`
 
 To update integration snapshots, run:
 

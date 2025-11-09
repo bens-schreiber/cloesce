@@ -170,9 +170,9 @@ impl Fixture {
         for out in [wrangler_out, workers_out, client_out] {
             match &cmd {
                 Ok(_) => {
-                    let (diff, path) = self.read_out_and_diff(out);
+                    let (diff, _) = self.read_out_and_diff(out);
                     if diff {
-                        return Ok((diff, path));
+                        return Ok((true, cidl_path));
                     }
                 }
                 Err(err) => return Err(self.read_fail_and_diff(out, err.clone())),

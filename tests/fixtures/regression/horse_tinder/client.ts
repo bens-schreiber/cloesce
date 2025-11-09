@@ -11,10 +11,11 @@ export class Horse {
 
   static async get(
         id: number,
+    fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Horse>> {
     const baseUrl = new URL(`http://localhost:5002/api/Horse/get`);
     baseUrl.searchParams.append('id', String(id));
-    const res = await fetch(baseUrl, { method: "GET" });
+    const res = await fetchImpl(baseUrl, { method: "GET" });
     let raw = await res.json();
     if (!res.ok) {
       return raw;
@@ -25,9 +26,10 @@ export class Horse {
   async like(
         horse: Horse,
         __dataSource: "default" |"withLikes" |"none" = "none",
+    fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<void>> {
     const baseUrl = new URL(`http://localhost:5002/api/Horse/${this.id}/like`);
-    const res = await fetch(baseUrl, {
+    const res = await fetchImpl(baseUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -42,9 +44,10 @@ export class Horse {
     return raw;
   }
   static async list(
+    fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Horse[]>> {
     const baseUrl = new URL(`http://localhost:5002/api/Horse/list`);
-    const res = await fetch(baseUrl, { method: "GET" });
+    const res = await fetchImpl(baseUrl, { method: "GET" });
     let raw = await res.json();
     if (!res.ok) {
       return raw;
@@ -54,9 +57,10 @@ export class Horse {
   }
   static async post(
         horse: Horse,
+    fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Horse>> {
     const baseUrl = new URL(`http://localhost:5002/api/Horse/post`);
-    const res = await fetch(baseUrl, {
+    const res = await fetchImpl(baseUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
