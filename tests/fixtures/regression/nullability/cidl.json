@@ -1,6 +1,6 @@
 {
   "hash": 10361364691045731291,
-  "version": "v0.0.3",
+  "version": "v0.0.4",
   "project_name": "runner",
   "language": "TypeScript",
   "wrangler_env": {

@@ -118,6 +118,10 @@ const cmds = subcommands({
           short: "d",
           description: "Show debug output",
         }),
+        skipTsCheck: flag({
+          long: "skipTsCheck",
+          description: "Skip TypeScript compilation checks",
+        }),
       },
       handler: async (args) => {
         await extract({ ...args });
@@ -193,24 +197,25 @@ const cmds = subcommands({
   },
 });
 
-async function extract(opts: {
+async function extract(args: {
   projectName?: string;
   out?: string;
   inp?: string;
   truncateSourcePaths?: boolean;
   debug?: boolean;
+  skipTsCheck?: boolean;
 }) {
   const root = process.cwd();
   const projectRoot = process.cwd();
-  const config = loadCloesceConfig(projectRoot, opts.debug);
+  const config = loadCloesceConfig(projectRoot, args.debug);
 
-  const searchPaths = opts.inp ? [opts.inp] : (config.paths ?? [root]);
+  const searchPaths = args.inp ? [args.inp] : (config.paths ?? [root]);
   const outputDir = config.outputDir ?? ".generated";
-  const outPath = opts.out ?? path.join(outputDir, "cidl.pre.json");
+  const outPath = args.out ?? path.join(outputDir, "cidl.pre.json");
   const truncate =
-    opts.truncateSourcePaths ?? config.truncateSourcePaths ?? false;
+    args.truncateSourcePaths ?? config.truncateSourcePaths ?? false;
   const cloesceProjectName =
-    opts.projectName ??
+    args.projectName ??
     config.projectName ??
     readPackageJsonProjectName(projectRoot);
 
@@ -227,10 +232,20 @@ async function extract(opts: {
     new ExtractorError(ExtractorErrorCode.MissingFile);
   }
 
-  if (opts.debug) console.log(`Found ${fileCount} .cloesce.ts files`);
+  if (args.debug) console.log(`Found ${fileCount} .cloesce.ts files`);
+
+  // Run typescript compiler checks to before extraction
+  if (!args.skipTsCheck) {
+    const diagnostics = project.getPreEmitDiagnostics();
+    if (diagnostics.length > 0) {
+      console.error("TypeScript errors detected in provided files:");
+      console.error(project.formatDiagnosticsWithColorAndContext(diagnostics));
+      process.exit(1);
+    }
+  }
 
   try {
-    const extractor = new CidlExtractor(cloesceProjectName, "v0.0.3");
+    const extractor = new CidlExtractor(cloesceProjectName, "v0.0.4");
     const result = extractor.extract(project);
 
     if (!result.ok) {
