@@ -1,3 +1,4 @@
+// GENERATED CODE. DO NOT MODIFY.
 import { cloesce, CloesceApp } from "cloesce/backend";
 import cidl from "./cidl.json";
 import { B } from "./seed__foreign_keys.cloesce.ts";
@@ -7,7 +8,7 @@ import { Student } from "./seed__foreign_keys.cloesce.ts";
 import { A } from "./seed__foreign_keys.cloesce.ts";
 import { Dog } from "./seed__foreign_keys.cloesce.ts";
 
-const app = new CloesceApp()
+const app = new CloesceApp();
 const constructorRegistry = {
 	B: B,
 	Course: Course,

@@ -1,6 +1,7 @@
 import { D1, POST, PrimaryKey, WranglerEnv, Inject } from "cloesce/backend";
+import { D1Database } from "@cloudflare/workers-types";
 type HttpResult<T = unknown> = {};
-type D1Database = {};
+type Integer = number & { __kind: "Integer" };
 
 @WranglerEnv
 export class Env {
@@ -10,13 +11,13 @@ export class Env {
 @D1
 export class NullabilityChecks {
   @PrimaryKey
-  id: number;
+  id: Integer;
 
   notNullableString: string;
   nullableString: string | null;
 
   @POST
-  primitiveTypes(a: number | null, b: string | null): boolean | null {
+  primitiveTypes(a: Integer | null, b: string | null): boolean | null {
     return null;
   }
 
@@ -30,7 +31,7 @@ export class NullabilityChecks {
 
   @POST
   arrayTypes(
-    a: number[] | null,
+    a: Integer[] | null,
     b: NullabilityChecks[] | null
   ): string[] | null {
     return null;
@@ -38,7 +39,7 @@ export class NullabilityChecks {
 
   @POST
   httpResultTypes(
-    a: HttpResult<number | null> | null
+    a: HttpResult<Integer | null> | null
   ): HttpResult<NullabilityChecks[] | null> | null {
     return null;
   }

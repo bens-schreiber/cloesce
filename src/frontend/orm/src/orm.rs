@@ -25,10 +25,7 @@ pub fn object_relational_mapping(
 
     // Scan each row for the root model (`model_name`)'s primary key
     for row in rows.iter() {
-        let Some(pk_value) = row
-            .get(&format!("{}.{}", model_name, pk_name))
-            .or_else(|| row.get(pk_name))
-        else {
+        let Some(pk_value) = row.get(pk_name).or_else(|| row.get(pk_name)) else {
             // The root models primary key is not in the row, this row
             // is not mappable.
             continue;
@@ -45,10 +42,7 @@ pub fn object_relational_mapping(
             // Set scalar attributes
             for attr in &model.attributes {
                 let attr_name = &attr.value.name;
-                let val = row
-                    .get(&format!("{}.{}", model_name, attr_name))
-                    .or_else(|| row.get(attr_name))
-                    .cloned();
+                let val = row.get(attr_name).or_else(|| row.get(attr_name)).cloned();
                 if let Some(v) = val {
                     m.insert(attr_name.clone(), v);
                 }
@@ -71,7 +65,7 @@ pub fn object_relational_mapping(
         if let Some(tree) = include_tree
             && let Value::Object(model_json) = model_json
         {
-            process_navigation_properties(model_json, model, model_name, tree, row, meta)?;
+            process_navigation_properties(model_json, model, "", tree, row, meta)?;
         }
     }
 
@@ -97,10 +91,13 @@ fn process_navigation_properties(
             None => return Err(format!("Unknown model {}.", nav_prop.model_name)),
         };
 
-        // NOTE: No need to check for non prefixed keys here, we can assume a nav prop
-        // comes from a view and thus will be prefixed
+        // Nested properties always use their navigation path prefix (e.g. "cat.toy.id")
         let nested_pk_name = &nested_model.primary_key.name;
-        let prefixed_key = format!("{}.{}.{}", prefix, nav_prop.var_name, nested_pk_name);
+        let prefixed_key = if prefix.is_empty() {
+            format!("{}.{}", nav_prop.var_name, nested_pk_name)
+        } else {
+            format!("{}.{}.{}", prefix, nav_prop.var_name, nested_pk_name)
+        };
         let Some(nested_pk_value) = row.get(&prefixed_key) else {
             continue;
         };
@@ -139,7 +136,11 @@ fn process_navigation_properties(
 
         // Recursively process the nested model if it's in the include tree
         if let Some(Value::Object(nested_include_tree)) = include_tree.get(&nav_prop.var_name) {
-            let prefix = format!("{prefix}.{}", nav_prop.var_name);
+            let prefix = if prefix.is_empty() {
+                nav_prop.var_name.clone()
+            } else {
+                format!("{prefix}.{}", nav_prop.var_name)
+            };
             process_navigation_properties(
                 &mut nested_model_json,
                 nested_model,
@@ -211,7 +212,7 @@ mod tests {
     }
 
     #[test]
-    fn handles_non_prefixed_columns() {
+    fn flat() {
         // Arrange
         let horse = ModelBuilder::new("Horse")
             .id()
@@ -239,34 +240,6 @@ mod tests {
     }
 
     #[test]
-    fn handles_prefixed_columns() {
-        // Arrange
-        let horse = ModelBuilder::new("Horse")
-            .id()
-            .attribute("name", CidlType::nullable(CidlType::Text), None)
-            .build();
-
-        let meta = HashMap::from([("Horse".to_string(), horse)]);
-
-        let row = vec![
-            ("Horse.id".to_string(), json!("1")),
-            ("Horse.name".to_string(), json!("Thunder")),
-        ]
-        .into_iter()
-        .collect::<Map<String, Value>>();
-
-        let include_tree: Option<Map<String, Value>> = None;
-
-        // Act
-        let result = object_relational_mapping("Horse", &meta, &vec![row], &include_tree).unwrap();
-        let horse = result.first().unwrap().as_object().unwrap();
-
-        // Assert
-        assert_eq!(horse.get("id"), Some(&json!("1")));
-        assert_eq!(horse.get("name"), Some(&json!("Thunder")));
-    }
-
-    #[test]
     fn assigns_scalar_attributes_and_navigation_arrays() {
         // Arrange
         let horse = ModelBuilder::new("Horse")
@@ -291,18 +264,18 @@ mod tests {
         // rows vector
         let rows: Vec<Map<String, Value>> = vec![
             vec![
-                ("Horse.id".to_string(), json!("1")),
-                ("Horse.name".to_string(), json!("Thunder")),
-                ("Horse.riders.id".to_string(), json!("r1")),
-                ("Horse.riders.nickname".to_string(), json!("Speedy")),
+                ("id".to_string(), json!("1")),
+                ("name".to_string(), json!("Thunder")),
+                ("riders.id".to_string(), json!("r1")),
+                ("riders.nickname".to_string(), json!("Speedy")),
             ]
             .into_iter()
             .collect(),
             vec![
-                ("Horse.id".to_string(), json!("1")),
-                ("Horse.name".to_string(), json!("Thunder")),
-                ("Horse.riders.id".to_string(), json!("r2")),
-                ("Horse.riders.nickname".to_string(), json!("Flash")),
+                ("id".to_string(), json!("1")),
+                ("name".to_string(), json!("Thunder")),
+                ("riders.id".to_string(), json!("r2")),
+                ("riders.nickname".to_string(), json!("Flash")),
             ]
             .into_iter()
             .collect(),
@@ -353,26 +326,26 @@ mod tests {
 
         let rows: Vec<Map<String, Value>> = vec![
             vec![
-                ("Horse.id".to_string(), json!("1")),
-                ("Horse.name".to_string(), json!("hoarse")),
-                ("Horse.riders.id".to_string(), json!("r1")),
-                ("Horse.riders.nickname".to_string(), json!("Speedy")),
+                ("id".to_string(), json!("1")),
+                ("name".to_string(), json!("hoarse")),
+                ("riders.id".to_string(), json!("r1")),
+                ("riders.nickname".to_string(), json!("Speedy")),
             ]
             .into_iter()
             .collect(),
             vec![
-                ("Horse.id".to_string(), json!("1")),
-                ("Horse.name".to_string(), json!("hoarse")),
-                ("Horse.riders.id".to_string(), json!("r1")),
-                ("Horse.riders.nickname".to_string(), json!("Speedy")),
+                ("id".to_string(), json!("1")),
+                ("name".to_string(), json!("hoarse")),
+                ("riders.id".to_string(), json!("r1")),
+                ("riders.nickname".to_string(), json!("Speedy")),
             ]
             .into_iter()
             .collect(),
             vec![
-                ("Horse.id".to_string(), json!("1")),
-                ("Horse.name".to_string(), json!("hoarse")),
-                ("Horse.riders.id".to_string(), json!("r2")),
-                ("Horse.riders.nickname".to_string(), json!("Flash")),
+                ("id".to_string(), json!("1")),
+                ("name".to_string(), json!("hoarse")),
+                ("riders.id".to_string(), json!("r2")),
+                ("riders.nickname".to_string(), json!("Flash")),
             ]
             .into_iter()
             .collect(),

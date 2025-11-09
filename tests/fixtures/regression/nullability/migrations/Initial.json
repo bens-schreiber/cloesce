@@ -1,8 +1,8 @@
 {
-  "hash": 4846770590421999872,
+  "hash": 10361364691045731291,
   "models": {
     "NullabilityChecks": {
-      "hash": 12779594012490832041,
+      "hash": 3976757330464425461,
       "name": "NullabilityChecks",
       "primary_key": {
         "name": "id",
@@ -18,7 +18,7 @@
           "foreign_key_reference": null
         },
         {
-          "hash": 7880481338775788177,
+          "hash": 15344237499420552175,
           "value": {
             "name": "nullableString",
             "cidl_type": {
@@ -29,152 +29,6 @@
         }
       ],
       "navigation_properties": [],
-      "methods": {
-        "arrayTypes": {
-          "name": "arrayTypes",
-          "is_static": false,
-          "http_verb": "POST",
-          "return_type": {
-            "Nullable": {
-              "Array": "Text"
-            }
-          },
-          "parameters": [
-            {
-              "name": "a",
-              "cidl_type": {
-                "Nullable": {
-                  "Array": "Integer"
-                }
-              }
-            },
-            {
-              "name": "b",
-              "cidl_type": {
-                "Nullable": {
-                  "Array": {
-                    "Object": "NullabilityChecks"
-                  }
-                }
-              }
-            },
-            {
-              "name": "__dataSource",
-              "cidl_type": {
-                "DataSource": "NullabilityChecks"
-              }
-            }
-          ]
-        },
-        "httpResultTypes": {
-          "name": "httpResultTypes",
-          "is_static": false,
-          "http_verb": "POST",
-          "return_type": {
-            "Nullable": {
-              "HttpResult": {
-                "Nullable": {
-                  "Array": {
-                    "Object": "NullabilityChecks"
-                  }
-                }
-              }
-            }
-          },
-          "parameters": [
-            {
-              "name": "a",
-              "cidl_type": {
-                "Nullable": {
-                  "HttpResult": {
-                    "Nullable": "Integer"
-                  }
-                }
-              }
-            },
-            {
-              "name": "__dataSource",
-              "cidl_type": {
-                "DataSource": "NullabilityChecks"
-              }
-            }
-          ]
-        },
-        "injectableTypes": {
-          "name": "injectableTypes",
-          "is_static": false,
-          "http_verb": "POST",
-          "return_type": "Void",
-          "parameters": [
-            {
-              "name": "env",
-              "cidl_type": {
-                "Nullable": {
-                  "Inject": "Env"
-                }
-              }
-            },
-            {
-              "name": "__dataSource",
-              "cidl_type": {
-                "DataSource": "NullabilityChecks"
-              }
-            }
-          ]
-        },
-        "modelTypes": {
-          "name": "modelTypes",
-          "is_static": false,
-          "http_verb": "POST",
-          "return_type": {
-            "Nullable": {
-              "Object": "NullabilityChecks"
-            }
-          },
-          "parameters": [
-            {
-              "name": "a",
-              "cidl_type": {
-                "Nullable": {
-                  "Object": "NullabilityChecks"
-                }
-              }
-            },
-            {
-              "name": "__dataSource",
-              "cidl_type": {
-                "DataSource": "NullabilityChecks"
-              }
-            }
-          ]
-        },
-        "primitiveTypes": {
-          "name": "primitiveTypes",
-          "is_static": false,
-          "http_verb": "POST",
-          "return_type": "Integer",
-          "parameters": [
-            {
-              "name": "a",
-              "cidl_type": {
-                "Nullable": "Integer"
-              }
-            },
-            {
-              "name": "b",
-              "cidl_type": {
-                "Nullable": "Text"
-              }
-            },
-            {
-              "name": "__dataSource",
-              "cidl_type": {
-                "DataSource": "NullabilityChecks"
-              }
-            }
-          ]
-        }
-      },
       "data_sources": {}
     }
   }

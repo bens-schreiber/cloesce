@@ -6,21 +6,10 @@ use std::{
 
 use similar::TextDiff;
 
-pub enum DiffOpts {
-    FailOnly,
-    All,
-}
-
 // Compares unified file diffs, creating a `.new` snapshot file if a diff is found
 ///
 /// Returns if a `.new` file created
-fn diff_file(
-    fixture_id: &String,
-    out: OutputFile,
-    new_contents: String,
-    fail: bool,
-    opt: &DiffOpts,
-) -> TestOutput {
+fn diff_file(fixture_id: &String, out: OutputFile, new_contents: String, fail: bool) -> TestOutput {
     let name = if fail {
         format!("{}_{}_fail.out", fixture_id, out.base_name)
     } else {
@@ -48,9 +37,7 @@ fn diff_file(
         .header(old_path.to_str().unwrap(), new_path.to_str().unwrap())
         .to_string();
 
-    // Only print a diff if there is some dif.
-    // If this is a run fail test, don't print file diff if there wasnt a failure
-    if (fail || !matches!(opt, DiffOpts::FailOnly)) && !unified_diff.trim().is_empty() {
+    if !unified_diff.trim().is_empty() {
         for line in unified_diff.lines() {
             if line.starts_with('+') && !line.starts_with("+++") {
                 println!("\x1b[32m{}\x1b[0m", line); // green
@@ -109,18 +96,13 @@ type TestResult = Result<TestOutput, TestOutput>;
 pub struct Fixture {
     /// The path of a fixture entry point, ie a seed source file
     pub path: PathBuf,
-    pub opt: DiffOpts,
     pub fixture_id: String,
 }
 
 impl Fixture {
-    pub fn new(path: PathBuf, opt: DiffOpts) -> Self {
+    pub fn new(path: PathBuf) -> Self {
         let fixture_id = path.file_stem().unwrap().to_str().unwrap().to_owned();
-        Self {
-            fixture_id,
-            path,
-            opt,
-        }
+        Self { fixture_id, path }
     }
 
     pub fn extract_cidl(&self) -> TestResult {
@@ -142,82 +124,62 @@ impl Fixture {
         }
     }
 
-    pub fn validate_cidl(&self, pre_cidl: &Path) -> TestResult {
-        let out = OutputFile::new(&self.path, "cidl.json");
-        let pre_cidl_path = pre_cidl.canonicalize().unwrap();
-        let res = self.run_command(
-            Command::new("cargo")
-                .arg("run")
-                .arg("validate")
-                .arg(&pre_cidl_path)
-                .arg(out.path())
-                .current_dir("../../src/generator"),
-        );
+    /// On all success, returns the cidl, else returns the failed file.
+    pub fn generate_all(
+        &self,
+        pre_cidl: &Path,
+        client_domain: &str,
+        workers_domain: &str,
+    ) -> TestResult {
+        let pre_cidl_canon = pre_cidl.canonicalize().unwrap();
 
-        match res {
-            Ok(_) => Ok(self.read_out_and_diff(out)),
-            Err(err) => Err(self.read_fail_and_diff(out, err)),
-        }
-    }
+        let cidl_out = OutputFile::new(&self.path, "cidl.json");
+        let wrangler_out = OutputFile::new(&self.path, "wrangler.toml");
+        let workers_out = OutputFile::new(&self.path, "workers.ts");
+        let client_out = OutputFile::new(&self.path, "client.ts");
 
-    pub fn generate_wrangler(&self) -> TestResult {
-        let out = OutputFile::new(&self.path, "wrangler.toml");
-        let res = self.run_command(
+        let cmd = self.run_command(
             Command::new("cargo")
+                .arg("--quiet")
                 .arg("run")
                 .arg("generate")
-                .arg("wrangler")
-                .arg(out.path())
+                .arg(&pre_cidl_canon)
+                .arg(cidl_out.path())
+                .arg(wrangler_out.path())
+                .arg(workers_out.path())
+                .arg(client_out.path())
+                .arg(client_domain)
+                .arg(workers_domain)
                 .current_dir("../../src/generator"),
         );
 
-        match res {
-            Ok(_) => Ok(self.read_out_and_diff(out)),
-            Err(err) => Err(self.read_fail_and_diff(out, err)),
+        let cidl_path = {
+            match &cmd {
+                Ok(_) => {
+                    let (diff, path) = self.read_out_and_diff(cidl_out);
+                    if diff {
+                        return Ok((diff, path));
+                    }
+
+                    path
+                }
+                Err(err) => return Err(self.read_fail_and_diff(cidl_out, err.clone())),
+            }
+        };
+
+        for out in [wrangler_out, workers_out, client_out] {
+            match &cmd {
+                Ok(_) => {
+                    let (diff, _) = self.read_out_and_diff(out);
+                    if diff {
+                        return Ok((true, cidl_path));
+                    }
+                }
+                Err(err) => return Err(self.read_fail_and_diff(out, err.clone())),
+            }
         }
-    }
 
-    pub fn generate_workers(&self, cidl: &Path, wrangler: &Path, domain: &str) -> TestResult {
-        let cidl_path = cidl.canonicalize().unwrap();
-        let wrangler_path = wrangler.canonicalize().unwrap();
-        let out = OutputFile::new(&self.path, "workers.ts");
-
-        let res = self.run_command(
-            Command::new("cargo")
-                .arg("run")
-                .arg("generate")
-                .arg("workers")
-                .arg(&cidl_path)
-                .arg(out.path())
-                .arg(&wrangler_path)
-                .arg(domain)
-                .current_dir("../../src/generator"),
-        );
-
-        match res {
-            Ok(_) => Ok(self.read_out_and_diff(out)),
-            Err(err) => Err(self.read_fail_and_diff(out, err)),
-        }
-    }
-
-    pub fn generate_client(&self, cidl: &Path, domain: &str) -> TestResult {
-        let cidl_path = cidl.canonicalize().unwrap();
-        let out = OutputFile::new(&self.path, "client.ts");
-
-        let res = self.run_command(
-            Command::new("cargo")
-                .arg("run")
-                .arg("generate")
-                .arg("client")
-                .arg(&cidl_path)
-                .arg(out.path())
-                .arg(domain)
-                .current_dir("../../src/generator"),
-        );
-        match res {
-            Ok(_) => Ok(self.read_out_and_diff(out)),
-            Err(err) => Err(self.read_fail_and_diff(out, err)),
-        }
+        Ok((false, cidl_path))
     }
 
     pub fn migrate(&self, cidl: &Path) -> (TestResult, TestResult) {
@@ -234,6 +196,7 @@ impl Fixture {
 
         let res = self.run_command(
             Command::new("cargo")
+                .arg("--quiet")
                 .arg("run")
                 .arg("migrations")
                 .arg(&cidl_path)
@@ -273,7 +236,6 @@ impl Fixture {
             out,
             String::from_utf8_lossy(&contents).to_string(),
             false,
-            &self.opt,
         )
     }
 
@@ -283,6 +245,6 @@ impl Fixture {
             .map(|pos| err[pos..].to_string())
             .unwrap_or_else(|| err.to_string());
 
-        diff_file(&self.fixture_id, out, normalized, true, &self.opt)
+        diff_file(&self.fixture_id, out, normalized, true)
     }
 }

@@ -1,0 +1,33 @@
+{
+  "hash": 17097008485444420876,
+  "models": {
+    "Weather": {
+      "hash": 15419486100592067894,
+      "name": "Weather",
+      "primary_key": {
+        "name": "id",
+        "cidl_type": "Integer"
+      },
+      "attributes": [
+        {
+          "hash": 3799822671517854410,
+          "value": {
+            "name": "date",
+            "cidl_type": "DateIso"
+          },
+          "foreign_key_reference": null
+        },
+        {
+          "hash": 13732298516080320688,
+          "value": {
+            "name": "isRaining",
+            "cidl_type": "Boolean"
+          },
+          "foreign_key_reference": null
+        }
+      ],
+      "navigation_properties": [],
+      "data_sources": {}
+    }
+  }
+}

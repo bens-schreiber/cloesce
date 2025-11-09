@@ -9,6 +9,7 @@ import {
   GET,
 } from "cloesce/backend";
 import { D1Database } from "@cloudflare/workers-types";
+type Integer = number & { __kind: "Integer" };
 
 @PlainOldObject
 export class InjectedThing {
@@ -21,10 +22,10 @@ export class Env {
 }
 
 @D1
-@CRUD(["POST"])
+@CRUD(["SAVE"])
 export class Model {
   @PrimaryKey
-  id: number;
+  id: Integer;
 
   @GET
   static blockedMethod() {}

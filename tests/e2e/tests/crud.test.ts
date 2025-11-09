@@ -14,7 +14,7 @@ afterAll(async () => {
 describe("Basic", () => {
   let model: CrudHaver;
   it("POST", async () => {
-    const res = await CrudHaver.post({
+    const res = await CrudHaver.save({
       name: "tim",
     });
     expect(res.ok, withRes("POST should be OK", res)).toBe(true);
@@ -27,7 +27,7 @@ describe("Basic", () => {
 
   it("POST Update", async () => {
     model.name = "julio";
-    const res = await CrudHaver.post(model);
+    const res = await CrudHaver.save(model);
     expect(res.ok, withRes("POST should be OK", res)).toBe(true);
     expect(res.data).toEqual({
       id: 1,
@@ -46,7 +46,7 @@ describe("Basic", () => {
   it("POST 3 Models", async () => {
     await Promise.all(
       models.map(async (m) => {
-        const res = await CrudHaver.post({ name: m });
+        const res = await CrudHaver.save({ name: m });
         expect(res.ok, withRes("POST should be OK", res)).toBe(true);
         expect(res.data.name).toEqual(m);
       }),
@@ -66,7 +66,7 @@ describe("Basic", () => {
 describe("Parent with children", () => {
   let model: Parent;
   it("POST", async () => {
-    const res = await Parent.post(
+    const res = await Parent.save(
       {
         favoriteChildId: null,
         children: [{}, {}, {}], // should be able to leave blank, creating 3 children
@@ -90,7 +90,7 @@ describe("Parent with children", () => {
 
   it("POST Update", async () => {
     model.favoriteChildId = model.children[0].id;
-    const res = await Parent.post(model, "withChildren");
+    const res = await Parent.save(model, "withChildren");
 
     expect(res.ok, withRes("POST should be OK", res)).toBe(true);
     expect(res.data, withRes("Data should be equal", res)).toEqual({

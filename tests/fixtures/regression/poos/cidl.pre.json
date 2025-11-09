@@ -4,7 +4,8 @@
     "language": "TypeScript",
     "wrangler_env": {
         "name": "Env",
-        "source_path": "./seed__poo.cloesce.ts"
+        "source_path": "./seed__poo.cloesce.ts",
+        "db_binding": "db"
     },
     "models": {
         "PooAcceptYield": {
@@ -66,6 +67,7 @@
                 }
             },
             "data_sources": {},
+            "cruds": [],
             "source_path": "./seed__poo.cloesce.ts"
         }
     },

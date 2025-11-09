@@ -1,8 +1,10 @@
-use std::collections::HashMap;
+mod fmt;
+
+use std::collections::{HashMap, HashSet};
 
 use ast::{
     CidlType, DataSource, IncludeTree, MigrationsAst, MigrationsModel, ModelAttribute,
-    NavigationPropertyKind,
+    NavigationProperty, NavigationPropertyKind,
 };
 
 use indexmap::IndexMap;
@@ -46,10 +48,12 @@ impl D1Generator {
                     .to_owned(),
             );
 
-            return format!("{tables}\n{views}\n--- Cloesce Temporary Table\n{cloesce_tmp}");
+            return fmt::beautify(format!(
+                "{tables}\n{views}\n--- Cloesce Temporary Table\n{cloesce_tmp}"
+            ));
         }
 
-        format!("{tables}\n{views}")
+        fmt::beautify(format!("{tables}\n{views}"))
     }
 }
 
@@ -93,7 +97,7 @@ impl MigrateViews {
                     model,
                     &d.tree,
                     &mut query,
-                    &mut vec![model.name.clone()],
+                    &mut vec![],
                     model_alias,
                     None,
                     &mut alias_counter,
@@ -105,7 +109,13 @@ impl MigrateViews {
                     model.name,
                     d.name,
                     query.to_string(SqliteQueryBuilder)
-                ))
+                ));
+
+                tracing::info!(
+                    "Created data source \"{}\" for model \"{}\"",
+                    d.name,
+                    model.name
+                );
             }
         }
 
@@ -122,7 +132,14 @@ impl MigrateViews {
             alias_counter: &mut HashMap<String, u32>,
             model_lookup: &IndexMap<String, MigrationsModel>,
         ) {
-            let path_to_column = path.join(".");
+            let join_path = |member: &str| {
+                if path.is_empty() {
+                    member.to_string()
+                } else {
+                    format!("{}.{}", path.join("."), member)
+                }
+            };
+
             let pk = &model.primary_key.name;
 
             // Primary Key
@@ -134,14 +151,14 @@ impl MigrateViews {
                     Expr::col((alias(&model_alias), alias(pk)))
                 };
 
-                query.expr_as(col, alias(format!("{}.{}", &path_to_column, pk)));
+                query.expr_as(col, alias(join_path(pk)));
             };
 
             // Columns
             for attr in &model.attributes {
                 query.expr_as(
                     Expr::col((alias(&model_alias), alias(&attr.value.name))),
-                    alias(format!("{}.{}", &path_to_column, attr.value.name)),
+                    alias(join_path(&attr.value.name)),
                 );
             }
 
@@ -275,6 +292,12 @@ impl MigrateViews {
                                 .push(format!("{DROP_VIEW} \"{}.{}\";", lm_model.name, lm_ds.name));
 
                             creates.entry(&lm_model.name).or_default().push(lm_ds);
+
+                            tracing::info!(
+                                "Altered data source \"{}\" for model \"{}\"",
+                                lm_ds.name,
+                                model.name
+                            );
                         }
                     }
                 }
@@ -282,6 +305,12 @@ impl MigrateViews {
                 None => {
                     for lm_ds in lm_model.data_sources.values() {
                         drops.push(format!("{DROP_VIEW} \"{}.{}\";", lm_model.name, lm_ds.name));
+
+                        tracing::info!(
+                            "Dropped data source \"{}\" from model \"{}\"",
+                            lm_ds.name,
+                            lm_model.name
+                        );
                     }
                 }
                 // Last migration model unchanged
@@ -331,16 +360,38 @@ impl MigrateViews {
         if !drop_stmts.is_empty() {
             res.push_str("--- Dropped and Refactored Data Sources\n");
             res.push_str(&drop_stmts.join("\n"));
-            res.push('\n');
         }
         if !create_stmts.is_empty() {
             res.push_str("--- New Data Sources\n");
             res.push_str(&create_stmts.join("\n"));
-            res.push('\n');
         }
 
         res
     }
+}
+
+enum AlterKind<'a> {
+    RenameTable,
+    RebuildTable,
+
+    AddColumn {
+        attr: &'a ModelAttribute,
+    },
+    AlterColumnType {
+        attr: &'a ModelAttribute,
+        lm_attr: &'a ModelAttribute,
+    },
+    DropColumn {
+        lm_attr: &'a ModelAttribute,
+    },
+
+    AddManyToMany {
+        unique_id: &'a String,
+        model_name: &'a String,
+    },
+    DropManyToMany {
+        unique_id: &'a String,
+    },
 }
 
 struct MigrateTables;
@@ -398,6 +449,7 @@ impl MigrateTables {
             }
 
             res.push(to_sqlite(table));
+            tracing::info!("Created table \"{}\"", model.name);
         }
 
         for (id, (a, b)) in jcts {
@@ -435,6 +487,12 @@ impl MigrateTables {
                 );
 
             res.push(to_sqlite(table));
+            tracing::info!(
+                "Created junction table \"{}\" between models \"{}\" \"{}\"",
+                id,
+                a.name,
+                b.name
+            );
         }
 
         res
@@ -460,242 +518,364 @@ impl MigrateTables {
         const PRAGMA_FK_CHECK: &str = "PRAGMA foreign_keys_check;";
 
         let mut res = vec![];
-        let mut rebuilds = vec![];
+        let mut visited_m2ms = HashSet::new();
 
-        'models: for (model, lm_model) in alter_models {
-            let mut stmts = vec![];
+        for (model, lm_model) in alter_models {
+            let mut needs_rename_intent = HashMap::<&String, &ModelAttribute>::new();
+            let mut needs_drop_intent = vec![];
 
-            // Rename table
-            if model.name != lm_model.name {
-                let mut rename = Table::rename();
-                rename.table(alias(&lm_model.name), alias(&model.name));
-                stmts.push(to_sqlite(rename));
-            }
-
-            // Alter primary key, requires rebuild.
-            if model.primary_key.cidl_type != lm_model.primary_key.cidl_type
-                || model.primary_key.name != lm_model.primary_key.name
-            {
-                rebuilds.push((model, lm_model));
-                continue;
-            }
-
-            let mut lm_model_attr_lookup = lm_model
-                .attributes
-                .iter()
-                .map(|a| (a.value.name.clone(), a))
-                .collect::<HashMap<String, &ModelAttribute>>();
-            let mut deferred_add_columns = HashMap::<&String, &ModelAttribute>::new();
-
-            for attr in &model.attributes {
-                let Some(lm_attr) = lm_model_attr_lookup.remove(&attr.value.name) else {
-                    // Column is new
-                    if attr.foreign_key_reference.is_some() {
-                        // Cannot alter the table to add a FK. Rebuild.
-                        rebuilds.push((model, lm_model));
-                        continue 'models;
-                    }
-
-                    deferred_add_columns.insert(&attr.value.name, attr);
-                    continue;
-                };
-
-                // No diff.
-                if attr.hash == lm_attr.hash {
-                    continue;
-                }
-
-                // Foreign keys cannot be altered in SQLite, defer for a full rebuild.
-                if attr.foreign_key_reference != lm_attr.foreign_key_reference {
-                    rebuilds.push((model, lm_model));
-                    continue 'models;
-                }
-
-                // Type mismatch
-                if attr.value.cidl_type != lm_attr.value.cidl_type {
-                    // Drop the last migrated column
-                    {
-                        stmts.push(to_sqlite(
-                            Table::alter()
-                                .table(alias(&model.name))
-                                .drop_column(alias(&lm_attr.value.name))
+            for kind in identify_alterations(model, lm_model) {
+                match kind {
+                    AlterKind::RenameTable => {
+                        res.push(to_sqlite(
+                            Table::rename()
+                                .table(alias(&lm_model.name), alias(&model.name))
                                 .to_owned(),
                         ));
-                    }
 
-                    // Add new
-                    {
-                        stmts.push(to_sqlite(
-                            Table::alter()
-                                .table(alias(&model.name))
-                                .add_column(typed_column(
-                                    &attr.value.name,
-                                    &attr.value.cidl_type,
-                                    true,
-                                ))
-                                .to_owned(),
+                        tracing::info!("Renamed table \"{}\" to \"{}\"", lm_model.name, model.name);
+                    }
+                    AlterKind::AddColumn { attr } => {
+                        needs_rename_intent.insert(&attr.value.name, attr);
+                    }
+                    AlterKind::AlterColumnType { attr, lm_attr } => {
+                        // Drop the last migrated column
+                        {
+                            res.push(to_sqlite(
+                                Table::alter()
+                                    .table(alias(&model.name))
+                                    .drop_column(alias(&lm_attr.value.name))
+                                    .to_owned(),
+                            ));
+                        }
+
+                        // Add new
+                        {
+                            res.push(to_sqlite(
+                                Table::alter()
+                                    .table(alias(&model.name))
+                                    .add_column(typed_column(
+                                        &attr.value.name,
+                                        &attr.value.cidl_type,
+                                        true,
+                                    ))
+                                    .to_owned(),
+                            ));
+                        }
+
+                        tracing::info!(
+                            "Altered column type of \"{}.{:?}\" to {:?}",
+                            lm_model.name,
+                            lm_attr.value.cidl_type,
+                            attr.value.cidl_type
+                        );
+                        tracing::warn!(
+                            "Altering column types drops the previous column. Data can be lost."
+                        );
+                    }
+                    AlterKind::DropColumn { lm_attr } => {
+                        needs_drop_intent.push(lm_attr);
+                    }
+                    AlterKind::AddManyToMany {
+                        unique_id,
+                        model_name,
+                    } => {
+                        if !visited_m2ms.insert(unique_id) {
+                            continue;
+                        }
+
+                        let mut jcts = HashMap::new();
+
+                        let join = model_lookup.get(model_name).unwrap();
+                        jcts.insert(
+                            unique_id,
+                            if model.name > join.name {
+                                (model, join)
+                            } else {
+                                (join, model)
+                            },
+                        );
+
+                        res.extend(Self::create(vec![], model_lookup, jcts));
+                        tracing::warn!(
+                            "Created a many to many table \"{}\" between models: \"{}\" \"{}\"",
+                            unique_id,
+                            model.name,
+                            join.name
+                        );
+                    }
+                    AlterKind::DropManyToMany { unique_id } => {
+                        if !visited_m2ms.insert(unique_id) {
+                            continue;
+                        }
+
+                        res.push(to_sqlite(
+                            Table::drop().table(alias(unique_id)).if_exists().to_owned(),
                         ));
+
+                        tracing::info!("Dropped a many to many table \"{}\"", unique_id,);
                     }
+                    AlterKind::RebuildTable => {
+                        let has_fk_col = model
+                            .attributes
+                            .iter()
+                            .any(|a| a.foreign_key_reference.is_some())
+                            || lm_model
+                                .attributes
+                                .iter()
+                                .any(|a| a.foreign_key_reference.is_some());
+                        if has_fk_col {
+                            res.push(PRAGMA_FK_OFF.into());
+                        }
 
-                    continue;
-                }
+                        // Rename the last migrated model to "<name>_<hash>"
+                        let name_hash = &format!("{}_{}", lm_model.name, lm_model.hash);
+                        {
+                            res.push(to_sqlite(
+                                Table::rename()
+                                    .table(alias(&lm_model.name), alias(name_hash))
+                                    .to_owned(),
+                            ));
+                        }
 
-                // Rename
-                if attr.value.name != lm_attr.value.name {
-                    stmts.push(to_sqlite(
-                        Table::alter()
-                            .table(alias(&model.name))
-                            .rename_column(alias(&lm_attr.value.name), alias(&attr.value.name))
-                            .to_owned(),
-                    ));
+                        // Create the new model
+                        {
+                            let create_stmts =
+                                Self::create(vec![model], model_lookup, HashMap::default()); // todo: m2ms
+                            for stmt in create_stmts {
+                                res.push(stmt);
+                            }
+                        }
+
+                        // Copy the data from the old table
+                        {
+                            let lm_attr_lookup = lm_model
+                                .attributes
+                                .iter()
+                                .map(|a| (&a.value.name, &a.value))
+                                .chain(std::iter::once((
+                                    &lm_model.primary_key.name,
+                                    &lm_model.primary_key,
+                                )))
+                                .collect::<HashMap<_, _>>();
+
+                            let columns = model
+                                .attributes
+                                .iter()
+                                .map(|a| &a.value)
+                                .chain(std::iter::once(&model.primary_key))
+                                .collect::<Vec<_>>();
+
+                            let insert = Query::insert()
+                                .into_table(alias(&model.name))
+                                .columns(columns.iter().map(|a| alias(&a.name)))
+                                .select_from(
+                                    Query::select()
+                                        .from(alias(name_hash))
+                                        .exprs(columns.iter().map(|model_c| {
+                                            let Some(lm_c) = lm_attr_lookup.get(&model_c.name)
+                                            else {
+                                                // Column is new, use a default value
+                                                return Expr::value(sql_default(
+                                                    &model_c.cidl_type,
+                                                ));
+                                            };
+
+                                            let col = Expr::col(alias(&lm_c.name));
+                                            if lm_c.cidl_type == model_c.cidl_type {
+                                                // Column directly transfers to the new table
+                                                col.into()
+                                            } else {
+                                                // Column type changed, cast
+                                                let sql_type = match &model_c.cidl_type.root_type()
+                                                {
+                                                    CidlType::Integer | CidlType::Boolean => {
+                                                        "integer"
+                                                    }
+                                                    CidlType::Real => "real",
+                                                    CidlType::Text | CidlType::DateIso => "text",
+                                                    _ => unreachable!(),
+                                                };
+
+                                                col.cast_as(sql_type)
+                                            }
+                                        }))
+                                        .to_owned(),
+                                )
+                                .unwrap()
+                                .to_owned();
+
+                            res.push(format!("{};", insert.to_string(SqliteQueryBuilder)));
+                        }
+
+                        // Drop the old table
+                        {
+                            res.push(to_sqlite(Table::drop().table(alias(name_hash)).to_owned()));
+                        }
+
+                        if has_fk_col {
+                            res.push(PRAGMA_FK_ON.into());
+                            res.push(PRAGMA_FK_CHECK.into());
+                        }
+
+                        tracing::warn!(
+                            "Rebuilt a table \"{}\" by moving data to the new version.",
+                            lm_model.name
+                        );
+                    }
                 }
             }
 
-            // `lm_model_attr_lookup` now contains only unreferenced columns, which
-            // are to be dropped if not intended for renaming
-            for lm_attr in lm_model_attr_lookup.values() {
+            // Drop or rename columns
+            for lm_attr in needs_drop_intent {
                 let mut alter = Table::alter();
                 alter.table(alias(&model.name));
 
-                let rename_options = deferred_add_columns
+                let rename_options = needs_rename_intent
                     .values()
                     .filter(|ma| ma.value.cidl_type == lm_attr.value.cidl_type)
                     .map(|ma| &ma.value.name)
                     .collect::<Vec<_>>();
 
                 if !rename_options.is_empty() {
-                    let solution = intent.ask(MigrationsDilemma::RenameOrDropAttribute {
+                    let i = intent.ask(MigrationsDilemma::RenameOrDropAttribute {
                         model_name: model.name.clone(),
                         attribute_name: lm_attr.value.name.clone(),
                         options: &rename_options,
                     });
 
-                    if let Some(solution) = solution {
-                        let option = &rename_options[solution];
+                    // Rename
+                    if let Some(i) = i {
+                        let option = &rename_options[i];
                         alter.rename_column(alias(&lm_attr.value.name), alias(*option));
-                        stmts.push(to_sqlite(alter));
-                        deferred_add_columns.remove(option);
+                        res.push(to_sqlite(alter));
+
+                        // Remove from the rename pool
+                        needs_rename_intent.remove(option);
+
+                        tracing::info!(
+                            "Renamed a column \"{}.{}\" to \"{}.{}\"",
+                            lm_model.name,
+                            lm_attr.value.name,
+                            model.name,
+                            option
+                        );
                         continue;
                     }
                 }
 
-                // _not_ a rename, drop.
+                // Drop
                 alter.drop_column(alias(&lm_attr.value.name));
-                stmts.push(to_sqlite(alter));
+                res.push(to_sqlite(alter));
+                tracing::info!("Dropped a column \"{}.{}\"", model.name, lm_attr.value.name);
             }
 
-            // Add the remaining deferred columns
-            for attr in deferred_add_columns.values() {
-                stmts.push(to_sqlite(
+            // Add column
+            for add_attr in needs_rename_intent.values() {
+                res.push(to_sqlite(
                     Table::alter()
                         .table(alias(&model.name))
-                        .add_column(typed_column(&attr.value.name, &attr.value.cidl_type, true))
+                        .add_column(typed_column(
+                            &add_attr.value.name,
+                            &add_attr.value.cidl_type,
+                            true,
+                        ))
                         .to_owned(),
                 ));
+                tracing::info!("Added a column \"{}.{}\"", model.name, add_attr.value.name);
             }
-
-            // Add all alter statements to the result
-            res.extend(stmts);
         }
 
-        if !rebuilds.is_empty() {
-            res.push(PRAGMA_FK_OFF.into());
-        }
+        return res;
 
-        // Full model rebuilds
-        for (model, lm_model) in &rebuilds {
-            // Rename the last migrated model to "name_hash"
-            {
-                res.push(to_sqlite(
-                    Table::rename()
-                        .table(
-                            alias(&lm_model.name),
-                            alias(format!("{}_{}", lm_model.name, lm_model.hash)),
-                        )
-                        .to_owned(),
-                ));
+        fn identify_alterations<'a>(
+            model: &'a MigrationsModel,
+            lm_model: &'a MigrationsModel,
+        ) -> Vec<AlterKind<'a>> {
+            let mut alterations = vec![];
+
+            if model.name != lm_model.name {
+                alterations.push(AlterKind::RenameTable);
             }
 
-            // Create the new model
+            if model.primary_key.cidl_type != lm_model.primary_key.cidl_type
+                || model.primary_key.name != lm_model.primary_key.name
             {
-                let create_stmts = Self::create(vec![model], model_lookup, HashMap::default()); // todo: m2ms
-                for stmt in create_stmts {
-                    res.push(stmt);
+                return vec![AlterKind::RebuildTable];
+            }
+
+            let mut lm_attrs = lm_model
+                .attributes
+                .iter()
+                .map(|a| (&a.value.name, a))
+                .collect::<HashMap<&String, &ModelAttribute>>();
+
+            for attr in &model.attributes {
+                let Some(lm_attr) = lm_attrs.remove(&attr.value.name) else {
+                    if attr.foreign_key_reference.is_some() {
+                        return vec![AlterKind::RebuildTable];
+                    }
+
+                    alterations.push(AlterKind::AddColumn { attr });
+                    continue;
+                };
+
+                if lm_attr.hash == attr.hash {
+                    continue;
+                }
+
+                // Changes on a foreign key column require a rebuild.
+                if lm_attr.foreign_key_reference.is_some() || attr.foreign_key_reference.is_some() {
+                    return vec![AlterKind::RebuildTable];
+                }
+
+                if lm_attr.value.cidl_type != attr.value.cidl_type {
+                    alterations.push(AlterKind::AlterColumnType { attr, lm_attr });
                 }
             }
 
-            // Copy the data from the old table
-            {
-                let lm_attr_lookup = lm_model
-                    .attributes
-                    .iter()
-                    .map(|a| (&a.value.name, &a.value))
-                    .chain(std::iter::once((
-                        &lm_model.primary_key.name,
-                        &lm_model.primary_key,
-                    )))
-                    .collect::<HashMap<_, _>>();
+            for unvisited_lm_attr in lm_attrs.into_values() {
+                if unvisited_lm_attr.foreign_key_reference.is_some() {
+                    return vec![AlterKind::RebuildTable];
+                }
 
-                let columns = model
-                    .attributes
-                    .iter()
-                    .map(|a| &a.value)
-                    .chain(std::iter::once(&model.primary_key))
-                    .collect::<Vec<_>>();
-
-                let insert = Query::insert()
-                    .into_table(alias(&model.name))
-                    .columns(columns.iter().map(|a| alias(&a.name)))
-                    .select_from(
-                        Query::select()
-                            .from(alias(format!("{}_{}", lm_model.name, lm_model.hash)))
-                            .exprs(columns.iter().map(|model_c| {
-                                let Some(lm_c) = lm_attr_lookup.get(&model_c.name) else {
-                                    // Column is new, use a default value
-                                    return Expr::value(sql_default(&model_c.cidl_type));
-                                };
-
-                                let col = Expr::col(alias(&lm_c.name));
-                                if lm_c.cidl_type == model_c.cidl_type {
-                                    // Column directly transfers to the new table
-                                    col.into()
-                                } else {
-                                    // Column type changed, cast
-                                    let sql_type = match &model_c.cidl_type.root_type() {
-                                        CidlType::Integer => "integer",
-                                        CidlType::Real => "real",
-                                        CidlType::Text => "text",
-                                        CidlType::Blob => "blob",
-                                        _ => unreachable!(),
-                                    };
-
-                                    col.cast_as(sql_type)
-                                }
-                            }))
-                            .to_owned(),
-                    )
-                    .unwrap()
-                    .to_owned();
-
-                res.push(format!("{};", insert.to_string(SqliteQueryBuilder)));
+                alterations.push(AlterKind::DropColumn {
+                    lm_attr: unvisited_lm_attr,
+                });
             }
 
-            // Drop the old table
-            {
-                res.push(to_sqlite(
-                    Table::drop()
-                        .table(alias(format!("{}_{}", lm_model.name, lm_model.hash)))
-                        .to_owned(),
-                ));
+            let mut lm_m2ms = lm_model
+                .navigation_properties
+                .iter()
+                .filter_map(|n| match &n.kind {
+                    NavigationPropertyKind::ManyToMany { unique_id } => Some((unique_id, n)),
+                    _ => None,
+                })
+                .collect::<HashMap<&String, &NavigationProperty>>();
+
+            for nav in &model.navigation_properties {
+                let NavigationPropertyKind::ManyToMany { unique_id } = &nav.kind else {
+                    continue;
+                };
+
+                if lm_m2ms.remove(unique_id).is_none() {
+                    alterations.push(AlterKind::AddManyToMany {
+                        unique_id,
+                        model_name: &nav.model_name,
+                    });
+                };
             }
-        }
 
-        if !rebuilds.is_empty() {
-            res.push(PRAGMA_FK_ON.into());
-            res.push(PRAGMA_FK_CHECK.into());
-        }
+            for unvisited_lm_nav in lm_m2ms.into_values() {
+                let NavigationPropertyKind::ManyToMany { unique_id } = &unvisited_lm_nav.kind
+                else {
+                    unreachable!()
+                };
+                alterations.push(AlterKind::DropManyToMany { unique_id });
+            }
 
-        res
+            alterations
+        }
     }
 
     /// Takes in a vec of last migrated models and deletes all of their m2m tables and tables.
@@ -717,6 +897,7 @@ impl MigrateTables {
                 res.push(to_sqlite(
                     Table::drop().table(alias(m2m_id)).if_exists().to_owned(),
                 ));
+                tracing::info!("Dropped a many to many table \"{}\"", m2m_id);
             }
 
             // Drop table
@@ -726,6 +907,7 @@ impl MigrateTables {
                     .if_exists()
                     .to_owned(),
             ));
+            tracing::info!("Dropped a table \"{}\"", model.name);
         }
 
         res
@@ -827,7 +1009,6 @@ impl MigrateTables {
 
             res.push_str(&format!("--- {title}\n"));
             res.push_str(&stmts.join("\n"));
-            res.push('\n');
         }
 
         res
@@ -850,7 +1031,6 @@ fn sql_default(ty: &CidlType) -> sea_query::Value {
         CidlType::Integer => sea_query::Value::Int(Some(0i32)),
         CidlType::Text => sea_query::Value::String(Some(Box::new("".into()))),
         CidlType::Real => sea_query::Value::Float(Some(0.0)),
-        CidlType::Blob => sea_query::Value::Bytes(Some(Box::new(vec![]))),
         _ => unreachable!(),
     }
 }
@@ -867,10 +1047,9 @@ fn typed_column(name: &str, ty: &CidlType, with_default: bool) -> ColumnDef {
     }
 
     match inner {
-        CidlType::Integer => col.integer(),
+        CidlType::Integer | CidlType::Boolean => col.integer(),
         CidlType::Real => col.decimal(),
-        CidlType::Text => col.text(),
-        CidlType::Blob => col.blob(),
+        CidlType::Text | CidlType::DateIso => col.text(),
         _ => unreachable!("column type must be validated earlier"),
     };
     col

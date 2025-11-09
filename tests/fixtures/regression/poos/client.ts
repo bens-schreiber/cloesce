@@ -1,3 +1,5 @@
+// GENERATED CODE. DO NOT MODIFY.
+
 import { HttpResult, instantiateObjectArray, DeepPartial } from "cloesce/client";
 
 export class PooA {
@@ -20,9 +22,10 @@ export class PooAcceptYield {
         b: PooB,
         c: PooC,
         __dataSource: "none" = "none",
+    fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<void>> {
     const baseUrl = new URL(`http://localhost:5002/api/PooAcceptYield/${this.id}/acceptPoos`);
-    const res = await fetch(baseUrl, {
+    const res = await fetchImpl(baseUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -40,9 +43,10 @@ export class PooAcceptYield {
   }
   async yieldPoo(
         __dataSource: "none" = "none",
+    fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<PooC>> {
     const baseUrl = new URL(`http://localhost:5002/api/PooAcceptYield/${this.id}/yieldPoo`);
-    const res = await fetch(baseUrl, {
+    const res = await fetchImpl(baseUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

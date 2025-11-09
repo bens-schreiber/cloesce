@@ -1,3 +1,5 @@
+// GENERATED CODE. DO NOT MODIFY.
+
 import { HttpResult, instantiateObjectArray, DeepPartial } from "cloesce/client";
 
 
@@ -13,12 +15,13 @@ export class CrudHaver {
 
   static async get(
         id: number,
-        dataSource: "none" = "none",
+        __datasource: "none" = "none",
+    fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<CrudHaver>> {
     const baseUrl = new URL(`http://localhost:5002/api/CrudHaver/get`);
     baseUrl.searchParams.append('id', String(id));
-    baseUrl.searchParams.append('dataSource', String(dataSource));
-    const res = await fetch(baseUrl, { method: "GET" });
+    baseUrl.searchParams.append('__datasource', String(__datasource));
+    const res = await fetchImpl(baseUrl, { method: "GET" });
     let raw = await res.json();
     if (!res.ok) {
       return raw;
@@ -27,11 +30,12 @@ export class CrudHaver {
     return raw;
   }
   static async list(
-        dataSource: "none" = "none",
+        __datasource: "none" = "none",
+    fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<CrudHaver[]>> {
     const baseUrl = new URL(`http://localhost:5002/api/CrudHaver/list`);
-    baseUrl.searchParams.append('dataSource', String(dataSource));
-    const res = await fetch(baseUrl, { method: "GET" });
+    baseUrl.searchParams.append('__datasource', String(__datasource));
+    const res = await fetchImpl(baseUrl, { method: "GET" });
     let raw = await res.json();
     if (!res.ok) {
       return raw;
@@ -41,9 +45,10 @@ export class CrudHaver {
   }
   async notCrud(
         __dataSource: "none" = "none",
+    fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<void>> {
     const baseUrl = new URL(`http://localhost:5002/api/CrudHaver/${this.id}/notCrud`);
-    const res = await fetch(baseUrl, {
+    const res = await fetchImpl(baseUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -56,17 +61,18 @@ export class CrudHaver {
     }
     return raw;
   }
-  static async post(
-        obj: DeepPartial<CrudHaver>,
-        dataSource: "none" = "none",
+  static async save(
+        model: DeepPartial<CrudHaver>,
+        __datasource: "none" = "none",
+    fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<CrudHaver>> {
-    const baseUrl = new URL(`http://localhost:5002/api/CrudHaver/post`);
-    const res = await fetch(baseUrl, {
+    const baseUrl = new URL(`http://localhost:5002/api/CrudHaver/save`);
+    const res = await fetchImpl(baseUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-            obj, 
-            dataSource
+            model, 
+            __datasource
       })
     });
     let raw = await res.json();
@@ -85,12 +91,13 @@ export class Parent {
 
   static async get(
         id: number,
-        dataSource: "withChildren" |"none" = "none",
+        __datasource: "withChildren" |"none" = "none",
+    fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Parent>> {
     const baseUrl = new URL(`http://localhost:5002/api/Parent/get`);
     baseUrl.searchParams.append('id', String(id));
-    baseUrl.searchParams.append('dataSource', String(dataSource));
-    const res = await fetch(baseUrl, { method: "GET" });
+    baseUrl.searchParams.append('__datasource', String(__datasource));
+    const res = await fetchImpl(baseUrl, { method: "GET" });
     let raw = await res.json();
     if (!res.ok) {
       return raw;
@@ -99,11 +106,12 @@ export class Parent {
     return raw;
   }
   static async list(
-        dataSource: "withChildren" |"none" = "none",
+        __datasource: "withChildren" |"none" = "none",
+    fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Parent[]>> {
     const baseUrl = new URL(`http://localhost:5002/api/Parent/list`);
-    baseUrl.searchParams.append('dataSource', String(dataSource));
-    const res = await fetch(baseUrl, { method: "GET" });
+    baseUrl.searchParams.append('__datasource', String(__datasource));
+    const res = await fetchImpl(baseUrl, { method: "GET" });
     let raw = await res.json();
     if (!res.ok) {
       return raw;
@@ -111,17 +119,18 @@ export class Parent {
     raw.data = instantiateObjectArray(raw.data, Parent);
     return raw;
   }
-  static async post(
-        obj: DeepPartial<Parent>,
-        dataSource: "withChildren" |"none" = "none",
+  static async save(
+        model: DeepPartial<Parent>,
+        __datasource: "withChildren" |"none" = "none",
+    fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Parent>> {
-    const baseUrl = new URL(`http://localhost:5002/api/Parent/post`);
-    const res = await fetch(baseUrl, {
+    const baseUrl = new URL(`http://localhost:5002/api/Parent/save`);
+    const res = await fetchImpl(baseUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-            obj, 
-            dataSource
+            model, 
+            __datasource
       })
     });
     let raw = await res.json();

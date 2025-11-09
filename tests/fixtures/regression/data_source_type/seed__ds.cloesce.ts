@@ -8,8 +8,8 @@ import {
   IncludeTree,
   PlainOldObject,
 } from "cloesce/backend";
-
 import { D1Database } from "@cloudflare/workers-types";
+type Integer = number & { __kind: "Integer" };
 
 @WranglerEnv
 export class Env {
@@ -19,13 +19,13 @@ export class Env {
 @D1
 export class NoDs {
   @PrimaryKey
-  id: number;
+  id: Integer;
 }
 
 @D1
 export class OneDs {
   @PrimaryKey
-  id: number;
+  id: Integer;
 
   @DataSource
   static readonly default: IncludeTree<OneDs> = {};
@@ -34,7 +34,7 @@ export class OneDs {
 @D1
 export class Foo {
   @PrimaryKey
-  id: number;
+  id: Integer;
 
   @DataSource
   static readonly baz: IncludeTree<Foo> = {};

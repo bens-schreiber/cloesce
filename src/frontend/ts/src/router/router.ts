@@ -14,7 +14,7 @@ import {
   CloesceApp,
   InstanceRegistry,
 } from "../common.js";
-import { OrmWasmExports, fromSql, loadOrmWasm } from "./wasm.js";
+import { OrmWasmExports, mapSql, loadOrmWasm } from "./wasm.js";
 import { CrudContext } from "./crud.js";
 
 /**
@@ -331,7 +331,7 @@ async function hydrateModel(
   const pk = model.primary_key.name;
   const query =
     dataSource !== NO_DATA_SOURCE
-      ? `SELECT * FROM "${model.name}.${dataSource}" WHERE "${model.name}.${pk}" = ?`
+      ? `SELECT * FROM "${model.name}.${dataSource}" WHERE "${pk}" = ?`
       : `SELECT * FROM "${model.name}" WHERE "${pk}" = ?`;
 
   // Query DB
@@ -349,7 +349,7 @@ async function hydrateModel(
   }
 
   // Hydrate
-  const models: object[] = fromSql(
+  const models: object[] = mapSql(
     constructorRegistry[model.name],
     records.results,
     model.data_sources[dataSource]?.tree ?? {},
@@ -445,8 +445,11 @@ function validateCidlType(
         return !Number.isNaN(Number(value));
       case "Text":
         return typeof value === "string";
-      case "Blob":
-        return value instanceof Blob || value instanceof ArrayBuffer;
+      case "Boolean":
+        return typeof value === "boolean";
+      case "DateIso":
+        const date = new Date(value as string);
+        return !isNaN(date.getTime());
       default:
         return false;
     }

@@ -4,7 +4,8 @@
     "language": "TypeScript",
     "wrangler_env": {
         "name": "Env",
-        "source_path": "./seed__app.cloesce.ts"
+        "source_path": "./seed__app.cloesce.ts",
+        "db_binding": "db"
     },
     "models": {
         "Model": {
@@ -38,33 +39,12 @@
                             }
                         }
                     ]
-                },
-                "post": {
-                    "name": "post",
-                    "is_static": true,
-                    "http_verb": "POST",
-                    "return_type": {
-                        "HttpResult": {
-                            "Object": "Model"
-                        }
-                    },
-                    "parameters": [
-                        {
-                            "name": "obj",
-                            "cidl_type": {
-                                "Partial": "Model"
-                            }
-                        },
-                        {
-                            "name": "dataSource",
-                            "cidl_type": {
-                                "DataSource": "Model"
-                            }
-                        }
-                    ]
                 }
             },
             "data_sources": {},
+            "cruds": [
+                "SAVE"
+            ],
             "source_path": "./seed__app.cloesce.ts"
         }
     },

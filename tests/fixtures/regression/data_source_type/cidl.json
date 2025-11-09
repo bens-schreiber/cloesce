@@ -5,7 +5,8 @@
   "language": "TypeScript",
   "wrangler_env": {
     "name": "Env",
-    "source_path": "./seed__ds.cloesce.ts"
+    "source_path": "./seed__ds.cloesce.ts",
+    "db_binding": "db"
   },
   "models": {
     "Foo": {
@@ -52,6 +53,7 @@
           "tree": {}
         }
       },
+      "cruds": [],
       "source_path": "./seed__ds.cloesce.ts"
     },
     "NoDs": {
@@ -65,6 +67,7 @@
       "navigation_properties": [],
       "methods": {},
       "data_sources": {},
+      "cruds": [],
       "source_path": "./seed__ds.cloesce.ts"
     },
     "OneDs": {
@@ -84,6 +87,7 @@
           "tree": {}
         }
       },
+      "cruds": [],
       "source_path": "./seed__ds.cloesce.ts"
     }
   },

@@ -13,9 +13,8 @@ import {
   WranglerEnv,
   Orm,
   CRUD,
+  Integer,
 } from "cloesce/backend";
-
-// TODO: Updated to v0.0.4 which hasn't released to NPM yet
 
 @WranglerEnv
 export class Env {
@@ -24,10 +23,10 @@ export class Env {
 }
 
 @D1
-@CRUD(["GET", "LIST", "POST"])
+@CRUD(["GET", "LIST", "SAVE"])
 export class Horse {
   @PrimaryKey
-  id: number;
+  id: Integer;
 
   name: string;
   bio: string | null;
@@ -47,32 +46,29 @@ export class Horse {
 
   @POST
   async like(@Inject { db }: Env, horse: Horse) {
-    await db
-      .prepare("INSERT INTO Like (horseId1, horseId2) VALUES (?, ?)")
-      .bind(this.id, horse.id)
-      .run();
+    const orm = Orm.fromD1(db);
+    await orm.upsert(Like, {
+      horseId1: this.id,
+      horseId2: horse.id,
+    });
   }
 
   @GET
   async matches(@Inject { db }: Env): Promise<Horse[]> {
-    const records = await db
-      .prepare(
-        `
-    SELECT * FROM [Horse.default] as H1
+    const sql = `
+    SELECT *
+    FROM [Horse.default]
     WHERE
-        H1.[Horse.id] = ?
-        AND EXISTS (
-            SELECT 1
-            FROM [Horse.default] AS H2
-            WHERE H2.[Horse.id] = H1.[Horse.likes.horse2.id]
-              AND H2.[Horse.likes.horse2.id] = H1.[Horse.id]
-        );
-    `
-      )
-      .bind(this.id)
-      .run();
+      [likes.horse2.id] = ?
+      AND [id] IN (
+        SELECT [likes.horse2.id]
+        FROM [Horse.default]
+        WHERE [id] = ?
+      );
+  `;
 
-    const res = Orm.fromSql(Horse, records.results, Horse.withLikes);
+    const records = await db.prepare(sql).bind(this.id, this.id).run();
+    const res = Orm.mapSql(Horse, records.results, Horse.withLikes);
     if (res.ok) {
       return res.value;
     }
@@ -84,13 +80,13 @@ export class Horse {
 @D1
 export class Like {
   @PrimaryKey
-  id: number;
+  id: Integer;
 
   @ForeignKey(Horse)
-  horseId1: number;
+  horseId1: Integer;
 
   @ForeignKey(Horse)
-  horseId2: number;
+  horseId2: Integer;
 
   @OneToOne("horseId2")
   horse2: Horse | undefined;

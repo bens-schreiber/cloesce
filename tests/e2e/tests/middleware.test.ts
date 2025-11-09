@@ -13,7 +13,7 @@ afterAll(async () => {
 
 describe("Global Middleware", () => {
   it("Rejects POST requests", async () => {
-    const res = await Model.post({});
+    const res = await Model.save({});
     expect(res.ok).toBe(false);
     expect(res.status).toBe(401);
     expect(res.message).toBe("POST methods aren't allowed.");

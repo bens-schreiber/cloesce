@@ -1,8 +1,0 @@
-==== CLOESCE ERROR ====
-Error [InvalidApiMethodModifier]: Model methods must be public if they are decorated as GET, POST, PUT, PATCH
-Phase: TypeScript IDL Extraction
-Context: Foo.method method
-@POST
-  private method() {}
-
-Suggested fix: Change the method modifier to just `public`

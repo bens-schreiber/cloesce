@@ -3,10 +3,10 @@ import {
   POST,
   PrimaryKey,
   WranglerEnv,
-  Inject,
   PlainOldObject,
 } from "cloesce/backend";
-type D1Database = {};
+import { D1Database } from "@cloudflare/workers-types";
+type Integer = number & { __kind: "Integer" };
 
 @PlainOldObject
 export class PooA {
@@ -33,7 +33,7 @@ export class Env {
 @D1
 export class PooAcceptYield {
   @PrimaryKey
-  id: number;
+  id: Integer;
 
   @POST
   acceptPoos(a: PooA, b: PooB, c: PooC) {}

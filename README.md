@@ -1,25 +1,23 @@
-# cloesce (experimental, `v0.0.3`)
+# cloesce (unstable, `v0.0.4`)
 
-Cloesce is a full stack compiler for the Cloudflare developer platform, allowing class definitions in high level languages to serve as the metadata basis for databases, a backend REST API, a frontend API client, and Cloudflare infrastructure.
+Cloesce is a full stack compiler for the Cloudflare developer platform, allowing class definitions in high level languages to serve as a metadata basis to create a database schema, backend REST API, frontend API client, and Cloudflare infrastructure (as of v0.0.4, D1 + Workers).
 
-Cloesce is working towards an alpha MVP (v0.1.0), with the general milestones being [here](https://cloesce.pages.dev/schreiber/v0.1.0_milestones/).
+Cloesce is working towards a stable alpha MVP (v0.1.0), with the general milestones being [here](https://cloesce.pages.dev/schreiber/v0.1.0_milestones/).
 
 Internal documentation going over design decisions and general thoughts for each milestone can be found [here](https://cloesce.pages.dev/).
 
-# Documentation `v0.0.3`
-
-Note that this version is very unstable (ie, it passes our set of happy-path tests).
+# Documentation `v0.0.4`
 
 ## Getting Started
 
-`v0.0.3` supports only Typescript-to-Typescript projects. An example project is shown [here](https://github.com/bens-schreiber/cloesce/tree/main/examples).
+`v0.0.4` supports only Typescript-to-Typescript projects. An example project is shown [here](https://github.com/bens-schreiber/cloesce/tree/main/examples).
 
 1. NPM
 
 - Create an NPM project and install cloesce
 
 ```sh
-npm i cloesce@0.0.3-fix.6
+npm i cloesce@0.0.4-unstable.5
 ```
 
 2. TypeScript
@@ -46,15 +44,15 @@ npm i cloesce@0.0.3-fix.6
 
 ```json
 {
-  "source": "./src", // or whatever src you want
-  "workersUrl": "http://localhost:5000/api", // or whatever url you want
-  "clientUrl": "http://localhost:5173/api" // or whatever url you want
+  "source": "./src",
+  "workersUrl": "http://localhost:5000/api",
+  "clientUrl": "http://localhost:5173/api"
 }
 ```
 
 4. Vite
 
-- `v0.0.3` does not yet support middleware, so you'll run into CORs problems. A vite proxy in some `vite.config.ts` can fix this:
+To prevent CORS issues, a Vite proxy can be used for the frontend:
 
 ```ts
 import { defineConfig } from "vite";
@@ -74,7 +72,7 @@ export default defineConfig({
 
 5. Wrangler Config
 
-- `v0.0.3` will generate the required areas of your wrangler config. A full config looks like this:
+- `v0.0.4` will generate the required areas of your wrangler config. A full config looks like this:
 
 ```toml
 compatibility_date = "2025-10-02"
@@ -89,19 +87,19 @@ database_name = "example"
 
 ## A Simple Model
 
-A model is a type which represents a database table, database view, backend api, frontend client and Cloudflare infrastructure (D1 + Workers).
+A model is a type which represents:
 
-Suprisingly, it's pretty compact. A basic scalar model (being, without foreign keys) looks like this:
+- a database table,
+- database views
+- REST API
+- Client API
+- Cloudflare infrastructure (D1 + Workers)
+
+Suprisingly, it's pretty compact. A basic model looks like this:
 
 ```ts
 // horse.cloesce.ts
-
-import {
-  D1,
-  GET,
-  POST,
-  PrimaryKey,
-} from "cloesce/backend";
+import { D1, GET, POST, PrimaryKey } from "cloesce/backend";
 
 @D1
 export class Horse {
@@ -111,7 +109,7 @@ export class Horse {
   name: string | null;
 
   @POST
-  async neigh(): Promise<string> {
+  neigh(): string {
     return `i am ${this.name}, this is my horse noise`;
   }
 }
@@ -120,22 +118,47 @@ export class Horse {
 - `@D1` denotes that this is a SQL Table
 - `@PrimaryKey` sets the SQL primary key. All models require a primary key.
 - `@POST` reveals the method as an API endpoint with the `POST` HTTP Verb.
+- All Cloesce models need to be under a `.cloesce.ts` file.
 
-After running `npx cloesce compile`, you will get a fully generated project that can be ran with:
+To compile this model into a working full stack application, Cloesce must undergo both **compilation** and **migrations**. Compilation is the process of extracting the metadata language that powers Cloesce, ensuring it is a valid program, and then producing code to orchestrate the program across different domains (database, backend, frontend, cloud). Migrations utilize the history of validated metadata to create SQL code, translating the evolution of your models.
+
+To compile, run `npx cloesce compile`.
+
+To create a migration, run `npx cloesce migrate <name>`.
+
+After running the above commands, you will have a full project capable of being ran with:
 
 ```sh
-# migrate wrangler
-npx wrangler d1 migrations apply db-name
+# Apply the generated migrations
+npx wrangler d1 migrations apply <db-name>
 
-# run wrangler
+# Run the backend
 npx wrangler dev
 ```
 
-Note the output in the `.generated/` dir:
+Note the output in the `.generated/` dir. These values should not be committed to git, as they depend on the file system of the machine running it.
 
 - `client.ts` is an importable API with all of your backend types and endpoints
-- `migrations/*.sql` is the generated SQL code (note, migrations beyond the initial aren't really supported yet)
 - `workers.ts` is the workers entrypoint.
+- `cidl.json` is the working metadata for the project
+
+Note the output in `migrations`, ex after running `npx cloesce migrate Initial`
+
+- `<date>_Initial.json` contains all model information necessary from SQL
+- `<date>_Initial.sql` contains the acual SQL migrations. In this early version of Cloesce, it's important to check migrations every time.
+
+#### Supported Column Types
+
+Model columns must directly map to SQLite columns. The supported TypeScript types are:
+
+- `number` => `Real` not null
+- `string` => `Text` not null
+- `boolean` and `Boolean` => `Integer` not null
+- `Integer` => `Integer` not null
+- `Date` => `Text` (ISO formatted) not null
+- `N | null` => `N` (nullable)
+
+Blob types will be added in v0.0.5 when R2 support is added.
 
 ## Features
 
@@ -144,8 +167,6 @@ Note the output in the `.generated/` dir:
 In order to interact with your database, you will need to define a WranglerEnv
 
 ```ts
-// horse.cloesce.ts
-
 import { WranglerEnv } from "cloesce/backend";
 
 @WranglerEnv
@@ -167,118 +188,207 @@ export class Horse {
 
   @POST
   async neigh(@Inject env: WranglerEnv): Promise<string> {
-    env.db.prepare(...);
+    await env.db.prepare(...);
 
     return `i am ${this.name}, this is my horse noise`;
   }
 }
 ```
 
-## Foreign Keys, One to One, Data Sources
+### Foreign Keys, One to One, Data Sources
 
-More complex model relationships are permitted via the `@ForeignKey`, `@OneToOne / @OneToMany @ManyToMany` and `@DataSource` decorators.
+Complex model relationships are permitted via the `@ForeignKey`, `@OneToOne / @OneToMany @ManyToMany` and `@DataSource` decorators.
 Foreign keys are scalar attributes which must reference some other model's primary key:
 
 ```ts
 @D1
-export class B {
+export class Dog {
   @PrimaryKey
   id: number;
 }
 
 @D1
-export class A {
+export class Person {
   @PrimaryKey
   id: number;
 
-  @ForeignKey(B)
-  bId: number;
-}
-```
-
-This representation is true to the underlying SQL table: `A` has a column `bId` which is a foreign key to `B`. Cloesce allows you to actually join these tables together in your model representation:
-
-```ts
-@D1
-export class B {
-  @PrimaryKey
-  id: number;
-}
-
-@D1
-export class A {
-  @PrimaryKey
-  id: number;
-
-  @ForeignKey(B)
-  bId: number;
-
-  @OneToOne("bId") // references A.bId
-  b: B | undefined; // This value is a "navigation property", which may or may not exist at runtime
+  @ForeignKey(Dog)
+  dogId: number;
 }
 ```
 
-In `v0.0.3`, there are no defaults, only very explicit decisons. Because of that, navigation properties won't exist at runtime unless you tell them to. Cloesce does this via a `DataSource`, which describes the foreign key dependencies you wish to include. All scalar properties are included by default and cannot be excluded.
+This representation is true to the underlying SQL table: `Person` has a column `dogId` which is a foreign key to `Dog`. Cloesce allows you to actually join these tables together in your model representation:
 
 ```ts
 @D1
-export class B {
+export class Dog {
   @PrimaryKey
   id: number;
 }
 
 @D1
-export class A {
+export class Person {
   @PrimaryKey
   id: number;
 
-  @ForeignKey(B)
-  bId: number;
+  @ForeignKey(Dog)
+  dogId: number;
 
-  @OneToOne("bId")
-  b: B | undefined;
+  @OneToOne("dogId") // references Person.dogId
+  dog: Dog | undefined; // This value is a "navigation property", which may or may not exist at runtime
+}
+```
+
+In `v0.0.4`, there are no defaults, only very explicit decisons. Because of that, navigation properties won't exist at runtime unless you tell them to. Cloesce does this via a `DataSource`, which describes the foreign key dependencies you wish to include. All scalar properties are included by default and cannot be excluded.
+
+```ts
+@D1
+export class Dog {
+  @PrimaryKey
+  id: number;
+}
+
+@D1
+export class Person {
+  @PrimaryKey
+  id: number;
+
+  @ForeignKey(Dog)
+  dogId: number;
+
+  @OneToOne("dogId")
+  dog: Dog | undefined;
 
   @DataSource
-  static readonly default: IncludeTree<A> = {
-    b: {}, // says: on model population, join A's B
+  static readonly default: IncludeTree<Person> = {
+    dog: {}, // says: on model population, join Persons's Dog
   };
 }
 ```
 
-Datasources are just SQL views and can be invoked in your queries. They are aliased in such a way that its identical to object properties. The frontend chooses which datasource to use in it's API client. `null` is a valid option, meaning no joins will occur.
+Data sources are just SQL views and can be invoked in your queries. They are aliased in such a way that its similiar to object properties. The frontend chooses which datasource to use in it's API client (all instantiated methods have an implicit DataSource parameter). `null` is a valid option, meaning no joins will occur.
 
 ```ts
 @D1
-export class A {
+export class Person {
   @PrimaryKey
   id: number;
 
-  @ForeignKey(B)
-  bId: number;
+  @ForeignKey(Dog)
+  dogId: number;
 
-  @OneToOne("bId")
-  b: B | undefined;
+  @OneToOne("dogId")
+  dog: Dog | undefined;
 
   @DataSource
-  static readonly default: IncludeTree<A> = {
-    b: {},
+  static readonly default: IncludeTree<Person> = {
+    dog: {},
   };
 
   @GET
-  static async get(id: number, @Inject env: WranglerEnv): Promise<A> {
+  static async get(id: number, @Inject env: WranglerEnv): Promise<Person> {
     let records = await env.db
-      .prepare("SELECT * FROM [A.default] WHERE [A.id] = ?") // A.default is the SQL view generated from the IncludeTree
+      .prepare("SELECT * FROM [Person.default] WHERE [id] = ?") // Person.default is the SQL view generated from the IncludeTree
       .bind(id)
       .run();
 
-    // modelsFromSql is a provided function to turn sql rows into an object.
-    // More ORM functions will be expanded on in v0.0.4.
-    return modelsFromSql(A, records.results, A.default)[0] as A;
+    let persons = Orm.mapSql(Person, records.results, Person.default);
+    return persons.value[0];
   }
 }
 ```
 
-Note: In later versions, nearly all of the code from the example above won't be needed (we can usually infer primary keys, foreign keys, relationships, have default made include trees, and generate CRUD methods like `get`).
+Note that the `get` code can be simplified using CRUD methods or the ORM primitive `get`.
+
+#### View Aliasing
+
+The generated views will always be aliased so that they can be accessed in an object like notation. For example, given some `Horse` that has a relationship with `Like`:
+
+```ts
+@D1
+export class Horse {
+  @PrimaryKey
+  id: Integer;
+
+  name: string;
+  bio: string | null;
+
+  @OneToMany("horseId1")
+  likes: Like[];
+
+  @DataSource
+  static readonly default: IncludeTree<Horse> = {
+    likes: { horse2: {} },
+  };
+}
+
+@D1
+export class Like {
+  @PrimaryKey
+  id: Integer;
+
+  @ForeignKey(Horse)
+  horseId1: Integer;
+
+  @ForeignKey(Horse)
+  horseId2: Integer;
+
+  @OneToOne("horseId2")
+  horse2: Horse | undefined;
+}
+```
+
+If you wanted to find all horses that like one another, a valid SQL query using the `default` data source would look like:
+
+```sql
+SELECT *
+FROM [Horse.default]
+WHERE
+  [likes.horse2.id] = ?
+  AND [id] IN (
+    SELECT [likes.horse2.id]
+    FROM [Horse.default]
+    WHERE [id] = ?
+  );
+```
+
+The actual generated view for `default` looks like:
+
+```sql
+CREATE VIEW IF NOT EXISTS "Horse.default" AS
+SELECT
+    "Horse"."id"          AS "id",
+    "Horse"."name"        AS "name",
+    "Horse"."bio"         AS "bio",
+    "Like"."id"           AS "likes.id",
+    "Like"."horseId1"     AS "likes.horseId1",
+    "Like"."horseId2"     AS "likes.horseId2",
+    "Horse1"."id"         AS "likes.horse2.id",
+    "Horse1"."name"       AS "likes.horse2.name",
+    "Horse1"."bio"        AS "likes.horse2.bio"
+FROM
+    "Horse"
+LEFT JOIN
+    "Like" ON "Horse"."id" = "Like"."horseId1"
+LEFT JOIN
+    "Horse" AS "Horse1" ON "Like"."horseId2" = "Horse1"."id";
+```
+
+#### DataSourceOf<T>
+
+If it is important to determine what data source the frontend called the instantiated method with, the type `DataSourceOf<T>` allows explicit data source parameters:
+
+```ts
+@D1
+class Foo {
+  ...
+
+  @POST
+  bar(ds: DataSourceOf<Foo>) {
+    // ds = "DataSource1" | "DataSource2" | ... | "none"
+  }
+}
+```
 
 ### One to Many
 
@@ -322,8 +432,6 @@ export class Dog {
 
 ### Many to Many
 
-NOTE: `M:M` relationships have a [bug](https://github.com/bens-schreiber/cloesce/issues/88) in `v0.0.3`, but the syntax is as follows:
-
 ```ts
 @D1
 export class Student {
@@ -339,10 +447,134 @@ export class Course {
   @PrimaryKey
   id: number;
 
-  @ManyToMany("StudentsCourses")
+  @ManyToMany("StudentsCourses") // same unique id => same jct table.
   students: Student[];
 }
 ```
+
+### ORM Methods
+
+Cloesce provides a suite of ORM methods for getting, listing, updating and inserting models.
+
+#### Upsert
+
+```ts
+@D1
+class Horse {
+  // ...
+
+  @POST
+  static async post(@Inject { db }: Env, horse: Horse): Promise<Horse> {
+    const orm = Orm.fromD1(db);
+    await orm.upsert(Horse, horse, null);
+    return (await orm.get(Horse, horse.id, null)).value;
+  }
+}
+```
+
+#### List, Get
+
+```ts
+@D1
+class Horse {
+  // ...
+  @GET
+  static async get(@Inject { db }: Env, id: number): Promise<Horse> {
+    const orm = Orm.fromD1(db);
+    return (await orm.get(Horse, id, "default")).value;
+  }
+
+  @GET
+  static async list(@Inject { db }: Env): Promise<Horse[]> {
+    const orm = Orm.fromD1(db);
+    return (await orm.list(Horse, "default")).value;
+  }
+}
+```
+
+### CRUD Methods
+
+Generic `GET, POST, PATCH` (and in a future version, DEL) boilerplate methods do not need to be copied around. Cloesce supports CRUD generation, a syntactic sugar that adds the methods to the compiler output.
+
+The `SAVE` method is an `upsert`, meaning it both inserts and updates in the same query.
+
+```ts
+@CRUD(["SAVE", "GET", "LIST"])
+@D1
+export class CrudHaver {
+  @PrimaryKey
+  id: number;
+  name: string;
+}
+```
+
+which will generate client API methods like:
+
+```ts
+static async get(
+      id: number,
+      dataSource: "none" = "none",
+): Promise<HttpResult<CrudHaver>>
+```
+
+### Middleware
+
+Cloesce supports middleware at the global level (before routing to a model+method), the model level (before hydration) and the method level (before hydration). Middleware also exposes read/write access to the dependency injection instance that all models use.
+
+Middleware is capable of exiting from the Cloesce Router early with an HTTP Result.
+
+An example of all levels of middleware is below. All middleware must be defined in the file `app.cloesce.ts`.
+
+```ts
+@PlainOldObject
+export class InjectedThing {
+  value: string;
+}
+
+@WranglerEnv
+export class Env {
+  db: D1Database;
+}
+
+@D1
+@CRUD(["POST"])
+export class Model {
+  @PrimaryKey
+  id: number;
+
+  @GET
+  static blockedMethod() {}
+
+  @GET
+  static getInjectedThing(@Inject thing: InjectedThing): InjectedThing {
+    return thing;
+  }
+}
+
+// Middleware instance
+const app: CloesceApp = new CloesceApp();
+
+app.useGlobal((request: Request, env, ir) => {
+  if (request.method === "POST") {
+    return { ok: false, status: 401, message: "POST methods aren't allowed." };
+  }
+});
+
+app.useModel(Model, (request, env, ir) => {
+  ir.set(InjectedThing.name, {
+    value: "hello world",
+  });
+});
+
+app.useMethod(Model, "blockedMethod", (request, env, ir) => {
+  return { ok: false, status: 401, message: "Blocked method" };
+});
+
+// Exporting the instance is required
+export default app;
+```
+
+With this middleware, all POST methods will be blocked, and all methods for the model `Model` will be able to inject `InjectedThing`. Additionally, on the method level, `blockedMethod` will return a 401.
 
 ### Plain Old Objects
 
@@ -361,7 +593,7 @@ export class Cat {
     id: number;
 
     @GET
-    async query(): Promise<CatStuff> {
+    query(): CatStuff {
         return {
             catFacts: ["cats r cool"],
             catNames: ["reginald"]
@@ -390,15 +622,24 @@ class Foo {
 
 ## Unit Tests
 
-- `src/extractor/ts` run `npm test`
+- `src/frontend/ts` run `npm test`
 - `src/generator` run `cargo test`
 
 ## Integration Tests
 
-- To run the regression tests: `cargo run --bin test regression`
-- To run the pass fail extractor tests: `cargo run --bin test run-fail`
+- Regression tests: `cargo run --bin test regression`
 
 Optionally, pass `--check` if new snapshots should not be created.
+
+To target a specific fixture, pass `--fixture folder_name`
+
+To update integration snapshots, run:
+
+- `cargo run --bin update`
+
+To delete any generated snapshots run:
+
+- `cargo run --bin update -- -d`
 
 ## E2E
 

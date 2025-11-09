@@ -1,10 +1,14 @@
 use std::path::Path;
 use std::{fs::File, io::Write};
 
+use ast::ensure;
+use ast::err::GeneratorErrorKind;
 use serde::Deserialize;
 use serde::Serialize;
 use serde_json::Value as JsonValue;
 use toml::Value as TomlValue;
+
+use ast::{CloesceAst, err::Result};
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
 pub struct D1Database {
@@ -16,7 +20,7 @@ pub struct D1Database {
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
 pub struct WranglerSpec {
     pub name: Option<String>,
-    pub compatability_date: Option<String>,
+    pub compatibility_date: Option<String>,
     pub main: Option<String>,
 
     #[serde(default)]
@@ -28,13 +32,15 @@ impl WranglerSpec {
     /// for them
     pub fn generate_defaults(&mut self) {
         // Generate default worker entry point values
-        self.name = Some(self.name.clone().unwrap_or_else(|| "cloesce".to_string()));
+        self.name = Some(self.name.clone().unwrap_or_else(|| {
+            tracing::warn!("Set a default worker name \"cloesce\"");
+            "cloesce".to_string()
+        }));
 
-        self.compatability_date = Some(
-            self.compatability_date
-                .clone()
-                .unwrap_or_else(|| "2025-10-02".to_string()),
-        );
+        self.compatibility_date = Some(self.compatibility_date.clone().unwrap_or_else(|| {
+            tracing::warn!("Set a default compatibility date.");
+            "2025-10-02".to_string()
+        }));
 
         self.main = Some(
             self.main
@@ -44,19 +50,22 @@ impl WranglerSpec {
 
         // Validate existing database configs, filling in missing values with a default
         for (i, d1) in self.d1_databases.iter_mut().enumerate() {
-            if d1.binding.is_none() {
-                d1.binding = Some(format!("db_{i}"));
+            if d1.database_name.is_none() {
+                d1.database_name = Some(format!("Cloesce_d1_{i}"));
+                tracing::warn!("Created a default database Cloesce_d1_{i}")
             }
 
-            if d1.database_name.is_none() {
-                d1.database_name = Some(format!("{}_d1_{i}", "Cloesce"));
+            if d1.binding.is_none() {
+                d1.binding = Some(format!("db_{i}"));
+                tracing::warn!("Created a default database binding db_{i}")
             }
 
             if d1.database_id.is_none() {
                 d1.database_id = Some("replace_with_db_id".into());
 
-                eprintln!(
-                    "Warning: Database \"default\" is missing an id. \n https://developers.cloudflare.com/d1/get-started/"
+                tracing::warn!(
+                    "Database {} is missing an id. See https://developers.cloudflare.com/d1/get-started/",
+                    d1.database_name.as_ref().unwrap()
                 );
             }
         }
@@ -69,10 +78,28 @@ impl WranglerSpec {
                 database_id: Some(String::from("replace_with_db_id")),
             });
 
-            eprintln!(
-                "Warning: Database \"default\" is missing an id. \n https://developers.cloudflare.com/d1/get-started/"
+            tracing::warn!(
+                "Database \"default\" is missing an id. See https://developers.cloudflare.com/d1/get-started/"
             );
         }
+    }
+
+    /// Validates that the bindings described in the AST's WranglerEnv are
+    /// consistent with the wrangler spec
+    pub fn validate_bindings(&self, ast: &CloesceAst) -> Result<()> {
+        // TODO: Multiple DB's
+        let d1_db = self.d1_databases.first().unwrap();
+        ensure!(
+            Some(&ast.wrangler_env.db_binding) == d1_db.binding.as_ref(),
+            GeneratorErrorKind::InconsistentDatabaseBinding,
+            "{}.{} != {} in {}",
+            ast.wrangler_env.name,
+            ast.wrangler_env.db_binding,
+            d1_db.binding.as_ref().unwrap(),
+            ast.wrangler_env.source_path.display()
+        );
+
+        Ok(())
     }
 }
 
@@ -115,7 +142,7 @@ impl WranglerFormat {
                 if let Some(name) = &spec.name {
                     val["name"] = serde_json::to_value(name).expect("JSON to serialize");
                 }
-                if let Some(date) = &spec.compatability_date {
+                if let Some(date) = &spec.compatibility_date {
                     val["compatibility_date"] =
                         serde_json::to_value(date).expect("JSON to serialize");
                 }
@@ -134,7 +161,7 @@ impl WranglerFormat {
                     if let Some(name) = &spec.name {
                         table.insert("name".to_string(), toml::Value::String(name.clone()));
                     }
-                    if let Some(date) = &spec.compatability_date {
+                    if let Some(date) = &spec.compatibility_date {
                         table.insert(
                             "compatibility_date".to_string(),
                             toml::Value::String(date.clone()),
@@ -176,6 +203,8 @@ impl WranglerFormat {
 
 #[cfg(test)]
 mod tests {
+    use ast::builder::create_ast;
+
     use crate::WranglerFormat;
 
     #[test]
@@ -189,5 +218,23 @@ mod tests {
         {
             WranglerFormat::Json(serde_json::from_str("{}").unwrap()).as_spec();
         }
+    }
+
+    #[test]
+    fn inconsistent_binding() {
+        // Arrange
+        let ast = create_ast(vec![]);
+        let mut spec = WranglerFormat::Toml(toml::from_str("").unwrap()).as_spec();
+        spec.generate_defaults();
+        spec.d1_databases[0].binding = Some("not matching".into());
+
+        // Act
+        let err = spec.validate_bindings(&ast).unwrap_err();
+
+        // Assert
+        assert!(matches!(
+            err.kind,
+            ast::err::GeneratorErrorKind::InconsistentDatabaseBinding
+        ));
     }
 }

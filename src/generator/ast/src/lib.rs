@@ -31,8 +31,11 @@ pub enum CidlType {
     /// SQLite string
     Text,
 
-    /// SQLite large structured data
-    Blob,
+    /// (SQL equivalent to Integer)
+    Boolean,
+
+    /// An ISO Date string (SQL equivalent to Text)
+    DateIso,
 
     /// A dependency injected instance, containing a type name.
     Inject(String),
@@ -92,6 +95,10 @@ impl CidlType {
 
     pub fn null() -> CidlType {
         CidlType::Nullable(Box::new(CidlType::Void))
+    }
+
+    pub fn http(cidl_type: CidlType) -> CidlType {
+        CidlType::HttpResult(Box::new(cidl_type))
     }
 }
 
@@ -157,6 +164,13 @@ pub struct NavigationProperty {
     pub kind: NavigationPropertyKind,
 }
 
+#[derive(Serialize, Deserialize, Hash, PartialEq, Eq, Debug)]
+pub enum CrudKind {
+    GET,
+    LIST,
+    SAVE,
+}
+
 #[serde_as]
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Model {
@@ -173,6 +187,8 @@ pub struct Model {
 
     #[serde_as(as = "MapPreventDuplicates<_, _>")]
     pub data_sources: BTreeMap<String, DataSource>,
+
+    pub cruds: Vec<CrudKind>,
 
     pub source_path: PathBuf,
 }
@@ -193,6 +209,7 @@ pub enum InputLanguage {
 pub struct WranglerEnv {
     pub name: String,
     pub source_path: PathBuf,
+    pub db_binding: String,
 }
 
 #[serde_as]
@@ -247,7 +264,6 @@ impl CloesceAst {
                     primary_key: model.primary_key,
                     attributes: model.attributes,
                     navigation_properties: model.navigation_properties,
-                    methods: model.methods,
                     data_sources: model.data_sources,
                 };
                 (name, m)
@@ -291,7 +307,11 @@ impl CloesceAst {
             ensure!(
                 matches!(
                     inner,
-                    CidlType::Integer | CidlType::Real | CidlType::Text | CidlType::Blob
+                    CidlType::Integer
+                        | CidlType::Real
+                        | CidlType::Text
+                        | CidlType::Boolean
+                        | CidlType::DateIso
                 ),
                 GeneratorErrorKind::InvalidSqlType,
                 "{}.{}",
@@ -330,32 +350,52 @@ impl CloesceAst {
             in_degree.entry(&model.name).or_insert(0);
 
             // Validate PK
+            ensure!(
+                !model.primary_key.cidl_type.is_nullable(),
+                GeneratorErrorKind::NullPrimaryKey,
+                "{}.{}",
+                model.name,
+                model.primary_key.name
+            );
             ensure_valid_sql_type(model, &model.primary_key)?;
 
             // Validate attributes
             for a in &model.attributes {
                 ensure_valid_sql_type(model, &a.value)?;
 
-                if let Some(fk_model) = &a.foreign_key_reference {
-                    // Validate the fk's model exists
+                if let Some(fk_model_name) = &a.foreign_key_reference {
+                    let Some(fk_model) = self.models.get(fk_model_name.as_str()) else {
+                        fail!(
+                            GeneratorErrorKind::UnknownObject,
+                            "{}.{} => {}?",
+                            model.name,
+                            a.value.name,
+                            fk_model_name
+                        );
+                    };
+
+                    // Validate the types are equal
                     ensure!(
-                        self.models.contains_key(fk_model.as_str()),
-                        GeneratorErrorKind::UnknownObject,
-                        "{}.{} => {}?",
+                        *a.value.cidl_type.root_type() == fk_model.primary_key.cidl_type,
+                        GeneratorErrorKind::MismatchedForeignKeyTypes,
+                        "{}.{} ({:?}) != {}.{} ({:?})",
                         model.name,
                         a.value.name,
-                        fk_model
+                        a.value.cidl_type,
+                        fk_model_name,
+                        fk_model.primary_key.name,
+                        fk_model.primary_key.cidl_type
                     );
 
                     model_reference_to_fk_model
-                        .insert((&model.name, a.value.name.as_str()), fk_model);
+                        .insert((&model.name, a.value.name.as_str()), fk_model_name);
 
                     // Nullable FK's do not constrain table creation order, and thus
                     // can be left out of the topo sort
                     if !a.value.cidl_type.is_nullable() {
                         // One To One: Person has a Dog ..(sql)=> Person has a fk to Dog
                         // Dog must come before Person
-                        graph.entry(fk_model).or_default().push(&model.name);
+                        graph.entry(fk_model_name).or_default().push(&model.name);
                         in_degree.entry(&model.name).and_modify(|d| *d += 1);
                     }
                 }
@@ -734,7 +774,6 @@ pub struct MigrationsModel {
     pub primary_key: NamedTypedValue,
     pub attributes: Vec<ModelAttribute>,
     pub navigation_properties: Vec<NavigationProperty>,
-    pub methods: BTreeMap<String, ModelMethod>,
     pub data_sources: BTreeMap<String, DataSource>,
 }
 

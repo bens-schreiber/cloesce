@@ -10,55 +10,6 @@
       },
       "attributes": [],
       "navigation_properties": [],
-      "methods": {
-        "blockedMethod": {
-          "name": "blockedMethod",
-          "is_static": true,
-          "http_verb": "GET",
-          "return_type": "Void",
-          "parameters": []
-        },
-        "getInjectedThing": {
-          "name": "getInjectedThing",
-          "is_static": true,
-          "http_verb": "GET",
-          "return_type": {
-            "Object": "InjectedThing"
-          },
-          "parameters": [
-            {
-              "name": "thing",
-              "cidl_type": {
-                "Inject": "InjectedThing"
-              }
-            }
-          ]
-        },
-        "post": {
-          "name": "post",
-          "is_static": true,
-          "http_verb": "POST",
-          "return_type": {
-            "HttpResult": {
-              "Object": "Model"
-            }
-          },
-          "parameters": [
-            {
-              "name": "obj",
-              "cidl_type": {
-                "Partial": "Model"
-              }
-            },
-            {
-              "name": "dataSource",
-              "cidl_type": {
-                "DataSource": "Model"
-              }
-            }
-          ]
-        }
-      },
       "data_sources": {}
     }
   }

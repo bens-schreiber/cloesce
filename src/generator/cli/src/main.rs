@@ -5,6 +5,7 @@ use std::{
 };
 
 use clap::{Parser, Subcommand, command};
+use tracing_subscriber::FmtSubscriber;
 
 use ast::{
     CloesceAst, MigrationsAst,
@@ -28,8 +29,13 @@ enum Commands {
         cidl_path: PathBuf,
     },
     Generate {
-        #[command(subcommand)]
-        target: GenerateTarget,
+        pre_cidl_path: PathBuf,
+        cidl_path: PathBuf,
+        wrangler_path: PathBuf,
+        workers_path: PathBuf,
+        client_path: PathBuf,
+        client_domain: String,
+        workers_domain: String,
     },
     Migrations {
         cidl_path: PathBuf,
@@ -39,34 +45,12 @@ enum Commands {
     },
 }
 
-#[derive(Subcommand)]
-enum GenerateTarget {
-    Wrangler {
-        wrangler_path: PathBuf,
-    },
-    Workers {
-        cidl_path: PathBuf,
-        workers_path: PathBuf,
-        wrangler_path: PathBuf,
-        domain: String,
-    },
-    Client {
-        cidl_path: PathBuf,
-        client_path: PathBuf,
-        domain: String,
-    },
-    All {
-        pre_cidl_path: PathBuf,
-        cidl_path: PathBuf,
-        wrangler_path: PathBuf,
-        workers_path: PathBuf,
-        client_path: PathBuf,
-        client_domain: String,
-        workers_domain: String,
-    },
-}
-
 fn main() {
+    let subscriber = FmtSubscriber::builder().finish();
+
+    tracing::subscriber::set_global_default(subscriber)
+        .expect("Failed to set global default subscriber");
+
     match panic::catch_unwind(run_cli) {
         Ok(Ok(())) => std::process::exit(0),
         Ok(Err(e)) if matches!(e.kind, GeneratorErrorKind::InvalidInputFile) => {
@@ -77,22 +61,25 @@ fn main() {
         }
         Ok(Err(e)) => {
             eprintln!(
-                r#"==== CLOESCE ERROR ====
+                r#"
+==== CLOESCE ERROR ====
 Error [{:?}]: {}
 Phase: {:?}
 Context: {}
-Suggested fix: {}"#,
+Suggested fix: {}
+
+"#,
                 e.kind, e.description, e.phase, e.context, e.suggestion
             );
         }
         Err(e) => {
-            eprintln!("==== GENERATOR PANIC CAUGHT ====");
+            tracing::error!("==== GENERATOR PANIC CAUGHT ====");
             let msg = e
                 .downcast_ref::<&str>()
                 .copied()
                 .or_else(|| e.downcast_ref::<String>().map(|s| s.as_str()))
                 .unwrap_or("Panic occurred but couldn't extract info.");
-            eprintln!("Panic info: {}", msg);
+            tracing::error!("Panic info: {}", msg);
         }
     }
 
@@ -105,8 +92,9 @@ fn run_cli() -> Result<()> {
             pre_cidl_path,
             cidl_path,
         } => {
-            validate_cidl(&pre_cidl_path, &cidl_path)?;
-            println!("Ok.");
+            let ast = validate_cidl(&pre_cidl_path)?;
+            write_cidl(ast, &cidl_path)?;
+            tracing::info!("Validation OK.");
         }
         Commands::Migrations {
             cidl_path,
@@ -114,8 +102,10 @@ fn run_cli() -> Result<()> {
             migrated_sql_path,
             last_migrated_cidl_path,
         } => {
-            let mut migrated_cidl_file = create_file_and_dir(&migrated_cidl_path)?;
-            let mut migrated_sql_file = create_file_and_dir(&migrated_sql_path)?;
+            tracing::info!("Starting migration ({})", migrated_sql_path.display());
+
+            let mut migrated_cidl_file = open_file_or_create(&migrated_cidl_path)?;
+            let mut migrated_sql_file = open_file_or_create(&migrated_sql_path)?;
 
             let lm_ast = last_migrated_cidl_path
                 .map(|p| MigrationsAst::from_json(&p))
@@ -130,50 +120,24 @@ fn run_cli() -> Result<()> {
             migrated_sql_file
                 .write_all(generated_sql.as_bytes())
                 .expect("Could not write to file");
+
+            tracing::info!("Finished migration.");
         }
-        Commands::Generate { target } => match target {
-            GenerateTarget::Wrangler { wrangler_path } => generate_wrangler(&wrangler_path)?,
-            GenerateTarget::Workers {
-                cidl_path,
-                workers_path,
-                wrangler_path,
-                domain,
-            } => {
-                let ast = CloesceAst::from_json(&cidl_path)?;
-                generate_workers(&ast, &workers_path, &wrangler_path, &domain)?
-            }
-            GenerateTarget::Client {
-                cidl_path,
-                client_path,
-                domain,
-            } => {
-                let ast = CloesceAst::from_json(&cidl_path)?;
-                generate_client(&ast, &client_path, &domain)?
-            }
-            GenerateTarget::All {
-                pre_cidl_path,
-                cidl_path,
-                wrangler_path,
-                workers_path,
-                client_path,
-                client_domain,
-                workers_domain,
-            } => {
-                let ast = validate_cidl(&pre_cidl_path, &cidl_path)?;
-                println!("Validation complete.");
-
-                generate_wrangler(&wrangler_path)?;
-                println!("Wrangler generated.");
-
-                generate_workers(&ast, &workers_path, &wrangler_path, &workers_domain)?;
-                println!("Workers generated.");
-
-                generate_client(&ast, &client_path, &client_domain)?;
-                println!("Client generated.");
-
-                println!("All generation steps completed successfully!");
-            }
-        },
+        Commands::Generate {
+            pre_cidl_path,
+            cidl_path,
+            wrangler_path,
+            workers_path,
+            client_path,
+            client_domain,
+            workers_domain,
+        } => {
+            let mut ast = validate_cidl(&pre_cidl_path)?;
+            generate_wrangler(&wrangler_path, &ast)?;
+            generate_workers(&mut ast, &workers_path, &wrangler_path, &workers_domain)?;
+            generate_client(&ast, &client_path, &client_domain)?;
+            write_cidl(ast, &cidl_path)?;
+        }
     }
 
     Ok(())
@@ -228,47 +192,52 @@ impl MigrationsCli {
 
                 let mut input = String::new();
                 if io::stdin().read_line(&mut input).is_err() {
-                    eprintln!("Error reading input. Aborting migrations.");
+                    tracing::error!("Error reading input. Aborting migrations.");
                     std::process::abort();
                 }
 
                 let idx = input.trim().parse::<usize>().unwrap_or_else(|_| {
-                    eprintln!("Invalid selection. Aborting migrations.");
+                    tracing::error!("Invalid selection. Aborting migrations.");
                     std::process::abort();
                 });
 
                 if idx >= options.len() {
-                    eprintln!("Index out of range. Aborting migrations.");
+                    tracing::error!("Index out of range. Aborting migrations.");
                     std::process::abort();
                 }
 
                 Some(idx)
             }
             _ => {
-                eprintln!("Invalid option. Aborting migrations.");
+                tracing::error!("Invalid option. Aborting migrations.");
                 std::process::abort();
             }
         }
     }
 }
 
-fn validate_cidl(pre_cidl_path: &Path, cidl_path: &Path) -> Result<CloesceAst> {
+fn validate_cidl(pre_cidl_path: &Path) -> Result<CloesceAst> {
     let mut ast = CloesceAst::from_json(pre_cidl_path)?;
     ast.semantic_analysis()?;
     ast.set_merkle_hash();
 
-    let mut cidl_file = create_file_and_dir(cidl_path)?;
+    Ok(ast)
+}
+
+fn write_cidl(ast: CloesceAst, cidl_path: &Path) -> Result<()> {
+    let mut cidl_file = open_file_or_create(cidl_path)?;
     cidl_file
         .write_all(ast.to_json().as_bytes())
         .expect("file to be written");
 
-    Ok(ast)
+    Ok(())
 }
 
-fn generate_wrangler(wrangler_path: &Path) -> Result<()> {
+fn generate_wrangler(wrangler_path: &Path, ast: &CloesceAst) -> Result<()> {
     let mut wrangler = WranglerFormat::from_path(wrangler_path);
     let mut spec = wrangler.as_spec();
     spec.generate_defaults();
+    spec.validate_bindings(ast)?;
 
     let wrangler_file = std::fs::OpenOptions::new()
         .write(true)
@@ -286,12 +255,12 @@ fn generate_wrangler(wrangler_path: &Path) -> Result<()> {
 }
 
 fn generate_workers(
-    ast: &CloesceAst,
+    ast: &mut CloesceAst,
     workers_path: &Path,
     wrangler_path: &Path,
     domain: &str,
 ) -> Result<()> {
-    let mut file = create_file_and_dir(workers_path)?;
+    let mut file = open_file_or_create(workers_path)?;
     let wrangler = WranglerFormat::from_path(wrangler_path);
 
     let workers =
@@ -302,13 +271,21 @@ fn generate_workers(
 }
 
 fn generate_client(ast: &CloesceAst, client_path: &Path, domain: &str) -> Result<()> {
-    let mut file = create_file_and_dir(client_path)?;
+    let mut file = open_file_or_create(client_path)?;
     file.write_all(client::generate_client_api(ast, domain.to_string()).as_bytes())
         .expect("Could not write to file");
     Ok(())
 }
 
-fn create_file_and_dir(path: &Path) -> Result<std::fs::File> {
+fn open_file_or_create(path: &Path) -> Result<std::fs::File> {
+    if path.exists() {
+        std::fs::File::open(path).map_err(|e| {
+            GeneratorErrorKind::InvalidInputFile
+                .to_error()
+                .with_context(e.to_string())
+        })?;
+    }
+
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent).map_err(|e| {
             GeneratorErrorKind::InvalidInputFile

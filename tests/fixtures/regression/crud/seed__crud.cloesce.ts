@@ -11,31 +11,32 @@ import {
   IncludeTree,
 } from "cloesce/backend";
 import { D1Database } from "@cloudflare/workers-types";
+type Integer = number & { __kind: "Integer" };
 
 @WranglerEnv
 export class Env {
   db: D1Database;
 }
 
-@CRUD(["POST", "GET", "LIST"])
+@CRUD(["SAVE", "GET", "LIST"])
 @D1
 export class CrudHaver {
   @PrimaryKey
-  id: number;
+  id: Integer;
   name: string;
 
   @POST
   async notCrud(): Promise<void> {}
 }
 
-@CRUD(["POST", "GET", "LIST"])
+@CRUD(["SAVE", "GET", "LIST"])
 @D1
 export class Parent {
   @PrimaryKey
-  id: number;
+  id: Integer;
 
   @ForeignKey("Child")
-  favoriteChildId: number | null;
+  favoriteChildId: Integer | null;
 
   @OneToOne("favoriteChildId")
   favoriteChild: Child | undefined;
@@ -53,10 +54,10 @@ export class Parent {
 @D1
 export class Child {
   @PrimaryKey
-  id: number;
+  id: Integer;
 
   @ForeignKey(Parent)
-  parentId: number;
+  parentId: Integer;
 
   @OneToOne("parentId")
   parent: Parent | undefined;

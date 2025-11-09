@@ -6,6 +6,7 @@ pub type Result<T> = std::result::Result<T, GeneratorError>;
 pub enum GeneratorPhase {
     ModelSemanticAnalysis,
     Workers,
+    Wrangler,
 }
 
 #[derive(Debug)]
@@ -59,6 +60,7 @@ impl GeneratorError {
 pub enum GeneratorErrorKind {
     InvalidInputFile,
     NullSqlType,
+    NullPrimaryKey,
     InvalidSqlType,
     UnknownObject,
     UnknownDataSourceReference,
@@ -68,12 +70,14 @@ pub enum GeneratorErrorKind {
     NotYetSupported,
     InvalidMapping,
     InvalidApiDomain,
+    MismatchedForeignKeyTypes,
     MismatchedNavigationPropertyTypes,
     InvalidNavigationPropertyReference,
     CyclicalModelDependency,
     UnknownIncludeTreeReference,
     ExtraneousManyToManyReferences,
     MissingManyToManyReference,
+    InconsistentDatabaseBinding,
 }
 
 impl GeneratorErrorKind {
@@ -84,13 +88,18 @@ impl GeneratorErrorKind {
                 "Remove 'null' from your Model definition.",
                 GeneratorPhase::ModelSemanticAnalysis,
             ),
+            GeneratorErrorKind::NullPrimaryKey => (
+                "Primary keys cannot be nullable",
+                "Remove 'null' from the primary key definition",
+                GeneratorPhase::ModelSemanticAnalysis,
+            ),
             GeneratorErrorKind::InvalidSqlType => (
-                "Model attributes must be valid SQLite types: Integer, Real, Text, Blob",
+                "Model attributes must be valid SQLite types: Integer, Real, Text",
                 "Consider using a navigation property or creating another model.",
                 GeneratorPhase::ModelSemanticAnalysis,
             ),
             GeneratorErrorKind::UnknownObject => (
-                "Objects must be decorated appropriately as a Model or PlainOldObject",
+                "Objects must be decorated appropriately as a Model, PlainOldObject, or Inject",
                 "Consider using a decorator on the object.",
                 GeneratorPhase::ModelSemanticAnalysis,
             ),
@@ -129,6 +138,11 @@ impl GeneratorErrorKind {
                 "API's must be of the form: http://domain.com/path/to/api",
                 GeneratorPhase::Workers,
             ),
+            GeneratorErrorKind::MismatchedForeignKeyTypes => (
+                "Mismatched foreign keys",
+                "Foreign keys must be the same type as their reference",
+                GeneratorPhase::ModelSemanticAnalysis,
+            ),
             GeneratorErrorKind::MismatchedNavigationPropertyTypes => (
                 "Navigation property references must match attribute types",
                 "TODO: a good suggestion here",
@@ -158,6 +172,11 @@ impl GeneratorErrorKind {
                 "Many to Many navigation properties must have a correlated reference on the adjacent model.",
                 "TODO: a good indicator of where to add the nav prop",
                 GeneratorPhase::ModelSemanticAnalysis,
+            ),
+            GeneratorErrorKind::InconsistentDatabaseBinding => (
+                "Wrangler file definitions must be consistent with the WranglerEnv definition",
+                "Change your WranglerEnv's database binding to match the Wrangler file",
+                GeneratorPhase::Wrangler,
             ),
 
             // Generic error, handeled seperately from all others

@@ -63,12 +63,11 @@ const cmds = subcommands({
 
         const outputDir = config.outputDir ?? ".generated";
 
-        const allConfig: WasmConfig = {
-          name: "all",
+        const generateConfig: WasmConfig = {
+          name: "generate",
           wasmFile: "generator.wasm",
           args: [
             "generate",
-            "all",
             path.join(outputDir, "cidl.pre.json"),
             path.join(outputDir, "cidl.json"),
             "wrangler.toml",
@@ -80,7 +79,7 @@ const cmds = subcommands({
         };
 
         // Runs a generator command. Exits the process on failure.
-        await generate(allConfig);
+        await generate(generateConfig);
       },
     }),
 
@@ -266,13 +265,15 @@ async function extract(opts: {
     fs.mkdirSync(path.dirname(outPath), { recursive: true });
     fs.writeFileSync(outPath, json);
 
-    console.log(`CIDL generated successfully at ${outPath}`);
+    console.log(`CIDL extracted to ${outPath}`);
 
     return { outPath, projectName: cloesceProjectName };
   } catch (err: any) {
     console.error(
-      "Critical uncaught error. Submit a ticket to https://github.com/bens-schreiber/cloesce: ",
-      err?.message ?? err,
+      "Critical uncaught error in generator. \nSubmit a ticket to https://github.com/bens-schreiber/cloesce\n\n",
+      err?.message ?? "No error message.",
+      "\n",
+      err?.stack ?? "No error stack.",
     );
     process.exit(1);
   }
@@ -394,10 +395,13 @@ function formatErr(e: ExtractorError): string {
   const contextLine = e.context ? `Context: ${e.context}\n` : "";
   const snippetLine = e.snippet ? `${e.snippet}\n\n` : "";
 
-  return `==== CLOESCE ERROR ====
+  return `
+==== CLOESCE ERROR ====
 Error [${ExtractorErrorCode[e.code]}]: ${description}
 Phase: TypeScript IDL Extraction
-${contextLine}${snippetLine}Suggested fix: ${suggestion}`;
+${contextLine}${snippetLine}Suggested fix: ${suggestion}
+
+`;
 }
 
 run(cmds, process.argv.slice(2)).catch((err) => {
