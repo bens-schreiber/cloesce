@@ -4,9 +4,8 @@ use std::{
 };
 
 use ast::{
-    CidlType, CloesceAst, HttpVerb, Model, ModelMethod, NamedTypedValue, PlainOldObject,
     err::{GeneratorErrorKind, Result},
-    fail,
+    fail, CidlType, CloesceAst, HttpVerb, Model, ModelMethod, NamedTypedValue, PlainOldObject,
 };
 
 use indexmap::IndexMap;
@@ -247,6 +246,7 @@ async function fetch(request: Request, env: any, ctx: any): Promise<Response> {{
             apiRoute
         );
     }} catch(e: any) {{
+        console.error(JSON.stringify(e));
         return new Response(JSON.stringify({{
             ok: false,
             status: 500,

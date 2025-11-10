@@ -23,6 +23,7 @@ async function fetch(request: Request, env: any, ctx: any): Promise<Response> {
             apiRoute
         );
     } catch(e: any) {
+        console.error(JSON.stringify(e));
         return new Response(JSON.stringify({
             ok: false,
             status: 500,
