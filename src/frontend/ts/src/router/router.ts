@@ -258,7 +258,30 @@ async function validateRequest(
   const url = new URL(request.url);
   let params: RequestParamMap = {};
   if (method.http_verb === "GET") {
-    params = Object.fromEntries(url.searchParams.entries());
+    const sp: URLSearchParams = url.searchParams;
+    const coerce = (v: string): unknown => {
+      if (v === "null") return null;
+      if (v === "true") return true;
+      if (v === "false") return false;
+      return v;
+    };
+    const out: RequestParamMap = {};
+    const uniqueKeys = new Set<string>();
+    for (const [k] of sp.entries()) uniqueKeys.add(k);
+    for (const rawKey of uniqueKeys) {
+      const isBracket = rawKey.endsWith("[]");
+      const key = isBracket ? rawKey.slice(0, -2) : rawKey;
+      const values: string[] = sp.getAll(rawKey);
+      if (values.length > 1 || isBracket) {
+        out[key] = values.map((v: string) => coerce(v));
+      } else {
+        const single: string | undefined = values[0];
+        if (single !== undefined) {
+          out[key] = coerce(single);
+        }
+      }
+    }
+    params = out; 
   } else {
     try {
       params = await request.json();
