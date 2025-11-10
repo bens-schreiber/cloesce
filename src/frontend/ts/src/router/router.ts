@@ -3,9 +3,7 @@ import {
   HttpResult,
   Either,
   ModelMethod,
-  left,
   CidlType,
-  right,
   CloesceAst,
   isNullableType,
   Model,
@@ -16,6 +14,7 @@ import {
 } from "../common.js";
 import { OrmWasmExports, mapSql, loadOrmWasm } from "./wasm.js";
 import { CrudContext } from "./crud.js";
+import { IncludeTree, Orm } from "../ui/backend.js";
 
 /**
  * Map of model names to their respective constructor.
@@ -101,10 +100,10 @@ export async function cloesce(
 
   //#region Match the route to a model method
   const route = matchRoute(request, ast, apiRoute);
-  if (!route.ok) {
+  if (route.isLeft()) {
     return toResponse(route.value);
   }
-  const { method, model, id } = route.value;
+  const { method, model, id } = route.unwrap();
   //#endregion
 
   //#region Model Middleware
@@ -118,10 +117,10 @@ export async function cloesce(
 
   //#region Validate request body to the model method
   const validation = await validateRequest(request, ast, model, method, id);
-  if (!validation.ok) {
+  if (validation.isLeft()) {
     return toResponse(validation.value);
   }
-  const { params, dataSource } = validation.value;
+  const { params, dataSource } = validation.unwrap();
   //#endregion
 
   //#region Method Middleware
@@ -136,7 +135,9 @@ export async function cloesce(
   //#region Instantatiate the model
   const crudCtx = await (async () => {
     if (method.is_static) {
-      return right(CrudContext.fromCtor(d1, constructorRegistry[model.name]));
+      return Either.right(
+        CrudContext.fromCtor(d1, constructorRegistry[model.name]),
+      );
     }
 
     const hydratedModel = await hydrateModel(
@@ -147,11 +148,7 @@ export async function cloesce(
       dataSource!, // ds must exist after validateRequest
     );
 
-    if (!hydratedModel.ok) {
-      return hydratedModel;
-    }
-
-    return right(
+    return hydratedModel.map((_) =>
       CrudContext.fromInstance(
         d1,
         hydratedModel.value,
@@ -159,12 +156,12 @@ export async function cloesce(
       ),
     );
   })();
-  if (!crudCtx.ok) {
+  if (crudCtx.isLeft()) {
     return toResponse(crudCtx.value);
   }
   //#endregion
 
-  return toResponse(await methodDispatch(crudCtx.value, ir, method, params));
+  return toResponse(await methodDispatch(crudCtx.unwrap(), ir, method, params));
 }
 
 /**
@@ -189,7 +186,7 @@ function matchRoute(
   // Error state: We expect an exact request format, and expect that the model
   // and are apart of the CIDL
   const notFound = (e: string) =>
-    left(errorState(404, `Path not found: ${e} ${url.pathname}`));
+    Either.left(errorState(404, `Path not found: ${e} ${url.pathname}`));
 
   const routeParts = url.pathname
     .slice(apiRoute.length)
@@ -219,7 +216,7 @@ function matchRoute(
     return notFound("Unmatched HTTP method");
   }
 
-  return right({
+  return Either.right({
     model,
     method,
     id,
@@ -242,7 +239,7 @@ async function validateRequest(
 > {
   // Error state: any missing parameter, body, or malformed input will exit with 400.
   const invalidRequest = (e: string) =>
-    left(errorState(400, `Invalid Request Body: ${e}`));
+    Either.left(errorState(400, `Invalid Request Body: ${e}`));
 
   if (!method.is_static && id == null) {
     return invalidRequest("Id's are required for instantiated methods.");
@@ -298,7 +295,7 @@ async function validateRequest(
     return invalidRequest(`Unknown data source ${dataSource}`);
   }
 
-  return right({ params, dataSource });
+  return Either.right({ params, dataSource });
 }
 
 /**
@@ -318,7 +315,7 @@ async function hydrateModel(
   // Error state: If the D1 database has been tweaked outside of Cloesce
   // resulting in a malformed query, exit with a 500.
   const malformedQuery = (e: any) =>
-    left(
+    Either.left(
       errorState(
         500,
         `Error in hydration query, is the database out of sync with the backend?: ${e instanceof Error ? e.message : String(e)}`,
@@ -326,18 +323,23 @@ async function hydrateModel(
     );
 
   // Error state: If no record is found for the id, return a 404
-  const missingRecord = left(errorState(404, "Record not found"));
-
-  const pk = model.primary_key.name;
-  const query =
-    dataSource !== NO_DATA_SOURCE
-      ? `SELECT * FROM "${model.name}.${dataSource}" WHERE "${pk}" = ?`
-      : `SELECT * FROM "${model.name}" WHERE "${pk}" = ?`;
+  const missingRecord = Either.left(errorState(404, "Record not found"));
 
   // Query DB
   let records;
   try {
-    records = await d1.prepare(query).bind(id).run();
+    let includeTree: IncludeTree<any> | null =
+      dataSource === NO_DATA_SOURCE
+        ? null
+        : (constructorRegistry[model.name] as any)[dataSource];
+
+    records = await d1
+      .prepare(
+        Orm.getQuery(constructorRegistry[model.name], includeTree).unwrap(),
+      )
+      .bind(id)
+      .run();
+
     if (!records?.results) {
       return missingRecord;
     }
@@ -355,7 +357,7 @@ async function hydrateModel(
     model.data_sources[dataSource]?.tree ?? {},
   ).value as object[];
 
-  return right(models[0]);
+  return Either.right(models[0]);
 }
 
 /**

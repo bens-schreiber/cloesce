@@ -90,7 +90,6 @@ database_name = "example"
 A model is a type which represents:
 
 - a database table,
-- database views
 - REST API
 - Client API
 - Cloudflare infrastructure (D1 + Workers)
@@ -266,113 +265,7 @@ export class Person {
 }
 ```
 
-Data sources are just SQL views and can be invoked in your queries. They are aliased in such a way that its similiar to object properties. The frontend chooses which datasource to use in it's API client (all instantiated methods have an implicit DataSource parameter). `null` is a valid option, meaning no joins will occur.
-
-```ts
-@D1
-export class Person {
-  @PrimaryKey
-  id: number;
-
-  @ForeignKey(Dog)
-  dogId: number;
-
-  @OneToOne("dogId")
-  dog: Dog | undefined;
-
-  @DataSource
-  static readonly default: IncludeTree<Person> = {
-    dog: {},
-  };
-
-  @GET
-  static async get(id: number, @Inject env: WranglerEnv): Promise<Person> {
-    let records = await env.db
-      .prepare("SELECT * FROM [Person.default] WHERE [id] = ?") // Person.default is the SQL view generated from the IncludeTree
-      .bind(id)
-      .run();
-
-    let persons = Orm.mapSql(Person, records.results, Person.default);
-    return persons.value[0];
-  }
-}
-```
-
-Note that the `get` code can be simplified using CRUD methods or the ORM primitive `get`.
-
-#### View Aliasing
-
-The generated views will always be aliased so that they can be accessed in an object like notation. For example, given some `Horse` that has a relationship with `Like`:
-
-```ts
-@D1
-export class Horse {
-  @PrimaryKey
-  id: Integer;
-
-  name: string;
-  bio: string | null;
-
-  @OneToMany("horseId1")
-  likes: Like[];
-
-  @DataSource
-  static readonly default: IncludeTree<Horse> = {
-    likes: { horse2: {} },
-  };
-}
-
-@D1
-export class Like {
-  @PrimaryKey
-  id: Integer;
-
-  @ForeignKey(Horse)
-  horseId1: Integer;
-
-  @ForeignKey(Horse)
-  horseId2: Integer;
-
-  @OneToOne("horseId2")
-  horse2: Horse | undefined;
-}
-```
-
-If you wanted to find all horses that like one another, a valid SQL query using the `default` data source would look like:
-
-```sql
-SELECT *
-FROM [Horse.default]
-WHERE
-  [likes.horse2.id] = ?
-  AND [id] IN (
-    SELECT [likes.horse2.id]
-    FROM [Horse.default]
-    WHERE [id] = ?
-  );
-```
-
-The actual generated view for `default` looks like:
-
-```sql
-CREATE VIEW IF NOT EXISTS "Horse.default" AS
-SELECT
-    "Horse"."id"          AS "id",
-    "Horse"."name"        AS "name",
-    "Horse"."bio"         AS "bio",
-    "Like"."id"           AS "likes.id",
-    "Like"."horseId1"     AS "likes.horseId1",
-    "Like"."horseId2"     AS "likes.horseId2",
-    "Horse1"."id"         AS "likes.horse2.id",
-    "Horse1"."name"       AS "likes.horse2.name",
-    "Horse1"."bio"        AS "likes.horse2.bio"
-FROM
-    "Horse"
-LEFT JOIN
-    "Like" ON "Horse"."id" = "Like"."horseId1"
-LEFT JOIN
-    "Horse" AS "Horse1" ON "Like"."horseId2" = "Horse1"."id";
-```
+Data sources describe how foreign keys should be joined on model hydration (i.e. when invoking any instantiated method). They are composed of an `IncludeTree<T>`, a recursive type composed of the relationships you wish to include. All scalar properties are always included.
 
 #### DataSourceOf<T>
 
@@ -389,6 +282,8 @@ class Foo {
   }
 }
 ```
+
+Note that `DataSourceOf` is added implicitly to all instantiated methods if no data source parameter is defined.
 
 ### One to Many
 
@@ -474,6 +369,44 @@ class Horse {
 
 #### List, Get
 
+Both methods take an optional `IncludeTree<T>` parameter to specify what relationships in the generated CTE.
+
+```ts
+@D1
+export class Person {
+  @PrimaryKey
+  id: number;
+
+  @ForeignKey(Dog)
+  dogId: number;
+
+  @OneToOne("dogId")
+  dog: Dog | undefined;
+
+  @DataSource
+  static readonly default: IncludeTree<Person> = {
+    dog: {},
+  };
+}
+```
+
+Running `Orm.listQuery` with the data source `Person.default` would produce the CTE:
+
+```sql
+WITH "Person_view" AS (
+  SELECT
+      "Person"."id"      AS "id",
+      "Person"."dogId"   AS "dogId",
+      "Dog"."id"         AS "dog.id"
+  FROM
+      "Person"
+  LEFT JOIN
+      "Dog" ON "Person"."dogId" = "Dog"."id"
+) SELECT * FROM "Person_view"
+```
+
+Example usages:
+
 ```ts
 @D1
 class Horse {
@@ -481,15 +414,37 @@ class Horse {
   @GET
   static async get(@Inject { db }: Env, id: number): Promise<Horse> {
     const orm = Orm.fromD1(db);
-    return (await orm.get(Horse, id, "default")).value;
+    return (await orm.get(Horse, id, Horse.default)).value;
   }
 
   @GET
   static async list(@Inject { db }: Env): Promise<Horse[]> {
     const orm = Orm.fromD1(db);
-    return (await orm.list(Horse, "default")).value;
+    return (await orm.list(Horse, {})).value;
   }
 }
+```
+
+`list` takes an optional `from` parameter to modify the source of the list query. This is useful in filtering / limiting results.
+
+```ts
+await orm.list(
+  Horse,
+  Horse.default,
+  "SELECT * FROM Horse ORDER BY name LIMIT 10"
+);
+```
+
+produces SQL
+
+```sql
+WITH "Horse_view" AS (
+  SELECT
+      "Horse"."id"      AS "id",
+      "Horse"."name"    AS "name"
+  FROM
+      (SELECT * FROM Horse ORDER BY name LIMIT 10) as "Horse"
+) SELECT * FROM "Horse_view"
 ```
 
 ### CRUD Methods

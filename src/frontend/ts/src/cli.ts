@@ -233,12 +233,12 @@ async function extract(opts: {
     const extractor = new CidlExtractor(cloesceProjectName, "v0.0.3");
     const result = extractor.extract(project);
 
-    if (!result.ok) {
+    if (result.isLeft()) {
       console.error(formatErr(result.value));
       process.exit(1);
     }
 
-    let ast = result.value;
+    let ast = result.unwrap();
 
     if (truncate) {
       ast.wrangler_env.source_path =

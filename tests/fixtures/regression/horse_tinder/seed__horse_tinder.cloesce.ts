@@ -52,13 +52,13 @@ class Horse {
   @GET
   static async get(@Inject { db }: Env, id: Integer): Promise<Horse> {
     const orm = Orm.fromD1(db);
-    return (await orm.get(Horse, id, "default")).value;
+    return (await orm.get(Horse, id, Horse.default)).value;
   }
 
   @GET
   static async list(@Inject { db }: Env): Promise<Horse[]> {
     const orm = Orm.fromD1(db);
-    return (await orm.list(Horse, "default")).value;
+    return (await orm.list(Horse, Horse.default)).value;
   }
 
   @POST

@@ -13,19 +13,5 @@ CREATE TABLE IF NOT EXISTS "Child" (
   FOREIGN KEY ("parentId") REFERENCES "Parent" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
 );
 
---- New Data Sources
-CREATE VIEW IF NOT EXISTS "Parent.withChildren" AS
-SELECT
-  "Parent"."id" AS "id",
-  "Parent"."favoriteChildId" AS "favoriteChildId",
-  "Child"."id" AS "favoriteChild.id",
-  "Child"."parentId" AS "favoriteChild.parentId",
-  "Child1"."id" AS "children.id",
-  "Child1"."parentId" AS "children.parentId"
-FROM
-  "Parent"
-  LEFT JOIN "Child" ON "Parent"."favoriteChildId" = "Child"."id"
-  LEFT JOIN "Child" AS "Child1" ON "Parent"."id" = "Child1"."parentId";
-
 --- Cloesce Temporary Table
-CREATE TABLE "_cloesce_tmp" ("path" text PRIMARY KEY, "id" integer NOT NULL);
+CREATE TABLE IF NOT EXISTS "_cloesce_tmp" ("path" text PRIMARY KEY, "id" integer NOT NULL);

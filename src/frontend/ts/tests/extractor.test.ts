@@ -40,7 +40,7 @@ describe("CIDL Type", () => {
     // Act
     const cidlTypes = attributes.map((a) => {
       const res = CidlExtractor.cidlType(a);
-      expect(res.ok).toBe(true);
+      expect(res.isRight()).toBe(true);
       return res.value as CidlType;
     });
 
@@ -79,7 +79,7 @@ describe("CIDL Type", () => {
     // Act
     const cidlTypes = attributes.map((a) => {
       const res = CidlExtractor.cidlType(a);
-      expect(res.ok).toBe(true);
+      expect(res.isRight()).toBe(true);
       return res.value as CidlType;
     });
 
@@ -123,7 +123,7 @@ describe("CIDL Type", () => {
     // Act
     const cidlTypes = attributes.map((a) => {
       const res = CidlExtractor.cidlType(a);
-      expect(res.ok).toBe(true);
+      expect(res.isRight()).toBe(true);
       return res.value as CidlType;
     });
 
@@ -156,7 +156,7 @@ describe("Middleware", () => {
 
     // Assert
     console.log(res.value);
-    expect(res.ok).toBe(true);
+    expect(res.isRight()).toBe(true);
   });
 });
 
@@ -180,7 +180,7 @@ describe("WranglerEnv", () => {
     const res = CidlExtractor.env(classDecl, sourceFile);
 
     // Assert
-    expect(res.ok).toBe(true);
+    expect(res.isRight()).toBe(true);
   });
 });
 
@@ -208,9 +208,9 @@ describe("Data Source", () => {
     const res = CidlExtractor.model(classDecl, sourceFile);
 
     // Assert
-    expect(res.ok).toBe(true);
+    expect(res.isRight()).toBe(true);
 
-    expect((res.value as Model).data_sources["default"]).toStrictEqual({
+    expect(res.unwrap().data_sources["default"]).toStrictEqual({
       name: "default",
       tree: {},
     } as DataSource);

@@ -1,11 +1,4 @@
-import {
-  CidlIncludeTree,
-  CloesceAst,
-  Either,
-  Model,
-  left,
-  right,
-} from "../common.js";
+import { CidlIncludeTree, CloesceAst, Either, Model } from "../common.js";
 import { IncludeTree } from "../ui/backend.js";
 import { RuntimeContainer } from "./router.js";
 
@@ -23,7 +16,7 @@ export interface OrmWasmExports {
   alloc(len: number): number;
   dealloc(ptr: number, len: number): void;
 
-  object_relational_mapping(
+  map_sql(
     model_name_ptr: number,
     model_name_len: number,
     sql_rows_ptr: number,
@@ -39,6 +32,15 @@ export interface OrmWasmExports {
     new_model_len: number,
     include_tree_ptr: number,
     include_tree_len: number,
+  ): boolean;
+
+  list_models(
+    model_name_ptr: number,
+    model_name_len: number,
+    include_tree_ptr: number,
+    include_tree_len: number,
+    custom_from_ptr: number,
+    custom_from_len: number,
   ): boolean;
 }
 
@@ -109,7 +111,7 @@ export function invokeOrmWasm<T>(
       new Uint8Array(wasm.memory.buffer, resPtr, resLen),
     );
 
-    return failed ? left(result) : right(result as T);
+    return failed ? Either.left(result) : Either.right(result as T);
   } finally {
     args.forEach((a) => a.free());
     if (resPtr && resLen) wasm.dealloc(resPtr, resLen);
@@ -132,15 +134,11 @@ export function mapSql<T extends object>(
     WasmResource.fromString(JSON.stringify(includeTree), wasm),
   ];
 
-  const jsonResults = invokeOrmWasm<string>(
-    wasm.object_relational_mapping,
-    args,
-    wasm,
-  );
-  if (!jsonResults.ok) return jsonResults;
+  const jsonResults = invokeOrmWasm<string>(wasm.map_sql, args, wasm);
+  if (jsonResults.isLeft()) return jsonResults;
 
   const parsed: any[] = JSON.parse(jsonResults.value);
-  return right(
+  return Either.right(
     parsed.map((obj: any) =>
       instantiateDepthFirst(obj, ast.models[ctor.name], includeTree),
     ) as T[],

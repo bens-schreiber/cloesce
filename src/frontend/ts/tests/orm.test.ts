@@ -439,7 +439,7 @@ describe("methodDispatch", () => {
   });
 });
 
-describe("modelsFromSql", () => {
+describe("mapSql", () => {
   test("handles recursive navigation properties", async () => {
     const wasm = await WebAssembly.instantiate(
       fs.readFileSync(path.resolve("./dist/orm.wasm")),

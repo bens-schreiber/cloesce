@@ -9,11 +9,11 @@ use crate::D1Result;
 use crate::IncludeTree;
 use crate::ModelMeta;
 
-pub fn object_relational_mapping(
+pub fn map_sql(
     model_name: &str,
     meta: &ModelMeta,
     rows: &D1Result,
-    include_tree: &Option<IncludeTree>,
+    include_tree: Option<&IncludeTree>,
 ) -> Result<Vec<Value>, String> {
     let model = match meta.get(model_name) {
         Some(m) => m,
@@ -177,7 +177,7 @@ mod tests {
     use serde_json::{Map, Value, json};
     use std::collections::HashMap;
 
-    use crate::orm::object_relational_mapping;
+    use crate::map::map_sql;
 
     #[test]
     fn no_records_returns_empty() {
@@ -205,7 +205,7 @@ mod tests {
         let include_tree: Option<Map<String, Value>> = None;
 
         // Act
-        let result = object_relational_mapping("Horse", &meta, &rows, &include_tree).unwrap();
+        let result = map_sql("Horse", &meta, &rows, include_tree.as_ref()).unwrap();
 
         // Assert
         assert_eq!(result.len(), 0);
@@ -231,7 +231,7 @@ mod tests {
         let include_tree: Option<Map<String, Value>> = None;
 
         // Act
-        let result = object_relational_mapping("Horse", &meta, &vec![row], &include_tree).unwrap();
+        let result = map_sql("Horse", &meta, &vec![row], include_tree.as_ref()).unwrap();
         let horse = result.first().unwrap().as_object().unwrap();
 
         // Assert
@@ -288,7 +288,7 @@ mod tests {
         );
 
         // Act
-        let result = object_relational_mapping("Horse", &meta, &rows, &include_tree).unwrap();
+        let result = map_sql("Horse", &meta, &rows, include_tree.as_ref()).unwrap();
         let horse = result.first().unwrap().as_object().unwrap();
 
         // Assert
@@ -358,7 +358,7 @@ mod tests {
         );
 
         // Act
-        let result = object_relational_mapping("Horse", &meta, &rows, &include_tree).unwrap();
+        let result = map_sql("Horse", &meta, &rows, include_tree.as_ref()).unwrap();
         let horse = result.first().unwrap().as_object().unwrap();
         let riders = horse.get("riders").unwrap().as_array().unwrap();
 

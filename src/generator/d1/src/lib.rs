@@ -3,14 +3,13 @@ mod fmt;
 use std::collections::{HashMap, HashSet};
 
 use ast::{
-    CidlType, DataSource, IncludeTree, MigrationsAst, MigrationsModel, ModelAttribute,
-    NavigationProperty, NavigationPropertyKind,
+    CidlType, MigrationsAst, MigrationsModel, ModelAttribute, NavigationProperty,
+    NavigationPropertyKind,
 };
 
 use indexmap::IndexMap;
 use sea_query::{
-    ColumnDef, Expr, ForeignKey, Index, IntoCondition, Query, SchemaStatementBuilder,
-    SelectStatement, SqliteQueryBuilder, Table,
+    ColumnDef, Expr, ForeignKey, Index, Query, SchemaStatementBuilder, SqliteQueryBuilder, Table,
 };
 
 pub struct D1Generator;
@@ -32,11 +31,11 @@ impl D1Generator {
         }
 
         let tables = MigrateTables::make_migrations(ast, lm_ast, intent);
-        let views = MigrateViews::make_migrations(ast, lm_ast);
         if lm_ast.is_none() {
             let cloesce_tmp = to_sqlite(
                 Table::create()
                     .table(alias("_cloesce_tmp"))
+                    .if_not_exists()
                     .col(
                         ColumnDef::new_with_type(alias("path"), sea_query::ColumnType::Text)
                             .primary_key(),
@@ -49,11 +48,11 @@ impl D1Generator {
             );
 
             return fmt::beautify(format!(
-                "{tables}\n{views}\n--- Cloesce Temporary Table\n{cloesce_tmp}"
+                "{tables}\n--- Cloesce Temporary Table\n{cloesce_tmp}"
             ));
         }
 
-        fmt::beautify(format!("{tables}\n{views}"))
+        fmt::beautify(format!("{tables}"))
     }
 }
 
@@ -74,300 +73,6 @@ pub trait MigrationsIntent {
     ///
     /// Returns None if the model should be dropped, Some if an option presented should be selected.
     fn ask(&self, dilemma: MigrationsDilemma) -> Option<usize>;
-}
-
-struct MigrateViews;
-impl MigrateViews {
-    /// Takes in a list of [ModelTree] and returns a list of `CREATE VIEW` statements
-    /// derived from their respective tree.
-    fn create(
-        models: Vec<(&MigrationsModel, Vec<&DataSource>)>,
-        model_lookup: &IndexMap<String, MigrationsModel>,
-    ) -> Vec<String> {
-        let mut res = vec![];
-
-        for (model, ds) in models {
-            for d in ds {
-                let mut query = Query::select();
-                query.from(alias(&model.name));
-
-                let mut alias_counter = HashMap::<String, u32>::new();
-                let model_alias = generate_alias(&model.name, &mut alias_counter);
-                dfs(
-                    model,
-                    &d.tree,
-                    &mut query,
-                    &mut vec![],
-                    model_alias,
-                    None,
-                    &mut alias_counter,
-                    model_lookup,
-                );
-
-                res.push(format!(
-                    "CREATE VIEW IF NOT EXISTS \"{}.{}\" AS {};",
-                    model.name,
-                    d.name,
-                    query.to_string(SqliteQueryBuilder)
-                ));
-
-                tracing::info!(
-                    "Created data source \"{}\" for model \"{}\"",
-                    d.name,
-                    model.name
-                );
-            }
-        }
-
-        return res;
-
-        #[allow(clippy::too_many_arguments)]
-        fn dfs(
-            model: &MigrationsModel,
-            tree: &IncludeTree,
-            query: &mut SelectStatement,
-            path: &mut Vec<String>,
-            model_alias: String,
-            m2m_alias: Option<&String>,
-            alias_counter: &mut HashMap<String, u32>,
-            model_lookup: &IndexMap<String, MigrationsModel>,
-        ) {
-            let join_path = |member: &str| {
-                if path.is_empty() {
-                    member.to_string()
-                } else {
-                    format!("{}.{}", path.join("."), member)
-                }
-            };
-
-            let pk = &model.primary_key.name;
-
-            // Primary Key
-            {
-                let col = if let Some(m2m_alias) = m2m_alias {
-                    // M:M pk is in the form "UniqueIdN.ModelName.PrimaryKeyName"
-                    Expr::col((alias(m2m_alias), alias(format!("{}.{}", model.name, pk))))
-                } else {
-                    Expr::col((alias(&model_alias), alias(pk)))
-                };
-
-                query.expr_as(col, alias(join_path(pk)));
-            };
-
-            // Columns
-            for attr in &model.attributes {
-                query.expr_as(
-                    Expr::col((alias(&model_alias), alias(&attr.value.name))),
-                    alias(join_path(&attr.value.name)),
-                );
-            }
-
-            // Navigation properties
-            for nav in &model.navigation_properties {
-                let Some(child_tree) = tree.0.get(&nav.var_name) else {
-                    continue;
-                };
-
-                let child = model_lookup.get(&nav.model_name).unwrap();
-                let child_alias = generate_alias(&child.name, alias_counter);
-                let mut child_m2m_alias = None;
-
-                match &nav.kind {
-                    NavigationPropertyKind::OneToOne { reference } => {
-                        let nav_model_pk = &child.primary_key.name;
-                        left_join_as(
-                            query,
-                            &child.name,
-                            &child_alias,
-                            Expr::col((alias(&model_alias), alias(reference)))
-                                .equals((alias(&child_alias), alias(nav_model_pk))),
-                        );
-                    }
-                    NavigationPropertyKind::OneToMany { reference } => {
-                        left_join_as(
-                            query,
-                            &child.name,
-                            &child_alias,
-                            Expr::col((alias(&model_alias), alias(pk)))
-                                .equals((alias(&child_alias), alias(reference))),
-                        );
-                    }
-                    NavigationPropertyKind::ManyToMany { unique_id } => {
-                        let nav_model_pk = &child.primary_key;
-                        let pk = &model.primary_key.name;
-                        let m2m_alias = generate_alias(unique_id, alias_counter);
-
-                        left_join_as(
-                            query,
-                            unique_id,
-                            &m2m_alias,
-                            Expr::col((alias(&model_alias), alias(pk))).equals((
-                                alias(&m2m_alias),
-                                alias(format!("{}.{}", model.name, pk)),
-                            )),
-                        );
-
-                        left_join_as(
-                            query,
-                            &child.name,
-                            &child_alias,
-                            Expr::col((alias(&m2m_alias), alias(format!("{}.{}", child.name, pk))))
-                                .equals((alias(&child_alias), alias(&nav_model_pk.name))),
-                        );
-
-                        child_m2m_alias = Some(m2m_alias);
-                    }
-                }
-
-                path.push(nav.var_name.clone());
-                dfs(
-                    child,
-                    child_tree,
-                    query,
-                    path,
-                    child_alias,
-                    child_m2m_alias.as_ref(),
-                    alias_counter,
-                    model_lookup,
-                );
-                path.pop();
-            }
-        }
-
-        fn generate_alias(name: &str, alias_counter: &mut HashMap<String, u32>) -> String {
-            let count = alias_counter.entry(name.to_string()).or_default();
-            let alias = if *count == 0 {
-                name.to_string()
-            } else {
-                format!("{}{}", name, count)
-            };
-            *count += 1;
-            alias
-        }
-
-        fn left_join_as(
-            query: &mut SelectStatement,
-            model_name: &str,
-            model_alias: &str,
-            condition: impl IntoCondition,
-        ) {
-            if model_name == model_alias {
-                query.left_join(alias(model_name), condition);
-            } else {
-                query.join_as(
-                    sea_query::JoinType::LeftJoin,
-                    alias(model_name),
-                    alias(model_alias),
-                    condition,
-                );
-            }
-        }
-    }
-
-    /// If a data source is altered in any way, it will be dropped and added to the create list.
-    /// Views don't contain data so I don't see a problem with this (@ben schreiber)
-    ///
-    /// Returns a list of dropped data source queries, along with a list of data sources that need to created.
-    fn drop_alter<'a>(
-        ast: &MigrationsAst,
-        lm_lookup: &'a IndexMap<String, MigrationsModel>,
-    ) -> (Vec<String>, Vec<(&'a MigrationsModel, Vec<&'a DataSource>)>) {
-        const DROP_VIEW: &str = "DROP VIEW IF EXISTS";
-        let mut drops = vec![];
-        let mut creates = HashMap::<&String, Vec<&DataSource>>::new();
-
-        for lm_model in lm_lookup.values() {
-            match ast.models.get(&lm_model.name) {
-                // Model was changed from last migration
-                Some(model) if model.hash != lm_model.hash => {
-                    for lm_ds in lm_model.data_sources.values() {
-                        let changed = model
-                            .data_sources
-                            .get(&lm_ds.name)
-                            .is_none_or(|ds| ds.hash != lm_ds.hash);
-
-                        // Data Source was changed from last migration
-                        if changed {
-                            drops
-                                .push(format!("{DROP_VIEW} \"{}.{}\";", lm_model.name, lm_ds.name));
-
-                            creates.entry(&lm_model.name).or_default().push(lm_ds);
-
-                            tracing::info!(
-                                "Altered data source \"{}\" for model \"{}\"",
-                                lm_ds.name,
-                                model.name
-                            );
-                        }
-                    }
-                }
-                // Last migration model was removed entirely
-                None => {
-                    for lm_ds in lm_model.data_sources.values() {
-                        drops.push(format!("{DROP_VIEW} \"{}.{}\";", lm_model.name, lm_ds.name));
-
-                        tracing::info!(
-                            "Dropped data source \"{}\" from model \"{}\"",
-                            lm_ds.name,
-                            lm_model.name
-                        );
-                    }
-                }
-                // Last migration model unchanged
-                _ => {}
-            }
-        }
-
-        (
-            drops,
-            creates
-                .drain()
-                .map(|(k, v)| (lm_lookup.get(k).unwrap(), v))
-                .collect::<Vec<_>>(),
-        )
-    }
-
-    /// Given a vector of all model trees in the new AST, and the last migrated AST's lookup table,
-    /// produces a sequence of SQL queries `CREATE`-ing and `DROP`-ing the last migrated AST to
-    /// sync with the new.
-    fn make_migrations(ast: &MigrationsAst, lm_ast: Option<&MigrationsAst>) -> String {
-        let (drop_stmts, creates) = if let Some(lm_ast) = lm_ast {
-            let (drops, mut creates) = Self::drop_alter(ast, &lm_ast.models);
-
-            for model in ast.models.values() {
-                if lm_ast.models.contains_key(&model.name) {
-                    continue;
-                }
-
-                creates.push((model, model.data_sources.values().collect::<Vec<_>>()));
-            }
-
-            (drops, creates)
-        } else {
-            // No last migration: create all
-            (
-                Vec::default(),
-                ast.models
-                    .iter()
-                    .map(|(_, m)| (m, m.data_sources.values().collect()))
-                    .collect::<Vec<_>>(),
-            )
-        };
-
-        let create_stmts = Self::create(creates, &ast.models);
-
-        let mut res = String::new();
-        if !drop_stmts.is_empty() {
-            res.push_str("--- Dropped and Refactored Data Sources\n");
-            res.push_str(&drop_stmts.join("\n"));
-        }
-        if !create_stmts.is_empty() {
-            res.push_str("--- New Data Sources\n");
-            res.push_str(&create_stmts.join("\n"));
-        }
-
-        res
-    }
 }
 
 enum AlterKind<'a> {
@@ -1015,8 +720,6 @@ impl MigrateTables {
     }
 }
 
-// TODO: SeaQuery forcing us to do alias everywhere is really annoying,
-// it feels like this library is a bad choice for our use case.
 fn alias(name: impl Into<String>) -> sea_query::Alias {
     sea_query::Alias::new(name)
 }

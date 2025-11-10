@@ -172,54 +172,50 @@ type DeepPartialInner<T> = T extends (infer U)[]
  */
 export type DeepPartial<T> = DeepPartialInner<T> & { __brand?: "Partial" };
 
-/**
- * A functional result type representing a computation that can either succeed (`ok: true`)
- * or fail (`ok: false`).
- *
- * `Either<L, R>` is used throughout Cloesce to return structured success/error values
- * instead of throwing exceptions.
- * - When `ok` is `true`, `value` contains the success result of type `R`.
- * - When `ok` is `false`, `value` contains the error information of type `L`.
- *
- * This pattern makes control flow predictable and encourages explicit handling
- * of failure cases.
- *
- * Example:
- * ```ts
- * const result: Either<string, number> = compute();
- *
- * if (!result.ok) {
- *   console.error("Failed:", result.value);
- * } else {
- *   console.log("Success:", result.value);
- * }
- * ```
- */
-export type Either<L, R> = { ok: false; value: L } | { ok: true; value: R };
+export class Either<L, R> {
+  private constructor(
+    private readonly inner: { ok: true; right: R } | { ok: false; left: L },
+  ) {}
 
-/**
- * Creates a failed `Either` result.
- *
- * Typically used to represent an error condition or unsuccessful operation.
- *
- * @param value The error or failure value to wrap.
- * @returns An `Either` with `ok: false` and the given value.
- */
-export function left<L>(value: L): Either<L, never> {
-  return { ok: false, value };
-}
+  get value(): L | R {
+    return this.inner.ok ? this.inner.right : this.inner.left;
+  }
 
-/**
- * Creates a successful `Either` result.
- *
- * Typically used to represent a successful operation while maintaining
- * a consistent `Either`-based return type.
- *
- * @param value The success value to wrap.
- * @returns An `Either` with `ok: true` and the given value.
- */
-export function right<R>(value: R): Either<never, R> {
-  return { ok: true, value };
+  static left<L, R = never>(value: L): Either<L, R> {
+    return new Either({ ok: false, left: value });
+  }
+
+  static right<R, L = never>(value: R): Either<L, R> {
+    return new Either({ ok: true, right: value });
+  }
+
+  isLeft(): this is Either<L, never> {
+    return !this.inner.ok;
+  }
+
+  isRight(): this is Either<never, R> {
+    return this.inner.ok;
+  }
+
+  unwrap(): R {
+    if (!this.inner.ok) {
+      throw new Error("Tried to unwrap a Left value");
+    }
+    return this.inner.right;
+  }
+
+  unwrapLeft(): L {
+    if (this.inner.ok) {
+      throw new Error("Tried to unwrapLeft a Right value");
+    }
+    return this.inner.left;
+  }
+
+  map<B>(fn: (val: R) => B): Either<L, B> {
+    return this.inner.ok
+      ? Either.right(fn(this.inner.right))
+      : Either.left(this.inner.left);
+  }
 }
 
 /**
