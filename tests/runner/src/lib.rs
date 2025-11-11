@@ -115,7 +115,8 @@ impl Fixture {
                 .arg(&self.path)
                 .arg("--out")
                 .arg(out.path())
-                .arg("--truncateSourcePaths"),
+                .arg("--truncateSourcePaths")
+                .arg("--skipTsCheck"),
         );
 
         match res {
