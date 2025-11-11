@@ -71,7 +71,7 @@ fn main() {
 fn run_integration_test(fixture: Fixture, domain: &str) -> Result<bool, bool> {
     let (pre_cidl_changed, pre_cidl_path) = fixture.extract_cidl().map_err(|(e, _)| e)?;
     let (generated_changed, cidl_path) = fixture
-        .generate_all(&pre_cidl_path, domain, domain)
+        .generate_all(&pre_cidl_path, domain)
         .map_err(|(e, _)| e)?;
     let (s1, s2) = fixture.migrate(&cidl_path);
     let (migrated_cidl_changed, _) = s1.map_err(|(e, _)| e)?;

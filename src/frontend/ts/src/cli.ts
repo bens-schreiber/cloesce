@@ -31,7 +31,6 @@ type CloesceConfig = {
   truncateSourcePaths?: boolean;
   outputDir?: string;
   workersUrl?: string;
-  clientUrl?: string;
   migrationsPath?: string;
 };
 
@@ -51,9 +50,9 @@ const cmds = subcommands({
       handler: async (args) => {
         const config = loadCloesceConfig(process.cwd(), args.debug);
 
-        if (!config.workersUrl || !config.clientUrl) {
+        if (!config.workersUrl) {
           console.error(
-            "Error: `workersUrl` and `clientUrl` must be defined in cloesce.config.json",
+            "Error: `workersUrl`` must be defined in cloesce.config.json",
           );
           process.exit(1);
         }
@@ -73,7 +72,6 @@ const cmds = subcommands({
             "wrangler.toml",
             path.join(outputDir, "workers.ts"),
             path.join(outputDir, "client.ts"),
-            config.clientUrl,
             config.workersUrl,
           ],
         };

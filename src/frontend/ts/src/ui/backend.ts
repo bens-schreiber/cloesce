@@ -7,15 +7,13 @@ import {
   invokeOrmWasm,
 } from "../router/wasm.js";
 
-export { cloesce } from "../router/router.js";
-export type {
-  HttpResult,
-  Either,
-  DeepPartial,
-  InstanceRegistry,
-  CrudKind,
-} from "../common.js";
-export { CloesceApp } from "../common.js";
+export {
+  CloesceApp,
+  MiddlewareFn,
+  ResponseMiddlewareFn,
+  DependencyInjector,
+} from "../router/router.js";
+export type { HttpResult, Either, DeepPartial, CrudKind } from "../common.js";
 
 /**
  * Marks a class as a D1-backed SQL model.

@@ -69,7 +69,6 @@ pub enum GeneratorErrorKind {
     MissingOrExtraneousDataSource,
     NotYetSupported,
     InvalidMapping,
-    InvalidApiDomain,
     MismatchedForeignKeyTypes,
     MismatchedNavigationPropertyTypes,
     InvalidNavigationPropertyReference,
@@ -132,11 +131,6 @@ impl GeneratorErrorKind {
                 "CIDL is ill-formatted",
                 "",
                 GeneratorPhase::ModelSemanticAnalysis,
-            ),
-            GeneratorErrorKind::InvalidApiDomain => (
-                "Invalid or ill-formatted API domain",
-                "API's must be of the form: http://domain.com/path/to/api",
-                GeneratorPhase::Workers,
             ),
             GeneratorErrorKind::MismatchedForeignKeyTypes => (
                 "Mismatched foreign keys",

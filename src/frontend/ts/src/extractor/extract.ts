@@ -28,7 +28,6 @@ import {
   ExtractorError,
   ExtractorErrorCode,
   PlainOldObject,
-  CloesceApp,
   CrudKind,
 } from "../common.js";
 import { TypeFormatFlags } from "typescript";
@@ -176,7 +175,7 @@ export class CidlExtractor {
     };
 
     const typeText = getTypeText();
-    if (typeText === CloesceApp.name) {
+    if (typeText === "CloesceApp") {
       return Either.right(sourceFile.getFilePath().toString());
     }
 

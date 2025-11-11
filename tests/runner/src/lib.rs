@@ -126,12 +126,7 @@ impl Fixture {
     }
 
     /// On all success, returns the cidl, else returns the failed file.
-    pub fn generate_all(
-        &self,
-        pre_cidl: &Path,
-        client_domain: &str,
-        workers_domain: &str,
-    ) -> TestResult {
+    pub fn generate_all(&self, pre_cidl: &Path, workers_domain: &str) -> TestResult {
         let pre_cidl_canon = pre_cidl.canonicalize().unwrap();
 
         let cidl_out = OutputFile::new(&self.path, "cidl.json");
@@ -149,7 +144,6 @@ impl Fixture {
                 .arg(wrangler_out.path())
                 .arg(workers_out.path())
                 .arg(client_out.path())
-                .arg(client_domain)
                 .arg(workers_domain)
                 .current_dir("../../src/generator"),
         );

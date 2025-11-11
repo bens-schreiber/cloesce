@@ -70,6 +70,8 @@ export default defineConfig({
 });
 ```
 
+Middleware support for CORS is also supported (see Middleware section).
+
 ### 5) Wrangler Config
 
 Cloesce will generate any missing `wrangler.toml` values (or the file if missing). A minimal `wrangler.toml` looks like this:
@@ -488,11 +490,11 @@ static async get(
 
 ### Middleware
 
-Cloesce supports middleware at the global level (before routing to a model+method), the model level (before hydration) and the method level (before hydration). Middleware also exposes read/write access to the dependency injection instance that all models use.
+Cloesce supports middleware at the global level (before routing to a model+method), the model level (before validation) and the method level (before hydration). Middleware also exposes read/write access to the dependency injection instance that all models use.
 
 Middleware is capable of exiting from the Cloesce Router early with an HTTP Result.
 
-An example of all levels of middleware is below. All middleware must be defined in the file `app.cloesce.ts`.
+An example of all levels of middleware is below. All middleware must be defined in the file `app.cloesce.ts` which exports a `CloesceApp` instance as default.
 
 ```ts
 @PlainOldObject
@@ -520,30 +522,41 @@ export class Model {
   }
 }
 
-// Middleware instance
 const app: CloesceApp = new CloesceApp();
 
-app.useGlobal((request: Request, env, ir) => {
+app.onRequest((request: Request, env, ir) => {
   if (request.method === "POST") {
     return { ok: false, status: 401, message: "POST methods aren't allowed." };
   }
 });
 
-app.useModel(Model, (request, env, ir) => {
+app.onModel(Model, (request, env, ir) => {
   ir.set(InjectedThing.name, {
     value: "hello world",
   });
 });
 
-app.useMethod(Model, "blockedMethod", (request, env, ir) => {
+app.onMethod(Model, "blockedMethod", (request, env, ir) => {
   return { ok: false, status: 401, message: "Blocked method" };
 });
 
-// Exporting the instance is required
+app.onResponse(async (request, env, di, response: Response) => {
+  // basic CORS, allow all origins
+  response.headers.set("Access-Control-Allow-Origin", "*");
+  response.headers.set(
+    "Access-Control-Allow-Methods",
+    "GET, POST, PUT, DELETE, OPTIONS"
+  );
+  response.headers.set(
+    "Access-Control-Allow-Headers",
+    "Content-Type, Authorization"
+  );
+});
+
 export default app;
 ```
 
-With this middleware, all POST methods will be blocked, and all methods for the model `Model` will be able to inject `InjectedThing`. Additionally, on the method level, `blockedMethod` will return a 401.
+With this middleware, all POST methods will be blocked, and all methods for the model `Model` will be able to inject `InjectedThing`,and `blockedMethod` will return a 401. Additionally, all responses will have CORS headers.
 
 ### Plain Old Objects
 

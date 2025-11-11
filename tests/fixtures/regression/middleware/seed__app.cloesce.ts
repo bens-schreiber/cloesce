@@ -38,20 +38,24 @@ export class Model {
 
 const app: CloesceApp = new CloesceApp();
 
-app.useGlobal((request: Request, env, ir) => {
+app.onRequest((request: Request, env, ir) => {
   if (request.method === "POST") {
     return { ok: false, status: 401, message: "POST methods aren't allowed." };
   }
 });
 
-app.useModel(Model, (request, env, ir) => {
+app.onModel(Model, (request, env, ir) => {
   ir.set(InjectedThing.name, {
     value: "hello world",
   });
 });
 
-app.useMethod(Model, "blockedMethod", (request, env, ir) => {
+app.onMethod(Model, "blockedMethod", (request, env, ir) => {
   return { ok: false, status: 401, message: "Blocked method" };
+});
+
+app.onResponse((request, env, ir, response: Response) => {
+  response.headers.set("X-Cloesce-Test", "true");
 });
 
 export default app;
