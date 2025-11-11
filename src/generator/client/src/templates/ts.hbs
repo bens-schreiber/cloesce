@@ -1,6 +1,6 @@
 // GENERATED CODE. DO NOT MODIFY.
 
-import { HttpResult, instantiateObjectArray, DeepPartial } from "cloesce/client";
+import { HttpResult, DeepPartial } from "cloesce/client";
 {{#each poos}}
 export class {{this.name}} {
   {{#each this.attributes}}
@@ -49,20 +49,12 @@ export class {{this.name}} {
       })
     });
     {{/if}}
-    let httpResult = HttpResult<{{get_cidl_type this.return_type}}>.fromJSON(await res.json());
-    if (!res.ok) {
-      return httpResult;
-    }
-    {{#if (eq (get_cidl_type this.return_type) "void")}}
-    return httpResult;
-    {{else if (is_object_array this.return_type)}}
-    httpResult.data = instantiateObjectArray(httpResult.data, {{object_name this.return_type}});
-    return httpResult;
+    {{#if if (is_object_array this.return_type)}}
+    return await HttpResult.fromResponse(res, {{object_name this.return_type}}, true);
     {{else if (is_object this.return_type)}}
-    httpResult.data = Object.assign(new {{object_name this.return_type}}(), httpResult.data);
-    return httpResult;
+    return await HttpResult.fromResponse(res, {{object_name this.return_type}}, false);
     {{else}}
-    return httpResult;
+    return await HttpResult.fromResponse(res);
     {{/if}}
   }
   {{/each}}

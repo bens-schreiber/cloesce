@@ -254,35 +254,56 @@ export class HttpResult<T = unknown> {
   }
 
   toResponse(): Response {
-    const body = JSON.stringify({
-      ok: this.ok,
-      status: this.status,
-      data: this.data,
-      message: this.message,
-      headers: Object.fromEntries(this.headers.entries()),
-    });
+    const body = () => {
+      if (this.status === 204) {
+        return undefined;
+      }
 
-    return new Response(body, {
+      return this.ok
+        ? JSON.stringify({
+            data: this.data,
+          })
+        : this.message;
+    };
+
+    return new Response(body(), {
       status: this.status,
       headers: this.headers,
     });
   }
 
-  static fromJSON<T = unknown>(obj: {
-    ok: boolean;
-    status: number;
-    headers: Record<string, string>;
-    data?: T;
-    message?: string;
-  }): HttpResult<T> {
-    const headers = new Headers(obj.headers);
-    return new HttpResult<T>(
-      obj.ok,
-      obj.status,
-      headers,
-      obj.data,
-      obj.message,
+  static async fromResponse(
+    response: Response,
+    ctor?: new () => any,
+    array: boolean = false,
+  ): Promise<HttpResult<any>> {
+    if (response.status < 400) {
+      const json = await response.json();
+
+      let data = json.data;
+      if (ctor) {
+        data = array
+          ? instantiateObjectArray(data, ctor)
+          : Object.assign(new ctor(), data);
+      }
+
+      return new HttpResult(true, response.status, response.headers, data);
+    }
+
+    return new HttpResult(
+      false,
+      response.status,
+      response.headers,
+      undefined,
+      await response.text(),
     );
+
+    function instantiateObjectArray(data: any, ctor: new () => any): any[] {
+      if (Array.isArray(data)) {
+        return data.map((x) => instantiateObjectArray(x, ctor)).flat();
+      }
+      return [Object.assign(new ctor(), data)];
+    }
   }
 }
 

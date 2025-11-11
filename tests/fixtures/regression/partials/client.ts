@@ -1,6 +1,6 @@
 // GENERATED CODE. DO NOT MODIFY.
 
-import { HttpResult, instantiateObjectArray, DeepPartial } from "cloesce/client";
+import { HttpResult, DeepPartial } from "cloesce/client";
 
 export class Dog {
   id: number;
@@ -19,11 +19,6 @@ export class Dog {
             dog
       })
     });
-    let httpResult = HttpResult<Dog>.fromJSON(await res.json());
-    if (!res.ok) {
-      return httpResult;
-    }
-    httpResult.data = Object.assign(new Dog(), httpResult.data);
-    return httpResult;
+    return await HttpResult.fromResponse(res, Dog, false);
   }
 }

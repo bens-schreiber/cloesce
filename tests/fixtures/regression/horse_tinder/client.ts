@@ -1,6 +1,6 @@
 // GENERATED CODE. DO NOT MODIFY.
 
-import { HttpResult, instantiateObjectArray, DeepPartial } from "cloesce/client";
+import { HttpResult, DeepPartial } from "cloesce/client";
 
 export class Horse {
   id: number;
@@ -15,12 +15,7 @@ export class Horse {
     const baseUrl = new URL(`http://localhost:5002/api/Horse/get`);
     baseUrl.searchParams.append('id', String(id));
     const res = await fetchImpl(baseUrl, { method: "GET" });
-    let httpResult = HttpResult<Horse>.fromJSON(await res.json());
-    if (!res.ok) {
-      return httpResult;
-    }
-    httpResult.data = Object.assign(new Horse(), httpResult.data);
-    return httpResult;
+    return await HttpResult.fromResponse(res, Horse, false);
   }
   async like(
         horse: Horse,
@@ -36,23 +31,14 @@ export class Horse {
             __dataSource
       })
     });
-    let httpResult = HttpResult<void>.fromJSON(await res.json());
-    if (!res.ok) {
-      return httpResult;
-    }
-    return httpResult;
+    return await HttpResult.fromResponse(res);
   }
   static async list(
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Horse[]>> {
     const baseUrl = new URL(`http://localhost:5002/api/Horse/list`);
     const res = await fetchImpl(baseUrl, { method: "GET" });
-    let httpResult = HttpResult<Horse[]>.fromJSON(await res.json());
-    if (!res.ok) {
-      return httpResult;
-    }
-    httpResult.data = instantiateObjectArray(httpResult.data, Horse);
-    return httpResult;
+    return await HttpResult.fromResponse(res);
   }
   static async post(
         horse: Horse,
@@ -66,12 +52,7 @@ export class Horse {
             horse
       })
     });
-    let httpResult = HttpResult<Horse>.fromJSON(await res.json());
-    if (!res.ok) {
-      return httpResult;
-    }
-    httpResult.data = Object.assign(new Horse(), httpResult.data);
-    return httpResult;
+    return await HttpResult.fromResponse(res, Horse, false);
   }
 }
 export class Like {

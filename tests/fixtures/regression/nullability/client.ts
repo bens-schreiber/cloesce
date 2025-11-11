@@ -1,6 +1,6 @@
 // GENERATED CODE. DO NOT MODIFY.
 
-import { HttpResult, instantiateObjectArray, DeepPartial } from "cloesce/client";
+import { HttpResult, DeepPartial } from "cloesce/client";
 
 export class NullabilityChecks {
   id: number;
@@ -23,11 +23,7 @@ export class NullabilityChecks {
             __dataSource
       })
     });
-    let httpResult = HttpResult<string[] | null>.fromJSON(await res.json());
-    if (!res.ok) {
-      return httpResult;
-    }
-    return httpResult;
+    return await HttpResult.fromResponse(res);
   }
   async httpResultTypes(
         a: number | null | null,
@@ -43,11 +39,7 @@ export class NullabilityChecks {
             __dataSource
       })
     });
-    let httpResult = HttpResult<NullabilityChecks[] | null | null>.fromJSON(await res.json());
-    if (!res.ok) {
-      return httpResult;
-    }
-    return httpResult;
+    return await HttpResult.fromResponse(res);
   }
   async injectableTypes(
         __dataSource: "none" = "none",
@@ -61,11 +53,7 @@ export class NullabilityChecks {
             __dataSource
       })
     });
-    let httpResult = HttpResult<void>.fromJSON(await res.json());
-    if (!res.ok) {
-      return httpResult;
-    }
-    return httpResult;
+    return await HttpResult.fromResponse(res);
   }
   async modelTypes(
         a: NullabilityChecks | null,
@@ -81,11 +69,7 @@ export class NullabilityChecks {
             __dataSource
       })
     });
-    let httpResult = HttpResult<NullabilityChecks | null>.fromJSON(await res.json());
-    if (!res.ok) {
-      return httpResult;
-    }
-    return httpResult;
+    return await HttpResult.fromResponse(res);
   }
   async primitiveTypes(
         a: number | null,
@@ -103,10 +87,6 @@ export class NullabilityChecks {
             __dataSource
       })
     });
-    let httpResult = HttpResult<boolean | null>.fromJSON(await res.json());
-    if (!res.ok) {
-      return httpResult;
-    }
-    return httpResult;
+    return await HttpResult.fromResponse(res);
   }
 }
