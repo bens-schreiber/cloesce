@@ -17,7 +17,7 @@ Internal documentation going over design decisions and general thoughts for each
 Create an NPM project and install cloesce
 
 ```sh
-npm i cloesce@0.0.4-unstable.8
+npm i cloesce@0.0.4-unstable.9
 ```
 
 ### 2) TypeScript

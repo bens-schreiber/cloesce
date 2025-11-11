@@ -234,7 +234,7 @@ fn write_cidl(ast: CloesceAst, cidl_path: &Path) -> Result<()> {
 fn generate_wrangler(wrangler_path: &Path, ast: &CloesceAst) -> Result<()> {
     let mut wrangler = WranglerFormat::from_path(wrangler_path);
     let mut spec = wrangler.as_spec();
-    spec.generate_defaults();
+    spec.generate_defaults(ast);
     spec.validate_bindings(ast)?;
 
     let wrangler_file = std::fs::OpenOptions::new()

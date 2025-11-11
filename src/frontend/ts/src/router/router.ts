@@ -74,6 +74,12 @@ export class CloesceApp {
    * Registers middleware which runs after the response is generated, but before
    * it is returned to the client.
    *
+   * Optionally, return a new HttpResult to short-circuit the response.
+   *
+   * Errors thrown in response middleware are caught and returned as a 500 response.
+   *
+   * Errors thrown in earlier middleware or route processing are not caught here.
+   *
    * @param m - The middleware function to register.
    */
   public onResponse(m: ResponseMiddlewareFn) {
@@ -466,9 +472,7 @@ async function hydrateModel(
         : (constructorRegistry[model.name] as any)[dataSource];
 
     records = await d1
-      .prepare(
-        Orm.getQuery(constructorRegistry[model.name], includeTree).unwrap(),
-      )
+      .prepare(Orm.getQuery(constructorRegistry[model.name], includeTree))
       .bind(id)
       .run();
 

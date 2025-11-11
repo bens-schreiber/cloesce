@@ -210,6 +210,7 @@ pub struct WranglerEnv {
     pub name: String,
     pub source_path: PathBuf,
     pub db_binding: String,
+    pub vars: HashMap<String, CidlType>,
 }
 
 #[serde_as]

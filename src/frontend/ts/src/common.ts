@@ -370,6 +370,7 @@ export interface WranglerEnv {
   name: string;
   source_path: string;
   db_binding: string;
+  vars: Record<string, CidlType>;
 }
 
 export interface CloesceAst {

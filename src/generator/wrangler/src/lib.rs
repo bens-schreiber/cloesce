@@ -1,14 +1,13 @@
+use std::collections::HashMap;
 use std::path::Path;
 use std::{fs::File, io::Write};
 
-use ast::ensure;
 use ast::err::GeneratorErrorKind;
+use ast::{ensure, err::Result, fail, CidlType, CloesceAst};
 use serde::Deserialize;
 use serde::Serialize;
 use serde_json::Value as JsonValue;
 use toml::Value as TomlValue;
-
-use ast::{CloesceAst, err::Result};
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
 pub struct D1Database {
@@ -25,12 +24,15 @@ pub struct WranglerSpec {
 
     #[serde(default)]
     pub d1_databases: Vec<D1Database>,
+
+    #[serde(default)]
+    pub vars: HashMap<String, String>,
 }
 
 impl WranglerSpec {
     /// Ensures that all required values exist or places a default
     /// for them
-    pub fn generate_defaults(&mut self) {
+    pub fn generate_defaults(&mut self, ast: &CloesceAst) {
         // Generate default worker entry point values
         self.name = Some(self.name.clone().unwrap_or_else(|| {
             tracing::warn!("Set a default worker name \"cloesce\"");
@@ -82,22 +84,63 @@ impl WranglerSpec {
                 "Database \"default\" is missing an id. See https://developers.cloudflare.com/d1/get-started/"
             );
         }
+
+        for (var, ty) in ast.wrangler_env.vars.iter() {
+            if !self.vars.contains_key(var) {
+                self.vars.insert(
+                    var.clone(),
+                    match ty {
+                        CidlType::Text => "default_string".into(),
+                        CidlType::Integer | CidlType::Real => "0".into(),
+                        CidlType::Boolean => "false".into(),
+                        _ => "default_value".into(),
+                    },
+                );
+
+                tracing::warn!("Added missing Wrangler var {var} with a default value");
+            }
+        }
     }
 
     /// Validates that the bindings described in the AST's WranglerEnv are
     /// consistent with the wrangler spec
     pub fn validate_bindings(&self, ast: &CloesceAst) -> Result<()> {
         // TODO: Multiple DB's
-        let d1_db = self.d1_databases.first().unwrap();
+        let Some(db) = self.d1_databases.first() else {
+            fail!(
+                GeneratorErrorKind::InconsistentWranglerBinding,
+                "No D1 databases defined in wrangler config for {}",
+                ast.wrangler_env.source_path.display()
+            );
+        };
+
         ensure!(
-            Some(&ast.wrangler_env.db_binding) == d1_db.binding.as_ref(),
-            GeneratorErrorKind::InconsistentDatabaseBinding,
+            Some(&ast.wrangler_env.db_binding) == db.binding.as_ref(),
+            GeneratorErrorKind::InconsistentWranglerBinding,
             "{}.{} != {} in {}",
             ast.wrangler_env.name,
             ast.wrangler_env.db_binding,
-            d1_db.binding.as_ref().unwrap(),
+            db.binding.as_ref().unwrap(),
             ast.wrangler_env.source_path.display()
         );
+
+        for var in self.vars.keys() {
+            ensure!(
+                ast.wrangler_env.vars.contains_key(var),
+                GeneratorErrorKind::InconsistentWranglerBinding,
+                "{} is defined in wrangler but not in the AST's WranglerEnv",
+                var
+            )
+        }
+
+        for var in ast.wrangler_env.vars.keys() {
+            ensure!(
+                self.vars.contains_key(var),
+                GeneratorErrorKind::InconsistentWranglerBinding,
+                "{} is defined in the AST's WranglerEnv but not in wrangler",
+                var
+            )
+        }
 
         Ok(())
     }
@@ -138,6 +181,8 @@ impl WranglerFormat {
                 val["d1_databases"] =
                     serde_json::to_value(&spec.d1_databases).expect("JSON to serialize");
 
+                val["vars"] = serde_json::to_value(&spec.vars).expect("JSON to serialize");
+
                 // entrypoint + metadata (only if provided)
                 if let Some(name) = &spec.name {
                     val["name"] = serde_json::to_value(name).expect("JSON to serialize");
@@ -155,6 +200,11 @@ impl WranglerFormat {
                     table.insert(
                         "d1_databases".to_string(),
                         toml::Value::try_from(&spec.d1_databases).expect("TOML to serialize"),
+                    );
+
+                    table.insert(
+                        "vars".to_string(),
+                        toml::Value::try_from(&spec.vars).expect("TOML to serialize"),
                     );
 
                     // entrypoint + metadata (only if provided)
@@ -203,9 +253,9 @@ impl WranglerFormat {
 
 #[cfg(test)]
 mod tests {
-    use ast::builder::create_ast;
+    use ast::{builder::create_ast, err::GeneratorErrorKind, WranglerEnv};
 
-    use crate::WranglerFormat;
+    use crate::{D1Database, WranglerFormat};
 
     #[test]
     fn test_serialize_wrangler_spec() {
@@ -221,20 +271,88 @@ mod tests {
     }
 
     #[test]
-    fn inconsistent_binding() {
+    fn generates_default_wrangler_value() {
         // Arrange
-        let ast = create_ast(vec![]);
-        let mut spec = WranglerFormat::Toml(toml::from_str("").unwrap()).as_spec();
-        spec.generate_defaults();
-        spec.d1_databases[0].binding = Some("not matching".into());
+        let mut ast = create_ast(vec![]);
+        ast.wrangler_env = WranglerEnv {
+            name: "Env".into(),
+            source_path: "source.ts".into(),
+            db_binding: "db".into(),
+            vars: [
+                ("API_KEY".into(), ast::CidlType::Text),
+                ("TIMEOUT".into(), ast::CidlType::Integer),
+                ("ENABLED".into(), ast::CidlType::Boolean),
+                ("THRESHOLD".into(), ast::CidlType::Real),
+            ]
+            .into_iter()
+            .collect(),
+        };
 
         // Act
-        let err = spec.validate_bindings(&ast).unwrap_err();
+        let specs = vec![
+            {
+                let mut spec = WranglerFormat::Toml(toml::from_str("").unwrap()).as_spec();
+                spec.generate_defaults(&ast);
+                spec
+            },
+            {
+                let mut spec = WranglerFormat::Json(serde_json::from_str("{}").unwrap()).as_spec();
+                spec.generate_defaults(&ast);
+                spec
+            },
+        ];
 
         // Assert
-        assert!(matches!(
-            err.kind,
-            ast::err::GeneratorErrorKind::InconsistentDatabaseBinding
-        ));
+        for spec in specs {
+            assert_eq!(spec.name.unwrap(), "cloesce");
+            assert_eq!(spec.compatibility_date.unwrap(), "2025-10-02");
+            assert_eq!(spec.main.unwrap(), "workers.ts");
+            assert_eq!(spec.d1_databases.len(), 1);
+            assert_eq!(spec.d1_databases[0].binding.as_ref().unwrap(), "db");
+            assert_eq!(
+                spec.d1_databases[0].database_name.as_ref().unwrap(),
+                "default"
+            );
+            assert_eq!(spec.vars.get("API_KEY").unwrap(), "default_string");
+            assert_eq!(spec.vars.get("TIMEOUT").unwrap(), "0");
+            assert_eq!(*spec.vars.get("ENABLED").unwrap(), "false");
+            assert_eq!(*spec.vars.get("THRESHOLD").unwrap(), "0");
+        }
+    }
+
+    #[test]
+    fn validate_missing_variable_in_wrangler() {
+        // Arrange
+        let mut ast = create_ast(vec![]);
+        ast.wrangler_env = WranglerEnv {
+            name: "Env".into(),
+            source_path: "source.ts".into(),
+            db_binding: "db".into(),
+            vars: [
+                ("API_KEY".into(), ast::CidlType::Text),
+                ("TIMEOUT".into(), ast::CidlType::Integer),
+            ]
+            .into_iter()
+            .collect(),
+        };
+
+        let specs = vec![
+            WranglerFormat::Toml(toml::from_str("").unwrap()).as_spec(),
+            WranglerFormat::Json(serde_json::from_str("{}").unwrap()).as_spec(),
+        ];
+
+        // Act + Assert
+        for mut spec in specs {
+            spec.d1_databases.push(D1Database {
+                binding: Some("db".into()),
+                database_name: Some("default".into()),
+                database_id: Some("".into()),
+            });
+
+            assert!(matches!(
+                spec.validate_bindings(&ast).unwrap_err().kind,
+                GeneratorErrorKind::InconsistentWranglerBinding
+            ));
+        }
     }
 }

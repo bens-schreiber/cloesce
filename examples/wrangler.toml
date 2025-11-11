@@ -8,4 +8,4 @@ database_id = "not_needed_for_example"
 database_name = "example"
 
 [vars]
-motd = "Horse tinder is the best!!!"
+allowedOrigin = "http://localhost:5173"

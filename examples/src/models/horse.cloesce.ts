@@ -1,4 +1,3 @@
-import { D1Database } from "@cloudflare/workers-types";
 import {
   D1,
   GET,
@@ -10,17 +9,11 @@ import {
   ForeignKey,
   IncludeTree,
   DataSource,
-  WranglerEnv,
   Orm,
   CRUD,
   Integer,
 } from "cloesce/backend";
-
-@WranglerEnv
-export class Env {
-  db: D1Database;
-  motd: string;
-}
+import { Env } from "./app.cloesce";
 
 @D1
 @CRUD(["GET", "LIST", "SAVE"])
@@ -55,23 +48,20 @@ export class Horse {
 
   @GET
   async matches(@Inject { db }: Env): Promise<Horse[]> {
-    const sql = Orm.listQuery(Horse, {
+    const select = Orm.listQuery(Horse, {
       includeTree: Horse.default,
       tagCte: "Horse.default",
-    })
-      .map(
-        (q) => `
-        ${q}
-        WHERE
-          [likes.horse2.id] = ?
-          AND [id] IN (
-            SELECT [likes.horse2.id]
-            FROM [Horse.default]
-            WHERE [id] = ?
-          )
-      `
-      )
-      .unwrap();
+    });
+
+    const sql = `
+    ${select} WHERE
+    [likes.horse2.id] = ?
+    AND [id] IN (
+      SELECT [likes.horse2.id]
+      FROM [Horse.default]
+      WHERE [id] = ?
+    )
+    `;
 
     const records = await db.prepare(sql).bind(this.id, this.id).run();
     const res = Orm.mapSql(Horse, records.results, Horse.withLikes);

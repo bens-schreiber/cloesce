@@ -483,16 +483,31 @@ export class CidlExtractor {
     classDecl: ClassDeclaration,
     sourceFile: SourceFile,
   ): Either<ExtractorError, WranglerEnv> {
-    const binding = classDecl.getProperties().find((p) => {
-      return (
-        p
+    const vars: Record<string, CidlType> = {};
+    let binding;
+
+    for (const prop of classDecl.getProperties()) {
+      if (
+        prop
           .getType()
           .getText(
             undefined,
             TypeFormatFlags.UseAliasDefinedOutsideCurrentScope,
           ) === "D1Database"
-      );
-    });
+      ) {
+        binding = prop.getName();
+        continue;
+      }
+
+      const ty = CidlExtractor.cidlType(prop.getType());
+      if (ty.isLeft()) {
+        ty.value.context = prop.getName();
+        ty.value.snippet = prop.getText();
+        return ty;
+      }
+
+      vars[prop.getName()] = ty.unwrap();
+    }
 
     if (!binding) {
       return err(ExtractorErrorCode.MissingDatabaseBinding);
@@ -501,7 +516,8 @@ export class CidlExtractor {
     return Either.right({
       name: classDecl.getName()!,
       source_path: sourceFile.getFilePath().toString(),
-      db_binding: binding.getName(),
+      db_binding: binding,
+      vars,
     });
   }
 
