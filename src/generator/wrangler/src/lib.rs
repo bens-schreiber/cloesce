@@ -3,7 +3,7 @@ use std::path::Path;
 use std::{fs::File, io::Write};
 
 use ast::err::GeneratorErrorKind;
-use ast::{ensure, err::Result, fail, CidlType, CloesceAst};
+use ast::{CidlType, CloesceAst, ensure, err::Result, fail};
 use serde::Deserialize;
 use serde::Serialize;
 use serde_json::Value as JsonValue;
@@ -85,20 +85,17 @@ impl WranglerSpec {
             );
         }
 
-        for (var, ty) in ast.wrangler_env.vars.iter() {
-            if !self.vars.contains_key(var) {
-                self.vars.insert(
-                    var.clone(),
-                    match ty {
-                        CidlType::Text => "default_string".into(),
-                        CidlType::Integer | CidlType::Real => "0".into(),
-                        CidlType::Boolean => "false".into(),
-                        _ => "default_value".into(),
-                    },
-                );
-
+        for (var, ty) in &ast.wrangler_env.vars {
+            self.vars.entry(var.clone()).or_insert_with(|| {
+                let default = match ty {
+                    CidlType::Text => "default_string",
+                    CidlType::Integer | CidlType::Real => "0",
+                    CidlType::Boolean => "false",
+                    _ => "default_value",
+                };
                 tracing::warn!("Added missing Wrangler var {var} with a default value");
-            }
+                default.into()
+            });
         }
     }
 
@@ -253,7 +250,7 @@ impl WranglerFormat {
 
 #[cfg(test)]
 mod tests {
-    use ast::{builder::create_ast, err::GeneratorErrorKind, WranglerEnv};
+    use ast::{WranglerEnv, builder::create_ast, err::GeneratorErrorKind};
 
     use crate::{D1Database, WranglerFormat};
 

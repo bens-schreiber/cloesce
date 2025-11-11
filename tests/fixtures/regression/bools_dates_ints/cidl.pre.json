@@ -5,7 +5,8 @@
     "wrangler_env": {
         "name": "Env",
         "source_path": "./seed__bools_dates_ints.cloesce.ts",
-        "db_binding": "db"
+        "db_binding": "db",
+        "vars": {}
     },
     "models": {
         "Weather": {
