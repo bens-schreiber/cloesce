@@ -22,7 +22,7 @@ export interface OrmWasmExports {
     sql_rows_ptr: number,
     sql_rows_len: number,
     include_tree_ptr: number,
-    include_tree_len: number
+    include_tree_len: number,
   ): boolean;
 
   upsert_model(
@@ -31,7 +31,7 @@ export interface OrmWasmExports {
     new_model_ptr: number,
     new_model_len: number,
     include_tree_ptr: number,
-    include_tree_len: number
+    include_tree_len: number,
   ): boolean;
 
   list_models(
@@ -42,7 +42,7 @@ export interface OrmWasmExports {
     tag_cte_ptr: number,
     tag_cte_len: number,
     custom_from_ptr: number,
-    custom_from_len: number
+    custom_from_len: number,
   ): boolean;
 }
 
@@ -53,7 +53,7 @@ export class WasmResource {
   constructor(
     private wasm: OrmWasmExports,
     public ptr: number,
-    public len: number
+    public len: number,
   ) {}
   free() {
     this.wasm.dealloc(this.ptr, this.len);
@@ -74,7 +74,7 @@ export class WasmResource {
 
 export async function loadOrmWasm(
   ast: CloesceAst,
-  wasm?: WebAssembly.Instance
+  wasm?: WebAssembly.Instance,
 ): Promise<OrmWasmExports> {
   // Load WASM
   const wasmInstance = (wasm ??
@@ -84,7 +84,7 @@ export async function loadOrmWasm(
 
   const modelMeta = WasmResource.fromString(
     JSON.stringify(ast.models),
-    wasmInstance.exports
+    wasmInstance.exports,
   );
 
   if (wasmInstance.exports.set_meta_ptr(modelMeta.ptr, modelMeta.len) != 0) {
@@ -105,7 +105,7 @@ export async function loadOrmWasm(
 export function invokeOrmWasm(
   fn: (...args: number[]) => boolean,
   args: WasmResource[],
-  wasm: OrmWasmExports
+  wasm: OrmWasmExports,
 ): Either<string, string> {
   let resPtr: number | undefined;
   let resLen: number | undefined;
@@ -116,7 +116,7 @@ export function invokeOrmWasm(
     resLen = wasm.get_return_len();
 
     const result = new TextDecoder().decode(
-      new Uint8Array(wasm.memory.buffer, resPtr, resLen)
+      new Uint8Array(wasm.memory.buffer, resPtr, resLen),
     );
 
     return failed ? Either.left(result) : Either.right(result);
@@ -133,7 +133,7 @@ export function invokeOrmWasm(
 export function mapSql<T extends object>(
   ctor: new () => T,
   records: Record<string, any>[],
-  includeTree: IncludeTree<T> | CidlIncludeTree | null
+  includeTree: IncludeTree<T> | CidlIncludeTree | null,
 ): Either<string, T[]> {
   const { ast, constructorRegistry, wasm } = RuntimeContainer.get();
   const args = [
@@ -148,14 +148,14 @@ export function mapSql<T extends object>(
   const parsed: any[] = JSON.parse(jsonResults.value);
   return Either.right(
     parsed.map((obj: any) =>
-      instantiateDepthFirst(obj, ast.models[ctor.name], includeTree)
-    ) as T[]
+      instantiateDepthFirst(obj, ast.models[ctor.name], includeTree),
+    ) as T[],
   );
 
   function instantiateDepthFirst(
     m: any,
     meta: Model,
-    includeTree: IncludeTree<any> | null
+    includeTree: IncludeTree<any> | null,
   ) {
     m = Object.assign(new constructorRegistry[meta.name](), m);
 
@@ -173,7 +173,7 @@ export function mapSql<T extends object>(
       // One to Many, Many to Many
       if (Array.isArray(value)) {
         m[navProp.var_name] = value.map((child: any) =>
-          instantiateDepthFirst(child, nestedMeta, nestedIncludeTree)
+          instantiateDepthFirst(child, nestedMeta, nestedIncludeTree),
         );
       }
       // One to one
@@ -181,7 +181,7 @@ export function mapSql<T extends object>(
         m[navProp.var_name] = instantiateDepthFirst(
           value,
           nestedMeta,
-          nestedIncludeTree
+          nestedIncludeTree,
         );
       }
     }

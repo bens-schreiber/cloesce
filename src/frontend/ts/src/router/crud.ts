@@ -9,13 +9,13 @@ export class CrudContext {
   private constructor(
     private d1: D1Database,
     private instance: object | undefined,
-    private ctor: new () => object
+    private ctor: new () => object,
   ) {}
 
   static fromInstance(
     d1: D1Database,
     instance: any,
-    ctor: new () => object
+    ctor: new () => object,
   ): CrudContext {
     return new this(d1, instance, ctor);
   }
@@ -81,7 +81,7 @@ export class CrudContext {
 
 function findIncludeTree(
   dataSource: string,
-  ctor: new () => object
+  ctor: new () => object,
 ): IncludeTree<any> | null {
   const normalizedDs = dataSource === NO_DATA_SOURCE ? null : dataSource;
   return normalizedDs ? (ctor as any)[normalizedDs] : null;
