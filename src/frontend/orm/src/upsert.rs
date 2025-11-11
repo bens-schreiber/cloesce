@@ -2,18 +2,26 @@ use std::collections::HashMap;
 
 use ast::NavigationPropertyKind::{ManyToMany, OneToMany};
 use ast::{CidlType, Model, NamedTypedValue, NavigationProperty, NavigationPropertyKind};
-use sea_query::{Alias, OnConflict, SimpleExpr, SqliteQueryBuilder, SubQueryStatement};
+use sea_query::{Alias, OnConflict, SimpleExpr, SqliteQueryBuilder, SubQueryStatement, Values};
 use sea_query::{Expr, Query};
+use serde::Serialize;
 use serde_json::Map;
 use serde_json::Value;
 
 use crate::IncludeTree;
 use crate::ModelMeta;
+use crate::common::alias;
 
 pub struct UpsertModel<'a> {
     meta: &'a ModelMeta,
     context: HashMap<String, Option<Value>>,
-    acc: Vec<String>,
+    acc: Vec<(String, Values)>,
+}
+
+#[derive(Serialize)]
+pub struct UpsertResult {
+    query: String,
+    values: Vec<serde_json::Value>,
 }
 
 impl<'a> UpsertModel<'a> {
@@ -30,8 +38,8 @@ impl<'a> UpsertModel<'a> {
         meta: &'a ModelMeta,
         new_model: Map<String, Value>,
         include_tree: Option<&IncludeTree>,
-    ) -> Result<String, String> {
-        let upsert_stmts = {
+    ) -> Result<Vec<UpsertResult>, String> {
+        let mut stmts = {
             let mut generator = Self {
                 meta,
                 context: HashMap::default(),
@@ -46,12 +54,7 @@ impl<'a> UpsertModel<'a> {
                 model_name.to_string(),
             )?;
 
-            generator
-                .acc
-                .drain(..)
-                .map(|stmt| format!("{stmt};"))
-                .collect::<Vec<_>>()
-                .join("\n")
+            generator.acc
         };
 
         let select_root_id_stmt = {
@@ -79,15 +82,39 @@ impl<'a> UpsertModel<'a> {
                     )
                     .to_owned(),
             }
-            .to_string(SqliteQueryBuilder)
+            .build(SqliteQueryBuilder)
         };
 
         let remove_vars_stmt = VariablesTable::delete_all();
 
-        Ok(format!(
-            "{}\n{};\n{};",
-            upsert_stmts, select_root_id_stmt, remove_vars_stmt
-        ))
+        stmts.push(select_root_id_stmt);
+        stmts.push((remove_vars_stmt, Values(vec![])));
+
+        // Convert from SeaQuery to serde_json
+        let mut res = vec![];
+        for (stmt, values) in stmts {
+            let mut serde_values: Vec<Value> = vec![];
+            for v in values {
+                match v {
+                    sea_query::Value::Int(Some(i)) => serde_values.push(Value::from(i)),
+                    sea_query::Value::Int(None) => serde_values.push(Value::Null),
+                    sea_query::Value::BigInt(Some(i)) => serde_values.push(Value::from(i)),
+                    sea_query::Value::BigInt(None) => serde_values.push(Value::Null),
+                    sea_query::Value::String(Some(s)) => serde_values.push(Value::String(*s)),
+                    sea_query::Value::String(None) => serde_values.push(Value::Null),
+                    sea_query::Value::Float(Some(f)) => serde_values.push(Value::from(f)),
+                    sea_query::Value::Double(Some(d)) => serde_values.push(Value::from(d)),
+                    _ => unimplemented!("Value type not implemented in upsert serde conversion"),
+                }
+            }
+
+            res.push(UpsertResult {
+                query: stmt,
+                values: serde_values,
+            });
+        }
+
+        Ok(res)
     }
 
     fn dfs(
@@ -306,7 +333,7 @@ impl<'a> UpsertModel<'a> {
             .columns(entries.iter().map(|(col, _)| alias(col)))
             .values_panic(entries.into_iter().map(|(_, val)| val));
 
-        self.acc.push(insert.to_string(SqliteQueryBuilder));
+        self.acc.push(insert.build(SqliteQueryBuilder));
         Ok(())
     }
 
@@ -358,7 +385,7 @@ impl VariablesTable {
             .to_string(SqliteQueryBuilder)
     }
 
-    fn insert_rowid(path: &str) -> String {
+    fn insert_rowid(path: &str) -> (String, Values) {
         Query::insert()
             .into_table(alias(VARIABLES_TABLE_NAME))
             .columns(vec![alias("path"), alias("id")])
@@ -367,7 +394,7 @@ impl VariablesTable {
                 Expr::cust("last_insert_rowid()"),
             ])
             .replace()
-            .to_string(SqliteQueryBuilder)
+            .build(SqliteQueryBuilder)
     }
 }
 
@@ -449,7 +476,7 @@ impl<'a> UpsertBuilder<'a> {
     }
 
     /// Creates a SQL query, being either an update only, insert only, or upsert.
-    fn build(self) -> Result<String, String> {
+    fn build(self) -> Result<(String, Values), String> {
         let pk_expr = self
             .pk_val
             .map(|v| {
@@ -474,7 +501,7 @@ impl<'a> UpsertBuilder<'a> {
                 .values(self.cols.into_iter().zip(self.vals))
                 .and_where(Expr::col(alias(&self.pk_ntv.name)).eq(pk_expr));
 
-            return Ok(update.to_string(SqliteQueryBuilder));
+            return Ok(update.build(SqliteQueryBuilder));
         }
 
         let mut insert = {
@@ -504,12 +531,8 @@ impl<'a> UpsertBuilder<'a> {
             );
         }
 
-        Ok(insert.to_string(SqliteQueryBuilder))
+        Ok(insert.build(SqliteQueryBuilder))
     }
-}
-
-fn alias(name: impl Into<String>) -> sea_query::Alias {
-    sea_query::Alias::new(name)
 }
 
 /// Validates that a JSON input follows the CIDL type, returning
@@ -566,27 +589,13 @@ mod test {
     use std::collections::HashMap;
 
     use ast::{CidlType, NavigationPropertyKind, builder::ModelBuilder};
-    use serde_json::json;
+    use serde_json::{Value, json};
+    use sqlx::SqlitePool;
 
-    use crate::upsert::UpsertModel;
+    use crate::{common::test_sql, expected_str, upsert::UpsertModel};
 
-    #[cfg(test)]
-    #[macro_export]
-    macro_rules! expected_str {
-        ($got:expr, $expected:expr) => {{
-            let got_val = &$got;
-            let expected_val = &$expected;
-            assert!(
-                got_val.to_string().contains(&expected_val.to_string()),
-                "Expected: \n`{}`, \n\ngot:\n{:?}",
-                expected_val,
-                got_val
-            );
-        }};
-    }
-
-    #[test]
-    fn upsert_scalar_model() {
+    #[sqlx::test]
+    fn upsert_scalar_model(db: SqlitePool) {
         // Arrange
         let ast_model = ModelBuilder::new("Horse")
             .id()
@@ -602,32 +611,49 @@ mod test {
             "address": null
         });
 
-        let mut model_meta = HashMap::new();
-        model_meta.insert(ast_model.name.clone(), ast_model);
+        let mut meta = HashMap::new();
+        meta.insert(ast_model.name.clone(), ast_model);
 
         // Act
-        let res = UpsertModel::query(
-            "Horse",
-            &model_meta,
-            new_model.as_object().unwrap().clone(),
-            None,
-        )
-        .unwrap();
+        let res = UpsertModel::query("Horse", &meta, new_model.as_object().unwrap().clone(), None)
+            .unwrap();
 
         // Assert
+        assert_eq!(res.len(), 3);
+
+        let res1 = &res[0];
         expected_str!(
-            res,
-            r#"INSERT INTO "Horse" ("color", "age", "address", "id") VALUES ('brown', 7, null, 1)"#
+            res1.query,
+            r#"INSERT INTO "Horse" ("color", "age", "address", "id") VALUES (?, ?, null, ?)"#
         );
         expected_str!(
-            res,
+            res1.query,
             r#"ON CONFLICT ("id") DO UPDATE SET "color" = "excluded"."color", "age" = "excluded"."age", "address" = "excluded"."address""#
         );
-        expected_str!(res, r#"SELECT 1 AS "id""#);
+        assert_eq!(
+            *res1.values,
+            vec![Value::from("brown"), Value::from(7i64), Value::from(1i64)]
+        );
+
+        let res2 = &res[1];
+        expected_str!(res2.query, r#"SELECT ? AS "id""#);
+        assert_eq!(*res2.values, vec![Value::from(1i64)]);
+
+        let res3 = &res[2];
+        expected_str!(res3.query, r#"DELETE FROM "_cloesce_tmp""#);
+        assert_eq!(res3.values.len(), 0);
+
+        test_sql(
+            meta,
+            res.into_iter().map(|r| (r.query, r.values)).collect(),
+            db,
+        )
+        .await
+        .expect("Upsert to work");
     }
 
-    #[test]
-    fn update_scalar_model() {
+    #[sqlx::test]
+    async fn update_scalar_model(db: SqlitePool) {
         // Arrange
         let ast_model = ModelBuilder::new("Horse")
             .id()
@@ -642,31 +668,42 @@ mod test {
             "address": null
         });
 
-        let mut model_meta = HashMap::new();
-        model_meta.insert(ast_model.name.clone(), ast_model);
+        let mut meta = HashMap::new();
+        meta.insert(ast_model.name.clone(), ast_model);
 
         // Act
-        let res = UpsertModel::query(
-            "Horse",
-            &model_meta,
-            new_model.as_object().unwrap().clone(),
-            None,
-        )
-        .unwrap();
+        let res = UpsertModel::query("Horse", &meta, new_model.as_object().unwrap().clone(), None)
+            .unwrap();
 
         // Assert
+        assert_eq!(res.len(), 3);
+
+        let res1 = &res[0];
         expected_str!(
-            res,
-            r#""Horse" SET "age" = 7, "address" = null WHERE "id" = 1"#
+            res1.query,
+            r#"UPDATE "Horse" SET "age" = ?, "address" = null WHERE "id" = ?"#
         );
-        expected_str!(res, r#"SELECT 1 AS "id""#);
+        assert_eq!(*res1.values, vec![Value::from(7), Value::from(1)]);
+
+        let res2 = &res[1];
+        expected_str!(res2.query, r#"SELECT ? AS "id""#);
+        assert_eq!(*res2.values, vec![Value::from(1i64)]);
+
+        test_sql(
+            meta,
+            res.into_iter().map(|r| (r.query, r.values)).collect(),
+            db,
+        )
+        .await
+        .expect("Upsert to work");
     }
 
-    #[test]
-    fn nav_props_no_include_tree() {
+    #[sqlx::test]
+    async fn nav_props_no_include_tree(db: SqlitePool) {
         // Arrange
         let ast_person = ModelBuilder::new("Person")
             .id()
+            .attribute("horseId", CidlType::Integer, Some("Horse".into()))
             .nav_p(
                 "horse",
                 "Horse",
@@ -685,26 +722,44 @@ mod test {
             }
         });
 
-        let mut model_meta = HashMap::new();
-        model_meta.insert(ast_horse.name.clone(), ast_horse);
-        model_meta.insert(ast_person.name.clone(), ast_person);
+        let mut meta = HashMap::new();
+        meta.insert(ast_horse.name.clone(), ast_horse);
+        meta.insert(ast_person.name.clone(), ast_person);
 
         // Act
         let res = UpsertModel::query(
             "Person",
-            &model_meta,
+            &meta,
             new_model.as_object().unwrap().clone(),
             None,
         )
         .unwrap();
 
         // Assert
-        expected_str!(res, r#"INSERT INTO "Person" ("id") VALUES (1)"#);
-        expected_str!(res, "SELECT 1");
+        assert_eq!(res.len(), 3);
+
+        let res1 = &res[0];
+        expected_str!(
+            res1.query,
+            r#"INSERT INTO "Person" ("horseId", "id") VALUES (?, ?)"#
+        );
+        assert_eq!(*res1.values, vec![1i64, 1i64]);
+
+        let res2 = &res[1];
+        expected_str!(res2.query, r#"SELECT ? AS "id""#);
+        assert_eq!(*res2.values, vec![1i64]);
+
+        test_sql(
+            meta,
+            res.into_iter().map(|r| (r.query, r.values)).collect(),
+            db,
+        )
+        .await
+        .unwrap_err();
     }
 
-    #[test]
-    fn one_to_one() {
+    #[sqlx::test]
+    async fn one_to_one(db: SqlitePool) {
         // Arrange
         let ast_person = ModelBuilder::new("Person")
             .id()
@@ -731,30 +786,46 @@ mod test {
             "horse": {}
         });
 
-        let mut model_meta = HashMap::new();
-        model_meta.insert(ast_horse.name.clone(), ast_horse);
-        model_meta.insert(ast_person.name.clone(), ast_person);
+        let mut meta = HashMap::new();
+        meta.insert(ast_horse.name.clone(), ast_horse);
+        meta.insert(ast_person.name.clone(), ast_person);
 
         // Act
         let res = UpsertModel::query(
             "Person",
-            &model_meta,
+            &meta,
             new_model.as_object().unwrap().clone(),
             Some(&include_tree.as_object().unwrap().clone()),
         )
         .unwrap();
 
         // Assert
-        expected_str!(res, r#"INSERT INTO "Horse" ("id") VALUES (1)"#);
+        let res1 = &res[0];
+        expected_str!(res1.query, r#"INSERT INTO "Horse" ("id") VALUES (?)"#);
+        assert_eq!(*res1.values, vec![1]);
+
+        let res2 = &res[1];
         expected_str!(
-            res,
-            r#"INSERT INTO "Person" ("horseId", "id") VALUES (1, 1) ON CONFLICT ("id") DO UPDATE SET "horseId" = "excluded"."horseId""#
+            res2.query,
+            r#"INSERT INTO "Person" ("horseId", "id") VALUES (?, ?) ON CONFLICT ("id") DO UPDATE SET "horseId" = "excluded"."horseId""#
         );
-        expected_str!(res, r#"SELECT 1 AS "id""#);
+        assert_eq!(*res2.values, vec![1, 1]);
+
+        let res3 = &res[2];
+        expected_str!(res3.query, r#"SELECT ? AS "id""#);
+        assert_eq!(*res3.values, vec![1]);
+
+        test_sql(
+            meta,
+            res.into_iter().map(|r| (r.query, r.values)).collect(),
+            db,
+        )
+        .await
+        .expect("Upsert to work");
     }
 
-    #[test]
-    fn one_to_many() {
+    #[sqlx::test]
+    async fn one_to_many(db: SqlitePool) {
         // Arrange
         let ast_person = ModelBuilder::new("Person")
             .id()
@@ -793,33 +864,62 @@ mod test {
             "horses": {}
         });
 
-        let mut model_meta = HashMap::new();
-        model_meta.insert(ast_horse.name.clone(), ast_horse);
-        model_meta.insert(ast_person.name.clone(), ast_person);
+        let mut meta = HashMap::new();
+        meta.insert(ast_horse.name.clone(), ast_horse);
+        meta.insert(ast_person.name.clone(), ast_person);
 
         // Act
         let res = UpsertModel::query(
             "Person",
-            &model_meta,
+            &meta,
             new_model.as_object().unwrap().clone(),
             Some(&include_tree.as_object().unwrap().clone()),
         )
         .unwrap();
 
         // Assert
-        expected_str!(res, r#"INSERT INTO "Person" ("id") VALUES (1)"#);
+        assert_eq!(res.len(), 6);
+
+        let res1 = &res[0];
+        expected_str!(res1.query, r#"INSERT INTO "Person" ("id") VALUES (?)"#);
+        assert_eq!(*res1.values, vec![1]);
+
+        let res2 = &res[1];
         expected_str!(
-            res,
-            r#"INSERT INTO "Person" ("id") VALUES (1);
-INSERT INTO "Horse" ("personId", "id") VALUES (1, 1) ON CONFLICT ("id") DO UPDATE SET "personId" = "excluded"."personId";
-INSERT INTO "Horse" ("personId", "id") VALUES (1, 2) ON CONFLICT ("id") DO UPDATE SET "personId" = "excluded"."personId";
-INSERT INTO "Horse" ("personId", "id") VALUES (1, 3) ON CONFLICT ("id") DO UPDATE SET "personId" = "excluded"."personId";"#
+            res2.query,
+            r#"INSERT INTO "Horse" ("personId", "id") VALUES (?, ?) ON CONFLICT ("id") DO UPDATE SET "personId" = "excluded"."personId""#
         );
-        expected_str!(res, "SELECT 1");
+        assert_eq!(*res2.values, vec![1, 1]);
+
+        let res3 = &res[2];
+        expected_str!(
+            res3.query,
+            r#"INSERT INTO "Horse" ("personId", "id") VALUES (?, ?) ON CONFLICT ("id") DO UPDATE SET "personId" = "excluded"."personId""#
+        );
+        assert_eq!(*res3.values, vec![1, 2]);
+
+        let res4 = &res[3];
+        expected_str!(
+            res4.query,
+            r#"INSERT INTO "Horse" ("personId", "id") VALUES (?, ?) ON CONFLICT ("id") DO UPDATE SET "personId" = "excluded"."personId""#
+        );
+        assert_eq!(*res4.values, vec![1, 3]);
+
+        let res5 = &res[4];
+        expected_str!(res5.query, r#"SELECT ? AS "id""#);
+        assert_eq!(*res5.values, vec![1]);
+
+        test_sql(
+            meta,
+            res.into_iter().map(|r| (r.query, r.values)).collect(),
+            db,
+        )
+        .await
+        .expect("Upsert to work");
     }
 
-    #[test]
-    fn many_to_many() {
+    #[sqlx::test]
+    async fn many_to_many(db: SqlitePool) {
         // Arrange
         let ast_person = ModelBuilder::new("Person")
             .id()
@@ -831,7 +931,16 @@ INSERT INTO "Horse" ("personId", "id") VALUES (1, 3) ON CONFLICT ("id") DO UPDAT
                 },
             )
             .build();
-        let ast_horse = ModelBuilder::new("Horse").id().build();
+        let ast_horse = ModelBuilder::new("Horse")
+            .nav_p(
+                "persons",
+                "Person",
+                NavigationPropertyKind::ManyToMany {
+                    unique_id: "PersonsHorses".to_string(),
+                },
+            )
+            .id()
+            .build();
 
         let new_model = json!({
             "id": 1,
@@ -851,33 +960,63 @@ INSERT INTO "Horse" ("personId", "id") VALUES (1, 3) ON CONFLICT ("id") DO UPDAT
             "horses": {}
         });
 
-        let mut model_meta = HashMap::new();
-        model_meta.insert(ast_horse.name.clone(), ast_horse);
-        model_meta.insert(ast_person.name.clone(), ast_person);
+        let mut meta = HashMap::new();
+        meta.insert(ast_horse.name.clone(), ast_horse);
+        meta.insert(ast_person.name.clone(), ast_person);
 
         // Act
         let res = UpsertModel::query(
             "Person",
-            &model_meta,
+            &meta,
             new_model.as_object().unwrap().clone(),
             Some(&include_tree.as_object().unwrap().clone()),
         )
         .unwrap();
 
         // Assert
+        assert_eq!(res.len(), 7);
+
+        let res1 = &res[0];
+        expected_str!(res1.query, r#"INSERT INTO "Person" ("id") VALUES (?)"#);
+        assert_eq!(*res1.values, vec![1]);
+
+        let res2 = &res[1];
+        expected_str!(res2.query, r#"INSERT INTO "Horse" ("id") VALUES (?)"#);
+        assert_eq!(*res2.values, vec![1]);
+
+        let res3 = &res[2];
         expected_str!(
-            res,
-            r#"INSERT INTO "Person" ("id") VALUES (1);
-INSERT INTO "Horse" ("id") VALUES (1);
-INSERT INTO "PersonsHorses" ("Horse.id", "Person.id") VALUES (1, 1) ON CONFLICT  DO NOTHING;
-INSERT INTO "Horse" ("id") VALUES (2);
-INSERT INTO "PersonsHorses" ("Horse.id", "Person.id") VALUES (2, 1) ON CONFLICT  DO NOTHING;"#
+            res3.query,
+            r#"INSERT INTO "PersonsHorses" ("Horse.id", "Person.id") VALUES (?, ?) ON CONFLICT  DO NOTHING"#
         );
-        expected_str!(res, "SELECT 1");
+        assert_eq!(*res3.values, vec![1, 1]);
+
+        let res4 = &res[3];
+        expected_str!(res4.query, r#"INSERT INTO "Horse" ("id") VALUES (?)"#);
+        assert_eq!(*res4.values, vec![2]);
+
+        let res5 = &res[4];
+        expected_str!(
+            res5.query,
+            r#"INSERT INTO "PersonsHorses" ("Horse.id", "Person.id") VALUES (?, ?) ON CONFLICT  DO NOTHING"#
+        );
+        assert_eq!(*res5.values, vec![2, 1]);
+
+        let res6 = &res[5];
+        expected_str!(res6.query, r#"SELECT ? AS "id""#);
+        assert_eq!(*res6.values, vec![1]);
+
+        test_sql(
+            meta,
+            res.into_iter().map(|r| (r.query, r.values)).collect(),
+            db,
+        )
+        .await
+        .expect("Upsert to work");
     }
 
-    #[test]
-    fn topological_ordering_is_correct() {
+    #[sqlx::test]
+    async fn topological_ordering_is_correct(db: SqlitePool) {
         // Arrange
         let ast_person = ModelBuilder::new("Person")
             .id()
@@ -893,7 +1032,6 @@ INSERT INTO "PersonsHorses" ("Horse.id", "Person.id") VALUES (2, 1) ON CONFLICT 
 
         let ast_horse = ModelBuilder::new("Horse")
             .id()
-            .attribute("personId", CidlType::Integer, Some("Person".into()))
             .nav_p(
                 "awards",
                 "Award",
@@ -943,35 +1081,48 @@ INSERT INTO "PersonsHorses" ("Horse.id", "Person.id") VALUES (2, 1) ON CONFLICT 
         .unwrap();
 
         // Assert
+        assert_eq!(res.len(), 6);
+
         let inserts: Vec<_> = res
-            .lines()
-            .filter(|line| line.starts_with("INSERT"))
+            .iter()
+            .filter(|stmt| stmt.query.starts_with("INSERT"))
             .collect();
 
         assert!(
-            inserts[0].contains("INSERT INTO \"Horse\""),
+            inserts[0].query.contains("INSERT INTO \"Horse\""),
             "Expected Horse inserted first, got {}",
-            inserts[0]
+            inserts[0].query
         );
+
         assert!(
-            inserts[1].contains("INSERT INTO \"Award\""),
+            inserts[1].query.contains("INSERT INTO \"Award\""),
             "Expected Award inserted third, got {}",
-            inserts[1]
+            inserts[1].query
         );
+
         assert!(
-            inserts[2].contains("INSERT INTO \"Award\""),
+            inserts[2].query.contains("INSERT INTO \"Award\""),
             "Expected another Award insert, got {}",
-            inserts[2]
+            inserts[2].query
         );
+
         assert!(
-            inserts[3].contains("INSERT INTO \"Person\""),
+            inserts[3].query.contains("INSERT INTO \"Person\""),
             "Expected Person inserted second, got {}",
-            inserts[3]
+            inserts[3].query
         );
+
+        test_sql(
+            meta,
+            res.into_iter().map(|r| (r.query, r.values)).collect(),
+            db,
+        )
+        .await
+        .expect("Upsert to work");
     }
 
-    #[test]
-    fn insert_missing_pk_autogenerates() {
+    #[sqlx::test]
+    async fn insert_missing_pk_autogenerates(db: SqlitePool) {
         // Arrange
         let person = ModelBuilder::new("Person").id().build();
         let mut meta = std::collections::HashMap::new();
@@ -989,20 +1140,37 @@ INSERT INTO "PersonsHorses" ("Horse.id", "Person.id") VALUES (2, 1) ON CONFLICT 
         .unwrap();
 
         // Assert
-        let lines = res.split("\n").collect::<Vec<_>>();
-        expected_str!(lines[0], "INSERT INTO \"Person\" DEFAULT VALUES;");
+        assert_eq!(res.len(), 4);
+
+        let res1 = &res[0];
+        expected_str!(res1.query, r#"INSERT INTO "Person" DEFAULT VALUES"#);
+        assert_eq!(res1.values.len(), 0);
+
+        let res2 = &res[1];
         expected_str!(
-            lines[1],
-            "REPLACE INTO \"_cloesce_tmp\" (\"path\", \"id\") VALUES ('Person.id', last_insert_rowid());"
+            res2.query,
+            r#"REPLACE INTO "_cloesce_tmp" ("path", "id") VALUES (?, last_insert_rowid())"#
         );
+        assert_eq!(*res2.values, vec!["Person.id"]);
+
+        let res3 = &res[2];
         expected_str!(
-            lines[2],
-            r#"SELECT "id" FROM "_cloesce_tmp" WHERE "path" = 'Person.id';"#
+            res3.query,
+            r#"SELECT "id" FROM "_cloesce_tmp" WHERE "path" = ?"#
         );
+        assert_eq!(*res3.values, vec!["Person.id"]);
+
+        test_sql(
+            meta,
+            res.into_iter().map(|r| (r.query, r.values)).collect(),
+            db,
+        )
+        .await
+        .expect("Upsert to work");
     }
 
-    #[test]
-    fn insert_missing_one_to_one_fk_autogenerates() {
+    #[sqlx::test]
+    async fn insert_missing_one_to_one_fk_autogenerates(db: SqlitePool) {
         let person = ModelBuilder::new("Person")
             .id()
             .attribute("horseId", CidlType::Integer, Some("Horse".into()))
@@ -1041,19 +1209,51 @@ INSERT INTO "PersonsHorses" ("Horse.id", "Person.id") VALUES (2, 1) ON CONFLICT 
         .unwrap();
 
         // Assert
+        assert_eq!(res.len(), 6);
+
+        let res1 = &res[0];
+        expected_str!(res1.query, r#"INSERT INTO "Horse" DEFAULT VALUES"#);
+        assert_eq!(res1.values.len(), 0);
+
+        let res2 = &res[1];
         expected_str!(
-            res,
-            r#"INSERT INTO "Horse" DEFAULT VALUES;
-REPLACE INTO "_cloesce_tmp" ("path", "id") VALUES ('Person.horse.id', last_insert_rowid());
-INSERT INTO "Person" ("horseId") VALUES ((SELECT "id" FROM "_cloesce_tmp" WHERE "path" = 'Person.horse.id'));
-REPLACE INTO "_cloesce_tmp" ("path", "id") VALUES ('Person.id', last_insert_rowid());
-SELECT "id" FROM "_cloesce_tmp" WHERE "path" = 'Person.id';
-"#
+            res2.query,
+            r#"REPLACE INTO "_cloesce_tmp" ("path", "id") VALUES (?, last_insert_rowid())"#
         );
+        assert_eq!(*res2.values, vec!["Person.horse.id"]);
+
+        let res3 = &res[2];
+        expected_str!(
+            res3.query,
+            r#"INSERT INTO "Person" ("horseId") VALUES ((SELECT "id" FROM "_cloesce_tmp" WHERE "path" = ?))"#
+        );
+        assert_eq!(*res3.values, vec!["Person.horse.id"]);
+
+        let res4 = &res[3];
+        expected_str!(
+            res4.query,
+            r#"REPLACE INTO "_cloesce_tmp" ("path", "id") VALUES (?, last_insert_rowid())"#
+        );
+        assert_eq!(*res4.values, vec!["Person.id"]);
+
+        let res5 = &res[4];
+        expected_str!(
+            res5.query,
+            r#"SELECT "id" FROM "_cloesce_tmp" WHERE "path" = ?"#
+        );
+        assert_eq!(*res5.values, vec!["Person.id"]);
+
+        test_sql(
+            meta,
+            res.into_iter().map(|r| (r.query, r.values)).collect(),
+            db,
+        )
+        .await
+        .expect("Upsert to work");
     }
 
-    #[test]
-    fn insert_missing_one_to_many_fk_autogenerates() {
+    #[sqlx::test]
+    async fn insert_missing_one_to_many_fk_autogenerates(db: SqlitePool) {
         // Arrange
         let person = ModelBuilder::new("Person")
             .id()
@@ -1098,19 +1298,50 @@ SELECT "id" FROM "_cloesce_tmp" WHERE "path" = 'Person.id';
         .unwrap();
 
         // Assert
+
+        let res1 = &res[0];
+        expected_str!(res1.query, r#"INSERT INTO "Person" DEFAULT VALUES"#);
+        assert_eq!(res1.values.len(), 0);
+
+        let res2 = &res[1];
         expected_str!(
-            res,
-            r#"INSERT INTO "Person" DEFAULT VALUES;
-REPLACE INTO "_cloesce_tmp" ("path", "id") VALUES ('Person.id', last_insert_rowid());
-INSERT INTO "Horse" ("personId") VALUES ((SELECT "id" FROM "_cloesce_tmp" WHERE "path" = 'Person.id'));
-REPLACE INTO "_cloesce_tmp" ("path", "id") VALUES ('Person.horses.id', last_insert_rowid());
-SELECT "id" FROM "_cloesce_tmp" WHERE "path" = 'Person.id';
-"#
+            res2.query,
+            r#"REPLACE INTO "_cloesce_tmp" ("path", "id") VALUES (?, last_insert_rowid())"#
         );
+        assert_eq!(*res2.values, vec!["Person.id"]);
+
+        let res3 = &res[2];
+        expected_str!(
+            res3.query,
+            r#"INSERT INTO "Horse" ("personId") VALUES ((SELECT "id" FROM "_cloesce_tmp" WHERE "path" = ?))"#
+        );
+        assert_eq!(*res3.values, vec!["Person.id"]);
+
+        let res4 = &res[3];
+        expected_str!(
+            res4.query,
+            r#"REPLACE INTO "_cloesce_tmp" ("path", "id") VALUES (?, last_insert_rowid())"#
+        );
+        assert_eq!(*res4.values, vec!["Person.horses.id"]);
+
+        let res5 = &res[4];
+        expected_str!(
+            res5.query,
+            r#"SELECT "id" FROM "_cloesce_tmp" WHERE "path" = ?"#
+        );
+        assert_eq!(*res5.values, vec!["Person.id"]);
+
+        test_sql(
+            meta,
+            res.into_iter().map(|r| (r.query, r.values)).collect(),
+            db,
+        )
+        .await
+        .expect("Upsert to work");
     }
 
-    #[test]
-    fn insert_missing_many_to_many_pk_fk_autogenerates() {
+    #[sqlx::test]
+    async fn insert_missing_many_to_many_pk_fk_autogenerates(db: SqlitePool) {
         // Arrange
         let person = ModelBuilder::new("Person")
             .id()
@@ -1123,7 +1354,16 @@ SELECT "id" FROM "_cloesce_tmp" WHERE "path" = 'Person.id';
             )
             .build();
 
-        let horse = ModelBuilder::new("Horse").id().build();
+        let horse = ModelBuilder::new("Horse")
+            .nav_p(
+                "persons",
+                "Person",
+                NavigationPropertyKind::ManyToMany {
+                    unique_id: "PersonsHorses".to_string(),
+                },
+            )
+            .id()
+            .build();
 
         let mut meta = std::collections::HashMap::new();
         meta.insert(person.name.clone(), person);
@@ -1151,17 +1391,67 @@ SELECT "id" FROM "_cloesce_tmp" WHERE "path" = 'Person.id';
         .unwrap();
 
         // Assert
+
+        let res1 = &res[0];
+        expected_str!(res1.query, r#"INSERT INTO "Person" DEFAULT VALUES"#);
+        assert_eq!(res1.values.len(), 0);
+
+        let res2 = &res[1];
         expected_str!(
-            res,
-            r#"INSERT INTO "Person" DEFAULT VALUES;
-REPLACE INTO "_cloesce_tmp" ("path", "id") VALUES ('Person.id', last_insert_rowid());
-INSERT INTO "Horse" DEFAULT VALUES;
-REPLACE INTO "_cloesce_tmp" ("path", "id") VALUES ('Person.horses.id', last_insert_rowid());
-INSERT INTO "PersonsHorses" ("Horse.id", "Person.id") VALUES ((SELECT "id" FROM "_cloesce_tmp" WHERE "path" = 'Person.horses.id'), (SELECT "id" FROM "_cloesce_tmp" WHERE "path" = 'Person.id')) ON CONFLICT  DO NOTHING;
-INSERT INTO "Horse" DEFAULT VALUES;
-REPLACE INTO "_cloesce_tmp" ("path", "id") VALUES ('Person.horses.id', last_insert_rowid());
-INSERT INTO "PersonsHorses" ("Horse.id", "Person.id") VALUES ((SELECT "id" FROM "_cloesce_tmp" WHERE "path" = 'Person.horses.id'), (SELECT "id" FROM "_cloesce_tmp" WHERE "path" = 'Person.id')) ON CONFLICT  DO NOTHING;
-SELECT "id" FROM "_cloesce_tmp" WHERE "path" = 'Person.id';"#
+            res2.query,
+            r#"REPLACE INTO "_cloesce_tmp" ("path", "id") VALUES (?, last_insert_rowid())"#
         );
+        assert_eq!(*res2.values, vec!["Person.id"]);
+
+        let res3 = &res[2];
+        expected_str!(res3.query, r#"INSERT INTO "Horse" DEFAULT VALUES"#);
+        assert_eq!(res3.values.len(), 0);
+
+        let res4 = &res[3];
+        expected_str!(
+            res4.query,
+            r#"REPLACE INTO "_cloesce_tmp" ("path", "id") VALUES (?, last_insert_rowid())"#
+        );
+        assert_eq!(*res4.values, vec!["Person.horses.id"]);
+
+        let res5 = &res[4];
+        expected_str!(
+            res5.query,
+            r#"INSERT INTO "PersonsHorses" ("Horse.id", "Person.id") VALUES ((SELECT "id" FROM "_cloesce_tmp" WHERE "path" = ?), (SELECT "id" FROM "_cloesce_tmp" WHERE "path" = ?)) ON CONFLICT  DO NOTHING"#
+        );
+        assert_eq!(*res5.values, vec!["Person.horses.id", "Person.id"]);
+
+        let res6 = &res[5];
+        expected_str!(res6.query, r#"INSERT INTO "Horse" DEFAULT VALUES"#);
+        assert_eq!(res6.values.len(), 0);
+
+        let res7 = &res[6];
+        expected_str!(
+            res7.query,
+            r#"REPLACE INTO "_cloesce_tmp" ("path", "id") VALUES (?, last_insert_rowid())"#
+        );
+        assert_eq!(*res7.values, vec!["Person.horses.id"]);
+
+        let res8 = &res[7];
+        expected_str!(
+            res8.query,
+            r#"INSERT INTO "PersonsHorses" ("Horse.id", "Person.id") VALUES ((SELECT "id" FROM "_cloesce_tmp" WHERE "path" = ?), (SELECT "id" FROM "_cloesce_tmp" WHERE "path" = ?)) ON CONFLICT  DO NOTHING"#
+        );
+        assert_eq!(*res8.values, vec!["Person.horses.id", "Person.id"]);
+
+        let res9 = &res[8];
+        expected_str!(
+            res9.query,
+            r#"SELECT "id" FROM "_cloesce_tmp" WHERE "path" = ?"#
+        );
+        assert_eq!(*res9.values, vec!["Person.id"]);
+
+        test_sql(
+            meta,
+            res.into_iter().map(|r| (r.query, r.values)).collect(),
+            db,
+        )
+        .await
+        .expect("Upsert to work");
     }
 }

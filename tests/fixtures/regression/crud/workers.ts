@@ -19,13 +19,14 @@ async function fetch(request: Request, env: any, ctx: any): Promise<Response> {
         return await cloesce(
             request, 
             env,
-            cidl, 
+            cidl as any, 
             app,
             constructorRegistry, 
             envMeta,  
             apiRoute
         );
     } catch(e: any) {
+        console.error(JSON.stringify(e));
         return new Response(JSON.stringify({
             ok: false,
             status: 500,

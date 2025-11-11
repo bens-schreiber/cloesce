@@ -25,8 +25,6 @@ import {
   NamedTypedValue,
   NavigationProperty,
   WranglerEnv,
-  left,
-  right,
   ExtractorError,
   ExtractorErrorCode,
   PlainOldObject,
@@ -73,11 +71,11 @@ export class CidlExtractor {
         sourceFile.getBaseName() === "seed__app.cloesce.ts" // hardcoding for tests
       ) {
         const app = CidlExtractor.app(sourceFile);
-        if (!app.ok) {
+        if (app.isLeft()) {
           return app;
         }
 
-        app_source = app.value;
+        app_source = app.unwrap();
       }
 
       for (const classDecl of sourceFile.getClasses()) {
@@ -91,11 +89,11 @@ export class CidlExtractor {
           const result = CidlExtractor.model(classDecl, sourceFile);
 
           // Error: propogate from models
-          if (!result.ok) {
+          if (result.isLeft()) {
             result.value.addContext((prev) => `${classDecl.getName()}.${prev}`);
             return result;
           }
-          models[result.value.name] = result.value;
+          models[result.unwrap().name] = result.unwrap();
           continue;
         }
 
@@ -104,11 +102,11 @@ export class CidlExtractor {
           const result = CidlExtractor.poo(classDecl, sourceFile);
 
           // Error: propogate from models
-          if (!result.ok) {
+          if (result.isLeft()) {
             result.value.addContext((prev) => `${classDecl.getName()}.${prev}`);
             return result;
           }
-          poos[result.value.name] = result.value;
+          poos[result.unwrap().name] = result.unwrap();
           continue;
         }
 
@@ -122,11 +120,11 @@ export class CidlExtractor {
           }
 
           const result = CidlExtractor.env(classDecl, sourceFile);
-          if (!result.ok) {
+          if (result.isLeft()) {
             return result;
           }
 
-          wranglerEnvs.push(result.value);
+          wranglerEnvs.push(result.unwrap());
         }
       }
     }
@@ -144,7 +142,7 @@ export class CidlExtractor {
       );
     }
 
-    return right({
+    return Either.right({
       version: this.version,
       project_name: this.projectName,
       language: "TypeScript",
@@ -179,7 +177,7 @@ export class CidlExtractor {
 
     const typeText = getTypeText();
     if (typeText === CloesceApp.name) {
-      return right(sourceFile.getFilePath().toString());
+      return Either.right(sourceFile.getFilePath().toString());
     }
 
     return err(ExtractorErrorCode.AppMissingDefaultExport);
@@ -211,7 +209,7 @@ export class CidlExtractor {
       const typeRes = CidlExtractor.cidlType(prop.getType());
 
       // Error: invalid property type
-      if (!typeRes.ok) {
+      if (typeRes.isLeft()) {
         typeRes.value.context = prop.getName();
         typeRes.value.snippet = prop.getText();
         return typeRes;
@@ -226,7 +224,7 @@ export class CidlExtractor {
           return checkModifierRes;
         }
 
-        const cidl_type = typeRes.value;
+        const cidl_type = typeRes.unwrap();
         attributes.push({
           foreign_key_reference: null,
           value: {
@@ -250,7 +248,7 @@ export class CidlExtractor {
       }
 
       // Process decorator
-      const cidl_type = typeRes.value;
+      const cidl_type = typeRes.unwrap();
       switch (decoratorName) {
         case AttributeDecoratorKind.PrimaryKey: {
           primary_key = {
@@ -390,7 +388,7 @@ export class CidlExtractor {
             sourceFile,
           );
 
-          if (!treeRes.ok) {
+          if (treeRes.isLeft()) {
             treeRes.value.addContext((prev) => `${prop.getName()} ${prev}`);
             treeRes.value.snippet = prop.getText();
             return treeRes;
@@ -398,7 +396,7 @@ export class CidlExtractor {
 
           data_sources[prop.getName()] = {
             name: prop.getName(),
-            tree: treeRes.value,
+            tree: treeRes.unwrap(),
           };
           break;
         }
@@ -425,14 +423,14 @@ export class CidlExtractor {
       }
 
       const result = CidlExtractor.method(name, m, httpVerb);
-      if (!result.ok) {
+      if (result.isLeft()) {
         result.value.addContext((prev) => `${m.getName()} ${prev}`);
-        return left(result.value);
+        return result;
       }
-      methods[result.value.name] = result.value;
+      methods[result.unwrap().name] = result.unwrap();
     }
 
-    return right({
+    return Either.right({
       name,
       attributes,
       primary_key,
@@ -455,7 +453,7 @@ export class CidlExtractor {
       const typeRes = CidlExtractor.cidlType(prop.getType());
 
       // Error: invalid property type
-      if (!typeRes.ok) {
+      if (typeRes.isLeft()) {
         typeRes.value.context = prop.getName();
         typeRes.value.snippet = prop.getText();
         return typeRes;
@@ -467,7 +465,7 @@ export class CidlExtractor {
         return modifierRes;
       }
 
-      const cidl_type = typeRes.value;
+      const cidl_type = typeRes.unwrap();
       attributes.push({
         name: prop.getName(),
         cidl_type,
@@ -475,7 +473,7 @@ export class CidlExtractor {
       continue;
     }
 
-    return right({
+    return Either.right({
       name,
       attributes,
       source_path: sourceFile.getFilePath().toString(),
@@ -501,7 +499,7 @@ export class CidlExtractor {
       return err(ExtractorErrorCode.MissingDatabaseBinding);
     }
 
-    return right({
+    return Either.right({
       name: classDecl.getName()!,
       source_path: sourceFile.getFilePath().toString(),
       db_binding: binding.getName(),
@@ -525,12 +523,12 @@ export class CidlExtractor {
   ): Either<ExtractorError, CidlType> {
     // Void
     if (type.isVoid()) {
-      return right("Void");
+      return Either.right("Void");
     }
 
     // Null
     if (type.isNull()) {
-      return right({ Nullable: "Void" });
+      return Either.right({ Nullable: "Void" });
     }
 
     // Nullable via union
@@ -543,7 +541,7 @@ export class CidlExtractor {
     // Primitives
     const prim = this.primTypeMap[tyText];
     if (prim) {
-      return right(wrapNullable(prim, nullable));
+      return Either.right(wrapNullable(prim, nullable));
     }
 
     const generics = [
@@ -559,7 +557,7 @@ export class CidlExtractor {
     // No generics -> inject or object
     if (generics.length === 0) {
       const base = inject ? { Inject: tyText } : { Object: tyText };
-      return right(wrapNullable(base, nullable));
+      return Either.right(wrapNullable(base, nullable));
     }
 
     // Single generic
@@ -568,7 +566,7 @@ export class CidlExtractor {
     const aliasName = unwrappedType.getAliasSymbol()?.getName();
 
     if (aliasName === "DataSourceOf") {
-      return right(
+      return Either.right(
         wrapNullable(
           {
             DataSource: genericTy.getText(
@@ -597,7 +595,7 @@ export class CidlExtractor {
         return err(ExtractorErrorCode.InvalidPartialType);
       }
 
-      return right(
+      return Either.right(
         wrapNullable(
           {
             Partial: genericTy
@@ -646,11 +644,7 @@ export class CidlExtractor {
       const res = CidlExtractor.cidlType(t, inject);
 
       // Error: propogated from `cidlType`
-      if (!res.ok) {
-        return res;
-      }
-
-      return right(wrapNullable(wrapper(res.value), isNullable));
+      return res.map((inner) => wrapNullable(wrapper(inner), isNullable));
     }
 
     function unwrapNullable(ty: Type): [Type, boolean] {
@@ -705,14 +699,14 @@ export class CidlExtractor {
       const typeRes = CidlExtractor.cidlType(navProp.getType());
 
       // Error: invalid referenced nav prop type
-      if (!typeRes.ok) {
+      if (typeRes.isLeft()) {
         typeRes.value.snippet = navProp.getText();
         typeRes.value.context = prop.getName();
         return typeRes;
       }
 
       // Error: invalid referenced nav prop type
-      const cidl_type = typeRes.value;
+      const cidl_type = typeRes.unwrap();
       if (typeof cidl_type === "string") {
         return err(
           ExtractorErrorCode.InvalidNavigationPropertyReference,
@@ -742,19 +736,19 @@ export class CidlExtractor {
           );
 
           // Error: Propogated from `includeTree`
-          if (!treeRes.ok) {
+          if (treeRes.isLeft()) {
             treeRes.value.snippet = expr.getText();
             return treeRes;
           }
 
-          nestedTree = treeRes.value;
+          nestedTree = treeRes.unwrap();
         }
       }
 
       result[navProp.getName()] = nestedTree;
     }
 
-    return right(result);
+    return Either.right(result);
   }
 
   static method(
@@ -779,7 +773,7 @@ export class CidlExtractor {
         const typeRes = CidlExtractor.cidlType(param.getType(), true);
 
         // Error: invalid type
-        if (!typeRes.ok) {
+        if (typeRes.isLeft()) {
           typeRes.value.snippet = method.getText();
           typeRes.value.context = param.getName();
           return typeRes;
@@ -787,7 +781,7 @@ export class CidlExtractor {
 
         parameters.push({
           name: param.getName(),
-          cidl_type: typeRes.value,
+          cidl_type: typeRes.unwrap(),
         });
         continue;
       }
@@ -796,7 +790,7 @@ export class CidlExtractor {
       const typeRes = CidlExtractor.cidlType(param.getType());
 
       // Error: invalid type
-      if (!typeRes.ok) {
+      if (typeRes.isLeft()) {
         typeRes.value.snippet = method.getText();
         typeRes.value.context = param.getName();
         return typeRes;
@@ -807,14 +801,14 @@ export class CidlExtractor {
 
       parameters.push({
         name: param.getName(),
-        cidl_type: typeRes.value,
+        cidl_type: typeRes.unwrap(),
       });
     }
 
     const typeRes = CidlExtractor.cidlType(method.getReturnType());
 
     // Error: invalid type
-    if (!typeRes.ok) {
+    if (typeRes.isLeft()) {
       typeRes.value.snippet = method.getText();
       return typeRes;
     }
@@ -827,11 +821,11 @@ export class CidlExtractor {
       });
     }
 
-    return right({
+    return Either.right({
       name: method.getName(),
       is_static: method.isStatic(),
       http_verb: httpVerb,
-      return_type: typeRes.value,
+      return_type: typeRes.unwrap(),
       parameters,
     });
   }
@@ -845,7 +839,7 @@ function err(
   if (fn) {
     fn(e);
   }
-  return left(e);
+  return Either.left(e);
 }
 
 function getDecoratorName(decorator: Decorator): string {

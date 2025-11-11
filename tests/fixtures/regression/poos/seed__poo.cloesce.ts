@@ -36,17 +36,17 @@ export class PooAcceptYield {
   id: Integer;
 
   @POST
-  acceptPoos(a: PooA, b: PooB, c: PooC) {}
+  static acceptPoos(a: PooA, b: PooB, c: PooC) {}
 
   @POST
-  yieldPoo(): PooC {
+  static yieldPoo(): PooC {
     return {
       a: {
-        name: "",
-        major: "",
+        name: "name",
+        major: "major",
       },
       b: {
-        color: "",
+        color: "color",
       },
     };
   }

@@ -17,14 +17,12 @@ describe("Extractor Run-Fail", () => {
       project.addSourceFileAtPath(file);
 
       const res = new CidlExtractor("proj", "1.0.0").extract(project);
-      expect(res.ok).toBe(false);
+      expect(res.isLeft()).toBe(true);
 
-      if (!res.ok) {
-        const actualName = getErrorNameFromCode(
-          (res.value as ExtractorError).code,
-        );
-        expect(actualName).toBe(expectedName);
-      }
+      const actualName = getErrorNameFromCode(
+        (res.value as ExtractorError).code,
+      );
+      expect(actualName).toBe(expectedName);
     });
   }
 });

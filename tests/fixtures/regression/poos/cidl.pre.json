@@ -19,7 +19,7 @@
             "methods": {
                 "acceptPoos": {
                     "name": "acceptPoos",
-                    "is_static": false,
+                    "is_static": true,
                     "http_verb": "POST",
                     "return_type": "Void",
                     "parameters": [
@@ -40,30 +40,17 @@
                             "cidl_type": {
                                 "Object": "PooC"
                             }
-                        },
-                        {
-                            "name": "__dataSource",
-                            "cidl_type": {
-                                "DataSource": "PooAcceptYield"
-                            }
                         }
                     ]
                 },
                 "yieldPoo": {
                     "name": "yieldPoo",
-                    "is_static": false,
+                    "is_static": true,
                     "http_verb": "POST",
                     "return_type": {
                         "Object": "PooC"
                     },
-                    "parameters": [
-                        {
-                            "name": "__dataSource",
-                            "cidl_type": {
-                                "DataSource": "PooAcceptYield"
-                            }
-                        }
-                    ]
+                    "parameters": []
                 }
             },
             "data_sources": {},

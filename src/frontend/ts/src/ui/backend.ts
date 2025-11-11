@@ -1,12 +1,5 @@
 import { D1Database } from "@cloudflare/workers-types/experimental/index.js";
-import {
-  CrudKind,
-  DeepPartial,
-  Either,
-  KeysOfType,
-  left,
-  right,
-} from "../common.js";
+import { CrudKind, DeepPartial, Either, KeysOfType } from "../common.js";
 import { RuntimeContainer } from "../router/router.js";
 import {
   WasmResource,
@@ -53,8 +46,6 @@ export const D1: ClassDecorator = () => {};
  * returned from a model method or API endpoint without being
  * treated as a database model.
  *
- * These are often used for DTOs or view models.
- *
  * Example:
  * ```ts
  * ＠PlainOldObject
@@ -62,6 +53,16 @@ export const D1: ClassDecorator = () => {};
  *   catFacts: string[];
  *   catNames: string[];
  * }
+ *
+ * // in a method...
+ * foo(): CatStuff {
+ *   return {
+ *    catFacts: ["cats sleep 16 hours a day"],
+ *   catNames: ["Whiskers", "Fluffy"]
+ *  };
+ *
+ * // which generates an API like:
+ * async function foo(): Promise<HttpResult<CatStuff>> { ... }
  * ```
  */
 export const PlainOldObject: ClassDecorator = () => {};
@@ -136,14 +137,12 @@ export const PATCH: MethodDecorator = () => {};
  * The method will appear in both backend and generated client APIs.
  */
 export const DELETE: MethodDecorator = () => {};
+
 /**
  * Declares a static property as a data source.
  *
- * Data sources describe SQL view definitions (joins) for
- * model relationships. They define which related models
- * are automatically included when querying. Data sources
- * can only reference navigation properties, not scalar
- * attributes.
+ * Data sources describe SQL left joins related to each
+ * models navigation properties.
  *
  * Example:
  * ```ts
@@ -166,27 +165,17 @@ export const DELETE: MethodDecorator = () => {};
  *   @OneToOne("dogId")
  *   dog: Dog | undefined;
  *
- *   // 👇 Defines a data source that joins the related Dog record
  *   ＠DataSource
  *   static readonly default: IncludeTree<Person> = {
- *     dog: {},
+ *     dog: {}, // join Dog table when querying Person with `default` data source
  *   };
  * }
  *
- * // The above will generate an SQL view similar to:
- * // CREATE VIEW "Person.default" AS
- * // SELECT
- * //   "Person"."id" AS "id",
- * //   "Person"."dogId" AS "dogId",
- * //   "Dog"."id" AS "dog.id",
- * //   "Dog"."name" AS "dog.name"
- * // FROM "Person"
- * // LEFT JOIN "Dog" ON "Person"."dogId" = "Dog"."id";
- *
  * // When queried via the ORM or client API:
  * const orm = Orm.fromD1(env.db);
- * const people = (await orm.list(Person, "default")).value;
- * // Each Person instance will now include a populated .dog property.
+ * const people = await orm.list(Person, Person.default);
+ *
+ * // => Person { id: 1, dogId: 2, dog: { id: 2, name: "Fido" } }[]
  * ```
  */
 
@@ -205,7 +194,7 @@ export const DataSource: PropertyDecorator = () => {};
  * ```
  */
 export const OneToMany =
-  (_: string): PropertyDecorator =>
+  (_foreignKeyColumn: string): PropertyDecorator =>
   () => {};
 
 /**
@@ -221,7 +210,7 @@ export const OneToMany =
  * ```
  */
 export const OneToOne =
-  (_: string): PropertyDecorator =>
+  (_foreignKeyColumn: string): PropertyDecorator =>
   () => {};
 
 /**
@@ -237,7 +226,7 @@ export const OneToOne =
  * ```
  */
 export const ManyToMany =
-  (_: string): PropertyDecorator =>
+  (_uniqueId: string): PropertyDecorator =>
   () => {};
 
 /**
@@ -255,7 +244,7 @@ export const ManyToMany =
  * ```
  */
 export const ForeignKey =
-  <T>(_: T | string): PropertyDecorator =>
+  <T>(_Model: T | string): PropertyDecorator =>
   () => {};
 
 /**
@@ -263,6 +252,9 @@ export const ForeignKey =
  *
  * Injected parameters can receive environment bindings,
  * middleware-provided objects, or other registered values.
+ *
+ * Note that injected parameters will not appear in the client
+ * API.
  *
  * Example:
  * ```ts
@@ -284,14 +276,13 @@ export const Inject: ParameterDecorator = () => {};
  * client bindings automatically, removing the need to manually
  * define common API operations.
  *
- * Supported kinds:
- * - **"SAVE"** — Performs an *upsert* (insert or update) for a model instance.
+ * CRUD Operations:
+ * - **"SAVE"** — Performs an *upsert* (insert, update, or both) for a model instance.
  * - **"GET"** — Retrieves a single record by its primary key, optionally using a `DataSource`.
  * - **"LIST"** — Retrieves all records for the model, using the specified `DataSource`.
- * - **(future)** `"DELETE"` — Will remove a record by primary key once implemented.
  *
  * The generated methods are static, exposed through both the backend
- * (Worker endpoints) and the frontend client API.
+ * and the frontend client API.
  *
  * Example:
  * ```ts
@@ -301,11 +292,6 @@ export const Inject: ParameterDecorator = () => {};
  *   ＠PrimaryKey id: number;
  *   name: string;
  * }
- *
- * // Generated methods (conceptually):
- * // static async save(item: CrudHaver): Promise<HttpResult<CrudHaver>>
- * // static async get(id: number, dataSource?: string): Promise<HttpResult<CrudHaver>>
- * // static async list(dataSource?: string): Promise<HttpResult<CrudHaver[]>>
  * ```
  */
 export const CRUD =
@@ -352,8 +338,7 @@ export type IncludeTree<T> = (T extends Primitive
  * Represents the name of a `＠DataSource` available on a model type `T`,
  * or `"none"` when no data source (no joins) should be applied.
  *
- * This type is used by ORM and CRUD methods to restrict valid
- * data source names to the actual static properties declared on the model.
+ * All instantiated model methods implicitly have a Data Source param `__dataSource`.
  *
  * Example:
  * ```ts
@@ -363,10 +348,15 @@ export type IncludeTree<T> = (T extends Primitive
  *
  *   ＠DataSource
  *   static readonly default: IncludeTree<Person> = { dogs: {} };
+ *
+ *   ＠POST
+ *   foo(ds: DataSourceOf<Person>) {
+ *    // Cloesce won't append an implicit data source param here since it's explicit
+ *   }
  * }
  *
- * type DS = DataSourceOf<Person>;
- * // => "default" | "none"
+ * // on the API client:
+ * async foo(ds: "default" | "none"): Promise<void> {...}
  * ```
  */
 export type DataSourceOf<T extends object> = (
@@ -394,22 +384,7 @@ export type DataSourceOf<T extends object> = (
 export type Integer = number & { __brand?: "Integer" };
 
 /**
- * Provides helper methods for performing ORM operations against a D1 database.
- *
- * The `Orm` class uses the Cloesce metadata system to generate, execute,
- * and map SQL queries for model classes decorated with `＠D1`.
- *
- * Typical operations include:
- * - `fromD1(db)` — create an ORM instance bound to a `D1Database`
- * - `upsert()` — insert or update a model
- * - `list()` — fetch all instances of a model
- * - `get()` — fetch one instance by primary key
- *
- * Example:
- * ```ts
- * const orm = Orm.fromD1(env.db);
- * const horses = (await orm.list(Horse, "default")).value;
- * ```
+ * Exposes the ORM primitives Cloesce uses to interact with D1 databases.
  */
 export class Orm {
   private constructor(private db: D1Database) {}
@@ -439,40 +414,15 @@ export class Orm {
   }
 
   /**
-   * Returns a SQL query to insert a model into the database. Uses an IncludeTree as a guide for
-   * foreign key relationships, only inserting the explicitly stated pattern in the tree.
-   *
-   * TODO: We should be able to leave primary keys and foreign keys undefined, with
-   * primary keys being auto incremented and foreign keys being assumed by navigation property
-   * context.
-   *
-   * @param ctor A model constructor.
-   * @param newModel The new model to insert.
-   * @param includeTree An include tree describing which foreign keys to join.
-   * @returns Either an error string, or the insert query string.
-   */
-  static upsertQuery<T extends object>(
-    ctor: new () => T,
-    newModel: DeepPartial<T>,
-    includeTree: IncludeTree<T> | null = null,
-  ): Either<string, string> {
-    const { wasm } = RuntimeContainer.get();
-    const args = [
-      WasmResource.fromString(ctor.name, wasm),
-      WasmResource.fromString(JSON.stringify(newModel), wasm),
-      WasmResource.fromString(JSON.stringify(includeTree), wasm),
-    ];
-    return invokeOrmWasm(wasm.upsert_model, args, wasm);
-  }
-
-  /**
    * Executes an "upsert" query, adding or augmenting a model in the database.
+   *
    * If a model's primary key is not defined in `newModel`, the query is assumed to be an insert.
+   *
    * If a model's primary key _is_ defined, but some attributes are missing, the query is assumed to be an update.
+   *
    * Finally, if the primary key is defined, but all attributes are included, a SQLite upsert will be performed.
    *
-   * Capable of inferring foreign keys from the surrounding context of the model. A missing primary key is allowed
-   * only if the primary key is an integer, in which case it will be auto incremented and assigned.
+   * In any other case, an error string will be returned.
    *
    * ### Inserting a new Model
    * ```ts
@@ -511,21 +461,27 @@ export class Orm {
     newModel: DeepPartial<T>,
     includeTree: IncludeTree<T> | null = null,
   ): Promise<Either<string, any>> {
-    let upsertQueryRes = Orm.upsertQuery(ctor, newModel, includeTree);
-    if (!upsertQueryRes.ok) {
+    const { wasm } = RuntimeContainer.get();
+    const args = [
+      WasmResource.fromString(ctor.name, wasm),
+      WasmResource.fromString(JSON.stringify(newModel), wasm),
+      WasmResource.fromString(JSON.stringify(includeTree), wasm),
+    ];
+
+    const upsertQueryRes = invokeOrmWasm(wasm.upsert_model, args, wasm);
+    if (upsertQueryRes.isLeft()) {
       return upsertQueryRes;
     }
 
-    // Split the query into individual statements.
-    const statements = upsertQueryRes.value
-      .split(";")
-      .map((s) => s.trim())
-      .filter((s) => s.length > 0);
+    const statements = JSON.parse(upsertQueryRes.unwrap()) as {
+      query: string;
+      values: any[];
+    }[];
 
     // One of these statements is a "SELECT", which is the root model id stmt.
     let selectIndex: number;
     for (let i = statements.length - 1; i >= 0; i--) {
-      if (/^SELECT/i.test(statements[i])) {
+      if (/^SELECT/i.test(statements[i].query)) {
         selectIndex = i;
         break;
       }
@@ -533,12 +489,12 @@ export class Orm {
 
     // Execute all statements in a batch.
     const batchRes = await this.db.batch(
-      statements.map((s) => this.db.prepare(s)),
+      statements.map((s) => this.db.prepare(s.query).bind(...s.values)),
     );
 
     if (!batchRes.every((r) => r.success)) {
       const failed = batchRes.find((r) => !r.success);
-      return left(
+      return Either.left(
         failed?.error ?? "D1 batch failed, but no error was returned.",
       );
     }
@@ -546,95 +502,192 @@ export class Orm {
     // Return the result of the SELECT statement
     const selectResult = batchRes[selectIndex!].results[0] as { id: any };
 
-    return right(selectResult.id);
+    return Either.right(selectResult.id);
   }
 
   /**
-   * Returns a query of the form `SELECT * FROM [Model.DataSource]`
+   * Returns a select query, creating a CTE view for the model using the provided include tree.
+   *
+   * @param ctor The model constructor.
+   * @param includeTree An include tree describing which related models to join.
+   * @param from An optional custom `FROM` clause to use instead of the base table.
+   * @param tagCte An optional CTE name to tag the query with. Defaults to "Model.view".
+   *
+   * ### Example:
+   * ```ts
+   * // Using a data source
+   * const query = Orm.listQuery(Person, "default");
+   *
+   * // Using a custom from statement
+   * const query = Orm.listQuery(Person, null, "SELECT * FROM Person WHERE age > 18");
+   * ```
+   *
+   * ### Example SQL output:
+   * ```sql
+   * WITH Person_view AS (
+   * SELECT
+   * "Person"."id" AS "id",
+   * ...
+   * FROM "Person"
+   * LEFT JOIN ...
+   * )
+   * SELECT * FROM Person_view
+   * ```
    */
   static listQuery<T extends object>(
     ctor: new () => T,
-    includeTree: KeysOfType<T, IncludeTree<T>> | null = null,
-  ): string {
-    if (includeTree) {
-      return `SELECT * FROM [${ctor.name}.${includeTree.toString()}]`;
-    }
-
-    return `SELECT * FROM [${ctor.name}]`;
+    opts: {
+      includeTree?: IncludeTree<T> | null;
+      from?: string;
+      tagCte?: string;
+    },
+  ): Either<string, string> {
+    const { wasm } = RuntimeContainer.get();
+    const args = [
+      WasmResource.fromString(ctor.name, wasm),
+      WasmResource.fromString(JSON.stringify(opts.includeTree ?? null), wasm),
+      WasmResource.fromString(JSON.stringify(opts.tagCte ?? null), wasm),
+      WasmResource.fromString(JSON.stringify(opts.from ?? null), wasm),
+    ];
+    return invokeOrmWasm(wasm.list_models, args, wasm);
   }
 
   /**
-   * Returns a query of the form `SELECT * FROM [Model.DataSource] WHERE [PrimaryKey] = ?`.
-   * Requires the id parameter to be bound (use db.prepare().bind)
+   * Returns a select query for a single model by primary key, creating a CTE view using the provided include tree.
+   *
+   * @param ctor The model constructor.
+   * @param includeTree An include tree describing which related models to join.
+   *
+   * ### Example:
+   * ```ts
+   * // Using a data source
+   * const query = Orm.getQuery(Person, "default");
+   * ```
+   *
+   * ### Example SQL output:
+   *
+   * ```sql
+   * WITH Person_view AS (
+   * SELECT
+   * "Person"."id" AS "id",
+   * ...
+   * FROM "Person"
+   * LEFT JOIN ...
+   * )
+   * SELECT * FROM Person_view WHERE [Person].[id] = ?
+   * ```
    */
   static getQuery<T extends object>(
     ctor: new () => T,
-    includeTree: KeysOfType<T, IncludeTree<T>> | null = null,
-  ): string {
+    includeTree?: IncludeTree<T> | null,
+  ): Either<string, string> {
     const { ast } = RuntimeContainer.get();
-    if (includeTree) {
-      return `${this.listQuery(ctor, includeTree)} WHERE [${ast.models[ctor.name].primary_key.name}] = ?`;
-    }
-
-    return `${this.listQuery(ctor, includeTree)} WHERE [${ast.models[ctor.name].primary_key.name}] = ?`;
+    return this.listQuery<T>(ctor, {
+      includeTree,
+    }).map(
+      (inner) =>
+        `${inner} WHERE [${ast.models[ctor.name].primary_key.name}] = ?`,
+    );
   }
 
   /**
-   * Executes a query of the form `SELECT * FROM [Model.DataSource]`, returning all results
-   * as instantiated models.
+   * Retrieves all instances of a model from the database.
+   * @param ctor The model constructor.
+   * @param includeTree An include tree describing which related models to join.
+   * @param from An optional custom `FROM` clause to use instead of the base table.
+   * @returns Either an error string, or an array of model instances.
+   *
+   * ### Example:
+   * ```ts
+   * const orm = Orm.fromD1(env.db);
+   * const horses = await orm.list(Horse, Horse.default);
+   * ```
+   *
+   * ### Example with custom from:
+   * ```ts
+   * const orm = Orm.fromD1(env.db);
+   * const adultHorses = await orm.list(Horse, Horse.default, "SELECT * FROM Horse ORDER BY age DESC LIMIT 10");
+   * ```
+   *
+   * =>
+   *
+   * ```sql
+   * SELECT
+   *  "Horse"."id" AS "id",
+   * ...
+   * FROM (SELECT * FROM Horse ORDER BY age DESC LIMIT 10)
+   * LEFT JOIN ...
+   * ```
+   *
    */
   async list<T extends object>(
     ctor: new () => T,
-    includeTreeKey: KeysOfType<T, IncludeTree<T>> | null = null,
+    opts: {
+      includeTree?: IncludeTree<T> | null;
+      from?: string;
+    },
   ): Promise<Either<string, T[]>> {
-    const q = Orm.listQuery(ctor, includeTreeKey);
-    const res = await this.db.prepare(q).run();
-
-    if (!res.success) {
-      return left(res.error ?? "D1 failed but no error was returned.");
+    const queryRes = Orm.listQuery(ctor, opts);
+    if (queryRes.isLeft()) {
+      return Either.left(queryRes.value);
     }
 
-    const { ast } = RuntimeContainer.get();
-    const includeTree =
-      includeTreeKey === null
-        ? null
-        : ast.models[ctor.name].data_sources[includeTreeKey.toString()].tree;
-
-    const fromSqlRes = mapSql<T>(ctor, res.results, includeTree);
-    if (!fromSqlRes.ok) {
-      return fromSqlRes;
+    const stmt = this.db.prepare(queryRes.value);
+    const records = await stmt.all();
+    if (!records.success) {
+      return Either.left(
+        records.error ?? "D1 query failed, but no error was returned.",
+      );
     }
 
-    return right(fromSqlRes.value);
+    const mapRes = Orm.mapSql(ctor, records.results, opts.includeTree ?? null);
+    if (mapRes.isLeft()) {
+      return Either.left(mapRes.value);
+    }
+
+    return Either.right(mapRes.value as T[]);
   }
 
   /**
-   * Executes a query of the form `SELECT * FROM [Model.DataSource] WHERE [Model.PrimaryKey] = ?`
-   * returning all results as instantiated models.
+   * Retrieves a single model by primary key.
+   * @param ctor The model constructor.
+   * @param id The primary key value.
+   * @param includeTree An include tree describing which related models to join.
+   * @returns Either an error string, or the model instance (null if not found).
+   *
+   * ### Example:
+   * ```ts
+   * const orm = Orm.fromD1(env.db);
+   * const horse = await orm.get(Horse, 1, Horse.default);
+   * ```
    */
   async get<T extends object>(
     ctor: new () => T,
     id: any,
-    includeTreeKey: KeysOfType<T, IncludeTree<T>> | null = null,
-  ): Promise<Either<string, T>> {
-    const q = Orm.getQuery(ctor, includeTreeKey);
-    const res = await this.db.prepare(q).bind(id).run();
-
-    if (!res.success) {
-      return left(res.error ?? "D1 failed but no error was returned.");
+    includeTree?: IncludeTree<T> | null,
+  ): Promise<Either<string, T | null>> {
+    const queryRes = Orm.getQuery(ctor, includeTree);
+    if (queryRes.isLeft()) {
+      return Either.left(queryRes.value);
     }
 
-    const { ast } = RuntimeContainer.get();
-    const includeTree =
-      includeTreeKey === null
-        ? null
-        : ast.models[ctor.name].data_sources[includeTreeKey.toString()].tree;
+    const record = await this.db.prepare(queryRes.value).bind(id).run();
 
-    const fromSqlRes = mapSql<T>(ctor, res.results, includeTree);
-    if (!fromSqlRes.ok) {
-      return fromSqlRes;
+    if (!record.success) {
+      return Either.left(
+        record.error ?? "D1 query failed, but no error was returned.",
+      );
     }
 
-    return right(fromSqlRes.value[0]);
+    if (record.results.length === 0) {
+      return Either.right(null);
+    }
+
+    const mapRes = Orm.mapSql(ctor, record.results, includeTree);
+    if (mapRes.isLeft()) {
+      return Either.left(mapRes.value);
+    }
+
+    return Either.right(mapRes.value[0] as T);
   }
 }

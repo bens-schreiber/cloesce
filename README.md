@@ -6,23 +6,23 @@ Cloesce is working towards a stable alpha MVP (v0.1.0), with the general milesto
 
 Internal documentation going over design decisions and general thoughts for each milestone can be found [here](https://cloesce.pages.dev/).
 
-# Documentation `v0.0.4`
+# Documentation
 
 ## Getting Started
 
 `v0.0.4` supports only Typescript-to-Typescript projects. An example project is shown [here](https://github.com/bens-schreiber/cloesce/tree/main/examples).
 
-1. NPM
+### 1) NPM
 
-- Create an NPM project and install cloesce
+Create an NPM project and install cloesce
 
 ```sh
-npm i cloesce@0.0.4-unstable.5
+npm i cloesce@0.0.4-unstable.8
 ```
 
-2. TypeScript
+### 2) TypeScript
 
-- Create a `tsconfig.json` with the following values:
+Create a `tsconfig.json` with the following values:
 
 ```json
 {
@@ -38,9 +38,9 @@ npm i cloesce@0.0.4-unstable.5
 }
 ```
 
-3. Cloesce Config
+### 3) Cloesce Config
 
-- Create a `cloesce.config.json` with the following keys:
+Create a `cloesce.config.json` with your desired configuration:
 
 ```json
 {
@@ -50,7 +50,7 @@ npm i cloesce@0.0.4-unstable.5
 }
 ```
 
-4. Vite
+### 4) Vite
 
 To prevent CORS issues, a Vite proxy can be used for the frontend:
 
@@ -70,9 +70,9 @@ export default defineConfig({
 });
 ```
 
-5. Wrangler Config
+### 5) Wrangler Config
 
-- `v0.0.4` will generate the required areas of your wrangler config. A full config looks like this:
+Cloesce will generate any missing `wrangler.toml` values (or the file if missing). A minimal `wrangler.toml` looks like this:
 
 ```toml
 compatibility_date = "2025-10-02"
@@ -85,12 +85,11 @@ database_id = "..."
 database_name = "example"
 ```
 
-## A Simple Model
+## Cloesce Models
 
 A model is a type which represents:
 
 - a database table,
-- database views
 - REST API
 - Client API
 - Cloudflare infrastructure (D1 + Workers)
@@ -120,13 +119,18 @@ export class Horse {
 - `@POST` reveals the method as an API endpoint with the `POST` HTTP Verb.
 - All Cloesce models need to be under a `.cloesce.ts` file.
 
-To compile this model into a working full stack application, Cloesce must undergo both **compilation** and **migrations**. Compilation is the process of extracting the metadata language that powers Cloesce, ensuring it is a valid program, and then producing code to orchestrate the program across different domains (database, backend, frontend, cloud). Migrations utilize the history of validated metadata to create SQL code, translating the evolution of your models.
+To compile this model into a working full stack application, Cloesce must undergo both **compilation** and **migrations**.
 
-To compile, run `npx cloesce compile`.
+Compilation is the process of extracting the metadata language that powers Cloesce, ensuring it is a valid program, and then producing code to orchestrate the program across different domains (database, backend, frontend, cloud).
 
-To create a migration, run `npx cloesce migrate <name>`.
+Migrations utilize the history of validated metadata to create SQL code, translating the evolution of your models.
 
-After running the above commands, you will have a full project capable of being ran with:
+### Compiling
+
+- `npx cloesce compile`
+- `npx cloesce migrate <name>`.
+
+After running the above commands, you will have a full project capable of being ran with Wrangler:
 
 ```sh
 # Apply the generated migrations
@@ -136,13 +140,19 @@ npx wrangler d1 migrations apply <db-name>
 npx wrangler dev
 ```
 
-Note the output in the `.generated/` dir. These values should not be committed to git, as they depend on the file system of the machine running it.
+### Compiled Artifacts
+
+#### `.generated/`
+
+These values should not be committed to git, as they depend on the file system of the machine running it.
 
 - `client.ts` is an importable API with all of your backend types and endpoints
 - `workers.ts` is the workers entrypoint.
 - `cidl.json` is the working metadata for the project
 
-Note the output in `migrations`, ex after running `npx cloesce migrate Initial`
+#### `migrations`
+
+After running `npx cloesce migrate <name>`, a new migration will be created in the `migrations/` folder. For example, after creating a migration called `Initial`, you will see:
 
 - `<date>_Initial.json` contains all model information necessary from SQL
 - `<date>_Initial.sql` contains the acual SQL migrations. In this early version of Cloesce, it's important to check migrations every time.
@@ -170,7 +180,7 @@ In order to interact with your database, you will need to define a WranglerEnv
 import { WranglerEnv } from "cloesce/backend";
 
 @WranglerEnv
-export class Env {
+export class MyEnv {
   db: D1Database; // only one DB is supported for now-- make sure it matches the name in `wrangler.toml`
 
   // you can also define values in the toml under [[vars]]
@@ -178,7 +188,7 @@ export class Env {
 }
 ```
 
-The wrangler environment is dependency injected into your method calls:
+Your WranglerEnv can then be injected into any model method using the `@Inject` decorator:
 
 ```ts
 @D1
@@ -187,7 +197,7 @@ export class Horse {
   id: number;
 
   @POST
-  async neigh(@Inject env: WranglerEnv): Promise<string> {
+  async neigh(@Inject env: MyEnv): Promise<string> {
     await env.db.prepare(...);
 
     return `i am ${this.name}, this is my horse noise`;
@@ -195,10 +205,9 @@ export class Horse {
 }
 ```
 
-### Foreign Keys, One to One, Data Sources
+### Foreign Key Column
 
-Complex model relationships are permitted via the `@ForeignKey`, `@OneToOne / @OneToMany @ManyToMany` and `@DataSource` decorators.
-Foreign keys are scalar attributes which must reference some other model's primary key:
+Reference another model via a foreign key using the `@ForeignKey` decorator:
 
 ```ts
 @D1
@@ -217,7 +226,9 @@ export class Person {
 }
 ```
 
-This representation is true to the underlying SQL table: `Person` has a column `dogId` which is a foreign key to `Dog`. Cloesce allows you to actually join these tables together in your model representation:
+### One to One
+
+Cloesce allows you to relate models via `1:1` relationships using the `@OneToOne` decorator. It requires that a foreign key already exists on the model.
 
 ```ts
 @D1
@@ -239,7 +250,7 @@ export class Person {
 }
 ```
 
-In `v0.0.4`, there are no defaults, only very explicit decisons. Because of that, navigation properties won't exist at runtime unless you tell them to. Cloesce does this via a `DataSource`, which describes the foreign key dependencies you wish to include. All scalar properties are included by default and cannot be excluded.
+In `v0.0.4`, there are no defaults, only very explicit decisons. Because of that, navigation properties won't exist at runtime unless you tell them to. Cloesce does this via a `Data Source`, which describes the foreign key dependencies you wish to include. All scalar properties are included by default and cannot be excluded.
 
 ```ts
 @D1
@@ -266,129 +277,9 @@ export class Person {
 }
 ```
 
-Data sources are just SQL views and can be invoked in your queries. They are aliased in such a way that its similiar to object properties. The frontend chooses which datasource to use in it's API client (all instantiated methods have an implicit DataSource parameter). `null` is a valid option, meaning no joins will occur.
+Data sources describe how foreign keys should be joined on model hydration (i.e. when invoking any instantiated method). They are composed of an `IncludeTree<T>`, a recursive type composed of the relationships you wish to include. All scalar properties are always included.
 
-```ts
-@D1
-export class Person {
-  @PrimaryKey
-  id: number;
-
-  @ForeignKey(Dog)
-  dogId: number;
-
-  @OneToOne("dogId")
-  dog: Dog | undefined;
-
-  @DataSource
-  static readonly default: IncludeTree<Person> = {
-    dog: {},
-  };
-
-  @GET
-  static async get(id: number, @Inject env: WranglerEnv): Promise<Person> {
-    let records = await env.db
-      .prepare("SELECT * FROM [Person.default] WHERE [id] = ?") // Person.default is the SQL view generated from the IncludeTree
-      .bind(id)
-      .run();
-
-    let persons = Orm.mapSql(Person, records.results, Person.default);
-    return persons.value[0];
-  }
-}
-```
-
-Note that the `get` code can be simplified using CRUD methods or the ORM primitive `get`.
-
-#### View Aliasing
-
-The generated views will always be aliased so that they can be accessed in an object like notation. For example, given some `Horse` that has a relationship with `Like`:
-
-```ts
-@D1
-export class Horse {
-  @PrimaryKey
-  id: Integer;
-
-  name: string;
-  bio: string | null;
-
-  @OneToMany("horseId1")
-  likes: Like[];
-
-  @DataSource
-  static readonly default: IncludeTree<Horse> = {
-    likes: { horse2: {} },
-  };
-}
-
-@D1
-export class Like {
-  @PrimaryKey
-  id: Integer;
-
-  @ForeignKey(Horse)
-  horseId1: Integer;
-
-  @ForeignKey(Horse)
-  horseId2: Integer;
-
-  @OneToOne("horseId2")
-  horse2: Horse | undefined;
-}
-```
-
-If you wanted to find all horses that like one another, a valid SQL query using the `default` data source would look like:
-
-```sql
-SELECT *
-FROM [Horse.default]
-WHERE
-  [likes.horse2.id] = ?
-  AND [id] IN (
-    SELECT [likes.horse2.id]
-    FROM [Horse.default]
-    WHERE [id] = ?
-  );
-```
-
-The actual generated view for `default` looks like:
-
-```sql
-CREATE VIEW IF NOT EXISTS "Horse.default" AS
-SELECT
-    "Horse"."id"          AS "id",
-    "Horse"."name"        AS "name",
-    "Horse"."bio"         AS "bio",
-    "Like"."id"           AS "likes.id",
-    "Like"."horseId1"     AS "likes.horseId1",
-    "Like"."horseId2"     AS "likes.horseId2",
-    "Horse1"."id"         AS "likes.horse2.id",
-    "Horse1"."name"       AS "likes.horse2.name",
-    "Horse1"."bio"        AS "likes.horse2.bio"
-FROM
-    "Horse"
-LEFT JOIN
-    "Like" ON "Horse"."id" = "Like"."horseId1"
-LEFT JOIN
-    "Horse" AS "Horse1" ON "Like"."horseId2" = "Horse1"."id";
-```
-
-#### DataSourceOf<T>
-
-If it is important to determine what data source the frontend called the instantiated method with, the type `DataSourceOf<T>` allows explicit data source parameters:
-
-```ts
-@D1
-class Foo {
-  ...
-
-  @POST
-  bar(ds: DataSourceOf<Foo>) {
-    // ds = "DataSource1" | "DataSource2" | ... | "none"
-  }
-}
-```
+Note that `DataSourceOf` is added implicitly to all instantiated methods if no data source parameter is defined.
 
 ### One to Many
 
@@ -452,6 +343,24 @@ export class Course {
 }
 ```
 
+### DataSourceOf<T>
+
+If it is important to determine what data source the frontend called the instantiated method with, the type `DataSourceOf<T>` allows explicit data source parameters:
+
+```ts
+@D1
+class Foo {
+  ...
+
+  @POST
+  bar(ds: DataSourceOf<Foo>) {
+    // ds = "DataSource1" | "DataSource2" | ... | "none"
+  }
+}
+```
+
+Data sources are implicitly added to all instantiated methods if no data source parameter is defined.
+
 ### ORM Methods
 
 Cloesce provides a suite of ORM methods for getting, listing, updating and inserting models.
@@ -474,6 +383,44 @@ class Horse {
 
 #### List, Get
 
+Both methods take an optional `IncludeTree<T>` parameter to specify what relationships in the generated CTE.
+
+```ts
+@D1
+export class Person {
+  @PrimaryKey
+  id: number;
+
+  @ForeignKey(Dog)
+  dogId: number;
+
+  @OneToOne("dogId")
+  dog: Dog | undefined;
+
+  @DataSource
+  static readonly default: IncludeTree<Person> = {
+    dog: {},
+  };
+}
+```
+
+Running `Orm.listQuery` with the data source `Person.default` would produce the CTE:
+
+```sql
+WITH "Person_view" AS (
+  SELECT
+      "Person"."id"      AS "id",
+      "Person"."dogId"   AS "dogId",
+      "Dog"."id"         AS "dog.id"
+  FROM
+      "Person"
+  LEFT JOIN
+      "Dog" ON "Person"."dogId" = "Dog"."id"
+) SELECT * FROM "Person_view"
+```
+
+Example usages:
+
 ```ts
 @D1
 class Horse {
@@ -481,15 +428,37 @@ class Horse {
   @GET
   static async get(@Inject { db }: Env, id: number): Promise<Horse> {
     const orm = Orm.fromD1(db);
-    return (await orm.get(Horse, id, "default")).value;
+    return (await orm.get(Horse, id, Horse.default)).value;
   }
 
   @GET
   static async list(@Inject { db }: Env): Promise<Horse[]> {
     const orm = Orm.fromD1(db);
-    return (await orm.list(Horse, "default")).value;
+    return (await orm.list(Horse, {})).value;
   }
 }
+```
+
+`list` takes an optional `from` parameter to modify the source of the list query. This is useful in filtering / limiting results.
+
+```ts
+await orm.list(
+  Horse,
+  Horse.default,
+  "SELECT * FROM Horse ORDER BY name LIMIT 10"
+);
+```
+
+produces SQL
+
+```sql
+WITH "Horse_view" AS (
+  SELECT
+      "Horse"."id"      AS "id",
+      "Horse"."name"    AS "name"
+  FROM
+      (SELECT * FROM Horse ORDER BY name LIMIT 10) as "Horse"
+) SELECT * FROM "Horse_view"
 ```
 
 ### CRUD Methods

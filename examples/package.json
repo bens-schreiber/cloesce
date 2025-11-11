@@ -1,13 +1,13 @@
 {
   "name": "examples",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "description": "A basic Cloesce project",
   "type": "module",
   "scripts": {
     "frontend": "vite ./src/frontend"
   },
   "dependencies": {
-    "cloesce": "0.0.4-unstable.5",
+    "cloesce": "^0.0.4-unstable.8",
     "wrangler": "^4.34.0"
   },
   "devDependencies": {

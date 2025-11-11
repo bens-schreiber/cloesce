@@ -222,6 +222,8 @@ async function extract(args: {
   const project = new Project({
     compilerOptions: {
       strictNullChecks: true,
+      experimentalDecorators: true,
+      emitDecoratorMetadata: true,
     },
   });
 
@@ -248,12 +250,12 @@ async function extract(args: {
     const extractor = new CidlExtractor(cloesceProjectName, "v0.0.4");
     const result = extractor.extract(project);
 
-    if (!result.ok) {
+    if (result.isLeft()) {
       console.error(formatErr(result.value));
       process.exit(1);
     }
 
-    let ast = result.value;
+    let ast = result.unwrap();
 
     if (truncate) {
       ast.wrangler_env.source_path =

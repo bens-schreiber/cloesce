@@ -55,25 +55,28 @@ export class Horse {
 
   @GET
   async matches(@Inject { db }: Env): Promise<Horse[]> {
-    const sql = `
-    SELECT *
-    FROM [Horse.default]
-    WHERE
-      [likes.horse2.id] = ?
-      AND [id] IN (
-        SELECT [likes.horse2.id]
-        FROM [Horse.default]
-        WHERE [id] = ?
-      );
-  `;
+    const sql = Orm.listQuery(Horse, {
+      includeTree: Horse.default,
+      tagCte: "Horse.default",
+    })
+      .map(
+        (q) => `
+        ${q}
+        WHERE
+          [likes.horse2.id] = ?
+          AND [id] IN (
+            SELECT [likes.horse2.id]
+            FROM [Horse.default]
+            WHERE [id] = ?
+          )
+      `
+      )
+      .unwrap();
 
     const records = await db.prepare(sql).bind(this.id, this.id).run();
     const res = Orm.mapSql(Horse, records.results, Horse.withLikes);
-    if (res.ok) {
-      return res.value;
-    }
 
-    return [];
+    return res.mapLeft((_) => []).unwrap();
   }
 }
 
