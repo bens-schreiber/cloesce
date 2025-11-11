@@ -2,7 +2,6 @@
 
 import { HttpResult, instantiateObjectArray, DeepPartial } from "cloesce/client";
 
-
 export class Weather {
   id: number;
   date: Date;
@@ -17,12 +16,12 @@ export class Weather {
     baseUrl.searchParams.append('id', String(id));
     baseUrl.searchParams.append('__datasource', String(__datasource));
     const res = await fetchImpl(baseUrl, { method: "GET" });
-    let raw = await res.json();
+    let httpResult = HttpResult<Weather>.fromJSON(await res.json());
     if (!res.ok) {
-      return raw;
+      return httpResult;
     }
-    raw.data = Object.assign(new Weather(), raw.data);
-    return raw;
+    httpResult.data = Object.assign(new Weather(), httpResult.data);
+    return httpResult;
   }
   static async save(
         model: DeepPartial<Weather>,
@@ -38,11 +37,11 @@ export class Weather {
             __datasource
       })
     });
-    let raw = await res.json();
+    let httpResult = HttpResult<Weather>.fromJSON(await res.json());
     if (!res.ok) {
-      return raw;
+      return httpResult;
     }
-    raw.data = Object.assign(new Weather(), raw.data);
-    return raw;
+    httpResult.data = Object.assign(new Weather(), httpResult.data);
+    return httpResult;
   }
 }

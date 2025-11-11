@@ -1,7 +1,6 @@
 // GENERATED CODE. DO NOT MODIFY.
 
 import { HttpResult, instantiateObjectArray, DeepPartial } from "cloesce/client";
-
 export class Poo {
   ds: "baz" |"none" = "none";
 }
@@ -25,11 +24,11 @@ export class Foo {
             noDs
       })
     });
-    let raw = await res.json();
+    let httpResult = HttpResult<void>.fromJSON(await res.json());
     if (!res.ok) {
-      return raw;
+      return httpResult;
     }
-    return raw;
+    return httpResult;
   }
 }
 export class NoDs {

@@ -44,11 +44,11 @@ export type MiddlewareFn = (
   di: DependencyInjector,
 ) => Promise<HttpResult | void>;
 
-export type ResponseMiddlewareFn = (
+export type ResultMiddlewareFn = (
   request: Request,
   env: any,
   di: DependencyInjector,
-  response: Response,
+  result: HttpResult,
 ) => Promise<HttpResult | void>;
 
 export class CloesceApp {
@@ -57,7 +57,7 @@ export class CloesceApp {
   private methodMiddleware: Map<string, Map<string, MiddlewareFn[]>> =
     new Map();
 
-  private responseMiddleware: ResponseMiddlewareFn[] = [];
+  private resultMiddleware: ResultMiddlewareFn[] = [];
 
   public routePrefix: string = "api";
 
@@ -82,8 +82,8 @@ export class CloesceApp {
    *
    * @param m - The middleware function to register.
    */
-  public onResponse(m: ResponseMiddlewareFn) {
-    this.responseMiddleware.push(m);
+  public onResult(m: ResultMiddlewareFn) {
+    this.resultMiddleware.push(m);
   }
 
   /**
@@ -140,19 +140,19 @@ export class CloesceApp {
     constructorRegistry: ModelConstructorRegistry,
     di: DependencyInjector,
     d1: D1Database,
-  ): Promise<Response> {
+  ): Promise<HttpResult> {
     // Global middleware
     for (const m of this.globalMiddleware) {
       const res = await m(request, env, di);
       if (res) {
-        return toResponse(res);
+        return res;
       }
     }
 
     // Route match
     const route = matchRoute(request, ast, this.routePrefix);
     if (route.isLeft()) {
-      return toResponse(route.value);
+      return route.value;
     }
     const { method, model, id } = route.unwrap();
 
@@ -160,14 +160,14 @@ export class CloesceApp {
     for (const m of this.modelMiddleware.get(model.name) ?? []) {
       const res = await m(request, env, di);
       if (res) {
-        return toResponse(res);
+        return res;
       }
     }
 
     // Request validation
     const validation = await validateRequest(request, ast, model, method, id);
     if (validation.isLeft()) {
-      return toResponse(validation.value);
+      return validation.value;
     }
     const { params, dataSource } = validation.unwrap();
 
@@ -176,7 +176,7 @@ export class CloesceApp {
       []) {
       const res = await m(request, env, di);
       if (res) {
-        return toResponse(res);
+        return res;
       }
     }
 
@@ -205,13 +205,11 @@ export class CloesceApp {
       );
     })();
     if (crudCtx.isLeft()) {
-      return toResponse(crudCtx.value);
+      return crudCtx.value;
     }
 
     // Method dispatch
-    return toResponse(
-      await methodDispatch(crudCtx.unwrap(), di, method, params),
-    );
+    return await methodDispatch(crudCtx.unwrap(), di, method, params);
   }
 
   /**
@@ -223,7 +221,7 @@ export class CloesceApp {
     ast: CloesceAst,
     constructorRegistry: ModelConstructorRegistry,
     envMeta: MetaWranglerEnv,
-  ) {
+  ): Promise<Response> {
     const di: DependencyInjector = new Map();
     di.set(envMeta.envName, env);
     di.set("Request", request);
@@ -243,27 +241,17 @@ export class CloesceApp {
       );
 
       // Response middleware
-      for (const m of this.responseMiddleware) {
+      for (const m of this.resultMiddleware) {
         const res = await m(request, env, di, response);
         if (res) {
-          return toResponse(res);
+          return res.toResponse();
         }
       }
 
-      return response;
+      return response.toResponse();
     } catch (e: any) {
       console.error(JSON.stringify(e));
-      return new Response(
-        JSON.stringify({
-          ok: false,
-          status: 500,
-          message: e.toString(),
-        }),
-        {
-          status: 500,
-          headers: { "Content-Type": "application/json" },
-        },
-      );
+      return HttpResult.fail(500, e.toString()).toResponse();
     }
   }
 }
@@ -325,7 +313,7 @@ function matchRoute(
   // Error state: We expect an exact request format, and expect that the model
   // and are apart of the CIDL
   const notFound = (e: string) =>
-    Either.left(errorState(404, `Path not found: ${e} ${url.pathname}`));
+    Either.left(HttpResult.fail(404, `Path not found: ${e} ${url.pathname}`));
 
   for (const p of prefix) {
     if (parts.shift() !== p) return notFound(`Missing prefix segment "${p}"`);
@@ -377,7 +365,7 @@ async function validateRequest(
 > {
   // Error state: any missing parameter, body, or malformed input will exit with 400.
   const invalidRequest = (e: string) =>
-    Either.left(errorState(400, `Invalid Request Body: ${e}`));
+    Either.left(HttpResult.fail(400, `Invalid Request Body: ${e}`));
 
   if (!method.is_static && id == null) {
     return invalidRequest("Id's are required for instantiated methods.");
@@ -454,14 +442,14 @@ async function hydrateModel(
   // resulting in a malformed query, exit with a 500.
   const malformedQuery = (e: any) =>
     Either.left(
-      errorState(
+      HttpResult.fail(
         500,
         `Error in hydration query, is the database out of sync with the backend?: ${e instanceof Error ? e.message : String(e)}`,
       ),
     );
 
   // Error state: If no record is found for the id, return a 404
-  const missingRecord = Either.left(errorState(404, "Record not found"));
+  const missingRecord = Either.left(HttpResult.fail(404, "Record not found"));
 
   // Query DB
   let records;
@@ -508,7 +496,7 @@ async function methodDispatch(
 ): Promise<HttpResult<unknown>> {
   // Error state: Client code ran into an uncaught exception.
   const uncaughtException = (e: any) =>
-    errorState(
+    HttpResult.fail(
       500,
       `Uncaught exception in method dispatch: ${e instanceof Error ? e.message : String(e)}`,
     );
@@ -525,7 +513,7 @@ async function methodDispatch(
     if (!injected) {
       // Error state: Injected parameters cannot be found at compile time, only at runtime.
       // If a injected reference does not exist, throw a 500.
-      return errorState(
+      return HttpResult.fail(
         500,
         `An injected parameter was missing from the instance registry: ${JSON.stringify(param.cidl_type)}`,
       );
@@ -539,14 +527,14 @@ async function methodDispatch(
     const rt = method.return_type;
 
     if (rt === null) {
-      return { ok: true, status: 200 };
+      return HttpResult.ok(200);
     }
 
     if (typeof rt === "object" && rt !== null && "HttpResult" in rt) {
       return res as HttpResult<unknown>;
     }
 
-    return { ok: true, status: 200, data: res };
+    return HttpResult.ok(200, res);
   };
 
   try {
@@ -679,17 +667,6 @@ function validateCidlType(
   }
 
   return false;
-}
-
-function errorState(status: number, message: string): HttpResult {
-  return { ok: false, status, message };
-}
-
-function toResponse(r: HttpResult): Response {
-  return new Response(JSON.stringify(r), {
-    status: r.status,
-    headers: { "Content-Type": "application/json" },
-  });
 }
 
 /**

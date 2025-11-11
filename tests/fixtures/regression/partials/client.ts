@@ -2,7 +2,6 @@
 
 import { HttpResult, instantiateObjectArray, DeepPartial } from "cloesce/client";
 
-
 export class Dog {
   id: number;
   name: string;
@@ -20,11 +19,11 @@ export class Dog {
             dog
       })
     });
-    let raw = await res.json();
+    let httpResult = HttpResult<Dog>.fromJSON(await res.json());
     if (!res.ok) {
-      return raw;
+      return httpResult;
     }
-    raw.data = Object.assign(new Dog(), raw.data);
-    return raw;
+    httpResult.data = Object.assign(new Dog(), httpResult.data);
+    return httpResult;
   }
 }

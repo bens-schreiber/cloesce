@@ -2,7 +2,6 @@
 
 import { HttpResult, instantiateObjectArray, DeepPartial } from "cloesce/client";
 
-
 export class Horse {
   id: number;
   name: string;
@@ -16,12 +15,12 @@ export class Horse {
     const baseUrl = new URL(`http://localhost:5002/api/Horse/get`);
     baseUrl.searchParams.append('id', String(id));
     const res = await fetchImpl(baseUrl, { method: "GET" });
-    let raw = await res.json();
+    let httpResult = HttpResult<Horse>.fromJSON(await res.json());
     if (!res.ok) {
-      return raw;
+      return httpResult;
     }
-    raw.data = Object.assign(new Horse(), raw.data);
-    return raw;
+    httpResult.data = Object.assign(new Horse(), httpResult.data);
+    return httpResult;
   }
   async like(
         horse: Horse,
@@ -37,23 +36,23 @@ export class Horse {
             __dataSource
       })
     });
-    let raw = await res.json();
+    let httpResult = HttpResult<void>.fromJSON(await res.json());
     if (!res.ok) {
-      return raw;
+      return httpResult;
     }
-    return raw;
+    return httpResult;
   }
   static async list(
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Horse[]>> {
     const baseUrl = new URL(`http://localhost:5002/api/Horse/list`);
     const res = await fetchImpl(baseUrl, { method: "GET" });
-    let raw = await res.json();
+    let httpResult = HttpResult<Horse[]>.fromJSON(await res.json());
     if (!res.ok) {
-      return raw;
+      return httpResult;
     }
-    raw.data = instantiateObjectArray(raw.data, Horse);
-    return raw;
+    httpResult.data = instantiateObjectArray(httpResult.data, Horse);
+    return httpResult;
   }
   static async post(
         horse: Horse,
@@ -67,12 +66,12 @@ export class Horse {
             horse
       })
     });
-    let raw = await res.json();
+    let httpResult = HttpResult<Horse>.fromJSON(await res.json());
     if (!res.ok) {
-      return raw;
+      return httpResult;
     }
-    raw.data = Object.assign(new Horse(), raw.data);
-    return raw;
+    httpResult.data = Object.assign(new Horse(), httpResult.data);
+    return httpResult;
   }
 }
 export class Like {

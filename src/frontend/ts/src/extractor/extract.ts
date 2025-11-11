@@ -626,6 +626,7 @@ export class CidlExtractor {
       );
     }
 
+    // Ignore
     if (symbolName === "Promise" || aliasName === "IncludeTree") {
       return wrapGeneric(genericTy, nullable, (inner) => inner);
     }
@@ -634,7 +635,7 @@ export class CidlExtractor {
       return wrapGeneric(genericTy, nullable, (inner) => ({ Array: inner }));
     }
 
-    if (aliasName === "HttpResult") {
+    if (symbolName === "HttpResult") {
       return wrapGeneric(genericTy, nullable, (inner) => ({
         HttpResult: inner,
       }));

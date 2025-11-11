@@ -224,49 +224,67 @@ export class Either<L, R> {
   }
 }
 
-/**
- * Represents the result of an HTTP operation in a monadic style.
- *
- * This type provides a uniform way to handle both success and error
- * outcomes of HTTP requests, similar to a `Result` or `Either` monad.
- *
- * It ensures that every HTTP response can be handled in a type-safe,
- * predictable way without throwing exceptions.
- *
- * @template T The type of the successful response data.
- *
- * @property {boolean} ok
- * Indicates whether the HTTP request was successful (`true` for success, `false` for error).
- * This is analogous to `Response.ok` in the Fetch API.
- *
- * @property {number} status
- * The numeric HTTP status code (e.g., 200, 404, 500).
- *
- * @property {T} [data]
- * The parsed response payload, present only when `ok` is `true`.
- *
- * @property {string} [message]
- * An optional human-readable error message or diagnostic information,
- * typically provided when `ok` is `false`.
- *
- * ## Worker APIs
- *
- * HttpResult is a first-class-citizen in the grammar in Cloesce. Methods can return HttpResults
- * which will be serialized on the client api.
- *
- * @example
- * ```ts
- *  bar(): HttpResult<Integer> {
- *    return { ok: false, status: 401, message: "forbidden"}
- *  }
- * ```
- */
-export type HttpResult<T = unknown> = {
-  ok: boolean;
-  status: number;
-  data?: T;
-  message?: string;
-};
+export class HttpResult<T = unknown> {
+  public constructor(
+    public ok: boolean,
+    public status: number,
+    public headers: Headers,
+    public data?: T,
+    public message?: string,
+  ) {}
+
+  static ok<T>(status: number, data?: T, init?: HeadersInit): HttpResult {
+    const headers: Headers = new Headers(
+      init ?? {
+        "Content-Type": "application/json",
+      },
+    );
+
+    return new HttpResult<T>(true, status, headers, data, undefined);
+  }
+
+  static fail(status: number, message?: string, init?: HeadersInit) {
+    const headers: Headers = new Headers(
+      init ?? {
+        "Content-Type": "application/json",
+      },
+    );
+
+    return new HttpResult<never>(false, status, headers, undefined, message);
+  }
+
+  toResponse(): Response {
+    const body = JSON.stringify({
+      ok: this.ok,
+      status: this.status,
+      data: this.data,
+      message: this.message,
+      headers: Object.fromEntries(this.headers.entries()),
+    });
+
+    return new Response(body, {
+      status: this.status,
+      headers: this.headers,
+    });
+  }
+
+  static fromJSON<T = unknown>(obj: {
+    ok: boolean;
+    status: number;
+    headers: Record<string, string>;
+    data?: T;
+    message?: string;
+  }): HttpResult<T> {
+    const headers = new Headers(obj.headers);
+    return new HttpResult<T>(
+      obj.ok,
+      obj.status,
+      headers,
+      obj.data,
+      obj.message,
+    );
+  }
+}
 
 export type KeysOfType<T, U> = {
   [K in keyof T]: T[K] extends U ? (K extends string ? K : never) : never;

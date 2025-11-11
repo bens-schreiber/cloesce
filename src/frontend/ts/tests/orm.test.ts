@@ -1,6 +1,12 @@
 import { describe, test, expect, vi, beforeEach } from "vitest";
 import { _cloesceInternal } from "../src/router/router";
-import { CloesceAst, HttpVerb, Model, NamedTypedValue } from "../src/common";
+import {
+  CloesceAst,
+  HttpResult,
+  HttpVerb,
+  Model,
+  NamedTypedValue,
+} from "../src/common";
 import { IncludeTree } from "../src/ui/backend";
 import { CrudContext } from "../src/router/crud";
 import { mapSql } from "../src/router/wasm";
@@ -12,6 +18,7 @@ const makeAst = (methods: Record<string, any>): CloesceAst => ({
     name: "",
     source_path: "./",
     db_binding: "",
+    vars: {},
   },
   version: "",
   project_name: "",
@@ -51,11 +58,12 @@ describe("Router Error States", () => {
       makeAst({}),
       "/api",
     );
-    expect(result.value).toStrictEqual({
-      ok: false,
-      status: 404,
-      message: `Path not found: Expected /model/method or /model/:id/method /api`,
-    });
+    expect(result.value).toStrictEqual(
+      HttpResult.fail(
+        404,
+        `Path not found: Expected /model/method or /model/:id/method /api`,
+      ),
+    );
   });
 
   test("404 on unknown model", () => {
@@ -65,11 +73,9 @@ describe("Router Error States", () => {
       makeAst({}),
       "/api",
     );
-    expect(result.value).toStrictEqual({
-      ok: false,
-      status: 404,
-      message: `Path not found: Unknown model Dog /api/Dog/woof`,
-    });
+    expect(result.value).toStrictEqual(
+      HttpResult.fail(404, `Path not found: Unknown model Dog /api/Dog/woof`),
+    );
   });
 
   test("404 on unknown method", () => {
@@ -79,11 +85,12 @@ describe("Router Error States", () => {
       makeAst({}),
       "/api",
     );
-    expect(result.value).toStrictEqual({
-      ok: false,
-      status: 404,
-      message: `Path not found: Unknown method Horse.neigh /api/Horse/neigh`,
-    });
+    expect(result.value).toStrictEqual(
+      HttpResult.fail(
+        404,
+        `Path not found: Unknown method Horse.neigh /api/Horse/neigh`,
+      ),
+    );
   });
 
   test("404 on mismatched HTTP verb", () => {
@@ -98,11 +105,12 @@ describe("Router Error States", () => {
       },
     });
     const result = _cloesceInternal.matchRoute(makeRequest(url), ast, "/api");
-    expect(result.value).toStrictEqual({
-      ok: false,
-      status: 404,
-      message: `Path not found: Unmatched HTTP method /api/Horse/0/neigh`,
-    });
+    expect(result.value).toStrictEqual(
+      HttpResult.fail(
+        404,
+        `Path not found: Unmatched HTTP method /api/Horse/0/neigh`,
+      ),
+    );
   });
 });
 
@@ -146,6 +154,7 @@ describe("Validate Request Error States", () => {
       name: "",
       source_path: "./",
       db_binding: "",
+      vars: {},
     },
     version: "",
     project_name: "",
@@ -179,12 +188,12 @@ describe("Validate Request Error States", () => {
       null,
     );
 
-    expect(result.value).toStrictEqual({
-      ok: false,
-      status: 400,
-      message:
+    expect(result.value).toStrictEqual(
+      HttpResult.fail(
+        400,
         "Invalid Request Body: Id's are required for instantiated methods.",
-    });
+      ),
+    );
   });
 
   test("non-GET requests require JSON body", async () => {
@@ -202,11 +211,12 @@ describe("Validate Request Error States", () => {
       null,
     );
 
-    expect(result.value).toStrictEqual({
-      ok: false,
-      status: 400,
-      message: "Invalid Request Body: Could not retrieve JSON body.",
-    });
+    expect(result.value).toStrictEqual(
+      HttpResult.fail(
+        400,
+        "Invalid Request Body: Could not retrieve JSON body.",
+      ),
+    );
   });
 
   test.each([
@@ -244,11 +254,9 @@ describe("Validate Request Error States", () => {
       "0",
     );
 
-    expect(result.value).toStrictEqual({
-      ok: false,
-      status: 400,
-      message: `Invalid Request Body: ${message}.`,
-    });
+    expect(result.value).toStrictEqual(
+      HttpResult.fail(400, `Invalid Request Body: ${message}.`),
+    );
   });
 });
 
@@ -355,7 +363,7 @@ describe("methodDispatch", () => {
       {},
     );
     expect(instance.testMethod).toHaveBeenCalled();
-    expect(result).toStrictEqual({ ok: true, status: 200 });
+    expect(result).toStrictEqual(HttpResult.ok(200));
   });
 
   test("wraps result when return_type { HttpResult }", async () => {
@@ -381,7 +389,7 @@ describe("methodDispatch", () => {
       makeMethod({ return_type: "Text" }),
       {},
     );
-    expect(result).toStrictEqual({ ok: true, status: 200, data: "neigh" });
+    expect(result).toStrictEqual(HttpResult.ok(200, "neigh"));
   });
 
   test("injects default d1 param", async () => {
@@ -397,7 +405,7 @@ describe("methodDispatch", () => {
       {},
     );
     expect(instance.testMethod).toHaveBeenCalledWith(ireg.get("Env"));
-    expect(result).toStrictEqual({ ok: true, status: 200, data: "used d1" });
+    expect(result).toStrictEqual(HttpResult.ok(200, "used d1"));
   });
 
   test("handles thrown errors", async () => {
@@ -426,16 +434,15 @@ describe("methodDispatch", () => {
       {},
     );
 
-    expect(result1).toStrictEqual({
-      ok: false,
-      status: 500,
-      message: "Uncaught exception in method dispatch: boom",
-    });
-    expect(result2).toStrictEqual({
-      ok: false,
-      status: 500,
-      message: "Uncaught exception in method dispatch: stringError",
-    });
+    expect(result1).toStrictEqual(
+      HttpResult.fail(500, "Uncaught exception in method dispatch: boom"),
+    );
+    expect(result2).toStrictEqual(
+      HttpResult.fail(
+        500,
+        "Uncaught exception in method dispatch: stringError",
+      ),
+    );
   });
 });
 
@@ -468,6 +475,7 @@ describe("mapSql", () => {
         name: "Env",
         source_path: "./",
         db_binding: "",
+        vars: {},
       },
       models: {
         [modelName]: {
