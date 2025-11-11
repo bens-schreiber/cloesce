@@ -9,13 +9,13 @@ export class CrudContext {
   private constructor(
     private d1: D1Database,
     private instance: object | undefined,
-    private ctor: new () => object,
+    private ctor: new () => object
   ) {}
 
   static fromInstance(
     d1: D1Database,
     instance: any,
-    ctor: new () => object,
+    ctor: new () => object
   ): CrudContext {
     return new this(d1, instance, ctor);
   }
@@ -70,7 +70,9 @@ export class CrudContext {
     const includeTree = findIncludeTree(dataSource, this.ctor);
 
     const orm = Orm.fromD1(this.d1);
-    const res = await orm.list(this.ctor, includeTree);
+    const res = await orm.list(this.ctor, {
+      includeTree,
+    });
     return res.isRight()
       ? { ok: true, status: 200, data: res.value }
       : { ok: false, status: 500, data: res.value };
@@ -79,7 +81,7 @@ export class CrudContext {
 
 function findIncludeTree(
   dataSource: string,
-  ctor: new () => object,
+  ctor: new () => object
 ): IncludeTree<any> | null {
   const normalizedDs = dataSource === NO_DATA_SOURCE ? null : dataSource;
   return normalizedDs ? (ctor as any)[normalizedDs] : null;

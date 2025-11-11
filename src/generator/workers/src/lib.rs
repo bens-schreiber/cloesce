@@ -4,8 +4,9 @@ use std::{
 };
 
 use ast::{
+    CidlType, CloesceAst, HttpVerb, Model, ModelMethod, NamedTypedValue, PlainOldObject,
     err::{GeneratorErrorKind, Result},
-    fail, CidlType, CloesceAst, HttpVerb, Model, ModelMethod, NamedTypedValue, PlainOldObject,
+    fail,
 };
 
 use indexmap::IndexMap;
@@ -239,7 +240,7 @@ async function fetch(request: Request, env: any, ctx: any): Promise<Response> {{
         return await cloesce(
             request, 
             env,
-            cidl, 
+            cidl as any, 
             app,
             constructorRegistry, 
             envMeta,  

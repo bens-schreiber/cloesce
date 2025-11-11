@@ -52,7 +52,7 @@ impl D1Generator {
             ));
         }
 
-        fmt::beautify(format!("{tables}"))
+        fmt::beautify(tables.to_string())
     }
 }
 

@@ -197,6 +197,10 @@ pub unsafe extern "C" fn list_models(
     include_tree_ptr: *const u8,
     include_tree_len: usize,
 
+    // Tag CTE
+    tag_cte_ptr: *const u8,
+    tag_cte_len: usize,
+
     // Custom From Clause
     custom_from_ptr: *const u8,
     custom_from_len: usize,
@@ -206,8 +210,19 @@ pub unsafe extern "C" fn list_models(
     let include_tree_json = unsafe {
         str::from_utf8(slice::from_raw_parts(include_tree_ptr, include_tree_len)).unwrap()
     };
+    let tag_cte_raw =
+        unsafe { str::from_utf8(slice::from_raw_parts(tag_cte_ptr, tag_cte_len)).unwrap() };
+
     let custom_from_raw =
         unsafe { str::from_utf8(slice::from_raw_parts(custom_from_ptr, custom_from_len)).unwrap() };
+
+    let tag_cte = match serde_json::from_str::<Option<String>>(tag_cte_raw) {
+        Ok(tc) => tc,
+        Err(e) => {
+            yield_error(e);
+            return 1;
+        }
+    };
 
     let custom_from = match serde_json::from_str::<Option<String>>(custom_from_raw) {
         Ok(cf) => cf,
@@ -230,6 +245,7 @@ pub unsafe extern "C" fn list_models(
             model_name,
             include_tree.as_ref(),
             custom_from,
+            tag_cte,
             &meta.borrow(),
         )
     });

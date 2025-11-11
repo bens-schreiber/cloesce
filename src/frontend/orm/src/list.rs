@@ -13,6 +13,7 @@ pub fn list_models(
     model_name: &str,
     include_tree: Option<&IncludeTree>,
     custom_from: Option<String>,
+    tag_cte: Option<String>,
     meta: &ModelMeta,
 ) -> Result<String, String> {
     let model = match meta.get(model_name) {
@@ -48,7 +49,10 @@ pub fn list_models(
         ));
     }
 
-    let view_name = format!("{}_view", model.name);
+    let view_name = match tag_cte {
+        Some(tag) => tag.to_string(),
+        None => format!("{}.view", model.name),
+    };
     let cte = CommonTableExpression::from_select(query.to_owned())
         .table_name(alias(&view_name))
         .to_owned();

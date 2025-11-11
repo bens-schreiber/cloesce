@@ -416,7 +416,7 @@ export class Orm {
   static mapSql<T extends object>(
     ctor: new () => T,
     records: Record<string, any>[],
-    includeTree: IncludeTree<T> | null = null,
+    includeTree: IncludeTree<T> | null = null
   ): Either<string, T[]> {
     return mapSql(ctor, records, includeTree);
   }
@@ -465,7 +465,7 @@ export class Orm {
   async upsert<T extends object>(
     ctor: new () => T,
     newModel: DeepPartial<T>,
-    includeTree: IncludeTree<T> | null = null,
+    includeTree: IncludeTree<T> | null = null
   ): Promise<Either<string, any>> {
     const { wasm } = RuntimeContainer.get();
     const args = [
@@ -495,13 +495,13 @@ export class Orm {
 
     // Execute all statements in a batch.
     const batchRes = await this.db.batch(
-      statements.map((s) => this.db.prepare(s.query).bind(...s.values)),
+      statements.map((s) => this.db.prepare(s.query).bind(...s.values))
     );
 
     if (!batchRes.every((r) => r.success)) {
       const failed = batchRes.find((r) => !r.success);
       return Either.left(
-        failed?.error ?? "D1 batch failed, but no error was returned.",
+        failed?.error ?? "D1 batch failed, but no error was returned."
       );
     }
 
@@ -513,11 +513,12 @@ export class Orm {
 
   /**
    * Returns a query using the provided include tree, aliasing columns to match the
-   * object structure.
+   * object structure. Wraps the query in a CTE.
    *
-   * Optionally, a `from` string can be provided to customize the source of the query.
-   * The `from` string should be a valid `SELECT` statement returning all columns from the
-   * desired source.
+   * @param ctor The model constructor.
+   * @param includeTree An include tree describing which related models to join.
+   * @param from An optional custom `FROM` clause to use instead of the base table.
+   * @param tagCte An optional CTE name to tag the query with. Defaults to "Model.view".
    *
    * Example:
    * ```ts
@@ -527,20 +528,32 @@ export class Orm {
    * // Using a custom from statement
    * const query = Orm.listQuery(Person, null, "SELECT * FROM Person WHERE age > 18");
    * ```
-   *
-   * Returns Either an error string, or the list query string. The list query can only fail if
-   * the model name is not found in the AST.
+   * Example SQL output:
+   * ```sql
+   * WITH Person_view AS (
+   * SELECT
+   * "Person"."id" AS "id",
+   * ...
+   * FROM "Person"
+   * LEFT JOIN ...
+   * )
+   * SELECT * FROM Person_view
+   * ```
    */
   static listQuery<T extends object>(
     ctor: new () => T,
-    includeTree: IncludeTree<T> | null = null,
-    from: string | null = null,
+    opts: {
+      includeTree?: IncludeTree<T> | null;
+      from?: string;
+      tagCte?: string;
+    }
   ): Either<string, string> {
     const { wasm } = RuntimeContainer.get();
     const args = [
       WasmResource.fromString(ctor.name, wasm),
-      WasmResource.fromString(JSON.stringify(includeTree), wasm),
-      WasmResource.fromString(JSON.stringify(from), wasm),
+      WasmResource.fromString(JSON.stringify(opts.includeTree ?? null), wasm),
+      WasmResource.fromString(JSON.stringify(opts.tagCte ?? null), wasm),
+      WasmResource.fromString(JSON.stringify(opts.from ?? null), wasm),
     ];
     return invokeOrmWasm(wasm.list_models, args, wasm);
   }
@@ -558,12 +571,14 @@ export class Orm {
    */
   static getQuery<T extends object>(
     ctor: new () => T,
-    includeTree: IncludeTree<T> | null = null,
+    includeTree?: IncludeTree<T> | null
   ): Either<string, string> {
     const { ast } = RuntimeContainer.get();
-    return this.listQuery(ctor, includeTree).map(
+    return this.listQuery<T>(ctor, {
+      includeTree,
+    }).map(
       (inner) =>
-        `${inner} WHERE [${ast.models[ctor.name].primary_key.name}] = ?`,
+        `${inner} WHERE [${ast.models[ctor.name].primary_key.name}] = ?`
     );
   }
 
@@ -607,10 +622,12 @@ export class Orm {
    */
   async list<T extends object>(
     ctor: new () => T,
-    includeTree: IncludeTree<T> | null = null,
-    from: string | null = null,
+    opts: {
+      includeTree?: IncludeTree<T> | null;
+      from?: string;
+    }
   ): Promise<Either<string, T[]>> {
-    const queryRes = Orm.listQuery(ctor, includeTree, from);
+    const queryRes = Orm.listQuery(ctor, opts);
     if (queryRes.isLeft()) {
       return Either.left(queryRes.value);
     }
@@ -619,11 +636,11 @@ export class Orm {
     const records = await stmt.all();
     if (!records.success) {
       return Either.left(
-        records.error ?? "D1 query failed, but no error was returned.",
+        records.error ?? "D1 query failed, but no error was returned."
       );
     }
 
-    const mapRes = Orm.mapSql(ctor, records.results, includeTree);
+    const mapRes = Orm.mapSql(ctor, records.results, opts.includeTree ?? null);
     if (mapRes.isLeft()) {
       return Either.left(mapRes.value);
     }
@@ -647,7 +664,7 @@ export class Orm {
   async get<T extends object>(
     ctor: new () => T,
     id: any,
-    includeTree: IncludeTree<T> | null = null,
+    includeTree?: IncludeTree<T> | null
   ): Promise<Either<string, T | null>> {
     const queryRes = Orm.getQuery(ctor, includeTree);
     if (queryRes.isLeft()) {
@@ -658,7 +675,7 @@ export class Orm {
 
     if (!record.success) {
       return Either.left(
-        record.error ?? "D1 query failed, but no error was returned.",
+        record.error ?? "D1 query failed, but no error was returned."
       );
     }
 
