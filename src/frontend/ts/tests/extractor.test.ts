@@ -99,7 +99,7 @@ describe("CIDL Type", () => {
     const sourceFile = project.createSourceFile(
       "test.ts",
       `
-      import { DataSourceOf, DeepPartial } from "./src/ui/backend";
+      import { DataSourceOf, DeepPartial, HttpResult } from "./src/ui/backend";
 
       class Bar {
         a: number;

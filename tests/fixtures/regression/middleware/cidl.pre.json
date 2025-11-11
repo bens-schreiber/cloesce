@@ -5,7 +5,8 @@
     "wrangler_env": {
         "name": "Env",
         "source_path": "./seed__app.cloesce.ts",
-        "db_binding": "db"
+        "db_binding": "db",
+        "vars": {}
     },
     "models": {
         "Model": {

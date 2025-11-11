@@ -1,4 +1,7 @@
-use std::{collections::BTreeMap, path::PathBuf};
+use std::{
+    collections::{BTreeMap, HashMap},
+    path::PathBuf,
+};
 
 use indexmap::IndexMap;
 
@@ -22,6 +25,7 @@ pub fn create_ast(mut models: Vec<Model>) -> CloesceAst {
             name: "Env".into(),
             source_path: "source.ts".into(),
             db_binding: "db".into(),
+            vars: HashMap::new(),
         },
         app_source: None,
         hash: 0,

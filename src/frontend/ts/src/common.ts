@@ -224,180 +224,92 @@ export class Either<L, R> {
   }
 }
 
-/**
- * Represents the result of an HTTP operation in a monadic style.
- *
- * This type provides a uniform way to handle both success and error
- * outcomes of HTTP requests, similar to a `Result` or `Either` monad.
- *
- * It ensures that every HTTP response can be handled in a type-safe,
- * predictable way without throwing exceptions.
- *
- * @template T The type of the successful response data.
- *
- * @property {boolean} ok
- * Indicates whether the HTTP request was successful (`true` for success, `false` for error).
- * This is analogous to `Response.ok` in the Fetch API.
- *
- * @property {number} status
- * The numeric HTTP status code (e.g., 200, 404, 500).
- *
- * @property {T} [data]
- * The parsed response payload, present only when `ok` is `true`.
- *
- * @property {string} [message]
- * An optional human-readable error message or diagnostic information,
- * typically provided when `ok` is `false`.
- *
- * ## Worker APIs
- *
- * HttpResult is a first-class-citizen in the grammar in Cloesce. Methods can return HttpResults
- * which will be serialized on the client api.
- *
- * @example
- * ```ts
- *  bar(): HttpResult<Integer> {
- *    return { ok: false, status: 401, message: "forbidden"}
- *  }
- * ```
- */
-export type HttpResult<T = unknown> = {
-  ok: boolean;
-  status: number;
-  data?: T;
-  message?: string;
-};
+export class HttpResult<T = unknown> {
+  public constructor(
+    public ok: boolean,
+    public status: number,
+    public headers: Headers,
+    public data?: T,
+    public message?: string,
+  ) {}
 
-/**
- * Dependency injection container, mapping an object type name to an instance of that object.
- *
- * Comes with the WranglerEnv and Request by default.
- */
-export type InstanceRegistry = Map<string, any>;
+  static ok<T>(status: number, data?: T, init?: HeadersInit): HttpResult {
+    const headers: Headers = new Headers(
+      init ?? {
+        "Content-Type": "application/json",
+      },
+    );
 
-export type MiddlewareFn = (
-  request: Request,
-  env: any,
-  ir: InstanceRegistry,
-) => Promise<HttpResult | undefined>;
+    return new HttpResult<T>(true, status, headers, data, undefined);
+  }
+
+  static fail(status: number, message?: string, init?: HeadersInit) {
+    const headers: Headers = new Headers(
+      init ?? {
+        "Content-Type": "application/json",
+      },
+    );
+
+    return new HttpResult<never>(false, status, headers, undefined, message);
+  }
+
+  toResponse(): Response {
+    const body = () => {
+      if (this.status === 204) {
+        return undefined;
+      }
+
+      return this.ok
+        ? JSON.stringify({
+            data: this.data,
+          })
+        : this.message;
+    };
+
+    return new Response(body(), {
+      status: this.status,
+      headers: this.headers,
+    });
+  }
+
+  static async fromResponse(
+    response: Response,
+    ctor?: new () => any,
+    array: boolean = false,
+  ): Promise<HttpResult<any>> {
+    if (response.status < 400) {
+      const json = await response.json();
+
+      let data = json.data;
+      if (ctor) {
+        data = array
+          ? instantiateObjectArray(data, ctor)
+          : Object.assign(new ctor(), data);
+      }
+
+      return new HttpResult(true, response.status, response.headers, data);
+    }
+
+    return new HttpResult(
+      false,
+      response.status,
+      response.headers,
+      undefined,
+      await response.text(),
+    );
+
+    function instantiateObjectArray(data: any, ctor: new () => any): any[] {
+      if (Array.isArray(data)) {
+        return data.map((x) => instantiateObjectArray(x, ctor)).flat();
+      }
+      return [Object.assign(new ctor(), data)];
+    }
+  }
+}
 
 export type KeysOfType<T, U> = {
   [K in keyof T]: T[K] extends U ? (K extends string ? K : never) : never;
 }[keyof T];
-
-/**
- * Represents the core middleware container for a Cloesce application.
- *
- * The `CloesceApp` class provides scoped middleware registration and
- * management across three primary levels of execution:
- *
- * 1. **Global Middleware** — Executed before any routing or model resolution occurs.
- * 2. **Model-Level Middleware** — Executed for requests targeting a specific model type.
- * 3. **Method-Level Middleware** — Executed for requests targeting a specific method on a model.
- *
- * When an instance of `CloesceApp` is exported from `app.cloesce.ts`,
- * it becomes the central container that the Cloesce runtime uses to
- * assemble and apply middleware in the correct execution order.
- *
- * ### Middleware Execution Order
- * Middleware is executed in FIFO order per scope. For example:
- * ```ts
- * app.use(Foo, A);
- * app.use(Foo, B);
- * app.use(Foo, C);
- * // Executed in order: A → B → C
- * ```
- *
- * Each middleware function (`MiddlewareFn`) can optionally short-circuit
- * execution by returning a result, in which case subsequent middleware
- * at the same or lower scope will not run.
- *
- * ### Example Usage
- * ```ts
- * import { app } from "cloesce";
- *
- * // Global authentication middleware
- * app.useGlobal((request, env, di) => {
- *   // ... authenticate and inject user
- * });
- *
- * // Model-level authorization
- * app.useModel(User, (user) => user.hasPermissions([UserPermissions.canUseFoo]));
- *
- * // Method-level middleware (e.g., CRUD operation)
- * app.useMethod(Foo, "someMethod", (user) => user.hasPermissions([UserPermissions.canUseFooMethod]));
- * ```
- */
-export class CloesceApp {
-  public global: MiddlewareFn[] = [];
-  public model: Map<string, MiddlewareFn[]> = new Map();
-  public method: Map<string, Map<string, MiddlewareFn[]>> = new Map();
-
-  /**
-   * Registers a new global middleware function.
-   *
-   * Global middleware runs before all routing and model resolution.
-   * It is the ideal place to perform tasks such as:
-   * - Authentication (e.g., JWT verification)
-   * - Global request logging
-   * - Dependency injection of shared context
-   *
-   * @param m - The middleware function to register.
-   */
-  public useGlobal(m: MiddlewareFn) {
-    this.global.push(m);
-  }
-
-  /**
-   * Registers middleware for a specific model type.
-   *
-   * Model-level middleware runs after all global middleware,
-   * but before method-specific middleware. This scope allows
-   * logic to be applied consistently across all endpoints
-   * associated with a given model (e.g., authorization).
-   *
-   * @typeParam T - The model type.
-   * @param ctor - The model constructor (used to derive its name).
-   * @param m - The middleware function to register.
-   */
-  public useModel<T>(ctor: new () => T, m: MiddlewareFn) {
-    if (this.model.has(ctor.name)) {
-      this.model.get(ctor.name)!.push(m);
-    } else {
-      this.model.set(ctor.name, [m]);
-    }
-  }
-
-  /**
-   * Registers middleware for a specific method on a model.
-   *
-   * Method-level middleware is executed after model middleware,
-   * and before the method implementation itself. It can be used for:
-   * - Fine-grained permission checks
-   * - Custom logging or tracing per endpoint
-   *
-   * @typeParam T - The model type.
-   * @param ctor - The model constructor (used to derive its name).
-   * @param method - The method name on the model.
-   * @param m - The middleware function to register.
-   */
-  public useMethod<T>(
-    ctor: new () => T,
-    method: KeysOfType<T, (...args: any) => any>,
-    m: MiddlewareFn,
-  ) {
-    if (!this.method.has(ctor.name)) {
-      this.method.set(ctor.name, new Map());
-    }
-
-    const methods = this.method.get(ctor.name)!;
-    if (!methods.has(method)) {
-      methods.set(method, []);
-    }
-
-    methods.get(method)!.push(m);
-  }
-}
 
 export type CrudKind = "SAVE" | "GET" | "LIST";
 
@@ -497,6 +409,7 @@ export interface WranglerEnv {
   name: string;
   source_path: string;
   db_binding: string;
+  vars: Record<string, CidlType>;
 }
 
 export interface CloesceAst {

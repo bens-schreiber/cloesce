@@ -6,3 +6,6 @@ name = "cloesce"
 binding = "db"
 database_id = "replace_with_db_id"
 database_name = "default"
+
+[vars]
+motd = "default_string"

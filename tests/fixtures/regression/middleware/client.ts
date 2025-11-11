@@ -1,7 +1,6 @@
 // GENERATED CODE. DO NOT MODIFY.
 
-import { HttpResult, instantiateObjectArray, DeepPartial } from "cloesce/client";
-
+import { HttpResult, DeepPartial } from "cloesce/client";
 export class InjectedThing {
   value: string;
 }
@@ -14,23 +13,14 @@ export class Model {
   ): Promise<HttpResult<void>> {
     const baseUrl = new URL(`http://localhost:5002/api/Model/blockedMethod`);
     const res = await fetchImpl(baseUrl, { method: "GET" });
-    let raw = await res.json();
-    if (!res.ok) {
-      return raw;
-    }
-    return raw;
+    return await HttpResult.fromResponse(res);
   }
   static async getInjectedThing(
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<InjectedThing>> {
     const baseUrl = new URL(`http://localhost:5002/api/Model/getInjectedThing`);
     const res = await fetchImpl(baseUrl, { method: "GET" });
-    let raw = await res.json();
-    if (!res.ok) {
-      return raw;
-    }
-    raw.data = Object.assign(new InjectedThing(), raw.data);
-    return raw;
+    return await HttpResult.fromResponse(res, InjectedThing, false);
   }
   static async save(
         model: DeepPartial<Model>,
@@ -46,11 +36,6 @@ export class Model {
             __datasource
       })
     });
-    let raw = await res.json();
-    if (!res.ok) {
-      return raw;
-    }
-    raw.data = Object.assign(new Model(), raw.data);
-    return raw;
+    return await HttpResult.fromResponse(res, Model, false);
   }
 }

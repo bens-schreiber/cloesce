@@ -34,7 +34,6 @@ enum Commands {
         wrangler_path: PathBuf,
         workers_path: PathBuf,
         client_path: PathBuf,
-        client_domain: String,
         workers_domain: String,
     },
     Migrations {
@@ -129,13 +128,12 @@ fn run_cli() -> Result<()> {
             wrangler_path,
             workers_path,
             client_path,
-            client_domain,
             workers_domain,
         } => {
             let mut ast = validate_cidl(&pre_cidl_path)?;
             generate_wrangler(&wrangler_path, &ast)?;
-            generate_workers(&mut ast, &workers_path, &wrangler_path, &workers_domain)?;
-            generate_client(&ast, &client_path, &client_domain)?;
+            generate_workers(&mut ast, &workers_path, &wrangler_path)?;
+            generate_client(&ast, &client_path, &workers_domain)?;
             write_cidl(ast, &cidl_path)?;
         }
     }
@@ -236,7 +234,7 @@ fn write_cidl(ast: CloesceAst, cidl_path: &Path) -> Result<()> {
 fn generate_wrangler(wrangler_path: &Path, ast: &CloesceAst) -> Result<()> {
     let mut wrangler = WranglerFormat::from_path(wrangler_path);
     let mut spec = wrangler.as_spec();
-    spec.generate_defaults();
+    spec.generate_defaults(ast);
     spec.validate_bindings(ast)?;
 
     let wrangler_file = std::fs::OpenOptions::new()
@@ -254,17 +252,11 @@ fn generate_wrangler(wrangler_path: &Path, ast: &CloesceAst) -> Result<()> {
     Ok(())
 }
 
-fn generate_workers(
-    ast: &mut CloesceAst,
-    workers_path: &Path,
-    wrangler_path: &Path,
-    domain: &str,
-) -> Result<()> {
+fn generate_workers(ast: &mut CloesceAst, workers_path: &Path, wrangler_path: &Path) -> Result<()> {
     let mut file = open_file_or_create(workers_path)?;
     let wrangler = WranglerFormat::from_path(wrangler_path);
 
-    let workers =
-        WorkersGenerator::create(ast, wrangler.as_spec(), domain.to_string(), workers_path)?;
+    let workers = WorkersGenerator::create(ast, wrangler.as_spec(), workers_path);
     file.write_all(workers.as_bytes())
         .expect("Could not write to file");
     Ok(())

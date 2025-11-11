@@ -7,6 +7,7 @@ import {
   Inject,
   PlainOldObject,
   GET,
+  HttpResult,
 } from "cloesce/backend";
 import { D1Database } from "@cloudflare/workers-types";
 type Integer = number & { __kind: "Integer" };
@@ -38,20 +39,24 @@ export class Model {
 
 const app: CloesceApp = new CloesceApp();
 
-app.useGlobal((request: Request, env, ir) => {
+app.onRequest((request: Request, env, di) => {
   if (request.method === "POST") {
-    return { ok: false, status: 401, message: "POST methods aren't allowed." };
+    return HttpResult.fail(401, "POST methods aren't allowed.");
   }
 });
 
-app.useModel(Model, (request, env, ir) => {
-  ir.set(InjectedThing.name, {
+app.onModel(Model, (request, env, di) => {
+  di.set(InjectedThing.name, {
     value: "hello world",
   });
 });
 
-app.useMethod(Model, "blockedMethod", (request, env, ir) => {
-  return { ok: false, status: 401, message: "Blocked method" };
+app.onMethod(Model, "blockedMethod", (request, env, di) => {
+  return HttpResult.fail(401, "Blocked method");
+});
+
+app.onResult((request, env, di, result: HttpResult) => {
+  result.headers.set("X-Cloesce-Test", "true");
 });
 
 export default app;

@@ -46,14 +46,14 @@ export class CrudContext {
     const orm = Orm.fromD1(this.d1);
     const upsert = await orm.upsert(this.ctor, obj, includeTree);
     if (upsert.isLeft()) {
-      return { ok: false, status: 500, data: upsert.value }; // TODO: better status code?
+      return HttpResult.fail(500, upsert.value); // TODO: better status code?
     }
 
     // Get
     const get = await orm.get(this.ctor, upsert.value, includeTree);
     return get.isRight()
-      ? { ok: true, status: 200, data: get.value }
-      : { ok: false, status: 500, data: get.value };
+      ? HttpResult.ok(200, get.value)
+      : HttpResult.fail(500, get.value);
   }
 
   async get(id: any, dataSource: string): Promise<HttpResult<unknown>> {
@@ -62,8 +62,8 @@ export class CrudContext {
     const orm = Orm.fromD1(this.d1);
     const res = await orm.get(this.ctor, id, includeTree);
     return res.isRight()
-      ? { ok: true, status: 200, data: res.value }
-      : { ok: false, status: 500, data: res.value };
+      ? HttpResult.ok(200, res.value)
+      : HttpResult.fail(500, res.value);
   }
 
   async list(dataSource: string): Promise<HttpResult<unknown>> {
@@ -73,9 +73,10 @@ export class CrudContext {
     const res = await orm.list(this.ctor, {
       includeTree,
     });
+
     return res.isRight()
-      ? { ok: true, status: 200, data: res.value }
-      : { ok: false, status: 500, data: res.value };
+      ? HttpResult.ok(200, res.value)
+      : HttpResult.fail(500, res.value as string);
   }
 }
 

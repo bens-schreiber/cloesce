@@ -13,17 +13,19 @@ afterAll(async () => {
 
 describe("Global Middleware", () => {
   it("Rejects POST requests", async () => {
-    const res = await Model.save({});
+    const res = await Model.save({}, "none");
     expect(res.ok).toBe(false);
     expect(res.status).toBe(401);
     expect(res.message).toBe("POST methods aren't allowed.");
     expect(res.data).toBeUndefined();
+    expect(res.headers.get("X-Cloesce-Test")).toBe("true");
   });
 });
 
 describe("Model + Method Middleware", () => {
   it("Rejects method", async () => {
     const res = await Model.blockedMethod();
+
     expect(res.ok).toBe(false);
     expect(res.status).toBe(401);
     expect(res.message).toBe("Blocked method");
@@ -32,6 +34,7 @@ describe("Model + Method Middleware", () => {
 
   it("Model middleware passes injected dep", async () => {
     const res = await Model.getInjectedThing();
+
     expect(res.ok).toBe(true);
     expect(res.data).toEqual({
       value: "hello world",

@@ -3,45 +3,13 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use ast::{
-    CidlType, CloesceAst, HttpVerb, Model, ModelMethod, NamedTypedValue, PlainOldObject,
-    err::{GeneratorErrorKind, Result},
-    fail,
-};
+use ast::{CidlType, CloesceAst, HttpVerb, Model, ModelMethod, NamedTypedValue, PlainOldObject};
 
 use indexmap::IndexMap;
 use wrangler::WranglerSpec;
 
 pub struct WorkersGenerator;
 impl WorkersGenerator {
-    /// Returns the API route
-    fn validate_domain(domain: &str) -> Result<String> {
-        if domain.is_empty() {
-            fail!(GeneratorErrorKind::InvalidApiDomain, "Empty domain")
-        }
-
-        match domain.split_once("://") {
-            None => fail!(GeneratorErrorKind::InvalidApiDomain, "Missing protocol"),
-            Some((protocol, rest)) => {
-                if protocol != "http" {
-                    fail!(
-                        GeneratorErrorKind::InvalidApiDomain,
-                        "Unsupported protocol {}",
-                        protocol
-                    )
-                }
-
-                match rest.split_once("/") {
-                    None => fail!(
-                        GeneratorErrorKind::InvalidApiDomain,
-                        "Missing API route on domain"
-                    ),
-                    Some((_, rest)) => Ok(rest.to_string()),
-                }
-            }
-        }
-    }
-
     /// Generates all model source imports as well as the Cloesce App
     fn link(
         models: &IndexMap<String, Model>,
@@ -197,14 +165,7 @@ impl WorkersGenerator {
         }
     }
 
-    pub fn create(
-        ast: &mut CloesceAst,
-        wrangler: WranglerSpec,
-        domain: String,
-        workers_path: &Path,
-    ) -> Result<String> {
-        let api_route = Self::validate_domain(&domain)?;
-
+    pub fn create(ast: &mut CloesceAst, wrangler: WranglerSpec, workers_path: &Path) -> String {
         let linked_sources = Self::link(
             &ast.models,
             &ast.poos,
@@ -225,41 +186,19 @@ impl WorkersGenerator {
             .expect("A database needs a binding to reference it in the instance container");
         let env_name = &ast.wrangler_env.name;
 
-        // TODO: Middleware function should return the DI instance registry
-        Ok(format!(
+        format!(
             r#"// GENERATED CODE. DO NOT MODIFY.
-import {{ cloesce, CloesceApp }} from "cloesce/backend";
+import {{ CloesceApp }} from "cloesce/backend";
 import cidl from "./cidl.json";
 {linked_sources}
 {constructor_registry}
 
 async function fetch(request: Request, env: any, ctx: any): Promise<Response> {{
-    try {{
-        const envMeta = {{ envName: "{env_name}", dbName: "{db_binding}" }};
-        const apiRoute = "/{api_route}";
-        return await cloesce(
-            request, 
-            env,
-            cidl as any, 
-            app,
-            constructorRegistry, 
-            envMeta,  
-            apiRoute
-        );
-    }} catch(e: any) {{
-        console.error(JSON.stringify(e));
-        return new Response(JSON.stringify({{
-            ok: false,
-            status: 500,
-            message: e.toString()
-        }}), {{
-            status: 500,
-            headers: {{ "Content-Type": "application/json" }},
-            }});
-    }}
+    const envMeta = {{ envName: "{env_name}", dbName: "{db_binding}" }};
+    return await app.run(request, env, cidl as any, constructorRegistry, envMeta);
 }}
 
-export default {{fetch}};"#
-        ))
+export default {{ fetch }};"#
+        )
     }
 }

@@ -69,7 +69,6 @@ pub enum GeneratorErrorKind {
     MissingOrExtraneousDataSource,
     NotYetSupported,
     InvalidMapping,
-    InvalidApiDomain,
     MismatchedForeignKeyTypes,
     MismatchedNavigationPropertyTypes,
     InvalidNavigationPropertyReference,
@@ -77,7 +76,7 @@ pub enum GeneratorErrorKind {
     UnknownIncludeTreeReference,
     ExtraneousManyToManyReferences,
     MissingManyToManyReference,
-    InconsistentDatabaseBinding,
+    InconsistentWranglerBinding,
 }
 
 impl GeneratorErrorKind {
@@ -133,11 +132,6 @@ impl GeneratorErrorKind {
                 "",
                 GeneratorPhase::ModelSemanticAnalysis,
             ),
-            GeneratorErrorKind::InvalidApiDomain => (
-                "Invalid or ill-formatted API domain",
-                "API's must be of the form: http://domain.com/path/to/api",
-                GeneratorPhase::Workers,
-            ),
             GeneratorErrorKind::MismatchedForeignKeyTypes => (
                 "Mismatched foreign keys",
                 "Foreign keys must be the same type as their reference",
@@ -173,9 +167,9 @@ impl GeneratorErrorKind {
                 "TODO: a good indicator of where to add the nav prop",
                 GeneratorPhase::ModelSemanticAnalysis,
             ),
-            GeneratorErrorKind::InconsistentDatabaseBinding => (
+            GeneratorErrorKind::InconsistentWranglerBinding => (
                 "Wrangler file definitions must be consistent with the WranglerEnv definition",
-                "Change your WranglerEnv's database binding to match the Wrangler file",
+                "Change your WranglerEnv's bindings to match the Wrangler file",
                 GeneratorPhase::Wrangler,
             ),
 

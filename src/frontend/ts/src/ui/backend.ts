@@ -1,21 +1,13 @@
 import { D1Database } from "@cloudflare/workers-types/experimental/index.js";
 import { CrudKind, DeepPartial, Either, KeysOfType } from "../common.js";
 import { RuntimeContainer } from "../router/router.js";
-import {
-  WasmResource,
-  mapSql as mapSql,
-  invokeOrmWasm,
-} from "../router/wasm.js";
+import { WasmResource, mapSql, invokeOrmWasm } from "../router/wasm.js";
 
-export { cloesce } from "../router/router.js";
-export type {
-  HttpResult,
-  Either,
-  DeepPartial,
-  InstanceRegistry,
-  CrudKind,
-} from "../common.js";
-export { CloesceApp } from "../common.js";
+export { CloesceApp, DependencyInjector } from "../router/router.js";
+export type { MiddlewareFn, ResultMiddlewareFn } from "../router/router.js";
+
+export { HttpResult, Either } from "../common.js";
+export type { DeepPartial, CrudKind } from "../common.js";
 
 /**
  * Marks a class as a D1-backed SQL model.
@@ -541,7 +533,7 @@ export class Orm {
       from?: string;
       tagCte?: string;
     },
-  ): Either<string, string> {
+  ): string {
     const { wasm } = RuntimeContainer.get();
     const args = [
       WasmResource.fromString(ctor.name, wasm),
@@ -549,7 +541,13 @@ export class Orm {
       WasmResource.fromString(JSON.stringify(opts.tagCte ?? null), wasm),
       WasmResource.fromString(JSON.stringify(opts.from ?? null), wasm),
     ];
-    return invokeOrmWasm(wasm.list_models, args, wasm);
+
+    const res = invokeOrmWasm(wasm.list_models, args, wasm);
+    if (res.isLeft()) {
+      throw new Error(`Error invoking the Cloesce WASM Binary: ${res.value}`);
+    }
+
+    return res.unwrap();
   }
 
   /**
@@ -580,14 +578,9 @@ export class Orm {
   static getQuery<T extends object>(
     ctor: new () => T,
     includeTree?: IncludeTree<T> | null,
-  ): Either<string, string> {
+  ): string {
     const { ast } = RuntimeContainer.get();
-    return this.listQuery<T>(ctor, {
-      includeTree,
-    }).map(
-      (inner) =>
-        `${inner} WHERE [${ast.models[ctor.name].primary_key.name}] = ?`,
-    );
+    return `${this.listQuery<T>(ctor, { includeTree })} WHERE [${ast.models[ctor.name].primary_key.name}] = ?`;
   }
 
   /**
@@ -627,12 +620,9 @@ export class Orm {
       from?: string;
     },
   ): Promise<Either<string, T[]>> {
-    const queryRes = Orm.listQuery(ctor, opts);
-    if (queryRes.isLeft()) {
-      return Either.left(queryRes.value);
-    }
+    const sql = Orm.listQuery(ctor, opts);
 
-    const stmt = this.db.prepare(queryRes.value);
+    const stmt = this.db.prepare(sql);
     const records = await stmt.all();
     if (!records.success) {
       return Either.left(
@@ -666,12 +656,8 @@ export class Orm {
     id: any,
     includeTree?: IncludeTree<T> | null,
   ): Promise<Either<string, T | null>> {
-    const queryRes = Orm.getQuery(ctor, includeTree);
-    if (queryRes.isLeft()) {
-      return Either.left(queryRes.value);
-    }
-
-    const record = await this.db.prepare(queryRes.value).bind(id).run();
+    const sql = Orm.getQuery(ctor, includeTree);
+    const record = await this.db.prepare(sql).bind(id).run();
 
     if (!record.success) {
       return Either.left(

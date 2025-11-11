@@ -6,7 +6,10 @@
   "wrangler_env": {
     "name": "Env",
     "source_path": "./seed__horse_tinder.cloesce.ts",
-    "db_binding": "db"
+    "db_binding": "db",
+    "vars": {
+      "motd": "Text"
+    }
   },
   "models": {
     "Horse": {

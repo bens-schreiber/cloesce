@@ -1,7 +1,6 @@
 // GENERATED CODE. DO NOT MODIFY.
 
-import { HttpResult, instantiateObjectArray, DeepPartial } from "cloesce/client";
-
+import { HttpResult, DeepPartial } from "cloesce/client";
 
 export class Weather {
   id: number;
@@ -17,12 +16,7 @@ export class Weather {
     baseUrl.searchParams.append('id', String(id));
     baseUrl.searchParams.append('__datasource', String(__datasource));
     const res = await fetchImpl(baseUrl, { method: "GET" });
-    let raw = await res.json();
-    if (!res.ok) {
-      return raw;
-    }
-    raw.data = Object.assign(new Weather(), raw.data);
-    return raw;
+    return await HttpResult.fromResponse(res, Weather, false);
   }
   static async save(
         model: DeepPartial<Weather>,
@@ -38,11 +32,6 @@ export class Weather {
             __datasource
       })
     });
-    let raw = await res.json();
-    if (!res.ok) {
-      return raw;
-    }
-    raw.data = Object.assign(new Weather(), raw.data);
-    return raw;
+    return await HttpResult.fromResponse(res, Weather, false);
   }
 }

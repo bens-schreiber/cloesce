@@ -1,7 +1,6 @@
 // GENERATED CODE. DO NOT MODIFY.
 
-import { HttpResult, instantiateObjectArray, DeepPartial } from "cloesce/client";
-
+import { HttpResult, DeepPartial } from "cloesce/client";
 export class PooA {
   name: string;
   major: string;
@@ -33,11 +32,7 @@ export class PooAcceptYield {
             c
       })
     });
-    let raw = await res.json();
-    if (!res.ok) {
-      return raw;
-    }
-    return raw;
+    return await HttpResult.fromResponse(res);
   }
   static async yieldPoo(
     fetchImpl: typeof fetch = fetch
@@ -49,11 +44,6 @@ export class PooAcceptYield {
       body: JSON.stringify({
       })
     });
-    let raw = await res.json();
-    if (!res.ok) {
-      return raw;
-    }
-    raw.data = Object.assign(new PooC(), raw.data);
-    return raw;
+    return await HttpResult.fromResponse(res, PooC, false);
   }
 }

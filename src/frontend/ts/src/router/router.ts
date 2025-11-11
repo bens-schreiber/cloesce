@@ -9,12 +9,18 @@ import {
   Model,
   getNavigationPropertyCidlType,
   NO_DATA_SOURCE,
-  CloesceApp,
-  InstanceRegistry,
+  KeysOfType,
 } from "../common.js";
 import { OrmWasmExports, mapSql, loadOrmWasm } from "./wasm.js";
 import { CrudContext } from "./crud.js";
 import { IncludeTree, Orm } from "../ui/backend.js";
+
+/**
+ * Dependency injection container, mapping an object type name to an instance of that object.
+ *
+ * Comes with the WranglerEnv and Request by default.
+ */
+export type DependencyInjector = Map<string, any>;
 
 /**
  * Map of model names to their respective constructor.
@@ -25,18 +31,236 @@ import { IncludeTree, Orm } from "../ui/backend.js";
 type ModelConstructorRegistry = Record<string, new () => any>;
 
 /**
- * Given a request, this represents a map of each body / url  param name to
- * its actual value. Unknown, as the a request can be anything.
- */
-type RequestParamMap = Record<string, unknown>;
-
-/**
  * Meta information on the wrangler env and db bindings
  */
 interface MetaWranglerEnv {
   envName: string;
   dbName: string; // TODO: support many db's
 }
+
+export type MiddlewareFn = (
+  request: Request,
+  env: any,
+  di: DependencyInjector,
+) => Promise<HttpResult | void>;
+
+export type ResultMiddlewareFn = (
+  request: Request,
+  env: any,
+  di: DependencyInjector,
+  result: HttpResult,
+) => Promise<HttpResult | void>;
+
+export class CloesceApp {
+  private globalMiddleware: MiddlewareFn[] = [];
+  private modelMiddleware: Map<string, MiddlewareFn[]> = new Map();
+  private methodMiddleware: Map<string, Map<string, MiddlewareFn[]>> =
+    new Map();
+
+  private resultMiddleware: ResultMiddlewareFn[] = [];
+
+  public routePrefix: string = "api";
+
+  /**
+   * Registers global middleware which runs before any route matching.
+   *
+   * @param m - The middleware function to register.
+   */
+  public onRequest(m: MiddlewareFn) {
+    this.globalMiddleware.push(m);
+  }
+
+  /**
+   * Registers middleware which runs after the response is generated, but before
+   * it is returned to the client.
+   *
+   * Optionally, return a new HttpResult to short-circuit the response.
+   *
+   * Errors thrown in response middleware are caught and returned as a 500 response.
+   *
+   * Errors thrown in earlier middleware or route processing are not caught here.
+   *
+   * @param m - The middleware function to register.
+   */
+  public onResult(m: ResultMiddlewareFn) {
+    this.resultMiddleware.push(m);
+  }
+
+  /**
+   * Registers middleware for a specific model type.
+   *
+   * Runs before request validation and method middleware.
+   *
+   * @typeParam T - The model type.
+   * @param ctor - The model constructor (used to derive its name).
+   * @param m - The middleware function to register.
+   */
+  public onModel<T>(ctor: new () => T, m: MiddlewareFn) {
+    if (this.modelMiddleware.has(ctor.name)) {
+      this.modelMiddleware.get(ctor.name)!.push(m);
+    } else {
+      this.modelMiddleware.set(ctor.name, [m]);
+    }
+  }
+
+  /**
+   * Registers middleware for a specific method on a model.
+   *
+   * Runs after model middleware and request validation.
+   *
+   * @typeParam T - The model type.
+   * @param ctor - The model constructor (used to derive its name).
+   * @param method - The method name on the model.
+   * @param m - The middleware function to register.
+   */
+  public onMethod<T>(
+    ctor: new () => T,
+    method: KeysOfType<T, (...args: any) => any>,
+    m: MiddlewareFn,
+  ) {
+    if (!this.methodMiddleware.has(ctor.name)) {
+      this.methodMiddleware.set(ctor.name, new Map());
+    }
+
+    const methods = this.methodMiddleware.get(ctor.name)!;
+    if (!methods.has(method)) {
+      methods.set(method, []);
+    }
+
+    methods.get(method)!.push(m);
+  }
+
+  /**
+   * Router entry point. Undergoes route matching, request validation, hydration, and method dispatch.
+   */
+  private async cloesce(
+    request: Request,
+    env: any,
+    ast: CloesceAst,
+    constructorRegistry: ModelConstructorRegistry,
+    di: DependencyInjector,
+    d1: D1Database,
+  ): Promise<HttpResult> {
+    // Global middleware
+    for (const m of this.globalMiddleware) {
+      const res = await m(request, env, di);
+      if (res) {
+        return res;
+      }
+    }
+
+    // Route match
+    const route = matchRoute(request, ast, this.routePrefix);
+    if (route.isLeft()) {
+      return route.value;
+    }
+    const { method, model, id } = route.unwrap();
+
+    // Model middleware
+    for (const m of this.modelMiddleware.get(model.name) ?? []) {
+      const res = await m(request, env, di);
+      if (res) {
+        return res;
+      }
+    }
+
+    // Request validation
+    const validation = await validateRequest(request, ast, model, method, id);
+    if (validation.isLeft()) {
+      return validation.value;
+    }
+    const { params, dataSource } = validation.unwrap();
+
+    // Method middleware
+    for (const m of this.methodMiddleware.get(model.name)?.get(method.name) ??
+      []) {
+      const res = await m(request, env, di);
+      if (res) {
+        return res;
+      }
+    }
+
+    // Hydration
+    const crudCtx = await (async () => {
+      if (method.is_static) {
+        return Either.right(
+          CrudContext.fromCtor(d1, constructorRegistry[model.name]),
+        );
+      }
+
+      const hydratedModel = await hydrateModel(
+        constructorRegistry,
+        d1,
+        model,
+        id!, // id must exist after matchRoute
+        dataSource!, // ds must exist after validateRequest
+      );
+
+      return hydratedModel.map((_) =>
+        CrudContext.fromInstance(
+          d1,
+          hydratedModel.value,
+          constructorRegistry[model.name],
+        ),
+      );
+    })();
+    if (crudCtx.isLeft()) {
+      return crudCtx.value;
+    }
+
+    // Method dispatch
+    return await methodDispatch(crudCtx.unwrap(), di, method, params);
+  }
+
+  /**
+   * Runs the Cloesce app. Intended to be called from the generated workers code.
+   */
+  public async run(
+    request: Request,
+    env: any,
+    ast: CloesceAst,
+    constructorRegistry: ModelConstructorRegistry,
+    envMeta: MetaWranglerEnv,
+  ): Promise<Response> {
+    const di: DependencyInjector = new Map();
+    di.set(envMeta.envName, env);
+    di.set("Request", request);
+
+    await RuntimeContainer.init(ast, constructorRegistry);
+    const d1: D1Database = env[envMeta.dbName]; // TODO: multiple dbs
+
+    try {
+      // Core cloesce processing
+      const response = await this.cloesce(
+        request,
+        env,
+        ast,
+        constructorRegistry,
+        di,
+        d1,
+      );
+
+      // Response middleware
+      for (const m of this.resultMiddleware) {
+        const res = await m(request, env, di, response);
+        if (res) {
+          return res.toResponse();
+        }
+      }
+
+      return response.toResponse();
+    } catch (e: any) {
+      console.error(JSON.stringify(e));
+      return HttpResult.fail(500, e.toString()).toResponse();
+    }
+  }
+}
+
+/**
+ * Given a request, this represents a map of each body / url  param name to
+ * its actual value. Unknown, as the a request can be anything.
+ */
+export type RequestParamMap = Record<string, unknown>;
 
 /**
  * Singleton instance containing the cidl, constructor registry, and wasm binary.
@@ -66,105 +290,6 @@ export class RuntimeContainer {
 }
 
 /**
- * Runtime entry point. Given a request, undergoes: routing, validating,
- * hydrating, and method dispatch.
- *
- * @returns A Response with an `HttpResult` JSON body.
- */
-export async function cloesce(
-  request: Request,
-  env: any,
-  ast: CloesceAst,
-  app: CloesceApp,
-  constructorRegistry: ModelConstructorRegistry,
-  envMeta: MetaWranglerEnv,
-  apiRoute: string,
-): Promise<Response> {
-  //#region Initialization
-  const ir: InstanceRegistry = new Map();
-  ir.set(envMeta.envName, env);
-  ir.set("Request", request);
-
-  await RuntimeContainer.init(ast, constructorRegistry);
-  const d1: D1Database = env[envMeta.dbName]; // TODO: multiple dbs
-  //#endregion
-
-  //#region Global Middleware
-  for (const m of app.global) {
-    const res = await m(request, env, ir);
-    if (res) {
-      return toResponse(res);
-    }
-  }
-  //#endregion
-
-  //#region Match the route to a model method
-  const route = matchRoute(request, ast, apiRoute);
-  if (route.isLeft()) {
-    return toResponse(route.value);
-  }
-  const { method, model, id } = route.unwrap();
-  //#endregion
-
-  //#region Model Middleware
-  for (const m of app.model.get(model.name) ?? []) {
-    const res = await m(request, env, ir);
-    if (res) {
-      return toResponse(res);
-    }
-  }
-  //#endregion
-
-  //#region Validate request body to the model method
-  const validation = await validateRequest(request, ast, model, method, id);
-  if (validation.isLeft()) {
-    return toResponse(validation.value);
-  }
-  const { params, dataSource } = validation.unwrap();
-  //#endregion
-
-  //#region Method Middleware
-  for (const m of app.method.get(model.name)?.get(method.name) ?? []) {
-    const res = await m(request, env, ir);
-    if (res) {
-      return toResponse(res);
-    }
-  }
-  //#endregion
-
-  //#region Instantatiate the model
-  const crudCtx = await (async () => {
-    if (method.is_static) {
-      return Either.right(
-        CrudContext.fromCtor(d1, constructorRegistry[model.name]),
-      );
-    }
-
-    const hydratedModel = await hydrateModel(
-      constructorRegistry,
-      d1,
-      model,
-      id!, // id must exist after matchRoute
-      dataSource!, // ds must exist after validateRequest
-    );
-
-    return hydratedModel.map((_) =>
-      CrudContext.fromInstance(
-        d1,
-        hydratedModel.value,
-        constructorRegistry[model.name],
-      ),
-    );
-  })();
-  if (crudCtx.isLeft()) {
-    return toResponse(crudCtx.value);
-  }
-  //#endregion
-
-  return toResponse(await methodDispatch(crudCtx.unwrap(), ir, method, params));
-}
-
-/**
  * Matches a request to a method on a model.
  * @param apiRoute The route from the domain to the actual API, ie https://foo.com/route/to/api => route/to/api/
  * @returns 404 or a `MatchedRoute`
@@ -172,7 +297,7 @@ export async function cloesce(
 function matchRoute(
   request: Request,
   ast: CloesceAst,
-  apiRoute: string,
+  routePrefix: string,
 ): Either<
   HttpResult,
   {
@@ -182,25 +307,26 @@ function matchRoute(
   }
 > {
   const url = new URL(request.url);
+  const parts = url.pathname.split("/").filter(Boolean);
+  const prefix = routePrefix.split("/").filter(Boolean);
 
   // Error state: We expect an exact request format, and expect that the model
   // and are apart of the CIDL
   const notFound = (e: string) =>
-    Either.left(errorState(404, `Path not found: ${e} ${url.pathname}`));
+    Either.left(HttpResult.fail(404, `Path not found: ${e} ${url.pathname}`));
 
-  const routeParts = url.pathname
-    .slice(apiRoute.length)
-    .split("/")
-    .filter(Boolean);
+  for (const p of prefix) {
+    if (parts.shift() !== p) return notFound(`Missing prefix segment "${p}"`);
+  }
 
-  if (routeParts.length < 2) {
+  if (parts.length < 2) {
     return notFound("Expected /model/method or /model/:id/method");
   }
 
   // Attempt to extract from routeParts
-  const modelName = routeParts[0];
-  const methodName = routeParts[routeParts.length - 1];
-  const id = routeParts.length === 3 ? routeParts[1] : null;
+  const modelName = parts[0];
+  const methodName = parts[parts.length - 1];
+  const id = parts.length === 3 ? parts[1] : null;
 
   const model = ast.models[modelName];
   if (!model) {
@@ -239,7 +365,7 @@ async function validateRequest(
 > {
   // Error state: any missing parameter, body, or malformed input will exit with 400.
   const invalidRequest = (e: string) =>
-    Either.left(errorState(400, `Invalid Request Body: ${e}`));
+    Either.left(HttpResult.fail(400, `Invalid Request Body: ${e}`));
 
   if (!method.is_static && id == null) {
     return invalidRequest("Id's are required for instantiated methods.");
@@ -316,14 +442,14 @@ async function hydrateModel(
   // resulting in a malformed query, exit with a 500.
   const malformedQuery = (e: any) =>
     Either.left(
-      errorState(
+      HttpResult.fail(
         500,
         `Error in hydration query, is the database out of sync with the backend?: ${e instanceof Error ? e.message : String(e)}`,
       ),
     );
 
   // Error state: If no record is found for the id, return a 404
-  const missingRecord = Either.left(errorState(404, "Record not found"));
+  const missingRecord = Either.left(HttpResult.fail(404, "Record not found"));
 
   // Query DB
   let records;
@@ -334,9 +460,7 @@ async function hydrateModel(
         : (constructorRegistry[model.name] as any)[dataSource];
 
     records = await d1
-      .prepare(
-        Orm.getQuery(constructorRegistry[model.name], includeTree).unwrap(),
-      )
+      .prepare(Orm.getQuery(constructorRegistry[model.name], includeTree))
       .bind(id)
       .run();
 
@@ -366,13 +490,13 @@ async function hydrateModel(
  */
 async function methodDispatch(
   crudCtx: CrudContext,
-  instanceRegistry: InstanceRegistry,
+  instanceRegistry: DependencyInjector,
   method: ModelMethod,
   params: Record<string, unknown>,
 ): Promise<HttpResult<unknown>> {
   // Error state: Client code ran into an uncaught exception.
   const uncaughtException = (e: any) =>
-    errorState(
+    HttpResult.fail(
       500,
       `Uncaught exception in method dispatch: ${e instanceof Error ? e.message : String(e)}`,
     );
@@ -389,7 +513,7 @@ async function methodDispatch(
     if (!injected) {
       // Error state: Injected parameters cannot be found at compile time, only at runtime.
       // If a injected reference does not exist, throw a 500.
-      return errorState(
+      return HttpResult.fail(
         500,
         `An injected parameter was missing from the instance registry: ${JSON.stringify(param.cidl_type)}`,
       );
@@ -403,14 +527,14 @@ async function methodDispatch(
     const rt = method.return_type;
 
     if (rt === null) {
-      return { ok: true, status: 200 };
+      return HttpResult.ok(200);
     }
 
     if (typeof rt === "object" && rt !== null && "HttpResult" in rt) {
       return res as HttpResult<unknown>;
     }
 
-    return { ok: true, status: 200, data: res };
+    return HttpResult.ok(200, res);
   };
 
   try {
@@ -421,6 +545,11 @@ async function methodDispatch(
   }
 }
 
+/**
+ * Runtime type validation for CIDL types.
+ *
+ * Returns true if the value matches the CIDL type, false otherwise.
+ */
 function validateCidlType(
   ast: CloesceAst,
   value: unknown,
@@ -538,17 +667,6 @@ function validateCidlType(
   }
 
   return false;
-}
-
-function errorState(status: number, message: string): HttpResult {
-  return { ok: false, status, message };
-}
-
-function toResponse(r: HttpResult): Response {
-  return new Response(JSON.stringify(r), {
-    status: r.status,
-    headers: { "Content-Type": "application/json" },
-  });
 }
 
 /**
