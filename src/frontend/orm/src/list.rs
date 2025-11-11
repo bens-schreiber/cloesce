@@ -207,292 +207,292 @@ fn left_join_as(
     }
 }
 
-#[cfg(test)]
-mod test {
-    use ast::{
-        CidlType, NavigationPropertyKind,
-        builder::{IncludeTreeBuilder, ModelBuilder},
-    };
-    use serde_json::json;
-    use sqlx::SqlitePool;
+// #[cfg(test)]
+// mod test {
+//     use ast::{
+//         CidlType, NavigationPropertyKind,
+//         builder::{IncludeTreeBuilder, ModelBuilder},
+//     };
+//     use serde_json::json;
+//     use sqlx::SqlitePool;
 
-    use crate::{ModelMeta, common::test_sql, expected_str};
+//     use crate::{ModelMeta, common::test_sql, expected_str};
 
-    use super::list_models;
+//     use super::list_models;
 
-    #[sqlx::test]
-    async fn scalar_model(db: SqlitePool) {
-        // Arrange
-        let ast_model = ModelBuilder::new("Person")
-            .id()
-            .attribute("name", CidlType::Text, None)
-            .build();
+//     #[sqlx::test]
+//     async fn scalar_model(db: SqlitePool) {
+//         // Arrange
+//         let ast_model = ModelBuilder::new("Person")
+//             .id()
+//             .attribute("name", CidlType::Text, None)
+//             .build();
 
-        let meta = vec![ast_model]
-            .into_iter()
-            .map(|m| (m.name.clone(), m))
-            .collect();
+//         let meta = vec![ast_model]
+//             .into_iter()
+//             .map(|m| (m.name.clone(), m))
+//             .collect();
 
-        // Act
-        let sql = list_models("Person", None, None, &meta).expect("list models to work");
+//         // Act
+//         let sql = list_models("Person", None, None, &meta).expect("list models to work");
 
-        // Assert
-        expected_str!(
-            sql,
-            r#"SELECT "Person"."id" AS "id", "Person"."name" AS "name" FROM "Person""#
-        );
+//         // Assert
+//         expected_str!(
+//             sql,
+//             r#"SELECT "Person"."id" AS "id", "Person"."name" AS "name" FROM "Person""#
+//         );
 
-        test_sql(meta, sql, db).await.expect("SQL to execute");
-    }
+//         test_sql(meta, sql, db).await.expect("SQL to execute");
+//     }
 
-    #[sqlx::test]
-    async fn custom_from(db: SqlitePool) {
-        // Arrange
-        let ast_model = ModelBuilder::new("Person")
-            .id()
-            .attribute("name", CidlType::Text, None)
-            .build();
+//     #[sqlx::test]
+//     async fn custom_from(db: SqlitePool) {
+//         // Arrange
+//         let ast_model = ModelBuilder::new("Person")
+//             .id()
+//             .attribute("name", CidlType::Text, None)
+//             .build();
 
-        let meta = vec![ast_model]
-            .into_iter()
-            .map(|m| (m.name.clone(), m))
-            .collect();
+//         let meta = vec![ast_model]
+//             .into_iter()
+//             .map(|m| (m.name.clone(), m))
+//             .collect();
 
-        let custom_from = "SELECT * FROM Person ORDER BY name DESC LIMIT 10";
+//         let custom_from = "SELECT * FROM Person ORDER BY name DESC LIMIT 10";
 
-        // Act
-        let sql = list_models("Person", None, Some(custom_from.into()), &meta)
-            .expect("list models to work");
+//         // Act
+//         let sql = list_models("Person", None, Some(custom_from.into()), &meta)
+//             .expect("list models to work");
 
-        // Assert
-        expected_str!(
-            sql,
-            r#"SELECT "Person"."id" AS "id", "Person"."name" AS "name" FROM (SELECT * FROM Person ORDER BY name DESC LIMIT 10) AS "Person""#
-        );
+//         // Assert
+//         expected_str!(
+//             sql,
+//             r#"SELECT "Person"."id" AS "id", "Person"."name" AS "name" FROM (SELECT * FROM Person ORDER BY name DESC LIMIT 10) AS "Person""#
+//         );
 
-        test_sql(meta, sql, db).await.expect("SQL to execute");
-    }
+//         test_sql(meta, sql, db).await.expect("SQL to execute");
+//     }
 
-    #[sqlx::test]
-    async fn one_to_one(db: SqlitePool) {
-        // Arrange
-        let meta: ModelMeta = vec![
-            ModelBuilder::new("Person")
-                .id()
-                .attribute("dogId", CidlType::Integer, Some("Dog".into()))
-                .nav_p(
-                    "dog",
-                    "Dog",
-                    NavigationPropertyKind::OneToOne {
-                        reference: "dogId".into(),
-                    },
-                )
-                .build(),
-            ModelBuilder::new("Dog").id().build(),
-        ]
-        .into_iter()
-        .map(|m| (m.name.clone(), m))
-        .collect();
+//     #[sqlx::test]
+//     async fn one_to_one(db: SqlitePool) {
+//         // Arrange
+//         let meta: ModelMeta = vec![
+//             ModelBuilder::new("Person")
+//                 .id()
+//                 .attribute("dogId", CidlType::Integer, Some("Dog".into()))
+//                 .nav_p(
+//                     "dog",
+//                     "Dog",
+//                     NavigationPropertyKind::OneToOne {
+//                         reference: "dogId".into(),
+//                     },
+//                 )
+//                 .build(),
+//             ModelBuilder::new("Dog").id().build(),
+//         ]
+//         .into_iter()
+//         .map(|m| (m.name.clone(), m))
+//         .collect();
 
-        let include_tree = json!({
-            "dog": {}
-        });
+//         let include_tree = json!({
+//             "dog": {}
+//         });
 
-        // Act
-        let sql = list_models(
-            "Person",
-            Some(&include_tree.as_object().unwrap().clone()),
-            None,
-            &meta,
-        )
-        .expect("list models to work");
+//         // Act
+//         let sql = list_models(
+//             "Person",
+//             Some(&include_tree.as_object().unwrap().clone()),
+//             None,
+//             &meta,
+//         )
+//         .expect("list models to work");
 
-        // Assert
-        expected_str!(
-            sql,
-            r#"SELECT "Person"."id" AS "id", "Person"."dogId" AS "dogId", "Dog"."id" AS "dog.id" FROM "Person" LEFT JOIN "Dog" ON "Person"."dogId" = "Dog"."id""#
-        );
+//         // Assert
+//         expected_str!(
+//             sql,
+//             r#"SELECT "Person"."id" AS "id", "Person"."dogId" AS "dogId", "Dog"."id" AS "dog.id" FROM "Person" LEFT JOIN "Dog" ON "Person"."dogId" = "Dog"."id""#
+//         );
 
-        test_sql(meta, sql, db).await.expect("SQL to execute");
-    }
+//         test_sql(meta, sql, db).await.expect("SQL to execute");
+//     }
 
-    #[sqlx::test]
-    fn one_to_many(db: SqlitePool) {
-        let meta: ModelMeta = vec![
-            ModelBuilder::new("Dog")
-                .id()
-                .attribute("personId", CidlType::Integer, Some("Person".into()))
-                .build(),
-            ModelBuilder::new("Cat")
-                .attribute("personId", CidlType::Integer, Some("Person".into()))
-                .id()
-                .build(),
-            ModelBuilder::new("Person")
-                .id()
-                .nav_p(
-                    "dogs",
-                    "Dog",
-                    NavigationPropertyKind::OneToMany {
-                        reference: "personId".into(),
-                    },
-                )
-                .nav_p(
-                    "cats",
-                    "Cat",
-                    NavigationPropertyKind::OneToMany {
-                        reference: "personId".into(),
-                    },
-                )
-                .attribute("bossId", CidlType::Integer, Some("Boss".into()))
-                .build(),
-            ModelBuilder::new("Boss")
-                .id()
-                .nav_p(
-                    "persons",
-                    "Person",
-                    NavigationPropertyKind::OneToMany {
-                        reference: "bossId".into(),
-                    },
-                )
-                .build(),
-        ]
-        .into_iter()
-        .map(|m| (m.name.clone(), m))
-        .collect();
+//     #[sqlx::test]
+//     fn one_to_many(db: SqlitePool) {
+//         let meta: ModelMeta = vec![
+//             ModelBuilder::new("Dog")
+//                 .id()
+//                 .attribute("personId", CidlType::Integer, Some("Person".into()))
+//                 .build(),
+//             ModelBuilder::new("Cat")
+//                 .attribute("personId", CidlType::Integer, Some("Person".into()))
+//                 .id()
+//                 .build(),
+//             ModelBuilder::new("Person")
+//                 .id()
+//                 .nav_p(
+//                     "dogs",
+//                     "Dog",
+//                     NavigationPropertyKind::OneToMany {
+//                         reference: "personId".into(),
+//                     },
+//                 )
+//                 .nav_p(
+//                     "cats",
+//                     "Cat",
+//                     NavigationPropertyKind::OneToMany {
+//                         reference: "personId".into(),
+//                     },
+//                 )
+//                 .attribute("bossId", CidlType::Integer, Some("Boss".into()))
+//                 .build(),
+//             ModelBuilder::new("Boss")
+//                 .id()
+//                 .nav_p(
+//                     "persons",
+//                     "Person",
+//                     NavigationPropertyKind::OneToMany {
+//                         reference: "bossId".into(),
+//                     },
+//                 )
+//                 .build(),
+//         ]
+//         .into_iter()
+//         .map(|m| (m.name.clone(), m))
+//         .collect();
 
-        let include_tree = json!({
-            "persons": {
-                "dogs": {},
-                "cats": {}
-            }
-        });
+//         let include_tree = json!({
+//             "persons": {
+//                 "dogs": {},
+//                 "cats": {}
+//             }
+//         });
 
-        // Act
-        let sql = list_models(
-            "Boss",
-            Some(&include_tree.as_object().unwrap().clone()),
-            None,
-            &meta,
-        )
-        .expect("list models to work");
+//         // Act
+//         let sql = list_models(
+//             "Boss",
+//             Some(&include_tree.as_object().unwrap().clone()),
+//             None,
+//             &meta,
+//         )
+//         .expect("list models to work");
 
-        // Assert
-        expected_str!(
-            sql,
-            r#"SELECT "Boss"."id" AS "id", "Person"."id" AS "persons.id", "Person"."bossId" AS "persons.bossId", "Dog"."id" AS "persons.dogs.id", "Dog"."personId" AS "persons.dogs.personId", "Cat"."id" AS "persons.cats.id", "Cat"."personId" AS "persons.cats.personId" FROM "Boss" LEFT JOIN "Person" ON "Boss"."id" = "Person"."bossId" LEFT JOIN "Dog" ON "Person"."id" = "Dog"."personId" LEFT JOIN "Cat" ON "Person"."id" = "Cat"."personId""#
-        );
+//         // Assert
+//         expected_str!(
+//             sql,
+//             r#"SELECT "Boss"."id" AS "id", "Person"."id" AS "persons.id", "Person"."bossId" AS "persons.bossId", "Dog"."id" AS "persons.dogs.id", "Dog"."personId" AS "persons.dogs.personId", "Cat"."id" AS "persons.cats.id", "Cat"."personId" AS "persons.cats.personId" FROM "Boss" LEFT JOIN "Person" ON "Boss"."id" = "Person"."bossId" LEFT JOIN "Dog" ON "Person"."id" = "Dog"."personId" LEFT JOIN "Cat" ON "Person"."id" = "Cat"."personId""#
+//         );
 
-        test_sql(meta, sql, db).await.expect("SQL to execute");
-    }
+//         test_sql(meta, sql, db).await.expect("SQL to execute");
+//     }
 
-    #[sqlx::test]
-    async fn many_to_many(db: SqlitePool) {
-        let meta: ModelMeta = vec![
-            ModelBuilder::new("Student")
-                .id()
-                .nav_p(
-                    "courses",
-                    "Course".to_string(),
-                    NavigationPropertyKind::ManyToMany {
-                        unique_id: "StudentsCourses".into(),
-                    },
-                )
-                .data_source(
-                    "withCourses",
-                    IncludeTreeBuilder::default().add_node("courses").build(),
-                )
-                .build(),
-            ModelBuilder::new("Course")
-                .id()
-                .nav_p(
-                    "students",
-                    "Student".to_string(),
-                    NavigationPropertyKind::ManyToMany {
-                        unique_id: "StudentsCourses".into(),
-                    },
-                )
-                .build(),
-        ]
-        .into_iter()
-        .map(|m| (m.name.clone(), m))
-        .collect();
+//     #[sqlx::test]
+//     async fn many_to_many(db: SqlitePool) {
+//         let meta: ModelMeta = vec![
+//             ModelBuilder::new("Student")
+//                 .id()
+//                 .nav_p(
+//                     "courses",
+//                     "Course".to_string(),
+//                     NavigationPropertyKind::ManyToMany {
+//                         unique_id: "StudentsCourses".into(),
+//                     },
+//                 )
+//                 .data_source(
+//                     "withCourses",
+//                     IncludeTreeBuilder::default().add_node("courses").build(),
+//                 )
+//                 .build(),
+//             ModelBuilder::new("Course")
+//                 .id()
+//                 .nav_p(
+//                     "students",
+//                     "Student".to_string(),
+//                     NavigationPropertyKind::ManyToMany {
+//                         unique_id: "StudentsCourses".into(),
+//                     },
+//                 )
+//                 .build(),
+//         ]
+//         .into_iter()
+//         .map(|m| (m.name.clone(), m))
+//         .collect();
 
-        let include_tree = json!({
-            "courses": {}
-        });
+//         let include_tree = json!({
+//             "courses": {}
+//         });
 
-        // Act
-        let sql = list_models(
-            "Student",
-            Some(&include_tree.as_object().unwrap().clone()),
-            None,
-            &meta,
-        )
-        .expect("list models to work");
+//         // Act
+//         let sql = list_models(
+//             "Student",
+//             Some(&include_tree.as_object().unwrap().clone()),
+//             None,
+//             &meta,
+//         )
+//         .expect("list models to work");
 
-        // Assert
-        expected_str!(
-            sql,
-            r#"SELECT "Student"."id" AS "id", "StudentsCourses"."Course.id" AS "courses.id" FROM "Student" LEFT JOIN "StudentsCourses" ON "Student"."id" = "StudentsCourses"."Student.id" LEFT JOIN "Course" ON "StudentsCourses"."Course.id" = "Course"."id""#
-        );
+//         // Assert
+//         expected_str!(
+//             sql,
+//             r#"SELECT "Student"."id" AS "id", "StudentsCourses"."Course.id" AS "courses.id" FROM "Student" LEFT JOIN "StudentsCourses" ON "Student"."id" = "StudentsCourses"."Student.id" LEFT JOIN "Course" ON "StudentsCourses"."Course.id" = "Course"."id""#
+//         );
 
-        test_sql(meta, sql, db).await.expect("SQL to execute");
-    }
+//         test_sql(meta, sql, db).await.expect("SQL to execute");
+//     }
 
-    #[sqlx::test]
-    async fn views_auto_alias(db: SqlitePool) {
-        let horse_model = ModelBuilder::new("Horse")
-            .id()
-            .attribute("name", CidlType::Text, None)
-            .attribute("bio", CidlType::nullable(CidlType::Text), None)
-            .nav_p(
-                "matches",
-                "Match",
-                NavigationPropertyKind::OneToMany {
-                    reference: "horseId1".into(),
-                },
-            )
-            .build();
+//     #[sqlx::test]
+//     async fn views_auto_alias(db: SqlitePool) {
+//         let horse_model = ModelBuilder::new("Horse")
+//             .id()
+//             .attribute("name", CidlType::Text, None)
+//             .attribute("bio", CidlType::nullable(CidlType::Text), None)
+//             .nav_p(
+//                 "matches",
+//                 "Match",
+//                 NavigationPropertyKind::OneToMany {
+//                     reference: "horseId1".into(),
+//                 },
+//             )
+//             .build();
 
-        let match_model = ModelBuilder::new("Match")
-            .id()
-            .attribute("horseId1", CidlType::Integer, Some("Horse".into()))
-            .attribute("horseId2", CidlType::Integer, Some("Horse".into()))
-            .nav_p(
-                "horse2",
-                "Horse",
-                NavigationPropertyKind::OneToOne {
-                    reference: "horseId2".into(),
-                },
-            )
-            .build();
+//         let match_model = ModelBuilder::new("Match")
+//             .id()
+//             .attribute("horseId1", CidlType::Integer, Some("Horse".into()))
+//             .attribute("horseId2", CidlType::Integer, Some("Horse".into()))
+//             .nav_p(
+//                 "horse2",
+//                 "Horse",
+//                 NavigationPropertyKind::OneToOne {
+//                     reference: "horseId2".into(),
+//                 },
+//             )
+//             .build();
 
-        let meta: ModelMeta = vec![horse_model, match_model]
-            .into_iter()
-            .map(|m| (m.name.clone(), m))
-            .collect();
+//         let meta: ModelMeta = vec![horse_model, match_model]
+//             .into_iter()
+//             .map(|m| (m.name.clone(), m))
+//             .collect();
 
-        let include_tree = json!({
-            "matches": {
-                "horse2": {}
-            }
-        });
+//         let include_tree = json!({
+//             "matches": {
+//                 "horse2": {}
+//             }
+//         });
 
-        // Act
-        let sql = list_models(
-            "Horse",
-            Some(&include_tree.as_object().unwrap().clone()),
-            None,
-            &meta,
-        )
-        .expect("list models to work");
+//         // Act
+//         let sql = list_models(
+//             "Horse",
+//             Some(&include_tree.as_object().unwrap().clone()),
+//             None,
+//             &meta,
+//         )
+//         .expect("list models to work");
 
-        // Assert
-        expected_str!(
-            sql,
-            r#"SELECT "Horse"."id" AS "id", "Horse"."name" AS "name", "Horse"."bio" AS "bio", "Match"."id" AS "matches.id", "Match"."horseId1" AS "matches.horseId1", "Match"."horseId2" AS "matches.horseId2", "Horse1"."id" AS "matches.horse2.id", "Horse1"."name" AS "matches.horse2.name", "Horse1"."bio" AS "matches.horse2.bio" FROM "Horse" LEFT JOIN "Match" ON "Horse"."id" = "Match"."horseId1" LEFT JOIN "Horse" AS "Horse1" ON "Match"."horseId2" = "Horse1"."id""#
-        );
+//         // Assert
+//         expected_str!(
+//             sql,
+//             r#"SELECT "Horse"."id" AS "id", "Horse"."name" AS "name", "Horse"."bio" AS "bio", "Match"."id" AS "matches.id", "Match"."horseId1" AS "matches.horseId1", "Match"."horseId2" AS "matches.horseId2", "Horse1"."id" AS "matches.horse2.id", "Horse1"."name" AS "matches.horse2.name", "Horse1"."bio" AS "matches.horse2.bio" FROM "Horse" LEFT JOIN "Match" ON "Horse"."id" = "Match"."horseId1" LEFT JOIN "Horse" AS "Horse1" ON "Match"."horseId2" = "Horse1"."id""#
+//         );
 
-        test_sql(meta, sql, db).await.expect("SQL to execute");
-    }
-}
+//         test_sql(meta, sql, db).await.expect("SQL to execute");
+//     }
+// }

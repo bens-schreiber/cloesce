@@ -94,11 +94,17 @@ export async function loadOrmWasm(
   return wasmInstance.exports;
 }
 
-export function invokeOrmWasm<T>(
+/**
+ * Invokes a WASM ORM function with the provided arguments, handling memory
+ * allocation and deallocation.
+ *
+ * Returns an Either where Left is an error message and Right the raw string result.
+ */
+export function invokeOrmWasm(
   fn: (...args: number[]) => boolean,
   args: WasmResource[],
   wasm: OrmWasmExports,
-): Either<string, T> {
+): Either<string, string> {
   let resPtr: number | undefined;
   let resLen: number | undefined;
 
@@ -111,7 +117,7 @@ export function invokeOrmWasm<T>(
       new Uint8Array(wasm.memory.buffer, resPtr, resLen),
     );
 
-    return failed ? Either.left(result) : Either.right(result as T);
+    return failed ? Either.left(result) : Either.right(result);
   } finally {
     args.forEach((a) => a.free());
     if (resPtr && resLen) wasm.dealloc(resPtr, resLen);
@@ -134,7 +140,7 @@ export function mapSql<T extends object>(
     WasmResource.fromString(JSON.stringify(includeTree), wasm),
   ];
 
-  const jsonResults = invokeOrmWasm<string>(wasm.map_sql, args, wasm);
+  const jsonResults = invokeOrmWasm(wasm.map_sql, args, wasm);
   if (jsonResults.isLeft()) return jsonResults;
 
   const parsed: any[] = JSON.parse(jsonResults.value);

@@ -474,21 +474,20 @@ export class Orm {
       WasmResource.fromString(JSON.stringify(includeTree), wasm),
     ];
 
-    const upsertQueryRes = invokeOrmWasm<string>(wasm.upsert_model, args, wasm);
+    const upsertQueryRes = invokeOrmWasm(wasm.upsert_model, args, wasm);
     if (upsertQueryRes.isLeft()) {
       return upsertQueryRes;
     }
 
-    // Split the query into individual statements.
-    const statements = upsertQueryRes.value
-      .split(";")
-      .map((s) => s.trim())
-      .filter((s) => s.length > 0);
+    const statements = JSON.parse(upsertQueryRes.unwrap()) as {
+      query: string;
+      values: any[];
+    }[];
 
     // One of these statements is a "SELECT", which is the root model id stmt.
     let selectIndex: number;
     for (let i = statements.length - 1; i >= 0; i--) {
-      if (/^SELECT/i.test(statements[i])) {
+      if (/^SELECT/i.test(statements[i].query)) {
         selectIndex = i;
         break;
       }
@@ -496,7 +495,7 @@ export class Orm {
 
     // Execute all statements in a batch.
     const batchRes = await this.db.batch(
-      statements.map((s) => this.db.prepare(s)),
+      statements.map((s) => this.db.prepare(s.query).bind(...s.values)),
     );
 
     if (!batchRes.every((r) => r.success)) {
@@ -543,7 +542,7 @@ export class Orm {
       WasmResource.fromString(JSON.stringify(includeTree), wasm),
       WasmResource.fromString(JSON.stringify(from), wasm),
     ];
-    return invokeOrmWasm<string>(wasm.list_models, args, wasm);
+    return invokeOrmWasm(wasm.list_models, args, wasm);
   }
 
   /**

@@ -176,7 +176,8 @@ pub unsafe extern "C" fn upsert_model(
     });
     match res {
         Ok(res) => {
-            yield_result(res.into_bytes());
+            let bytes = serde_json::to_string(&res).unwrap().into_bytes();
+            yield_result(bytes);
             0
         }
         Err(e) => {
