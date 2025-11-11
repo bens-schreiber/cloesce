@@ -222,6 +222,8 @@ async function extract(args: {
   const project = new Project({
     compilerOptions: {
       strictNullChecks: true,
+      experimentalDecorators: true,
+      emitDecoratorMetadata: true,
     },
   });
 

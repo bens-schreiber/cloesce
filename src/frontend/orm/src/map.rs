@@ -1,7 +1,6 @@
-use std::collections::HashMap;
-
 use ast::Model;
 use ast::NavigationPropertyKind;
+use indexmap::IndexMap;
 use serde_json::Map;
 use serde_json::Value;
 
@@ -21,7 +20,7 @@ pub fn map_sql(
     };
 
     let pk_name = &model.primary_key.name;
-    let mut result_map: HashMap<Value, Value> = HashMap::new();
+    let mut result_map = IndexMap::new();
 
     // Scan each row for the root model (`model_name`)'s primary key
     for row in rows.iter() {
