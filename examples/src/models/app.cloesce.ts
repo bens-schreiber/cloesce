@@ -9,7 +9,7 @@ export class Env {
 
 const app = new CloesceApp();
 
-// basic CORS, allow all origins
+// basic CORS
 app.onResponse(async (request, env: Env, di, response: Response) => {
   console.log(env.allowedOrigin);
   response.headers.set("Access-Control-Allow-Origin", env.allowedOrigin);
