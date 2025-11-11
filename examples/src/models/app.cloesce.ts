@@ -12,7 +12,7 @@ const app = new CloesceApp();
 // Preflight
 app.onRequest(async (request: Request, env, di) => {
   if (request.method === "OPTIONS") {
-    return HttpResult.ok(204, undefined, {
+    return HttpResult.ok(200, undefined, {
       "Access-Control-Allow-Origin": "*",
       "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
       "Access-Control-Allow-Headers": "Content-Type, Authorization",
