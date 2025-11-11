@@ -6,23 +6,23 @@ Cloesce is working towards a stable alpha MVP (v0.1.0), with the general milesto
 
 Internal documentation going over design decisions and general thoughts for each milestone can be found [here](https://cloesce.pages.dev/).
 
-# Documentation `v0.0.4`
+# Documentation
 
 ## Getting Started
 
 `v0.0.4` supports only Typescript-to-Typescript projects. An example project is shown [here](https://github.com/bens-schreiber/cloesce/tree/main/examples).
 
-1. NPM
+### 1) NPM
 
-- Create an NPM project and install cloesce
+Create an NPM project and install cloesce
 
 ```sh
 npm i cloesce@0.0.4-unstable.5
 ```
 
-2. TypeScript
+### 2) TypeScript
 
-- Create a `tsconfig.json` with the following values:
+Create a `tsconfig.json` with the following values:
 
 ```json
 {
@@ -38,9 +38,9 @@ npm i cloesce@0.0.4-unstable.5
 }
 ```
 
-3. Cloesce Config
+### 3) Cloesce Config
 
-- Create a `cloesce.config.json` with the following keys:
+Create a `cloesce.config.json` with your desired configuration:
 
 ```json
 {
@@ -50,7 +50,7 @@ npm i cloesce@0.0.4-unstable.5
 }
 ```
 
-4. Vite
+### 4) Vite
 
 To prevent CORS issues, a Vite proxy can be used for the frontend:
 
@@ -70,9 +70,9 @@ export default defineConfig({
 });
 ```
 
-5. Wrangler Config
+### 5) Wrangler Config
 
-- `v0.0.4` will generate the required areas of your wrangler config. A full config looks like this:
+Cloesce will generate any missing `wrangler.toml` values (or the file if missing). A minimal `wrangler.toml` looks like this:
 
 ```toml
 compatibility_date = "2025-10-02"
@@ -85,7 +85,7 @@ database_id = "..."
 database_name = "example"
 ```
 
-## A Simple Model
+## Cloesce Models
 
 A model is a type which represents:
 
@@ -119,13 +119,18 @@ export class Horse {
 - `@POST` reveals the method as an API endpoint with the `POST` HTTP Verb.
 - All Cloesce models need to be under a `.cloesce.ts` file.
 
-To compile this model into a working full stack application, Cloesce must undergo both **compilation** and **migrations**. Compilation is the process of extracting the metadata language that powers Cloesce, ensuring it is a valid program, and then producing code to orchestrate the program across different domains (database, backend, frontend, cloud). Migrations utilize the history of validated metadata to create SQL code, translating the evolution of your models.
+To compile this model into a working full stack application, Cloesce must undergo both **compilation** and **migrations**.
 
-To compile, run `npx cloesce compile`.
+Compilation is the process of extracting the metadata language that powers Cloesce, ensuring it is a valid program, and then producing code to orchestrate the program across different domains (database, backend, frontend, cloud).
 
-To create a migration, run `npx cloesce migrate <name>`.
+Migrations utilize the history of validated metadata to create SQL code, translating the evolution of your models.
 
-After running the above commands, you will have a full project capable of being ran with:
+### Compiling
+
+- `npx cloesce compile`
+- `npx cloesce migrate <name>`.
+
+After running the above commands, you will have a full project capable of being ran with Wrangler:
 
 ```sh
 # Apply the generated migrations
@@ -135,13 +140,19 @@ npx wrangler d1 migrations apply <db-name>
 npx wrangler dev
 ```
 
-Note the output in the `.generated/` dir. These values should not be committed to git, as they depend on the file system of the machine running it.
+### Compiled Artifacts
+
+#### `.generated/`
+
+These values should not be committed to git, as they depend on the file system of the machine running it.
 
 - `client.ts` is an importable API with all of your backend types and endpoints
 - `workers.ts` is the workers entrypoint.
 - `cidl.json` is the working metadata for the project
 
-Note the output in `migrations`, ex after running `npx cloesce migrate Initial`
+#### `migrations`
+
+After running `npx cloesce migrate <name>`, a new migration will be created in the `migrations/` folder. For example, after creating a migration called `Initial`, you will see:
 
 - `<date>_Initial.json` contains all model information necessary from SQL
 - `<date>_Initial.sql` contains the acual SQL migrations. In this early version of Cloesce, it's important to check migrations every time.
@@ -169,7 +180,7 @@ In order to interact with your database, you will need to define a WranglerEnv
 import { WranglerEnv } from "cloesce/backend";
 
 @WranglerEnv
-export class Env {
+export class MyEnv {
   db: D1Database; // only one DB is supported for now-- make sure it matches the name in `wrangler.toml`
 
   // you can also define values in the toml under [[vars]]
@@ -177,7 +188,7 @@ export class Env {
 }
 ```
 
-The wrangler environment is dependency injected into your method calls:
+Your WranglerEnv can then be injected into any model method using the `@Inject` decorator:
 
 ```ts
 @D1
@@ -186,7 +197,7 @@ export class Horse {
   id: number;
 
   @POST
-  async neigh(@Inject env: WranglerEnv): Promise<string> {
+  async neigh(@Inject env: MyEnv): Promise<string> {
     await env.db.prepare(...);
 
     return `i am ${this.name}, this is my horse noise`;
@@ -194,10 +205,9 @@ export class Horse {
 }
 ```
 
-### Foreign Keys, One to One, Data Sources
+### Foreign Key Column
 
-Complex model relationships are permitted via the `@ForeignKey`, `@OneToOne / @OneToMany @ManyToMany` and `@DataSource` decorators.
-Foreign keys are scalar attributes which must reference some other model's primary key:
+Reference another model via a foreign key using the `@ForeignKey` decorator:
 
 ```ts
 @D1
@@ -216,7 +226,9 @@ export class Person {
 }
 ```
 
-This representation is true to the underlying SQL table: `Person` has a column `dogId` which is a foreign key to `Dog`. Cloesce allows you to actually join these tables together in your model representation:
+### One to One
+
+Cloesce allows you to relate models via `1:1` relationships using the `@OneToOne` decorator. It requires that a foreign key already exists on the model.
 
 ```ts
 @D1
@@ -238,7 +250,7 @@ export class Person {
 }
 ```
 
-In `v0.0.4`, there are no defaults, only very explicit decisons. Because of that, navigation properties won't exist at runtime unless you tell them to. Cloesce does this via a `DataSource`, which describes the foreign key dependencies you wish to include. All scalar properties are included by default and cannot be excluded.
+In `v0.0.4`, there are no defaults, only very explicit decisons. Because of that, navigation properties won't exist at runtime unless you tell them to. Cloesce does this via a `Data Source`, which describes the foreign key dependencies you wish to include. All scalar properties are included by default and cannot be excluded.
 
 ```ts
 @D1
@@ -266,22 +278,6 @@ export class Person {
 ```
 
 Data sources describe how foreign keys should be joined on model hydration (i.e. when invoking any instantiated method). They are composed of an `IncludeTree<T>`, a recursive type composed of the relationships you wish to include. All scalar properties are always included.
-
-#### DataSourceOf<T>
-
-If it is important to determine what data source the frontend called the instantiated method with, the type `DataSourceOf<T>` allows explicit data source parameters:
-
-```ts
-@D1
-class Foo {
-  ...
-
-  @POST
-  bar(ds: DataSourceOf<Foo>) {
-    // ds = "DataSource1" | "DataSource2" | ... | "none"
-  }
-}
-```
 
 Note that `DataSourceOf` is added implicitly to all instantiated methods if no data source parameter is defined.
 
@@ -346,6 +342,24 @@ export class Course {
   students: Student[];
 }
 ```
+
+### DataSourceOf<T>
+
+If it is important to determine what data source the frontend called the instantiated method with, the type `DataSourceOf<T>` allows explicit data source parameters:
+
+```ts
+@D1
+class Foo {
+  ...
+
+  @POST
+  bar(ds: DataSourceOf<Foo>) {
+    // ds = "DataSource1" | "DataSource2" | ... | "none"
+  }
+}
+```
+
+Data sources are implicitly added to all instantiated methods if no data source parameter is defined.
 
 ### ORM Methods
 

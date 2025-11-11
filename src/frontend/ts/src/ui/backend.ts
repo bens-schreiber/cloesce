@@ -46,8 +46,6 @@ export const D1: ClassDecorator = () => {};
  * returned from a model method or API endpoint without being
  * treated as a database model.
  *
- * These are often used for DTOs or view models.
- *
  * Example:
  * ```ts
  * ＠PlainOldObject
@@ -55,6 +53,16 @@ export const D1: ClassDecorator = () => {};
  *   catFacts: string[];
  *   catNames: string[];
  * }
+ *
+ * // in a method...
+ * foo(): CatStuff {
+ *   return {
+ *    catFacts: ["cats sleep 16 hours a day"],
+ *   catNames: ["Whiskers", "Fluffy"]
+ *  };
+ *
+ * // which generates an API like:
+ * async function foo(): Promise<HttpResult<CatStuff>> { ... }
  * ```
  */
 export const PlainOldObject: ClassDecorator = () => {};
@@ -129,14 +137,12 @@ export const PATCH: MethodDecorator = () => {};
  * The method will appear in both backend and generated client APIs.
  */
 export const DELETE: MethodDecorator = () => {};
+
 /**
  * Declares a static property as a data source.
  *
- * Data sources describe SQL CTE definitions (joins) for
- * model relationships. They define which related models
- * are automatically included when querying. Data sources
- * can only reference navigation properties, not scalar
- * attributes.
+ * Data sources describe SQL left joins related to each
+ * models navigation properties.
  *
  * Example:
  * ```ts
@@ -159,17 +165,17 @@ export const DELETE: MethodDecorator = () => {};
  *   @OneToOne("dogId")
  *   dog: Dog | undefined;
  *
- *   // Defines a data source that joins the related Dog record
  *   ＠DataSource
  *   static readonly default: IncludeTree<Person> = {
- *     dog: {},
+ *     dog: {}, // join Dog table when querying Person with `default` data source
  *   };
  * }
  *
  * // When queried via the ORM or client API:
  * const orm = Orm.fromD1(env.db);
- * const people = (await orm.list(Person, Person.default)).value;
- * // Each Person instance will now include a populated .dog property.
+ * const people = await orm.list(Person, Person.default);
+ *
+ * // => Person { id: 1, dogId: 2, dog: { id: 2, name: "Fido" } }[]
  * ```
  */
 
@@ -188,7 +194,7 @@ export const DataSource: PropertyDecorator = () => {};
  * ```
  */
 export const OneToMany =
-  (_: string): PropertyDecorator =>
+  (_foreignKeyColumn: string): PropertyDecorator =>
   () => {};
 
 /**
@@ -204,7 +210,7 @@ export const OneToMany =
  * ```
  */
 export const OneToOne =
-  (_: string): PropertyDecorator =>
+  (_foreignKeyColumn: string): PropertyDecorator =>
   () => {};
 
 /**
@@ -220,7 +226,7 @@ export const OneToOne =
  * ```
  */
 export const ManyToMany =
-  (_: string): PropertyDecorator =>
+  (_uniqueId: string): PropertyDecorator =>
   () => {};
 
 /**
@@ -238,7 +244,7 @@ export const ManyToMany =
  * ```
  */
 export const ForeignKey =
-  <T>(_: T | string): PropertyDecorator =>
+  <T>(_Model: T | string): PropertyDecorator =>
   () => {};
 
 /**
@@ -246,6 +252,9 @@ export const ForeignKey =
  *
  * Injected parameters can receive environment bindings,
  * middleware-provided objects, or other registered values.
+ *
+ * Note that injected parameters will not appear in the client
+ * API.
  *
  * Example:
  * ```ts
@@ -267,14 +276,13 @@ export const Inject: ParameterDecorator = () => {};
  * client bindings automatically, removing the need to manually
  * define common API operations.
  *
- * Supported kinds:
- * - **"SAVE"** — Performs an *upsert* (insert or update) for a model instance.
+ * CRUD Operations:
+ * - **"SAVE"** — Performs an *upsert* (insert, update, or both) for a model instance.
  * - **"GET"** — Retrieves a single record by its primary key, optionally using a `DataSource`.
  * - **"LIST"** — Retrieves all records for the model, using the specified `DataSource`.
- * - **(future)** `"DELETE"` — Will remove a record by primary key once implemented.
  *
  * The generated methods are static, exposed through both the backend
- * (Worker endpoints) and the frontend client API.
+ * and the frontend client API.
  *
  * Example:
  * ```ts
@@ -284,11 +292,6 @@ export const Inject: ParameterDecorator = () => {};
  *   ＠PrimaryKey id: number;
  *   name: string;
  * }
- *
- * // Generated methods (conceptually):
- * // static async save(item: CrudHaver): Promise<HttpResult<CrudHaver>>
- * // static async get(id: number, dataSource?: string): Promise<HttpResult<CrudHaver>>
- * // static async list(dataSource?: string): Promise<HttpResult<CrudHaver[]>>
  * ```
  */
 export const CRUD =
@@ -335,8 +338,7 @@ export type IncludeTree<T> = (T extends Primitive
  * Represents the name of a `＠DataSource` available on a model type `T`,
  * or `"none"` when no data source (no joins) should be applied.
  *
- * This type is used by ORM and CRUD methods to restrict valid
- * data source names to the actual static properties declared on the model.
+ * All instantiated model methods implicitly have a Data Source param `__dataSource`.
  *
  * Example:
  * ```ts
@@ -346,10 +348,15 @@ export type IncludeTree<T> = (T extends Primitive
  *
  *   ＠DataSource
  *   static readonly default: IncludeTree<Person> = { dogs: {} };
+ *
+ *   ＠POST
+ *   foo(ds: DataSourceOf<Person>) {
+ *    // Cloesce won't append an implicit data source param here since it's explicit
+ *   }
  * }
  *
- * type DS = DataSourceOf<Person>;
- * // => "default" | "none"
+ * // on the API client:
+ * async foo(ds: "default" | "none"): Promise<void> {...}
  * ```
  */
 export type DataSourceOf<T extends object> = (
@@ -377,22 +384,7 @@ export type DataSourceOf<T extends object> = (
 export type Integer = number & { __brand?: "Integer" };
 
 /**
- * Provides helper methods for performing ORM operations against a D1 database.
- *
- * The `Orm` class uses the Cloesce metadata system to generate, execute,
- * and map SQL queries for model classes decorated with `＠D1`.
- *
- * Typical operations include:
- * - `fromD1(db)` — create an ORM instance bound to a `D1Database`
- * - `upsert()` — insert or update a model
- * - `list()` — fetch all instances of a model
- * - `get()` — fetch one instance by primary key
- *
- * Example:
- * ```ts
- * const orm = Orm.fromD1(env.db);
- * const horses = (await orm.list(Horse, "default")).value;
- * ```
+ * Exposes the ORM primitives Cloesce uses to interact with D1 databases.
  */
 export class Orm {
   private constructor(private db: D1Database) {}
@@ -423,12 +415,14 @@ export class Orm {
 
   /**
    * Executes an "upsert" query, adding or augmenting a model in the database.
+   *
    * If a model's primary key is not defined in `newModel`, the query is assumed to be an insert.
+   *
    * If a model's primary key _is_ defined, but some attributes are missing, the query is assumed to be an update.
+   *
    * Finally, if the primary key is defined, but all attributes are included, a SQLite upsert will be performed.
    *
-   * Capable of inferring foreign keys from the surrounding context of the model. A missing primary key is allowed
-   * only if the primary key is an integer, in which case it will be auto incremented and assigned.
+   * In any other case, an error string will be returned.
    *
    * ### Inserting a new Model
    * ```ts
@@ -512,15 +506,14 @@ export class Orm {
   }
 
   /**
-   * Returns a query using the provided include tree, aliasing columns to match the
-   * object structure. Wraps the query in a CTE.
+   * Returns a select query, creating a CTE view for the model using the provided include tree.
    *
    * @param ctor The model constructor.
    * @param includeTree An include tree describing which related models to join.
    * @param from An optional custom `FROM` clause to use instead of the base table.
    * @param tagCte An optional CTE name to tag the query with. Defaults to "Model.view".
    *
-   * Example:
+   * ### Example:
    * ```ts
    * // Using a data source
    * const query = Orm.listQuery(Person, "default");
@@ -528,7 +521,8 @@ export class Orm {
    * // Using a custom from statement
    * const query = Orm.listQuery(Person, null, "SELECT * FROM Person WHERE age > 18");
    * ```
-   * Example SQL output:
+   *
+   * ### Example SQL output:
    * ```sql
    * WITH Person_view AS (
    * SELECT
@@ -559,14 +553,28 @@ export class Orm {
   }
 
   /**
-   * Returns a query to get a single model by primary key, using the provided include tree.
-   * Optionally, a `from` string can be provided to customize the source of the query.
-   * The `from` string should be a valid `SELECT` statement returning all columns from the
-   * desired source.
+   * Returns a select query for a single model by primary key, creating a CTE view using the provided include tree.
    *
-   * Example:
+   * @param ctor The model constructor.
+   * @param includeTree An include tree describing which related models to join.
+   *
+   * ### Example:
    * ```ts
-   * const query = Orm.getQuery(Person, Person.default);
+   * // Using a data source
+   * const query = Orm.getQuery(Person, "default");
+   * ```
+   *
+   * ### Example SQL output:
+   *
+   * ```sql
+   * WITH Person_view AS (
+   * SELECT
+   * "Person"."id" AS "id",
+   * ...
+   * FROM "Person"
+   * LEFT JOIN ...
+   * )
+   * SELECT * FROM Person_view WHERE [Person].[id] = ?
    * ```
    */
   static getQuery<T extends object>(
@@ -589,35 +597,27 @@ export class Orm {
    * @param from An optional custom `FROM` clause to use instead of the base table.
    * @returns Either an error string, or an array of model instances.
    *
-   * Example:
+   * ### Example:
    * ```ts
    * const orm = Orm.fromD1(env.db);
    * const horses = await orm.list(Horse, Horse.default);
    * ```
    *
-   * will translate to the SQL query:
-   * ```sql
-   * SELECT
-   *  "Horse"."id" AS "id",
-   *  ...
-   * FROM "Horse"
-   * LEFT JOIN ...
-   * ```
-   *
-   *
-   * Example with custom from:
+   * ### Example with custom from:
    * ```ts
    * const orm = Orm.fromD1(env.db);
    * const adultHorses = await orm.list(Horse, Horse.default, "SELECT * FROM Horse ORDER BY age DESC LIMIT 10");
    * ```
    *
-   * will translate to the SQL query:
+   * =>
+   *
    * ```sql
    * SELECT
    *  "Horse"."id" AS "id",
    * ...
    * FROM (SELECT * FROM Horse ORDER BY age DESC LIMIT 10)
    * LEFT JOIN ...
+   * ```
    *
    */
   async list<T extends object>(
@@ -655,7 +655,7 @@ export class Orm {
    * @param includeTree An include tree describing which related models to join.
    * @returns Either an error string, or the model instance (null if not found).
    *
-   * Example:
+   * ### Example:
    * ```ts
    * const orm = Orm.fromD1(env.db);
    * const horse = await orm.get(Horse, 1, Horse.default);
