@@ -519,6 +519,8 @@ function validateCidlType(
     ) {
       return false;
     }
+
+    return true;
   }
 
   if ("Array" in cidlType) {
