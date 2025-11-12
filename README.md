@@ -441,7 +441,7 @@ class Horse {
 }
 ```
 
-`list` takes an optional `from` parameter to modify the source of the list query. This is useful in filtering / limiting results.
+`list` takes an optional `from` parameter to modify the source of the list query. This is useful in filtering / limiting results before joining.
 
 ```ts
 await orm.list(
@@ -526,7 +526,15 @@ const app: CloesceApp = new CloesceApp();
 
 app.onRequest((request: Request, env, ir) => {
   if (request.method === "POST") {
-    return { ok: false, status: 401, message: "POST methods aren't allowed." };
+    return HttpResult.fail(401, "POST methods aren't allowed.");
+  }
+
+  if (request.method === "OPTIONS") {
+    return HttpResult.ok(204, undefined, {
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type, Authorization",
+    });
   }
 });
 
@@ -537,17 +545,17 @@ app.onModel(Model, (request, env, ir) => {
 });
 
 app.onMethod(Model, "blockedMethod", (request, env, ir) => {
-  return { ok: false, status: 401, message: "Blocked method" };
+  return HttpResult.fail(401, "Forbidden");
 });
 
-app.onResponse(async (request, env, di, response: Response) => {
+app.onResponse(async (request, env, di, result: HttpResult) => {
   // basic CORS, allow all origins
-  response.headers.set("Access-Control-Allow-Origin", "*");
-  response.headers.set(
+  result.headers.set("Access-Control-Allow-Origin", "*");
+  result.headers.set(
     "Access-Control-Allow-Methods",
     "GET, POST, PUT, DELETE, OPTIONS"
   );
-  response.headers.set(
+  result.headers.set(
     "Access-Control-Allow-Headers",
     "Content-Type, Authorization"
   );
@@ -595,7 +603,7 @@ class Foo {
 
     @GET
     async foo(): Promise<HttpResult<number>> {
-        return { ok: false, status: 500, message: "divided by 0"};
+        return HttpResult.fail(400, "divided by 0");
     }
 }
 ```
