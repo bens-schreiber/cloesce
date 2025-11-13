@@ -22,7 +22,7 @@ export class PooB {
 @PlainOldObject
 export class PooC {
   a: PooA;
-  b: PooB;
+  b: PooB[];
 }
 
 @WranglerEnv
@@ -45,9 +45,11 @@ export class PooAcceptYield {
         name: "name",
         major: "major",
       },
-      b: {
-        color: "color",
-      },
+      b: [
+        {
+          color: "color",
+        },
+      ],
     };
   }
 }

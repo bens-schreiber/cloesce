@@ -3,6 +3,11 @@
 import { HttpResult, DeepPartial } from "cloesce/client";
 export class Poo {
   ds: "baz" |"none" = "none";
+
+  static fromJson(data: any): Poo {
+    const res = Object.assign(new Poo(), data);
+    return res;
+  }
 }
 
 export class Foo {
@@ -26,12 +31,27 @@ export class Foo {
     });
     return await HttpResult.fromResponse(res);
   }
+
+  static fromJson(data: any): Foo {
+    const res = Object.assign(new Foo(), data);
+    return res;
+  }
 }
 export class NoDs {
   id: number;
 
+
+  static fromJson(data: any): NoDs {
+    const res = Object.assign(new NoDs(), data);
+    return res;
+  }
 }
 export class OneDs {
   id: number;
 
+
+  static fromJson(data: any): OneDs {
+    const res = Object.assign(new OneDs(), data);
+    return res;
+  }
 }

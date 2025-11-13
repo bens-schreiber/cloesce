@@ -274,17 +274,22 @@ export class HttpResult<T = unknown> {
 
   static async fromResponse(
     response: Response,
-    ctor?: new () => any,
+    ctor?: any,
     array: boolean = false,
   ): Promise<HttpResult<any>> {
     if (response.status < 400) {
       const json = await response.json();
 
+      // The `fromJson` method is generated on every single model.
       let data = json.data;
       if (ctor) {
-        data = array
-          ? instantiateObjectArray(data, ctor)
-          : Object.assign(new ctor(), data);
+        if (array) {
+          for (let i = 0; i < data.length; i++) {
+            data[i] = ctor.fromJson(data[i]);
+          }
+        } else {
+          data = ctor.fromJson(data);
+        }
       }
 
       return new HttpResult(true, response.status, response.headers, data);
@@ -297,13 +302,6 @@ export class HttpResult<T = unknown> {
       undefined,
       await response.text(),
     );
-
-    function instantiateObjectArray(data: any, ctor: new () => any): any[] {
-      if (Array.isArray(data)) {
-        return data.map((x) => instantiateObjectArray(x, ctor)).flat();
-      }
-      return [Object.assign(new ctor(), data)];
-    }
   }
 }
 

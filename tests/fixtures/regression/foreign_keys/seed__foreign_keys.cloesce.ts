@@ -26,6 +26,9 @@ export class Env {
 export class B {
   @PrimaryKey
   id: Integer;
+
+  @POST
+  foo() {}
 }
 
 @D1

@@ -34,4 +34,9 @@ export class Weather {
     });
     return await HttpResult.fromResponse(res, Weather, false);
   }
+
+  static fromJson(data: any): Weather {
+    const res = Object.assign(new Weather(), data);
+    return res;
+  }
 }

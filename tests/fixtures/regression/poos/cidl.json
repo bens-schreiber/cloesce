@@ -98,7 +98,9 @@
         {
           "name": "b",
           "cidl_type": {
-            "Object": "PooB"
+            "Array": {
+              "Object": "PooB"
+            }
           }
         }
       ],

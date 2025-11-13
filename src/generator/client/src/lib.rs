@@ -19,6 +19,7 @@ handlebars_helper!(is_object_array: |cidl_type: CidlType| match cidl_type {
     _ => false,
 });
 handlebars_helper!(is_one_to_one: |nav: NavigationProperty| matches!(nav.kind, NavigationPropertyKind::OneToOne {..}));
+handlebars_helper!(is_many_nav: |nav: NavigationProperty| matches!(nav.kind, NavigationPropertyKind::OneToMany {..} | NavigationPropertyKind::ManyToMany { .. }));
 handlebars_helper!(object_name: |cidl_type: CidlType| match cidl_type.root_type() {
     CidlType::Object(name) => name.clone(),
     _ => panic!("Not an object")
@@ -35,6 +36,7 @@ fn register_helpers<'a>(
     handlebars.register_helper("is_object_array", Box::new(is_object_array));
     handlebars.register_helper("is_one_to_one", Box::new(is_one_to_one));
     handlebars.register_helper("object_name", Box::new(object_name));
+    handlebars.register_helper("is_many_nav", Box::new(is_many_nav));
     handlebars.register_helper("eq", Box::new(eq));
 
     let mapper1 = mapper.clone();

@@ -21,4 +21,9 @@ export class Dog {
     });
     return await HttpResult.fromResponse(res, Dog, false);
   }
+
+  static fromJson(data: any): Dog {
+    const res = Object.assign(new Dog(), data);
+    return res;
+  }
 }

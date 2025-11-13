@@ -17,7 +17,22 @@
                 "cidl_type": "Integer"
             },
             "navigation_properties": [],
-            "methods": {},
+            "methods": {
+                "foo": {
+                    "name": "foo",
+                    "is_static": false,
+                    "http_verb": "POST",
+                    "return_type": "Void",
+                    "parameters": [
+                        {
+                            "name": "__dataSource",
+                            "cidl_type": {
+                                "DataSource": "B"
+                            }
+                        }
+                    ]
+                }
+            },
             "data_sources": {},
             "cruds": [],
             "source_path": "./seed__foreign_keys.cloesce.ts"

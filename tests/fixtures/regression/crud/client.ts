@@ -7,6 +7,12 @@ export class Child {
   parentId: number;
   parent: Parent | undefined;
 
+
+  static fromJson(data: any): Child {
+    const res = Object.assign(new Child(), data);
+    res["parent"] &&= Object.assign(new Parent(), res.parent);
+    return res;
+  }
 }
 export class CrudHaver {
   id: number;
@@ -62,6 +68,11 @@ export class CrudHaver {
     });
     return await HttpResult.fromResponse(res, CrudHaver, false);
   }
+
+  static fromJson(data: any): CrudHaver {
+    const res = Object.assign(new CrudHaver(), data);
+    return res;
+  }
 }
 export class Parent {
   id: number;
@@ -104,5 +115,14 @@ export class Parent {
       })
     });
     return await HttpResult.fromResponse(res, Parent, false);
+  }
+
+  static fromJson(data: any): Parent {
+    const res = Object.assign(new Parent(), data);
+    res["favoriteChild"] &&= Object.assign(new Child(), res.favoriteChild);
+    for (let i = 0; i < res.children?.length; i++) {
+      res.children[i] = Child.fromJson(res.children[i]);
+    }
+    return res;
   }
 }

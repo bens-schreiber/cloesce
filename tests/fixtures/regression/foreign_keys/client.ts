@@ -30,20 +30,58 @@ export class A {
     const res = await fetchImpl(baseUrl, { method: "GET" });
     return await HttpResult.fromResponse(res, A, false);
   }
+
+  static fromJson(data: any): A {
+    const res = Object.assign(new A(), data);
+    res["b"] &&= Object.assign(new B(), res.b);
+    return res;
+  }
 }
 export class B {
   id: number;
 
+  async foo(
+        __dataSource: "none" = "none",
+    fetchImpl: typeof fetch = fetch
+  ): Promise<HttpResult<void>> {
+    const baseUrl = new URL(`http://localhost:5002/api/B/${this.id}/foo`);
+    const res = await fetchImpl(baseUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+            __dataSource
+      })
+    });
+    return await HttpResult.fromResponse(res);
+  }
+
+  static fromJson(data: any): B {
+    const res = Object.assign(new B(), data);
+    return res;
+  }
 }
 export class Course {
   id: number;
   students: Student[];
 
+
+  static fromJson(data: any): Course {
+    const res = Object.assign(new Course(), data);
+    for (let i = 0; i < res.students?.length; i++) {
+      res.students[i] = Student.fromJson(res.students[i]);
+    }
+    return res;
+  }
 }
 export class Dog {
   id: number;
   personId: number;
 
+
+  static fromJson(data: any): Dog {
+    const res = Object.assign(new Dog(), data);
+    return res;
+  }
 }
 export class Person {
   id: number;
@@ -72,6 +110,14 @@ export class Person {
     const res = await fetchImpl(baseUrl, { method: "GET" });
     return await HttpResult.fromResponse(res, Person, false);
   }
+
+  static fromJson(data: any): Person {
+    const res = Object.assign(new Person(), data);
+    for (let i = 0; i < res.dogs?.length; i++) {
+      res.dogs[i] = Dog.fromJson(res.dogs[i]);
+    }
+    return res;
+  }
 }
 export class Student {
   id: number;
@@ -99,5 +145,13 @@ export class Student {
     baseUrl.searchParams.append('__dataSource', String(__dataSource));
     const res = await fetchImpl(baseUrl, { method: "GET" });
     return await HttpResult.fromResponse(res, Student, false);
+  }
+
+  static fromJson(data: any): Student {
+    const res = Object.assign(new Student(), data);
+    for (let i = 0; i < res.courses?.length; i++) {
+      res.courses[i] = Course.fromJson(res.courses[i]);
+    }
+    return res;
   }
 }

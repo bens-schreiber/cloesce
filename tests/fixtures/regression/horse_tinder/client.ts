@@ -54,6 +54,14 @@ export class Horse {
     });
     return await HttpResult.fromResponse(res, Horse, false);
   }
+
+  static fromJson(data: any): Horse {
+    const res = Object.assign(new Horse(), data);
+    for (let i = 0; i < res.likes?.length; i++) {
+      res.likes[i] = Like.fromJson(res.likes[i]);
+    }
+    return res;
+  }
 }
 export class Like {
   id: number;
@@ -61,4 +69,10 @@ export class Like {
   horseId2: number;
   horse2: Horse | undefined;
 
+
+  static fromJson(data: any): Like {
+    const res = Object.assign(new Like(), data);
+    res["horse2"] &&= Object.assign(new Horse(), res.horse2);
+    return res;
+  }
 }

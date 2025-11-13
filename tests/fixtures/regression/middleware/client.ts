@@ -3,6 +3,11 @@
 import { HttpResult, DeepPartial } from "cloesce/client";
 export class InjectedThing {
   value: string;
+
+  static fromJson(data: any): InjectedThing {
+    const res = Object.assign(new InjectedThing(), data);
+    return res;
+  }
 }
 
 export class Model {
@@ -37,5 +42,10 @@ export class Model {
       })
     });
     return await HttpResult.fromResponse(res, Model, false);
+  }
+
+  static fromJson(data: any): Model {
+    const res = Object.assign(new Model(), data);
+    return res;
   }
 }

@@ -6,6 +6,7 @@ import {
   Dog,
   Student,
   Course,
+  B,
 } from "../../fixtures/regression/foreign_keys/client.js";
 
 beforeAll(async () => {
@@ -40,10 +41,16 @@ describe("POST and refresh A", () => {
     },
   });
 
+  let b: B;
   it("POST A", async () => {
     const res = await A.post(a);
     expect(res.ok, withRes("POST should be OK", res)).toBe(true);
     expect(res.data.id, withRes("POST id should match input", res)).toBe(a.id);
+    b = res.data.b;
+  });
+
+  it("Inner object is instantiated", async () => {
+    expect(b.foo).toBeDefined();
   });
 
   testRefresh(a, ["withB", "withoutB", "none"], {

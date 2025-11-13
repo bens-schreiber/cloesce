@@ -89,4 +89,9 @@ export class NullabilityChecks {
     });
     return await HttpResult.fromResponse(res);
   }
+
+  static fromJson(data: any): NullabilityChecks {
+    const res = Object.assign(new NullabilityChecks(), data);
+    return res;
+  }
 }
