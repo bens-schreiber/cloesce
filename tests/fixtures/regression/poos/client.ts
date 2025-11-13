@@ -4,13 +4,32 @@ import { HttpResult, DeepPartial } from "cloesce/client";
 export class PooA {
   name: string;
   major: string;
+
+  static fromJson(data: any): PooA {
+    const res = Object.assign(new PooA(), data);
+    return res;
+  }
 }
 export class PooB {
   color: string;
+
+  static fromJson(data: any): PooB {
+    const res = Object.assign(new PooB(), data);
+    return res;
+  }
 }
 export class PooC {
   a: PooA;
-  b: PooB;
+  b: PooB[];
+
+  static fromJson(data: any): PooC {
+    const res = Object.assign(new PooC(), data);
+    res["a"] &&= Object.assign(new PooA(), res.a);
+    for (let i = 0; i < res.b?.length; i++) {
+      res.b[i] = PooB.fromJson(res.b[i]);
+    }
+    return res;
+  }
 }
 
 export class PooAcceptYield {
@@ -32,7 +51,7 @@ export class PooAcceptYield {
             c
       })
     });
-    return await HttpResult.fromResponse(res);
+    return await HttpResult.fromResponse<void>(res);
   }
   static async yieldPoo(
     fetchImpl: typeof fetch = fetch
@@ -44,6 +63,11 @@ export class PooAcceptYield {
       body: JSON.stringify({
       })
     });
-    return await HttpResult.fromResponse(res, PooC, false);
+    return await HttpResult.fromResponse<PooC>(res, PooC, false);
+  }
+
+  static fromJson(data: any): PooAcceptYield {
+    const res = Object.assign(new PooAcceptYield(), data);
+    return res;
   }
 }

@@ -3,6 +3,11 @@
 import { HttpResult, DeepPartial } from "cloesce/client";
 export class InjectedThing {
   value: string;
+
+  static fromJson(data: any): InjectedThing {
+    const res = Object.assign(new InjectedThing(), data);
+    return res;
+  }
 }
 
 export class Model {
@@ -13,14 +18,14 @@ export class Model {
   ): Promise<HttpResult<void>> {
     const baseUrl = new URL(`http://localhost:5002/api/Model/blockedMethod`);
     const res = await fetchImpl(baseUrl, { method: "GET" });
-    return await HttpResult.fromResponse(res);
+    return await HttpResult.fromResponse<void>(res);
   }
   static async getInjectedThing(
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<InjectedThing>> {
     const baseUrl = new URL(`http://localhost:5002/api/Model/getInjectedThing`);
     const res = await fetchImpl(baseUrl, { method: "GET" });
-    return await HttpResult.fromResponse(res, InjectedThing, false);
+    return await HttpResult.fromResponse<InjectedThing>(res, InjectedThing, false);
   }
   static async save(
         model: DeepPartial<Model>,
@@ -36,6 +41,11 @@ export class Model {
             __datasource
       })
     });
-    return await HttpResult.fromResponse(res, Model, false);
+    return await HttpResult.fromResponse<Model>(res, Model, false);
+  }
+
+  static fromJson(data: any): Model {
+    const res = Object.assign(new Model(), data);
+    return res;
   }
 }

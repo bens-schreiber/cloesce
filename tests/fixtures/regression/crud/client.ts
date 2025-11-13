@@ -7,6 +7,12 @@ export class Child {
   parentId: number;
   parent: Parent | undefined;
 
+
+  static fromJson(data: any): Child {
+    const res = Object.assign(new Child(), data);
+    res["parent"] &&= Object.assign(new Parent(), res.parent);
+    return res;
+  }
 }
 export class CrudHaver {
   id: number;
@@ -21,7 +27,7 @@ export class CrudHaver {
     baseUrl.searchParams.append('id', String(id));
     baseUrl.searchParams.append('__datasource', String(__datasource));
     const res = await fetchImpl(baseUrl, { method: "GET" });
-    return await HttpResult.fromResponse(res, CrudHaver, false);
+    return await HttpResult.fromResponse<CrudHaver>(res, CrudHaver, false);
   }
   static async list(
         __datasource: "none" = "none",
@@ -30,7 +36,7 @@ export class CrudHaver {
     const baseUrl = new URL(`http://localhost:5002/api/CrudHaver/list`);
     baseUrl.searchParams.append('__datasource', String(__datasource));
     const res = await fetchImpl(baseUrl, { method: "GET" });
-    return await HttpResult.fromResponse(res);
+    return await HttpResult.fromResponse<CrudHaver[]>(res);
   }
   async notCrud(
         __dataSource: "none" = "none",
@@ -44,7 +50,7 @@ export class CrudHaver {
             __dataSource
       })
     });
-    return await HttpResult.fromResponse(res);
+    return await HttpResult.fromResponse<void>(res);
   }
   static async save(
         model: DeepPartial<CrudHaver>,
@@ -60,7 +66,12 @@ export class CrudHaver {
             __datasource
       })
     });
-    return await HttpResult.fromResponse(res, CrudHaver, false);
+    return await HttpResult.fromResponse<CrudHaver>(res, CrudHaver, false);
+  }
+
+  static fromJson(data: any): CrudHaver {
+    const res = Object.assign(new CrudHaver(), data);
+    return res;
   }
 }
 export class Parent {
@@ -78,7 +89,7 @@ export class Parent {
     baseUrl.searchParams.append('id', String(id));
     baseUrl.searchParams.append('__datasource', String(__datasource));
     const res = await fetchImpl(baseUrl, { method: "GET" });
-    return await HttpResult.fromResponse(res, Parent, false);
+    return await HttpResult.fromResponse<Parent>(res, Parent, false);
   }
   static async list(
         __datasource: "withChildren" |"none" = "none",
@@ -87,7 +98,7 @@ export class Parent {
     const baseUrl = new URL(`http://localhost:5002/api/Parent/list`);
     baseUrl.searchParams.append('__datasource', String(__datasource));
     const res = await fetchImpl(baseUrl, { method: "GET" });
-    return await HttpResult.fromResponse(res);
+    return await HttpResult.fromResponse<Parent[]>(res);
   }
   static async save(
         model: DeepPartial<Parent>,
@@ -103,6 +114,15 @@ export class Parent {
             __datasource
       })
     });
-    return await HttpResult.fromResponse(res, Parent, false);
+    return await HttpResult.fromResponse<Parent>(res, Parent, false);
+  }
+
+  static fromJson(data: any): Parent {
+    const res = Object.assign(new Parent(), data);
+    res["favoriteChild"] &&= Object.assign(new Child(), res.favoriteChild);
+    for (let i = 0; i < res.children?.length; i++) {
+      res.children[i] = Child.fromJson(res.children[i]);
+    }
+    return res;
   }
 }

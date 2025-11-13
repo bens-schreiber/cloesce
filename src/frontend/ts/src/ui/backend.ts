@@ -1,13 +1,17 @@
 import { D1Database } from "@cloudflare/workers-types/experimental/index.js";
-import { CrudKind, DeepPartial, Either, KeysOfType } from "../common.js";
+import { DeepPartial, Either, KeysOfType } from "./common.js";
 import { RuntimeContainer } from "../router/router.js";
 import { WasmResource, mapSql, invokeOrmWasm } from "../router/wasm.js";
+import { CrudKind } from "../ast.js";
 
+/**
+ * Types accessible via cloesce/backend
+ */
 export { CloesceApp, DependencyInjector } from "../router/router.js";
 export type { MiddlewareFn, ResultMiddlewareFn } from "../router/router.js";
-
-export { HttpResult, Either } from "../common.js";
-export type { DeepPartial, CrudKind } from "../common.js";
+export { HttpResult, Either } from "./common.js";
+export type { DeepPartial } from "./common.js";
+export type { CrudKind } from "../ast.js";
 
 /**
  * Marks a class as a D1-backed SQL model.

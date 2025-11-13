@@ -1,7 +1,7 @@
 import { describe, test, expect } from "vitest";
 import { Project } from "ts-morph";
 import { CidlExtractor } from "../src/extractor/extract";
-import { CidlType, DataSource, Model } from "../src/common";
+import { CidlType, DataSource, Model } from "../src/ast";
 
 function cloesceProject(): Project {
   const project = new Project({
@@ -10,7 +10,7 @@ function cloesceProject(): Project {
     },
   });
 
-  project.addSourceFileAtPath("./src/common.ts");
+  project.addSourceFileAtPath("./src/ui/common.ts");
   project.addSourceFileAtPath("./src/ui/backend.ts");
   return project;
 }

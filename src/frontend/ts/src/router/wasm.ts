@@ -1,9 +1,10 @@
-import { CidlIncludeTree, CloesceAst, Either, Model } from "../common.js";
+import { CidlIncludeTree, CloesceAst, Model } from "../ast.js";
 import { IncludeTree } from "../ui/backend.js";
 import { RuntimeContainer } from "./router.js";
 
 // Requires the ORM binary to have been built
 import mod from "../orm.wasm";
+import { Either } from "../ui/common.js";
 
 /**
  * WASM ABI
@@ -152,6 +153,7 @@ export function mapSql<T extends object>(
     ) as T[],
   );
 
+  // TODO: Lazy instantiation via Proxy?
   function instantiateDepthFirst(
     m: any,
     meta: Model,
@@ -168,18 +170,21 @@ export function mapSql<T extends object>(
       if (!nestedIncludeTree) continue;
 
       const nestedMeta = ast.models[navProp.model_name];
-      const value = m[navProp.var_name];
 
       // One to Many, Many to Many
-      if (Array.isArray(value)) {
-        m[navProp.var_name] = value.map((child: any) =>
-          instantiateDepthFirst(child, nestedMeta, nestedIncludeTree),
-        );
+      if (Array.isArray(m[navProp.var_name])) {
+        for (let i = 0; i < m[navProp.var_name].length; i++) {
+          m[navProp.var_name][i] = instantiateDepthFirst(
+            m[navProp.var_name][i],
+            nestedMeta,
+            nestedIncludeTree,
+          );
+        }
       }
       // One to one
-      else if (value) {
+      else if (m[navProp.var_name]) {
         m[navProp.var_name] = instantiateDepthFirst(
-          value,
+          m[navProp.var_name],
           nestedMeta,
           nestedIncludeTree,
         );

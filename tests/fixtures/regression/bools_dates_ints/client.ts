@@ -16,7 +16,7 @@ export class Weather {
     baseUrl.searchParams.append('id', String(id));
     baseUrl.searchParams.append('__datasource', String(__datasource));
     const res = await fetchImpl(baseUrl, { method: "GET" });
-    return await HttpResult.fromResponse(res, Weather, false);
+    return await HttpResult.fromResponse<Weather>(res, Weather, false);
   }
   static async save(
         model: DeepPartial<Weather>,
@@ -32,6 +32,11 @@ export class Weather {
             __datasource
       })
     });
-    return await HttpResult.fromResponse(res, Weather, false);
+    return await HttpResult.fromResponse<Weather>(res, Weather, false);
+  }
+
+  static fromJson(data: any): Weather {
+    const res = Object.assign(new Weather(), data);
+    return res;
   }
 }

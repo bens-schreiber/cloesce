@@ -1,13 +1,7 @@
 import { describe, test, expect, vi, beforeEach } from "vitest";
 import { _cloesceInternal } from "../src/router/router";
-import {
-  CloesceAst,
-  HttpResult,
-  HttpVerb,
-  Model,
-  NamedTypedValue,
-} from "../src/common";
-import { IncludeTree } from "../src/ui/backend";
+import { CloesceAst, HttpVerb, Model, NamedTypedValue } from "../src/ast";
+import { HttpResult, IncludeTree } from "../src/ui/backend";
 import { CrudContext } from "../src/router/crud";
 import { mapSql } from "../src/router/wasm";
 import fs from "fs";

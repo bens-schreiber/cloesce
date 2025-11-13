@@ -26,9 +26,11 @@ describe("POST PooAcceptYield", () => {
           name: "test-name",
           major: "test-major",
         },
-        b: {
-          color: "test-color",
-        },
+        b: [
+          {
+            color: "test-color",
+          },
+        ],
       },
     );
 
@@ -46,9 +48,11 @@ describe("yieldPoo", () => {
         name: "name",
         major: "major",
       },
-      b: {
-        color: "color",
-      },
+      b: [
+        {
+          color: "color",
+        },
+      ],
     });
   });
 });

@@ -6,6 +6,20 @@ export class {{this.name}} {
   {{#each this.attributes}}
   {{name}}: {{get_cidl_type cidl_type}};
   {{/each}}
+
+  static fromJson(data: any): {{this.name}} {
+    const res = Object.assign(new {{this.name}}(), data);
+    {{#each this.attributes}}
+      {{#if (is_object_array cidl_type)}}
+    for (let i = 0; i < res.{{name}}?.length; i++) {
+      res.{{name}}[i] = {{object_name cidl_type}}.fromJson(res.{{name}}[i]);
+    }
+      {{else if (is_object cidl_type)}}
+    res["{{name}}"] &&= Object.assign(new {{object_name cidl_type}}(), res.{{name}});
+      {{/if}}
+    {{/each}}
+    return res;
+  }
 }
 {{/each}}
 
@@ -50,13 +64,28 @@ export class {{this.name}} {
     });
     {{/if}}
     {{#if if (is_object_array this.return_type)}}
-    return await HttpResult.fromResponse(res, {{object_name this.return_type}}, true);
+    return await HttpResult.fromResponse<{{object_name this.return_type}}>(res, {{object_name this.return_type}}, true);
     {{else if (is_object this.return_type)}}
-    return await HttpResult.fromResponse(res, {{object_name this.return_type}}, false);
+    return await HttpResult.fromResponse<{{object_name this.return_type}}>(res, {{object_name this.return_type}}, false);
     {{else}}
-    return await HttpResult.fromResponse(res);
+    return await HttpResult.fromResponse<{{get_cidl_type this.return_type}}>(res);
     {{/if}}
   }
   {{/each}}
+
+  static fromJson(data: any): {{this.name}} {
+    const res = Object.assign(new {{this.name}}(), data);
+    {{#each this.navigation_properties}}
+    {{#if (is_one_to_one this)}}
+    res["{{var_name}}"] &&= Object.assign(new {{this.model_name}}(), res.{{var_name}});
+    {{/if}}
+    {{#if (is_many_nav this)}}
+    for (let i = 0; i < res.{{var_name}}?.length; i++) {
+      res.{{var_name}}[i] = {{this.model_name}}.fromJson(res.{{var_name}}[i]);
+    }
+    {{/if}}
+    {{/each}}
+    return res;
+  }
 }
 {{/each}}
