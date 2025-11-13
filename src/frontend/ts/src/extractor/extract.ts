@@ -17,7 +17,6 @@ import {
   CloesceAst,
   CidlType,
   DataSource,
-  Either,
   HttpVerb,
   Model,
   ModelAttribute,
@@ -25,12 +24,12 @@ import {
   NamedTypedValue,
   NavigationProperty,
   WranglerEnv,
-  ExtractorError,
-  ExtractorErrorCode,
   PlainOldObject,
   CrudKind,
-} from "../common.js";
+} from "../ast.js";
 import { TypeFormatFlags } from "typescript";
+import { ExtractorError, ExtractorErrorCode } from "./err.js";
+import { Either } from "../ui/common.js";
 
 enum AttributeDecoratorKind {
   PrimaryKey = "PrimaryKey",

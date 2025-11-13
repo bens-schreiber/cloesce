@@ -19,7 +19,7 @@ export class Dog {
             dog
       })
     });
-    return await HttpResult.fromResponse(res, Dog, false);
+    return await HttpResult.fromResponse<Dog>(res, Dog, false);
   }
 
   static fromJson(data: any): Dog {

@@ -15,7 +15,11 @@ import {
 } from "cmd-ts";
 import { Project } from "ts-morph";
 import { CidlExtractor } from "./extractor/extract.js";
-import { ExtractorError, ExtractorErrorCode, getErrorInfo } from "./common.js";
+import {
+  ExtractorError,
+  ExtractorErrorCode,
+  getErrorInfo,
+} from "./extractor/err.js";
 
 type WasmConfig = {
   name: string;

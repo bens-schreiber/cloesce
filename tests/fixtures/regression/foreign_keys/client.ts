@@ -19,7 +19,7 @@ export class A {
             a
       })
     });
-    return await HttpResult.fromResponse(res, A, false);
+    return await HttpResult.fromResponse<A>(res, A, false);
   }
   async refresh(
         __dataSource: "withB" |"withoutB" |"none" = "none",
@@ -28,7 +28,7 @@ export class A {
     const baseUrl = new URL(`http://localhost:5002/api/A/${this.id}/refresh`);
     baseUrl.searchParams.append('__dataSource', String(__dataSource));
     const res = await fetchImpl(baseUrl, { method: "GET" });
-    return await HttpResult.fromResponse(res, A, false);
+    return await HttpResult.fromResponse<A>(res, A, false);
   }
 
   static fromJson(data: any): A {
@@ -52,7 +52,7 @@ export class B {
             __dataSource
       })
     });
-    return await HttpResult.fromResponse(res);
+    return await HttpResult.fromResponse<void>(res);
   }
 
   static fromJson(data: any): B {
@@ -99,7 +99,7 @@ export class Person {
             person
       })
     });
-    return await HttpResult.fromResponse(res, Person, false);
+    return await HttpResult.fromResponse<Person>(res, Person, false);
   }
   async refresh(
         __dataSource: "withDogs" |"none" = "none",
@@ -108,7 +108,7 @@ export class Person {
     const baseUrl = new URL(`http://localhost:5002/api/Person/${this.id}/refresh`);
     baseUrl.searchParams.append('__dataSource', String(__dataSource));
     const res = await fetchImpl(baseUrl, { method: "GET" });
-    return await HttpResult.fromResponse(res, Person, false);
+    return await HttpResult.fromResponse<Person>(res, Person, false);
   }
 
   static fromJson(data: any): Person {
@@ -135,7 +135,7 @@ export class Student {
             student
       })
     });
-    return await HttpResult.fromResponse(res, Student, false);
+    return await HttpResult.fromResponse<Student>(res, Student, false);
   }
   async refresh(
         __dataSource: "withCoursesStudents" |"withCoursesStudentsCourses" |"none" = "none",
@@ -144,7 +144,7 @@ export class Student {
     const baseUrl = new URL(`http://localhost:5002/api/Student/${this.id}/refresh`);
     baseUrl.searchParams.append('__dataSource', String(__dataSource));
     const res = await fetchImpl(baseUrl, { method: "GET" });
-    return await HttpResult.fromResponse(res, Student, false);
+    return await HttpResult.fromResponse<Student>(res, Student, false);
   }
 
   static fromJson(data: any): Student {

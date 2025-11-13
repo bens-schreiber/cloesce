@@ -23,7 +23,7 @@ export class NullabilityChecks {
             __dataSource
       })
     });
-    return await HttpResult.fromResponse(res);
+    return await HttpResult.fromResponse<string[] | null>(res);
   }
   async httpResultTypes(
         a: number | null | null,
@@ -39,7 +39,7 @@ export class NullabilityChecks {
             __dataSource
       })
     });
-    return await HttpResult.fromResponse(res);
+    return await HttpResult.fromResponse<NullabilityChecks[] | null | null>(res);
   }
   async injectableTypes(
         __dataSource: "none" = "none",
@@ -53,7 +53,7 @@ export class NullabilityChecks {
             __dataSource
       })
     });
-    return await HttpResult.fromResponse(res);
+    return await HttpResult.fromResponse<void>(res);
   }
   async modelTypes(
         a: NullabilityChecks | null,
@@ -69,7 +69,7 @@ export class NullabilityChecks {
             __dataSource
       })
     });
-    return await HttpResult.fromResponse(res);
+    return await HttpResult.fromResponse<NullabilityChecks | null>(res);
   }
   async primitiveTypes(
         a: number | null,
@@ -87,7 +87,7 @@ export class NullabilityChecks {
             __dataSource
       })
     });
-    return await HttpResult.fromResponse(res);
+    return await HttpResult.fromResponse<boolean | null>(res);
   }
 
   static fromJson(data: any): NullabilityChecks {

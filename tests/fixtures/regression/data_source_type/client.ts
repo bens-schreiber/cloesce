@@ -29,7 +29,7 @@ export class Foo {
             noDs
       })
     });
-    return await HttpResult.fromResponse(res);
+    return await HttpResult.fromResponse<void>(res);
   }
 
   static fromJson(data: any): Foo {

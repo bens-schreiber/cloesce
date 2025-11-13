@@ -15,7 +15,7 @@ export class Horse {
     const baseUrl = new URL(`http://localhost:5002/api/Horse/get`);
     baseUrl.searchParams.append('id', String(id));
     const res = await fetchImpl(baseUrl, { method: "GET" });
-    return await HttpResult.fromResponse(res, Horse, false);
+    return await HttpResult.fromResponse<Horse>(res, Horse, false);
   }
   async like(
         horse: Horse,
@@ -31,14 +31,14 @@ export class Horse {
             __dataSource
       })
     });
-    return await HttpResult.fromResponse(res);
+    return await HttpResult.fromResponse<void>(res);
   }
   static async list(
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Horse[]>> {
     const baseUrl = new URL(`http://localhost:5002/api/Horse/list`);
     const res = await fetchImpl(baseUrl, { method: "GET" });
-    return await HttpResult.fromResponse(res);
+    return await HttpResult.fromResponse<Horse[]>(res);
   }
   static async post(
         horse: Horse,
@@ -52,7 +52,7 @@ export class Horse {
             horse
       })
     });
-    return await HttpResult.fromResponse(res, Horse, false);
+    return await HttpResult.fromResponse<Horse>(res, Horse, false);
   }
 
   static fromJson(data: any): Horse {

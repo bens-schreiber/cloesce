@@ -51,7 +51,7 @@ export class PooAcceptYield {
             c
       })
     });
-    return await HttpResult.fromResponse(res);
+    return await HttpResult.fromResponse<void>(res);
   }
   static async yieldPoo(
     fetchImpl: typeof fetch = fetch
@@ -63,7 +63,7 @@ export class PooAcceptYield {
       body: JSON.stringify({
       })
     });
-    return await HttpResult.fromResponse(res, PooC, false);
+    return await HttpResult.fromResponse<PooC>(res, PooC, false);
   }
 
   static fromJson(data: any): PooAcceptYield {

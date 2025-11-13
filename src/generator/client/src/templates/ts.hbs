@@ -64,11 +64,11 @@ export class {{this.name}} {
     });
     {{/if}}
     {{#if if (is_object_array this.return_type)}}
-    return await HttpResult.fromResponse(res, {{object_name this.return_type}}, true);
+    return await HttpResult.fromResponse<{{object_name this.return_type}}>(res, {{object_name this.return_type}}, true);
     {{else if (is_object this.return_type)}}
-    return await HttpResult.fromResponse(res, {{object_name this.return_type}}, false);
+    return await HttpResult.fromResponse<{{object_name this.return_type}}>(res, {{object_name this.return_type}}, false);
     {{else}}
-    return await HttpResult.fromResponse(res);
+    return await HttpResult.fromResponse<{{get_cidl_type this.return_type}}>(res);
     {{/if}}
   }
   {{/each}}

@@ -3,7 +3,7 @@ import path from "path";
 import { describe, test, expect } from "vitest";
 import { Project } from "ts-morph";
 import { CidlExtractor } from "../src/extractor/extract";
-import { ExtractorError, ExtractorErrorCode } from "../src/common";
+import { ExtractorError, ExtractorErrorCode } from "../src/extractor/err";
 
 const FIXTURE_ROOT = path.resolve(__dirname, "fixtures");
 
