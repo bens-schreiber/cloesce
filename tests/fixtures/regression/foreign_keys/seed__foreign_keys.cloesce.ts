@@ -12,11 +12,11 @@ import {
   GET,
   Orm,
   Inject,
-  HttpResult,
+  HttpResult as CloesceHttpResult,
 } from "cloesce/backend";
 import { D1Database } from "@cloudflare/workers-types";
-class HttpResult<T = unknown> {}
 type Integer = number & { __kind: "Integer" };
+class HttpResult<T = unknown> {}
 
 @WranglerEnv
 export class Env {
@@ -64,14 +64,14 @@ export class A {
     a: A
   ): Promise<HttpResult<void>> {
     if (!a.refresh) {
-      return HttpResult.fail(500, "a.refresh was undefined");
+      return CloesceHttpResult.fail(500, "a.refresh was undefined");
     }
 
     if (!a.b?.testMethod) {
-      return HttpResult.fail(500, "a.b was undefined");
+      return CloesceHttpResult.fail(500, "a.b was undefined");
     }
 
-    return HttpResult.ok(200);
+    return CloesceHttpResult.ok(200);
   }
 
   @GET
@@ -108,18 +108,18 @@ export class Person {
     person: Person
   ): Promise<HttpResult<void>> {
     if (person.refresh === undefined) {
-      return HttpResult.fail(500);
+      return CloesceHttpResult.fail(500);
     }
 
     if (person.dogs === undefined) {
-      return HttpResult.fail(500);
+      return CloesceHttpResult.fail(500);
     }
 
     if (person.dogs.some((d) => d.testMethod === undefined)) {
-      return HttpResult.fail(500);
+      return CloesceHttpResult.fail(500);
     }
 
-    return HttpResult.ok(200);
+    return CloesceHttpResult.ok(200);
   }
 
   @GET
