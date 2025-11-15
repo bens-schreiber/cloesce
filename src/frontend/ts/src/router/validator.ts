@@ -27,7 +27,7 @@ export class RuntimeValidator {
     value: any,
     cidlType: CidlType,
     ast: CloesceAst,
-    ctorReg: ModelConstructorRegistry
+    ctorReg: ModelConstructorRegistry,
   ): Either<null, any> {
     return RuntimeValidator.recurse(value, cidlType, false, ast, ctorReg);
   }
@@ -37,7 +37,7 @@ export class RuntimeValidator {
     cidlType: any,
     isPartial: boolean,
     ast: CloesceAst,
-    ctorReg: ModelConstructorRegistry
+    ctorReg: ModelConstructorRegistry,
   ): Either<null, any> {
     isPartial ||= typeof cidlType !== "string" && "Partial" in cidlType;
 
@@ -92,7 +92,7 @@ export class RuntimeValidator {
         () => value,
         typeof value === "string" &&
           (value === NO_DATA_SOURCE ||
-            ast.models[objectName]?.data_sources[value] !== undefined)
+            ast.models[objectName]?.data_sources[value] !== undefined),
       );
     }
 
@@ -112,7 +112,7 @@ export class RuntimeValidator {
           pk.cidl_type,
           isPartial,
           ast,
-          ctorReg
+          ctorReg,
         );
 
         if (res.isLeft()) {
@@ -130,7 +130,7 @@ export class RuntimeValidator {
           attr.value.cidl_type,
           isPartial,
           ast,
-          ctorReg
+          ctorReg,
         );
         if (res.isLeft()) {
           return res;
@@ -147,7 +147,7 @@ export class RuntimeValidator {
           getNavigationPropertyCidlType(nav),
           isPartial,
           ast,
-          ctorReg
+          ctorReg,
         );
         if (res.isLeft()) {
           return res;
@@ -178,7 +178,7 @@ export class RuntimeValidator {
           attr.cidl_type,
           isPartial,
           ast,
-          ctorReg
+          ctorReg,
         );
         if (res.isLeft()) {
           return res;
@@ -206,7 +206,7 @@ export class RuntimeValidator {
           cidlType.Array,
           isPartial,
           ast,
-          ctorReg
+          ctorReg,
         );
         if (res.isLeft()) {
           return res;

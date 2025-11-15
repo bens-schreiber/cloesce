@@ -84,7 +84,7 @@ describe("Global Middleware", () => {
       ast,
       constructorRegistry,
       di,
-      d1
+      d1,
     );
 
     // Assert
@@ -120,7 +120,7 @@ describe("Global Middleware", () => {
       ast,
       constructorRegistry,
       di,
-      d1
+      d1,
     );
 
     // Assert
@@ -141,7 +141,7 @@ describe("Match Route", () => {
     expect(res.isLeft()).toBe(true);
     expect(res.unwrapLeft().status).toEqual(404);
     expect(extractErrorCode(res.unwrapLeft().message)).toEqual(
-      RouterFailState.UnknownPrefix
+      RouterFailState.UnknownPrefix,
     );
   });
 
@@ -157,7 +157,7 @@ describe("Match Route", () => {
     expect(res.isLeft()).toBe(true);
     expect(res.unwrapLeft().status).toEqual(404);
     expect(extractErrorCode(res.unwrapLeft().message)).toEqual(
-      RouterFailState.UnknownModel
+      RouterFailState.UnknownModel,
     );
   });
 
@@ -173,7 +173,7 @@ describe("Match Route", () => {
     expect(res.isLeft()).toBe(true);
     expect(res.unwrapLeft().status).toEqual(404);
     expect(extractErrorCode(res.unwrapLeft().message)).toEqual(
-      RouterFailState.UnknownMethod
+      RouterFailState.UnknownMethod,
     );
   });
 
@@ -194,7 +194,7 @@ describe("Match Route", () => {
     expect(res.isLeft()).toBe(true);
     expect(res.unwrapLeft().status).toEqual(404);
     expect(extractErrorCode(res.unwrapLeft().message)).toEqual(
-      RouterFailState.UnmatchedHttpVerb
+      RouterFailState.UnmatchedHttpVerb,
     );
   });
 
@@ -274,7 +274,7 @@ describe("Model Middleware", () => {
       ast,
       constructorRegistry,
       di,
-      d1
+      d1,
     );
 
     // Assert
@@ -303,13 +303,13 @@ describe("Request Validation", () => {
       ctorReg,
       model,
       model.methods["method"],
-      null
+      null,
     );
 
     // Assert
     expect(res.isLeft()).toBe(true);
     expect(extractErrorCode(res.unwrapLeft().message)).toEqual(
-      RouterFailState.InstantiatedMethodMissingId
+      RouterFailState.InstantiatedMethodMissingId,
     );
   });
 
@@ -332,13 +332,13 @@ describe("Request Validation", () => {
       ctorReg,
       model,
       model.methods["method"],
-      "0"
+      "0",
     );
 
     // Assert
     expect(res.isLeft()).toBe(true);
     expect(extractErrorCode(res.unwrapLeft().message)).toEqual(
-      RouterFailState.RequestMissingJsonBody
+      RouterFailState.RequestMissingJsonBody,
     );
   });
 
@@ -357,7 +357,7 @@ describe("Request Validation", () => {
             cidl_type: "Integer",
           },
         ],
-        "Void"
+        "Void",
       )
       .build();
     const ast = createAst([model]);
@@ -372,13 +372,13 @@ describe("Request Validation", () => {
       ctorReg,
       model,
       model.methods["method"],
-      "0"
+      "0",
     );
 
     // Assert
     expect(res.isLeft()).toBe(true);
     expect(extractErrorCode(res.unwrapLeft().message)).toEqual(
-      RouterFailState.RequestBodyMissingParameters
+      RouterFailState.RequestBodyMissingParameters,
     );
   });
 
@@ -565,7 +565,7 @@ describe("Request Validation", () => {
           models: testCase.models,
           ctorReg: testCase.ctorReg,
         };
-      })
+      }),
     );
   });
 
@@ -578,7 +578,7 @@ describe("Request Validation", () => {
         testCase.isGetRequest ? HttpVerb.GET : HttpVerb.POST,
         true,
         testCase.params,
-        "Void"
+        "Void",
       )
       .build();
     const ast = createAst([model, ...(testCase.models ?? [])]);
@@ -593,7 +593,7 @@ describe("Request Validation", () => {
     const request = mockRequest(
       url.toString(),
       testCase.isGetRequest ? "GET" : "POST",
-      testCase.isGetRequest ? undefined : testCase.jsonValue
+      testCase.isGetRequest ? undefined : testCase.jsonValue,
     );
 
     // Act
@@ -603,7 +603,7 @@ describe("Request Validation", () => {
       testCase.ctorReg ?? {},
       model,
       model.methods["testMethod"],
-      "0"
+      "0",
     );
     ``;
     // Assert
@@ -643,7 +643,7 @@ describe("Method Middleware", () => {
       ast,
       constructorRegistry,
       di,
-      d1
+      d1,
     );
 
     // Assert
@@ -667,7 +667,7 @@ describe("Method Dispatch", () => {
             cidl_type: { Inject: "D1Database" },
           },
         ],
-        "Void"
+        "Void",
       )
       .build();
 
@@ -680,13 +680,13 @@ describe("Method Dispatch", () => {
       crud as unknown as CrudProxy,
       di,
       method,
-      {}
+      {},
     );
 
     // Assert
     expect(res.ok).toBe(false);
     expect(extractErrorCode(res.message)).toBe(
-      RouterFailState.MissingDependency
+      RouterFailState.MissingDependency,
     );
   });
 
@@ -711,7 +711,7 @@ describe("Method Dispatch", () => {
       crud as unknown as CrudProxy,
       di,
       method,
-      {}
+      {},
     );
 
     // Assert
@@ -747,7 +747,7 @@ describe("Method Dispatch", () => {
       crud as unknown as CrudProxy,
       di,
       method,
-      {}
+      {},
     );
 
     // Assert
@@ -779,7 +779,7 @@ describe("Method Dispatch", () => {
       crud as unknown as CrudProxy,
       di,
       method,
-      {}
+      {},
     );
 
     // Assert
@@ -809,12 +809,12 @@ describe("Method Dispatch", () => {
       crud as unknown as CrudProxy,
       di,
       method,
-      {}
+      {},
     );
 
     // Assert
     expect(extractErrorCode(res.message)).toBe(
-      RouterFailState.UncaughtException
+      RouterFailState.UncaughtException,
     );
     expect(res.status).toBe(500);
   });
@@ -824,7 +824,7 @@ describe("mapSql", () => {
   test("handles recursive navigation properties", async () => {
     const wasm = await WebAssembly.instantiate(
       fs.readFileSync(path.resolve("./dist/orm.wasm")),
-      {}
+      {},
     );
 
     // Build models with ModelBuilder

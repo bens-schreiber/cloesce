@@ -33,14 +33,14 @@ interface MetaWranglerEnv {
 export type MiddlewareFn = (
   request: Request,
   env: any,
-  di: DependencyContainer
+  di: DependencyContainer,
 ) => Promise<HttpResult | void>;
 
 export type ResultMiddlewareFn = (
   request: Request,
   env: any,
   di: DependencyContainer,
-  result: HttpResult
+  result: HttpResult,
 ) => Promise<HttpResult | void>;
 
 export class CloesceApp {
@@ -108,7 +108,7 @@ export class CloesceApp {
   public onMethod<T>(
     ctor: new () => T,
     method: KeysOfType<T, (...args: any) => any>,
-    m: MiddlewareFn
+    m: MiddlewareFn,
   ) {
     if (!this.methodMiddleware.has(ctor.name)) {
       this.methodMiddleware.set(ctor.name, new Map());
@@ -131,7 +131,7 @@ export class CloesceApp {
     ast: CloesceAst,
     ctorReg: ModelConstructorRegistry,
     di: DependencyContainer,
-    d1: D1Database
+    d1: D1Database,
   ): Promise<HttpResult> {
     // Global middleware
     for (const m of this.globalMiddleware) {
@@ -163,7 +163,7 @@ export class CloesceApp {
       ctorReg,
       model,
       method,
-      id
+      id,
     );
     if (validation.isLeft()) {
       return validation.value;
@@ -190,11 +190,11 @@ export class CloesceApp {
         d1,
         model,
         id!, // id must exist after matchRoute
-        dataSource! // ds must exist after validateRequest
+        dataSource!, // ds must exist after validateRequest
       );
 
       return hydratedModel.map((_) =>
-        CrudProxy.fromInstance(d1, hydratedModel.value, ctorReg[model.name])
+        CrudProxy.fromInstance(d1, hydratedModel.value, ctorReg[model.name]),
       );
     })();
     if (crud.isLeft()) {
@@ -213,7 +213,7 @@ export class CloesceApp {
     env: any,
     ast: CloesceAst,
     constructorRegistry: ModelConstructorRegistry,
-    envMeta: MetaWranglerEnv
+    envMeta: MetaWranglerEnv,
   ): Promise<Response> {
     const di: DependencyContainer = new Map();
     di.set(envMeta.envName, env);
@@ -230,7 +230,7 @@ export class CloesceApp {
         ast,
         constructorRegistry,
         di,
-        d1
+        d1,
       );
 
       // Response middleware
@@ -264,13 +264,13 @@ export class RuntimeContainer {
   private constructor(
     public readonly ast: CloesceAst,
     public readonly constructorRegistry: ModelConstructorRegistry,
-    public readonly wasm: OrmWasmExports
+    public readonly wasm: OrmWasmExports,
   ) {}
 
   static async init(
     ast: CloesceAst,
     constructorRegistry: ModelConstructorRegistry,
-    wasm?: WebAssembly.Instance
+    wasm?: WebAssembly.Instance,
   ) {
     if (this.instance) return;
     const wasmAbi = await loadOrmWasm(ast, wasm);
@@ -306,7 +306,7 @@ export enum RouterFailState {
 function matchRoute(
   request: Request,
   ast: CloesceAst,
-  routePrefix: string
+  routePrefix: string,
 ): Either<
   HttpResult,
   {
@@ -369,7 +369,7 @@ async function validateRequest(
   ctorReg: ModelConstructorRegistry,
   model: Model,
   method: ModelMethod,
-  id: string | null
+  id: string | null,
 ): Promise<
   Either<HttpResult, { params: RequestParamMap; dataSource: string | null }>
 > {
@@ -384,7 +384,7 @@ async function validateRequest(
   // Filter out any injected parameters that will not be passed
   // by the query.
   const requiredParams = method.parameters.filter(
-    (p) => !(typeof p.cidl_type === "object" && "Inject" in p.cidl_type)
+    (p) => !(typeof p.cidl_type === "object" && "Inject" in p.cidl_type),
   );
 
   // Extract url or body parameters
@@ -411,7 +411,7 @@ async function validateRequest(
       params[p.name],
       p.cidl_type,
       ast,
-      ctorReg
+      ctorReg,
     );
     if (res.isLeft()) {
       return invalidRequest(RouterFailState.RequestBodyInvalidParameter);
@@ -425,7 +425,7 @@ async function validateRequest(
       (p) =>
         typeof p.cidl_type === "object" &&
         "DataSource" in p.cidl_type &&
-        p.cidl_type.DataSource === model.name
+        p.cidl_type.DataSource === model.name,
     )
     .map((p) => params[p.name] as string)[0];
 
@@ -449,7 +449,7 @@ async function hydrateModel(
   d1: D1Database,
   model: Model,
   id: string,
-  dataSource: string
+  dataSource: string,
 ): Promise<Either<HttpResult, object>> {
   // Error state: If the D1 database has been tweaked outside of Cloesce
   // resulting in a malformed query, exit with a 500.
@@ -457,16 +457,16 @@ async function hydrateModel(
     Either.left(
       HttpResult.fail(
         500,
-        `Error in hydration query, is the database out of sync with the backend?: ${e instanceof Error ? e.message : String(e)} (ErrorCode: ${RouterFailState.InvalidDatabaseQuery})`
-      )
+        `Error in hydration query, is the database out of sync with the backend?: ${e instanceof Error ? e.message : String(e)} (ErrorCode: ${RouterFailState.InvalidDatabaseQuery})`,
+      ),
     );
 
   // Error state: If no record is found for the id, return a 404
   const missingRecord = Either.left(
     HttpResult.fail(
       404,
-      `Record not found (ErrorCode: ${RouterFailState.ModelNotFound})`
-    )
+      `Record not found (ErrorCode: ${RouterFailState.ModelNotFound})`,
+    ),
   );
 
   // Query DB
@@ -496,7 +496,7 @@ async function hydrateModel(
   const models: object[] = mapSql(
     constructorRegistry[model.name],
     records.results,
-    model.data_sources[dataSource]?.tree ?? {}
+    model.data_sources[dataSource]?.tree ?? {},
   ).value as object[];
 
   return Either.right(models[0]);
@@ -510,13 +510,13 @@ async function methodDispatch(
   crud: CrudProxy,
   di: DependencyContainer,
   method: ModelMethod,
-  params: Record<string, unknown>
+  params: Record<string, unknown>,
 ): Promise<HttpResult<unknown>> {
   // Error state: Client code ran into an uncaught exception.
   const uncaughtException = (e: any) =>
     HttpResult.fail(
       500,
-      `Uncaught exception in method dispatch: ${e instanceof Error ? e.message : String(e)} (ErrorCode: ${RouterFailState.UncaughtException})`
+      `Uncaught exception in method dispatch: ${e instanceof Error ? e.message : String(e)} (ErrorCode: ${RouterFailState.UncaughtException})`,
     );
 
   const paramArray = [];
@@ -533,7 +533,7 @@ async function methodDispatch(
       // If a injected reference does not exist, throw a 500.
       return HttpResult.fail(
         500,
-        `An injected parameter was missing from the instance registry: ${JSON.stringify(param.cidl_type)} (ErrorCode: ${RouterFailState.MissingDependency})`
+        `An injected parameter was missing from the instance registry: ${JSON.stringify(param.cidl_type)} (ErrorCode: ${RouterFailState.MissingDependency})`,
       );
     }
 
