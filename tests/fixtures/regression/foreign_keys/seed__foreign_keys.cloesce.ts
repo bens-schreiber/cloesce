@@ -12,6 +12,7 @@ import {
   GET,
   Orm,
   Inject,
+  HttpResult,
 } from "cloesce/backend";
 import { D1Database } from "@cloudflare/workers-types";
 type Integer = number & { __kind: "Integer" };
@@ -28,7 +29,7 @@ export class B {
   id: Integer;
 
   @POST
-  foo() {}
+  testMethod() {}
 }
 
 @D1
@@ -55,6 +56,21 @@ export class A {
     const orm = Orm.fromD1(db);
     await orm.upsert(A, a, A.withB);
     return (await orm.get(A, a.id, A.withB)).value;
+  }
+
+  @POST
+  static async returnFatalIfParamsNotInstantiated(
+    a: A
+  ): Promise<HttpResult<void>> {
+    if (!a.refresh) {
+      return HttpResult.fail(500, "a.refresh was undefined");
+    }
+
+    if (!a.b?.testMethod) {
+      return HttpResult.fail(500, "a.b was undefined");
+    }
+
+    return HttpResult.ok(200);
   }
 
   @GET
@@ -86,6 +102,25 @@ export class Person {
     return (await orm.get(Person, person.id, Person.withDogs)).value;
   }
 
+  @POST
+  static async returnFatalIfParamsNotInstantiated(
+    person: Person
+  ): Promise<HttpResult<void>> {
+    if (person.refresh === undefined) {
+      return HttpResult.fail(500);
+    }
+
+    if (person.dogs === undefined) {
+      return HttpResult.fail(500);
+    }
+
+    if (person.dogs.some((d) => d.testMethod === undefined)) {
+      return HttpResult.fail(500);
+    }
+
+    return HttpResult.ok(200);
+  }
+
   @GET
   refresh(): Person {
     return this;
@@ -99,6 +134,9 @@ export class Dog {
 
   @ForeignKey(Person)
   personId: Integer;
+
+  @POST
+  testMethod() {}
 }
 //#endregion
 

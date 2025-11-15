@@ -100,6 +100,7 @@ export interface WranglerEnv {
 }
 
 export interface CloesceAst {
+  [x: string]: any;
   version: string;
   project_name: string;
   language: string;

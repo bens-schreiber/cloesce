@@ -1,0 +1,151 @@
+import {
+  Model,
+  CloesceAst,
+  CidlIncludeTree,
+  NamedTypedValue,
+  HttpVerb,
+  CidlType,
+  NavigationPropertyKind,
+  ModelAttribute,
+  ModelMethod,
+  DataSource,
+  NavigationProperty,
+} from "../src/ast";
+
+export function createAst(models: Model[]): CloesceAst {
+  const modelsMap = Object.fromEntries(models.map((m) => [m.name, m]));
+
+  return {
+    version: "1.0",
+    project_name: "test",
+    language: "TypeScript",
+    models: modelsMap,
+    poos: {},
+    wrangler_env: {
+      name: "Env",
+      source_path: "source.ts",
+      db_binding: "db",
+      vars: {},
+    },
+    app_source: null,
+  };
+}
+
+export class IncludeTreeBuilder {
+  private nodes: CidlIncludeTree = {};
+
+  static new(): IncludeTreeBuilder {
+    return new IncludeTreeBuilder();
+  }
+
+  addNode(name: string): this {
+    this.nodes[name] = {};
+    return this;
+  }
+
+  addWithChildren(
+    name: string,
+    build: (b: IncludeTreeBuilder) => IncludeTreeBuilder,
+  ): this {
+    const subtree = build(new IncludeTreeBuilder()).build();
+    this.nodes[name] = subtree;
+    return this;
+  }
+
+  build(): CidlIncludeTree {
+    return this.nodes;
+  }
+}
+
+export class ModelBuilder {
+  private name: string;
+  private attributes: ModelAttribute[] = [];
+  private navigation_properties: NavigationProperty[] = [];
+  private primary_key: NamedTypedValue | null = null;
+  private methods: Record<string, ModelMethod> = {};
+  private data_sources: Record<string, DataSource> = {};
+
+  constructor(name: string) {
+    this.name = name;
+  }
+
+  static model(name: string) {
+    return new ModelBuilder(name);
+  }
+
+  attribute(
+    name: string,
+    cidl_type: CidlType,
+    foreign_key: string | null = null,
+  ): this {
+    this.attributes.push({
+      value: { name, cidl_type },
+      foreign_key_reference: foreign_key,
+    });
+    return this;
+  }
+
+  navP(
+    var_name: string,
+    model_name: string,
+    kind: NavigationPropertyKind,
+  ): this {
+    this.navigation_properties.push({
+      var_name,
+      model_name,
+      kind,
+    });
+    return this;
+  }
+
+  pk(name: string, cidl_type: CidlType): this {
+    this.primary_key = { name, cidl_type };
+    return this;
+  }
+
+  id(): this {
+    return this.pk("id", "Integer");
+  }
+
+  method(
+    name: string,
+    http_verb: HttpVerb,
+    is_static: boolean,
+    parameters: NamedTypedValue[],
+    return_type: CidlType,
+  ): this {
+    this.methods[name] = {
+      name,
+      http_verb,
+      is_static,
+      parameters,
+      return_type,
+    };
+    return this;
+  }
+
+  dataSource(name: string, tree: CidlIncludeTree): this {
+    this.data_sources[name] = {
+      name,
+      tree,
+    };
+    return this;
+  }
+
+  build(): Model {
+    if (!this.primary_key) {
+      throw new Error(`Model '${this.name}' has no primary key`);
+    }
+
+    return {
+      name: this.name,
+      attributes: this.attributes,
+      navigation_properties: this.navigation_properties,
+      primary_key: this.primary_key,
+      methods: this.methods,
+      data_sources: this.data_sources,
+      cruds: [],
+      source_path: "",
+    };
+  }
+}

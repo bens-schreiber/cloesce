@@ -7,7 +7,10 @@ import { CrudKind } from "../ast.js";
 /**
  * Types accessible via cloesce/backend
  */
-export { CloesceApp, DependencyInjector } from "../router/router.js";
+export {
+  CloesceApp,
+  DependencyContainer as DependencyInjector,
+} from "../router/router.js";
 export type { MiddlewareFn, ResultMiddlewareFn } from "../router/router.js";
 export { HttpResult, Either } from "./common.js";
 export type { DeepPartial } from "./common.js";
