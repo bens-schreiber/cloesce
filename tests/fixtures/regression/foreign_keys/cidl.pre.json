@@ -18,8 +18,8 @@
             },
             "navigation_properties": [],
             "methods": {
-                "foo": {
-                    "name": "foo",
+                "testMethod": {
+                    "name": "testMethod",
                     "is_static": false,
                     "http_verb": "POST",
                     "return_type": "Void",
@@ -78,6 +78,22 @@
                                 "Inject": "Env"
                             }
                         },
+                        {
+                            "name": "a",
+                            "cidl_type": {
+                                "Object": "A"
+                            }
+                        }
+                    ]
+                },
+                "returnFatalIfParamsNotInstantiated": {
+                    "name": "returnFatalIfParamsNotInstantiated",
+                    "is_static": true,
+                    "http_verb": "POST",
+                    "return_type": {
+                        "HttpResult": "Void"
+                    },
+                    "parameters": [
                         {
                             "name": "a",
                             "cidl_type": {
@@ -159,6 +175,22 @@
                         }
                     ]
                 },
+                "returnFatalIfParamsNotInstantiated": {
+                    "name": "returnFatalIfParamsNotInstantiated",
+                    "is_static": true,
+                    "http_verb": "POST",
+                    "return_type": {
+                        "HttpResult": "Void"
+                    },
+                    "parameters": [
+                        {
+                            "name": "person",
+                            "cidl_type": {
+                                "Object": "Person"
+                            }
+                        }
+                    ]
+                },
                 "refresh": {
                     "name": "refresh",
                     "is_static": false,
@@ -203,7 +235,22 @@
                 "cidl_type": "Integer"
             },
             "navigation_properties": [],
-            "methods": {},
+            "methods": {
+                "testMethod": {
+                    "name": "testMethod",
+                    "is_static": false,
+                    "http_verb": "POST",
+                    "return_type": "Void",
+                    "parameters": [
+                        {
+                            "name": "__dataSource",
+                            "cidl_type": {
+                                "DataSource": "Dog"
+                            }
+                        }
+                    ]
+                }
+            },
             "data_sources": {},
             "cruds": [],
             "source_path": "./seed__foreign_keys.cloesce.ts"

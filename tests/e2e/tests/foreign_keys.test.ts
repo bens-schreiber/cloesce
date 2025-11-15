@@ -49,12 +49,21 @@ describe("POST and refresh A", () => {
     b = res.data.b;
   });
 
+  it("Object to be instantiated on backend", async () => {
+    const res = await A.returnFatalIfParamsNotInstantiated(a);
+    console.log(JSON.stringify(res));
+    expect(
+      res.ok,
+      withRes("Objects should be instantiated on the backend", res),
+    ).toBe(true);
+  });
+
   it("Inner object is instantiated", async () => {
-    expect(b.foo).toBeDefined();
+    expect(b.testMethod).toBeDefined();
   });
 
   testRefresh(a, ["withB", "withoutB", "none"], {
-    withB: (data) => expect(data.b).not.toBeUndefined(),
+    withB: (data) => expect(data.b).toBeDefined(),
     withoutB: (data) => expect(data.b).toBeUndefined(),
     none: () => {},
   });
@@ -79,7 +88,7 @@ describe("POST and refresh Person", () => {
 });
 
 describe("POST and refresh Student", () => {
-  const course = Object.assign(new Course(), { id: 500 });
+  const course = Object.assign(new Course(), { id: 500, students: [] });
   const student = Object.assign(new Student(), { id: 1, courses: [course] });
 
   it("POST Student", async () => {

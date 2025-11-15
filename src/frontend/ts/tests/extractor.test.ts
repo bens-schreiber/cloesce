@@ -1,7 +1,7 @@
 import { describe, test, expect } from "vitest";
 import { Project } from "ts-morph";
 import { CidlExtractor } from "../src/extractor/extract";
-import { CidlType, DataSource, Model } from "../src/ast";
+import { CidlType, DataSource } from "../src/ast";
 
 function cloesceProject(): Project {
   const project = new Project({

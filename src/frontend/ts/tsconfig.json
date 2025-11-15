@@ -14,5 +14,6 @@
     "emitDeclarationOnly": false,
     "stripInternal": true
   },
-  "include": ["src"]
+  "include": ["src", "tests"],
+  "exclude": ["tests/**/*.ts"]
 }

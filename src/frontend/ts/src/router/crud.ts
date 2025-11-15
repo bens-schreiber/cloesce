@@ -6,7 +6,7 @@ import { NO_DATA_SOURCE } from "../ast.js";
 /**
  * A wrapper for Model Instances, containing definitions for built-in CRUD methods.
  */
-export class CrudContext {
+export class CrudProxy {
   private constructor(
     private d1: D1Database,
     private instance: object | undefined,
@@ -17,11 +17,11 @@ export class CrudContext {
     d1: D1Database,
     instance: any,
     ctor: new () => object,
-  ): CrudContext {
+  ): CrudProxy {
     return new this(d1, instance, ctor);
   }
 
-  static fromCtor(d1: D1Database, ctor: new () => object): CrudContext {
+  static fromCtor(d1: D1Database, ctor: new () => object): CrudProxy {
     return new this(d1, ctor, ctor);
   }
 
@@ -29,7 +29,7 @@ export class CrudContext {
    * Invokes a method on the instance, intercepting built-in CRUD methods and injecting
    * a default definition.
    */
-  interceptCrud(methodName: string): Function {
+  invoke(methodName: string): Function {
     const map: Record<string, Function> = {
       save: this.upsert.bind(this),
       get: this.get.bind(this),
