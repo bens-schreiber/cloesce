@@ -376,13 +376,18 @@ class Comment {
   @R2({
     bucket: "someBucket",
     keyColumn: "gif",
-    expiresIn: 60 * 15
   })
   gifDownloadUrl: R2Download | undefined;
 
   @DataSource
   static readonly withDownload: IncludeTree<Comment> {
-    gifDownloadUrl: {}
+    gifDownloadUrl: {
+      // We should try to place the S3 Type "GetObjectRequest" in here
+      // though I'm not sure if the TS type system would allow that.
+      //
+      // If impossible, we might just want to revamp how IncludeTrees are generated,
+      // potentially creating a custom builder.
+    }
   }
 }
 
@@ -428,8 +433,6 @@ const input = {
   ChecksumMode: "ENABLED",
 };
 ```
-
-We will just hardcode these for now with the defaults, but will probably want to expose something to mess with how we generate this at a later time.
 
 # Summary of Changes
 
