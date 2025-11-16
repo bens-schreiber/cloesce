@@ -430,3 +430,14 @@ const input = {
 ```
 
 We will just hardcode these for now with the defaults, but will probably want to expose something to mess with how we generate this at a later time.
+
+# Summary of Changes
+
+- Introduce Cloesce Services
+- Add `Blob` SQL column type
+- Add `Blob`, `Stream` CIDL Types
+- Add `MediaType` enum for a methods parameters and return value
+- Switch behavior on the router based off `MediaType`
+- Switch behavior on the client API based off `MediaType`
+- Add R2 Wrangler config generation / support
+- Add R2 Navigation Property; Generate signed download URLs
