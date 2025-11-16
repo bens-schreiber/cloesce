@@ -519,7 +519,7 @@ async function methodDispatch(
       `Uncaught exception in method dispatch: ${e instanceof Error ? e.message : String(e)} (ErrorCode: ${RouterFailState.UncaughtException})`,
     );
 
-  const paramArray = [];
+  const paramArray: any[] = [];
   for (const param of method.parameters) {
     if (param.name in params) {
       paramArray.push(params[param.name]);
