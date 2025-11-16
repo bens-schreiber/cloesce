@@ -92,7 +92,7 @@ We will also want to rename the `Model Middleware` to `Namespace Middleware` (or
 
 Lastly, Model Hydration will have to be more generic, hydrating a Model or just getting the injected Service.
 
-![Cloesce Router Interface](../../assets/Cloesce%20Router%20Interface%20with%20Services.drawio.png)
+![Cloesce Router Interface](../../assets//Cloesce%20Router%20with%20Services.png)
 
 ## Blobs and R2
 
