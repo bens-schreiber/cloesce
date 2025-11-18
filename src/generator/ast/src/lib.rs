@@ -128,7 +128,7 @@ pub struct ModelAttribute {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct ModelMethod {
+pub struct ApiMethod {
     pub name: String,
     pub is_static: bool,
     pub http_verb: HttpVerb,
@@ -184,7 +184,7 @@ pub struct Model {
     pub navigation_properties: Vec<NavigationProperty>,
 
     #[serde_as(as = "MapPreventDuplicates<_, _>")]
-    pub methods: BTreeMap<String, ModelMethod>,
+    pub methods: BTreeMap<String, ApiMethod>,
 
     #[serde_as(as = "MapPreventDuplicates<_, _>")]
     pub data_sources: BTreeMap<String, DataSource>,
@@ -195,21 +195,21 @@ pub struct Model {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct ServiceMethod {
-    pub name: String,
-    pub http_verb: HttpVerb,
-    pub return_type: CidlType,
-    pub parameters: Vec<NamedTypedValue>,
+pub struct ServiceAttribute {
+    pub var_name: String,
+    pub injected: String,
 }
 
 #[serde_as]
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Service {
     pub name: String,
-    pub injected: Vec<String>,
+    pub attributes: Vec<ServiceAttribute>,
 
     #[serde_as(as = "MapPreventDuplicates<_, _>")]
-    pub methods: BTreeMap<String, ServiceMethod>,
+    pub methods: BTreeMap<String, ApiMethod>,
+
+    pub source_path: PathBuf,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -270,12 +270,10 @@ impl CloesceAst {
     }
 
     pub fn to_json(&self) -> String {
-        assert!(self.hash != 0u64);
         serde_json::to_string_pretty(self).expect("serialize self to work")
     }
 
     pub fn to_migrations_json(self) -> String {
-        assert!(self.hash != 0u64);
         let Self { hash, models, .. } = self;
 
         let migrations_models: IndexMap<String, MigrationsModel> = models

@@ -402,12 +402,15 @@ impl SemanticAnalysis {
             );
 
             // Assemble graph
-            for inject in service.injected.iter() {
-                if !ast.services.contains_key(inject) {
+            for attr in service.attributes.iter() {
+                if !ast.services.contains_key(&attr.injected) {
                     continue;
                 }
 
-                graph.entry(inject).or_default().push(&service.name);
+                graph
+                    .entry(attr.injected.as_str())
+                    .or_default()
+                    .push(&service.name);
                 in_degree.entry(&service.name).and_modify(|d| *d += 1);
             }
 

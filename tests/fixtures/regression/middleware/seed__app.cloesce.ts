@@ -45,7 +45,7 @@ app.onRequest((request: Request, env, di) => {
   }
 });
 
-app.onModel(Model, (request, env, di) => {
+app.onNamespace(Model, (request, env, di) => {
   di.set(InjectedThing.name, {
     value: "hello world",
   });

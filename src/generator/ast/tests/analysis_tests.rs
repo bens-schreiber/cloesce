@@ -1,7 +1,7 @@
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, path::PathBuf};
 
 use ast::{
-    CidlType, MigrationsAst, NavigationPropertyKind, Service,
+    CidlType, MigrationsAst, NavigationPropertyKind, Service, ServiceAttribute,
     builder::{ModelBuilder, create_ast},
     err::GeneratorErrorKind,
 };
@@ -97,18 +97,30 @@ fn service_cycle_detection_error() {
         // A -> B -> C -> A
         Service {
             name: "A".into(),
-            injected: vec!["B".into()],
+            attributes: vec![ServiceAttribute {
+                var_name: "b".into(),
+                injected: "B".into(),
+            }],
             methods: BTreeMap::default(),
+            source_path: PathBuf::default(),
         },
         Service {
             name: "B".into(),
-            injected: vec!["C".into()],
+            attributes: vec![ServiceAttribute {
+                var_name: "c".into(),
+                injected: "C".into(),
+            }],
             methods: BTreeMap::default(),
+            source_path: PathBuf::default(),
         },
         Service {
             name: "C".into(),
-            injected: vec!["A".into()],
+            attributes: vec![ServiceAttribute {
+                var_name: "a".into(),
+                injected: "A".into(),
+            }],
             methods: BTreeMap::default(),
+            source_path: PathBuf::default(),
         },
     ];
     ast.services = services.into_iter().map(|s| (s.name.clone(), s)).collect();

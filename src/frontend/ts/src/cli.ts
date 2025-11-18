@@ -268,15 +268,15 @@ async function extract(args: {
       }
 
       for (const model of Object.values(ast.models)) {
-        (model as any).source_path =
-          "./" + path.basename((model as any).source_path);
+        model.source_path = "./" + path.basename(model.source_path);
       }
 
-      if ((ast as any).poos) {
-        for (const poo of Object.values((ast as any).poos)) {
-          (poo as any).source_path =
-            "./" + path.basename((poo as any).source_path);
-        }
+      for (const poo of Object.values(ast.poos)) {
+        poo.source_path = "./" + path.basename(poo.source_path);
+      }
+
+      for (const service of Object.values(ast.services)) {
+        service.source_path = "./" + path.basename(service.source_path);
       }
     }
 

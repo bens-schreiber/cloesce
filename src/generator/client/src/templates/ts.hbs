@@ -23,7 +23,7 @@ export class {{this.name}} {
 }
 {{/each}}
 
-{{#each service}}
+{{#each services}}
 export class {{this.name}} {
   {{#each this.methods}}
   static async {{this.name}}(
@@ -34,7 +34,7 @@ export class {{this.name}} {
     {{/each}}
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<{{get_cidl_type this.return_type}}>> {
-    const baseUrl = new URL(`{{../../domain}}/{{../name}}/{{this.name}}`);
+    const baseUrl = new URL("{{../../domain}}/{{../name}}/{{this.name}}");
     {{#if (eq this.http_verb "GET")}}
       {{#each this.parameters}}
         {{#if (is_serializable cidl_type)}}

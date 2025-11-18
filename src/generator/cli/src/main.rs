@@ -54,7 +54,7 @@ fn main() {
         Ok(Ok(())) => std::process::exit(0),
         Ok(Err(e)) if matches!(e.kind, GeneratorErrorKind::InvalidInputFile) => {
             eprintln!(
-                "==== CLOESCE ERROR ====\nInvalid generator file input: {}\n",
+                "==== CLOESCE ERROR ====\nAn error occurred when reading a file: {}\n",
                 e.context
             );
         }

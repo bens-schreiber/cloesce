@@ -38,6 +38,8 @@ export type { CrudKind } from "../ast.js";
  */
 export const D1: ClassDecorator = () => {};
 
+export const Service: ClassDecorator = () => {};
+
 /**
  * Marks a class as a plain serializable object.
  *

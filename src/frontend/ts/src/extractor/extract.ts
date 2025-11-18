@@ -20,12 +20,13 @@ import {
   HttpVerb,
   Model,
   ModelAttribute,
-  ModelMethod,
+  ApiMethod,
   NamedTypedValue,
   NavigationProperty,
   WranglerEnv,
   PlainOldObject,
   CrudKind,
+  Service,
 } from "../ast.js";
 import { TypeFormatFlags } from "typescript";
 import { ExtractorError, ExtractorErrorCode } from "./err.js";
@@ -44,6 +45,7 @@ enum ClassDecoratorKind {
   D1 = "D1",
   WranglerEnv = "WranglerEnv",
   PlainOldObject = "PlainOldObject",
+  Service = "Service",
   CRUD = "CRUD",
 }
 
@@ -61,6 +63,7 @@ export class CidlExtractor {
     const models: Record<string, Model> = {};
     const poos: Record<string, PlainOldObject> = {};
     const wranglerEnvs: WranglerEnv[] = [];
+    const services: Record<string, Service> = {};
     let app_source: string | null = null;
 
     for (const sourceFile of project.getSourceFiles()) {
@@ -91,7 +94,24 @@ export class CidlExtractor {
             result.value.addContext((prev) => `${classDecl.getName()}.${prev}`);
             return result;
           }
-          models[result.unwrap().name] = result.unwrap();
+
+          const model = result.unwrap();
+          models[model.name] = model;
+          continue;
+        }
+
+        if (hasDecorator(classDecl, ClassDecoratorKind.Service)) {
+          if (!classDecl.isExported()) return notExportedErr;
+          const result = CidlExtractor.service(classDecl, sourceFile);
+
+          // Error: propogate from service
+          if (result.isLeft()) {
+            result.value.addContext((prev) => `${classDecl.getName()}.${prev}`);
+            return result;
+          }
+
+          const service = result.unwrap();
+          services[service.name] = service;
           continue;
         }
 
@@ -112,7 +132,7 @@ export class CidlExtractor {
           // Error: invalid attribute modifier
           for (const prop of classDecl.getProperties()) {
             const modifierRes = checkAttributeModifier(prop);
-            if (modifierRes) {
+            if (modifierRes.isLeft()) {
               return modifierRes;
             }
           }
@@ -147,6 +167,7 @@ export class CidlExtractor {
       wrangler_env: wranglerEnvs[0],
       models,
       poos,
+      services,
       app_source,
     });
   }
@@ -189,7 +210,7 @@ export class CidlExtractor {
     const attributes: ModelAttribute[] = [];
     const navigation_properties: NavigationProperty[] = [];
     const data_sources: Record<string, DataSource> = {};
-    const methods: Record<string, ModelMethod> = {};
+    const methods: Record<string, ApiMethod> = {};
     const cruds: Set<CrudKind> = new Set<CrudKind>();
     let primary_key: NamedTypedValue | undefined = undefined;
 
@@ -218,7 +239,7 @@ export class CidlExtractor {
       // No decorators means this is a standard attribute
       if (decorators.length === 0) {
         // Error: invalid attribute modifier
-        if (checkModifierRes !== undefined) {
+        if (checkModifierRes.isLeft()) {
           return checkModifierRes;
         }
 
@@ -239,7 +260,7 @@ export class CidlExtractor {
 
       // Error: invalid attribute modifier
       if (
-        checkModifierRes !== undefined &&
+        checkModifierRes.isLeft() &&
         decoratorName !== AttributeDecoratorKind.DataSource
       ) {
         return checkModifierRes;
@@ -420,7 +441,7 @@ export class CidlExtractor {
         continue;
       }
 
-      const result = CidlExtractor.method(name, m, httpVerb);
+      const result = CidlExtractor.modelMethod(name, m, httpVerb);
       if (result.isLeft()) {
         result.value.addContext((prev) => `${m.getName()} ${prev}`);
         return result;
@@ -437,6 +458,217 @@ export class CidlExtractor {
       data_sources,
       cruds: Array.from(cruds).sort(),
       source_path: sourceFile.getFilePath().toString(),
+    });
+  }
+
+  static modelMethod(
+    modelName: string,
+    method: MethodDeclaration,
+    verb: HttpVerb,
+  ): Either<ExtractorError, ApiMethod> {
+    // Error: invalid method scope, must be public
+    if (method.getScope() != Scope.Public) {
+      return err(ExtractorErrorCode.InvalidApiMethodModifier, (e) => {
+        e.context = method.getName();
+        e.snippet = method.getText();
+      });
+    }
+
+    let needsDataSource = !method.isStatic();
+    const parameters: NamedTypedValue[] = [];
+
+    for (const param of method.getParameters()) {
+      // Handle injected param
+      if (param.getDecorator(ParameterDecoratorKind.Inject)) {
+        const typeRes = CidlExtractor.cidlType(param.getType(), true);
+
+        // Error: invalid type
+        if (typeRes.isLeft()) {
+          typeRes.value.snippet = method.getText();
+          typeRes.value.context = param.getName();
+          return typeRes;
+        }
+
+        parameters.push({
+          name: param.getName(),
+          cidl_type: typeRes.unwrap(),
+        });
+        continue;
+      }
+
+      // Handle all other params
+      const typeRes = CidlExtractor.cidlType(param.getType());
+
+      // Error: invalid type
+      if (typeRes.isLeft()) {
+        typeRes.value.snippet = method.getText();
+        typeRes.value.context = param.getName();
+        return typeRes;
+      }
+      if (typeof typeRes.value !== "string" && "DataSource" in typeRes.value) {
+        needsDataSource = false;
+      }
+
+      parameters.push({
+        name: param.getName(),
+        cidl_type: typeRes.unwrap(),
+      });
+    }
+
+    const typeRes = CidlExtractor.cidlType(method.getReturnType());
+
+    // Error: invalid type
+    if (typeRes.isLeft()) {
+      typeRes.value.snippet = method.getText();
+      return typeRes;
+    }
+
+    // Sugaring: add data source
+    if (needsDataSource) {
+      parameters.push({
+        name: "__dataSource",
+        cidl_type: { DataSource: modelName },
+      });
+    }
+
+    return Either.right({
+      name: method.getName(),
+      is_static: method.isStatic(),
+      http_verb: verb,
+      return_type: typeRes.unwrap(),
+      parameters,
+    });
+  }
+
+  static service(
+    classDecl: ClassDeclaration,
+    sourceFile: SourceFile,
+  ): Either<ExtractorError, Service> {
+    const attributes = [];
+    const methods: Record<string, ApiMethod> = {};
+
+    // Attributes
+    for (const prop of classDecl.getProperties()) {
+      const typeRes = CidlExtractor.cidlType(prop.getType(), true);
+
+      // Error: invalid property type
+      if (typeRes.isLeft()) {
+        typeRes.value.context = prop.getName();
+        typeRes.value.snippet = prop.getText();
+        return typeRes;
+      }
+
+      if (typeof typeRes.value === "string" || !("Inject" in typeRes.value)) {
+        return err(ExtractorErrorCode.InvalidServiceAttribute, (e) => {
+          e.context = prop.getName();
+          e.snippet = prop.getText();
+        });
+      }
+
+      const checkModifierRes = checkAttributeModifier(prop);
+      if (checkModifierRes.isLeft()) {
+        return checkModifierRes;
+      }
+
+      attributes.push({
+        var_name: prop.getName(),
+        injected: typeRes.value.Inject,
+      });
+    }
+
+    // Methods
+    for (const m of classDecl.getMethods()) {
+      const httpVerb = m
+        .getDecorators()
+        .map((d) => getDecoratorName(d))
+        .find((name) =>
+          Object.values(HttpVerb).includes(name as HttpVerb),
+        ) as HttpVerb;
+
+      if (!httpVerb) {
+        continue;
+      }
+
+      const res = CidlExtractor.serviceMethod(m, httpVerb);
+      if (res.isLeft()) {
+        return res;
+      }
+
+      const serviceMethod = res.unwrap();
+      methods[serviceMethod.name] = serviceMethod;
+    }
+
+    return Either.right({
+      name: classDecl.getName()!,
+      attributes,
+      methods,
+      source_path: sourceFile.getFilePath().toString(),
+    });
+  }
+
+  static serviceMethod(
+    method: MethodDeclaration,
+    verb: HttpVerb,
+  ): Either<ExtractorError, ApiMethod> {
+    // Error: invalid method scope, must be public
+    if (method.getScope() != Scope.Public) {
+      return err(ExtractorErrorCode.InvalidApiMethodModifier, (e) => {
+        e.context = method.getName();
+        e.snippet = method.getText();
+      });
+    }
+
+    const parameters = [];
+
+    for (const param of method.getParameters()) {
+      // Handle injected param
+      if (param.getDecorator(ParameterDecoratorKind.Inject)) {
+        const typeRes = CidlExtractor.cidlType(param.getType(), true);
+
+        // Error: invalid type
+        if (typeRes.isLeft()) {
+          typeRes.value.snippet = method.getText();
+          typeRes.value.context = param.getName();
+          return typeRes;
+        }
+
+        parameters.push({
+          name: param.getName(),
+          cidl_type: typeRes.unwrap(),
+        });
+        continue;
+      }
+
+      // Handle all other params
+      const typeRes = CidlExtractor.cidlType(param.getType());
+
+      // Error: invalid type
+      if (typeRes.isLeft()) {
+        typeRes.value.snippet = method.getText();
+        typeRes.value.context = param.getName();
+        return typeRes;
+      }
+
+      parameters.push({
+        name: param.getName(),
+        cidl_type: typeRes.unwrap(),
+      });
+    }
+
+    const typeRes = CidlExtractor.cidlType(method.getReturnType());
+
+    // Error: invalid type
+    if (typeRes.isLeft()) {
+      typeRes.value.snippet = method.getText();
+      return typeRes;
+    }
+
+    return Either.right({
+      name: method.getName(),
+      http_verb: verb,
+      is_static: method.isStatic(),
+      return_type: typeRes.unwrap(),
+      parameters,
     });
   }
 
@@ -459,7 +691,7 @@ export class CidlExtractor {
 
       // Error: invalid attribute modifier
       const modifierRes = checkAttributeModifier(prop);
-      if (modifierRes) {
+      if (modifierRes.isLeft()) {
         return modifierRes;
       }
 
@@ -765,85 +997,6 @@ export class CidlExtractor {
 
     return Either.right(result);
   }
-
-  static method(
-    modelName: string,
-    method: MethodDeclaration,
-    httpVerb: HttpVerb,
-  ): Either<ExtractorError, ModelMethod> {
-    // Error: invalid method scope, must be public
-    if (method.getScope() != Scope.Public) {
-      return err(ExtractorErrorCode.InvalidApiMethodModifier, (e) => {
-        e.context = method.getName();
-        e.snippet = method.getText();
-      });
-    }
-
-    let needsDataSource = !method.isStatic();
-    const parameters: NamedTypedValue[] = [];
-
-    for (const param of method.getParameters()) {
-      // Handle injected param
-      if (param.getDecorator(ParameterDecoratorKind.Inject)) {
-        const typeRes = CidlExtractor.cidlType(param.getType(), true);
-
-        // Error: invalid type
-        if (typeRes.isLeft()) {
-          typeRes.value.snippet = method.getText();
-          typeRes.value.context = param.getName();
-          return typeRes;
-        }
-
-        parameters.push({
-          name: param.getName(),
-          cidl_type: typeRes.unwrap(),
-        });
-        continue;
-      }
-
-      // Handle all other params
-      const typeRes = CidlExtractor.cidlType(param.getType());
-
-      // Error: invalid type
-      if (typeRes.isLeft()) {
-        typeRes.value.snippet = method.getText();
-        typeRes.value.context = param.getName();
-        return typeRes;
-      }
-      if (typeof typeRes.value !== "string" && "DataSource" in typeRes.value) {
-        needsDataSource = false;
-      }
-
-      parameters.push({
-        name: param.getName(),
-        cidl_type: typeRes.unwrap(),
-      });
-    }
-
-    const typeRes = CidlExtractor.cidlType(method.getReturnType());
-
-    // Error: invalid type
-    if (typeRes.isLeft()) {
-      typeRes.value.snippet = method.getText();
-      return typeRes;
-    }
-
-    // Sugaring: add data source
-    if (needsDataSource) {
-      parameters.push({
-        name: "__dataSource",
-        cidl_type: { DataSource: modelName },
-      });
-    }
-
-    return Either.right({
-      name: method.getName(),
-      is_static: method.isStatic(),
-      http_verb: httpVerb,
-      return_type: typeRes.unwrap(),
-      parameters,
-    });
-  }
 }
 
 function err(
@@ -944,7 +1097,7 @@ function hasDecorator(
 
 function checkAttributeModifier(
   prop: PropertyDeclaration,
-): Either<ExtractorError, never> | undefined {
+): Either<ExtractorError, null> {
   // Error: attributes must be just 'public'
   if (prop.getScope() != Scope.Public || prop.isReadonly() || prop.isStatic()) {
     return err(ExtractorErrorCode.InvalidAttributeModifier, (e) => {
@@ -952,4 +1105,5 @@ function checkAttributeModifier(
       e.snippet = prop.getText();
     });
   }
+  return Either.right(null);
 }

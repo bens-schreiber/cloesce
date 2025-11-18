@@ -12,7 +12,7 @@ describe("Extractor Run-Fail", () => {
     const lines = fs.readFileSync(file, "utf8").split(/\r?\n/);
     const expectedName = lines[1].replace("//", "").trim();
 
-    test(path.relative(FIXTURE_ROOT, file), () => {
+    test.concurrent(path.relative(FIXTURE_ROOT, file), () => {
       const project = new Project({ compilerOptions: { strict: true } });
       project.addSourceFileAtPath(file);
 

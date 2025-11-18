@@ -10,6 +10,7 @@ export class InjectedThing {
   }
 }
 
+
 export class Model {
   id: number;
 
@@ -28,8 +29,8 @@ export class Model {
     return await HttpResult.fromResponse<InjectedThing>(res, InjectedThing, false);
   }
   static async save(
-        model: DeepPartial<Model>,
-        __datasource: "none" = "none",
+    model: DeepPartial<Model>,
+    __datasource: "none" = "none",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Model>> {
     const baseUrl = new URL(`http://localhost:5002/api/Model/save`);

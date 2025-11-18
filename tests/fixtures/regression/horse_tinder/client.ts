@@ -2,6 +2,7 @@
 
 import { HttpResult, DeepPartial } from "cloesce/client";
 
+
 export class Horse {
   id: number;
   name: string;
@@ -9,7 +10,7 @@ export class Horse {
   likes: Like[];
 
   static async get(
-        id: number,
+    id: number,
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Horse>> {
     const baseUrl = new URL(`http://localhost:5002/api/Horse/get`);
@@ -18,8 +19,8 @@ export class Horse {
     return await HttpResult.fromResponse<Horse>(res, Horse, false);
   }
   async like(
-        horse: Horse,
-        __dataSource: "default" |"withLikes" |"none" = "none",
+    horse: Horse,
+    __dataSource: "default" |"withLikes" |"none" = "none",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<void>> {
     const baseUrl = new URL(`http://localhost:5002/api/Horse/${this.id}/like`);
@@ -41,7 +42,7 @@ export class Horse {
     return await HttpResult.fromResponse<Horse[]>(res);
   }
   static async post(
-        horse: Horse,
+    horse: Horse,
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Horse>> {
     const baseUrl = new URL(`http://localhost:5002/api/Horse/post`);

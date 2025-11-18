@@ -1,5 +1,9 @@
 import { describe, test, expect, vi, beforeEach, beforeAll } from "vitest";
-import { RouterFailState, _cloesceInternal } from "../src/router/router";
+import {
+  ModelRoute,
+  RouterFailState,
+  _cloesceInternal,
+} from "../src/router/router";
 import { HttpVerb, Model, NamedTypedValue } from "../src/ast";
 import {
   CloesceApp,
@@ -11,7 +15,12 @@ import { CrudProxy } from "../src/router/crud";
 import { mapSql } from "../src/router/wasm";
 import fs from "fs";
 import path from "path";
-import { IncludeTreeBuilder, ModelBuilder, createAst } from "./builder";
+import {
+  IncludeTreeBuilder,
+  ModelBuilder,
+  ServiceBuilder,
+  createAst,
+} from "./builder";
 import { D1Database } from "@cloudflare/workers-types/experimental";
 
 function mockRequest(url: string, method?: string, body?: any) {
@@ -145,7 +154,7 @@ describe("Match Route", () => {
     );
   });
 
-  test("Unknown Model => 404", () => {
+  test("Unknown Route => 404", () => {
     // Arrange
     const request = mockRequest("http://foo.com/api/Model/method");
     const ast = createAst([]);
@@ -157,7 +166,7 @@ describe("Match Route", () => {
     expect(res.isLeft()).toBe(true);
     expect(res.unwrapLeft().status).toEqual(404);
     expect(extractErrorCode(res.unwrapLeft().message)).toEqual(
-      RouterFailState.UnknownModel,
+      RouterFailState.UnknownRoute,
     );
   });
 
@@ -173,7 +182,7 @@ describe("Match Route", () => {
     expect(res.isLeft()).toBe(true);
     expect(res.unwrapLeft().status).toEqual(404);
     expect(extractErrorCode(res.unwrapLeft().message)).toEqual(
-      RouterFailState.UnknownMethod,
+      RouterFailState.UnknownRoute,
     );
   });
 
@@ -198,7 +207,7 @@ describe("Match Route", () => {
     );
   });
 
-  test("Matches static method", () => {
+  test("Matches static method on Model", () => {
     // Arrange
     const request = mockRequest("http://foo.com/api/Model/method", "POST");
     const ast = createAst([
@@ -212,16 +221,17 @@ describe("Match Route", () => {
     const res = _cloesceInternal.matchRoute(request, ast, "api");
 
     // Assert
-    console.log(res);
     expect(res.isRight()).toBe(true);
     expect(res.unwrap()).toEqual({
       id: null,
-      method: ast.models["Model"].methods["method"],
-      model: ast.models["Model"],
+      route: {
+        method: ast.models["Model"].methods["method"],
+        model: ast.models["Model"],
+      },
     });
   });
 
-  test("Matches instantiated method", () => {
+  test("Matches instantiated method on Model", () => {
     // Arrange
     const request = mockRequest("http://foo.com/api/Model/0/method", "POST");
     const ast = createAst([
@@ -235,18 +245,71 @@ describe("Match Route", () => {
     const res = _cloesceInternal.matchRoute(request, ast, "api");
 
     // Assert
-    console.log(res);
     expect(res.isRight()).toBe(true);
     expect(res.unwrap()).toEqual({
       id: "0",
-      method: ast.models["Model"].methods["method"],
-      model: ast.models["Model"],
+      route: {
+        model: ast.models["Model"],
+        method: ast.models["Model"].methods["method"],
+      },
+    });
+  });
+
+  test("Matches static method on Service", () => {
+    // Arrange
+    const request = mockRequest("http://foo.com/api/Service/method", "POST");
+    const ast = createAst(
+      [],
+      [
+        ServiceBuilder.service("Service")
+          .method("method", HttpVerb.POST, true, [], "Void")
+          .build(),
+      ],
+    );
+
+    // Act
+    const res = _cloesceInternal.matchRoute(request, ast, "api");
+
+    // Assert
+    expect(res.isRight()).toBe(true);
+    expect(res.unwrap()).toEqual({
+      id: null,
+      route: {
+        method: ast.services["Service"].methods["method"],
+        service: ast.services["Service"],
+      },
+    });
+  });
+
+  test("Matches instantiated method on Service", () => {
+    // Arrange
+    const request = mockRequest("http://foo.com/api/Service/method", "POST");
+    const ast = createAst(
+      [],
+      [
+        ServiceBuilder.service("Service")
+          .method("method", HttpVerb.POST, false, [], "Void")
+          .build(),
+      ],
+    );
+
+    // Act
+    const res = _cloesceInternal.matchRoute(request, ast, "api");
+
+    // Assert
+    expect(res.isRight()).toBe(true);
+    expect(res.unwrap()).toEqual({
+      id: null,
+      route: {
+        method: ast.services["Service"].methods["method"],
+        service: ast.services["Service"],
+      },
     });
   });
 });
 
-describe("Model Middleware", () => {
-  test("Exits early", async () => {
+describe("Namespace Middleware", () => {
+  test("Exits early on Model", async () => {
     // Arrange
     const app = new CloesceApp();
     const request = mockRequest("http://foo.com/api/Foo/method", "POST");
@@ -263,7 +326,45 @@ describe("Model Middleware", () => {
 
     class Foo {}
 
-    app.onModel(Foo, async (_req, _e, _di) => {
+    app.onNamespace(Foo, async (_req, _e, _di) => {
+      return HttpResult.fail(500, "oogly boogly");
+    });
+
+    // Act
+    const res: HttpResult = await (app as any).cloesce(
+      request,
+      env,
+      ast,
+      constructorRegistry,
+      di,
+      d1,
+    );
+
+    // Assert
+    expect(res.status).toBe(500);
+    expect(res.message).toBe("oogly boogly");
+  });
+
+  test("Exits early on Service", async () => {
+    // Arrange
+    const app = new CloesceApp();
+    const request = mockRequest("http://foo.com/api/Foo/method", "POST");
+    const env = mockWranglerEnv();
+    const ast = createAst(
+      [],
+      [
+        ServiceBuilder.service("Foo")
+          .method("method", HttpVerb.POST, true, [], "Void")
+          .build(),
+      ],
+    );
+    const constructorRegistry = mockCtorReg();
+    const di = mockDi();
+    const d1 = mockD1();
+
+    class Foo {}
+
+    app.onNamespace(Foo, async (_req, _e, _di) => {
       return HttpResult.fail(500, "oogly boogly");
     });
 
@@ -295,14 +396,14 @@ describe("Request Validation", () => {
 
     class Foo {}
     const ctorReg = mockCtorReg([Foo]);
+    const route = ModelRoute.from(ast, Foo.name, "method")!;
 
     // Act
     const res = await _cloesceInternal.validateRequest(
       request,
       ast,
       ctorReg,
-      model,
-      model.methods["method"],
+      route,
       null,
     );
 
@@ -324,14 +425,14 @@ describe("Request Validation", () => {
 
     class Foo {}
     const ctorReg = mockCtorReg([Foo]);
+    const route = ModelRoute.from(ast, Foo.name, "method")!;
 
     // Act
     const res = await _cloesceInternal.validateRequest(
       request,
       ast,
       ctorReg,
-      model,
-      model.methods["method"],
+      route,
       "0",
     );
 
@@ -364,14 +465,14 @@ describe("Request Validation", () => {
 
     class Foo {}
     const ctorReg = mockCtorReg([Foo]);
+    const route = ModelRoute.from(ast, Foo.name, "method")!;
 
     // Act
     const res = await _cloesceInternal.validateRequest(
       request,
       ast,
       ctorReg,
-      model,
-      model.methods["method"],
+      route,
       "0",
     );
 
@@ -596,14 +697,15 @@ describe("Request Validation", () => {
       testCase.isGetRequest ? undefined : testCase.jsonValue,
     );
 
+    const route = ModelRoute.from(ast, "TestCase", "testMethod")!;
+
     // Act
     const res = await _cloesceInternal.validateRequest(
       request,
       ast,
       testCase.ctorReg ?? {},
-      model,
-      model.methods["testMethod"],
-      "0",
+      route,
+      null,
     );
     ``;
     // Assert
@@ -671,15 +773,15 @@ describe("Method Dispatch", () => {
       )
       .build();
 
-    const method = model.methods["method"];
     const crud = vi.mockObject(CrudProxy);
     const di = mockDi();
+    const route = ModelRoute.from(createAst([model]), "Foo", "method")!;
 
     // Act
     const res = await _cloesceInternal.methodDispatch(
       crud as unknown as CrudProxy,
       di,
-      method,
+      route,
       {},
     );
 
@@ -704,13 +806,13 @@ describe("Method Dispatch", () => {
       .method("testMethod", HttpVerb.GET, true, [], "Void")
       .build();
 
-    const method = model.methods["testMethod"];
+    const route = ModelRoute.from(createAst([model]), "Foo", "testMethod")!;
 
     // Act
     const res = await _cloesceInternal.methodDispatch(
       crud as unknown as CrudProxy,
       di,
-      method,
+      route,
       {},
     );
 
@@ -740,13 +842,13 @@ describe("Method Dispatch", () => {
       .method("testMethod", HttpVerb.GET, true, [], { HttpResult: "Void" })
       .build();
 
-    const method = model.methods["testMethod"];
+    const route = ModelRoute.from(createAst([model]), "Foo", "testMethod")!;
 
     // Act
     const res = await _cloesceInternal.methodDispatch(
       crud as unknown as CrudProxy,
       di,
-      method,
+      route,
       {},
     );
 
@@ -772,13 +874,13 @@ describe("Method Dispatch", () => {
       .method("testMethod", HttpVerb.GET, true, [], "Text")
       .build();
 
-    const method = model.methods["testMethod"];
+    const route = ModelRoute.from(createAst([model]), "Foo", "testMethod")!;
 
     // Act
     const res = await _cloesceInternal.methodDispatch(
       crud as unknown as CrudProxy,
       di,
-      method,
+      route,
       {},
     );
 
@@ -792,7 +894,7 @@ describe("Method Dispatch", () => {
       .id()
       .method("testMethod", HttpVerb.GET, true, [], "Text")
       .build();
-    const method = model.methods["testMethod"];
+    const route = ModelRoute.from(createAst([model]), "Foo", "testMethod")!;
 
     const crud = {
       invoke() {
@@ -808,7 +910,7 @@ describe("Method Dispatch", () => {
     const res = await _cloesceInternal.methodDispatch(
       crud as unknown as CrudProxy,
       di,
-      method,
+      route,
       {},
     );
 

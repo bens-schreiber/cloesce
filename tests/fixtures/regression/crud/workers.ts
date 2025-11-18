@@ -5,6 +5,7 @@ import { CrudHaver } from "./seed__crud.cloesce.ts";
 import { Parent } from "./seed__crud.cloesce.ts";
 import { Child } from "./seed__crud.cloesce.ts";
 
+
 const app = new CloesceApp();
 const constructorRegistry = {
 	CrudHaver: CrudHaver,

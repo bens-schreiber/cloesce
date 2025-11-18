@@ -6,7 +6,7 @@ import {
   isNullableType,
 } from "../ast";
 import { Either } from "../ui/common";
-import { ModelConstructorRegistry } from "./router";
+import { ConstructorRegistry } from "./router";
 
 /**
  * Runtime type validation, asserting that the structure of a value follows the
@@ -27,7 +27,7 @@ export class RuntimeValidator {
     value: any,
     cidlType: CidlType,
     ast: CloesceAst,
-    ctorReg: ModelConstructorRegistry,
+    ctorReg: ConstructorRegistry,
   ): Either<null, any> {
     return RuntimeValidator.recurse(value, cidlType, false, ast, ctorReg);
   }
@@ -37,7 +37,7 @@ export class RuntimeValidator {
     cidlType: any,
     isPartial: boolean,
     ast: CloesceAst,
-    ctorReg: ModelConstructorRegistry,
+    ctorReg: ConstructorRegistry,
   ): Either<null, any> {
     isPartial ||= typeof cidlType !== "string" && "Partial" in cidlType;
 

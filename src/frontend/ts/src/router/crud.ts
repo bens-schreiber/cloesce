@@ -5,6 +5,7 @@ import { NO_DATA_SOURCE } from "../ast.js";
 
 /**
  * A wrapper for Model Instances, containing definitions for built-in CRUD methods.
+ * Safe to wrap Services as well (default behavior).
  */
 export class CrudProxy {
   private constructor(

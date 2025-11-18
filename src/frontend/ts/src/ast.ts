@@ -38,11 +38,11 @@ export interface ModelAttribute {
   foreign_key_reference: string | null;
 }
 
-export interface ModelMethod {
+export interface ApiMethod {
   name: string;
   is_static: boolean;
   http_verb: HttpVerb;
-  return_type: CidlType | null;
+  return_type: CidlType;
   parameters: NamedTypedValue[];
 }
 
@@ -70,7 +70,7 @@ export interface Model {
   primary_key: NamedTypedValue;
   attributes: ModelAttribute[];
   navigation_properties: NavigationProperty[];
-  methods: Record<string, ModelMethod>;
+  methods: Record<string, ApiMethod>;
   data_sources: Record<string, DataSource>;
   cruds: CrudKind[];
   source_path: string;
@@ -79,6 +79,18 @@ export interface Model {
 export interface PlainOldObject {
   name: string;
   attributes: NamedTypedValue[];
+  source_path: string;
+}
+
+export interface ServiceAttribute {
+  var_name: string;
+  injected: string;
+}
+
+export interface Service {
+  name: string;
+  attributes: ServiceAttribute[];
+  methods: Record<string, ApiMethod>;
   source_path: string;
 }
 
@@ -107,5 +119,6 @@ export interface CloesceAst {
   wrangler_env: WranglerEnv;
   models: Record<string, Model>;
   poos: Record<string, PlainOldObject>;
+  services: Record<string, Service>;
   app_source: string | null;
 }

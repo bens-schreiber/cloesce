@@ -10,13 +10,14 @@ export class Poo {
   }
 }
 
+
 export class Foo {
   id: number;
 
   async bar(
-        customDs: "baz" |"none" = "none",
-        oneDs: "default" |"none" = "none",
-        noDs: "none" = "none",
+    customDs: "baz" |"none" = "none",
+    oneDs: "default" |"none" = "none",
+    noDs: "none" = "none",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<void>> {
     const baseUrl = new URL(`http://localhost:5002/api/Foo/${this.id}/bar`);
