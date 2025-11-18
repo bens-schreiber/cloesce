@@ -4,82 +4,83 @@ import { HttpResult } from "../ui/common.js";
 import { NO_DATA_SOURCE } from "../ast.js";
 
 /**
- * A wrapper for Model Instances, containing definitions for built-in CRUD methods.
- * Safe to wrap Services as well (default behavior).
+ * Wraps an object in a Proxy that will intercept non-overriden CRUD methods,
+ * calling a default implementation.
  */
-export class CrudProxy {
-  private constructor(
-    private d1: D1Database,
-    private instance: object | undefined,
-    private ctor: new () => object,
-  ) {}
+export function proxyCrud(obj: any, ctor: any, d1: D1Database) {
+  return new Proxy(obj, {
+    get(target, method) {
+      // If the instance defines the method, always use it (override allowed)
+      const value = Reflect.get(target, method);
+      if (typeof value === "function") {
+        return value.bind(target);
+      }
 
-  static fromInstance(
-    d1: D1Database,
-    instance: any,
-    ctor: new () => object,
-  ): CrudProxy {
-    return new this(d1, instance, ctor);
-  }
+      // Fallback to CRUD methods
+      if (method === "save") {
+        return (body: object, ds: string) => upsert(ctor, body, ds, d1);
+      }
 
-  static fromCtor(d1: D1Database, ctor: new () => object): CrudProxy {
-    return new this(d1, ctor, ctor);
-  }
+      if (method === "list") {
+        return (ds: string) => list(ctor, ds, d1);
+      }
 
-  /**
-   * Invokes a method on the instance, intercepting built-in CRUD methods and injecting
-   * a default definition.
-   */
-  invoke(methodName: string): Function {
-    const map: Record<string, Function> = {
-      save: this.upsert.bind(this),
-      get: this.get.bind(this),
-      list: this.list.bind(this),
-    };
+      if (method === "get") {
+        return (id: any, ds: string) => get(ctor, id, ds, d1);
+      }
 
-    const fn = this.instance && (this.instance as any)[methodName];
-    return fn ? fn.bind(this.instance) : map[methodName];
-  }
+      return value;
+    },
+  });
+}
 
-  async upsert(obj: object, dataSource: string): Promise<HttpResult<unknown>> {
-    const includeTree = findIncludeTree(dataSource, this.ctor);
+async function upsert(
+  ctor: any,
+  body: object,
+  dataSource: string,
+  d1: D1Database,
+): Promise<HttpResult<unknown>> {
+  const includeTree = findIncludeTree(dataSource, ctor);
+  const orm = Orm.fromD1(d1);
 
-    // Upsert
-    const orm = Orm.fromD1(this.d1);
-    const upsert = await orm.upsert(this.ctor, obj, includeTree);
-    if (upsert.isLeft()) {
-      return HttpResult.fail(500, upsert.value); // TODO: better status code?
-    }
+  const result = await orm.upsert(ctor, body, includeTree);
+  if (result.isLeft()) return HttpResult.fail(500, result.value);
 
-    // Get
-    const get = await orm.get(this.ctor, upsert.value, includeTree);
-    return get.isRight()
-      ? HttpResult.ok(200, get.value)
-      : HttpResult.fail(500, get.value);
-  }
+  const getRes = await orm.get(ctor, result.value, includeTree);
+  return getRes.isRight()
+    ? HttpResult.ok(200, getRes.value)
+    : HttpResult.fail(500, getRes.value);
+}
 
-  async get(id: any, dataSource: string): Promise<HttpResult<unknown>> {
-    const includeTree = findIncludeTree(dataSource, this.ctor);
+async function get(
+  ctor: any,
+  id: any,
+  dataSource: string,
+  d1: D1Database,
+): Promise<HttpResult<unknown>> {
+  const includeTree = findIncludeTree(dataSource, ctor);
 
-    const orm = Orm.fromD1(this.d1);
-    const res = await orm.get(this.ctor, id, includeTree);
-    return res.isRight()
-      ? HttpResult.ok(200, res.value)
-      : HttpResult.fail(500, res.value);
-  }
+  const orm = Orm.fromD1(d1);
+  const res = await orm.get(ctor, id, includeTree);
 
-  async list(dataSource: string): Promise<HttpResult<unknown>> {
-    const includeTree = findIncludeTree(dataSource, this.ctor);
+  return res.isRight()
+    ? HttpResult.ok(200, res.value)
+    : HttpResult.fail(500, res.value);
+}
 
-    const orm = Orm.fromD1(this.d1);
-    const res = await orm.list(this.ctor, {
-      includeTree,
-    });
+async function list(
+  ctor: any,
+  dataSource: string,
+  d1: D1Database,
+): Promise<HttpResult<unknown>> {
+  const includeTree = findIncludeTree(dataSource, ctor);
 
-    return res.isRight()
-      ? HttpResult.ok(200, res.value)
-      : HttpResult.fail(500, res.value as string);
-  }
+  const orm = Orm.fromD1(d1);
+  const res = await orm.list(ctor, { includeTree });
+
+  return res.isRight()
+    ? HttpResult.ok(200, res.value)
+    : HttpResult.fail(500, res.value as string);
 }
 
 function findIncludeTree(

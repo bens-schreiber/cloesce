@@ -1,18 +1,15 @@
 import { D1Database } from "@cloudflare/workers-types/experimental/index.js";
 
 import { OrmWasmExports, mapSql, loadOrmWasm } from "./wasm.js";
-import { CrudProxy } from "./crud.js";
+import { proxyCrud } from "./crud.js";
 import { HttpResult, IncludeTree, Orm } from "../ui/backend.js";
 import { Either, KeysOfType } from "../ui/common.js";
 import {
   CloesceAst,
-  HttpVerb,
   Model,
   ApiMethod,
   NO_DATA_SOURCE,
-  NamedTypedValue,
   Service,
-  CidlType,
 } from "../ast.js";
 import { RuntimeValidator } from "./validator.js";
 
@@ -189,7 +186,7 @@ export class CloesceApp {
     if (routeRes.isLeft()) {
       return routeRes.value;
     }
-    const { route, id } = routeRes.unwrap();
+    const route = routeRes.unwrap();
 
     // Model middleware
     for (const m of this.namespaceMiddleware.get(route.namespace) ?? []) {
@@ -200,7 +197,7 @@ export class CloesceApp {
     }
 
     // Request validation
-    const validation = await validateRequest(request, ast, ctorReg, route, id);
+    const validation = await validateRequest(request, ast, ctorReg, route);
     if (validation.isLeft()) {
       return validation.value;
     }
@@ -209,29 +206,41 @@ export class CloesceApp {
     // Method middleware
     for (const m of this.methodMiddleware
       .get(route.namespace)
-      ?.get(route.methodName) ?? []) {
+      ?.get(route.method.name) ?? []) {
       const res = await m(request, env, di);
       if (res) {
         return res;
       }
     }
 
-    // Static, skip hydration
-    if (route.isMethodStatic) {
-      const instance = CrudProxy.fromCtor(d1, ctorReg[route.namespace]);
-
-      // Method dispatch
-      return await methodDispatch(instance, di, route, params);
-    }
-
     // Hydration
-    const hydrated = await route.hydrate(d1, ctorReg, id, dataSource, di);
+    const hydrated = await (async () => {
+      if (route.method.is_static) {
+        return Either.right(ctorReg[route.namespace]);
+      }
+
+      if (route.kind == "model") {
+        return await hydrateModel(
+          ctorReg,
+          d1,
+          route.model!,
+          route.id!,
+          dataSource!,
+        );
+      }
+
+      return Either.right(di.get(route.namespace));
+    })();
+
     if (hydrated.isLeft()) {
       return hydrated.value;
     }
 
+    // Proxy CRUD methods
+    const crud = proxyCrud(hydrated.unwrap(), ctorReg[route.namespace], d1);
+
     // Method dispatch
-    return await methodDispatch(hydrated.unwrap(), di, route, params);
+    return await methodDispatch(crud, di, route, params);
   }
 
   /**
@@ -306,170 +315,14 @@ export enum RouterFailState {
   UncaughtException,
 }
 
-interface MatchedRoute {
-  get verb(): HttpVerb;
-  get namespace(): string;
-  get isStatic(): boolean;
-  get isMethodStatic(): boolean;
-  get params(): NamedTypedValue[];
-  get methodName(): string;
-  get returnType(): CidlType;
-  hydrate(
-    d1: D1Database,
-    ctorReg: ConstructorRegistry,
-    id: string | null,
-    dataSource: string | null,
-    di: DependencyContainer,
-  ): Promise<Either<HttpResult, CrudProxy>>;
-}
-
-export class ModelRoute implements MatchedRoute {
-  constructor(
-    private model: Model,
-    private method: ApiMethod,
-  ) {}
-
-  get verb(): HttpVerb {
-    return this.method.http_verb;
-  }
-
-  get namespace(): string {
-    return this.model.name;
-  }
-
-  get isStatic(): boolean {
-    return this.method.is_static;
-  }
-
-  get isMethodStatic(): boolean {
-    return this.method.is_static;
-  }
-
-  get params(): NamedTypedValue[] {
-    return this.method.parameters;
-  }
-
-  get methodName(): string {
-    return this.method.name;
-  }
-
-  get returnType(): CidlType {
-    return this.method.return_type;
-  }
-
-  async hydrate(
-    d1: D1Database,
-    ctorReg: ConstructorRegistry,
-    id: string | null,
-    dataSource: string | null,
-  ): Promise<Either<HttpResult, CrudProxy>> {
-    const hydratedModel = await hydrateModel(
-      ctorReg,
-      d1,
-      this.model,
-      id!, // id must exist after matchRoute
-      dataSource!, // ds must exist after validateRequest
-    );
-
-    return hydratedModel.map((_) =>
-      CrudProxy.fromInstance(d1, hydratedModel.value, ctorReg[this.namespace]),
-    );
-  }
-
-  static from(
-    ast: CloesceAst,
-    modelName: string,
-    methodName: string,
-  ): MatchedRoute | null {
-    const model = ast.models[modelName];
-    if (!model) {
-      return null;
-    }
-
-    const method = model.methods[methodName];
-    if (!method) {
-      return null;
-    }
-
-    return new ModelRoute(model, method);
-  }
-}
-
-export class ServiceRoute implements MatchedRoute {
-  constructor(
-    private service: Service,
-    private method: ApiMethod,
-  ) {}
-
-  get verb(): HttpVerb {
-    return this.method.http_verb;
-  }
-
-  get namespace(): string {
-    return this.service.name;
-  }
-
-  get isStatic(): boolean {
-    return true;
-  }
-
-  get isMethodStatic(): boolean {
-    return this.method.is_static;
-  }
-
-  get params(): NamedTypedValue[] {
-    return this.method.parameters;
-  }
-
-  get methodName(): string {
-    return this.method.name;
-  }
-
-  get returnType(): CidlType {
-    return this.method.return_type;
-  }
-
-  /// Fetches the instance from DI
-  async hydrate(
-    d1: D1Database,
-    ctorReg: ConstructorRegistry,
-    _id: string | null,
-    _dataSource: string | null,
-    di: DependencyContainer,
-  ): Promise<Either<HttpResult, CrudProxy>> {
-    const service = di.get(this.namespace);
-    if (!service) {
-      return Either.left(
-        HttpResult.fail(
-          500,
-          `An injected parameter was missing from the instance registry: ${JSON.stringify(this.namespace)} (ErrorCode: ${RouterFailState.MissingDependency})`,
-        ),
-      );
-    }
-
-    return Either.right(
-      CrudProxy.fromInstance(d1, service, ctorReg[this.namespace]),
-    );
-  }
-
-  static from(
-    ast: CloesceAst,
-    serviceName: string,
-    methodName: string,
-  ): MatchedRoute | null {
-    const service = ast.services[serviceName];
-    if (!service) {
-      return null;
-    }
-
-    const method = service.methods[methodName];
-    if (!method) {
-      return null;
-    }
-
-    return new ServiceRoute(service, method);
-  }
-}
+export type MatchedRoute = {
+  kind: "model" | "service";
+  namespace: string;
+  method: ApiMethod;
+  id: string | null;
+  model?: Model;
+  service?: Service;
+};
 
 /**
  * Matches a request to an ApiInvocation
@@ -480,13 +333,7 @@ function matchRoute(
   request: Request,
   ast: CloesceAst,
   routePrefix: string,
-): Either<
-  HttpResult,
-  {
-    route: MatchedRoute;
-    id: string | null;
-  }
-> {
+): Either<HttpResult, MatchedRoute> {
   const url = new URL(request.url);
   const parts = url.pathname.split("/").filter(Boolean);
   const prefix = routePrefix.split("/").filter(Boolean);
@@ -504,27 +351,50 @@ function matchRoute(
     return notFound(RouterFailState.UnknownPrefix);
   }
 
-  // Attempt to extract from routeParts
-  const namespaceName = parts[0];
+  // Extract pattern
+  const namespace = parts[0];
   const methodName = parts[parts.length - 1];
   const id = parts.length === 3 ? parts[1] : null;
 
-  const route =
-    ModelRoute.from(ast, namespaceName, methodName) ??
-    ServiceRoute.from(ast, namespaceName, methodName);
+  const model = ast.models[namespace];
+  if (model) {
+    const method = model.methods[methodName];
+    if (!method) return notFound(RouterFailState.UnknownRoute);
 
-  if (!route) {
-    return notFound(RouterFailState.UnknownRoute);
+    if (request.method !== method.http_verb) {
+      return notFound(RouterFailState.UnmatchedHttpVerb);
+    }
+
+    return Either.right({
+      kind: "model",
+      namespace,
+      method,
+      model,
+      id,
+    });
   }
 
-  if (request.method !== route.verb) {
-    return notFound(RouterFailState.UnmatchedHttpVerb);
+  const service = ast.services[namespace];
+  if (service) {
+    const method = service.methods[methodName];
+
+    // Services do not have IDs.
+    if (!method || id) return notFound(RouterFailState.UnknownRoute);
+
+    if (request.method !== method.http_verb) {
+      return notFound(RouterFailState.UnmatchedHttpVerb);
+    }
+
+    return Either.right({
+      kind: "service",
+      namespace,
+      method,
+      service,
+      id: null,
+    });
   }
 
-  return Either.right({
-    route,
-    id,
-  });
+  return notFound(RouterFailState.UnknownRoute);
 }
 
 /**
@@ -537,7 +407,6 @@ async function validateRequest(
   ast: CloesceAst,
   ctorReg: ConstructorRegistry,
   route: MatchedRoute,
-  id: string | null,
 ): Promise<
   Either<HttpResult, { params: RequestParamMap; dataSource: string | null }>
 > {
@@ -545,25 +414,26 @@ async function validateRequest(
   const invalidRequest = (c: RouterFailState) =>
     Either.left(HttpResult.fail(400, `Invalid Request Body (ErrorCode: ${c})`));
 
-  if (!route.isStatic && id == null) {
+  // Models must have an ID on instantiated methods.
+  if (route.kind === "model" && !route.method.is_static && route.id == null) {
     return invalidRequest(RouterFailState.InstantiatedMethodMissingId);
   }
 
   // Filter out any injected parameters that will not be passed
   // by the query.
-  const requiredParams = route.params.filter(
+  const requiredParams = route.method.parameters.filter(
     (p) => !(typeof p.cidl_type === "object" && "Inject" in p.cidl_type),
   );
 
   // Extract url or body parameters
   const url = new URL(request.url);
   let params: RequestParamMap = {};
-  if (route.verb === "GET") {
+  if (route.method.http_verb === "GET") {
     params = Object.fromEntries(url.searchParams.entries());
   } else {
     try {
       params = await request.json();
-    } catch {
+    } catch (e) {
       return invalidRequest(RouterFailState.RequestMissingJsonBody);
     }
   }
@@ -597,8 +467,8 @@ async function validateRequest(
     )
     .map((p) => params[p.name] as string)[0];
 
-  // Data source is required for instantiated methods
-  if (!route.isStatic && !dataSource) {
+  // Data source is required for instantiated model methods
+  if (route.kind === "model" && !route.method.is_static && !dataSource) {
     return invalidRequest(RouterFailState.InstantiatedMethodMissingDataSource);
   }
 
@@ -675,7 +545,7 @@ async function hydrateModel(
  * @returns 500 on an uncaught client error, 200 with a result body on success
  */
 async function methodDispatch(
-  crud: CrudProxy,
+  obj: any,
   di: DependencyContainer,
   route: MatchedRoute,
   params: Record<string, unknown>,
@@ -688,7 +558,7 @@ async function methodDispatch(
     );
 
   const paramArray: any[] = [];
-  for (const param of route.params) {
+  for (const param of route.method.parameters) {
     if (param.name in params) {
       paramArray.push(params[param.name]);
       continue;
@@ -710,7 +580,7 @@ async function methodDispatch(
 
   // Ensure the result is always some HttpResult
   const resultWrapper = (res: any): HttpResult<unknown> => {
-    const rt = route.returnType;
+    const rt = route.method.return_type;
 
     if (rt === null) {
       return HttpResult.ok(200);
@@ -724,7 +594,7 @@ async function methodDispatch(
   };
 
   try {
-    const res = await crud.invoke(route.methodName)(...paramArray);
+    const res = await obj[route.method.name](...paramArray);
     return resultWrapper(res);
   } catch (e) {
     return uncaughtException(e);
