@@ -1,5 +1,7 @@
+use std::collections::BTreeMap;
+
 use ast::{
-    CidlType, MigrationsAst, NavigationPropertyKind,
+    CidlType, MigrationsAst, NavigationPropertyKind, Service,
     builder::{ModelBuilder, create_ast},
     err::GeneratorErrorKind,
 };
@@ -61,10 +63,10 @@ fn mismatched_foreign_keys() {
 }
 
 #[test]
-fn cycle_detection_error() {
+fn model_cycle_detection_error() {
     // Arrange
-    // A -> B -> C -> A
     let mut ast = create_ast(vec![
+        // A -> B -> C -> A
         ModelBuilder::new("A")
             .id()
             .attribute("bId", CidlType::Integer, Some("B".to_string()))
@@ -78,17 +80,44 @@ fn cycle_detection_error() {
             .attribute("aId", CidlType::Integer, Some("A".to_string()))
             .build(),
     ]);
-    ast.set_merkle_hash();
 
     // Act
-
     let err = ast.semantic_analysis().unwrap_err();
 
     // Assert
-    assert!(matches!(
-        err.kind,
-        GeneratorErrorKind::CyclicalModelDependency
-    ));
+    assert!(matches!(err.kind, GeneratorErrorKind::CyclicalDependency));
+    assert!(err.context.contains("A, B, C"));
+}
+
+#[test]
+fn service_cycle_detection_error() {
+    // Arrange
+    let mut ast = create_ast(vec![]);
+    let services = vec![
+        // A -> B -> C -> A
+        Service {
+            name: "A".into(),
+            injected: vec!["B".into()],
+            methods: BTreeMap::default(),
+        },
+        Service {
+            name: "B".into(),
+            injected: vec!["C".into()],
+            methods: BTreeMap::default(),
+        },
+        Service {
+            name: "C".into(),
+            injected: vec!["A".into()],
+            methods: BTreeMap::default(),
+        },
+    ];
+    ast.services = services.into_iter().map(|s| (s.name.clone(), s)).collect();
+
+    // Act
+    let err = ast.semantic_analysis().unwrap_err();
+
+    // Assert
+    assert!(matches!(err.kind, GeneratorErrorKind::CyclicalDependency));
     assert!(err.context.contains("A, B, C"));
 }
 

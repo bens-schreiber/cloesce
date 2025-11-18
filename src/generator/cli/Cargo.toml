@@ -4,8 +4,8 @@ version = "0.0.1"
 edition = "2024"
 
 [dependencies]
-clap = { version = "4.5.46", features = ["derive"] }
 ast = { path = "../ast" }
+clap = { version = "4.5.46", features = ["derive"] }
 d1 = { path = "../d1" }
 client = { path = "../client" }
 workers = { path = "../workers" }

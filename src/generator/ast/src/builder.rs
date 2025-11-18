@@ -27,6 +27,7 @@ pub fn create_ast(mut models: Vec<Model>) -> CloesceAst {
             db_binding: "db".into(),
             vars: HashMap::new(),
         },
+        services: IndexMap::default(),
         app_source: None,
         hash: 0,
     }

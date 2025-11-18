@@ -80,17 +80,18 @@ impl WorkersGenerator {
     }
 
     /// Generates the constructor registry
-    fn registry(
-        models: &IndexMap<String, Model>,
-        poos: &BTreeMap<String, PlainOldObject>,
-    ) -> String {
+    fn registry(ast: &CloesceAst) -> String {
         let mut constructor_registry = Vec::new();
-        for model in models.values() {
+        for model in ast.models.values() {
             constructor_registry.push(format!("\t{}: {}", &model.name, &model.name));
         }
 
-        for poo in poos.values() {
+        for poo in ast.poos.values() {
             constructor_registry.push(format!("\t{}: {}", &poo.name, &poo.name));
+        }
+
+        for service in ast.services.values() {
+            constructor_registry.push(format!("\t{}: {}", &service.name, &service.name));
         }
 
         format!(
@@ -172,7 +173,7 @@ impl WorkersGenerator {
             ast.app_source.as_ref(),
             workers_path,
         );
-        let constructor_registry = Self::registry(&ast.models, &ast.poos);
+        let constructor_registry = Self::registry(ast);
 
         Self::cruds(ast);
 

@@ -3,9 +3,10 @@ name = "ast"
 version = "0.0.1"
 edition = "2024"
 
+
 [dependencies]
-hex = "0.4.3"
 rustc-hash = "2.1.1"
+hex = "0.4.3"
 indexmap = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
