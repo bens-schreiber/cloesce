@@ -72,7 +72,7 @@ pub enum GeneratorErrorKind {
     MismatchedForeignKeyTypes,
     MismatchedNavigationPropertyTypes,
     InvalidNavigationPropertyReference,
-    CyclicalModelDependency,
+    CyclicalDependency,
     UnknownIncludeTreeReference,
     ExtraneousManyToManyReferences,
     MissingManyToManyReference,
@@ -147,9 +147,9 @@ impl GeneratorErrorKind {
                 "TODO: a good suggestion here",
                 GeneratorPhase::ModelSemanticAnalysis,
             ),
-            GeneratorErrorKind::CyclicalModelDependency => (
-                "Model composition cannot be cyclical",
-                "Allow a navigation property to be null",
+            GeneratorErrorKind::CyclicalDependency => (
+                "Model and Service composition cannot be cyclical",
+                "In Models, allow a navigation property to be null. In Services prefer direct dependency injection.)",
                 GeneratorPhase::ModelSemanticAnalysis,
             ),
             GeneratorErrorKind::UnknownIncludeTreeReference => (

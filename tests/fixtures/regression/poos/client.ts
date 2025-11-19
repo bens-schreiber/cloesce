@@ -32,13 +32,14 @@ export class PooC {
   }
 }
 
+
 export class PooAcceptYield {
   id: number;
 
   static async acceptPoos(
-        a: PooA,
-        b: PooB,
-        c: PooC,
+    a: PooA,
+    b: PooB,
+    c: PooC,
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<void>> {
     const baseUrl = new URL(`http://localhost:5002/api/PooAcceptYield/acceptPoos`);

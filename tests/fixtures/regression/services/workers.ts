@@ -1,14 +1,14 @@
 // GENERATED CODE. DO NOT MODIFY.
 import { CloesceApp } from "cloesce/backend";
 import cidl from "./cidl.json";
-import { Horse } from "./seed__horse_tinder.cloesce.ts";
-import { Like } from "./seed__horse_tinder.cloesce.ts";
 
 
-const app = new CloesceApp();
+import { FooService } from "./seed__app.cloesce.ts";
+import { BarService } from "./seed__app.cloesce.ts";
+import app from "./seed__app.cloesce.ts"
 const constructorRegistry = {
-	Horse: Horse,
-	Like: Like
+	FooService: FooService,
+	BarService: BarService
 };
 
 async function fetch(request: Request, env: any, ctx: any): Promise<Response> {

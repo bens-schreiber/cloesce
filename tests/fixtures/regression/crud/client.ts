@@ -2,6 +2,7 @@
 
 import { HttpResult, DeepPartial } from "cloesce/client";
 
+
 export class Child {
   id: number;
   parentId: number;
@@ -19,8 +20,8 @@ export class CrudHaver {
   name: string;
 
   static async get(
-        id: number,
-        __datasource: "none" = "none",
+    id: number,
+    __datasource: "none" = "none",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<CrudHaver>> {
     const baseUrl = new URL(`http://localhost:5002/api/CrudHaver/get`);
@@ -30,7 +31,7 @@ export class CrudHaver {
     return await HttpResult.fromResponse<CrudHaver>(res, CrudHaver, false);
   }
   static async list(
-        __datasource: "none" = "none",
+    __datasource: "none" = "none",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<CrudHaver[]>> {
     const baseUrl = new URL(`http://localhost:5002/api/CrudHaver/list`);
@@ -39,7 +40,7 @@ export class CrudHaver {
     return await HttpResult.fromResponse<CrudHaver[]>(res);
   }
   async notCrud(
-        __dataSource: "none" = "none",
+    __dataSource: "none" = "none",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<void>> {
     const baseUrl = new URL(`http://localhost:5002/api/CrudHaver/${this.id}/notCrud`);
@@ -53,8 +54,8 @@ export class CrudHaver {
     return await HttpResult.fromResponse<void>(res);
   }
   static async save(
-        model: DeepPartial<CrudHaver>,
-        __datasource: "none" = "none",
+    model: DeepPartial<CrudHaver>,
+    __datasource: "none" = "none",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<CrudHaver>> {
     const baseUrl = new URL(`http://localhost:5002/api/CrudHaver/save`);
@@ -81,8 +82,8 @@ export class Parent {
   children: Child[];
 
   static async get(
-        id: number,
-        __datasource: "withChildren" |"none" = "none",
+    id: number,
+    __datasource: "withChildren" |"none" = "none",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Parent>> {
     const baseUrl = new URL(`http://localhost:5002/api/Parent/get`);
@@ -92,7 +93,7 @@ export class Parent {
     return await HttpResult.fromResponse<Parent>(res, Parent, false);
   }
   static async list(
-        __datasource: "withChildren" |"none" = "none",
+    __datasource: "withChildren" |"none" = "none",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Parent[]>> {
     const baseUrl = new URL(`http://localhost:5002/api/Parent/list`);
@@ -101,8 +102,8 @@ export class Parent {
     return await HttpResult.fromResponse<Parent[]>(res);
   }
   static async save(
-        model: DeepPartial<Parent>,
-        __datasource: "withChildren" |"none" = "none",
+    model: DeepPartial<Parent>,
+    __datasource: "withChildren" |"none" = "none",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Parent>> {
     const baseUrl = new URL(`http://localhost:5002/api/Parent/save`);

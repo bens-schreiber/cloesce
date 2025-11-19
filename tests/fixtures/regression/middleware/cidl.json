@@ -87,5 +87,6 @@
       "source_path": "./seed__app.cloesce.ts"
     }
   },
+  "services": {},
   "app_source": "./seed__app.cloesce.ts"
 }

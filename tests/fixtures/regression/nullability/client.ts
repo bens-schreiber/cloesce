@@ -2,15 +2,16 @@
 
 import { HttpResult, DeepPartial } from "cloesce/client";
 
+
 export class NullabilityChecks {
   id: number;
   notNullableString: string;
   nullableString: string | null;
 
   async arrayTypes(
-        a: number[] | null,
-        b: NullabilityChecks[] | null,
-        __dataSource: "none" = "none",
+    a: number[] | null,
+    b: NullabilityChecks[] | null,
+    __dataSource: "none" = "none",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<string[] | null>> {
     const baseUrl = new URL(`http://localhost:5002/api/NullabilityChecks/${this.id}/arrayTypes`);
@@ -26,8 +27,8 @@ export class NullabilityChecks {
     return await HttpResult.fromResponse<string[] | null>(res);
   }
   async httpResultTypes(
-        a: number | null | null,
-        __dataSource: "none" = "none",
+    a: number | null | null,
+    __dataSource: "none" = "none",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<NullabilityChecks[] | null | null>> {
     const baseUrl = new URL(`http://localhost:5002/api/NullabilityChecks/${this.id}/httpResultTypes`);
@@ -42,7 +43,7 @@ export class NullabilityChecks {
     return await HttpResult.fromResponse<NullabilityChecks[] | null | null>(res);
   }
   async injectableTypes(
-        __dataSource: "none" = "none",
+    __dataSource: "none" = "none",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<void>> {
     const baseUrl = new URL(`http://localhost:5002/api/NullabilityChecks/${this.id}/injectableTypes`);
@@ -56,8 +57,8 @@ export class NullabilityChecks {
     return await HttpResult.fromResponse<void>(res);
   }
   async modelTypes(
-        a: NullabilityChecks | null,
-        __dataSource: "none" = "none",
+    a: NullabilityChecks | null,
+    __dataSource: "none" = "none",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<NullabilityChecks | null>> {
     const baseUrl = new URL(`http://localhost:5002/api/NullabilityChecks/${this.id}/modelTypes`);
@@ -72,9 +73,9 @@ export class NullabilityChecks {
     return await HttpResult.fromResponse<NullabilityChecks | null>(res);
   }
   async primitiveTypes(
-        a: number | null,
-        b: string | null,
-        __dataSource: "none" = "none",
+    a: number | null,
+    b: string | null,
+    __dataSource: "none" = "none",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<boolean | null>> {
     const baseUrl = new URL(`http://localhost:5002/api/NullabilityChecks/${this.id}/primitiveTypes`);

@@ -1,7 +1,7 @@
 import { describe, test, expect } from "vitest";
 import { Project } from "ts-morph";
 import { CidlExtractor } from "../src/extractor/extract";
-import { CidlType, DataSource } from "../src/ast";
+import { CidlType, DataSource, Service } from "../src/ast";
 
 function cloesceProject(): Project {
   const project = new Project({
@@ -155,7 +155,6 @@ describe("Middleware", () => {
     const res = CidlExtractor.app(sourceFile);
 
     // Assert
-    console.log(res.value);
     expect(res.isRight()).toBe(true);
   });
 });
@@ -214,5 +213,44 @@ describe("Data Source", () => {
       name: "default",
       tree: {},
     } as DataSource);
+  });
+});
+
+describe("Services", () => {
+  test("Finds injected attributes", () => {
+    // Arrange
+    const project = cloesceProject();
+    const sourceFile = project.createSourceFile(
+      "test.ts",
+      `
+          import { IncludeTree } from "./src/ui/backend";
+
+          @Service
+          class BarService {}
+
+          @Service
+          class FooService {
+            barService: BarService;
+          }
+          `,
+    );
+
+    // Act
+    const classDecl = sourceFile.getClass("FooService")!;
+    const res = CidlExtractor.service(classDecl, sourceFile);
+
+    // Assert
+    expect(res.isRight()).toBe(true);
+    expect(res.unwrap()).toEqual({
+      name: "FooService",
+      attributes: [
+        {
+          var_name: "barService",
+          injected: "BarService",
+        },
+      ],
+      methods: {},
+      source_path: sourceFile.getFilePath().toString(),
+    } as Service);
   });
 });

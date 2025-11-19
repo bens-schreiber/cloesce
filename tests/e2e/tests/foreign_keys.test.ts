@@ -51,7 +51,6 @@ describe("POST and refresh A", () => {
 
   it("Object to be instantiated on backend", async () => {
     const res = await A.returnFatalIfParamsNotInstantiated(a);
-    console.log(JSON.stringify(res));
     expect(
       res.ok,
       withRes("Objects should be instantiated on the backend", res),

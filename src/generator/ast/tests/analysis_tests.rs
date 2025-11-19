@@ -1,5 +1,7 @@
+use std::{collections::BTreeMap, path::PathBuf};
+
 use ast::{
-    CidlType, MigrationsAst, NavigationPropertyKind,
+    CidlType, MigrationsAst, NavigationPropertyKind, Service, ServiceAttribute,
     builder::{ModelBuilder, create_ast},
     err::GeneratorErrorKind,
 };
@@ -61,10 +63,10 @@ fn mismatched_foreign_keys() {
 }
 
 #[test]
-fn cycle_detection_error() {
+fn model_cycle_detection_error() {
     // Arrange
-    // A -> B -> C -> A
     let mut ast = create_ast(vec![
+        // A -> B -> C -> A
         ModelBuilder::new("A")
             .id()
             .attribute("bId", CidlType::Integer, Some("B".to_string()))
@@ -78,17 +80,56 @@ fn cycle_detection_error() {
             .attribute("aId", CidlType::Integer, Some("A".to_string()))
             .build(),
     ]);
-    ast.set_merkle_hash();
 
     // Act
-
     let err = ast.semantic_analysis().unwrap_err();
 
     // Assert
-    assert!(matches!(
-        err.kind,
-        GeneratorErrorKind::CyclicalModelDependency
-    ));
+    assert!(matches!(err.kind, GeneratorErrorKind::CyclicalDependency));
+    assert!(err.context.contains("A, B, C"));
+}
+
+#[test]
+fn service_cycle_detection_error() {
+    // Arrange
+    let mut ast = create_ast(vec![]);
+    let services = vec![
+        // A -> B -> C -> A
+        Service {
+            name: "A".into(),
+            attributes: vec![ServiceAttribute {
+                var_name: "b".into(),
+                injected: "B".into(),
+            }],
+            methods: BTreeMap::default(),
+            source_path: PathBuf::default(),
+        },
+        Service {
+            name: "B".into(),
+            attributes: vec![ServiceAttribute {
+                var_name: "c".into(),
+                injected: "C".into(),
+            }],
+            methods: BTreeMap::default(),
+            source_path: PathBuf::default(),
+        },
+        Service {
+            name: "C".into(),
+            attributes: vec![ServiceAttribute {
+                var_name: "a".into(),
+                injected: "A".into(),
+            }],
+            methods: BTreeMap::default(),
+            source_path: PathBuf::default(),
+        },
+    ];
+    ast.services = services.into_iter().map(|s| (s.name.clone(), s)).collect();
+
+    // Act
+    let err = ast.semantic_analysis().unwrap_err();
+
+    // Assert
+    assert!(matches!(err.kind, GeneratorErrorKind::CyclicalDependency));
     assert!(err.context.contains("A, B, C"));
 }
 

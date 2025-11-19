@@ -5,6 +5,7 @@ import { Foo } from "./seed__ds.cloesce.ts";
 import { NoDs } from "./seed__ds.cloesce.ts";
 import { OneDs } from "./seed__ds.cloesce.ts";
 import { Poo } from "./seed__ds.cloesce.ts";
+
 const app = new CloesceApp();
 const constructorRegistry = {
 	Foo: Foo,

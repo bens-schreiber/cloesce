@@ -23,6 +23,50 @@ export class {{this.name}} {
 }
 {{/each}}
 
+{{#each services}}
+export class {{this.name}} {
+  {{#each this.methods}}
+  static async {{this.name}}(
+    {{#each this.parameters}}
+      {{#if (is_serializable cidl_type)}}
+    {{name}}: {{get_cidl_type cidl_type}},
+      {{/if}}
+    {{/each}}
+    fetchImpl: typeof fetch = fetch
+  ): Promise<HttpResult<{{get_cidl_type this.return_type}}>> {
+    const baseUrl = new URL("{{../../domain}}/{{../name}}/{{this.name}}");
+    {{#if (eq this.http_verb "GET")}}
+      {{#each this.parameters}}
+        {{#if (is_serializable cidl_type)}}
+    baseUrl.searchParams.append('{{name}}', String({{name}}));
+        {{/if}}
+      {{/each}}
+    const res = await fetchImpl(baseUrl, { method: "GET" });
+    {{else}}
+    const res = await fetchImpl(baseUrl, {
+      method: "{{this.http_verb}}",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        {{#each this.parameters}}
+          {{#if (is_serializable cidl_type)}}
+            {{name}}{{#unless @last}}, {{/unless}}
+          {{/if}}
+        {{/each}}
+      })
+    });
+    {{/if}}
+    {{#if if (is_object_array this.return_type)}}
+    return await HttpResult.fromResponse<{{object_name this.return_type}}>(res, {{object_name this.return_type}}, true);
+    {{else if (is_object this.return_type)}}
+    return await HttpResult.fromResponse<{{object_name this.return_type}}>(res, {{object_name this.return_type}}, false);
+    {{else}}
+    return await HttpResult.fromResponse<{{get_cidl_type this.return_type}}>(res);
+    {{/if}}
+    }
+  {{/each}}
+}
+{{/each}}
+
 {{#each models}}
 export class {{this.name}} {
   {{this.primary_key.name}}: {{get_cidl_type this.primary_key.cidl_type}};
@@ -37,7 +81,7 @@ export class {{this.name}} {
   {{#if this.is_static}}static {{/if}}async {{this.name}}(
     {{#each this.parameters}}
       {{#if (is_serializable cidl_type)}}
-        {{name}}: {{get_cidl_type cidl_type}},
+    {{name}}: {{get_cidl_type cidl_type}},
       {{/if}}
     {{/each}}
     fetchImpl: typeof fetch = fetch

@@ -17,6 +17,7 @@ export enum ExtractorErrorCode {
   MissingWranglerEnv,
   TooManyWranglerEnvs,
   MissingFile,
+  InvalidServiceAttribute,
 }
 
 const errorInfoMap: Record<
@@ -103,6 +104,11 @@ const errorInfoMap: Record<
   [ExtractorErrorCode.MissingFile]: {
     description: "A specified input file could not be found",
     suggestion: "Verify the input file path is correct",
+  },
+  [ExtractorErrorCode.InvalidServiceAttribute]: {
+    description:
+      "Services must contain only dependency injected instances as attributes.",
+    suggestion: "Remove the attribute.",
   },
 };
 

@@ -3,6 +3,7 @@ import { CloesceApp } from "cloesce/backend";
 import cidl from "./cidl.json";
 import { NullabilityChecks } from "./seed__nullability.cloesce.ts";
 
+
 const app = new CloesceApp();
 const constructorRegistry = {
 	NullabilityChecks: NullabilityChecks

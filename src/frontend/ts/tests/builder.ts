@@ -7,13 +7,19 @@ import {
   CidlType,
   NavigationPropertyKind,
   ModelAttribute,
-  ModelMethod,
   DataSource,
   NavigationProperty,
+  ApiMethod,
+  Service,
+  ServiceAttribute,
 } from "../src/ast";
 
-export function createAst(models: Model[]): CloesceAst {
+export function createAst(
+  models: Model[],
+  services: Service[] = [],
+): CloesceAst {
   const modelsMap = Object.fromEntries(models.map((m) => [m.name, m]));
+  const serviceMap = Object.fromEntries(services.map((s) => [s.name, s]));
 
   return {
     version: "1.0",
@@ -27,6 +33,7 @@ export function createAst(models: Model[]): CloesceAst {
       db_binding: "db",
       vars: {},
     },
+    services: serviceMap,
     app_source: null,
   };
 }
@@ -62,7 +69,7 @@ export class ModelBuilder {
   private attributes: ModelAttribute[] = [];
   private navigation_properties: NavigationProperty[] = [];
   private primary_key: NamedTypedValue | null = null;
-  private methods: Record<string, ModelMethod> = {};
+  private methods: Record<string, ApiMethod> = {};
   private data_sources: Record<string, DataSource> = {};
 
   constructor(name: string) {
@@ -145,6 +152,51 @@ export class ModelBuilder {
       methods: this.methods,
       data_sources: this.data_sources,
       cruds: [],
+      source_path: "",
+    };
+  }
+}
+
+export class ServiceBuilder {
+  private name: string;
+  private attributes: ServiceAttribute[] = [];
+  private methods: Record<string, ApiMethod> = {};
+
+  constructor(name: string) {
+    this.name = name;
+  }
+
+  static service(name: string) {
+    return new ServiceBuilder(name);
+  }
+
+  inject(var_name: string, injected: string): this {
+    this.attributes.push({ var_name, injected });
+    return this;
+  }
+
+  method(
+    name: string,
+    http_verb: HttpVerb,
+    is_static: boolean,
+    parameters: NamedTypedValue[],
+    return_type: CidlType,
+  ): this {
+    this.methods[name] = {
+      name,
+      http_verb,
+      is_static,
+      parameters,
+      return_type,
+    };
+    return this;
+  }
+
+  build(): Service {
+    return {
+      name: this.name,
+      attributes: this.attributes,
+      methods: this.methods,
       source_path: "",
     };
   }

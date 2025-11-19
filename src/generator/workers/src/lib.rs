@@ -1,22 +1,13 @@
-use std::{
-    collections::BTreeMap,
-    path::{Path, PathBuf},
-};
+use std::path::Path;
 
-use ast::{CidlType, CloesceAst, HttpVerb, Model, ModelMethod, NamedTypedValue, PlainOldObject};
+use ast::{ApiMethod, CidlType, CloesceAst, HttpVerb, NamedTypedValue};
 
-use indexmap::IndexMap;
 use wrangler::WranglerSpec;
 
 pub struct WorkersGenerator;
 impl WorkersGenerator {
     /// Generates all model source imports as well as the Cloesce App
-    fn link(
-        models: &IndexMap<String, Model>,
-        poos: &BTreeMap<String, PlainOldObject>,
-        app_source: Option<&PathBuf>,
-        workers_path: &Path,
-    ) -> String {
+    fn link(ast: &CloesceAst, workers_path: &Path) -> String {
         let workers_dir = workers_path
             .parent()
             .expect("workers_path has no parent; cannot compute relative imports");
@@ -45,7 +36,8 @@ impl WorkersGenerator {
             Ok(rel_str)
         }
 
-        let model_imports = models
+        let model_imports = ast
+            .models
             .values()
             .map(|m| {
                 // If the relative path is not possible, just use the file name.
@@ -56,7 +48,8 @@ impl WorkersGenerator {
             .collect::<Vec<_>>()
             .join("\n");
 
-        let poo_imports = poos
+        let poo_imports = ast
+            .poos
             .values()
             .map(|p| {
                 // If the relative path is not possible, just use the file name.
@@ -67,7 +60,19 @@ impl WorkersGenerator {
             .collect::<Vec<_>>()
             .join("\n");
 
-        let app_import = match app_source {
+        let service_imports = ast
+            .services
+            .values()
+            .map(|s| {
+                // If the relative path is not possible, just use the file name.
+                let path = rel_path(&s.source_path, workers_dir)
+                    .unwrap_or_else(|_| s.source_path.clone().to_string_lossy().to_string());
+                format!("import {{ {} }} from \"{}\";", s.name, path)
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
+
+        let app_import = match &ast.app_source {
             Some(p) => {
                 let path = rel_path(p, workers_dir)
                     .unwrap_or_else(|_| p.clone().to_string_lossy().to_string());
@@ -76,21 +81,22 @@ impl WorkersGenerator {
             None => "const app = new CloesceApp();".into(),
         };
 
-        format!("{model_imports}\n{poo_imports}\n{app_import}")
+        [model_imports, poo_imports, service_imports, app_import].join("\n")
     }
 
     /// Generates the constructor registry
-    fn registry(
-        models: &IndexMap<String, Model>,
-        poos: &BTreeMap<String, PlainOldObject>,
-    ) -> String {
+    fn registry(ast: &CloesceAst) -> String {
         let mut constructor_registry = Vec::new();
-        for model in models.values() {
+        for model in ast.models.values() {
             constructor_registry.push(format!("\t{}: {}", &model.name, &model.name));
         }
 
-        for poo in poos.values() {
+        for poo in ast.poos.values() {
             constructor_registry.push(format!("\t{}: {}", &poo.name, &poo.name));
+        }
+
+        for service in ast.services.values() {
+            constructor_registry.push(format!("\t{}: {}", &service.name, &service.name));
         }
 
         format!(
@@ -104,7 +110,7 @@ impl WorkersGenerator {
         for model in ast.models.values_mut() {
             for crud in model.cruds.iter() {
                 let method = match crud {
-                    ast::CrudKind::GET => ModelMethod {
+                    ast::CrudKind::GET => ApiMethod {
                         name: "get".into(),
                         is_static: true,
                         http_verb: HttpVerb::GET,
@@ -120,7 +126,7 @@ impl WorkersGenerator {
                             },
                         ],
                     },
-                    ast::CrudKind::LIST => ModelMethod {
+                    ast::CrudKind::LIST => ApiMethod {
                         name: "list".into(),
                         is_static: true,
                         http_verb: HttpVerb::GET,
@@ -132,7 +138,7 @@ impl WorkersGenerator {
                             cidl_type: CidlType::DataSource(model.name.clone()),
                         }],
                     },
-                    ast::CrudKind::SAVE => ModelMethod {
+                    ast::CrudKind::SAVE => ApiMethod {
                         name: "save".into(),
                         is_static: true,
                         http_verb: HttpVerb::POST,
@@ -166,13 +172,8 @@ impl WorkersGenerator {
     }
 
     pub fn create(ast: &mut CloesceAst, wrangler: WranglerSpec, workers_path: &Path) -> String {
-        let linked_sources = Self::link(
-            &ast.models,
-            &ast.poos,
-            ast.app_source.as_ref(),
-            workers_path,
-        );
-        let constructor_registry = Self::registry(&ast.models, &ast.poos);
+        let linked_sources = Self::link(ast, workers_path);
+        let constructor_registry = Self::registry(ast);
 
         Self::cruds(ast);
 

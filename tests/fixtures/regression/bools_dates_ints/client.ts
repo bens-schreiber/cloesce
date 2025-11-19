@@ -2,14 +2,15 @@
 
 import { HttpResult, DeepPartial } from "cloesce/client";
 
+
 export class Weather {
   id: number;
   date: Date;
   isRaining: boolean;
 
   static async get(
-        id: number,
-        __datasource: "none" = "none",
+    id: number,
+    __datasource: "none" = "none",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Weather>> {
     const baseUrl = new URL(`http://localhost:5002/api/Weather/get`);
@@ -19,8 +20,8 @@ export class Weather {
     return await HttpResult.fromResponse<Weather>(res, Weather, false);
   }
   static async save(
-        model: DeepPartial<Weather>,
-        __datasource: "none" = "none",
+    model: DeepPartial<Weather>,
+    __datasource: "none" = "none",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Weather>> {
     const baseUrl = new URL(`http://localhost:5002/api/Weather/save`);

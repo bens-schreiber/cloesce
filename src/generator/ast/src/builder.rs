@@ -6,8 +6,8 @@ use std::{
 use indexmap::IndexMap;
 
 use crate::{
-    CidlType, CloesceAst, DataSource, HttpVerb, IncludeTree, InputLanguage, Model, ModelAttribute,
-    ModelMethod, NamedTypedValue, NavigationProperty, NavigationPropertyKind, WranglerEnv,
+    ApiMethod, CidlType, CloesceAst, DataSource, HttpVerb, IncludeTree, InputLanguage, Model,
+    ModelAttribute, NamedTypedValue, NavigationProperty, NavigationPropertyKind, WranglerEnv,
 };
 
 pub fn create_ast(mut models: Vec<Model>) -> CloesceAst {
@@ -27,6 +27,7 @@ pub fn create_ast(mut models: Vec<Model>) -> CloesceAst {
             db_binding: "db".into(),
             vars: HashMap::new(),
         },
+        services: IndexMap::default(),
         app_source: None,
         hash: 0,
     }
@@ -64,7 +65,7 @@ pub struct ModelBuilder {
     attributes: Vec<ModelAttribute>,
     navigation_properties: Vec<NavigationProperty>,
     primary_key: Option<NamedTypedValue>,
-    methods: BTreeMap<String, ModelMethod>,
+    methods: BTreeMap<String, ApiMethod>,
     data_sources: BTreeMap<String, DataSource>,
 }
 
@@ -134,7 +135,7 @@ impl ModelBuilder {
     ) -> Self {
         self.methods.insert(
             name.clone().into(),
-            ModelMethod {
+            ApiMethod {
                 name: name.into(),
                 is_static,
                 http_verb,
