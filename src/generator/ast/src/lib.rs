@@ -1,6 +1,6 @@
 pub mod builder;
 pub mod err;
-mod semantic;
+pub mod semantic;
 
 use std::collections::BTreeMap;
 use std::collections::HashMap;
@@ -12,6 +12,7 @@ use err::GeneratorErrorKind;
 use err::Result;
 use indexmap::IndexMap;
 use rustc_hash::FxHasher;
+use semantic::BlobObjectSet;
 use semantic::SemanticAnalysis;
 use serde::Deserialize;
 use serde::Serialize;
@@ -32,11 +33,18 @@ pub enum CidlType {
     /// SQLite string
     Text,
 
+    /// SQLite Binary Large Object
+    Blob,
+
     /// (SQL equivalent to Integer)
     Boolean,
 
     /// An ISO Date string (SQL equivalent to Text)
     DateIso,
+
+    /// A Binary Large Object that is not to be buffered in memory,
+    /// but rather piped to some destination.
+    Stream,
 
     /// A dependency injected instance, containing a type name.
     Inject(String),
@@ -128,11 +136,30 @@ pub struct ModelAttribute {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
+pub enum MediaType {
+    Json,
+    Octet,
+    FormData,
+}
+
+impl Default for MediaType {
+    fn default() -> Self {
+        Self::Json
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug)]
 pub struct ApiMethod {
     pub name: String,
     pub is_static: bool,
     pub http_verb: HttpVerb,
+
+    #[serde(default)]
+    pub return_media: MediaType,
     pub return_type: CidlType,
+
+    #[serde(default)]
+    pub parameters_media: MediaType,
     pub parameters: Vec<NamedTypedValue>,
 }
 
@@ -246,8 +273,8 @@ pub struct CloesceAst {
     // TODO: MapPreventDuplicates is not supported for IndexMap
     pub models: IndexMap<String, Model>,
 
-    #[serde_as(as = "MapPreventDuplicates<_, _>")]
-    pub poos: BTreeMap<String, PlainOldObject>,
+    // TODO: MapPreventDuplicates is not supported for IndexMap
+    pub poos: IndexMap<String, PlainOldObject>,
 
     // TODO: MapPreventDuplicates is not supported for IndexMap
     pub services: IndexMap<String, Service>,
@@ -299,8 +326,8 @@ impl CloesceAst {
         serde_json::to_string_pretty(&migrations_ast).expect("serialize migrations ast to work")
     }
 
-    pub fn semantic_analysis(&mut self) -> Result<()> {
-        SemanticAnalysis::models(self).and(SemanticAnalysis::services(self))
+    pub fn semantic_analysis(&mut self) -> Result<BlobObjectSet> {
+        SemanticAnalysis::analyze(self)
     }
 
     /// Traverses the AST setting the `hash` field as a merkle hash, meaning a parents hash depends on it's childrens hashes.

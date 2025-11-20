@@ -1,29 +1,157 @@
-use std::collections::{BTreeMap, HashMap, VecDeque};
+use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
 
 use crate::err::{GeneratorErrorKind, Result};
 use crate::{
-    CidlType, CloesceAst, HttpVerb, Model, NamedTypedValue, NavigationPropertyKind, ensure, fail,
+    ApiMethod, CidlType, CloesceAst, HttpVerb, Model, NamedTypedValue, NavigationPropertyKind,
+    ensure, fail,
 };
 
-/// Analyzes the grammar of the AST, yielding a [GeneratorErrorKind] on failure.
-///
-/// Sorts models topologically in SQL insertion order.
-///
-/// Returns error on
-/// - Model attributes with invalid SQL types
-/// - Primary keys with invalid SQL types
-/// - Invalid Model or Method map K/V
-/// - Unknown navigation property model references
-/// - Unknown model references in method parameters
-/// - Invalid method parameter types
-/// - Unknown or invalid foreign key references
-/// - Missing navigation property attributes
-/// - Cyclical dependencies
-/// - Invalid data source type
-/// - Invalid data source reference
+type AdjacencyList<'a> = BTreeMap<&'a str, Vec<&'a str>>;
+
+/// A set of all objects (be it a Plain old Object or Model) that is composed of some
+/// Blob or Stream type, be it through a direct attribute (ie Foo { blob: Blob })
+/// or a composition (ie Bar { foo: Foo } where Foo has a blob attr)
+pub type BlobObjectSet = HashSet<String>;
+
 pub struct SemanticAnalysis;
 impl SemanticAnalysis {
-    pub fn models(ast: &mut CloesceAst) -> Result<()> {
+    /// Analyzes the grammar of the AST, yielding a [GeneratorErrorKind] on failure.
+    ///
+    /// Sorts models topologically in SQL insertion order.
+    ///
+    /// Sorts services and plain old objects in constructor order.
+    ///
+    /// Determines the MediaType of all [ApiMethod]'s.
+    ///
+    /// Returns a set of all objects that have blobs (be it a direct attribute or composition)
+    ///
+    /// Returns error on
+    /// - Model attributes with invalid SQL types
+    /// - Primary keys with invalid SQL types
+    /// - Invalid Model or Method map K/V
+    /// - Unknown navigation property model references
+    /// - Unknown model references in method parameters
+    /// - Invalid method parameter types
+    /// - Unknown or invalid foreign key references
+    /// - Missing navigation property attributes
+    /// - Cyclical dependencies
+    /// - Invalid data source type
+    /// - Invalid data source reference
+    pub fn analyze(ast: &mut CloesceAst) -> Result<BlobObjectSet> {
+        let mut blob_objects = HashSet::new();
+
+        // Validate models
+        Self::models(ast, &mut blob_objects)?;
+
+        // Utilize the topo ordering of the models to find composition
+        // based blob relationships
+        for (name, model) in &ast.models {
+            if blob_objects.contains(name) {
+                continue;
+            }
+
+            for nav in &model.navigation_properties {
+                if blob_objects.contains(&nav.model_name) {
+                    blob_objects.insert(model.name.clone());
+                }
+            }
+        }
+
+        // Validate Plain Old Objects
+        Self::poos(ast, &mut blob_objects)?;
+
+        // Utilize the topo ordering of the Plain old Objects to find composition
+        // based blob relationships
+        for (name, poo) in &ast.poos {
+            if blob_objects.contains(name) {
+                continue;
+            }
+
+            for attr in &poo.attributes {
+                let (CidlType::Object(o) | CidlType::Partial(o)) = attr.cidl_type.root_type()
+                else {
+                    continue;
+                };
+
+                if blob_objects.contains(o) {
+                    blob_objects.insert(poo.name.clone());
+                }
+            }
+        }
+
+        // Validate Services
+        Self::services(ast)?;
+
+        Ok(blob_objects)
+    }
+
+    fn poos(ast: &mut CloesceAst, blob_objects: &mut BlobObjectSet) -> Result<()> {
+        // Topo sort and cycle detection
+        let mut in_degree = BTreeMap::<&str, usize>::new();
+        let mut graph = BTreeMap::<&str, Vec<&str>>::new();
+
+        for (name, poo) in &ast.poos {
+            graph.entry(&poo.name).or_default();
+            in_degree.entry(&poo.name).or_insert(0);
+
+            ensure!(
+                *name == poo.name,
+                GeneratorErrorKind::InvalidMapping,
+                "Plain Old Object record key did not match it's Plain Old Object name? {} : {}",
+                name,
+                poo.name
+            );
+
+            for attr in &poo.attributes {
+                match &attr.cidl_type.root_type() {
+                    CidlType::Void => {
+                        fail!(
+                            GeneratorErrorKind::UnexpectedVoid,
+                            "{}.{}",
+                            poo.name,
+                            attr.name
+                        )
+                    }
+                    CidlType::Object(o) | CidlType::Partial(o) => {
+                        ensure!(
+                            is_valid_object_ref(ast, o),
+                            GeneratorErrorKind::UnknownObject,
+                            "{}.{} => {}?",
+                            poo.name,
+                            attr.name,
+                            o
+                        );
+
+                        if ast.poos.contains_key(o) {
+                            graph.entry(o.as_str()).or_default().push(&poo.name);
+                            in_degree.entry(&poo.name).and_modify(|d| *d += 1);
+                        }
+                    }
+                    CidlType::Inject(o) => {
+                        fail!(
+                            GeneratorErrorKind::UnexpectedInject,
+                            "{}.{} => {}?",
+                            poo.name,
+                            attr.name,
+                            o
+                        )
+                    }
+                    CidlType::Blob | CidlType::Stream => {
+                        blob_objects.insert(poo.name.clone());
+                    }
+                    _ => {}
+                }
+            }
+        }
+
+        // Sort
+        let rank = kahns(graph, in_degree, ast.poos.len())?;
+        ast.poos.sort_by_key(|k, _| rank.get(k.as_str()).unwrap());
+
+        Ok(())
+    }
+
+    fn models(ast: &mut CloesceAst, blob_objects: &mut BlobObjectSet) -> Result<()> {
         let ensure_valid_sql_type = |model: &Model, value: &NamedTypedValue| {
             let inner = match &value.cidl_type {
                 CidlType::Nullable(inner) if matches!(inner.as_ref(), CidlType::Void) => {
@@ -39,6 +167,7 @@ impl SemanticAnalysis {
                     CidlType::Integer
                         | CidlType::Real
                         | CidlType::Text
+                        | CidlType::Blob
                         | CidlType::Boolean
                         | CidlType::DateIso
                 ),
@@ -50,8 +179,6 @@ impl SemanticAnalysis {
 
             Ok(())
         };
-
-        let is_valid_object_ref = |o| ast.models.contains_key(o) || ast.poos.contains_key(o);
 
         // Topo sort and cycle detection
         let mut in_degree = BTreeMap::<&str, usize>::new();
@@ -91,6 +218,11 @@ impl SemanticAnalysis {
             // Validate attributes
             for a in &model.attributes {
                 ensure_valid_sql_type(model, &a.value)?;
+
+                // Populate blob model list
+                if matches!(a.value.cidl_type, CidlType::Blob) {
+                    blob_objects.insert(model.name.clone());
+                }
 
                 if let Some(fk_model_name) = &a.foreign_key_reference {
                     let Some(fk_model) = ast.models.get(fk_model_name.as_str()) else {
@@ -210,101 +342,15 @@ impl SemanticAnalysis {
                 }
             }
 
-            // Validate methods
+            // Validate Methods
             for (method_name, method) in &model.methods {
-                // Validate record
-                ensure!(
-                    *method_name == method.name,
-                    GeneratorErrorKind::InvalidMapping,
-                    "Method record key did not match it's method name? {}: {}",
-                    method_name,
-                    method.name
-                );
-
-                // Validate return type
-                match &method.return_type {
-                    CidlType::Object(o) => {
-                        ensure!(
-                            is_valid_object_ref(o),
-                            GeneratorErrorKind::UnknownObject,
-                            "{}.{}",
-                            model.name,
-                            method.name
-                        );
-                    }
-                    CidlType::Partial(_) => {
-                        fail!(
-                            GeneratorErrorKind::UnexpectedPartialReturn,
-                            "{}.{}",
-                            model.name,
-                            method.name,
-                        )
-                    }
-                    _ => {}
-                }
-
-                // Validate method params
-                let mut ds = 0;
-                for param in &method.parameters {
-                    if let CidlType::DataSource(model_name) = &param.cidl_type {
-                        ensure!(
-                            ast.models.contains_key(model_name),
-                            GeneratorErrorKind::UnknownDataSourceReference,
-                            "{}.{} data source references {}",
-                            model.name,
-                            method.name,
-                            model_name
-                        );
-
-                        if *model_name == model.name {
-                            ds += 1;
-                        }
-                    }
-
-                    let root_type = param.cidl_type.root_type();
-
-                    match root_type {
-                        CidlType::Void => {
-                            fail!(
-                                GeneratorErrorKind::UnexpectedVoid,
-                                "{}.{}.{}",
-                                model.name,
-                                method.name,
-                                param.name
-                            )
-                        }
-                        CidlType::Object(o) | CidlType::Partial(o) => {
-                            ensure!(
-                                is_valid_object_ref(o),
-                                GeneratorErrorKind::UnknownObject,
-                                "{}.{}.{}",
-                                model.name,
-                                method.name,
-                                param.name
-                            );
-
-                            // TODO: remove this
-                            if method.http_verb == HttpVerb::GET {
-                                fail!(
-                                    GeneratorErrorKind::NotYetSupported,
-                                    "GET Requests currently do not support model parameters {}.{}.{}",
-                                    model.name,
-                                    method.name,
-                                    param.name
-                                )
-                            }
-                        }
-                        _ => {
-                            // Ignore
-                        }
-                    }
-                }
+                let ds = validate_methods(&model.name, method_name, method, ast)?;
 
                 if !method.is_static {
                     ensure!(
                         ds == 1,
                         GeneratorErrorKind::MissingOrExtraneousDataSource,
-                        "Instantiated methods require one data source: {}.{}",
+                        "Instantiated model methods require one data source: {}.{}",
                         model.name,
                         method.name,
                     )
@@ -373,22 +419,19 @@ impl SemanticAnalysis {
             }
         }
 
-        let rank = kahns(graph, in_degree, ast.models.len())?;
-
         // Sort models by SQL insertion order
+        let rank = kahns(graph, in_degree, ast.models.len())?;
         ast.models.sort_by_key(|k, _| rank.get(k.as_str()).unwrap());
 
         Ok(())
     }
 
-    pub fn services(ast: &mut CloesceAst) -> Result<()> {
+    fn services(ast: &mut CloesceAst) -> Result<()> {
         // Topo sort and cycle detection
         let mut in_degree = BTreeMap::<&str, usize>::new();
         let mut graph = BTreeMap::<&str, Vec<&str>>::new();
 
-        let is_valid_object_ref = |o| ast.models.contains_key(o) || ast.poos.contains_key(o);
-
-        for (service_name, service) in ast.services.iter() {
+        for (service_name, service) in &ast.services {
             graph.entry(&service.name).or_default();
             in_degree.entry(&service.name).or_insert(0);
 
@@ -402,7 +445,7 @@ impl SemanticAnalysis {
             );
 
             // Assemble graph
-            for attr in service.attributes.iter() {
+            for attr in &service.attributes {
                 if !ast.services.contains_key(&attr.injected) {
                     continue;
                 }
@@ -416,39 +459,11 @@ impl SemanticAnalysis {
 
             // Validate methods
             for (method_name, method) in &service.methods {
-                // Validate record
-                ensure!(
-                    *method_name == method.name,
-                    GeneratorErrorKind::InvalidMapping,
-                    "Method record key did not match it's method name? {}: {}",
-                    method_name,
-                    method.name
-                );
-
-                // Validate return type
-                match &method.return_type {
-                    CidlType::Object(o) => {
-                        ensure!(
-                            is_valid_object_ref(o),
-                            GeneratorErrorKind::UnknownObject,
-                            "{}.{}",
-                            service.name,
-                            method.name
-                        );
-                    }
-                    CidlType::Partial(_) => {
-                        fail!(
-                            GeneratorErrorKind::UnexpectedPartialReturn,
-                            "{}.{}",
-                            service.name,
-                            method.name,
-                        )
-                    }
-                    _ => {}
-                }
+                validate_methods(service_name, method_name, method, ast)?;
             }
         }
 
+        // Sort
         let rank = kahns(graph, in_degree, ast.services.len())?;
         ast.services
             .sort_by_key(|k, _| rank.get(k.as_str()).unwrap());
@@ -457,10 +472,118 @@ impl SemanticAnalysis {
     }
 }
 
+fn is_valid_object_ref(ast: &CloesceAst, o: &String) -> bool {
+    ast.models.contains_key(o) || ast.poos.contains_key(o)
+}
+
+/// Returns how many data sources to the namespace are in the method.
+fn validate_methods(
+    namespace: &str,
+    method_name: &str,
+    method: &ApiMethod,
+    ast: &CloesceAst,
+) -> Result<i32> {
+    // Validate record
+    ensure!(
+        *method_name == method.name,
+        GeneratorErrorKind::InvalidMapping,
+        "Method record key did not match it's method name? {}: {}",
+        method_name,
+        method.name
+    );
+
+    // Validate return type
+    match &method.return_type {
+        CidlType::Object(o) | CidlType::Partial(o) => ensure!(
+            is_valid_object_ref(ast, o),
+            GeneratorErrorKind::UnknownObject,
+            "{}.{}",
+            namespace,
+            method.name
+        ),
+
+        CidlType::DataSource(o) => ensure!(
+            ast.models.contains_key(o),
+            GeneratorErrorKind::UnknownDataSourceReference,
+            "{}.{}",
+            namespace,
+            method.name,
+        ),
+
+        CidlType::Inject(o) => fail!(
+            GeneratorErrorKind::UnexpectedInject,
+            "{}.{} => {}?",
+            namespace,
+            method.name,
+            o
+        ),
+        _ => {}
+    }
+
+    // Validate method params
+    let mut ds = 0;
+    for param in &method.parameters {
+        if let CidlType::DataSource(model_name) = &param.cidl_type {
+            ensure!(
+                ast.models.contains_key(model_name),
+                GeneratorErrorKind::UnknownDataSourceReference,
+                "{}.{} data source references {}",
+                namespace,
+                method.name,
+                model_name
+            );
+
+            if *model_name == namespace {
+                ds += 1;
+            }
+        }
+
+        let root_type = param.cidl_type.root_type();
+
+        match root_type {
+            CidlType::Void => {
+                fail!(
+                    GeneratorErrorKind::UnexpectedVoid,
+                    "{}.{}.{}",
+                    namespace,
+                    method.name,
+                    param.name
+                )
+            }
+            CidlType::Object(o) | CidlType::Partial(o) => {
+                ensure!(
+                    is_valid_object_ref(ast, o),
+                    GeneratorErrorKind::UnknownObject,
+                    "{}.{}.{}",
+                    namespace,
+                    method.name,
+                    param.name
+                );
+
+                // TODO: remove this
+                if method.http_verb == HttpVerb::GET {
+                    fail!(
+                        GeneratorErrorKind::NotYetSupported,
+                        "GET Requests currently do not support object parameters {}.{}.{}",
+                        namespace,
+                        method.name,
+                        param.name
+                    )
+                }
+            }
+            _ => {
+                // Ignore
+            }
+        }
+    }
+
+    Ok(ds)
+}
+
 // Kahns algorithm for topological sort + cycle detection.
 // If no cycles, returns a map of id to position used for sorting the original collection.
 fn kahns<'a>(
-    graph: BTreeMap<&'a str, Vec<&'a str>>,
+    graph: AdjacencyList<'a>,
     mut in_degree: BTreeMap<&'a str, usize>,
     len: usize,
 ) -> Result<HashMap<String, usize>> {

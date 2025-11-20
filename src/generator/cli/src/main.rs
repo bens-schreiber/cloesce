@@ -10,6 +10,7 @@ use tracing_subscriber::FmtSubscriber;
 use ast::{
     CloesceAst, MigrationsAst,
     err::{GeneratorErrorKind, Result},
+    semantic::BlobObjectSet,
 };
 use d1::{D1Generator, MigrationsDilemma, MigrationsIntent};
 use workers::WorkersGenerator;
@@ -91,7 +92,7 @@ fn run_cli() -> Result<()> {
             pre_cidl_path,
             cidl_path,
         } => {
-            let ast = validate_cidl(&pre_cidl_path)?;
+            let (ast, _) = validate_cidl(&pre_cidl_path)?;
             write_cidl(ast, &cidl_path)?;
             tracing::info!("Validation OK.");
         }
@@ -130,9 +131,9 @@ fn run_cli() -> Result<()> {
             client_path,
             workers_domain,
         } => {
-            let mut ast = validate_cidl(&pre_cidl_path)?;
+            let (mut ast, blob_objects) = validate_cidl(&pre_cidl_path)?;
             generate_wrangler(&wrangler_path, &ast)?;
-            generate_workers(&mut ast, &workers_path, &wrangler_path)?;
+            generate_workers(&mut ast, &workers_path, &wrangler_path, &blob_objects)?;
             generate_client(&ast, &client_path, &workers_domain)?;
             write_cidl(ast, &cidl_path)?;
         }
@@ -214,12 +215,12 @@ impl MigrationsCli {
     }
 }
 
-fn validate_cidl(pre_cidl_path: &Path) -> Result<CloesceAst> {
+fn validate_cidl(pre_cidl_path: &Path) -> Result<(CloesceAst, BlobObjectSet)> {
     let mut ast = CloesceAst::from_json(pre_cidl_path)?;
-    ast.semantic_analysis()?;
+    let blob_objects = ast.semantic_analysis()?;
     ast.set_merkle_hash();
 
-    Ok(ast)
+    Ok((ast, blob_objects))
 }
 
 fn write_cidl(ast: CloesceAst, cidl_path: &Path) -> Result<()> {
@@ -252,11 +253,16 @@ fn generate_wrangler(wrangler_path: &Path, ast: &CloesceAst) -> Result<()> {
     Ok(())
 }
 
-fn generate_workers(ast: &mut CloesceAst, workers_path: &Path, wrangler_path: &Path) -> Result<()> {
+fn generate_workers(
+    ast: &mut CloesceAst,
+    workers_path: &Path,
+    wrangler_path: &Path,
+    blob_objects: &BlobObjectSet,
+) -> Result<()> {
     let mut file = open_file_or_create(workers_path)?;
     let wrangler = WranglerFormat::from_path(wrangler_path);
 
-    let workers = WorkersGenerator::create(ast, wrangler.as_spec(), workers_path);
+    let workers = WorkersGenerator::create(ast, wrangler.as_spec(), workers_path, blob_objects);
     file.write_all(workers.as_bytes())
         .expect("Could not write to file");
     Ok(())

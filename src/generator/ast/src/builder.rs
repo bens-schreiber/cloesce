@@ -6,8 +6,9 @@ use std::{
 use indexmap::IndexMap;
 
 use crate::{
-    ApiMethod, CidlType, CloesceAst, DataSource, HttpVerb, IncludeTree, InputLanguage, Model,
-    ModelAttribute, NamedTypedValue, NavigationProperty, NavigationPropertyKind, WranglerEnv,
+    ApiMethod, CidlType, CloesceAst, DataSource, HttpVerb, IncludeTree, InputLanguage, MediaType,
+    Model, ModelAttribute, NamedTypedValue, NavigationProperty, NavigationPropertyKind,
+    WranglerEnv,
 };
 
 pub fn create_ast(mut models: Vec<Model>) -> CloesceAst {
@@ -20,7 +21,7 @@ pub fn create_ast(mut models: Vec<Model>) -> CloesceAst {
         project_name: "test".to_string(),
         language: InputLanguage::TypeScript,
         models: map,
-        poos: BTreeMap::default(),
+        poos: IndexMap::default(),
         wrangler_env: WranglerEnv {
             name: "Env".into(),
             source_path: "source.ts".into(),
@@ -141,6 +142,8 @@ impl ModelBuilder {
                 http_verb,
                 return_type,
                 parameters,
+                return_media: MediaType::default(),
+                parameters_media: MediaType::default(),
             },
         );
         self

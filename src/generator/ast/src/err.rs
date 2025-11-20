@@ -65,7 +65,7 @@ pub enum GeneratorErrorKind {
     UnknownObject,
     UnknownDataSourceReference,
     UnexpectedVoid,
-    UnexpectedPartialReturn,
+    UnexpectedInject,
     MissingOrExtraneousDataSource,
     NotYetSupported,
     InvalidMapping,
@@ -112,9 +112,9 @@ impl GeneratorErrorKind {
                 "Remove `void`",
                 GeneratorPhase::ModelSemanticAnalysis,
             ),
-            GeneratorErrorKind::UnexpectedPartialReturn => (
-                "Methods cannot return a partial value.",
-                "Try using a Plain Old Object instead",
+            GeneratorErrorKind::UnexpectedInject => (
+                "Attributes and return types cannot be injected values.",
+                "Remove the value.",
                 GeneratorPhase::ModelSemanticAnalysis,
             ),
             GeneratorErrorKind::MissingOrExtraneousDataSource => (

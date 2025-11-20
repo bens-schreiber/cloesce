@@ -1,13 +1,18 @@
 use std::path::Path;
 
-use ast::{ApiMethod, CidlType, CloesceAst, HttpVerb, NamedTypedValue};
+use ast::{
+    ApiMethod, CidlType, CloesceAst, CrudKind, HttpVerb, MediaType, NamedTypedValue,
+    semantic::BlobObjectSet,
+};
 
 use wrangler::WranglerSpec;
 
 pub struct WorkersGenerator;
 impl WorkersGenerator {
     /// Generates all model source imports as well as the Cloesce App
-    fn link(ast: &CloesceAst, workers_path: &Path) -> String {
+    ///
+    /// Public for tests
+    pub fn link(ast: &CloesceAst, workers_path: &Path) -> String {
         let workers_dir = workers_path
             .parent()
             .expect("workers_path has no parent; cannot compute relative imports");
@@ -105,12 +110,14 @@ impl WorkersGenerator {
         )
     }
 
-    /// Inserts CRUD methods into the AST
-    pub fn cruds(ast: &mut CloesceAst) {
+    /// Sets the [MediaType] of all ApiMethods; generates CRUD methods.
+    ///
+    /// Public for tests
+    pub fn finalize_api_methods(ast: &mut CloesceAst, blob_objects: &BlobObjectSet) {
         for model in ast.models.values_mut() {
-            for crud in model.cruds.iter() {
+            for crud in &model.cruds {
                 let method = match crud {
-                    ast::CrudKind::GET => ApiMethod {
+                    CrudKind::GET => ApiMethod {
                         name: "get".into(),
                         is_static: true,
                         http_verb: HttpVerb::GET,
@@ -125,8 +132,10 @@ impl WorkersGenerator {
                                 cidl_type: CidlType::DataSource(model.name.clone()),
                             },
                         ],
+                        parameters_media: MediaType::default(),
+                        return_media: MediaType::default(),
                     },
-                    ast::CrudKind::LIST => ApiMethod {
+                    CrudKind::LIST => ApiMethod {
                         name: "list".into(),
                         is_static: true,
                         http_verb: HttpVerb::GET,
@@ -137,8 +146,10 @@ impl WorkersGenerator {
                             name: "__datasource".into(),
                             cidl_type: CidlType::DataSource(model.name.clone()),
                         }],
+                        parameters_media: MediaType::default(),
+                        return_media: MediaType::default(),
                     },
-                    ast::CrudKind::SAVE => ApiMethod {
+                    CrudKind::SAVE => ApiMethod {
                         name: "save".into(),
                         is_static: true,
                         http_verb: HttpVerb::POST,
@@ -153,6 +164,8 @@ impl WorkersGenerator {
                                 cidl_type: CidlType::DataSource(model.name.clone()),
                             },
                         ],
+                        parameters_media: MediaType::default(),
+                        return_media: MediaType::default(),
                     },
                 };
 
@@ -168,14 +181,48 @@ impl WorkersGenerator {
 
                 model.methods.insert(method.name.clone(), method);
             }
+
+            for method in model.methods.values_mut() {
+                // Return Media Type
+                method.return_media = match method.return_type.root_type() {
+                    CidlType::Blob | CidlType::Stream => MediaType::Octet,
+                    CidlType::Object(o) if blob_objects.contains(o) => MediaType::FormData,
+                    _ => MediaType::Json,
+                };
+
+                let mut has_blob = false;
+                let mut has_model = false;
+                for param in &method.parameters {
+                    match param.cidl_type.root_type() {
+                        CidlType::Blob | CidlType::Stream => has_blob = true,
+                        CidlType::Object(o) | CidlType::Partial(o) => {
+                            has_blob |= blob_objects.contains(o);
+                            has_model = true;
+                        }
+                        _ => {}
+                    };
+                }
+
+                // Parameters Media
+                method.parameters_media = match (has_blob, has_model) {
+                    (true, true) => MediaType::FormData,
+                    (true, false) => MediaType::Octet,
+                    _ => MediaType::Json,
+                };
+            }
         }
     }
 
-    pub fn create(ast: &mut CloesceAst, wrangler: WranglerSpec, workers_path: &Path) -> String {
+    pub fn create(
+        ast: &mut CloesceAst,
+        wrangler: WranglerSpec,
+        workers_path: &Path,
+        blob_objects: &BlobObjectSet,
+    ) -> String {
         let linked_sources = Self::link(ast, workers_path);
         let constructor_registry = Self::registry(ast);
 
-        Self::cruds(ast);
+        Self::finalize_api_methods(ast, blob_objects);
 
         // TODO: Hardcoding one database, in the future we need to support any amount
         let db_binding = wrangler
