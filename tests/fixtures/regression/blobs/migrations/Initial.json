@@ -1,0 +1,33 @@
+{
+  "hash": 14061493059919975776,
+  "models": {
+    "BlobHaver": {
+      "hash": 16282627471475622808,
+      "name": "BlobHaver",
+      "primary_key": {
+        "name": "id",
+        "cidl_type": "Real"
+      },
+      "attributes": [
+        {
+          "hash": 3614122834570409634,
+          "value": {
+            "name": "blob1",
+            "cidl_type": "Blob"
+          },
+          "foreign_key_reference": null
+        },
+        {
+          "hash": 1356319928856589796,
+          "value": {
+            "name": "blob2",
+            "cidl_type": "Blob"
+          },
+          "foreign_key_reference": null
+        }
+      ],
+      "navigation_properties": [],
+      "data_sources": {}
+    }
+  }
+}

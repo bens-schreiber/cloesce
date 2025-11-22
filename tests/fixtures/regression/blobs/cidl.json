@@ -1,0 +1,48 @@
+{
+  "hash": 14061493059919975776,
+  "version": "v0.0.4",
+  "project_name": "runner",
+  "language": "TypeScript",
+  "wrangler_env": {
+    "name": "Env",
+    "source_path": "./seed__blobs.cloesce.ts",
+    "db_binding": "db",
+    "vars": {}
+  },
+  "models": {
+    "BlobHaver": {
+      "hash": 16282627471475622808,
+      "name": "BlobHaver",
+      "primary_key": {
+        "name": "id",
+        "cidl_type": "Real"
+      },
+      "attributes": [
+        {
+          "hash": 3614122834570409634,
+          "value": {
+            "name": "blob1",
+            "cidl_type": "Blob"
+          },
+          "foreign_key_reference": null
+        },
+        {
+          "hash": 1356319928856589796,
+          "value": {
+            "name": "blob2",
+            "cidl_type": "Blob"
+          },
+          "foreign_key_reference": null
+        }
+      ],
+      "navigation_properties": [],
+      "methods": {},
+      "data_sources": {},
+      "cruds": [],
+      "source_path": "./seed__blobs.cloesce.ts"
+    }
+  },
+  "poos": {},
+  "services": {},
+  "app_source": null
+}

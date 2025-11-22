@@ -44,8 +44,8 @@ fn register_helpers<'a>(
     handlebars.register_helper("is_serializable", Box::new(is_serializable));
     handlebars.register_helper("is_object", Box::new(is_object));
     handlebars.register_helper("is_object_array", Box::new(is_object_array));
-    handlebars.register_helper("is_blob", Box::new(is_object));
-    handlebars.register_helper("is_blob_array", Box::new(is_object_array));
+    handlebars.register_helper("is_blob", Box::new(is_blob));
+    handlebars.register_helper("is_blob_array", Box::new(is_blob_array));
     handlebars.register_helper("is_one_to_one", Box::new(is_one_to_one));
     handlebars.register_helper("object_name", Box::new(object_name));
     handlebars.register_helper("is_many_nav", Box::new(is_many_nav));

@@ -137,11 +137,11 @@ export class {{this.name}} {
     {{/each}}
 
     {{#each this.attributes}}
-      {{#if (is_blob_array cidl_type)}}
+      {{#if (is_blob_array value.cidl_type)}}
     for (let i = 0; i < res.{{name}}.length; i++) {
       res.{{name}}[i] = blobs[res.{{name}}[i].__blobIndex]; 
     }
-      {{else if (is_blob cidl_type)}}
+      {{else if (is_blob value.cidl_type)}}
     res.{{name}} = blobs[res.{{name}}.__blobIndex];
       {{/if}}
     {{/each}}
