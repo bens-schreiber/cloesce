@@ -167,7 +167,6 @@ fn finalize_sets_formdata_media_type() {
 #[test]
 fn finalize_sets_octet_media_type() {
     // Arrange
-
     let mut ast = create_ast(vec![
         ModelBuilder::new("User")
             .id()

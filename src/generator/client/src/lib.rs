@@ -18,6 +18,16 @@ handlebars_helper!(is_object_array: |cidl_type: CidlType| match cidl_type {
     CidlType::Array(inner) => matches!(inner.deref(), CidlType::Object(_)),
     _ => false,
 });
+handlebars_helper!(is_blob: |cidl_type: CidlType| match cidl_type {
+    CidlType::Blob => true,
+    CidlType::HttpResult(inner) => matches!(inner.deref(), CidlType::Blob),
+    _ => false,
+});
+handlebars_helper!(is_blob_array: |cidl_type: CidlType| match cidl_type {
+    CidlType::HttpResult(inner) => matches!(inner.deref(), CidlType::Array(inner2) if matches!(inner2.deref(), CidlType::Blob)),
+    CidlType::Array(inner) => matches!(inner.deref(), CidlType::Blob),
+    _ => false,
+});
 handlebars_helper!(is_one_to_one: |nav: NavigationProperty| matches!(nav.kind, NavigationPropertyKind::OneToOne {..}));
 handlebars_helper!(is_many_nav: |nav: NavigationProperty| matches!(nav.kind, NavigationPropertyKind::OneToMany {..} | NavigationPropertyKind::ManyToMany { .. }));
 handlebars_helper!(object_name: |cidl_type: CidlType| match cidl_type.root_type() {
@@ -34,6 +44,8 @@ fn register_helpers<'a>(
     handlebars.register_helper("is_serializable", Box::new(is_serializable));
     handlebars.register_helper("is_object", Box::new(is_object));
     handlebars.register_helper("is_object_array", Box::new(is_object_array));
+    handlebars.register_helper("is_blob", Box::new(is_object));
+    handlebars.register_helper("is_blob_array", Box::new(is_object_array));
     handlebars.register_helper("is_one_to_one", Box::new(is_one_to_one));
     handlebars.register_helper("object_name", Box::new(object_name));
     handlebars.register_helper("is_many_nav", Box::new(is_many_nav));

@@ -16,6 +16,12 @@ export class {{this.name}} {
     }
       {{else if (is_object cidl_type)}}
     res["{{name}}"] &&= Object.assign(new {{object_name cidl_type}}(), res.{{name}});
+      {{else if (is_blob_array cidl_type)}}
+    for (let i = 0; i < res.{{name}}.length; i++) {
+      res.{{name}}[i] = blobs[res.{{name}}[i].__blobIndex]; 
+    }
+      {{else if (is_blob cidl_type)}}
+    res.{{name}} = blobs[res.{{name}}.__blobIndex];
       {{/if}}
     {{/each}}
     return res;
@@ -120,15 +126,26 @@ export class {{this.name}} {
   static fromJson(data: any): {{this.name}} {
     const res = Object.assign(new {{this.name}}(), data);
     {{#each this.navigation_properties}}
-    {{#if (is_one_to_one this)}}
+      {{#if (is_one_to_one this)}}
     res["{{var_name}}"] &&= Object.assign(new {{this.model_name}}(), res.{{var_name}});
-    {{/if}}
+      {{/if}}
     {{#if (is_many_nav this)}}
     for (let i = 0; i < res.{{var_name}}?.length; i++) {
       res.{{var_name}}[i] = {{this.model_name}}.fromJson(res.{{var_name}}[i]);
     }
-    {{/if}}
+      {{/if}}
     {{/each}}
+
+    {{#each this.attributes}}
+      {{#if (is_blob_array cidl_type)}}
+    for (let i = 0; i < res.{{name}}.length; i++) {
+      res.{{name}}[i] = blobs[res.{{name}}[i].__blobIndex]; 
+    }
+      {{else if (is_blob cidl_type)}}
+    res.{{name}} = blobs[res.{{name}}.__blobIndex];
+      {{/if}}
+    {{/each}}
+
     return res;
   }
 }

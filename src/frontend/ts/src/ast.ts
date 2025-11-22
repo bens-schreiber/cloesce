@@ -38,11 +38,32 @@ export interface ModelAttribute {
   foreign_key_reference: string | null;
 }
 
+export enum MediaType {
+  Json = "Json",
+  Octet = "Octet",
+  FormData = "FormData",
+}
+
+/**
+ * The generator portion of the Cloesce Compiler will determine what the
+ * true actual media should be after extraction. This function provides a default
+ * dummy value to be used until then.
+ *
+ * @returns MediaType.Json
+ */
+export function defaultMediaType(): MediaType {
+  return MediaType.Json;
+}
+
 export interface ApiMethod {
   name: string;
   is_static: boolean;
   http_verb: HttpVerb;
+
+  return_media: MediaType;
   return_type: CidlType;
+
+  parameters_media: MediaType;
   parameters: NamedTypedValue[];
 }
 
@@ -58,7 +79,7 @@ export interface NavigationProperty {
 }
 
 export function getNavigationPropertyCidlType(
-  nav: NavigationProperty,
+  nav: NavigationProperty
 ): CidlType {
   return "OneToOne" in nav.kind
     ? { Object: nav.model_name }

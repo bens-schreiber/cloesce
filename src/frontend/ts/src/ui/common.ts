@@ -1,3 +1,5 @@
+import { MediaType } from "../ast";
+
 type DeepPartialInner<T> = T extends (infer U)[]
   ? DeepPartialInner<U>[]
   : T extends object
@@ -51,7 +53,7 @@ export type DeepPartial<T> = DeepPartialInner<T> & { __brand?: "Partial" };
 
 export class Either<L, R> {
   private constructor(
-    private readonly inner: { ok: true; right: R } | { ok: false; left: L },
+    private readonly inner: { ok: true; right: R } | { ok: false; left: L }
   ) {}
 
   get value(): L | R {
@@ -101,6 +103,12 @@ export class Either<L, R> {
   }
 }
 
+const contentTypeMap: Record<MediaType, string> = {
+  [MediaType.Json]: "application/json",
+  [MediaType.FormData]: "multipart/form-data",
+  [MediaType.Octet]: "application/octet-stream",
+};
+
 /**
  * The result of a Workers endpoint.
  *
@@ -118,41 +126,81 @@ export class HttpResult<T = unknown> {
     public ok: boolean,
     public status: number,
     public headers: Headers,
+    public mediaType: MediaType,
     public data?: T,
-    public message?: string,
+    public message?: string
   ) {}
 
-  static ok<T>(status: number, data?: T, init?: HeadersInit): HttpResult {
+  static ok<T>(
+    status: number,
+    data?: T,
+    init?: HeadersInit,
+    mediaType: MediaType = MediaType.Json
+  ): HttpResult {
     const headers: Headers = new Headers(
       init ?? {
-        "Content-Type": "application/json",
-      },
+        "Content-Type": contentTypeMap[mediaType],
+      }
     );
 
-    return new HttpResult<T>(true, status, headers, data, undefined);
+    return new HttpResult<T>(true, status, headers, mediaType, data, undefined);
   }
 
   static fail(status: number, message?: string, init?: HeadersInit) {
     const headers: Headers = new Headers(
       init ?? {
-        "Content-Type": "application/json",
-      },
+        "Content-Type": "text/plain",
+      }
     );
 
-    return new HttpResult<never>(false, status, headers, undefined, message);
+    return new HttpResult<never>(
+      false,
+      status,
+      headers,
+      MediaType.Json, // default, won't be used
+      undefined,
+      message
+    );
   }
 
   toResponse(): Response {
     const body = () => {
+      // No body
       if (this.status === 204) {
         return undefined;
       }
 
-      return this.ok
-        ? JSON.stringify({
-            data: this.data,
-          })
-        : this.message;
+      // Failures will always return as text.
+      if (!this.ok) {
+        return this.message;
+      }
+
+      switch (this.mediaType) {
+        case MediaType.Json: {
+          return JSON.stringify(this.data);
+        }
+        case MediaType.FormData: {
+          const formData = new FormData();
+          let blobIndex = 0;
+
+          const json = JSON.stringify(this.data, (key, value) => {
+            if (value instanceof Blob) {
+              const index = blobIndex++;
+              formData.append("blobs[]", value, String(index));
+              return { __blobIndex: index };
+            }
+
+            return value;
+          });
+
+          formData.set("json", json);
+
+          return formData;
+        }
+        case MediaType.Octet: {
+          return this.data as Blob | ArrayBuffer | ReadableStream;
+        }
+      }
     };
 
     return new Response(body(), {
@@ -170,33 +218,71 @@ export class HttpResult<T = unknown> {
    */
   static async fromResponse(
     response: Response,
+    mediaType: MediaType,
     ctor?: any,
-    array: boolean = false,
+    array: boolean = false
   ): Promise<HttpResult<any>> {
-    if (response.status < 400) {
-      const json = await response.json();
-
-      // TODO: Lazy instantiation via Proxy?
-      let data = json.data;
-      if (ctor) {
-        if (array) {
-          for (let i = 0; i < data.length; i++) {
-            data[i] = ctor.fromJson(data[i]);
-          }
-        } else {
-          data = ctor.fromJson(data);
-        }
-      }
-
-      return new HttpResult(true, response.status, response.headers, data);
+    if (response.status > 400) {
+      return new HttpResult(
+        false,
+        response.status,
+        response.headers,
+        MediaType.Json,
+        undefined,
+        await response.text()
+      );
     }
 
+    const data = async () => {
+      switch (mediaType) {
+        case MediaType.Json: {
+          let json = await response.json();
+
+          if (!ctor) {
+            return json;
+          }
+
+          if (array) {
+            for (let i = 0; i < json.length; i++) {
+              json[i] = ctor.fromJson(json[i]);
+            }
+          } else {
+            json = ctor.fromJson(json);
+          }
+
+          return json;
+        }
+
+        case MediaType.FormData: {
+          // todo: blob[]?
+          const formData = await response.formData();
+          const blobs = formData.getAll("blobs[]");
+          let json: any = formData.get("json")!;
+
+          if (array) {
+            for (let i = 0; i < json.length; i++) {
+              json[i] = ctor.fromJson(json[i], blobs);
+            }
+          } else {
+            json = ctor.fromJson(json, blobs);
+          }
+
+          return json;
+        }
+
+        case MediaType.Octet: {
+          const buffer = await response.arrayBuffer();
+          return new Blob([buffer]);
+        }
+      }
+    };
+
     return new HttpResult(
-      false,
+      true,
       response.status,
       response.headers,
-      undefined,
-      await response.text(),
+      mediaType,
+      await data()
     );
   }
 }
