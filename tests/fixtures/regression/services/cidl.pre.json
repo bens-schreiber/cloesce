@@ -19,14 +19,18 @@
                     "name": "staticMethod",
                     "http_verb": "GET",
                     "is_static": true,
+                    "return_media": "Json",
                     "return_type": "Text",
+                    "parameters_media": "Json",
                     "parameters": []
                 },
                 "instantiatedMethod": {
                     "name": "instantiatedMethod",
                     "http_verb": "GET",
                     "is_static": false,
+                    "return_media": "Json",
                     "return_type": "Text",
+                    "parameters_media": "Json",
                     "parameters": []
                 }
             },
@@ -49,7 +53,9 @@
                     "name": "useFoo",
                     "http_verb": "GET",
                     "is_static": false,
+                    "return_media": "Json",
                     "return_type": "Text",
+                    "parameters_media": "Json",
                     "parameters": []
                 }
             },

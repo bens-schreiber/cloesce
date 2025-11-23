@@ -36,9 +36,102 @@
         }
       ],
       "navigation_properties": [],
-      "methods": {},
+      "methods": {
+        "get": {
+          "name": "get",
+          "is_static": true,
+          "http_verb": "GET",
+          "return_media": "FormData",
+          "return_type": {
+            "HttpResult": {
+              "Object": "BlobHaver"
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "id",
+              "cidl_type": "Real"
+            },
+            {
+              "name": "__datasource",
+              "cidl_type": {
+                "DataSource": "BlobHaver"
+              }
+            }
+          ]
+        },
+        "getBlob1": {
+          "name": "getBlob1",
+          "is_static": false,
+          "http_verb": "GET",
+          "return_media": "Octet",
+          "return_type": "Blob",
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "__dataSource",
+              "cidl_type": {
+                "DataSource": "BlobHaver"
+              }
+            }
+          ]
+        },
+        "list": {
+          "name": "list",
+          "is_static": true,
+          "http_verb": "GET",
+          "return_media": "FormData",
+          "return_type": {
+            "HttpResult": {
+              "Array": {
+                "Object": "BlobHaver"
+              }
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "__datasource",
+              "cidl_type": {
+                "DataSource": "BlobHaver"
+              }
+            }
+          ]
+        },
+        "save": {
+          "name": "save",
+          "is_static": true,
+          "http_verb": "POST",
+          "return_media": "FormData",
+          "return_type": {
+            "HttpResult": {
+              "Object": "BlobHaver"
+            }
+          },
+          "parameters_media": "FormData",
+          "parameters": [
+            {
+              "name": "model",
+              "cidl_type": {
+                "Partial": "BlobHaver"
+              }
+            },
+            {
+              "name": "__datasource",
+              "cidl_type": {
+                "DataSource": "BlobHaver"
+              }
+            }
+          ]
+        }
+      },
       "data_sources": {},
-      "cruds": [],
+      "cruds": [
+        "GET",
+        "LIST",
+        "SAVE"
+      ],
       "source_path": "./seed__blobs.cloesce.ts"
     }
   },

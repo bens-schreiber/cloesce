@@ -2,7 +2,9 @@ mod mappers;
 
 use std::{ops::Deref, sync::Arc};
 
-use ast::{CidlType, CloesceAst, InputLanguage, NavigationProperty, NavigationPropertyKind};
+use ast::{
+    CidlType, CloesceAst, InputLanguage, MediaType, NavigationProperty, NavigationPropertyKind,
+};
 use mappers::{ClientLanguageTypeMapper, TypeScriptMapper};
 
 use handlebars::{Handlebars, handlebars_helper};
@@ -30,10 +32,6 @@ handlebars_helper!(is_blob_array: |cidl_type: CidlType| match cidl_type {
 });
 handlebars_helper!(is_one_to_one: |nav: NavigationProperty| matches!(nav.kind, NavigationPropertyKind::OneToOne {..}));
 handlebars_helper!(is_many_nav: |nav: NavigationProperty| matches!(nav.kind, NavigationPropertyKind::OneToMany {..} | NavigationPropertyKind::ManyToMany { .. }));
-handlebars_helper!(object_name: |cidl_type: CidlType| match cidl_type.root_type() {
-    CidlType::Object(name) => name.clone(),
-    _ => panic!("Not an object")
-});
 handlebars_helper!(eq: |a: str, b: str| a == b);
 
 fn register_helpers<'a>(
@@ -47,7 +45,6 @@ fn register_helpers<'a>(
     handlebars.register_helper("is_blob", Box::new(is_blob));
     handlebars.register_helper("is_blob_array", Box::new(is_blob_array));
     handlebars.register_helper("is_one_to_one", Box::new(is_one_to_one));
-    handlebars.register_helper("object_name", Box::new(object_name));
     handlebars.register_helper("is_many_nav", Box::new(is_many_nav));
     handlebars.register_helper("eq", Box::new(eq));
 
@@ -71,7 +68,7 @@ fn register_helpers<'a>(
                     }
                 };
 
-                let rendered = mapper1.type_name(&cidl_type, ast);
+                let rendered = mapper1.cidl_type(&cidl_type, ast);
                 out.write(&rendered)?;
                 Ok(())
             },
@@ -90,7 +87,26 @@ fn register_helpers<'a>(
                 let cidl_type: CidlType =
                     serde_json::from_value(h.param(0).unwrap().value().clone()).unwrap();
 
-                let rendered = mapper2.type_name(&cidl_type, ast);
+                let rendered = mapper2.cidl_type(&cidl_type, ast);
+                out.write(&rendered)?;
+                Ok(())
+            },
+        ),
+    );
+
+    let mapper3 = mapper.clone();
+    handlebars.register_helper(
+        "get_media_type",
+        Box::new(
+            move |h: &handlebars::Helper<'_>,
+                  _: &Handlebars,
+                  _: &handlebars::Context,
+                  _: &mut handlebars::RenderContext<'_, '_>,
+                  out: &mut dyn handlebars::Output| {
+                let media_type: MediaType =
+                    serde_json::from_value(h.param(0).unwrap().value().clone()).unwrap();
+
+                let rendered = mapper3.media_type(&media_type);
                 out.write(&rendered)?;
                 Ok(())
             },

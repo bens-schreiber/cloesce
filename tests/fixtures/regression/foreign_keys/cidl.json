@@ -24,7 +24,9 @@
           "name": "testMethod",
           "is_static": false,
           "http_verb": "POST",
+          "return_media": "Json",
           "return_type": "Void",
+          "parameters_media": "Json",
           "parameters": [
             {
               "name": "__dataSource",
@@ -89,9 +91,11 @@
           "name": "post",
           "is_static": true,
           "http_verb": "POST",
+          "return_media": "Json",
           "return_type": {
             "Object": "Person"
           },
+          "parameters_media": "Json",
           "parameters": [
             {
               "name": "{ db }",
@@ -111,9 +115,11 @@
           "name": "refresh",
           "is_static": false,
           "http_verb": "GET",
+          "return_media": "Json",
           "return_type": {
             "Object": "Person"
           },
+          "parameters_media": "Json",
           "parameters": [
             {
               "name": "__dataSource",
@@ -127,9 +133,11 @@
           "name": "returnFatalIfParamsNotInstantiated",
           "is_static": true,
           "http_verb": "POST",
+          "return_media": "Json",
           "return_type": {
             "HttpResult": "Void"
           },
+          "parameters_media": "Json",
           "parameters": [
             {
               "name": "person",
@@ -177,9 +185,11 @@
           "name": "post",
           "is_static": true,
           "http_verb": "POST",
+          "return_media": "Json",
           "return_type": {
             "Object": "Student"
           },
+          "parameters_media": "Json",
           "parameters": [
             {
               "name": "{ db }",
@@ -199,9 +209,11 @@
           "name": "refresh",
           "is_static": false,
           "http_verb": "GET",
+          "return_media": "Json",
           "return_type": {
             "Object": "Student"
           },
+          "parameters_media": "Json",
           "parameters": [
             {
               "name": "__dataSource",
@@ -271,9 +283,11 @@
           "name": "post",
           "is_static": true,
           "http_verb": "POST",
+          "return_media": "Json",
           "return_type": {
             "Object": "A"
           },
+          "parameters_media": "Json",
           "parameters": [
             {
               "name": "{ db }",
@@ -293,9 +307,11 @@
           "name": "refresh",
           "is_static": false,
           "http_verb": "GET",
+          "return_media": "Json",
           "return_type": {
             "Object": "A"
           },
+          "parameters_media": "Json",
           "parameters": [
             {
               "name": "__dataSource",
@@ -309,9 +325,11 @@
           "name": "returnFatalIfParamsNotInstantiated",
           "is_static": true,
           "http_verb": "POST",
+          "return_media": "Json",
           "return_type": {
             "HttpResult": "Void"
           },
+          "parameters_media": "Json",
           "parameters": [
             {
               "name": "a",
@@ -362,7 +380,9 @@
           "name": "testMethod",
           "is_static": false,
           "http_verb": "POST",
+          "return_media": "Json",
           "return_type": "Void",
+          "parameters_media": "Json",
           "parameters": [
             {
               "name": "__dataSource",

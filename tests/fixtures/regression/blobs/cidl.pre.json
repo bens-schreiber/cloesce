@@ -32,9 +32,30 @@
                 "cidl_type": "Real"
             },
             "navigation_properties": [],
-            "methods": {},
+            "methods": {
+                "getBlob1": {
+                    "name": "getBlob1",
+                    "is_static": false,
+                    "http_verb": "GET",
+                    "return_media": "Json",
+                    "return_type": "Blob",
+                    "parameters_media": "Json",
+                    "parameters": [
+                        {
+                            "name": "__dataSource",
+                            "cidl_type": {
+                                "DataSource": "BlobHaver"
+                            }
+                        }
+                    ]
+                }
+            },
             "data_sources": {},
-            "cruds": [],
+            "cruds": [
+                "GET",
+                "LIST",
+                "SAVE"
+            ],
             "source_path": "./seed__blobs.cloesce.ts"
         }
     },

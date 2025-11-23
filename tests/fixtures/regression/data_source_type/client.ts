@@ -1,6 +1,6 @@
 // GENERATED CODE. DO NOT MODIFY.
 
-import { HttpResult, DeepPartial } from "cloesce/client";
+import { HttpResult, DeepPartial, MediaType } from "cloesce/client";
 export class Poo {
   ds: "baz" |"none" = "none";
 
@@ -30,11 +30,17 @@ export class Foo {
             noDs
       })
     });
-    return await HttpResult.fromResponse<void>(res);
+
+    return await HttpResult.fromResponse<void>(
+      res, 
+      MediaType.Json,
+    );
   }
 
   static fromJson(data: any): Foo {
     const res = Object.assign(new Foo(), data);
+
+
     return res;
   }
 }
@@ -44,6 +50,8 @@ export class NoDs {
 
   static fromJson(data: any): NoDs {
     const res = Object.assign(new NoDs(), data);
+
+
     return res;
   }
 }
@@ -53,6 +61,8 @@ export class OneDs {
 
   static fromJson(data: any): OneDs {
     const res = Object.assign(new OneDs(), data);
+
+
     return res;
   }
 }

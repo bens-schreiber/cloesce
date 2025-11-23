@@ -1,6 +1,6 @@
 // GENERATED CODE. DO NOT MODIFY.
 
-import { HttpResult, DeepPartial } from "cloesce/client";
+import { HttpResult, DeepPartial, MediaType } from "cloesce/client";
 
 
 export class NullabilityChecks {
@@ -24,7 +24,11 @@ export class NullabilityChecks {
             __dataSource
       })
     });
-    return await HttpResult.fromResponse<string[] | null>(res);
+
+    return await HttpResult.fromResponse<string[] | null>(
+      res, 
+      MediaType.Json,
+    );
   }
   async httpResultTypes(
     a: number | null | null,
@@ -40,7 +44,11 @@ export class NullabilityChecks {
             __dataSource
       })
     });
-    return await HttpResult.fromResponse<NullabilityChecks[] | null | null>(res);
+
+    return await HttpResult.fromResponse<NullabilityChecks[] | null | null>(
+      res, 
+      MediaType.Json,
+    );
   }
   async injectableTypes(
     __dataSource: "none" = "none",
@@ -54,7 +62,11 @@ export class NullabilityChecks {
             __dataSource
       })
     });
-    return await HttpResult.fromResponse<void>(res);
+
+    return await HttpResult.fromResponse<void>(
+      res, 
+      MediaType.Json,
+    );
   }
   async modelTypes(
     a: NullabilityChecks | null,
@@ -70,7 +82,11 @@ export class NullabilityChecks {
             __dataSource
       })
     });
-    return await HttpResult.fromResponse<NullabilityChecks | null>(res);
+
+    return await HttpResult.fromResponse<NullabilityChecks | null>(
+      res, 
+      MediaType.Json,
+    );
   }
   async primitiveTypes(
     a: number | null,
@@ -88,11 +104,17 @@ export class NullabilityChecks {
             __dataSource
       })
     });
-    return await HttpResult.fromResponse<boolean | null>(res);
+
+    return await HttpResult.fromResponse<boolean | null>(
+      res, 
+      MediaType.Json,
+    );
   }
 
   static fromJson(data: any): NullabilityChecks {
     const res = Object.assign(new NullabilityChecks(), data);
+
+
     return res;
   }
 }

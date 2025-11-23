@@ -30,7 +30,9 @@
                     "name": "notCrud",
                     "is_static": false,
                     "http_verb": "POST",
+                    "return_media": "Json",
                     "return_type": "Void",
+                    "parameters_media": "Json",
                     "parameters": [
                         {
                             "name": "__dataSource",

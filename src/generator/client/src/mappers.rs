@@ -1,12 +1,13 @@
-use ast::{CidlType, CloesceAst};
+use ast::{CidlType, CloesceAst, MediaType};
 
 pub trait ClientLanguageTypeMapper {
-    fn type_name(&self, ty: &CidlType, ast: &CloesceAst) -> String;
+    fn cidl_type(&self, ty: &CidlType, ast: &CloesceAst) -> String;
+    fn media_type(&self, ty: &MediaType) -> String;
 }
 
 pub struct TypeScriptMapper;
 impl ClientLanguageTypeMapper for TypeScriptMapper {
-    fn type_name(&self, ty: &CidlType, ast: &CloesceAst) -> String {
+    fn cidl_type(&self, ty: &CidlType, ast: &CloesceAst) -> String {
         match ty {
             CidlType::Integer => "number".to_string(),
             CidlType::Real => "number".to_string(),
@@ -20,14 +21,14 @@ impl ClientLanguageTypeMapper for TypeScriptMapper {
                     return "null".to_string();
                 }
 
-                let inner_ts = self.type_name(inner, ast);
+                let inner_ts = self.cidl_type(inner, ast);
                 format!("{} | null", inner_ts)
             }
             CidlType::Array(inner) => {
-                let inner_ts = self.type_name(inner, ast);
+                let inner_ts = self.cidl_type(inner, ast);
                 format!("{}[]", inner_ts)
             }
-            CidlType::HttpResult(inner) => self.type_name(inner, ast),
+            CidlType::HttpResult(inner) => self.cidl_type(inner, ast),
             CidlType::Void => "void".to_string(),
             CidlType::Partial(name) => format!("DeepPartial<{name}>"),
             CidlType::DataSource(model_name) => {
@@ -44,6 +45,14 @@ impl ClientLanguageTypeMapper for TypeScriptMapper {
                 format!("{} = \"none\"", ds.join(" |")) // default to none
             }
             _ => panic!("Invalid type {:?}", ty),
+        }
+    }
+
+    fn media_type(&self, ty: &MediaType) -> String {
+        match ty {
+            MediaType::Json => "MediaType.Json".to_string(),
+            MediaType::Octet => "MediaType.Octet".to_string(),
+            MediaType::FormData => "MediaType.FormData".to_string(),
         }
     }
 }

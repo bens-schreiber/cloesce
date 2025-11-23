@@ -1,8 +1,8 @@
 {
-  "hash": 15693835366153894573,
+  "hash": 15625196225428469955,
   "models": {
     "Horse": {
-      "hash": 1811063493174485920,
+      "hash": 3138960426576706732,
       "name": "Horse",
       "primary_key": {
         "name": "id",
@@ -18,7 +18,7 @@
           "foreign_key_reference": null
         },
         {
-          "hash": 14370241494486110232,
+          "hash": 10851009741998977749,
           "value": {
             "name": "bio",
             "cidl_type": {

@@ -1,6 +1,6 @@
 // GENERATED CODE. DO NOT MODIFY.
 
-import { HttpResult, DeepPartial } from "cloesce/client";
+import { HttpResult, DeepPartial, MediaType } from "cloesce/client";
 
 
 export class Horse {
@@ -16,7 +16,12 @@ export class Horse {
     const baseUrl = new URL(`http://localhost:5002/api/Horse/get`);
     baseUrl.searchParams.append('id', String(id));
     const res = await fetchImpl(baseUrl, { method: "GET" });
-    return await HttpResult.fromResponse<Horse>(res, Horse, false);
+
+    return await HttpResult.fromResponse<Horse>(
+      res, 
+      MediaType.Json,
+      Horse, false
+    );
   }
   async like(
     horse: Horse,
@@ -32,14 +37,22 @@ export class Horse {
             __dataSource
       })
     });
-    return await HttpResult.fromResponse<void>(res);
+
+    return await HttpResult.fromResponse<void>(
+      res, 
+      MediaType.Json,
+    );
   }
   static async list(
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Horse[]>> {
     const baseUrl = new URL(`http://localhost:5002/api/Horse/list`);
     const res = await fetchImpl(baseUrl, { method: "GET" });
-    return await HttpResult.fromResponse<Horse[]>(res);
+
+    return await HttpResult.fromResponse<Horse[]>(
+      res, 
+      MediaType.Json,
+    );
   }
   static async post(
     horse: Horse,
@@ -53,7 +66,12 @@ export class Horse {
             horse
       })
     });
-    return await HttpResult.fromResponse<Horse>(res, Horse, false);
+
+    return await HttpResult.fromResponse<Horse>(
+      res, 
+      MediaType.Json,
+      Horse, false
+    );
   }
 
   static fromJson(data: any): Horse {
@@ -61,6 +79,8 @@ export class Horse {
     for (let i = 0; i < res.likes?.length; i++) {
       res.likes[i] = Like.fromJson(res.likes[i]);
     }
+
+
     return res;
   }
 }
@@ -74,6 +94,8 @@ export class Like {
   static fromJson(data: any): Like {
     const res = Object.assign(new Like(), data);
     res["horse2"] &&= Object.assign(new Horse(), res.horse2);
+
+
     return res;
   }
 }

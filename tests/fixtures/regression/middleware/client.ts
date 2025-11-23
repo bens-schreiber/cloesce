@@ -1,6 +1,6 @@
 // GENERATED CODE. DO NOT MODIFY.
 
-import { HttpResult, DeepPartial } from "cloesce/client";
+import { HttpResult, DeepPartial, MediaType } from "cloesce/client";
 export class InjectedThing {
   value: string;
 
@@ -19,14 +19,23 @@ export class Model {
   ): Promise<HttpResult<void>> {
     const baseUrl = new URL(`http://localhost:5002/api/Model/blockedMethod`);
     const res = await fetchImpl(baseUrl, { method: "GET" });
-    return await HttpResult.fromResponse<void>(res);
+
+    return await HttpResult.fromResponse<void>(
+      res, 
+      MediaType.Json,
+    );
   }
   static async getInjectedThing(
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<InjectedThing>> {
     const baseUrl = new URL(`http://localhost:5002/api/Model/getInjectedThing`);
     const res = await fetchImpl(baseUrl, { method: "GET" });
-    return await HttpResult.fromResponse<InjectedThing>(res, InjectedThing, false);
+
+    return await HttpResult.fromResponse<InjectedThing>(
+      res, 
+      MediaType.Json,
+      InjectedThing, false
+    );
   }
   static async save(
     model: DeepPartial<Model>,
@@ -42,11 +51,18 @@ export class Model {
             __datasource
       })
     });
-    return await HttpResult.fromResponse<Model>(res, Model, false);
+
+    return await HttpResult.fromResponse<Model>(
+      res, 
+      MediaType.Json,
+      Model, false
+    );
   }
 
   static fromJson(data: any): Model {
     const res = Object.assign(new Model(), data);
+
+
     return res;
   }
 }

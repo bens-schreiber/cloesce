@@ -24,7 +24,9 @@
           "name": "acceptPoos",
           "is_static": true,
           "http_verb": "POST",
+          "return_media": "Json",
           "return_type": "Void",
+          "parameters_media": "Json",
           "parameters": [
             {
               "name": "a",
@@ -50,9 +52,11 @@
           "name": "yieldPoo",
           "is_static": true,
           "http_verb": "POST",
+          "return_media": "Json",
           "return_type": {
             "Object": "PooC"
           },
+          "parameters_media": "Json",
           "parameters": []
         }
       },

@@ -1,5 +1,5 @@
 {
-  "hash": 17097008485444420876,
+  "hash": 8156365678891819022,
   "version": "v0.0.4",
   "project_name": "runner",
   "language": "TypeScript",
@@ -11,7 +11,7 @@
   },
   "models": {
     "Weather": {
-      "hash": 15419486100592067894,
+      "hash": 1994866534909032805,
       "name": "Weather",
       "primary_key": {
         "name": "id",
@@ -19,7 +19,7 @@
       },
       "attributes": [
         {
-          "hash": 3799822671517854410,
+          "hash": 16832578939214678454,
           "value": {
             "name": "date",
             "cidl_type": "DateIso"
@@ -27,7 +27,7 @@
           "foreign_key_reference": null
         },
         {
-          "hash": 13732298516080320688,
+          "hash": 8318310710067593117,
           "value": {
             "name": "isRaining",
             "cidl_type": "Boolean"
@@ -41,11 +41,13 @@
           "name": "get",
           "is_static": true,
           "http_verb": "GET",
+          "return_media": "Json",
           "return_type": {
             "HttpResult": {
               "Object": "Weather"
             }
           },
+          "parameters_media": "Json",
           "parameters": [
             {
               "name": "id",
@@ -63,11 +65,13 @@
           "name": "save",
           "is_static": true,
           "http_verb": "POST",
+          "return_media": "Json",
           "return_type": {
             "HttpResult": {
               "Object": "Weather"
             }
           },
+          "parameters_media": "Json",
           "parameters": [
             {
               "name": "model",

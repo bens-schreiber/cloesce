@@ -1,5 +1,5 @@
 {
-  "hash": 15693835366153894573,
+  "hash": 15625196225428469955,
   "version": "v0.0.4",
   "project_name": "runner",
   "language": "TypeScript",
@@ -13,7 +13,7 @@
   },
   "models": {
     "Horse": {
-      "hash": 1811063493174485920,
+      "hash": 3138960426576706732,
       "name": "Horse",
       "primary_key": {
         "name": "id",
@@ -29,7 +29,7 @@
           "foreign_key_reference": null
         },
         {
-          "hash": 14370241494486110232,
+          "hash": 10851009741998977749,
           "value": {
             "name": "bio",
             "cidl_type": {
@@ -56,9 +56,11 @@
           "name": "get",
           "is_static": true,
           "http_verb": "GET",
+          "return_media": "Json",
           "return_type": {
             "Object": "Horse"
           },
+          "parameters_media": "Json",
           "parameters": [
             {
               "name": "{ db }",
@@ -76,7 +78,9 @@
           "name": "like",
           "is_static": false,
           "http_verb": "POST",
+          "return_media": "Json",
           "return_type": "Void",
+          "parameters_media": "Json",
           "parameters": [
             {
               "name": "{ db }",
@@ -102,11 +106,13 @@
           "name": "list",
           "is_static": true,
           "http_verb": "GET",
+          "return_media": "Json",
           "return_type": {
             "Array": {
               "Object": "Horse"
             }
           },
+          "parameters_media": "Json",
           "parameters": [
             {
               "name": "{ db }",
@@ -120,9 +126,11 @@
           "name": "post",
           "is_static": true,
           "http_verb": "POST",
+          "return_media": "Json",
           "return_type": {
             "Object": "Horse"
           },
+          "parameters_media": "Json",
           "parameters": [
             {
               "name": "{ db }",
