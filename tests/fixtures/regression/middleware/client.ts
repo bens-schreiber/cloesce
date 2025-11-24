@@ -4,7 +4,7 @@ import { HttpResult, DeepPartial, MediaType } from "cloesce/client";
 export class InjectedThing {
   value: string;
 
-  static fromJson(data: any): InjectedThing {
+  static fromJson(data: any, blobs: Uint8Array[]): InjectedThing {
     const res = Object.assign(new InjectedThing(), data);
     return res;
   }
@@ -45,7 +45,6 @@ export class Model {
     const baseUrl = new URL(`http://localhost:5002/api/Model/save`);
     const res = await fetchImpl(baseUrl, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
             model, 
             __datasource
@@ -59,7 +58,7 @@ export class Model {
     );
   }
 
-  static fromJson(data: any): Model {
+  static fromJson(data: any, blobs: Uint8Array[]): Model {
     const res = Object.assign(new Model(), data);
 
 

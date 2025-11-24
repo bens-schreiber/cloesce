@@ -15,7 +15,6 @@ export class Dog {
     const baseUrl = new URL(`http://localhost:5002/api/Dog/post`);
     const res = await fetchImpl(baseUrl, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
             dog
       })
@@ -28,7 +27,7 @@ export class Dog {
     );
   }
 
-  static fromJson(data: any): Dog {
+  static fromJson(data: any, blobs: Uint8Array[]): Dog {
     const res = Object.assign(new Dog(), data);
 
 

@@ -4,7 +4,7 @@ import { HttpResult, DeepPartial, MediaType } from "cloesce/client";
 export class Poo {
   ds: "baz" |"none" = "none";
 
-  static fromJson(data: any): Poo {
+  static fromJson(data: any, blobs: Uint8Array[]): Poo {
     const res = Object.assign(new Poo(), data);
     return res;
   }
@@ -23,7 +23,6 @@ export class Foo {
     const baseUrl = new URL(`http://localhost:5002/api/Foo/${this.id}/bar`);
     const res = await fetchImpl(baseUrl, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
             customDs, 
             oneDs, 
@@ -37,7 +36,7 @@ export class Foo {
     );
   }
 
-  static fromJson(data: any): Foo {
+  static fromJson(data: any, blobs: Uint8Array[]): Foo {
     const res = Object.assign(new Foo(), data);
 
 
@@ -48,7 +47,7 @@ export class NoDs {
   id: number;
 
 
-  static fromJson(data: any): NoDs {
+  static fromJson(data: any, blobs: Uint8Array[]): NoDs {
     const res = Object.assign(new NoDs(), data);
 
 
@@ -59,7 +58,7 @@ export class OneDs {
   id: number;
 
 
-  static fromJson(data: any): OneDs {
+  static fromJson(data: any, blobs: Uint8Array[]): OneDs {
     const res = Object.assign(new OneDs(), data);
 
 

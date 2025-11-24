@@ -5,7 +5,7 @@ export class PooA {
   name: string;
   major: string;
 
-  static fromJson(data: any): PooA {
+  static fromJson(data: any, blobs: Uint8Array[]): PooA {
     const res = Object.assign(new PooA(), data);
     return res;
   }
@@ -13,7 +13,7 @@ export class PooA {
 export class PooB {
   color: string;
 
-  static fromJson(data: any): PooB {
+  static fromJson(data: any, blobs: Uint8Array[]): PooB {
     const res = Object.assign(new PooB(), data);
     return res;
   }
@@ -22,7 +22,7 @@ export class PooC {
   a: PooA;
   b: PooB[];
 
-  static fromJson(data: any): PooC {
+  static fromJson(data: any, blobs: Uint8Array[]): PooC {
     const res = Object.assign(new PooC(), data);
     res["a"] &&= PooA.fromJson(res.a);
     for (let i = 0; i < res.b?.length; i++) {
@@ -45,7 +45,6 @@ export class PooAcceptYield {
     const baseUrl = new URL(`http://localhost:5002/api/PooAcceptYield/acceptPoos`);
     const res = await fetchImpl(baseUrl, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
             a, 
             b, 
@@ -64,7 +63,6 @@ export class PooAcceptYield {
     const baseUrl = new URL(`http://localhost:5002/api/PooAcceptYield/yieldPoo`);
     const res = await fetchImpl(baseUrl, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
       })
     });
@@ -76,7 +74,7 @@ export class PooAcceptYield {
     );
   }
 
-  static fromJson(data: any): PooAcceptYield {
+  static fromJson(data: any, blobs: Uint8Array[]): PooAcceptYield {
     const res = Object.assign(new PooAcceptYield(), data);
 
 

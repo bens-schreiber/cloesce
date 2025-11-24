@@ -17,7 +17,6 @@ export class NullabilityChecks {
     const baseUrl = new URL(`http://localhost:5002/api/NullabilityChecks/${this.id}/arrayTypes`);
     const res = await fetchImpl(baseUrl, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
             a, 
             b, 
@@ -38,7 +37,6 @@ export class NullabilityChecks {
     const baseUrl = new URL(`http://localhost:5002/api/NullabilityChecks/${this.id}/httpResultTypes`);
     const res = await fetchImpl(baseUrl, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
             a, 
             __dataSource
@@ -57,7 +55,6 @@ export class NullabilityChecks {
     const baseUrl = new URL(`http://localhost:5002/api/NullabilityChecks/${this.id}/injectableTypes`);
     const res = await fetchImpl(baseUrl, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
             __dataSource
       })
@@ -76,7 +73,6 @@ export class NullabilityChecks {
     const baseUrl = new URL(`http://localhost:5002/api/NullabilityChecks/${this.id}/modelTypes`);
     const res = await fetchImpl(baseUrl, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
             a, 
             __dataSource
@@ -97,7 +93,6 @@ export class NullabilityChecks {
     const baseUrl = new URL(`http://localhost:5002/api/NullabilityChecks/${this.id}/primitiveTypes`);
     const res = await fetchImpl(baseUrl, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
             a, 
             b, 
@@ -111,7 +106,7 @@ export class NullabilityChecks {
     );
   }
 
-  static fromJson(data: any): NullabilityChecks {
+  static fromJson(data: any, blobs: Uint8Array[]): NullabilityChecks {
     const res = Object.assign(new NullabilityChecks(), data);
 
 

@@ -5,8 +5,8 @@ import { HttpResult, DeepPartial, MediaType } from "cloesce/client";
 
 export class BlobHaver {
   id: number;
-  blob1: Blob;
-  blob2: Blob;
+  blob1: Uint8Array;
+  blob2: Uint8Array;
 
   static async get(
     id: number,
@@ -27,12 +27,12 @@ export class BlobHaver {
   async getBlob1(
     __dataSource: "none" = "none",
     fetchImpl: typeof fetch = fetch
-  ): Promise<HttpResult<Blob>> {
+  ): Promise<HttpResult<Uint8Array>> {
     const baseUrl = new URL(`http://localhost:5002/api/BlobHaver/${this.id}/getBlob1`);
     baseUrl.searchParams.append('__dataSource', String(__dataSource));
     const res = await fetchImpl(baseUrl, { method: "GET" });
 
-    return await HttpResult.fromResponse<Blob>(
+    return await HttpResult.fromResponse<Uint8Array>(
       res, 
       MediaType.Octet,
     );
@@ -58,7 +58,6 @@ export class BlobHaver {
     const baseUrl = new URL(`http://localhost:5002/api/BlobHaver/save`);
     const res = await fetchImpl(baseUrl, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
             model, 
             __datasource
@@ -72,7 +71,7 @@ export class BlobHaver {
     );
   }
 
-  static fromJson(data: any): BlobHaver {
+  static fromJson(data: any, blobs: Uint8Array[]): BlobHaver {
     const res = Object.assign(new BlobHaver(), data);
 
     res.blob1 = blobs[res.blob1.__blobIndex];

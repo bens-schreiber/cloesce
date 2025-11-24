@@ -82,6 +82,8 @@ export type ResultMiddlewareFn = (
   result: HttpResult
 ) => Promise<HttpResult | void>;
 
+type CloesceResult<T = unknown> = [HttpResult<T>, MediaType];
+
 export class CloesceApp {
   public routePrefix: string = "api";
 
@@ -173,19 +175,19 @@ export class CloesceApp {
     ctorReg: ConstructorRegistry,
     di: DependencyContainer,
     d1: D1Database
-  ): Promise<HttpResult> {
+  ): Promise<[HttpResult, MediaType]> {
     // Global middleware
     for (const m of this.globalMiddleware) {
       const res = await m(request, env, di);
       if (res) {
-        return res;
+        return [res, MediaType.Text];
       }
     }
 
     // Route match
     const routeRes = matchRoute(request, ast, this.routePrefix);
     if (routeRes.isLeft()) {
-      return routeRes.value;
+      return [routeRes.value, MediaType.Text];
     }
     const route = routeRes.unwrap();
 
@@ -193,14 +195,14 @@ export class CloesceApp {
     for (const m of this.namespaceMiddleware.get(route.namespace) ?? []) {
       const res = await m(request, env, di);
       if (res) {
-        return res;
+        return [res, MediaType.Text];
       }
     }
 
     // Request validation
     const validation = await validateRequest(request, ast, ctorReg, route);
     if (validation.isLeft()) {
-      return validation.value;
+      return [validation.value, MediaType.Text];
     }
     const { params, dataSource } = validation.unwrap();
 
@@ -210,7 +212,7 @@ export class CloesceApp {
       ?.get(route.method.name) ?? []) {
       const res = await m(request, env, di);
       if (res) {
-        return res;
+        return [res, MediaType.Text];
       }
     }
 
@@ -234,7 +236,7 @@ export class CloesceApp {
     })();
 
     if (hydrated.isLeft()) {
-      return hydrated.value;
+      return [hydrated.value, MediaType.Text];
     }
 
     // Proxy CRUD methods
@@ -268,7 +270,7 @@ export class CloesceApp {
           return HttpResult.fail(
             500,
             `An injected parameter was missing from the instance registry: ${JSON.stringify(attr.injected)} (ErrorCode: ${RouterFailState.MissingDependency})`
-          ).toResponse();
+          ).toResponse(MediaType.Text);
         }
 
         service[attr.var_name] = injected;
@@ -283,20 +285,27 @@ export class CloesceApp {
 
     try {
       // Core cloesce processing
-      const response = await this.cloesce(request, env, ast, ctorReg, di, d1);
+      const [response, mediaType] = await this.cloesce(
+        request,
+        env,
+        ast,
+        ctorReg,
+        di,
+        d1
+      );
 
       // Response middleware
       for (const m of this.resultMiddleware) {
         const res = await m(request, env, di, response);
         if (res) {
-          return res.toResponse();
+          return res.toResponse(MediaType.Text);
         }
       }
 
-      return response.toResponse();
+      return response.toResponse(mediaType);
     } catch (e: any) {
       console.error(JSON.stringify(e));
-      return HttpResult.fail(500, e.toString()).toResponse();
+      return HttpResult.fail(500, e.toString()).toResponse(MediaType.Text);
     }
   }
 }
@@ -432,11 +441,21 @@ async function validateRequest(
   if (route.method.http_verb === "GET") {
     params = Object.fromEntries(url.searchParams.entries());
   } else {
-    try {
-      params = await request.json();
-    } catch (e) {
-      return invalidRequest(RouterFailState.RequestMissingJsonBody);
+    switch (route.method.parameters_media) {
+      case MediaType.Json: {
+        params = await request.json();
+      }
+      case MediaType.FormData: {
+        const formData = await request.formData();
+        params = await request.form
+      }
     }
+
+    // try {
+    //   params = await request.json();
+    // } catch (e) {
+    //   return invalidRequest(RouterFailState.RequestMissingJsonBody);
+    // }
   }
 
   // Ensure all required params exist
@@ -550,13 +569,15 @@ async function methodDispatch(
   di: DependencyContainer,
   route: MatchedRoute,
   params: Record<string, unknown>
-): Promise<HttpResult<unknown>> {
+): Promise<CloesceResult> {
   // Error state: Client code ran into an uncaught exception.
-  const uncaughtException = (e: any) =>
+  const uncaughtException = (e: any): CloesceResult => [
     HttpResult.fail(
       500,
       `Uncaught exception in method dispatch: ${e instanceof Error ? e.message : String(e)} (ErrorCode: ${RouterFailState.UncaughtException})`
-    );
+    ),
+    MediaType.Text,
+  ];
 
   const paramArray: any[] = [];
   for (const param of route.method.parameters) {
@@ -570,28 +591,31 @@ async function methodDispatch(
     if (!injected) {
       // Error state: Injected parameters cannot be found at compile time, only at runtime.
       // If a injected reference does not exist, throw a 500.
-      return HttpResult.fail(
-        500,
-        `An injected parameter was missing from the instance registry: ${JSON.stringify(param.cidl_type)} (ErrorCode: ${RouterFailState.MissingDependency})`
-      );
+      return [
+        HttpResult.fail(
+          500,
+          `An injected parameter was missing from the instance registry: ${JSON.stringify(param.cidl_type)} (ErrorCode: ${RouterFailState.MissingDependency})`
+        ),
+        MediaType.Text,
+      ];
     }
 
     paramArray.push(injected);
   }
 
   // Ensure the result is always some HttpResult
-  const resultWrapper = (res: any): HttpResult<unknown> => {
+  const resultWrapper = (res: any): CloesceResult => {
     const rt = route.method.return_type;
 
     if (rt === null) {
-      return HttpResult.ok(200, route.method.return_media);
+      return [HttpResult.ok(200), route.method.return_media];
     }
 
     if (typeof rt === "object" && rt !== null && "HttpResult" in rt) {
-      return res as HttpResult<unknown>;
+      return [res as HttpResult<unknown>, route.method.return_media];
     }
 
-    return HttpResult.ok(200, res);
+    return [HttpResult.ok(200, res), route.method.return_media];
   };
 
   try {

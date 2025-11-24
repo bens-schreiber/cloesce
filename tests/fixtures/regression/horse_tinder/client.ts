@@ -31,7 +31,6 @@ export class Horse {
     const baseUrl = new URL(`http://localhost:5002/api/Horse/${this.id}/like`);
     const res = await fetchImpl(baseUrl, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
             horse, 
             __dataSource
@@ -61,7 +60,6 @@ export class Horse {
     const baseUrl = new URL(`http://localhost:5002/api/Horse/post`);
     const res = await fetchImpl(baseUrl, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
             horse
       })
@@ -74,7 +72,7 @@ export class Horse {
     );
   }
 
-  static fromJson(data: any): Horse {
+  static fromJson(data: any, blobs: Uint8Array[]): Horse {
     const res = Object.assign(new Horse(), data);
     for (let i = 0; i < res.likes?.length; i++) {
       res.likes[i] = Like.fromJson(res.likes[i]);
@@ -91,7 +89,7 @@ export class Like {
   horse2: Horse | undefined;
 
 
-  static fromJson(data: any): Like {
+  static fromJson(data: any, blobs: Uint8Array[]): Like {
     const res = Object.assign(new Like(), data);
     res["horse2"] &&= Horse.fromJson(res.horse2);
 

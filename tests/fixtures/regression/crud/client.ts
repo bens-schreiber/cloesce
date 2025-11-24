@@ -9,7 +9,7 @@ export class Child {
   parent: Parent | undefined;
 
 
-  static fromJson(data: any): Child {
+  static fromJson(data: any, blobs: Uint8Array[]): Child {
     const res = Object.assign(new Child(), data);
     res["parent"] &&= Parent.fromJson(res.parent);
 
@@ -57,7 +57,6 @@ export class CrudHaver {
     const baseUrl = new URL(`http://localhost:5002/api/CrudHaver/${this.id}/notCrud`);
     const res = await fetchImpl(baseUrl, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
             __dataSource
       })
@@ -76,7 +75,6 @@ export class CrudHaver {
     const baseUrl = new URL(`http://localhost:5002/api/CrudHaver/save`);
     const res = await fetchImpl(baseUrl, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
             model, 
             __datasource
@@ -90,7 +88,7 @@ export class CrudHaver {
     );
   }
 
-  static fromJson(data: any): CrudHaver {
+  static fromJson(data: any, blobs: Uint8Array[]): CrudHaver {
     const res = Object.assign(new CrudHaver(), data);
 
 
@@ -140,7 +138,6 @@ export class Parent {
     const baseUrl = new URL(`http://localhost:5002/api/Parent/save`);
     const res = await fetchImpl(baseUrl, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
             model, 
             __datasource
@@ -154,7 +151,7 @@ export class Parent {
     );
   }
 
-  static fromJson(data: any): Parent {
+  static fromJson(data: any, blobs: Uint8Array[]): Parent {
     const res = Object.assign(new Parent(), data);
     res["favoriteChild"] &&= Child.fromJson(res.favoriteChild);
     for (let i = 0; i < res.children?.length; i++) {

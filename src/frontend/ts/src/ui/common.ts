@@ -103,12 +103,6 @@ export class Either<L, R> {
   }
 }
 
-const contentTypeMap: Record<MediaType, string> = {
-  [MediaType.Json]: "application/json",
-  [MediaType.FormData]: "multipart/form-data",
-  [MediaType.Octet]: "application/octet-stream",
-};
-
 /**
  * The result of a Workers endpoint.
  *
@@ -126,44 +120,21 @@ export class HttpResult<T = unknown> {
     public ok: boolean,
     public status: number,
     public headers: Headers,
-    public mediaType: MediaType,
     public data?: T,
     public message?: string
   ) {}
 
-  static ok<T>(
-    status: number,
-    data?: T,
-    init?: HeadersInit,
-    mediaType: MediaType = MediaType.Json
-  ): HttpResult {
-    const headers: Headers = new Headers(
-      init ?? {
-        "Content-Type": contentTypeMap[mediaType],
-      }
-    );
-
-    return new HttpResult<T>(true, status, headers, mediaType, data, undefined);
+  static ok<T>(status: number, data?: T, init?: HeadersInit): HttpResult {
+    const headers: Headers = new Headers(init);
+    return new HttpResult<T>(true, status, headers, data, undefined);
   }
 
   static fail(status: number, message?: string, init?: HeadersInit) {
-    const headers: Headers = new Headers(
-      init ?? {
-        "Content-Type": "text/plain",
-      }
-    );
-
-    return new HttpResult<never>(
-      false,
-      status,
-      headers,
-      MediaType.Json, // default, won't be used
-      undefined,
-      message
-    );
+    const headers: Headers = new Headers(init);
+    return new HttpResult<never>(false, status, headers, undefined, message);
   }
 
-  toResponse(): Response {
+  toResponse(mediaType: MediaType): Response {
     const body = () => {
       // No body
       if (this.status === 204) {
@@ -175,7 +146,10 @@ export class HttpResult<T = unknown> {
         return this.message;
       }
 
-      switch (this.mediaType) {
+      switch (mediaType) {
+        case MediaType.Text: {
+          return undefined;
+        }
         case MediaType.Json: {
           return JSON.stringify(this.data ?? {});
         }
@@ -184,9 +158,15 @@ export class HttpResult<T = unknown> {
           let blobIndex = 0;
 
           const json = JSON.stringify(this.data ?? {}, (key, value) => {
-            if (value instanceof Blob) {
+            if (value instanceof Uint8Array) {
               const index = blobIndex++;
-              formData.append("blobs[]", value, String(index));
+
+              const bytes = new Uint8Array(value.buffer as ArrayBuffer);
+              const blob = new Blob([bytes], {
+                type: "application/octet-stream",
+              });
+
+              formData.append("blobs[]", blob, String(index));
               return { __blobIndex: index };
             }
 
@@ -198,7 +178,8 @@ export class HttpResult<T = unknown> {
           return formData;
         }
         case MediaType.Octet: {
-          return this.data as Blob | ArrayBuffer | ReadableStream;
+          // todo: what to cast as?
+          return this.data as any;
         }
       }
     };
@@ -227,7 +208,6 @@ export class HttpResult<T = unknown> {
         false,
         response.status,
         response.headers,
-        MediaType.Json,
         undefined,
         await response.text()
       );
@@ -244,10 +224,10 @@ export class HttpResult<T = unknown> {
 
           if (array) {
             for (let i = 0; i < json.length; i++) {
-              json[i] = ctor.fromJson(json[i]);
+              json[i] = ctor.fromJson(json[i], []);
             }
           } else {
-            json = ctor.fromJson(json);
+            json = ctor.fromJson(json, []);
           }
 
           return json;

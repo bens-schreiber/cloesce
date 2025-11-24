@@ -766,7 +766,7 @@ export class CidlExtractor {
     boolean: "Boolean",
     Boolean: "Boolean",
     Date: "DateIso",
-    Blob: "Blob",
+    Uint8Array: "Blob",
   };
 
   static cidlType(

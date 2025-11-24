@@ -12,11 +12,11 @@ export class BlobHaver {
   @PrimaryKey
   id: number;
 
-  blob1: Blob;
-  blob2: Blob;
+  blob1: Uint8Array;
+  blob2: Uint8Array;
 
   @GET
-  getBlob1(): Blob {
+  getBlob1(): Uint8Array {
     return this.blob1;
   }
 }

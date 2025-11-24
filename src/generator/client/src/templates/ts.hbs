@@ -7,7 +7,7 @@ export class {{this.name}} {
   {{name}}: {{get_cidl_type cidl_type}};
   {{/each}}
 
-  static fromJson(data: any): {{this.name}} {
+  static fromJson(data: any, blobs: Uint8Array[]): {{this.name}} {
     const res = Object.assign(new {{this.name}}(), data);
     {{#each this.attributes}}
       {{#if (is_object_array cidl_type)}}
@@ -51,7 +51,6 @@ export class {{this.name}} {
     {{else}}
     const res = await fetchImpl(baseUrl, {
       method: "{{this.http_verb}}",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         {{#each this.parameters}}
           {{#if (is_serializable cidl_type)}}
@@ -106,7 +105,6 @@ export class {{this.name}} {
     {{else}}
     const res = await fetchImpl(baseUrl, {
       method: "{{this.http_verb}}",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         {{#each this.parameters}}
           {{#if (is_serializable cidl_type)}}
@@ -129,7 +127,7 @@ export class {{this.name}} {
   }
   {{/each}}
 
-  static fromJson(data: any): {{this.name}} {
+  static fromJson(data: any, blobs: Uint8Array[]): {{this.name}} {
     const res = Object.assign(new {{this.name}}(), data);
     {{#each this.navigation_properties}}
       {{#if (is_one_to_one this)}}

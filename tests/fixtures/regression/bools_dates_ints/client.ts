@@ -32,7 +32,6 @@ export class Weather {
     const baseUrl = new URL(`http://localhost:5002/api/Weather/save`);
     const res = await fetchImpl(baseUrl, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
             model, 
             __datasource
@@ -46,7 +45,7 @@ export class Weather {
     );
   }
 
-  static fromJson(data: any): Weather {
+  static fromJson(data: any, blobs: Uint8Array[]): Weather {
     const res = Object.assign(new Weather(), data);
 
 

@@ -15,7 +15,6 @@ export class A {
     const baseUrl = new URL(`http://localhost:5002/api/A/post`);
     const res = await fetchImpl(baseUrl, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
             a
       })
@@ -48,7 +47,6 @@ export class A {
     const baseUrl = new URL(`http://localhost:5002/api/A/returnFatalIfParamsNotInstantiated`);
     const res = await fetchImpl(baseUrl, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
             a
       })
@@ -60,7 +58,7 @@ export class A {
     );
   }
 
-  static fromJson(data: any): A {
+  static fromJson(data: any, blobs: Uint8Array[]): A {
     const res = Object.assign(new A(), data);
     res["b"] &&= B.fromJson(res.b);
 
@@ -78,7 +76,6 @@ export class B {
     const baseUrl = new URL(`http://localhost:5002/api/B/${this.id}/testMethod`);
     const res = await fetchImpl(baseUrl, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
             __dataSource
       })
@@ -90,7 +87,7 @@ export class B {
     );
   }
 
-  static fromJson(data: any): B {
+  static fromJson(data: any, blobs: Uint8Array[]): B {
     const res = Object.assign(new B(), data);
 
 
@@ -102,7 +99,7 @@ export class Course {
   students: Student[];
 
 
-  static fromJson(data: any): Course {
+  static fromJson(data: any, blobs: Uint8Array[]): Course {
     const res = Object.assign(new Course(), data);
     for (let i = 0; i < res.students?.length; i++) {
       res.students[i] = Student.fromJson(res.students[i]);
@@ -123,7 +120,6 @@ export class Dog {
     const baseUrl = new URL(`http://localhost:5002/api/Dog/${this.id}/testMethod`);
     const res = await fetchImpl(baseUrl, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
             __dataSource
       })
@@ -135,7 +131,7 @@ export class Dog {
     );
   }
 
-  static fromJson(data: any): Dog {
+  static fromJson(data: any, blobs: Uint8Array[]): Dog {
     const res = Object.assign(new Dog(), data);
 
 
@@ -153,7 +149,6 @@ export class Person {
     const baseUrl = new URL(`http://localhost:5002/api/Person/post`);
     const res = await fetchImpl(baseUrl, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
             person
       })
@@ -186,7 +181,6 @@ export class Person {
     const baseUrl = new URL(`http://localhost:5002/api/Person/returnFatalIfParamsNotInstantiated`);
     const res = await fetchImpl(baseUrl, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
             person
       })
@@ -198,7 +192,7 @@ export class Person {
     );
   }
 
-  static fromJson(data: any): Person {
+  static fromJson(data: any, blobs: Uint8Array[]): Person {
     const res = Object.assign(new Person(), data);
     for (let i = 0; i < res.dogs?.length; i++) {
       res.dogs[i] = Dog.fromJson(res.dogs[i]);
@@ -219,7 +213,6 @@ export class Student {
     const baseUrl = new URL(`http://localhost:5002/api/Student/post`);
     const res = await fetchImpl(baseUrl, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
             student
       })
@@ -246,7 +239,7 @@ export class Student {
     );
   }
 
-  static fromJson(data: any): Student {
+  static fromJson(data: any, blobs: Uint8Array[]): Student {
     const res = Object.assign(new Student(), data);
     for (let i = 0; i < res.courses?.length; i++) {
       res.courses[i] = Course.fromJson(res.courses[i]);
