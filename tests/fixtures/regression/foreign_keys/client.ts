@@ -62,7 +62,7 @@ export class A {
 
   static fromJson(data: any): A {
     const res = Object.assign(new A(), data);
-    res["b"] &&= Object.assign(new B(), res.b);
+    res["b"] &&= B.fromJson(res.b);
 
 
     return res;

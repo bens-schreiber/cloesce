@@ -177,13 +177,13 @@ export class HttpResult<T = unknown> {
 
       switch (this.mediaType) {
         case MediaType.Json: {
-          return JSON.stringify(this.data);
+          return JSON.stringify(this.data ?? {});
         }
         case MediaType.FormData: {
           const formData = new FormData();
           let blobIndex = 0;
 
-          const json = JSON.stringify(this.data, (key, value) => {
+          const json = JSON.stringify(this.data ?? {}, (key, value) => {
             if (value instanceof Blob) {
               const index = blobIndex++;
               formData.append("blobs[]", value, String(index));

@@ -11,7 +11,7 @@ export class Child {
 
   static fromJson(data: any): Child {
     const res = Object.assign(new Child(), data);
-    res["parent"] &&= Object.assign(new Parent(), res.parent);
+    res["parent"] &&= Parent.fromJson(res.parent);
 
 
     return res;
@@ -156,7 +156,7 @@ export class Parent {
 
   static fromJson(data: any): Parent {
     const res = Object.assign(new Parent(), data);
-    res["favoriteChild"] &&= Object.assign(new Child(), res.favoriteChild);
+    res["favoriteChild"] &&= Child.fromJson(res.favoriteChild);
     for (let i = 0; i < res.children?.length; i++) {
       res.children[i] = Child.fromJson(res.children[i]);
     }

@@ -24,9 +24,9 @@ export class PooC {
 
   static fromJson(data: any): PooC {
     const res = Object.assign(new PooC(), data);
-    res["a"] &&= Object.assign(new PooA(), res.a);
+    res["a"] &&= PooA.fromJson(res.a);
     for (let i = 0; i < res.b?.length; i++) {
-      res.b[i] = PooB[].fromJson(res.b[i]);
+      res.b[i] = PooB.fromJson(res.b[i]);
     }
     return res;
   }

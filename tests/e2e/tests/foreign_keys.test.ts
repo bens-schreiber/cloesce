@@ -21,7 +21,7 @@ afterAll(async () => {
 async function testRefresh<T>(
   obj: T & { refresh: (dataSource: any) => Promise<any> },
   dataSources: any[],
-  assertions: Record<string, (res: any) => void>,
+  assertions: Record<string, (res: any) => void>
 ) {
   for (const ds of dataSources) {
     it(`refresh ${ds}`, async () => {
@@ -53,7 +53,7 @@ describe("POST and refresh A", () => {
     const res = await A.returnFatalIfParamsNotInstantiated(a);
     expect(
       res.ok,
-      withRes("Objects should be instantiated on the backend", res),
+      withRes("Objects should be instantiated on the backend", res)
     ).toBe(true);
   });
 
@@ -109,6 +109,6 @@ describe("POST and refresh Student", () => {
         expect(data.courses[0].students[0].courses).not.toBeUndefined();
       },
       none: (data) => expect(data.courses.length).toBe(0),
-    },
+    }
   );
 });

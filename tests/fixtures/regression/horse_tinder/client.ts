@@ -93,7 +93,7 @@ export class Like {
 
   static fromJson(data: any): Like {
     const res = Object.assign(new Like(), data);
-    res["horse2"] &&= Object.assign(new Horse(), res.horse2);
+    res["horse2"] &&= Horse.fromJson(res.horse2);
 
 
     return res;
