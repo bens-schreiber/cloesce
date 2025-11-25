@@ -103,6 +103,49 @@ export class Either<L, R> {
   }
 }
 
+export function requestBody(
+  mediaType: MediaType,
+  data: any | undefined
+): undefined | string | FormData {
+  switch (mediaType) {
+    case MediaType.Text: {
+      return undefined;
+    }
+    case MediaType.Json: {
+      return JSON.stringify(data ?? {});
+    }
+    case MediaType.FormData: {
+      const formData = new FormData();
+      let blobIndex = 0;
+
+      // Serialize blobs to an index in a blob array
+      const json = JSON.stringify(data ?? {}, (key, value) => {
+        if (value instanceof Uint8Array) {
+          const index = blobIndex++;
+
+          const bytes = new Uint8Array(value.buffer as ArrayBuffer);
+          const blob = new Blob([bytes], {
+            type: "application/octet-stream",
+          });
+
+          formData.append("blobs[]", blob, String(index));
+          return { __blobIndex: index };
+        }
+
+        return value;
+      });
+
+      formData.set("json", json);
+
+      return formData;
+    }
+    case MediaType.Octet: {
+      // todo: what type??
+      return data;
+    }
+  }
+}
+
 /**
  * The result of a Workers endpoint.
  *
@@ -135,56 +178,33 @@ export class HttpResult<T = unknown> {
   }
 
   toResponse(mediaType: MediaType): Response {
-    const body = () => {
-      // No body
-      if (this.status === 204) {
-        return undefined;
+    switch (mediaType) {
+      case MediaType.Text: {
+        this.headers.set("Content-Type", "text/plain");
+        break;
       }
-
-      // Failures will always return as text.
-      if (!this.ok) {
-        return this.message;
+      case MediaType.Json: {
+        this.headers.set("Content-Type", "application/json");
+        break;
       }
-
-      switch (mediaType) {
-        case MediaType.Text: {
-          return undefined;
-        }
-        case MediaType.Json: {
-          return JSON.stringify(this.data ?? {});
-        }
-        case MediaType.FormData: {
-          const formData = new FormData();
-          let blobIndex = 0;
-
-          const json = JSON.stringify(this.data ?? {}, (key, value) => {
-            if (value instanceof Uint8Array) {
-              const index = blobIndex++;
-
-              const bytes = new Uint8Array(value.buffer as ArrayBuffer);
-              const blob = new Blob([bytes], {
-                type: "application/octet-stream",
-              });
-
-              formData.append("blobs[]", blob, String(index));
-              return { __blobIndex: index };
-            }
-
-            return value;
-          });
-
-          formData.set("json", json);
-
-          return formData;
-        }
-        case MediaType.Octet: {
-          // todo: what to cast as?
-          return this.data as any;
-        }
+      case MediaType.FormData: {
+        this.headers.set("Content-Type", "multipart/form-data");
+        break;
       }
-    };
+      case MediaType.Octet: {
+        this.headers.set("Content-Type", "application/octet-stream");
+        break;
+      }
+    }
 
-    return new Response(body(), {
+    if (!this.ok) {
+      return new Response(this.message, {
+        status: this.status,
+        headers: this.headers,
+      });
+    }
+
+    return new Response(requestBody(mediaType, this.data), {
       status: this.status,
       headers: this.headers,
     });
@@ -203,7 +223,7 @@ export class HttpResult<T = unknown> {
     ctor?: any,
     array: boolean = false
   ): Promise<HttpResult<any>> {
-    if (response.status > 400) {
+    if (response.status >= 400) {
       return new HttpResult(
         false,
         response.status,
@@ -251,8 +271,7 @@ export class HttpResult<T = unknown> {
         }
 
         case MediaType.Octet: {
-          const buffer = await response.arrayBuffer();
-          return new Blob([buffer]);
+          return response.body;
         }
       }
     };
@@ -261,7 +280,6 @@ export class HttpResult<T = unknown> {
       true,
       response.status,
       response.headers,
-      mediaType,
       await data()
     );
   }

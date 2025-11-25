@@ -1,7 +1,27 @@
 // GENERATED CODE. DO NOT MODIFY.
 
-import { HttpResult, DeepPartial, MediaType } from "cloesce/client";
+import { HttpResult, DeepPartial, MediaType, requestBody } from "cloesce/client";
 
+export class BlobService {
+  static async incrementBlob(
+    blob: Uint8Array,
+    fetchImpl: typeof fetch = fetch
+  ): Promise<HttpResult<Uint8Array>> {
+    const baseUrl = new URL("http://localhost:5002/api/BlobService/incrementBlob");
+    const res = await fetchImpl(baseUrl, {
+      method: "POST",
+      headers: { "Content-Type": "multipart/form-data" },
+      body: requestBody(MediaType.FormData, {
+            blob
+      })
+    });
+
+    return await HttpResult.fromResponse<Blob>(
+      res, 
+      MediaType.FormData,
+    );
+    }
+}
 
 export class BlobHaver {
   id: number;
@@ -34,7 +54,7 @@ export class BlobHaver {
 
     return await HttpResult.fromResponse<Uint8Array>(
       res, 
-      MediaType.Octet,
+      MediaType.FormData,
     );
   }
   static async list(
@@ -58,7 +78,8 @@ export class BlobHaver {
     const baseUrl = new URL(`http://localhost:5002/api/BlobHaver/save`);
     const res = await fetchImpl(baseUrl, {
       method: "POST",
-      body: JSON.stringify({
+      headers: { "Content-Type": "multipart/form-data" },
+      body: requestBody(MediaType.FormData, {
             model, 
             __datasource
       })

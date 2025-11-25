@@ -1,6 +1,6 @@
 // GENERATED CODE. DO NOT MODIFY.
 
-import { HttpResult, DeepPartial, MediaType } from "cloesce/client";
+import { HttpResult, DeepPartial, MediaType, requestBody } from "cloesce/client";
 
 
 export class Horse {
@@ -31,7 +31,8 @@ export class Horse {
     const baseUrl = new URL(`http://localhost:5002/api/Horse/${this.id}/like`);
     const res = await fetchImpl(baseUrl, {
       method: "POST",
-      body: JSON.stringify({
+      headers: { "Content-Type": "application/json" },
+      body: requestBody(MediaType.Json, {
             horse, 
             __dataSource
       })
@@ -60,7 +61,8 @@ export class Horse {
     const baseUrl = new URL(`http://localhost:5002/api/Horse/post`);
     const res = await fetchImpl(baseUrl, {
       method: "POST",
-      body: JSON.stringify({
+      headers: { "Content-Type": "application/json" },
+      body: requestBody(MediaType.Json, {
             horse
       })
     });
@@ -75,7 +77,7 @@ export class Horse {
   static fromJson(data: any, blobs: Uint8Array[]): Horse {
     const res = Object.assign(new Horse(), data);
     for (let i = 0; i < res.likes?.length; i++) {
-      res.likes[i] = Like.fromJson(res.likes[i]);
+      res.likes[i] = Like.fromJson(res.likes[i], blobs);
     }
 
 
@@ -91,7 +93,7 @@ export class Like {
 
   static fromJson(data: any, blobs: Uint8Array[]): Like {
     const res = Object.assign(new Like(), data);
-    res["horse2"] &&= Horse.fromJson(res.horse2);
+    res["horse2"] &&= Horse.fromJson(res.horse2, blobs);
 
 
     return res;

@@ -1,6 +1,6 @@
 // GENERATED CODE. DO NOT MODIFY.
 
-import { HttpResult, DeepPartial, MediaType } from "cloesce/client";
+import { HttpResult, DeepPartial, MediaType, requestBody } from "cloesce/client";
 
 
 export class Dog {
@@ -15,7 +15,8 @@ export class Dog {
     const baseUrl = new URL(`http://localhost:5002/api/Dog/post`);
     const res = await fetchImpl(baseUrl, {
       method: "POST",
-      body: JSON.stringify({
+      headers: { "Content-Type": "application/json" },
+      body: requestBody(MediaType.Json, {
             dog
       })
     });

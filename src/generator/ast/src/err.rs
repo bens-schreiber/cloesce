@@ -77,6 +77,7 @@ pub enum GeneratorErrorKind {
     ExtraneousManyToManyReferences,
     MissingManyToManyReference,
     InconsistentWranglerBinding,
+    InvalidStream,
 }
 
 impl GeneratorErrorKind {
@@ -170,6 +171,11 @@ impl GeneratorErrorKind {
             GeneratorErrorKind::InconsistentWranglerBinding => (
                 "Wrangler file definitions must be consistent with the WranglerEnv definition",
                 "Change your WranglerEnv's bindings to match the Wrangler file",
+                GeneratorPhase::Wrangler,
+            ),
+            GeneratorErrorKind::InvalidStream => (
+                "Streams cannot be nullable, apart of an object or in an array.",
+                "Use a `Blob` type",
                 GeneratorPhase::Wrangler,
             ),
 

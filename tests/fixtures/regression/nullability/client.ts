@@ -1,6 +1,6 @@
 // GENERATED CODE. DO NOT MODIFY.
 
-import { HttpResult, DeepPartial, MediaType } from "cloesce/client";
+import { HttpResult, DeepPartial, MediaType, requestBody } from "cloesce/client";
 
 
 export class NullabilityChecks {
@@ -17,7 +17,8 @@ export class NullabilityChecks {
     const baseUrl = new URL(`http://localhost:5002/api/NullabilityChecks/${this.id}/arrayTypes`);
     const res = await fetchImpl(baseUrl, {
       method: "POST",
-      body: JSON.stringify({
+      headers: { "Content-Type": "application/json" },
+      body: requestBody(MediaType.Json, {
             a, 
             b, 
             __dataSource
@@ -37,7 +38,8 @@ export class NullabilityChecks {
     const baseUrl = new URL(`http://localhost:5002/api/NullabilityChecks/${this.id}/httpResultTypes`);
     const res = await fetchImpl(baseUrl, {
       method: "POST",
-      body: JSON.stringify({
+      headers: { "Content-Type": "application/json" },
+      body: requestBody(MediaType.Json, {
             a, 
             __dataSource
       })
@@ -55,7 +57,8 @@ export class NullabilityChecks {
     const baseUrl = new URL(`http://localhost:5002/api/NullabilityChecks/${this.id}/injectableTypes`);
     const res = await fetchImpl(baseUrl, {
       method: "POST",
-      body: JSON.stringify({
+      headers: { "Content-Type": "application/json" },
+      body: requestBody(MediaType.Json, {
             __dataSource
       })
     });
@@ -73,7 +76,8 @@ export class NullabilityChecks {
     const baseUrl = new URL(`http://localhost:5002/api/NullabilityChecks/${this.id}/modelTypes`);
     const res = await fetchImpl(baseUrl, {
       method: "POST",
-      body: JSON.stringify({
+      headers: { "Content-Type": "application/json" },
+      body: requestBody(MediaType.Json, {
             a, 
             __dataSource
       })
@@ -93,7 +97,8 @@ export class NullabilityChecks {
     const baseUrl = new URL(`http://localhost:5002/api/NullabilityChecks/${this.id}/primitiveTypes`);
     const res = await fetchImpl(baseUrl, {
       method: "POST",
-      body: JSON.stringify({
+      headers: { "Content-Type": "application/json" },
+      body: requestBody(MediaType.Json, {
             a, 
             b, 
             __dataSource

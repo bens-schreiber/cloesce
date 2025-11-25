@@ -1,6 +1,6 @@
 // GENERATED CODE. DO NOT MODIFY.
 
-import { HttpResult, DeepPartial, MediaType } from "cloesce/client";
+import { HttpResult, DeepPartial, MediaType, requestBody } from "cloesce/client";
 
 export class BarService {
   static async useFoo(

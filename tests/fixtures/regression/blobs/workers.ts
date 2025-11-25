@@ -3,10 +3,11 @@ import { CloesceApp } from "cloesce/backend";
 import cidl from "./cidl.json";
 import { BlobHaver } from "./seed__blobs.cloesce.ts";
 
-
+import { BlobService } from "./seed__blobs.cloesce.ts";
 const app = new CloesceApp();
 const constructorRegistry = {
-	BlobHaver: BlobHaver
+	BlobHaver: BlobHaver,
+	BlobService: BlobService
 };
 
 async function fetch(request: Request, env: any, ctx: any): Promise<Response> {

@@ -1,6 +1,6 @@
 // GENERATED CODE. DO NOT MODIFY.
 
-import { HttpResult, DeepPartial, MediaType } from "cloesce/client";
+import { HttpResult, DeepPartial, MediaType, requestBody } from "cloesce/client";
 
 
 export class Child {
@@ -11,7 +11,7 @@ export class Child {
 
   static fromJson(data: any, blobs: Uint8Array[]): Child {
     const res = Object.assign(new Child(), data);
-    res["parent"] &&= Parent.fromJson(res.parent);
+    res["parent"] &&= Parent.fromJson(res.parent, blobs);
 
 
     return res;
@@ -57,7 +57,8 @@ export class CrudHaver {
     const baseUrl = new URL(`http://localhost:5002/api/CrudHaver/${this.id}/notCrud`);
     const res = await fetchImpl(baseUrl, {
       method: "POST",
-      body: JSON.stringify({
+      headers: { "Content-Type": "application/json" },
+      body: requestBody(MediaType.Json, {
             __dataSource
       })
     });
@@ -75,7 +76,8 @@ export class CrudHaver {
     const baseUrl = new URL(`http://localhost:5002/api/CrudHaver/save`);
     const res = await fetchImpl(baseUrl, {
       method: "POST",
-      body: JSON.stringify({
+      headers: { "Content-Type": "application/json" },
+      body: requestBody(MediaType.Json, {
             model, 
             __datasource
       })
@@ -138,7 +140,8 @@ export class Parent {
     const baseUrl = new URL(`http://localhost:5002/api/Parent/save`);
     const res = await fetchImpl(baseUrl, {
       method: "POST",
-      body: JSON.stringify({
+      headers: { "Content-Type": "application/json" },
+      body: requestBody(MediaType.Json, {
             model, 
             __datasource
       })
@@ -153,9 +156,9 @@ export class Parent {
 
   static fromJson(data: any, blobs: Uint8Array[]): Parent {
     const res = Object.assign(new Parent(), data);
-    res["favoriteChild"] &&= Child.fromJson(res.favoriteChild);
+    res["favoriteChild"] &&= Child.fromJson(res.favoriteChild, blobs);
     for (let i = 0; i < res.children?.length; i++) {
-      res.children[i] = Child.fromJson(res.children[i]);
+      res.children[i] = Child.fromJson(res.children[i], blobs);
     }
 
 

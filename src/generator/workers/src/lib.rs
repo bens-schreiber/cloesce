@@ -114,6 +114,36 @@ impl WorkersGenerator {
     ///
     /// Public for tests
     pub fn finalize_api_methods(ast: &mut CloesceAst, blob_objects: &BlobObjectSet) {
+        let set_media_types = |method: &mut ApiMethod| {
+            // Return Media Type
+            method.return_media = match method.return_type.root_type() {
+                CidlType::Stream => MediaType::Octet,
+                CidlType::Blob => MediaType::FormData,
+                CidlType::Object(o) if blob_objects.contains(o) => MediaType::FormData,
+                _ => MediaType::Json,
+            };
+
+            let mut has_blob = false;
+            let mut has_stream = false;
+            for param in &method.parameters {
+                match param.cidl_type.root_type() {
+                    CidlType::Blob => has_blob = true,
+                    CidlType::Stream => has_stream = true,
+                    CidlType::Object(o) | CidlType::Partial(o) => {
+                        has_blob |= blob_objects.contains(o);
+                    }
+                    _ => {}
+                };
+            }
+
+            // Parameters Media
+            method.parameters_media = match (has_stream, has_blob) {
+                (true, _) => MediaType::Octet,
+                (_, true) => MediaType::FormData,
+                _ => MediaType::Json,
+            };
+        };
+
         for model in ast.models.values_mut() {
             for crud in &model.cruds {
                 let method = match crud {
@@ -183,32 +213,13 @@ impl WorkersGenerator {
             }
 
             for method in model.methods.values_mut() {
-                // Return Media Type
-                method.return_media = match method.return_type.root_type() {
-                    CidlType::Blob | CidlType::Stream => MediaType::Octet,
-                    CidlType::Object(o) if blob_objects.contains(o) => MediaType::FormData,
-                    _ => MediaType::Json,
-                };
+                set_media_types(method);
+            }
+        }
 
-                let mut has_blob = false;
-                let mut has_model = false;
-                for param in &method.parameters {
-                    match param.cidl_type.root_type() {
-                        CidlType::Blob | CidlType::Stream => has_blob = true,
-                        CidlType::Object(o) | CidlType::Partial(o) => {
-                            has_blob |= blob_objects.contains(o);
-                            has_model = true;
-                        }
-                        _ => {}
-                    };
-                }
-
-                // Parameters Media
-                method.parameters_media = match (has_blob, has_model) {
-                    (true, true) => MediaType::FormData,
-                    (true, false) => MediaType::Octet,
-                    _ => MediaType::Json,
-                };
+        for service in ast.services.values_mut() {
+            for method in service.methods.values_mut() {
+                set_media_types(method);
             }
         }
     }

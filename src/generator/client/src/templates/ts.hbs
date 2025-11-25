@@ -1,6 +1,6 @@
 // GENERATED CODE. DO NOT MODIFY.
 
-import { HttpResult, DeepPartial, MediaType } from "cloesce/client";
+import { HttpResult, DeepPartial, MediaType, requestBody } from "cloesce/client";
 {{#each poos}}
 export class {{this.name}} {
   {{#each this.attributes}}
@@ -12,10 +12,10 @@ export class {{this.name}} {
     {{#each this.attributes}}
       {{#if (is_object_array cidl_type)}}
     for (let i = 0; i < res.{{name}}?.length; i++) {
-      res.{{name}}[i] = {{object_name cidl_type}}.fromJson(res.{{name}}[i]);
+      res.{{name}}[i] = {{object_name cidl_type}}.fromJson(res.{{name}}[i], blobs);
     }
       {{else if (is_object cidl_type)}}
-    res["{{name}}"] &&= {{object_name cidl_type}}.fromJson(res.{{name}});
+    res["{{name}}"] &&= {{object_name cidl_type}}.fromJson(res.{{name}}, blobs);
       {{else if (is_blob_array cidl_type)}}
     for (let i = 0; i < res.{{name}}.length; i++) {
       res.{{name}}[i] = blobs[res.{{name}}[i].__blobIndex]; 
@@ -51,7 +51,8 @@ export class {{this.name}} {
     {{else}}
     const res = await fetchImpl(baseUrl, {
       method: "{{this.http_verb}}",
-      body: JSON.stringify({
+      headers: { "Content-Type": "{{get_content_type this.parameters_media}}" },
+      body: requestBody({{get_media_type this.parameters_media}}, {
         {{#each this.parameters}}
           {{#if (is_serializable cidl_type)}}
             {{name}}{{#unless @last}}, {{/unless}}
@@ -105,7 +106,8 @@ export class {{this.name}} {
     {{else}}
     const res = await fetchImpl(baseUrl, {
       method: "{{this.http_verb}}",
-      body: JSON.stringify({
+      headers: { "Content-Type": "{{get_content_type this.parameters_media}}" },
+      body: requestBody({{get_media_type this.parameters_media}}, {
         {{#each this.parameters}}
           {{#if (is_serializable cidl_type)}}
             {{name}}{{#unless @last}}, {{/unless}}
@@ -131,11 +133,11 @@ export class {{this.name}} {
     const res = Object.assign(new {{this.name}}(), data);
     {{#each this.navigation_properties}}
       {{#if (is_one_to_one this)}}
-    res["{{var_name}}"] &&= {{this.model_name}}.fromJson(res.{{var_name}});
+    res["{{var_name}}"] &&= {{this.model_name}}.fromJson(res.{{var_name}}, blobs);
       {{/if}}
     {{#if (is_many_nav this)}}
     for (let i = 0; i < res.{{var_name}}?.length; i++) {
-      res.{{var_name}}[i] = {{this.model_name}}.fromJson(res.{{var_name}}[i]);
+      res.{{var_name}}[i] = {{this.model_name}}.fromJson(res.{{var_name}}[i], blobs);
     }
       {{/if}}
     {{/each}}

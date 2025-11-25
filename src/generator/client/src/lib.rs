@@ -7,7 +7,7 @@ use ast::{
 };
 use mappers::{ClientLanguageTypeMapper, TypeScriptMapper};
 
-use handlebars::{handlebars_helper, Handlebars};
+use handlebars::{Handlebars, handlebars_helper};
 
 handlebars_helper!(is_serializable: |cidl_type: CidlType| !matches!(cidl_type.root_type(), CidlType::Inject(_)));
 handlebars_helper!(is_object: |cidl_type: CidlType| match cidl_type {
@@ -37,6 +37,11 @@ handlebars_helper!(is_blob_array: |cidl_type: CidlType| match cidl_type {
 handlebars_helper!(is_one_to_one: |nav: NavigationProperty| matches!(nav.kind, NavigationPropertyKind::OneToOne {..}));
 handlebars_helper!(is_many_nav: |nav: NavigationProperty| matches!(nav.kind, NavigationPropertyKind::OneToMany {..} | NavigationPropertyKind::ManyToMany { .. }));
 handlebars_helper!(eq: |a: str, b: str| a == b);
+handlebars_helper!(get_content_type: |media: MediaType| match media {
+    MediaType::Json=>"application/json",
+    MediaType::Octet => "application/octet-stream",
+    MediaType::FormData => "multipart/form-data",
+});
 
 fn register_helpers<'a>(
     handlebars: &mut Handlebars<'a>,
@@ -52,6 +57,7 @@ fn register_helpers<'a>(
     handlebars.register_helper("is_many_nav", Box::new(is_many_nav));
     handlebars.register_helper("object_name", Box::new(object_name));
     handlebars.register_helper("eq", Box::new(eq));
+    handlebars.register_helper("get_content_type", Box::new(get_content_type));
 
     let mapper1 = mapper.clone();
     handlebars.register_helper(

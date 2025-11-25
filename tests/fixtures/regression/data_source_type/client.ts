@@ -1,6 +1,6 @@
 // GENERATED CODE. DO NOT MODIFY.
 
-import { HttpResult, DeepPartial, MediaType } from "cloesce/client";
+import { HttpResult, DeepPartial, MediaType, requestBody } from "cloesce/client";
 export class Poo {
   ds: "baz" |"none" = "none";
 
@@ -23,7 +23,8 @@ export class Foo {
     const baseUrl = new URL(`http://localhost:5002/api/Foo/${this.id}/bar`);
     const res = await fetchImpl(baseUrl, {
       method: "POST",
-      body: JSON.stringify({
+      headers: { "Content-Type": "application/json" },
+      body: requestBody(MediaType.Json, {
             customDs, 
             oneDs, 
             noDs

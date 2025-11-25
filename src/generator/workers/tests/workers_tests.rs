@@ -175,10 +175,10 @@ fn finalize_sets_octet_media_type() {
                 HttpVerb::POST,
                 true,
                 vec![NamedTypedValue {
-                    name: "blob".into(),
-                    cidl_type: CidlType::Blob,
+                    name: "stream".into(),
+                    cidl_type: CidlType::Stream,
                 }],
-                CidlType::Blob,
+                CidlType::Stream,
             )
             .build(),
     ]);

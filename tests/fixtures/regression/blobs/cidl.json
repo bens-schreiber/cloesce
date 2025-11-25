@@ -65,7 +65,7 @@
           "name": "getBlob1",
           "is_static": false,
           "http_verb": "GET",
-          "return_media": "Octet",
+          "return_media": "FormData",
           "return_type": "Blob",
           "parameters_media": "Json",
           "parameters": [
@@ -136,6 +136,28 @@
     }
   },
   "poos": {},
-  "services": {},
+  "services": {
+    "BlobService": {
+      "name": "BlobService",
+      "attributes": [],
+      "methods": {
+        "incrementBlob": {
+          "name": "incrementBlob",
+          "is_static": false,
+          "http_verb": "POST",
+          "return_media": "FormData",
+          "return_type": "Blob",
+          "parameters_media": "FormData",
+          "parameters": [
+            {
+              "name": "blob",
+              "cidl_type": "Blob"
+            }
+          ]
+        }
+      },
+      "source_path": "./seed__blobs.cloesce.ts"
+    }
+  },
   "app_source": null
 }

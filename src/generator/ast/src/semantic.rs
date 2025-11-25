@@ -9,7 +9,7 @@ use crate::{
 type AdjacencyList<'a> = BTreeMap<&'a str, Vec<&'a str>>;
 
 /// A set of all objects (be it a Plain old Object or Model) that is composed of some
-/// Blob or Stream type, be it through a direct attribute (ie Foo { blob: Blob })
+/// Blob type, be it through a direct attribute (ie Foo { blob: Blob })
 /// or a composition (ie Bar { foo: Foo } where Foo has a blob attr)
 pub type BlobObjectSet = HashSet<String>;
 
@@ -136,7 +136,15 @@ impl SemanticAnalysis {
                             o
                         )
                     }
-                    CidlType::Blob | CidlType::Stream => {
+                    CidlType::Stream => {
+                        fail!(
+                            GeneratorErrorKind::InvalidStream,
+                            "{}.{}",
+                            poo.name,
+                            attr.name,
+                        )
+                    }
+                    CidlType::Blob => {
                         blob_objects.insert(poo.name.clone());
                     }
                     _ => {}
@@ -493,7 +501,7 @@ fn validate_methods(
     );
 
     // Validate return type
-    match &method.return_type {
+    match &method.return_type.root_type() {
         CidlType::Object(o) | CidlType::Partial(o) => ensure!(
             is_valid_object_ref(ast, o),
             GeneratorErrorKind::UnknownObject,
@@ -516,6 +524,13 @@ fn validate_methods(
             namespace,
             method.name,
             o
+        ),
+        CidlType::Stream => ensure!(
+            matches!(method.return_type, CidlType::Stream),
+            GeneratorErrorKind::InvalidStream,
+            "{}.{}",
+            namespace,
+            method.name
         ),
         _ => {}
     }
@@ -570,6 +585,15 @@ fn validate_methods(
                         param.name
                     )
                 }
+            }
+            CidlType::Stream => {
+                ensure!(
+                    method.parameters.len() == 1 && matches!(param.cidl_type, CidlType::Stream),
+                    GeneratorErrorKind::InvalidStream,
+                    "{}.{}",
+                    namespace,
+                    method.name
+                )
             }
             _ => {
                 // Ignore

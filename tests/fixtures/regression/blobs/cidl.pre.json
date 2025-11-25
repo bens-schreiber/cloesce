@@ -60,6 +60,28 @@
         }
     },
     "poos": {},
-    "services": {},
+    "services": {
+        "BlobService": {
+            "name": "BlobService",
+            "attributes": [],
+            "methods": {
+                "incrementBlob": {
+                    "name": "incrementBlob",
+                    "http_verb": "POST",
+                    "is_static": false,
+                    "return_media": "Json",
+                    "return_type": "Blob",
+                    "parameters_media": "Json",
+                    "parameters": [
+                        {
+                            "name": "blob",
+                            "cidl_type": "Blob"
+                        }
+                    ]
+                }
+            },
+            "source_path": "./seed__blobs.cloesce.ts"
+        }
+    },
     "app_source": null
 }

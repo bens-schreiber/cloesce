@@ -315,7 +315,7 @@ export enum RouterFailState {
   UnknownRoute,
   UnmatchedHttpVerb,
   InstantiatedMethodMissingId,
-  RequestMissingJsonBody,
+  RequestMissingBody,
   RequestBodyMissingParameters,
   RequestBodyInvalidParameter,
   InstantiatedMethodMissingDataSource,
@@ -421,8 +421,10 @@ async function validateRequest(
   Either<HttpResult, { params: RequestParamMap; dataSource: string | null }>
 > {
   // Error state: any missing parameter, body, or malformed input will exit with 400.
-  const invalidRequest = (c: RouterFailState) =>
-    Either.left(HttpResult.fail(400, `Invalid Request Body (ErrorCode: ${c})`));
+  const invalidRequest = (c: RouterFailState, t?: string) =>
+    Either.left(
+      HttpResult.fail(400, `Invalid Request Body (ErrorCode: ${c} ${t})`)
+    );
 
   // Models must have an ID on instantiated methods.
   if (route.kind === "model" && !route.method.is_static && route.id == null) {
@@ -435,27 +437,33 @@ async function validateRequest(
     (p) => !(typeof p.cidl_type === "object" && "Inject" in p.cidl_type)
   );
 
-  // Extract url or body parameters
   const url = new URL(request.url);
   let params: RequestParamMap = {};
+  let blobs: any[] = [];
+
+  // Extract the method parameters from the URL or body
   if (route.method.http_verb === "GET") {
     params = Object.fromEntries(url.searchParams.entries());
   } else {
-    switch (route.method.parameters_media) {
-      case MediaType.Json: {
-        params = await request.json();
+    try {
+      switch (route.method.parameters_media) {
+        case MediaType.Json: {
+          params = await request.json();
+          break;
+        }
+        case MediaType.FormData: {
+          const formData = await request.formData();
+          params = formData.get("json") as any;
+          blobs = formData.getAll("blob[]");
+          break;
+        }
+        default: {
+          throw new Error("not implemented");
+        }
       }
-      case MediaType.FormData: {
-        const formData = await request.formData();
-        params = await request.form
-      }
+    } catch (e: any) {
+      return invalidRequest(RouterFailState.RequestMissingBody, e.toString());
     }
-
-    // try {
-    //   params = await request.json();
-    // } catch (e) {
-    //   return invalidRequest(RouterFailState.RequestMissingJsonBody);
-    // }
   }
 
   // Ensure all required params exist
@@ -467,6 +475,7 @@ async function validateRequest(
   for (const p of requiredParams) {
     const res = RuntimeValidator.fromJson(
       params[p.name],
+      blobs,
       p.cidl_type,
       ast,
       ctorReg

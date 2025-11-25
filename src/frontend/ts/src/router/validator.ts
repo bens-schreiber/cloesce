@@ -23,21 +23,30 @@ import { ConstructorRegistry } from "./router";
  * Returns the instantiated value (if applicable). On error, returns null.
  */
 export class RuntimeValidator {
+  constructor(
+    private ast: CloesceAst,
+    private ctorReg: ConstructorRegistry,
+    private blobs: any[]
+  ) {}
+
   static fromJson(
     value: any,
+    blobs: any[],
     cidlType: CidlType,
     ast: CloesceAst,
-    ctorReg: ConstructorRegistry,
+    ctorReg: ConstructorRegistry
   ): Either<null, any> {
-    return RuntimeValidator.recurse(value, cidlType, false, ast, ctorReg);
+    return new RuntimeValidator(ast, ctorReg, blobs).recurse(
+      value,
+      cidlType,
+      false
+    );
   }
 
-  private static recurse(
+  private recurse(
     value: any,
     cidlType: any,
-    isPartial: boolean,
-    ast: CloesceAst,
-    ctorReg: ConstructorRegistry,
+    isPartial: boolean
   ): Either<null, any> {
     isPartial ||= typeof cidlType !== "string" && "Partial" in cidlType;
 
@@ -71,15 +80,25 @@ export class RuntimeValidator {
           return rightIf(() => Number(value), !Number.isNaN(Number(value)));
         case "Text":
           return rightIf(() => String(value), typeof value === "string");
-        case "Boolean":
+        case "Boolean": {
           if (typeof value === "boolean") return Either.right(value);
           if (value === "true") return Either.right(true);
           if (value === "false") return Either.right(false);
           return Either.left(null);
-        case "DateIso":
+        }
+        case "DateIso": {
           // Instantiate
           const date = new Date(value as string);
           return rightIf(() => date, !isNaN(date.getTime()));
+        }
+        case "Blob": {
+          // Instantiate
+          return rightIf(
+            () => this.blobs[value.__blobIndex],
+            value.__blobIndex !== undefined &&
+              this.blobs[value.__blobIndex] !== undefined
+          );
+        }
         default:
           return Either.left(null);
       }
@@ -92,28 +111,22 @@ export class RuntimeValidator {
         () => value,
         typeof value === "string" &&
           (value === NO_DATA_SOURCE ||
-            ast.models[objectName]?.data_sources[value] !== undefined),
+            this.ast.models[objectName]?.data_sources[value] !== undefined)
       );
     }
 
     const objName = getObjectName(cidlType);
 
     // Models
-    if (objName && ast.models[objName]) {
-      const model = ast.models[objName];
+    if (objName && this.ast.models[objName]) {
+      const model = this.ast.models[objName];
       if (!model || typeof value !== "object") return Either.left(null);
       const valueObj = value as Record<string, unknown>;
 
       // Validate + instantiate PK
       {
         const pk = model.primary_key;
-        const res = this.recurse(
-          valueObj[pk.name],
-          pk.cidl_type,
-          isPartial,
-          ast,
-          ctorReg,
-        );
+        const res = this.recurse(valueObj[pk.name], pk.cidl_type, isPartial);
 
         if (res.isLeft()) {
           return res;
@@ -128,9 +141,7 @@ export class RuntimeValidator {
         const res = this.recurse(
           valueObj[attr.value.name],
           attr.value.cidl_type,
-          isPartial,
-          ast,
-          ctorReg,
+          isPartial
         );
         if (res.isLeft()) {
           return res;
@@ -145,9 +156,7 @@ export class RuntimeValidator {
         const res = this.recurse(
           valueObj[nav.var_name],
           getNavigationPropertyCidlType(nav),
-          isPartial,
-          ast,
-          ctorReg,
+          isPartial
         );
         if (res.isLeft()) {
           return res;
@@ -161,12 +170,12 @@ export class RuntimeValidator {
       }
 
       // Instantiate
-      return Either.right(Object.assign(new ctorReg[objName](), value));
+      return Either.right(Object.assign(new this.ctorReg[objName](), value));
     }
 
     // Plain old Objects
-    if (objName && ast.poos[objName]) {
-      const poo = ast.poos[objName];
+    if (objName && this.ast.poos[objName]) {
+      const poo = this.ast.poos[objName];
       if (!poo || typeof value !== "object") return Either.left(null);
       const valueObj = value as Record<string, unknown>;
 
@@ -176,9 +185,7 @@ export class RuntimeValidator {
         const res = this.recurse(
           valueObj[attr.name],
           attr.cidl_type,
-          isPartial,
-          ast,
-          ctorReg,
+          isPartial
         );
         if (res.isLeft()) {
           return res;
@@ -191,7 +198,7 @@ export class RuntimeValidator {
       }
 
       // Instantiate
-      return Either.right(Object.assign(new ctorReg[objName](), value));
+      return Either.right(Object.assign(new this.ctorReg[objName](), value));
     }
 
     // Arrays
@@ -201,13 +208,7 @@ export class RuntimeValidator {
       }
 
       for (let i = 0; i < value.length; i++) {
-        const res = this.recurse(
-          value[i],
-          cidlType.Array,
-          isPartial,
-          ast,
-          ctorReg,
-        );
+        const res = this.recurse(value[i], cidlType.Array, isPartial);
         if (res.isLeft()) {
           return res;
         }
@@ -221,7 +222,7 @@ export class RuntimeValidator {
     // HTTP Result
     // TODO: Do we even want to support this?
     if ("HttpResult" in cidlType) {
-      return this.recurse(value, cidlType.HttpResult, isPartial, ast, ctorReg);
+      return this.recurse(value, cidlType.HttpResult, isPartial);
     }
 
     return Either.left(null);

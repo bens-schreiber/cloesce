@@ -1,6 +1,6 @@
 // GENERATED CODE. DO NOT MODIFY.
 
-import { HttpResult, DeepPartial, MediaType } from "cloesce/client";
+import { HttpResult, DeepPartial, MediaType, requestBody } from "cloesce/client";
 export class PooA {
   name: string;
   major: string;
@@ -24,9 +24,9 @@ export class PooC {
 
   static fromJson(data: any, blobs: Uint8Array[]): PooC {
     const res = Object.assign(new PooC(), data);
-    res["a"] &&= PooA.fromJson(res.a);
+    res["a"] &&= PooA.fromJson(res.a, blobs);
     for (let i = 0; i < res.b?.length; i++) {
-      res.b[i] = PooB.fromJson(res.b[i]);
+      res.b[i] = PooB.fromJson(res.b[i], blobs);
     }
     return res;
   }
@@ -45,7 +45,8 @@ export class PooAcceptYield {
     const baseUrl = new URL(`http://localhost:5002/api/PooAcceptYield/acceptPoos`);
     const res = await fetchImpl(baseUrl, {
       method: "POST",
-      body: JSON.stringify({
+      headers: { "Content-Type": "application/json" },
+      body: requestBody(MediaType.Json, {
             a, 
             b, 
             c
@@ -63,7 +64,8 @@ export class PooAcceptYield {
     const baseUrl = new URL(`http://localhost:5002/api/PooAcceptYield/yieldPoo`);
     const res = await fetchImpl(baseUrl, {
       method: "POST",
-      body: JSON.stringify({
+      headers: { "Content-Type": "application/json" },
+      body: requestBody(MediaType.Json, {
       })
     });
 

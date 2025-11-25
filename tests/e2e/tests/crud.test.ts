@@ -18,7 +18,6 @@ describe("Basic", () => {
       name: "tim",
     });
     expect(res.ok, withRes("POST should be OK", res)).toBe(true);
-    console.log(JSON.stringify(res));
     expect(res.data).toEqual({
       id: 1,
       name: "tim",

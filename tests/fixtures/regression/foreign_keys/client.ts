@@ -1,6 +1,6 @@
 // GENERATED CODE. DO NOT MODIFY.
 
-import { HttpResult, DeepPartial, MediaType } from "cloesce/client";
+import { HttpResult, DeepPartial, MediaType, requestBody } from "cloesce/client";
 
 
 export class A {
@@ -15,7 +15,8 @@ export class A {
     const baseUrl = new URL(`http://localhost:5002/api/A/post`);
     const res = await fetchImpl(baseUrl, {
       method: "POST",
-      body: JSON.stringify({
+      headers: { "Content-Type": "application/json" },
+      body: requestBody(MediaType.Json, {
             a
       })
     });
@@ -47,7 +48,8 @@ export class A {
     const baseUrl = new URL(`http://localhost:5002/api/A/returnFatalIfParamsNotInstantiated`);
     const res = await fetchImpl(baseUrl, {
       method: "POST",
-      body: JSON.stringify({
+      headers: { "Content-Type": "application/json" },
+      body: requestBody(MediaType.Json, {
             a
       })
     });
@@ -60,7 +62,7 @@ export class A {
 
   static fromJson(data: any, blobs: Uint8Array[]): A {
     const res = Object.assign(new A(), data);
-    res["b"] &&= B.fromJson(res.b);
+    res["b"] &&= B.fromJson(res.b, blobs);
 
 
     return res;
@@ -76,7 +78,8 @@ export class B {
     const baseUrl = new URL(`http://localhost:5002/api/B/${this.id}/testMethod`);
     const res = await fetchImpl(baseUrl, {
       method: "POST",
-      body: JSON.stringify({
+      headers: { "Content-Type": "application/json" },
+      body: requestBody(MediaType.Json, {
             __dataSource
       })
     });
@@ -102,7 +105,7 @@ export class Course {
   static fromJson(data: any, blobs: Uint8Array[]): Course {
     const res = Object.assign(new Course(), data);
     for (let i = 0; i < res.students?.length; i++) {
-      res.students[i] = Student.fromJson(res.students[i]);
+      res.students[i] = Student.fromJson(res.students[i], blobs);
     }
 
 
@@ -120,7 +123,8 @@ export class Dog {
     const baseUrl = new URL(`http://localhost:5002/api/Dog/${this.id}/testMethod`);
     const res = await fetchImpl(baseUrl, {
       method: "POST",
-      body: JSON.stringify({
+      headers: { "Content-Type": "application/json" },
+      body: requestBody(MediaType.Json, {
             __dataSource
       })
     });
@@ -149,7 +153,8 @@ export class Person {
     const baseUrl = new URL(`http://localhost:5002/api/Person/post`);
     const res = await fetchImpl(baseUrl, {
       method: "POST",
-      body: JSON.stringify({
+      headers: { "Content-Type": "application/json" },
+      body: requestBody(MediaType.Json, {
             person
       })
     });
@@ -181,7 +186,8 @@ export class Person {
     const baseUrl = new URL(`http://localhost:5002/api/Person/returnFatalIfParamsNotInstantiated`);
     const res = await fetchImpl(baseUrl, {
       method: "POST",
-      body: JSON.stringify({
+      headers: { "Content-Type": "application/json" },
+      body: requestBody(MediaType.Json, {
             person
       })
     });
@@ -195,7 +201,7 @@ export class Person {
   static fromJson(data: any, blobs: Uint8Array[]): Person {
     const res = Object.assign(new Person(), data);
     for (let i = 0; i < res.dogs?.length; i++) {
-      res.dogs[i] = Dog.fromJson(res.dogs[i]);
+      res.dogs[i] = Dog.fromJson(res.dogs[i], blobs);
     }
 
 
@@ -213,7 +219,8 @@ export class Student {
     const baseUrl = new URL(`http://localhost:5002/api/Student/post`);
     const res = await fetchImpl(baseUrl, {
       method: "POST",
-      body: JSON.stringify({
+      headers: { "Content-Type": "application/json" },
+      body: requestBody(MediaType.Json, {
             student
       })
     });
@@ -242,7 +249,7 @@ export class Student {
   static fromJson(data: any, blobs: Uint8Array[]): Student {
     const res = Object.assign(new Student(), data);
     for (let i = 0; i < res.courses?.length; i++) {
-      res.courses[i] = Course.fromJson(res.courses[i]);
+      res.courses[i] = Course.fromJson(res.courses[i], blobs);
     }
 
 
