@@ -7,21 +7,21 @@ export class {{this.name}} {
   {{name}}: {{get_cidl_type cidl_type}};
   {{/each}}
 
-  static fromJson(data: any, blobs: Uint8Array[]): {{this.name}} {
+  static fromJson(data: any): {{this.name}} {
     const res = Object.assign(new {{this.name}}(), data);
     {{#each this.attributes}}
       {{#if (is_object_array cidl_type)}}
     for (let i = 0; i < res.{{name}}?.length; i++) {
-      res.{{name}}[i] = {{object_name cidl_type}}.fromJson(res.{{name}}[i], blobs);
+      res.{{name}}[i] = {{object_name cidl_type}}.fromJson(res.{{name}}[i]);
     }
       {{else if (is_object cidl_type)}}
-    res["{{name}}"] &&= {{object_name cidl_type}}.fromJson(res.{{name}}, blobs);
+    res["{{name}}"] &&= {{object_name cidl_type}}.fromJson(res.{{name}});
       {{else if (is_blob_array cidl_type)}}
     for (let i = 0; i < res.{{name}}.length; i++) {
-      res.{{name}}[i] = blobs[res.{{name}}[i].__blobIndex]; 
+      res.{{name}}[i] = atob(res.{{name}}[i]);
     }
       {{else if (is_blob cidl_type)}}
-    res.{{name}} = blobs[res.{{name}}.__blobIndex];
+    res.{{name}} = atob(res.{{name}});
       {{/if}}
     {{/each}}
     return res;
@@ -129,15 +129,15 @@ export class {{this.name}} {
   }
   {{/each}}
 
-  static fromJson(data: any, blobs: Uint8Array[]): {{this.name}} {
+  static fromJson(data: any): {{this.name}} {
     const res = Object.assign(new {{this.name}}(), data);
     {{#each this.navigation_properties}}
       {{#if (is_one_to_one this)}}
-    res["{{var_name}}"] &&= {{this.model_name}}.fromJson(res.{{var_name}}, blobs);
+    res["{{var_name}}"] &&= {{this.model_name}}.fromJson(res.{{var_name}});
       {{/if}}
     {{#if (is_many_nav this)}}
     for (let i = 0; i < res.{{var_name}}?.length; i++) {
-      res.{{var_name}}[i] = {{this.model_name}}.fromJson(res.{{var_name}}[i], blobs);
+      res.{{var_name}}[i] = {{this.model_name}}.fromJson(res.{{var_name}}[i]);
     }
       {{/if}}
     {{/each}}
@@ -145,10 +145,10 @@ export class {{this.name}} {
     {{#each this.attributes}}
       {{#if (is_blob_array value.cidl_type)}}
     for (let i = 0; i < res.{{name}}.length; i++) {
-      res.{{value.name}}[i] = blobs[res.{{value.name}}[i].__blobIndex]; 
+      res.{{value.name}}[i] = atob(res.{{value.name}}[i]);
     }
       {{else if (is_blob value.cidl_type)}}
-    res.{{value.name}} = blobs[res.{{value.name}}.__blobIndex];
+    res.{{value.name}} = atob(res.{{value.name}});
       {{/if}}
     {{/each}}
 

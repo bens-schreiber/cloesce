@@ -1,9 +1,6 @@
 use std::path::Path;
 
-use ast::{
-    ApiMethod, CidlType, CloesceAst, CrudKind, HttpVerb, MediaType, NamedTypedValue,
-    semantic::BlobObjectSet,
-};
+use ast::{ApiMethod, CidlType, CloesceAst, CrudKind, HttpVerb, MediaType, NamedTypedValue};
 
 use wrangler::WranglerSpec;
 
@@ -113,33 +110,16 @@ impl WorkersGenerator {
     /// Sets the [MediaType] of all ApiMethods; generates CRUD methods.
     ///
     /// Public for tests
-    pub fn finalize_api_methods(ast: &mut CloesceAst, blob_objects: &BlobObjectSet) {
+    pub fn finalize_api_methods(ast: &mut CloesceAst) {
         let set_media_types = |method: &mut ApiMethod| {
             // Return Media Type
             method.return_media = match method.return_type.root_type() {
                 CidlType::Stream => MediaType::Octet,
-                CidlType::Blob => MediaType::FormData,
-                CidlType::Object(o) if blob_objects.contains(o) => MediaType::FormData,
                 _ => MediaType::Json,
             };
 
-            let mut has_blob = false;
-            let mut has_stream = false;
-            for param in &method.parameters {
-                match param.cidl_type.root_type() {
-                    CidlType::Blob => has_blob = true,
-                    CidlType::Stream => has_stream = true,
-                    CidlType::Object(o) | CidlType::Partial(o) => {
-                        has_blob |= blob_objects.contains(o);
-                    }
-                    _ => {}
-                };
-            }
-
-            // Parameters Media
-            method.parameters_media = match (has_stream, has_blob) {
-                (true, _) => MediaType::Octet,
-                (_, true) => MediaType::FormData,
+            method.parameters_media = match method.parameters.as_slice() {
+                [p] if matches!(p.cidl_type, CidlType::Stream) => MediaType::Octet,
                 _ => MediaType::Json,
             };
         };
@@ -224,16 +204,11 @@ impl WorkersGenerator {
         }
     }
 
-    pub fn create(
-        ast: &mut CloesceAst,
-        wrangler: WranglerSpec,
-        workers_path: &Path,
-        blob_objects: &BlobObjectSet,
-    ) -> String {
+    pub fn create(ast: &mut CloesceAst, wrangler: WranglerSpec, workers_path: &Path) -> String {
         let linked_sources = Self::link(ast, workers_path);
         let constructor_registry = Self::registry(ast);
 
-        Self::finalize_api_methods(ast, blob_objects);
+        Self::finalize_api_methods(ast);
 
         // TODO: Hardcoding one database, in the future we need to support any amount
         let db_binding = wrangler

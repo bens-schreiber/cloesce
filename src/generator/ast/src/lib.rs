@@ -12,7 +12,6 @@ use err::GeneratorErrorKind;
 use err::Result;
 use indexmap::IndexMap;
 use rustc_hash::FxHasher;
-use semantic::BlobObjectSet;
 use semantic::SemanticAnalysis;
 use serde::Deserialize;
 use serde::Serialize;
@@ -139,7 +138,6 @@ pub struct ModelAttribute {
 pub enum MediaType {
     Json,
     Octet,
-    FormData,
 }
 
 impl Default for MediaType {
@@ -326,7 +324,7 @@ impl CloesceAst {
         serde_json::to_string_pretty(&migrations_ast).expect("serialize migrations ast to work")
     }
 
-    pub fn semantic_analysis(&mut self) -> Result<BlobObjectSet> {
+    pub fn semantic_analysis(&mut self) -> Result<()> {
         SemanticAnalysis::analyze(self)
     }
 

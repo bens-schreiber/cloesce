@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
+use std::collections::{BTreeMap, HashMap, VecDeque};
 
 use crate::err::{GeneratorErrorKind, Result};
 use crate::{
@@ -7,11 +7,6 @@ use crate::{
 };
 
 type AdjacencyList<'a> = BTreeMap<&'a str, Vec<&'a str>>;
-
-/// A set of all objects (be it a Plain old Object or Model) that is composed of some
-/// Blob type, be it through a direct attribute (ie Foo { blob: Blob })
-/// or a composition (ie Bar { foo: Foo } where Foo has a blob attr)
-pub type BlobObjectSet = HashSet<String>;
 
 pub struct SemanticAnalysis;
 impl SemanticAnalysis {
@@ -37,55 +32,20 @@ impl SemanticAnalysis {
     /// - Cyclical dependencies
     /// - Invalid data source type
     /// - Invalid data source reference
-    pub fn analyze(ast: &mut CloesceAst) -> Result<BlobObjectSet> {
-        let mut blob_objects = HashSet::new();
-
+    pub fn analyze(ast: &mut CloesceAst) -> Result<()> {
         // Validate models
-        Self::models(ast, &mut blob_objects)?;
-
-        // Utilize the topo ordering of the models to find composition
-        // based blob relationships
-        for (name, model) in &ast.models {
-            if blob_objects.contains(name) {
-                continue;
-            }
-
-            for nav in &model.navigation_properties {
-                if blob_objects.contains(&nav.model_name) {
-                    blob_objects.insert(model.name.clone());
-                }
-            }
-        }
+        Self::models(ast)?;
 
         // Validate Plain Old Objects
-        Self::poos(ast, &mut blob_objects)?;
-
-        // Utilize the topo ordering of the Plain old Objects to find composition
-        // based blob relationships
-        for (name, poo) in &ast.poos {
-            if blob_objects.contains(name) {
-                continue;
-            }
-
-            for attr in &poo.attributes {
-                let (CidlType::Object(o) | CidlType::Partial(o)) = attr.cidl_type.root_type()
-                else {
-                    continue;
-                };
-
-                if blob_objects.contains(o) {
-                    blob_objects.insert(poo.name.clone());
-                }
-            }
-        }
+        Self::poos(ast)?;
 
         // Validate Services
         Self::services(ast)?;
 
-        Ok(blob_objects)
+        Ok(())
     }
 
-    fn poos(ast: &mut CloesceAst, blob_objects: &mut BlobObjectSet) -> Result<()> {
+    fn poos(ast: &mut CloesceAst) -> Result<()> {
         // Topo sort and cycle detection
         let mut in_degree = BTreeMap::<&str, usize>::new();
         let mut graph = BTreeMap::<&str, Vec<&str>>::new();
@@ -144,9 +104,6 @@ impl SemanticAnalysis {
                             attr.name,
                         )
                     }
-                    CidlType::Blob => {
-                        blob_objects.insert(poo.name.clone());
-                    }
                     _ => {}
                 }
             }
@@ -159,7 +116,7 @@ impl SemanticAnalysis {
         Ok(())
     }
 
-    fn models(ast: &mut CloesceAst, blob_objects: &mut BlobObjectSet) -> Result<()> {
+    fn models(ast: &mut CloesceAst) -> Result<()> {
         let ensure_valid_sql_type = |model: &Model, value: &NamedTypedValue| {
             let inner = match &value.cidl_type {
                 CidlType::Nullable(inner) if matches!(inner.as_ref(), CidlType::Void) => {
@@ -226,11 +183,6 @@ impl SemanticAnalysis {
             // Validate attributes
             for a in &model.attributes {
                 ensure_valid_sql_type(model, &a.value)?;
-
-                // Populate blob model list
-                if matches!(a.value.cidl_type, CidlType::Blob) {
-                    blob_objects.insert(model.name.clone());
-                }
 
                 if let Some(fk_model_name) = &a.foreign_key_reference {
                     let Some(fk_model) = ast.models.get(fk_model_name.as_str()) else {

@@ -52,7 +52,6 @@ impl ClientLanguageTypeMapper for TypeScriptMapper {
         match ty {
             MediaType::Json => "MediaType.Json".to_string(),
             MediaType::Octet => "MediaType.Octet".to_string(),
-            MediaType::FormData => "MediaType.FormData".to_string(),
         }
     }
 }

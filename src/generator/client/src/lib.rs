@@ -40,7 +40,6 @@ handlebars_helper!(eq: |a: str, b: str| a == b);
 handlebars_helper!(get_content_type: |media: MediaType| match media {
     MediaType::Json=>"application/json",
     MediaType::Octet => "application/octet-stream",
-    MediaType::FormData => "multipart/form-data",
 });
 
 fn register_helpers<'a>(

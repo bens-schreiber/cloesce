@@ -1,8 +1,7 @@
 use std::{collections::BTreeMap, path::PathBuf};
 
 use ast::{
-    CidlType, MigrationsAst, NamedTypedValue, NavigationPropertyKind, PlainOldObject, Service,
-    ServiceAttribute,
+    CidlType, MigrationsAst, NavigationPropertyKind, Service, ServiceAttribute,
     builder::{ModelBuilder, create_ast},
     err::GeneratorErrorKind,
 };
@@ -25,107 +24,6 @@ fn cloesce_serializes_to_migrations() {
     assert!(migrations_ast.models.contains_key("Dog"));
     assert!(migrations_ast.models.contains_key("Person"));
     assert!(migrations_ast.models[0].hash != 0u64);
-}
-
-#[test]
-fn blob_set_from_direct_model() {
-    // Arrange
-    let mut ast = create_ast(vec![
-        ModelBuilder::new("Photo")
-            .id()
-            .attribute("blob", CidlType::Blob, None)
-            .build(),
-        ModelBuilder::new("Dog").id().build(),
-    ]);
-
-    // Act
-    let blob_objects = ast.semantic_analysis().unwrap();
-
-    // Assert
-    assert!(blob_objects.contains("Photo"));
-    assert!(!blob_objects.contains("Dog"));
-}
-
-#[test]
-fn blobs_from_direct_poo() {
-    // Arrange
-    let mut ast = create_ast(vec![ModelBuilder::new("Dog").id().build()]);
-    ast.poos.insert(
-        "Photo".into(),
-        PlainOldObject {
-            name: "Photo".into(),
-            attributes: vec![NamedTypedValue {
-                name: "blob".into(),
-                cidl_type: CidlType::Blob,
-            }],
-            source_path: PathBuf::default(),
-        },
-    );
-
-    // Act
-    let blob_objects = ast.semantic_analysis().unwrap();
-
-    // Assert
-    assert!(blob_objects.contains("Photo"));
-    assert!(!blob_objects.contains("Dog"));
-}
-
-#[test]
-fn blob_set_from_one_to_one() {
-    // Arrange
-    let mut ast = create_ast(vec![
-        ModelBuilder::new("Photo")
-            .id()
-            .attribute("dogId", CidlType::Integer, Some("Dog".into()))
-            .nav_p(
-                "dog",
-                "Dog",
-                NavigationPropertyKind::OneToOne {
-                    reference: "dogId".into(),
-                },
-            )
-            .build(),
-        ModelBuilder::new("Dog")
-            .id()
-            .attribute("dogPicture", CidlType::Blob, None)
-            .build(),
-    ]);
-
-    // Act
-    let blob_objects = ast.semantic_analysis().unwrap();
-
-    // Assert
-    assert!(blob_objects.contains("Photo"));
-    assert!(blob_objects.contains("Dog"));
-}
-
-#[test]
-fn blob_set_from_one_to_many() {
-    // Arrange
-    let mut ast = create_ast(vec![
-        ModelBuilder::new("Photo")
-            .id()
-            .nav_p(
-                "dogs",
-                "Dog",
-                NavigationPropertyKind::OneToMany {
-                    reference: "photoId".into(),
-                },
-            )
-            .build(),
-        ModelBuilder::new("Dog")
-            .id()
-            .attribute("photoId", CidlType::Integer, Some("Photo".into()))
-            .attribute("dogPicture", CidlType::Blob, None)
-            .build(),
-    ]);
-
-    // Act
-    let blob_objects = ast.semantic_analysis().unwrap();
-
-    // Assert
-    assert!(blob_objects.contains("Photo"));
-    assert!(blob_objects.contains("Dog"));
 }
 
 #[test]
