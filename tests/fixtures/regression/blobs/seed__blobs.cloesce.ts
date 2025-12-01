@@ -6,8 +6,10 @@ import {
   GET,
   Service,
   POST,
+  Integer,
 } from "cloesce/backend";
 import { D1Database } from "@cloudflare/workers-types";
+type Integer = number & { __kind: "Integer" };
 
 @WranglerEnv
 export class Env {
@@ -26,8 +28,7 @@ export class BlobService {
       );
     }
 
-    blob.map((b) => b + 1);
-    return blob;
+    return blob.map((b) => b + 1);
   }
 }
 
@@ -35,7 +36,7 @@ export class BlobService {
 @CRUD(["SAVE", "GET", "LIST"])
 export class BlobHaver {
   @PrimaryKey
-  id: number;
+  id: Integer;
 
   blob1: Uint8Array;
   blob2: Uint8Array;

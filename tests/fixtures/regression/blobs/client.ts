@@ -1,6 +1,6 @@
 // GENERATED CODE. DO NOT MODIFY.
 
-import { HttpResult, DeepPartial, MediaType, requestBody } from "cloesce/client";
+import { HttpResult, DeepPartial, MediaType, requestBody, b64ToU8 } from "cloesce/client";
 
 export class BlobService {
   static async incrementBlob(
@@ -10,15 +10,17 @@ export class BlobService {
     const baseUrl = new URL("http://localhost:5002/api/BlobService/incrementBlob");
     const res = await fetchImpl(baseUrl, {
       method: "POST",
-      headers: { "Content-Type": "multipart/form-data" },
-      body: requestBody(MediaType.FormData, {
+      headers: { "Content-Type": "application/json" },
+      body: requestBody(MediaType.Json, {
             blob
       })
     });
 
-    return await HttpResult.fromResponse<Blob>(
+    return await HttpResult.fromResponse<Uint8Array>(
       res, 
-      MediaType.FormData,
+      MediaType.Json,
+      Uint8Array,
+      false
     );
     }
 }
@@ -40,8 +42,9 @@ export class BlobHaver {
 
     return await HttpResult.fromResponse<BlobHaver>(
       res, 
-      MediaType.FormData,
-      BlobHaver, false
+      MediaType.Json,
+      BlobHaver,
+      false
     );
   }
   async getBlob1(
@@ -54,7 +57,9 @@ export class BlobHaver {
 
     return await HttpResult.fromResponse<Uint8Array>(
       res, 
-      MediaType.FormData,
+      MediaType.Json,
+      Uint8Array,
+      false
     );
   }
   static async list(
@@ -67,7 +72,9 @@ export class BlobHaver {
 
     return await HttpResult.fromResponse<BlobHaver[]>(
       res, 
-      MediaType.FormData,
+      MediaType.Json,
+      BlobHaver,
+      true
     );
   }
   static async save(
@@ -78,8 +85,8 @@ export class BlobHaver {
     const baseUrl = new URL(`http://localhost:5002/api/BlobHaver/save`);
     const res = await fetchImpl(baseUrl, {
       method: "POST",
-      headers: { "Content-Type": "multipart/form-data" },
-      body: requestBody(MediaType.FormData, {
+      headers: { "Content-Type": "application/json" },
+      body: requestBody(MediaType.Json, {
             model, 
             __datasource
       })
@@ -87,16 +94,17 @@ export class BlobHaver {
 
     return await HttpResult.fromResponse<BlobHaver>(
       res, 
-      MediaType.FormData,
-      BlobHaver, false
+      MediaType.Json,
+      BlobHaver,
+      false
     );
   }
 
-  static fromJson(data: any, blobs: Uint8Array[]): BlobHaver {
+  static fromJson(data: any): BlobHaver {
     const res = Object.assign(new BlobHaver(), data);
 
-    res.blob1 = blobs[res.blob1.__blobIndex];
-    res.blob2 = blobs[res.blob2.__blobIndex];
+    res.blob1 = b64ToU8(res.blob1);
+    res.blob2 = b64ToU8(res.blob2);
 
     return res;
   }

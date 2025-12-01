@@ -29,7 +29,7 @@
             ],
             "primary_key": {
                 "name": "id",
-                "cidl_type": "Real"
+                "cidl_type": "Integer"
             },
             "navigation_properties": [],
             "methods": {

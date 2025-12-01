@@ -1,6 +1,6 @@
 // GENERATED CODE. DO NOT MODIFY.
 
-import { HttpResult, DeepPartial, MediaType, requestBody } from "cloesce/client";
+import { HttpResult, DeepPartial, MediaType, requestBody, b64ToU8 } from "cloesce/client";
 
 
 export class A {
@@ -24,7 +24,8 @@ export class A {
     return await HttpResult.fromResponse<A>(
       res, 
       MediaType.Json,
-      A, false
+      A,
+      false
     );
   }
   async refresh(
@@ -38,7 +39,8 @@ export class A {
     return await HttpResult.fromResponse<A>(
       res, 
       MediaType.Json,
-      A, false
+      A,
+      false
     );
   }
   static async returnFatalIfParamsNotInstantiated(
@@ -57,12 +59,14 @@ export class A {
     return await HttpResult.fromResponse<void>(
       res, 
       MediaType.Json,
+      undefined,
+      false
     );
   }
 
-  static fromJson(data: any, blobs: Uint8Array[]): A {
+  static fromJson(data: any): A {
     const res = Object.assign(new A(), data);
-    res["b"] &&= B.fromJson(res.b, blobs);
+    res["b"] &&= B.fromJson(res.b);
 
 
     return res;
@@ -87,10 +91,12 @@ export class B {
     return await HttpResult.fromResponse<void>(
       res, 
       MediaType.Json,
+      undefined,
+      false
     );
   }
 
-  static fromJson(data: any, blobs: Uint8Array[]): B {
+  static fromJson(data: any): B {
     const res = Object.assign(new B(), data);
 
 
@@ -102,10 +108,10 @@ export class Course {
   students: Student[];
 
 
-  static fromJson(data: any, blobs: Uint8Array[]): Course {
+  static fromJson(data: any): Course {
     const res = Object.assign(new Course(), data);
     for (let i = 0; i < res.students?.length; i++) {
-      res.students[i] = Student.fromJson(res.students[i], blobs);
+      res.students[i] = Student.fromJson(res.students[i]);
     }
 
 
@@ -132,10 +138,12 @@ export class Dog {
     return await HttpResult.fromResponse<void>(
       res, 
       MediaType.Json,
+      undefined,
+      false
     );
   }
 
-  static fromJson(data: any, blobs: Uint8Array[]): Dog {
+  static fromJson(data: any): Dog {
     const res = Object.assign(new Dog(), data);
 
 
@@ -162,7 +170,8 @@ export class Person {
     return await HttpResult.fromResponse<Person>(
       res, 
       MediaType.Json,
-      Person, false
+      Person,
+      false
     );
   }
   async refresh(
@@ -176,7 +185,8 @@ export class Person {
     return await HttpResult.fromResponse<Person>(
       res, 
       MediaType.Json,
-      Person, false
+      Person,
+      false
     );
   }
   static async returnFatalIfParamsNotInstantiated(
@@ -195,13 +205,15 @@ export class Person {
     return await HttpResult.fromResponse<void>(
       res, 
       MediaType.Json,
+      undefined,
+      false
     );
   }
 
-  static fromJson(data: any, blobs: Uint8Array[]): Person {
+  static fromJson(data: any): Person {
     const res = Object.assign(new Person(), data);
     for (let i = 0; i < res.dogs?.length; i++) {
-      res.dogs[i] = Dog.fromJson(res.dogs[i], blobs);
+      res.dogs[i] = Dog.fromJson(res.dogs[i]);
     }
 
 
@@ -228,7 +240,8 @@ export class Student {
     return await HttpResult.fromResponse<Student>(
       res, 
       MediaType.Json,
-      Student, false
+      Student,
+      false
     );
   }
   async refresh(
@@ -242,14 +255,15 @@ export class Student {
     return await HttpResult.fromResponse<Student>(
       res, 
       MediaType.Json,
-      Student, false
+      Student,
+      false
     );
   }
 
-  static fromJson(data: any, blobs: Uint8Array[]): Student {
+  static fromJson(data: any): Student {
     const res = Object.assign(new Student(), data);
     for (let i = 0; i < res.courses?.length; i++) {
-      res.courses[i] = Course.fromJson(res.courses[i], blobs);
+      res.courses[i] = Course.fromJson(res.courses[i]);
     }
 
 

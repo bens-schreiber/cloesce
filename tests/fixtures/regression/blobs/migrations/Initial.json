@@ -1,12 +1,12 @@
 {
-  "hash": 14061493059919975776,
+  "hash": 8447275917592500618,
   "models": {
     "BlobHaver": {
-      "hash": 16282627471475622808,
+      "hash": 17711648149110095680,
       "name": "BlobHaver",
       "primary_key": {
         "name": "id",
-        "cidl_type": "Real"
+        "cidl_type": "Integer"
       },
       "attributes": [
         {

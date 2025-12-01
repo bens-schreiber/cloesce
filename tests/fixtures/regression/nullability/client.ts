@@ -1,6 +1,6 @@
 // GENERATED CODE. DO NOT MODIFY.
 
-import { HttpResult, DeepPartial, MediaType, requestBody } from "cloesce/client";
+import { HttpResult, DeepPartial, MediaType, requestBody, b64ToU8 } from "cloesce/client";
 
 
 export class NullabilityChecks {
@@ -28,6 +28,8 @@ export class NullabilityChecks {
     return await HttpResult.fromResponse<string[] | null>(
       res, 
       MediaType.Json,
+      undefined,
+      true
     );
   }
   async httpResultTypes(
@@ -48,6 +50,8 @@ export class NullabilityChecks {
     return await HttpResult.fromResponse<NullabilityChecks[] | null | null>(
       res, 
       MediaType.Json,
+      NullabilityChecks,
+      true
     );
   }
   async injectableTypes(
@@ -66,6 +70,8 @@ export class NullabilityChecks {
     return await HttpResult.fromResponse<void>(
       res, 
       MediaType.Json,
+      undefined,
+      false
     );
   }
   async modelTypes(
@@ -86,6 +92,8 @@ export class NullabilityChecks {
     return await HttpResult.fromResponse<NullabilityChecks | null>(
       res, 
       MediaType.Json,
+      NullabilityChecks,
+      false
     );
   }
   async primitiveTypes(
@@ -108,10 +116,12 @@ export class NullabilityChecks {
     return await HttpResult.fromResponse<boolean | null>(
       res, 
       MediaType.Json,
+      undefined,
+      false
     );
   }
 
-  static fromJson(data: any, blobs: Uint8Array[]): NullabilityChecks {
+  static fromJson(data: any): NullabilityChecks {
     const res = Object.assign(new NullabilityChecks(), data);
 
 

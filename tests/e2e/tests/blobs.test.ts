@@ -17,32 +17,38 @@ afterAll(async () => {
 describe("BlobService", () => {
   it("Receives, modifies and returns Uint8Array", async () => {
     const res = await BlobService.incrementBlob(new Uint8Array([1, 2, 3, 4]));
-    console.log(res.status);
-    console.log(res.message);
+    expect(res.ok, withRes("POST should be OK", res)).toBe(true);
+    expect(res.data).toStrictEqual(new Uint8Array([2, 3, 4, 5]));
   });
 });
 
 describe("CRUD Blob", () => {
-  // let blobHaver;
-  // it("POST Blob", async () => {
-  //   // const baseUrl = new URL(`http://localhost:5002/api/BlobHaver/save`);
-  //   // const res = await fetch(baseUrl, {
-  //   //   method: "POST",
-  //   //   body: JSON.stringify({
-  //   //     model: {},
-  //   //     __dataSource: "none",
-  //   //   }),
-  //   // });
-  //   // console.log(JSON.stringify(res));
-  //   // return await HttpResult.fromResponse<BlobHaver>(
-  //   //   res,
-  //   //   MediaType.FormData,
-  //   //   BlobHaver,
-  //   //   false
-  //   // );
-  //   // const res = await BlobHaver.save({
-  //   //   // blob1: new Uint8Array([1, 2, 3, 4]),
-  //   //   // blob2: new Uint8Array([5, 6, 7, 8]),
-  //   // });
-  // });
+  let blobHaver: BlobHaver;
+  it("POST Blob", async () => {
+    const res = await BlobHaver.save({
+      blob1: new Uint8Array([1, 2, 3, 4]),
+      blob2: new Uint8Array([5, 6, 7, 8]),
+    });
+    expect(res.ok, withRes("POST should be OK", res)).toBe(true);
+    expect(res.data).toStrictEqual(
+      Object.assign(new BlobHaver(), {
+        id: 1,
+        blob1: new Uint8Array([1, 2, 3, 4]),
+        blob2: new Uint8Array([5, 6, 7, 8]),
+      })
+    );
+    blobHaver = res.data;
+  });
+
+  it("GET Blob", async () => {
+    const res = await blobHaver.getBlob1();
+    expect(res.ok, withRes("GET should be OK", res)).toBe(true);
+    expect(res.data).toStrictEqual(new Uint8Array([1, 2, 3, 4]));
+  });
+
+  it("LIST Blobs", async () => {
+    const res = await BlobHaver.list();
+    expect(res.ok, withRes("GET should be OK", res)).toBe(true);
+    expect(res.data).toStrictEqual([blobHaver]);
+  });
 });

@@ -1,6 +1,6 @@
 // GENERATED CODE. DO NOT MODIFY.
 
-import { HttpResult, DeepPartial, MediaType, requestBody } from "cloesce/client";
+import { HttpResult, DeepPartial, MediaType, requestBody, b64ToU8 } from "cloesce/client";
 
 
 export class Weather {
@@ -21,7 +21,8 @@ export class Weather {
     return await HttpResult.fromResponse<Weather>(
       res, 
       MediaType.Json,
-      Weather, false
+      Weather,
+      false
     );
   }
   static async save(
@@ -42,11 +43,12 @@ export class Weather {
     return await HttpResult.fromResponse<Weather>(
       res, 
       MediaType.Json,
-      Weather, false
+      Weather,
+      false
     );
   }
 
-  static fromJson(data: any, blobs: Uint8Array[]): Weather {
+  static fromJson(data: any): Weather {
     const res = Object.assign(new Weather(), data);
 
 

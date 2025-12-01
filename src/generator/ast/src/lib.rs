@@ -18,6 +18,27 @@ use serde::Serialize;
 use serde_with::MapPreventDuplicates;
 use serde_with::serde_as;
 
+#[macro_export]
+macro_rules! cidl_type_contains {
+    ($value:expr, $pattern:pat) => {{
+        let mut cur = $value;
+
+        loop {
+            match cur {
+                $pattern => break true,
+
+                CidlType::Array(inner)
+                | CidlType::Nullable(inner)
+                | CidlType::HttpResult(inner) => {
+                    cur = inner;
+                }
+
+                _ => break false,
+            }
+        }
+    }};
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
 pub enum CidlType {
     /// No type
@@ -71,14 +92,6 @@ pub enum CidlType {
 }
 
 impl CidlType {
-    /// Returns the inner part of an array if the type is an array
-    pub fn unwrap_array(&self) -> Option<&CidlType> {
-        match self {
-            CidlType::Array(inner) => Some(inner),
-            _ => None,
-        }
-    }
-
     /// Returns the root most CidlType, being any non Model/Array/Result.
     pub fn root_type(&self) -> &CidlType {
         match self {

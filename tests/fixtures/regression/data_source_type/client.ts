@@ -1,10 +1,10 @@
 // GENERATED CODE. DO NOT MODIFY.
 
-import { HttpResult, DeepPartial, MediaType, requestBody } from "cloesce/client";
+import { HttpResult, DeepPartial, MediaType, requestBody, b64ToU8 } from "cloesce/client";
 export class Poo {
   ds: "baz" |"none" = "none";
 
-  static fromJson(data: any, blobs: Uint8Array[]): Poo {
+  static fromJson(data: any): Poo {
     const res = Object.assign(new Poo(), data);
     return res;
   }
@@ -34,10 +34,12 @@ export class Foo {
     return await HttpResult.fromResponse<void>(
       res, 
       MediaType.Json,
+      undefined,
+      false
     );
   }
 
-  static fromJson(data: any, blobs: Uint8Array[]): Foo {
+  static fromJson(data: any): Foo {
     const res = Object.assign(new Foo(), data);
 
 
@@ -48,7 +50,7 @@ export class NoDs {
   id: number;
 
 
-  static fromJson(data: any, blobs: Uint8Array[]): NoDs {
+  static fromJson(data: any): NoDs {
     const res = Object.assign(new NoDs(), data);
 
 
@@ -59,7 +61,7 @@ export class OneDs {
   id: number;
 
 
-  static fromJson(data: any, blobs: Uint8Array[]): OneDs {
+  static fromJson(data: any): OneDs {
     const res = Object.assign(new OneDs(), data);
 
 

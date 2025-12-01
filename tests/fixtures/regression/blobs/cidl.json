@@ -1,5 +1,5 @@
 {
-  "hash": 14061493059919975776,
+  "hash": 8447275917592500618,
   "version": "v0.0.4",
   "project_name": "runner",
   "language": "TypeScript",
@@ -11,11 +11,11 @@
   },
   "models": {
     "BlobHaver": {
-      "hash": 16282627471475622808,
+      "hash": 17711648149110095680,
       "name": "BlobHaver",
       "primary_key": {
         "name": "id",
-        "cidl_type": "Real"
+        "cidl_type": "Integer"
       },
       "attributes": [
         {
@@ -41,7 +41,7 @@
           "name": "get",
           "is_static": true,
           "http_verb": "GET",
-          "return_media": "FormData",
+          "return_media": "Json",
           "return_type": {
             "HttpResult": {
               "Object": "BlobHaver"
@@ -51,7 +51,7 @@
           "parameters": [
             {
               "name": "id",
-              "cidl_type": "Real"
+              "cidl_type": "Integer"
             },
             {
               "name": "__datasource",
@@ -65,7 +65,7 @@
           "name": "getBlob1",
           "is_static": false,
           "http_verb": "GET",
-          "return_media": "FormData",
+          "return_media": "Json",
           "return_type": "Blob",
           "parameters_media": "Json",
           "parameters": [
@@ -81,7 +81,7 @@
           "name": "list",
           "is_static": true,
           "http_verb": "GET",
-          "return_media": "FormData",
+          "return_media": "Json",
           "return_type": {
             "HttpResult": {
               "Array": {
@@ -103,13 +103,13 @@
           "name": "save",
           "is_static": true,
           "http_verb": "POST",
-          "return_media": "FormData",
+          "return_media": "Json",
           "return_type": {
             "HttpResult": {
               "Object": "BlobHaver"
             }
           },
-          "parameters_media": "FormData",
+          "parameters_media": "Json",
           "parameters": [
             {
               "name": "model",
@@ -145,9 +145,9 @@
           "name": "incrementBlob",
           "is_static": false,
           "http_verb": "POST",
-          "return_media": "FormData",
+          "return_media": "Json",
           "return_type": "Blob",
-          "parameters_media": "FormData",
+          "parameters_media": "Json",
           "parameters": [
             {
               "name": "blob",

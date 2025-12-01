@@ -1,6 +1,6 @@
 // GENERATED CODE. DO NOT MODIFY.
 
-import { HttpResult, DeepPartial, MediaType, requestBody } from "cloesce/client";
+import { HttpResult, DeepPartial, MediaType, requestBody, b64ToU8 } from "cloesce/client";
 
 export class BarService {
   static async useFoo(
@@ -9,9 +9,11 @@ export class BarService {
     const baseUrl = new URL("http://localhost:5002/api/BarService/useFoo");
     const res = await fetchImpl(baseUrl, { method: "GET" });
 
-    return await HttpResult.fromResponse<Text>(
+    return await HttpResult.fromResponse<string>(
       res, 
       MediaType.Json,
+      undefined,
+      false
     );
     }
 }
@@ -22,9 +24,11 @@ export class FooService {
     const baseUrl = new URL("http://localhost:5002/api/FooService/instantiatedMethod");
     const res = await fetchImpl(baseUrl, { method: "GET" });
 
-    return await HttpResult.fromResponse<Text>(
+    return await HttpResult.fromResponse<string>(
       res, 
       MediaType.Json,
+      undefined,
+      false
     );
     }
   static async staticMethod(
@@ -33,9 +37,11 @@ export class FooService {
     const baseUrl = new URL("http://localhost:5002/api/FooService/staticMethod");
     const res = await fetchImpl(baseUrl, { method: "GET" });
 
-    return await HttpResult.fromResponse<Text>(
+    return await HttpResult.fromResponse<string>(
       res, 
       MediaType.Json,
+      undefined,
+      false
     );
     }
 }

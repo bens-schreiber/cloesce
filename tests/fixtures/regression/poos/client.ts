@@ -1,11 +1,11 @@
 // GENERATED CODE. DO NOT MODIFY.
 
-import { HttpResult, DeepPartial, MediaType, requestBody } from "cloesce/client";
+import { HttpResult, DeepPartial, MediaType, requestBody, b64ToU8 } from "cloesce/client";
 export class PooA {
   name: string;
   major: string;
 
-  static fromJson(data: any, blobs: Uint8Array[]): PooA {
+  static fromJson(data: any): PooA {
     const res = Object.assign(new PooA(), data);
     return res;
   }
@@ -13,7 +13,7 @@ export class PooA {
 export class PooB {
   color: string;
 
-  static fromJson(data: any, blobs: Uint8Array[]): PooB {
+  static fromJson(data: any): PooB {
     const res = Object.assign(new PooB(), data);
     return res;
   }
@@ -22,11 +22,11 @@ export class PooC {
   a: PooA;
   b: PooB[];
 
-  static fromJson(data: any, blobs: Uint8Array[]): PooC {
+  static fromJson(data: any): PooC {
     const res = Object.assign(new PooC(), data);
-    res["a"] &&= PooA.fromJson(res.a, blobs);
+    res["a"] &&= [object].fromJson(res.a);
     for (let i = 0; i < res.b?.length; i++) {
-      res.b[i] = PooB.fromJson(res.b[i], blobs);
+      res.b[i] = [object].fromJson(res.b[i]);
     }
     return res;
   }
@@ -56,6 +56,8 @@ export class PooAcceptYield {
     return await HttpResult.fromResponse<void>(
       res, 
       MediaType.Json,
+      undefined,
+      false
     );
   }
   static async yieldPoo(
@@ -72,11 +74,12 @@ export class PooAcceptYield {
     return await HttpResult.fromResponse<PooC>(
       res, 
       MediaType.Json,
-      PooC, false
+      PooC,
+      false
     );
   }
 
-  static fromJson(data: any, blobs: Uint8Array[]): PooAcceptYield {
+  static fromJson(data: any): PooAcceptYield {
     const res = Object.assign(new PooAcceptYield(), data);
 
 

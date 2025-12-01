@@ -1,6 +1,6 @@
 // GENERATED CODE. DO NOT MODIFY.
 
-import { HttpResult, DeepPartial, MediaType, requestBody } from "cloesce/client";
+import { HttpResult, DeepPartial, MediaType, requestBody, b64ToU8 } from "cloesce/client";
 
 
 export class Horse {
@@ -20,7 +20,8 @@ export class Horse {
     return await HttpResult.fromResponse<Horse>(
       res, 
       MediaType.Json,
-      Horse, false
+      Horse,
+      false
     );
   }
   async like(
@@ -41,6 +42,8 @@ export class Horse {
     return await HttpResult.fromResponse<void>(
       res, 
       MediaType.Json,
+      undefined,
+      false
     );
   }
   static async list(
@@ -52,6 +55,8 @@ export class Horse {
     return await HttpResult.fromResponse<Horse[]>(
       res, 
       MediaType.Json,
+      Horse,
+      true
     );
   }
   static async post(
@@ -70,14 +75,15 @@ export class Horse {
     return await HttpResult.fromResponse<Horse>(
       res, 
       MediaType.Json,
-      Horse, false
+      Horse,
+      false
     );
   }
 
-  static fromJson(data: any, blobs: Uint8Array[]): Horse {
+  static fromJson(data: any): Horse {
     const res = Object.assign(new Horse(), data);
     for (let i = 0; i < res.likes?.length; i++) {
-      res.likes[i] = Like.fromJson(res.likes[i], blobs);
+      res.likes[i] = Like.fromJson(res.likes[i]);
     }
 
 
@@ -91,9 +97,9 @@ export class Like {
   horse2: Horse | undefined;
 
 
-  static fromJson(data: any, blobs: Uint8Array[]): Like {
+  static fromJson(data: any): Like {
     const res = Object.assign(new Like(), data);
-    res["horse2"] &&= Horse.fromJson(res.horse2, blobs);
+    res["horse2"] &&= Horse.fromJson(res.horse2);
 
 
     return res;

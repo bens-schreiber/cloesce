@@ -1,6 +1,6 @@
 // GENERATED CODE. DO NOT MODIFY.
 
-import { HttpResult, DeepPartial, MediaType, requestBody } from "cloesce/client";
+import { HttpResult, DeepPartial, MediaType, requestBody, b64ToU8 } from "cloesce/client";
 
 
 export class Child {
@@ -9,9 +9,9 @@ export class Child {
   parent: Parent | undefined;
 
 
-  static fromJson(data: any, blobs: Uint8Array[]): Child {
+  static fromJson(data: any): Child {
     const res = Object.assign(new Child(), data);
-    res["parent"] &&= Parent.fromJson(res.parent, blobs);
+    res["parent"] &&= Parent.fromJson(res.parent);
 
 
     return res;
@@ -34,7 +34,8 @@ export class CrudHaver {
     return await HttpResult.fromResponse<CrudHaver>(
       res, 
       MediaType.Json,
-      CrudHaver, false
+      CrudHaver,
+      false
     );
   }
   static async list(
@@ -48,6 +49,8 @@ export class CrudHaver {
     return await HttpResult.fromResponse<CrudHaver[]>(
       res, 
       MediaType.Json,
+      CrudHaver,
+      true
     );
   }
   async notCrud(
@@ -66,6 +69,8 @@ export class CrudHaver {
     return await HttpResult.fromResponse<void>(
       res, 
       MediaType.Json,
+      undefined,
+      false
     );
   }
   static async save(
@@ -86,11 +91,12 @@ export class CrudHaver {
     return await HttpResult.fromResponse<CrudHaver>(
       res, 
       MediaType.Json,
-      CrudHaver, false
+      CrudHaver,
+      false
     );
   }
 
-  static fromJson(data: any, blobs: Uint8Array[]): CrudHaver {
+  static fromJson(data: any): CrudHaver {
     const res = Object.assign(new CrudHaver(), data);
 
 
@@ -116,7 +122,8 @@ export class Parent {
     return await HttpResult.fromResponse<Parent>(
       res, 
       MediaType.Json,
-      Parent, false
+      Parent,
+      false
     );
   }
   static async list(
@@ -130,6 +137,8 @@ export class Parent {
     return await HttpResult.fromResponse<Parent[]>(
       res, 
       MediaType.Json,
+      Parent,
+      true
     );
   }
   static async save(
@@ -150,15 +159,16 @@ export class Parent {
     return await HttpResult.fromResponse<Parent>(
       res, 
       MediaType.Json,
-      Parent, false
+      Parent,
+      false
     );
   }
 
-  static fromJson(data: any, blobs: Uint8Array[]): Parent {
+  static fromJson(data: any): Parent {
     const res = Object.assign(new Parent(), data);
-    res["favoriteChild"] &&= Child.fromJson(res.favoriteChild, blobs);
+    res["favoriteChild"] &&= Child.fromJson(res.favoriteChild);
     for (let i = 0; i < res.children?.length; i++) {
-      res.children[i] = Child.fromJson(res.children[i], blobs);
+      res.children[i] = Child.fromJson(res.children[i]);
     }
 
 

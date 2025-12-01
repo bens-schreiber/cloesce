@@ -421,10 +421,8 @@ async function validateRequest(
   Either<HttpResult, { params: RequestParamMap; dataSource: string | null }>
 > {
   // Error state: any missing parameter, body, or malformed input will exit with 400.
-  const invalidRequest = (c: RouterFailState, t?: string) =>
-    Either.left(
-      HttpResult.fail(400, `Invalid Request Body (ErrorCode: ${c} ${t})`)
-    );
+  const invalidRequest = (c: RouterFailState) =>
+    Either.left(HttpResult.fail(400, `Invalid Request Body (ErrorCode: ${c})`));
 
   // Models must have an ID on instantiated methods.
   if (route.kind === "model" && !route.method.is_static && route.id == null) {
@@ -439,7 +437,6 @@ async function validateRequest(
 
   const url = new URL(request.url);
   let params: RequestParamMap = {};
-  let blobs: any[] = [];
 
   // Extract the method parameters from the URL or body
   if (route.method.http_verb === "GET") {
@@ -451,18 +448,12 @@ async function validateRequest(
           params = await request.json();
           break;
         }
-        case MediaType.FormData: {
-          const formData = await request.formData();
-          params = formData.get("json") as any;
-          blobs = formData.getAll("blob[]");
-          break;
-        }
         default: {
           throw new Error("not implemented");
         }
       }
     } catch (e: any) {
-      return invalidRequest(RouterFailState.RequestMissingBody, e.toString());
+      return invalidRequest(RouterFailState.RequestMissingBody);
     }
   }
 
@@ -475,7 +466,6 @@ async function validateRequest(
   for (const p of requiredParams) {
     const res = RuntimeValidator.fromJson(
       params[p.name],
-      blobs,
       p.cidl_type,
       ast,
       ctorReg

@@ -1,10 +1,10 @@
 // GENERATED CODE. DO NOT MODIFY.
 
-import { HttpResult, DeepPartial, MediaType, requestBody } from "cloesce/client";
+import { HttpResult, DeepPartial, MediaType, requestBody, b64ToU8 } from "cloesce/client";
 export class InjectedThing {
   value: string;
 
-  static fromJson(data: any, blobs: Uint8Array[]): InjectedThing {
+  static fromJson(data: any): InjectedThing {
     const res = Object.assign(new InjectedThing(), data);
     return res;
   }
@@ -23,6 +23,8 @@ export class Model {
     return await HttpResult.fromResponse<void>(
       res, 
       MediaType.Json,
+      undefined,
+      false
     );
   }
   static async getInjectedThing(
@@ -34,7 +36,8 @@ export class Model {
     return await HttpResult.fromResponse<InjectedThing>(
       res, 
       MediaType.Json,
-      InjectedThing, false
+      InjectedThing,
+      false
     );
   }
   static async save(
@@ -55,11 +58,12 @@ export class Model {
     return await HttpResult.fromResponse<Model>(
       res, 
       MediaType.Json,
-      Model, false
+      Model,
+      false
     );
   }
 
-  static fromJson(data: any, blobs: Uint8Array[]): Model {
+  static fromJson(data: any): Model {
     const res = Object.assign(new Model(), data);
 
 

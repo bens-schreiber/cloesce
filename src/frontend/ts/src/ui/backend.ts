@@ -1,5 +1,5 @@
 import { D1Database } from "@cloudflare/workers-types/experimental/index.js";
-import { DeepPartial, Either, KeysOfType } from "./common.js";
+import { DeepPartial, Either, KeysOfType, b64ToU8, u8ToB64 } from "./common.js";
 import { RuntimeContainer } from "../router/router.js";
 import { WasmResource, mapSql, invokeOrmWasm } from "../router/wasm.js";
 import { CrudKind } from "../ast.js";
@@ -409,7 +409,7 @@ export class Orm {
   static mapSql<T extends object>(
     ctor: new () => T,
     records: Record<string, any>[],
-    includeTree: IncludeTree<T> | null = null,
+    includeTree: IncludeTree<T> | null = null
   ): Either<string, T[]> {
     return mapSql(ctor, records, includeTree);
   }
@@ -460,12 +460,17 @@ export class Orm {
   async upsert<T extends object>(
     ctor: new () => T,
     newModel: DeepPartial<T>,
-    includeTree: IncludeTree<T> | null = null,
+    includeTree: IncludeTree<T> | null = null
   ): Promise<Either<string, any>> {
     const { wasm } = RuntimeContainer.get();
     const args = [
       WasmResource.fromString(ctor.name, wasm),
-      WasmResource.fromString(JSON.stringify(newModel), wasm),
+      WasmResource.fromString(
+        JSON.stringify(newModel, (k, v) =>
+          v instanceof Uint8Array ? u8ToB64(v) : v
+        ),
+        wasm
+      ),
       WasmResource.fromString(JSON.stringify(includeTree), wasm),
     ];
 
@@ -490,13 +495,13 @@ export class Orm {
 
     // Execute all statements in a batch.
     const batchRes = await this.db.batch(
-      statements.map((s) => this.db.prepare(s.query).bind(...s.values)),
+      statements.map((s) => this.db.prepare(s.query).bind(...s.values))
     );
 
     if (!batchRes.every((r) => r.success)) {
       const failed = batchRes.find((r) => !r.success);
       return Either.left(
-        failed?.error ?? "D1 batch failed, but no error was returned.",
+        failed?.error ?? "D1 batch failed, but no error was returned."
       );
     }
 
@@ -541,7 +546,7 @@ export class Orm {
       includeTree?: IncludeTree<T> | null;
       from?: string;
       tagCte?: string;
-    },
+    }
   ): string {
     const { wasm } = RuntimeContainer.get();
     const args = [
@@ -586,7 +591,7 @@ export class Orm {
    */
   static getQuery<T extends object>(
     ctor: new () => T,
-    includeTree?: IncludeTree<T> | null,
+    includeTree?: IncludeTree<T> | null
   ): string {
     const { ast } = RuntimeContainer.get();
     return `${this.listQuery<T>(ctor, { includeTree })} WHERE [${ast.models[ctor.name].primary_key.name}] = ?`;
@@ -627,7 +632,7 @@ export class Orm {
     opts: {
       includeTree?: IncludeTree<T> | null;
       from?: string;
-    },
+    }
   ): Promise<Either<string, T[]>> {
     const sql = Orm.listQuery(ctor, opts);
 
@@ -635,7 +640,7 @@ export class Orm {
     const records = await stmt.all();
     if (!records.success) {
       return Either.left(
-        records.error ?? "D1 query failed, but no error was returned.",
+        records.error ?? "D1 query failed, but no error was returned."
       );
     }
 
@@ -663,14 +668,14 @@ export class Orm {
   async get<T extends object>(
     ctor: new () => T,
     id: any,
-    includeTree?: IncludeTree<T> | null,
+    includeTree?: IncludeTree<T> | null
   ): Promise<Either<string, T | null>> {
     const sql = Orm.getQuery(ctor, includeTree);
     const record = await this.db.prepare(sql).bind(id).run();
 
     if (!record.success) {
       return Either.left(
-        record.error ?? "D1 query failed, but no error was returned.",
+        record.error ?? "D1 query failed, but no error was returned."
       );
     }
 

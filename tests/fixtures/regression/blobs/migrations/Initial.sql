@@ -1,6 +1,6 @@
 --- New Models
 CREATE TABLE IF NOT EXISTS "BlobHaver" (
-  "id" real PRIMARY KEY,
+  "id" integer PRIMARY KEY,
   "blob1" blob NOT NULL,
   "blob2" blob NOT NULL
 );

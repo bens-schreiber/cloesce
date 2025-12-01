@@ -105,39 +105,16 @@ export class Either<L, R> {
 
 export function requestBody(
   mediaType: MediaType,
-  data: any | undefined
+  data: any | string | undefined
 ): undefined | string | FormData {
   switch (mediaType) {
     case MediaType.Text: {
-      return undefined;
+      return data ?? "";
     }
     case MediaType.Json: {
-      return JSON.stringify(data ?? {});
-    }
-    case MediaType.FormData: {
-      const formData = new FormData();
-      let blobIndex = 0;
-
-      // Serialize blobs to an index in a blob array
-      const json = JSON.stringify(data ?? {}, (key, value) => {
-        if (value instanceof Uint8Array) {
-          const index = blobIndex++;
-
-          const bytes = new Uint8Array(value.buffer as ArrayBuffer);
-          const blob = new Blob([bytes], {
-            type: "application/octet-stream",
-          });
-
-          formData.append("blobs[]", blob, String(index));
-          return { __blobIndex: index };
-        }
-
-        return value;
-      });
-
-      formData.set("json", json);
-
-      return formData;
+      return JSON.stringify(data ?? {}, (k, v) =>
+        v instanceof Uint8Array ? u8ToB64(v) : v
+      );
     }
     case MediaType.Octet: {
       // todo: what type??
@@ -187,10 +164,6 @@ export class HttpResult<T = unknown> {
         this.headers.set("Content-Type", "application/json");
         break;
       }
-      case MediaType.FormData: {
-        this.headers.set("Content-Type", "multipart/form-data");
-        break;
-      }
       case MediaType.Octet: {
         this.headers.set("Content-Type", "application/octet-stream");
         break;
@@ -233,48 +206,43 @@ export class HttpResult<T = unknown> {
       );
     }
 
-    const data = async () => {
+    function instantiate(json: any, ctor?: any) {
+      switch (ctor) {
+        case Date: {
+          return new Date(json);
+        }
+        case Uint8Array: {
+          return b64ToU8(json);
+        }
+        case undefined: {
+          return json;
+        }
+        default: {
+          return ctor.fromJson(json);
+        }
+      }
+    }
+
+    async function data() {
       switch (mediaType) {
         case MediaType.Json: {
           let json = await response.json();
 
-          if (!ctor) {
-            return json;
-          }
-
           if (array) {
             for (let i = 0; i < json.length; i++) {
-              json[i] = ctor.fromJson(json[i], []);
+              json[i] = instantiate(json[i], ctor);
             }
           } else {
-            json = ctor.fromJson(json, []);
+            json = instantiate(json, ctor);
           }
 
           return json;
         }
-
-        case MediaType.FormData: {
-          // todo: blob[]?
-          const formData = await response.formData();
-          const blobs = formData.getAll("blobs[]");
-          let json: any = formData.get("json")!;
-
-          if (array) {
-            for (let i = 0; i < json.length; i++) {
-              json[i] = ctor.fromJson(json[i], blobs);
-            }
-          } else {
-            json = ctor.fromJson(json, blobs);
-          }
-
-          return json;
-        }
-
         case MediaType.Octet: {
           return response.body;
         }
       }
-    };
+    }
 
     return new HttpResult(
       true,
@@ -288,3 +256,33 @@ export class HttpResult<T = unknown> {
 export type KeysOfType<T, U> = {
   [K in keyof T]: T[K] extends U ? (K extends string ? K : never) : never;
 }[keyof T];
+
+export function b64ToU8(b64: string) {
+  // Prefer Buffer in Node.js environments
+  if (typeof Buffer !== "undefined") {
+    const buffer = Buffer.from(b64, "base64");
+    return new Uint8Array(buffer);
+  }
+
+  // Use atob only in browser environments
+  const s = atob(b64);
+  const u8 = new Uint8Array(s.length);
+  for (let i = 0; i < s.length; i++) {
+    u8[i] = s.charCodeAt(i);
+  }
+  return u8;
+}
+
+export function u8ToB64(u8: Uint8Array) {
+  // Prefer Buffer in Node.js environments
+  if (typeof Buffer !== "undefined") {
+    return Buffer.from(u8).toString("base64");
+  }
+
+  // Use btoa only in browser environments
+  let s = "";
+  for (let i = 0; i < u8.length; i++) {
+    s += String.fromCharCode(u8[i]);
+  }
+  return btoa(s);
+}

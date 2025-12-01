@@ -42,7 +42,6 @@ export enum MediaType {
   Text,
   Json = "Json",
   Octet = "Octet",
-  FormData = "FormData",
 }
 
 /**

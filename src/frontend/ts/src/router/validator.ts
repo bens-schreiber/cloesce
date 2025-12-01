@@ -5,7 +5,7 @@ import {
   getNavigationPropertyCidlType,
   isNullableType,
 } from "../ast";
-import { Either } from "../ui/common";
+import { Either, b64ToU8 } from "../ui/common";
 import { ConstructorRegistry } from "./router";
 
 /**
@@ -25,22 +25,16 @@ import { ConstructorRegistry } from "./router";
 export class RuntimeValidator {
   constructor(
     private ast: CloesceAst,
-    private ctorReg: ConstructorRegistry,
-    private blobs: any[]
+    private ctorReg: ConstructorRegistry
   ) {}
 
   static fromJson(
     value: any,
-    blobs: any[],
     cidlType: CidlType,
     ast: CloesceAst,
     ctorReg: ConstructorRegistry
   ): Either<null, any> {
-    return new RuntimeValidator(ast, ctorReg, blobs).recurse(
-      value,
-      cidlType,
-      false
-    );
+    return new RuntimeValidator(ast, ctorReg).recurse(value, cidlType, false);
   }
 
   private recurse(
@@ -93,11 +87,7 @@ export class RuntimeValidator {
         }
         case "Blob": {
           // Instantiate
-          return rightIf(
-            () => this.blobs[value.__blobIndex],
-            value.__blobIndex !== undefined &&
-              this.blobs[value.__blobIndex] !== undefined
-          );
+          return Either.right(b64ToU8(value));
         }
         default:
           return Either.left(null);

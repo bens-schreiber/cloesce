@@ -4,34 +4,27 @@ use std::{ops::Deref, sync::Arc};
 
 use ast::{
     CidlType, CloesceAst, InputLanguage, MediaType, NavigationProperty, NavigationPropertyKind,
+    cidl_type_contains,
 };
 use mappers::{ClientLanguageTypeMapper, TypeScriptMapper};
 
 use handlebars::{Handlebars, handlebars_helper};
 
 handlebars_helper!(is_serializable: |cidl_type: CidlType| !matches!(cidl_type.root_type(), CidlType::Inject(_)));
-handlebars_helper!(is_object: |cidl_type: CidlType| match cidl_type {
-    CidlType::Object(_) => true,
-    CidlType::HttpResult(inner) => matches!(inner.deref(), CidlType::Object(_)),
-    _ => false,
-});
-handlebars_helper!(object_name: |cidl_type: CidlType| match cidl_type.root_type() {
-    CidlType::Object(name) => name.clone(),
-    _ => unreachable!()
-});
-handlebars_helper!(is_object_array: |cidl_type: CidlType| match cidl_type {
-    CidlType::HttpResult(inner) => matches!(inner.deref(), CidlType::Array(inner2) if matches!(inner2.deref(), CidlType::Object(_))),
-    CidlType::Array(inner) => matches!(inner.deref(), CidlType::Object(_)),
-    _ => false,
-});
+handlebars_helper!(is_object: |cidl_type: CidlType| matches!(cidl_type.root_type(), CidlType::Object(_) | CidlType::Partial(_)));
+handlebars_helper!(is_object_array: |cidl_type: CidlType| matches!(cidl_type.root_type(), CidlType::Object(_)) && cidl_type_contains!(&cidl_type, CidlType::Array(_)));
+handlebars_helper!(is_blob_array: |cidl_type: CidlType| matches!(cidl_type.root_type(), CidlType::Blob) && cidl_type_contains!(&cidl_type, CidlType::Array(_)));
+handlebars_helper!(needs_constructor: |cidl_type: CidlType| matches!(cidl_type.root_type(),
+    CidlType::Object(_)
+    | CidlType::Blob
+    | CidlType::Partial(_)
+    | CidlType::DateIso
+    | CidlType::Stream
+));
+handlebars_helper!(get_root_type: |cidl_type: CidlType| serde_json::to_value(cidl_type.root_type()).unwrap());
 handlebars_helper!(is_blob: |cidl_type: CidlType| match cidl_type {
     CidlType::Blob => true,
     CidlType::HttpResult(inner) => matches!(inner.deref(), CidlType::Blob),
-    _ => false,
-});
-handlebars_helper!(is_blob_array: |cidl_type: CidlType| match cidl_type {
-    CidlType::HttpResult(inner) => matches!(inner.deref(), CidlType::Array(inner2) if matches!(inner2.deref(), CidlType::Blob)),
-    CidlType::Array(inner) => matches!(inner.deref(), CidlType::Blob),
     _ => false,
 });
 handlebars_helper!(is_one_to_one: |nav: NavigationProperty| matches!(nav.kind, NavigationPropertyKind::OneToOne {..}));
@@ -41,6 +34,7 @@ handlebars_helper!(get_content_type: |media: MediaType| match media {
     MediaType::Json=>"application/json",
     MediaType::Octet => "application/octet-stream",
 });
+handlebars_helper!(has_array: |cidl_type: CidlType| cidl_type_contains!(&cidl_type, CidlType::Array(_)));
 
 fn register_helpers<'a>(
     handlebars: &mut Handlebars<'a>,
@@ -48,15 +42,17 @@ fn register_helpers<'a>(
     ast: &'a CloesceAst,
 ) {
     handlebars.register_helper("is_serializable", Box::new(is_serializable));
-    handlebars.register_helper("is_object", Box::new(is_object));
-    handlebars.register_helper("is_object_array", Box::new(is_object_array));
     handlebars.register_helper("is_blob", Box::new(is_blob));
-    handlebars.register_helper("is_blob_array", Box::new(is_blob_array));
     handlebars.register_helper("is_one_to_one", Box::new(is_one_to_one));
     handlebars.register_helper("is_many_nav", Box::new(is_many_nav));
-    handlebars.register_helper("object_name", Box::new(object_name));
+    handlebars.register_helper("get_root_type", Box::new(get_root_type));
     handlebars.register_helper("eq", Box::new(eq));
     handlebars.register_helper("get_content_type", Box::new(get_content_type));
+    handlebars.register_helper("has_array", Box::new(has_array));
+    handlebars.register_helper("needs_constructor", Box::new(needs_constructor));
+    handlebars.register_helper("is_object", Box::new(is_object));
+    handlebars.register_helper("is_object_array", Box::new(is_object_array));
+    handlebars.register_helper("is_blob_array", Box::new(is_blob_array));
 
     let mapper1 = mapper.clone();
     handlebars.register_helper(
@@ -87,7 +83,7 @@ fn register_helpers<'a>(
 
     let mapper2 = mapper.clone();
     handlebars.register_helper(
-        "get_cidl_type",
+        "map_cidl_type",
         Box::new(
             move |h: &handlebars::Helper<'_>,
                   _: &Handlebars,
@@ -106,6 +102,25 @@ fn register_helpers<'a>(
 
     let mapper3 = mapper.clone();
     handlebars.register_helper(
+        "map_root_cidl_type",
+        Box::new(
+            move |h: &handlebars::Helper<'_>,
+                  _: &Handlebars,
+                  _: &handlebars::Context,
+                  _: &mut handlebars::RenderContext<'_, '_>,
+                  out: &mut dyn handlebars::Output| {
+                let cidl_type: CidlType =
+                    serde_json::from_value(h.param(0).unwrap().value().clone()).unwrap();
+
+                let rendered = mapper3.cidl_type(cidl_type.root_type(), ast);
+                out.write(&rendered)?;
+                Ok(())
+            },
+        ),
+    );
+
+    let mapper4 = mapper.clone();
+    handlebars.register_helper(
         "get_media_type",
         Box::new(
             move |h: &handlebars::Helper<'_>,
@@ -116,7 +131,7 @@ fn register_helpers<'a>(
                 let media_type: MediaType =
                     serde_json::from_value(h.param(0).unwrap().value().clone()).unwrap();
 
-                let rendered = mapper3.media_type(&media_type);
+                let rendered = mapper4.media_type(&media_type);
                 out.write(&rendered)?;
                 Ok(())
             },

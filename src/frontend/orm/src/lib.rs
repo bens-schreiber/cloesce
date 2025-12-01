@@ -181,7 +181,7 @@ pub unsafe extern "C" fn upsert_model(
             0
         }
         Err(e) => {
-            yield_result(e.into_bytes());
+            yield_error(e);
             1
         }
     }

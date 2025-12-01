@@ -1,6 +1,6 @@
 // GENERATED CODE. DO NOT MODIFY.
 
-import { HttpResult, DeepPartial, MediaType, requestBody } from "cloesce/client";
+import { HttpResult, DeepPartial, MediaType, requestBody, b64ToU8 } from "cloesce/client";
 
 
 export class Dog {
@@ -24,11 +24,12 @@ export class Dog {
     return await HttpResult.fromResponse<Dog>(
       res, 
       MediaType.Json,
-      Dog, false
+      Dog,
+      false
     );
   }
 
-  static fromJson(data: any, blobs: Uint8Array[]): Dog {
+  static fromJson(data: any): Dog {
     const res = Object.assign(new Dog(), data);
 
 
