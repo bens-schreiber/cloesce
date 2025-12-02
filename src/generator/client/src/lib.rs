@@ -3,12 +3,12 @@ mod mappers;
 use std::sync::Arc;
 
 use ast::{
-    CidlType, CloesceAst, HttpVerb, InputLanguage, MediaType, NavigationProperty,
-    NavigationPropertyKind, cidl_type_contains,
+    cidl_type_contains, CidlType, CloesceAst, HttpVerb, InputLanguage, MediaType,
+    NavigationProperty, NavigationPropertyKind,
 };
 use mappers::{ClientLanguageTypeMapper, TypeScriptMapper};
 
-use handlebars::{Handlebars, handlebars_helper};
+use handlebars::{handlebars_helper, Handlebars};
 
 handlebars_helper!(needs_constructor: |cidl_type: CidlType| matches!(cidl_type.root_type(),
     CidlType::Object(_)
@@ -55,7 +55,7 @@ fn register_helpers<'a>(
     handlebars.register_helper("get_content_type", Box::new(get_content_type));
     handlebars.register_helper("has_array", Box::new(has_array));
     handlebars.register_helper("needs_constructor", Box::new(needs_constructor));
-    handlebars.register_helper("object_name", Box::new(get_object_name));
+    handlebars.register_helper("get_object_name", Box::new(get_object_name));
     handlebars.register_helper("is_object", Box::new(is_object));
     handlebars.register_helper("is_object_array", Box::new(is_object_array));
     handlebars.register_helper("is_blob_array", Box::new(is_blob_array));
