@@ -7,6 +7,7 @@ import {
   Service,
   POST,
   Integer,
+  Stream,
 } from "cloesce/backend";
 import { D1Database } from "@cloudflare/workers-types";
 type Integer = number & { __kind: "Integer" };
@@ -44,5 +45,38 @@ export class BlobHaver {
   @GET
   getBlob1(): Uint8Array {
     return this.blob1;
+  }
+
+  @POST
+  static async inputStream(stream: Stream) {
+    if (!(stream instanceof ReadableStream)) {
+      throw new Error("Did not receive a stream");
+    }
+
+    const value: Uint8Array = (await stream.getReader().read()).value;
+    if (!(value instanceof Uint8Array)) {
+      throw new Error("Did not receive a uint8array");
+    }
+
+    const expected = [1, 2, 3, 4, 5];
+    const got = Array.from(value);
+    if (
+      expected.length !== got.length ||
+      !expected.every((v, i) => v === got[i])
+    ) {
+      throw new Error(
+        `Arrays did not match, got: ${got}; expected: ${expected} `
+      );
+    }
+  }
+
+  @GET
+  yieldStream(): Stream {
+    return new ReadableStream({
+      start(controller) {
+        controller.enqueue(this.blob1);
+        controller.close();
+      },
+    });
   }
 }

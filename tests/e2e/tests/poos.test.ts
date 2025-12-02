@@ -31,7 +31,7 @@ describe("Upload", () => {
             color: "test-color",
           },
         ],
-      }
+      },
     );
     expect(res.ok, withRes("POST should be OK", res)).toBe(true);
   });

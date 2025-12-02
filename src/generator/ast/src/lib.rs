@@ -92,7 +92,6 @@ pub enum CidlType {
 }
 
 impl CidlType {
-    /// Returns the root most CidlType, being any non Model/Array/Result.
     pub fn root_type(&self) -> &CidlType {
         match self {
             CidlType::Array(inner) => inner.root_type(),

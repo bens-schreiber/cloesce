@@ -15,14 +15,17 @@ export class NullabilityChecks {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<string[] | null>> {
     const baseUrl = new URL(`http://localhost:5002/api/NullabilityChecks/${this.id}/arrayTypes`);
+    const payload: any = {};
+
+      payload["a"] = a;
+      payload["b"] = b;
+      baseUrl.searchParams.append('__dataSource', String(__dataSource));
+
     const res = await fetchImpl(baseUrl, {
       method: "POST",
+      duplex: "half",
       headers: { "Content-Type": "application/json" },
-      body: requestBody(MediaType.Json, {
-            a, 
-            b, 
-            __dataSource
-      })
+      body: requestBody(MediaType.Json, payload)
     });
 
     return await HttpResult.fromResponse<string[] | null>(
@@ -38,13 +41,16 @@ export class NullabilityChecks {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<NullabilityChecks[] | null | null>> {
     const baseUrl = new URL(`http://localhost:5002/api/NullabilityChecks/${this.id}/httpResultTypes`);
+    const payload: any = {};
+
+      payload["a"] = a;
+      baseUrl.searchParams.append('__dataSource', String(__dataSource));
+
     const res = await fetchImpl(baseUrl, {
       method: "POST",
+      duplex: "half",
       headers: { "Content-Type": "application/json" },
-      body: requestBody(MediaType.Json, {
-            a, 
-            __dataSource
-      })
+      body: requestBody(MediaType.Json, payload)
     });
 
     return await HttpResult.fromResponse<NullabilityChecks[] | null | null>(
@@ -59,12 +65,15 @@ export class NullabilityChecks {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<void>> {
     const baseUrl = new URL(`http://localhost:5002/api/NullabilityChecks/${this.id}/injectableTypes`);
+    const payload: any = {};
+
+      baseUrl.searchParams.append('__dataSource', String(__dataSource));
+
     const res = await fetchImpl(baseUrl, {
       method: "POST",
+      duplex: "half",
       headers: { "Content-Type": "application/json" },
-      body: requestBody(MediaType.Json, {
-            __dataSource
-      })
+      body: requestBody(MediaType.Json, payload)
     });
 
     return await HttpResult.fromResponse<void>(
@@ -80,13 +89,16 @@ export class NullabilityChecks {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<NullabilityChecks | null>> {
     const baseUrl = new URL(`http://localhost:5002/api/NullabilityChecks/${this.id}/modelTypes`);
+    const payload: any = {};
+
+      payload["a"] = a;
+      baseUrl.searchParams.append('__dataSource', String(__dataSource));
+
     const res = await fetchImpl(baseUrl, {
       method: "POST",
+      duplex: "half",
       headers: { "Content-Type": "application/json" },
-      body: requestBody(MediaType.Json, {
-            a, 
-            __dataSource
-      })
+      body: requestBody(MediaType.Json, payload)
     });
 
     return await HttpResult.fromResponse<NullabilityChecks | null>(
@@ -103,14 +115,17 @@ export class NullabilityChecks {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<boolean | null>> {
     const baseUrl = new URL(`http://localhost:5002/api/NullabilityChecks/${this.id}/primitiveTypes`);
+    const payload: any = {};
+
+      payload["a"] = a;
+      payload["b"] = b;
+      baseUrl.searchParams.append('__dataSource', String(__dataSource));
+
     const res = await fetchImpl(baseUrl, {
       method: "POST",
+      duplex: "half",
       headers: { "Content-Type": "application/json" },
-      body: requestBody(MediaType.Json, {
-            a, 
-            b, 
-            __dataSource
-      })
+      body: requestBody(MediaType.Json, payload)
     });
 
     return await HttpResult.fromResponse<boolean | null>(

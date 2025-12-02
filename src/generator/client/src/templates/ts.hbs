@@ -12,10 +12,10 @@ export class {{this.name}} {
     {{#each this.attributes}}
       {{#if (is_object_array cidl_type)}}
     for (let i = 0; i < res.{{name}}?.length; i++) {
-      res.{{name}}[i] = {{get_root_type cidl_type}}.fromJson(res.{{name}}[i]);
+      res.{{name}}[i] = {{object_name cidl_type}}.fromJson(res.{{name}}[i]);
     }
       {{else if (is_object cidl_type)}}
-    res["{{name}}"] &&= {{get_root_type cidl_type}}.fromJson(res.{{name}});
+    res["{{name}}"] &&= {{object_name cidl_type}}.fromJson(res.{{name}});
       {{else if (is_blob_array cidl_type)}}
     for (let i = 0; i < res.{{name}}.length; i++) {
       res.{{name}}[i] = b64ToU8(res.{{name}}[i]);
@@ -41,26 +41,28 @@ export class {{this.name}} {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<{{map_cidl_type this.return_type}}>> {
     const baseUrl = new URL("{{../../domain}}/{{../name}}/{{this.name}}");
-    {{#if (eq this.http_verb "GET")}}
-      {{#each this.parameters}}
-        {{#if (is_serializable cidl_type)}}
-    baseUrl.searchParams.append('{{name}}', String({{name}}));
+    {{#unless (is_get_request this.http_verb)}}
+    const payload: any = {};
+    {{/unless}}
+
+    {{#each this.parameters}}
+      {{#if (is_serializable cidl_type) }}
+        {{#if (is_url_param cidl_type ../http_verb)}}
+      baseUrl.searchParams.append('{{name}}', String({{name}}));
+        {{else}}
+      payload["{{name}}"] = {{name}};
         {{/if}}
-      {{/each}}
-    const res = await fetchImpl(baseUrl, { method: "GET" });
-    {{else}}
+      {{/if}}
+    {{/each}}
+
     const res = await fetchImpl(baseUrl, {
       method: "{{this.http_verb}}",
+      duplex: "half",
+      {{#unless (is_get_request this.http_verb)}}
       headers: { "Content-Type": "{{get_content_type this.parameters_media}}" },
-      body: requestBody({{get_media_type this.parameters_media}}, {
-        {{#each this.parameters}}
-          {{#if (is_serializable cidl_type)}}
-            {{name}}{{#unless @last}}, {{/unless}}
-          {{/if}}
-        {{/each}}
-      })
+      body: requestBody({{get_media_type this.parameters_media}}, payload)
+      {{/unless}}
     });
-    {{/if}}
 
     return await HttpResult.fromResponse<{{ map_cidl_type this.return_type}}>(
       res, 
@@ -97,26 +99,28 @@ export class {{this.name}} {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<{{map_cidl_type this.return_type}}>> {
     const baseUrl = new URL(`{{../../domain}}/{{#if this.is_static}}{{../name}}/{{this.name}}{{else}}{{../name}}/${this.{{../primary_key.name}}}/{{this.name}}{{/if}}`);
-    {{#if (eq this.http_verb "GET")}}
-      {{#each this.parameters}}
-        {{#if (is_serializable cidl_type)}}
-    baseUrl.searchParams.append('{{name}}', String({{name}}));
+    {{#unless (is_get_request this.http_verb)}}
+    const payload: any = {};
+    {{/unless}}
+
+    {{#each this.parameters}}
+      {{#if (is_serializable cidl_type) }}
+        {{#if (is_url_param cidl_type ../http_verb)}}
+      baseUrl.searchParams.append('{{name}}', String({{name}}));
+        {{else}}
+      payload["{{name}}"] = {{name}};
         {{/if}}
-      {{/each}}
-    const res = await fetchImpl(baseUrl, { method: "GET" });
-    {{else}}
+      {{/if}}
+    {{/each}}
+
     const res = await fetchImpl(baseUrl, {
       method: "{{this.http_verb}}",
+      duplex: "half",
+      {{#unless (is_get_request this.http_verb)}}
       headers: { "Content-Type": "{{get_content_type this.parameters_media}}" },
-      body: requestBody({{get_media_type this.parameters_media}}, {
-        {{#each this.parameters}}
-          {{#if (is_serializable cidl_type)}}
-            {{name}}{{#unless @last}}, {{/unless}}
-          {{/if}}
-        {{/each}}
-      })
+      body: requestBody({{get_media_type this.parameters_media}}, payload)
+      {{/unless}}
     });
-    {{/if}}
 
     return await HttpResult.fromResponse<{{ map_cidl_type this.return_type}}>(
       res, 

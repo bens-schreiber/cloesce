@@ -13,12 +13,15 @@ export class A {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<A>> {
     const baseUrl = new URL(`http://localhost:5002/api/A/post`);
+    const payload: any = {};
+
+      payload["a"] = a;
+
     const res = await fetchImpl(baseUrl, {
       method: "POST",
+      duplex: "half",
       headers: { "Content-Type": "application/json" },
-      body: requestBody(MediaType.Json, {
-            a
-      })
+      body: requestBody(MediaType.Json, payload)
     });
 
     return await HttpResult.fromResponse<A>(
@@ -33,8 +36,13 @@ export class A {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<A>> {
     const baseUrl = new URL(`http://localhost:5002/api/A/${this.id}/refresh`);
-    baseUrl.searchParams.append('__dataSource', String(__dataSource));
-    const res = await fetchImpl(baseUrl, { method: "GET" });
+
+      baseUrl.searchParams.append('__dataSource', String(__dataSource));
+
+    const res = await fetchImpl(baseUrl, {
+      method: "GET",
+      duplex: "half",
+    });
 
     return await HttpResult.fromResponse<A>(
       res, 
@@ -48,12 +56,15 @@ export class A {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<void>> {
     const baseUrl = new URL(`http://localhost:5002/api/A/returnFatalIfParamsNotInstantiated`);
+    const payload: any = {};
+
+      payload["a"] = a;
+
     const res = await fetchImpl(baseUrl, {
       method: "POST",
+      duplex: "half",
       headers: { "Content-Type": "application/json" },
-      body: requestBody(MediaType.Json, {
-            a
-      })
+      body: requestBody(MediaType.Json, payload)
     });
 
     return await HttpResult.fromResponse<void>(
@@ -80,12 +91,15 @@ export class B {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<void>> {
     const baseUrl = new URL(`http://localhost:5002/api/B/${this.id}/testMethod`);
+    const payload: any = {};
+
+      baseUrl.searchParams.append('__dataSource', String(__dataSource));
+
     const res = await fetchImpl(baseUrl, {
       method: "POST",
+      duplex: "half",
       headers: { "Content-Type": "application/json" },
-      body: requestBody(MediaType.Json, {
-            __dataSource
-      })
+      body: requestBody(MediaType.Json, payload)
     });
 
     return await HttpResult.fromResponse<void>(
@@ -127,12 +141,15 @@ export class Dog {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<void>> {
     const baseUrl = new URL(`http://localhost:5002/api/Dog/${this.id}/testMethod`);
+    const payload: any = {};
+
+      baseUrl.searchParams.append('__dataSource', String(__dataSource));
+
     const res = await fetchImpl(baseUrl, {
       method: "POST",
+      duplex: "half",
       headers: { "Content-Type": "application/json" },
-      body: requestBody(MediaType.Json, {
-            __dataSource
-      })
+      body: requestBody(MediaType.Json, payload)
     });
 
     return await HttpResult.fromResponse<void>(
@@ -159,12 +176,15 @@ export class Person {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Person>> {
     const baseUrl = new URL(`http://localhost:5002/api/Person/post`);
+    const payload: any = {};
+
+      payload["person"] = person;
+
     const res = await fetchImpl(baseUrl, {
       method: "POST",
+      duplex: "half",
       headers: { "Content-Type": "application/json" },
-      body: requestBody(MediaType.Json, {
-            person
-      })
+      body: requestBody(MediaType.Json, payload)
     });
 
     return await HttpResult.fromResponse<Person>(
@@ -179,8 +199,13 @@ export class Person {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Person>> {
     const baseUrl = new URL(`http://localhost:5002/api/Person/${this.id}/refresh`);
-    baseUrl.searchParams.append('__dataSource', String(__dataSource));
-    const res = await fetchImpl(baseUrl, { method: "GET" });
+
+      baseUrl.searchParams.append('__dataSource', String(__dataSource));
+
+    const res = await fetchImpl(baseUrl, {
+      method: "GET",
+      duplex: "half",
+    });
 
     return await HttpResult.fromResponse<Person>(
       res, 
@@ -194,12 +219,15 @@ export class Person {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<void>> {
     const baseUrl = new URL(`http://localhost:5002/api/Person/returnFatalIfParamsNotInstantiated`);
+    const payload: any = {};
+
+      payload["person"] = person;
+
     const res = await fetchImpl(baseUrl, {
       method: "POST",
+      duplex: "half",
       headers: { "Content-Type": "application/json" },
-      body: requestBody(MediaType.Json, {
-            person
-      })
+      body: requestBody(MediaType.Json, payload)
     });
 
     return await HttpResult.fromResponse<void>(
@@ -229,12 +257,15 @@ export class Student {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Student>> {
     const baseUrl = new URL(`http://localhost:5002/api/Student/post`);
+    const payload: any = {};
+
+      payload["student"] = student;
+
     const res = await fetchImpl(baseUrl, {
       method: "POST",
+      duplex: "half",
       headers: { "Content-Type": "application/json" },
-      body: requestBody(MediaType.Json, {
-            student
-      })
+      body: requestBody(MediaType.Json, payload)
     });
 
     return await HttpResult.fromResponse<Student>(
@@ -249,8 +280,13 @@ export class Student {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Student>> {
     const baseUrl = new URL(`http://localhost:5002/api/Student/${this.id}/refresh`);
-    baseUrl.searchParams.append('__dataSource', String(__dataSource));
-    const res = await fetchImpl(baseUrl, { method: "GET" });
+
+      baseUrl.searchParams.append('__dataSource', String(__dataSource));
+
+    const res = await fetchImpl(baseUrl, {
+      method: "GET",
+      duplex: "half",
+    });
 
     return await HttpResult.fromResponse<Student>(
       res, 

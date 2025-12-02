@@ -38,7 +38,7 @@ async function upsert(
   ctor: any,
   body: object,
   dataSource: string,
-  d1: D1Database
+  d1: D1Database,
 ): Promise<HttpResult<unknown>> {
   const includeTree = findIncludeTree(dataSource, ctor);
   const orm = Orm.fromD1(d1);
@@ -56,7 +56,7 @@ async function get(
   ctor: any,
   id: any,
   dataSource: string,
-  d1: D1Database
+  d1: D1Database,
 ): Promise<HttpResult<unknown>> {
   const includeTree = findIncludeTree(dataSource, ctor);
 
@@ -71,7 +71,7 @@ async function get(
 async function list(
   ctor: any,
   dataSource: string,
-  d1: D1Database
+  d1: D1Database,
 ): Promise<HttpResult<unknown>> {
   const includeTree = findIncludeTree(dataSource, ctor);
 
@@ -85,7 +85,7 @@ async function list(
 
 function findIncludeTree(
   dataSource: string,
-  ctor: new () => object
+  ctor: new () => object,
 ): IncludeTree<any> | null {
   const normalizedDs = dataSource === NO_DATA_SOURCE ? null : dataSource;
   return normalizedDs ? (ctor as any)[normalizedDs] : null;

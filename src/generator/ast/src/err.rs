@@ -168,14 +168,14 @@ impl GeneratorErrorKind {
                 "TODO: a good indicator of where to add the nav prop",
                 GeneratorPhase::ModelSemanticAnalysis,
             ),
+            GeneratorErrorKind::InvalidStream => (
+                "Streams cannot be nullable, apart of an object or in an array. In a method, they must be the only parameter.",
+                "Use a `Blob` type",
+                GeneratorPhase::ModelSemanticAnalysis,
+            ),
             GeneratorErrorKind::InconsistentWranglerBinding => (
                 "Wrangler file definitions must be consistent with the WranglerEnv definition",
                 "Change your WranglerEnv's bindings to match the Wrangler file",
-                GeneratorPhase::Wrangler,
-            ),
-            GeneratorErrorKind::InvalidStream => (
-                "Streams cannot be nullable, apart of an object or in an array.",
-                "Use a `Blob` type",
                 GeneratorPhase::Wrangler,
             ),
 

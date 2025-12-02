@@ -3,8 +3,8 @@ mod mappers;
 use std::{ops::Deref, sync::Arc};
 
 use ast::{
-    CidlType, CloesceAst, InputLanguage, MediaType, NavigationProperty, NavigationPropertyKind,
-    cidl_type_contains,
+    CidlType, CloesceAst, HttpVerb, InputLanguage, MediaType, NavigationProperty,
+    NavigationPropertyKind, cidl_type_contains,
 };
 use mappers::{ClientLanguageTypeMapper, TypeScriptMapper};
 
@@ -21,7 +21,10 @@ handlebars_helper!(needs_constructor: |cidl_type: CidlType| matches!(cidl_type.r
     | CidlType::DateIso
     | CidlType::Stream
 ));
-handlebars_helper!(get_root_type: |cidl_type: CidlType| serde_json::to_value(cidl_type.root_type()).unwrap());
+handlebars_helper!(object_name: |cidl_type: CidlType| match cidl_type.root_type() {
+    CidlType::Inject(name) | CidlType::Object(name) | CidlType::Partial(name) => serde_json::to_value(name).unwrap(),
+    ty => serde_json::to_value(ty).unwrap()
+});
 handlebars_helper!(is_blob: |cidl_type: CidlType| match cidl_type {
     CidlType::Blob => true,
     CidlType::HttpResult(inner) => matches!(inner.deref(), CidlType::Blob),
@@ -29,12 +32,13 @@ handlebars_helper!(is_blob: |cidl_type: CidlType| match cidl_type {
 });
 handlebars_helper!(is_one_to_one: |nav: NavigationProperty| matches!(nav.kind, NavigationPropertyKind::OneToOne {..}));
 handlebars_helper!(is_many_nav: |nav: NavigationProperty| matches!(nav.kind, NavigationPropertyKind::OneToMany {..} | NavigationPropertyKind::ManyToMany { .. }));
-handlebars_helper!(eq: |a: str, b: str| a == b);
 handlebars_helper!(get_content_type: |media: MediaType| match media {
     MediaType::Json=>"application/json",
     MediaType::Octet => "application/octet-stream",
 });
 handlebars_helper!(has_array: |cidl_type: CidlType| cidl_type_contains!(&cidl_type, CidlType::Array(_)));
+handlebars_helper!(is_url_param: |cidl_type: CidlType, verb: HttpVerb| matches!(verb, HttpVerb::GET) || matches!(cidl_type, CidlType::DataSource(_)));
+handlebars_helper!(is_get_request: |verb: HttpVerb| matches!(verb, HttpVerb::GET));
 
 fn register_helpers<'a>(
     handlebars: &mut Handlebars<'a>,
@@ -45,14 +49,15 @@ fn register_helpers<'a>(
     handlebars.register_helper("is_blob", Box::new(is_blob));
     handlebars.register_helper("is_one_to_one", Box::new(is_one_to_one));
     handlebars.register_helper("is_many_nav", Box::new(is_many_nav));
-    handlebars.register_helper("get_root_type", Box::new(get_root_type));
-    handlebars.register_helper("eq", Box::new(eq));
     handlebars.register_helper("get_content_type", Box::new(get_content_type));
     handlebars.register_helper("has_array", Box::new(has_array));
     handlebars.register_helper("needs_constructor", Box::new(needs_constructor));
+    handlebars.register_helper("object_name", Box::new(object_name));
     handlebars.register_helper("is_object", Box::new(is_object));
     handlebars.register_helper("is_object_array", Box::new(is_object_array));
     handlebars.register_helper("is_blob_array", Box::new(is_blob_array));
+    handlebars.register_helper("is_url_param", Box::new(is_url_param));
+    handlebars.register_helper("is_get_request", Box::new(is_get_request));
 
     let mapper1 = mapper.clone();
     handlebars.register_helper(

@@ -1,4 +1,4 @@
-import { MediaType } from "../ast.js";
+import { HttpVerb, MediaType } from "../ast.js";
 
 type DeepPartialInner<T> = T extends (infer U)[]
   ? DeepPartialInner<U>[]
@@ -53,7 +53,7 @@ export type DeepPartial<T> = DeepPartialInner<T> & { __brand?: "Partial" };
 
 export class Either<L, R> {
   private constructor(
-    private readonly inner: { ok: true; right: R } | { ok: false; left: L }
+    private readonly inner: { ok: true; right: R } | { ok: false; left: L },
   ) {}
 
   get value(): L | R {
@@ -105,7 +105,7 @@ export class Either<L, R> {
 
 export function requestBody(
   mediaType: MediaType,
-  data: any | string | undefined
+  data: any | string | undefined,
 ): undefined | string | FormData {
   switch (mediaType) {
     case MediaType.Text: {
@@ -113,12 +113,12 @@ export function requestBody(
     }
     case MediaType.Json: {
       return JSON.stringify(data ?? {}, (k, v) =>
-        v instanceof Uint8Array ? u8ToB64(v) : v
+        v instanceof Uint8Array ? u8ToB64(v) : v,
       );
     }
     case MediaType.Octet: {
-      // todo: what type??
-      return data;
+      // JSON structure isn't needed, just take the first value
+      return Object.values(data)[0] as any;
     }
   }
 }
@@ -141,7 +141,7 @@ export class HttpResult<T = unknown> {
     public status: number,
     public headers: Headers,
     public data?: T,
-    public message?: string
+    public message?: string,
   ) {}
 
   static ok<T>(status: number, data?: T, init?: HeadersInit): HttpResult {
@@ -194,7 +194,7 @@ export class HttpResult<T = unknown> {
     response: Response,
     mediaType: MediaType,
     ctor?: any,
-    array: boolean = false
+    array: boolean = false,
   ): Promise<HttpResult<any>> {
     if (response.status >= 400) {
       return new HttpResult(
@@ -202,7 +202,7 @@ export class HttpResult<T = unknown> {
         response.status,
         response.headers,
         undefined,
-        await response.text()
+        await response.text(),
       );
     }
 
@@ -248,7 +248,7 @@ export class HttpResult<T = unknown> {
       true,
       response.status,
       response.headers,
-      await data()
+      await data(),
     );
   }
 }
@@ -256,6 +256,8 @@ export class HttpResult<T = unknown> {
 export type KeysOfType<T, U> = {
   [K in keyof T]: T[K] extends U ? (K extends string ? K : never) : never;
 }[keyof T];
+
+export type Stream = ReadableStream<Uint8Array>;
 
 export function b64ToU8(b64: string) {
   // Prefer Buffer in Node.js environments

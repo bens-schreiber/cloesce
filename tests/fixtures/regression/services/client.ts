@@ -7,7 +7,12 @@ export class BarService {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<string>> {
     const baseUrl = new URL("http://localhost:5002/api/BarService/useFoo");
-    const res = await fetchImpl(baseUrl, { method: "GET" });
+
+
+    const res = await fetchImpl(baseUrl, {
+      method: "GET",
+      duplex: "half",
+    });
 
     return await HttpResult.fromResponse<string>(
       res, 
@@ -22,7 +27,12 @@ export class FooService {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<string>> {
     const baseUrl = new URL("http://localhost:5002/api/FooService/instantiatedMethod");
-    const res = await fetchImpl(baseUrl, { method: "GET" });
+
+
+    const res = await fetchImpl(baseUrl, {
+      method: "GET",
+      duplex: "half",
+    });
 
     return await HttpResult.fromResponse<string>(
       res, 
@@ -35,7 +45,12 @@ export class FooService {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<string>> {
     const baseUrl = new URL("http://localhost:5002/api/FooService/staticMethod");
-    const res = await fetchImpl(baseUrl, { method: "GET" });
+
+
+    const res = await fetchImpl(baseUrl, {
+      method: "GET",
+      duplex: "half",
+    });
 
     return await HttpResult.fromResponse<string>(
       res, 

@@ -25,14 +25,14 @@ import { ConstructorRegistry } from "./router";
 export class RuntimeValidator {
   constructor(
     private ast: CloesceAst,
-    private ctorReg: ConstructorRegistry
+    private ctorReg: ConstructorRegistry,
   ) {}
 
   static fromJson(
     value: any,
     cidlType: CidlType,
     ast: CloesceAst,
-    ctorReg: ConstructorRegistry
+    ctorReg: ConstructorRegistry,
   ): Either<null, any> {
     return new RuntimeValidator(ast, ctorReg).recurse(value, cidlType, false);
   }
@@ -40,7 +40,7 @@ export class RuntimeValidator {
   private recurse(
     value: any,
     cidlType: any,
-    isPartial: boolean
+    isPartial: boolean,
   ): Either<null, any> {
     isPartial ||= typeof cidlType !== "string" && "Partial" in cidlType;
 
@@ -101,7 +101,7 @@ export class RuntimeValidator {
         () => value,
         typeof value === "string" &&
           (value === NO_DATA_SOURCE ||
-            this.ast.models[objectName]?.data_sources[value] !== undefined)
+            this.ast.models[objectName]?.data_sources[value] !== undefined),
       );
     }
 
@@ -131,7 +131,7 @@ export class RuntimeValidator {
         const res = this.recurse(
           valueObj[attr.value.name],
           attr.value.cidl_type,
-          isPartial
+          isPartial,
         );
         if (res.isLeft()) {
           return res;
@@ -146,7 +146,7 @@ export class RuntimeValidator {
         const res = this.recurse(
           valueObj[nav.var_name],
           getNavigationPropertyCidlType(nav),
-          isPartial
+          isPartial,
         );
         if (res.isLeft()) {
           return res;
@@ -175,7 +175,7 @@ export class RuntimeValidator {
         const res = this.recurse(
           valueObj[attr.name],
           attr.cidl_type,
-          isPartial
+          isPartial,
         );
         if (res.isLeft()) {
           return res;

@@ -21,14 +21,17 @@ export class Foo {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<void>> {
     const baseUrl = new URL(`http://localhost:5002/api/Foo/${this.id}/bar`);
+    const payload: any = {};
+
+      baseUrl.searchParams.append('customDs', String(customDs));
+      baseUrl.searchParams.append('oneDs', String(oneDs));
+      baseUrl.searchParams.append('noDs', String(noDs));
+
     const res = await fetchImpl(baseUrl, {
       method: "POST",
+      duplex: "half",
       headers: { "Content-Type": "application/json" },
-      body: requestBody(MediaType.Json, {
-            customDs, 
-            oneDs, 
-            noDs
-      })
+      body: requestBody(MediaType.Json, payload)
     });
 
     return await HttpResult.fromResponse<void>(

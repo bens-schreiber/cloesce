@@ -14,8 +14,13 @@ export class Horse {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Horse>> {
     const baseUrl = new URL(`http://localhost:5002/api/Horse/get`);
-    baseUrl.searchParams.append('id', String(id));
-    const res = await fetchImpl(baseUrl, { method: "GET" });
+
+      baseUrl.searchParams.append('id', String(id));
+
+    const res = await fetchImpl(baseUrl, {
+      method: "GET",
+      duplex: "half",
+    });
 
     return await HttpResult.fromResponse<Horse>(
       res, 
@@ -30,13 +35,16 @@ export class Horse {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<void>> {
     const baseUrl = new URL(`http://localhost:5002/api/Horse/${this.id}/like`);
+    const payload: any = {};
+
+      payload["horse"] = horse;
+      baseUrl.searchParams.append('__dataSource', String(__dataSource));
+
     const res = await fetchImpl(baseUrl, {
       method: "POST",
+      duplex: "half",
       headers: { "Content-Type": "application/json" },
-      body: requestBody(MediaType.Json, {
-            horse, 
-            __dataSource
-      })
+      body: requestBody(MediaType.Json, payload)
     });
 
     return await HttpResult.fromResponse<void>(
@@ -50,7 +58,12 @@ export class Horse {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Horse[]>> {
     const baseUrl = new URL(`http://localhost:5002/api/Horse/list`);
-    const res = await fetchImpl(baseUrl, { method: "GET" });
+
+
+    const res = await fetchImpl(baseUrl, {
+      method: "GET",
+      duplex: "half",
+    });
 
     return await HttpResult.fromResponse<Horse[]>(
       res, 
@@ -64,12 +77,15 @@ export class Horse {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Horse>> {
     const baseUrl = new URL(`http://localhost:5002/api/Horse/post`);
+    const payload: any = {};
+
+      payload["horse"] = horse;
+
     const res = await fetchImpl(baseUrl, {
       method: "POST",
+      duplex: "half",
       headers: { "Content-Type": "application/json" },
-      body: requestBody(MediaType.Json, {
-            horse
-      })
+      body: requestBody(MediaType.Json, payload)
     });
 
     return await HttpResult.fromResponse<Horse>(

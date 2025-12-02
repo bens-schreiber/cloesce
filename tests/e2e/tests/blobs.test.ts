@@ -22,7 +22,19 @@ describe("BlobService", () => {
   });
 });
 
-describe("CRUD Blob", () => {
+describe("BlobHaver", () => {
+  it("POST Stream", async () => {
+    const stream = new ReadableStream({
+      start(controller) {
+        controller.enqueue(new Uint8Array([1, 2, 3, 4, 5]));
+        controller.close();
+      },
+    });
+
+    const res = await BlobHaver.inputStream(stream);
+    expect(res.ok, withRes("POST should be OK", res)).toBe(true);
+  });
+
   let blobHaver: BlobHaver;
   it("POST Blob", async () => {
     const res = await BlobHaver.save({
@@ -35,7 +47,7 @@ describe("CRUD Blob", () => {
         id: 1,
         blob1: new Uint8Array([1, 2, 3, 4]),
         blob2: new Uint8Array([5, 6, 7, 8]),
-      })
+      }),
     );
     blobHaver = res.data;
   });
@@ -50,5 +62,16 @@ describe("CRUD Blob", () => {
     const res = await BlobHaver.list();
     expect(res.ok, withRes("GET should be OK", res)).toBe(true);
     expect(res.data).toStrictEqual([blobHaver]);
+  });
+
+  it("GET Stream", async () => {
+    const res = await blobHaver.yieldStream();
+    expect(res.ok, withRes("GET should be OK", res)).toBe(true);
+
+    const got: number[] = Array.from(res.data);
+    const expected = [1, 2, 3, 4];
+    expect(
+      expected.length !== got.length || !expected.every((v, i) => v === got[i]),
+    );
   });
 });

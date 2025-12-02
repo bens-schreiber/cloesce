@@ -77,6 +77,20 @@
             }
           ]
         },
+        "inputStream": {
+          "name": "inputStream",
+          "is_static": true,
+          "http_verb": "POST",
+          "return_media": "Json",
+          "return_type": "Void",
+          "parameters_media": "Octet",
+          "parameters": [
+            {
+              "name": "stream",
+              "cidl_type": "Stream"
+            }
+          ]
+        },
         "list": {
           "name": "list",
           "is_static": true,
@@ -119,6 +133,22 @@
             },
             {
               "name": "__datasource",
+              "cidl_type": {
+                "DataSource": "BlobHaver"
+              }
+            }
+          ]
+        },
+        "yieldStream": {
+          "name": "yieldStream",
+          "is_static": false,
+          "http_verb": "GET",
+          "return_media": "Octet",
+          "return_type": "Stream",
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "__dataSource",
               "cidl_type": {
                 "DataSource": "BlobHaver"
               }

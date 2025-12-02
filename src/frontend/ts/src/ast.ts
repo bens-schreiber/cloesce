@@ -8,6 +8,7 @@ export type CidlType =
   | "Blob"
   | "DateIso"
   | "Boolean"
+  | "Stream"
   | { DataSource: string }
   | { Inject: string }
   | { Object: string }
@@ -79,7 +80,7 @@ export interface NavigationProperty {
 }
 
 export function getNavigationPropertyCidlType(
-  nav: NavigationProperty
+  nav: NavigationProperty,
 ): CidlType {
   return "OneToOne" in nav.kind
     ? { Object: nav.model_name }

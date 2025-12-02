@@ -616,14 +616,14 @@ fn validate_json_to_cidl(
                     .collect::<String>();
                 Ok(SimpleExpr::Custom(format!("X'{}'", hex)))
             }
-            _ => Err(format!("Expected a b64 string or u8 array for blob")),
+            _ => Err("Expected a b64 string or u8 array for blob".to_string()),
         },
         _ => {
             unreachable!("Invalid CIDL");
         }
     };
 
-    res.map_err(|e| format!("{e}, got {}", value.to_string()))
+    res.map_err(|e| format!("{e}, got {value}"))
 }
 
 #[cfg(test)]

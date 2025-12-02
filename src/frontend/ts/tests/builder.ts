@@ -12,6 +12,7 @@ import {
   ApiMethod,
   Service,
   ServiceAttribute,
+  MediaType,
 } from "../src/ast";
 
 export function createAst(
@@ -120,13 +121,17 @@ export class ModelBuilder {
     is_static: boolean,
     parameters: NamedTypedValue[],
     return_type: CidlType,
+    parameters_media: MediaType = MediaType.Json,
+    return_media: MediaType = MediaType.Json,
   ): this {
     this.methods[name] = {
       name,
       http_verb,
       is_static,
       parameters,
+      parameters_media,
       return_type,
+      return_media,
     };
     return this;
   }
@@ -181,6 +186,8 @@ export class ServiceBuilder {
     is_static: boolean,
     parameters: NamedTypedValue[],
     return_type: CidlType,
+    return_media: MediaType = MediaType.Json,
+    parameters_media: MediaType = MediaType.Json,
   ): this {
     this.methods[name] = {
       name,
@@ -188,6 +195,8 @@ export class ServiceBuilder {
       is_static,
       parameters,
       return_type,
+      return_media,
+      parameters_media,
     };
     return this;
   }

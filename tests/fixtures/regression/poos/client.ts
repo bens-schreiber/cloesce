@@ -24,9 +24,9 @@ export class PooC {
 
   static fromJson(data: any): PooC {
     const res = Object.assign(new PooC(), data);
-    res["a"] &&= [object].fromJson(res.a);
+    res["a"] &&= PooA.fromJson(res.a);
     for (let i = 0; i < res.b?.length; i++) {
-      res.b[i] = [object].fromJson(res.b[i]);
+      res.b[i] = PooB.fromJson(res.b[i]);
     }
     return res;
   }
@@ -43,14 +43,17 @@ export class PooAcceptYield {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<void>> {
     const baseUrl = new URL(`http://localhost:5002/api/PooAcceptYield/acceptPoos`);
+    const payload: any = {};
+
+      payload["a"] = a;
+      payload["b"] = b;
+      payload["c"] = c;
+
     const res = await fetchImpl(baseUrl, {
       method: "POST",
+      duplex: "half",
       headers: { "Content-Type": "application/json" },
-      body: requestBody(MediaType.Json, {
-            a, 
-            b, 
-            c
-      })
+      body: requestBody(MediaType.Json, payload)
     });
 
     return await HttpResult.fromResponse<void>(
@@ -64,11 +67,14 @@ export class PooAcceptYield {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<PooC>> {
     const baseUrl = new URL(`http://localhost:5002/api/PooAcceptYield/yieldPoo`);
+    const payload: any = {};
+
+
     const res = await fetchImpl(baseUrl, {
       method: "POST",
+      duplex: "half",
       headers: { "Content-Type": "application/json" },
-      body: requestBody(MediaType.Json, {
-      })
+      body: requestBody(MediaType.Json, payload)
     });
 
     return await HttpResult.fromResponse<PooC>(

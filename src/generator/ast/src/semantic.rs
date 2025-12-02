@@ -503,6 +503,8 @@ fn validate_methods(
             if *model_name == namespace {
                 ds += 1;
             }
+
+            continue;
         }
 
         let root_type = param.cidl_type.root_type();
@@ -538,9 +540,27 @@ fn validate_methods(
                     )
                 }
             }
-            CidlType::Stream => {
+            CidlType::DataSource(model_name) => {
                 ensure!(
-                    method.parameters.len() == 1 && matches!(param.cidl_type, CidlType::Stream),
+                    ast.models.contains_key(model_name),
+                    GeneratorErrorKind::UnknownDataSourceReference,
+                    "{}.{} data source references {}",
+                    namespace,
+                    method.name,
+                    ds
+                )
+            }
+            CidlType::Stream => {
+                let valid_params_len = if method.is_static {
+                    // There should only be the stream param
+                    method.parameters.len() == 1
+                } else {
+                    // There should be a data source and the stream param
+                    method.parameters.len() < 3
+                };
+
+                ensure!(
+                    valid_params_len && matches!(param.cidl_type, CidlType::Stream),
                     GeneratorErrorKind::InvalidStream,
                     "{}.{}",
                     namespace,
