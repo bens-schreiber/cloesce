@@ -103,18 +103,18 @@ For this milestone, trying to create an interface to abstract and orchestrate th
 
 ### Blob, Stream, Media Type
 
-To support Blobs, we will add them into the Cloesce grammar. SQLite supports a Blob type as well, meaning it is a valid column type for a Model. The way Blobs move through a REST API is vastly different than pure `application/json` data, which is all we've been dealing with up until now. JSON is meant for structured data, under a strict text format. JSON text is all buffered into memory by default. On the other hand blob uploads are typically done as `application/octet-stream`. Combining the two introduces another format, `multipart/form-data`.
+To support Blobs, we will add them into the Cloesce grammar. SQLite supports a Blob type as well, meaning it is a valid column type for a Model. The way Blobs move through a REST API is vastly different than pure `application/json` data, which is all we've been dealing with up until now. JSON is meant for structured data, under a strict text format. JSON text is all buffered into memory by default. On the other hand blob uploads are typically done as `application/octet-stream`. Combining the two requires inline-serializing Blobs to base64.
 
 #### Incoming and Outgoing Blob
 
-Let's imagine a method takes a Blob as an argument.
+Imagine a method takes a Blob as an argument.
 
 ```ts
 @POST
 fooBlob(blob: Blob) {}
 ```
 
-This is simple enough. There is no JSON data, just a single blob. We can send this as an octet stream.
+There is no JSON data, just a single blob. We can send this as an octet stream.
 
 ```ts
 // Client
@@ -154,7 +154,7 @@ class BlobService {
 }
 ```
 
-#### Multipart Form Data
+#### Encoding Blobs in Base64 JSON Strings
 
 It's reasonable to have methods that have both Blobs and JSON, ex:
 
@@ -163,113 +163,11 @@ It's reasonable to have methods that have both Blobs and JSON, ex:
 fooBlob(blob: Blob, obj: SomeObj, color: string) {}
 ```
 
-This comes with a caveat. We _cannot_ use a Stream here, because there are other parameters in the mix. `FormData` is the only type that supports both blobs and JSON data. This means the only way to convey this endpoint in REST is to load the buffer in memory, potentially hitting the memory limit. A sufficient warning should be displayed in this case.
-
-```ts
-// Client
-const blob = new Blob(["hello world"], { type: "text/plain" });
-const form = new FormData();
-form.append("blob", blob, "hello.txt");
-form.append("json", JSON.stringify({
-    obj: {...}
-    color: "..."
-}))
-
-const response = await fetch("https://example.com/upload", {
-  method: "POST",
-  body: form,
-});
-```
-
-```ts
-// Backend
-const data request.formData();
-const blob = form.get("blob");
-const json = JSON.parse(form.get("json"));
-fooBlob(blob, json.obj, json.color);
-```
-
-#### Uploading Multiple Blobs & Composition
-
-Given a scenario:
-
-```ts
-class Parent {
-  blobs: Blob[];
-  children: Child[];
-}
-
-class Child {
-  blobs: Blob[];
-  favoriteBlob: Blob;
-}
-```
-
-How do we serialize the objects into FormData and deserialize appropriately? We can map each blob to an index in a flattened blob array:
-
-```ts
-function extractBlobs(value, blobs) {
-  if (value instanceof Blob) {
-    return { __blobIndex: blobs.push(value) - 1 };
-  }
-
-  if (Array.isArray(value)) {
-    return value.map((v) => extractBlobs(v, blobs));
-  }
-
-  if (value && typeof value === "object") {
-    return Object.fromEntries(
-      Object.entries(value).map(([k, v]) => [k, extractBlobs(v, blobs)])
-    );
-  }
-
-  return value;
-}
-
-function toJson(obj) {
-  const blobs = [];
-  const replaced = extractBlobs(obj, blobs);
-  return { json: JSON.stringify(replaced), blobs };
-}
-
-const { json, blobs } = toJson(parent);
-// => now blobs contains [...parent.blobs, ...parent.flatMap(p => p.children.map(c => [c.favoriteBlob, ...c.blobs]))]
-//
-// and each blob has been replaced with an index ie Child { favoriteBlob: K, blobs: [K + 1, K + 2, K + 3, ...]}
-```
-
-When serializing, we should do so with respect to a blob array.
-
-```ts
-function parseWithBlobs(json, blobs) {
-  function revive(value) {
-    if (value && typeof value === "object") {
-      if (value.__blobIndex !== undefined) {
-        return blobs[value.__blobIndex];
-      }
-
-      if (Array.isArray(value)) {
-        return value.map((v) => revive(v));
-      }
-
-      const out = {};
-      for (const k in value) out[k] = revive(value[k]);
-      return out;
-    }
-    return value;
-  }
-
-  return revive(JSON.parse(json));
-}
-```
-
-#### Uploading only JSON
-
-If no Blob type is in the request, we can continue as normal and upload straight JSON.
+This comes with a caveat. We _cannot_ use a Stream here, because there are other parameters in the mix. Encoding the blob to b64 will allow representing both the binary data and the metadata. This means the only way to convey this endpoint in REST is to load the buffer in memory, potentially hitting the memory limit. It's also worth noting encoding and decoding a significant binary is cumbersome. A sufficient warning should be displayed in this case.
 
 #### Determining Endpoint Media Type
 
-We will need to define a `MediaType ` in the CIDL: `MediaType::Octet | MediaType::Json | MediaType::FormData`. Each method will have to mark its set of parameters under a `MediaType`, and its return value under a `MediaType`. We can do this in the generator portion, after intaking the `cidl.pre.json`, adding a media type to the end. The backend will then assume that the `MediaType` sent by the frontend is correct (or throw a `415`), and the client will assume that the server is sending the correct `MediaType`. Note that the server could return an error which would be text. if the server responds with the incorrect media type, we will want some fatal error to occur, as the generated code should always be synced (this should only happen if the `CIDL` was tampered with).
+We will need to define a `MediaType ` in the CIDL: `MediaType::Octet | MediaType::Json`. Each method will have to mark its set of parameters under a `MediaType`, and its return value under a `MediaType`. We can do this in the generator portion, after intaking the `cidl.pre.json`, adding a media type to the end. The backend will then assume that the `MediaType` sent by the frontend is correct (or throw a `415`), and the client will assume that the server is sending the correct `MediaType`. Note that the server could return an error which would be text. if the server responds with the incorrect media type, we will want some fatal error to occur, as the generated code should always be synced (this should only happen if the `CIDL` was tampered with).
 
 ### R2
 
