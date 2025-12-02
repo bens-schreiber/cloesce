@@ -1,13 +1,15 @@
 use std::path::Path;
 
-use ast::{ApiMethod, CidlType, CloesceAst, HttpVerb, NamedTypedValue};
+use ast::{ApiMethod, CidlType, CloesceAst, CrudKind, HttpVerb, MediaType, NamedTypedValue};
 
 use wrangler::WranglerSpec;
 
 pub struct WorkersGenerator;
 impl WorkersGenerator {
     /// Generates all model source imports as well as the Cloesce App
-    fn link(ast: &CloesceAst, workers_path: &Path) -> String {
+    ///
+    /// Public for tests
+    pub fn link(ast: &CloesceAst, workers_path: &Path) -> String {
         let workers_dir = workers_path
             .parent()
             .expect("workers_path has no parent; cannot compute relative imports");
@@ -105,12 +107,27 @@ impl WorkersGenerator {
         )
     }
 
-    /// Inserts CRUD methods into the AST
-    pub fn cruds(ast: &mut CloesceAst) {
+    /// Sets the [MediaType] of all ApiMethods; generates CRUD methods.
+    ///
+    /// Public for tests
+    pub fn finalize_api_methods(ast: &mut CloesceAst) {
+        let set_media_types = |method: &mut ApiMethod| {
+            // Return Media Type
+            method.return_media = match method.return_type.root_type() {
+                CidlType::Stream => MediaType::Octet,
+                _ => MediaType::Json,
+            };
+
+            method.parameters_media = match method.parameters.as_slice() {
+                [p] if matches!(p.cidl_type, CidlType::Stream) => MediaType::Octet,
+                _ => MediaType::Json,
+            };
+        };
+
         for model in ast.models.values_mut() {
-            for crud in model.cruds.iter() {
+            for crud in &model.cruds {
                 let method = match crud {
-                    ast::CrudKind::GET => ApiMethod {
+                    CrudKind::GET => ApiMethod {
                         name: "get".into(),
                         is_static: true,
                         http_verb: HttpVerb::GET,
@@ -125,8 +142,10 @@ impl WorkersGenerator {
                                 cidl_type: CidlType::DataSource(model.name.clone()),
                             },
                         ],
+                        parameters_media: MediaType::default(),
+                        return_media: MediaType::default(),
                     },
-                    ast::CrudKind::LIST => ApiMethod {
+                    CrudKind::LIST => ApiMethod {
                         name: "list".into(),
                         is_static: true,
                         http_verb: HttpVerb::GET,
@@ -137,8 +156,10 @@ impl WorkersGenerator {
                             name: "__datasource".into(),
                             cidl_type: CidlType::DataSource(model.name.clone()),
                         }],
+                        parameters_media: MediaType::default(),
+                        return_media: MediaType::default(),
                     },
-                    ast::CrudKind::SAVE => ApiMethod {
+                    CrudKind::SAVE => ApiMethod {
                         name: "save".into(),
                         is_static: true,
                         http_verb: HttpVerb::POST,
@@ -153,6 +174,8 @@ impl WorkersGenerator {
                                 cidl_type: CidlType::DataSource(model.name.clone()),
                             },
                         ],
+                        parameters_media: MediaType::default(),
+                        return_media: MediaType::default(),
                     },
                 };
 
@@ -168,6 +191,16 @@ impl WorkersGenerator {
 
                 model.methods.insert(method.name.clone(), method);
             }
+
+            for method in model.methods.values_mut() {
+                set_media_types(method);
+            }
+        }
+
+        for service in ast.services.values_mut() {
+            for method in service.methods.values_mut() {
+                set_media_types(method);
+            }
         }
     }
 
@@ -175,7 +208,7 @@ impl WorkersGenerator {
         let linked_sources = Self::link(ast, workers_path);
         let constructor_registry = Self::registry(ast);
 
-        Self::cruds(ast);
+        Self::finalize_api_methods(ast);
 
         // TODO: Hardcoding one database, in the future we need to support any amount
         let db_binding = wrangler

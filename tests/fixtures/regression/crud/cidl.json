@@ -1,5 +1,5 @@
 {
-  "hash": 5421063311567244103,
+  "hash": 11231265921349769574,
   "version": "v0.0.4",
   "project_name": "runner",
   "language": "TypeScript",
@@ -33,11 +33,13 @@
           "name": "get",
           "is_static": true,
           "http_verb": "GET",
+          "return_media": "Json",
           "return_type": {
             "HttpResult": {
               "Object": "CrudHaver"
             }
           },
+          "parameters_media": "Json",
           "parameters": [
             {
               "name": "id",
@@ -55,6 +57,7 @@
           "name": "list",
           "is_static": true,
           "http_verb": "GET",
+          "return_media": "Json",
           "return_type": {
             "HttpResult": {
               "Array": {
@@ -62,6 +65,7 @@
               }
             }
           },
+          "parameters_media": "Json",
           "parameters": [
             {
               "name": "__datasource",
@@ -75,7 +79,9 @@
           "name": "notCrud",
           "is_static": false,
           "http_verb": "POST",
+          "return_media": "Json",
           "return_type": "Void",
+          "parameters_media": "Json",
           "parameters": [
             {
               "name": "__dataSource",
@@ -89,11 +95,13 @@
           "name": "save",
           "is_static": true,
           "http_verb": "POST",
+          "return_media": "Json",
           "return_type": {
             "HttpResult": {
               "Object": "CrudHaver"
             }
           },
+          "parameters_media": "Json",
           "parameters": [
             {
               "name": "model",
@@ -119,7 +127,7 @@
       "source_path": "./seed__crud.cloesce.ts"
     },
     "Parent": {
-      "hash": 9090035507002968846,
+      "hash": 7318046172721680760,
       "name": "Parent",
       "primary_key": {
         "name": "id",
@@ -127,7 +135,7 @@
       },
       "attributes": [
         {
-          "hash": 13560306771462183197,
+          "hash": 10702265416126128589,
           "value": {
             "name": "favoriteChildId",
             "cidl_type": {
@@ -164,11 +172,13 @@
           "name": "get",
           "is_static": true,
           "http_verb": "GET",
+          "return_media": "Json",
           "return_type": {
             "HttpResult": {
               "Object": "Parent"
             }
           },
+          "parameters_media": "Json",
           "parameters": [
             {
               "name": "id",
@@ -186,6 +196,7 @@
           "name": "list",
           "is_static": true,
           "http_verb": "GET",
+          "return_media": "Json",
           "return_type": {
             "HttpResult": {
               "Array": {
@@ -193,6 +204,7 @@
               }
             }
           },
+          "parameters_media": "Json",
           "parameters": [
             {
               "name": "__datasource",
@@ -206,11 +218,13 @@
           "name": "save",
           "is_static": true,
           "http_verb": "POST",
+          "return_media": "Json",
           "return_type": {
             "HttpResult": {
               "Object": "Parent"
             }
           },
+          "parameters_media": "Json",
           "parameters": [
             {
               "name": "model",

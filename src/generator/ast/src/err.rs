@@ -65,7 +65,7 @@ pub enum GeneratorErrorKind {
     UnknownObject,
     UnknownDataSourceReference,
     UnexpectedVoid,
-    UnexpectedPartialReturn,
+    UnexpectedInject,
     MissingOrExtraneousDataSource,
     NotYetSupported,
     InvalidMapping,
@@ -77,6 +77,7 @@ pub enum GeneratorErrorKind {
     ExtraneousManyToManyReferences,
     MissingManyToManyReference,
     InconsistentWranglerBinding,
+    InvalidStream,
 }
 
 impl GeneratorErrorKind {
@@ -112,9 +113,9 @@ impl GeneratorErrorKind {
                 "Remove `void`",
                 GeneratorPhase::ModelSemanticAnalysis,
             ),
-            GeneratorErrorKind::UnexpectedPartialReturn => (
-                "Methods cannot return a partial value.",
-                "Try using a Plain Old Object instead",
+            GeneratorErrorKind::UnexpectedInject => (
+                "Attributes and return types cannot be injected values.",
+                "Remove the value.",
                 GeneratorPhase::ModelSemanticAnalysis,
             ),
             GeneratorErrorKind::MissingOrExtraneousDataSource => (
@@ -165,6 +166,11 @@ impl GeneratorErrorKind {
             GeneratorErrorKind::MissingManyToManyReference => (
                 "Many to Many navigation properties must have a correlated reference on the adjacent model.",
                 "TODO: a good indicator of where to add the nav prop",
+                GeneratorPhase::ModelSemanticAnalysis,
+            ),
+            GeneratorErrorKind::InvalidStream => (
+                "Streams cannot be nullable, apart of an object or in an array. In a method, they must be the only parameter.",
+                "Use a `Blob` type",
                 GeneratorPhase::ModelSemanticAnalysis,
             ),
             GeneratorErrorKind::InconsistentWranglerBinding => (

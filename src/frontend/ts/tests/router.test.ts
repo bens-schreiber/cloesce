@@ -1,10 +1,10 @@
 import { describe, test, expect, vi, beforeAll } from "vitest";
 import {
   MatchedRoute,
-  RouterFailState,
+  RouterExitState,
   _cloesceInternal,
 } from "../src/router/router";
-import { HttpVerb, Model, NamedTypedValue } from "../src/ast";
+import { HttpVerb, MediaType, Model, NamedTypedValue } from "../src/ast";
 import { CloesceApp, HttpResult } from "../src/ui/backend";
 import { mapSql } from "../src/router/wasm";
 import fs from "fs";
@@ -16,7 +16,6 @@ import {
   createAst,
 } from "./builder";
 import { D1Database } from "@cloudflare/workers-types/experimental";
-import { proxyCrud } from "../src/router/crud";
 
 function mockRequest(url: string, method?: string, body?: any) {
   return new Request(url, {
@@ -34,13 +33,6 @@ function mockCtorReg(ctors?: (new () => any)[]) {
   }
 
   return res;
-}
-
-function mockWranglerEnvMeta() {
-  return {
-    envName: "Env",
-    dbName: "db",
-  };
 }
 
 function mockWranglerEnv() {
@@ -82,7 +74,7 @@ describe("Global Middleware", () => {
     });
 
     // Act
-    const res: HttpResult = await (app as any).cloesce(
+    const [res, _]: [HttpResult, MediaType] = await (app as any).router(
       request,
       env,
       ast,
@@ -118,7 +110,7 @@ describe("Global Middleware", () => {
     });
 
     // Act
-    const res: HttpResult = await (app as any).cloesce(
+    const [res, _]: [HttpResult, MediaType] = await (app as any).router(
       request,
       env,
       ast,
@@ -145,7 +137,7 @@ describe("Match Route", () => {
     expect(res.isLeft()).toBe(true);
     expect(res.unwrapLeft().status).toEqual(404);
     expect(extractErrorCode(res.unwrapLeft().message)).toEqual(
-      RouterFailState.UnknownPrefix,
+      RouterExitState.UnknownPrefix,
     );
   });
 
@@ -161,7 +153,7 @@ describe("Match Route", () => {
     expect(res.isLeft()).toBe(true);
     expect(res.unwrapLeft().status).toEqual(404);
     expect(extractErrorCode(res.unwrapLeft().message)).toEqual(
-      RouterFailState.UnknownRoute,
+      RouterExitState.UnknownRoute,
     );
   });
 
@@ -177,7 +169,7 @@ describe("Match Route", () => {
     expect(res.isLeft()).toBe(true);
     expect(res.unwrapLeft().status).toEqual(404);
     expect(extractErrorCode(res.unwrapLeft().message)).toEqual(
-      RouterFailState.UnknownRoute,
+      RouterExitState.UnknownRoute,
     );
   });
 
@@ -198,7 +190,7 @@ describe("Match Route", () => {
     expect(res.isLeft()).toBe(true);
     expect(res.unwrapLeft().status).toEqual(404);
     expect(extractErrorCode(res.unwrapLeft().message)).toEqual(
-      RouterFailState.UnmatchedHttpVerb,
+      RouterExitState.UnmatchedHttpVerb,
     );
   });
 
@@ -326,7 +318,7 @@ describe("Namespace Middleware", () => {
     });
 
     // Act
-    const res: HttpResult = await (app as any).cloesce(
+    const [res, _]: [HttpResult, MediaType] = await (app as any).router(
       request,
       env,
       ast,
@@ -364,7 +356,7 @@ describe("Namespace Middleware", () => {
     });
 
     // Act
-    const res: HttpResult = await (app as any).cloesce(
+    const [res, _]: [HttpResult, MediaType] = await (app as any).router(
       request,
       env,
       ast,
@@ -409,7 +401,7 @@ describe("Request Validation", () => {
     // Assert
     expect(res.isLeft()).toBe(true);
     expect(extractErrorCode(res.unwrapLeft().message)).toEqual(
-      RouterFailState.InstantiatedMethodMissingId,
+      RouterExitState.InstantiatedMethodMissingId,
     );
   });
 
@@ -442,7 +434,7 @@ describe("Request Validation", () => {
     // Assert
     expect(res.isLeft()).toBe(true);
     expect(extractErrorCode(res.unwrapLeft().message)).toEqual(
-      RouterFailState.RequestMissingJsonBody,
+      RouterExitState.RequestMissingBody,
     );
   });
 
@@ -486,7 +478,7 @@ describe("Request Validation", () => {
     // Assert
     expect(res.isLeft()).toBe(true);
     expect(extractErrorCode(res.unwrapLeft().message)).toEqual(
-      RouterFailState.RequestBodyMissingParameters,
+      RouterExitState.RequestBodyMissingParameters,
     );
   });
 
@@ -755,7 +747,7 @@ describe("Method Middleware", () => {
     });
 
     // Act
-    const res: HttpResult = await (app as any).cloesce(
+    const [res, _]: [HttpResult, MediaType] = await (app as any).router(
       request,
       env,
       ast,
@@ -798,12 +790,13 @@ describe("Method Dispatch", () => {
     };
 
     // Act
-    const res = await _cloesceInternal.methodDispatch({}, di, route, {});
+    const [res, _]: [HttpResult, MediaType] =
+      await _cloesceInternal.methodDispatch({}, di, route, {});
 
     // Assert
     expect(res.ok).toBe(false);
     expect(extractErrorCode(res.message)).toBe(
-      RouterFailState.MissingDependency,
+      RouterExitState.MissingDependency,
     );
   });
 
@@ -829,7 +822,8 @@ describe("Method Dispatch", () => {
     };
 
     // Act
-    const res = await _cloesceInternal.methodDispatch(crud, di, route, {});
+    const [res, _]: [HttpResult, MediaType] =
+      await _cloesceInternal.methodDispatch(crud, di, route, {});
 
     // Assert
     expect(res).toStrictEqual(HttpResult.ok(200));
@@ -863,7 +857,8 @@ describe("Method Dispatch", () => {
     };
 
     // Act
-    const res = await _cloesceInternal.methodDispatch(crud, di, route, {});
+    const [res, _]: [HttpResult, MediaType] =
+      await _cloesceInternal.methodDispatch(crud, di, route, {});
 
     // Assert
     expect(res).toStrictEqual({
@@ -895,7 +890,8 @@ describe("Method Dispatch", () => {
     };
 
     // Act
-    const res = await _cloesceInternal.methodDispatch(crud, di, route, {});
+    const [res, _]: [HttpResult, MediaType] =
+      await _cloesceInternal.methodDispatch(crud, di, route, {});
 
     // Assert
     expect(res).toStrictEqual(HttpResult.ok(200, "neigh"));
@@ -924,11 +920,12 @@ describe("Method Dispatch", () => {
     const di = mockDi();
 
     // Act
-    const res = await _cloesceInternal.methodDispatch(crud, di, route, {});
+    const [res, _]: [HttpResult, MediaType] =
+      await _cloesceInternal.methodDispatch(crud, di, route, {});
 
     // Assert
     expect(extractErrorCode(res.message)).toBe(
-      RouterFailState.UncaughtException,
+      RouterExitState.UncaughtException,
     );
     expect(res.status).toBe(500);
   });

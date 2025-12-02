@@ -1,6 +1,6 @@
 // GENERATED CODE. DO NOT MODIFY.
 
-import { HttpResult, DeepPartial } from "cloesce/client";
+import { HttpResult, DeepPartial, MediaType, requestBody, b64ToU8 } from "cloesce/client";
 export class PooA {
   name: string;
   major: string;
@@ -24,7 +24,7 @@ export class PooC {
 
   static fromJson(data: any): PooC {
     const res = Object.assign(new PooC(), data);
-    res["a"] &&= Object.assign(new PooA(), res.a);
+    res["a"] &&= PooA.fromJson(res.a);
     for (let i = 0; i < res.b?.length; i++) {
       res.b[i] = PooB.fromJson(res.b[i]);
     }
@@ -43,32 +43,52 @@ export class PooAcceptYield {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<void>> {
     const baseUrl = new URL(`http://localhost:5002/api/PooAcceptYield/acceptPoos`);
+    const payload: any = {};
+
+      payload["a"] = a;
+      payload["b"] = b;
+      payload["c"] = c;
+
     const res = await fetchImpl(baseUrl, {
       method: "POST",
+      duplex: "half",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-            a, 
-            b, 
-            c
-      })
+      body: requestBody(MediaType.Json, payload)
     });
-    return await HttpResult.fromResponse<void>(res);
+
+    return await HttpResult.fromResponse<void>(
+      res, 
+      MediaType.Json,
+      undefined,
+      false
+    );
   }
   static async yieldPoo(
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<PooC>> {
     const baseUrl = new URL(`http://localhost:5002/api/PooAcceptYield/yieldPoo`);
+    const payload: any = {};
+
+
     const res = await fetchImpl(baseUrl, {
       method: "POST",
+      duplex: "half",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-      })
+      body: requestBody(MediaType.Json, payload)
     });
-    return await HttpResult.fromResponse<PooC>(res, PooC, false);
+
+    return await HttpResult.fromResponse<PooC>(
+      res, 
+      MediaType.Json,
+      PooC,
+      false
+    );
   }
 
   static fromJson(data: any): PooAcceptYield {
     const res = Object.assign(new PooAcceptYield(), data);
+
+
     return res;
   }
 }

@@ -5,7 +5,7 @@
   "language": "TypeScript",
   "wrangler_env": {
     "name": "Env",
-    "source_path": "./seed__partial.cloesce.ts",
+    "source_path": "./seed__partials.cloesce.ts",
     "db_binding": "db",
     "vars": {}
   },
@@ -41,9 +41,11 @@
           "name": "post",
           "is_static": true,
           "http_verb": "POST",
+          "return_media": "Json",
           "return_type": {
             "Object": "Dog"
           },
+          "parameters_media": "Json",
           "parameters": [
             {
               "name": "{ db }",
@@ -62,7 +64,7 @@
       },
       "data_sources": {},
       "cruds": [],
-      "source_path": "./seed__partial.cloesce.ts"
+      "source_path": "./seed__partials.cloesce.ts"
     }
   },
   "poos": {},

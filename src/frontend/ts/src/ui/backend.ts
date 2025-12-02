@@ -1,18 +1,18 @@
 import { D1Database } from "@cloudflare/workers-types/experimental/index.js";
-import { DeepPartial, Either, KeysOfType } from "./common.js";
+import { DeepPartial, Either, KeysOfType, b64ToU8, u8ToB64 } from "./common.js";
 import { RuntimeContainer } from "../router/router.js";
 import { WasmResource, mapSql, invokeOrmWasm } from "../router/wasm.js";
 import { CrudKind } from "../ast.js";
 
 /**
- * Types accessible via cloesce/backend
+ * cloesce/backend
  */
 export {
   CloesceApp,
   DependencyContainer as DependencyInjector,
 } from "../router/router.js";
 export type { MiddlewareFn, ResultMiddlewareFn } from "../router/router.js";
-export { HttpResult, Either } from "./common.js";
+export { HttpResult, Either, Stream } from "./common.js";
 export type { DeepPartial } from "./common.js";
 export type { CrudKind } from "../ast.js";
 
@@ -465,7 +465,12 @@ export class Orm {
     const { wasm } = RuntimeContainer.get();
     const args = [
       WasmResource.fromString(ctor.name, wasm),
-      WasmResource.fromString(JSON.stringify(newModel), wasm),
+      WasmResource.fromString(
+        JSON.stringify(newModel, (k, v) =>
+          v instanceof Uint8Array ? u8ToB64(v) : v,
+        ),
+        wasm,
+      ),
       WasmResource.fromString(JSON.stringify(includeTree), wasm),
     ];
 
@@ -500,10 +505,8 @@ export class Orm {
       );
     }
 
-    // Return the result of the SELECT statement
-    const selectResult = batchRes[selectIndex!].results[0] as { id: any };
-
-    return Either.right(selectResult.id);
+    const rootModelId = batchRes[selectIndex!].results[0] as { id: any };
+    return Either.right(rootModelId.id);
   }
 
   /**

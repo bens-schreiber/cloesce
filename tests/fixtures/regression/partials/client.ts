@@ -1,6 +1,6 @@
 // GENERATED CODE. DO NOT MODIFY.
 
-import { HttpResult, DeepPartial } from "cloesce/client";
+import { HttpResult, DeepPartial, MediaType, requestBody, b64ToU8 } from "cloesce/client";
 
 
 export class Dog {
@@ -13,18 +13,29 @@ export class Dog {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Dog>> {
     const baseUrl = new URL(`http://localhost:5002/api/Dog/post`);
+    const payload: any = {};
+
+      payload["dog"] = dog;
+
     const res = await fetchImpl(baseUrl, {
       method: "POST",
+      duplex: "half",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-            dog
-      })
+      body: requestBody(MediaType.Json, payload)
     });
-    return await HttpResult.fromResponse<Dog>(res, Dog, false);
+
+    return await HttpResult.fromResponse<Dog>(
+      res, 
+      MediaType.Json,
+      Dog,
+      false
+    );
   }
 
   static fromJson(data: any): Dog {
     const res = Object.assign(new Dog(), data);
+
+
     return res;
   }
 }

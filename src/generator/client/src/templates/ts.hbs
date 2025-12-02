@@ -1,10 +1,10 @@
 // GENERATED CODE. DO NOT MODIFY.
 
-import { HttpResult, DeepPartial } from "cloesce/client";
+import { HttpResult, DeepPartial, MediaType, requestBody, b64ToU8 } from "cloesce/client";
 {{#each poos}}
 export class {{this.name}} {
   {{#each this.attributes}}
-  {{name}}: {{get_cidl_type cidl_type}};
+  {{name}}: {{map_cidl_type cidl_type}};
   {{/each}}
 
   static fromJson(data: any): {{this.name}} {
@@ -12,10 +12,16 @@ export class {{this.name}} {
     {{#each this.attributes}}
       {{#if (is_object_array cidl_type)}}
     for (let i = 0; i < res.{{name}}?.length; i++) {
-      res.{{name}}[i] = {{object_name cidl_type}}.fromJson(res.{{name}}[i]);
+      res.{{name}}[i] = {{get_object_name cidl_type}}.fromJson(res.{{name}}[i]);
     }
       {{else if (is_object cidl_type)}}
-    res["{{name}}"] &&= Object.assign(new {{object_name cidl_type}}(), res.{{name}});
+    res["{{name}}"] &&= {{get_object_name cidl_type}}.fromJson(res.{{name}});
+      {{else if (is_blob_array cidl_type)}}
+    for (let i = 0; i < res.{{name}}.length; i++) {
+      res.{{name}}[i] = b64ToU8(res.{{name}}[i]);
+    }
+      {{else if (is_blob cidl_type)}}
+    res.{{name}} = b64ToU8(res.{{name}});
       {{/if}}
     {{/each}}
     return res;
@@ -29,39 +35,45 @@ export class {{this.name}} {
   static async {{this.name}}(
     {{#each this.parameters}}
       {{#if (is_serializable cidl_type)}}
-    {{name}}: {{get_cidl_type cidl_type}},
+    {{name}}: {{map_cidl_type cidl_type}},
       {{/if}}
     {{/each}}
     fetchImpl: typeof fetch = fetch
-  ): Promise<HttpResult<{{get_cidl_type this.return_type}}>> {
+  ): Promise<HttpResult<{{map_cidl_type this.return_type}}>> {
     const baseUrl = new URL("{{../../domain}}/{{../name}}/{{this.name}}");
-    {{#if (eq this.http_verb "GET")}}
-      {{#each this.parameters}}
-        {{#if (is_serializable cidl_type)}}
-    baseUrl.searchParams.append('{{name}}', String({{name}}));
+    {{#unless (is_get_request this.http_verb)}}
+    const payload: any = {};
+    {{/unless}}
+
+    {{#each this.parameters}}
+      {{#if (is_serializable cidl_type) }}
+        {{#if (is_url_param cidl_type ../http_verb)}}
+      baseUrl.searchParams.append('{{name}}', String({{name}}));
+        {{else}}
+      payload["{{name}}"] = {{name}};
         {{/if}}
-      {{/each}}
-    const res = await fetchImpl(baseUrl, { method: "GET" });
-    {{else}}
+      {{/if}}
+    {{/each}}
+
     const res = await fetchImpl(baseUrl, {
       method: "{{this.http_verb}}",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        {{#each this.parameters}}
-          {{#if (is_serializable cidl_type)}}
-            {{name}}{{#unless @last}}, {{/unless}}
-          {{/if}}
-        {{/each}}
-      })
+      duplex: "half",
+      {{#unless (is_get_request this.http_verb)}}
+      headers: { "Content-Type": "{{get_content_type this.parameters_media}}" },
+      body: requestBody({{get_media_type this.parameters_media}}, payload)
+      {{/unless}}
     });
-    {{/if}}
-    {{#if if (is_object_array this.return_type)}}
-    return await HttpResult.fromResponse<{{object_name this.return_type}}>(res, {{object_name this.return_type}}, true);
-    {{else if (is_object this.return_type)}}
-    return await HttpResult.fromResponse<{{object_name this.return_type}}>(res, {{object_name this.return_type}}, false);
+
+    return await HttpResult.fromResponse<{{ map_cidl_type this.return_type}}>(
+      res, 
+      {{get_media_type this.return_media}},
+    {{#if (needs_constructor this.return_type)}}
+      {{map_root_cidl_type this.return_type}},
     {{else}}
-    return await HttpResult.fromResponse<{{get_cidl_type this.return_type}}>(res);
+      undefined,
     {{/if}}
+      {{has_array this.return_type}}
+    );
     }
   {{/each}}
 }
@@ -69,9 +81,9 @@ export class {{this.name}} {
 
 {{#each models}}
 export class {{this.name}} {
-  {{this.primary_key.name}}: {{get_cidl_type this.primary_key.cidl_type}};
+  {{this.primary_key.name}}: {{map_cidl_type this.primary_key.cidl_type}};
   {{#each this.attributes}}
-  {{value.name}}: {{get_cidl_type value.cidl_type}};
+  {{value.name}}: {{map_cidl_type value.cidl_type}};
   {{/each}}
   {{#each this.navigation_properties}}
   {{var_name}}: {{get_nav_cidl_type this}}{{#if (is_one_to_one this)}} | undefined{{/if}};
@@ -81,54 +93,71 @@ export class {{this.name}} {
   {{#if this.is_static}}static {{/if}}async {{this.name}}(
     {{#each this.parameters}}
       {{#if (is_serializable cidl_type)}}
-    {{name}}: {{get_cidl_type cidl_type}},
+    {{name}}: {{map_cidl_type cidl_type}},
       {{/if}}
     {{/each}}
     fetchImpl: typeof fetch = fetch
-  ): Promise<HttpResult<{{get_cidl_type this.return_type}}>> {
+  ): Promise<HttpResult<{{map_cidl_type this.return_type}}>> {
     const baseUrl = new URL(`{{../../domain}}/{{#if this.is_static}}{{../name}}/{{this.name}}{{else}}{{../name}}/${this.{{../primary_key.name}}}/{{this.name}}{{/if}}`);
-    {{#if (eq this.http_verb "GET")}}
-      {{#each this.parameters}}
-        {{#if (is_serializable cidl_type)}}
-    baseUrl.searchParams.append('{{name}}', String({{name}}));
+    {{#unless (is_get_request this.http_verb)}}
+    const payload: any = {};
+    {{/unless}}
+
+    {{#each this.parameters}}
+      {{#if (is_serializable cidl_type) }}
+        {{#if (is_url_param cidl_type ../http_verb)}}
+      baseUrl.searchParams.append('{{name}}', String({{name}}));
+        {{else}}
+      payload["{{name}}"] = {{name}};
         {{/if}}
-      {{/each}}
-    const res = await fetchImpl(baseUrl, { method: "GET" });
-    {{else}}
+      {{/if}}
+    {{/each}}
+
     const res = await fetchImpl(baseUrl, {
       method: "{{this.http_verb}}",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        {{#each this.parameters}}
-          {{#if (is_serializable cidl_type)}}
-            {{name}}{{#unless @last}}, {{/unless}}
-          {{/if}}
-        {{/each}}
-      })
+      duplex: "half",
+      {{#unless (is_get_request this.http_verb)}}
+      headers: { "Content-Type": "{{get_content_type this.parameters_media}}" },
+      body: requestBody({{get_media_type this.parameters_media}}, payload)
+      {{/unless}}
     });
-    {{/if}}
-    {{#if if (is_object_array this.return_type)}}
-    return await HttpResult.fromResponse<{{object_name this.return_type}}>(res, {{object_name this.return_type}}, true);
-    {{else if (is_object this.return_type)}}
-    return await HttpResult.fromResponse<{{object_name this.return_type}}>(res, {{object_name this.return_type}}, false);
+
+    return await HttpResult.fromResponse<{{ map_cidl_type this.return_type}}>(
+      res, 
+      {{get_media_type this.return_media}},
+    {{#if (needs_constructor this.return_type)}}
+      {{map_root_cidl_type this.return_type}},
     {{else}}
-    return await HttpResult.fromResponse<{{get_cidl_type this.return_type}}>(res);
+      undefined,
     {{/if}}
+      {{has_array this.return_type}}
+    );
   }
   {{/each}}
 
   static fromJson(data: any): {{this.name}} {
     const res = Object.assign(new {{this.name}}(), data);
     {{#each this.navigation_properties}}
-    {{#if (is_one_to_one this)}}
-    res["{{var_name}}"] &&= Object.assign(new {{this.model_name}}(), res.{{var_name}});
-    {{/if}}
+      {{#if (is_one_to_one this)}}
+    res["{{var_name}}"] &&= {{this.model_name}}.fromJson(res.{{var_name}});
+      {{/if}}
     {{#if (is_many_nav this)}}
     for (let i = 0; i < res.{{var_name}}?.length; i++) {
       res.{{var_name}}[i] = {{this.model_name}}.fromJson(res.{{var_name}}[i]);
     }
-    {{/if}}
+      {{/if}}
     {{/each}}
+
+    {{#each this.attributes}}
+      {{#if (is_blob_array value.cidl_type)}}
+    for (let i = 0; i < res.{{name}}.length; i++) {
+      res.{{value.name}}[i] = b64ToU8(res.{{value.name}}[i]);
+    }
+      {{else if (is_blob value.cidl_type)}}
+    res.{{value.name}} = b64ToU8(res.{{value.name}});
+      {{/if}}
+    {{/each}}
+
     return res;
   }
 }

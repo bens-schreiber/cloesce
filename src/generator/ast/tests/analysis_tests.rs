@@ -1,7 +1,8 @@
 use std::{collections::BTreeMap, path::PathBuf};
 
 use ast::{
-    CidlType, MigrationsAst, NavigationPropertyKind, Service, ServiceAttribute,
+    CidlType, HttpVerb, MigrationsAst, NamedTypedValue, NavigationPropertyKind, Service,
+    ServiceAttribute,
     builder::{ModelBuilder, create_ast},
     err::GeneratorErrorKind,
 };
@@ -27,7 +28,7 @@ fn cloesce_serializes_to_migrations() {
 }
 
 #[test]
-fn null_primary_key() {
+fn null_primary_key_error() {
     // Arrange
     let mut model = ModelBuilder::new("Dog").id().build();
     model.primary_key.cidl_type = CidlType::nullable(CidlType::Integer);
@@ -42,7 +43,7 @@ fn null_primary_key() {
 }
 
 #[test]
-fn mismatched_foreign_keys() {
+fn mismatched_foreign_keys_error() {
     // Arrange
     let mut ast = create_ast(vec![
         ModelBuilder::new("Person")
@@ -134,7 +135,7 @@ fn service_cycle_detection_error() {
 }
 
 #[test]
-fn nullability_prevents_cycle_error() {
+fn model_attr_nullability_prevents_cycle_error() {
     // Arrange
     // A -> B -> C -> Nullable<A>
     let mut ast = create_ast(vec![
@@ -311,4 +312,97 @@ fn junction_table_builder_errors() {
             GeneratorErrorKind::ExtraneousManyToManyReferences
         ));
     }
+}
+
+#[test]
+fn instantiated_stream_method() {
+    // Arrange
+    let model = ModelBuilder::new("Dog")
+        .id()
+        .method(
+            "uploadPhoto",
+            HttpVerb::POST,
+            false,
+            vec![
+                NamedTypedValue {
+                    name: "stream".into(),
+                    cidl_type: CidlType::Stream,
+                },
+                NamedTypedValue {
+                    name: "ds".into(),
+                    cidl_type: CidlType::DataSource("Dog".into()),
+                },
+            ],
+            CidlType::Stream,
+        )
+        .build();
+
+    let mut ast = create_ast(vec![model]);
+
+    // Act
+    let res = ast.semantic_analysis();
+
+    // Assert
+    res.unwrap();
+}
+
+#[test]
+fn static_stream_method() {
+    // Arrange
+    let model = ModelBuilder::new("Dog")
+        .id()
+        .method(
+            "uploadPhoto",
+            HttpVerb::POST,
+            true,
+            vec![NamedTypedValue {
+                name: "stream".into(),
+                cidl_type: CidlType::Stream,
+            }],
+            CidlType::Stream,
+        )
+        .build();
+
+    let mut ast = create_ast(vec![model]);
+
+    // Act
+    let res = ast.semantic_analysis();
+
+    // Assert
+    res.unwrap();
+}
+
+#[test]
+fn invalid_stream_method() {
+    // Arrange
+    let model = ModelBuilder::new("Dog")
+        .id()
+        .method(
+            "uploadPhoto",
+            HttpVerb::POST,
+            true, // static is true, can only have 1 param
+            vec![
+                NamedTypedValue {
+                    name: "stream".into(),
+                    cidl_type: CidlType::Stream,
+                },
+                NamedTypedValue {
+                    name: "ds".into(),
+                    cidl_type: CidlType::DataSource("Dog".into()),
+                },
+            ],
+            CidlType::Stream,
+        )
+        .build();
+
+    let mut ast = create_ast(vec![model]);
+
+    // Act
+    let res = ast.semantic_analysis();
+
+    // Assert
+    assert!(matches!(
+        res.unwrap_err().kind,
+        GeneratorErrorKind::InvalidStream
+    ));
 }

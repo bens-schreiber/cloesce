@@ -1,6 +1,6 @@
 // GENERATED CODE. DO NOT MODIFY.
 
-import { HttpResult, DeepPartial } from "cloesce/client";
+import { HttpResult, DeepPartial, MediaType, requestBody, b64ToU8 } from "cloesce/client";
 export class Poo {
   ds: "baz" |"none" = "none";
 
@@ -21,20 +21,31 @@ export class Foo {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<void>> {
     const baseUrl = new URL(`http://localhost:5002/api/Foo/${this.id}/bar`);
+    const payload: any = {};
+
+      baseUrl.searchParams.append('customDs', String(customDs));
+      baseUrl.searchParams.append('oneDs', String(oneDs));
+      baseUrl.searchParams.append('noDs', String(noDs));
+
     const res = await fetchImpl(baseUrl, {
       method: "POST",
+      duplex: "half",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-            customDs, 
-            oneDs, 
-            noDs
-      })
+      body: requestBody(MediaType.Json, payload)
     });
-    return await HttpResult.fromResponse<void>(res);
+
+    return await HttpResult.fromResponse<void>(
+      res, 
+      MediaType.Json,
+      undefined,
+      false
+    );
   }
 
   static fromJson(data: any): Foo {
     const res = Object.assign(new Foo(), data);
+
+
     return res;
   }
 }
@@ -44,6 +55,8 @@ export class NoDs {
 
   static fromJson(data: any): NoDs {
     const res = Object.assign(new NoDs(), data);
+
+
     return res;
   }
 }
@@ -53,6 +66,8 @@ export class OneDs {
 
   static fromJson(data: any): OneDs {
     const res = Object.assign(new OneDs(), data);
+
+
     return res;
   }
 }

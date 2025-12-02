@@ -1,3 +1,5 @@
+import { HttpVerb, MediaType } from "../ast.js";
+
 type DeepPartialInner<T> = T extends (infer U)[]
   ? DeepPartialInner<U>[]
   : T extends object
@@ -102,6 +104,31 @@ export class Either<L, R> {
 }
 
 /**
+ * Given a media type and some data, converts to a proper
+ * `RequestInit` body,
+ */
+export function requestBody(
+  mediaType: MediaType,
+  data: any | string | undefined,
+): undefined | string | FormData {
+  switch (mediaType) {
+    case MediaType.Text: {
+      return data ?? "";
+    }
+    case MediaType.Json: {
+      return JSON.stringify(data ?? {}, (_, v) =>
+        v instanceof Uint8Array ? u8ToB64(v) : v,
+      );
+    }
+    case MediaType.Octet: {
+      // JSON structure isn't needed; assume the first
+      // value is the stream data
+      return Object.values(data)[0] as any;
+    }
+  }
+}
+
+/**
  * The result of a Workers endpoint.
  *
  * @param ok True if `status` < 400
@@ -123,39 +150,39 @@ export class HttpResult<T = unknown> {
   ) {}
 
   static ok<T>(status: number, data?: T, init?: HeadersInit): HttpResult {
-    const headers: Headers = new Headers(
-      init ?? {
-        "Content-Type": "application/json",
-      },
-    );
-
+    const headers: Headers = new Headers(init);
     return new HttpResult<T>(true, status, headers, data, undefined);
   }
 
   static fail(status: number, message?: string, init?: HeadersInit) {
-    const headers: Headers = new Headers(
-      init ?? {
-        "Content-Type": "application/json",
-      },
-    );
-
+    const headers: Headers = new Headers(init);
     return new HttpResult<never>(false, status, headers, undefined, message);
   }
 
-  toResponse(): Response {
-    const body = () => {
-      if (this.status === 204) {
-        return undefined;
+  toResponse(mediaType: MediaType): Response {
+    switch (mediaType) {
+      case MediaType.Text: {
+        this.headers.set("Content-Type", "text/plain");
+        break;
       }
+      case MediaType.Json: {
+        this.headers.set("Content-Type", "application/json");
+        break;
+      }
+      case MediaType.Octet: {
+        this.headers.set("Content-Type", "application/octet-stream");
+        break;
+      }
+    }
 
-      return this.ok
-        ? JSON.stringify({
-            data: this.data,
-          })
-        : this.message;
-    };
+    if (!this.ok) {
+      return new Response(this.message, {
+        status: this.status,
+        headers: this.headers,
+      });
+    }
 
-    return new Response(body(), {
+    return new Response(requestBody(mediaType, this.data), {
       status: this.status,
       headers: this.headers,
     });
@@ -170,35 +197,97 @@ export class HttpResult<T = unknown> {
    */
   static async fromResponse(
     response: Response,
+    mediaType: MediaType,
     ctor?: any,
     array: boolean = false,
   ): Promise<HttpResult<any>> {
-    if (response.status < 400) {
-      const json = await response.json();
+    if (response.status >= 400) {
+      return new HttpResult(
+        false,
+        response.status,
+        response.headers,
+        undefined,
+        await response.text(),
+      );
+    }
 
-      // TODO: Lazy instantiation via Proxy?
-      let data = json.data;
-      if (ctor) {
-        if (array) {
-          for (let i = 0; i < data.length; i++) {
-            data[i] = ctor.fromJson(data[i]);
-          }
-        } else {
-          data = ctor.fromJson(data);
+    function instantiate(json: any, ctor?: any) {
+      switch (ctor) {
+        case Date: {
+          return new Date(json);
+        }
+        case Uint8Array: {
+          return b64ToU8(json);
+        }
+        case undefined: {
+          return json;
+        }
+        default: {
+          return ctor.fromJson(json);
         }
       }
+    }
 
-      return new HttpResult(true, response.status, response.headers, data);
+    async function data() {
+      switch (mediaType) {
+        case MediaType.Json: {
+          let json = await response.json();
+
+          if (array) {
+            for (let i = 0; i < json.length; i++) {
+              json[i] = instantiate(json[i], ctor);
+            }
+          } else {
+            json = instantiate(json, ctor);
+          }
+
+          return json;
+        }
+        case MediaType.Octet: {
+          return response.body;
+        }
+      }
     }
 
     return new HttpResult(
-      false,
+      true,
       response.status,
       response.headers,
-      undefined,
-      await response.text(),
+      await data(),
     );
   }
+}
+
+export type Stream = ReadableStream<Uint8Array>;
+
+export function b64ToU8(b64: string) {
+  // Prefer Buffer in Node.js environments
+  if (typeof Buffer !== "undefined") {
+    const buffer = Buffer.from(b64, "base64");
+    return new Uint8Array(buffer);
+  }
+
+  // Use atob only in browser environments
+  const s = atob(b64);
+  const u8 = new Uint8Array(s.length);
+  for (let i = 0; i < s.length; i++) {
+    u8[i] = s.charCodeAt(i);
+  }
+  return u8;
+}
+
+export function u8ToB64(u8: Uint8Array) {
+  // Prefer Buffer in Node.js environments
+  if (typeof Buffer !== "undefined") {
+    return Buffer.from(u8).toString("base64");
+  }
+
+  // Use btoa only in browser environments
+  let s = "";
+  for (let i = 0; i < u8.length; i++) {
+    s += String.fromCharCode(u8[i]);
+  }
+  return btoa(s);
 }
 
 export type KeysOfType<T, U> = {

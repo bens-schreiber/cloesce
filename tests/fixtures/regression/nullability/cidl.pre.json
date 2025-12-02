@@ -39,9 +39,11 @@
                     "name": "primitiveTypes",
                     "is_static": false,
                     "http_verb": "POST",
+                    "return_media": "Json",
                     "return_type": {
                         "Nullable": "Boolean"
                     },
+                    "parameters_media": "Json",
                     "parameters": [
                         {
                             "name": "a",
@@ -67,11 +69,13 @@
                     "name": "modelTypes",
                     "is_static": false,
                     "http_verb": "POST",
+                    "return_media": "Json",
                     "return_type": {
                         "Nullable": {
                             "Object": "NullabilityChecks"
                         }
                     },
+                    "parameters_media": "Json",
                     "parameters": [
                         {
                             "name": "a",
@@ -93,7 +97,9 @@
                     "name": "injectableTypes",
                     "is_static": false,
                     "http_verb": "POST",
+                    "return_media": "Json",
                     "return_type": "Void",
+                    "parameters_media": "Json",
                     "parameters": [
                         {
                             "name": "env",
@@ -115,11 +121,13 @@
                     "name": "arrayTypes",
                     "is_static": false,
                     "http_verb": "POST",
+                    "return_media": "Json",
                     "return_type": {
                         "Nullable": {
                             "Array": "Text"
                         }
                     },
+                    "parameters_media": "Json",
                     "parameters": [
                         {
                             "name": "a",
@@ -151,6 +159,7 @@
                     "name": "httpResultTypes",
                     "is_static": false,
                     "http_verb": "POST",
+                    "return_media": "Json",
                     "return_type": {
                         "Nullable": {
                             "HttpResult": {
@@ -162,6 +171,7 @@
                             }
                         }
                     },
+                    "parameters_media": "Json",
                     "parameters": [
                         {
                             "name": "a",

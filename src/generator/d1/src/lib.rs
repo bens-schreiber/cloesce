@@ -753,7 +753,8 @@ fn typed_column(name: &str, ty: &CidlType, with_default: bool) -> ColumnDef {
         CidlType::Integer | CidlType::Boolean => col.integer(),
         CidlType::Real => col.decimal(),
         CidlType::Text | CidlType::DateIso => col.text(),
-        _ => unreachable!("column type must be validated earlier"),
+        CidlType::Blob => col.blob(),
+        _ => unreachable!("column type must be validated"),
     };
     col
 }

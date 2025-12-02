@@ -24,16 +24,20 @@
           "name": "blockedMethod",
           "is_static": true,
           "http_verb": "GET",
+          "return_media": "Json",
           "return_type": "Void",
+          "parameters_media": "Json",
           "parameters": []
         },
         "getInjectedThing": {
           "name": "getInjectedThing",
           "is_static": true,
           "http_verb": "GET",
+          "return_media": "Json",
           "return_type": {
             "Object": "InjectedThing"
           },
+          "parameters_media": "Json",
           "parameters": [
             {
               "name": "thing",
@@ -47,11 +51,13 @@
           "name": "save",
           "is_static": true,
           "http_verb": "POST",
+          "return_media": "Json",
           "return_type": {
             "HttpResult": {
               "Object": "Model"
             }
           },
+          "parameters_media": "Json",
           "parameters": [
             {
               "name": "model",

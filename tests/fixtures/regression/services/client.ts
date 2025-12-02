@@ -1,14 +1,25 @@
 // GENERATED CODE. DO NOT MODIFY.
 
-import { HttpResult, DeepPartial } from "cloesce/client";
+import { HttpResult, DeepPartial, MediaType, requestBody, b64ToU8 } from "cloesce/client";
 
 export class BarService {
   static async useFoo(
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<string>> {
     const baseUrl = new URL("http://localhost:5002/api/BarService/useFoo");
-    const res = await fetchImpl(baseUrl, { method: "GET" });
-    return await HttpResult.fromResponse<string>(res);
+
+
+    const res = await fetchImpl(baseUrl, {
+      method: "GET",
+      duplex: "half",
+    });
+
+    return await HttpResult.fromResponse<string>(
+      res, 
+      MediaType.Json,
+      undefined,
+      false
+    );
     }
 }
 export class FooService {
@@ -16,15 +27,37 @@ export class FooService {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<string>> {
     const baseUrl = new URL("http://localhost:5002/api/FooService/instantiatedMethod");
-    const res = await fetchImpl(baseUrl, { method: "GET" });
-    return await HttpResult.fromResponse<string>(res);
+
+
+    const res = await fetchImpl(baseUrl, {
+      method: "GET",
+      duplex: "half",
+    });
+
+    return await HttpResult.fromResponse<string>(
+      res, 
+      MediaType.Json,
+      undefined,
+      false
+    );
     }
   static async staticMethod(
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<string>> {
     const baseUrl = new URL("http://localhost:5002/api/FooService/staticMethod");
-    const res = await fetchImpl(baseUrl, { method: "GET" });
-    return await HttpResult.fromResponse<string>(res);
+
+
+    const res = await fetchImpl(baseUrl, {
+      method: "GET",
+      duplex: "half",
+    });
+
+    return await HttpResult.fromResponse<string>(
+      res, 
+      MediaType.Json,
+      undefined,
+      false
+    );
     }
 }
 

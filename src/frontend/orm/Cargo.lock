@@ -21,7 +21,6 @@ dependencies = [
 name = "ast"
 version = "0.0.1"
 dependencies = [
- "hex",
  "indexmap 2.12.0",
  "rustc-hash",
  "serde",
@@ -908,6 +907,7 @@ name = "orm"
 version = "0.0.3"
 dependencies = [
  "ast",
+ "base64",
  "d1",
  "indexmap 2.12.0",
  "sea-query",

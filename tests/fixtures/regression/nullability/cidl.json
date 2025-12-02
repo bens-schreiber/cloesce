@@ -1,5 +1,5 @@
 {
-  "hash": 10361364691045731291,
+  "hash": 10133679158382118118,
   "version": "v0.0.4",
   "project_name": "runner",
   "language": "TypeScript",
@@ -11,7 +11,7 @@
   },
   "models": {
     "NullabilityChecks": {
-      "hash": 3976757330464425461,
+      "hash": 5712226491349635149,
       "name": "NullabilityChecks",
       "primary_key": {
         "name": "id",
@@ -27,7 +27,7 @@
           "foreign_key_reference": null
         },
         {
-          "hash": 15344237499420552175,
+          "hash": 11825005746933419692,
           "value": {
             "name": "nullableString",
             "cidl_type": {
@@ -43,11 +43,13 @@
           "name": "arrayTypes",
           "is_static": false,
           "http_verb": "POST",
+          "return_media": "Json",
           "return_type": {
             "Nullable": {
               "Array": "Text"
             }
           },
+          "parameters_media": "Json",
           "parameters": [
             {
               "name": "a",
@@ -79,6 +81,7 @@
           "name": "httpResultTypes",
           "is_static": false,
           "http_verb": "POST",
+          "return_media": "Json",
           "return_type": {
             "Nullable": {
               "HttpResult": {
@@ -90,6 +93,7 @@
               }
             }
           },
+          "parameters_media": "Json",
           "parameters": [
             {
               "name": "a",
@@ -113,7 +117,9 @@
           "name": "injectableTypes",
           "is_static": false,
           "http_verb": "POST",
+          "return_media": "Json",
           "return_type": "Void",
+          "parameters_media": "Json",
           "parameters": [
             {
               "name": "env",
@@ -135,11 +141,13 @@
           "name": "modelTypes",
           "is_static": false,
           "http_verb": "POST",
+          "return_media": "Json",
           "return_type": {
             "Nullable": {
               "Object": "NullabilityChecks"
             }
           },
+          "parameters_media": "Json",
           "parameters": [
             {
               "name": "a",
@@ -161,9 +169,11 @@
           "name": "primitiveTypes",
           "is_static": false,
           "http_verb": "POST",
+          "return_media": "Json",
           "return_type": {
             "Nullable": "Boolean"
           },
+          "parameters_media": "Json",
           "parameters": [
             {
               "name": "a",

@@ -27,6 +27,7 @@ import {
   PlainOldObject,
   CrudKind,
   Service,
+  defaultMediaType,
 } from "../ast.js";
 import { TypeFormatFlags } from "typescript";
 import { ExtractorError, ExtractorErrorCode } from "./err.js";
@@ -535,7 +536,9 @@ export class CidlExtractor {
       name: method.getName(),
       is_static: method.isStatic(),
       http_verb: verb,
+      return_media: defaultMediaType(),
       return_type: typeRes.unwrap(),
+      parameters_media: defaultMediaType(),
       parameters,
     });
   }
@@ -667,7 +670,9 @@ export class CidlExtractor {
       name: method.getName(),
       http_verb: verb,
       is_static: method.isStatic(),
+      return_media: defaultMediaType(),
       return_type: typeRes.unwrap(),
+      parameters_media: defaultMediaType(),
       parameters,
     });
   }
@@ -761,6 +766,8 @@ export class CidlExtractor {
     boolean: "Boolean",
     Boolean: "Boolean",
     Date: "DateIso",
+    Uint8Array: "Blob",
+    Stream: "Stream",
   };
 
   static cidlType(
@@ -857,8 +864,8 @@ export class CidlExtractor {
       );
     }
 
-    // Ignore
     if (symbolName === "Promise" || aliasName === "IncludeTree") {
+      // Unwrap promises
       return wrapGeneric(genericTy, nullable, (inner) => inner);
     }
 

@@ -1,7 +1,7 @@
 // GENERATED CODE. DO NOT MODIFY.
 import { CloesceApp } from "cloesce/backend";
 import cidl from "./cidl.json";
-import { Dog } from "./seed__partial.cloesce.ts";
+import { Dog } from "./seed__partials.cloesce.ts";
 
 
 const app = new CloesceApp();

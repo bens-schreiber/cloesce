@@ -8,6 +8,7 @@ export type CidlType =
   | "Blob"
   | "DateIso"
   | "Boolean"
+  | "Stream"
   | { DataSource: string }
   | { Inject: string }
   | { Object: string }
@@ -38,11 +39,31 @@ export interface ModelAttribute {
   foreign_key_reference: string | null;
 }
 
+export enum MediaType {
+  Text, // Not apart of the CIDL; used for returning error text
+
+  Json = "Json",
+  Octet = "Octet",
+}
+
+/**
+ * A placeholder value which should be updated by the generator.
+ *
+ * @returns MediaType.Json
+ */
+export function defaultMediaType(): MediaType {
+  return MediaType.Json;
+}
+
 export interface ApiMethod {
   name: string;
   is_static: boolean;
   http_verb: HttpVerb;
+
+  return_media: MediaType;
   return_type: CidlType;
+
+  parameters_media: MediaType;
   parameters: NamedTypedValue[];
 }
 

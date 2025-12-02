@@ -1,6 +1,6 @@
 // GENERATED CODE. DO NOT MODIFY.
 
-import { HttpResult, DeepPartial } from "cloesce/client";
+import { HttpResult, DeepPartial, MediaType, requestBody, b64ToU8 } from "cloesce/client";
 export class InjectedThing {
   value: string;
 
@@ -18,15 +18,37 @@ export class Model {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<void>> {
     const baseUrl = new URL(`http://localhost:5002/api/Model/blockedMethod`);
-    const res = await fetchImpl(baseUrl, { method: "GET" });
-    return await HttpResult.fromResponse<void>(res);
+
+
+    const res = await fetchImpl(baseUrl, {
+      method: "GET",
+      duplex: "half",
+    });
+
+    return await HttpResult.fromResponse<void>(
+      res, 
+      MediaType.Json,
+      undefined,
+      false
+    );
   }
   static async getInjectedThing(
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<InjectedThing>> {
     const baseUrl = new URL(`http://localhost:5002/api/Model/getInjectedThing`);
-    const res = await fetchImpl(baseUrl, { method: "GET" });
-    return await HttpResult.fromResponse<InjectedThing>(res, InjectedThing, false);
+
+
+    const res = await fetchImpl(baseUrl, {
+      method: "GET",
+      duplex: "half",
+    });
+
+    return await HttpResult.fromResponse<InjectedThing>(
+      res, 
+      MediaType.Json,
+      InjectedThing,
+      false
+    );
   }
   static async save(
     model: DeepPartial<Model>,
@@ -34,19 +56,30 @@ export class Model {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Model>> {
     const baseUrl = new URL(`http://localhost:5002/api/Model/save`);
+    const payload: any = {};
+
+      payload["model"] = model;
+      baseUrl.searchParams.append('__datasource', String(__datasource));
+
     const res = await fetchImpl(baseUrl, {
       method: "POST",
+      duplex: "half",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-            model, 
-            __datasource
-      })
+      body: requestBody(MediaType.Json, payload)
     });
-    return await HttpResult.fromResponse<Model>(res, Model, false);
+
+    return await HttpResult.fromResponse<Model>(
+      res, 
+      MediaType.Json,
+      Model,
+      false
+    );
   }
 
   static fromJson(data: any): Model {
     const res = Object.assign(new Model(), data);
+
+
     return res;
   }
 }

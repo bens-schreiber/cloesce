@@ -1,6 +1,6 @@
 // GENERATED CODE. DO NOT MODIFY.
 
-import { HttpResult, DeepPartial } from "cloesce/client";
+import { HttpResult, DeepPartial, MediaType, requestBody, b64ToU8 } from "cloesce/client";
 
 
 export class Horse {
@@ -14,9 +14,20 @@ export class Horse {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Horse>> {
     const baseUrl = new URL(`http://localhost:5002/api/Horse/get`);
-    baseUrl.searchParams.append('id', String(id));
-    const res = await fetchImpl(baseUrl, { method: "GET" });
-    return await HttpResult.fromResponse<Horse>(res, Horse, false);
+
+      baseUrl.searchParams.append('id', String(id));
+
+    const res = await fetchImpl(baseUrl, {
+      method: "GET",
+      duplex: "half",
+    });
+
+    return await HttpResult.fromResponse<Horse>(
+      res, 
+      MediaType.Json,
+      Horse,
+      false
+    );
   }
   async like(
     horse: Horse,
@@ -24,36 +35,65 @@ export class Horse {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<void>> {
     const baseUrl = new URL(`http://localhost:5002/api/Horse/${this.id}/like`);
+    const payload: any = {};
+
+      payload["horse"] = horse;
+      baseUrl.searchParams.append('__dataSource', String(__dataSource));
+
     const res = await fetchImpl(baseUrl, {
       method: "POST",
+      duplex: "half",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-            horse, 
-            __dataSource
-      })
+      body: requestBody(MediaType.Json, payload)
     });
-    return await HttpResult.fromResponse<void>(res);
+
+    return await HttpResult.fromResponse<void>(
+      res, 
+      MediaType.Json,
+      undefined,
+      false
+    );
   }
   static async list(
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Horse[]>> {
     const baseUrl = new URL(`http://localhost:5002/api/Horse/list`);
-    const res = await fetchImpl(baseUrl, { method: "GET" });
-    return await HttpResult.fromResponse<Horse[]>(res);
+
+
+    const res = await fetchImpl(baseUrl, {
+      method: "GET",
+      duplex: "half",
+    });
+
+    return await HttpResult.fromResponse<Horse[]>(
+      res, 
+      MediaType.Json,
+      Horse,
+      true
+    );
   }
   static async post(
     horse: Horse,
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Horse>> {
     const baseUrl = new URL(`http://localhost:5002/api/Horse/post`);
+    const payload: any = {};
+
+      payload["horse"] = horse;
+
     const res = await fetchImpl(baseUrl, {
       method: "POST",
+      duplex: "half",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-            horse
-      })
+      body: requestBody(MediaType.Json, payload)
     });
-    return await HttpResult.fromResponse<Horse>(res, Horse, false);
+
+    return await HttpResult.fromResponse<Horse>(
+      res, 
+      MediaType.Json,
+      Horse,
+      false
+    );
   }
 
   static fromJson(data: any): Horse {
@@ -61,6 +101,8 @@ export class Horse {
     for (let i = 0; i < res.likes?.length; i++) {
       res.likes[i] = Like.fromJson(res.likes[i]);
     }
+
+
     return res;
   }
 }
@@ -73,7 +115,9 @@ export class Like {
 
   static fromJson(data: any): Like {
     const res = Object.assign(new Like(), data);
-    res["horse2"] &&= Object.assign(new Horse(), res.horse2);
+    res["horse2"] &&= Horse.fromJson(res.horse2);
+
+
     return res;
   }
 }

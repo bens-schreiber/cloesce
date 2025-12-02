@@ -2,6 +2,8 @@ use std::collections::HashMap;
 
 use ast::NavigationPropertyKind::{ManyToMany, OneToMany};
 use ast::{CidlType, Model, NamedTypedValue, NavigationProperty, NavigationPropertyKind};
+use base64::Engine;
+use base64::prelude::BASE64_STANDARD;
 use sea_query::{Alias, OnConflict, SimpleExpr, SqliteQueryBuilder, SubQueryStatement, Values};
 use sea_query::{Expr, Query};
 use serde::Serialize;
@@ -475,7 +477,7 @@ impl<'a> UpsertBuilder<'a> {
         SimpleExpr::SubQuery(None, Box::new(subq))
     }
 
-    /// Creates a SQL query, being either an update only, insert only, or upsert.
+    /// Creates a SQL query, being either an update, insert, or upsert.
     fn build(self) -> Result<(String, Values), String> {
         let pk_expr = self
             .pk_val
@@ -547,7 +549,7 @@ fn validate_json_to_cidl(
         return Ok(SimpleExpr::Custom("null".into()));
     }
 
-    match cidl_type.root_type() {
+    let res = match cidl_type.root_type() {
         CidlType::Integer | CidlType::Boolean => {
             if !matches!(value, Value::Number(_)) {
                 return Err(format!(
@@ -578,10 +580,55 @@ fn validate_json_to_cidl(
 
             Ok(Expr::val(value.as_str().unwrap()).into())
         }
+        CidlType::Blob => match value {
+            // Base64 string
+            Value::String(b64) => {
+                let bytes = BASE64_STANDARD
+                    .decode(b64)
+                    .map_err(|_| format!("Invalid base64 blob for {}.{}", model_name, attr_name))?;
+
+                Ok(bytes_to_sqlite(&bytes))
+            }
+
+            // Byte array
+            Value::Array(inner) => {
+                let mut bytes = Vec::with_capacity(inner.len());
+                for v in inner {
+                    let n = v.as_u64().ok_or_else(|| {
+                        format!(
+                            "Expected integer values in blob array for {}.{}",
+                            model_name, attr_name
+                        )
+                    })?;
+                    if n > 255 {
+                        return Err(format!(
+                            "Blob array values must be 0-255 in {}.{}",
+                            model_name, attr_name
+                        ));
+                    }
+                    bytes.push(n as u8);
+                }
+
+                Ok(bytes_to_sqlite(&bytes))
+            }
+            _ => Err("Expected a b64 string or u8 array for blob".to_string()),
+        },
         _ => {
             unreachable!("Invalid CIDL");
         }
-    }
+    };
+
+    res.map_err(|e| format!("{e}, got {value}"))
+}
+
+/// Convert a byte array to a sqlite hex string suitable
+/// for [CidlType::Blob] columns
+fn bytes_to_sqlite(bytes: &[u8]) -> SimpleExpr {
+    let hex = bytes
+        .iter()
+        .map(|b| format!("{:02X}", b))
+        .collect::<String>();
+    SimpleExpr::Custom(format!("X'{}'", hex))
 }
 
 #[cfg(test)]
@@ -595,7 +642,7 @@ mod test {
     use crate::{common::test_sql, expected_str, upsert::UpsertModel};
 
     #[sqlx::test]
-    fn upsert_scalar_model(db: SqlitePool) {
+    async fn upsert_scalar_model(db: SqlitePool) {
         // Arrange
         let ast_model = ModelBuilder::new("Horse")
             .id()
@@ -684,6 +731,110 @@ mod test {
             r#"UPDATE "Horse" SET "age" = ?, "address" = null WHERE "id" = ?"#
         );
         assert_eq!(*res1.values, vec![Value::from(7), Value::from(1)]);
+
+        let res2 = &res[1];
+        expected_str!(res2.query, r#"SELECT ? AS "id""#);
+        assert_eq!(*res2.values, vec![Value::from(1i64)]);
+
+        test_sql(
+            meta,
+            res.into_iter().map(|r| (r.query, r.values)).collect(),
+            db,
+        )
+        .await
+        .expect("Upsert to work");
+    }
+
+    #[sqlx::test]
+    async fn upsert_blob_b64(db: SqlitePool) {
+        // Arrange
+        let ast_model = ModelBuilder::new("Picture")
+            .id()
+            .attribute("metadata", CidlType::Text, None)
+            .attribute("blob", CidlType::Blob, None)
+            .build();
+
+        let mut meta = HashMap::new();
+        meta.insert(ast_model.name.clone(), ast_model);
+
+        let new_model = json!({
+            "id": 1,
+            "metadata": "meta",
+            "blob": "aGVsbG8gd29ybGQ="
+        });
+
+        // Act
+        let res = UpsertModel::query(
+            "Picture",
+            &meta,
+            new_model.as_object().unwrap().clone(),
+            None,
+        )
+        .unwrap();
+
+        // Assert
+        assert_eq!(res.len(), 3);
+
+        let res1 = &res[0];
+        expected_str!(
+            res1.query,
+            r#"INSERT INTO "Picture" ("metadata", "blob", "id") VALUES (?, X'68656C6C6F20776F726C64', ?) ON CONFLICT ("id") DO UPDATE SET "metadata" = "excluded"."metadata", "blob" = "excluded"."blob""#
+        );
+        assert_eq!(*res1.values, vec![Value::from("meta"), Value::from(1i64),]);
+
+        let res2 = &res[1];
+        expected_str!(res2.query, r#"SELECT ? AS "id""#);
+        assert_eq!(*res2.values, vec![Value::from(1i64)]);
+
+        test_sql(
+            meta,
+            res.into_iter().map(|r| (r.query, r.values)).collect(),
+            db,
+        )
+        .await
+        .expect("Upsert to work");
+    }
+
+    #[sqlx::test]
+    async fn upsert_blob_u8_arr(db: SqlitePool) {
+        // Arrange
+        let ast_model = ModelBuilder::new("Picture")
+            .id()
+            .attribute("metadata", CidlType::Text, None)
+            .attribute("blob", CidlType::Blob, None)
+            .build();
+
+        let mut meta = HashMap::new();
+        meta.insert(ast_model.name.clone(), ast_model);
+
+        let new_model = json!({
+            "id": 1,
+            "metadata": "meta",
+            "blob": [
+                104, 101, 108, 108, 111, // hello
+                32,                      // space
+                119, 111, 114, 108, 100  // world
+            ]
+        });
+
+        // Act
+        let res = UpsertModel::query(
+            "Picture",
+            &meta,
+            new_model.as_object().unwrap().clone(),
+            None,
+        )
+        .unwrap();
+
+        // Assert
+        assert_eq!(res.len(), 3);
+
+        let res1 = &res[0];
+        expected_str!(
+            res1.query,
+            r#"INSERT INTO "Picture" ("metadata", "blob", "id") VALUES (?, X'68656C6C6F20776F726C64', ?) ON CONFLICT ("id") DO UPDATE SET "metadata" = "excluded"."metadata", "blob" = "excluded"."blob""#
+        );
+        assert_eq!(*res1.values, vec![Value::from("meta"), Value::from(1i64),]);
 
         let res2 = &res[1];
         expected_str!(res2.query, r#"SELECT ? AS "id""#);

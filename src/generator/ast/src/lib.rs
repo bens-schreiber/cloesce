@@ -1,6 +1,6 @@
 pub mod builder;
 pub mod err;
-mod semantic;
+pub mod semantic;
 
 use std::collections::BTreeMap;
 use std::collections::HashMap;
@@ -18,6 +18,27 @@ use serde::Serialize;
 use serde_with::MapPreventDuplicates;
 use serde_with::serde_as;
 
+#[macro_export]
+macro_rules! cidl_type_contains {
+    ($value:expr, $pattern:pat) => {{
+        let mut cur = $value;
+
+        loop {
+            match cur {
+                $pattern => break true,
+
+                CidlType::Array(inner)
+                | CidlType::Nullable(inner)
+                | CidlType::HttpResult(inner) => {
+                    cur = inner;
+                }
+
+                _ => break false,
+            }
+        }
+    }};
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
 pub enum CidlType {
     /// No type
@@ -32,11 +53,18 @@ pub enum CidlType {
     /// SQLite string
     Text,
 
+    /// SQLite Binary Large Object
+    Blob,
+
     /// (SQL equivalent to Integer)
     Boolean,
 
     /// An ISO Date string (SQL equivalent to Text)
     DateIso,
+
+    /// A Binary Large Object that is not to be buffered in memory,
+    /// but rather piped to some destination.
+    Stream,
 
     /// A dependency injected instance, containing a type name.
     Inject(String),
@@ -64,15 +92,6 @@ pub enum CidlType {
 }
 
 impl CidlType {
-    /// Returns the inner part of an array if the type is an array
-    pub fn unwrap_array(&self) -> Option<&CidlType> {
-        match self {
-            CidlType::Array(inner) => Some(inner),
-            _ => None,
-        }
-    }
-
-    /// Returns the root most CidlType, being any non Model/Array/Result.
     pub fn root_type(&self) -> &CidlType {
         match self {
             CidlType::Array(inner) => inner.root_type(),
@@ -127,12 +146,26 @@ pub struct ModelAttribute {
     pub foreign_key_reference: Option<String>,
 }
 
+#[derive(Serialize, Deserialize, Debug, Default)]
+pub enum MediaType {
+    #[default]
+    Json,
+
+    Octet,
+}
+
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ApiMethod {
     pub name: String,
     pub is_static: bool,
     pub http_verb: HttpVerb,
+
+    #[serde(default)]
+    pub return_media: MediaType,
     pub return_type: CidlType,
+
+    #[serde(default)]
+    pub parameters_media: MediaType,
     pub parameters: Vec<NamedTypedValue>,
 }
 
@@ -246,8 +279,8 @@ pub struct CloesceAst {
     // TODO: MapPreventDuplicates is not supported for IndexMap
     pub models: IndexMap<String, Model>,
 
-    #[serde_as(as = "MapPreventDuplicates<_, _>")]
-    pub poos: BTreeMap<String, PlainOldObject>,
+    // TODO: MapPreventDuplicates is not supported for IndexMap
+    pub poos: IndexMap<String, PlainOldObject>,
 
     // TODO: MapPreventDuplicates is not supported for IndexMap
     pub services: IndexMap<String, Service>,
@@ -300,7 +333,7 @@ impl CloesceAst {
     }
 
     pub fn semantic_analysis(&mut self) -> Result<()> {
-        SemanticAnalysis::models(self).and(SemanticAnalysis::services(self))
+        SemanticAnalysis::analyze(self)
     }
 
     /// Traverses the AST setting the `hash` field as a merkle hash, meaning a parents hash depends on it's childrens hashes.

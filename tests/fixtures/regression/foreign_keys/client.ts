@@ -1,6 +1,6 @@
 // GENERATED CODE. DO NOT MODIFY.
 
-import { HttpResult, DeepPartial } from "cloesce/client";
+import { HttpResult, DeepPartial, MediaType, requestBody, b64ToU8 } from "cloesce/client";
 
 
 export class A {
@@ -13,42 +13,73 @@ export class A {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<A>> {
     const baseUrl = new URL(`http://localhost:5002/api/A/post`);
+    const payload: any = {};
+
+      payload["a"] = a;
+
     const res = await fetchImpl(baseUrl, {
       method: "POST",
+      duplex: "half",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-            a
-      })
+      body: requestBody(MediaType.Json, payload)
     });
-    return await HttpResult.fromResponse<A>(res, A, false);
+
+    return await HttpResult.fromResponse<A>(
+      res, 
+      MediaType.Json,
+      A,
+      false
+    );
   }
   async refresh(
     __dataSource: "withB" |"withoutB" |"none" = "none",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<A>> {
     const baseUrl = new URL(`http://localhost:5002/api/A/${this.id}/refresh`);
-    baseUrl.searchParams.append('__dataSource', String(__dataSource));
-    const res = await fetchImpl(baseUrl, { method: "GET" });
-    return await HttpResult.fromResponse<A>(res, A, false);
+
+      baseUrl.searchParams.append('__dataSource', String(__dataSource));
+
+    const res = await fetchImpl(baseUrl, {
+      method: "GET",
+      duplex: "half",
+    });
+
+    return await HttpResult.fromResponse<A>(
+      res, 
+      MediaType.Json,
+      A,
+      false
+    );
   }
   static async returnFatalIfParamsNotInstantiated(
     a: A,
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<void>> {
     const baseUrl = new URL(`http://localhost:5002/api/A/returnFatalIfParamsNotInstantiated`);
+    const payload: any = {};
+
+      payload["a"] = a;
+
     const res = await fetchImpl(baseUrl, {
       method: "POST",
+      duplex: "half",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-            a
-      })
+      body: requestBody(MediaType.Json, payload)
     });
-    return await HttpResult.fromResponse<void>(res);
+
+    return await HttpResult.fromResponse<void>(
+      res, 
+      MediaType.Json,
+      undefined,
+      false
+    );
   }
 
   static fromJson(data: any): A {
     const res = Object.assign(new A(), data);
-    res["b"] &&= Object.assign(new B(), res.b);
+    res["b"] &&= B.fromJson(res.b);
+
+
     return res;
   }
 }
@@ -60,18 +91,29 @@ export class B {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<void>> {
     const baseUrl = new URL(`http://localhost:5002/api/B/${this.id}/testMethod`);
+    const payload: any = {};
+
+      baseUrl.searchParams.append('__dataSource', String(__dataSource));
+
     const res = await fetchImpl(baseUrl, {
       method: "POST",
+      duplex: "half",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-            __dataSource
-      })
+      body: requestBody(MediaType.Json, payload)
     });
-    return await HttpResult.fromResponse<void>(res);
+
+    return await HttpResult.fromResponse<void>(
+      res, 
+      MediaType.Json,
+      undefined,
+      false
+    );
   }
 
   static fromJson(data: any): B {
     const res = Object.assign(new B(), data);
+
+
     return res;
   }
 }
@@ -85,6 +127,8 @@ export class Course {
     for (let i = 0; i < res.students?.length; i++) {
       res.students[i] = Student.fromJson(res.students[i]);
     }
+
+
     return res;
   }
 }
@@ -97,18 +141,29 @@ export class Dog {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<void>> {
     const baseUrl = new URL(`http://localhost:5002/api/Dog/${this.id}/testMethod`);
+    const payload: any = {};
+
+      baseUrl.searchParams.append('__dataSource', String(__dataSource));
+
     const res = await fetchImpl(baseUrl, {
       method: "POST",
+      duplex: "half",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-            __dataSource
-      })
+      body: requestBody(MediaType.Json, payload)
     });
-    return await HttpResult.fromResponse<void>(res);
+
+    return await HttpResult.fromResponse<void>(
+      res, 
+      MediaType.Json,
+      undefined,
+      false
+    );
   }
 
   static fromJson(data: any): Dog {
     const res = Object.assign(new Dog(), data);
+
+
     return res;
   }
 }
@@ -121,37 +176,66 @@ export class Person {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Person>> {
     const baseUrl = new URL(`http://localhost:5002/api/Person/post`);
+    const payload: any = {};
+
+      payload["person"] = person;
+
     const res = await fetchImpl(baseUrl, {
       method: "POST",
+      duplex: "half",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-            person
-      })
+      body: requestBody(MediaType.Json, payload)
     });
-    return await HttpResult.fromResponse<Person>(res, Person, false);
+
+    return await HttpResult.fromResponse<Person>(
+      res, 
+      MediaType.Json,
+      Person,
+      false
+    );
   }
   async refresh(
     __dataSource: "withDogs" |"none" = "none",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Person>> {
     const baseUrl = new URL(`http://localhost:5002/api/Person/${this.id}/refresh`);
-    baseUrl.searchParams.append('__dataSource', String(__dataSource));
-    const res = await fetchImpl(baseUrl, { method: "GET" });
-    return await HttpResult.fromResponse<Person>(res, Person, false);
+
+      baseUrl.searchParams.append('__dataSource', String(__dataSource));
+
+    const res = await fetchImpl(baseUrl, {
+      method: "GET",
+      duplex: "half",
+    });
+
+    return await HttpResult.fromResponse<Person>(
+      res, 
+      MediaType.Json,
+      Person,
+      false
+    );
   }
   static async returnFatalIfParamsNotInstantiated(
     person: Person,
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<void>> {
     const baseUrl = new URL(`http://localhost:5002/api/Person/returnFatalIfParamsNotInstantiated`);
+    const payload: any = {};
+
+      payload["person"] = person;
+
     const res = await fetchImpl(baseUrl, {
       method: "POST",
+      duplex: "half",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-            person
-      })
+      body: requestBody(MediaType.Json, payload)
     });
-    return await HttpResult.fromResponse<void>(res);
+
+    return await HttpResult.fromResponse<void>(
+      res, 
+      MediaType.Json,
+      undefined,
+      false
+    );
   }
 
   static fromJson(data: any): Person {
@@ -159,6 +243,8 @@ export class Person {
     for (let i = 0; i < res.dogs?.length; i++) {
       res.dogs[i] = Dog.fromJson(res.dogs[i]);
     }
+
+
     return res;
   }
 }
@@ -171,23 +257,43 @@ export class Student {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Student>> {
     const baseUrl = new URL(`http://localhost:5002/api/Student/post`);
+    const payload: any = {};
+
+      payload["student"] = student;
+
     const res = await fetchImpl(baseUrl, {
       method: "POST",
+      duplex: "half",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-            student
-      })
+      body: requestBody(MediaType.Json, payload)
     });
-    return await HttpResult.fromResponse<Student>(res, Student, false);
+
+    return await HttpResult.fromResponse<Student>(
+      res, 
+      MediaType.Json,
+      Student,
+      false
+    );
   }
   async refresh(
     __dataSource: "withCoursesStudents" |"withCoursesStudentsCourses" |"none" = "none",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Student>> {
     const baseUrl = new URL(`http://localhost:5002/api/Student/${this.id}/refresh`);
-    baseUrl.searchParams.append('__dataSource', String(__dataSource));
-    const res = await fetchImpl(baseUrl, { method: "GET" });
-    return await HttpResult.fromResponse<Student>(res, Student, false);
+
+      baseUrl.searchParams.append('__dataSource', String(__dataSource));
+
+    const res = await fetchImpl(baseUrl, {
+      method: "GET",
+      duplex: "half",
+    });
+
+    return await HttpResult.fromResponse<Student>(
+      res, 
+      MediaType.Json,
+      Student,
+      false
+    );
   }
 
   static fromJson(data: any): Student {
@@ -195,6 +301,8 @@ export class Student {
     for (let i = 0; i < res.courses?.length; i++) {
       res.courses[i] = Course.fromJson(res.courses[i]);
     }
+
+
     return res;
   }
 }

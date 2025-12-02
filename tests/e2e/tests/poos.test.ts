@@ -11,7 +11,7 @@ afterAll(async () => {
   await stopWrangler();
 });
 
-describe("POST PooAcceptYield", () => {
+describe("Upload", () => {
   it("accepts Poos", async () => {
     const res = await PooAcceptYield.acceptPoos(
       {
@@ -33,12 +33,11 @@ describe("POST PooAcceptYield", () => {
         ],
       },
     );
-
     expect(res.ok, withRes("POST should be OK", res)).toBe(true);
   });
 });
 
-describe("yieldPoo", () => {
+describe("Receive", () => {
   it("yields Poo", async () => {
     const res = await PooAcceptYield.yieldPoo();
 

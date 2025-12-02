@@ -1,0 +1,193 @@
+{
+  "hash": 8447275917592500618,
+  "version": "v0.0.4",
+  "project_name": "runner",
+  "language": "TypeScript",
+  "wrangler_env": {
+    "name": "Env",
+    "source_path": "./seed__blobs.cloesce.ts",
+    "db_binding": "db",
+    "vars": {}
+  },
+  "models": {
+    "BlobHaver": {
+      "hash": 17711648149110095680,
+      "name": "BlobHaver",
+      "primary_key": {
+        "name": "id",
+        "cidl_type": "Integer"
+      },
+      "attributes": [
+        {
+          "hash": 3614122834570409634,
+          "value": {
+            "name": "blob1",
+            "cidl_type": "Blob"
+          },
+          "foreign_key_reference": null
+        },
+        {
+          "hash": 1356319928856589796,
+          "value": {
+            "name": "blob2",
+            "cidl_type": "Blob"
+          },
+          "foreign_key_reference": null
+        }
+      ],
+      "navigation_properties": [],
+      "methods": {
+        "get": {
+          "name": "get",
+          "is_static": true,
+          "http_verb": "GET",
+          "return_media": "Json",
+          "return_type": {
+            "HttpResult": {
+              "Object": "BlobHaver"
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "id",
+              "cidl_type": "Integer"
+            },
+            {
+              "name": "__datasource",
+              "cidl_type": {
+                "DataSource": "BlobHaver"
+              }
+            }
+          ]
+        },
+        "getBlob1": {
+          "name": "getBlob1",
+          "is_static": false,
+          "http_verb": "GET",
+          "return_media": "Json",
+          "return_type": "Blob",
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "__dataSource",
+              "cidl_type": {
+                "DataSource": "BlobHaver"
+              }
+            }
+          ]
+        },
+        "inputStream": {
+          "name": "inputStream",
+          "is_static": true,
+          "http_verb": "POST",
+          "return_media": "Json",
+          "return_type": "Void",
+          "parameters_media": "Octet",
+          "parameters": [
+            {
+              "name": "stream",
+              "cidl_type": "Stream"
+            }
+          ]
+        },
+        "list": {
+          "name": "list",
+          "is_static": true,
+          "http_verb": "GET",
+          "return_media": "Json",
+          "return_type": {
+            "HttpResult": {
+              "Array": {
+                "Object": "BlobHaver"
+              }
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "__datasource",
+              "cidl_type": {
+                "DataSource": "BlobHaver"
+              }
+            }
+          ]
+        },
+        "save": {
+          "name": "save",
+          "is_static": true,
+          "http_verb": "POST",
+          "return_media": "Json",
+          "return_type": {
+            "HttpResult": {
+              "Object": "BlobHaver"
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "model",
+              "cidl_type": {
+                "Partial": "BlobHaver"
+              }
+            },
+            {
+              "name": "__datasource",
+              "cidl_type": {
+                "DataSource": "BlobHaver"
+              }
+            }
+          ]
+        },
+        "yieldStream": {
+          "name": "yieldStream",
+          "is_static": false,
+          "http_verb": "GET",
+          "return_media": "Octet",
+          "return_type": "Stream",
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "__dataSource",
+              "cidl_type": {
+                "DataSource": "BlobHaver"
+              }
+            }
+          ]
+        }
+      },
+      "data_sources": {},
+      "cruds": [
+        "GET",
+        "LIST",
+        "SAVE"
+      ],
+      "source_path": "./seed__blobs.cloesce.ts"
+    }
+  },
+  "poos": {},
+  "services": {
+    "BlobService": {
+      "name": "BlobService",
+      "attributes": [],
+      "methods": {
+        "incrementBlob": {
+          "name": "incrementBlob",
+          "is_static": false,
+          "http_verb": "POST",
+          "return_media": "Json",
+          "return_type": "Blob",
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "blob",
+              "cidl_type": "Blob"
+            }
+          ]
+        }
+      },
+      "source_path": "./seed__blobs.cloesce.ts"
+    }
+  },
+  "app_source": null
+}
