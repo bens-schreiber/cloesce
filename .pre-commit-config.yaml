@@ -1,0 +1,38 @@
+##########################################
+# TO USE:
+# pip install pre-commit
+# pre-commit install --hook-type pre-push
+##########################################
+
+repos:
+  - repo: local
+    hooks:
+      - id: rust-fmt-orm
+        name: Rust fmt check (ORM)
+        language: system
+        pass_filenames: false
+        entry: bash -c "cd src/frontend/orm && cargo fmt -- --check"
+        stages: [push]
+
+      - id: rust-fmt-generator
+        name: Rust fmt check (Generator)
+        language: system
+        pass_filenames: false
+        entry: bash -c "cd src/generator && cargo fmt -- --check"
+        stages: [push]
+
+  - repo: local
+    hooks:
+      - id: ts-format-frontend
+        name: TS format check (frontend)
+        language: system
+        pass_filenames: false
+        entry: bash -c "cd src/frontend/ts && npm run format -- --check"
+        stages: [push]
+
+      - id: ts-format-e2e
+        name: TS format check (e2e)
+        language: system
+        pass_filenames: false
+        entry: bash -c "cd tests/e2e && npm run format -- --check"
+        stages: [push]
