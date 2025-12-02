@@ -12,10 +12,10 @@ export class {{this.name}} {
     {{#each this.attributes}}
       {{#if (is_object_array cidl_type)}}
     for (let i = 0; i < res.{{name}}?.length; i++) {
-      res.{{name}}[i] = {{object_name cidl_type}}.fromJson(res.{{name}}[i]);
+      res.{{name}}[i] = {{get_object_name cidl_type}}.fromJson(res.{{name}}[i]);
     }
       {{else if (is_object cidl_type)}}
-    res["{{name}}"] &&= {{object_name cidl_type}}.fromJson(res.{{name}});
+    res["{{name}}"] &&= {{get_object_name cidl_type}}.fromJson(res.{{name}});
       {{else if (is_blob_array cidl_type)}}
     for (let i = 0; i < res.{{name}}.length; i++) {
       res.{{name}}[i] = b64ToU8(res.{{name}}[i]);

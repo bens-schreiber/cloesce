@@ -5,7 +5,7 @@ import { WasmResource, mapSql, invokeOrmWasm } from "../router/wasm.js";
 import { CrudKind } from "../ast.js";
 
 /**
- * Types accessible via cloesce/backend
+ * cloesce/backend
  */
 export {
   CloesceApp,
@@ -505,10 +505,8 @@ export class Orm {
       );
     }
 
-    // Return the result of the SELECT statement
-    const selectResult = batchRes[selectIndex!].results[0] as { id: any };
-
-    return Either.right(selectResult.id);
+    const rootModelId = batchRes[selectIndex!].results[0] as { id: any };
+    return Either.right(rootModelId.id);
   }
 
   /**

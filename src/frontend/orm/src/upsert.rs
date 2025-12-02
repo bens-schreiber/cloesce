@@ -477,7 +477,7 @@ impl<'a> UpsertBuilder<'a> {
         SimpleExpr::SubQuery(None, Box::new(subq))
     }
 
-    /// Creates a SQL query, being either an update only, insert only, or upsert.
+    /// Creates a SQL query, being either an update, insert, or upsert.
     fn build(self) -> Result<(String, Values), String> {
         let pk_expr = self
             .pk_val
@@ -581,17 +581,16 @@ fn validate_json_to_cidl(
             Ok(Expr::val(value.as_str().unwrap()).into())
         }
         CidlType::Blob => match value {
+            // Base64 string
             Value::String(b64) => {
                 let bytes = BASE64_STANDARD
                     .decode(b64)
                     .map_err(|_| format!("Invalid base64 blob for {}.{}", model_name, attr_name))?;
 
-                let hex = bytes
-                    .iter()
-                    .map(|b| format!("{:02X}", b))
-                    .collect::<String>();
-                Ok(SimpleExpr::Custom(format!("X'{}'", hex)))
+                Ok(bytes_to_sqlite(&bytes))
             }
+
+            // Byte array
             Value::Array(inner) => {
                 let mut bytes = Vec::with_capacity(inner.len());
                 for v in inner {
@@ -610,11 +609,7 @@ fn validate_json_to_cidl(
                     bytes.push(n as u8);
                 }
 
-                let hex = bytes
-                    .iter()
-                    .map(|b| format!("{:02X}", b))
-                    .collect::<String>();
-                Ok(SimpleExpr::Custom(format!("X'{}'", hex)))
+                Ok(bytes_to_sqlite(&bytes))
             }
             _ => Err("Expected a b64 string or u8 array for blob".to_string()),
         },
@@ -624,6 +619,16 @@ fn validate_json_to_cidl(
     };
 
     res.map_err(|e| format!("{e}, got {value}"))
+}
+
+/// Convert a byte array to a sqlite hex string suitable
+/// for [CidlType::Blob] columns
+fn bytes_to_sqlite(bytes: &[u8]) -> SimpleExpr {
+    let hex = bytes
+        .iter()
+        .map(|b| format!("{:02X}", b))
+        .collect::<String>();
+    SimpleExpr::Custom(format!("X'{}'", hex))
 }
 
 #[cfg(test)]

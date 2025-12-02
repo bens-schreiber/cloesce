@@ -103,6 +103,10 @@ export class Either<L, R> {
   }
 }
 
+/**
+ * Given a media type and some data, converts to a proper
+ * `RequestInit` body,
+ */
 export function requestBody(
   mediaType: MediaType,
   data: any | string | undefined,
@@ -112,12 +116,13 @@ export function requestBody(
       return data ?? "";
     }
     case MediaType.Json: {
-      return JSON.stringify(data ?? {}, (k, v) =>
+      return JSON.stringify(data ?? {}, (_, v) =>
         v instanceof Uint8Array ? u8ToB64(v) : v,
       );
     }
     case MediaType.Octet: {
-      // JSON structure isn't needed, just take the first value
+      // JSON structure isn't needed; assume the first
+      // value is the stream data
       return Object.values(data)[0] as any;
     }
   }
@@ -253,10 +258,6 @@ export class HttpResult<T = unknown> {
   }
 }
 
-export type KeysOfType<T, U> = {
-  [K in keyof T]: T[K] extends U ? (K extends string ? K : never) : never;
-}[keyof T];
-
 export type Stream = ReadableStream<Uint8Array>;
 
 export function b64ToU8(b64: string) {
@@ -288,3 +289,7 @@ export function u8ToB64(u8: Uint8Array) {
   }
   return btoa(s);
 }
+
+export type KeysOfType<T, U> = {
+  [K in keyof T]: T[K] extends U ? (K extends string ? K : never) : never;
+}[keyof T];

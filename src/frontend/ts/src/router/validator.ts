@@ -20,7 +20,9 @@ import { ConstructorRegistry } from "./router";
  *
  * If partial, no child types will be instantaited aside from primitives (as of now, just Dates).
  *
- * Returns the instantiated value (if applicable). On error, returns null.
+ * Blob types will be assumed to be b64 encoded
+ *
+ * @returns the instantiated value (if applicable). On error, returns null.
  */
 export class RuntimeValidator {
   constructor(
@@ -28,7 +30,7 @@ export class RuntimeValidator {
     private ctorReg: ConstructorRegistry,
   ) {}
 
-  static fromJson(
+  static validate(
     value: any,
     cidlType: CidlType,
     ast: CloesceAst,
@@ -207,12 +209,6 @@ export class RuntimeValidator {
       }
 
       return Either.right(value);
-    }
-
-    // HTTP Result
-    // TODO: Do we even want to support this?
-    if ("HttpResult" in cidlType) {
-      return this.recurse(value, cidlType.HttpResult, isPartial);
     }
 
     return Either.left(null);

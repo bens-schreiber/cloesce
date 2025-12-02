@@ -864,10 +864,6 @@ export class CidlExtractor {
       );
     }
 
-    if (aliasName === "Stream") {
-      return Either.right(wrapNullable("Stream", nullable));
-    }
-
     if (symbolName === "Promise" || aliasName === "IncludeTree") {
       // Unwrap promises
       return wrapGeneric(genericTy, nullable, (inner) => inner);

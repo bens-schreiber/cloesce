@@ -33,15 +33,9 @@ impl SemanticAnalysis {
     /// - Invalid data source type
     /// - Invalid data source reference
     pub fn analyze(ast: &mut CloesceAst) -> Result<()> {
-        // Validate models
         Self::models(ast)?;
-
-        // Validate Plain Old Objects
         Self::poos(ast)?;
-
-        // Validate Services
         Self::services(ast)?;
-
         Ok(())
     }
 
@@ -96,6 +90,14 @@ impl SemanticAnalysis {
                             o
                         )
                     }
+                    CidlType::DataSource(o) => ensure!(
+                        ast.models.contains_key(o),
+                        GeneratorErrorKind::UnknownDataSourceReference,
+                        "{}.{} => {}?",
+                        poo.name,
+                        attr.name,
+                        o
+                    ),
                     CidlType::Stream => {
                         fail!(
                             GeneratorErrorKind::InvalidStream,

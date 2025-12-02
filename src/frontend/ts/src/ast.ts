@@ -40,15 +40,14 @@ export interface ModelAttribute {
 }
 
 export enum MediaType {
-  Text,
+  Text, // Not apart of the CIDL; used for returning error text
+
   Json = "Json",
   Octet = "Octet",
 }
 
 /**
- * The generator portion of the Cloesce Compiler will determine what the
- * true actual media should be after extraction. This function provides a default
- * dummy value to be used until then.
+ * A placeholder value which should be updated by the generator.
  *
  * @returns MediaType.Json
  */
