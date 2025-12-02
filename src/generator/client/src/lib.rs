@@ -3,12 +3,12 @@ mod mappers;
 use std::sync::Arc;
 
 use ast::{
-    cidl_type_contains, CidlType, CloesceAst, HttpVerb, InputLanguage, MediaType,
-    NavigationProperty, NavigationPropertyKind,
+    CidlType, CloesceAst, HttpVerb, InputLanguage, MediaType, NavigationProperty,
+    NavigationPropertyKind, cidl_type_contains,
 };
 use mappers::{ClientLanguageTypeMapper, TypeScriptMapper};
 
-use handlebars::{handlebars_helper, Handlebars};
+use handlebars::{Handlebars, handlebars_helper};
 
 handlebars_helper!(needs_constructor: |cidl_type: CidlType| matches!(cidl_type.root_type(),
     CidlType::Object(_)
