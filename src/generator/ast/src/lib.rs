@@ -146,16 +146,12 @@ pub struct ModelAttribute {
     pub foreign_key_reference: Option<String>,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 pub enum MediaType {
+    #[default]
     Json,
-    Octet,
-}
 
-impl Default for MediaType {
-    fn default() -> Self {
-        Self::Json
-    }
+    Octet,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
