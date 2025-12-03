@@ -13,12 +13,20 @@ repos:
         entry: bash -c "cd src/frontend/orm && cargo fmt -- --check"
         pass_filenames: false
         always_run: true
-        files: "" # required for always_run on pre-push
+        files: ""
 
       - id: rust-fmt-generator
         name: Rust fmt check (Generator)
         language: system
         entry: bash -c "cd src/generator && cargo fmt -- --check"
+        pass_filenames: false
+        always_run: true
+        files: ""
+
+      - id: rust-clippy
+        name: Rust clippy (workspace)
+        language: system
+        entry: bash -c "cargo clippy --all-targets --all-features -- -D warnings"
         pass_filenames: false
         always_run: true
         files: ""
