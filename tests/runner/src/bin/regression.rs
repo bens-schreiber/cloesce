@@ -1,39 +1,28 @@
-use clap::{Parser, Subcommand};
+use clap::Parser;
 use glob::glob;
 use runner::Fixture;
 
 use std::thread;
 
 #[derive(Parser)]
-#[command(name = "test", version = "0.0.1")]
+#[command(name = "regression", version = "0.0.1")]
 struct Cli {
     #[arg(short = 'c', long = "check", global = true)]
-    check_only: bool,
+    check: bool,
 
     #[arg(long, default_value = "http://localhost:5002/api")]
     domain: String,
-
-    #[command(subcommand)]
-    command: Commands,
 
     #[arg(long, default_value = "*", global = true)]
     fixture: String,
 }
 
-#[derive(Subcommand, Clone)]
-enum Commands {
-    Regression,
-}
-
 /// Runs the regression tests, passing each fixture through the entire compilation process.
 fn main() {
     let cli = Cli::parse();
+    let pattern = format!("../fixtures/regression/{}/seed__*", cli.fixture);
 
-    let pattern = match &cli.command {
-        Commands::Regression => &format!("../fixtures/regression/{}/seed__*", cli.fixture),
-    };
-
-    let fixtures = glob(pattern)
+    let fixtures = glob(&pattern)
         .expect("valid glob pattern")
         .filter_map(Result::ok)
         .filter(|p| p.is_file())
@@ -57,10 +46,12 @@ fn main() {
     }
 
     if changed {
-        if cli.check_only {
+        if cli.check {
             panic!("Found a difference in snapshot files.");
         } else {
-            println!("Run `cargo run --bin update` to update the snapshot tests");
+            println!(
+                "Changes found. \n Run `cargo run --bin update` to update the snapshot tests or `cargo run --bin update -- -d` to delete them"
+            );
         }
 
         return;
@@ -68,14 +59,20 @@ fn main() {
 
     println!("No changes found.");
 }
+
 fn run_integration_test(fixture: Fixture, domain: &str) -> Result<bool, bool> {
     let (pre_cidl_changed, pre_cidl_path) = fixture.extract_cidl().map_err(|(e, _)| e)?;
+
     let (generated_changed, cidl_path) = fixture
         .generate_all(&pre_cidl_path, domain)
         .map_err(|(e, _)| e)?;
-    let (s1, s2) = fixture.migrate(&cidl_path);
-    let (migrated_cidl_changed, _) = s1.map_err(|(e, _)| e)?;
-    let (migrated_sql_changed, _) = s2.map_err(|(e, _)| e)?;
+
+    let (migrated_cidl_changed, migrated_sql_changed) = {
+        let (s1, s2) = fixture.migrate(&cidl_path);
+        let (cidl, _) = s1.map_err(|(e, _)| e)?;
+        let (sql, _) = s2.map_err(|(e, _)| e)?;
+        (cidl, sql)
+    };
 
     Ok(pre_cidl_changed | generated_changed | migrated_cidl_changed | migrated_sql_changed)
 }

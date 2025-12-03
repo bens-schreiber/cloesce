@@ -125,7 +125,7 @@ impl Fixture {
         }
     }
 
-    /// On all success, returns the cidl, else returns the failed file.
+    /// On all success, returns the cidl, otherwise returns the failed file.
     pub fn generate_all(&self, pre_cidl: &Path, workers_domain: &str) -> TestResult {
         let pre_cidl_canon = pre_cidl.canonicalize().unwrap();
 
@@ -148,13 +148,13 @@ impl Fixture {
                 .current_dir("../../src/generator"),
         );
 
+        let mut has_diff = false;
+
         let cidl_path = {
             match &cmd {
                 Ok(_) => {
                     let (diff, path) = self.read_out_and_diff(cidl_out);
-                    if diff {
-                        return Ok((diff, path));
-                    }
+                    has_diff |= diff;
 
                     path
                 }
@@ -166,15 +166,13 @@ impl Fixture {
             match &cmd {
                 Ok(_) => {
                     let (diff, _) = self.read_out_and_diff(out);
-                    if diff {
-                        return Ok((true, cidl_path));
-                    }
+                    has_diff |= diff;
                 }
                 Err(err) => return Err(self.read_fail_and_diff(out, err.clone())),
             }
         }
 
-        Ok((false, cidl_path))
+        Ok((has_diff, cidl_path))
     }
 
     pub fn migrate(&self, cidl: &Path) -> (TestResult, TestResult) {
