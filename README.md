@@ -617,7 +617,7 @@ class Foo {
 
 ## Integration Tests
 
-- Regression tests: `cargo run --bin test regression`
+- Regression tests: `cargo run --bin regression`
 
 Optionally, pass `--check` if new snapshots should not be created.
 

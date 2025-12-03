@@ -10,13 +10,19 @@
 			"path": "src/frontend/orm"
 		},
 		{
+			"name": "frontend-ts",
 			"path": "src/frontend/ts"
 		},
 		{
 			"path": "tests/e2e"
 		},
 		{
+			"name": "regression-runner",
 			"path": "tests/runner"
+		},
+		{
+			"name": "regression-fixtures",
+			"path": "tests/fixtures/regression"
 		}
 	],
 	"settings": {}
