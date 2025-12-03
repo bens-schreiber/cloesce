@@ -1,0 +1,23 @@
+{
+	"folders": [
+		{
+			"path": "."
+		},
+		{
+			"path": "src/generator"
+		},
+		{
+			"path": "src/frontend/orm"
+		},
+		{
+			"path": "src/frontend/ts"
+		},
+		{
+			"path": "tests/e2e"
+		},
+		{
+			"path": "tests/runner"
+		}
+	],
+	"settings": {}
+}

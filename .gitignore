@@ -312,11 +312,6 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# Editor-specific files
-.vscode/ # VSCode settings
-.idea/ # WebStorm/IntelliJ settings
-*.sublime-project
-*.sublime-workspace
 
 # Operating System files
 .DS_Store
@@ -346,9 +341,3 @@ tmp/
 .generated
 tmp.*
 examples/package-lock.json
-
-
-
-
-# ----------- VSCODE -----------
-.vscode
