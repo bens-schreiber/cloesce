@@ -79,7 +79,7 @@ jobs:
       # --- Integration Tests ---
       - name: Regression Tests
         working-directory: tests/runner
-        run: cargo run --bin test regression --check
+        run: cargo run --bin regression --check
 
       # --- E2E Tests ---
       - name: Check & Test E2E
