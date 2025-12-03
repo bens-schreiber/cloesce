@@ -15,6 +15,14 @@ repos:
         always_run: true
         files: ""
 
+      - id: rust-clippy-orm
+        name: Rust clippy check (ORM)
+        language: system
+        entry: bash -c "cd src/frontend/orm && cargo clippy --all-targets --all-features -- -D warnings"
+        pass_filenames: false
+        always_run: true
+        files: ""
+
       - id: rust-fmt-generator
         name: Rust fmt check (Generator)
         language: system
@@ -23,10 +31,10 @@ repos:
         always_run: true
         files: ""
 
-      - id: rust-clippy
-        name: Rust clippy (workspace)
+      - id: rust-clippy-generator
+        name: Rust clippy check (Generator)
         language: system
-        entry: bash -c "cargo clippy --all-targets --all-features -- -D warnings"
+        entry: bash -c "cd src/generator && cargo clippy --all-targets --all-features -- -D warnings"
         pass_filenames: false
         always_run: true
         files: ""
