@@ -20,6 +20,10 @@
 			"name": "regression",
 			"path": "tests/runner"
 		},
+		{
+			"name": "examples",
+			"path": "examples"
+		}
 	],
 	"settings": {}
 }

@@ -64,9 +64,7 @@ export class Horse {
     `;
 
     const records = await db.prepare(sql).bind(this.id, this.id).run();
-    const res = Orm.mapSql(Horse, records.results, Horse.withLikes);
-
-    return res.mapLeft((_) => []).unwrap();
+    return Orm.mapSql(Horse, records.results, Horse.withLikes);
   }
 }
 

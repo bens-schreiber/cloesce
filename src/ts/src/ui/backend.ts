@@ -402,6 +402,9 @@ export class Orm {
    * Maps SQL records to an instantiated Model. The records must be flat
    * (e.g., of the form "id, name, address") or derive from a Cloesce data source view
    * (e.g., of the form "Horse.id, Horse.name, Horse.address")
+   * 
+   * Assumes the data is formatted correctly, throwing an error otherwise.
+   * 
    * @param ctor The model constructor
    * @param records D1 Result records
    * @param includeTree Include tree to define the relationships to join.
@@ -410,8 +413,8 @@ export class Orm {
     ctor: new () => T,
     records: Record<string, any>[],
     includeTree: IncludeTree<T> | null = null,
-  ): Either<string, T[]> {
-    return mapSql(ctor, records, includeTree);
+  ): T[] {
+    return mapSql(ctor, records, includeTree).unwrap();
   }
 
   /**
@@ -642,12 +645,8 @@ export class Orm {
       );
     }
 
-    const mapRes = Orm.mapSql(ctor, records.results, opts.includeTree ?? null);
-    if (mapRes.isLeft()) {
-      return Either.left(mapRes.value);
-    }
-
-    return Either.right(mapRes.value as T[]);
+    const mapped = Orm.mapSql(ctor, records.results, opts.includeTree ?? null);
+    return Either.right(mapped);
   }
 
   /**
@@ -681,11 +680,7 @@ export class Orm {
       return Either.right(null);
     }
 
-    const mapRes = Orm.mapSql(ctor, record.results, includeTree);
-    if (mapRes.isLeft()) {
-      return Either.left(mapRes.value);
-    }
-
-    return Either.right(mapRes.value[0] as T);
+    const mapped = Orm.mapSql(ctor, record.results, includeTree);
+    return Either.right(mapped[0]);
   }
 }

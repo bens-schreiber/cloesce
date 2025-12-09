@@ -128,7 +128,7 @@ export function invokeOrmWasm(
 }
 
 /**
- * Calls `object_relational_mapping` to turn a row of SQL records into
+ * Calls the object relational mapping function to turn a row of SQL records into
  * an instantiated object.
  */
 export function mapSql<T extends object>(
