@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use ast::NavigationPropertyKind::{ManyToMany, OneToMany};
-use ast::{CidlType, Model, NamedTypedValue, NavigationProperty, NavigationPropertyKind};
+use ast::{CidlType, Model, NamedTypedValue, NavigationProperty, NavigationPropertyKind, fail};
 use base64::Engine;
 use base64::prelude::BASE64_STANDARD;
 use sea_query::{Alias, OnConflict, SimpleExpr, SqliteQueryBuilder, SubQueryStatement, Values};
@@ -10,9 +10,11 @@ use serde::Serialize;
 use serde_json::Map;
 use serde_json::Value;
 
-use crate::IncludeTreeJson;
 use crate::ModelMeta;
-use crate::methods::alias;
+use crate::methods::{OrmErrorKind, alias};
+use crate::{IncludeTreeJson, ensure};
+
+use super::Result;
 
 pub struct UpsertModel<'a> {
     meta: &'a ModelMeta,
@@ -40,7 +42,7 @@ impl<'a> UpsertModel<'a> {
         meta: &'a ModelMeta,
         new_model: Map<String, Value>,
         include_tree: Option<&IncludeTreeJson>,
-    ) -> Result<Vec<UpsertResult>, String> {
+    ) -> Result<Vec<UpsertResult>> {
         let mut stmts = {
             let mut generator = Self {
                 meta,
@@ -126,10 +128,10 @@ impl<'a> UpsertModel<'a> {
         new_model: &Map<String, Value>,
         include_tree: Option<&IncludeTreeJson>,
         path: String,
-    ) -> Result<String, String> {
+    ) -> Result<String> {
         let model = match self.meta.get(model_name) {
             Some(m) => m,
-            None => return Err(format!("Unknown model {model_name}")),
+            None => fail!(OrmErrorKind::UnknownModel, "{}", model_name),
         };
 
         let mut builder =
@@ -145,12 +147,12 @@ impl<'a> UpsertModel<'a> {
                 // Generated id
             }
             _ => {
-                // Only integer primary keys can be left blank and generated.
-                return Err(format!(
-                    "Missing primary key for {}: {}",
+                fail!(
+                    OrmErrorKind::MissingPrimaryKey,
+                    "{}.{}",
                     model.name,
                     serde_json::to_string(new_model).unwrap()
-                ));
+                );
             }
         };
 
@@ -225,13 +227,13 @@ impl<'a> UpsertModel<'a> {
                         // this must be an update query.
                     }
                     _ => {
-                        // This is an insert or upsert which cannot have missing attributes.
-                        return Err(format!(
-                            "Missing attribute {} on {}: {}",
-                            attr.value.name,
+                        fail!(
+                            OrmErrorKind::MissingAttribute,
+                            "{}.{}: {}",
                             model.name,
+                            attr.value.name,
                             serde_json::to_string(&new_model).unwrap()
-                        ));
+                        );
                     }
                 };
             }
@@ -269,7 +271,7 @@ impl<'a> UpsertModel<'a> {
                                 format!("{path}.{}", nav.var_name),
                             )?;
 
-                            self.insert_jct(&path, nav, unique_id, new_model, model)?;
+                            self.insert_jct(&path, nav, unique_id, model)?;
                         }
                     }
                     _ => {
@@ -289,9 +291,8 @@ impl<'a> UpsertModel<'a> {
         path: &str,
         nav: &NavigationProperty,
         unique_id: &str,
-        new_model: &Map<String, Value>,
         model: &Model,
-    ) -> Result<(), String> {
+    ) -> Result<()> {
         let nav_meta = self.meta.get(&nav.model_name).unwrap();
         let nav_pk = &nav_meta.primary_key;
 
@@ -312,13 +313,8 @@ impl<'a> UpsertModel<'a> {
         // Collect column/value pairs from context
         let mut entries = Vec::new();
         for (var_name, cidl_type, path_key) in pairs {
-            let ctx_value = self.context.get(&path_key).ok_or(format!(
-                "Expected many to many model to contain an ID, got {}",
-                serde_json::to_string(new_model).unwrap(),
-            ))?;
-
-            let value = match ctx_value {
-                Some(v) => validate_json_to_cidl(v, cidl_type, unique_id, &var_name)?,
+            let value = match self.context.get(&path_key).cloned().flatten() {
+                Some(v) => validate_json_to_cidl(&v, cidl_type, unique_id, &var_name)?,
                 None => UpsertBuilder::value_from_ctx(&path_key),
             };
             entries.push((var_name, value));
@@ -348,7 +344,7 @@ impl<'a> UpsertModel<'a> {
         path: &str,
         model: &Model,
         builder: UpsertBuilder,
-    ) -> Result<String, String> {
+    ) -> Result<String> {
         self.acc.push(builder.build()?);
         let id_path = format!("{path}.{}", model.primary_key.name);
 
@@ -433,12 +429,7 @@ impl<'a> UpsertBuilder<'a> {
     /// Adds a column and value to the insert statement.
     ///
     /// Returns an error if the value does not match the meta type.
-    fn push_val(
-        &mut self,
-        var_name: &str,
-        value: &Value,
-        cidl_type: &CidlType,
-    ) -> Result<(), String> {
+    fn push_val(&mut self, var_name: &str, value: &Value, cidl_type: &CidlType) -> Result<()> {
         self.cols.push(alias(var_name));
         let val = validate_json_to_cidl(value, cidl_type, self.model_name, var_name)?;
         self.vals.push(val);
@@ -452,7 +443,7 @@ impl<'a> UpsertBuilder<'a> {
         var_name: &str,
         cidl_type: &CidlType,
         path: &str,
-    ) -> Result<(), String> {
+    ) -> Result<()> {
         match ctx {
             None => {
                 self.cols.push(alias(var_name));
@@ -478,7 +469,7 @@ impl<'a> UpsertBuilder<'a> {
     }
 
     /// Creates a SQL query, being either an update, insert, or upsert.
-    fn build(self) -> Result<(String, Values), String> {
+    fn build(self) -> Result<(String, Values)> {
         let pk_expr = self
             .pk_val
             .map(|v| {
@@ -544,48 +535,52 @@ fn validate_json_to_cidl(
     cidl_type: &CidlType,
     model_name: &str,
     attr_name: &str,
-) -> Result<SimpleExpr, String> {
+) -> Result<SimpleExpr> {
     if matches!(cidl_type, CidlType::Nullable(_)) && value.is_null() {
         return Ok(SimpleExpr::Custom("null".into()));
     }
 
-    let res = match cidl_type.root_type() {
+    match cidl_type.root_type() {
         CidlType::Integer | CidlType::Boolean => {
-            if !matches!(value, Value::Number(_)) {
-                return Err(format!(
-                    "Expected an integer type for {}.{}",
-                    model_name, attr_name
-                ));
-            }
+            ensure!(
+                matches!(value, Value::Number(_)),
+                OrmErrorKind::TypeMismatch,
+                "{}.{}",
+                model_name,
+                attr_name
+            );
 
             Ok(Expr::val(value.as_i64().unwrap()).into())
         }
         CidlType::Real => {
-            if !matches!(value, Value::Number(_)) {
-                return Err(format!(
-                    "Expected an real type for {}.{}",
-                    model_name, attr_name
-                ));
-            }
+            ensure!(
+                matches!(value, Value::Number(_)),
+                OrmErrorKind::TypeMismatch,
+                "{}.{}",
+                model_name,
+                attr_name
+            );
 
             Ok(Expr::val(value.as_f64().unwrap()).into())
         }
         CidlType::Text | CidlType::DateIso => {
-            if !matches!(value, Value::String(_)) {
-                return Err(format!(
-                    "Expected an real type for {}.{}",
-                    model_name, attr_name
-                ));
-            }
+            ensure!(
+                matches!(value, Value::String(_)),
+                OrmErrorKind::TypeMismatch,
+                "{}.{}",
+                model_name,
+                attr_name
+            );
 
             Ok(Expr::val(value.as_str().unwrap()).into())
         }
         CidlType::Blob => match value {
             // Base64 string
             Value::String(b64) => {
-                let bytes = BASE64_STANDARD
-                    .decode(b64)
-                    .map_err(|_| format!("Invalid base64 blob for {}.{}", model_name, attr_name))?;
+                let bytes = match BASE64_STANDARD.decode(b64) {
+                    Ok(b) => b,
+                    Err(_) => fail!(OrmErrorKind::TypeMismatch, "{}.{}", model_name, attr_name),
+                };
 
                 Ok(bytes_to_sqlite(&bytes))
             }
@@ -594,31 +589,25 @@ fn validate_json_to_cidl(
             Value::Array(inner) => {
                 let mut bytes = Vec::with_capacity(inner.len());
                 for v in inner {
-                    let n = v.as_u64().ok_or_else(|| {
-                        format!(
-                            "Expected integer values in blob array for {}.{}",
-                            model_name, attr_name
-                        )
-                    })?;
+                    let n = match v.as_u64() {
+                        Some(n) => n,
+                        None => fail!(OrmErrorKind::TypeMismatch, "{}.{}", model_name, attr_name),
+                    };
+
                     if n > 255 {
-                        return Err(format!(
-                            "Blob array values must be 0-255 in {}.{}",
-                            model_name, attr_name
-                        ));
+                        fail!(OrmErrorKind::TypeMismatch, "{}.{}", model_name, attr_name);
                     }
                     bytes.push(n as u8);
                 }
 
                 Ok(bytes_to_sqlite(&bytes))
             }
-            _ => Err("Expected a b64 string or u8 array for blob".to_string()),
+            _ => fail!(OrmErrorKind::TypeMismatch, "{}.{}", model_name, attr_name),
         },
         _ => {
             unreachable!("Invalid CIDL");
         }
-    };
-
-    res.map_err(|e| format!("{e}, got {value}"))
+    }
 }
 
 /// Convert a byte array to a sqlite hex string suitable

@@ -1,5 +1,6 @@
 use ast::Model;
 use ast::NavigationPropertyKind;
+use ast::fail;
 use indexmap::IndexMap;
 use serde_json::Map;
 use serde_json::Value;
@@ -7,16 +8,19 @@ use serde_json::Value;
 use crate::D1Result;
 use crate::IncludeTreeJson;
 use crate::ModelMeta;
+use crate::methods::OrmErrorKind;
+
+use super::Result;
 
 pub fn map_sql(
     model_name: &str,
     meta: &ModelMeta,
     rows: &D1Result,
     include_tree: Option<&IncludeTreeJson>,
-) -> Result<Vec<Value>, String> {
+) -> Result<Vec<Value>> {
     let model = match meta.get(model_name) {
         Some(m) => m,
-        None => return Err(format!("Unknown model {model_name}")),
+        None => fail!(OrmErrorKind::UnknownModel, "{}", model_name),
     };
 
     let pk_name = &model.primary_key.name;
@@ -78,7 +82,7 @@ fn process_navigation_properties(
     include_tree: &Map<String, Value>,
     row: &Map<String, Value>,
     meta: &ModelMeta,
-) -> Result<(), String> {
+) -> Result<()> {
     for nav_prop in &model.navigation_properties {
         // Skip any property not in the tree.
         if !include_tree.contains_key(&nav_prop.var_name) {
@@ -87,7 +91,7 @@ fn process_navigation_properties(
 
         let nested_model = match meta.get(&nav_prop.model_name) {
             Some(m) => m,
-            None => return Err(format!("Unknown model {}.", nav_prop.model_name)),
+            None => fail!(OrmErrorKind::UnknownModel, "{}", nav_prop.model_name),
         };
 
         // Nested properties always use their navigation path prefix (e.g. "cat.toy.id")

@@ -1,13 +1,18 @@
 use std::collections::HashMap;
 
-use ast::{Model, NavigationPropertyKind};
+use ast::{Model, NavigationPropertyKind, fail};
 use sea_query::{
     ColumnRef, CommonTableExpression, Expr, IntoCondition, IntoIden, Query, SelectStatement,
     SqliteQueryBuilder, TableRef, WithClause,
 };
 use serde_json::Value;
 
-use crate::{IncludeTreeJson, ModelMeta, methods::alias};
+use crate::{
+    IncludeTreeJson, ModelMeta,
+    methods::{OrmErrorKind, alias},
+};
+
+use super::Result;
 
 pub fn list_models(
     model_name: &str,
@@ -15,10 +20,10 @@ pub fn list_models(
     custom_from: Option<String>,
     tag_cte: Option<String>,
     meta: &ModelMeta,
-) -> Result<String, String> {
+) -> Result<String> {
     let model = match meta.get(model_name) {
         Some(m) => m,
-        None => return Err(format!("Unknown model {model_name}")),
+        None => fail!(OrmErrorKind::UnknownModel, "{}", model_name),
     };
 
     let mut query = Query::select();
