@@ -402,9 +402,9 @@ export class Orm {
    * Maps SQL records to an instantiated Model. The records must be flat
    * (e.g., of the form "id, name, address") or derive from a Cloesce data source view
    * (e.g., of the form "Horse.id, Horse.name, Horse.address")
-   * 
+   *
    * Assumes the data is formatted correctly, throwing an error otherwise.
-   * 
+   *
    * @param ctor The model constructor
    * @param records D1 Result records
    * @param includeTree Include tree to define the relationships to join.

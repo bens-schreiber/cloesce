@@ -1,5 +1,3 @@
 {
-  "ignorePatterns": [
-    "**/fixtures/**"
-  ]
+  "ignorePatterns": ["**/fixtures/**"]
 }

@@ -87,7 +87,7 @@ type RouterResult<T = unknown> = [HttpResult<T>, MediaType];
 /**
  * Expected states in which the router may exit.
  */
-export enum RouterExitState {
+export enum RouterError {
   UnknownPrefix,
   UnknownRoute,
   UnmatchedHttpVerb,
@@ -292,7 +292,7 @@ export class CloesceApp {
         if (!injected) {
           return HttpResult.fail(
             500,
-            `An injected parameter was missing from the instance registry: ${JSON.stringify(attr.injected)} (ErrorCode: ${RouterExitState.MissingDependency})`,
+            `An injected parameter was missing from the instance registry: ${JSON.stringify(attr.injected)} (ErrorCode: ${RouterError.MissingDependency})`,
           ).toResponse(MediaType.Text);
         }
 
@@ -358,14 +358,14 @@ function matchRoute(
 
   // Error state: We expect an exact request format, and expect that the model
   // and are apart of the CIDL
-  const notFound = (c: RouterExitState) => exit(404, c, "Unknown route");
+  const notFound = (c: RouterError) => exit(404, c, "Unknown route");
 
   for (const p of prefix) {
-    if (parts.shift() !== p) return notFound(RouterExitState.UnknownPrefix);
+    if (parts.shift() !== p) return notFound(RouterError.UnknownPrefix);
   }
 
   if (parts.length < 2) {
-    return notFound(RouterExitState.UnknownPrefix);
+    return notFound(RouterError.UnknownPrefix);
   }
 
   // Extract pattern
@@ -376,10 +376,10 @@ function matchRoute(
   const model = ast.models[namespace];
   if (model) {
     const method = model.methods[methodName];
-    if (!method) return notFound(RouterExitState.UnknownRoute);
+    if (!method) return notFound(RouterError.UnknownRoute);
 
     if (request.method !== method.http_verb) {
-      return notFound(RouterExitState.UnmatchedHttpVerb);
+      return notFound(RouterError.UnmatchedHttpVerb);
     }
 
     return Either.right({
@@ -396,10 +396,10 @@ function matchRoute(
     const method = service.methods[methodName];
 
     // Services do not have IDs.
-    if (!method || id) return notFound(RouterExitState.UnknownRoute);
+    if (!method || id) return notFound(RouterError.UnknownRoute);
 
     if (request.method !== method.http_verb) {
-      return notFound(RouterExitState.UnmatchedHttpVerb);
+      return notFound(RouterError.UnmatchedHttpVerb);
     }
 
     return Either.right({
@@ -411,7 +411,7 @@ function matchRoute(
     });
   }
 
-  return notFound(RouterExitState.UnknownRoute);
+  return notFound(RouterError.UnknownRoute);
 }
 
 /**
@@ -428,12 +428,12 @@ async function validateRequest(
   Either<HttpResult, { params: RequestParamMap; dataSource: string | null }>
 > {
   // Error state: any missing parameter, body, or malformed input will exit with 400.
-  const invalidRequest = (c: RouterExitState) =>
+  const invalidRequest = (c: RouterError) =>
     exit(400, c, "Invalid Request Body");
 
   // Models must have an ID on instantiated methods.
   if (route.kind === "model" && !route.method.is_static && route.id == null) {
-    return invalidRequest(RouterExitState.InstantiatedMethodMissingId);
+    return invalidRequest(RouterError.InstantiatedMethodMissingId);
   }
 
   // Filter out injected parameters
@@ -468,12 +468,12 @@ async function validateRequest(
         }
       }
     } catch {
-      return invalidRequest(RouterExitState.RequestMissingBody);
+      return invalidRequest(RouterError.RequestMissingBody);
     }
   }
 
   if (!requiredParams.every((p) => p.name in params)) {
-    return invalidRequest(RouterExitState.RequestBodyMissingParameters);
+    return invalidRequest(RouterError.RequestBodyMissingParameters);
   }
 
   // Validate all parameters type
@@ -487,7 +487,7 @@ async function validateRequest(
         ctorReg,
       );
       if (res.isLeft()) {
-        return invalidRequest(RouterExitState.RequestBodyInvalidParameter);
+        return invalidRequest(RouterError.RequestBodyInvalidParameter);
       }
 
       params[p.name] = res.unwrap();
@@ -504,7 +504,7 @@ async function validateRequest(
     )
     .map((p) => params[p.name] as string)[0];
   if (route.kind === "model" && !route.method.is_static && !dataSource) {
-    return invalidRequest(RouterExitState.InstantiatedMethodMissingDataSource);
+    return invalidRequest(RouterError.InstantiatedMethodMissingDataSource);
   }
 
   return Either.right({ params, dataSource: dataSource ?? null });
@@ -529,7 +529,7 @@ async function hydrateModelD1(
   const malformedQuery = (e: any) =>
     exit(
       500,
-      RouterExitState.InvalidDatabaseQuery,
+      RouterError.InvalidDatabaseQuery,
       `Error in hydration query, is the database out of sync with the backend?: ${e instanceof Error ? e.message : String(e)}`,
     );
 
@@ -548,7 +548,7 @@ async function hydrateModelD1(
 
     // Error state: If no record is found for the id, return a 404
     if (!records?.results) {
-      return exit(404, RouterExitState.ModelNotFound, "Record not found");
+      return exit(404, RouterError.ModelNotFound, "Record not found");
     }
 
     if (records.error) {
@@ -593,7 +593,7 @@ async function methodDispatch(
       return [
         exit(
           500,
-          RouterExitState.MissingDependency,
+          RouterError.MissingDependency,
           `An injected parameter was missing from the instance registry: ${JSON.stringify(param.cidl_type)}`,
         ).unwrapLeft(),
         MediaType.Text,
@@ -627,7 +627,7 @@ async function methodDispatch(
     return [
       exit(
         500,
-        RouterExitState.UncaughtException,
+        RouterError.UncaughtException,
         `Uncaught exception in method dispatch: ${e instanceof Error ? e.message : String(e)}`,
       ).unwrapLeft(),
       MediaType.Text,
@@ -637,7 +637,7 @@ async function methodDispatch(
 
 function exit(
   status: number,
-  state: RouterExitState,
+  state: RouterError,
   message: string,
   debugMessage: string = "",
 ): Either<HttpResult<void>, never> {

@@ -116,9 +116,11 @@ impl GeneratorErrorKind {
                 "",
                 GeneratorPhase::SemanticAnalysis,
             ),
-            GeneratorErrorKind::InvalidMapping => {
-                ("CIDL is ill-formatted", "", GeneratorPhase::SemanticAnalysis)
-            }
+            GeneratorErrorKind::InvalidMapping => (
+                "CIDL is ill-formatted",
+                "",
+                GeneratorPhase::SemanticAnalysis,
+            ),
             GeneratorErrorKind::MismatchedForeignKeyTypes => (
                 "Mismatched foreign keys",
                 "Foreign keys must be the same type as their reference",
