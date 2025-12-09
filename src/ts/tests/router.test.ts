@@ -711,7 +711,7 @@ describe("Request Validation", () => {
       testCase.ctorReg ?? {},
       route,
     );
-    ``;
+
     // Assert
     expect(res.isRight()).toBe(true);
     expect(res.unwrap().params).toEqual(testCase.instanceValues);

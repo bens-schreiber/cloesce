@@ -11,7 +11,7 @@
     "typecheck": "tsc --noEmit",
     "build": "tsc -p tsconfig.json && npm run copy-rs-orm-wasm && npm run copy-generator-wasm && chmod +x dist/cli.js",
     "copy-rs-orm-wasm": "cp ../orm/target/wasm32-unknown-unknown/release/orm.wasm ./dist/orm.wasm",
-    "copy-generator-wasm": "cp ../../generator/target/wasm32-wasip1/release/cli.wasm ./dist/generator.wasm"
+    "copy-generator-wasm": "cp ../generator/target/wasm32-wasip1/release/cli.wasm ./dist/generator.wasm"
   },
   "dependencies": {
     "cmd-ts": "^0.14.1",
@@ -20,9 +20,10 @@
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20250906.0",
+    "oxlint": "^1.32.0",
+    "prettier": "^3.6.2",
     "ts-node": "^10.9.2",
     "typescript": "^5.6.0",
-    "prettier": "^3.6.2",
     "vitest": "^3.2.4"
   },
   "exports": {

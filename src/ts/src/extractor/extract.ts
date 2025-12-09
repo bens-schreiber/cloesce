@@ -965,7 +965,8 @@ export class CidlExtractor {
         return err(
           ExtractorErrorCode.InvalidNavigationPropertyReference,
           (e) => {
-            ((e.snippet = navProp.getText()), (e.context = prop.getName()));
+            e.snippet = navProp.getText();
+            e.context = prop.getName();
           },
         );
       }

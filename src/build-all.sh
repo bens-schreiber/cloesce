@@ -1,7 +1,7 @@
 # ORM (ensure wasm is installed, `rustup target add wasm32-unknown-unknown`)
-cd ./frontend/orm
+cd ./orm
 cargo build --target wasm32-unknown-unknown --release
-cd ../..
+cd ../
 
 # Generator (ensure wasi is installed, `rustup target add wasm32-wasip1`)
 cd ./generator
@@ -9,5 +9,5 @@ cargo build --target wasm32-wasip1 --release
 cd ..
 
 # Frontend TS
-cd ./frontend/ts
+cd ./ts
 npm run build

@@ -1,4 +1,4 @@
-import { HttpVerb, MediaType } from "../ast.js";
+import { MediaType } from "../ast.js";
 
 type DeepPartialInner<T> = T extends (infer U)[]
   ? DeepPartialInner<U>[]

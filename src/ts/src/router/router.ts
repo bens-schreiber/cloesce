@@ -467,7 +467,7 @@ async function validateRequest(
           throw new Error("not implemented");
         }
       }
-    } catch (e: any) {
+    } catch {
       return invalidRequest(RouterExitState.RequestMissingBody);
     }
   }
