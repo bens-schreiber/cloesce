@@ -8,6 +8,26 @@ export class Dog {
   name: string;
   age: number;
 
+  async getPartialSelf(
+    __dataSource: "none" = "none",
+    fetchImpl: typeof fetch = fetch
+  ): Promise<HttpResult<DeepPartial<Dog>>> {
+    const baseUrl = new URL(`http://localhost:5002/api/Dog/${this.id}/getPartialSelf`);
+
+      baseUrl.searchParams.append('__dataSource', String(__dataSource));
+
+    const res = await fetchImpl(baseUrl, {
+      method: "GET",
+      duplex: "half",
+    });
+
+    return await HttpResult.fromResponse<DeepPartial<Dog>>(
+      res, 
+      MediaType.Json,
+      DeepPartial<Dog>,
+      false
+    );
+  }
   static async post(
     dog: DeepPartial<Dog>,
     fetchImpl: typeof fetch = fetch
@@ -34,8 +54,6 @@ export class Dog {
 
   static fromJson(data: any): Dog {
     const res = Object.assign(new Dog(), data);
-
-
     return res;
   }
 }

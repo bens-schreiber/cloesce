@@ -37,6 +37,24 @@
       ],
       "navigation_properties": [],
       "methods": {
+        "getPartialSelf": {
+          "name": "getPartialSelf",
+          "is_static": false,
+          "http_verb": "GET",
+          "return_media": "Json",
+          "return_type": {
+            "Partial": "Dog"
+          },
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "__dataSource",
+              "cidl_type": {
+                "DataSource": "Dog"
+              }
+            }
+          ]
+        },
         "post": {
           "name": "post",
           "is_static": true,
