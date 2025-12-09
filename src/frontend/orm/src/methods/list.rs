@@ -7,11 +7,11 @@ use sea_query::{
 };
 use serde_json::Value;
 
-use crate::{IncludeTree, ModelMeta, common::alias};
+use crate::{IncludeTreeJson, ModelMeta, methods::alias};
 
 pub fn list_models(
     model_name: &str,
-    include_tree: Option<&IncludeTree>,
+    include_tree: Option<&IncludeTreeJson>,
     custom_from: Option<String>,
     tag_cte: Option<String>,
     meta: &ModelMeta,
@@ -70,7 +70,7 @@ pub fn list_models(
 #[allow(clippy::too_many_arguments)]
 fn dfs(
     model: &Model,
-    tree: Option<&IncludeTree>,
+    tree: Option<&IncludeTreeJson>,
     query: &mut SelectStatement,
     path: &mut Vec<String>,
     model_alias: String,
@@ -220,7 +220,7 @@ mod test {
     use serde_json::json;
     use sqlx::SqlitePool;
 
-    use crate::{ModelMeta, common::test_sql, expected_str};
+    use crate::{ModelMeta, expected_str, methods::test_sql};
 
     use super::list_models;
 

@@ -5,14 +5,14 @@ use serde_json::Map;
 use serde_json::Value;
 
 use crate::D1Result;
-use crate::IncludeTree;
+use crate::IncludeTreeJson;
 use crate::ModelMeta;
 
 pub fn map_sql(
     model_name: &str,
     meta: &ModelMeta,
     rows: &D1Result,
-    include_tree: Option<&IncludeTree>,
+    include_tree: Option<&IncludeTreeJson>,
 ) -> Result<Vec<Value>, String> {
     let model = match meta.get(model_name) {
         Some(m) => m,
@@ -176,7 +176,7 @@ mod tests {
     use serde_json::{Map, Value, json};
     use std::collections::HashMap;
 
-    use crate::map::map_sql;
+    use crate::methods::map::map_sql;
 
     #[test]
     fn no_records_returns_empty() {

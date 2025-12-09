@@ -1,21 +1,19 @@
 #![allow(clippy::missing_safety_doc)]
-mod common;
-mod list;
-mod map;
-mod upsert;
+mod methods;
 
 use ast::Model;
+
+use methods::upsert::UpsertModel;
 
 use serde_json::Map;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::slice;
 use std::str;
-use upsert::UpsertModel;
 
 type D1Result = Vec<Map<String, serde_json::Value>>;
 type ModelMeta = HashMap<String, Model>;
-type IncludeTree = Map<String, serde_json::Value>;
+type IncludeTreeJson = Map<String, serde_json::Value>;
 
 /// WASM memory allocation handler. A subsequent [dealloc] must be called to prevent memory leaks.
 #[unsafe(no_mangle)]
@@ -35,7 +33,7 @@ pub unsafe extern "C" fn dealloc(ptr: *mut u8, cap: usize) {
 }
 
 thread_local! {
-    /// Cloesce meta data AST, intended to be imported once at WASM initializaton
+    /// Cloesce meta data, intended to be imported once at WASM initializaton
     pub static META: RefCell<ModelMeta> = RefCell::new(HashMap::new());
 }
 
@@ -105,7 +103,7 @@ pub unsafe extern "C" fn map_sql(
         }
     };
 
-    let include_tree = match serde_json::from_str::<Option<IncludeTree>>(include_tree_json) {
+    let include_tree = match serde_json::from_str::<Option<IncludeTreeJson>>(include_tree_json) {
         Ok(include_tree) => include_tree,
         Err(e) => {
             yield_error(e);
@@ -113,8 +111,9 @@ pub unsafe extern "C" fn map_sql(
         }
     };
 
-    let res =
-        META.with(|meta| map::map_sql(model_name, &meta.borrow(), &rows, include_tree.as_ref()));
+    let res = META.with(|meta| {
+        methods::map::map_sql(model_name, &meta.borrow(), &rows, include_tree.as_ref())
+    });
     match res {
         Ok(res) => {
             let json_str = serde_json::to_string(&res).unwrap();
@@ -163,7 +162,7 @@ pub unsafe extern "C" fn upsert_model(
         }
     };
 
-    let include_tree = match serde_json::from_str::<Option<IncludeTree>>(include_tree_json) {
+    let include_tree = match serde_json::from_str::<Option<IncludeTreeJson>>(include_tree_json) {
         Ok(include_tree) => include_tree,
         Err(e) => {
             yield_error(e);
@@ -232,7 +231,7 @@ pub unsafe extern "C" fn list_models(
         }
     };
 
-    let include_tree = match serde_json::from_str::<Option<IncludeTree>>(include_tree_json) {
+    let include_tree = match serde_json::from_str::<Option<IncludeTreeJson>>(include_tree_json) {
         Ok(include_tree) => include_tree,
         Err(e) => {
             yield_error(e);
@@ -241,7 +240,7 @@ pub unsafe extern "C" fn list_models(
     };
 
     let res = META.with(|meta| {
-        list::list_models(
+        methods::list::list_models(
             model_name,
             include_tree.as_ref(),
             custom_from,

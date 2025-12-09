@@ -10,9 +10,9 @@ use serde::Serialize;
 use serde_json::Map;
 use serde_json::Value;
 
-use crate::IncludeTree;
+use crate::IncludeTreeJson;
 use crate::ModelMeta;
-use crate::common::alias;
+use crate::methods::alias;
 
 pub struct UpsertModel<'a> {
     meta: &'a ModelMeta,
@@ -39,7 +39,7 @@ impl<'a> UpsertModel<'a> {
         model_name: &str,
         meta: &'a ModelMeta,
         new_model: Map<String, Value>,
-        include_tree: Option<&IncludeTree>,
+        include_tree: Option<&IncludeTreeJson>,
     ) -> Result<Vec<UpsertResult>, String> {
         let mut stmts = {
             let mut generator = Self {
@@ -124,7 +124,7 @@ impl<'a> UpsertModel<'a> {
         parent_model_name: Option<&String>,
         model_name: &str,
         new_model: &Map<String, Value>,
-        include_tree: Option<&IncludeTree>,
+        include_tree: Option<&IncludeTreeJson>,
         path: String,
     ) -> Result<String, String> {
         let model = match self.meta.get(model_name) {
@@ -639,7 +639,10 @@ mod test {
     use serde_json::{Value, json};
     use sqlx::SqlitePool;
 
-    use crate::{common::test_sql, expected_str, upsert::UpsertModel};
+    use crate::{
+        expected_str,
+        methods::{test_sql, upsert::UpsertModel},
+    };
 
     #[sqlx::test]
     async fn upsert_scalar_model(db: SqlitePool) {
