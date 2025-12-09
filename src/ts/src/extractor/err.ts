@@ -14,7 +14,6 @@ export enum ExtractorErrorCode {
   MissingManyToManyUniqueId,
   MissingPrimaryKey,
   MissingDatabaseBinding,
-  MissingWranglerEnv,
   TooManyWranglerEnvs,
   MissingFile,
   InvalidServiceAttribute,
@@ -92,10 +91,6 @@ const errorInfoMap: Record<
   [ExtractorErrorCode.MissingDatabaseBinding]: {
     description: "Missing a database binding in the WranglerEnv definition",
     suggestion: "Add a `D1Database` to your WranglerEnv",
-  },
-  [ExtractorErrorCode.MissingWranglerEnv]: {
-    description: "Missing a wrangler environment definition in the project",
-    suggestion: "Add a @WranglerEnv class in your project.",
   },
   [ExtractorErrorCode.TooManyWranglerEnvs]: {
     description: "Too many wrangler environments defined in the project",

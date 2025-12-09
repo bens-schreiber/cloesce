@@ -137,7 +137,7 @@ export interface CloesceAst {
   version: string;
   project_name: string;
   language: string;
-  wrangler_env: WranglerEnv;
+  wrangler_env?: WranglerEnv;
   models: Record<string, Model>;
   poos: Record<string, PlainOldObject>;
   services: Record<string, Service>;

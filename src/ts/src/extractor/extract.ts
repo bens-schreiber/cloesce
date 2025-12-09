@@ -148,11 +148,6 @@ export class CidlExtractor {
       }
     }
 
-    // Error: A wrangler environment is required
-    if (wranglerEnvs.length < 1) {
-      return err(ExtractorErrorCode.MissingWranglerEnv);
-    }
-
     // Error: Only one wrangler environment can exist
     if (wranglerEnvs.length > 1) {
       return err(
