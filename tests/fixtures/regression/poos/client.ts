@@ -87,8 +87,6 @@ export class PooAcceptYield {
 
   static fromJson(data: any): PooAcceptYield {
     const res = Object.assign(new PooAcceptYield(), data);
-
-
     return res;
   }
 }

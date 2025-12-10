@@ -1,6 +1,0 @@
-==== CLOESCE ERROR ====
-Error [MissingWranglerEnv]: Missing a wrangler environment definition in the project
-Phase: TypeScript IDL Extraction
-Suggested fix: Add a @WranglerEnv class in your project.
-
-

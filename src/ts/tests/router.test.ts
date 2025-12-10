@@ -1,7 +1,7 @@
 import { describe, test, expect, vi, beforeAll } from "vitest";
 import {
   MatchedRoute,
-  RouterExitState,
+  RouterError,
   _cloesceInternal,
 } from "../src/router/router";
 import { HttpVerb, MediaType, Model, NamedTypedValue } from "../src/ast";
@@ -137,7 +137,7 @@ describe("Match Route", () => {
     expect(res.isLeft()).toBe(true);
     expect(res.unwrapLeft().status).toEqual(404);
     expect(extractErrorCode(res.unwrapLeft().message)).toEqual(
-      RouterExitState.UnknownPrefix,
+      RouterError.UnknownPrefix,
     );
   });
 
@@ -153,7 +153,7 @@ describe("Match Route", () => {
     expect(res.isLeft()).toBe(true);
     expect(res.unwrapLeft().status).toEqual(404);
     expect(extractErrorCode(res.unwrapLeft().message)).toEqual(
-      RouterExitState.UnknownRoute,
+      RouterError.UnknownRoute,
     );
   });
 
@@ -169,7 +169,7 @@ describe("Match Route", () => {
     expect(res.isLeft()).toBe(true);
     expect(res.unwrapLeft().status).toEqual(404);
     expect(extractErrorCode(res.unwrapLeft().message)).toEqual(
-      RouterExitState.UnknownRoute,
+      RouterError.UnknownRoute,
     );
   });
 
@@ -190,7 +190,7 @@ describe("Match Route", () => {
     expect(res.isLeft()).toBe(true);
     expect(res.unwrapLeft().status).toEqual(404);
     expect(extractErrorCode(res.unwrapLeft().message)).toEqual(
-      RouterExitState.UnmatchedHttpVerb,
+      RouterError.UnmatchedHttpVerb,
     );
   });
 
@@ -401,7 +401,7 @@ describe("Request Validation", () => {
     // Assert
     expect(res.isLeft()).toBe(true);
     expect(extractErrorCode(res.unwrapLeft().message)).toEqual(
-      RouterExitState.InstantiatedMethodMissingId,
+      RouterError.InstantiatedMethodMissingId,
     );
   });
 
@@ -434,7 +434,7 @@ describe("Request Validation", () => {
     // Assert
     expect(res.isLeft()).toBe(true);
     expect(extractErrorCode(res.unwrapLeft().message)).toEqual(
-      RouterExitState.RequestMissingBody,
+      RouterError.RequestMissingBody,
     );
   });
 
@@ -478,7 +478,7 @@ describe("Request Validation", () => {
     // Assert
     expect(res.isLeft()).toBe(true);
     expect(extractErrorCode(res.unwrapLeft().message)).toEqual(
-      RouterExitState.RequestBodyMissingParameters,
+      RouterError.RequestBodyMissingParameters,
     );
   });
 
@@ -795,9 +795,7 @@ describe("Method Dispatch", () => {
 
     // Assert
     expect(res.ok).toBe(false);
-    expect(extractErrorCode(res.message)).toBe(
-      RouterExitState.MissingDependency,
-    );
+    expect(extractErrorCode(res.message)).toBe(RouterError.MissingDependency);
   });
 
   test("Void Return Type => 200, no data", async () => {
@@ -924,9 +922,7 @@ describe("Method Dispatch", () => {
       await _cloesceInternal.methodDispatch(crud, di, route, {});
 
     // Assert
-    expect(extractErrorCode(res.message)).toBe(
-      RouterExitState.UncaughtException,
-    );
+    expect(extractErrorCode(res.message)).toBe(RouterError.UncaughtException);
     expect(res.status).toBe(500);
   });
 });

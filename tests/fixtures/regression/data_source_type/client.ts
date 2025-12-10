@@ -44,8 +44,6 @@ export class Foo {
 
   static fromJson(data: any): Foo {
     const res = Object.assign(new Foo(), data);
-
-
     return res;
   }
 }
@@ -55,8 +53,6 @@ export class NoDs {
 
   static fromJson(data: any): NoDs {
     const res = Object.assign(new NoDs(), data);
-
-
     return res;
   }
 }
@@ -66,8 +62,6 @@ export class OneDs {
 
   static fromJson(data: any): OneDs {
     const res = Object.assign(new OneDs(), data);
-
-
     return res;
   }
 }

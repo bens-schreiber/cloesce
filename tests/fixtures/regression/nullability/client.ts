@@ -138,8 +138,6 @@ export class NullabilityChecks {
 
   static fromJson(data: any): NullabilityChecks {
     const res = Object.assign(new NullabilityChecks(), data);
-
-
     return res;
   }
 }

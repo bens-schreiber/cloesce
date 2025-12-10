@@ -78,8 +78,6 @@ export class A {
   static fromJson(data: any): A {
     const res = Object.assign(new A(), data);
     res["b"] &&= B.fromJson(res.b);
-
-
     return res;
   }
 }
@@ -112,8 +110,6 @@ export class B {
 
   static fromJson(data: any): B {
     const res = Object.assign(new B(), data);
-
-
     return res;
   }
 }
@@ -127,8 +123,6 @@ export class Course {
     for (let i = 0; i < res.students?.length; i++) {
       res.students[i] = Student.fromJson(res.students[i]);
     }
-
-
     return res;
   }
 }
@@ -162,8 +156,6 @@ export class Dog {
 
   static fromJson(data: any): Dog {
     const res = Object.assign(new Dog(), data);
-
-
     return res;
   }
 }
@@ -243,8 +235,6 @@ export class Person {
     for (let i = 0; i < res.dogs?.length; i++) {
       res.dogs[i] = Dog.fromJson(res.dogs[i]);
     }
-
-
     return res;
   }
 }
@@ -301,8 +291,6 @@ export class Student {
     for (let i = 0; i < res.courses?.length; i++) {
       res.courses[i] = Course.fromJson(res.courses[i]);
     }
-
-
     return res;
   }
 }

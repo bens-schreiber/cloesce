@@ -26,7 +26,7 @@ export function proxyCrud(obj: any, ctor: any, d1: D1Database) {
       }
 
       if (method === "get") {
-        return (id: any, ds: string) => get(ctor, id, ds, d1);
+        return (id: any, ds: string) => _get(ctor, id, ds, d1);
       }
 
       return value;
@@ -52,7 +52,7 @@ async function upsert(
     : HttpResult.fail(500, getRes.value);
 }
 
-async function get(
+async function _get(
   ctor: any,
   id: any,
   dataSource: string,

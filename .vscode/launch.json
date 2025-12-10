@@ -1,0 +1,11 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+      {
+        "name": "Wrangler E2E Debug",
+        "type": "node",
+        "request": "attach",
+        "port": 9230
+      }
+    ]
+  }

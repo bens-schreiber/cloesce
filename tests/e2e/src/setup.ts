@@ -1,14 +1,16 @@
-import { ChildProcessWithoutNullStreams, execSync, spawn } from "child_process";
+import { ChildProcess, execSync, spawn } from "child_process";
 import fs from "fs/promises";
 import kill from "tree-kill";
 
 const PORT = 5002;
-let wranglerProcess: ChildProcessWithoutNullStreams;
+const DEBUG_PORT = 9230;
+let wranglerProcess: ChildProcess;
 
 /**
  * Copies a fixture, runs migrations, builds, and starts a wrangler server.
  */
 export async function startWrangler(fixturesPath: string) {
+  await fs.rm(".generated", { recursive: true, force: true });
   await fs.cp(fixturesPath, ".generated", { recursive: true });
 
   await runCmd(
@@ -27,18 +29,27 @@ export async function startWrangler(fixturesPath: string) {
 
   wranglerProcess = spawn(
     "npx",
-    ["wrangler", "dev", "--port", String(PORT), "--config", "wrangler.toml"],
+    [
+      "wrangler",
+      "dev",
+      "--port",
+      String(PORT),
+      "--config",
+      "wrangler.toml",
+      "--inspector-port",
+      String(DEBUG_PORT),
+    ],
     {
       cwd: ".generated",
-      stdio: "pipe",
+      stdio: "inherit",
     },
   );
 
-  wranglerProcess.stdout.on("data", (data) => {
+  wranglerProcess.stdout?.on("data", (data) => {
     console.log(`[wrangler stdout]: ${data}`);
   });
 
-  wranglerProcess.stderr.on("data", (data) => {
+  wranglerProcess.stderr?.on("data", (data) => {
     console.error(`[wrangler stderr]: ${data}`);
   });
 
@@ -60,8 +71,6 @@ export async function stopWrangler() {
       else resolve();
     });
   });
-
-  await fs.rm(".generated", { recursive: true, force: true });
 }
 
 export function withRes(message: string, res: any): string {

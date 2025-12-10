@@ -1,7 +1,4 @@
-use std::{
-    collections::{BTreeMap, HashMap},
-    path::PathBuf,
-};
+use std::{collections::BTreeMap, path::PathBuf};
 
 use indexmap::IndexMap;
 

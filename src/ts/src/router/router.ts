@@ -56,14 +56,6 @@ export class RuntimeContainer {
 }
 
 /**
- * Meta information on the wrangler env and db bindings
- */
-interface MetaWranglerEnv {
-  envName: string;
-  dbName: string; // TODO: support many db's
-}
-
-/**
  * Given a request, this represents a map of each body / url  param name to
  * its actual value. Unknown, as the a request can be anything.
  */
@@ -197,7 +189,6 @@ export class CloesceApp {
     ast: CloesceAst,
     ctorReg: ConstructorRegistry,
     di: DependencyContainer,
-    d1: D1Database,
   ): Promise<RouterResult> {
     // Global middleware
     for (const m of this.globalMiddleware) {
@@ -241,11 +232,18 @@ export class CloesceApp {
 
     // Hydration
     const hydrated = await (async () => {
-      if (route.method.is_static) {
-        return Either.right(ctorReg[route.namespace]);
-      }
-
       if (route.kind == "model") {
+        // TODO: Support multiple D1 bindings
+        // It's been verified by the compiler that wrangler_env exists if a D1 model is present
+        const d1: D1Database = env[ast.wrangler_env!.db_binding];
+
+        // Proxy CRUD
+        if (route.method.is_static) {
+          return Either.right(
+            proxyCrud(ctorReg[route.namespace], ctorReg[route.namespace], d1),
+          );
+        }
+
         return await hydrateModelD1(
           ctorReg,
           d1,
@@ -255,6 +253,10 @@ export class CloesceApp {
         );
       }
 
+      // Services
+      if (route.method.is_static) {
+        return Either.right(ctorReg[route.namespace]);
+      }
       return Either.right(di.get(route.namespace));
     })();
 
@@ -262,11 +264,8 @@ export class CloesceApp {
       return [hydrated.value, MediaType.Text];
     }
 
-    // Proxy CRUD methods
-    const crud = proxyCrud(hydrated.unwrap(), ctorReg[route.namespace], d1);
-
     // Method dispatch
-    return await methodDispatch(crud, di, route, params);
+    return await methodDispatch(hydrated.unwrap(), di, route, params);
   }
 
   /**
@@ -277,23 +276,29 @@ export class CloesceApp {
     env: any,
     ast: CloesceAst,
     ctorReg: ConstructorRegistry,
-    envMeta: MetaWranglerEnv,
   ): Promise<Response> {
+    await RuntimeContainer.init(ast, ctorReg);
+
     const di: DependencyContainer = new Map();
-    di.set(envMeta.envName, env);
+    if (ast.wrangler_env) {
+      di.set(ast.wrangler_env.name, env);
+    }
     di.set("Request", request);
 
-    // Note: The compiler will put services in topological order
+    // Note: Services are in topological order
     for (const name in ast.services) {
       const service: any = ast.services[name];
 
       for (const attr of service.attributes) {
         const injected = di.get(attr.injected);
         if (!injected) {
-          return HttpResult.fail(
+          return exit(
             500,
-            `An injected parameter was missing from the instance registry: ${JSON.stringify(attr.injected)} (ErrorCode: ${RouterError.MissingDependency})`,
-          ).toResponse(MediaType.Text);
+            RouterError.MissingDependency,
+            `An injected parameter was missing from the instance registry: ${JSON.stringify(attr.injected)}`,
+          )
+            .unwrapLeft()
+            .toResponse(MediaType.Text);
         }
 
         service[attr.var_name] = injected;
@@ -303,18 +308,13 @@ export class CloesceApp {
       di.set(name, Object.assign(new ctorReg[name](), service));
     }
 
-    await RuntimeContainer.init(ast, ctorReg);
-    const d1: D1Database = env[envMeta.dbName]; // TODO: multiple dbs
-
     try {
-      // Core cloesce processing
       const [response, mediaType] = await this.router(
         request,
         env,
         ast,
         ctorReg,
         di,
-        d1,
       );
 
       // Response middleware

@@ -101,8 +101,6 @@ export class Horse {
     for (let i = 0; i < res.likes?.length; i++) {
       res.likes[i] = Like.fromJson(res.likes[i]);
     }
-
-
     return res;
   }
 }
@@ -116,8 +114,6 @@ export class Like {
   static fromJson(data: any): Like {
     const res = Object.assign(new Like(), data);
     res["horse2"] &&= Horse.fromJson(res.horse2);
-
-
     return res;
   }
 }

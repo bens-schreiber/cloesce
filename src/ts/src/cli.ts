@@ -260,10 +260,9 @@ async function extract(args: {
     let ast = result.unwrap();
 
     if (truncate) {
-
       if (ast.wrangler_env) {
         ast.wrangler_env.source_path =
-        "./" + path.basename(ast.wrangler_env.source_path);
+          "./" + path.basename(ast.wrangler_env.source_path);
       }
 
       if (ast.app_source) {
