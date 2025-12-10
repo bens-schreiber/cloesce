@@ -12,8 +12,6 @@ export class Child {
   static fromJson(data: any): Child {
     const res = Object.assign(new Child(), data);
     res["parent"] &&= Parent.fromJson(res.parent);
-
-
     return res;
   }
 }
@@ -114,8 +112,6 @@ export class CrudHaver {
 
   static fromJson(data: any): CrudHaver {
     const res = Object.assign(new CrudHaver(), data);
-
-
     return res;
   }
 }
@@ -199,8 +195,6 @@ export class Parent {
     for (let i = 0; i < res.children?.length; i++) {
       res.children[i] = Child.fromJson(res.children[i]);
     }
-
-
     return res;
   }
 }

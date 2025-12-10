@@ -104,7 +104,7 @@ impl WranglerSpec {
     /// Validates that the bindings described in the AST's WranglerEnv are
     /// consistent with the wrangler spec
     pub fn validate_bindings(&self, ast: &CloesceAst) -> Result<()> {
-        let env = if ast.models.is_empty() {
+        let env = if !ast.models.is_empty() {
             match &ast.wrangler_env {
                 Some(env) => env,
                 None => {
