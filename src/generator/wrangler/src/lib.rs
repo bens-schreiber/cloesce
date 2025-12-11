@@ -266,7 +266,11 @@ impl WranglerFormat {
 
 #[cfg(test)]
 mod tests {
-    use ast::{WranglerEnv, builder::create_ast, err::GeneratorErrorKind};
+    use ast::{
+        WranglerEnv,
+        builder::{ModelBuilder, create_ast},
+        err::GeneratorErrorKind,
+    };
 
     use crate::{D1Database, WranglerFormat};
 
@@ -336,7 +340,7 @@ mod tests {
     #[test]
     fn validate_missing_variable_in_wrangler() {
         // Arrange
-        let mut ast = create_ast(vec![]);
+        let mut ast = create_ast(vec![ModelBuilder::new("User").id().build()]);
         ast.wrangler_env = Some(WranglerEnv {
             name: "Env".into(),
             source_path: "source.ts".into(),
