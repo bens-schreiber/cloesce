@@ -2,8 +2,6 @@ use std::path::Path;
 
 use ast::{ApiMethod, CidlType, CloesceAst, CrudKind, HttpVerb, MediaType, NamedTypedValue};
 
-use wrangler::WranglerSpec;
-
 pub struct WorkersGenerator;
 impl WorkersGenerator {
     /// Generates all model source imports as well as the Cloesce App
@@ -204,21 +202,11 @@ impl WorkersGenerator {
         }
     }
 
-    pub fn create(ast: &mut CloesceAst, wrangler: WranglerSpec, workers_path: &Path) -> String {
+    pub fn create(ast: &mut CloesceAst, workers_path: &Path) -> String {
         let linked_sources = Self::link(ast, workers_path);
         let constructor_registry = Self::registry(ast);
 
         Self::finalize_api_methods(ast);
-
-        // TODO: Hardcoding one database, in the future we need to support any amount
-        let db_binding = wrangler
-            .d1_databases
-            .first()
-            .expect("A D1 database is required to run Cloesce")
-            .binding
-            .as_ref()
-            .expect("A database needs a binding to reference it in the instance container");
-        let env_name = &ast.wrangler_env.name;
 
         format!(
             r#"// GENERATED CODE. DO NOT MODIFY.
@@ -228,8 +216,7 @@ import cidl from "./cidl.json";
 {constructor_registry}
 
 async function fetch(request: Request, env: any, ctx: any): Promise<Response> {{
-    const envMeta = {{ envName: "{env_name}", dbName: "{db_binding}" }};
-    return await app.run(request, env, cidl as any, constructorRegistry, envMeta);
+    return await app.run(request, env, cidl as any, constructorRegistry);
 }}
 
 export default {{ fetch }};"#

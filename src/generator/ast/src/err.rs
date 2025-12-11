@@ -1,11 +1,9 @@
-use std::fmt::Display;
-
 pub type Result<T> = std::result::Result<T, GeneratorError>;
 
 #[derive(Debug)]
 pub enum GeneratorPhase {
-    ModelSemanticAnalysis,
-    Workers,
+    External,
+    SemanticAnalysis,
     Wrangler,
 }
 
@@ -16,16 +14,6 @@ pub struct GeneratorError {
     pub description: String,
     pub suggestion: String,
     pub context: String,
-}
-
-impl Display for GeneratorError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "Description: {} Suggestion: {} Context: {} Kind: {:?} Phase: {:?}",
-            self.description, self.suggestion, self.context, self.kind, self.phase,
-        )
-    }
 }
 
 impl GeneratorError {
@@ -86,92 +74,92 @@ impl GeneratorErrorKind {
             GeneratorErrorKind::NullSqlType => (
                 "Model attributes cannot be literally null",
                 "Remove 'null' from your Model definition.",
-                GeneratorPhase::ModelSemanticAnalysis,
+                GeneratorPhase::SemanticAnalysis,
             ),
             GeneratorErrorKind::NullPrimaryKey => (
                 "Primary keys cannot be nullable",
                 "Remove 'null' from the primary key definition",
-                GeneratorPhase::ModelSemanticAnalysis,
+                GeneratorPhase::SemanticAnalysis,
             ),
             GeneratorErrorKind::InvalidSqlType => (
                 "Model attributes must be valid SQLite types: Integer, Real, Text",
                 "Consider using a navigation property or creating another model.",
-                GeneratorPhase::ModelSemanticAnalysis,
+                GeneratorPhase::SemanticAnalysis,
             ),
             GeneratorErrorKind::UnknownObject => (
                 "Objects must be decorated appropriately as a Model, PlainOldObject, or Inject",
                 "Consider using a decorator on the object.",
-                GeneratorPhase::ModelSemanticAnalysis,
+                GeneratorPhase::SemanticAnalysis,
             ),
             GeneratorErrorKind::UnknownDataSourceReference => (
                 "Data sources must reference a model",
                 "",
-                GeneratorPhase::ModelSemanticAnalysis,
+                GeneratorPhase::SemanticAnalysis,
             ),
             GeneratorErrorKind::UnexpectedVoid => (
                 "Void cannot be an attribute or parameter, only a return type.",
                 "Remove `void`",
-                GeneratorPhase::ModelSemanticAnalysis,
+                GeneratorPhase::SemanticAnalysis,
             ),
             GeneratorErrorKind::UnexpectedInject => (
                 "Attributes and return types cannot be injected values.",
                 "Remove the value.",
-                GeneratorPhase::ModelSemanticAnalysis,
+                GeneratorPhase::SemanticAnalysis,
             ),
             GeneratorErrorKind::MissingOrExtraneousDataSource => (
                 "All instantiated methods must have one data source parameter.",
                 "Add a data source parameter, or remove extras.",
-                GeneratorPhase::ModelSemanticAnalysis,
+                GeneratorPhase::SemanticAnalysis,
             ),
             GeneratorErrorKind::NotYetSupported => (
                 "This feature will be supported in an upcoming Cloesce release.",
                 "",
-                GeneratorPhase::ModelSemanticAnalysis,
+                GeneratorPhase::SemanticAnalysis,
             ),
             GeneratorErrorKind::InvalidMapping => (
                 "CIDL is ill-formatted",
                 "",
-                GeneratorPhase::ModelSemanticAnalysis,
+                GeneratorPhase::SemanticAnalysis,
             ),
             GeneratorErrorKind::MismatchedForeignKeyTypes => (
                 "Mismatched foreign keys",
                 "Foreign keys must be the same type as their reference",
-                GeneratorPhase::ModelSemanticAnalysis,
+                GeneratorPhase::SemanticAnalysis,
             ),
             GeneratorErrorKind::MismatchedNavigationPropertyTypes => (
                 "Navigation property references must match attribute types",
                 "TODO: a good suggestion here",
-                GeneratorPhase::ModelSemanticAnalysis,
+                GeneratorPhase::SemanticAnalysis,
             ),
             GeneratorErrorKind::InvalidNavigationPropertyReference => (
                 "Navigation property references must be to foreign keys or other navigation properties",
                 "TODO: a good suggestion here",
-                GeneratorPhase::ModelSemanticAnalysis,
+                GeneratorPhase::SemanticAnalysis,
             ),
             GeneratorErrorKind::CyclicalDependency => (
                 "Model and Service composition cannot be cyclical",
                 "In Models, allow a navigation property to be null. In Services prefer direct dependency injection.)",
-                GeneratorPhase::ModelSemanticAnalysis,
+                GeneratorPhase::SemanticAnalysis,
             ),
             GeneratorErrorKind::UnknownIncludeTreeReference => (
                 "Unknown reference in Include Tree definition",
                 "",
-                GeneratorPhase::ModelSemanticAnalysis,
+                GeneratorPhase::SemanticAnalysis,
             ),
             GeneratorErrorKind::ExtraneousManyToManyReferences => (
                 "Only two navigation properties can reference a many to many table",
                 "Remove a reference",
-                GeneratorPhase::ModelSemanticAnalysis,
+                GeneratorPhase::SemanticAnalysis,
             ),
             GeneratorErrorKind::MissingManyToManyReference => (
                 "Many to Many navigation properties must have a correlated reference on the adjacent model.",
                 "TODO: a good indicator of where to add the nav prop",
-                GeneratorPhase::ModelSemanticAnalysis,
+                GeneratorPhase::SemanticAnalysis,
             ),
             GeneratorErrorKind::InvalidStream => (
                 "Streams cannot be nullable, apart of an object or in an array. In a method, they must be the only parameter.",
                 "Use a `Blob` type",
-                GeneratorPhase::ModelSemanticAnalysis,
+                GeneratorPhase::SemanticAnalysis,
             ),
             GeneratorErrorKind::InconsistentWranglerBinding => (
                 "Wrangler file definitions must be consistent with the WranglerEnv definition",
@@ -180,7 +168,7 @@ impl GeneratorErrorKind {
             ),
 
             // Generic error, handeled seperately from all others
-            GeneratorErrorKind::InvalidInputFile => ("", "", GeneratorPhase::ModelSemanticAnalysis),
+            GeneratorErrorKind::InvalidInputFile => ("", "", GeneratorPhase::External),
         };
 
         GeneratorError::new(self, phase, description.into(), suggestion.into())

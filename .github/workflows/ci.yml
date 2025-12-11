@@ -41,7 +41,7 @@ jobs:
       - run: rustup target add wasm32-wasip1
 
       - name: Check & Build & Test ORM
-        working-directory: src/frontend/orm
+        working-directory: src/orm
         run: |
           cargo fmt -- --check
           cargo clippy --all-targets --all-features -- -D warnings
@@ -68,7 +68,7 @@ jobs:
           key: npm-cache-${{ hashFiles('**/package-lock.json') }}
 
       - name: Check & Build & Test Frontend TS
-        working-directory: src/frontend/ts
+        working-directory: src/ts
         run: |
           npm ci
           npm run format -- --check

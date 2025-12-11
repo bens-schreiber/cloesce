@@ -7,22 +7,22 @@
 			"path": "src/generator"
 		},
 		{
-			"path": "src/frontend/orm"
+			"path": "src/orm"
 		},
 		{
-			"name": "frontend-ts",
-			"path": "src/frontend/ts"
+			"name": "ts",
+			"path": "src/ts"
 		},
 		{
 			"path": "tests/e2e"
 		},
 		{
-			"name": "regression-runner",
+			"name": "regression",
 			"path": "tests/runner"
 		},
 		{
-			"name": "regression-fixtures",
-			"path": "tests/fixtures/regression"
+			"name": "examples",
+			"path": "examples"
 		}
 	],
 	"settings": {}

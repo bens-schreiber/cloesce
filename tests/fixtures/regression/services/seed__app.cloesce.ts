@@ -1,16 +1,9 @@
 import {
   Service,
-  WranglerEnv,
   GET,
   CloesceApp,
   HttpResult,
 } from "cloesce/backend";
-import { D1Database } from "@cloudflare/workers-types";
-
-@WranglerEnv
-class Env {
-  db: D1Database;
-}
 
 @Service
 export class FooService {
@@ -28,7 +21,6 @@ export class FooService {
 @Service
 export class BarService {
   foo: FooService;
-  env: Env;
 
   @GET
   useFoo(): string {

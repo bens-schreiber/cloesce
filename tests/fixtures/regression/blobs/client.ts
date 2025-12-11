@@ -166,10 +166,8 @@ export class BlobHaver {
 
   static fromJson(data: any): BlobHaver {
     const res = Object.assign(new BlobHaver(), data);
-
     res.blob1 = b64ToU8(res.blob1);
     res.blob2 = b64ToU8(res.blob2);
-
     return res;
   }
 }

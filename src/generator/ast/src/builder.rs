@@ -1,14 +1,10 @@
-use std::{
-    collections::{BTreeMap, HashMap},
-    path::PathBuf,
-};
+use std::{collections::BTreeMap, path::PathBuf};
 
 use indexmap::IndexMap;
 
 use crate::{
     ApiMethod, CidlType, CloesceAst, DataSource, HttpVerb, IncludeTree, InputLanguage, MediaType,
     Model, ModelAttribute, NamedTypedValue, NavigationProperty, NavigationPropertyKind,
-    WranglerEnv,
 };
 
 pub fn create_ast(mut models: Vec<Model>) -> CloesceAst {
@@ -22,12 +18,7 @@ pub fn create_ast(mut models: Vec<Model>) -> CloesceAst {
         language: InputLanguage::TypeScript,
         models: map,
         poos: IndexMap::default(),
-        wrangler_env: WranglerEnv {
-            name: "Env".into(),
-            source_path: "source.ts".into(),
-            db_binding: "db".into(),
-            vars: HashMap::new(),
-        },
+        wrangler_env: None,
         services: IndexMap::default(),
         app_source: None,
         hash: 0,

@@ -56,6 +56,24 @@
                             }
                         }
                     ]
+                },
+                "getPartialSelf": {
+                    "name": "getPartialSelf",
+                    "is_static": false,
+                    "http_verb": "GET",
+                    "return_media": "Json",
+                    "return_type": {
+                        "Partial": "Dog"
+                    },
+                    "parameters_media": "Json",
+                    "parameters": [
+                        {
+                            "name": "__dataSource",
+                            "cidl_type": {
+                                "DataSource": "Dog"
+                            }
+                        }
+                    ]
                 }
             },
             "data_sources": {},

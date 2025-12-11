@@ -612,7 +612,7 @@ class Foo {
 
 ## Unit Tests
 
-- `src/frontend/ts` run `npm test`
+- `src/ts` run `npm test`
 - `src/generator` run `cargo test`
 
 ## Integration Tests

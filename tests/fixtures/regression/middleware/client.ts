@@ -78,8 +78,6 @@ export class Model {
 
   static fromJson(data: any): Model {
     const res = Object.assign(new Model(), data);
-
-
     return res;
   }
 }

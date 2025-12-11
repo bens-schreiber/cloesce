@@ -3,12 +3,7 @@
   "version": "v0.0.4",
   "project_name": "runner",
   "language": "TypeScript",
-  "wrangler_env": {
-    "name": "Env",
-    "source_path": "./seed__app.cloesce.ts",
-    "db_binding": "db",
-    "vars": {}
-  },
+  "wrangler_env": null,
   "models": {},
   "poos": {},
   "services": {
@@ -43,10 +38,6 @@
         {
           "var_name": "foo",
           "injected": "FooService"
-        },
-        {
-          "var_name": "env",
-          "injected": "Env"
         }
       ],
       "methods": {

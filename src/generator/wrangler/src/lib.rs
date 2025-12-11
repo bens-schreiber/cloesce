@@ -85,52 +85,68 @@ impl WranglerSpec {
             );
         }
 
-        for (var, ty) in &ast.wrangler_env.vars {
-            self.vars.entry(var.clone()).or_insert_with(|| {
-                let default = match ty {
-                    CidlType::Text => "default_string",
-                    CidlType::Integer | CidlType::Real => "0",
-                    CidlType::Boolean => "false",
-                    _ => "default_value",
-                };
-                tracing::warn!("Added missing Wrangler var {var} with a default value");
-                default.into()
-            });
+        if let Some(env) = &ast.wrangler_env {
+            for (var, ty) in &env.vars {
+                self.vars.entry(var.clone()).or_insert_with(|| {
+                    let default = match ty {
+                        CidlType::Text => "default_string",
+                        CidlType::Integer | CidlType::Real => "0",
+                        CidlType::Boolean => "false",
+                        _ => "default_value",
+                    };
+                    tracing::warn!("Added missing Wrangler var {var} with a default value");
+                    default.into()
+                });
+            }
         }
     }
 
     /// Validates that the bindings described in the AST's WranglerEnv are
     /// consistent with the wrangler spec
     pub fn validate_bindings(&self, ast: &CloesceAst) -> Result<()> {
+        let env = if !ast.models.is_empty() {
+            match &ast.wrangler_env {
+                Some(env) => env,
+                None => {
+                    fail!(
+                        GeneratorErrorKind::InconsistentWranglerBinding,
+                        "AST is missing WranglerEnv but models are defined"
+                    );
+                }
+            }
+        } else {
+            return Ok(());
+        };
+
         // TODO: Multiple DB's
         let Some(db) = self.d1_databases.first() else {
             fail!(
                 GeneratorErrorKind::InconsistentWranglerBinding,
                 "No D1 databases defined in wrangler config for {}",
-                ast.wrangler_env.source_path.display()
+                env.source_path.display()
             );
         };
 
         ensure!(
-            Some(&ast.wrangler_env.db_binding) == db.binding.as_ref(),
+            Some(&env.db_binding) == db.binding.as_ref(),
             GeneratorErrorKind::InconsistentWranglerBinding,
             "{}.{} != {} in {}",
-            ast.wrangler_env.name,
-            ast.wrangler_env.db_binding,
+            env.name,
+            env.db_binding,
             db.binding.as_ref().unwrap(),
-            ast.wrangler_env.source_path.display()
+            env.source_path.display()
         );
 
         for var in self.vars.keys() {
             ensure!(
-                ast.wrangler_env.vars.contains_key(var),
+                env.vars.contains_key(var),
                 GeneratorErrorKind::InconsistentWranglerBinding,
                 "{} is defined in wrangler but not in the AST's WranglerEnv",
                 var
             )
         }
 
-        for var in ast.wrangler_env.vars.keys() {
+        for var in env.vars.keys() {
             ensure!(
                 self.vars.contains_key(var),
                 GeneratorErrorKind::InconsistentWranglerBinding,
@@ -250,7 +266,11 @@ impl WranglerFormat {
 
 #[cfg(test)]
 mod tests {
-    use ast::{WranglerEnv, builder::create_ast, err::GeneratorErrorKind};
+    use ast::{
+        WranglerEnv,
+        builder::{ModelBuilder, create_ast},
+        err::GeneratorErrorKind,
+    };
 
     use crate::{D1Database, WranglerFormat};
 
@@ -271,7 +291,7 @@ mod tests {
     fn generates_default_wrangler_value() {
         // Arrange
         let mut ast = create_ast(vec![]);
-        ast.wrangler_env = WranglerEnv {
+        ast.wrangler_env = Some(WranglerEnv {
             name: "Env".into(),
             source_path: "source.ts".into(),
             db_binding: "db".into(),
@@ -283,7 +303,7 @@ mod tests {
             ]
             .into_iter()
             .collect(),
-        };
+        });
 
         // Act
         let specs = vec![
@@ -320,8 +340,8 @@ mod tests {
     #[test]
     fn validate_missing_variable_in_wrangler() {
         // Arrange
-        let mut ast = create_ast(vec![]);
-        ast.wrangler_env = WranglerEnv {
+        let mut ast = create_ast(vec![ModelBuilder::new("User").id().build()]);
+        ast.wrangler_env = Some(WranglerEnv {
             name: "Env".into(),
             source_path: "source.ts".into(),
             db_binding: "db".into(),
@@ -331,7 +351,7 @@ mod tests {
             ]
             .into_iter()
             .collect(),
-        };
+        });
 
         let specs = vec![
             WranglerFormat::Toml(toml::from_str("").unwrap()).as_spec(),

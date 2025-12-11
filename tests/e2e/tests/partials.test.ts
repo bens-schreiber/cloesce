@@ -11,7 +11,8 @@ afterAll(async () => {
   await stopWrangler();
 });
 
-describe("POST Dog", () => {
+describe("Dog", () => {
+  let dog: Dog | undefined;
   it("Partial", async () => {
     const res = await Dog.post({
       name: "fido",
@@ -24,6 +25,8 @@ describe("POST Dog", () => {
       name: "fido",
       age: 100,
     });
+
+    dog = res.data;
   });
 
   it("Full", async () => {
@@ -38,6 +41,14 @@ describe("POST Dog", () => {
       id: 2,
       name: "fido",
       age: 100,
+    });
+  });
+
+  it("Get Partial Self", async () => {
+    const res = await dog!.getPartialSelf();
+    expect(res.ok, withRes("GET should be OK", res)).toBe(true);
+    expect(res.data).toEqual({
+      name: "fido",
     });
   });
 });

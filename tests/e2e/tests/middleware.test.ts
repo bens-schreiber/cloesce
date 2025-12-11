@@ -1,4 +1,4 @@
-import { startWrangler, stopWrangler, withRes } from "../src/setup.js";
+import { startWrangler, stopWrangler } from "../src/setup.js";
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { Model } from "../../fixtures/regression/middleware/client.js";
 

@@ -147,7 +147,6 @@ export class {{this.name}} {
     }
       {{/if}}
     {{/each}}
-
     {{#each this.attributes}}
       {{#if (is_blob_array value.cidl_type)}}
     for (let i = 0; i < res.{{name}}.length; i++) {
@@ -157,7 +156,6 @@ export class {{this.name}} {
     res.{{value.name}} = b64ToU8(res.{{value.name}});
       {{/if}}
     {{/each}}
-
     return res;
   }
 }

@@ -274,7 +274,7 @@ pub struct CloesceAst {
     pub version: String,
     pub project_name: String,
     pub language: InputLanguage,
-    pub wrangler_env: WranglerEnv,
+    pub wrangler_env: Option<WranglerEnv>,
 
     // TODO: MapPreventDuplicates is not supported for IndexMap
     pub models: IndexMap<String, Model>,

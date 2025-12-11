@@ -10,8 +10,7 @@ const constructorRegistry = {
 };
 
 async function fetch(request: Request, env: any, ctx: any): Promise<Response> {
-    const envMeta = { envName: "Env", dbName: "db" };
-    return await app.run(request, env, cidl as any, constructorRegistry, envMeta);
+    return await app.run(request, env, cidl as any, constructorRegistry);
 }
 
 export default { fetch };
