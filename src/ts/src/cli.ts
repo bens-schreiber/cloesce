@@ -21,6 +21,11 @@ import {
   getErrorInfo,
 } from "./extractor/err.js";
 
+let debugPhase: "extractor" | "npm cloesce" = "npm cloesce";
+function debug(...args: any[]) {
+  console.log(`[${debugPhase}]: `, ...args);
+}
+
 type WasmConfig = {
   name: string;
   description?: string;
@@ -30,12 +35,12 @@ type WasmConfig = {
 };
 
 type CloesceConfig = {
-  paths?: string[];
-  projectName?: string;
-  truncateSourcePaths?: boolean;
-  outputDir?: string;
-  workersUrl?: string;
-  migrationsPath?: string;
+  paths: string[];
+  projectName: string;
+  truncateSourcePaths: boolean;
+  outPath: string;
+  workersUrl: string;
+  migrationsPath: string;
 };
 
 const cmds = subcommands({
@@ -44,28 +49,17 @@ const cmds = subcommands({
     compile: command({
       name: "compile",
       description: "Run through the full compilation process.",
-      args: {
-        debug: flag({
-          long: "debug",
-          short: "d",
-          description: "Show debug output",
-        }),
-      },
-      handler: async (args) => {
-        const config = loadCloesceConfig(process.cwd(), args.debug);
-
-        if (!config.workersUrl) {
-          console.error(
-            "Error: `workersUrl`` must be defined in cloesce.config.json",
-          );
+      args: {},
+      handler: async () => {
+        const config = loadCloesceConfig(process.cwd());
+        if (!config) {
           process.exit(1);
         }
 
-        // Creates a `cidl.json` file. Exits the process on failure.
-        await extract({ debug: args.debug });
+        await extract(config);
+        debugPhase = "npm cloesce";
 
-        const outputDir = config.outputDir ?? ".generated";
-
+        const outputDir = config.outPath ?? ".generated";
         const generateConfig: WasmConfig = {
           name: "generate",
           wasmFile: "generator.wasm",
@@ -80,7 +74,6 @@ const cmds = subcommands({
           ],
         };
 
-        // Runs a generator command. Exits the process on failure.
         await generate(generateConfig);
       },
     }),
@@ -105,20 +98,9 @@ const cmds = subcommands({
           type: optional(string),
           description: "Input file or directory",
         }),
-        location: option({
-          long: "location",
-          short: "l",
-          type: optional(string),
-          description: "Project directory (default: cwd)",
-        }),
         truncateSourcePaths: flag({
           long: "truncateSourcePaths",
           description: "Sets all source paths to just their file name",
-        }),
-        debug: flag({
-          long: "debug",
-          short: "d",
-          description: "Show debug output",
         }),
         skipTsCheck: flag({
           long: "skipTsCheck",
@@ -126,7 +108,19 @@ const cmds = subcommands({
         }),
       },
       handler: async (args) => {
-        await extract({ ...args });
+        const config: CloesceConfig = {
+          projectName: args.projectName!,
+          outPath: args.out!,
+          paths: [args.inp!],
+          truncateSourcePaths: false,
+          workersUrl: "",
+          migrationsPath: "",
+        };
+
+        await extract(config, {
+          truncateSourcePaths: args.truncateSourcePaths,
+          skipTsCheck: args.skipTsCheck,
+        });
       },
     }),
 
@@ -142,12 +136,12 @@ const cmds = subcommands({
         }),
       },
       handler: async (args) => {
-        const config = loadCloesceConfig(process.cwd(), args.debug);
+        const config = loadCloesceConfig(process.cwd());
+        if (!config) {
+          process.exit(1);
+        }
 
-        const cidlPath = path.join(
-          config.outputDir ?? ".generated",
-          "cidl.json",
-        );
+        const cidlPath = path.join(config.outPath, "cidl.json");
         if (!fs.existsSync(cidlPath)) {
           console.error(
             "Err: No cloesce file found, have you ran `cloesce compile`?",
@@ -155,13 +149,12 @@ const cmds = subcommands({
           process.exit(1);
         }
 
-        const migrationsPath = "./migrations";
-        if (!fs.existsSync(migrationsPath)) {
-          fs.mkdirSync(migrationsPath);
+        if (!fs.existsSync(config.migrationsPath)) {
+          fs.mkdirSync(config.migrationsPath);
         }
 
         const migrationPrefix = path.join(
-          migrationsPath,
+          config.migrationsPath,
           `${timestamp()}_${args.name}`,
         );
         let wasmArgs = [
@@ -173,7 +166,7 @@ const cmds = subcommands({
 
         // Add last migration if exists
         {
-          const files = fs.readdirSync(migrationsPath);
+          const files = fs.readdirSync(config.migrationsPath);
           const jsonFiles = files.filter((f) => f.endsWith(".json"));
 
           // Sort descending by filename
@@ -182,7 +175,7 @@ const cmds = subcommands({
           );
 
           if (jsonFiles.length > 0) {
-            wasmArgs.push(path.join(migrationsPath, jsonFiles[0]));
+            wasmArgs.push(path.join(config.migrationsPath, jsonFiles[0]));
           }
         }
 
@@ -199,59 +192,83 @@ const cmds = subcommands({
   },
 });
 
-async function extract(args: {
-  projectName?: string;
-  out?: string;
-  inp?: string;
-  truncateSourcePaths?: boolean;
-  debug?: boolean;
-  skipTsCheck?: boolean;
-}) {
+async function extract(
+  config: CloesceConfig,
+  args: {
+    truncateSourcePaths?: boolean;
+    skipTsCheck?: boolean;
+  } = {},
+) {
+  const startTime = Date.now();
+  debugPhase = "extractor";
+  debug("Preparing extraction...");
+
   const root = process.cwd();
   const projectRoot = process.cwd();
-  const config = loadCloesceConfig(projectRoot, args.debug);
 
-  const searchPaths = args.inp ? [args.inp] : (config.paths ?? [root]);
-  const outputDir = config.outputDir ?? ".generated";
-  const outPath = args.out ?? path.join(outputDir, "cidl.pre.json");
+  const searchPaths = config.paths ?? [root];
+
+  const outPath = (() => {
+    // If the out path is a directory, join it with "cidl.pre.json"
+    if (
+      fs.existsSync(config.outPath) &&
+      fs.statSync(config.outPath).isDirectory()
+    ) {
+      return path.join(config.outPath, "cidl.pre.json");
+    }
+
+    // If the out path is a file, use it directly
+    if (config.outPath && config.outPath.endsWith(".json")) {
+      return config.outPath;
+    }
+
+    // Default to .generated/cidl.pre.json
+    return path.join(config.outPath ?? ".generated", "cidl.pre.json");
+  })();
+
   const truncate =
     args.truncateSourcePaths ?? config.truncateSourcePaths ?? false;
   const cloesceProjectName =
-    args.projectName ??
-    config.projectName ??
-    readPackageJsonProjectName(projectRoot);
+    config.projectName ?? readPackageJsonProjectName(projectRoot);
 
   const project = new Project({
+    skipAddingFilesFromTsConfig: true,
     compilerOptions: {
+      skipLibCheck: true,
       strictNullChecks: true,
       experimentalDecorators: true,
       emitDecoratorMetadata: true,
     },
   });
-
   findCloesceProject(root, searchPaths, project);
 
   const fileCount = project.getSourceFiles().length;
   if (fileCount === 0) {
     new ExtractorError(ExtractorErrorCode.MissingFile);
   }
-
-  if (args.debug) console.log(`Found ${fileCount} .cloesce.ts files`);
+  debug(`Found ${fileCount} .cloesce.ts files`);
 
   // Run typescript compiler checks to before extraction
   if (!args.skipTsCheck) {
+    const tscStart = Date.now();
+    debug("Running TypeScript compiler checks...");
+
     const diagnostics = project.getPreEmitDiagnostics();
     if (diagnostics.length > 0) {
       console.error("TypeScript errors detected in provided files:");
       console.error(project.formatDiagnosticsWithColorAndContext(diagnostics));
       process.exit(1);
     }
+
+    debug(`TypeScript checks completed in ${Date.now() - tscStart}ms`);
   }
 
   try {
+    const extractorStart = Date.now();
+    debug("Extracting CIDL...");
+
     const extractor = new CidlExtractor(cloesceProjectName, "v0.0.4");
     const result = extractor.extract(project);
-
     if (result.isLeft()) {
       console.error(formatErr(result.value));
       process.exit(1);
@@ -286,28 +303,36 @@ async function extract(args: {
     fs.mkdirSync(path.dirname(outPath), { recursive: true });
     fs.writeFileSync(outPath, json);
 
-    console.log(`CIDL extracted to ${outPath}`);
-
+    debug(
+      `Successfully extracted cidl.pre.json ${outPath} in ${Date.now() - extractorStart}ms`,
+    );
     return { outPath, projectName: cloesceProjectName };
   } catch (err: any) {
     console.error(
-      "Critical uncaught error in generator. \nSubmit a ticket to https://github.com/bens-schreiber/cloesce\n\n",
+      "Critical uncaught error in extractor. \nSubmit a ticket to https://github.com/bens-schreiber/cloesce\n\n",
       err?.message ?? "No error message.",
       "\n",
       err?.stack ?? "No error stack.",
     );
     process.exit(1);
+  } finally {
+    debug(`Extraction process completed in ${Date.now() - startTime}ms`);
   }
 }
 
 async function generate(config: WasmConfig) {
+  const debugStart = Date.now();
+  debug(`Starting generator`);
+
   const root = process.cwd();
 
   // Look for wrangler.toml in the root directory
   const wranglerPath = path.join(root, "wrangler.toml");
   if (!fs.existsSync(wranglerPath)) {
+    debug("No wrangler.toml found, creating empty file.");
     fs.writeFileSync(wranglerPath, "");
   }
+  debug(`Using wrangler.toml at ${wranglerPath}`);
 
   const wasi = new WASI({
     version: "preview1",
@@ -316,34 +341,84 @@ async function generate(config: WasmConfig) {
     preopens: { ".": root },
   });
 
+  const readWasmStart = Date.now();
+  debug(`Reading generator binary...`);
+
   const wasm = await readFile(new URL("./generator.wasm", import.meta.url));
   const mod = await WebAssembly.compile(new Uint8Array(wasm));
   let instance = await WebAssembly.instantiate(mod, {
     wasi_snapshot_preview1: wasi.wasiImport,
   });
+  debug(
+    `Read and compiled generator wasm binary in ${Date.now() - readWasmStart}ms`,
+  );
 
   try {
     wasi.start(instance);
   } catch (err) {
     console.error(`WASM execution failed for ${config.name}:`, err);
+    throw err;
+  } finally {
+    debug(`Generator ${config.name} completed in ${Date.now() - debugStart}ms`);
   }
 }
 
-function loadCloesceConfig(
-  root: string,
-  debug: boolean = false,
-): CloesceConfig {
+function loadCloesceConfig(root: string): CloesceConfig | undefined {
   const configPath = path.join(root, "cloesce.config.json");
-  if (fs.existsSync(configPath)) {
-    try {
-      const config = JSON.parse(fs.readFileSync(configPath, "utf8"));
-      if (debug) console.log(`Loaded config from ${configPath}`);
-      return config;
-    } catch (err) {
-      console.warn(`Failed to parse cloesce.config.json: ${err}`);
-    }
+  if (!fs.existsSync(configPath)) {
+    debug("No cloesce.config.json found");
+    return undefined;
   }
-  return {};
+
+  try {
+    const config = JSON.parse(fs.readFileSync(configPath, "utf8"));
+    debug(`Loaded config from ${configPath}`);
+
+    if (!config.paths || !Array.isArray(config.paths)) {
+      debug("No paths specified in cloesce.config.json, defaulting to root");
+      config.paths = [root];
+    }
+
+    if (!config.projectName) {
+      debug(
+        "No projectName specified in cloesce.config.json, reading from package.json",
+      );
+      config.projectName = readPackageJsonProjectName(root);
+    }
+
+    if (!config.outPath) {
+      debug(
+        "No outPath specified in cloesce.config.json, defaulting to .generated",
+      );
+      config.outPath = ".generated";
+    }
+
+    if (!config.workersUrl) {
+      debug(
+        "No workersUrl specified in cloesce.config.json, localhost:8787 will be used",
+      );
+      config.workersUrl = "http://localhost:8787";
+    }
+
+    if (!config.migrationsPath) {
+      debug(
+        "No migrationsPath specified in cloesce.config.json, defaulting to ./migrations",
+      );
+      config.migrationsPath = "./migrations";
+    }
+
+    if (typeof config.truncateSourcePaths !== "boolean") {
+      config.truncateSourcePaths = false;
+    }
+
+    debug(
+      `Cloesce Config: ${JSON.stringify({ ...config, truncateSourcePaths: undefined }, null, 4)}`,
+    );
+    return config;
+  } catch (err) {
+    console.warn(`Failed to parse cloesce.config.json: ${err}`);
+    throw err;
+  }
 }
 
 function timestamp(): string {
@@ -392,18 +467,23 @@ function findCloesceProject(
 
     const stats = fs.statSync(fullPath);
     if (stats.isFile() && /\.cloesce\.ts$/i.test(fullPath)) {
+      debug(`Found file: ${fullPath}`);
+
       project.addSourceFileAtPath(fullPath);
     } else if (stats.isDirectory()) {
-      walkDirectory(fullPath, project);
+      debug(`Searching directory: ${fullPath}`);
+      walkDirectory(fullPath);
     }
   }
 
-  function walkDirectory(dir: string, project: Project): void {
+  function walkDirectory(dir: string): void {
     for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
       const fullPath = path.join(dir, entry.name);
       if (entry.isDirectory() && !entry.name.startsWith(".")) {
-        walkDirectory(fullPath, project);
+        debug(`Entering directory: ${fullPath}`);
+        walkDirectory(fullPath);
       } else if (entry.isFile() && /\.cloesce\.ts$/i.test(entry.name)) {
+        debug(`Found file: ${fullPath}`);
         project.addSourceFileAtPath(fullPath);
       }
     }

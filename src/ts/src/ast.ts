@@ -40,8 +40,6 @@ export interface ModelAttribute {
 }
 
 export enum MediaType {
-  Text, // Not apart of the CIDL; used for returning error text
-
   Json = "Json",
   Octet = "Octet",
 }

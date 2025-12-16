@@ -15,14 +15,14 @@ export class Horse {
   ): Promise<HttpResult<Horse>> {
     const baseUrl = new URL(`http://localhost:5002/api/Horse/get`);
 
-      baseUrl.searchParams.append('id', String(id));
+    baseUrl.searchParams.append('id', String(id));
 
     const res = await fetchImpl(baseUrl, {
       method: "GET",
       duplex: "half",
     });
 
-    return await HttpResult.fromResponse<Horse>(
+    return await HttpResult.fromResponse(
       res, 
       MediaType.Json,
       Horse,
@@ -37,8 +37,8 @@ export class Horse {
     const baseUrl = new URL(`http://localhost:5002/api/Horse/${this.id}/like`);
     const payload: any = {};
 
-      payload["horse"] = horse;
-      baseUrl.searchParams.append('__dataSource', String(__dataSource));
+    payload["horse"] = horse;
+    baseUrl.searchParams.append('__dataSource', String(__dataSource));
 
     const res = await fetchImpl(baseUrl, {
       method: "POST",
@@ -47,7 +47,7 @@ export class Horse {
       body: requestBody(MediaType.Json, payload)
     });
 
-    return await HttpResult.fromResponse<void>(
+    return await HttpResult.fromResponse(
       res, 
       MediaType.Json,
       undefined,
@@ -65,7 +65,7 @@ export class Horse {
       duplex: "half",
     });
 
-    return await HttpResult.fromResponse<Horse[]>(
+    return await HttpResult.fromResponse(
       res, 
       MediaType.Json,
       Horse,
@@ -79,7 +79,7 @@ export class Horse {
     const baseUrl = new URL(`http://localhost:5002/api/Horse/post`);
     const payload: any = {};
 
-      payload["horse"] = horse;
+    payload["horse"] = horse;
 
     const res = await fetchImpl(baseUrl, {
       method: "POST",
@@ -88,7 +88,7 @@ export class Horse {
       body: requestBody(MediaType.Json, payload)
     });
 
-    return await HttpResult.fromResponse<Horse>(
+    return await HttpResult.fromResponse(
       res, 
       MediaType.Json,
       Horse,

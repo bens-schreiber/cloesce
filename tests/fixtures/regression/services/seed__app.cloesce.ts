@@ -30,7 +30,7 @@ export class BarService {
 
 const app: CloesceApp = new CloesceApp();
 
-app.onRequest((request: Request, env, di: Map<string, any>) => {
+app.onRequest((di: Map<string, any>) => {
   if (!di.has(BarService.name)) {
     return HttpResult.fail(500, "Bar Service was not injected");
   }

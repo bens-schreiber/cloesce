@@ -23,9 +23,9 @@ export class Foo {
     const baseUrl = new URL(`http://localhost:5002/api/Foo/${this.id}/bar`);
     const payload: any = {};
 
-      baseUrl.searchParams.append('customDs', String(customDs));
-      baseUrl.searchParams.append('oneDs', String(oneDs));
-      baseUrl.searchParams.append('noDs', String(noDs));
+    baseUrl.searchParams.append('customDs', String(customDs));
+    baseUrl.searchParams.append('oneDs', String(oneDs));
+    baseUrl.searchParams.append('noDs', String(noDs));
 
     const res = await fetchImpl(baseUrl, {
       method: "POST",
@@ -34,7 +34,7 @@ export class Foo {
       body: requestBody(MediaType.Json, payload)
     });
 
-    return await HttpResult.fromResponse<void>(
+    return await HttpResult.fromResponse(
       res, 
       MediaType.Json,
       undefined,

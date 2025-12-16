@@ -45,9 +45,9 @@ export class PooAcceptYield {
     const baseUrl = new URL(`http://localhost:5002/api/PooAcceptYield/acceptPoos`);
     const payload: any = {};
 
-      payload["a"] = a;
-      payload["b"] = b;
-      payload["c"] = c;
+    payload["a"] = a;
+    payload["b"] = b;
+    payload["c"] = c;
 
     const res = await fetchImpl(baseUrl, {
       method: "POST",
@@ -56,7 +56,7 @@ export class PooAcceptYield {
       body: requestBody(MediaType.Json, payload)
     });
 
-    return await HttpResult.fromResponse<void>(
+    return await HttpResult.fromResponse(
       res, 
       MediaType.Json,
       undefined,
@@ -77,7 +77,7 @@ export class PooAcceptYield {
       body: requestBody(MediaType.Json, payload)
     });
 
-    return await HttpResult.fromResponse<PooC>(
+    return await HttpResult.fromResponse(
       res, 
       MediaType.Json,
       PooC,

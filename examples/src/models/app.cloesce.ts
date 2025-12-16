@@ -10,7 +10,9 @@ export class Env {
 const app = new CloesceApp();
 
 // Preflight
-app.onRequest(async (request: Request, env, di) => {
+app.onRequest(async (di) => {
+  const request = di.get(Request.name) as Request;
+
   if (request.method === "OPTIONS") {
     return HttpResult.ok(200, undefined, {
       "Access-Control-Allow-Origin": "*",
@@ -21,7 +23,9 @@ app.onRequest(async (request: Request, env, di) => {
 });
 
 // attach CORS headers
-app.onResult(async (request, env: Env, di, result: HttpResult) => {
+app.onResult(async (di, result: HttpResult) => {
+  const env: Env = di.get(Env.name) as Env;
+
   result.headers.set("Access-Control-Allow-Origin", env.allowedOrigin);
   result.headers.set(
     "Access-Control-Allow-Methods",

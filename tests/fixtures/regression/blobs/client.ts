@@ -10,7 +10,7 @@ export class BlobService {
     const baseUrl = new URL("http://localhost:5002/api/BlobService/incrementBlob");
     const payload: any = {};
 
-      payload["blob"] = blob;
+    payload["blob"] = blob;
 
     const res = await fetchImpl(baseUrl, {
       method: "POST",
@@ -19,7 +19,7 @@ export class BlobService {
       body: requestBody(MediaType.Json, payload)
     });
 
-    return await HttpResult.fromResponse<Uint8Array>(
+    return await HttpResult.fromResponse(
       res, 
       MediaType.Json,
       Uint8Array,
@@ -40,15 +40,15 @@ export class BlobHaver {
   ): Promise<HttpResult<BlobHaver>> {
     const baseUrl = new URL(`http://localhost:5002/api/BlobHaver/get`);
 
-      baseUrl.searchParams.append('id', String(id));
-      baseUrl.searchParams.append('__datasource', String(__datasource));
+    baseUrl.searchParams.append('id', String(id));
+    baseUrl.searchParams.append('__datasource', String(__datasource));
 
     const res = await fetchImpl(baseUrl, {
       method: "GET",
       duplex: "half",
     });
 
-    return await HttpResult.fromResponse<BlobHaver>(
+    return await HttpResult.fromResponse(
       res, 
       MediaType.Json,
       BlobHaver,
@@ -61,14 +61,14 @@ export class BlobHaver {
   ): Promise<HttpResult<Uint8Array>> {
     const baseUrl = new URL(`http://localhost:5002/api/BlobHaver/${this.id}/getBlob1`);
 
-      baseUrl.searchParams.append('__dataSource', String(__dataSource));
+    baseUrl.searchParams.append('__dataSource', String(__dataSource));
 
     const res = await fetchImpl(baseUrl, {
       method: "GET",
       duplex: "half",
     });
 
-    return await HttpResult.fromResponse<Uint8Array>(
+    return await HttpResult.fromResponse(
       res, 
       MediaType.Json,
       Uint8Array,
@@ -82,7 +82,7 @@ export class BlobHaver {
     const baseUrl = new URL(`http://localhost:5002/api/BlobHaver/inputStream`);
     const payload: any = {};
 
-      payload["stream"] = stream;
+    payload["stream"] = stream;
 
     const res = await fetchImpl(baseUrl, {
       method: "POST",
@@ -91,7 +91,7 @@ export class BlobHaver {
       body: requestBody(MediaType.Octet, payload)
     });
 
-    return await HttpResult.fromResponse<void>(
+    return await HttpResult.fromResponse(
       res, 
       MediaType.Json,
       undefined,
@@ -104,14 +104,14 @@ export class BlobHaver {
   ): Promise<HttpResult<BlobHaver[]>> {
     const baseUrl = new URL(`http://localhost:5002/api/BlobHaver/list`);
 
-      baseUrl.searchParams.append('__datasource', String(__datasource));
+    baseUrl.searchParams.append('__datasource', String(__datasource));
 
     const res = await fetchImpl(baseUrl, {
       method: "GET",
       duplex: "half",
     });
 
-    return await HttpResult.fromResponse<BlobHaver[]>(
+    return await HttpResult.fromResponse(
       res, 
       MediaType.Json,
       BlobHaver,
@@ -126,8 +126,8 @@ export class BlobHaver {
     const baseUrl = new URL(`http://localhost:5002/api/BlobHaver/save`);
     const payload: any = {};
 
-      payload["model"] = model;
-      baseUrl.searchParams.append('__datasource', String(__datasource));
+    payload["model"] = model;
+    baseUrl.searchParams.append('__datasource', String(__datasource));
 
     const res = await fetchImpl(baseUrl, {
       method: "POST",
@@ -136,7 +136,7 @@ export class BlobHaver {
       body: requestBody(MediaType.Json, payload)
     });
 
-    return await HttpResult.fromResponse<BlobHaver>(
+    return await HttpResult.fromResponse(
       res, 
       MediaType.Json,
       BlobHaver,
@@ -149,14 +149,14 @@ export class BlobHaver {
   ): Promise<HttpResult<ReadableStream<Uint8Array>>> {
     const baseUrl = new URL(`http://localhost:5002/api/BlobHaver/${this.id}/yieldStream`);
 
-      baseUrl.searchParams.append('__dataSource', String(__dataSource));
+    baseUrl.searchParams.append('__dataSource', String(__dataSource));
 
     const res = await fetchImpl(baseUrl, {
       method: "GET",
       duplex: "half",
     });
 
-    return await HttpResult.fromResponse<ReadableStream<Uint8Array>>(
+    return await HttpResult.fromResponse(
       res, 
       MediaType.Octet,
       ReadableStream<Uint8Array>,

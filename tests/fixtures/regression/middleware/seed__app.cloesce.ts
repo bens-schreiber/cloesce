@@ -29,7 +29,7 @@ export class Model {
   id: Integer;
 
   @GET
-  static blockedMethod() {}
+  static blockedMethod() { }
 
   @GET
   static getInjectedThing(@Inject thing: InjectedThing): InjectedThing {
@@ -39,23 +39,24 @@ export class Model {
 
 const app: CloesceApp = new CloesceApp();
 
-app.onRequest((request: Request, env, di) => {
+app.onRequest((di) => {
+  const request = di.get("Request") as Request;
   if (request.method === "POST") {
     return HttpResult.fail(401, "POST methods aren't allowed.");
   }
 });
 
-app.onNamespace(Model, (request, env, di) => {
+app.onNamespace(Model, (di) => {
   di.set(InjectedThing.name, {
     value: "hello world",
   });
 });
 
-app.onMethod(Model, "blockedMethod", (request, env, di) => {
+app.onMethod(Model, "blockedMethod", (di) => {
   return HttpResult.fail(401, "Blocked method");
 });
 
-app.onResult((request, env, di, result: HttpResult) => {
+app.onResult((_di, result: HttpResult) => {
   result.headers.set("X-Cloesce-Test", "true");
 });
 

@@ -15,15 +15,15 @@ export class Weather {
   ): Promise<HttpResult<Weather>> {
     const baseUrl = new URL(`http://localhost:5002/api/Weather/get`);
 
-      baseUrl.searchParams.append('id', String(id));
-      baseUrl.searchParams.append('__datasource', String(__datasource));
+    baseUrl.searchParams.append('id', String(id));
+    baseUrl.searchParams.append('__datasource', String(__datasource));
 
     const res = await fetchImpl(baseUrl, {
       method: "GET",
       duplex: "half",
     });
 
-    return await HttpResult.fromResponse<Weather>(
+    return await HttpResult.fromResponse(
       res, 
       MediaType.Json,
       Weather,
@@ -38,8 +38,8 @@ export class Weather {
     const baseUrl = new URL(`http://localhost:5002/api/Weather/save`);
     const payload: any = {};
 
-      payload["model"] = model;
-      baseUrl.searchParams.append('__datasource', String(__datasource));
+    payload["model"] = model;
+    baseUrl.searchParams.append('__datasource', String(__datasource));
 
     const res = await fetchImpl(baseUrl, {
       method: "POST",
@@ -48,7 +48,7 @@ export class Weather {
       body: requestBody(MediaType.Json, payload)
     });
 
-    return await HttpResult.fromResponse<Weather>(
+    return await HttpResult.fromResponse(
       res, 
       MediaType.Json,
       Weather,

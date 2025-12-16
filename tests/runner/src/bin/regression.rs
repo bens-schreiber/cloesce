@@ -20,6 +20,7 @@ struct Cli {
 /// Runs the regression tests, passing each fixture through the entire compilation process.
 fn main() {
     let cli = Cli::parse();
+
     let pattern = format!("../fixtures/regression/{}/seed__*", cli.fixture);
 
     let fixtures = glob(&pattern)
