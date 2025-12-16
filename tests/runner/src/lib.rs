@@ -214,7 +214,6 @@ impl Fixture {
     /// Returns the error given by the command on failure
     fn run_command(&self, command: &mut Command) -> Result<(), String> {
         let output = command.output().expect("Failed to execute command");
-
         if !output.status.success() {
             return Err(String::from_utf8_lossy(&output.stderr).to_string());
         }
