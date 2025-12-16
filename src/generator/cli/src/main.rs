@@ -4,7 +4,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use clap::{Parser, Subcommand, command};
+use clap::{Parser, Subcommand};
 use tracing_subscriber::FmtSubscriber;
 
 use ast::{
