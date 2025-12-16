@@ -28,7 +28,7 @@ pub fn list_models(
 
     let mut query = Query::select();
     if custom_from.is_some() {
-        query.from(TableRef::Table(alias("%CUSTOM_FROM%").into_iden()));
+        query.from(TableRef::Table(alias("__CUSTOM_FROM__").into_iden()));
     } else {
         query.from(alias(&model.name));
     }
@@ -46,14 +46,6 @@ pub fn list_models(
         meta,
     );
 
-    // Hack to support custom FROM clauses
-    if let Some(custom_from) = custom_from {
-        return Ok(query.to_string(SqliteQueryBuilder).replace(
-            "\"%CUSTOM_FROM%\"",
-            &format!("({}) AS \"{}\"", custom_from, model.name),
-        ));
-    }
-
     let view_name = match tag_cte {
         Some(tag) => tag.to_string(),
         None => format!("{}.view", model.name),
@@ -69,7 +61,17 @@ pub fn list_models(
 
     let with = WithClause::new().cte(cte).to_owned();
 
-    Ok(select.with(with).to_string(SqliteQueryBuilder))
+    let res = select.with(with).to_string(SqliteQueryBuilder);
+
+    // Dumb hack to support custom FROM clauses
+    if let Some(custom_from) = custom_from {
+        return Ok(res.replace(
+            "\"__CUSTOM_FROM__\"",
+            &format!("({}) AS \"{}\"", custom_from, model.name),
+        ));
+    }
+
+    Ok(res)
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -276,6 +278,7 @@ mod test {
             .expect("list models to work");
 
         // Assert
+        expected_str!(sql, r#"WITH "Person.view""#);
         expected_str!(
             sql,
             r#"SELECT "Person"."id" AS "id", "Person"."name" AS "name" FROM (SELECT * FROM Person ORDER BY name DESC LIMIT 10) AS "Person""#
