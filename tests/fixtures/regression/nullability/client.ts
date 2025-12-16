@@ -28,7 +28,7 @@ export class NullabilityChecks {
       body: requestBody(MediaType.Json, payload)
     });
 
-    return await HttpResult.fromResponse<string[] | null>(
+    return await HttpResult.fromResponse(
       res, 
       MediaType.Json,
       undefined,
@@ -53,7 +53,7 @@ export class NullabilityChecks {
       body: requestBody(MediaType.Json, payload)
     });
 
-    return await HttpResult.fromResponse<NullabilityChecks[] | null | null>(
+    return await HttpResult.fromResponse(
       res, 
       MediaType.Json,
       NullabilityChecks,
@@ -76,7 +76,7 @@ export class NullabilityChecks {
       body: requestBody(MediaType.Json, payload)
     });
 
-    return await HttpResult.fromResponse<void>(
+    return await HttpResult.fromResponse(
       res, 
       MediaType.Json,
       undefined,
@@ -101,7 +101,7 @@ export class NullabilityChecks {
       body: requestBody(MediaType.Json, payload)
     });
 
-    return await HttpResult.fromResponse<NullabilityChecks | null>(
+    return await HttpResult.fromResponse(
       res, 
       MediaType.Json,
       NullabilityChecks,
@@ -128,7 +128,7 @@ export class NullabilityChecks {
       body: requestBody(MediaType.Json, payload)
     });
 
-    return await HttpResult.fromResponse<boolean | null>(
+    return await HttpResult.fromResponse(
       res, 
       MediaType.Json,
       undefined,

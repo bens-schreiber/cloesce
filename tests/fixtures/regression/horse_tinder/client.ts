@@ -22,7 +22,7 @@ export class Horse {
       duplex: "half",
     });
 
-    return await HttpResult.fromResponse<Horse>(
+    return await HttpResult.fromResponse(
       res, 
       MediaType.Json,
       Horse,
@@ -47,7 +47,7 @@ export class Horse {
       body: requestBody(MediaType.Json, payload)
     });
 
-    return await HttpResult.fromResponse<void>(
+    return await HttpResult.fromResponse(
       res, 
       MediaType.Json,
       undefined,
@@ -65,7 +65,7 @@ export class Horse {
       duplex: "half",
     });
 
-    return await HttpResult.fromResponse<Horse[]>(
+    return await HttpResult.fromResponse(
       res, 
       MediaType.Json,
       Horse,
@@ -88,7 +88,7 @@ export class Horse {
       body: requestBody(MediaType.Json, payload)
     });
 
-    return await HttpResult.fromResponse<Horse>(
+    return await HttpResult.fromResponse(
       res, 
       MediaType.Json,
       Horse,

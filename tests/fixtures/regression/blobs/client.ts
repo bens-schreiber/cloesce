@@ -19,7 +19,7 @@ export class BlobService {
       body: requestBody(MediaType.Json, payload)
     });
 
-    return await HttpResult.fromResponse<Uint8Array>(
+    return await HttpResult.fromResponse(
       res, 
       MediaType.Json,
       Uint8Array,
@@ -48,7 +48,7 @@ export class BlobHaver {
       duplex: "half",
     });
 
-    return await HttpResult.fromResponse<BlobHaver>(
+    return await HttpResult.fromResponse(
       res, 
       MediaType.Json,
       BlobHaver,
@@ -68,7 +68,7 @@ export class BlobHaver {
       duplex: "half",
     });
 
-    return await HttpResult.fromResponse<Uint8Array>(
+    return await HttpResult.fromResponse(
       res, 
       MediaType.Json,
       Uint8Array,
@@ -91,7 +91,7 @@ export class BlobHaver {
       body: requestBody(MediaType.Octet, payload)
     });
 
-    return await HttpResult.fromResponse<void>(
+    return await HttpResult.fromResponse(
       res, 
       MediaType.Json,
       undefined,
@@ -111,7 +111,7 @@ export class BlobHaver {
       duplex: "half",
     });
 
-    return await HttpResult.fromResponse<BlobHaver[]>(
+    return await HttpResult.fromResponse(
       res, 
       MediaType.Json,
       BlobHaver,
@@ -136,7 +136,7 @@ export class BlobHaver {
       body: requestBody(MediaType.Json, payload)
     });
 
-    return await HttpResult.fromResponse<BlobHaver>(
+    return await HttpResult.fromResponse(
       res, 
       MediaType.Json,
       BlobHaver,
@@ -156,7 +156,7 @@ export class BlobHaver {
       duplex: "half",
     });
 
-    return await HttpResult.fromResponse<ReadableStream<Uint8Array>>(
+    return await HttpResult.fromResponse(
       res, 
       MediaType.Octet,
       ReadableStream<Uint8Array>,

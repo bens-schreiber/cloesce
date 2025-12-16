@@ -64,7 +64,7 @@ export class {{this.name}} {
       {{/unless}}
     });
 
-    return await HttpResult.fromResponse<{{ map_cidl_type this.return_type}}>(
+    return await HttpResult.fromResponse(
       res, 
       {{get_media_type this.return_media}},
     {{#if (needs_constructor this.return_type)}}
@@ -122,7 +122,7 @@ export class {{this.name}} {
       {{/unless}}
     });
 
-    return await HttpResult.fromResponse<{{ map_cidl_type this.return_type}}>(
+    return await HttpResult.fromResponse(
       res, 
       {{get_media_type this.return_media}},
     {{#if (needs_constructor this.return_type)}}

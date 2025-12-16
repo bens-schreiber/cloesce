@@ -23,7 +23,7 @@ export class Weather {
       duplex: "half",
     });
 
-    return await HttpResult.fromResponse<Weather>(
+    return await HttpResult.fromResponse(
       res, 
       MediaType.Json,
       Weather,
@@ -48,7 +48,7 @@ export class Weather {
       body: requestBody(MediaType.Json, payload)
     });
 
-    return await HttpResult.fromResponse<Weather>(
+    return await HttpResult.fromResponse(
       res, 
       MediaType.Json,
       Weather,

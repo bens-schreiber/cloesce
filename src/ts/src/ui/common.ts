@@ -191,13 +191,6 @@ export class HttpResult<T = unknown> {
     return this;
   }
 
-  /**
-   * @internal
-   * A method utilized by generated client code to create an `HttpResult` from a Cloesce Workers
-   * `Response`. Given a ctor, assumes it is a Plain old Object or a Model.
-   *
-   * All Cloesce objects have a `static fromJson` method which recursively instantiate the object.
-   */
   static async fromResponse(
     response: Response,
     mediaType: MediaType,

@@ -14,7 +14,7 @@ export class BarService {
       duplex: "half",
     });
 
-    return await HttpResult.fromResponse<string>(
+    return await HttpResult.fromResponse(
       res, 
       MediaType.Json,
       undefined,
@@ -34,7 +34,7 @@ export class FooService {
       duplex: "half",
     });
 
-    return await HttpResult.fromResponse<string>(
+    return await HttpResult.fromResponse(
       res, 
       MediaType.Json,
       undefined,
@@ -52,7 +52,7 @@ export class FooService {
       duplex: "half",
     });
 
-    return await HttpResult.fromResponse<string>(
+    return await HttpResult.fromResponse(
       res, 
       MediaType.Json,
       undefined,

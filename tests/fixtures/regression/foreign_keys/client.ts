@@ -24,7 +24,7 @@ export class A {
       body: requestBody(MediaType.Json, payload)
     });
 
-    return await HttpResult.fromResponse<A>(
+    return await HttpResult.fromResponse(
       res, 
       MediaType.Json,
       A,
@@ -44,7 +44,7 @@ export class A {
       duplex: "half",
     });
 
-    return await HttpResult.fromResponse<A>(
+    return await HttpResult.fromResponse(
       res, 
       MediaType.Json,
       A,
@@ -67,7 +67,7 @@ export class A {
       body: requestBody(MediaType.Json, payload)
     });
 
-    return await HttpResult.fromResponse<void>(
+    return await HttpResult.fromResponse(
       res, 
       MediaType.Json,
       undefined,
@@ -100,7 +100,7 @@ export class B {
       body: requestBody(MediaType.Json, payload)
     });
 
-    return await HttpResult.fromResponse<void>(
+    return await HttpResult.fromResponse(
       res, 
       MediaType.Json,
       undefined,
@@ -146,7 +146,7 @@ export class Dog {
       body: requestBody(MediaType.Json, payload)
     });
 
-    return await HttpResult.fromResponse<void>(
+    return await HttpResult.fromResponse(
       res, 
       MediaType.Json,
       undefined,
@@ -179,7 +179,7 @@ export class Person {
       body: requestBody(MediaType.Json, payload)
     });
 
-    return await HttpResult.fromResponse<Person>(
+    return await HttpResult.fromResponse(
       res, 
       MediaType.Json,
       Person,
@@ -199,7 +199,7 @@ export class Person {
       duplex: "half",
     });
 
-    return await HttpResult.fromResponse<Person>(
+    return await HttpResult.fromResponse(
       res, 
       MediaType.Json,
       Person,
@@ -222,7 +222,7 @@ export class Person {
       body: requestBody(MediaType.Json, payload)
     });
 
-    return await HttpResult.fromResponse<void>(
+    return await HttpResult.fromResponse(
       res, 
       MediaType.Json,
       undefined,
@@ -258,7 +258,7 @@ export class Student {
       body: requestBody(MediaType.Json, payload)
     });
 
-    return await HttpResult.fromResponse<Student>(
+    return await HttpResult.fromResponse(
       res, 
       MediaType.Json,
       Student,
@@ -278,7 +278,7 @@ export class Student {
       duplex: "half",
     });
 
-    return await HttpResult.fromResponse<Student>(
+    return await HttpResult.fromResponse(
       res, 
       MediaType.Json,
       Student,

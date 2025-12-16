@@ -25,7 +25,7 @@ export class Model {
       duplex: "half",
     });
 
-    return await HttpResult.fromResponse<void>(
+    return await HttpResult.fromResponse(
       res, 
       MediaType.Json,
       undefined,
@@ -43,7 +43,7 @@ export class Model {
       duplex: "half",
     });
 
-    return await HttpResult.fromResponse<InjectedThing>(
+    return await HttpResult.fromResponse(
       res, 
       MediaType.Json,
       InjectedThing,
@@ -68,7 +68,7 @@ export class Model {
       body: requestBody(MediaType.Json, payload)
     });
 
-    return await HttpResult.fromResponse<Model>(
+    return await HttpResult.fromResponse(
       res, 
       MediaType.Json,
       Model,

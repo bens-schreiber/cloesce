@@ -56,7 +56,7 @@ export class PooAcceptYield {
       body: requestBody(MediaType.Json, payload)
     });
 
-    return await HttpResult.fromResponse<void>(
+    return await HttpResult.fromResponse(
       res, 
       MediaType.Json,
       undefined,
@@ -77,7 +77,7 @@ export class PooAcceptYield {
       body: requestBody(MediaType.Json, payload)
     });
 
-    return await HttpResult.fromResponse<PooC>(
+    return await HttpResult.fromResponse(
       res, 
       MediaType.Json,
       PooC,

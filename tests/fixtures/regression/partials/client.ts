@@ -21,7 +21,7 @@ export class Dog {
       duplex: "half",
     });
 
-    return await HttpResult.fromResponse<DeepPartial<Dog>>(
+    return await HttpResult.fromResponse(
       res, 
       MediaType.Json,
       DeepPartial<Dog>,
@@ -44,7 +44,7 @@ export class Dog {
       body: requestBody(MediaType.Json, payload)
     });
 
-    return await HttpResult.fromResponse<Dog>(
+    return await HttpResult.fromResponse(
       res, 
       MediaType.Json,
       Dog,

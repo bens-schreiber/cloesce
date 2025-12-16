@@ -34,7 +34,7 @@ export class CrudHaver {
       duplex: "half",
     });
 
-    return await HttpResult.fromResponse<CrudHaver>(
+    return await HttpResult.fromResponse(
       res, 
       MediaType.Json,
       CrudHaver,
@@ -54,7 +54,7 @@ export class CrudHaver {
       duplex: "half",
     });
 
-    return await HttpResult.fromResponse<CrudHaver[]>(
+    return await HttpResult.fromResponse(
       res, 
       MediaType.Json,
       CrudHaver,
@@ -77,7 +77,7 @@ export class CrudHaver {
       body: requestBody(MediaType.Json, payload)
     });
 
-    return await HttpResult.fromResponse<void>(
+    return await HttpResult.fromResponse(
       res, 
       MediaType.Json,
       undefined,
@@ -102,7 +102,7 @@ export class CrudHaver {
       body: requestBody(MediaType.Json, payload)
     });
 
-    return await HttpResult.fromResponse<CrudHaver>(
+    return await HttpResult.fromResponse(
       res, 
       MediaType.Json,
       CrudHaver,
@@ -136,7 +136,7 @@ export class Parent {
       duplex: "half",
     });
 
-    return await HttpResult.fromResponse<Parent>(
+    return await HttpResult.fromResponse(
       res, 
       MediaType.Json,
       Parent,
@@ -156,7 +156,7 @@ export class Parent {
       duplex: "half",
     });
 
-    return await HttpResult.fromResponse<Parent[]>(
+    return await HttpResult.fromResponse(
       res, 
       MediaType.Json,
       Parent,
@@ -181,7 +181,7 @@ export class Parent {
       body: requestBody(MediaType.Json, payload)
     });
 
-    return await HttpResult.fromResponse<Parent>(
+    return await HttpResult.fromResponse(
       res, 
       MediaType.Json,
       Parent,
