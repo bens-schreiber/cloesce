@@ -21,7 +21,6 @@ import {
   getErrorInfo,
 } from "./extractor/err.js";
 
-
 let debugPhase: "extractor" | "npm cloesce" = "npm cloesce";
 function debug(...args: any[]) {
   console.log(`[${debugPhase}]: `, ...args);
@@ -197,13 +196,16 @@ const cmds = subcommands({
   },
 });
 
-async function extract(config: CloesceConfig, args: {
-  projectName?: string;
-  out?: string;
-  inp?: string;
-  truncateSourcePaths?: boolean;
-  skipTsCheck?: boolean;
-} = {}) {
+async function extract(
+  config: CloesceConfig,
+  args: {
+    projectName?: string;
+    out?: string;
+    inp?: string;
+    truncateSourcePaths?: boolean;
+    skipTsCheck?: boolean;
+  } = {},
+) {
   const startTime = Date.now();
   debugPhase = "extractor";
   debug("Preparing extraction...");
@@ -212,7 +214,8 @@ async function extract(config: CloesceConfig, args: {
   const projectRoot = process.cwd();
 
   const searchPaths = args.inp ? [args.inp] : (config.paths ?? [root]);
-  const outPath = args.out ?? path.join(config.outputDir ?? ".generated", "cidl.pre.json");
+  const outPath =
+    args.out ?? path.join(config.outputDir ?? ".generated", "cidl.pre.json");
   const truncate =
     args.truncateSourcePaths ?? config.truncateSourcePaths ?? false;
   const cloesceProjectName =
@@ -292,7 +295,9 @@ async function extract(config: CloesceConfig, args: {
     fs.mkdirSync(path.dirname(outPath), { recursive: true });
     fs.writeFileSync(outPath, json);
 
-    debug(`Successfully extracted cidl.pre.json ${outPath} in ${Date.now() - extractorStart}ms`);
+    debug(
+      `Successfully extracted cidl.pre.json ${outPath} in ${Date.now() - extractorStart}ms`,
+    );
     return { outPath, projectName: cloesceProjectName };
   } catch (err: any) {
     console.error(
@@ -302,14 +307,12 @@ async function extract(config: CloesceConfig, args: {
       err?.stack ?? "No error stack.",
     );
     process.exit(1);
-  }
-  finally {
+  } finally {
     debug(`Extraction process completed in ${Date.now() - startTime}ms`);
   }
 }
 
 async function generate(config: WasmConfig) {
-
   const debugStart = Date.now();
   debug(`Starting generator`);
 
@@ -338,22 +341,21 @@ async function generate(config: WasmConfig) {
   let instance = await WebAssembly.instantiate(mod, {
     wasi_snapshot_preview1: wasi.wasiImport,
   });
-  debug(`Read and compiled generator wasm binary in ${Date.now() - readWasmStart}ms`);
+  debug(
+    `Read and compiled generator wasm binary in ${Date.now() - readWasmStart}ms`,
+  );
 
   try {
     wasi.start(instance);
   } catch (err) {
     console.error(`WASM execution failed for ${config.name}:`, err);
     throw err;
-  }
-  finally {
+  } finally {
     debug(`Generator ${config.name} completed in ${Date.now() - debugStart}ms`);
   }
 }
 
-function loadCloesceConfig(
-  root: string,
-): CloesceConfig {
+function loadCloesceConfig(root: string): CloesceConfig {
   const configPath = path.join(root, "cloesce.config.json");
   if (!fs.existsSync(configPath)) {
     debug("No cloesce.config.json found, using default");
@@ -420,7 +422,6 @@ function findCloesceProject(
 
       project.addSourceFileAtPath(fullPath);
     } else if (stats.isDirectory()) {
-
       debug(`Searching directory: ${fullPath}`);
       walkDirectory(fullPath);
     }
@@ -432,7 +433,6 @@ function findCloesceProject(
       if (entry.isDirectory() && !entry.name.startsWith(".")) {
         debug(`Entering directory: ${fullPath}`);
         walkDirectory(fullPath);
-
       } else if (entry.isFile() && /\.cloesce\.ts$/i.test(entry.name)) {
         debug(`Found file: ${fullPath}`);
         project.addSourceFileAtPath(fullPath);
