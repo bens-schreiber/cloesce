@@ -60,8 +60,11 @@ export class Either<L, R> {
     return this.inner.ok ? this.inner.right : this.inner.left;
   }
 
-  static left<L, R = never>(value: L): Either<L, R> {
-    return new Either({ ok: false, left: value });
+  static left<R>(): Either<void, R>;
+  static left<L, R = never>(value: L): Either<L, R>;
+
+  static left<L, R = never>(value?: L): Either<L | void, R> {
+    return new Either({ ok: false, left: value as L | void });
   }
 
   static right<R, L = never>(value: R): Either<L, R> {
@@ -112,9 +115,6 @@ export function requestBody(
   data: any | string | undefined,
 ): undefined | string | FormData {
   switch (mediaType) {
-    case MediaType.Text: {
-      return data ?? "";
-    }
     case MediaType.Json: {
       return JSON.stringify(data ?? {}, (_, v) =>
         v instanceof Uint8Array ? u8ToB64(v) : v,
@@ -147,6 +147,7 @@ export class HttpResult<T = unknown> {
     public headers: Headers,
     public data?: T,
     public message?: string,
+    public mediaType?: MediaType,
   ) {}
 
   static ok<T>(status: number, data?: T, init?: HeadersInit): HttpResult {
@@ -159,12 +160,8 @@ export class HttpResult<T = unknown> {
     return new HttpResult<never>(false, status, headers, undefined, message);
   }
 
-  toResponse(mediaType: MediaType): Response {
-    switch (mediaType) {
-      case MediaType.Text: {
-        this.headers.set("Content-Type", "text/plain");
-        break;
-      }
+  toResponse(): Response {
+    switch (this.mediaType) {
       case MediaType.Json: {
         this.headers.set("Content-Type", "application/json");
         break;
@@ -173,19 +170,25 @@ export class HttpResult<T = unknown> {
         this.headers.set("Content-Type", "application/octet-stream");
         break;
       }
+      case undefined: {
+        // Errors are always text.
+        this.headers.set("Content-Type", "text/plain");
+        return new Response(this.message, {
+          status: this.status,
+          headers: this.headers,
+        });
+      }
     }
 
-    if (!this.ok) {
-      return new Response(this.message, {
-        status: this.status,
-        headers: this.headers,
-      });
-    }
-
-    return new Response(requestBody(mediaType, this.data), {
+    return new Response(requestBody(this.mediaType, this.data), {
       status: this.status,
       headers: this.headers,
     });
+  }
+
+  setMediaType(mediaType: MediaType): this {
+    this.mediaType = mediaType;
+    return this;
   }
 
   /**

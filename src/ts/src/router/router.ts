@@ -53,6 +53,13 @@ export class RuntimeContainer {
   static get(): RuntimeContainer {
     return this.instance!;
   }
+
+  /**
+   * Disposes the singleton instance. For testing purposes only.
+   */
+  static dispose() {
+    this.instance = undefined;
+  }
 }
 
 /**
@@ -62,19 +69,13 @@ export class RuntimeContainer {
 export type RequestParamMap = Record<string, unknown>;
 
 export type MiddlewareFn = (
-  request: Request,
-  env: any,
   di: DependencyContainer,
 ) => Promise<HttpResult | void>;
 
 export type ResultMiddlewareFn = (
-  request: Request,
-  env: any,
   di: DependencyContainer,
   result: HttpResult,
 ) => Promise<HttpResult | void>;
-
-type RouterResult<T = unknown> = [HttpResult<T>, MediaType];
 
 /**
  * Expected states in which the router may exit.
@@ -119,8 +120,6 @@ export class CloesceApp {
    * Optionally, return a new HttpResult to short-circuit the response.
    *
    * Errors thrown in response middleware are caught and returned as a 500 response.
-   *
-   * Errors thrown in earlier middleware or route processing are not caught here.
    *
    * TODO: Middleware may violate the API contract and return unexpected types
    *
@@ -189,34 +188,34 @@ export class CloesceApp {
     ast: CloesceAst,
     ctorReg: ConstructorRegistry,
     di: DependencyContainer,
-  ): Promise<RouterResult> {
+  ): Promise<HttpResult<unknown>> {
     // Global middleware
     for (const m of this.globalMiddleware) {
-      const res = await m(request, env, di);
+      const res = await m(di);
       if (res) {
-        return [res, MediaType.Text];
+        return res;
       }
     }
 
     // Route match
     const routeRes = matchRoute(request, ast, this.routePrefix);
     if (routeRes.isLeft()) {
-      return [routeRes.value, MediaType.Text];
+      return routeRes.value;
     }
     const route = routeRes.unwrap();
 
     // Model middleware
     for (const m of this.namespaceMiddleware.get(route.namespace) ?? []) {
-      const res = await m(request, env, di);
+      const res = await m(di);
       if (res) {
-        return [res, MediaType.Text];
+        return res;
       }
     }
 
     // Request validation
     const validation = await validateRequest(request, ast, ctorReg, route);
     if (validation.isLeft()) {
-      return [validation.value, MediaType.Text];
+      return validation.value;
     }
     const { params, dataSource } = validation.unwrap();
 
@@ -224,9 +223,9 @@ export class CloesceApp {
     for (const m of this.methodMiddleware
       .get(route.namespace)
       ?.get(route.method.name) ?? []) {
-      const res = await m(request, env, di);
+      const res = await m(di);
       if (res) {
-        return [res, MediaType.Text];
+        return res;
       }
     }
 
@@ -261,7 +260,7 @@ export class CloesceApp {
     })();
 
     if (hydrated.isLeft()) {
-      return [hydrated.value, MediaType.Text];
+      return hydrated.value;
     }
 
     // Method dispatch
@@ -298,7 +297,7 @@ export class CloesceApp {
             `An injected parameter was missing from the instance registry: ${JSON.stringify(attr.injected)}`,
           )
             .unwrapLeft()
-            .toResponse(MediaType.Text);
+            .toResponse();
         }
 
         service[attr.var_name] = injected;
@@ -309,26 +308,42 @@ export class CloesceApp {
     }
 
     try {
-      const [response, mediaType] = await this.router(
-        request,
-        env,
-        ast,
-        ctorReg,
-        di,
-      );
+      let httpResult = await this.router(request, env, ast, ctorReg, di);
 
       // Response middleware
       for (const m of this.resultMiddleware) {
-        const res = await m(request, env, di, response);
+        const res = await m(di, httpResult);
+
         if (res) {
-          return res.toResponse(MediaType.Text);
+          return res.toResponse();
         }
       }
 
-      return response.toResponse(mediaType);
+      return httpResult.toResponse();
     } catch (e: any) {
-      console.error(JSON.stringify(e));
-      return HttpResult.fail(500, e.toString()).toResponse(MediaType.Text);
+      let debug: any;
+      if (e instanceof Error) {
+        debug = {
+          name: e.name,
+          message: e.message,
+          stack: e.stack,
+          cause: (e as any).cause,
+        };
+      } else {
+        debug = {
+          name: "NonErrorThrown",
+          message: typeof e === "string" ? e : JSON.stringify(e),
+          stack: undefined,
+        };
+      }
+
+      const res = HttpResult.fail(500, JSON.stringify(debug));
+
+      console.error(
+        "An uncaught error occurred in the Cloesce Router: ",
+        debug,
+      );
+      return res.toResponse();
     }
   }
 }
@@ -524,8 +539,8 @@ async function hydrateModelD1(
   id: string,
   dataSource: string,
 ): Promise<Either<HttpResult, object>> {
-  // Error state: If the D1 database has been tweaked outside of Cloesce
-  // resulting in a malformed query, exit with a 500.
+  // Error state: If some outside force tweaked the database schema, the query may fail.
+  // Otherwise, this indicates a bug in the compiler or runtime.
   const malformedQuery = (e: any) =>
     exit(
       500,
@@ -559,13 +574,17 @@ async function hydrateModelD1(
   }
 
   // Hydrate
-  const models: object[] = mapSql(
+  const models = mapSql(
     constructorRegistry[model.name],
     records.results,
     model.data_sources[dataSource]?.tree ?? {},
-  ).value as object[];
+  );
 
-  return Either.right(models[0]);
+  if (models.isLeft()) {
+    return malformedQuery(models.value);
+  }
+
+  return Either.right(models.unwrap()[0]);
 }
 
 /**
@@ -577,7 +596,7 @@ async function methodDispatch(
   di: DependencyContainer,
   route: MatchedRoute,
   params: Record<string, unknown>,
-): Promise<RouterResult> {
+): Promise<HttpResult<unknown>> {
   const paramArray: any[] = [];
   for (const param of route.method.parameters) {
     if (param.name in params) {
@@ -590,14 +609,11 @@ async function methodDispatch(
     if (!injected) {
       // Error state: Injected parameters cannot be found at compile time, only at runtime.
       // If a injected reference does not exist, throw a 500.
-      return [
-        exit(
-          500,
-          RouterError.MissingDependency,
-          `An injected parameter was missing from the instance registry: ${JSON.stringify(param.cidl_type)}`,
-        ).unwrapLeft(),
-        MediaType.Text,
-      ];
+      return exit(
+        500,
+        RouterError.MissingDependency,
+        `An injected parameter was missing from the instance registry: ${JSON.stringify(param.cidl_type)}`,
+      ).unwrapLeft();
     }
 
     paramArray.push(injected);
@@ -605,33 +621,23 @@ async function methodDispatch(
 
   const wrapResult = (res: any): HttpResult => {
     const rt = route.method.return_type;
-
-    if (rt === "Void") {
-      return HttpResult.ok(200);
-    }
-
-    if (typeof rt === "object" && rt !== null && "HttpResult" in rt) {
-      // The result should already have an HttpResult, return as is
-      return res as HttpResult<unknown>;
-    }
-
-    // Wrap in an HttpResult
-    return HttpResult.ok(200, res);
+    const httpResult: HttpResult<unknown> =
+      typeof rt === "object" && rt !== null && "HttpResult" in rt
+        ? res
+        : HttpResult.ok(200, res);
+    return httpResult.setMediaType(route.method.return_media);
   };
 
   try {
     const res = await obj[route.method.name](...paramArray);
-    return [wrapResult(res), route.method.return_media];
+    return wrapResult(res);
   } catch (e) {
     // Error state: Client code threw an uncaught exception.
-    return [
-      exit(
-        500,
-        RouterError.UncaughtException,
-        `Uncaught exception in method dispatch: ${e instanceof Error ? e.message : String(e)}`,
-      ).unwrapLeft(),
-      MediaType.Text,
-    ];
+    return exit(
+      500,
+      RouterError.UncaughtException,
+      `Uncaught exception in method dispatch: ${e instanceof Error ? e.message : String(e)}`,
+    ).unwrapLeft();
   }
 }
 
