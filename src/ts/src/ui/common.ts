@@ -3,8 +3,8 @@ import { MediaType } from "../ast.js";
 type DeepPartialInner<T> = T extends (infer U)[]
   ? DeepPartialInner<U>[]
   : T extends object
-    ? { [K in keyof T]?: DeepPartialInner<T[K]> }
-    : T | (null extends T ? null : never);
+  ? { [K in keyof T]?: DeepPartialInner<T[K]> }
+  : T | (null extends T ? null : never);
 
 /**
  * Recursively makes all properties of a type optional — including nested objects and arrays.
@@ -54,7 +54,7 @@ export type DeepPartial<T> = DeepPartialInner<T> & { __brand?: "Partial" };
 export class Either<L, R> {
   private constructor(
     private readonly inner: { ok: true; right: R } | { ok: false; left: L },
-  ) {}
+  ) { }
 
   get value(): L | R {
     return this.inner.ok ? this.inner.right : this.inner.left;
@@ -148,7 +148,7 @@ export class HttpResult<T = unknown> {
     public data?: T,
     public message?: string,
     public mediaType?: MediaType,
-  ) {}
+  ) { }
 
   static ok<T>(status: number, data?: T, init?: HeadersInit): HttpResult {
     const headers: Headers = new Headers(init);
@@ -263,7 +263,7 @@ export class HttpResult<T = unknown> {
 
 export type Stream = ReadableStream<Uint8Array>;
 
-export function b64ToU8(b64: string) {
+export function b64ToU8(b64: string): Uint8Array {
   // Prefer Buffer in Node.js environments
   if (typeof Buffer !== "undefined") {
     const buffer = Buffer.from(b64, "base64");
@@ -279,7 +279,7 @@ export function b64ToU8(b64: string) {
   return u8;
 }
 
-export function u8ToB64(u8: Uint8Array) {
+export function u8ToB64(u8: Uint8Array): string {
   // Prefer Buffer in Node.js environments
   if (typeof Buffer !== "undefined") {
     return Buffer.from(u8).toString("base64");
