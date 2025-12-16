@@ -10,7 +10,7 @@ export class BlobService {
     const baseUrl = new URL("http://localhost:5002/api/BlobService/incrementBlob");
     const payload: any = {};
 
-      payload["blob"] = blob;
+    payload["blob"] = blob;
 
     const res = await fetchImpl(baseUrl, {
       method: "POST",
@@ -40,8 +40,8 @@ export class BlobHaver {
   ): Promise<HttpResult<BlobHaver>> {
     const baseUrl = new URL(`http://localhost:5002/api/BlobHaver/get`);
 
-      baseUrl.searchParams.append('id', String(id));
-      baseUrl.searchParams.append('__datasource', String(__datasource));
+    baseUrl.searchParams.append('id', String(id));
+    baseUrl.searchParams.append('__datasource', String(__datasource));
 
     const res = await fetchImpl(baseUrl, {
       method: "GET",
@@ -61,7 +61,7 @@ export class BlobHaver {
   ): Promise<HttpResult<Uint8Array>> {
     const baseUrl = new URL(`http://localhost:5002/api/BlobHaver/${this.id}/getBlob1`);
 
-      baseUrl.searchParams.append('__dataSource', String(__dataSource));
+    baseUrl.searchParams.append('__dataSource', String(__dataSource));
 
     const res = await fetchImpl(baseUrl, {
       method: "GET",
@@ -82,7 +82,7 @@ export class BlobHaver {
     const baseUrl = new URL(`http://localhost:5002/api/BlobHaver/inputStream`);
     const payload: any = {};
 
-      payload["stream"] = stream;
+    payload["stream"] = stream;
 
     const res = await fetchImpl(baseUrl, {
       method: "POST",
@@ -104,7 +104,7 @@ export class BlobHaver {
   ): Promise<HttpResult<BlobHaver[]>> {
     const baseUrl = new URL(`http://localhost:5002/api/BlobHaver/list`);
 
-      baseUrl.searchParams.append('__datasource', String(__datasource));
+    baseUrl.searchParams.append('__datasource', String(__datasource));
 
     const res = await fetchImpl(baseUrl, {
       method: "GET",
@@ -126,8 +126,8 @@ export class BlobHaver {
     const baseUrl = new URL(`http://localhost:5002/api/BlobHaver/save`);
     const payload: any = {};
 
-      payload["model"] = model;
-      baseUrl.searchParams.append('__datasource', String(__datasource));
+    payload["model"] = model;
+    baseUrl.searchParams.append('__datasource', String(__datasource));
 
     const res = await fetchImpl(baseUrl, {
       method: "POST",
@@ -149,7 +149,7 @@ export class BlobHaver {
   ): Promise<HttpResult<ReadableStream<Uint8Array>>> {
     const baseUrl = new URL(`http://localhost:5002/api/BlobHaver/${this.id}/yieldStream`);
 
-      baseUrl.searchParams.append('__dataSource', String(__dataSource));
+    baseUrl.searchParams.append('__dataSource', String(__dataSource));
 
     const res = await fetchImpl(baseUrl, {
       method: "GET",

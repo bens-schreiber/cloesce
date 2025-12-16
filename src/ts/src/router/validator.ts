@@ -59,7 +59,8 @@ export class RuntimeValidator {
     // as a string for GET requests
     const nullable = isNullableType(cidlType);
     if (value == null || value === "null") {
-      return rightIf(() => null, nullable);
+      // NOTE: Partial types are always nullable.
+      return rightIf(() => null, nullable || isPartial);
     }
 
     // Unwrap nullable types

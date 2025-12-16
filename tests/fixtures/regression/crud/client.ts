@@ -26,8 +26,8 @@ export class CrudHaver {
   ): Promise<HttpResult<CrudHaver>> {
     const baseUrl = new URL(`http://localhost:5002/api/CrudHaver/get`);
 
-      baseUrl.searchParams.append('id', String(id));
-      baseUrl.searchParams.append('__datasource', String(__datasource));
+    baseUrl.searchParams.append('id', String(id));
+    baseUrl.searchParams.append('__datasource', String(__datasource));
 
     const res = await fetchImpl(baseUrl, {
       method: "GET",
@@ -47,7 +47,7 @@ export class CrudHaver {
   ): Promise<HttpResult<CrudHaver[]>> {
     const baseUrl = new URL(`http://localhost:5002/api/CrudHaver/list`);
 
-      baseUrl.searchParams.append('__datasource', String(__datasource));
+    baseUrl.searchParams.append('__datasource', String(__datasource));
 
     const res = await fetchImpl(baseUrl, {
       method: "GET",
@@ -68,7 +68,7 @@ export class CrudHaver {
     const baseUrl = new URL(`http://localhost:5002/api/CrudHaver/${this.id}/notCrud`);
     const payload: any = {};
 
-      baseUrl.searchParams.append('__dataSource', String(__dataSource));
+    baseUrl.searchParams.append('__dataSource', String(__dataSource));
 
     const res = await fetchImpl(baseUrl, {
       method: "POST",
@@ -92,8 +92,8 @@ export class CrudHaver {
     const baseUrl = new URL(`http://localhost:5002/api/CrudHaver/save`);
     const payload: any = {};
 
-      payload["model"] = model;
-      baseUrl.searchParams.append('__datasource', String(__datasource));
+    payload["model"] = model;
+    baseUrl.searchParams.append('__datasource', String(__datasource));
 
     const res = await fetchImpl(baseUrl, {
       method: "POST",
@@ -128,8 +128,8 @@ export class Parent {
   ): Promise<HttpResult<Parent>> {
     const baseUrl = new URL(`http://localhost:5002/api/Parent/get`);
 
-      baseUrl.searchParams.append('id', String(id));
-      baseUrl.searchParams.append('__datasource', String(__datasource));
+    baseUrl.searchParams.append('id', String(id));
+    baseUrl.searchParams.append('__datasource', String(__datasource));
 
     const res = await fetchImpl(baseUrl, {
       method: "GET",
@@ -149,7 +149,7 @@ export class Parent {
   ): Promise<HttpResult<Parent[]>> {
     const baseUrl = new URL(`http://localhost:5002/api/Parent/list`);
 
-      baseUrl.searchParams.append('__datasource', String(__datasource));
+    baseUrl.searchParams.append('__datasource', String(__datasource));
 
     const res = await fetchImpl(baseUrl, {
       method: "GET",
@@ -171,8 +171,8 @@ export class Parent {
     const baseUrl = new URL(`http://localhost:5002/api/Parent/save`);
     const payload: any = {};
 
-      payload["model"] = model;
-      baseUrl.searchParams.append('__datasource', String(__datasource));
+    payload["model"] = model;
+    baseUrl.searchParams.append('__datasource', String(__datasource));
 
     const res = await fetchImpl(baseUrl, {
       method: "POST",

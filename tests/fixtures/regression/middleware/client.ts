@@ -58,8 +58,8 @@ export class Model {
     const baseUrl = new URL(`http://localhost:5002/api/Model/save`);
     const payload: any = {};
 
-      payload["model"] = model;
-      baseUrl.searchParams.append('__datasource', String(__datasource));
+    payload["model"] = model;
+    baseUrl.searchParams.append('__datasource', String(__datasource));
 
     const res = await fetchImpl(baseUrl, {
       method: "POST",

@@ -15,7 +15,7 @@ export class A {
     const baseUrl = new URL(`http://localhost:5002/api/A/post`);
     const payload: any = {};
 
-      payload["a"] = a;
+    payload["a"] = a;
 
     const res = await fetchImpl(baseUrl, {
       method: "POST",
@@ -37,7 +37,7 @@ export class A {
   ): Promise<HttpResult<A>> {
     const baseUrl = new URL(`http://localhost:5002/api/A/${this.id}/refresh`);
 
-      baseUrl.searchParams.append('__dataSource', String(__dataSource));
+    baseUrl.searchParams.append('__dataSource', String(__dataSource));
 
     const res = await fetchImpl(baseUrl, {
       method: "GET",
@@ -58,7 +58,7 @@ export class A {
     const baseUrl = new URL(`http://localhost:5002/api/A/returnFatalIfParamsNotInstantiated`);
     const payload: any = {};
 
-      payload["a"] = a;
+    payload["a"] = a;
 
     const res = await fetchImpl(baseUrl, {
       method: "POST",
@@ -91,7 +91,7 @@ export class B {
     const baseUrl = new URL(`http://localhost:5002/api/B/${this.id}/testMethod`);
     const payload: any = {};
 
-      baseUrl.searchParams.append('__dataSource', String(__dataSource));
+    baseUrl.searchParams.append('__dataSource', String(__dataSource));
 
     const res = await fetchImpl(baseUrl, {
       method: "POST",
@@ -137,7 +137,7 @@ export class Dog {
     const baseUrl = new URL(`http://localhost:5002/api/Dog/${this.id}/testMethod`);
     const payload: any = {};
 
-      baseUrl.searchParams.append('__dataSource', String(__dataSource));
+    baseUrl.searchParams.append('__dataSource', String(__dataSource));
 
     const res = await fetchImpl(baseUrl, {
       method: "POST",
@@ -170,7 +170,7 @@ export class Person {
     const baseUrl = new URL(`http://localhost:5002/api/Person/post`);
     const payload: any = {};
 
-      payload["person"] = person;
+    payload["person"] = person;
 
     const res = await fetchImpl(baseUrl, {
       method: "POST",
@@ -192,7 +192,7 @@ export class Person {
   ): Promise<HttpResult<Person>> {
     const baseUrl = new URL(`http://localhost:5002/api/Person/${this.id}/refresh`);
 
-      baseUrl.searchParams.append('__dataSource', String(__dataSource));
+    baseUrl.searchParams.append('__dataSource', String(__dataSource));
 
     const res = await fetchImpl(baseUrl, {
       method: "GET",
@@ -213,7 +213,7 @@ export class Person {
     const baseUrl = new URL(`http://localhost:5002/api/Person/returnFatalIfParamsNotInstantiated`);
     const payload: any = {};
 
-      payload["person"] = person;
+    payload["person"] = person;
 
     const res = await fetchImpl(baseUrl, {
       method: "POST",
@@ -249,7 +249,7 @@ export class Student {
     const baseUrl = new URL(`http://localhost:5002/api/Student/post`);
     const payload: any = {};
 
-      payload["student"] = student;
+    payload["student"] = student;
 
     const res = await fetchImpl(baseUrl, {
       method: "POST",
@@ -271,7 +271,7 @@ export class Student {
   ): Promise<HttpResult<Student>> {
     const baseUrl = new URL(`http://localhost:5002/api/Student/${this.id}/refresh`);
 
-      baseUrl.searchParams.append('__dataSource', String(__dataSource));
+    baseUrl.searchParams.append('__dataSource', String(__dataSource));
 
     const res = await fetchImpl(baseUrl, {
       method: "GET",

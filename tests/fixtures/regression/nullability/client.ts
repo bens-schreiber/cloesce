@@ -17,9 +17,9 @@ export class NullabilityChecks {
     const baseUrl = new URL(`http://localhost:5002/api/NullabilityChecks/${this.id}/arrayTypes`);
     const payload: any = {};
 
-      payload["a"] = a;
-      payload["b"] = b;
-      baseUrl.searchParams.append('__dataSource', String(__dataSource));
+    payload["a"] = a;
+    payload["b"] = b;
+    baseUrl.searchParams.append('__dataSource', String(__dataSource));
 
     const res = await fetchImpl(baseUrl, {
       method: "POST",
@@ -43,8 +43,8 @@ export class NullabilityChecks {
     const baseUrl = new URL(`http://localhost:5002/api/NullabilityChecks/${this.id}/httpResultTypes`);
     const payload: any = {};
 
-      payload["a"] = a;
-      baseUrl.searchParams.append('__dataSource', String(__dataSource));
+    payload["a"] = a;
+    baseUrl.searchParams.append('__dataSource', String(__dataSource));
 
     const res = await fetchImpl(baseUrl, {
       method: "POST",
@@ -67,7 +67,7 @@ export class NullabilityChecks {
     const baseUrl = new URL(`http://localhost:5002/api/NullabilityChecks/${this.id}/injectableTypes`);
     const payload: any = {};
 
-      baseUrl.searchParams.append('__dataSource', String(__dataSource));
+    baseUrl.searchParams.append('__dataSource', String(__dataSource));
 
     const res = await fetchImpl(baseUrl, {
       method: "POST",
@@ -91,8 +91,8 @@ export class NullabilityChecks {
     const baseUrl = new URL(`http://localhost:5002/api/NullabilityChecks/${this.id}/modelTypes`);
     const payload: any = {};
 
-      payload["a"] = a;
-      baseUrl.searchParams.append('__dataSource', String(__dataSource));
+    payload["a"] = a;
+    baseUrl.searchParams.append('__dataSource', String(__dataSource));
 
     const res = await fetchImpl(baseUrl, {
       method: "POST",
@@ -117,9 +117,9 @@ export class NullabilityChecks {
     const baseUrl = new URL(`http://localhost:5002/api/NullabilityChecks/${this.id}/primitiveTypes`);
     const payload: any = {};
 
-      payload["a"] = a;
-      payload["b"] = b;
-      baseUrl.searchParams.append('__dataSource', String(__dataSource));
+    payload["a"] = a;
+    payload["b"] = b;
+    baseUrl.searchParams.append('__dataSource', String(__dataSource));
 
     const res = await fetchImpl(baseUrl, {
       method: "POST",

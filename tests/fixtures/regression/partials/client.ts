@@ -14,7 +14,7 @@ export class Dog {
   ): Promise<HttpResult<DeepPartial<Dog>>> {
     const baseUrl = new URL(`http://localhost:5002/api/Dog/${this.id}/getPartialSelf`);
 
-      baseUrl.searchParams.append('__dataSource', String(__dataSource));
+    baseUrl.searchParams.append('__dataSource', String(__dataSource));
 
     const res = await fetchImpl(baseUrl, {
       method: "GET",
@@ -35,7 +35,7 @@ export class Dog {
     const baseUrl = new URL(`http://localhost:5002/api/Dog/post`);
     const payload: any = {};
 
-      payload["dog"] = dog;
+    payload["dog"] = dog;
 
     const res = await fetchImpl(baseUrl, {
       method: "POST",

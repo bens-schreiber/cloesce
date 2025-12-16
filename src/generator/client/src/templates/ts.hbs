@@ -48,9 +48,9 @@ export class {{this.name}} {
     {{#each this.parameters}}
       {{#if (is_serializable cidl_type) }}
         {{#if (is_url_param cidl_type ../http_verb)}}
-      baseUrl.searchParams.append('{{name}}', String({{name}}));
+    baseUrl.searchParams.append('{{name}}', String({{name}}));
         {{else}}
-      payload["{{name}}"] = {{name}};
+    payload["{{name}}"] = {{name}};
         {{/if}}
       {{/if}}
     {{/each}}
@@ -106,9 +106,9 @@ export class {{this.name}} {
     {{#each this.parameters}}
       {{#if (is_serializable cidl_type) }}
         {{#if (is_url_param cidl_type ../http_verb)}}
-      baseUrl.searchParams.append('{{name}}', String({{name}}));
+    baseUrl.searchParams.append('{{name}}', String({{name}}));
         {{else}}
-      payload["{{name}}"] = {{name}};
+    payload["{{name}}"] = {{name}};
         {{/if}}
       {{/if}}
     {{/each}}

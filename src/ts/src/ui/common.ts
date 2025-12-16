@@ -113,7 +113,7 @@ export class Either<L, R> {
 export function requestBody(
   mediaType: MediaType,
   data: any | string | undefined,
-): undefined | string | FormData {
+): undefined | string | ReadableStream<Uint8Array> {
   switch (mediaType) {
     case MediaType.Json: {
       return JSON.stringify(data ?? {}, (_, v) =>
@@ -123,7 +123,7 @@ export function requestBody(
     case MediaType.Octet: {
       // JSON structure isn't needed; assume the first
       // value is the stream data
-      return Object.values(data)[0] as any;
+      return Object.values(data)[0] as ReadableStream<Uint8Array>;
     }
   }
 }
