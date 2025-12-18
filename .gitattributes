@@ -1,4 +1,4 @@
 tests/fixtures/* linguist-generated
-ts/tests/fixtures/* linguist-generated
+src/ts/tests/fixtures/* linguist-generated
 package-lock.json linguist-generated
 examples/* linguist-vendored
