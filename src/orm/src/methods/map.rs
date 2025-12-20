@@ -1,4 +1,4 @@
-use ast::Model;
+use ast::D1Model;
 use ast::NavigationPropertyKind;
 use ast::fail;
 use indexmap::IndexMap;
@@ -77,7 +77,7 @@ pub fn map_sql(
 
 fn process_navigation_properties(
     model_json: &mut Map<String, Value>,
-    model: &Model,
+    model: &D1Model,
     prefix: &str,
     include_tree: &Map<String, Value>,
     row: &Map<String, Value>,

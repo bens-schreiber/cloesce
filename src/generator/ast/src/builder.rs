@@ -1,22 +1,27 @@
-use std::{collections::BTreeMap, path::PathBuf};
+use std::{
+    collections::{BTreeMap, HashMap},
+    path::PathBuf,
+};
 
 use indexmap::IndexMap;
 
 use crate::{
-    ApiMethod, CidlType, CloesceAst, DataSource, HttpVerb, IncludeTree, InputLanguage, MediaType,
-    Model, ModelAttribute, NamedTypedValue, NavigationProperty, NavigationPropertyKind,
+    ApiMethod, CidlType, CloesceAst, D1Model, D1ModelAttribute, DataSource, HttpVerb, IncludeTree,
+    InputLanguage, MediaType, NamedTypedValue, NavigationProperty, NavigationPropertyKind,
 };
 
-pub fn create_ast(mut models: Vec<Model>) -> CloesceAst {
+pub fn create_ast(mut models: Vec<D1Model>) -> CloesceAst {
     let map = models
         .drain(..)
         .map(|m| (m.name.clone(), m))
-        .collect::<IndexMap<String, Model>>();
+        .collect::<IndexMap<String, D1Model>>();
+
     CloesceAst {
         version: "1.0".to_string(),
         project_name: "test".to_string(),
         language: InputLanguage::TypeScript,
-        models: map,
+        d1_models: map,
+        kv_models: HashMap::default(),
         poos: IndexMap::default(),
         wrangler_env: None,
         services: IndexMap::default(),
@@ -54,7 +59,7 @@ impl IncludeTreeBuilder {
 /// A builder pattern for tests to create models easily
 pub struct ModelBuilder {
     name: String,
-    attributes: Vec<ModelAttribute>,
+    attributes: Vec<D1ModelAttribute>,
     navigation_properties: Vec<NavigationProperty>,
     primary_key: Option<NamedTypedValue>,
     methods: BTreeMap<String, ApiMethod>,
@@ -79,7 +84,7 @@ impl ModelBuilder {
         cidl_type: CidlType,
         foreign_key: Option<String>,
     ) -> Self {
-        self.attributes.push(ModelAttribute {
+        self.attributes.push(D1ModelAttribute {
             value: NamedTypedValue {
                 name: name.into(),
                 cidl_type,
@@ -152,8 +157,8 @@ impl ModelBuilder {
         self
     }
 
-    pub fn build(self) -> Model {
-        Model {
+    pub fn build(self) -> D1Model {
+        D1Model {
             name: self.name,
             attributes: self.attributes,
             navigation_properties: self.navigation_properties,

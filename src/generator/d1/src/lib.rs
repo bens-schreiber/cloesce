@@ -3,7 +3,7 @@ mod fmt;
 use std::collections::{HashMap, HashSet};
 
 use ast::{
-    CidlType, MigrationsAst, MigrationsModel, ModelAttribute, NavigationProperty,
+    CidlType, D1ModelAttribute, MigrationsAst, MigrationsModel, NavigationProperty,
     NavigationPropertyKind,
 };
 
@@ -80,14 +80,14 @@ enum AlterKind<'a> {
     RebuildTable,
 
     AddColumn {
-        attr: &'a ModelAttribute,
+        attr: &'a D1ModelAttribute,
     },
     AlterColumnType {
-        attr: &'a ModelAttribute,
-        lm_attr: &'a ModelAttribute,
+        attr: &'a D1ModelAttribute,
+        lm_attr: &'a D1ModelAttribute,
     },
     DropColumn {
-        lm_attr: &'a ModelAttribute,
+        lm_attr: &'a D1ModelAttribute,
     },
 
     AddManyToMany {
@@ -226,7 +226,7 @@ impl MigrateTables {
         let mut visited_m2ms = HashSet::new();
 
         for (model, lm_model) in alter_models {
-            let mut needs_rename_intent = HashMap::<&String, &ModelAttribute>::new();
+            let mut needs_rename_intent = HashMap::<&String, &D1ModelAttribute>::new();
             let mut needs_drop_intent = vec![];
 
             for kind in identify_alterations(model, lm_model) {
@@ -513,7 +513,7 @@ impl MigrateTables {
                 .attributes
                 .iter()
                 .map(|a| (&a.value.name, a))
-                .collect::<HashMap<&String, &ModelAttribute>>();
+                .collect::<HashMap<&String, &D1ModelAttribute>>();
 
             for attr in &model.attributes {
                 let Some(lm_attr) = lm_attrs.remove(&attr.value.name) else {

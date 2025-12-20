@@ -15,8 +15,7 @@ use rustc_hash::FxHasher;
 use semantic::SemanticAnalysis;
 use serde::Deserialize;
 use serde::Serialize;
-use serde_with::MapPreventDuplicates;
-use serde_with::serde_as;
+use serde_with::{MapPreventDuplicates, serde_as};
 
 #[macro_export]
 macro_rules! cidl_type_contains {
@@ -41,7 +40,6 @@ macro_rules! cidl_type_contains {
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
 pub enum CidlType {
-    /// No type
     Void,
 
     /// SQLite integer
@@ -65,6 +63,9 @@ pub enum CidlType {
     /// A Binary Large Object that is not to be buffered in memory,
     /// but rather piped to some destination.
     Stream,
+
+    /// Any valid JSON value
+    JsonValue,
 
     /// A dependency injected instance, containing a type name.
     Inject(String),
@@ -138,7 +139,7 @@ pub struct NamedTypedValue {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct ModelAttribute {
+pub struct D1ModelAttribute {
     #[serde(default)]
     pub hash: u64,
 
@@ -207,13 +208,13 @@ pub enum CrudKind {
 
 #[serde_as]
 #[derive(Serialize, Deserialize, Debug)]
-pub struct Model {
+pub struct D1Model {
     #[serde(default)]
     pub hash: u64,
 
     pub name: String,
     pub primary_key: NamedTypedValue,
-    pub attributes: Vec<ModelAttribute>,
+    pub attributes: Vec<D1ModelAttribute>,
     pub navigation_properties: Vec<NavigationProperty>,
 
     #[serde_as(as = "MapPreventDuplicates<_, _>")]
@@ -245,6 +246,19 @@ pub struct Service {
     pub source_path: PathBuf,
 }
 
+#[serde_as]
+#[derive(Serialize, Deserialize, Debug)]
+pub struct KVModel {
+    pub name: String,
+    pub namespace: String,
+    pub cidl_type: CidlType,
+
+    #[serde_as(as = "MapPreventDuplicates<_, _>")]
+    pub methods: BTreeMap<String, ApiMethod>,
+
+    pub source_path: PathBuf,
+}
+
 #[derive(Serialize, Deserialize, Debug)]
 pub struct PlainOldObject {
     pub name: String,
@@ -261,7 +275,11 @@ pub enum InputLanguage {
 pub struct WranglerEnv {
     pub name: String,
     pub source_path: PathBuf,
-    pub db_binding: String,
+
+    // TODO: Many database bindings?
+    pub db_binding: Option<String>,
+    pub kv_bindings: Vec<String>,
+
     pub vars: HashMap<String, CidlType>,
 }
 
@@ -277,7 +295,10 @@ pub struct CloesceAst {
     pub wrangler_env: Option<WranglerEnv>,
 
     // TODO: MapPreventDuplicates is not supported for IndexMap
-    pub models: IndexMap<String, Model>,
+    pub d1_models: IndexMap<String, D1Model>,
+
+    #[serde_as(as = "MapPreventDuplicates<_, _>")]
+    pub kv_models: HashMap<String, KVModel>,
 
     // TODO: MapPreventDuplicates is not supported for IndexMap
     pub poos: IndexMap<String, PlainOldObject>,
@@ -307,7 +328,11 @@ impl CloesceAst {
     }
 
     pub fn to_migrations_json(self) -> String {
-        let Self { hash, models, .. } = self;
+        let Self {
+            hash,
+            d1_models: models,
+            ..
+        } = self;
 
         let migrations_models: IndexMap<String, MigrationsModel> = models
             .into_iter()
@@ -345,7 +370,7 @@ impl CloesceAst {
         }
 
         let mut root_h = FxHasher::default();
-        for model in self.models.values_mut() {
+        for model in self.d1_models.values_mut() {
             let mut model_h = FxHasher::default();
             model_h.write(b"Model");
             model.primary_key.hash(&mut model_h);
@@ -416,12 +441,12 @@ pub struct MigrationsModel {
     pub hash: u64,
     pub name: String,
     pub primary_key: NamedTypedValue,
-    pub attributes: Vec<ModelAttribute>,
+    pub attributes: Vec<D1ModelAttribute>,
     pub navigation_properties: Vec<NavigationProperty>,
     pub data_sources: BTreeMap<String, DataSource>,
 }
 
-/// A subset of [CloesceAst] suited for migrations.
+/// A subset of [CloesceAst] suited for D1 migrations.
 ///
 /// Assumed that the tree is semantically valid.
 #[derive(Serialize, Deserialize)]

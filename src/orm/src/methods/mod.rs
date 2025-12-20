@@ -115,8 +115,10 @@ pub async fn test_sql(
         let mut ast = create_ast(models.drain().map(|(_, m)| m).collect::<Vec<_>>());
         ast.semantic_analysis().unwrap();
 
-        let CloesceAst { hash, models, .. } = ast;
-        let migrations_models = models
+        let CloesceAst {
+            hash, d1_models, ..
+        } = ast;
+        let migrations_models = d1_models
             .into_iter()
             .map(|(name, model)| {
                 (

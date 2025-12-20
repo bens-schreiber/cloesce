@@ -17,6 +17,12 @@ pub struct D1Database {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
+pub struct KVNamespace {
+    pub binding: Option<String>,
+    pub id: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
 pub struct WranglerSpec {
     pub name: Option<String>,
     pub compatibility_date: Option<String>,
@@ -24,6 +30,9 @@ pub struct WranglerSpec {
 
     #[serde(default)]
     pub d1_databases: Vec<D1Database>,
+
+    #[serde(default)]
+    pub kv_namespaces: Vec<KVNamespace>,
 
     #[serde(default)]
     pub vars: HashMap<String, String>,
@@ -50,41 +59,79 @@ impl WranglerSpec {
                 .unwrap_or_else(|| "workers.ts".to_string()),
         );
 
-        // Validate existing database configs, filling in missing values with a default
-        for (i, d1) in self.d1_databases.iter_mut().enumerate() {
-            if d1.database_name.is_none() {
-                d1.database_name = Some(format!("Cloesce_d1_{i}"));
-                tracing::warn!("Created a default database Cloesce_d1_{i}")
+        // Ensure all bindings referenced in the WranglerEnv exist in the spec
+        if let Some(env) = &ast.wrangler_env {
+            if let Some(db_binding) = &env.db_binding {
+                let db = self
+                    .d1_databases
+                    .iter_mut()
+                    .find(|db| db.binding.as_deref() == Some(db_binding));
+
+                match db {
+                    Some(db) => {
+                        if db.database_id.is_none() {
+                            db.database_id = Some("replace_with_db_id".into());
+                            tracing::warn!(
+                                "D1 Database with binding {} is missing an id. See https://developers.cloudflare.com/d1/get-started/",
+                                db_binding
+                            );
+                        }
+
+                        if db.database_name.is_none() {
+                            db.database_name = Some("replace_with_db_name".into());
+                            tracing::warn!(
+                                "D1 Database with binding {} is missing a name. See https://developers.cloudflare.com/d1/get-started/",
+                                db_binding
+                            );
+                        }
+                    }
+                    None => {
+                        self.d1_databases.push(D1Database {
+                            binding: Some(db_binding.clone()),
+                            database_name: Some("replace_with_db_name".into()),
+                            database_id: Some("replace_with_db_id".into()),
+                        });
+
+                        tracing::warn!(
+                            "D1 Database with binding {} was missing, added a default. See https://developers.cloudflare.com/d1/get-started/",
+                            db_binding
+                        );
+                    }
+                }
             }
 
-            if d1.binding.is_none() {
-                d1.binding = Some(format!("db_{i}"));
-                tracing::warn!("Created a default database binding db_{i}")
-            }
+            for kv_binding in &env.kv_bindings {
+                let kv = self
+                    .kv_namespaces
+                    .iter_mut()
+                    .find(|ns| ns.binding.as_deref() == Some(kv_binding));
 
-            if d1.database_id.is_none() {
-                d1.database_id = Some("replace_with_db_id".into());
+                match kv {
+                    Some(ns) => {
+                        if ns.id.is_none() {
+                            ns.id = Some("replace_with_kv_id".into());
+                            tracing::warn!(
+                                "KV Namespace with binding {} is missing an id. See https://developers.cloudflare.com/workers/platform/storage/#namespaces",
+                                kv_binding
+                            );
+                        }
+                    }
+                    None => {
+                        self.kv_namespaces.push(KVNamespace {
+                            binding: Some(kv_binding.clone()),
+                            id: Some("replace_with_kv_id".into()),
+                        });
 
-                tracing::warn!(
-                    "Database {} is missing an id. See https://developers.cloudflare.com/d1/get-started/",
-                    d1.database_name.as_ref().unwrap()
-                );
+                        tracing::warn!(
+                            "KV Namespace with binding {} was missing, added a default. See https://developers.cloudflare.com/workers/platform/storage/#namespaces",
+                            kv_binding
+                        );
+                    }
+                }
             }
         }
 
-        // Ensure a database exists (if there are even models), provide a default if not
-        if self.d1_databases.is_empty() {
-            self.d1_databases.push(D1Database {
-                binding: Some(String::from("db")),
-                database_name: Some(String::from("default")),
-                database_id: Some(String::from("replace_with_db_id")),
-            });
-
-            tracing::warn!(
-                "Database \"default\" is missing an id. See https://developers.cloudflare.com/d1/get-started/"
-            );
-        }
-
+        // Generate default vars from the AST's WranglerEnv
         if let Some(env) = &ast.wrangler_env {
             for (var, ty) in &env.vars {
                 self.vars.entry(var.clone()).or_insert_with(|| {
@@ -101,41 +148,58 @@ impl WranglerSpec {
         }
     }
 
-    /// Validates that the bindings described in the AST's WranglerEnv are
-    /// consistent with the wrangler spec
-    pub fn validate_bindings(&self, ast: &CloesceAst) -> Result<()> {
-        let env = if !ast.models.is_empty() {
-            match &ast.wrangler_env {
-                Some(env) => env,
-                None => {
-                    fail!(
-                        GeneratorErrorKind::InconsistentWranglerBinding,
-                        "AST is missing WranglerEnv but models are defined"
-                    );
-                }
-            }
-        } else {
-            return Ok(());
-        };
+    pub fn validate_ast_matches_wrangler(&self, ast: &CloesceAst) -> Result<()> {
+        let env = match &ast.wrangler_env {
+            Some(env) => env,
 
-        // TODO: Multiple DB's
-        let Some(db) = self.d1_databases.first() else {
-            fail!(
+            // No models are defined, no env is required
+            None if ast.d1_models.is_empty() && ast.kv_models.is_empty() => return Ok(()),
+
+            // Models are defined but an env is not
+            _ => fail!(
                 GeneratorErrorKind::InconsistentWranglerBinding,
-                "No D1 databases defined in wrangler config for {}",
-                env.source_path.display()
-            );
+                "AST is missing WranglerEnv but models are defined"
+            ),
         };
 
         ensure!(
-            Some(&env.db_binding) == db.binding.as_ref(),
+            !ast.d1_models.is_empty() || !self.d1_databases.is_empty(),
             GeneratorErrorKind::InconsistentWranglerBinding,
-            "{}.{} != {} in {}",
-            env.name,
-            env.db_binding,
-            db.binding.as_ref().unwrap(),
+            "No D1 database binding was found, but D1 models were defined {}",
             env.source_path.display()
         );
+
+        // TODO: multiple databases
+        if let Some(db) = self.d1_databases.first() {
+            ensure!(
+                env.db_binding == db.binding,
+                GeneratorErrorKind::InconsistentWranglerBinding,
+                "A Wrangler specification D1 binding did not match the WranglerEnv binding {}.{:?} != {} in {}",
+                env.name,
+                env.db_binding,
+                db.binding.as_ref().unwrap(),
+                env.source_path.display()
+            );
+        }
+
+        ensure!(
+            !ast.kv_models.is_empty() || !self.kv_namespaces.is_empty(),
+            GeneratorErrorKind::InconsistentWranglerBinding,
+            "No KV namespace binding was found, but KV models were defined {}",
+            env.source_path.display()
+        );
+
+        for kv in &env.kv_bindings {
+            ensure!(
+                self.kv_namespaces
+                    .iter()
+                    .any(|ns| ns.binding.as_ref().is_some_and(|b| b == kv)),
+                GeneratorErrorKind::InconsistentWranglerBinding,
+                "A Wrangler specification KV binding {} was missing or did not match the WranglerEnv binding at {}",
+                kv,
+                env.source_path.display()
+            )
+        }
 
         for var in self.vars.keys() {
             ensure!(
@@ -266,13 +330,18 @@ impl WranglerFormat {
 
 #[cfg(test)]
 mod tests {
+    use std::{
+        collections::{BTreeMap, HashMap},
+        path::PathBuf,
+    };
+
     use ast::{
-        WranglerEnv,
+        KVModel, WranglerEnv,
         builder::{ModelBuilder, create_ast},
         err::GeneratorErrorKind,
     };
 
-    use crate::{D1Database, WranglerFormat};
+    use crate::WranglerFormat;
 
     #[test]
     fn test_serialize_wrangler_spec() {
@@ -294,7 +363,7 @@ mod tests {
         ast.wrangler_env = Some(WranglerEnv {
             name: "Env".into(),
             source_path: "source.ts".into(),
-            db_binding: "db".into(),
+            db_binding: Some("db".into()),
             vars: [
                 ("API_KEY".into(), ast::CidlType::Text),
                 ("TIMEOUT".into(), ast::CidlType::Integer),
@@ -303,6 +372,7 @@ mod tests {
             ]
             .into_iter()
             .collect(),
+            kv_bindings: vec![],
         });
 
         // Act
@@ -324,16 +394,98 @@ mod tests {
             assert_eq!(spec.name.unwrap(), "cloesce");
             assert_eq!(spec.compatibility_date.unwrap(), "2025-10-02");
             assert_eq!(spec.main.unwrap(), "workers.ts");
-            assert_eq!(spec.d1_databases.len(), 1);
-            assert_eq!(spec.d1_databases[0].binding.as_ref().unwrap(), "db");
-            assert_eq!(
-                spec.d1_databases[0].database_name.as_ref().unwrap(),
-                "default"
-            );
             assert_eq!(spec.vars.get("API_KEY").unwrap(), "default_string");
             assert_eq!(spec.vars.get("TIMEOUT").unwrap(), "0");
             assert_eq!(*spec.vars.get("ENABLED").unwrap(), "false");
             assert_eq!(*spec.vars.get("THRESHOLD").unwrap(), "0");
+        }
+    }
+
+    #[test]
+    fn generates_default_d1_wrangler_values() {
+        // Arrange
+        let mut ast = create_ast(vec![ModelBuilder::new("User").id().build()]);
+        ast.wrangler_env = Some(WranglerEnv {
+            name: "Env".into(),
+            source_path: "source.ts".into(),
+            db_binding: Some("db".into()),
+            vars: HashMap::new(),
+            kv_bindings: vec![],
+        });
+
+        // Act
+        let specs = vec![
+            {
+                let mut spec = WranglerFormat::Toml(toml::from_str("").unwrap()).as_spec();
+                spec.generate_defaults(&ast);
+                spec
+            },
+            {
+                let mut spec = WranglerFormat::Json(serde_json::from_str("{}").unwrap()).as_spec();
+                spec.generate_defaults(&ast);
+                spec
+            },
+        ];
+
+        // Assert
+        for spec in specs {
+            assert_eq!(spec.d1_databases.len(), 1);
+            assert_eq!(spec.d1_databases[0].binding.as_ref().unwrap(), "db");
+            assert_eq!(
+                spec.d1_databases[0].database_name.as_ref().unwrap(),
+                "replace_with_db_name"
+            );
+            assert_eq!(
+                spec.d1_databases[0].database_id.as_ref().unwrap(),
+                "replace_with_db_id"
+            );
+        }
+    }
+
+    #[test]
+    fn generates_default_kv_wrangler_values() {
+        // Arrange
+        let mut ast = create_ast(vec![]);
+        ast.kv_models.insert(
+            "MyKV".into(),
+            KVModel {
+                name: "MyKV".into(),
+                namespace: "my_kv".into(),
+                cidl_type: ast::CidlType::JsonValue,
+                methods: BTreeMap::default(),
+                source_path: PathBuf::default(),
+            },
+        );
+        ast.wrangler_env = Some(WranglerEnv {
+            name: "Env".into(),
+            source_path: "source.ts".into(),
+            db_binding: None,
+            vars: HashMap::new(),
+            kv_bindings: vec!["my_kv".into()],
+        });
+
+        // Act
+        let specs = vec![
+            {
+                let mut spec = WranglerFormat::Toml(toml::from_str("").unwrap()).as_spec();
+                spec.generate_defaults(&ast);
+                spec
+            },
+            {
+                let mut spec = WranglerFormat::Json(serde_json::from_str("{}").unwrap()).as_spec();
+                spec.generate_defaults(&ast);
+                spec
+            },
+        ];
+
+        // Assert
+        for spec in specs {
+            assert_eq!(spec.kv_namespaces.len(), 1);
+            assert_eq!(spec.kv_namespaces[0].binding.as_ref().unwrap(), "my_kv");
+            assert_eq!(
+                spec.kv_namespaces[0].id.as_ref().unwrap(),
+                "replace_with_kv_id"
+            );
         }
     }
 
@@ -344,7 +496,8 @@ mod tests {
         ast.wrangler_env = Some(WranglerEnv {
             name: "Env".into(),
             source_path: "source.ts".into(),
-            db_binding: "db".into(),
+            db_binding: None,
+            kv_bindings: vec![],
             vars: [
                 ("API_KEY".into(), ast::CidlType::Text),
                 ("TIMEOUT".into(), ast::CidlType::Integer),
@@ -359,15 +512,28 @@ mod tests {
         ];
 
         // Act + Assert
-        for mut spec in specs {
-            spec.d1_databases.push(D1Database {
-                binding: Some("db".into()),
-                database_name: Some("default".into()),
-                database_id: Some("".into()),
-            });
-
+        for spec in specs {
             assert!(matches!(
-                spec.validate_bindings(&ast).unwrap_err().kind,
+                spec.validate_ast_matches_wrangler(&ast).unwrap_err().kind,
+                GeneratorErrorKind::InconsistentWranglerBinding
+            ));
+        }
+    }
+
+    #[test]
+    fn validate_missing_env_in_ast() {
+        // Arrange
+        let ast = create_ast(vec![ModelBuilder::new("User").id().build()]);
+
+        let specs = vec![
+            WranglerFormat::Toml(toml::from_str("").unwrap()).as_spec(),
+            WranglerFormat::Json(serde_json::from_str("{}").unwrap()).as_spec(),
+        ];
+
+        // Act + Assert
+        for spec in specs {
+            assert!(matches!(
+                spec.validate_ast_matches_wrangler(&ast).unwrap_err().kind,
                 GeneratorErrorKind::InconsistentWranglerBinding
             ));
         }

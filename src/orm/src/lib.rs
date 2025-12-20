@@ -1,7 +1,7 @@
 #![allow(clippy::missing_safety_doc)]
 mod methods;
 
-use ast::Model;
+use ast::D1Model;
 
 use methods::upsert::UpsertModel;
 
@@ -12,7 +12,7 @@ use std::slice;
 use std::str;
 
 type D1Result = Vec<Map<String, serde_json::Value>>;
-type ModelMeta = HashMap<String, Model>;
+type ModelMeta = HashMap<String, D1Model>;
 type IncludeTreeJson = Map<String, serde_json::Value>;
 
 /// WASM memory allocation handler. A subsequent [dealloc] must be called to prevent memory leaks.
@@ -69,14 +69,14 @@ pub extern "C" fn get_return_ptr() -> *const u8 {
     unsafe { RETURN_PTR }
 }
 
-/// Maps ORM friendly SQL rows to a [Model]. Requires a previous call to [set_meta_ptr].
+/// Maps ORM friendly SQL rows to a [D1Model]. Requires a previous call to [set_meta_ptr].
 ///
 /// Panics on any error.
 ///
 /// Returns 0 on pass 1 on fail. Stores result in [RETURN_PTR]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn map_sql(
-    // Model Name
+    // D1Model Name
     model_name_ptr: *const u8,
     model_name_len: usize,
 
@@ -134,11 +134,11 @@ pub unsafe extern "C" fn map_sql(
 /// Returns 0 on pass 1 on fail. Stores result in [RETURN_PTR].
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn upsert_model(
-    // Model Name
+    // D1Model Name
     model_name_ptr: *const u8,
     model_name_len: usize,
 
-    // New Model
+    // New D1Model
     new_model_ptr: *const u8,
     new_model_len: usize,
 
@@ -188,7 +188,7 @@ pub unsafe extern "C" fn upsert_model(
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn list_models(
-    // Model Name
+    // D1Model Name
     model_name_ptr: *const u8,
     model_name_len: usize,
 

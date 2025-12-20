@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use ast::NavigationPropertyKind::{ManyToMany, OneToMany};
-use ast::{CidlType, Model, NamedTypedValue, NavigationProperty, NavigationPropertyKind, fail};
+use ast::{CidlType, D1Model, NamedTypedValue, NavigationProperty, NavigationPropertyKind, fail};
 use base64::Engine;
 use base64::prelude::BASE64_STANDARD;
 use sea_query::{Alias, OnConflict, SimpleExpr, SqliteQueryBuilder, SubQueryStatement, Values};
@@ -291,7 +291,7 @@ impl<'a> UpsertModel<'a> {
         path: &str,
         nav: &NavigationProperty,
         unique_id: &str,
-        model: &Model,
+        model: &D1Model,
     ) -> Result<()> {
         let nav_meta = self.meta.get(&nav.model_name).unwrap();
         let nav_pk = &nav_meta.primary_key;
@@ -342,7 +342,7 @@ impl<'a> UpsertModel<'a> {
         &mut self,
         pk: Option<&Value>,
         path: &str,
-        model: &Model,
+        model: &D1Model,
         builder: UpsertBuilder,
     ) -> Result<String> {
         self.acc.push(builder.build()?);

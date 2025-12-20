@@ -1,4 +1,4 @@
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use ast::{ApiMethod, CidlType, CloesceAst, CrudKind, HttpVerb, MediaType, NamedTypedValue};
 
@@ -36,41 +36,23 @@ impl WorkersGenerator {
             Ok(rel_str)
         }
 
-        let model_imports = ast
-            .models
-            .values()
-            .map(|m| {
-                // If the relative path is not possible, just use the file name.
-                let path = rel_path(&m.source_path, workers_dir)
-                    .unwrap_or_else(|_| m.source_path.clone().to_string_lossy().to_string());
-                format!("import {{ {} }} from \"{}\";", m.name, path)
-            })
-            .collect::<Vec<_>>()
-            .join("\n");
-
-        let poo_imports = ast
-            .poos
-            .values()
-            .map(|p| {
-                // If the relative path is not possible, just use the file name.
-                let path = rel_path(&p.source_path, workers_dir)
-                    .unwrap_or_else(|_| p.source_path.clone().to_string_lossy().to_string());
-                format!("import {{ {} }} from \"{}\";", p.name, path)
-            })
-            .collect::<Vec<_>>()
-            .join("\n");
-
-        let service_imports = ast
-            .services
-            .values()
-            .map(|s| {
-                // If the relative path is not possible, just use the file name.
-                let path = rel_path(&s.source_path, workers_dir)
-                    .unwrap_or_else(|_| s.source_path.clone().to_string_lossy().to_string());
-                format!("import {{ {} }} from \"{}\";", s.name, path)
-            })
-            .collect::<Vec<_>>()
-            .join("\n");
+        /// Generates import statements for a collection of source items
+        fn imports<I, F>(items: I, workers_dir: &Path, f: F) -> String
+        where
+            I: IntoIterator,
+            F: Fn(I::Item) -> (String, PathBuf),
+        {
+            items
+                .into_iter()
+                .map(|item| {
+                    let (name, path) = f(item);
+                    let path = rel_path(&path, workers_dir)
+                        .unwrap_or_else(|_| path.to_string_lossy().to_string());
+                    format!("import {{ {} }} from \"{}\";", name, path)
+                })
+                .collect::<Vec<_>>()
+                .join("\n")
+        }
 
         let app_import = match &ast.app_source {
             Some(p) => {
@@ -81,13 +63,28 @@ impl WorkersGenerator {
             None => "const app = new CloesceApp();".into(),
         };
 
-        [model_imports, poo_imports, service_imports, app_import].join("\n")
+        [
+            imports(&ast.d1_models, workers_dir, |(name, model)| {
+                (name.clone(), model.source_path.clone())
+            }),
+            imports(&ast.kv_models, workers_dir, |(name, model)| {
+                (name.clone(), model.source_path.clone())
+            }),
+            imports(&ast.poos, workers_dir, |(name, poo)| {
+                (name.clone(), poo.source_path.clone())
+            }),
+            imports(&ast.services, workers_dir, |(name, service)| {
+                (name.clone(), service.source_path.clone())
+            }),
+            app_import,
+        ]
+        .join("\n")
     }
 
     /// Generates the constructor registry
     fn registry(ast: &CloesceAst) -> String {
         let mut constructor_registry = Vec::new();
-        for model in ast.models.values() {
+        for model in ast.d1_models.values() {
             constructor_registry.push(format!("\t{}: {}", &model.name, &model.name));
         }
 
@@ -122,7 +119,7 @@ impl WorkersGenerator {
             };
         };
 
-        for model in ast.models.values_mut() {
+        for model in ast.d1_models.values_mut() {
             for crud in &model.cruds {
                 let method = match crud {
                     CrudKind::GET => ApiMethod {

@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, HashMap, VecDeque};
 
 use crate::err::{GeneratorErrorKind, Result};
 use crate::{
-    ApiMethod, CidlType, CloesceAst, HttpVerb, Model, NamedTypedValue, NavigationPropertyKind,
+    ApiMethod, CidlType, CloesceAst, D1Model, HttpVerb, NamedTypedValue, NavigationPropertyKind,
     ensure, fail,
 };
 
@@ -33,7 +33,8 @@ impl SemanticAnalysis {
     /// - Invalid data source type
     /// - Invalid data source reference
     pub fn analyze(ast: &mut CloesceAst) -> Result<()> {
-        Self::models(ast)?;
+        Self::d1_models(ast)?;
+        Self::kv_models(ast)?;
         Self::poos(ast)?;
         Self::services(ast)?;
         Ok(())
@@ -76,6 +77,8 @@ impl SemanticAnalysis {
                             o
                         );
 
+                        ensure_serializeable_object_ref(ast, o)?;
+
                         if ast.poos.contains_key(o) {
                             graph.entry(o.as_str()).or_default().push(&poo.name);
                             in_degree.entry(&poo.name).and_modify(|d| *d += 1);
@@ -91,7 +94,7 @@ impl SemanticAnalysis {
                         )
                     }
                     CidlType::DataSource(o) => ensure!(
-                        ast.models.contains_key(o),
+                        ast.d1_models.contains_key(o),
                         GeneratorErrorKind::UnknownDataSourceReference,
                         "{}.{} => {}?",
                         poo.name,
@@ -118,8 +121,8 @@ impl SemanticAnalysis {
         Ok(())
     }
 
-    fn models(ast: &mut CloesceAst) -> Result<()> {
-        let ensure_valid_sql_type = |model: &Model, value: &NamedTypedValue| {
+    fn d1_models(ast: &mut CloesceAst) -> Result<()> {
+        let ensure_valid_sql_type = |model: &D1Model, value: &NamedTypedValue| {
             let inner = match &value.cidl_type {
                 CidlType::Nullable(inner) if matches!(inner.as_ref(), CidlType::Void) => {
                     fail!(GeneratorErrorKind::NullSqlType)
@@ -160,7 +163,7 @@ impl SemanticAnalysis {
         let mut m2m = HashMap::<&String, Vec<&String>>::new();
 
         // Validate Models
-        for (model_name, model) in &ast.models {
+        for (model_name, model) in &ast.d1_models {
             ensure!(
                 *model_name == model.name,
                 GeneratorErrorKind::InvalidMapping,
@@ -187,7 +190,7 @@ impl SemanticAnalysis {
                 ensure_valid_sql_type(model, &a.value)?;
 
                 if let Some(fk_model_name) = &a.foreign_key_reference {
-                    let Some(fk_model) = ast.models.get(fk_model_name.as_str()) else {
+                    let Some(fk_model) = ast.d1_models.get(fk_model_name.as_str()) else {
                         fail!(
                             GeneratorErrorKind::UnknownObject,
                             "{}.{} => {}?",
@@ -227,7 +230,7 @@ impl SemanticAnalysis {
             // Validate navigation props
             for nav in &model.navigation_properties {
                 ensure!(
-                    ast.models.contains_key(nav.model_name.as_str()),
+                    ast.d1_models.contains_key(nav.model_name.as_str()),
                     GeneratorErrorKind::UnknownObject,
                     "{} => {}?",
                     model.name,
@@ -290,7 +293,7 @@ impl SemanticAnalysis {
                             );
                         };
 
-                        let Some(child_model) = ast.models.get(model_name) else {
+                        let Some(child_model) = ast.d1_models.get(model_name) else {
                             fail!(
                                 GeneratorErrorKind::UnknownObject,
                                 "{} => {}?",
@@ -382,8 +385,27 @@ impl SemanticAnalysis {
         }
 
         // Sort models by SQL insertion order
-        let rank = kahns(graph, in_degree, ast.models.len())?;
-        ast.models.sort_by_key(|k, _| rank.get(k.as_str()).unwrap());
+        let rank = kahns(graph, in_degree, ast.d1_models.len())?;
+        ast.d1_models
+            .sort_by_key(|k, _| rank.get(k.as_str()).unwrap());
+
+        Ok(())
+    }
+
+    fn kv_models(ast: &mut CloesceAst) -> Result<()> {
+        for (model_name, model) in &ast.kv_models {
+            ensure!(
+                *model_name == model.name,
+                GeneratorErrorKind::InvalidMapping,
+                "KV Model record key did not match it's model name? {} : {}",
+                model_name,
+                model.name
+            );
+
+            for (method_name, method) in &model.methods {
+                validate_methods(model_name, method_name, method, ast)?;
+            }
+        }
 
         Ok(())
     }
@@ -435,7 +457,19 @@ impl SemanticAnalysis {
 }
 
 fn is_valid_object_ref(ast: &CloesceAst, o: &String) -> bool {
-    ast.models.contains_key(o) || ast.poos.contains_key(o)
+    ast.d1_models.contains_key(o) || ast.poos.contains_key(o) || ast.kv_models.contains_key(o)
+}
+
+fn ensure_serializeable_object_ref(ast: &CloesceAst, o: &String) -> Result<()> {
+    if let Some(kv) = ast.kv_models.get(o) {
+        ensure!(
+            !matches!(kv.cidl_type.root_type(), CidlType::Stream),
+            GeneratorErrorKind::InvalidStream,
+            "KV Model {o} cannot be used in a serializeable context.",
+        )
+    }
+
+    Ok(())
 }
 
 /// Returns how many data sources to the namespace are in the method.
@@ -456,16 +490,20 @@ fn validate_methods(
 
     // Validate return type
     match &method.return_type.root_type() {
-        CidlType::Object(o) | CidlType::Partial(o) => ensure!(
-            is_valid_object_ref(ast, o),
-            GeneratorErrorKind::UnknownObject,
-            "{}.{}",
-            namespace,
-            method.name
-        ),
+        CidlType::Object(o) | CidlType::Partial(o) => {
+            ensure!(
+                is_valid_object_ref(ast, o),
+                GeneratorErrorKind::UnknownObject,
+                "{}.{}",
+                namespace,
+                method.name
+            );
+
+            ensure_serializeable_object_ref(ast, o)?;
+        }
 
         CidlType::DataSource(o) => ensure!(
-            ast.models.contains_key(o),
+            ast.d1_models.contains_key(o),
             GeneratorErrorKind::UnknownDataSourceReference,
             "{}.{}",
             namespace,
@@ -494,7 +532,7 @@ fn validate_methods(
     for param in &method.parameters {
         if let CidlType::DataSource(model_name) = &param.cidl_type {
             ensure!(
-                ast.models.contains_key(model_name),
+                ast.d1_models.contains_key(model_name),
                 GeneratorErrorKind::UnknownDataSourceReference,
                 "{}.{} data source references {}",
                 namespace,
@@ -531,6 +569,8 @@ fn validate_methods(
                     param.name
                 );
 
+                ensure_serializeable_object_ref(ast, o)?;
+
                 // TODO: remove this
                 if method.http_verb == HttpVerb::GET {
                     fail!(
@@ -544,7 +584,7 @@ fn validate_methods(
             }
             CidlType::DataSource(model_name) => {
                 ensure!(
-                    ast.models.contains_key(model_name),
+                    ast.d1_models.contains_key(model_name),
                     GeneratorErrorKind::UnknownDataSourceReference,
                     "{}.{} data source references {}",
                     namespace,

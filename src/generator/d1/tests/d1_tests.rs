@@ -44,7 +44,11 @@ async fn query(db: &SqlitePool, sql: &str) -> Result<(), sqlx::Error> {
 }
 
 fn as_migration(ast: CloesceAst) -> MigrationsAst {
-    let CloesceAst { hash, models, .. } = ast;
+    let CloesceAst {
+        hash,
+        d1_models: models,
+        ..
+    } = ast;
 
     // Convert each full Model → MigrationsModel
     let migrations_models: IndexMap<String, MigrationsModel> = models
@@ -468,7 +472,7 @@ ALTER TABLE "User" ADD COLUMN "age" text"#
                     .attribute("favorite_color", CidlType::Text, None)
                     .build(),
             ]);
-            ast.models[0].primary_key.cidl_type = CidlType::Text; // new PK type
+            ast.d1_models[0].primary_key.cidl_type = CidlType::Text; // new PK type
             ast.set_merkle_hash();
             as_migration(ast)
         };
@@ -508,7 +512,7 @@ ALTER TABLE "User" ADD COLUMN "age" text"#
                     .attribute("dog_id", CidlType::Integer, Some("Dog".into())) // added Dog FK
                     .build(),
             ]);
-            ast.models[1].primary_key.cidl_type = CidlType::Text;
+            ast.d1_models[1].primary_key.cidl_type = CidlType::Text;
             ast.set_merkle_hash();
             as_migration(ast)
         };

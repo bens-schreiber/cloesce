@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use ast::{Model, NavigationPropertyKind, fail};
+use ast::{D1Model, NavigationPropertyKind, fail};
 use sea_query::{
     ColumnRef, CommonTableExpression, Expr, IntoCondition, IntoIden, Query, SelectStatement,
     SqliteQueryBuilder, TableRef, WithClause,
@@ -76,7 +76,7 @@ pub fn list_models(
 
 #[allow(clippy::too_many_arguments)]
 fn dfs(
-    model: &Model,
+    model: &D1Model,
     tree: Option<&IncludeTreeJson>,
     query: &mut SelectStatement,
     path: &mut Vec<String>,

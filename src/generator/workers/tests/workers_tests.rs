@@ -78,7 +78,7 @@ fn finalize_adds_crud_methods_to_model() {
     WorkersGenerator::finalize_api_methods(&mut ast);
 
     // Assert
-    let user = ast.models.get("User").unwrap();
+    let user = ast.d1_models.get("User").unwrap();
 
     assert!(user.methods.contains_key("get"));
     assert!(user.methods.contains_key("list"));
@@ -109,7 +109,7 @@ fn finalize_does_not_overwrite_existing_method() {
     WorkersGenerator::finalize_api_methods(&mut ast);
 
     // Assert
-    let user = ast.models.get("User").unwrap();
+    let user = ast.d1_models.get("User").unwrap();
     let method = user.methods.get("get").unwrap();
 
     assert_eq!(method.http_verb, HttpVerb::POST);
@@ -128,7 +128,7 @@ fn finalize_sets_json_media_type() {
     WorkersGenerator::finalize_api_methods(&mut ast);
 
     // Assert
-    let mut user = ast.models.shift_remove("User").unwrap();
+    let mut user = ast.d1_models.shift_remove("User").unwrap();
     let (_, method) = user.methods.pop_first().unwrap();
     assert!(matches!(method.return_media, MediaType::Json));
     assert!(matches!(method.parameters_media, MediaType::Json));
@@ -157,7 +157,7 @@ fn finalize_sets_octet_media_type() {
     WorkersGenerator::finalize_api_methods(&mut ast);
 
     // Assert
-    let mut user = ast.models.shift_remove("User").unwrap();
+    let mut user = ast.d1_models.shift_remove("User").unwrap();
     let method = user.methods.remove("acceptReturnOctet").unwrap();
     assert!(matches!(method.return_media, MediaType::Octet));
     assert!(matches!(method.parameters_media, MediaType::Octet));

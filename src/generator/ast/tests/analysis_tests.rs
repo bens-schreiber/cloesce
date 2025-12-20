@@ -1,7 +1,7 @@
 use std::{collections::BTreeMap, path::PathBuf};
 
 use ast::{
-    CidlType, HttpVerb, MigrationsAst, NamedTypedValue, NavigationPropertyKind, Service,
+    CidlType, HttpVerb, KVModel, MigrationsAst, NamedTypedValue, NavigationPropertyKind, Service,
     ServiceAttribute,
     builder::{ModelBuilder, create_ast},
     err::GeneratorErrorKind,
@@ -396,6 +396,45 @@ fn invalid_stream_method() {
         .build();
 
     let mut ast = create_ast(vec![model]);
+
+    // Act
+    let res = ast.semantic_analysis();
+
+    // Assert
+    assert!(matches!(
+        res.unwrap_err().kind,
+        GeneratorErrorKind::InvalidStream
+    ));
+}
+
+#[test]
+fn stream_kv_model() {
+    // Arrange
+    let mut ast = create_ast(vec![
+        ModelBuilder::new("Dog")
+            .id()
+            .method(
+                "someMethod",
+                HttpVerb::PUT,
+                true,
+                vec![NamedTypedValue {
+                    name: "bad".into(),
+                    cidl_type: CidlType::Object("StreamKV".into()),
+                }],
+                CidlType::Void,
+            )
+            .build(),
+    ]);
+    ast.kv_models.insert(
+        "StreamKV".into(),
+        KVModel {
+            name: "StreamKV".into(),
+            namespace: String::default(),
+            cidl_type: CidlType::Stream,
+            methods: BTreeMap::default(),
+            source_path: PathBuf::default(),
+        },
+    );
 
     // Act
     let res = ast.semantic_analysis();
