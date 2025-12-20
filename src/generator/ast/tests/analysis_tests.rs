@@ -3,7 +3,7 @@ use std::{collections::BTreeMap, path::PathBuf};
 use ast::{
     CidlType, HttpVerb, KVModel, MigrationsAst, NamedTypedValue, NavigationPropertyKind, Service,
     ServiceAttribute,
-    builder::{ModelBuilder, create_ast},
+    builder::{D1ModelBuilder, create_ast},
     err::GeneratorErrorKind,
 };
 
@@ -11,8 +11,8 @@ use ast::{
 fn cloesce_serializes_to_migrations() {
     // Arrange
     let mut ast = create_ast(vec![
-        ModelBuilder::new("Dog").id().build(),
-        ModelBuilder::new("Person").id().build(),
+        D1ModelBuilder::new("Dog").id().build(),
+        D1ModelBuilder::new("Person").id().build(),
     ]);
     ast.set_merkle_hash();
 
@@ -30,7 +30,7 @@ fn cloesce_serializes_to_migrations() {
 #[test]
 fn null_primary_key_error() {
     // Arrange
-    let mut model = ModelBuilder::new("Dog").id().build();
+    let mut model = D1ModelBuilder::new("Dog").id().build();
     model.primary_key.cidl_type = CidlType::nullable(CidlType::Integer);
 
     let mut ast = create_ast(vec![model]);
@@ -46,11 +46,11 @@ fn null_primary_key_error() {
 fn mismatched_foreign_keys_error() {
     // Arrange
     let mut ast = create_ast(vec![
-        ModelBuilder::new("Person")
+        D1ModelBuilder::new("Person")
             .id()
             .attribute("dogId", CidlType::Text, Some("Dog".into()))
             .build(),
-        ModelBuilder::new("Dog").id().build(),
+        D1ModelBuilder::new("Dog").id().build(),
     ]);
 
     // Act
@@ -68,15 +68,15 @@ fn model_cycle_detection_error() {
     // Arrange
     let mut ast = create_ast(vec![
         // A -> B -> C -> A
-        ModelBuilder::new("A")
+        D1ModelBuilder::new("A")
             .id()
             .attribute("bId", CidlType::Integer, Some("B".to_string()))
             .build(),
-        ModelBuilder::new("B")
+        D1ModelBuilder::new("B")
             .id()
             .attribute("cId", CidlType::Integer, Some("C".to_string()))
             .build(),
-        ModelBuilder::new("C")
+        D1ModelBuilder::new("C")
             .id()
             .attribute("aId", CidlType::Integer, Some("A".to_string()))
             .build(),
@@ -139,15 +139,15 @@ fn model_attr_nullability_prevents_cycle_error() {
     // Arrange
     // A -> B -> C -> Nullable<A>
     let mut ast = create_ast(vec![
-        ModelBuilder::new("A")
+        D1ModelBuilder::new("A")
             .id()
             .attribute("bId", CidlType::Integer, Some("B".to_string()))
             .build(),
-        ModelBuilder::new("B")
+        D1ModelBuilder::new("B")
             .id()
             .attribute("cId", CidlType::Integer, Some("C".to_string()))
             .build(),
-        ModelBuilder::new("C")
+        D1ModelBuilder::new("C")
             .id()
             .attribute(
                 "aId",
@@ -165,8 +165,8 @@ fn model_attr_nullability_prevents_cycle_error() {
 fn one_to_one_nav_property_unknown_attribute_reference_error() {
     // Arrange
     let mut ast = create_ast(vec![
-        ModelBuilder::new("Dog").id().build(),
-        ModelBuilder::new("Person")
+        D1ModelBuilder::new("Dog").id().build(),
+        D1ModelBuilder::new("Person")
             .id()
             .nav_p(
                 "dog",
@@ -192,9 +192,9 @@ fn one_to_one_nav_property_unknown_attribute_reference_error() {
 fn one_to_one_mismatched_fk_and_nav_type_error() {
     // Arrange: attribute dogId references Dog, but nav prop type is Cat -> mismatch
     let mut ast = create_ast(vec![
-        ModelBuilder::new("Dog").id().build(),
-        ModelBuilder::new("Cat").id().build(),
-        ModelBuilder::new("Person")
+        D1ModelBuilder::new("Dog").id().build(),
+        D1ModelBuilder::new("Cat").id().build(),
+        D1ModelBuilder::new("Person")
             .id()
             .attribute("dogId", CidlType::Integer, Some("Dog".into()))
             .nav_p(
@@ -222,8 +222,8 @@ fn one_to_many_unresolved_reference_error() {
     // Arrange:
     // Person declares OneToMany to Dog referencing Dog.personId, but Dog has no personId FK attr.
     let mut ast = create_ast(vec![
-        ModelBuilder::new("Dog").id().build(), // no personId attribute
-        ModelBuilder::new("Person")
+        D1ModelBuilder::new("Dog").id().build(), // no personId attribute
+        D1ModelBuilder::new("Person")
             .id()
             .nav_p(
                 "dogs",
@@ -249,7 +249,7 @@ fn junction_table_builder_errors() {
     // Missing second nav property case: only one side of many-to-many
     {
         let mut ast = create_ast(vec![
-            ModelBuilder::new("Student")
+            D1ModelBuilder::new("Student")
                 .id()
                 .nav_p(
                     "courses",
@@ -260,7 +260,7 @@ fn junction_table_builder_errors() {
                 )
                 .build(),
             // Course exists, but doesn't declare the reciprocal nav property
-            ModelBuilder::new("Course").id().build(),
+            D1ModelBuilder::new("Course").id().build(),
         ]);
 
         let err = ast.semantic_analysis().unwrap_err();
@@ -273,7 +273,7 @@ fn junction_table_builder_errors() {
     // Too many models case: three models register the same junction id
     {
         let mut ast = create_ast(vec![
-            ModelBuilder::new("A")
+            D1ModelBuilder::new("A")
                 .id()
                 .nav_p(
                     "bs",
@@ -283,7 +283,7 @@ fn junction_table_builder_errors() {
                     },
                 )
                 .build(),
-            ModelBuilder::new("B")
+            D1ModelBuilder::new("B")
                 .id()
                 .nav_p(
                     "as",
@@ -294,7 +294,7 @@ fn junction_table_builder_errors() {
                 )
                 .build(),
             // Third model C tries to use the same junction id -> should error
-            ModelBuilder::new("C")
+            D1ModelBuilder::new("C")
                 .id()
                 .nav_p(
                     "as",
@@ -317,7 +317,7 @@ fn junction_table_builder_errors() {
 #[test]
 fn instantiated_stream_method() {
     // Arrange
-    let model = ModelBuilder::new("Dog")
+    let model = D1ModelBuilder::new("Dog")
         .id()
         .method(
             "uploadPhoto",
@@ -349,7 +349,7 @@ fn instantiated_stream_method() {
 #[test]
 fn static_stream_method() {
     // Arrange
-    let model = ModelBuilder::new("Dog")
+    let model = D1ModelBuilder::new("Dog")
         .id()
         .method(
             "uploadPhoto",
@@ -375,7 +375,7 @@ fn static_stream_method() {
 #[test]
 fn invalid_stream_method() {
     // Arrange
-    let model = ModelBuilder::new("Dog")
+    let model = D1ModelBuilder::new("Dog")
         .id()
         .method(
             "uploadPhoto",
@@ -411,7 +411,7 @@ fn invalid_stream_method() {
 fn stream_kv_model() {
     // Arrange
     let mut ast = create_ast(vec![
-        ModelBuilder::new("Dog")
+        D1ModelBuilder::new("Dog")
             .id()
             .method(
                 "someMethod",

@@ -77,10 +77,7 @@ async function list(
 
   const orm = Orm.fromD1(d1);
   const res = await orm.list(ctor, { includeTree });
-
-  return res.isRight()
-    ? HttpResult.ok(200, res.value)
-    : HttpResult.fail(500, res.value as string);
+  return HttpResult.ok(200, res);
 }
 
 function findIncludeTree(

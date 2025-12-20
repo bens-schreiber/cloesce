@@ -12,11 +12,7 @@ Cloudflare KV is a simple key-value store. It is not relational, and does not su
 
 ```ts
 /** KV BASE CLASS */
-
-type Json = unknown;
-type KVType = string | ArrayBuffer | ReadableStream | Json;
-
-class KVModel<V extends KVType> {
+class KVModel<V> {
     key: string;
     value: V;
     metadata: unknown;

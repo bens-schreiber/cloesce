@@ -18,8 +18,8 @@ import {
   CidlType,
   DataSource,
   HttpVerb,
-  Model,
-  ModelAttribute,
+  D1Model,
+  D1ModelAttribute,
   ApiMethod,
   NamedTypedValue,
   NavigationProperty,
@@ -28,10 +28,12 @@ import {
   CrudKind,
   Service,
   defaultMediaType,
+  KVModel
 } from "../ast.js";
 import { TypeFormatFlags } from "typescript";
 import { ExtractorError, ExtractorErrorCode } from "./err.js";
-import { Either } from "../ui/common.js";
+import { HttpResult, KVModel as UiKVModel } from "../ui/common.js";
+import Either from "../either.js";
 
 enum AttributeDecoratorKind {
   PrimaryKey = "PrimaryKey",
@@ -48,6 +50,7 @@ enum ClassDecoratorKind {
   PlainOldObject = "PlainOldObject",
   Service = "Service",
   CRUD = "CRUD",
+  KV = "KV",
 }
 
 enum ParameterDecoratorKind {
@@ -58,13 +61,14 @@ export class CidlExtractor {
   constructor(
     public projectName: string,
     public version: string,
-  ) {}
+  ) { }
 
   extract(project: Project): Either<ExtractorError, CloesceAst> {
-    const models: Record<string, Model> = {};
+    const d1Models: Record<string, D1Model> = {};
     const poos: Record<string, PlainOldObject> = {};
     const wranglerEnvs: WranglerEnv[] = [];
     const services: Record<string, Service> = {};
+    const kvModels: Record<string, KVModel> = {};
     let app_source: string | null = null;
 
     for (const sourceFile of project.getSourceFiles()) {
@@ -88,7 +92,7 @@ export class CidlExtractor {
 
         if (hasDecorator(classDecl, ClassDecoratorKind.D1)) {
           if (!classDecl.isExported()) return notExportedErr;
-          const result = CidlExtractor.model(classDecl, sourceFile);
+          const result = D1ModelExtractor.extract(classDecl, sourceFile);
 
           // Error: propogate from models
           if (result.isLeft()) {
@@ -97,13 +101,13 @@ export class CidlExtractor {
           }
 
           const model = result.unwrap();
-          models[model.name] = model;
+          d1Models[model.name] = model;
           continue;
         }
 
         if (hasDecorator(classDecl, ClassDecoratorKind.Service)) {
           if (!classDecl.isExported()) return notExportedErr;
-          const result = CidlExtractor.service(classDecl, sourceFile);
+          const result = ServiceExtractor.extract(classDecl, sourceFile);
 
           // Error: propogate from service
           if (result.isLeft()) {
@@ -144,6 +148,37 @@ export class CidlExtractor {
           }
 
           wranglerEnvs.push(result.unwrap());
+          continue;
+        }
+
+        if (hasDecorator(classDecl, ClassDecoratorKind.KV)) {
+          if (!classDecl.isExported()) return notExportedErr;
+
+          // Extract the namespace from the decorator
+          const kvDecorator = classDecl
+            .getDecorators()
+            .find((d) => getDecoratorName(d) === ClassDecoratorKind.KV)!;
+          const arg = kvDecorator.getCallExpression()?.getArguments()[0];
+          if (!arg || arg.isKind(SyntaxKind.StringLiteral) === false) {
+            return err(ExtractorErrorCode.MissingKVNamespace, (e) => {
+              e.context = classDecl.getName();
+              e.snippet = kvDecorator.getText();
+            });
+          }
+
+          const namespace = arg.asKindOrThrow(SyntaxKind.StringLiteral).getLiteralValue();
+          const result = KVModelExtractor.extract(namespace, classDecl, sourceFile);
+
+          // Error: propogate from models
+          if (result.isLeft()) {
+            result.value.addContext((prev) => `${classDecl.getName()}.${prev}`);
+            return result;
+          }
+
+          const model = result.unwrap();
+          kvModels[model.name] = model;
+
+          continue;
         }
       }
     }
@@ -161,7 +196,8 @@ export class CidlExtractor {
       project_name: this.projectName,
       language: "TypeScript",
       wrangler_env: wranglerEnvs[0],
-      models,
+      d1_models: d1Models,
+      kv_models: kvModels,
       poos,
       services,
       app_source,
@@ -198,12 +234,347 @@ export class CidlExtractor {
     return err(ExtractorErrorCode.AppMissingDefaultExport);
   }
 
-  static model(
+  static poo(
     classDecl: ClassDeclaration,
     sourceFile: SourceFile,
-  ): Either<ExtractorError, Model> {
+  ): Either<ExtractorError, PlainOldObject> {
     const name = classDecl.getName()!;
-    const attributes: ModelAttribute[] = [];
+    const attributes: NamedTypedValue[] = [];
+
+    for (const prop of classDecl.getProperties()) {
+      const typeRes = CidlExtractor.cidlType(prop.getType());
+
+      // Error: invalid property type
+      if (typeRes.isLeft()) {
+        typeRes.value.context = prop.getName();
+        typeRes.value.snippet = prop.getText();
+        return typeRes;
+      }
+
+      // Error: invalid attribute modifier
+      const modifierRes = checkAttributeModifier(prop);
+      if (modifierRes.isLeft()) {
+        return modifierRes;
+      }
+
+      const cidl_type = typeRes.unwrap();
+      attributes.push({
+        name: prop.getName(),
+        cidl_type,
+      });
+      continue;
+    }
+
+    return Either.right({
+      name,
+      attributes,
+      source_path: sourceFile.getFilePath().toString(),
+    });
+  }
+
+  static env(
+    classDecl: ClassDeclaration,
+    sourceFile: SourceFile,
+  ): Either<ExtractorError, WranglerEnv> {
+    const vars: Record<string, CidlType> = {};
+    let binding;
+
+    for (const prop of classDecl.getProperties()) {
+      if (
+        prop
+          .getType()
+          .getText(
+            undefined,
+            TypeFormatFlags.UseAliasDefinedOutsideCurrentScope,
+          ) === "D1Database"
+      ) {
+        binding = prop.getName();
+        continue;
+      }
+
+      const ty = CidlExtractor.cidlType(prop.getType());
+      if (ty.isLeft()) {
+        ty.value.context = prop.getName();
+        ty.value.snippet = prop.getText();
+        return ty;
+      }
+
+      vars[prop.getName()] = ty.unwrap();
+    }
+
+    if (!binding) {
+      return err(ExtractorErrorCode.MissingDatabaseBinding);
+    }
+
+    return Either.right({
+      name: classDecl.getName()!,
+      source_path: sourceFile.getFilePath().toString(),
+      db_binding: binding,
+      vars,
+    });
+  }
+
+  private static readonly primTypeMap: Record<string, CidlType> = {
+    number: "Real",
+    Number: "Real",
+    Integer: "Integer",
+    string: "Text",
+    String: "Text",
+    boolean: "Boolean",
+    Boolean: "Boolean",
+    Date: "DateIso",
+    Uint8Array: "Blob",
+    Stream: "Stream",
+  };
+
+  static cidlType(
+    type: Type,
+    inject: boolean = false,
+  ): Either<ExtractorError, CidlType> {
+    // Void
+    if (type.isVoid()) {
+      return Either.right("Void");
+    }
+
+    // Unknown
+    if (type.isUnknown()) {
+      return Either.right("JsonValue");
+    }
+
+    // Null
+    if (type.isNull()) {
+      return Either.right({ Nullable: "Void" });
+    }
+
+    // Nullable via union
+    const [unwrappedType, nullable] = unwrapNullable(type);
+    const tyText = unwrappedType
+      .getText(undefined, TypeFormatFlags.UseAliasDefinedOutsideCurrentScope)
+      .split("|")[0]
+      .trim();
+
+    // Primitives
+    const prim = this.primTypeMap[tyText];
+    if (prim) {
+      return Either.right(wrapNullable(prim, nullable));
+    }
+
+    const generics = [
+      ...unwrappedType.getAliasTypeArguments(),
+      ...unwrappedType.getTypeArguments(),
+    ];
+
+    // Error: can't handle multiple generics
+    if (generics.length > 1) {
+      return err(ExtractorErrorCode.MultipleGenericType);
+    }
+
+    // No generics -> inject or object
+    if (generics.length === 0) {
+      const base = inject ? { Inject: tyText } : { Object: tyText };
+      return Either.right(wrapNullable(base, nullable));
+    }
+
+    // Single generic
+    const genericTy = generics[0];
+    const symbolName = unwrappedType.getSymbol()?.getName();
+    const aliasName = unwrappedType.getAliasSymbol()?.getName();
+
+    if (aliasName === "DataSourceOf") {
+      return Either.right(
+        wrapNullable(
+          {
+            DataSource: genericTy.getText(
+              undefined,
+              TypeFormatFlags.UseAliasDefinedOutsideCurrentScope,
+            ),
+          },
+          nullable,
+        ),
+      );
+    }
+
+    if (aliasName === "DeepPartial") {
+      const [_, genericTyNullable] = unwrapNullable(genericTy);
+      const genericTyGenerics = [
+        ...genericTy.getAliasTypeArguments(),
+        ...genericTy.getTypeArguments(),
+      ];
+
+      // Expect partials to be of the exact form DeepPartial<Model>
+      if (
+        genericTyNullable ||
+        genericTy.isUnion() ||
+        genericTyGenerics.length > 0
+      ) {
+        return err(ExtractorErrorCode.InvalidPartialType);
+      }
+
+      return Either.right(
+        wrapNullable(
+          {
+            Partial: genericTy
+              .getText(
+                undefined,
+                TypeFormatFlags.UseAliasDefinedOutsideCurrentScope,
+              )
+              .split("|")[0]
+              .trim(),
+          },
+          nullable,
+        ),
+      );
+    }
+
+    if (symbolName === Promise.name || aliasName === "IncludeTree") {
+      return wrapGeneric(genericTy, nullable, (inner) => inner);
+    }
+
+    if (unwrappedType.isArray()) {
+      return wrapGeneric(genericTy, nullable, (inner) => ({ Array: inner }));
+    }
+
+    if (symbolName === HttpResult.name) {
+      return wrapGeneric(genericTy, nullable, (inner) => ({
+        HttpResult: inner,
+      }));
+    }
+
+    // Error: unknown type
+    return err(ExtractorErrorCode.UnknownType);
+
+    function wrapNullable(inner: CidlType, isNullable: boolean): CidlType {
+      if (isNullable) {
+        return { Nullable: inner };
+      } else {
+        return inner;
+      }
+    }
+
+    function wrapGeneric(
+      t: Type,
+      isNullable: boolean,
+      wrapper: (inner: CidlType) => CidlType,
+    ): Either<ExtractorError, CidlType> {
+      const res = CidlExtractor.cidlType(t, inject);
+
+      // Error: propogated from `cidlType`
+      return res.map((inner) => wrapNullable(wrapper(inner), isNullable));
+    }
+
+    function unwrapNullable(ty: Type): [Type, boolean] {
+      if (!ty.isUnion()) return [ty, false];
+
+      const unions = ty.getUnionTypes();
+      const nonNulls = unions.filter((t) => !t.isNull() && !t.isUndefined());
+      const hasNullable = nonNulls.length < unions.length;
+
+      // Booleans seperate into [null, true, false] from the `getUnionTypes` call
+      if (
+        nonNulls.length === 2 &&
+        nonNulls.every((t) => t.isBooleanLiteral())
+      ) {
+        return [nonNulls[0].getApparentType(), hasNullable];
+      }
+
+      return [nonNulls[0] ?? ty, hasNullable];
+    }
+  }
+
+  static includeTree(
+    expr: Expression | undefined,
+    currentClass: ClassDeclaration,
+    sf: SourceFile,
+  ): Either<ExtractorError, CidlIncludeTree> {
+    // Include trees must be of the expected form
+    if (
+      !expr ||
+      !expr.isKind ||
+      !expr.isKind(SyntaxKind.ObjectLiteralExpression)
+    ) {
+      return err(ExtractorErrorCode.InvalidIncludeTree);
+    }
+
+    const result: CidlIncludeTree = {};
+    for (const prop of expr.getProperties()) {
+      if (!prop.isKind(SyntaxKind.PropertyAssignment)) continue;
+
+      // Error: navigation property not found
+      const navProp = findPropertyByName(currentClass, prop.getName());
+      if (!navProp) {
+        return err(
+          ExtractorErrorCode.UnknownNavigationPropertyReference,
+          (e) => {
+            e.snippet = expr.getText();
+            e.context = prop.getName();
+          },
+        );
+      }
+
+      const typeRes = CidlExtractor.cidlType(navProp.getType());
+
+      // Error: invalid referenced nav prop type
+      if (typeRes.isLeft()) {
+        typeRes.value.snippet = navProp.getText();
+        typeRes.value.context = prop.getName();
+        return typeRes;
+      }
+
+      // Error: invalid referenced nav prop type
+      const cidl_type = typeRes.unwrap();
+      if (typeof cidl_type === "string") {
+        return err(
+          ExtractorErrorCode.InvalidNavigationPropertyReference,
+          (e) => {
+            e.snippet = navProp.getText();
+            e.context = prop.getName();
+          },
+        );
+      }
+
+      // Recurse for nested includes
+      const initializer = (prop as any).getInitializer?.();
+      let nestedTree: CidlIncludeTree = {};
+      if (initializer?.isKind?.(SyntaxKind.ObjectLiteralExpression)) {
+        const targetModel = getObjectName(cidl_type);
+        const targetClass = currentClass
+          .getSourceFile()
+          .getProject()
+          .getSourceFiles()
+          .flatMap((f) => f.getClasses())
+          .find((c) => c.getName() === targetModel);
+
+        if (targetClass) {
+          const treeRes = CidlExtractor.includeTree(
+            initializer,
+            targetClass,
+            sf,
+          );
+
+          // Error: Propogated from `includeTree`
+          if (treeRes.isLeft()) {
+            treeRes.value.snippet = expr.getText();
+            return treeRes;
+          }
+
+          nestedTree = treeRes.unwrap();
+        }
+      }
+
+      result[navProp.getName()] = nestedTree;
+    }
+
+    return Either.right(result);
+  }
+}
+
+export class D1ModelExtractor {
+  static extract(
+    classDecl: ClassDeclaration,
+    sourceFile: SourceFile,
+  ): Either<ExtractorError, D1Model> {
+    const name = classDecl.getName()!;
+    const attributes: D1ModelAttribute[] = [];
     const navigation_properties: NavigationProperty[] = [];
     const data_sources: Record<string, DataSource> = {};
     const methods: Record<string, ApiMethod> = {};
@@ -437,7 +808,7 @@ export class CidlExtractor {
         continue;
       }
 
-      const result = CidlExtractor.modelMethod(name, m, httpVerb);
+      const result = this.method(name, m, httpVerb);
       if (result.isLeft()) {
         result.value.addContext((prev) => `${m.getName()} ${prev}`);
         return result;
@@ -457,7 +828,7 @@ export class CidlExtractor {
     });
   }
 
-  static modelMethod(
+  private static method(
     modelName: string,
     method: MethodDeclaration,
     verb: HttpVerb,
@@ -537,8 +908,84 @@ export class CidlExtractor {
       parameters,
     });
   }
+}
 
-  static service(
+export class KVModelExtractor {
+  static extract(
+    namespace: string,
+    classDecl: ClassDeclaration,
+    sourceFile: SourceFile
+  ): Either<ExtractorError, KVModel> {
+
+    // KV Models must extend from the "KVModel" base class
+    const heritage = classDecl.getHeritageClauses()
+      .flatMap(h => h.getTypeNodes())
+      .find(t => t.getExpression().getText() === UiKVModel.name);
+    if (!heritage) {
+      return err(ExtractorErrorCode.MissingKVModelBaseClass, (e) => {
+        e.context = classDecl.getName();
+        e.snippet = classDecl.getText();
+      });
+    }
+
+    const typeArgs = heritage.getTypeArguments();
+    if (typeArgs.length !== 1) {
+      return err(ExtractorErrorCode.MissingKVModelBaseClass, (e) => {
+        e.context = classDecl.getName();
+        e.snippet = classDecl.getText();
+      });
+    }
+
+    const cidlType = CidlExtractor.cidlType(typeArgs[0].getType());
+    if (cidlType.isLeft()) {
+      cidlType.value.context = classDecl.getName();
+      cidlType.value.snippet = classDecl.getText();
+      return cidlType;
+    }
+
+    // KV Models cannot have any attributes
+    if (classDecl.getProperties().length > 0) {
+      return err(ExtractorErrorCode.InvalidKVModelField, (e) => {
+        e.context = classDecl.getName();
+        e.snippet = classDecl.getText();
+      });
+    }
+
+    const methods: Record<string, ApiMethod> = {};
+    for (const m of classDecl.getMethods()) {
+      const httpVerb = m
+        .getDecorators()
+        .map((d) => getDecoratorName(d))
+        .find((name) =>
+          Object.values(HttpVerb).includes(name as HttpVerb),
+        ) as HttpVerb;
+
+      if (!httpVerb) {
+        continue;
+      }
+
+      // can reuse service method extractor here
+      const res = ServiceExtractor.method(m, httpVerb);
+      if (res.isLeft()) {
+        return res;
+      }
+
+      const serviceMethod = res.unwrap();
+      methods[serviceMethod.name] = serviceMethod;
+    }
+
+    return Either.right({
+      namespace,
+      name: classDecl.getName()!,
+      methods,
+      cidl_type: cidlType.unwrap(),
+      source_path: sourceFile.getFilePath().toString(),
+    });
+  }
+}
+
+export class ServiceExtractor {
+  static extract(
     classDecl: ClassDeclaration,
     sourceFile: SourceFile,
   ): Either<ExtractorError, Service> {
@@ -587,7 +1034,7 @@ export class CidlExtractor {
         continue;
       }
 
-      const res = CidlExtractor.serviceMethod(m, httpVerb);
+      const res = this.method(m, httpVerb);
       if (res.isLeft()) {
         return res;
       }
@@ -604,7 +1051,7 @@ export class CidlExtractor {
     });
   }
 
-  static serviceMethod(
+  static method(
     method: MethodDeclaration,
     verb: HttpVerb,
   ): Either<ExtractorError, ApiMethod> {
@@ -670,335 +1117,6 @@ export class CidlExtractor {
       parameters_media: defaultMediaType(),
       parameters,
     });
-  }
-
-  static poo(
-    classDecl: ClassDeclaration,
-    sourceFile: SourceFile,
-  ): Either<ExtractorError, PlainOldObject> {
-    const name = classDecl.getName()!;
-    const attributes: NamedTypedValue[] = [];
-
-    for (const prop of classDecl.getProperties()) {
-      const typeRes = CidlExtractor.cidlType(prop.getType());
-
-      // Error: invalid property type
-      if (typeRes.isLeft()) {
-        typeRes.value.context = prop.getName();
-        typeRes.value.snippet = prop.getText();
-        return typeRes;
-      }
-
-      // Error: invalid attribute modifier
-      const modifierRes = checkAttributeModifier(prop);
-      if (modifierRes.isLeft()) {
-        return modifierRes;
-      }
-
-      const cidl_type = typeRes.unwrap();
-      attributes.push({
-        name: prop.getName(),
-        cidl_type,
-      });
-      continue;
-    }
-
-    return Either.right({
-      name,
-      attributes,
-      source_path: sourceFile.getFilePath().toString(),
-    });
-  }
-
-  static env(
-    classDecl: ClassDeclaration,
-    sourceFile: SourceFile,
-  ): Either<ExtractorError, WranglerEnv> {
-    const vars: Record<string, CidlType> = {};
-    let binding;
-
-    for (const prop of classDecl.getProperties()) {
-      if (
-        prop
-          .getType()
-          .getText(
-            undefined,
-            TypeFormatFlags.UseAliasDefinedOutsideCurrentScope,
-          ) === "D1Database"
-      ) {
-        binding = prop.getName();
-        continue;
-      }
-
-      const ty = CidlExtractor.cidlType(prop.getType());
-      if (ty.isLeft()) {
-        ty.value.context = prop.getName();
-        ty.value.snippet = prop.getText();
-        return ty;
-      }
-
-      vars[prop.getName()] = ty.unwrap();
-    }
-
-    if (!binding) {
-      return err(ExtractorErrorCode.MissingDatabaseBinding);
-    }
-
-    return Either.right({
-      name: classDecl.getName()!,
-      source_path: sourceFile.getFilePath().toString(),
-      db_binding: binding,
-      vars,
-    });
-  }
-
-  private static readonly primTypeMap: Record<string, CidlType> = {
-    number: "Real",
-    Number: "Real",
-    Integer: "Integer",
-    string: "Text",
-    String: "Text",
-    boolean: "Boolean",
-    Boolean: "Boolean",
-    Date: "DateIso",
-    Uint8Array: "Blob",
-    Stream: "Stream",
-  };
-
-  static cidlType(
-    type: Type,
-    inject: boolean = false,
-  ): Either<ExtractorError, CidlType> {
-    // Void
-    if (type.isVoid()) {
-      return Either.right("Void");
-    }
-
-    // Null
-    if (type.isNull()) {
-      return Either.right({ Nullable: "Void" });
-    }
-
-    // Nullable via union
-    const [unwrappedType, nullable] = unwrapNullable(type);
-    const tyText = unwrappedType
-      .getText(undefined, TypeFormatFlags.UseAliasDefinedOutsideCurrentScope)
-      .split("|")[0]
-      .trim();
-
-    // Primitives
-    const prim = this.primTypeMap[tyText];
-    if (prim) {
-      return Either.right(wrapNullable(prim, nullable));
-    }
-
-    const generics = [
-      ...unwrappedType.getAliasTypeArguments(),
-      ...unwrappedType.getTypeArguments(),
-    ];
-
-    // Error: can't handle multiple generics
-    if (generics.length > 1) {
-      return err(ExtractorErrorCode.MultipleGenericType);
-    }
-
-    // No generics -> inject or object
-    if (generics.length === 0) {
-      const base = inject ? { Inject: tyText } : { Object: tyText };
-      return Either.right(wrapNullable(base, nullable));
-    }
-
-    // Single generic
-    const genericTy = generics[0];
-    const symbolName = unwrappedType.getSymbol()?.getName();
-    const aliasName = unwrappedType.getAliasSymbol()?.getName();
-
-    if (aliasName === "DataSourceOf") {
-      return Either.right(
-        wrapNullable(
-          {
-            DataSource: genericTy.getText(
-              undefined,
-              TypeFormatFlags.UseAliasDefinedOutsideCurrentScope,
-            ),
-          },
-          nullable,
-        ),
-      );
-    }
-
-    if (aliasName === "DeepPartial") {
-      const [_, genericTyNullable] = unwrapNullable(genericTy);
-      const genericTyGenerics = [
-        ...genericTy.getAliasTypeArguments(),
-        ...genericTy.getTypeArguments(),
-      ];
-
-      // Expect partials to be of the exact form DeepPartial<Model>
-      if (
-        genericTyNullable ||
-        genericTy.isUnion() ||
-        genericTyGenerics.length > 0
-      ) {
-        return err(ExtractorErrorCode.InvalidPartialType);
-      }
-
-      return Either.right(
-        wrapNullable(
-          {
-            Partial: genericTy
-              .getText(
-                undefined,
-                TypeFormatFlags.UseAliasDefinedOutsideCurrentScope,
-              )
-              .split("|")[0]
-              .trim(),
-          },
-          nullable,
-        ),
-      );
-    }
-
-    if (symbolName === "Promise" || aliasName === "IncludeTree") {
-      // Unwrap promises
-      return wrapGeneric(genericTy, nullable, (inner) => inner);
-    }
-
-    if (unwrappedType.isArray()) {
-      return wrapGeneric(genericTy, nullable, (inner) => ({ Array: inner }));
-    }
-
-    if (symbolName === "HttpResult") {
-      return wrapGeneric(genericTy, nullable, (inner) => ({
-        HttpResult: inner,
-      }));
-    }
-
-    // Error: unknown type
-    return err(ExtractorErrorCode.UnknownType);
-
-    function wrapNullable(inner: CidlType, isNullable: boolean): CidlType {
-      if (isNullable) {
-        return { Nullable: inner };
-      } else {
-        return inner;
-      }
-    }
-
-    function wrapGeneric(
-      t: Type,
-      isNullable: boolean,
-      wrapper: (inner: CidlType) => CidlType,
-    ): Either<ExtractorError, CidlType> {
-      const res = CidlExtractor.cidlType(t, inject);
-
-      // Error: propogated from `cidlType`
-      return res.map((inner) => wrapNullable(wrapper(inner), isNullable));
-    }
-
-    function unwrapNullable(ty: Type): [Type, boolean] {
-      if (!ty.isUnion()) return [ty, false];
-
-      const unions = ty.getUnionTypes();
-      const nonNulls = unions.filter((t) => !t.isNull() && !t.isUndefined());
-      const hasNullable = nonNulls.length < unions.length;
-
-      // Booleans seperate into [null, true, false] from the `getUnionTypes` call
-      if (
-        nonNulls.length === 2 &&
-        nonNulls.every((t) => t.isBooleanLiteral())
-      ) {
-        return [nonNulls[0].getApparentType(), hasNullable];
-      }
-
-      return [nonNulls[0] ?? ty, hasNullable];
-    }
-  }
-
-  static includeTree(
-    expr: Expression | undefined,
-    currentClass: ClassDeclaration,
-    sf: SourceFile,
-  ): Either<ExtractorError, CidlIncludeTree> {
-    // Include trees must be of the expected form
-    if (
-      !expr ||
-      !expr.isKind ||
-      !expr.isKind(SyntaxKind.ObjectLiteralExpression)
-    ) {
-      return err(ExtractorErrorCode.InvalidIncludeTree);
-    }
-
-    const result: CidlIncludeTree = {};
-    for (const prop of expr.getProperties()) {
-      if (!prop.isKind(SyntaxKind.PropertyAssignment)) continue;
-
-      // Error: navigation property not found
-      const navProp = findPropertyByName(currentClass, prop.getName());
-      if (!navProp) {
-        return err(
-          ExtractorErrorCode.UnknownNavigationPropertyReference,
-          (e) => {
-            e.snippet = expr.getText();
-            e.context = prop.getName();
-          },
-        );
-      }
-
-      const typeRes = CidlExtractor.cidlType(navProp.getType());
-
-      // Error: invalid referenced nav prop type
-      if (typeRes.isLeft()) {
-        typeRes.value.snippet = navProp.getText();
-        typeRes.value.context = prop.getName();
-        return typeRes;
-      }
-
-      // Error: invalid referenced nav prop type
-      const cidl_type = typeRes.unwrap();
-      if (typeof cidl_type === "string") {
-        return err(
-          ExtractorErrorCode.InvalidNavigationPropertyReference,
-          (e) => {
-            e.snippet = navProp.getText();
-            e.context = prop.getName();
-          },
-        );
-      }
-
-      // Recurse for nested includes
-      const initializer = (prop as any).getInitializer?.();
-      let nestedTree: CidlIncludeTree = {};
-      if (initializer?.isKind?.(SyntaxKind.ObjectLiteralExpression)) {
-        const targetModel = getObjectName(cidl_type);
-        const targetClass = currentClass
-          .getSourceFile()
-          .getProject()
-          .getSourceFiles()
-          .flatMap((f) => f.getClasses())
-          .find((c) => c.getName() === targetModel);
-
-        if (targetClass) {
-          const treeRes = CidlExtractor.includeTree(
-            initializer,
-            targetClass,
-            sf,
-          );
-
-          // Error: Propogated from `includeTree`
-          if (treeRes.isLeft()) {
-            treeRes.value.snippet = expr.getText();
-            return treeRes;
-          }
-
-          nestedTree = treeRes.unwrap();
-        }
-      }
-
-      result[navProp.getName()] = nestedTree;
-    }
-
-    return Either.right(result);
   }
 }
 

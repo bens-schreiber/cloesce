@@ -3,16 +3,17 @@ import { D1Database } from "@cloudflare/workers-types/experimental/index.js";
 import { OrmWasmExports, mapSql, loadOrmWasm } from "./wasm.js";
 import { proxyCrud } from "./crud.js";
 import { HttpResult, IncludeTree, Orm } from "../ui/backend.js";
-import { Either, KeysOfType } from "../ui/common.js";
+import { KeysOfType } from "../ui/common.js";
 import {
   CloesceAst,
-  Model,
+  D1Model,
   ApiMethod,
   NO_DATA_SOURCE,
   Service,
   MediaType,
 } from "../ast.js";
 import { RuntimeValidator } from "./validator.js";
+import Either from "../either.js";
 
 /**
  * Dependency injection container, mapping an object type name to an instance of that object.
@@ -38,7 +39,7 @@ export class RuntimeContainer {
     public readonly ast: CloesceAst,
     public readonly constructorRegistry: ConstructorRegistry,
     public readonly wasm: OrmWasmExports,
-  ) {}
+  ) { }
 
   static async init(
     ast: CloesceAst,
@@ -353,7 +354,7 @@ export type MatchedRoute = {
   namespace: string;
   method: ApiMethod;
   id: string | null;
-  model?: Model;
+  model?: D1Model;
   service?: Service;
 };
 
@@ -388,7 +389,7 @@ function matchRoute(
   const methodName = parts[parts.length - 1];
   const id = parts.length === 3 ? parts[1] : null;
 
-  const model = ast.models[namespace];
+  const model = ast.d1_models[namespace];
   if (model) {
     const method = model.methods[methodName];
     if (!method) return notFound(RouterError.UnknownRoute);
@@ -535,7 +536,7 @@ async function validateRequest(
 async function hydrateModelD1(
   constructorRegistry: ConstructorRegistry,
   d1: D1Database,
-  model: Model,
+  model: D1Model,
   id: string,
   dataSource: string,
 ): Promise<Either<HttpResult, object>> {

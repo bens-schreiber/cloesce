@@ -222,7 +222,7 @@ fn left_join_as(
 mod test {
     use ast::{
         CidlType, NavigationPropertyKind,
-        builder::{IncludeTreeBuilder, ModelBuilder},
+        builder::{D1ModelBuilder, IncludeTreeBuilder},
     };
     use serde_json::json;
     use sqlx::SqlitePool;
@@ -234,7 +234,7 @@ mod test {
     #[sqlx::test]
     async fn scalar_model(db: SqlitePool) {
         // Arrange
-        let ast_model = ModelBuilder::new("Person")
+        let ast_model = D1ModelBuilder::new("Person")
             .id()
             .attribute("name", CidlType::Text, None)
             .build();
@@ -261,7 +261,7 @@ mod test {
     #[sqlx::test]
     async fn custom_from(db: SqlitePool) {
         // Arrange
-        let ast_model = ModelBuilder::new("Person")
+        let ast_model = D1ModelBuilder::new("Person")
             .id()
             .attribute("name", CidlType::Text, None)
             .build();
@@ -293,7 +293,7 @@ mod test {
     async fn one_to_one(db: SqlitePool) {
         // Arrange
         let meta: ModelMeta = vec![
-            ModelBuilder::new("Person")
+            D1ModelBuilder::new("Person")
                 .id()
                 .attribute("dogId", CidlType::Integer, Some("Dog".into()))
                 .nav_p(
@@ -304,7 +304,7 @@ mod test {
                     },
                 )
                 .build(),
-            ModelBuilder::new("Dog").id().build(),
+            D1ModelBuilder::new("Dog").id().build(),
         ]
         .into_iter()
         .map(|m| (m.name.clone(), m))
@@ -338,15 +338,15 @@ mod test {
     #[sqlx::test]
     fn one_to_many(db: SqlitePool) {
         let meta: ModelMeta = vec![
-            ModelBuilder::new("Dog")
+            D1ModelBuilder::new("Dog")
                 .id()
                 .attribute("personId", CidlType::Integer, Some("Person".into()))
                 .build(),
-            ModelBuilder::new("Cat")
+            D1ModelBuilder::new("Cat")
                 .attribute("personId", CidlType::Integer, Some("Person".into()))
                 .id()
                 .build(),
-            ModelBuilder::new("Person")
+            D1ModelBuilder::new("Person")
                 .id()
                 .nav_p(
                     "dogs",
@@ -364,7 +364,7 @@ mod test {
                 )
                 .attribute("bossId", CidlType::Integer, Some("Boss".into()))
                 .build(),
-            ModelBuilder::new("Boss")
+            D1ModelBuilder::new("Boss")
                 .id()
                 .nav_p(
                     "persons",
@@ -410,7 +410,7 @@ mod test {
     #[sqlx::test]
     async fn many_to_many(db: SqlitePool) {
         let meta: ModelMeta = vec![
-            ModelBuilder::new("Student")
+            D1ModelBuilder::new("Student")
                 .id()
                 .nav_p(
                     "courses",
@@ -424,7 +424,7 @@ mod test {
                     IncludeTreeBuilder::default().add_node("courses").build(),
                 )
                 .build(),
-            ModelBuilder::new("Course")
+            D1ModelBuilder::new("Course")
                 .id()
                 .nav_p(
                     "students",
@@ -466,7 +466,7 @@ mod test {
 
     #[sqlx::test]
     async fn views_auto_alias(db: SqlitePool) {
-        let horse_model = ModelBuilder::new("Horse")
+        let horse_model = D1ModelBuilder::new("Horse")
             .id()
             .attribute("name", CidlType::Text, None)
             .attribute("bio", CidlType::nullable(CidlType::Text), None)
@@ -479,7 +479,7 @@ mod test {
             )
             .build();
 
-        let match_model = ModelBuilder::new("Match")
+        let match_model = D1ModelBuilder::new("Match")
             .id()
             .attribute("horseId1", CidlType::Integer, Some("Horse".into()))
             .attribute("horseId2", CidlType::Integer, Some("Horse".into()))

@@ -176,7 +176,7 @@ fn process_navigation_properties(
 
 #[cfg(test)]
 mod tests {
-    use ast::{CidlType, NavigationPropertyKind, builder::ModelBuilder};
+    use ast::{CidlType, NavigationPropertyKind, builder::D1ModelBuilder};
     use serde_json::{Map, Value, json};
     use std::collections::HashMap;
 
@@ -185,7 +185,7 @@ mod tests {
     #[test]
     fn no_records_returns_empty() {
         // Arrange
-        let horse = ModelBuilder::new("Horse")
+        let horse = D1ModelBuilder::new("Horse")
             .id()
             .attribute("name", CidlType::nullable(CidlType::Text), None)
             .nav_p(
@@ -197,7 +197,7 @@ mod tests {
             )
             .build();
 
-        let rider = ModelBuilder::new("Rider")
+        let rider = D1ModelBuilder::new("Rider")
             .id()
             .attribute("nickname", CidlType::nullable(CidlType::Text), None)
             .build();
@@ -217,7 +217,7 @@ mod tests {
     #[test]
     fn flat() {
         // Arrange
-        let horse = ModelBuilder::new("Horse")
+        let horse = D1ModelBuilder::new("Horse")
             .id()
             .attribute("name", CidlType::nullable(CidlType::Text), None)
             .build();
@@ -245,7 +245,7 @@ mod tests {
     #[test]
     fn assigns_scalar_attributes_and_navigation_arrays() {
         // Arrange
-        let horse = ModelBuilder::new("Horse")
+        let horse = D1ModelBuilder::new("Horse")
             .id()
             .attribute("name", CidlType::nullable(CidlType::Text), None)
             .nav_p(
@@ -257,7 +257,7 @@ mod tests {
             )
             .build();
 
-        let rider = ModelBuilder::new("Rider")
+        let rider = D1ModelBuilder::new("Rider")
             .id()
             .attribute("nickname", CidlType::nullable(CidlType::Text), None)
             .build();
@@ -308,7 +308,7 @@ mod tests {
     #[test]
     fn merges_duplicate_rows_with_arrays() {
         // Arrange
-        let horse = ModelBuilder::new("Horse")
+        let horse = D1ModelBuilder::new("Horse")
             .id()
             .attribute("name", CidlType::nullable(CidlType::Text), None)
             .nav_p(
@@ -320,7 +320,7 @@ mod tests {
             )
             .build();
 
-        let rider = ModelBuilder::new("Rider")
+        let rider = D1ModelBuilder::new("Rider")
             .id()
             .attribute("nickname", CidlType::nullable(CidlType::Text), None)
             .build();

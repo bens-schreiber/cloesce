@@ -4,14 +4,14 @@ import {
   RouterError,
   _cloesceInternal,
 } from "../src/router/router";
-import { HttpVerb, MediaType, Model, NamedTypedValue } from "../src/ast";
+import { HttpVerb, MediaType, D1Model, NamedTypedValue } from "../src/ast";
 import { CloesceApp, HttpResult } from "../src/ui/backend";
 import { mapSql } from "../src/router/wasm";
 import fs from "fs";
 import path from "path";
 import {
   IncludeTreeBuilder,
-  ModelBuilder,
+  D1ModelBuilder,
   ServiceBuilder,
   createAst,
 } from "./builder";
@@ -165,7 +165,7 @@ describe("Match Route", () => {
   test("Unknown Method => 404", () => {
     // Arrange
     const request = createRequest("http://foo.com/api/Model/method");
-    const ast = createAst([ModelBuilder.model("Model").id().build()]);
+    const ast = createAst([D1ModelBuilder.model("Model").id().build()]);
 
     // Act
     const res = _cloesceInternal.matchRoute(request, ast, "api");
@@ -182,7 +182,7 @@ describe("Match Route", () => {
     // Arrange
     const request = createRequest("http://foo.com/api/Model/method");
     const ast = createAst([
-      ModelBuilder.model("Model")
+      D1ModelBuilder.model("Model")
         .id()
         .method("method", HttpVerb.DELETE, false, [], "Void")
         .build(),
@@ -203,7 +203,7 @@ describe("Match Route", () => {
     // Arrange
     const request = createRequest("http://foo.com/api/Model/method", "POST");
     const ast = createAst([
-      ModelBuilder.model("Model")
+      D1ModelBuilder.model("Model")
         .id()
         .method("method", HttpVerb.POST, true, [], "Void")
         .build(),
@@ -216,8 +216,8 @@ describe("Match Route", () => {
     expect(res.isRight()).toBe(true);
     expect(res.unwrap()).toEqual({
       id: null,
-      method: ast.models["Model"].methods["method"],
-      model: ast.models["Model"],
+      method: ast.d1_models["Model"].methods["method"],
+      model: ast.d1_models["Model"],
       namespace: "Model",
       kind: "model",
     });
@@ -227,7 +227,7 @@ describe("Match Route", () => {
     // Arrange
     const request = createRequest("http://foo.com/api/Model/0/method", "POST");
     const ast = createAst([
-      ModelBuilder.model("Model")
+      D1ModelBuilder.model("Model")
         .id()
         .method("method", HttpVerb.POST, false, [], "Void")
         .build(),
@@ -240,8 +240,8 @@ describe("Match Route", () => {
     expect(res.isRight()).toBe(true);
     expect(res.unwrap()).toEqual({
       id: "0",
-      model: ast.models["Model"],
-      method: ast.models["Model"].methods["method"],
+      model: ast.d1_models["Model"],
+      method: ast.d1_models["Model"].methods["method"],
       namespace: "Model",
       kind: "model",
     });
@@ -307,7 +307,7 @@ describe("Namespace Middleware", () => {
     const request = createRequest("http://foo.com/api/Foo/method", "POST");
     const env = mockWranglerEnv();
     const ast = createAst([
-      ModelBuilder.model("Foo")
+      D1ModelBuilder.model("Foo")
         .id()
         .method("method", HttpVerb.POST, true, [], "Void")
         .build(),
@@ -316,7 +316,7 @@ describe("Namespace Middleware", () => {
     const di = createDi();
     const d1 = mockD1();
 
-    class Foo {}
+    class Foo { }
 
     app.onNamespace(Foo, async () => {
       return HttpResult.fail(500, "oogly boogly");
@@ -354,7 +354,7 @@ describe("Namespace Middleware", () => {
     const di = createDi();
     const d1 = mockD1();
 
-    class Foo {}
+    class Foo { }
 
     app.onNamespace(Foo, async () => {
       return HttpResult.fail(500, "oogly boogly");
@@ -380,13 +380,13 @@ describe("Request Validation", () => {
   test("Instantiated Method Missing Id => 400", async () => {
     // Arrange
     const request = createRequest("http://foo.com/api/Foo/method", "POST", {});
-    const model = ModelBuilder.model("Foo")
+    const model = D1ModelBuilder.model("Foo")
       .id()
       .method("method", HttpVerb.POST, false, [], "Void")
       .build();
     const ast = createAst([model]);
 
-    class Foo {}
+    class Foo { }
     const ctorReg = createCtorReg([Foo]);
     const route: MatchedRoute = {
       kind: "model",
@@ -413,13 +413,13 @@ describe("Request Validation", () => {
   test("Request Missing JSON Body => 400", async () => {
     // Arrange
     const request = createRequest("http://foo.com/api/Foo/method", "POST");
-    const model = ModelBuilder.model("Foo")
+    const model = D1ModelBuilder.model("Foo")
       .id()
       .method("method", HttpVerb.POST, true, [], "Void")
       .build();
     const ast = createAst([model]);
 
-    class Foo {}
+    class Foo { }
     const ctorReg = createCtorReg([Foo]);
     const route: MatchedRoute = {
       kind: "model",
@@ -446,7 +446,7 @@ describe("Request Validation", () => {
   test("Request Body Missing Parameters => 400", async () => {
     // Arrange
     const request = createRequest("http://foo.com/api/Foo/method", "POST", {});
-    const model = ModelBuilder.model("Foo")
+    const model = D1ModelBuilder.model("Foo")
       .id()
       .method(
         "method",
@@ -463,7 +463,7 @@ describe("Request Validation", () => {
       .build();
     const ast = createAst([model]);
 
-    class Foo {}
+    class Foo { }
     const ctorReg = createCtorReg([Foo]);
     const route: MatchedRoute = {
       kind: "model",
@@ -502,143 +502,143 @@ describe("Request Validation", () => {
     params: NamedTypedValue[];
     jsonValue: any;
     instanceValues: any;
-    models?: Model[];
+    models?: D1Model[];
     noGetRequests?: boolean; // TODO: allow
     ctorReg?: Record<string, new () => any>;
   }[] = [
-    // // Primitives
-    {
-      params: [
-        {
-          name: "int",
-          cidl_type: "Integer",
+      // // Primitives
+      {
+        params: [
+          {
+            name: "int",
+            cidl_type: "Integer",
+          },
+          {
+            name: "string",
+            cidl_type: "Text",
+          },
+          {
+            name: "bool",
+            cidl_type: "Boolean",
+          },
+          {
+            name: "date",
+            cidl_type: "DateIso",
+          },
+          {
+            name: "float",
+            cidl_type: "Real",
+          },
+        ],
+        jsonValue: {
+          int: "0",
+          string: "hello",
+          bool: "false",
+          date: new Date(now).toISOString(),
+          float: "0.99",
         },
-        {
-          name: "string",
-          cidl_type: "Text",
+        instanceValues: {
+          int: 0,
+          string: "hello",
+          bool: false,
+          date: new Date(now),
+          float: 0.99,
         },
-        {
-          name: "bool",
-          cidl_type: "Boolean",
-        },
-        {
-          name: "date",
-          cidl_type: "DateIso",
-        },
-        {
-          name: "float",
-          cidl_type: "Real",
-        },
-      ],
-      jsonValue: {
-        int: "0",
-        string: "hello",
-        bool: "false",
-        date: new Date(now).toISOString(),
-        float: "0.99",
       },
-      instanceValues: {
-        int: 0,
-        string: "hello",
-        bool: false,
-        date: new Date(now),
-        float: 0.99,
-      },
-    },
 
-    // // Data Sources
-    {
-      params: [
-        {
-          name: "ds",
-          cidl_type: { DataSource: "TestCase" },
+      // // Data Sources
+      {
+        params: [
+          {
+            name: "ds",
+            cidl_type: { DataSource: "TestCase" },
+          },
+        ],
+        jsonValue: {
+          ds: "none",
         },
-      ],
-      jsonValue: {
-        ds: "none",
+        instanceValues: {
+          ds: "none",
+        },
       },
-      instanceValues: {
-        ds: "none",
-      },
-    },
 
-    // Models, Partials
-    {
-      params: [
-        {
-          name: "scalar",
-          cidl_type: { Object: "Scalar" },
+      // Models, Partials
+      {
+        params: [
+          {
+            name: "scalar",
+            cidl_type: { Object: "Scalar" },
+          },
+          {
+            name: "manyScalars",
+            cidl_type: { Object: "ManyScalars" },
+          },
+          {
+            name: "partialScalar",
+            cidl_type: { Partial: "Scalar" },
+          },
+          {
+            name: "partialManyScalars",
+            cidl_type: { Partial: "ManyScalars" },
+          },
+        ],
+        jsonValue: {
+          scalar: {
+            id: "0",
+            manyScalarsId: "0",
+          },
+          manyScalars: {
+            id: "0",
+            scalars: [
+              {
+                id: "1",
+                manyScalarsId: "0",
+              },
+              {
+                id: "2",
+                manyScalarsId: "0",
+              },
+            ],
+          },
+          partialScalar: {},
+          partialManyScalars: {
+            id: "1234",
+          },
         },
-        {
-          name: "manyScalars",
-          cidl_type: { Object: "ManyScalars" },
+        instanceValues: {
+          scalar: Object.assign(new Scalar(), { id: 0, manyScalarsId: 0 }),
+          manyScalars: Object.assign(new ManyScalars(), {
+            id: 0,
+            scalars: [
+              Object.assign(new Scalar(), { id: 1, manyScalarsId: 0 }),
+              Object.assign(new Scalar(), { id: 2, manyScalarsId: 0 }),
+            ],
+          }),
+          partialScalar: {},
+          partialManyScalars: {
+            id: 1234,
+            scalars: [],
+          },
         },
-        {
-          name: "partialScalar",
-          cidl_type: { Partial: "Scalar" },
+        models: [
+          D1ModelBuilder.model("Scalar")
+            .id()
+            .attribute("manyScalarsId", "Integer", "ManyScalars")
+            .build(),
+          D1ModelBuilder.model("ManyScalars")
+            .id()
+            .navP("scalars", "Scalar", {
+              OneToMany: { reference: "manyScalarsId" },
+            })
+            .build(),
+        ],
+        ctorReg: {
+          Scalar: Scalar,
+          ManyScalars: ManyScalars,
         },
-        {
-          name: "partialManyScalars",
-          cidl_type: { Partial: "ManyScalars" },
-        },
-      ],
-      jsonValue: {
-        scalar: {
-          id: "0",
-          manyScalarsId: "0",
-        },
-        manyScalars: {
-          id: "0",
-          scalars: [
-            {
-              id: "1",
-              manyScalarsId: "0",
-            },
-            {
-              id: "2",
-              manyScalarsId: "0",
-            },
-          ],
-        },
-        partialScalar: {},
-        partialManyScalars: {
-          id: "1234",
-        },
+        noGetRequests: true,
       },
-      instanceValues: {
-        scalar: Object.assign(new Scalar(), { id: 0, manyScalarsId: 0 }),
-        manyScalars: Object.assign(new ManyScalars(), {
-          id: 0,
-          scalars: [
-            Object.assign(new Scalar(), { id: 1, manyScalarsId: 0 }),
-            Object.assign(new Scalar(), { id: 2, manyScalarsId: 0 }),
-          ],
-        }),
-        partialScalar: {},
-        partialManyScalars: {
-          id: 1234,
-          scalars: [],
-        },
-      },
-      models: [
-        ModelBuilder.model("Scalar")
-          .id()
-          .attribute("manyScalarsId", "Integer", "ManyScalars")
-          .build(),
-        ModelBuilder.model("ManyScalars")
-          .id()
-          .navP("scalars", "Scalar", {
-            OneToMany: { reference: "manyScalarsId" },
-          })
-          .build(),
-      ],
-      ctorReg: {
-        Scalar: Scalar,
-        ManyScalars: ManyScalars,
-      },
-      noGetRequests: true,
-    },
-  ];
+    ];
 
   const expandedCases = cases.flatMap((testCase) => {
     const canBeGetRequest = testCase.noGetRequests ? [false] : [true, false];
@@ -676,7 +676,7 @@ describe("Request Validation", () => {
 
   test.each(expandedCases)("validates parameters %#", async (testCase) => {
     // Arrange
-    const model = ModelBuilder.model("TestCase")
+    const model = D1ModelBuilder.model("TestCase")
       .id()
       .method(
         "testMethod",
@@ -734,7 +734,7 @@ describe("Method Middleware", () => {
     );
     const env = mockWranglerEnv();
     const ast = createAst([
-      ModelBuilder.model("Foo")
+      D1ModelBuilder.model("Foo")
         .id()
         .method("method", HttpVerb.POST, true, [], "Void")
         .build(),
@@ -744,7 +744,7 @@ describe("Method Middleware", () => {
     const d1 = mockD1();
 
     class Foo {
-      method() {}
+      method() { }
     }
 
     app.onMethod(Foo, "method", async () => {
@@ -770,7 +770,7 @@ describe("Method Middleware", () => {
 describe("Method Dispatch", () => {
   test("Missing Dependency => 500", async () => {
     // Arrange
-    const model = ModelBuilder.model("Foo")
+    const model = D1ModelBuilder.model("Foo")
       .id()
       .method(
         "method",
@@ -811,7 +811,7 @@ describe("Method Dispatch", () => {
     };
 
     const di = createDi();
-    const model = ModelBuilder.model("Foo")
+    const model = D1ModelBuilder.model("Foo")
       .id()
       .method("testMethod", HttpVerb.GET, true, [], "Void")
       .build();
@@ -841,7 +841,7 @@ describe("Method Dispatch", () => {
 
     const di = createDi();
 
-    const model = ModelBuilder.model("Foo")
+    const model = D1ModelBuilder.model("Foo")
       .id()
       .method("testMethod", HttpVerb.GET, true, [], { HttpResult: "Void" })
       .build();
@@ -871,7 +871,7 @@ describe("Method Dispatch", () => {
     };
     const di = createDi();
 
-    const model = ModelBuilder.model("Foo")
+    const model = D1ModelBuilder.model("Foo")
       .id()
       .method("testMethod", HttpVerb.GET, true, [], "Text")
       .build();
@@ -894,7 +894,7 @@ describe("Method Dispatch", () => {
 
   test("handles thrown errors", async () => {
     // Arrange – Error object
-    const model = ModelBuilder.model("Foo")
+    const model = D1ModelBuilder.model("Foo")
       .id()
       .method("testMethod", HttpVerb.GET, true, [], "Text")
       .build();
@@ -938,7 +938,7 @@ describe("Result Middleware", () => {
     );
     const env = mockWranglerEnv();
     const ast = createAst([
-      ModelBuilder.model("Foo")
+      D1ModelBuilder.model("Foo")
         .id()
         .method("method", HttpVerb.POST, true, [], "Void")
         .build(),
@@ -987,7 +987,7 @@ describe("Result Middleware", () => {
     );
     const env = mockWranglerEnv();
     const ast = createAst([
-      ModelBuilder.model("Foo")
+      D1ModelBuilder.model("Foo")
         .id()
         .method("method", HttpVerb.POST, true, [], "Void")
         .build(),
@@ -1040,14 +1040,14 @@ describe("mapSql", () => {
     );
 
     // Build models with ModelBuilder
-    const Horse = ModelBuilder.model("Horse")
+    const Horse = D1ModelBuilder.model("Horse")
       .attribute("name", "Text")
       .attribute("bio", { Nullable: "Text" })
       .navP("likes", "Like", { OneToMany: { reference: "horseId1" } })
       .id()
       .build();
 
-    const Like = ModelBuilder.model("Like")
+    const Like = D1ModelBuilder.model("Like")
       .attribute("horseId1", "Integer", "Horse")
       .attribute("horseId2", "Integer", "Horse")
       .navP("horse2", "Horse", { OneToOne: { reference: "horseId2" } })

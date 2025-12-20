@@ -1,10 +1,12 @@
-import { CidlIncludeTree, CloesceAst, Model } from "../ast.js";
+import { CidlIncludeTree, CloesceAst, D1Model } from "../ast.js";
 import { IncludeTree } from "../ui/backend.js";
 import { RuntimeContainer } from "./router.js";
+import Either from "../either.js";
 
 // Requires the ORM binary to have been built
 import mod from "../orm.wasm";
-import { Either } from "../ui/common.js";
+
+
 
 /**
  * WASM ABI
@@ -55,7 +57,7 @@ export class WasmResource {
     private wasm: OrmWasmExports,
     public ptr: number,
     public len: number,
-  ) {}
+  ) { }
   free() {
     this.wasm.dealloc(this.ptr, this.len);
   }
@@ -80,11 +82,11 @@ export async function loadOrmWasm(
   // Load WASM
   const wasmInstance = (wasm ??
     (await WebAssembly.instantiate(mod))) as WebAssembly.Instance & {
-    exports: OrmWasmExports;
-  };
+      exports: OrmWasmExports;
+    };
 
   const modelMeta = WasmResource.fromString(
-    JSON.stringify(ast.models),
+    JSON.stringify(ast.d1_models),
     wasmInstance.exports,
   );
 
@@ -149,14 +151,14 @@ export function mapSql<T extends object>(
   const parsed: any[] = JSON.parse(jsonResults.value);
   return Either.right(
     parsed.map((obj: any) =>
-      instantiateDepthFirst(obj, ast.models[ctor.name], includeTree),
+      instantiateDepthFirst(obj, ast.d1_models[ctor.name], includeTree),
     ) as T[],
   );
 
   // TODO: Lazy instantiation via Proxy?
   function instantiateDepthFirst(
     m: any,
-    meta: Model,
+    meta: D1Model,
     includeTree: IncludeTree<any> | null,
   ) {
     m = Object.assign(new constructorRegistry[meta.name](), m);
@@ -169,7 +171,7 @@ export function mapSql<T extends object>(
       const nestedIncludeTree = includeTree[navProp.var_name];
       if (!nestedIncludeTree) continue;
 
-      const nestedMeta = ast.models[navProp.model_name];
+      const nestedMeta = ast.d1_models[navProp.model_name];
 
       // One to Many, Many to Many
       if (Array.isArray(m[navProp.var_name])) {

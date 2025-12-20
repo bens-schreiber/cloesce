@@ -1,6 +1,6 @@
 import { describe, test, expect } from "vitest";
 import { Project } from "ts-morph";
-import { CidlExtractor } from "../src/extractor/extract";
+import { CidlExtractor, D1ModelExtractor, KVModelExtractor, ServiceExtractor } from "../src/extractor/extract";
 import { CidlType, DataSource, Service } from "../src/ast";
 
 function cloesceProject(): Project {
@@ -204,7 +204,7 @@ describe("Data Source", () => {
 
     // Act
     const classDecl = sourceFile.getClass("Foo")!;
-    const res = CidlExtractor.model(classDecl, sourceFile);
+    const res = D1ModelExtractor.extract(classDecl, sourceFile);
 
     // Assert
     expect(res.isRight()).toBe(true);
@@ -237,7 +237,7 @@ describe("Services", () => {
 
     // Act
     const classDecl = sourceFile.getClass("FooService")!;
-    const res = CidlExtractor.service(classDecl, sourceFile);
+    const res = ServiceExtractor.extract(classDecl, sourceFile);
 
     // Assert
     expect(res.isRight()).toBe(true);
@@ -252,5 +252,47 @@ describe("Services", () => {
       methods: {},
       source_path: sourceFile.getFilePath().toString(),
     } as Service);
+  });
+});
+
+describe("KV Models", () => {
+  test("Finds KV Model", () => {
+    // Arrange
+    const project = cloesceProject();
+    const sourceFile = project.createSourceFile(
+      "test.ts",
+      `
+        import { KVModel, POST } from "./src/ui/backend";
+
+        @KV("FOO_NAMESPACE")
+        export class Foo extends KVModel<unknown> {
+          @POST
+          method(): void {}
+        }
+        `,
+    );
+
+    // Act
+    const res = new CidlExtractor("proj", "1.0.0").extract(project);
+
+    // Assert
+    expect(res.isRight()).toBe(true);
+    expect(res.unwrap().kv_models["Foo"]).toEqual({
+      name: "Foo",
+      namespace: "FOO_NAMESPACE",
+      cidl_type: "JsonValue",
+      methods: {
+        method: {
+          name: "method",
+          http_verb: "POST",
+          is_static: false,
+          parameters: [],
+          "parameters_media": "Json",
+          "return_media": "Json",
+          return_type: "Void",
+        },
+      },
+      source_path: sourceFile.getFilePath().toString(),
+    });
   });
 });

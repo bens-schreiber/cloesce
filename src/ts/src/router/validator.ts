@@ -5,8 +5,9 @@ import {
   getNavigationPropertyCidlType,
   isNullableType,
 } from "../ast";
-import { Either, b64ToU8 } from "../ui/common";
+import { b64ToU8 } from "../ui/common";
 import { ConstructorRegistry } from "./router";
+import Either from "../either";
 
 /**
  * Runtime type validation, asserting that the structure of a value follows the
@@ -28,7 +29,7 @@ export class RuntimeValidator {
   constructor(
     private ast: CloesceAst,
     private ctorReg: ConstructorRegistry,
-  ) {}
+  ) { }
 
   static validate(
     value: any,
@@ -103,16 +104,16 @@ export class RuntimeValidator {
       return rightIf(
         () => value,
         typeof value === "string" &&
-          (value === NO_DATA_SOURCE ||
-            this.ast.models[objectName]?.data_sources[value] !== undefined),
+        (value === NO_DATA_SOURCE ||
+          this.ast.d1_models[objectName]?.data_sources[value] !== undefined),
       );
     }
 
     const objName = getObjectName(cidlType);
 
     // Models
-    if (objName && this.ast.models[objName]) {
-      const model = this.ast.models[objName];
+    if (objName && this.ast.d1_models[objName]) {
+      const model = this.ast.d1_models[objName];
       if (!model || typeof value !== "object") return Either.left(null);
       const valueObj = value as Record<string, unknown>;
 

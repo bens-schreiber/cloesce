@@ -1,12 +1,12 @@
 import {
-  Model,
+  D1Model,
   CloesceAst,
   CidlIncludeTree,
   NamedTypedValue,
   HttpVerb,
   CidlType,
   NavigationPropertyKind,
-  ModelAttribute,
+  D1ModelAttribute,
   DataSource,
   NavigationProperty,
   ApiMethod,
@@ -16,7 +16,7 @@ import {
 } from "../src/ast";
 
 export function createAst(
-  models: Model[],
+  models: D1Model[],
   services: Service[] = [],
 ): CloesceAst {
   const modelsMap = Object.fromEntries(models.map((m) => [m.name, m]));
@@ -26,7 +26,8 @@ export function createAst(
     version: "1.0",
     project_name: "test",
     language: "TypeScript",
-    models: modelsMap,
+    d1_models: modelsMap,
+    kv_models: {},
     poos: {},
     wrangler_env: {
       name: "Env",
@@ -65,9 +66,9 @@ export class IncludeTreeBuilder {
   }
 }
 
-export class ModelBuilder {
+export class D1ModelBuilder {
   private name: string;
-  private attributes: ModelAttribute[] = [];
+  private attributes: D1ModelAttribute[] = [];
   private navigation_properties: NavigationProperty[] = [];
   private primary_key: NamedTypedValue | null = null;
   private methods: Record<string, ApiMethod> = {};
@@ -78,7 +79,7 @@ export class ModelBuilder {
   }
 
   static model(name: string) {
-    return new ModelBuilder(name);
+    return new D1ModelBuilder(name);
   }
 
   attribute(
@@ -144,7 +145,7 @@ export class ModelBuilder {
     return this;
   }
 
-  build(): Model {
+  build(): D1Model {
     if (!this.primary_key) {
       throw new Error(`Model '${this.name}' has no primary key`);
     }

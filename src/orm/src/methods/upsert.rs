@@ -624,7 +624,7 @@ fn bytes_to_sqlite(bytes: &[u8]) -> SimpleExpr {
 mod test {
     use std::collections::HashMap;
 
-    use ast::{CidlType, NavigationPropertyKind, builder::ModelBuilder};
+    use ast::{CidlType, NavigationPropertyKind, builder::D1ModelBuilder};
     use serde_json::{Value, json};
     use sqlx::SqlitePool;
 
@@ -636,7 +636,7 @@ mod test {
     #[sqlx::test]
     async fn upsert_scalar_model(db: SqlitePool) {
         // Arrange
-        let ast_model = ModelBuilder::new("Horse")
+        let ast_model = D1ModelBuilder::new("Horse")
             .id()
             .attribute("color", CidlType::Text, None)
             .attribute("age", CidlType::Integer, None)
@@ -694,7 +694,7 @@ mod test {
     #[sqlx::test]
     async fn update_scalar_model(db: SqlitePool) {
         // Arrange
-        let ast_model = ModelBuilder::new("Horse")
+        let ast_model = D1ModelBuilder::new("Horse")
             .id()
             .attribute("color", CidlType::Text, None)
             .attribute("age", CidlType::Integer, None)
@@ -740,7 +740,7 @@ mod test {
     #[sqlx::test]
     async fn upsert_blob_b64(db: SqlitePool) {
         // Arrange
-        let ast_model = ModelBuilder::new("Picture")
+        let ast_model = D1ModelBuilder::new("Picture")
             .id()
             .attribute("metadata", CidlType::Text, None)
             .attribute("blob", CidlType::Blob, None)
@@ -790,7 +790,7 @@ mod test {
     #[sqlx::test]
     async fn upsert_blob_u8_arr(db: SqlitePool) {
         // Arrange
-        let ast_model = ModelBuilder::new("Picture")
+        let ast_model = D1ModelBuilder::new("Picture")
             .id()
             .attribute("metadata", CidlType::Text, None)
             .attribute("blob", CidlType::Blob, None)
@@ -844,7 +844,7 @@ mod test {
     #[sqlx::test]
     async fn nav_props_no_include_tree(db: SqlitePool) {
         // Arrange
-        let ast_person = ModelBuilder::new("Person")
+        let ast_person = D1ModelBuilder::new("Person")
             .id()
             .attribute("horseId", CidlType::Integer, Some("Horse".into()))
             .nav_p(
@@ -855,7 +855,7 @@ mod test {
                 },
             )
             .build();
-        let ast_horse = ModelBuilder::new("Horse").id().build();
+        let ast_horse = D1ModelBuilder::new("Horse").id().build();
 
         let new_model = json!({
             "id": 1,
@@ -904,7 +904,7 @@ mod test {
     #[sqlx::test]
     async fn one_to_one(db: SqlitePool) {
         // Arrange
-        let ast_person = ModelBuilder::new("Person")
+        let ast_person = D1ModelBuilder::new("Person")
             .id()
             .attribute("horseId", CidlType::Integer, Some("Horse".into()))
             .nav_p(
@@ -915,7 +915,7 @@ mod test {
                 },
             )
             .build();
-        let ast_horse = ModelBuilder::new("Horse").id().build();
+        let ast_horse = D1ModelBuilder::new("Horse").id().build();
 
         let new_model = json!({
             "id": 1,
@@ -970,7 +970,7 @@ mod test {
     #[sqlx::test]
     async fn one_to_many(db: SqlitePool) {
         // Arrange
-        let ast_person = ModelBuilder::new("Person")
+        let ast_person = D1ModelBuilder::new("Person")
             .id()
             .nav_p(
                 "horses",
@@ -980,7 +980,7 @@ mod test {
                 },
             )
             .build();
-        let ast_horse = ModelBuilder::new("Horse")
+        let ast_horse = D1ModelBuilder::new("Horse")
             .id()
             .attribute("personId", CidlType::Integer, Some("Person".into()))
             .build();
@@ -1064,7 +1064,7 @@ mod test {
     #[sqlx::test]
     async fn many_to_many(db: SqlitePool) {
         // Arrange
-        let ast_person = ModelBuilder::new("Person")
+        let ast_person = D1ModelBuilder::new("Person")
             .id()
             .nav_p(
                 "horses",
@@ -1074,7 +1074,7 @@ mod test {
                 },
             )
             .build();
-        let ast_horse = ModelBuilder::new("Horse")
+        let ast_horse = D1ModelBuilder::new("Horse")
             .nav_p(
                 "persons",
                 "Person",
@@ -1161,7 +1161,7 @@ mod test {
     #[sqlx::test]
     async fn topological_ordering_is_correct(db: SqlitePool) {
         // Arrange
-        let ast_person = ModelBuilder::new("Person")
+        let ast_person = D1ModelBuilder::new("Person")
             .id()
             .attribute("horseId", CidlType::Integer, Some("Horse".into()))
             .nav_p(
@@ -1173,7 +1173,7 @@ mod test {
             )
             .build();
 
-        let ast_horse = ModelBuilder::new("Horse")
+        let ast_horse = D1ModelBuilder::new("Horse")
             .id()
             .nav_p(
                 "awards",
@@ -1184,7 +1184,7 @@ mod test {
             )
             .build();
 
-        let ast_award = ModelBuilder::new("Award")
+        let ast_award = D1ModelBuilder::new("Award")
             .id()
             .attribute("horseId", CidlType::Integer, Some("Horse".into()))
             .attribute("title", CidlType::Text, None)
@@ -1267,7 +1267,7 @@ mod test {
     #[sqlx::test]
     async fn insert_missing_pk_autogenerates(db: SqlitePool) {
         // Arrange
-        let person = ModelBuilder::new("Person").id().build();
+        let person = D1ModelBuilder::new("Person").id().build();
         let mut meta = std::collections::HashMap::new();
         meta.insert(person.name.clone(), person);
 
@@ -1314,7 +1314,7 @@ mod test {
 
     #[sqlx::test]
     async fn insert_missing_one_to_one_fk_autogenerates(db: SqlitePool) {
-        let person = ModelBuilder::new("Person")
+        let person = D1ModelBuilder::new("Person")
             .id()
             .attribute("horseId", CidlType::Integer, Some("Horse".into()))
             .nav_p(
@@ -1326,7 +1326,7 @@ mod test {
             )
             .build();
 
-        let horse = ModelBuilder::new("Horse").id().build();
+        let horse = D1ModelBuilder::new("Horse").id().build();
 
         let mut meta = std::collections::HashMap::new();
         meta.insert(person.name.clone(), person);
@@ -1398,7 +1398,7 @@ mod test {
     #[sqlx::test]
     async fn insert_missing_one_to_many_fk_autogenerates(db: SqlitePool) {
         // Arrange
-        let person = ModelBuilder::new("Person")
+        let person = D1ModelBuilder::new("Person")
             .id()
             .nav_p(
                 "horses",
@@ -1409,7 +1409,7 @@ mod test {
             )
             .build();
 
-        let horse = ModelBuilder::new("Horse")
+        let horse = D1ModelBuilder::new("Horse")
             .id()
             .attribute("personId", CidlType::Integer, Some("Person".into()))
             .build();
@@ -1486,7 +1486,7 @@ mod test {
     #[sqlx::test]
     async fn insert_missing_many_to_many_pk_fk_autogenerates(db: SqlitePool) {
         // Arrange
-        let person = ModelBuilder::new("Person")
+        let person = D1ModelBuilder::new("Person")
             .id()
             .nav_p(
                 "horses",
@@ -1497,7 +1497,7 @@ mod test {
             )
             .build();
 
-        let horse = ModelBuilder::new("Horse")
+        let horse = D1ModelBuilder::new("Horse")
             .nav_p(
                 "persons",
                 "Person",

@@ -17,6 +17,9 @@ export enum ExtractorErrorCode {
   TooManyWranglerEnvs,
   MissingFile,
   InvalidServiceAttribute,
+  MissingKVNamespace,
+  MissingKVModelBaseClass,
+  InvalidKVModelField,
 }
 
 const errorInfoMap: Record<
@@ -105,6 +108,20 @@ const errorInfoMap: Record<
       "Services must contain only dependency injected instances as attributes.",
     suggestion: "Remove the attribute.",
   },
+  [ExtractorErrorCode.MissingKVNamespace]: {
+    description:
+      "KV Models require a KV Namespace to be defined in their decorator",
+    suggestion: "Add a namespace (e.g., @KVModel('MY_KV_NAMESPACE'))",
+  },
+  [ExtractorErrorCode.MissingKVModelBaseClass]: {
+    description:
+      "KV Models must extend from the KVModel base class with a generic value type.",
+    suggestion: "Extend from KVModel<T> with a valid value type.",
+  },
+  [ExtractorErrorCode.InvalidKVModelField]: {
+    description: "KV Models cannot have any fields.",
+    suggestion: "Remove all fields from the KV Model.",
+  },
 };
 
 export function getErrorInfo(code: ExtractorErrorCode) {
@@ -115,7 +132,7 @@ export class ExtractorError {
   context?: string;
   snippet?: string;
 
-  constructor(public code: ExtractorErrorCode) {}
+  constructor(public code: ExtractorErrorCode) { }
 
   addContext(fn: (val: string | undefined) => string | undefined) {
     this.context = fn(this.context ?? "");

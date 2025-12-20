@@ -286,7 +286,7 @@ async function extract(
         ast.app_source = "./" + path.basename(ast.app_source);
       }
 
-      for (const model of Object.values(ast.models)) {
+      for (const model of Object.values(ast.d1_models)) {
         model.source_path = "./" + path.basename(model.source_path);
       }
 

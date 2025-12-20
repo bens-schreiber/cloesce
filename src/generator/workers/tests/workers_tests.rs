@@ -2,7 +2,7 @@ use std::path::Path;
 
 use ast::{
     CidlType, CrudKind, HttpVerb, MediaType, NamedTypedValue,
-    builder::{ModelBuilder, create_ast},
+    builder::{D1ModelBuilder, create_ast},
 };
 use workers::WorkersGenerator;
 
@@ -11,7 +11,7 @@ fn link_generates_relative_import_for_model() {
     // Arrange
     let workers_path = Path::new("/project/workers/index.ts");
 
-    let mut user = ModelBuilder::new("User").id().build();
+    let mut user = D1ModelBuilder::new("User").id().build();
     user.source_path = Path::new("/project/models/User.ts").to_path_buf();
 
     let ast = create_ast(vec![user]);
@@ -30,7 +30,7 @@ fn link_adds_dot_slash_when_model_in_same_directory() {
     // Arrange
     let workers_path = Path::new("/project/workers/index.ts");
 
-    let mut thing = ModelBuilder::new("Thing").id().build();
+    let mut thing = D1ModelBuilder::new("Thing").id().build();
     thing.source_path = Path::new("/project/workers/Thing.ts").to_path_buf();
 
     let ast = create_ast(vec![thing]);
@@ -50,7 +50,7 @@ fn link_falls_back_to_absolute_path_when_relative_not_possible() {
     // Arrange
     let workers_path = Path::new("/project/workers/index.ts");
 
-    let mut alien = ModelBuilder::new("Alien").id().build();
+    let mut alien = D1ModelBuilder::new("Alien").id().build();
     alien.source_path = Path::new("C:\\nonrelative\\Alien.ts").to_path_buf();
 
     let ast = create_ast(vec![alien]);
@@ -68,7 +68,7 @@ fn link_falls_back_to_absolute_path_when_relative_not_possible() {
 #[test]
 fn finalize_adds_crud_methods_to_model() {
     // Arrange
-    let mut user = ModelBuilder::new("User").id().build();
+    let mut user = D1ModelBuilder::new("User").id().build();
     user.cruds
         .extend(vec![CrudKind::GET, CrudKind::SAVE, CrudKind::LIST]);
 
@@ -88,7 +88,7 @@ fn finalize_adds_crud_methods_to_model() {
 #[test]
 fn finalize_does_not_overwrite_existing_method() {
     // Arrange
-    let mut user = ModelBuilder::new("User")
+    let mut user = D1ModelBuilder::new("User")
         .id()
         .method(
             "get",
@@ -119,7 +119,7 @@ fn finalize_does_not_overwrite_existing_method() {
 #[test]
 fn finalize_sets_json_media_type() {
     // Arrange
-    let mut user = ModelBuilder::new("User").id().build();
+    let mut user = D1ModelBuilder::new("User").id().build();
     user.cruds.extend(vec![CrudKind::GET]);
 
     let mut ast = create_ast(vec![user]);
@@ -138,7 +138,7 @@ fn finalize_sets_json_media_type() {
 fn finalize_sets_octet_media_type() {
     // Arrange
     let mut ast = create_ast(vec![
-        ModelBuilder::new("User")
+        D1ModelBuilder::new("User")
             .id()
             .method(
                 "acceptReturnOctet",

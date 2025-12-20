@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use ast::{
     CidlType, CloesceAst, MigrationsAst, MigrationsModel, NavigationPropertyKind,
-    builder::{IncludeTreeBuilder, ModelBuilder, create_ast},
+    builder::{D1ModelBuilder, IncludeTreeBuilder, create_ast},
 };
 
 use d1::{D1Generator, MigrationsIntent};
@@ -111,7 +111,7 @@ async fn migrate_models_scalars(db: SqlitePool) {
         // Arrange
         let ast = {
             let mut ast = create_ast(vec![
-                ModelBuilder::new("User")
+                D1ModelBuilder::new("User")
                     .id()
                     .attribute("name", CidlType::nullable(CidlType::Text), None)
                     .attribute("age", CidlType::Integer, None)
@@ -160,7 +160,7 @@ async fn migrate_models_one_to_one(db: SqlitePool) {
         // Arrange
         let ast = {
             let mut ast = create_ast(vec![
-                ModelBuilder::new("Person")
+                D1ModelBuilder::new("Person")
                     .id()
                     .attribute("dogId", CidlType::Integer, Some("Dog".into()))
                     .nav_p(
@@ -175,7 +175,7 @@ async fn migrate_models_one_to_one(db: SqlitePool) {
                         IncludeTreeBuilder::default().add_node("dog").build(),
                     )
                     .build(),
-                ModelBuilder::new("Dog").id().build(),
+                D1ModelBuilder::new("Dog").id().build(),
             ]);
             ast.set_merkle_hash();
             as_migration(ast)
@@ -219,15 +219,15 @@ async fn migrate_models_one_to_many(db: SqlitePool) {
         // Arrange
         let ast = {
             let mut ast = create_ast(vec![
-                ModelBuilder::new("Dog")
+                D1ModelBuilder::new("Dog")
                     .id()
                     .attribute("personId", CidlType::Integer, Some("Person".into()))
                     .build(),
-                ModelBuilder::new("Cat")
+                D1ModelBuilder::new("Cat")
                     .attribute("personId", CidlType::Integer, Some("Person".into()))
                     .id()
                     .build(),
-                ModelBuilder::new("Person")
+                D1ModelBuilder::new("Person")
                     .id()
                     .nav_p(
                         "dogs",
@@ -252,7 +252,7 @@ async fn migrate_models_one_to_many(db: SqlitePool) {
                             .build(),
                     )
                     .build(),
-                ModelBuilder::new("Boss")
+                D1ModelBuilder::new("Boss")
                     .id()
                     .nav_p(
                         "persons",
@@ -325,7 +325,7 @@ async fn migrate_models_many_to_many(db: SqlitePool) {
         // Arrange
         let ast = {
             let mut ast = create_ast(vec![
-                ModelBuilder::new("Student")
+                D1ModelBuilder::new("Student")
                     .id()
                     .nav_p(
                         "courses",
@@ -339,7 +339,7 @@ async fn migrate_models_many_to_many(db: SqlitePool) {
                         IncludeTreeBuilder::default().add_node("courses").build(),
                     )
                     .build(),
-                ModelBuilder::new("Course")
+                D1ModelBuilder::new("Course")
                     .id()
                     .nav_p(
                         "students",
@@ -396,7 +396,7 @@ async fn migrate_models_many_to_many(db: SqlitePool) {
 async fn migrate_with_alterations(db: SqlitePool) {
     let mut base_ast = {
         let ast = as_migration(create_ast(vec![
-            ModelBuilder::new("User")
+            D1ModelBuilder::new("User")
                 .id()
                 .attribute("name", CidlType::nullable(CidlType::Text), None)
                 .attribute("age", CidlType::Integer, None)
@@ -417,7 +417,7 @@ async fn migrate_with_alterations(db: SqlitePool) {
         // Arrange
         let new = {
             let mut ast = create_ast(vec![
-                ModelBuilder::new("User")
+                D1ModelBuilder::new("User")
                     .id()
                     .attribute("first_name", CidlType::nullable(CidlType::Text), None) // changed name
                     .attribute("age", CidlType::Text, None) // changed type
@@ -465,7 +465,7 @@ ALTER TABLE "User" ADD COLUMN "age" text"#
         // Arrange
         let new = {
             let mut ast = create_ast(vec![
-                ModelBuilder::new("User")
+                D1ModelBuilder::new("User")
                     .id()
                     .attribute("first_name", CidlType::nullable(CidlType::Text), None)
                     .attribute("age", CidlType::Text, None)
@@ -503,8 +503,8 @@ ALTER TABLE "User" ADD COLUMN "age" text"#
         // Arrange
         let new = {
             let mut ast = create_ast(vec![
-                ModelBuilder::new("Dog").id().build(), // added Dog
-                ModelBuilder::new("User")
+                D1ModelBuilder::new("Dog").id().build(), // added Dog
+                D1ModelBuilder::new("User")
                     .id()
                     .attribute("first_name", CidlType::nullable(CidlType::Text), None)
                     .attribute("age", CidlType::Text, None)
@@ -539,7 +539,7 @@ async fn migrate_alter_drop_m2m(db: SqlitePool) {
     // Arrange
     let m2m_ast = {
         let mut ast = create_ast(vec![
-            ModelBuilder::new("Student")
+            D1ModelBuilder::new("Student")
                 .id()
                 .nav_p(
                     "courses",
@@ -549,7 +549,7 @@ async fn migrate_alter_drop_m2m(db: SqlitePool) {
                     },
                 )
                 .build(),
-            ModelBuilder::new("Course")
+            D1ModelBuilder::new("Course")
                 .id()
                 .nav_p(
                     "students",
@@ -574,8 +574,8 @@ async fn migrate_alter_drop_m2m(db: SqlitePool) {
 
     let no_m2m_ast = {
         let mut ast = create_ast(vec![
-            ModelBuilder::new("Student").id().build(),
-            ModelBuilder::new("Course").id().build(),
+            D1ModelBuilder::new("Student").id().build(),
+            D1ModelBuilder::new("Course").id().build(),
         ]);
         ast.set_merkle_hash();
         as_migration(ast)
@@ -601,8 +601,8 @@ async fn migrate_alter_add_m2m(db: SqlitePool) {
     // Arrange
     let no_m2m_ast = {
         let mut ast = create_ast(vec![
-            ModelBuilder::new("Student").id().build(),
-            ModelBuilder::new("Course").id().build(),
+            D1ModelBuilder::new("Student").id().build(),
+            D1ModelBuilder::new("Course").id().build(),
         ]);
         ast.set_merkle_hash();
         let migration = as_migration(ast);
@@ -617,7 +617,7 @@ async fn migrate_alter_add_m2m(db: SqlitePool) {
 
     let m2m_ast = {
         let mut ast = create_ast(vec![
-            ModelBuilder::new("Student")
+            D1ModelBuilder::new("Student")
                 .id()
                 .nav_p(
                     "courses",
@@ -627,7 +627,7 @@ async fn migrate_alter_add_m2m(db: SqlitePool) {
                     },
                 )
                 .build(),
-            ModelBuilder::new("Course")
+            D1ModelBuilder::new("Course")
                 .id()
                 .nav_p(
                     "students",

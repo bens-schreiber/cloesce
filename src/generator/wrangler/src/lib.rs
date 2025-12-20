@@ -337,7 +337,7 @@ mod tests {
 
     use ast::{
         KVModel, WranglerEnv,
-        builder::{ModelBuilder, create_ast},
+        builder::{D1ModelBuilder, create_ast},
         err::GeneratorErrorKind,
     };
 
@@ -404,7 +404,7 @@ mod tests {
     #[test]
     fn generates_default_d1_wrangler_values() {
         // Arrange
-        let mut ast = create_ast(vec![ModelBuilder::new("User").id().build()]);
+        let mut ast = create_ast(vec![D1ModelBuilder::new("User").id().build()]);
         ast.wrangler_env = Some(WranglerEnv {
             name: "Env".into(),
             source_path: "source.ts".into(),
@@ -492,7 +492,7 @@ mod tests {
     #[test]
     fn validate_missing_variable_in_wrangler() {
         // Arrange
-        let mut ast = create_ast(vec![ModelBuilder::new("User").id().build()]);
+        let mut ast = create_ast(vec![D1ModelBuilder::new("User").id().build()]);
         ast.wrangler_env = Some(WranglerEnv {
             name: "Env".into(),
             source_path: "source.ts".into(),
@@ -523,7 +523,7 @@ mod tests {
     #[test]
     fn validate_missing_env_in_ast() {
         // Arrange
-        let ast = create_ast(vec![ModelBuilder::new("User").id().build()]);
+        let ast = create_ast(vec![D1ModelBuilder::new("User").id().build()]);
 
         let specs = vec![
             WranglerFormat::Toml(toml::from_str("").unwrap()).as_spec(),

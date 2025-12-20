@@ -1,5 +1,5 @@
-import { D1Database } from "@cloudflare/workers-types/experimental/index.js";
-import { DeepPartial, Either, KeysOfType, u8ToB64 } from "./common.js";
+import { D1Database, D1Result } from "@cloudflare/workers-types/experimental/index.js";
+import { DeepPartial, KeysOfType, u8ToB64 } from "./common.js";
 import { RuntimeContainer } from "../router/router.js";
 import { WasmResource, mapSql, invokeOrmWasm } from "../router/wasm.js";
 import { CrudKind } from "../ast.js";
@@ -12,8 +12,8 @@ export {
   DependencyContainer as DependencyInjector,
 } from "../router/router.js";
 export type { MiddlewareFn, ResultMiddlewareFn } from "../router/router.js";
-export { HttpResult, Either, Stream } from "./common.js";
-export type { DeepPartial } from "./common.js";
+export { HttpResult, KVModel } from "./common.js";
+export type { DeepPartial, Stream } from "./common.js";
 export type { CrudKind } from "../ast.js";
 
 /**
@@ -36,9 +36,13 @@ export type { CrudKind } from "../ast.js";
  *  }
  * ```
  */
-export const D1: ClassDecorator = () => {};
+export const D1: ClassDecorator = () => { };
 
-export const Service: ClassDecorator = () => {};
+export const KV = (namespace: string): ClassDecorator => {
+  return () => { };
+};
+
+export const Service: ClassDecorator = () => { };
 
 /**
  * Marks a class as a plain serializable object.
@@ -66,7 +70,7 @@ export const Service: ClassDecorator = () => {};
  * async function foo(): Promise<HttpResult<CatStuff>> { ... }
  * ```
  */
-export const PlainOldObject: ClassDecorator = () => {};
+export const PlainOldObject: ClassDecorator = () => { };
 
 /**
  * Declares a Wrangler environment definition.
@@ -89,7 +93,7 @@ export const PlainOldObject: ClassDecorator = () => {};
  * foo(＠Inject env: WranglerEnv) {...}
  * ```
  */
-export const WranglerEnv: ClassDecorator = () => {};
+export const WranglerEnv: ClassDecorator = () => { };
 
 /**
  * Marks a property as the SQL primary key for a model.
@@ -107,37 +111,37 @@ export const WranglerEnv: ClassDecorator = () => {};
  * }
  * ```
  */
-export const PrimaryKey: PropertyDecorator = () => {};
+export const PrimaryKey: PropertyDecorator = () => { };
 
 /**
  * Exposes a class method as an HTTP GET endpoint.
  * The method will appear in both backend and generated client APIs.
  */
-export const GET: MethodDecorator = () => {};
+export const GET: MethodDecorator = () => { };
 
 /**
  * Exposes a class method as an HTTP POST endpoint.
  * The method will appear in both backend and generated client APIs.
  */
-export const POST: MethodDecorator = () => {};
+export const POST: MethodDecorator = () => { };
 
 /**
  * Exposes a class method as an HTTP PUT endpoint.
  * The method will appear in both backend and generated client APIs.
  */
-export const PUT: MethodDecorator = () => {};
+export const PUT: MethodDecorator = () => { };
 
 /**
  * Exposes a class method as an HTTP PATCH endpoint.
  * The method will appear in both backend and generated client APIs.
  */
-export const PATCH: MethodDecorator = () => {};
+export const PATCH: MethodDecorator = () => { };
 
 /**
  * Exposes a class method as an HTTP DEL endpoint.
  * The method will appear in both backend and generated client APIs.
  */
-export const DELETE: MethodDecorator = () => {};
+export const DELETE: MethodDecorator = () => { };
 
 /**
  * Declares a static property as a data source.
@@ -180,7 +184,7 @@ export const DELETE: MethodDecorator = () => {};
  * ```
  */
 
-export const DataSource: PropertyDecorator = () => {};
+export const DataSource: PropertyDecorator = () => { };
 
 /**
  * Declares a one-to-many relationship between models.
@@ -196,7 +200,7 @@ export const DataSource: PropertyDecorator = () => {};
  */
 export const OneToMany =
   (_foreignKeyColumn: string): PropertyDecorator =>
-  () => {};
+    () => { };
 
 /**
  * Declares a one-to-one relationship between models.
@@ -212,7 +216,7 @@ export const OneToMany =
  */
 export const OneToOne =
   (_foreignKeyColumn: string): PropertyDecorator =>
-  () => {};
+    () => { };
 
 /**
  * Declares a many-to-many relationship between models.
@@ -228,7 +232,7 @@ export const OneToOne =
  */
 export const ManyToMany =
   (_uniqueId: string): PropertyDecorator =>
-  () => {};
+    () => { };
 
 /**
  * Declares a foreign key relationship between models.
@@ -246,7 +250,7 @@ export const ManyToMany =
  */
 export const ForeignKey =
   <T>(_Model: T | string): PropertyDecorator =>
-  () => {};
+    () => { };
 
 /**
  * Marks a method parameter for dependency injection.
@@ -265,7 +269,7 @@ export const ForeignKey =
  * }
  * ```
  */
-export const Inject: ParameterDecorator = () => {};
+export const Inject: ParameterDecorator = () => { };
 
 /**
  * Enables automatic CRUD method generation for a model.
@@ -297,7 +301,7 @@ export const Inject: ParameterDecorator = () => {};
  */
 export const CRUD =
   (_kinds: CrudKind[]): ClassDecorator =>
-  () => {};
+    () => { };
 
 type Primitive = string | number | boolean | bigint | symbol | null | undefined;
 
@@ -330,10 +334,10 @@ type Primitive = string | number | boolean | bigint | symbol | null | undefined;
 export type IncludeTree<T> = (T extends Primitive
   ? never
   : {
-      [K in keyof T]?: T[K] extends (infer U)[]
-        ? IncludeTree<NonNullable<U>>
-        : IncludeTree<NonNullable<T[K]>>;
-    }) & { __brand?: "IncludeTree" };
+    [K in keyof T]?: T[K] extends (infer U)[]
+    ? IncludeTree<NonNullable<U>>
+    : IncludeTree<NonNullable<T[K]>>;
+  }) & { __brand?: "IncludeTree" };
 
 /**
  * Represents the name of a `＠DataSource` available on a model type `T`,
@@ -388,7 +392,7 @@ export type Integer = number & { __brand?: "Integer" };
  * Exposes the ORM primitives Cloesce uses to interact with D1 databases.
  */
 export class Orm {
-  private constructor(private db: D1Database) {}
+  private constructor(private db: D1Database) { }
 
   /**
    * Creates an instance of an `Orm`
@@ -426,7 +430,7 @@ export class Orm {
    *
    * Finally, if the primary key is defined, but all attributes are included, a SQLite upsert will be performed.
    *
-   * In any other case, an error string will be returned.
+   * In any other case, an  error will be thrown.
    *
    * ### Inserting a new Model
    * ```ts
@@ -458,13 +462,13 @@ export class Orm {
    * @param ctor A model constructor.
    * @param newModel The new or augmented model.
    * @param includeTree An include tree describing which foreign keys to join.
-   * @returns An error string, or the primary key of the inserted model.
+   * @returns The primary key of the inserted model.
    */
   async upsert<T extends object>(
     ctor: new () => T,
     newModel: DeepPartial<T>,
     includeTree: IncludeTree<T> | null = null,
-  ): Promise<Either<string, any>> {
+  ): Promise<any> {
     const { wasm } = RuntimeContainer.get();
     const args = [
       WasmResource.fromString(ctor.name, wasm),
@@ -479,7 +483,9 @@ export class Orm {
 
     const upsertQueryRes = invokeOrmWasm(wasm.upsert_model, args, wasm);
     if (upsertQueryRes.isLeft()) {
-      return upsertQueryRes;
+      throw new Error(
+        `Upsert failed: ${upsertQueryRes.value}`,
+      );
     }
 
     const statements = JSON.parse(upsertQueryRes.unwrap()) as {
@@ -501,15 +507,13 @@ export class Orm {
       statements.map((s) => this.db.prepare(s.query).bind(...s.values)),
     );
 
-    if (!batchRes.every((r) => r.success)) {
-      const failed = batchRes.find((r) => !r.success);
-      return Either.left(
-        failed?.error ?? "D1 batch failed, but no error was returned.",
-      );
+    const failed = batchRes.find((r) => !r.success);
+    if (failed) {
+      throw new Error("Upsert failed: " + (failed.error ?? "unknown error"));
     }
 
     const rootModelId = batchRes[selectIndex!].results[0] as { id: any };
-    return Either.right(rootModelId.id);
+    return rootModelId.id;
   }
 
   /**
@@ -595,7 +599,7 @@ export class Orm {
     includeTree?: IncludeTree<T> | null,
   ): string {
     const { ast } = RuntimeContainer.get();
-    return `${this.listQuery<T>(ctor, { includeTree })} WHERE [${ast.models[ctor.name].primary_key.name}] = ?`;
+    return `${this.listQuery<T>(ctor, { includeTree })} WHERE [${ast.d1_models[ctor.name].primary_key.name}] = ?`;
   }
 
   /**
@@ -634,19 +638,18 @@ export class Orm {
       includeTree?: IncludeTree<T> | null;
       from?: string;
     },
-  ): Promise<Either<string, T[]>> {
+  ): Promise<T[]> {
     const sql = Orm.listQuery(ctor, opts);
 
     const stmt = this.db.prepare(sql);
     const records = await stmt.all();
     if (!records.success) {
-      return Either.left(
-        records.error ?? "D1 query failed, but no error was returned.",
+      throw new Error(
+        "List query failed: " + (records.error ?? "unknown error"),
       );
     }
 
-    const mapped = Orm.mapSql(ctor, records.results, opts.includeTree ?? null);
-    return Either.right(mapped);
+    return Orm.mapSql(ctor, records.results, opts.includeTree ?? null);
   }
 
   /**
@@ -666,21 +669,21 @@ export class Orm {
     ctor: new () => T,
     id: any,
     includeTree?: IncludeTree<T> | null,
-  ): Promise<Either<string, T | null>> {
+  ): Promise<T | null> {
     const sql = Orm.getQuery(ctor, includeTree);
     const record = await this.db.prepare(sql).bind(id).run();
 
     if (!record.success) {
-      return Either.left(
-        record.error ?? "D1 query failed, but no error was returned.",
+      throw new Error(
+        "Get query failed: " + (record.error ?? "unknown error"),
       );
     }
 
     if (record.results.length === 0) {
-      return Either.right(null);
+      return null
     }
 
     const mapped = Orm.mapSql(ctor, record.results, includeTree);
-    return Either.right(mapped[0]);
+    return mapped[0];
   }
 }

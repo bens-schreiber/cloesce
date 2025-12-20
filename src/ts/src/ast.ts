@@ -9,6 +9,7 @@ export type CidlType =
   | "DateIso"
   | "Boolean"
   | "Stream"
+  | "JsonValue"
   | { DataSource: string }
   | { Inject: string }
   | { Object: string }
@@ -34,7 +35,7 @@ export interface NamedTypedValue {
   cidl_type: CidlType;
 }
 
-export interface ModelAttribute {
+export interface D1ModelAttribute {
   value: NamedTypedValue;
   foreign_key_reference: string | null;
 }
@@ -84,10 +85,10 @@ export function getNavigationPropertyCidlType(
     : { Array: { Object: nav.model_name } };
 }
 
-export interface Model {
+export interface D1Model {
   name: string;
   primary_key: NamedTypedValue;
-  attributes: ModelAttribute[];
+  attributes: D1ModelAttribute[];
   navigation_properties: NavigationProperty[];
   methods: Record<string, ApiMethod>;
   data_sources: Record<string, DataSource>;
@@ -98,6 +99,14 @@ export interface Model {
 export interface PlainOldObject {
   name: string;
   attributes: NamedTypedValue[];
+  source_path: string;
+}
+
+export interface KVModel {
+  name: string;
+  namespace: string;
+  cidl_type: CidlType;
+  methods: Record<string, ApiMethod>;
   source_path: string;
 }
 
@@ -131,12 +140,12 @@ export interface WranglerEnv {
 }
 
 export interface CloesceAst {
-  [x: string]: any;
   version: string;
   project_name: string;
   language: string;
   wrangler_env?: WranglerEnv;
-  models: Record<string, Model>;
+  d1_models: Record<string, D1Model>;
+  kv_models: Record<string, KVModel>;
   poos: Record<string, PlainOldObject>;
   services: Record<string, Service>;
   app_source: string | null;

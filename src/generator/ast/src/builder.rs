@@ -56,8 +56,7 @@ impl IncludeTreeBuilder {
     }
 }
 
-/// A builder pattern for tests to create models easily
-pub struct ModelBuilder {
+pub struct D1ModelBuilder {
     name: String,
     attributes: Vec<D1ModelAttribute>,
     navigation_properties: Vec<NavigationProperty>,
@@ -66,7 +65,7 @@ pub struct ModelBuilder {
     data_sources: BTreeMap<String, DataSource>,
 }
 
-impl ModelBuilder {
+impl D1ModelBuilder {
     pub fn new(name: impl Into<String>) -> Self {
         Self {
             name: name.into(),
