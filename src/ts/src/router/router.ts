@@ -1,4 +1,7 @@
-import { D1Database } from "@cloudflare/workers-types/experimental/index.js";
+import {
+  D1Database,
+  KVNamespace,
+} from "@cloudflare/workers-types/experimental/index.js";
 
 import { OrmWasmExports, mapSql, loadOrmWasm } from "./wasm.js";
 import { proxyCrud } from "./crud.js";
@@ -11,6 +14,7 @@ import {
   NO_DATA_SOURCE,
   Service,
   MediaType,
+  KVModel,
 } from "../ast.js";
 import { RuntimeValidator } from "./validator.js";
 import Either from "../either.js";
@@ -30,7 +34,7 @@ export type DependencyContainer = Map<string, any>;
 export type ConstructorRegistry = Record<string, new () => any>;
 
 /**
- * Singleton instance containing the cidl, constructor registry, and wasm binary.
+ * Singleton instance containing the CIDL, constructor registry, and wasm binary.
  * These values are guaranteed to never change throughout a workers lifetime.
  */
 export class RuntimeContainer {
@@ -39,7 +43,7 @@ export class RuntimeContainer {
     public readonly ast: CloesceAst,
     public readonly constructorRegistry: ConstructorRegistry,
     public readonly wasm: OrmWasmExports,
-  ) { }
+  ) {}
 
   static async init(
     ast: CloesceAst,
@@ -133,7 +137,7 @@ export class CloesceApp {
   private namespaceMiddleware: Map<string, MiddlewareFn[]> = new Map();
 
   /**
-   * Registers middleware for a specific namespace (being, a model or service)
+   * Registers middleware for a specific namespace (model or service)
    *
    * Runs before request validation and method middleware.
    *
@@ -205,7 +209,7 @@ export class CloesceApp {
     }
     const route = routeRes.unwrap();
 
-    // Model middleware
+    // Namespace middleware
     for (const m of this.namespaceMiddleware.get(route.namespace) ?? []) {
       const res = await m(di);
       if (res) {
@@ -232,32 +236,45 @@ export class CloesceApp {
 
     // Hydration
     const hydrated = await (async () => {
-      if (route.kind == "model") {
-        // TODO: Support multiple D1 bindings
-        // It's been verified by the compiler that wrangler_env exists if a D1 model is present
-        const d1: D1Database = env[ast.wrangler_env!.db_binding];
+      switch (route.kind) {
+        case "service": {
+          if (route.method.is_static) {
+            return Either.right(ctorReg[route.namespace]);
+          }
 
-        // Proxy CRUD
-        if (route.method.is_static) {
-          return Either.right(
-            proxyCrud(ctorReg[route.namespace], ctorReg[route.namespace], d1),
+          return Either.right(di.get(route.namespace));
+        }
+        case "d1": {
+          // It's been verified by the compiler that wrangler_env exists if a D1 model is present
+          // TODO: Support multiple D1 bindings
+          const d1: D1Database = env[ast.wrangler_env!.db_binding];
+
+          // Proxy CRUD
+          if (route.method.is_static) {
+            return Either.right(
+              proxyCrud(ctorReg[route.namespace], ctorReg[route.namespace], d1),
+            );
+          }
+
+          return await hydrateD1Model(
+            ctorReg,
+            d1,
+            route.d1Model!,
+            route.id!,
+            dataSource!,
           );
         }
+        case "kv": {
+          const kv: KVNamespace = env[route.kvModel!.binding];
 
-        return await hydrateModelD1(
-          ctorReg,
-          d1,
-          route.model!,
-          route.id!,
-          dataSource!,
-        );
-      }
+          // TODO: CRUD operations for KV models
+          if (route.method.is_static) {
+            return Either.right(ctorReg[route.namespace]);
+          }
 
-      // Services
-      if (route.method.is_static) {
-        return Either.right(ctorReg[route.namespace]);
+          return await hydrateKVModel(ctorReg, kv, route.kvModel!, route.id!);
+        }
       }
-      return Either.right(di.get(route.namespace));
     })();
 
     if (hydrated.isLeft()) {
@@ -350,11 +367,12 @@ export class CloesceApp {
 }
 
 export type MatchedRoute = {
-  kind: "model" | "service";
+  kind: "d1" | "kv" | "service";
   namespace: string;
   method: ApiMethod;
   id: string | null;
-  model?: D1Model;
+  d1Model?: D1Model;
+  kvModel?: KVModel;
   service?: Service;
 };
 
@@ -384,14 +402,14 @@ function matchRoute(
     return notFound(RouterError.UnknownPrefix);
   }
 
-  // Extract pattern
+  // Route format: /{namespace}/{id?}/{method}
   const namespace = parts[0];
   const methodName = parts[parts.length - 1];
   const id = parts.length === 3 ? parts[1] : null;
 
-  const model = ast.d1_models[namespace];
-  if (model) {
-    const method = model.methods[methodName];
+  const d1Model = ast.d1_models[namespace];
+  if (d1Model) {
+    const method = d1Model.methods[methodName];
     if (!method) return notFound(RouterError.UnknownRoute);
 
     if (request.method !== method.http_verb) {
@@ -399,10 +417,28 @@ function matchRoute(
     }
 
     return Either.right({
-      kind: "model",
+      kind: "d1",
       namespace,
       method,
-      model,
+      model: d1Model,
+      id,
+    });
+  }
+
+  const kvModel = ast.kv_models[namespace];
+  if (kvModel) {
+    const method = kvModel.methods[methodName];
+    if (!method) return notFound(RouterError.UnknownRoute);
+
+    if (request.method !== method.http_verb) {
+      return notFound(RouterError.UnmatchedHttpVerb);
+    }
+
+    return Either.right({
+      kind: "kv",
+      namespace,
+      method,
+      model: kvModel,
       id,
     });
   }
@@ -448,7 +484,8 @@ async function validateRequest(
     exit(400, c, "Invalid Request Body");
 
   // Models must have an ID on instantiated methods.
-  if (route.kind === "model" && !route.method.is_static && route.id == null) {
+  const isModel = route.kind === "d1" || route.kind === "kv";
+  if (isModel && !route.method.is_static && route.id == null) {
     return invalidRequest(RouterError.InstantiatedMethodMissingId);
   }
 
@@ -510,7 +547,7 @@ async function validateRequest(
     }
   }
 
-  // A data source is required for instantiated model methods
+  // A data source is required for instantiated d1 model methods
   const dataSource: string | undefined = requiredParams
     .filter(
       (p) =>
@@ -519,7 +556,7 @@ async function validateRequest(
         p.cidl_type.DataSource === route.namespace,
     )
     .map((p) => params[p.name] as string)[0];
-  if (route.kind === "model" && !route.method.is_static && !dataSource) {
+  if (route.kind === "d1" && !route.method.is_static && !dataSource) {
     return invalidRequest(RouterError.InstantiatedMethodMissingDataSource);
   }
 
@@ -533,7 +570,7 @@ async function validateRequest(
  * @returns 500 if the D1 database is not synced with Cloesce and yields an error
  * @returns The instantiated model on success
  */
-async function hydrateModelD1(
+async function hydrateD1Model(
   constructorRegistry: ConstructorRegistry,
   d1: D1Database,
   model: D1Model,
@@ -586,6 +623,61 @@ async function hydrateModelD1(
   }
 
   return Either.right(models.unwrap()[0]);
+}
+
+/**
+ * Queries KV for a particular model's key, constructing a model instance.
+ *
+ * Depending on the model's type, retrieves the value as JSON, text, arrayBuffer, or stream.
+ *
+ * Streams are hydrated without metadata, as a request cannot contain both a body and a stream.
+ *
+ * @returns 404 if no record was found for the provided key
+ * @returns The instantiated model on success
+ */
+async function hydrateKVModel(
+  ctorReg: ConstructorRegistry,
+  kv: KVNamespace,
+  model: KVModel,
+  key: string,
+): Promise<Either<HttpResult, object>> {
+  const ctor = ctorReg[model.name];
+  const getType: "json" | "text" | "arrayBuffer" | "stream" = (() => {
+    switch (model.cidl_type) {
+      case "Text":
+        return "text";
+      case "Blob":
+        return "arrayBuffer";
+      case "Stream":
+        return "stream";
+      default:
+        return "json";
+    }
+  })();
+
+  // Hydrate stream value
+  if (getType === "stream") {
+    const stream = await kv.get(key, { type: "stream" });
+    if (stream === null) {
+      return exit(404, RouterError.ModelNotFound, "Key not found");
+    }
+
+    return Either.right(Object.assign(new ctor(), { key, value: stream }));
+  }
+
+  // Hydrate value + metadata
+  const value = await kv.getWithMetadata(key, { type: getType as any });
+  if (value === null) {
+    return exit(404, RouterError.ModelNotFound, "Key not found");
+  }
+
+  return Either.right(
+    Object.assign(new ctor(), {
+      key,
+      value: value.value,
+      metadata: value.metadata,
+    }),
+  );
 }
 
 /**

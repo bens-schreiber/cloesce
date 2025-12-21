@@ -1,6 +1,10 @@
 import { describe, test, expect } from "vitest";
 import { Project } from "ts-morph";
-import { CidlExtractor, D1ModelExtractor, KVModelExtractor, ServiceExtractor } from "../src/extractor/extract";
+import {
+  CidlExtractor,
+  D1ModelExtractor,
+  ServiceExtractor,
+} from "../src/extractor/extract";
 import { CidlType, DataSource, Service } from "../src/ast";
 
 function cloesceProject(): Project {
@@ -279,7 +283,7 @@ describe("KV Models", () => {
     expect(res.isRight()).toBe(true);
     expect(res.unwrap().kv_models["Foo"]).toEqual({
       name: "Foo",
-      namespace: "FOO_NAMESPACE",
+      binding: "FOO_NAMESPACE",
       cidl_type: "JsonValue",
       methods: {
         method: {
@@ -287,8 +291,8 @@ describe("KV Models", () => {
           http_verb: "POST",
           is_static: false,
           parameters: [],
-          "parameters_media": "Json",
-          "return_media": "Json",
+          parameters_media: "Json",
+          return_media: "Json",
           return_type: "Void",
         },
       },

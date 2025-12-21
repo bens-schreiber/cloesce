@@ -3,8 +3,8 @@ import { MediaType } from "../ast.js";
 type DeepPartialInner<T> = T extends (infer U)[]
   ? DeepPartialInner<U>[]
   : T extends object
-  ? { [K in keyof T]?: DeepPartialInner<T[K]> }
-  : T | (null extends T ? null : never);
+    ? { [K in keyof T]?: DeepPartialInner<T[K]> }
+    : T | (null extends T ? null : never);
 
 /**
  * Recursively makes all properties of a type optional — including nested objects and arrays.
@@ -53,12 +53,12 @@ export type DeepPartial<T> = DeepPartialInner<T> & { __brand?: "Partial" };
 
 /**
  * Base class for a Cloudflare KV model.
- * 
+ *
  * Consists of a `key`, `value`, and optional `metadata`.
- * 
+ *
  * @template V The type of the value stored in the KV model. Note that KV is schema-less,
  * so this type is not enforced at runtime, but serves as the type the client expects.
- * 
+ *
  * @remarks
  * - The `key` is a string that uniquely identifies the entry in the KV store.
  * - The `value` is of generic type `V`, allowing flexibility in the type of data stored.
@@ -113,7 +113,7 @@ export class HttpResult<T = unknown> {
     public data?: T,
     public message?: string,
     public mediaType?: MediaType,
-  ) { }
+  ) {}
 
   static ok<T>(status: number, data?: T, init?: HeadersInit): HttpResult {
     const headers: Headers = new Headers(init);

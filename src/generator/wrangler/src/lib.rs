@@ -450,7 +450,7 @@ mod tests {
             "MyKV".into(),
             KVModel {
                 name: "MyKV".into(),
-                namespace: "my_kv".into(),
+                binding: "my_kv".into(),
                 cidl_type: ast::CidlType::JsonValue,
                 methods: BTreeMap::default(),
                 source_path: PathBuf::default(),

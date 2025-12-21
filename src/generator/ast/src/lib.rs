@@ -250,7 +250,7 @@ pub struct Service {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct KVModel {
     pub name: String,
-    pub namespace: String,
+    pub binding: String,
     pub cidl_type: CidlType,
 
     #[serde_as(as = "MapPreventDuplicates<_, _>")]

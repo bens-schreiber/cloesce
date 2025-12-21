@@ -429,7 +429,7 @@ fn stream_kv_model() {
         "StreamKV".into(),
         KVModel {
             name: "StreamKV".into(),
-            namespace: String::default(),
+            binding: String::default(),
             cidl_type: CidlType::Stream,
             methods: BTreeMap::default(),
             source_path: PathBuf::default(),

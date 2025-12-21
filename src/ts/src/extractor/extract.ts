@@ -28,7 +28,7 @@ import {
   CrudKind,
   Service,
   defaultMediaType,
-  KVModel
+  KVModel,
 } from "../ast.js";
 import { TypeFormatFlags } from "typescript";
 import { ExtractorError, ExtractorErrorCode } from "./err.js";
@@ -61,7 +61,7 @@ export class CidlExtractor {
   constructor(
     public projectName: string,
     public version: string,
-  ) { }
+  ) {}
 
   extract(project: Project): Either<ExtractorError, CloesceAst> {
     const d1Models: Record<string, D1Model> = {};
@@ -166,8 +166,14 @@ export class CidlExtractor {
             });
           }
 
-          const namespace = arg.asKindOrThrow(SyntaxKind.StringLiteral).getLiteralValue();
-          const result = KVModelExtractor.extract(namespace, classDecl, sourceFile);
+          const namespace = arg
+            .asKindOrThrow(SyntaxKind.StringLiteral)
+            .getLiteralValue();
+          const result = KVModelExtractor.extract(
+            namespace,
+            classDecl,
+            sourceFile,
+          );
 
           // Error: propogate from models
           if (result.isLeft()) {
@@ -912,15 +918,15 @@ export class D1ModelExtractor {
 
 export class KVModelExtractor {
   static extract(
-    namespace: string,
+    binding: string,
     classDecl: ClassDeclaration,
-    sourceFile: SourceFile
+    sourceFile: SourceFile,
   ): Either<ExtractorError, KVModel> {
-
     // KV Models must extend from the "KVModel" base class
-    const heritage = classDecl.getHeritageClauses()
-      .flatMap(h => h.getTypeNodes())
-      .find(t => t.getExpression().getText() === UiKVModel.name);
+    const heritage = classDecl
+      .getHeritageClauses()
+      .flatMap((h) => h.getTypeNodes())
+      .find((t) => t.getExpression().getText() === UiKVModel.name);
     if (!heritage) {
       return err(ExtractorErrorCode.MissingKVModelBaseClass, (e) => {
         e.context = classDecl.getName();
@@ -975,7 +981,7 @@ export class KVModelExtractor {
     }
 
     return Either.right({
-      namespace,
+      binding,
       name: classDecl.getName()!,
       methods,
       cidl_type: cidlType.unwrap(),

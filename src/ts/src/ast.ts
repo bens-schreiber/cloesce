@@ -104,7 +104,7 @@ export interface PlainOldObject {
 
 export interface KVModel {
   name: string;
-  namespace: string;
+  binding: string;
   cidl_type: CidlType;
   methods: Record<string, ApiMethod>;
   source_path: string;

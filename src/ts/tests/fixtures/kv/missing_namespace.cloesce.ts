@@ -1,4 +1,4 @@
 // @ts-nocheck
 // MissingKVNamespace
 @KV()
-export class SomeKVModel extends KVModel<unknown> { }
+export class SomeKVModel extends KVModel<unknown> {}
