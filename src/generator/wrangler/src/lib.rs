@@ -61,7 +61,7 @@ impl WranglerSpec {
 
         // Ensure all bindings referenced in the WranglerEnv exist in the spec
         if let Some(env) = &ast.wrangler_env {
-            if let Some(db_binding) = &env.db_binding {
+            if let Some(db_binding) = &env.d1_binding {
                 let db = self
                     .d1_databases
                     .iter_mut()
@@ -162,8 +162,9 @@ impl WranglerSpec {
             ),
         };
 
+        // If D1 models are defined, ensure a D1 database binding exists
         ensure!(
-            !ast.d1_models.is_empty() || !self.d1_databases.is_empty(),
+            !ast.d1_models.is_empty() || self.d1_databases.is_empty(),
             GeneratorErrorKind::InconsistentWranglerBinding,
             "No D1 database binding was found, but D1 models were defined {}",
             env.source_path.display()
@@ -172,11 +173,11 @@ impl WranglerSpec {
         // TODO: multiple databases
         if let Some(db) = self.d1_databases.first() {
             ensure!(
-                env.db_binding == db.binding,
+                env.d1_binding == db.binding,
                 GeneratorErrorKind::InconsistentWranglerBinding,
                 "A Wrangler specification D1 binding did not match the WranglerEnv binding {}.{:?} != {} in {}",
                 env.name,
-                env.db_binding,
+                env.d1_binding,
                 db.binding.as_ref().unwrap(),
                 env.source_path.display()
             );
@@ -258,6 +259,9 @@ impl WranglerFormat {
                 val["d1_databases"] =
                     serde_json::to_value(&spec.d1_databases).expect("JSON to serialize");
 
+                val["kv_namespaces"] =
+                    serde_json::to_value(&spec.kv_namespaces).expect("JSON to serialize");
+
                 val["vars"] = serde_json::to_value(&spec.vars).expect("JSON to serialize");
 
                 // entrypoint + metadata (only if provided)
@@ -282,6 +286,11 @@ impl WranglerFormat {
                     table.insert(
                         "vars".to_string(),
                         toml::Value::try_from(&spec.vars).expect("TOML to serialize"),
+                    );
+
+                    table.insert(
+                        "kv_namespaces".to_string(),
+                        toml::Value::try_from(&spec.kv_namespaces).expect("TOML to serialize"),
                     );
 
                     // entrypoint + metadata (only if provided)
@@ -363,7 +372,7 @@ mod tests {
         ast.wrangler_env = Some(WranglerEnv {
             name: "Env".into(),
             source_path: "source.ts".into(),
-            db_binding: Some("db".into()),
+            d1_binding: Some("db".into()),
             vars: [
                 ("API_KEY".into(), ast::CidlType::Text),
                 ("TIMEOUT".into(), ast::CidlType::Integer),
@@ -408,7 +417,7 @@ mod tests {
         ast.wrangler_env = Some(WranglerEnv {
             name: "Env".into(),
             source_path: "source.ts".into(),
-            db_binding: Some("db".into()),
+            d1_binding: Some("db".into()),
             vars: HashMap::new(),
             kv_bindings: vec![],
         });
@@ -459,7 +468,7 @@ mod tests {
         ast.wrangler_env = Some(WranglerEnv {
             name: "Env".into(),
             source_path: "source.ts".into(),
-            db_binding: None,
+            d1_binding: None,
             vars: HashMap::new(),
             kv_bindings: vec!["my_kv".into()],
         });
@@ -496,7 +505,7 @@ mod tests {
         ast.wrangler_env = Some(WranglerEnv {
             name: "Env".into(),
             source_path: "source.ts".into(),
-            db_binding: None,
+            d1_binding: None,
             kv_bindings: vec![],
             vars: [
                 ("API_KEY".into(), ast::CidlType::Text),

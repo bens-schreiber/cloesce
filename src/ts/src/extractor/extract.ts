@@ -61,7 +61,7 @@ export class CidlExtractor {
   constructor(
     public projectName: string,
     public version: string,
-  ) {}
+  ) { }
 
   extract(project: Project): Either<ExtractorError, CloesceAst> {
     const d1Models: Record<string, D1Model> = {};
@@ -283,9 +283,12 @@ export class CidlExtractor {
     sourceFile: SourceFile,
   ): Either<ExtractorError, WranglerEnv> {
     const vars: Record<string, CidlType> = {};
-    let binding;
+    let d1_binding;
+    const kv_bindings = [];
 
     for (const prop of classDecl.getProperties()) {
+
+      // TODO: Support multiple D1 bindings
       if (
         prop
           .getType()
@@ -294,7 +297,18 @@ export class CidlExtractor {
             TypeFormatFlags.UseAliasDefinedOutsideCurrentScope,
           ) === "D1Database"
       ) {
-        binding = prop.getName();
+        d1_binding = prop.getName();
+        continue;
+      }
+
+      if (
+        prop
+          .getType()
+          .getSymbol()
+          ?.getName()
+        === "KVNamespace"
+      ) {
+        kv_bindings.push(prop.getName());
         continue;
       }
 
@@ -308,14 +322,11 @@ export class CidlExtractor {
       vars[prop.getName()] = ty.unwrap();
     }
 
-    if (!binding) {
-      return err(ExtractorErrorCode.MissingDatabaseBinding);
-    }
-
     return Either.right({
       name: classDecl.getName()!,
       source_path: sourceFile.getFilePath().toString(),
-      db_binding: binding,
+      d1_binding,
+      kv_bindings,
       vars,
     });
   }

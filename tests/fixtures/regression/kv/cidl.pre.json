@@ -1,0 +1,161 @@
+{
+    "version": "v0.0.4",
+    "project_name": "runner",
+    "language": "TypeScript",
+    "wrangler_env": {
+        "name": "Env",
+        "source_path": "./seed__kv.cloesce.ts",
+        "kv_bindings": [
+            "textNamespace",
+            "streamNamespace",
+            "jsonNamespace"
+        ],
+        "vars": {}
+    },
+    "d1_models": {},
+    "kv_models": {
+        "TextKV": {
+            "binding": "stringValueNamespace",
+            "name": "TextKV",
+            "methods": {
+                "get": {
+                    "name": "get",
+                    "http_verb": "GET",
+                    "is_static": true,
+                    "return_media": "Json",
+                    "return_type": {
+                        "Object": "TextKV"
+                    },
+                    "parameters_media": "Json",
+                    "parameters": [
+                        {
+                            "name": "env",
+                            "cidl_type": {
+                                "Inject": "Env"
+                            }
+                        },
+                        {
+                            "name": "key",
+                            "cidl_type": "Text"
+                        }
+                    ]
+                },
+                "put": {
+                    "name": "put",
+                    "http_verb": "POST",
+                    "is_static": true,
+                    "return_media": "Json",
+                    "return_type": "Void",
+                    "parameters_media": "Json",
+                    "parameters": [
+                        {
+                            "name": "env",
+                            "cidl_type": {
+                                "Inject": "Env"
+                            }
+                        },
+                        {
+                            "name": "key",
+                            "cidl_type": "Text"
+                        },
+                        {
+                            "name": "value",
+                            "cidl_type": "Text"
+                        }
+                    ]
+                },
+                "delete": {
+                    "name": "delete",
+                    "http_verb": "POST",
+                    "is_static": false,
+                    "return_media": "Json",
+                    "return_type": "Void",
+                    "parameters_media": "Json",
+                    "parameters": [
+                        {
+                            "name": "env",
+                            "cidl_type": {
+                                "Inject": "Env"
+                            }
+                        }
+                    ]
+                }
+            },
+            "cidl_type": "Text",
+            "source_path": "./seed__kv.cloesce.ts"
+        },
+        "JsonKV": {
+            "binding": "jsonValueNamespace",
+            "name": "JsonKV",
+            "methods": {
+                "get": {
+                    "name": "get",
+                    "http_verb": "GET",
+                    "is_static": true,
+                    "return_media": "Json",
+                    "return_type": {
+                        "Object": "JsonKV"
+                    },
+                    "parameters_media": "Json",
+                    "parameters": [
+                        {
+                            "name": "env",
+                            "cidl_type": {
+                                "Inject": "Env"
+                            }
+                        },
+                        {
+                            "name": "key",
+                            "cidl_type": "Text"
+                        }
+                    ]
+                },
+                "put": {
+                    "name": "put",
+                    "http_verb": "POST",
+                    "is_static": true,
+                    "return_media": "Json",
+                    "return_type": "Void",
+                    "parameters_media": "Json",
+                    "parameters": [
+                        {
+                            "name": "env",
+                            "cidl_type": {
+                                "Inject": "Env"
+                            }
+                        },
+                        {
+                            "name": "key",
+                            "cidl_type": "Text"
+                        },
+                        {
+                            "name": "json",
+                            "cidl_type": "JsonValue"
+                        }
+                    ]
+                },
+                "delete": {
+                    "name": "delete",
+                    "http_verb": "POST",
+                    "is_static": false,
+                    "return_media": "Json",
+                    "return_type": "Void",
+                    "parameters_media": "Json",
+                    "parameters": [
+                        {
+                            "name": "env",
+                            "cidl_type": {
+                                "Inject": "Env"
+                            }
+                        }
+                    ]
+                }
+            },
+            "cidl_type": "JsonValue",
+            "source_path": "./seed__kv.cloesce.ts"
+        }
+    },
+    "poos": {},
+    "services": {},
+    "app_source": null
+}

@@ -13,7 +13,6 @@ export enum ExtractorErrorCode {
   MissingNavigationPropertyReference,
   MissingManyToManyUniqueId,
   MissingPrimaryKey,
-  MissingDatabaseBinding,
   TooManyWranglerEnvs,
   MissingFile,
   InvalidServiceAttribute,
@@ -91,10 +90,6 @@ const errorInfoMap: Record<
     description: "Missing primary key on a model",
     suggestion: "Add a primary key field to your model (e.g., `id: number`)",
   },
-  [ExtractorErrorCode.MissingDatabaseBinding]: {
-    description: "Missing a database binding in the WranglerEnv definition",
-    suggestion: "Add a `D1Database` to your WranglerEnv",
-  },
   [ExtractorErrorCode.TooManyWranglerEnvs]: {
     description: "Too many wrangler environments defined in the project",
     suggestion: "Consolidate or remove unused @WranglerEnv's",
@@ -132,7 +127,7 @@ export class ExtractorError {
   context?: string;
   snippet?: string;
 
-  constructor(public code: ExtractorErrorCode) {}
+  constructor(public code: ExtractorErrorCode) { }
 
   addContext(fn: (val: string | undefined) => string | undefined) {
     this.context = fn(this.context ?? "");

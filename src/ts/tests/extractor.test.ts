@@ -170,7 +170,7 @@ describe("WranglerEnv", () => {
     const sourceFile = project.createSourceFile(
       "test.ts",
       `
-       import { D1Database } from "@cloudflare/workers-types/experimental/index.js";
+       import { D1Database } from "@cloudflare/workers-types";
         @WranglerEnv
         class Env {
           db: D1Database;
@@ -184,6 +184,30 @@ describe("WranglerEnv", () => {
 
     // Assert
     expect(res.isRight()).toBe(true);
+  });
+
+  test("Finds KVNamespaces", () => {
+    // Arrange
+    const project = cloesceProject();
+    const sourceFile = project.createSourceFile(
+      "test.ts",
+      `
+       import { KVNamespace } from "@cloudflare/workers-types";
+        @WranglerEnv
+        class Env {
+          foo: KVNamespace;
+          bar: KVNamespace;
+        }
+      `,
+    );
+
+    // Act
+    const classDecl = sourceFile.getClass("Env")!;
+    const res = CidlExtractor.env(classDecl, sourceFile);
+
+    // Assert
+    expect(res.isRight()).toBe(true);
+    expect(res.unwrap().kv_bindings).toEqual(["foo", "bar"]);
   });
 });
 

@@ -1,0 +1,163 @@
+{
+  "hash": 0,
+  "version": "v0.0.4",
+  "project_name": "runner",
+  "language": "TypeScript",
+  "wrangler_env": {
+    "name": "Env",
+    "source_path": "./seed__kv.cloesce.ts",
+    "d1_binding": null,
+    "kv_bindings": [
+      "textNamespace",
+      "streamNamespace",
+      "jsonNamespace"
+    ],
+    "vars": {}
+  },
+  "d1_models": {},
+  "kv_models": {
+    "JsonKV": {
+      "name": "JsonKV",
+      "binding": "jsonValueNamespace",
+      "cidl_type": "JsonValue",
+      "methods": {
+        "delete": {
+          "name": "delete",
+          "is_static": false,
+          "http_verb": "POST",
+          "return_media": "Json",
+          "return_type": "Void",
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "env",
+              "cidl_type": {
+                "Inject": "Env"
+              }
+            }
+          ]
+        },
+        "get": {
+          "name": "get",
+          "is_static": true,
+          "http_verb": "GET",
+          "return_media": "Json",
+          "return_type": {
+            "Object": "JsonKV"
+          },
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "env",
+              "cidl_type": {
+                "Inject": "Env"
+              }
+            },
+            {
+              "name": "key",
+              "cidl_type": "Text"
+            }
+          ]
+        },
+        "put": {
+          "name": "put",
+          "is_static": true,
+          "http_verb": "POST",
+          "return_media": "Json",
+          "return_type": "Void",
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "env",
+              "cidl_type": {
+                "Inject": "Env"
+              }
+            },
+            {
+              "name": "key",
+              "cidl_type": "Text"
+            },
+            {
+              "name": "json",
+              "cidl_type": "JsonValue"
+            }
+          ]
+        }
+      },
+      "source_path": "./seed__kv.cloesce.ts"
+    },
+    "TextKV": {
+      "name": "TextKV",
+      "binding": "stringValueNamespace",
+      "cidl_type": "Text",
+      "methods": {
+        "delete": {
+          "name": "delete",
+          "is_static": false,
+          "http_verb": "POST",
+          "return_media": "Json",
+          "return_type": "Void",
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "env",
+              "cidl_type": {
+                "Inject": "Env"
+              }
+            }
+          ]
+        },
+        "get": {
+          "name": "get",
+          "is_static": true,
+          "http_verb": "GET",
+          "return_media": "Json",
+          "return_type": {
+            "Object": "TextKV"
+          },
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "env",
+              "cidl_type": {
+                "Inject": "Env"
+              }
+            },
+            {
+              "name": "key",
+              "cidl_type": "Text"
+            }
+          ]
+        },
+        "put": {
+          "name": "put",
+          "is_static": true,
+          "http_verb": "POST",
+          "return_media": "Json",
+          "return_type": "Void",
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "env",
+              "cidl_type": {
+                "Inject": "Env"
+              }
+            },
+            {
+              "name": "key",
+              "cidl_type": "Text"
+            },
+            {
+              "name": "value",
+              "cidl_type": "Text"
+            }
+          ]
+        }
+      },
+      "source_path": "./seed__kv.cloesce.ts"
+    }
+  },
+  "poos": {},
+  "services": {},
+  "app_source": null
+}

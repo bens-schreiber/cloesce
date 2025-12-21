@@ -286,8 +286,12 @@ async function extract(
         ast.app_source = "./" + path.basename(ast.app_source);
       }
 
-      for (const model of Object.values(ast.d1_models)) {
-        model.source_path = "./" + path.basename(model.source_path);
+      for (const d1Model of Object.values(ast.d1_models)) {
+        d1Model.source_path = "./" + path.basename(d1Model.source_path);
+      }
+
+      for (const kvModel of Object.values(ast.kv_models)) {
+        kvModel.source_path = "./" + path.basename(kvModel.source_path);
       }
 
       for (const poo of Object.values(ast.poos)) {

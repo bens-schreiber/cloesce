@@ -22,9 +22,9 @@ fn cloesce_serializes_to_migrations() {
 
     // Assert
     assert!(migrations_ast.hash != 0u64);
-    assert!(migrations_ast.models.contains_key("Dog"));
-    assert!(migrations_ast.models.contains_key("Person"));
-    assert!(migrations_ast.models[0].hash != 0u64);
+    assert!(migrations_ast.d1_models.contains_key("Dog"));
+    assert!(migrations_ast.d1_models.contains_key("Person"));
+    assert!(migrations_ast.d1_models[0].hash != 0u64);
 }
 
 #[test]

@@ -1,7 +1,7 @@
 import {
   D1Database,
   KVNamespace,
-} from "@cloudflare/workers-types/experimental/index.js";
+} from "@cloudflare/workers-types";
 
 import { OrmWasmExports, mapSql, loadOrmWasm } from "./wasm.js";
 import { proxyCrud } from "./crud.js";
@@ -43,7 +43,7 @@ export class RuntimeContainer {
     public readonly ast: CloesceAst,
     public readonly constructorRegistry: ConstructorRegistry,
     public readonly wasm: OrmWasmExports,
-  ) {}
+  ) { }
 
   static async init(
     ast: CloesceAst,
@@ -245,9 +245,11 @@ export class CloesceApp {
           return Either.right(di.get(route.namespace));
         }
         case "d1": {
-          // It's been verified by the compiler that wrangler_env exists if a D1 model is present
+          // It's been verified by the compiler that wrangler_env and a d1 binding exists
+          // if a D1 model is present
+          //
           // TODO: Support multiple D1 bindings
-          const d1: D1Database = env[ast.wrangler_env!.db_binding];
+          const d1: D1Database = env[ast.wrangler_env!.d1_binding!];
 
           // Proxy CRUD
           if (route.method.is_static) {

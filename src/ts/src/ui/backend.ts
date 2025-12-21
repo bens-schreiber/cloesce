@@ -1,4 +1,4 @@
-import { D1Database } from "@cloudflare/workers-types/experimental/index.js";
+import { D1Database } from "@cloudflare/workers-types";
 import { DeepPartial, KeysOfType, u8ToB64 } from "./common.js";
 import { RuntimeContainer } from "../router/router.js";
 import { WasmResource, mapSql, invokeOrmWasm } from "../router/wasm.js";
@@ -36,13 +36,13 @@ export type { CrudKind } from "../ast.js";
  *  }
  * ```
  */
-export const D1: ClassDecorator = () => {};
+export const D1: ClassDecorator = () => { };
 
 export const KV = (_binding: string): ClassDecorator => {
-  return () => {};
+  return () => { };
 };
 
-export const Service: ClassDecorator = () => {};
+export const Service: ClassDecorator = () => { };
 
 /**
  * Marks a class as a plain serializable object.
@@ -70,7 +70,7 @@ export const Service: ClassDecorator = () => {};
  * async function foo(): Promise<HttpResult<CatStuff>> { ... }
  * ```
  */
-export const PlainOldObject: ClassDecorator = () => {};
+export const PlainOldObject: ClassDecorator = () => { };
 
 /**
  * Declares a Wrangler environment definition.
@@ -93,7 +93,7 @@ export const PlainOldObject: ClassDecorator = () => {};
  * foo(＠Inject env: WranglerEnv) {...}
  * ```
  */
-export const WranglerEnv: ClassDecorator = () => {};
+export const WranglerEnv: ClassDecorator = () => { };
 
 /**
  * Marks a property as the SQL primary key for a model.
@@ -111,37 +111,37 @@ export const WranglerEnv: ClassDecorator = () => {};
  * }
  * ```
  */
-export const PrimaryKey: PropertyDecorator = () => {};
+export const PrimaryKey: PropertyDecorator = () => { };
 
 /**
  * Exposes a class method as an HTTP GET endpoint.
  * The method will appear in both backend and generated client APIs.
  */
-export const GET: MethodDecorator = () => {};
+export const GET: MethodDecorator = () => { };
 
 /**
  * Exposes a class method as an HTTP POST endpoint.
  * The method will appear in both backend and generated client APIs.
  */
-export const POST: MethodDecorator = () => {};
+export const POST: MethodDecorator = () => { };
 
 /**
  * Exposes a class method as an HTTP PUT endpoint.
  * The method will appear in both backend and generated client APIs.
  */
-export const PUT: MethodDecorator = () => {};
+export const PUT: MethodDecorator = () => { };
 
 /**
  * Exposes a class method as an HTTP PATCH endpoint.
  * The method will appear in both backend and generated client APIs.
  */
-export const PATCH: MethodDecorator = () => {};
+export const PATCH: MethodDecorator = () => { };
 
 /**
  * Exposes a class method as an HTTP DEL endpoint.
  * The method will appear in both backend and generated client APIs.
  */
-export const DELETE: MethodDecorator = () => {};
+export const DELETE: MethodDecorator = () => { };
 
 /**
  * Declares a static property as a data source.
@@ -184,7 +184,7 @@ export const DELETE: MethodDecorator = () => {};
  * ```
  */
 
-export const DataSource: PropertyDecorator = () => {};
+export const DataSource: PropertyDecorator = () => { };
 
 /**
  * Declares a one-to-many relationship between models.
@@ -200,7 +200,7 @@ export const DataSource: PropertyDecorator = () => {};
  */
 export const OneToMany =
   (_foreignKeyColumn: string): PropertyDecorator =>
-  () => {};
+    () => { };
 
 /**
  * Declares a one-to-one relationship between models.
@@ -216,7 +216,7 @@ export const OneToMany =
  */
 export const OneToOne =
   (_foreignKeyColumn: string): PropertyDecorator =>
-  () => {};
+    () => { };
 
 /**
  * Declares a many-to-many relationship between models.
@@ -232,7 +232,7 @@ export const OneToOne =
  */
 export const ManyToMany =
   (_uniqueId: string): PropertyDecorator =>
-  () => {};
+    () => { };
 
 /**
  * Declares a foreign key relationship between models.
@@ -250,7 +250,7 @@ export const ManyToMany =
  */
 export const ForeignKey =
   <T>(_Model: T | string): PropertyDecorator =>
-  () => {};
+    () => { };
 
 /**
  * Marks a method parameter for dependency injection.
@@ -269,7 +269,7 @@ export const ForeignKey =
  * }
  * ```
  */
-export const Inject: ParameterDecorator = () => {};
+export const Inject: ParameterDecorator = () => { };
 
 /**
  * Enables automatic CRUD method generation for a model.
@@ -301,7 +301,7 @@ export const Inject: ParameterDecorator = () => {};
  */
 export const CRUD =
   (_kinds: CrudKind[]): ClassDecorator =>
-  () => {};
+    () => { };
 
 type Primitive = string | number | boolean | bigint | symbol | null | undefined;
 
@@ -334,10 +334,10 @@ type Primitive = string | number | boolean | bigint | symbol | null | undefined;
 export type IncludeTree<T> = (T extends Primitive
   ? never
   : {
-      [K in keyof T]?: T[K] extends (infer U)[]
-        ? IncludeTree<NonNullable<U>>
-        : IncludeTree<NonNullable<T[K]>>;
-    }) & { __brand?: "IncludeTree" };
+    [K in keyof T]?: T[K] extends (infer U)[]
+    ? IncludeTree<NonNullable<U>>
+    : IncludeTree<NonNullable<T[K]>>;
+  }) & { __brand?: "IncludeTree" };
 
 /**
  * Represents the name of a `＠DataSource` available on a model type `T`,
@@ -392,7 +392,7 @@ export type Integer = number & { __brand?: "Integer" };
  * Exposes the ORM primitives Cloesce uses to interact with D1 databases.
  */
 export class Orm {
-  private constructor(private db: D1Database) {}
+  private constructor(private db: D1Database) { }
 
   /**
    * Creates an instance of an `Orm`

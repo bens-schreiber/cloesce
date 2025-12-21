@@ -1,4 +1,4 @@
-import { D1Database } from "@cloudflare/workers-types/experimental/index.js";
+import { D1Database } from "@cloudflare/workers-types";
 import { IncludeTree, Orm } from "../ui/backend.js";
 import { HttpResult } from "../ui/common.js";
 import { NO_DATA_SOURCE } from "../ast.js";

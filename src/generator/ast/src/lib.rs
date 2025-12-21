@@ -276,8 +276,9 @@ pub struct WranglerEnv {
     pub name: String,
     pub source_path: PathBuf,
 
-    // TODO: Many database bindings?
-    pub db_binding: Option<String>,
+    // TODO: Many database bindings
+    pub d1_binding: Option<String>,
+
     pub kv_bindings: Vec<String>,
 
     pub vars: HashMap<String, CidlType>,
@@ -351,7 +352,7 @@ impl CloesceAst {
 
         let migrations_ast = MigrationsAst {
             hash,
-            models: migrations_models,
+            d1_models: migrations_models,
         };
 
         serde_json::to_string_pretty(&migrations_ast).expect("serialize migrations ast to work")
@@ -452,7 +453,7 @@ pub struct MigrationsModel {
 #[derive(Serialize, Deserialize)]
 pub struct MigrationsAst {
     pub hash: u64,
-    pub models: IndexMap<String, MigrationsModel>,
+    pub d1_models: IndexMap<String, MigrationsModel>,
 }
 
 impl MigrationsAst {

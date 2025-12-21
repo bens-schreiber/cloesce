@@ -135,7 +135,8 @@ export interface DataSource {
 export interface WranglerEnv {
   name: string;
   source_path: string;
-  db_binding: string;
+  d1_binding?: string; // TODO: multiple D1 bindings
+  kv_bindings: string[];
   vars: Record<string, CidlType>;
 }
 

@@ -164,7 +164,7 @@ export class {{this.name}} {
 {{#each kv_models}}
 export class {{this.name}} {
   key: string;
-  value: {{get_value_cidl_type this.cidl_type}};
+  value: {{map_cidl_type this.cidl_type}};
   metadata: unknown;
 
   {{#each this.methods}}
