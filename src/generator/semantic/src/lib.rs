@@ -1,9 +1,9 @@
-use std::collections::{BTreeMap, HashMap, VecDeque};
+use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
 
-use crate::err::{GeneratorErrorKind, Result};
-use crate::{
+use ast::err::{GeneratorErrorKind, Result};
+use ast::{
     ApiMethod, CidlType, CloesceAst, D1Model, HttpVerb, NamedTypedValue, NavigationPropertyKind,
-    ensure, fail,
+    WranglerSpec, ensure, fail,
 };
 
 type AdjacencyList<'a> = BTreeMap<&'a str, Vec<&'a str>>;
@@ -21,6 +21,9 @@ impl SemanticAnalysis {
     /// Returns a set of all objects that have blobs (be it a direct attribute or composition)
     ///
     /// Returns error on
+    /// - Missing WranglerEnv when models are defined
+    /// - Inconsistent WranglerEnv bindings with WranglerSpec
+    /// - Missing WranglerEnv vars in WranglerSpec
     /// - Model attributes with invalid SQL types
     /// - Primary keys with invalid SQL types
     /// - Invalid Model or Method map K/V
@@ -32,11 +35,80 @@ impl SemanticAnalysis {
     /// - Cyclical dependencies
     /// - Invalid data source type
     /// - Invalid data source reference
-    pub fn analyze(ast: &mut CloesceAst) -> Result<()> {
+    pub fn analyze(ast: &mut CloesceAst, spec: &WranglerSpec) -> Result<()> {
+        // Wrangler must be validated first so that the env can be used in later validations
+        Self::wrangler(ast, spec)?;
+
         Self::d1_models(ast)?;
         Self::kv_models(ast)?;
         Self::poos(ast)?;
         Self::services(ast)?;
+        Ok(())
+    }
+
+    fn wrangler(ast: &CloesceAst, spec: &WranglerSpec) -> Result<()> {
+        let env = match &ast.wrangler_env {
+            Some(env) => env,
+
+            // No models => no wrangler needed
+            None if ast.d1_models.is_empty() && ast.kv_models.is_empty() => return Ok(()),
+
+            _ => fail!(
+                GeneratorErrorKind::MissingWranglerEnv,
+                "The AST is missing a WranglerEnv but models are defined"
+            ),
+        };
+
+        for var in env.vars.keys() {
+            ensure!(
+                spec.vars.contains_key(var),
+                GeneratorErrorKind::MissingWranglerVariable,
+                "A variable is defined in the WranglerEnv but not in the Wrangler config ({})",
+                var
+            )
+        }
+
+        // If D1 models are defined, ensure a D1 database binding exists
+        ensure!(
+            !spec.d1_databases.is_empty() || ast.d1_models.is_empty(),
+            GeneratorErrorKind::MissingWranglerD1Binding,
+            "No D1 database binding is defined, but D1 models are defined in the WranglerEnv ({})",
+            env.source_path.display()
+        );
+
+        // TODO: multiple databases
+        if let Some(db) = spec.d1_databases.first() {
+            ensure!(
+                env.d1_binding == db.binding,
+                GeneratorErrorKind::InconsistentWranglerBinding,
+                "The Wrangler configs D1 binding does not match the WranglerEnv binding ({}.{:?} != {} in {})",
+                env.name,
+                env.d1_binding,
+                db.binding.as_ref().unwrap(),
+                env.source_path.display()
+            );
+        }
+
+        // If KV models are defined, ensure a KV namespace binding exists
+        ensure!(
+            !spec.kv_namespaces.is_empty() || ast.kv_models.is_empty(),
+            GeneratorErrorKind::MissingWranglerKVNamespace,
+            "No KV namespace binding is defined, but KV models are defined in the WranglerEnv ({})",
+            env.source_path.display()
+        );
+
+        for kv in &env.kv_bindings {
+            ensure!(
+                spec.kv_namespaces
+                    .iter()
+                    .any(|ns| ns.binding.as_ref().is_some_and(|b| b == kv)),
+                GeneratorErrorKind::InconsistentWranglerBinding,
+                "A Wrangler config KV binding was missing or did not match the WranglerEnv binding ({} {})",
+                kv,
+                env.source_path.display()
+            )
+        }
+
         Ok(())
     }
 
@@ -122,6 +194,11 @@ impl SemanticAnalysis {
     }
 
     fn d1_models(ast: &mut CloesceAst) -> Result<()> {
+        // TODO: Use env to check binding on each model (multiple databases)
+        let Some(_env) = &ast.wrangler_env else {
+            unreachable!("WranglerEnv must be validated before D1 models");
+        };
+
         let ensure_valid_sql_type = |model: &D1Model, value: &NamedTypedValue| {
             let inner = match &value.cidl_type {
                 CidlType::Nullable(inner) if matches!(inner.as_ref(), CidlType::Void) => {
@@ -392,7 +469,13 @@ impl SemanticAnalysis {
         Ok(())
     }
 
-    fn kv_models(ast: &mut CloesceAst) -> Result<()> {
+    fn kv_models(ast: &CloesceAst) -> Result<()> {
+        let Some(env) = &ast.wrangler_env else {
+            unreachable!("WranglerEnv must be validated before KV models");
+        };
+
+        let kv_binding_set = env.kv_bindings.iter().collect::<HashSet<&String>>();
+
         for (model_name, model) in &ast.kv_models {
             ensure!(
                 *model_name == model.name,
@@ -400,6 +483,14 @@ impl SemanticAnalysis {
                 "KV Model record key did not match it's model name? {} : {}",
                 model_name,
                 model.name
+            );
+
+            ensure!(
+                kv_binding_set.contains(&model.binding),
+                GeneratorErrorKind::InconsistentWranglerBinding,
+                "KV Model {} binding {} not found in WranglerEnv bindings",
+                model.name,
+                model.binding
             );
 
             for (method_name, method) in &model.methods {

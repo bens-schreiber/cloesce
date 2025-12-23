@@ -2,10 +2,11 @@ use std::{collections::BTreeMap, path::PathBuf};
 
 use ast::{
     CidlType, HttpVerb, KVModel, MigrationsAst, NamedTypedValue, NavigationPropertyKind, Service,
-    ServiceAttribute,
-    builder::{D1ModelBuilder, create_ast},
-    err::GeneratorErrorKind,
+    ServiceAttribute, WranglerEnv, err::GeneratorErrorKind,
 };
+use generator_test::{D1ModelBuilder, create_ast, create_spec};
+use semantic::SemanticAnalysis;
+use wrangler::WranglerGenerator;
 
 #[test]
 fn cloesce_serializes_to_migrations() {
@@ -34,9 +35,10 @@ fn null_primary_key_error() {
     model.primary_key.cidl_type = CidlType::nullable(CidlType::Integer);
 
     let mut ast = create_ast(vec![model]);
+    let spec = create_spec(&ast);
 
     // Act
-    let err = ast.semantic_analysis().unwrap_err();
+    let err = SemanticAnalysis::analyze(&mut ast, &spec).unwrap_err();
 
     // Assert
     assert!(matches!(err.kind, GeneratorErrorKind::NullPrimaryKey));
@@ -52,9 +54,10 @@ fn mismatched_foreign_keys_error() {
             .build(),
         D1ModelBuilder::new("Dog").id().build(),
     ]);
+    let spec = create_spec(&ast);
 
     // Act
-    let err = ast.semantic_analysis().unwrap_err();
+    let err = SemanticAnalysis::analyze(&mut ast, &spec).unwrap_err();
 
     // Assert
     assert!(matches!(
@@ -81,9 +84,10 @@ fn model_cycle_detection_error() {
             .attribute("aId", CidlType::Integer, Some("A".to_string()))
             .build(),
     ]);
+    let spec = create_spec(&ast);
 
     // Act
-    let err = ast.semantic_analysis().unwrap_err();
+    let err = SemanticAnalysis::analyze(&mut ast, &spec).unwrap_err();
 
     // Assert
     assert!(matches!(err.kind, GeneratorErrorKind::CyclicalDependency));
@@ -126,8 +130,10 @@ fn service_cycle_detection_error() {
     ];
     ast.services = services.into_iter().map(|s| (s.name.clone(), s)).collect();
 
+    let spec = create_spec(&ast);
+
     // Act
-    let err = ast.semantic_analysis().unwrap_err();
+    let err = SemanticAnalysis::analyze(&mut ast, &spec).unwrap_err();
 
     // Assert
     assert!(matches!(err.kind, GeneratorErrorKind::CyclicalDependency));
@@ -156,9 +162,10 @@ fn model_attr_nullability_prevents_cycle_error() {
             )
             .build(),
     ]);
+    let spec = create_spec(&ast);
 
     // Act
-    ast.semantic_analysis().expect("analysis to pass");
+    SemanticAnalysis::analyze(&mut ast, &spec).expect("analysis to pass");
 }
 
 #[test]
@@ -177,9 +184,10 @@ fn one_to_one_nav_property_unknown_attribute_reference_error() {
             )
             .build(),
     ]);
+    let spec = create_spec(&ast);
 
     // Act
-    let err = ast.semantic_analysis().unwrap_err();
+    let err = SemanticAnalysis::analyze(&mut ast, &spec).unwrap_err();
 
     // Assert
     assert!(matches!(
@@ -206,9 +214,10 @@ fn one_to_one_mismatched_fk_and_nav_type_error() {
             )
             .build(),
     ]);
+    let spec = create_spec(&ast);
 
     // Act
-    let err = ast.semantic_analysis().unwrap_err();
+    let err = SemanticAnalysis::analyze(&mut ast, &spec).unwrap_err();
 
     // Assert
     assert!(matches!(
@@ -234,9 +243,10 @@ fn one_to_many_unresolved_reference_error() {
             )
             .build(),
     ]);
+    let spec = create_spec(&ast);
 
     // Act
-    let err = ast.semantic_analysis().unwrap_err();
+    let err = SemanticAnalysis::analyze(&mut ast, &spec).unwrap_err();
 
     // Assert
     assert!(err.context.contains(
@@ -262,8 +272,9 @@ fn junction_table_builder_errors() {
             // Course exists, but doesn't declare the reciprocal nav property
             D1ModelBuilder::new("Course").id().build(),
         ]);
+        let spec = create_spec(&ast);
 
-        let err = ast.semantic_analysis().unwrap_err();
+        let err = SemanticAnalysis::analyze(&mut ast, &spec).unwrap_err();
         assert!(matches!(
             err.kind,
             GeneratorErrorKind::MissingManyToManyReference
@@ -305,8 +316,9 @@ fn junction_table_builder_errors() {
                 )
                 .build(),
         ]);
+        let spec = create_spec(&ast);
 
-        let err = ast.semantic_analysis().unwrap_err();
+        let err = SemanticAnalysis::analyze(&mut ast, &spec).unwrap_err();
         assert!(matches!(
             err.kind,
             GeneratorErrorKind::ExtraneousManyToManyReferences
@@ -338,9 +350,10 @@ fn instantiated_stream_method() {
         .build();
 
     let mut ast = create_ast(vec![model]);
+    let spec = create_spec(&ast);
 
     // Act
-    let res = ast.semantic_analysis();
+    let res = SemanticAnalysis::analyze(&mut ast, &spec);
 
     // Assert
     res.unwrap();
@@ -364,9 +377,10 @@ fn static_stream_method() {
         .build();
 
     let mut ast = create_ast(vec![model]);
+    let spec = create_spec(&ast);
 
     // Act
-    let res = ast.semantic_analysis();
+    let res = SemanticAnalysis::analyze(&mut ast, &spec);
 
     // Assert
     res.unwrap();
@@ -396,9 +410,10 @@ fn invalid_stream_method() {
         .build();
 
     let mut ast = create_ast(vec![model]);
+    let spec = create_spec(&ast);
 
     // Act
-    let res = ast.semantic_analysis();
+    let res = SemanticAnalysis::analyze(&mut ast, &spec);
 
     // Assert
     assert!(matches!(
@@ -408,7 +423,7 @@ fn invalid_stream_method() {
 }
 
 #[test]
-fn stream_kv_model() {
+fn invalid_stream_kv_model() {
     // Arrange
     let mut ast = create_ast(vec![
         D1ModelBuilder::new("Dog")
@@ -429,19 +444,125 @@ fn stream_kv_model() {
         "StreamKV".into(),
         KVModel {
             name: "StreamKV".into(),
-            binding: String::default(),
+            binding: "STREAM_KV".into(),
             cidl_type: CidlType::Stream,
             methods: BTreeMap::default(),
             source_path: PathBuf::default(),
         },
     );
+    ast.wrangler_env
+        .as_mut()
+        .unwrap()
+        .kv_bindings
+        .push("STREAM_KV".into());
+
+    let spec = create_spec(&ast);
 
     // Act
-    let res = ast.semantic_analysis();
+    let res = SemanticAnalysis::analyze(&mut ast, &spec);
 
     // Assert
     assert!(matches!(
         res.unwrap_err().kind,
         GeneratorErrorKind::InvalidStream
     ));
+}
+
+#[test]
+fn missing_variable_in_wrangler() {
+    // Arrange
+    let mut ast = create_ast(vec![D1ModelBuilder::new("User").id().build()]);
+    ast.wrangler_env = Some(WranglerEnv {
+        name: "Env".into(),
+        source_path: "source.ts".into(),
+        d1_binding: None,
+        kv_bindings: vec![],
+        vars: [
+            ("API_KEY".into(), ast::CidlType::Text),
+            ("TIMEOUT".into(), ast::CidlType::Integer),
+        ]
+        .into_iter()
+        .collect(),
+    });
+
+    let specs = vec![
+        WranglerGenerator::Toml(toml::from_str("").unwrap()).as_spec(),
+        WranglerGenerator::Json(serde_json::from_str("{}").unwrap()).as_spec(),
+    ];
+
+    // Act + Assert
+    for spec in specs {
+        assert!(matches!(
+            SemanticAnalysis::analyze(&mut ast, &spec).unwrap_err().kind,
+            GeneratorErrorKind::MissingWranglerVariable
+        ));
+    }
+}
+
+#[test]
+fn missing_env_in_ast() {
+    // Arrange
+    let mut ast = create_ast(vec![D1ModelBuilder::new("User").id().build()]);
+    ast.wrangler_env = None;
+
+    let specs = vec![
+        WranglerGenerator::Toml(toml::from_str("").unwrap()).as_spec(),
+        WranglerGenerator::Json(serde_json::from_str("{}").unwrap()).as_spec(),
+    ];
+
+    // Act + Assert
+    for spec in specs {
+        assert!(matches!(
+            SemanticAnalysis::analyze(&mut ast, &spec).unwrap_err().kind,
+            GeneratorErrorKind::MissingWranglerEnv
+        ));
+    }
+}
+
+#[test]
+fn missing_d1_binding_in_wrangler() {
+    // Arrange
+    let mut ast = create_ast(vec![D1ModelBuilder::new("User").id().build()]);
+
+    let specs = vec![
+        WranglerGenerator::Toml(toml::from_str("").unwrap()).as_spec(),
+        WranglerGenerator::Json(serde_json::from_str("{}").unwrap()).as_spec(),
+    ];
+
+    // Act + Assert
+    for spec in specs {
+        assert!(matches!(
+            SemanticAnalysis::analyze(&mut ast, &spec).unwrap_err().kind,
+            GeneratorErrorKind::MissingWranglerD1Binding
+        ));
+    }
+}
+
+#[test]
+fn missing_kv_bindings_in_wrangler() {
+    // Arrange
+    let mut ast = create_ast(vec![]);
+    ast.kv_models.insert(
+        "MyKV".into(),
+        KVModel {
+            name: "MyKV".into(),
+            binding: "MY_KV_BINDING".into(),
+            cidl_type: CidlType::Object("SomeType".into()),
+            methods: BTreeMap::new(),
+            source_path: PathBuf::new(),
+        },
+    );
+
+    let specs = vec![
+        WranglerGenerator::Toml(toml::from_str("").unwrap()).as_spec(),
+        WranglerGenerator::Json(serde_json::from_str("{}").unwrap()).as_spec(),
+    ];
+
+    // Act + Assert
+    for spec in specs {
+        assert!(matches!(
+            SemanticAnalysis::analyze(&mut ast, &spec).unwrap_err().kind,
+            GeneratorErrorKind::MissingWranglerKVNamespace
+        ));
+    }
 }

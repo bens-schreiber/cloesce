@@ -1,7 +1,4 @@
-import {
-  D1Database,
-  KVNamespace,
-} from "@cloudflare/workers-types";
+import { D1Database, KVNamespace } from "@cloudflare/workers-types";
 
 import { OrmWasmExports, mapSql, loadOrmWasm } from "./wasm.js";
 import { proxyCrud } from "./crud.js";
@@ -43,7 +40,7 @@ export class RuntimeContainer {
     public readonly ast: CloesceAst,
     public readonly constructorRegistry: ConstructorRegistry,
     public readonly wasm: OrmWasmExports,
-  ) { }
+  ) {}
 
   static async init(
     ast: CloesceAst,

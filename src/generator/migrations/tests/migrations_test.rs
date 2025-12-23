@@ -1,27 +1,11 @@
 use std::collections::HashMap;
 
-use ast::{
-    CidlType, CloesceAst, MigrationsAst, MigrationsModel, NavigationPropertyKind,
-    builder::{D1ModelBuilder, IncludeTreeBuilder, create_ast},
-};
+use ast::{CidlType, CloesceAst, MigrationsAst, MigrationsModel, NavigationPropertyKind};
+use generator_test::{D1ModelBuilder, IncludeTreeBuilder, create_ast, expected_str};
+use migrations::{MigrationsDilemma, MigrationsGenerator, MigrationsIntent};
 
-use d1::{D1Generator, MigrationsIntent};
 use indexmap::IndexMap;
 use sqlx::SqlitePool;
-
-/// Compares two strings disregarding tabs, amount of spaces, and amount of newlines.
-/// Ensures that some expr is present in another expr.
-macro_rules! expected_str {
-    ($got:expr, $expected:expr) => {{
-        let clean = |s: &str| s.chars().filter(|c| !c.is_whitespace()).collect::<String>();
-        assert!(
-            clean(&$got.to_string()).contains(&clean(&$expected.to_string())),
-            "Expected:\n`{}`\n\ngot:\n`{}`",
-            $expected,
-            $got
-        );
-    }};
-}
 
 async fn exists_in_db(db: &SqlitePool, name: &str) -> bool {
     sqlx::query_scalar::<_, i64>(
@@ -84,13 +68,13 @@ struct MockMigrationsIntent {
 }
 
 impl MigrationsIntent for MockMigrationsIntent {
-    fn ask(&self, dilemma: d1::MigrationsDilemma) -> Option<usize> {
+    fn ask(&self, dilemma: MigrationsDilemma) -> Option<usize> {
         let (key, opts) = match &dilemma {
-            d1::MigrationsDilemma::RenameOrDropModel {
+            MigrationsDilemma::RenameOrDropModel {
                 model_name,
                 options,
             } => ((model_name.clone(), None), options),
-            d1::MigrationsDilemma::RenameOrDropAttribute {
+            MigrationsDilemma::RenameOrDropAttribute {
                 model_name,
                 options,
                 attribute_name,
@@ -123,7 +107,8 @@ async fn migrate_models_scalars(db: SqlitePool) {
         };
 
         // Act
-        let sql = D1Generator::migrate(&ast, Some(&empty_ast), &MockMigrationsIntent::default());
+        let sql =
+            MigrationsGenerator::migrate(&ast, Some(&empty_ast), &MockMigrationsIntent::default());
 
         // Assert
         expected_str!(sql, "CREATE TABLE IF NOT EXISTS");
@@ -141,7 +126,8 @@ async fn migrate_models_scalars(db: SqlitePool) {
     // Drop
     {
         // Act
-        let sql = D1Generator::migrate(&empty_ast, Some(&ast), &MockMigrationsIntent::default());
+        let sql =
+            MigrationsGenerator::migrate(&empty_ast, Some(&ast), &MockMigrationsIntent::default());
 
         // Assert
         expected_str!(sql, "DROP TABLE IF EXISTS \"User\"");
@@ -182,7 +168,8 @@ async fn migrate_models_one_to_one(db: SqlitePool) {
         };
 
         // Act
-        let sql = D1Generator::migrate(&ast, Some(&empty_ast), &MockMigrationsIntent::default());
+        let sql =
+            MigrationsGenerator::migrate(&ast, Some(&empty_ast), &MockMigrationsIntent::default());
 
         // Assert
         expected_str!(
@@ -200,7 +187,8 @@ async fn migrate_models_one_to_one(db: SqlitePool) {
     // Drop
     {
         // Act
-        let sql = D1Generator::migrate(&empty_ast, Some(&ast), &MockMigrationsIntent::default());
+        let sql =
+            MigrationsGenerator::migrate(&empty_ast, Some(&ast), &MockMigrationsIntent::default());
 
         // Assert
         query(&db, &sql).await.expect("Drop query to work");
@@ -274,7 +262,8 @@ async fn migrate_models_one_to_many(db: SqlitePool) {
         };
 
         // Act
-        let sql = D1Generator::migrate(&ast, Some(&empty_ast), &MockMigrationsIntent::default());
+        let sql =
+            MigrationsGenerator::migrate(&ast, Some(&empty_ast), &MockMigrationsIntent::default());
 
         // Assert
         expected_str!(
@@ -306,7 +295,8 @@ async fn migrate_models_one_to_many(db: SqlitePool) {
     // Drop
     {
         // Act
-        let sql = D1Generator::migrate(&empty_ast, Some(&ast), &MockMigrationsIntent::default());
+        let sql =
+            MigrationsGenerator::migrate(&empty_ast, Some(&ast), &MockMigrationsIntent::default());
 
         query(&db, &sql).await.expect("Drop tables query to work");
         assert!(!exists_in_db(&db, "Boss").await);
@@ -359,7 +349,8 @@ async fn migrate_models_many_to_many(db: SqlitePool) {
         };
 
         // Act
-        let sql = D1Generator::migrate(&ast, Some(&empty_ast), &MockMigrationsIntent::default());
+        let sql =
+            MigrationsGenerator::migrate(&ast, Some(&empty_ast), &MockMigrationsIntent::default());
 
         // Assert
         expected_str!(sql, r#"CREATE TABLE IF NOT EXISTS "StudentsCourses""#);
@@ -384,7 +375,8 @@ async fn migrate_models_many_to_many(db: SqlitePool) {
     // Drop
     {
         // Act
-        let sql = D1Generator::migrate(&empty_ast, Some(&ast), &MockMigrationsIntent::default());
+        let sql =
+            MigrationsGenerator::migrate(&empty_ast, Some(&ast), &MockMigrationsIntent::default());
 
         // Assert
         query(&db, &sql).await.expect("Drop tables query to work");
@@ -404,7 +396,7 @@ async fn migrate_with_alterations(db: SqlitePool) {
                 .build(),
         ]));
 
-        let sql = D1Generator::migrate(&ast, None, &MockMigrationsIntent::default());
+        let sql = MigrationsGenerator::migrate(&ast, None, &MockMigrationsIntent::default());
         query(&db, &sql)
             .await
             .expect("Create table queries to work");
@@ -439,7 +431,7 @@ async fn migrate_with_alterations(db: SqlitePool) {
             .insert(("User".into(), Some("address".into())), None);
 
         // Act
-        let sql = D1Generator::migrate(&new, Some(&base_ast), &intent);
+        let sql = MigrationsGenerator::migrate(&new, Some(&base_ast), &intent);
 
         // Assert
         expected_str!(
@@ -478,7 +470,8 @@ ALTER TABLE "User" ADD COLUMN "age" text"#
         };
 
         // Act
-        let sql = D1Generator::migrate(&new, Some(&base_ast), &MockMigrationsIntent::default());
+        let sql =
+            MigrationsGenerator::migrate(&new, Some(&base_ast), &MockMigrationsIntent::default());
 
         // Assert
         expected_str!(sql, r#"ALTER TABLE "User" RENAME TO "User_"#);
@@ -518,7 +511,8 @@ ALTER TABLE "User" ADD COLUMN "age" text"#
         };
 
         // Act
-        let sql = D1Generator::migrate(&new, Some(&base_ast), &MockMigrationsIntent::default());
+        let sql =
+            MigrationsGenerator::migrate(&new, Some(&base_ast), &MockMigrationsIntent::default());
 
         // Assert
         expected_str!(sql, r#"ALTER TABLE "User" RENAME TO "User_"#);
@@ -563,7 +557,7 @@ async fn migrate_alter_drop_m2m(db: SqlitePool) {
         ast.set_merkle_hash();
         let migration = as_migration(ast);
 
-        let sql = D1Generator::migrate(&migration, None, &MockMigrationsIntent::default());
+        let sql = MigrationsGenerator::migrate(&migration, None, &MockMigrationsIntent::default());
         query(&db, &sql)
             .await
             .expect("Create table queries to work");
@@ -582,7 +576,7 @@ async fn migrate_alter_drop_m2m(db: SqlitePool) {
     };
 
     // Act
-    let sql = D1Generator::migrate(
+    let sql = MigrationsGenerator::migrate(
         &no_m2m_ast,
         Some(&m2m_ast),
         &MockMigrationsIntent::default(),
@@ -607,7 +601,7 @@ async fn migrate_alter_add_m2m(db: SqlitePool) {
         ast.set_merkle_hash();
         let migration = as_migration(ast);
 
-        let sql = D1Generator::migrate(&migration, None, &MockMigrationsIntent::default());
+        let sql = MigrationsGenerator::migrate(&migration, None, &MockMigrationsIntent::default());
         query(&db, &sql)
             .await
             .expect("Create table queries to work");
@@ -643,7 +637,7 @@ async fn migrate_alter_add_m2m(db: SqlitePool) {
     };
 
     // Act
-    let sql = D1Generator::migrate(
+    let sql = MigrationsGenerator::migrate(
         &m2m_ast,
         Some(&no_m2m_ast),
         &MockMigrationsIntent::default(),

@@ -3,8 +3,8 @@ pub type Result<T> = std::result::Result<T, GeneratorError>;
 #[derive(Debug)]
 pub enum GeneratorPhase {
     External,
-    SemanticAnalysis,
-    Wrangler,
+    ModelAnalysis,
+    WranglerAnalysis,
 }
 
 #[derive(Debug)]
@@ -64,6 +64,10 @@ pub enum GeneratorErrorKind {
     UnknownIncludeTreeReference,
     ExtraneousManyToManyReferences,
     MissingManyToManyReference,
+    MissingWranglerEnv,
+    MissingWranglerVariable,
+    MissingWranglerD1Binding,
+    MissingWranglerKVNamespace,
     InconsistentWranglerBinding,
     InvalidStream,
 }
@@ -71,103 +75,124 @@ pub enum GeneratorErrorKind {
 impl GeneratorErrorKind {
     pub fn to_error(self) -> GeneratorError {
         let (description, suggestion, phase) = match self {
+            /* ---- MODELS ---- */
             GeneratorErrorKind::NullSqlType => (
                 "Model attributes cannot be literally null",
                 "Remove 'null' from your Model definition.",
-                GeneratorPhase::SemanticAnalysis,
+                GeneratorPhase::ModelAnalysis,
             ),
             GeneratorErrorKind::NullPrimaryKey => (
                 "Primary keys cannot be nullable",
                 "Remove 'null' from the primary key definition",
-                GeneratorPhase::SemanticAnalysis,
+                GeneratorPhase::ModelAnalysis,
             ),
             GeneratorErrorKind::InvalidSqlType => (
                 "Model attributes must be valid SQLite types: Integer, Real, Text",
                 "Consider using a navigation property or creating another model.",
-                GeneratorPhase::SemanticAnalysis,
+                GeneratorPhase::ModelAnalysis,
             ),
             GeneratorErrorKind::UnknownObject => (
                 "Objects must be decorated appropriately as a Model, PlainOldObject, or Inject",
                 "Consider using a decorator on the object.",
-                GeneratorPhase::SemanticAnalysis,
+                GeneratorPhase::ModelAnalysis,
             ),
             GeneratorErrorKind::UnknownDataSourceReference => (
                 "Data sources must reference a model",
                 "",
-                GeneratorPhase::SemanticAnalysis,
+                GeneratorPhase::ModelAnalysis,
             ),
             GeneratorErrorKind::UnexpectedVoid => (
                 "Void cannot be an attribute or parameter, only a return type.",
                 "Remove `void`",
-                GeneratorPhase::SemanticAnalysis,
+                GeneratorPhase::ModelAnalysis,
             ),
             GeneratorErrorKind::UnexpectedInject => (
                 "Attributes and return types cannot be injected values.",
                 "Remove the value.",
-                GeneratorPhase::SemanticAnalysis,
+                GeneratorPhase::ModelAnalysis,
             ),
             GeneratorErrorKind::MissingOrExtraneousDataSource => (
                 "All instantiated methods must have one data source parameter.",
                 "Add a data source parameter, or remove extras.",
-                GeneratorPhase::SemanticAnalysis,
+                GeneratorPhase::ModelAnalysis,
             ),
             GeneratorErrorKind::NotYetSupported => (
                 "This feature will be supported in an upcoming Cloesce release.",
                 "",
-                GeneratorPhase::SemanticAnalysis,
+                GeneratorPhase::ModelAnalysis,
             ),
-            GeneratorErrorKind::InvalidMapping => (
-                "CIDL is ill-formatted",
-                "",
-                GeneratorPhase::SemanticAnalysis,
-            ),
+            GeneratorErrorKind::InvalidMapping => {
+                ("CIDL is ill-formatted", "", GeneratorPhase::ModelAnalysis)
+            }
             GeneratorErrorKind::MismatchedForeignKeyTypes => (
                 "Mismatched foreign keys",
                 "Foreign keys must be the same type as their reference",
-                GeneratorPhase::SemanticAnalysis,
+                GeneratorPhase::ModelAnalysis,
             ),
             GeneratorErrorKind::MismatchedNavigationPropertyTypes => (
                 "Navigation property references must match attribute types",
                 "TODO: a good suggestion here",
-                GeneratorPhase::SemanticAnalysis,
+                GeneratorPhase::ModelAnalysis,
             ),
             GeneratorErrorKind::InvalidNavigationPropertyReference => (
                 "Navigation property references must be to foreign keys or other navigation properties",
                 "TODO: a good suggestion here",
-                GeneratorPhase::SemanticAnalysis,
+                GeneratorPhase::ModelAnalysis,
             ),
             GeneratorErrorKind::CyclicalDependency => (
                 "Model and Service composition cannot be cyclical",
                 "In Models, allow a navigation property to be null. In Services prefer direct dependency injection.)",
-                GeneratorPhase::SemanticAnalysis,
+                GeneratorPhase::ModelAnalysis,
             ),
             GeneratorErrorKind::UnknownIncludeTreeReference => (
                 "Unknown reference in Include Tree definition",
                 "",
-                GeneratorPhase::SemanticAnalysis,
+                GeneratorPhase::ModelAnalysis,
             ),
             GeneratorErrorKind::ExtraneousManyToManyReferences => (
                 "Only two navigation properties can reference a many to many table",
                 "Remove a reference",
-                GeneratorPhase::SemanticAnalysis,
+                GeneratorPhase::ModelAnalysis,
             ),
             GeneratorErrorKind::MissingManyToManyReference => (
                 "Many to Many navigation properties must have a correlated reference on the adjacent model.",
                 "TODO: a good indicator of where to add the nav prop",
-                GeneratorPhase::SemanticAnalysis,
+                GeneratorPhase::ModelAnalysis,
             ),
             GeneratorErrorKind::InvalidStream => (
                 "Streams cannot be nullable, apart of an object or in an array. In a method, they must be the only parameter.",
                 "Use a `Blob` type",
-                GeneratorPhase::SemanticAnalysis,
-            ),
-            GeneratorErrorKind::InconsistentWranglerBinding => (
-                "Wrangler file definitions must be consistent with the WranglerEnv definition",
-                "Change your WranglerEnv's bindings to match the Wrangler file",
-                GeneratorPhase::Wrangler,
+                GeneratorPhase::ModelAnalysis,
             ),
 
-            // Generic error, handeled seperately from all others
+            /* ---- WRANGLER ---- */
+            GeneratorErrorKind::InconsistentWranglerBinding => (
+                "Wrangler config definitions must be consistent with the WranglerEnv definition",
+                "Change your WranglerEnv's bindings to match the Wrangler file",
+                GeneratorPhase::WranglerAnalysis,
+            ),
+            GeneratorErrorKind::MissingWranglerEnv => (
+                "A WranglerEnv definition is required to use Models.",
+                "Add a WranglerEnv definition to your backend code.",
+                GeneratorPhase::WranglerAnalysis,
+            ),
+            GeneratorErrorKind::MissingWranglerVariable => (
+                "A Wrangler config variable binding is required to define a variable in the WranglerEnv",
+                "Add the variable binding to your Wrangler configuration.",
+                GeneratorPhase::WranglerAnalysis,
+            ),
+            GeneratorErrorKind::MissingWranglerD1Binding => (
+                "A Wrangler config D1 database binding is required to define a D1 Model.",
+                "Add the D1 database binding to your Wrangler configuration.",
+                GeneratorPhase::WranglerAnalysis,
+            ),
+            GeneratorErrorKind::MissingWranglerKVNamespace => (
+                "A Wrangler config KV namespace binding is required to define a KV Model.",
+                "Add the KV namespace binding to your Wrangler configuration.",
+                GeneratorPhase::WranglerAnalysis,
+            ),
+
+            /* ---- EXTERNAL ---- */
             GeneratorErrorKind::InvalidInputFile => ("", "", GeneratorPhase::External),
         };
 

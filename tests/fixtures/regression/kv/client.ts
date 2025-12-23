@@ -12,7 +12,7 @@ export class JsonKV {
   async delete(
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<void>> {
-    const baseUrl = new URL(`http://localhost:5002/api/JsonKV/${this.}/delete`);
+    const baseUrl = new URL(`http://localhost:5002/api/JsonKV/${this.key}/delete`);
     const payload: any = {};
 
 
@@ -24,7 +24,7 @@ export class JsonKV {
     });
 
     return await HttpResult.fromResponse(
-      res, 
+      res,
       MediaType.Json,
       undefined,
       false
@@ -44,7 +44,7 @@ export class JsonKV {
     });
 
     return await HttpResult.fromResponse(
-      res, 
+      res,
       MediaType.Json,
       JsonKV,
       false
@@ -69,7 +69,7 @@ export class JsonKV {
     });
 
     return await HttpResult.fromResponse(
-      res, 
+      res,
       MediaType.Json,
       undefined,
       false
@@ -91,7 +91,7 @@ export class TextKV {
   async delete(
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<void>> {
-    const baseUrl = new URL(`http://localhost:5002/api/TextKV/${this.}/delete`);
+    const baseUrl = new URL(`http://localhost:5002/api/TextKV/${this.key}/delete`);
     const payload: any = {};
 
 
@@ -103,7 +103,7 @@ export class TextKV {
     });
 
     return await HttpResult.fromResponse(
-      res, 
+      res,
       MediaType.Json,
       undefined,
       false
@@ -123,7 +123,7 @@ export class TextKV {
     });
 
     return await HttpResult.fromResponse(
-      res, 
+      res,
       MediaType.Json,
       TextKV,
       false
@@ -148,7 +148,7 @@ export class TextKV {
     });
 
     return await HttpResult.fromResponse(
-      res, 
+      res,
       MediaType.Json,
       undefined,
       false

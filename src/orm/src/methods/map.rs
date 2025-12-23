@@ -176,7 +176,8 @@ fn process_navigation_properties(
 
 #[cfg(test)]
 mod tests {
-    use ast::{CidlType, NavigationPropertyKind, builder::D1ModelBuilder};
+    use ast::{CidlType, NavigationPropertyKind};
+    use generator_test::D1ModelBuilder;
     use serde_json::{Map, Value, json};
     use std::collections::HashMap;
 

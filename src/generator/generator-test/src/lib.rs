@@ -5,13 +5,15 @@ use std::{
 
 use indexmap::IndexMap;
 
-use crate::{
+use ast::{
     ApiMethod, CidlType, CloesceAst, D1Model, D1ModelAttribute, DataSource, HttpVerb, IncludeTree,
     InputLanguage, MediaType, NamedTypedValue, NavigationProperty, NavigationPropertyKind,
+    WranglerEnv, WranglerSpec,
 };
+use wrangler::WranglerDefault;
 
-pub fn create_ast(mut models: Vec<D1Model>) -> CloesceAst {
-    let map = models
+pub fn create_ast(mut d1_models: Vec<D1Model>) -> CloesceAst {
+    let map = d1_models
         .drain(..)
         .map(|m| (m.name.clone(), m))
         .collect::<IndexMap<String, D1Model>>();
@@ -23,16 +25,43 @@ pub fn create_ast(mut models: Vec<D1Model>) -> CloesceAst {
         d1_models: map,
         kv_models: HashMap::default(),
         poos: IndexMap::default(),
-        wrangler_env: None,
+        wrangler_env: Some(WranglerEnv {
+            name: "TestEnv".to_string(),
+            source_path: PathBuf::default(),
+            d1_binding: Some("TEST_DB".to_string()),
+            kv_bindings: Vec::default(),
+            vars: HashMap::default(),
+        }),
         services: IndexMap::default(),
         app_source: None,
         hash: 0,
     }
 }
 
+pub fn create_spec(ast: &CloesceAst) -> WranglerSpec {
+    let mut spec = WranglerSpec::default();
+    WranglerDefault::set_defaults(&mut spec, ast);
+    spec
+}
+
 #[derive(Default)]
 pub struct IncludeTreeBuilder {
     nodes: BTreeMap<String, IncludeTree>,
+}
+
+/// Compares two strings disregarding tabs, amount of spaces, and amount of newlines.
+/// Ensures that some expr is present in another expr.
+#[macro_export]
+macro_rules! expected_str {
+    ($got:expr, $expected:expr) => {{
+        let clean = |s: &str| s.chars().filter(|c| !c.is_whitespace()).collect::<String>();
+        assert!(
+            clean(&$got.to_string()).contains(&clean(&$expected.to_string())),
+            "Expected:\n`{}`\n\ngot:\n`{}`",
+            $expected,
+            $got
+        );
+    }};
 }
 
 impl IncludeTreeBuilder {

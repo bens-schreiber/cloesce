@@ -12,8 +12,8 @@ use sea_query::{
     ColumnDef, Expr, ForeignKey, Index, Query, SchemaStatementBuilder, SqliteQueryBuilder, Table,
 };
 
-pub struct D1Generator;
-impl D1Generator {
+pub struct MigrationsGenerator;
+impl MigrationsGenerator {
     /// Uses the last migrated [MigrationsAst] to produce a new migrated SQL schema.
     ///
     /// Some migration scenarios require user intervention through a [MigrationsIntent], which

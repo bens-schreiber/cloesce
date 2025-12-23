@@ -1,5 +1,5 @@
 [package]
-name = "d1"
+name = "migrations"
 version = "0.0.1"
 edition = "2024"
 
@@ -11,4 +11,5 @@ sqlformat = "0.5.0"
 tracing = { workspace = true }
 
 [dev-dependencies]
+generator-test = { path = "../generator-test" }
 sqlx = { version = "0.8", features = ["sqlite", "runtime-tokio"] }

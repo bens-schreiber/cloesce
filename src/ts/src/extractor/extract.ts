@@ -61,7 +61,7 @@ export class CidlExtractor {
   constructor(
     public projectName: string,
     public version: string,
-  ) { }
+  ) {}
 
   extract(project: Project): Either<ExtractorError, CloesceAst> {
     const d1Models: Record<string, D1Model> = {};
@@ -287,7 +287,6 @@ export class CidlExtractor {
     const kv_bindings = [];
 
     for (const prop of classDecl.getProperties()) {
-
       // TODO: Support multiple D1 bindings
       if (
         prop
@@ -301,13 +300,7 @@ export class CidlExtractor {
         continue;
       }
 
-      if (
-        prop
-          .getType()
-          .getSymbol()
-          ?.getName()
-        === "KVNamespace"
-      ) {
+      if (prop.getType().getSymbol()?.getName() === "KVNamespace") {
         kv_bindings.push(prop.getName());
         continue;
       }

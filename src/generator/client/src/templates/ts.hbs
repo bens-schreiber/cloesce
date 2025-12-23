@@ -176,7 +176,7 @@ export class {{this.name}} {
     {{/each}}
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<{{map_cidl_type this.return_type}}>> {
-    const baseUrl = new URL(`{{../../domain}}/{{#if this.is_static}}{{../name}}/{{this.name}}{{else}}{{../name}}/${this.{{../primary_key.name}}}/{{this.name}}{{/if}}`);
+    const baseUrl = new URL(`{{../../domain}}/{{#if this.is_static}}{{../name}}/{{this.name}}{{else}}{{../name}}/${this.key}/{{this.name}}{{/if}}`);
     {{#unless (is_get_request this.http_verb)}}
     const payload: any = {};
     {{/unless}}

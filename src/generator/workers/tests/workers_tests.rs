@@ -1,9 +1,7 @@
 use std::path::Path;
 
-use ast::{
-    CidlType, CrudKind, HttpVerb, MediaType, NamedTypedValue,
-    builder::{D1ModelBuilder, create_ast},
-};
+use ast::{CidlType, CrudKind, HttpVerb, MediaType, NamedTypedValue};
+use generator_test::{D1ModelBuilder, create_ast};
 use workers::WorkersGenerator;
 
 #[test]

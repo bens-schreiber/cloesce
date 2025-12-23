@@ -1,6 +1,15 @@
 [workspace]
 resolver = "3"
-members = ["cli", "ast", "d1", "workers", "client", "wrangler"]
+members = [
+    "cli",
+    "ast",
+    "migrations",
+    "workers",
+    "client",
+    "wrangler",
+    "semantic",
+    "generator-test",
+]
 
 [workspace.dependencies]
 indexmap = { version = "2.12.0", features = ["serde"] }

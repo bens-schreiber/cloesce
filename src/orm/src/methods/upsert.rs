@@ -624,14 +624,12 @@ fn bytes_to_sqlite(bytes: &[u8]) -> SimpleExpr {
 mod test {
     use std::collections::HashMap;
 
-    use ast::{CidlType, NavigationPropertyKind, builder::D1ModelBuilder};
+    use ast::{CidlType, NavigationPropertyKind};
+    use generator_test::{D1ModelBuilder, expected_str};
     use serde_json::{Value, json};
     use sqlx::SqlitePool;
 
-    use crate::{
-        expected_str,
-        methods::{test_sql, upsert::UpsertModel},
-    };
+    use crate::methods::{test_sql, upsert::UpsertModel};
 
     #[sqlx::test]
     async fn upsert_scalar_model(db: SqlitePool) {

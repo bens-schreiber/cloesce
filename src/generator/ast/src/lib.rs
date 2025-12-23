@@ -1,6 +1,4 @@
-pub mod builder;
 pub mod err;
-pub mod semantic;
 
 use std::collections::BTreeMap;
 use std::collections::HashMap;
@@ -12,7 +10,6 @@ use err::GeneratorErrorKind;
 use err::Result;
 use indexmap::IndexMap;
 use rustc_hash::FxHasher;
-use semantic::SemanticAnalysis;
 use serde::Deserialize;
 use serde::Serialize;
 use serde_with::{MapPreventDuplicates, serde_as};
@@ -358,10 +355,6 @@ impl CloesceAst {
         serde_json::to_string_pretty(&migrations_ast).expect("serialize migrations ast to work")
     }
 
-    pub fn semantic_analysis(&mut self) -> Result<()> {
-        SemanticAnalysis::analyze(self)
-    }
-
     /// Traverses the AST setting the `hash` field as a merkle hash, meaning a parents hash depends on it's childrens hashes.
     pub fn set_merkle_hash(&mut self) {
         if self.hash != 0u64 {
@@ -473,4 +466,33 @@ impl MigrationsAst {
     pub fn to_json(&self) -> String {
         serde_json::to_string_pretty(self).expect("serialize self to work")
     }
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
+pub struct D1Database {
+    pub binding: Option<String>,
+    pub database_name: Option<String>,
+    pub database_id: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
+pub struct KVNamespace {
+    pub binding: Option<String>,
+    pub id: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
+pub struct WranglerSpec {
+    pub name: Option<String>,
+    pub compatibility_date: Option<String>,
+    pub main: Option<String>,
+
+    #[serde(default)]
+    pub d1_databases: Vec<D1Database>,
+
+    #[serde(default)]
+    pub kv_namespaces: Vec<KVNamespace>,
+
+    #[serde(default)]
+    pub vars: HashMap<String, String>,
 }

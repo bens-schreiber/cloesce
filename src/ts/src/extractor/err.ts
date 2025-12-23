@@ -127,7 +127,7 @@ export class ExtractorError {
   context?: string;
   snippet?: string;
 
-  constructor(public code: ExtractorErrorCode) { }
+  constructor(public code: ExtractorErrorCode) {}
 
   addContext(fn: (val: string | undefined) => string | undefined) {
     this.context = fn(this.context ?? "");

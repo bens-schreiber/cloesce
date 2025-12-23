@@ -220,14 +220,12 @@ fn left_join_as(
 
 #[cfg(test)]
 mod test {
-    use ast::{
-        CidlType, NavigationPropertyKind,
-        builder::{D1ModelBuilder, IncludeTreeBuilder},
-    };
+    use ast::{CidlType, NavigationPropertyKind};
+    use generator_test::{D1ModelBuilder, IncludeTreeBuilder, expected_str};
     use serde_json::json;
     use sqlx::SqlitePool;
 
-    use crate::{ModelMeta, expected_str, methods::test_sql};
+    use crate::{ModelMeta, methods::test_sql};
 
     use super::list_models;
 

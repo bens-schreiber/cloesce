@@ -43,6 +43,39 @@ handlebars_helper!(is_blob_array: |cidl_type: CidlType| matches!(cidl_type.root_
 // True for any [CidlType::DataSource] or given the verb [HttpVerb::GET]
 handlebars_helper!(is_url_param: |cidl_type: CidlType, verb: HttpVerb| matches!(verb, HttpVerb::GET) || matches!(cidl_type, CidlType::DataSource(_)));
 
+const TYPESCRIPT_TEMPLATE: &str = include_str!("./templates/ts.hbs");
+const TEMPLATE_STRING: &str = "client_api";
+
+pub struct ClientGenerator;
+impl ClientGenerator {
+    pub fn generate_client_api(ast: &CloesceAst, domain: String) -> String {
+        let template = match ast.language {
+            InputLanguage::TypeScript => TYPESCRIPT_TEMPLATE,
+            // InputLanguage::...
+        };
+
+        let mapper = match ast.language {
+            InputLanguage::TypeScript => Arc::new(TypeScriptMapper),
+            // InputLanguage::...
+        };
+
+        let mut handlebars = Handlebars::new();
+        handlebars
+            .register_template_string(TEMPLATE_STRING, template)
+            .unwrap();
+        register_helpers(&mut handlebars, mapper, ast);
+
+        let mut context = serde_json::to_value(ast).unwrap();
+
+        // Manually get the domain in there
+        if let serde_json::Value::Object(ref mut map) = context {
+            map.insert("domain".to_string(), serde_json::Value::String(domain));
+        }
+
+        handlebars.render(TEMPLATE_STRING, &context).unwrap()
+    }
+}
+
 fn register_helpers<'a>(
     handlebars: &mut Handlebars<'a>,
     mapper: Arc<dyn ClientLanguageTypeMapper + Send + Sync>,
@@ -145,34 +178,4 @@ fn register_helpers<'a>(
             },
         ),
     );
-}
-
-const TYPESCRIPT_TEMPLATE: &str = include_str!("./templates/ts.hbs");
-const TEMPLATE_STRING: &str = "client_api";
-
-pub fn generate_client_api(ast: &CloesceAst, domain: String) -> String {
-    let template = match ast.language {
-        InputLanguage::TypeScript => TYPESCRIPT_TEMPLATE,
-        // InputLanguage::...
-    };
-
-    let mapper = match ast.language {
-        InputLanguage::TypeScript => Arc::new(TypeScriptMapper),
-        // InputLanguage::...
-    };
-
-    let mut handlebars = Handlebars::new();
-    handlebars
-        .register_template_string(TEMPLATE_STRING, template)
-        .unwrap();
-    register_helpers(&mut handlebars, mapper, ast);
-
-    let mut context = serde_json::to_value(ast).unwrap();
-
-    // Manually get the domain in there
-    if let serde_json::Value::Object(ref mut map) = context {
-        map.insert("domain".to_string(), serde_json::Value::String(domain));
-    }
-
-    handlebars.render(TEMPLATE_STRING, &context).unwrap()
 }

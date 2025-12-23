@@ -5,7 +5,10 @@ edition = "2024"
 
 [dependencies]
 ast = { path = "../ast" }
+tracing = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 toml = { workspace = true }
-tracing = { workspace = true }
+
+[dev-dependencies]
+generator-test = { path = "../generator-test" }
