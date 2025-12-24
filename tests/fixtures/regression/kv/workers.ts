@@ -3,12 +3,14 @@ import { CloesceApp } from "cloesce/backend";
 import cidl from "./cidl.json";
 
 import { JsonKV } from "./seed__kv.cloesce.ts";
+import { StreamKV } from "./seed__kv.cloesce.ts";
 import { TextKV } from "./seed__kv.cloesce.ts";
 
 
 const app = new CloesceApp();
 const constructorRegistry = {
 	JsonKV: JsonKV,
+	StreamKV: StreamKV,
 	TextKV: TextKV
 };
 

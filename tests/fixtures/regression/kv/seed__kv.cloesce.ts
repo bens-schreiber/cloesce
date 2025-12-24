@@ -5,7 +5,7 @@ import {
     Inject,
     KV,
     KVModel,
-    // Stream
+    Stream
 } from "cloesce/backend";
 class KVNamespace { }
 
@@ -56,26 +56,35 @@ export class JsonKV extends KVModel<unknown> {
     }
 }
 
-// @KV("streamValueNamespace")
-// export class StreamKV extends KVModel<Stream> {
-//     @GET
-//     static async get(@Inject env: Env, key: string): Promise<StreamKV> {
-//         const res = await env.streamNamespace.getWithMetadata(key);
+@KV("streamNamespace")
+export class StreamKV extends KVModel<Stream> {
+    @POST
+    static async put(@Inject env: Env, key: string): Promise<void> {
+        await env.streamNamespace.put(key, ""); // Placeholder for stream data
+    }
 
-//     }
+    @POST
+    static async get(@Inject env: Env, key: string): Promise<StreamKV> {
+        const res = await env.streamNamespace.getWithMetadata(key, { type: "stream" });
 
-//     @POST
-//     static async put(@Inject env: Env, key: string): Promise<void> {
-//         await env.streamNamespace.put(key, []); // Placeholder for stream data
-//     }
+        // The router should remove the stream from the response as that cannot be serialized.
+        return {
+            ...res, key
+        }
+    }
 
-//     @POST
-//     async putStream(@Inject env: Env, stream: Stream): Promise<void> {
-//         await env.streamNamespace.put(super.key, stream);
-//     }
+    @GET
+    async getStream(): Promise<Stream> {
+        return this.value;
+    }
 
-//     @POST
-//     async delete(@Inject env: Env): Promise<void> {
-//         await env.streamNamespace.delete(super.key);
-//     }
-// }
+    @POST
+    async putStream(@Inject env: Env, stream: Stream): Promise<void> {
+        await env.streamNamespace.put(this.key, stream);
+    }
+
+    @POST
+    async delete(@Inject env: Env): Promise<void> {
+        await env.streamNamespace.delete(this.key);
+    }
+}

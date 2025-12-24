@@ -153,6 +153,101 @@
             },
             "cidl_type": "JsonValue",
             "source_path": "./seed__kv.cloesce.ts"
+        },
+        "StreamKV": {
+            "binding": "streamNamespace",
+            "name": "StreamKV",
+            "methods": {
+                "put": {
+                    "name": "put",
+                    "http_verb": "POST",
+                    "is_static": true,
+                    "return_media": "Json",
+                    "return_type": "Void",
+                    "parameters_media": "Json",
+                    "parameters": [
+                        {
+                            "name": "env",
+                            "cidl_type": {
+                                "Inject": "Env"
+                            }
+                        },
+                        {
+                            "name": "key",
+                            "cidl_type": "Text"
+                        }
+                    ]
+                },
+                "get": {
+                    "name": "get",
+                    "http_verb": "POST",
+                    "is_static": true,
+                    "return_media": "Json",
+                    "return_type": {
+                        "Object": "StreamKV"
+                    },
+                    "parameters_media": "Json",
+                    "parameters": [
+                        {
+                            "name": "env",
+                            "cidl_type": {
+                                "Inject": "Env"
+                            }
+                        },
+                        {
+                            "name": "key",
+                            "cidl_type": "Text"
+                        }
+                    ]
+                },
+                "getStream": {
+                    "name": "getStream",
+                    "http_verb": "GET",
+                    "is_static": false,
+                    "return_media": "Json",
+                    "return_type": "Stream",
+                    "parameters_media": "Json",
+                    "parameters": []
+                },
+                "putStream": {
+                    "name": "putStream",
+                    "http_verb": "POST",
+                    "is_static": false,
+                    "return_media": "Json",
+                    "return_type": "Void",
+                    "parameters_media": "Json",
+                    "parameters": [
+                        {
+                            "name": "env",
+                            "cidl_type": {
+                                "Inject": "Env"
+                            }
+                        },
+                        {
+                            "name": "stream",
+                            "cidl_type": "Stream"
+                        }
+                    ]
+                },
+                "delete": {
+                    "name": "delete",
+                    "http_verb": "POST",
+                    "is_static": false,
+                    "return_media": "Json",
+                    "return_type": "Void",
+                    "parameters_media": "Json",
+                    "parameters": [
+                        {
+                            "name": "env",
+                            "cidl_type": {
+                                "Inject": "Env"
+                            }
+                        }
+                    ]
+                }
+            },
+            "cidl_type": "Stream",
+            "source_path": "./seed__kv.cloesce.ts"
         }
     },
     "poos": {},

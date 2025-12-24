@@ -106,34 +106,38 @@ impl WorkersGenerator {
     /// Public for tests
     pub fn finalize_api_methods(ast: &mut CloesceAst) {
         let set_media_types = |method: &mut ApiMethod| {
-            // Return Media Type
             method.return_media = match method.return_type.root_type() {
                 CidlType::Stream => MediaType::Octet,
                 _ => MediaType::Json,
             };
 
-            method.parameters_media = match method.parameters.as_slice() {
-                [p] if matches!(p.cidl_type, CidlType::Stream) => MediaType::Octet,
-                _ => MediaType::Json,
+            method.parameters_media = if method
+                .parameters
+                .iter()
+                .any(|p| matches!(p.cidl_type.root_type(), CidlType::Stream))
+            {
+                MediaType::Octet
+            } else {
+                MediaType::Json
             };
         };
 
-        for model in ast.d1_models.values_mut() {
-            for crud in &model.cruds {
+        for d1_model in ast.d1_models.values_mut() {
+            for crud in &d1_model.cruds {
                 let method = match crud {
                     CrudKind::GET => ApiMethod {
                         name: "get".into(),
                         is_static: true,
                         http_verb: HttpVerb::GET,
-                        return_type: CidlType::http(CidlType::Object(model.name.clone())),
+                        return_type: CidlType::http(CidlType::Object(d1_model.name.clone())),
                         parameters: vec![
                             NamedTypedValue {
-                                name: model.primary_key.name.clone(),
-                                cidl_type: model.primary_key.cidl_type.clone(),
+                                name: d1_model.primary_key.name.clone(),
+                                cidl_type: d1_model.primary_key.cidl_type.clone(),
                             },
                             NamedTypedValue {
                                 name: "__datasource".into(),
-                                cidl_type: CidlType::DataSource(model.name.clone()),
+                                cidl_type: CidlType::DataSource(d1_model.name.clone()),
                             },
                         ],
                         parameters_media: MediaType::default(),
@@ -144,11 +148,11 @@ impl WorkersGenerator {
                         is_static: true,
                         http_verb: HttpVerb::GET,
                         return_type: CidlType::http(CidlType::array(CidlType::Object(
-                            model.name.clone(),
+                            d1_model.name.clone(),
                         ))),
                         parameters: vec![NamedTypedValue {
                             name: "__datasource".into(),
-                            cidl_type: CidlType::DataSource(model.name.clone()),
+                            cidl_type: CidlType::DataSource(d1_model.name.clone()),
                         }],
                         parameters_media: MediaType::default(),
                         return_media: MediaType::default(),
@@ -157,15 +161,15 @@ impl WorkersGenerator {
                         name: "save".into(),
                         is_static: true,
                         http_verb: HttpVerb::POST,
-                        return_type: CidlType::http(CidlType::Object(model.name.clone())),
+                        return_type: CidlType::http(CidlType::Object(d1_model.name.clone())),
                         parameters: vec![
                             NamedTypedValue {
                                 name: "model".into(),
-                                cidl_type: CidlType::Partial(model.name.clone()),
+                                cidl_type: CidlType::Partial(d1_model.name.clone()),
                             },
                             NamedTypedValue {
                                 name: "__datasource".into(),
-                                cidl_type: CidlType::DataSource(model.name.clone()),
+                                cidl_type: CidlType::DataSource(d1_model.name.clone()),
                             },
                         ],
                         parameters_media: MediaType::default(),
@@ -173,20 +177,26 @@ impl WorkersGenerator {
                     },
                 };
 
-                if model.methods.contains_key(&method.name) {
+                if d1_model.methods.contains_key(&method.name) {
                     // Don't overwrite an existing method
                     tracing::warn!(
                         "Found an overwritten CRUD method {}.{}, skipping.",
-                        model.name,
+                        d1_model.name,
                         method.name
                     );
                     continue;
                 }
 
-                model.methods.insert(method.name.clone(), method);
+                d1_model.methods.insert(method.name.clone(), method);
             }
 
-            for method in model.methods.values_mut() {
+            for method in d1_model.methods.values_mut() {
+                set_media_types(method);
+            }
+        }
+
+        for kv_model in ast.kv_models.values_mut() {
+            for method in kv_model.methods.values_mut() {
                 set_media_types(method);
             }
         }

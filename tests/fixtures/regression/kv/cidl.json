@@ -86,6 +86,101 @@
       },
       "source_path": "./seed__kv.cloesce.ts"
     },
+    "StreamKV": {
+      "name": "StreamKV",
+      "binding": "streamNamespace",
+      "cidl_type": "Stream",
+      "methods": {
+        "delete": {
+          "name": "delete",
+          "is_static": false,
+          "http_verb": "POST",
+          "return_media": "Json",
+          "return_type": "Void",
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "env",
+              "cidl_type": {
+                "Inject": "Env"
+              }
+            }
+          ]
+        },
+        "get": {
+          "name": "get",
+          "is_static": true,
+          "http_verb": "POST",
+          "return_media": "Json",
+          "return_type": {
+            "Object": "StreamKV"
+          },
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "env",
+              "cidl_type": {
+                "Inject": "Env"
+              }
+            },
+            {
+              "name": "key",
+              "cidl_type": "Text"
+            }
+          ]
+        },
+        "getStream": {
+          "name": "getStream",
+          "is_static": false,
+          "http_verb": "GET",
+          "return_media": "Octet",
+          "return_type": "Stream",
+          "parameters_media": "Json",
+          "parameters": []
+        },
+        "put": {
+          "name": "put",
+          "is_static": true,
+          "http_verb": "POST",
+          "return_media": "Json",
+          "return_type": "Void",
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "env",
+              "cidl_type": {
+                "Inject": "Env"
+              }
+            },
+            {
+              "name": "key",
+              "cidl_type": "Text"
+            }
+          ]
+        },
+        "putStream": {
+          "name": "putStream",
+          "is_static": false,
+          "http_verb": "POST",
+          "return_media": "Json",
+          "return_type": "Void",
+          "parameters_media": "Octet",
+          "parameters": [
+            {
+              "name": "env",
+              "cidl_type": {
+                "Inject": "Env"
+              }
+            },
+            {
+              "name": "stream",
+              "cidl_type": "Stream"
+            }
+          ]
+        }
+      },
+      "source_path": "./seed__kv.cloesce.ts"
+    },
     "TextKV": {
       "name": "TextKV",
       "binding": "textNamespace",

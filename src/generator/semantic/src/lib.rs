@@ -149,8 +149,6 @@ impl SemanticAnalysis {
                             o
                         );
 
-                        ensure_serializeable_object_ref(ast, o)?;
-
                         if ast.poos.contains_key(o) {
                             graph.entry(o.as_str()).or_default().push(&poo.name);
                             in_degree.entry(&poo.name).and_modify(|d| *d += 1);
@@ -551,18 +549,6 @@ fn is_valid_object_ref(ast: &CloesceAst, o: &String) -> bool {
     ast.d1_models.contains_key(o) || ast.poos.contains_key(o) || ast.kv_models.contains_key(o)
 }
 
-fn ensure_serializeable_object_ref(ast: &CloesceAst, o: &String) -> Result<()> {
-    if let Some(kv) = ast.kv_models.get(o) {
-        ensure!(
-            !matches!(kv.cidl_type.root_type(), CidlType::Stream),
-            GeneratorErrorKind::InvalidStream,
-            "KV Model {o} cannot be used in a serializeable context.",
-        )
-    }
-
-    Ok(())
-}
-
 /// Returns how many data sources to the namespace are in the method.
 fn validate_methods(
     namespace: &str,
@@ -589,8 +575,6 @@ fn validate_methods(
                 namespace,
                 method.name
             );
-
-            ensure_serializeable_object_ref(ast, o)?;
         }
 
         CidlType::DataSource(o) => ensure!(
@@ -659,8 +643,6 @@ fn validate_methods(
                     method.name,
                     param.name
                 );
-
-                ensure_serializeable_object_ref(ast, o)?;
 
                 // TODO: remove this
                 if method.http_verb == HttpVerb::GET {

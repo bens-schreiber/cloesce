@@ -81,9 +81,19 @@ export function requestBody(
 ): undefined | string | ReadableStream<Uint8Array> {
   switch (mediaType) {
     case MediaType.Json: {
-      return JSON.stringify(data ?? {}, (_, v) =>
-        v instanceof Uint8Array ? u8ToB64(v) : v,
-      );
+      return JSON.stringify(data ?? {}, (_, v) => {
+        // Convert Uint8Arrays to base64 strings
+        if (v instanceof Uint8Array) {
+          return u8ToB64(v);
+        }
+
+        // ReadableStreams are not serializable, toss them
+        if (v instanceof ReadableStream) {
+          return undefined;
+        }
+
+        return v;
+      });
     }
     case MediaType.Octet: {
       // JSON structure isn't needed; assume the first

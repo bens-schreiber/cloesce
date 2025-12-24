@@ -43,6 +43,8 @@ handlebars_helper!(is_blob_array: |cidl_type: CidlType| matches!(cidl_type.root_
 // True for any [CidlType::DataSource] or given the verb [HttpVerb::GET]
 handlebars_helper!(is_url_param: |cidl_type: CidlType, verb: HttpVerb| matches!(verb, HttpVerb::GET) || matches!(cidl_type, CidlType::DataSource(_)));
 
+handlebars_helper!(is_stream: |cidl_type: CidlType| matches!(cidl_type.root_type(), CidlType::Stream));
+
 const TYPESCRIPT_TEMPLATE: &str = include_str!("./templates/ts.hbs");
 const TEMPLATE_STRING: &str = "client_api";
 
@@ -94,6 +96,7 @@ fn register_helpers<'a>(
     handlebars.register_helper("is_blob_array", Box::new(is_blob_array));
     handlebars.register_helper("is_url_param", Box::new(is_url_param));
     handlebars.register_helper("is_get_request", Box::new(is_get_request));
+    handlebars.register_helper("is_stream", Box::new(is_stream));
 
     let mapper1 = mapper.clone();
     handlebars.register_helper(

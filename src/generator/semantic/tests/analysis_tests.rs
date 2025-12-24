@@ -423,52 +423,6 @@ fn invalid_stream_method() {
 }
 
 #[test]
-fn invalid_stream_kv_model() {
-    // Arrange
-    let mut ast = create_ast(vec![
-        D1ModelBuilder::new("Dog")
-            .id()
-            .method(
-                "someMethod",
-                HttpVerb::PUT,
-                true,
-                vec![NamedTypedValue {
-                    name: "bad".into(),
-                    cidl_type: CidlType::Object("StreamKV".into()),
-                }],
-                CidlType::Void,
-            )
-            .build(),
-    ]);
-    ast.kv_models.insert(
-        "StreamKV".into(),
-        KVModel {
-            name: "StreamKV".into(),
-            binding: "STREAM_KV".into(),
-            cidl_type: CidlType::Stream,
-            methods: BTreeMap::default(),
-            source_path: PathBuf::default(),
-        },
-    );
-    ast.wrangler_env
-        .as_mut()
-        .unwrap()
-        .kv_bindings
-        .push("STREAM_KV".into());
-
-    let spec = create_spec(&ast);
-
-    // Act
-    let res = SemanticAnalysis::analyze(&mut ast, &spec);
-
-    // Assert
-    assert!(matches!(
-        res.unwrap_err().kind,
-        GeneratorErrorKind::InvalidStream
-    ));
-}
-
-#[test]
 fn missing_variable_in_wrangler() {
     // Arrange
     let mut ast = create_ast(vec![D1ModelBuilder::new("User").id().build()]);

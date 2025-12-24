@@ -528,8 +528,7 @@ async function validateRequest(
     return invalidRequest(RouterError.RequestBodyMissingParameters);
   }
 
-  // Validate all parameters type
-  // Octet streams can be passed as is
+  // Validate all parameters type. Octet streams need no validation.
   if (route.method.parameters_media !== MediaType.Octet) {
     for (const p of requiredParams) {
       const res = RuntimeValidator.validate(
@@ -629,8 +628,6 @@ async function hydrateD1Model(
  *
  * Depending on the model's type, retrieves the value as JSON, text, arrayBuffer, or stream.
  *
- * Streams are hydrated without metadata, as a request cannot contain both a body and a stream.
- *
  * @returns 404 if no record was found for the provided key
  * @returns The instantiated model on success
  */
@@ -654,17 +651,6 @@ async function hydrateKVModel(
     }
   })();
 
-  // Hydrate stream value
-  if (getType === "stream") {
-    const stream = await kv.get(key, { type: "stream" });
-    if (stream === null) {
-      return exit(404, RouterError.ModelNotFound, "Key not found");
-    }
-
-    return Either.right(Object.assign(new ctor(), { key, value: stream }));
-  }
-
-  // Hydrate value + metadata
   const res = await kv.getWithMetadata(key, { type: getType as any });
   if (res.value === null) {
     return exit(404, RouterError.ModelNotFound, "Key not found");

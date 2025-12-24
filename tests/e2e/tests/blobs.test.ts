@@ -71,7 +71,7 @@ describe("BlobHaver", () => {
     const got: number[] = Array.from(res.data);
     const expected = [1, 2, 3, 4];
     expect(
-      expected.length !== got.length || !expected.every((v, i) => v === got[i]),
+      expected.length === got.length && expected.every((v, i) => v === got[i]),
     );
   });
 });
