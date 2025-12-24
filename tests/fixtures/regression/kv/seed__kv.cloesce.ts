@@ -5,7 +5,7 @@ import {
     Inject,
     KV,
     KVModel,
-    Stream
+    // Stream
 } from "cloesce/backend";
 class KVNamespace { }
 
@@ -16,13 +16,12 @@ class Env {
     jsonNamespace: KVNamespace;
 }
 
-@KV("stringValueNamespace")
+@KV("textNamespace")
 export class TextKV extends KVModel<string> {
     @GET
     static async get(@Inject env: Env, key: string): Promise<TextKV> {
         const res = await env.textNamespace.getWithMetadata(key);
         return { ...res, key };
-
     }
 
     @POST
@@ -36,7 +35,7 @@ export class TextKV extends KVModel<string> {
     }
 }
 
-@KV("jsonValueNamespace")
+@KV("jsonNamespace")
 export class JsonKV extends KVModel<unknown> {
     @GET
     static async get(@Inject env: Env, key: string): Promise<JsonKV> {

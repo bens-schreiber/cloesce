@@ -1,19 +1,20 @@
 {
-  "hash": 15625196225428469955,
+  "hash": 1370722617160899709,
   "version": "v0.0.4",
   "project_name": "runner",
   "language": "TypeScript",
   "wrangler_env": {
     "name": "Env",
     "source_path": "./seed__horse_tinder.cloesce.ts",
-    "db_binding": "db",
+    "d1_binding": "db",
+    "kv_bindings": [],
     "vars": {
       "motd": "Text"
     }
   },
-  "models": {
+  "d1_models": {
     "Horse": {
-      "hash": 3138960426576706732,
+      "hash": 2773434116584790482,
       "name": "Horse",
       "primary_key": {
         "name": "id",
@@ -29,7 +30,7 @@
           "foreign_key_reference": null
         },
         {
-          "hash": 10851009741998977749,
+          "hash": 18314765902643741747,
           "value": {
             "name": "bio",
             "cidl_type": {
@@ -211,6 +212,7 @@
       "source_path": "./seed__horse_tinder.cloesce.ts"
     }
   },
+  "kv_models": {},
   "poos": {},
   "services": {},
   "app_source": null

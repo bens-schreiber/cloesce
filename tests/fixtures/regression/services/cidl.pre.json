@@ -2,7 +2,8 @@
     "version": "v0.0.4",
     "project_name": "runner",
     "language": "TypeScript",
-    "models": {},
+    "d1_models": {},
+    "kv_models": {},
     "poos": {},
     "services": {
         "FooService": {

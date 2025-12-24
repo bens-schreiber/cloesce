@@ -5,10 +5,11 @@
     "wrangler_env": {
         "name": "Env",
         "source_path": "./seed__app.cloesce.ts",
-        "db_binding": "db",
+        "d1_binding": "db",
+        "kv_bindings": [],
         "vars": {}
     },
-    "models": {
+    "d1_models": {
         "Model": {
             "name": "Model",
             "attributes": [],
@@ -53,6 +54,7 @@
             "source_path": "./seed__app.cloesce.ts"
         }
     },
+    "kv_models": {},
     "poos": {
         "InjectedThing": {
             "name": "InjectedThing",

@@ -18,7 +18,7 @@
   "kv_models": {
     "JsonKV": {
       "name": "JsonKV",
-      "binding": "jsonValueNamespace",
+      "binding": "jsonNamespace",
       "cidl_type": "JsonValue",
       "methods": {
         "delete": {
@@ -88,7 +88,7 @@
     },
     "TextKV": {
       "name": "TextKV",
-      "binding": "stringValueNamespace",
+      "binding": "textNamespace",
       "cidl_type": "Text",
       "methods": {
         "delete": {

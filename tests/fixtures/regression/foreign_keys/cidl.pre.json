@@ -5,10 +5,11 @@
     "wrangler_env": {
         "name": "Env",
         "source_path": "./seed__foreign_keys.cloesce.ts",
-        "db_binding": "db",
+        "d1_binding": "db",
+        "kv_bindings": [],
         "vars": {}
     },
-    "models": {
+    "d1_models": {
         "B": {
             "name": "B",
             "attributes": [],
@@ -380,6 +381,7 @@
             "source_path": "./seed__foreign_keys.cloesce.ts"
         }
     },
+    "kv_models": {},
     "poos": {},
     "services": {},
     "app_source": null

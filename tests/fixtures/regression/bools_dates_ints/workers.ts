@@ -4,6 +4,7 @@ import cidl from "./cidl.json";
 import { Weather } from "./seed__bools_dates_ints.cloesce.ts";
 
 
+
 const app = new CloesceApp();
 const constructorRegistry = {
 	Weather: Weather

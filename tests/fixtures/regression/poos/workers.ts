@@ -2,6 +2,7 @@
 import { CloesceApp } from "cloesce/backend";
 import cidl from "./cidl.json";
 import { PooAcceptYield } from "./seed__poo.cloesce.ts";
+
 import { PooA } from "./seed__poo.cloesce.ts";
 import { PooB } from "./seed__poo.cloesce.ts";
 import { PooC } from "./seed__poo.cloesce.ts";

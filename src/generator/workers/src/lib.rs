@@ -2,6 +2,7 @@ use std::path::{Path, PathBuf};
 
 use ast::{ApiMethod, CidlType, CloesceAst, CrudKind, HttpVerb, MediaType, NamedTypedValue};
 
+// TODO: This is all hardcoded to TypeScript workers
 pub struct WorkersGenerator;
 impl WorkersGenerator {
     /// Generates all model source imports as well as the Cloesce App
@@ -83,22 +84,20 @@ impl WorkersGenerator {
 
     /// Generates the constructor registry
     fn registry(ast: &CloesceAst) -> String {
-        let mut constructor_registry = Vec::new();
-        for model in ast.d1_models.values() {
-            constructor_registry.push(format!("\t{}: {}", &model.name, &model.name));
-        }
-
-        for poo in ast.poos.values() {
-            constructor_registry.push(format!("\t{}: {}", &poo.name, &poo.name));
-        }
-
-        for service in ast.services.values() {
-            constructor_registry.push(format!("\t{}: {}", &service.name, &service.name));
-        }
+        let symbols = ast
+            .d1_models
+            .values()
+            .map(|m| &m.name)
+            .chain(ast.kv_models.values().map(|m| &m.name))
+            .chain(ast.poos.values().map(|p| &p.name))
+            .chain(ast.services.values().map(|s| &s.name));
 
         format!(
             "const constructorRegistry = {{\n{}\n}};",
-            constructor_registry.join(",\n")
+            symbols
+                .map(|name| format!("\t{}: {}", name, name))
+                .collect::<Vec<_>>()
+                .join(",\n")
         )
     }
 

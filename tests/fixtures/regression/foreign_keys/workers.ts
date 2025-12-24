@@ -9,6 +9,7 @@ import { A } from "./seed__foreign_keys.cloesce.ts";
 import { Dog } from "./seed__foreign_keys.cloesce.ts";
 
 
+
 const app = new CloesceApp();
 const constructorRegistry = {
 	B: B,

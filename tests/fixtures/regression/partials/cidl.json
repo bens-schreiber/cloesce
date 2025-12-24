@@ -6,10 +6,11 @@
   "wrangler_env": {
     "name": "Env",
     "source_path": "./seed__partials.cloesce.ts",
-    "db_binding": "db",
+    "d1_binding": "db",
+    "kv_bindings": [],
     "vars": {}
   },
-  "models": {
+  "d1_models": {
     "Dog": {
       "hash": 13091719692277049822,
       "name": "Dog",
@@ -85,6 +86,7 @@
       "source_path": "./seed__partials.cloesce.ts"
     }
   },
+  "kv_models": {},
   "poos": {},
   "services": {},
   "app_source": null

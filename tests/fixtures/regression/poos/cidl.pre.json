@@ -5,10 +5,11 @@
     "wrangler_env": {
         "name": "Env",
         "source_path": "./seed__poo.cloesce.ts",
-        "db_binding": "db",
+        "d1_binding": "db",
+        "kv_bindings": [],
         "vars": {}
     },
-    "models": {
+    "d1_models": {
         "PooAcceptYield": {
             "name": "PooAcceptYield",
             "attributes": [],
@@ -63,6 +64,7 @@
             "source_path": "./seed__poo.cloesce.ts"
         }
     },
+    "kv_models": {},
     "poos": {
         "PooA": {
             "name": "PooA",

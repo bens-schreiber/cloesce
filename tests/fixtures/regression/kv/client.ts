@@ -24,7 +24,7 @@ export class JsonKV {
     });
 
     return await HttpResult.fromResponse(
-      res,
+      res, 
       MediaType.Json,
       undefined,
       false
@@ -44,7 +44,7 @@ export class JsonKV {
     });
 
     return await HttpResult.fromResponse(
-      res,
+      res, 
       MediaType.Json,
       JsonKV,
       false
@@ -69,7 +69,7 @@ export class JsonKV {
     });
 
     return await HttpResult.fromResponse(
-      res,
+      res, 
       MediaType.Json,
       undefined,
       false
@@ -103,7 +103,7 @@ export class TextKV {
     });
 
     return await HttpResult.fromResponse(
-      res,
+      res, 
       MediaType.Json,
       undefined,
       false
@@ -123,7 +123,7 @@ export class TextKV {
     });
 
     return await HttpResult.fromResponse(
-      res,
+      res, 
       MediaType.Json,
       TextKV,
       false
@@ -148,7 +148,7 @@ export class TextKV {
     });
 
     return await HttpResult.fromResponse(
-      res,
+      res, 
       MediaType.Json,
       undefined,
       false

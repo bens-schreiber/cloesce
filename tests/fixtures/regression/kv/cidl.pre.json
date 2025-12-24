@@ -15,7 +15,7 @@
     "d1_models": {},
     "kv_models": {
         "TextKV": {
-            "binding": "stringValueNamespace",
+            "binding": "textNamespace",
             "name": "TextKV",
             "methods": {
                 "get": {
@@ -85,7 +85,7 @@
             "source_path": "./seed__kv.cloesce.ts"
         },
         "JsonKV": {
-            "binding": "jsonValueNamespace",
+            "binding": "jsonNamespace",
             "name": "JsonKV",
             "methods": {
                 "get": {

@@ -281,6 +281,10 @@ pub struct WranglerEnv {
     pub vars: HashMap<String, CidlType>,
 }
 
+// TODO: MapPreventDuplicates is not supported for IndexMap
+//
+// NOTE: IndexMap is used to maintain topological sorted order while BTreeMap is
+// used to maintain a deterministic order.
 #[serde_as]
 #[derive(Serialize, Deserialize)]
 pub struct CloesceAst {
@@ -291,17 +295,12 @@ pub struct CloesceAst {
     pub project_name: String,
     pub language: InputLanguage,
     pub wrangler_env: Option<WranglerEnv>,
-
-    // TODO: MapPreventDuplicates is not supported for IndexMap
     pub d1_models: IndexMap<String, D1Model>,
 
     #[serde_as(as = "MapPreventDuplicates<_, _>")]
-    pub kv_models: HashMap<String, KVModel>,
+    pub kv_models: BTreeMap<String, KVModel>,
 
-    // TODO: MapPreventDuplicates is not supported for IndexMap
     pub poos: IndexMap<String, PlainOldObject>,
-
-    // TODO: MapPreventDuplicates is not supported for IndexMap
     pub services: IndexMap<String, Service>,
 
     pub app_source: Option<PathBuf>,

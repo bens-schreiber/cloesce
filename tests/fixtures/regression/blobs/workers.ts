@@ -3,6 +3,7 @@ import { CloesceApp } from "cloesce/backend";
 import cidl from "./cidl.json";
 import { BlobHaver } from "./seed__blobs.cloesce.ts";
 
+
 import { BlobService } from "./seed__blobs.cloesce.ts";
 const app = new CloesceApp();
 const constructorRegistry = {

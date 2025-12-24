@@ -6,10 +6,11 @@
   "wrangler_env": {
     "name": "Env",
     "source_path": "./seed__bools_dates_ints.cloesce.ts",
-    "db_binding": "db",
+    "d1_binding": "db",
+    "kv_bindings": [],
     "vars": {}
   },
-  "models": {
+  "d1_models": {
     "Weather": {
       "hash": 1994866534909032805,
       "name": "Weather",
@@ -96,6 +97,7 @@
       "source_path": "./seed__bools_dates_ints.cloesce.ts"
     }
   },
+  "kv_models": {},
   "poos": {},
   "services": {},
   "app_source": null

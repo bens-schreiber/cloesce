@@ -8,7 +8,8 @@ import { TextKV } from "./seed__kv.cloesce.ts";
 
 const app = new CloesceApp();
 const constructorRegistry = {
-
+	JsonKV: JsonKV,
+	TextKV: TextKV
 };
 
 async function fetch(request: Request, env: any, ctx: any): Promise<Response> {

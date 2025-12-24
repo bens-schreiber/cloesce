@@ -1,17 +1,18 @@
 {
-  "hash": 10133679158382118118,
+  "hash": 13132620355884486038,
   "version": "v0.0.4",
   "project_name": "runner",
   "language": "TypeScript",
   "wrangler_env": {
     "name": "Env",
     "source_path": "./seed__nullability.cloesce.ts",
-    "db_binding": "db",
+    "d1_binding": "db",
+    "kv_bindings": [],
     "vars": {}
   },
-  "models": {
+  "d1_models": {
     "NullabilityChecks": {
-      "hash": 5712226491349635149,
+      "hash": 9067290928582431620,
       "name": "NullabilityChecks",
       "primary_key": {
         "name": "id",
@@ -27,7 +28,7 @@
           "foreign_key_reference": null
         },
         {
-          "hash": 11825005746933419692,
+          "hash": 842017833868632075,
           "value": {
             "name": "nullableString",
             "cidl_type": {
@@ -201,6 +202,7 @@
       "source_path": "./seed__nullability.cloesce.ts"
     }
   },
+  "kv_models": {},
   "poos": {},
   "services": {},
   "app_source": null

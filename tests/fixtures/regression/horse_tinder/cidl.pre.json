@@ -5,12 +5,13 @@
     "wrangler_env": {
         "name": "Env",
         "source_path": "./seed__horse_tinder.cloesce.ts",
-        "db_binding": "db",
+        "d1_binding": "db",
+        "kv_bindings": [],
         "vars": {
             "motd": "Text"
         }
     },
-    "models": {
+    "d1_models": {
         "Horse": {
             "name": "Horse",
             "attributes": [
@@ -200,6 +201,7 @@
             "source_path": "./seed__horse_tinder.cloesce.ts"
         }
     },
+    "kv_models": {},
     "poos": {},
     "services": {},
     "app_source": null

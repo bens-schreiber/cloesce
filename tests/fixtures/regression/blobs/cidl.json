@@ -6,10 +6,11 @@
   "wrangler_env": {
     "name": "Env",
     "source_path": "./seed__blobs.cloesce.ts",
-    "db_binding": "db",
+    "d1_binding": "db",
+    "kv_bindings": [],
     "vars": {}
   },
-  "models": {
+  "d1_models": {
     "BlobHaver": {
       "hash": 17711648149110095680,
       "name": "BlobHaver",
@@ -165,6 +166,7 @@
       "source_path": "./seed__blobs.cloesce.ts"
     }
   },
+  "kv_models": {},
   "poos": {},
   "services": {
     "BlobService": {

@@ -5,10 +5,11 @@
     "wrangler_env": {
         "name": "Env",
         "source_path": "./seed__crud.cloesce.ts",
-        "db_binding": "db",
+        "d1_binding": "db",
+        "kv_bindings": [],
         "vars": {}
     },
-    "models": {
+    "d1_models": {
         "CrudHaver": {
             "name": "CrudHaver",
             "attributes": [
@@ -137,6 +138,7 @@
             "source_path": "./seed__crud.cloesce.ts"
         }
     },
+    "kv_models": {},
     "poos": {},
     "services": {},
     "app_source": null

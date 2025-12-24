@@ -23,7 +23,7 @@ pub fn create_ast(mut d1_models: Vec<D1Model>) -> CloesceAst {
         project_name: "test".to_string(),
         language: InputLanguage::TypeScript,
         d1_models: map,
-        kv_models: HashMap::default(),
+        kv_models: BTreeMap::default(),
         poos: IndexMap::default(),
         wrangler_env: Some(WranglerEnv {
             name: "TestEnv".to_string(),
