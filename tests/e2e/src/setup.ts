@@ -9,7 +9,10 @@ let wranglerProcess: ChildProcess;
 /**
  * Copies a fixture, runs migrations, builds, and starts a wrangler server.
  */
-export async function startWrangler(fixturesPath: string, withMigrations: boolean = true) {
+export async function startWrangler(
+  fixturesPath: string,
+  withMigrations: boolean = true,
+) {
   await fs.rm(".generated", { recursive: true, force: true });
   await fs.cp(fixturesPath, ".generated", { recursive: true });
 

@@ -69,6 +69,11 @@ export class RuntimeValidator {
       cidlType = (cidlType as any).Nullable;
     }
 
+    // JsonValue accepts anything
+    if (cidlType === "JsonValue") {
+      return Either.right(value);
+    }
+
     // Primitives
     if (typeof cidlType === "string") {
       switch (cidlType) {

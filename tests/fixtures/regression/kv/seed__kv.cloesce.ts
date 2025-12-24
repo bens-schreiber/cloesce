@@ -39,7 +39,7 @@ export class TextKV extends KVModel<string> {
 export class JsonKV extends KVModel<unknown> {
     @GET
     static async get(@Inject env: Env, key: string): Promise<JsonKV> {
-        const res = await env.jsonNamespace.getWithMetadata(key);
+        const res = await env.jsonNamespace.getWithMetadata(key, { type: "json" });
         return {
             ...res, key
         }
@@ -52,7 +52,7 @@ export class JsonKV extends KVModel<unknown> {
 
     @POST
     async delete(@Inject env: Env): Promise<void> {
-        await env.jsonNamespace.delete(super.key);
+        await env.jsonNamespace.delete(this.key);
     }
 }
 
