@@ -196,7 +196,7 @@ impl SemanticAnalysis {
     fn d1_models(ast: &mut CloesceAst) -> Result<()> {
         // TODO: Use env to check binding on each model (multiple databases)
         let Some(_env) = &ast.wrangler_env else {
-            unreachable!("WranglerEnv must be validated before D1 models");
+            return Ok(()); // No D1 models
         };
 
         let ensure_valid_sql_type = |model: &D1Model, value: &NamedTypedValue| {
@@ -471,7 +471,7 @@ impl SemanticAnalysis {
 
     fn kv_models(ast: &CloesceAst) -> Result<()> {
         let Some(env) = &ast.wrangler_env else {
-            unreachable!("WranglerEnv must be validated before KV models");
+            return Ok(()); // No KV models
         };
 
         let kv_binding_set = env.kv_bindings.iter().collect::<HashSet<&String>>();

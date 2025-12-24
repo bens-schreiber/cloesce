@@ -40,7 +40,7 @@ export class RuntimeContainer {
     public readonly ast: CloesceAst,
     public readonly constructorRegistry: ConstructorRegistry,
     public readonly wasm: OrmWasmExports,
-  ) {}
+  ) { }
 
   static async init(
     ast: CloesceAst,
@@ -419,7 +419,7 @@ function matchRoute(
       kind: "d1",
       namespace,
       method,
-      model: d1Model,
+      d1Model,
       id,
     });
   }
@@ -437,7 +437,7 @@ function matchRoute(
       kind: "kv",
       namespace,
       method,
-      model: kvModel,
+      kvModel,
       id,
     });
   }
@@ -665,16 +665,16 @@ async function hydrateKVModel(
   }
 
   // Hydrate value + metadata
-  const value = await kv.getWithMetadata(key, { type: getType as any });
-  if (value === null) {
+  const res = await kv.getWithMetadata(key, { type: getType as any });
+  if (res.value === null) {
     return exit(404, RouterError.ModelNotFound, "Key not found");
   }
 
   return Either.right(
     Object.assign(new ctor(), {
       key,
-      value: value.value,
-      metadata: value.metadata,
+      value: res.value,
+      metadata: res.metadata,
     }),
   );
 }

@@ -31,7 +31,7 @@ export class TextKV extends KVModel<string> {
 
     @POST
     async delete(@Inject env: Env): Promise<void> {
-        await env.textNamespace.delete(super.key);
+        await env.textNamespace.delete(this.key);
     }
 }
 

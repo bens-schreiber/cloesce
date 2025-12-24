@@ -39,15 +39,6 @@ impl WranglerGenerator {
     pub fn generate(&mut self, spec: WranglerSpec, mut wrangler_file: File) {
         match self {
             WranglerGenerator::Json(val) => {
-                val["d1_databases"] =
-                    serde_json::to_value(&spec.d1_databases).expect("JSON to serialize");
-
-                val["kv_namespaces"] =
-                    serde_json::to_value(&spec.kv_namespaces).expect("JSON to serialize");
-
-                val["vars"] = serde_json::to_value(&spec.vars).expect("JSON to serialize");
-
-                // entrypoint + metadata (only if provided)
                 if let Some(name) = &spec.name {
                     val["name"] = serde_json::to_value(name).expect("JSON to serialize");
                 }
@@ -58,25 +49,23 @@ impl WranglerGenerator {
                 if let Some(main) = &spec.main {
                     val["main"] = serde_json::to_value(main).expect("JSON to serialize");
                 }
+
+                if !spec.d1_databases.is_empty() {
+                    val["d1_databases"] =
+                        serde_json::to_value(&spec.d1_databases).expect("JSON to serialize");
+                }
+
+                if !spec.kv_namespaces.is_empty() {
+                    val["kv_namespaces"] =
+                        serde_json::to_value(&spec.kv_namespaces).expect("JSON to serialize");
+                }
+
+                if !spec.vars.is_empty() {
+                    val["vars"] = serde_json::to_value(&spec.vars).expect("JSON to serialize");
+                }
             }
             WranglerGenerator::Toml(val) => {
                 if let toml::Value::Table(table) = val {
-                    table.insert(
-                        "d1_databases".to_string(),
-                        toml::Value::try_from(&spec.d1_databases).expect("TOML to serialize"),
-                    );
-
-                    table.insert(
-                        "vars".to_string(),
-                        toml::Value::try_from(&spec.vars).expect("TOML to serialize"),
-                    );
-
-                    table.insert(
-                        "kv_namespaces".to_string(),
-                        toml::Value::try_from(&spec.kv_namespaces).expect("TOML to serialize"),
-                    );
-
-                    // entrypoint + metadata (only if provided)
                     if let Some(name) = &spec.name {
                         table.insert("name".to_string(), toml::Value::String(name.clone()));
                     }
@@ -88,6 +77,27 @@ impl WranglerGenerator {
                     }
                     if let Some(main) = &spec.main {
                         table.insert("main".to_string(), toml::Value::String(main.clone()));
+                    }
+
+                    if !spec.d1_databases.is_empty() {
+                        table.insert(
+                            "d1_databases".to_string(),
+                            toml::Value::try_from(&spec.d1_databases).expect("TOML to serialize"),
+                        );
+                    }
+
+                    if !spec.kv_namespaces.is_empty() {
+                        table.insert(
+                            "kv_namespaces".to_string(),
+                            toml::Value::try_from(&spec.kv_namespaces).expect("TOML to serialize"),
+                        );
+                    }
+
+                    if !spec.vars.is_empty() {
+                        table.insert(
+                            "vars".to_string(),
+                            toml::Value::try_from(&spec.vars).expect("TOML to serialize"),
+                        );
                     }
                 } else {
                     panic!("Expected TOML root to be a table");

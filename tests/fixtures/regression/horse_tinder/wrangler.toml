@@ -1,5 +1,4 @@
 compatibility_date = "2025-10-02"
-kv_namespaces = []
 main = "workers.ts"
 name = "cloesce"
 

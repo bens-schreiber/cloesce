@@ -3,6 +3,7 @@ import { CloesceApp } from "cloesce/backend";
 import cidl from "./cidl.json";
 
 
+
 import { FooService } from "./seed__app.cloesce.ts";
 import { BarService } from "./seed__app.cloesce.ts";
 import app from "./seed__app.cloesce.ts"

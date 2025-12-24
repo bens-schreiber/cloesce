@@ -4,7 +4,8 @@
   "project_name": "runner",
   "language": "TypeScript",
   "wrangler_env": null,
-  "models": {},
+  "d1_models": {},
+  "kv_models": {},
   "poos": {},
   "services": {
     "FooService": {

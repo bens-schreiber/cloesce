@@ -1,5 +1,4 @@
 compatibility_date = "2025-10-02"
-kv_namespaces = []
 main = "workers.ts"
 name = "cloesce"
 
@@ -7,5 +6,3 @@ name = "cloesce"
 binding = "db"
 database_id = "replace_with_db_id"
 database_name = "replace_with_db_name"
-
-[vars]

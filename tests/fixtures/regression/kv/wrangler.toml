@@ -1,5 +1,4 @@
 compatibility_date = "2025-10-02"
-d1_databases = []
 main = "workers.ts"
 name = "cloesce"
 
@@ -14,5 +13,3 @@ id = "replace_with_kv_id"
 [[kv_namespaces]]
 binding = "jsonNamespace"
 id = "replace_with_kv_id"
-
-[vars]

@@ -9,15 +9,17 @@ let wranglerProcess: ChildProcess;
 /**
  * Copies a fixture, runs migrations, builds, and starts a wrangler server.
  */
-export async function startWrangler(fixturesPath: string) {
+export async function startWrangler(fixturesPath: string, withMigrations: boolean = true) {
   await fs.rm(".generated", { recursive: true, force: true });
   await fs.cp(fixturesPath, ".generated", { recursive: true });
 
-  await runCmd(
-    "Applying D1 migrations",
-    "echo y | npx wrangler d1 migrations apply db",
-    { cwd: ".generated" },
-  );
+  if (withMigrations) {
+    await runCmd(
+      "Applying D1 migrations",
+      "echo y | npx wrangler d1 migrations apply db",
+      { cwd: ".generated" },
+    );
+  }
 
   await runCmd(
     "Building Wrangler",
