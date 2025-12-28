@@ -1,7 +1,7 @@
 use std::path::Path;
 
 use ast::{CidlType, CrudKind, HttpVerb, MediaType, NamedTypedValue};
-use generator_test::{D1ModelBuilder, create_ast};
+use generator_test::{D1ModelBuilder, create_ast_d1};
 use workers::WorkersGenerator;
 
 #[test]
@@ -12,7 +12,7 @@ fn link_generates_relative_import_for_model() {
     let mut user = D1ModelBuilder::new("User").id().build();
     user.source_path = Path::new("/project/models/User.ts").to_path_buf();
 
-    let ast = create_ast(vec![user]);
+    let ast = create_ast_d1(vec![user]);
 
     // Act
     let result = WorkersGenerator::link(&ast, workers_path);
@@ -31,7 +31,7 @@ fn link_adds_dot_slash_when_model_in_same_directory() {
     let mut thing = D1ModelBuilder::new("Thing").id().build();
     thing.source_path = Path::new("/project/workers/Thing.ts").to_path_buf();
 
-    let ast = create_ast(vec![thing]);
+    let ast = create_ast_d1(vec![thing]);
 
     // Act
     let result = WorkersGenerator::link(&ast, workers_path);
@@ -51,7 +51,7 @@ fn link_falls_back_to_absolute_path_when_relative_not_possible() {
     let mut alien = D1ModelBuilder::new("Alien").id().build();
     alien.source_path = Path::new("C:\\nonrelative\\Alien.ts").to_path_buf();
 
-    let ast = create_ast(vec![alien]);
+    let ast = create_ast_d1(vec![alien]);
 
     // Act
     let result = WorkersGenerator::link(&ast, workers_path);
@@ -70,7 +70,7 @@ fn finalize_adds_crud_methods_to_model() {
     user.cruds
         .extend(vec![CrudKind::GET, CrudKind::SAVE, CrudKind::LIST]);
 
-    let mut ast = create_ast(vec![user]);
+    let mut ast = create_ast_d1(vec![user]);
 
     // Act
     WorkersGenerator::finalize_api_methods(&mut ast);
@@ -101,7 +101,7 @@ fn finalize_does_not_overwrite_existing_method() {
         .build();
     user.cruds.push(CrudKind::GET);
 
-    let mut ast = create_ast(vec![user]);
+    let mut ast = create_ast_d1(vec![user]);
 
     // Act
     WorkersGenerator::finalize_api_methods(&mut ast);
@@ -120,7 +120,7 @@ fn finalize_sets_json_media_type() {
     let mut user = D1ModelBuilder::new("User").id().build();
     user.cruds.extend(vec![CrudKind::GET]);
 
-    let mut ast = create_ast(vec![user]);
+    let mut ast = create_ast_d1(vec![user]);
 
     // Act
     WorkersGenerator::finalize_api_methods(&mut ast);
@@ -135,7 +135,7 @@ fn finalize_sets_json_media_type() {
 #[test]
 fn finalize_sets_octet_media_type() {
     // Arrange
-    let mut ast = create_ast(vec![
+    let mut ast = create_ast_d1(vec![
         D1ModelBuilder::new("User")
             .id()
             .method(
@@ -159,4 +159,76 @@ fn finalize_sets_octet_media_type() {
     let method = user.methods.remove("acceptReturnOctet").unwrap();
     assert!(matches!(method.return_media, MediaType::Octet));
     assert!(matches!(method.parameters_media, MediaType::Octet));
+}
+
+#[test]
+fn finalize_adds_datasource_parameter_to_instance_method() {
+    // Arrange
+    let mut ast = create_ast_d1(vec![
+        D1ModelBuilder::new("User")
+            .id()
+            // No datasource parameter initially
+            .method(
+                "instanceMethod",
+                HttpVerb::GET,
+                false,
+                vec![],
+                CidlType::Object("User".into()),
+            )
+            // Static, does not need datasource parameter
+            .method(
+                "staticMethod",
+                HttpVerb::GET,
+                true,
+                vec![],
+                CidlType::Object("User".into()),
+            )
+            // Has a datasource parameter already
+            .method(
+                "methodWithDatasource",
+                HttpVerb::GET,
+                false,
+                vec![NamedTypedValue {
+                    name: "datasource".into(),
+                    cidl_type: CidlType::DataSource("User".into()),
+                }],
+                CidlType::Object("User".into()),
+            )
+            .build(),
+    ]);
+
+    // Act
+    WorkersGenerator::finalize_api_methods(&mut ast);
+
+    // Assert
+    let mut user = ast.d1_models.shift_remove("User").unwrap();
+    let instance_method = user.methods.remove("instanceMethod").unwrap();
+    let static_method = user.methods.remove("staticMethod").unwrap();
+    let method_with_datasource = user.methods.remove("methodWithDatasource").unwrap();
+
+    assert!(
+        instance_method
+            .parameters
+            .iter()
+            .any(|p| matches!(p.cidl_type, CidlType::DataSource(_))),
+        "Instance method should have a __datasource parameter"
+    );
+
+    assert!(
+        !static_method
+            .parameters
+            .iter()
+            .any(|p| matches!(p.cidl_type, CidlType::DataSource(_))),
+        "Static method should not have a __datasource parameter"
+    );
+
+    assert_eq!(
+        method_with_datasource
+            .parameters
+            .iter()
+            .filter(|p| matches!(p.cidl_type, CidlType::DataSource(_)))
+            .count(),
+        1,
+        "Method should not have duplicate __datasource parameters"
+    );
 }

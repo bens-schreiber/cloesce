@@ -122,6 +122,20 @@ impl WorkersGenerator {
             };
         };
 
+        let set_datasource_param = |method: &mut ApiMethod, model_name: &str| {
+            if !method.is_static
+                && !method
+                    .parameters
+                    .iter()
+                    .any(|p| matches!(p.cidl_type, CidlType::DataSource(_)))
+            {
+                method.parameters.push(NamedTypedValue {
+                    name: "__datasource".into(),
+                    cidl_type: CidlType::DataSource(model_name.into()),
+                });
+            }
+        };
+
         for d1_model in ast.d1_models.values_mut() {
             for crud in &d1_model.cruds {
                 let method = match crud {
@@ -191,12 +205,14 @@ impl WorkersGenerator {
             }
 
             for method in d1_model.methods.values_mut() {
+                set_datasource_param(method, &d1_model.name);
                 set_media_types(method);
             }
         }
 
         for kv_model in ast.kv_models.values_mut() {
             for method in kv_model.methods.values_mut() {
+                set_datasource_param(method, &kv_model.name);
                 set_media_types(method);
             }
         }

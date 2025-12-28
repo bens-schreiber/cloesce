@@ -3,8 +3,8 @@ mod fmt;
 use std::collections::{HashMap, HashSet};
 
 use ast::{
-    CidlType, D1ModelAttribute, MigrationsAst, MigrationsModel, NavigationProperty,
-    NavigationPropertyKind,
+    CidlType, D1ModelAttribute, D1NavigationProperty, D1NavigationPropertyKind, MigrationsAst,
+    MigrationsModel,
 };
 
 use indexmap::IndexMap;
@@ -553,26 +553,26 @@ impl MigrateTables {
                 .navigation_properties
                 .iter()
                 .filter_map(|n| match &n.kind {
-                    NavigationPropertyKind::ManyToMany { unique_id } => Some((unique_id, n)),
+                    D1NavigationPropertyKind::ManyToMany { unique_id } => Some((unique_id, n)),
                     _ => None,
                 })
-                .collect::<HashMap<&String, &NavigationProperty>>();
+                .collect::<HashMap<&String, &D1NavigationProperty>>();
 
             for nav in &model.navigation_properties {
-                let NavigationPropertyKind::ManyToMany { unique_id } = &nav.kind else {
+                let D1NavigationPropertyKind::ManyToMany { unique_id } = &nav.kind else {
                     continue;
                 };
 
                 if lm_m2ms.remove(unique_id).is_none() {
                     alterations.push(AlterKind::AddManyToMany {
                         unique_id,
-                        model_name: &nav.model_name,
+                        model_name: &nav.model_reference,
                     });
                 };
             }
 
             for unvisited_lm_nav in lm_m2ms.into_values() {
-                let NavigationPropertyKind::ManyToMany { unique_id } = &unvisited_lm_nav.kind
+                let D1NavigationPropertyKind::ManyToMany { unique_id } = &unvisited_lm_nav.kind
                 else {
                     unreachable!()
                 };
@@ -595,7 +595,7 @@ impl MigrateTables {
                 .navigation_properties
                 .iter()
                 .filter_map(|n| match &n.kind {
-                    NavigationPropertyKind::ManyToMany { unique_id } => Some(unique_id),
+                    D1NavigationPropertyKind::ManyToMany { unique_id } => Some(unique_id),
                     _ => None,
                 })
             {
@@ -643,11 +643,12 @@ impl MigrateTables {
                     }
                     None => {
                         for nav in &model.navigation_properties {
-                            let NavigationPropertyKind::ManyToMany { unique_id } = &nav.kind else {
+                            let D1NavigationPropertyKind::ManyToMany { unique_id } = &nav.kind
+                            else {
                                 continue;
                             };
 
-                            let jct_model = ast.d1_models.get(&nav.model_name).unwrap();
+                            let jct_model = ast.d1_models.get(&nav.model_reference).unwrap();
                             create_m2ms.insert(
                                 unique_id,
                                 if jct_model.name > model.name {

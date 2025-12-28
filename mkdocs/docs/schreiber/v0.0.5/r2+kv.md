@@ -1,34 +1,43 @@
 # Thoughts on R2 and KV Models
 
-In the Cloesce abstract, we describe a tool that  "orchestrates the database, backend, client and infrastructure". This is unnecessarily limited-- why stop at just a "database" (meaning a relational SQL database)? Is it reasonable shift to "data" in general? 
+In the Cloesce abstract, we describe a tool that  "orchestrates the database, backend, client and infrastructure". In this version, we will change the word "database" to be "data".
 
-For our purposes, data can be defined as: anything that can be stored and retrieved in some persistent way. This includes relational databases (D1), object storage (R2), key-value stores (KV), and potentially other storage mechanisms Cloudflare may introduce (e.g., graph databases, document stores, etc).
+For our purposes, data can be defined as anything that can be stored and retrieved in some persistent way. This includes relational databases (D1), object storage (R2), key-value stores (KV), and potentially other storage mechanisms Cloudflare may introduce (e.g., graph databases, document stores, whatever durable objects is, etc).
 
-With that in mind, Cloesce should be capable of orchestrating not just D1 (via the established `Model` concept), but also R2 buckets and KV namespaces (and later, Durable Objects). From this version on, `Model` will refer to the surrounding paradigm of data orchestration, and we will introduce R2 Models and KV Models as first-class citizens alongside D1 Models.
+With that in mind, Cloesce should be capable of orchestrating not just D1 (via the established `Model` concept), but also R2 buckets and KV namespaces (and later, Durable Objects). From this version on, `Model` will refer to the surrounding paradigm of data orchestration, introducing R2 Models and KV Models as first-class citizens alongside D1 Models.
 
 ## KV Models
 
-Cloudflare KV is a simple key-value store. It is not relational, and does not support complex queries. However, it is extremely fast and globally distributed, making it ideal for caching, session storage, feature flags, and other use cases. Key sizes can be up to 512 bytes, and value sizes can reach 25MB. An additional metadata field of up to 4KB can also be stored alongside each value.
+Cloudflare KV is a simple persistent storage platform capable of associating a key (which must be a string) with a value (which can be text, json, bytes, etc). Additionally, JSON metadata can be stored with each key. KV is schema-less, meaning you can throw any value into any key and face no problems. Cloesce will not try to create a schema layer over KV (though it would be interesting to explore some kind of key format protocol, TBD).
+
+Even though KV is schema-less, the client should still be able to expect data to come in some kind of format (even a format that means no format). To make this work, KV Models will take in a generic type that the frontend will expect. We will also introduce a new `JsonValue` type to the CIDL, meaning "I don't know what the format of this is but it is JSON".
+
+Unlike D1 models, KV Models will have no attributes. This is because the only "attributes" are key, value and metadata. Hydration of a KV Model will be simple (compared to D1): call `KV_NAMESPACE.get(key)`, which will return `null` if the key doesn't exist, or the key value and metadata if it does.
+
+When fetching from KV, a type hint must be specified `"text" | "json" | "arraybuffer" | "stream"`. Cloesce will be capable of determining the correct way to fetch your data based off the generic type passed in. A string value would be text, byte array an array buffer, anything else in JSON. Streams are a special case however, because a KV Model must be serializeable, and a stream value would impede that. Thus, if the generic type for the model is a stream, the `value` attribute will not be generated on the client (though it will exist on the backend and be hydrated as a ReadableStream).
+
+Below is the proposed v0.0.5 implementation:
+
 
 ```ts
 /** KV BASE CLASS */
 class KVModel<V> {
     key: string;
-    value: V;
+    value: V; // V must be a serializeable CIDL Type
     metadata: unknown;
 }
 ```
 
 ```ts
 /** BASIC EXAMPLE*/
-
 @KV("MY_KV_NAMESPACE")
 class Config extends KVModel<Json> {
 
     // This could be done with @CRUD(["SAVE"])
     @POST
-    static post(@Inject kv: KVNamespace, value: MyConfigDto, metadata: string) {
+    static post(@Inject kv: KVNamespace, value: MyConfigDto, metadata: unknown): Config {
         kv.put("config-key", value, { metadata: metadata });
+        return this;
     }
 
     // This could be done with @CRUD(["GET"])
@@ -46,14 +55,6 @@ class Config extends KVModel<Json> {
 }
 ```
 
-Unlike D1, KV has no schema, but simply: `key, value, metadata`. Keys must always be strings, values can be a string, ArrayBuffer, ReadableStream, or JSON. Metadata is optional and can be any JSON-serializable object. There will be no migrations or runtime schema validation for KV Models.
-
-KV Models will have both static and instance methods. Static methods will be used for operations that do not require an existing key (e.g., saving a new value), while instance methods will be used for operations on existing keys (e.g., calling a method on a model). The Cloesce Router will handle hydration of KV Models by fetching the value and metadata from the KV namespace based on the key, potentially throwing a 404 if the key does not exist.
-
-KV Models are serializeable, and can be passed as arguments or return values in any method, with an appropriately generated type on the client side.
-
-There should be no reason to limit to a one-model-per-namespace approach, so the following would be valid:
-
 ```ts
 @KV("MY_KV_NAMESPACE")
 class KVModelA extends KVModel<string> {
@@ -66,65 +67,76 @@ class KVModelB extends KVModel<Json> {
 }
 ```
 
-Some features like setting a default TTL for keys will be added in future versions, along with integration with D1 Models (navigation properties based off keys stored in D1).
 
 ## R2 Models
 
-Cloudflare R2 is an large object storage service where objects up to 5TB can be stored in a namespace called a bucket. R2 is ideal for storing large files, media assets, backups, and other unstructured data. R2 objects are stored as key-value pairs, where the key is the object name (string) and the value is the object data (binary). Along with the binary data, R2 supports JSON metadata as well as custom HTTP headers.
-
-Sending large binary data is supported in [two ways](./services+media-types.md#blobs): as a buffered base64 `Blob` or as a `ReadableStream`. Note that a Cloudflare Worker can only handle up to 128MB of memory, so streaming is preferred for very large files. Another noteable way to interact with R2 data is through signed upload and download URLs via the Amazon S3-compatible API.
-
 ```ts
-/** R2 BASE CLASS */
 
+// Cloudflare response to a `head` query 
+class R2Object {
+  key: string;
+  version: string;
+  size: number;
+  etag: string;
+  httpEtag: string;
+  checksums: R2Checksums;
+  uploaded: Date;
+  httpMetadata?: R2HTTPMetadata;
+  customMetadata?: Record<string, string>;
+  range?: R2Range;
+  storageClass: string;
+  ssecKeyMd5?: string;
+}
+
+/** R2 BASE CLASS */
 class R2Model {
-    head: R2Object; // cloudflare defined type populated from an R2 getHead call
+  head: R2Object;
+
+  // NOTE: Does not exist on the client.
+  value: ReadableStream;
 }
 ```
 
 ```ts
 /** BASIC EXAMPLE*/
-
 @R2("MY_R2_BUCKET")
 class Picture extends R2Model {
     @POST
-    static async post(@Inject r2: R2Bucket, stream: Stream) {
-        const object = await r2.put("picture-key", stream, {
-            httpMetadata: {
-                contentType: "image/png",
-            },
-            customMetadata: {
-                uploadedBy: "user123",
-            },
-        });
-        return object;
+    static async post(@Inject r2: R2Bucket, key: string): Promise<Picture> {
+        await r2.put(key, ""); // Empty body
+        const head = await r2.head(key);
+        if (head === null) {
+            throw new Error("r2 failed");
+        }
+
+        return { head };
     }
 
+    @PUT
+    async put(stream: Stream) {
+        await r2.put(this.head.key, stream);
+    }
+
+    @POST
+    async getValue(): Stream {
+        return this.value;
+    }
+
+    // This could be done with @CRUD(["GET"])
     @GET
-    getValue(@Inject r2: R2Bucket): Stream {
-        return await r2.get(super.head.key).body;
-    }
+    static async get(@Inject r2: R2Bucket, key: string): Promise<Picture | null> {
+        const res = await r2.get(key);
+        if (res === null) {
+            return null;
+        }
 
-    // This could be done with @CRUD(["HEAD"])
-    @HEAD
-    head(): R2Object {
-        return this;
+        return { ... }; // ...convert the R2ObjectBody to a Picture
     }
 
     // This could be done with @CRUD(["DELETE"])
     @DELETE
     async delete(@Inject r2: R2Bucket) {
-        await r2.delete(super.head.key);
+        await r2.delete(this.head.key);
     }
 }
 ```
-
-Like KV Models, R2 Models have no schema but instead a fixed structure returned from a `HEAD` call to fetch object metadata. No attributes are allowed on R2 Models, since R2 objects are unstructured binary data. There will be no migrations or runtime schema validation for R2 Models. R2 Models are serializeable, and can be passed as arguments or return values in any method, with an appropriately generated type on the client side.
-
-Like all models, R2 Models will have both static and instance methods. Static methods will be used for operations that do not require an existing object (e.g., uploading a new object), while instance methods will be used for operations on existing objects (e.g., fetching or deleting an object). The Cloesce Router will handle hydration of R2 Models by fetching the object data and metadata from the R2 bucket based on the object key, potentially throwing a 404 if the object does not exist.
-
-Because R2 objects can be very large, values will not be fetched automatically during hydration. Instead, only the `head` property (of type `R2Object`) will be populated. Developers can then choose to fetch the object data on demand using instance methods.
-
-CRUD methods for R2 are interesting. The two most simple to implement would be `HEAD`, which returns what the Cloesce Router hydrates, and `DELETE` which deletes the object based on the key. Other operations don't have a standard form. For instance, would `GET` return the entire object data as a stream? As a buffer? As a signed download URL? Similiar problems arise for `POST`/`PUT` operations. For now, we will leave these decisions up to the developer to implement in custom methods, but future versions may introduce standard CRUD behaviors for R2 Models.
-
-Future featues for R2 Models include support for generating signed upload and download URLs, as well as integration with D1 Models (storing R2 object keys in D1 columns).

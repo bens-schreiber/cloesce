@@ -51,7 +51,6 @@ pub enum GeneratorErrorKind {
     NullPrimaryKey,
     InvalidSqlType,
     UnknownObject,
-    UnknownDataSourceReference,
     UnexpectedVoid,
     UnexpectedInject,
     MissingOrExtraneousDataSource,
@@ -70,6 +69,9 @@ pub enum GeneratorErrorKind {
     MissingWranglerKVNamespace,
     InconsistentWranglerBinding,
     InvalidStream,
+    InvalidModelReference,
+    InvalidKVTree,
+    MismatchedKVModelNamespaces,
 }
 
 impl GeneratorErrorKind {
@@ -94,11 +96,6 @@ impl GeneratorErrorKind {
             GeneratorErrorKind::UnknownObject => (
                 "Objects must be decorated appropriately as a Model, PlainOldObject, or Inject",
                 "Consider using a decorator on the object.",
-                GeneratorPhase::ModelAnalysis,
-            ),
-            GeneratorErrorKind::UnknownDataSourceReference => (
-                "Data sources must reference a model",
-                "",
                 GeneratorPhase::ModelAnalysis,
             ),
             GeneratorErrorKind::UnexpectedVoid => (
@@ -162,6 +159,21 @@ impl GeneratorErrorKind {
             GeneratorErrorKind::InvalidStream => (
                 "Streams cannot be nullable, apart of an object or in an array. In a method, they must be the only parameter.",
                 "Use a `Blob` type",
+                GeneratorPhase::ModelAnalysis,
+            ),
+            GeneratorErrorKind::InvalidModelReference => (
+                "Unknown or invalid Model reference.",
+                "References to a Model must be a defined matching type.",
+                GeneratorPhase::ModelAnalysis,
+            ),
+            GeneratorErrorKind::InvalidKVTree => (
+                "KV Models cannot share dependencies (e.g., must be a directed tree)",
+                "Remove the shared dependency.",
+                GeneratorPhase::ModelAnalysis,
+            ),
+            GeneratorErrorKind::MismatchedKVModelNamespaces => (
+                "KV Models that share dependencies must use the same KV namespace.",
+                "Ensure that all dependent Models use the same KV namespace.",
                 GeneratorPhase::ModelAnalysis,
             ),
 

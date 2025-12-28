@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
-use ast::{CidlType, CloesceAst, MigrationsAst, MigrationsModel, NavigationPropertyKind};
-use generator_test::{D1ModelBuilder, IncludeTreeBuilder, create_ast, expected_str};
+use ast::{CidlType, CloesceAst, D1NavigationPropertyKind, MigrationsAst, MigrationsModel};
+use generator_test::{D1ModelBuilder, IncludeTreeBuilder, create_ast_d1, expected_str};
 use migrations::{MigrationsDilemma, MigrationsGenerator, MigrationsIntent};
 
 use indexmap::IndexMap;
@@ -57,7 +57,7 @@ fn as_migration(ast: CloesceAst) -> MigrationsAst {
 }
 
 fn empty_migration() -> MigrationsAst {
-    let mut empty_ast = create_ast(vec![]);
+    let mut empty_ast = create_ast_d1(vec![]);
     empty_ast.set_merkle_hash();
     as_migration(empty_ast)
 }
@@ -94,7 +94,7 @@ async fn migrate_models_scalars(db: SqlitePool) {
     let ast = {
         // Arrange
         let ast = {
-            let mut ast = create_ast(vec![
+            let mut ast = create_ast_d1(vec![
                 D1ModelBuilder::new("User")
                     .id()
                     .attribute("name", CidlType::nullable(CidlType::Text), None)
@@ -145,15 +145,15 @@ async fn migrate_models_one_to_one(db: SqlitePool) {
     let ast = {
         // Arrange
         let ast = {
-            let mut ast = create_ast(vec![
+            let mut ast = create_ast_d1(vec![
                 D1ModelBuilder::new("Person")
                     .id()
                     .attribute("dogId", CidlType::Integer, Some("Dog".into()))
                     .nav_p(
                         "dog",
                         "Dog",
-                        NavigationPropertyKind::OneToOne {
-                            reference: "dogId".into(),
+                        D1NavigationPropertyKind::OneToOne {
+                            attribute_reference: "dogId".into(),
                         },
                     )
                     .data_source(
@@ -206,7 +206,7 @@ async fn migrate_models_one_to_many(db: SqlitePool) {
     let ast = {
         // Arrange
         let ast = {
-            let mut ast = create_ast(vec![
+            let mut ast = create_ast_d1(vec![
                 D1ModelBuilder::new("Dog")
                     .id()
                     .attribute("personId", CidlType::Integer, Some("Person".into()))
@@ -220,15 +220,15 @@ async fn migrate_models_one_to_many(db: SqlitePool) {
                     .nav_p(
                         "dogs",
                         "Dog",
-                        NavigationPropertyKind::OneToMany {
-                            reference: "personId".into(),
+                        D1NavigationPropertyKind::OneToMany {
+                            attribute_reference: "personId".into(),
                         },
                     )
                     .nav_p(
                         "cats",
                         "Cat",
-                        NavigationPropertyKind::OneToMany {
-                            reference: "personId".into(),
+                        D1NavigationPropertyKind::OneToMany {
+                            attribute_reference: "personId".into(),
                         },
                     )
                     .attribute("bossId", CidlType::Integer, Some("Boss".into()))
@@ -245,8 +245,8 @@ async fn migrate_models_one_to_many(db: SqlitePool) {
                     .nav_p(
                         "persons",
                         "Person",
-                        NavigationPropertyKind::OneToMany {
-                            reference: "bossId".into(),
+                        D1NavigationPropertyKind::OneToMany {
+                            attribute_reference: "bossId".into(),
                         },
                     )
                     .data_source(
@@ -314,13 +314,13 @@ async fn migrate_models_many_to_many(db: SqlitePool) {
     let ast = {
         // Arrange
         let ast = {
-            let mut ast = create_ast(vec![
+            let mut ast = create_ast_d1(vec![
                 D1ModelBuilder::new("Student")
                     .id()
                     .nav_p(
                         "courses",
                         "Course".to_string(),
-                        NavigationPropertyKind::ManyToMany {
+                        D1NavigationPropertyKind::ManyToMany {
                             unique_id: "StudentsCourses".into(),
                         },
                     )
@@ -334,7 +334,7 @@ async fn migrate_models_many_to_many(db: SqlitePool) {
                     .nav_p(
                         "students",
                         "Student".to_string(),
-                        NavigationPropertyKind::ManyToMany {
+                        D1NavigationPropertyKind::ManyToMany {
                             unique_id: "StudentsCourses".into(),
                         },
                     )
@@ -387,7 +387,7 @@ async fn migrate_models_many_to_many(db: SqlitePool) {
 #[sqlx::test]
 async fn migrate_with_alterations(db: SqlitePool) {
     let mut base_ast = {
-        let ast = as_migration(create_ast(vec![
+        let ast = as_migration(create_ast_d1(vec![
             D1ModelBuilder::new("User")
                 .id()
                 .attribute("name", CidlType::nullable(CidlType::Text), None)
@@ -408,7 +408,7 @@ async fn migrate_with_alterations(db: SqlitePool) {
     base_ast = {
         // Arrange
         let new = {
-            let mut ast = create_ast(vec![
+            let mut ast = create_ast_d1(vec![
                 D1ModelBuilder::new("User")
                     .id()
                     .attribute("first_name", CidlType::nullable(CidlType::Text), None) // changed name
@@ -456,7 +456,7 @@ ALTER TABLE "User" ADD COLUMN "age" text"#
     base_ast = {
         // Arrange
         let new = {
-            let mut ast = create_ast(vec![
+            let mut ast = create_ast_d1(vec![
                 D1ModelBuilder::new("User")
                     .id()
                     .attribute("first_name", CidlType::nullable(CidlType::Text), None)
@@ -495,7 +495,7 @@ ALTER TABLE "User" ADD COLUMN "age" text"#
     {
         // Arrange
         let new = {
-            let mut ast = create_ast(vec![
+            let mut ast = create_ast_d1(vec![
                 D1ModelBuilder::new("Dog").id().build(), // added Dog
                 D1ModelBuilder::new("User")
                     .id()
@@ -532,13 +532,13 @@ ALTER TABLE "User" ADD COLUMN "age" text"#
 async fn migrate_alter_drop_m2m(db: SqlitePool) {
     // Arrange
     let m2m_ast = {
-        let mut ast = create_ast(vec![
+        let mut ast = create_ast_d1(vec![
             D1ModelBuilder::new("Student")
                 .id()
                 .nav_p(
                     "courses",
                     "Course",
-                    NavigationPropertyKind::ManyToMany {
+                    D1NavigationPropertyKind::ManyToMany {
                         unique_id: "StudentsCourses".into(),
                     },
                 )
@@ -548,7 +548,7 @@ async fn migrate_alter_drop_m2m(db: SqlitePool) {
                 .nav_p(
                     "students",
                     "Student",
-                    NavigationPropertyKind::ManyToMany {
+                    D1NavigationPropertyKind::ManyToMany {
                         unique_id: "StudentsCourses".into(),
                     },
                 )
@@ -567,7 +567,7 @@ async fn migrate_alter_drop_m2m(db: SqlitePool) {
     };
 
     let no_m2m_ast = {
-        let mut ast = create_ast(vec![
+        let mut ast = create_ast_d1(vec![
             D1ModelBuilder::new("Student").id().build(),
             D1ModelBuilder::new("Course").id().build(),
         ]);
@@ -594,7 +594,7 @@ async fn migrate_alter_drop_m2m(db: SqlitePool) {
 async fn migrate_alter_add_m2m(db: SqlitePool) {
     // Arrange
     let no_m2m_ast = {
-        let mut ast = create_ast(vec![
+        let mut ast = create_ast_d1(vec![
             D1ModelBuilder::new("Student").id().build(),
             D1ModelBuilder::new("Course").id().build(),
         ]);
@@ -610,13 +610,13 @@ async fn migrate_alter_add_m2m(db: SqlitePool) {
     };
 
     let m2m_ast = {
-        let mut ast = create_ast(vec![
+        let mut ast = create_ast_d1(vec![
             D1ModelBuilder::new("Student")
                 .id()
                 .nav_p(
                     "courses",
                     "Course",
-                    NavigationPropertyKind::ManyToMany {
+                    D1NavigationPropertyKind::ManyToMany {
                         unique_id: "StudentsCourses".into(),
                     },
                 )
@@ -626,7 +626,7 @@ async fn migrate_alter_add_m2m(db: SqlitePool) {
                 .nav_p(
                     "students",
                     "Student",
-                    NavigationPropertyKind::ManyToMany {
+                    D1NavigationPropertyKind::ManyToMany {
                         unique_id: "StudentsCourses".into(),
                     },
                 )

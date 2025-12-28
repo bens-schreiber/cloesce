@@ -1,7 +1,8 @@
 use std::collections::HashMap;
 
-use ast::NavigationPropertyKind::{ManyToMany, OneToMany};
-use ast::{CidlType, D1Model, NamedTypedValue, NavigationProperty, NavigationPropertyKind, fail};
+use ast::{
+    CidlType, D1Model, D1NavigationProperty, D1NavigationPropertyKind, NamedTypedValue, fail,
+};
 use base64::Engine;
 use base64::prelude::BASE64_STANDARD;
 use sea_query::{Alias, OnConflict, SimpleExpr, SqliteQueryBuilder, SubQueryStatement, Values};
@@ -159,7 +160,7 @@ impl<'a> UpsertModel<'a> {
         let (one_to_ones, others): (Vec<_>, Vec<_>) = model
             .navigation_properties
             .iter()
-            .partition(|n| matches!(n.kind, NavigationPropertyKind::OneToOne { .. }));
+            .partition(|n| matches!(n.kind, D1NavigationPropertyKind::OneToOne { .. }));
 
         // This table is dependent on it's 1:1 references, so they must be traversed before
         // table insertion (granted the include tree references them).
@@ -172,16 +173,19 @@ impl<'a> UpsertModel<'a> {
                 let Some(Value::Object(nested_tree)) = include_tree.get(&nav.var_name) else {
                     continue;
                 };
-                let NavigationPropertyKind::OneToOne { reference } = &nav.kind else {
+                let D1NavigationPropertyKind::OneToOne {
+                    attribute_reference,
+                } = &nav.kind
+                else {
                     continue;
                 };
                 // Recursively handle nested inserts
 
                 nav_ref_to_path.insert(
-                    reference,
+                    attribute_reference,
                     self.dfs(
                         Some(&model.name),
-                        &nav.model_name,
+                        &nav.model_reference,
                         nav_model,
                         Some(nested_tree),
                         format!("{path}.{}", nav.var_name),
@@ -250,22 +254,28 @@ impl<'a> UpsertModel<'a> {
                 };
 
                 match (&nav.kind, new_model.get(&nav.var_name)) {
-                    (OneToMany { .. }, Some(Value::Array(nav_models))) => {
+                    (
+                        D1NavigationPropertyKind::OneToMany { .. },
+                        Some(Value::Array(nav_models)),
+                    ) => {
                         for nav_model in nav_models.iter().filter_map(|v| v.as_object()) {
                             self.dfs(
                                 Some(&model.name),
-                                &nav.model_name,
+                                &nav.model_reference,
                                 nav_model,
                                 Some(nested_tree),
                                 format!("{path}.{}", nav.var_name),
                             )?;
                         }
                     }
-                    (ManyToMany { unique_id }, Some(Value::Array(nav_models))) => {
+                    (
+                        D1NavigationPropertyKind::ManyToMany { unique_id },
+                        Some(Value::Array(nav_models)),
+                    ) => {
                         for nav_model in nav_models.iter().filter_map(|v| v.as_object()) {
                             self.dfs(
                                 Some(&model.name),
-                                &nav.model_name,
+                                &nav.model_reference,
                                 nav_model,
                                 Some(nested_tree),
                                 format!("{path}.{}", nav.var_name),
@@ -289,17 +299,17 @@ impl<'a> UpsertModel<'a> {
     fn insert_jct(
         &mut self,
         path: &str,
-        nav: &NavigationProperty,
+        nav: &D1NavigationProperty,
         unique_id: &str,
         model: &D1Model,
     ) -> Result<()> {
-        let nav_meta = self.meta.get(&nav.model_name).unwrap();
+        let nav_meta = self.meta.get(&nav.model_reference).unwrap();
         let nav_pk = &nav_meta.primary_key;
 
         // Resolve both sides of the M:M relationship
         let pairs = [
             (
-                format!("{}.{}", nav.model_name, nav_pk.name),
+                format!("{}.{}", nav.model_reference, nav_pk.name),
                 &nav_pk.cidl_type,
                 format!("{path}.{}.{}", nav.var_name, nav_pk.name),
             ),
@@ -624,7 +634,7 @@ fn bytes_to_sqlite(bytes: &[u8]) -> SimpleExpr {
 mod test {
     use std::collections::HashMap;
 
-    use ast::{CidlType, NavigationPropertyKind};
+    use ast::{CidlType, D1NavigationPropertyKind};
     use generator_test::{D1ModelBuilder, expected_str};
     use serde_json::{Value, json};
     use sqlx::SqlitePool;
@@ -848,8 +858,8 @@ mod test {
             .nav_p(
                 "horse",
                 "Horse",
-                NavigationPropertyKind::OneToOne {
-                    reference: "horseId".to_string(),
+                D1NavigationPropertyKind::OneToOne {
+                    attribute_reference: "horseId".to_string(),
                 },
             )
             .build();
@@ -908,8 +918,8 @@ mod test {
             .nav_p(
                 "horse",
                 "Horse",
-                NavigationPropertyKind::OneToOne {
-                    reference: "horseId".to_string(),
+                D1NavigationPropertyKind::OneToOne {
+                    attribute_reference: "horseId".to_string(),
                 },
             )
             .build();
@@ -973,8 +983,8 @@ mod test {
             .nav_p(
                 "horses",
                 "Horse",
-                NavigationPropertyKind::OneToMany {
-                    reference: "personId".to_string(),
+                D1NavigationPropertyKind::OneToMany {
+                    attribute_reference: "personId".to_string(),
                 },
             )
             .build();
@@ -1067,7 +1077,7 @@ mod test {
             .nav_p(
                 "horses",
                 "Horse",
-                NavigationPropertyKind::ManyToMany {
+                D1NavigationPropertyKind::ManyToMany {
                     unique_id: "PersonsHorses".to_string(),
                 },
             )
@@ -1076,7 +1086,7 @@ mod test {
             .nav_p(
                 "persons",
                 "Person",
-                NavigationPropertyKind::ManyToMany {
+                D1NavigationPropertyKind::ManyToMany {
                     unique_id: "PersonsHorses".to_string(),
                 },
             )
@@ -1165,8 +1175,8 @@ mod test {
             .nav_p(
                 "horse",
                 "Horse",
-                NavigationPropertyKind::OneToOne {
-                    reference: "horseId".to_string(),
+                D1NavigationPropertyKind::OneToOne {
+                    attribute_reference: "horseId".to_string(),
                 },
             )
             .build();
@@ -1176,8 +1186,8 @@ mod test {
             .nav_p(
                 "awards",
                 "Award",
-                NavigationPropertyKind::OneToMany {
-                    reference: "horseId".to_string(),
+                D1NavigationPropertyKind::OneToMany {
+                    attribute_reference: "horseId".to_string(),
                 },
             )
             .build();
@@ -1318,8 +1328,8 @@ mod test {
             .nav_p(
                 "horse",
                 "Horse",
-                NavigationPropertyKind::OneToOne {
-                    reference: "horseId".into(),
+                D1NavigationPropertyKind::OneToOne {
+                    attribute_reference: "horseId".into(),
                 },
             )
             .build();
@@ -1401,8 +1411,8 @@ mod test {
             .nav_p(
                 "horses",
                 "Horse",
-                NavigationPropertyKind::OneToMany {
-                    reference: "personId".into(),
+                D1NavigationPropertyKind::OneToMany {
+                    attribute_reference: "personId".into(),
                 },
             )
             .build();
@@ -1489,7 +1499,7 @@ mod test {
             .nav_p(
                 "horses",
                 "Horse",
-                NavigationPropertyKind::ManyToMany {
+                D1NavigationPropertyKind::ManyToMany {
                     unique_id: "PersonsHorses".to_string(),
                 },
             )
@@ -1499,7 +1509,7 @@ mod test {
             .nav_p(
                 "persons",
                 "Person",
-                NavigationPropertyKind::ManyToMany {
+                D1NavigationPropertyKind::ManyToMany {
                     unique_id: "PersonsHorses".to_string(),
                 },
             )

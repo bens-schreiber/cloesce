@@ -131,7 +131,10 @@ pub enum HttpVerb {
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash)]
 pub struct NamedTypedValue {
+    /// Symbol name of the value.
     pub name: String,
+
+    /// Cloesce type associated with the value.
     pub cidl_type: CidlType,
 }
 
@@ -140,10 +143,18 @@ pub struct D1ModelAttribute {
     #[serde(default)]
     pub hash: u64,
 
+    /// Symbol name and Cloesce type of the attribute.
+    /// Represents both the column name and type.
     pub value: NamedTypedValue,
+
+    /// If the attribute is a foreign key, the referenced model name.
+    /// Otherwise, None.
     pub foreign_key_reference: Option<String>,
 }
 
+/// The expected media type for request/response bodies.
+/// An API endpoint may expect data in some format, and return data in some format.
+/// Defaults to JSON.
 #[derive(Serialize, Deserialize, Debug, Default)]
 pub enum MediaType {
     #[default]
@@ -154,14 +165,21 @@ pub enum MediaType {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ApiMethod {
+    /// Symbol name of the method.
     pub name: String,
+
+    /// If true, the method is static (instantiated on a class, not an instance).
+    /// Static methods require no hydration or data source.
     pub is_static: bool,
+
     pub http_verb: HttpVerb,
 
+    /// The media format the client should use to read the response body.
     #[serde(default)]
     pub return_media: MediaType,
     pub return_type: CidlType,
 
+    /// The media format the client should use to send the request body.
     #[serde(default)]
     pub parameters_media: MediaType,
     pub parameters: Vec<NamedTypedValue>,
@@ -170,30 +188,37 @@ pub struct ApiMethod {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct IncludeTree(pub BTreeMap<String, IncludeTree>);
 
+/// A tree of model symbol names to include when hydrating a data source.
 #[derive(Serialize, Deserialize, Debug)]
 pub struct DataSource {
     #[serde(default)]
     pub hash: u64,
 
+    /// The symbol name of the data source, e.g., "withUserDetails"
     pub name: String,
+
     pub tree: IncludeTree,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Hash)]
-pub enum NavigationPropertyKind {
-    OneToOne { reference: String },
-    OneToMany { reference: String },
+pub enum D1NavigationPropertyKind {
+    OneToOne { attribute_reference: String },
+    OneToMany { attribute_reference: String },
     ManyToMany { unique_id: String },
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct NavigationProperty {
+pub struct D1NavigationProperty {
     #[serde(default)]
     pub hash: u64,
 
+    /// Symbol name of the navigation property.
     pub var_name: String,
-    pub model_name: String,
-    pub kind: NavigationPropertyKind,
+
+    /// Referenced model name.
+    pub model_reference: String,
+
+    pub kind: D1NavigationPropertyKind,
 }
 
 #[derive(Serialize, Deserialize, Hash, PartialEq, Eq, Debug)]
@@ -209,11 +234,19 @@ pub struct D1Model {
     #[serde(default)]
     pub hash: u64,
 
+    /// The symbol that defines the model in the source code.
     pub name: String,
-    pub primary_key: NamedTypedValue,
-    pub attributes: Vec<D1ModelAttribute>,
-    pub navigation_properties: Vec<NavigationProperty>,
 
+    /// Primary key attribute of the model.
+    /// Must be a non-nullable attribute.
+    /// Translates to the PRIMARY KEY column in SQLite.
+    // TODO: Composite primary keys
+    pub primary_key: NamedTypedValue,
+
+    pub attributes: Vec<D1ModelAttribute>,
+    pub navigation_properties: Vec<D1NavigationProperty>,
+
+    /// API definitions.
     #[serde_as(as = "MapPreventDuplicates<_, _>")]
     pub methods: BTreeMap<String, ApiMethod>,
 
@@ -221,35 +254,71 @@ pub struct D1Model {
     pub data_sources: BTreeMap<String, DataSource>,
 
     pub cruds: Vec<CrudKind>,
+    pub source_path: PathBuf,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub enum KVNavigationProperty {
+    KValue(NamedTypedValue),
+    Model {
+        model_reference: String,
+        var_name: String,
+        many: bool,
+    },
+}
+
+#[serde_as]
+#[derive(Serialize, Deserialize, Debug)]
+pub struct KVModel {
+    /// The symbol that defines the model in the source code.
+    pub name: String,
+
+    /// Binding to a KV namespace.
+    pub binding: String,
+
+    /// The "type hint" of the values stored in the KV namespace.
+    /// KV namespaces are schemaless, so this is only a hint for code generation.
+    pub cidl_type: CidlType,
+
+    /// Key parameters
+    /// ex: Users/{userId}/Settings/{settingId} => ["userId", "settingId"]
+    pub params: Vec<String>,
+
+    /// Hydrated attributes of the model.
+    pub navigation_properties: Vec<KVNavigationProperty>,
+
+    /// CRUD operations to generate.
+    pub cruds: Vec<CrudKind>,
+
+    /// API definitions.
+    #[serde_as(as = "MapPreventDuplicates<_, _>")]
+    pub methods: BTreeMap<String, ApiMethod>,
+
+    #[serde_as(as = "MapPreventDuplicates<_, _>")]
+    pub data_sources: BTreeMap<String, DataSource>,
 
     pub source_path: PathBuf,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ServiceAttribute {
+    /// Symbol name of the class field.
     pub var_name: String,
-    pub injected: String,
+
+    /// Symbol of the injected class.
+    pub inject_reference: String,
 }
 
 #[serde_as]
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Service {
+    /// The symbol that defines the service in the source code.
     pub name: String,
+
+    /// Class fields which are all injected dependencies.
     pub attributes: Vec<ServiceAttribute>,
 
-    #[serde_as(as = "MapPreventDuplicates<_, _>")]
-    pub methods: BTreeMap<String, ApiMethod>,
-
-    pub source_path: PathBuf,
-}
-
-#[serde_as]
-#[derive(Serialize, Deserialize, Debug)]
-pub struct KVModel {
-    pub name: String,
-    pub binding: String,
-    pub cidl_type: CidlType,
-
+    /// API definitions.
     #[serde_as(as = "MapPreventDuplicates<_, _>")]
     pub methods: BTreeMap<String, ApiMethod>,
 
@@ -258,8 +327,12 @@ pub struct KVModel {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct PlainOldObject {
+    /// The symbol that defines the POO in the source code.
     pub name: String,
+
+    /// Class fields of any serializable type.
     pub attributes: Vec<NamedTypedValue>,
+
     pub source_path: PathBuf,
 }
 
@@ -270,6 +343,7 @@ pub enum InputLanguage {
 
 #[derive(Serialize, Deserialize)]
 pub struct WranglerEnv {
+    /// Class name of the Wrangler environment.
     pub name: String,
     pub source_path: PathBuf,
 
@@ -277,31 +351,31 @@ pub struct WranglerEnv {
     pub d1_binding: Option<String>,
 
     pub kv_bindings: Vec<String>,
-
     pub vars: HashMap<String, CidlType>,
 }
 
-// TODO: MapPreventDuplicates is not supported for IndexMap
-//
-// NOTE: IndexMap is used to maintain topological sorted order while BTreeMap is
-// used to maintain a deterministic order.
 #[serde_as]
 #[derive(Serialize, Deserialize)]
 pub struct CloesceAst {
     #[serde(default)]
     pub hash: u64,
 
+    // TODO: Version checking is not implemented
     pub version: String,
+
     pub project_name: String,
     pub language: InputLanguage,
     pub wrangler_env: Option<WranglerEnv>,
+
+    // TODO: MapPreventDuplicates is not supported for IndexMap
     pub d1_models: IndexMap<String, D1Model>,
+    pub services: IndexMap<String, Service>,
 
     #[serde_as(as = "MapPreventDuplicates<_, _>")]
     pub kv_models: BTreeMap<String, KVModel>,
 
-    pub poos: IndexMap<String, PlainOldObject>,
-    pub services: IndexMap<String, Service>,
+    #[serde_as(as = "MapPreventDuplicates<_, _>")]
+    pub poos: BTreeMap<String, PlainOldObject>,
 
     pub app_source: Option<PathBuf>,
 }
@@ -407,7 +481,7 @@ impl CloesceAst {
                 let nav_h = {
                     let mut h = FxHasher::default();
                     h.write(b"ModelNavigationProperty");
-                    nav.model_name.hash(&mut h);
+                    nav.model_reference.hash(&mut h);
                     nav.var_name.hash(&mut h);
                     nav.kind.hash(&mut h);
                     h.finish()
@@ -435,7 +509,7 @@ pub struct MigrationsModel {
     pub name: String,
     pub primary_key: NamedTypedValue,
     pub attributes: Vec<D1ModelAttribute>,
-    pub navigation_properties: Vec<NavigationProperty>,
+    pub navigation_properties: Vec<D1NavigationProperty>,
     pub data_sources: BTreeMap<String, DataSource>,
 }
 

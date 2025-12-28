@@ -2,8 +2,8 @@ use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
 
 use ast::err::{GeneratorErrorKind, Result};
 use ast::{
-    ApiMethod, CidlType, CloesceAst, D1Model, HttpVerb, NamedTypedValue, NavigationPropertyKind,
-    WranglerSpec, ensure, fail,
+    ApiMethod, CidlType, CloesceAst, D1Model, D1NavigationPropertyKind, HttpVerb,
+    KVNavigationProperty, NamedTypedValue, WranglerSpec, ensure, fail,
 };
 
 type AdjacencyList<'a> = BTreeMap<&'a str, Vec<&'a str>>;
@@ -113,7 +113,7 @@ impl SemanticAnalysis {
     }
 
     fn poos(ast: &mut CloesceAst) -> Result<()> {
-        // Topo sort and cycle detection
+        // Cycle detection
         let mut in_degree = BTreeMap::<&str, usize>::new();
         let mut graph = BTreeMap::<&str, Vec<&str>>::new();
 
@@ -163,13 +163,13 @@ impl SemanticAnalysis {
                             o
                         )
                     }
-                    CidlType::DataSource(o) => ensure!(
-                        ast.d1_models.contains_key(o),
-                        GeneratorErrorKind::UnknownDataSourceReference,
+                    CidlType::DataSource(reference) => ensure!(
+                        is_valid_data_source_ref(ast, reference),
+                        GeneratorErrorKind::InvalidModelReference,
                         "{}.{} => {}?",
                         poo.name,
                         attr.name,
-                        o
+                        reference
                     ),
                     CidlType::Stream => {
                         fail!(
@@ -184,9 +184,8 @@ impl SemanticAnalysis {
             }
         }
 
-        // Sort
-        let rank = kahns(graph, in_degree, ast.poos.len())?;
-        ast.poos.sort_by_key(|k, _| rank.get(k.as_str()).unwrap());
+        // Detect cycles
+        kahns(graph, in_degree, ast.poos.len())?;
 
         Ok(())
     }
@@ -231,7 +230,7 @@ impl SemanticAnalysis {
 
         // Maps a model name and a foreign key reference to the model it is referencing
         // Ie, Person.dogId => { (Person, dogId): "Dog" }
-        let mut model_reference_to_fk_model = HashMap::<(&str, &str), &str>::new();
+        let mut model_attr_ref_to_fk_model = HashMap::<(&str, &str), &str>::new();
         let mut unvalidated_navs = Vec::new();
 
         // Maps a m2m unique id to the models that reference the id
@@ -267,7 +266,7 @@ impl SemanticAnalysis {
                 if let Some(fk_model_name) = &a.foreign_key_reference {
                     let Some(fk_model) = ast.d1_models.get(fk_model_name.as_str()) else {
                         fail!(
-                            GeneratorErrorKind::UnknownObject,
+                            GeneratorErrorKind::InvalidModelReference,
                             "{}.{} => {}?",
                             model.name,
                             a.value.name,
@@ -288,7 +287,7 @@ impl SemanticAnalysis {
                         fk_model.primary_key.cidl_type
                     );
 
-                    model_reference_to_fk_model
+                    model_attr_ref_to_fk_model
                         .insert((&model.name, a.value.name.as_str()), fk_model_name);
 
                     // Nullable FK's do not constrain table creation order, and thus
@@ -305,21 +304,23 @@ impl SemanticAnalysis {
             // Validate navigation props
             for nav in &model.navigation_properties {
                 ensure!(
-                    ast.d1_models.contains_key(nav.model_name.as_str()),
-                    GeneratorErrorKind::UnknownObject,
+                    ast.d1_models.contains_key(nav.model_reference.as_str()),
+                    GeneratorErrorKind::InvalidModelReference,
                     "{} => {}?",
                     model.name,
-                    nav.model_name
+                    nav.model_reference
                 );
 
                 match &nav.kind {
-                    NavigationPropertyKind::OneToOne { reference } => {
+                    D1NavigationPropertyKind::OneToOne {
+                        attribute_reference,
+                    } => {
                         // Validate the nav prop's reference is consistent
                         if let Some(&fk_model) =
-                            model_reference_to_fk_model.get(&(&model.name, reference))
+                            model_attr_ref_to_fk_model.get(&(&model.name, attribute_reference))
                         {
                             ensure!(
-                                fk_model == nav.model_name,
+                                fk_model == nav.model_reference,
                                 GeneratorErrorKind::MismatchedNavigationPropertyTypes,
                                 "({}.{}) does not match type ({})",
                                 model.name,
@@ -332,16 +333,18 @@ impl SemanticAnalysis {
                                 "{}.{} references {}.{} which does not exist or is not a foreign key to {}",
                                 model.name,
                                 nav.var_name,
-                                nav.model_name,
-                                reference,
+                                nav.model_reference,
+                                attribute_reference,
                                 model.name
                             );
                         }
                     }
-                    NavigationPropertyKind::OneToMany { reference: _ } => {
-                        unvalidated_navs.push((&model.name, &nav.model_name, nav));
+                    D1NavigationPropertyKind::OneToMany {
+                        attribute_reference: _,
+                    } => {
+                        unvalidated_navs.push((&model.name, &nav.model_reference, nav));
                     }
-                    NavigationPropertyKind::ManyToMany { unique_id } => {
+                    D1NavigationPropertyKind::ManyToMany { unique_id } => {
                         m2m.entry(unique_id).or_default().push(&model.name);
                     }
                 }
@@ -358,7 +361,7 @@ impl SemanticAnalysis {
                             .navigation_properties
                             .iter()
                             .find(|nav| nav.var_name == *var_name)
-                            .map(|nav| &nav.model_name)
+                            .map(|nav| &nav.model_reference)
                         else {
                             fail!(
                                 GeneratorErrorKind::UnknownIncludeTreeReference,
@@ -370,7 +373,7 @@ impl SemanticAnalysis {
 
                         let Some(child_model) = ast.d1_models.get(model_name) else {
                             fail!(
-                                GeneratorErrorKind::UnknownObject,
+                                GeneratorErrorKind::InvalidModelReference,
                                 "{} => {}?",
                                 model.name,
                                 model_name
@@ -400,20 +403,24 @@ impl SemanticAnalysis {
 
         // Validate 1:M nav props
         for (model_name, nav_model, nav) in unvalidated_navs {
-            let NavigationPropertyKind::OneToMany { reference } = &nav.kind else {
+            let D1NavigationPropertyKind::OneToMany {
+                attribute_reference,
+            } = &nav.kind
+            else {
                 continue;
             };
 
             // Validate the nav props reference is consistent to an attribute
             // on another model
-            let Some(&fk_model) = model_reference_to_fk_model.get(&(nav_model, reference)) else {
+            let Some(&fk_model) = model_attr_ref_to_fk_model.get(&(nav_model, attribute_reference))
+            else {
                 fail!(
                     GeneratorErrorKind::InvalidNavigationPropertyReference,
                     "{}.{} references {}.{} which does not exist or is not a foreign key to {}",
                     model_name,
                     nav.var_name,
                     nav_model,
-                    reference,
+                    attribute_reference,
                     model_name
                 );
             };
@@ -427,7 +434,7 @@ impl SemanticAnalysis {
                 model_name,
                 nav.var_name,
                 nav_model,
-                reference,
+                attribute_reference,
             );
 
             // One To Many: Person has many Dogs (sql)=> Dog has an fk to  Person
@@ -472,8 +479,12 @@ impl SemanticAnalysis {
             return Ok(()); // No KV models
         };
 
+        // Tree validation
+        let mut in_degree = BTreeMap::<&str, usize>::new();
+
         let kv_binding_set = env.kv_bindings.iter().collect::<HashSet<&String>>();
 
+        // Validate models
         for (model_name, model) in &ast.kv_models {
             ensure!(
                 *model_name == model.name,
@@ -491,9 +502,152 @@ impl SemanticAnalysis {
                 model.binding
             );
 
+            ensure!(
+                !matches!(model.cidl_type, CidlType::Inject(_)),
+                GeneratorErrorKind::UnexpectedInject,
+                r#"KV Model "{}"'s type cannot be an injected instance."#,
+                model.name
+            );
+
+            // Attributes
+            for attr in &model.navigation_properties {
+                match attr {
+                    KVNavigationProperty::KValue(ntv) => match ntv.cidl_type.root_type() {
+                        CidlType::Inject(_) => fail!(
+                            GeneratorErrorKind::UnexpectedInject,
+                            r#"KV Model attribute "{}.{}"'s type cannot be an injected instance."#,
+                            model.name,
+                            ntv.name
+                        ),
+                        CidlType::Object(o) | CidlType::Partial(o) => {
+                            ensure!(
+                                is_valid_object_ref(ast, o),
+                                GeneratorErrorKind::UnknownObject,
+                                "{}.{} => {}?",
+                                model.name,
+                                ntv.name,
+                                o
+                            )
+                        }
+                        CidlType::DataSource(reference) => ensure!(
+                            is_valid_data_source_ref(ast, reference),
+                            GeneratorErrorKind::InvalidModelReference,
+                            "{}.{} => {}?",
+                            model.name,
+                            ntv.name,
+                            reference
+                        ),
+                        _ => {}
+                    },
+                    KVNavigationProperty::Model {
+                        model_reference,
+                        var_name,
+                        many,
+                    } => {
+                        let Some(ref_model) = ast.kv_models.get(model_reference.as_str()) else {
+                            fail!(
+                                GeneratorErrorKind::InvalidModelReference,
+                                "{}.{} => {}?",
+                                model.name,
+                                var_name,
+                                model_reference
+                            );
+                        };
+
+                        // namespaces must be equal
+                        ensure!(
+                            ref_model.binding == model.binding,
+                            GeneratorErrorKind::MismatchedKVModelNamespaces,
+                            "{}.{} ({}) != {}.{} ({})",
+                            model.name,
+                            var_name,
+                            model.binding,
+                            model_reference,
+                            var_name,
+                            ref_model.binding
+                        );
+
+                        ensure!(
+                            !*many || !ref_model.params.is_empty(),
+                            GeneratorErrorKind::InvalidKVTree,
+                            r#"KV Model "{}" is referenced as many in "{}.{}", but has no key parameters."#,
+                            model_reference,
+                            model.name,
+                            var_name
+                        );
+
+                        in_degree
+                            .entry(model_reference.as_str())
+                            .and_modify(|d| *d += 1)
+                            .or_insert(1);
+                    }
+                }
+            }
+
+            // Data Sources
+            for ds in model.data_sources.values() {
+                let mut q = VecDeque::new();
+                q.push_back((&ds.tree, model));
+
+                while let Some((node, parent_model)) = q.pop_front() {
+                    for (var_name, child) in &node.0 {
+                        let found_match =
+                            parent_model
+                                .navigation_properties
+                                .iter()
+                                .find(|attr| match attr {
+                                    KVNavigationProperty::Model { var_name: v, .. } => {
+                                        *v == *var_name
+                                    }
+                                    KVNavigationProperty::KValue(named_typed_value) => {
+                                        named_typed_value.name == *var_name
+                                    }
+                                });
+
+                        let Some(found_match) = found_match else {
+                            fail!(
+                                GeneratorErrorKind::UnknownIncludeTreeReference,
+                                "{}.{}",
+                                model.name,
+                                var_name
+                            );
+                        };
+
+                        match found_match {
+                            KVNavigationProperty::KValue(_) => {
+                                // KValues do not have attributes to traverse
+                            }
+                            KVNavigationProperty::Model {
+                                model_reference, ..
+                            } => {
+                                let Some(child_model) = ast.kv_models.get(model_reference.as_str())
+                                else {
+                                    unreachable!(
+                                        "Model references should be validated before data sources"
+                                    )
+                                };
+
+                                q.push_back((child, child_model));
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Methods
             for (method_name, method) in &model.methods {
                 validate_methods(model_name, method_name, method, ast)?;
             }
+        }
+
+        // KV Models must be a tree (in degree <= 1)
+        if let Some((name, deg)) = in_degree.iter().find(|(_, deg)| **deg > 1) {
+            fail!(
+                GeneratorErrorKind::InvalidKVTree,
+                r#"KV Model "{}" has an in degree of {}."#,
+                name,
+                deg
+            )
         }
 
         Ok(())
@@ -519,12 +673,12 @@ impl SemanticAnalysis {
 
             // Assemble graph
             for attr in &service.attributes {
-                if !ast.services.contains_key(&attr.injected) {
+                if !ast.services.contains_key(&attr.inject_reference) {
                     continue;
                 }
 
                 graph
-                    .entry(attr.injected.as_str())
+                    .entry(attr.inject_reference.as_str())
                     .or_default()
                     .push(&service.name);
                 in_degree.entry(&service.name).and_modify(|d| *d += 1);
@@ -547,6 +701,10 @@ impl SemanticAnalysis {
 
 fn is_valid_object_ref(ast: &CloesceAst, o: &String) -> bool {
     ast.d1_models.contains_key(o) || ast.poos.contains_key(o) || ast.kv_models.contains_key(o)
+}
+
+fn is_valid_data_source_ref(ast: &CloesceAst, o: &String) -> bool {
+    ast.d1_models.contains_key(o) || ast.kv_models.contains_key(o)
 }
 
 /// Returns how many data sources to the namespace are in the method.
@@ -577,9 +735,9 @@ fn validate_methods(
             );
         }
 
-        CidlType::DataSource(o) => ensure!(
-            ast.d1_models.contains_key(o),
-            GeneratorErrorKind::UnknownDataSourceReference,
+        CidlType::DataSource(model_name) => ensure!(
+            is_valid_data_source_ref(ast, model_name),
+            GeneratorErrorKind::InvalidModelReference,
             "{}.{}",
             namespace,
             method.name,
@@ -607,8 +765,8 @@ fn validate_methods(
     for param in &method.parameters {
         if let CidlType::DataSource(model_name) = &param.cidl_type {
             ensure!(
-                ast.d1_models.contains_key(model_name),
-                GeneratorErrorKind::UnknownDataSourceReference,
+                is_valid_data_source_ref(ast, model_name),
+                GeneratorErrorKind::InvalidModelReference,
                 "{}.{} data source references {}",
                 namespace,
                 method.name,
@@ -658,7 +816,7 @@ fn validate_methods(
             CidlType::DataSource(model_name) => {
                 ensure!(
                     ast.d1_models.contains_key(model_name),
-                    GeneratorErrorKind::UnknownDataSourceReference,
+                    GeneratorErrorKind::InvalidModelReference,
                     "{}.{} data source references {}",
                     namespace,
                     method.name,

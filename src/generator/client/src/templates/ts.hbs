@@ -167,6 +167,22 @@ export class {{this.name}} {
   {{#unless (is_stream this.cidl_type)}}value: {{map_cidl_type this.cidl_type}};{{/unless}}
   metadata: unknown;
 
+  {{#each this.params}}
+  {{this.name}}: string;
+  {{/each}}
+  
+  {{#each this.attributes}}
+    {{#if is_kv_nav_model this}}
+  {{this.var_name}}: {{this.model_name}}{{#if this.many}}[]{{else}} | undefined{{/if}};
+    {{else}}
+  {{this.name}}: {
+    key: string;
+    {{#unless (is_stream this.cidl_type)}}value: {{map_cidl_type this.cidl_type}};{{/unless}}
+    metadata: unknown;
+  };
+    {{/if}}
+  {{/each}}
+
   {{#each this.methods}}
   {{#if this.is_static}}static {{/if}}async {{this.name}}(
     {{#each this.parameters}}

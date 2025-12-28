@@ -3,8 +3,8 @@ mod mappers;
 use std::sync::Arc;
 
 use ast::{
-    CidlType, CloesceAst, HttpVerb, InputLanguage, MediaType, NavigationProperty,
-    NavigationPropertyKind, cidl_type_contains,
+    CidlType, CloesceAst, D1NavigationProperty, D1NavigationPropertyKind, HttpVerb, InputLanguage,
+    KVNavigationProperty, MediaType, cidl_type_contains,
 };
 use mappers::{ClientLanguageTypeMapper, TypeScriptMapper};
 
@@ -28,8 +28,8 @@ handlebars_helper!(get_content_type: |media: MediaType| match media {
 });
 
 handlebars_helper!(is_blob: |cidl_type: CidlType| matches!(cidl_type.root_type(), CidlType::Blob));
-handlebars_helper!(is_one_to_one: |nav: NavigationProperty| matches!(nav.kind, NavigationPropertyKind::OneToOne {..}));
-handlebars_helper!(is_many_nav: |nav: NavigationProperty| matches!(nav.kind, NavigationPropertyKind::OneToMany {..} | NavigationPropertyKind::ManyToMany { .. }));
+handlebars_helper!(is_one_to_one: |nav: D1NavigationProperty| matches!(nav.kind, D1NavigationPropertyKind::OneToOne {..}));
+handlebars_helper!(is_many_nav: |nav: D1NavigationProperty| matches!(nav.kind, D1NavigationPropertyKind::OneToMany {..} | D1NavigationPropertyKind::ManyToMany { .. }));
 handlebars_helper!(is_get_request: |verb: HttpVerb| matches!(verb, HttpVerb::GET));
 handlebars_helper!(is_serializable: |cidl_type: CidlType| !matches!(cidl_type.root_type(), CidlType::Inject(_)));
 handlebars_helper!(is_object: |cidl_type: CidlType| matches!(cidl_type.root_type(), CidlType::Object(_) | CidlType::Partial(_)));
@@ -44,6 +44,8 @@ handlebars_helper!(is_blob_array: |cidl_type: CidlType| matches!(cidl_type.root_
 handlebars_helper!(is_url_param: |cidl_type: CidlType, verb: HttpVerb| matches!(verb, HttpVerb::GET) || matches!(cidl_type, CidlType::DataSource(_)));
 
 handlebars_helper!(is_stream: |cidl_type: CidlType| matches!(cidl_type.root_type(), CidlType::Stream));
+
+handlebars_helper!(is_kv_nav_model: |kv_nav: KVNavigationProperty| matches!(kv_nav, KVNavigationProperty::Model {..}));
 
 const TYPESCRIPT_TEMPLATE: &str = include_str!("./templates/ts.hbs");
 const TEMPLATE_STRING: &str = "client_api";
@@ -69,7 +71,7 @@ impl ClientGenerator {
 
         let mut context = serde_json::to_value(ast).unwrap();
 
-        // Manually get the domain in there
+        // Manually set the "domain" field in the context
         if let serde_json::Value::Object(ref mut map) = context {
             map.insert("domain".to_string(), serde_json::Value::String(domain));
         }
@@ -97,6 +99,7 @@ fn register_helpers<'a>(
     handlebars.register_helper("is_url_param", Box::new(is_url_param));
     handlebars.register_helper("is_get_request", Box::new(is_get_request));
     handlebars.register_helper("is_stream", Box::new(is_stream));
+    handlebars.register_helper("is_kv_nav_model", Box::new(is_kv_nav_model));
 
     let mapper1 = mapper.clone();
     handlebars.register_helper(
@@ -107,14 +110,16 @@ fn register_helpers<'a>(
                   _: &handlebars::Context,
                   _: &mut handlebars::RenderContext<'_, '_>,
                   out: &mut dyn handlebars::Output| {
-                let nav: NavigationProperty =
+                let nav: D1NavigationProperty =
                     serde_json::from_value(h.param(0).unwrap().value().clone()).unwrap();
 
                 let cidl_type = match nav.kind {
-                    NavigationPropertyKind::OneToOne { .. } => CidlType::Object(nav.model_name),
-                    NavigationPropertyKind::OneToMany { .. }
-                    | NavigationPropertyKind::ManyToMany { .. } => {
-                        CidlType::array(CidlType::Object(nav.model_name))
+                    D1NavigationPropertyKind::OneToOne { .. } => {
+                        CidlType::Object(nav.model_reference)
+                    }
+                    D1NavigationPropertyKind::OneToMany { .. }
+                    | D1NavigationPropertyKind::ManyToMany { .. } => {
+                        CidlType::array(CidlType::Object(nav.model_reference))
                     }
                 };
 

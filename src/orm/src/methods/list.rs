@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use ast::{D1Model, NavigationPropertyKind, fail};
+use ast::{D1Model, D1NavigationPropertyKind, fail};
 use sea_query::{
     ColumnRef, CommonTableExpression, Expr, IntoCondition, IntoIden, Query, SelectStatement,
     SqliteQueryBuilder, TableRef, WithClause,
@@ -125,31 +125,35 @@ fn dfs(
             continue;
         };
 
-        let child = meta.get(&nav.model_name).unwrap();
+        let child = meta.get(&nav.model_reference).unwrap();
         let child_alias = generate_alias(&child.name, alias_counter);
         let mut child_m2m_alias = None;
 
         match &nav.kind {
-            NavigationPropertyKind::OneToOne { reference } => {
+            D1NavigationPropertyKind::OneToOne {
+                attribute_reference,
+            } => {
                 let nav_model_pk = &child.primary_key.name;
                 left_join_as(
                     query,
                     &child.name,
                     &child_alias,
-                    Expr::col((alias(&model_alias), alias(reference)))
+                    Expr::col((alias(&model_alias), alias(attribute_reference)))
                         .equals((alias(&child_alias), alias(nav_model_pk))),
                 );
             }
-            NavigationPropertyKind::OneToMany { reference } => {
+            D1NavigationPropertyKind::OneToMany {
+                attribute_reference,
+            } => {
                 left_join_as(
                     query,
                     &child.name,
                     &child_alias,
                     Expr::col((alias(&model_alias), alias(pk)))
-                        .equals((alias(&child_alias), alias(reference))),
+                        .equals((alias(&child_alias), alias(attribute_reference))),
                 );
             }
-            NavigationPropertyKind::ManyToMany { unique_id } => {
+            D1NavigationPropertyKind::ManyToMany { unique_id } => {
                 let nav_model_pk = &child.primary_key;
                 let pk = &model.primary_key.name;
                 let m2m_alias = generate_alias(unique_id, alias_counter);
@@ -220,7 +224,7 @@ fn left_join_as(
 
 #[cfg(test)]
 mod test {
-    use ast::{CidlType, NavigationPropertyKind};
+    use ast::{CidlType, D1NavigationPropertyKind};
     use generator_test::{D1ModelBuilder, IncludeTreeBuilder, expected_str};
     use serde_json::json;
     use sqlx::SqlitePool;
@@ -297,8 +301,8 @@ mod test {
                 .nav_p(
                     "dog",
                     "Dog",
-                    NavigationPropertyKind::OneToOne {
-                        reference: "dogId".into(),
+                    D1NavigationPropertyKind::OneToOne {
+                        attribute_reference: "dogId".into(),
                     },
                 )
                 .build(),
@@ -349,15 +353,15 @@ mod test {
                 .nav_p(
                     "dogs",
                     "Dog",
-                    NavigationPropertyKind::OneToMany {
-                        reference: "personId".into(),
+                    D1NavigationPropertyKind::OneToMany {
+                        attribute_reference: "personId".into(),
                     },
                 )
                 .nav_p(
                     "cats",
                     "Cat",
-                    NavigationPropertyKind::OneToMany {
-                        reference: "personId".into(),
+                    D1NavigationPropertyKind::OneToMany {
+                        attribute_reference: "personId".into(),
                     },
                 )
                 .attribute("bossId", CidlType::Integer, Some("Boss".into()))
@@ -367,8 +371,8 @@ mod test {
                 .nav_p(
                     "persons",
                     "Person",
-                    NavigationPropertyKind::OneToMany {
-                        reference: "bossId".into(),
+                    D1NavigationPropertyKind::OneToMany {
+                        attribute_reference: "bossId".into(),
                     },
                 )
                 .build(),
@@ -413,7 +417,7 @@ mod test {
                 .nav_p(
                     "courses",
                     "Course".to_string(),
-                    NavigationPropertyKind::ManyToMany {
+                    D1NavigationPropertyKind::ManyToMany {
                         unique_id: "StudentsCourses".into(),
                     },
                 )
@@ -427,7 +431,7 @@ mod test {
                 .nav_p(
                     "students",
                     "Student".to_string(),
-                    NavigationPropertyKind::ManyToMany {
+                    D1NavigationPropertyKind::ManyToMany {
                         unique_id: "StudentsCourses".into(),
                     },
                 )
@@ -471,8 +475,8 @@ mod test {
             .nav_p(
                 "matches",
                 "Match",
-                NavigationPropertyKind::OneToMany {
-                    reference: "horseId1".into(),
+                D1NavigationPropertyKind::OneToMany {
+                    attribute_reference: "horseId1".into(),
                 },
             )
             .build();
@@ -484,8 +488,8 @@ mod test {
             .nav_p(
                 "horse2",
                 "Horse",
-                NavigationPropertyKind::OneToOne {
-                    reference: "horseId2".into(),
+                D1NavigationPropertyKind::OneToOne {
+                    attribute_reference: "horseId2".into(),
                 },
             )
             .build();

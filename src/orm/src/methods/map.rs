@@ -1,5 +1,5 @@
 use ast::D1Model;
-use ast::NavigationPropertyKind;
+use ast::D1NavigationPropertyKind;
 use ast::fail;
 use indexmap::IndexMap;
 use serde_json::Map;
@@ -53,8 +53,8 @@ pub fn map_sql(
 
             // Initialize OneToMany / ManyToMany arrays as empty
             for nav in &model.navigation_properties {
-                if matches!(nav.kind, NavigationPropertyKind::OneToMany { .. })
-                    || matches!(nav.kind, NavigationPropertyKind::ManyToMany { .. })
+                if matches!(nav.kind, D1NavigationPropertyKind::OneToMany { .. })
+                    || matches!(nav.kind, D1NavigationPropertyKind::ManyToMany { .. })
                 {
                     m.insert(nav.var_name.clone(), serde_json::Value::Array(vec![]));
                 }
@@ -89,9 +89,9 @@ fn process_navigation_properties(
             continue;
         }
 
-        let nested_model = match meta.get(&nav_prop.model_name) {
+        let nested_model = match meta.get(&nav_prop.model_reference) {
             Some(m) => m,
-            None => fail!(OrmErrorKind::UnknownModel, "{}", nav_prop.model_name),
+            None => fail!(OrmErrorKind::UnknownModel, "{}", nav_prop.model_reference),
         };
 
         // Nested properties always use their navigation path prefix (e.g. "cat.toy.id")
@@ -128,10 +128,10 @@ fn process_navigation_properties(
         for nested_nav_prop in &nested_model.navigation_properties {
             if matches!(
                 nested_nav_prop.kind,
-                NavigationPropertyKind::OneToMany { .. }
+                D1NavigationPropertyKind::OneToMany { .. }
             ) || matches!(
                 nested_nav_prop.kind,
-                NavigationPropertyKind::ManyToMany { .. }
+                D1NavigationPropertyKind::ManyToMany { .. }
             ) {
                 nested_model_json.insert(nested_nav_prop.var_name.clone(), Value::Array(vec![]));
             }
@@ -154,8 +154,8 @@ fn process_navigation_properties(
             )?;
         }
 
-        if matches!(nav_prop.kind, NavigationPropertyKind::OneToMany { .. })
-            || matches!(nav_prop.kind, NavigationPropertyKind::ManyToMany { .. })
+        if matches!(nav_prop.kind, D1NavigationPropertyKind::OneToMany { .. })
+            || matches!(nav_prop.kind, D1NavigationPropertyKind::ManyToMany { .. })
         {
             if let Value::Array(arr) = model_json.get_mut(&nav_prop.var_name).unwrap() {
                 let already_exists = arr
@@ -176,7 +176,7 @@ fn process_navigation_properties(
 
 #[cfg(test)]
 mod tests {
-    use ast::{CidlType, NavigationPropertyKind};
+    use ast::{CidlType, D1NavigationPropertyKind};
     use generator_test::D1ModelBuilder;
     use serde_json::{Map, Value, json};
     use std::collections::HashMap;
@@ -192,8 +192,8 @@ mod tests {
             .nav_p(
                 "riders",
                 "Rider",
-                NavigationPropertyKind::OneToMany {
-                    reference: "id".into(),
+                D1NavigationPropertyKind::OneToMany {
+                    attribute_reference: "id".into(),
                 },
             )
             .build();
@@ -252,8 +252,8 @@ mod tests {
             .nav_p(
                 "riders",
                 "Rider",
-                NavigationPropertyKind::OneToMany {
-                    reference: "id".into(),
+                D1NavigationPropertyKind::OneToMany {
+                    attribute_reference: "id".into(),
                 },
             )
             .build();
@@ -315,8 +315,8 @@ mod tests {
             .nav_p(
                 "riders",
                 "Rider",
-                NavigationPropertyKind::OneToMany {
-                    reference: "id".into(),
+                D1NavigationPropertyKind::OneToMany {
+                    attribute_reference: "id".into(),
                 },
             )
             .build();

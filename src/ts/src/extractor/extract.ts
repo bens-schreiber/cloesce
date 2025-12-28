@@ -61,7 +61,7 @@ export class CidlExtractor {
   constructor(
     public projectName: string,
     public version: string,
-  ) {}
+  ) { }
 
   extract(project: Project): Either<ExtractorError, CloesceAst> {
     const d1Models: Record<string, D1Model> = {};
@@ -851,7 +851,6 @@ export class D1ModelExtractor {
       });
     }
 
-    let needsDataSource = !method.isStatic();
     const parameters: NamedTypedValue[] = [];
 
     for (const param of method.getParameters()) {
@@ -882,9 +881,6 @@ export class D1ModelExtractor {
         typeRes.value.context = param.getName();
         return typeRes;
       }
-      if (typeof typeRes.value !== "string" && "DataSource" in typeRes.value) {
-        needsDataSource = false;
-      }
 
       parameters.push({
         name: param.getName(),
@@ -898,14 +894,6 @@ export class D1ModelExtractor {
     if (typeRes.isLeft()) {
       typeRes.value.snippet = method.getText();
       return typeRes;
-    }
-
-    // Sugaring: add data source
-    if (needsDataSource) {
-      parameters.push({
-        name: "__dataSource",
-        cidl_type: { DataSource: modelName },
-      });
     }
 
     return Either.right({
