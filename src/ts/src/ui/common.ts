@@ -52,11 +52,11 @@ type DeepPartialInner<T> = T extends (infer U)[]
 export type DeepPartial<T> = DeepPartialInner<T> & { __brand?: "Partial" };
 
 /**
- * Base class for a Cloudflare KV model.
+ * Base class for a Cloudflare KV model or navigation property.
  *
  * Consists of a `key`, `value`, and optional `metadata`.
  *
- * @template V The type of the value stored in the KV model. Note that KV is schema-less,
+ * @template V The type of the value stored in the KValue. Note that KV is schema-less,
  * so this type is not enforced at runtime, but serves as the type the client expects.
  *
  * @remarks
@@ -65,7 +65,7 @@ export type DeepPartial<T> = DeepPartialInner<T> & { __brand?: "Partial" };
  * - `V` must be serializable to JSON.
  * - The `metadata` can hold any additional information associated with the KV entry.
  */
-export class KVModel<V> {
+export class KValue<V> {
   key!: string;
   value!: V;
   metadata: unknown;
@@ -228,8 +228,6 @@ export class HttpResult<T = unknown> {
     );
   }
 }
-
-export type Stream = ReadableStream<Uint8Array>;
 
 export function b64ToU8(b64: string): Uint8Array {
   // Prefer Buffer in Node.js environments

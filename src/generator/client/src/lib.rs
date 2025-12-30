@@ -3,7 +3,7 @@ mod mappers;
 use std::sync::Arc;
 
 use ast::{
-    CidlType, CloesceAst, D1NavigationProperty, D1NavigationPropertyKind, HttpVerb, InputLanguage,
+    CidlType, CloesceAst, D1NavigationProperty, D1NavigationPropertyKind, HttpVerb,
     KVNavigationProperty, MediaType, cidl_type_contains,
 };
 use mappers::{ClientLanguageTypeMapper, TypeScriptMapper};
@@ -53,15 +53,9 @@ const TEMPLATE_STRING: &str = "client_api";
 pub struct ClientGenerator;
 impl ClientGenerator {
     pub fn generate_client_api(ast: &CloesceAst, domain: String) -> String {
-        let template = match ast.language {
-            InputLanguage::TypeScript => TYPESCRIPT_TEMPLATE,
-            // InputLanguage::...
-        };
-
-        let mapper = match ast.language {
-            InputLanguage::TypeScript => Arc::new(TypeScriptMapper),
-            // InputLanguage::...
-        };
+        // TODO: Hardcoded TypeScript for now
+        let template = TYPESCRIPT_TEMPLATE;
+        let mapper = Arc::new(TypeScriptMapper);
 
         let mut handlebars = Handlebars::new();
         handlebars

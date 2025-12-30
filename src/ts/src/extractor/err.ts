@@ -18,7 +18,8 @@ export enum ExtractorErrorCode {
   InvalidServiceAttribute,
   MissingKVNamespace,
   MissingKVModelBaseClass,
-  InvalidKVModelField,
+  MissingKVKeyParamDecorator,
+  InvalidKVKeyParamType,
 }
 
 const errorInfoMap: Record<
@@ -113,9 +114,15 @@ const errorInfoMap: Record<
       "KV Models must extend from the KVModel base class with a generic value type.",
     suggestion: "Extend from KVModel<T> with a valid value type.",
   },
-  [ExtractorErrorCode.InvalidKVModelField]: {
-    description: "KV Models cannot have any fields.",
-    suggestion: "Remove all fields from the KV Model.",
+  [ExtractorErrorCode.MissingKVKeyParamDecorator]: {
+    description:
+      "KV Model key parameters must be decorated with the @KeyParam decorator.",
+    suggestion: "Add the @KeyParam decorator to the key parameter attribute.",
+  },
+  [ExtractorErrorCode.InvalidKVKeyParamType]: {
+    description:
+      "KV Model key parameters must be of type string, number, or boolean.",
+    suggestion: "Change the key parameter type to string, number, or boolean.",
   },
 };
 

@@ -185,30 +185,6 @@ describe("WranglerEnv", () => {
     // Assert
     expect(res.isRight()).toBe(true);
   });
-
-  test("Finds KVNamespaces", () => {
-    // Arrange
-    const project = cloesceProject();
-    const sourceFile = project.createSourceFile(
-      "test.ts",
-      `
-       import { KVNamespace } from "@cloudflare/workers-types";
-        @WranglerEnv
-        class Env {
-          foo: KVNamespace;
-          bar: KVNamespace;
-        }
-      `,
-    );
-
-    // Act
-    const classDecl = sourceFile.getClass("Env")!;
-    const res = CidlExtractor.env(classDecl, sourceFile);
-
-    // Assert
-    expect(res.isRight()).toBe(true);
-    expect(res.unwrap().kv_bindings).toEqual(["foo", "bar"]);
-  });
 });
 
 describe("Data Source", () => {
@@ -274,53 +250,11 @@ describe("Services", () => {
       attributes: [
         {
           var_name: "barService",
-          injected: "BarService",
+          inject_reference: "BarService",
         },
       ],
       methods: {},
       source_path: sourceFile.getFilePath().toString(),
     } as Service);
-  });
-});
-
-describe("KV Models", () => {
-  test("Finds KV Model", () => {
-    // Arrange
-    const project = cloesceProject();
-    const sourceFile = project.createSourceFile(
-      "test.ts",
-      `
-        import { KVModel, POST } from "./src/ui/backend";
-
-        @KV("FOO_NAMESPACE")
-        export class Foo extends KVModel<unknown> {
-          @POST
-          method(): void {}
-        }
-        `,
-    );
-
-    // Act
-    const res = new CidlExtractor("proj", "1.0.0").extract(project);
-
-    // Assert
-    expect(res.isRight()).toBe(true);
-    expect(res.unwrap().kv_models["Foo"]).toEqual({
-      name: "Foo",
-      binding: "FOO_NAMESPACE",
-      cidl_type: "JsonValue",
-      methods: {
-        method: {
-          name: "method",
-          http_verb: "POST",
-          is_static: false,
-          parameters: [],
-          parameters_media: "Json",
-          return_media: "Json",
-          return_type: "Void",
-        },
-      },
-      source_path: sourceFile.getFilePath().toString(),
-    });
   });
 });

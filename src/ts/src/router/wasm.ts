@@ -169,7 +169,7 @@ export function mapSql<T extends object>(
       const nestedIncludeTree = includeTree[navProp.var_name];
       if (!nestedIncludeTree) continue;
 
-      const nestedMeta = ast.d1_models[navProp.model_name];
+      const nestedMeta = ast.d1_models[navProp.model_reference];
 
       // One to Many, Many to Many
       if (Array.isArray(m[navProp.var_name])) {

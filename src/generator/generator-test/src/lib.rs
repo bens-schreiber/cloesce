@@ -7,8 +7,8 @@ use indexmap::IndexMap;
 
 use ast::{
     ApiMethod, CidlType, CloesceAst, CrudKind, D1Model, D1ModelAttribute, D1NavigationProperty,
-    D1NavigationPropertyKind, DataSource, HttpVerb, IncludeTree, InputLanguage, KVModel,
-    KVNavigationProperty, MediaType, NamedTypedValue, WranglerEnv, WranglerSpec,
+    D1NavigationPropertyKind, DataSource, HttpVerb, IncludeTree, KVModel, KVNavigationProperty,
+    MediaType, NamedTypedValue, WranglerEnv, WranglerSpec,
 };
 use wrangler::WranglerDefault;
 
@@ -24,9 +24,7 @@ pub fn create_ast(d1_models: Vec<D1Model>, kv_models: Vec<KVModel>) -> CloesceAs
         .collect::<BTreeMap<String, KVModel>>();
 
     CloesceAst {
-        version: "1.0".to_string(),
         project_name: "test".to_string(),
-        language: InputLanguage::TypeScript,
         d1_models: d1_map,
         kv_models: kv_map,
         poos: BTreeMap::default(),

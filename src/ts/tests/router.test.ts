@@ -14,7 +14,6 @@ import {
   D1ModelBuilder,
   ServiceBuilder,
   createAst,
-  KVModelBuilder,
 } from "./builder";
 
 function createRequest(url: string, method?: string, body?: any) {
@@ -224,34 +223,9 @@ describe("Match Route", () => {
     expect(res.unwrap()).toEqual({
       id: null,
       method: ast.d1_models["Model"].methods["method"],
-      model: ast.d1_models["Model"],
+      d1Model: ast.d1_models["Model"],
       namespace: "Model",
       kind: "d1",
-    });
-  });
-
-  test("Matches static method on KV Model", () => {
-    // Arrange
-    const request = createRequest("http://foo.com/api/Model/method", "POST");
-    const ast = createAst({
-      kvModels: [
-        KVModelBuilder.model("Model")
-          .method("method", HttpVerb.POST, true, [], "Void")
-          .build(),
-      ],
-    });
-
-    // Act
-    const res = _cloesceInternal.matchRoute(request, ast, "api");
-
-    // Assert
-    expect(res.isRight()).toBe(true);
-    expect(res.unwrap()).toEqual({
-      id: null,
-      method: ast.kv_models["Model"].methods["method"],
-      model: ast.kv_models["Model"],
-      namespace: "Model",
-      kind: "kv",
     });
   });
 
@@ -274,35 +248,10 @@ describe("Match Route", () => {
     expect(res.isRight()).toBe(true);
     expect(res.unwrap()).toEqual({
       id: "0",
-      model: ast.d1_models["Model"],
+      d1Model: ast.d1_models["Model"],
       method: ast.d1_models["Model"].methods["method"],
       namespace: "Model",
       kind: "d1",
-    });
-  });
-
-  test("Matches instantiated method on KVModel", () => {
-    // Arrange
-    const request = createRequest("http://foo.com/api/Model/0/method", "POST");
-    const ast = createAst({
-      kvModels: [
-        KVModelBuilder.model("Model")
-          .method("method", HttpVerb.POST, false, [], "Void")
-          .build(),
-      ],
-    });
-
-    // Act
-    const res = _cloesceInternal.matchRoute(request, ast, "api");
-
-    // Assert
-    expect(res.isRight()).toBe(true);
-    expect(res.unwrap()).toEqual({
-      id: "0",
-      model: ast.kv_models["Model"],
-      method: ast.kv_models["Model"].methods["method"],
-      namespace: "Model",
-      kind: "kv",
     });
   });
 
@@ -450,40 +399,6 @@ describe("Request Validation", () => {
     const ctorReg = createCtorReg([Foo]);
     const route: MatchedRoute = {
       kind: "d1",
-      namespace: Foo.name,
-      method: model.methods["method"],
-      id: null,
-    };
-
-    // Act
-    const res = await _cloesceInternal.validateRequest(
-      request,
-      ast,
-      ctorReg,
-      route,
-    );
-
-    // Assert
-    expect(res.isLeft()).toBe(true);
-    expect(extractErrorCode(res.unwrapLeft().message)).toEqual(
-      RouterError.InstantiatedMethodMissingId,
-    );
-  });
-
-  test("Instantiated KV Model Method Missing Key => 400", async () => {
-    // Arrange
-    const request = createRequest("http://foo.com/api/Foo/method", "POST", {});
-    const model = KVModelBuilder.model("Foo")
-      .method("method", HttpVerb.POST, false, [], "Void")
-      .build();
-    const ast = createAst({
-      kvModels: [model],
-    });
-
-    class Foo {}
-    const ctorReg = createCtorReg([Foo]);
-    const route: MatchedRoute = {
-      kind: "kv",
       namespace: Foo.name,
       method: model.methods["method"],
       id: null,
@@ -726,7 +641,7 @@ describe("Request Validation", () => {
         D1ModelBuilder.model("ManyScalars")
           .id()
           .navP("scalars", "Scalar", {
-            OneToMany: { reference: "manyScalarsId" },
+            OneToMany: { attribute_reference: "manyScalarsId" },
           })
           .build(),
       ],
@@ -1149,14 +1064,16 @@ describe("mapSql", () => {
     const Horse = D1ModelBuilder.model("Horse")
       .attribute("name", "Text")
       .attribute("bio", { Nullable: "Text" })
-      .navP("likes", "Like", { OneToMany: { reference: "horseId1" } })
+      .navP("likes", "Like", { OneToMany: { attribute_reference: "horseId1" } })
       .id()
       .build();
 
     const Like = D1ModelBuilder.model("Like")
       .attribute("horseId1", "Integer", "Horse")
       .attribute("horseId2", "Integer", "Horse")
-      .navP("horse2", "Horse", { OneToOne: { reference: "horseId2" } })
+      .navP("horse2", "Horse", {
+        OneToOne: { attribute_reference: "horseId2" },
+      })
       .id()
       .build();
 

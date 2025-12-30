@@ -1,4 +1,4 @@
-import { D1Database, KVNamespace } from "@cloudflare/workers-types";
+import { D1Database } from "@cloudflare/workers-types";
 
 import { OrmWasmExports, mapSql, loadOrmWasm } from "./wasm.js";
 import { proxyCrud } from "./crud.js";
@@ -11,7 +11,6 @@ import {
   NO_DATA_SOURCE,
   Service,
   MediaType,
-  KVModel,
 } from "../ast.js";
 import { RuntimeValidator } from "./validator.js";
 import Either from "../either.js";
@@ -263,16 +262,6 @@ export class CloesceApp {
             dataSource!,
           );
         }
-        case "kv": {
-          const kv: KVNamespace = env[route.kvModel!.binding];
-
-          // TODO: CRUD operations for KV models
-          if (route.method.is_static) {
-            return Either.right(ctorReg[route.namespace]);
-          }
-
-          return await hydrateKVModel(ctorReg, kv, route.kvModel!, route.id!);
-        }
       }
     })();
 
@@ -366,12 +355,12 @@ export class CloesceApp {
 }
 
 export type MatchedRoute = {
-  kind: "d1" | "kv" | "service";
+  kind: "d1" | "service"; // | "kv";
   namespace: string;
   method: ApiMethod;
   id: string | null;
   d1Model?: D1Model;
-  kvModel?: KVModel;
+  // kvModel?: KVModel;
   service?: Service;
 };
 
@@ -424,24 +413,6 @@ function matchRoute(
     });
   }
 
-  const kvModel = ast.kv_models[namespace];
-  if (kvModel) {
-    const method = kvModel.methods[methodName];
-    if (!method) return notFound(RouterError.UnknownRoute);
-
-    if (request.method !== method.http_verb) {
-      return notFound(RouterError.UnmatchedHttpVerb);
-    }
-
-    return Either.right({
-      kind: "kv",
-      namespace,
-      method,
-      kvModel,
-      id,
-    });
-  }
-
   const service = ast.services[namespace];
   if (service) {
     const method = service.methods[methodName];
@@ -483,7 +454,7 @@ async function validateRequest(
     exit(400, c, "Invalid Request Body");
 
   // Models must have an ID on instantiated methods.
-  const isModel = route.kind === "d1" || route.kind === "kv";
+  const isModel = route.kind === "d1";
   if (isModel && !route.method.is_static && route.id == null) {
     return invalidRequest(RouterError.InstantiatedMethodMissingId);
   }
@@ -621,48 +592,6 @@ async function hydrateD1Model(
   }
 
   return Either.right(models.unwrap()[0]);
-}
-
-/**
- * Queries KV for a particular model's key, constructing a model instance.
- *
- * Depending on the model's type, retrieves the value as JSON, text, arrayBuffer, or stream.
- *
- * @returns 404 if no record was found for the provided key
- * @returns The instantiated model on success
- */
-async function hydrateKVModel(
-  ctorReg: ConstructorRegistry,
-  kv: KVNamespace,
-  model: KVModel,
-  key: string,
-): Promise<Either<HttpResult, object>> {
-  const ctor = ctorReg[model.name];
-  const getType: "json" | "text" | "arrayBuffer" | "stream" = (() => {
-    switch (model.cidl_type) {
-      case "Text":
-        return "text";
-      case "Blob":
-        return "arrayBuffer";
-      case "Stream":
-        return "stream";
-      default:
-        return "json";
-    }
-  })();
-
-  const res = await kv.getWithMetadata(key, { type: getType as any });
-  if (res.value === null) {
-    return exit(404, RouterError.ModelNotFound, "Key not found");
-  }
-
-  return Either.right(
-    Object.assign(new ctor(), {
-      key,
-      value: res.value,
-      metadata: res.metadata,
-    }),
-  );
 }
 
 /**

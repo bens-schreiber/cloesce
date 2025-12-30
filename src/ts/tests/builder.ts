@@ -8,7 +8,7 @@ import {
   NavigationPropertyKind,
   D1ModelAttribute,
   DataSource,
-  NavigationProperty,
+  D1NavigationProperty,
   ApiMethod,
   Service,
   ServiceAttribute,
@@ -32,9 +32,7 @@ export function createAst(args?: {
   );
 
   return {
-    version: "1.0",
     project_name: "test",
-    language: "TypeScript",
     d1_models: d1ModelsMap,
     kv_models: kvModelsMap,
     services: serviceMap,
@@ -42,7 +40,8 @@ export function createAst(args?: {
     wrangler_env: {
       name: "Env",
       source_path: "source.ts",
-      db_binding: "db",
+      d1_binding: "db",
+      kv_bindings: [],
       vars: {},
     },
     app_source: null,
@@ -103,7 +102,7 @@ export class IncludeTreeBuilder {
 export class D1ModelBuilder extends ApiMethodBuilder {
   private name: string;
   private attributes: D1ModelAttribute[] = [];
-  private navigation_properties: NavigationProperty[] = [];
+  private navigation_properties: D1NavigationProperty[] = [];
   private primary_key: NamedTypedValue | null = null;
   private data_sources: Record<string, DataSource> = {};
 
@@ -130,12 +129,12 @@ export class D1ModelBuilder extends ApiMethodBuilder {
 
   navP(
     var_name: string,
-    model_name: string,
+    model_reference: string,
     kind: NavigationPropertyKind,
   ): this {
     this.navigation_properties.push({
       var_name,
-      model_name,
+      model_reference,
       kind,
     });
     return this;
@@ -176,41 +175,6 @@ export class D1ModelBuilder extends ApiMethodBuilder {
   }
 }
 
-export class KVModelBuilder extends ApiMethodBuilder {
-  private name: string;
-  private cidl_type: CidlType | null = null;
-  private binding: string;
-
-  constructor(name: string) {
-    super();
-    this.name = name;
-  }
-
-  static model(name: string) {
-    return new KVModelBuilder(name);
-  }
-
-  value(cidl_type: CidlType): this {
-    this.cidl_type = cidl_type;
-    return this;
-  }
-
-  bind(binding: string): this {
-    this.binding = binding;
-    return this;
-  }
-
-  build(): KVModel {
-    return {
-      name: this.name,
-      cidl_type: this.cidl_type!,
-      binding: this.binding,
-      source_path: "",
-      methods: this.methods,
-    };
-  }
-}
-
 export class ServiceBuilder extends ApiMethodBuilder {
   private name: string;
   private attributes: ServiceAttribute[] = [];
@@ -224,8 +188,8 @@ export class ServiceBuilder extends ApiMethodBuilder {
     return new ServiceBuilder(name);
   }
 
-  inject(var_name: string, injected: string): this {
-    this.attributes.push({ var_name, injected });
+  inject(var_name: string, inject_reference: string): this {
+    this.attributes.push({ var_name, inject_reference });
     return this;
   }
 

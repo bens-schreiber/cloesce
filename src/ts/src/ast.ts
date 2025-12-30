@@ -67,29 +67,29 @@ export interface ApiMethod {
 }
 
 export type NavigationPropertyKind =
-  | { OneToOne: { reference: string } }
-  | { OneToMany: { reference: string } }
+  | { OneToOne: { attribute_reference: string } }
+  | { OneToMany: { attribute_reference: string } }
   | { ManyToMany: { unique_id: string } };
 
-export interface NavigationProperty {
+export interface D1NavigationProperty {
   var_name: string;
-  model_name: string;
+  model_reference: string;
   kind: NavigationPropertyKind;
 }
 
 export function getNavigationPropertyCidlType(
-  nav: NavigationProperty,
+  nav: D1NavigationProperty,
 ): CidlType {
   return "OneToOne" in nav.kind
-    ? { Object: nav.model_name }
-    : { Array: { Object: nav.model_name } };
+    ? { Object: nav.model_reference }
+    : { Array: { Object: nav.model_reference } };
 }
 
 export interface D1Model {
   name: string;
   primary_key: NamedTypedValue;
   attributes: D1ModelAttribute[];
-  navigation_properties: NavigationProperty[];
+  navigation_properties: D1NavigationProperty[];
   methods: Record<string, ApiMethod>;
   data_sources: Record<string, DataSource>;
   cruds: CrudKind[];
@@ -102,17 +102,31 @@ export interface PlainOldObject {
   source_path: string;
 }
 
+export type KVNavigationProperty =
+  | { KValue: NamedTypedValue }
+  | {
+      Model: {
+        model_reference: string;
+        var_name: string;
+        many: boolean;
+      };
+    };
+
 export interface KVModel {
   name: string;
   binding: string;
   cidl_type: CidlType;
+  params: string[];
+  navigation_properties: KVNavigationProperty[];
+  cruds: CrudKind[];
   methods: Record<string, ApiMethod>;
+  data_sources: Record<string, DataSource>;
   source_path: string;
 }
 
 export interface ServiceAttribute {
   var_name: string;
-  injected: string;
+  inject_reference: string;
 }
 
 export interface Service {
@@ -141,9 +155,7 @@ export interface WranglerEnv {
 }
 
 export interface CloesceAst {
-  version: string;
   project_name: string;
-  language: string;
   wrangler_env?: WranglerEnv;
   d1_models: Record<string, D1Model>;
   kv_models: Record<string, KVModel>;

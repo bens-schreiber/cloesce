@@ -238,8 +238,6 @@ pub struct D1Model {
     pub name: String,
 
     /// Primary key attribute of the model.
-    /// Must be a non-nullable attribute.
-    /// Translates to the PRIMARY KEY column in SQLite.
     // TODO: Composite primary keys
     pub primary_key: NamedTypedValue,
 
@@ -337,11 +335,6 @@ pub struct PlainOldObject {
 }
 
 #[derive(Serialize, Deserialize)]
-pub enum InputLanguage {
-    TypeScript,
-}
-
-#[derive(Serialize, Deserialize)]
 pub struct WranglerEnv {
     /// Class name of the Wrangler environment.
     pub name: String,
@@ -360,11 +353,7 @@ pub struct CloesceAst {
     #[serde(default)]
     pub hash: u64,
 
-    // TODO: Version checking is not implemented
-    pub version: String,
-
     pub project_name: String,
-    pub language: InputLanguage,
     pub wrangler_env: Option<WranglerEnv>,
 
     // TODO: MapPreventDuplicates is not supported for IndexMap

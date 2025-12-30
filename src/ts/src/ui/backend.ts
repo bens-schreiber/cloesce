@@ -12,65 +12,19 @@ export {
   DependencyContainer as DependencyInjector,
 } from "../router/router.js";
 export type { MiddlewareFn, ResultMiddlewareFn } from "../router/router.js";
-export { HttpResult, KVModel } from "./common.js";
-export type { DeepPartial, Stream } from "./common.js";
+export { HttpResult, KValue as KVModel } from "./common.js";
+export type { DeepPartial } from "./common.js";
 export type { CrudKind } from "../ast.js";
 
-/**
- * Marks a class as a D1-backed SQL model.
- *
- * Classes annotated with `@D1` are compiled into:
- *  - a D1 table definition (via `cloesce migrate`)
- *  - backend API endpoints (Workers)
- *  - a frontend client API
- *  - Cloudflare Wrangler configurations
- *
- * Each `@D1` class must define exactly one `@PrimaryKey`.
- *
- * Example:
- *```ts
- *  ＠D1
- *  export class Horse {
- *    ＠PrimaryKey id: number;
- *    name: string;
- *  }
- * ```
- */
-export const D1: ClassDecorator = () => {};
+export const D1 = (_cruds: CrudKind[]): ClassDecorator => {
+  return () => {};
+};
 
-export const KV = (_binding: string): ClassDecorator => {
+export const KV = (_binding: string, _cruds: CrudKind[]): ClassDecorator => {
   return () => {};
 };
 
 export const Service: ClassDecorator = () => {};
-
-/**
- * Marks a class as a plain serializable object.
- *
- * `@PlainOldObject` types represent data that can be safely
- * returned from a model method or API endpoint without being
- * treated as a database model.
- *
- * Example:
- * ```ts
- * ＠PlainOldObject
- * export class CatStuff {
- *   catFacts: string[];
- *   catNames: string[];
- * }
- *
- * // in a method...
- * foo(): CatStuff {
- *   return {
- *    catFacts: ["cats sleep 16 hours a day"],
- *   catNames: ["Whiskers", "Fluffy"]
- *  };
- *
- * // which generates an API like:
- * async function foo(): Promise<HttpResult<CatStuff>> { ... }
- * ```
- */
-export const PlainOldObject: ClassDecorator = () => {};
 
 /**
  * Declares a Wrangler environment definition.
