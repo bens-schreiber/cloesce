@@ -267,8 +267,7 @@ async function extract(
     const extractorStart = Date.now();
     debug("Extracting CIDL...");
 
-    const extractor = new CidlExtractor(cloesceProjectName, "v0.0.4");
-    const result = extractor.extract(project);
+    const result = CidlExtractor.extract(cloesceProjectName, project);
     if (result.isLeft()) {
       console.error(formatErr(result.value));
       process.exit(1);

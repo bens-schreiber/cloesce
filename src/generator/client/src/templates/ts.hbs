@@ -166,18 +166,16 @@ export class {{this.name}} {
   key: string;
   {{#unless (is_stream this.cidl_type)}}value: {{map_cidl_type this.cidl_type}};{{/unless}}
   metadata: unknown;
-
   {{#each this.params}}
-  {{this.name}}: string;
+  {{this}}: string;
   {{/each}}
-  
-  {{#each this.attributes}}
-    {{#if is_kv_nav_model this}}
-  {{this.var_name}}: {{this.model_name}}{{#if this.many}}[]{{else}} | undefined{{/if}};
+  {{#each this.navigation_properties}}
+    {{#if (is_kv_nav_model this)}}
+  {{Model.var_name}}: {{Model.model_name}}{{#if Model.many}}[]{{else}} | undefined{{/if}};
     {{else}}
-  {{this.name}}: {
+  {{KValue.name}}: {
     key: string;
-    {{#unless (is_stream this.cidl_type)}}value: {{map_cidl_type this.cidl_type}};{{/unless}}
+    {{#unless (is_stream KValue.cidl_type)}}value: {{map_cidl_type KValue.cidl_type}};{{/unless}}
     metadata: unknown;
   };
     {{/if}}
@@ -245,6 +243,17 @@ export class {{this.name}} {
     {{else if (is_blob cidl_type)}}
     res.{{name}} = b64ToU8(res.{{name}});
     {{/if}}
+    {{#each this.navigation_properties}}
+      {{#if (is_kv_nav_model this)}}
+        {{#if Model.many}}
+    for (let i = 0; i < res.{{Model.var_name}}?.length; i++) {
+      res.{{Model.var_name}}[i] = {{Model.model_reference}}.fromJson(res.{{Model.var_name}}[i]);
+    }
+        {{else}}
+    res["{{Model.var_name}}"] &&= {{Model.model_reference}}.fromJson(res.{{Model.var_name}});
+        {{/if}}
+      {{/if}}
+    {{/each}}
 
     return res;
   }

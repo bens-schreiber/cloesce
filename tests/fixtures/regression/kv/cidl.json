@@ -1,0 +1,128 @@
+{
+  "hash": 0,
+  "project_name": "runner",
+  "wrangler_env": {
+    "name": "Env",
+    "source_path": "./seed__kv.cloesce.ts",
+    "d1_binding": null,
+    "kv_bindings": [
+      "namespace",
+      "otherNamespace"
+    ],
+    "vars": {}
+  },
+  "d1_models": {},
+  "services": {},
+  "kv_models": {
+    "Data": {
+      "name": "Data",
+      "binding": "namespace",
+      "cidl_type": {
+        "Object": "DataValue"
+      },
+      "params": [
+        "id1",
+        "id2"
+      ],
+      "navigation_properties": [
+        {
+          "KValue": {
+            "name": "settings",
+            "cidl_type": "JsonValue"
+          }
+        }
+      ],
+      "cruds": [],
+      "methods": {},
+      "data_sources": {},
+      "source_path": "./seed__kv.cloesce.ts"
+    },
+    "DataScientist": {
+      "name": "DataScientist",
+      "binding": "namespace",
+      "cidl_type": "JsonValue",
+      "params": [],
+      "navigation_properties": [
+        {
+          "Model": {
+            "model_reference": "Data",
+            "var_name": "datasets",
+            "many": true
+          }
+        }
+      ],
+      "cruds": [],
+      "methods": {},
+      "data_sources": {
+        "withDatasets": {
+          "hash": 0,
+          "name": "withDatasets",
+          "tree": {
+            "datasets": {
+              "settings": {}
+            }
+          }
+        }
+      },
+      "source_path": "./seed__kv.cloesce.ts"
+    },
+    "JsonValue": {
+      "name": "JsonValue",
+      "binding": "namespace",
+      "cidl_type": "JsonValue",
+      "params": [],
+      "navigation_properties": [],
+      "cruds": [],
+      "methods": {},
+      "data_sources": {},
+      "source_path": "./seed__kv.cloesce.ts"
+    },
+    "StreamValue": {
+      "name": "StreamValue",
+      "binding": "namespace",
+      "cidl_type": "Stream",
+      "params": [],
+      "navigation_properties": [],
+      "cruds": [],
+      "methods": {},
+      "data_sources": {},
+      "source_path": "./seed__kv.cloesce.ts"
+    },
+    "TextValue": {
+      "name": "TextValue",
+      "binding": "namespace",
+      "cidl_type": "Text",
+      "params": [],
+      "navigation_properties": [],
+      "cruds": [],
+      "methods": {},
+      "data_sources": {},
+      "source_path": "./seed__kv.cloesce.ts"
+    }
+  },
+  "poos": {
+    "DataValue": {
+      "name": "DataValue",
+      "attributes": [
+        {
+          "name": "id",
+          "cidl_type": "Text"
+        },
+        {
+          "name": "name",
+          "cidl_type": "Text"
+        },
+        {
+          "name": "age",
+          "cidl_type": "Real"
+        },
+        {
+          "name": "favoriteColor",
+          "cidl_type": "Text"
+        }
+      ],
+      "source_path": "./seed__kv.cloesce.ts"
+    }
+  },
+  "app_source": null
+}
