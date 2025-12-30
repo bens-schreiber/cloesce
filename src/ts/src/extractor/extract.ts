@@ -8,8 +8,8 @@ import {
   SyntaxKind,
   ClassDeclaration,
   Decorator,
-  Expression,
   Scope,
+  ObjectLiteralExpression,
 } from "ts-morph";
 
 import {
@@ -30,10 +30,11 @@ import {
   defaultMediaType,
   KVModel,
   ServiceAttribute,
+  KVNavigationProperty,
 } from "../ast.js";
 import { TypeFormatFlags } from "typescript";
 import { ExtractorError, ExtractorErrorCode } from "./err.js";
-import { HttpResult } from "../ui/common.js";
+import { HttpResult, KValue } from "../ui/common.js";
 import Either from "../either.js";
 
 enum AttributeDecoratorKind {
@@ -59,12 +60,10 @@ enum ParameterDecoratorKind {
 }
 
 export class CidlExtractor {
-  constructor(
-    public projectName: string,
-    public version: string,
-  ) {}
-
-  extract(project: Project): Either<ExtractorError, CloesceAst> {
+  static extract(
+    projectName: string,
+    project: Project,
+  ): Either<ExtractorError, CloesceAst> {
     const d1Models: Record<string, D1Model> = {};
     const poos: Record<string, PlainOldObject> = {};
     const wranglerEnvs: WranglerEnv[] = [];
@@ -73,10 +72,9 @@ export class CidlExtractor {
     let app_source: string | null = null;
 
     for (const sourceFile of project.getSourceFiles()) {
-      if (
-        sourceFile.getBaseName() === "app.cloesce.ts" ||
-        sourceFile.getBaseName() === "seed__app.cloesce.ts" // hardcoding for tests
-      ) {
+      // Check if this is the app source file
+      const sourceFiles = ["app.cloesce.ts", "seed__app.cloesce.ts"];
+      if (sourceFiles.includes(sourceFile.getBaseName())) {
         const app = CidlExtractor.app(sourceFile);
         if (app.isLeft()) {
           return app;
@@ -91,65 +89,93 @@ export class CidlExtractor {
           e.snippet = classDecl.getText();
         });
 
-        if (hasDecorator(classDecl, ClassDecoratorKind.D1)) {
-          if (!classDecl.isExported()) return notExportedErr;
-          const result = D1ModelExtractor.extract(classDecl, sourceFile);
+        const decorator: Decorator | undefined = classDecl.getDecorators()[0];
+        const decoratorName: string | undefined = decorator?.getName();
 
-          // Error: propogate from models
-          if (result.isLeft()) {
-            result.value.addContext((prev) => `${classDecl.getName()}.${prev}`);
-            return result;
-          }
+        switch (decoratorName) {
+          case ClassDecoratorKind.D1: {
+            if (!classDecl.isExported()) return notExportedErr;
+            const result = D1ModelExtractor.extract(classDecl, sourceFile);
 
-          const model = result.unwrap();
-          d1Models[model.name] = model;
-          continue;
-        }
-
-        if (hasDecorator(classDecl, ClassDecoratorKind.Service)) {
-          if (!classDecl.isExported()) return notExportedErr;
-          const result = ServiceExtractor.extract(classDecl, sourceFile);
-
-          // Error: propogate from service
-          if (result.isLeft()) {
-            result.value.addContext((prev) => `${classDecl.getName()}.${prev}`);
-            return result;
-          }
-
-          const service = result.unwrap();
-          services[service.name] = service;
-          continue;
-        }
-
-        if (hasDecorator(classDecl, ClassDecoratorKind.PlainOldObject)) {
-          if (!classDecl.isExported()) return notExportedErr;
-          const result = CidlExtractor.poo(classDecl, sourceFile);
-
-          // Error: propogate from models
-          if (result.isLeft()) {
-            result.value.addContext((prev) => `${classDecl.getName()}.${prev}`);
-            return result;
-          }
-          poos[result.unwrap().name] = result.unwrap();
-          continue;
-        }
-
-        if (hasDecorator(classDecl, ClassDecoratorKind.WranglerEnv)) {
-          // Error: invalid attribute modifier
-          for (const prop of classDecl.getProperties()) {
-            const modifierRes = checkAttributeModifier(prop);
-            if (modifierRes.isLeft()) {
-              return modifierRes;
+            if (result.isLeft()) {
+              result.value.addContext(
+                (prev) => `${classDecl.getName()}.${prev}`,
+              );
+              return result;
             }
+
+            const model = result.unwrap();
+            d1Models[model.name] = model;
+            break;
           }
 
-          const result = CidlExtractor.env(classDecl, sourceFile);
-          if (result.isLeft()) {
-            return result;
+          case ClassDecoratorKind.KV: {
+            if (!classDecl.isExported()) return notExportedErr;
+            const result = KVModelExtractor.extract(
+              classDecl,
+              sourceFile,
+              decorator,
+            );
+
+            if (result.isLeft()) {
+              result.value.addContext(
+                (prev) => `${classDecl.getName()}.${prev}`,
+              );
+              return result;
+            }
+
+            const model = result.unwrap();
+            kvModels[model.name] = model;
+            break;
           }
 
-          wranglerEnvs.push(result.unwrap());
-          continue;
+          case ClassDecoratorKind.Service: {
+            if (!classDecl.isExported()) return notExportedErr;
+            const result = ServiceExtractor.extract(classDecl, sourceFile);
+
+            if (result.isLeft()) {
+              result.value.addContext(
+                (prev) => `${classDecl.getName()}.${prev}`,
+              );
+              return result;
+            }
+
+            const service = result.unwrap();
+            services[service.name] = service;
+            break;
+          }
+
+          case ClassDecoratorKind.PlainOldObject: {
+            if (!classDecl.isExported()) return notExportedErr;
+            const result = CidlExtractor.poo(classDecl, sourceFile);
+
+            if (result.isLeft()) {
+              result.value.addContext(
+                (prev) => `${classDecl.getName()}.${prev}`,
+              );
+              return result;
+            }
+            poos[result.unwrap().name] = result.unwrap();
+            break;
+          }
+
+          case ClassDecoratorKind.WranglerEnv: {
+            // Error: invalid attribute modifier
+            for (const prop of classDecl.getProperties()) {
+              const modifierRes = checkAttributeModifier(prop);
+              if (modifierRes.isLeft()) {
+                return modifierRes;
+              }
+            }
+
+            const result = CidlExtractor.env(classDecl, sourceFile);
+            if (result.isLeft()) {
+              return result;
+            }
+
+            wranglerEnvs.push(result.unwrap());
+            break;
+          }
         }
       }
     }
@@ -163,9 +189,7 @@ export class CidlExtractor {
     }
 
     return Either.right({
-      version: this.version,
-      project_name: this.projectName,
-      language: "TypeScript",
+      project_name: projectName,
       wrangler_env: wranglerEnvs[0],
       d1_models: d1Models,
       kv_models: kvModels,
@@ -459,92 +483,6 @@ export class CidlExtractor {
     }
   }
 
-  static includeTree(
-    expr: Expression | undefined,
-    currentClass: ClassDeclaration,
-    sf: SourceFile,
-  ): Either<ExtractorError, CidlIncludeTree> {
-    // Include trees must be of the expected form
-    if (
-      !expr ||
-      !expr.isKind ||
-      !expr.isKind(SyntaxKind.ObjectLiteralExpression)
-    ) {
-      return err(ExtractorErrorCode.InvalidIncludeTree);
-    }
-
-    const result: CidlIncludeTree = {};
-    for (const prop of expr.getProperties()) {
-      if (!prop.isKind(SyntaxKind.PropertyAssignment)) continue;
-
-      // Error: navigation property not found
-      const navProp = findPropertyByName(currentClass, prop.getName());
-      if (!navProp) {
-        return err(
-          ExtractorErrorCode.UnknownNavigationPropertyReference,
-          (e) => {
-            e.snippet = expr.getText();
-            e.context = prop.getName();
-          },
-        );
-      }
-
-      const typeRes = CidlExtractor.cidlType(navProp.getType());
-
-      // Error: invalid referenced nav prop type
-      if (typeRes.isLeft()) {
-        typeRes.value.snippet = navProp.getText();
-        typeRes.value.context = prop.getName();
-        return typeRes;
-      }
-
-      // Error: invalid referenced nav prop type
-      const cidl_type = typeRes.unwrap();
-      if (typeof cidl_type === "string") {
-        return err(
-          ExtractorErrorCode.InvalidNavigationPropertyReference,
-          (e) => {
-            e.snippet = navProp.getText();
-            e.context = prop.getName();
-          },
-        );
-      }
-
-      // Recurse for nested includes
-      const initializer = (prop as any).getInitializer?.();
-      let nestedTree: CidlIncludeTree = {};
-      if (initializer?.isKind?.(SyntaxKind.ObjectLiteralExpression)) {
-        const targetModel = getObjectName(cidl_type);
-        const targetClass = currentClass
-          .getSourceFile()
-          .getProject()
-          .getSourceFiles()
-          .flatMap((f) => f.getClasses())
-          .find((c) => c.getName() === targetModel);
-
-        if (targetClass) {
-          const treeRes = CidlExtractor.includeTree(
-            initializer,
-            targetClass,
-            sf,
-          );
-
-          // Error: Propogated from `includeTree`
-          if (treeRes.isLeft()) {
-            treeRes.value.snippet = expr.getText();
-            return treeRes;
-          }
-
-          nestedTree = treeRes.unwrap();
-        }
-      }
-
-      result[navProp.getName()] = nestedTree;
-    }
-
-    return Either.right(result);
-  }
-
   static method(
     method: MethodDeclaration,
     verb: HttpVerb,
@@ -813,22 +751,16 @@ export class D1ModelExtractor {
           }
 
           const initializer = prop.getInitializer();
-
-          const treeRes = CidlExtractor.includeTree(
-            initializer,
-            classDecl,
-            sourceFile,
-          );
-
-          if (treeRes.isLeft()) {
-            treeRes.value.addContext((prev) => `${prop.getName()} ${prev}`);
-            treeRes.value.snippet = prop.getText();
-            return treeRes;
+          if (!initializer?.isKind(SyntaxKind.ObjectLiteralExpression)) {
+            return err(ExtractorErrorCode.InvalidDataSourceDefinition, (e) => {
+              e.snippet = prop.getText();
+              e.context = prop.getName();
+            });
           }
 
           data_sources[prop.getName()] = {
             name: prop.getName(),
-            tree: treeRes.unwrap(),
+            tree: parseIncludeTree(initializer),
           };
           break;
         }
@@ -875,6 +807,209 @@ export class D1ModelExtractor {
   }
 }
 
+export class KVModelExtractor {
+  static extract(
+    classDecl: ClassDeclaration,
+    sourceFile: SourceFile,
+    decorator: Decorator,
+  ): Either<ExtractorError, KVModel> {
+    const name = classDecl.getName()!;
+    const cruds: Set<CrudKind> = new Set<CrudKind>();
+    const params: string[] = [];
+    const navigation_properties: KVNavigationProperty[] = [];
+    const data_sources: Record<string, DataSource> = {};
+    const methods: Record<string, ApiMethod> = {};
+    let binding: string | undefined = undefined;
+
+    // KVModels must extend KValue
+    const extendsKValue = classDecl
+      .getHeritageClauses()
+      .flatMap((h) => h.getTypeNodes())
+      .find((t) => t.getExpression().getText() === KValue.name);
+    if (!extendsKValue) {
+      return err(ExtractorErrorCode.MissingKVModelBaseClass, (e) => {
+        e.context = classDecl.getName();
+        e.snippet = classDecl.getText();
+      });
+    }
+
+    // Type Hint
+    const generics = [...extendsKValue.getTypeArguments()];
+    const typeHintRes = CidlExtractor.cidlType(generics[0].getType());
+    if (typeHintRes.isLeft()) {
+      typeHintRes.value.addContext((prev) => `KVModel base type ${prev}`);
+      return typeHintRes;
+    }
+
+    // Extract crud methods
+    const crudDecorator = classDecl
+      .getDecorators()
+      .find((d) => getDecoratorName(d) === ClassDecoratorKind.CRUD);
+    if (crudDecorator) {
+      setCrudKinds(crudDecorator, cruds);
+    }
+
+    // Extract binding from class decorator
+    const bindingArg = decorator.getArguments()[0];
+    if (bindingArg && MorphNode.isStringLiteral(bindingArg)) {
+      binding = bindingArg.getLiteralValue();
+    } else {
+      return err(ExtractorErrorCode.MissingKVNamespace, (e) => {
+        e.context = classDecl.getName();
+        e.snippet = classDecl.getText();
+      });
+    }
+
+    for (const prop of classDecl.getProperties()) {
+      // Data source
+      const propDecorator: Decorator | undefined = prop.getDecorators()[0];
+      if (
+        propDecorator &&
+        getDecoratorName(propDecorator) === AttributeDecoratorKind.DataSource
+      ) {
+        const isIncludeTree =
+          prop
+            .getType()
+            .getText(
+              undefined,
+              TypeFormatFlags.UseAliasDefinedOutsideCurrentScope,
+            ) === `IncludeTree<${name}>`;
+
+        // Error: data sources must be static include trees
+        if (!prop.isStatic() || !isIncludeTree) {
+          return err(ExtractorErrorCode.InvalidDataSourceDefinition, (e) => {
+            e.snippet = prop.getText();
+            e.context = prop.getName();
+          });
+        }
+
+        const initializer = prop.getInitializer();
+        if (!initializer?.isKind(SyntaxKind.ObjectLiteralExpression)) {
+          return err(ExtractorErrorCode.InvalidDataSourceDefinition, (e) => {
+            e.snippet = prop.getText();
+            e.context = prop.getName();
+          });
+        }
+
+        data_sources[prop.getName()] = {
+          name: prop.getName(),
+          tree: parseIncludeTree(initializer),
+        };
+        continue;
+      }
+
+      // Error: invalid attribute modifier
+      const modifierRes = checkAttributeModifier(prop);
+      if (modifierRes.isLeft()) {
+        return modifierRes;
+      }
+
+      // Key param
+      const propType = prop.getType();
+      if (propType.isString()) {
+        params.push(prop.getName());
+        continue;
+      }
+
+      // Navigation property
+
+      // Case 1: Type is a KValue<V> and V is a valid Cidl type
+      const generics = [
+        ...propType.getAliasTypeArguments(),
+        ...propType.getTypeArguments(),
+      ];
+      if (generics.length === 1 && propType.getText().startsWith(KValue.name)) {
+        const genericTy = generics[0];
+        const typeRes = CidlExtractor.cidlType(genericTy);
+
+        // Error: invalid type
+        if (typeRes.isLeft()) {
+          typeRes.value.snippet = prop.getText();
+          typeRes.value.context = prop.getName();
+          return typeRes;
+        }
+
+        navigation_properties.push({
+          KValue: {
+            name: prop.getName(),
+            cidl_type: typeRes.unwrap(),
+          },
+        });
+        continue;
+      }
+
+      // Case 2: Type is a Model that extends KValue
+      const checkType = propType.isArray()
+        ? propType.getArrayElementTypeOrThrow()
+        : propType;
+      const extendsKValue = checkType
+        .getSymbol()
+        ?.getDeclarations()
+        .some((decl) => {
+          if (MorphNode.isClassDeclaration(decl)) {
+            return decl
+              .getHeritageClauses()
+              .flatMap((h) => h.getTypeNodes())
+              .some((t) => t.getExpression().getText() === KValue.name);
+          }
+          return false;
+        });
+      if (extendsKValue) {
+        navigation_properties.push({
+          Model: {
+            model_reference: checkType.getText(
+              undefined,
+              TypeFormatFlags.UseAliasDefinedOutsideCurrentScope,
+            ),
+            var_name: prop.getName(),
+            many: propType.isArray(),
+          },
+        });
+        continue;
+      }
+
+      // Error: Not a valid key param or navigation property
+      return err(ExtractorErrorCode.InvalidKVModelAttribute, (e) => {
+        e.snippet = prop.getText();
+        e.context = prop.getName();
+      });
+    }
+
+    // Process methods
+    for (const m of classDecl.getMethods()) {
+      const httpVerb = m
+        .getDecorators()
+        .map(getDecoratorName)
+        .find((name) =>
+          Object.values(HttpVerb).includes(name as HttpVerb),
+        ) as HttpVerb;
+
+      if (!httpVerb) {
+        continue;
+      }
+
+      const result = CidlExtractor.method(m, httpVerb);
+      if (result.isLeft()) {
+        result.value.addContext((prev) => `${m.getName()} ${prev}`);
+        return result;
+      }
+      methods[result.unwrap().name] = result.unwrap();
+    }
+
+    return Either.right({
+      name,
+      binding,
+      cidl_type: typeHintRes.unwrap(),
+      params,
+      navigation_properties,
+      methods,
+      data_sources,
+      cruds: Array.from(cruds).sort(),
+      source_path: sourceFile.getFilePath().toString(),
+    });
+  }
+}
+
 export class ServiceExtractor {
   static extract(
     classDecl: ClassDeclaration,
@@ -901,6 +1036,7 @@ export class ServiceExtractor {
         });
       }
 
+      // Error: invalid attribute modifier
       const checkModifierRes = checkAttributeModifier(prop);
       if (checkModifierRes.isLeft()) {
         return checkModifierRes;
@@ -1021,22 +1157,26 @@ function setCrudKinds(d: Decorator, cruds: Set<CrudKind>) {
   }
 }
 
-function findPropertyByName(
-  cls: ClassDeclaration,
-  name: string,
-): PropertyDeclaration | undefined {
-  const exactMatch = cls.getProperties().find((p) => p.getName() === name);
-  return exactMatch;
-}
+function parseIncludeTree(
+  objLiteral: ObjectLiteralExpression,
+): CidlIncludeTree {
+  const result: CidlIncludeTree = {};
 
-function hasDecorator(
-  node: { getDecorators(): Decorator[] },
-  name: string,
-): boolean {
-  return node.getDecorators().some((d) => {
-    const decoratorName = getDecoratorName(d);
-    return decoratorName === name || decoratorName.endsWith("." + name);
+  objLiteral.getProperties().forEach((prop) => {
+    if (prop.isKind(SyntaxKind.PropertyAssignment)) {
+      const name = prop.getName();
+      const init = prop.getInitializer();
+
+      // Check if it's a nested object literal
+      if (init?.isKind(SyntaxKind.ObjectLiteralExpression)) {
+        result[name] = parseIncludeTree(init); // Recurse
+      } else {
+        result[name] = {}; // Empty object by default
+      }
+    }
   });
+
+  return result;
 }
 
 function checkAttributeModifier(

@@ -16,11 +16,9 @@ export { HttpResult, KValue as KVModel } from "./common.js";
 export type { DeepPartial } from "./common.js";
 export type { CrudKind } from "../ast.js";
 
-export const D1 = (_cruds: CrudKind[]): ClassDecorator => {
-  return () => {};
-};
+export const D1: ClassDecorator = () => {};
 
-export const KV = (_binding: string, _cruds: CrudKind[]): ClassDecorator => {
+export const KV = (_binding: string): ClassDecorator => {
   return () => {};
 };
 

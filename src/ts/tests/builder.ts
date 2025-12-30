@@ -14,6 +14,8 @@ import {
   ServiceAttribute,
   MediaType,
   KVModel,
+  KVNavigationProperty,
+  CrudKind,
 } from "../src/ast";
 
 export function createAst(args?: {
@@ -170,6 +172,69 @@ export class D1ModelBuilder extends ApiMethodBuilder {
       methods: this.methods,
       data_sources: this.data_sources,
       cruds: [],
+      source_path: "",
+    };
+  }
+}
+
+export class KVModelBuilder {
+  private name: string;
+  private binding: string;
+  private cidl_type: CidlType;
+  private params: string[] = [];
+  private navigation_properties: KVNavigationProperty[] = [];
+  private cruds: CrudKind[] = [];
+  private methods: Record<string, ApiMethod> = {};
+  private data_sources: Record<string, DataSource> = {};
+
+  constructor(name: string, binding: string, cidl_type: CidlType) {
+    this.name = name;
+    this.binding = binding;
+    this.cidl_type = cidl_type;
+  }
+
+  param(p: string): this {
+    this.params.push(p);
+    return this;
+  }
+
+  navP(name: string, cidl_type: CidlType): this {
+    this.navigation_properties.push({
+      KValue: { name, cidl_type },
+    });
+    return this;
+  }
+
+  modelNavP(model_reference: string, var_name: string, many: boolean): this {
+    this.navigation_properties.push({
+      Model: { model_reference, var_name, many },
+    });
+    return this;
+  }
+
+  method(name: string, api_method: ApiMethod): this {
+    this.methods[name] = api_method;
+    return this;
+  }
+
+  dataSource(name: string, tree: CidlIncludeTree): this {
+    this.data_sources[name] = {
+      name,
+      tree,
+    };
+    return this;
+  }
+
+  build(): KVModel {
+    return {
+      name: this.name,
+      binding: this.binding,
+      cidl_type: this.cidl_type,
+      params: [...this.params],
+      navigation_properties: [...this.navigation_properties],
+      cruds: [...this.cruds],
+      methods: { ...this.methods },
+      data_sources: { ...this.data_sources },
       source_path: "",
     };
   }

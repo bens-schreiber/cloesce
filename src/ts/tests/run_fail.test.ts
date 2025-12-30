@@ -16,7 +16,7 @@ describe("Extractor Run-Fail", () => {
       const project = new Project({ compilerOptions: { strict: true } });
       project.addSourceFileAtPath(file);
 
-      const res = new CidlExtractor("proj", "1.0.0").extract(project);
+      const res = CidlExtractor.extract("proj", project);
       expect(res.isLeft()).toBe(true);
 
       const actualName = getErrorNameFromCode(

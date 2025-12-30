@@ -20,6 +20,7 @@ export enum ExtractorErrorCode {
   MissingKVModelBaseClass,
   MissingKVKeyParamDecorator,
   InvalidKVKeyParamType,
+  InvalidKVModelAttribute,
 }
 
 const errorInfoMap: Record<
@@ -123,6 +124,11 @@ const errorInfoMap: Record<
     description:
       "KV Model key parameters must be of type string, number, or boolean.",
     suggestion: "Change the key parameter type to string, number, or boolean.",
+  },
+  [ExtractorErrorCode.InvalidKVModelAttribute]: {
+    description:
+      "KV Model attributes must be of a supported CIDL type (KValue or Model).",
+    suggestion: "Change the attribute to a supported CIDL type.",
   },
 };
 
