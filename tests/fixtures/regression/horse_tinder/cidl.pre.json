@@ -1,7 +1,5 @@
 {
-    "version": "v0.0.4",
     "project_name": "runner",
-    "language": "TypeScript",
     "wrangler_env": {
         "name": "Env",
         "source_path": "./seed__horse_tinder.cloesce.ts",
@@ -39,10 +37,10 @@
             "navigation_properties": [
                 {
                     "var_name": "likes",
-                    "model_name": "Like",
+                    "model_reference": "Like",
                     "kind": {
                         "OneToMany": {
-                            "reference": "horseId1"
+                            "attribute_reference": "horseId1"
                         }
                     }
                 }
@@ -50,8 +48,8 @@
             "methods": {
                 "post": {
                     "name": "post",
-                    "is_static": true,
                     "http_verb": "POST",
+                    "is_static": true,
                     "return_media": "Json",
                     "return_type": {
                         "Object": "Horse"
@@ -74,8 +72,8 @@
                 },
                 "get": {
                     "name": "get",
-                    "is_static": true,
                     "http_verb": "GET",
+                    "is_static": true,
                     "return_media": "Json",
                     "return_type": {
                         "Object": "Horse"
@@ -96,8 +94,8 @@
                 },
                 "list": {
                     "name": "list",
-                    "is_static": true,
                     "http_verb": "GET",
+                    "is_static": true,
                     "return_media": "Json",
                     "return_type": {
                         "Array": {
@@ -116,8 +114,8 @@
                 },
                 "like": {
                     "name": "like",
-                    "is_static": false,
                     "http_verb": "POST",
+                    "is_static": false,
                     "return_media": "Json",
                     "return_type": "Void",
                     "parameters_media": "Json",
@@ -132,12 +130,6 @@
                             "name": "horse",
                             "cidl_type": {
                                 "Object": "Horse"
-                            }
-                        },
-                        {
-                            "name": "__dataSource",
-                            "cidl_type": {
-                                "DataSource": "Horse"
                             }
                         }
                     ]
@@ -187,10 +179,10 @@
             "navigation_properties": [
                 {
                     "var_name": "horse2",
-                    "model_name": "Horse",
+                    "model_reference": "Horse",
                     "kind": {
                         "OneToOne": {
-                            "reference": "horseId2"
+                            "attribute_reference": "horseId2"
                         }
                     }
                 }

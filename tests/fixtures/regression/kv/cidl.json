@@ -17,12 +17,10 @@
     "Data": {
       "name": "Data",
       "binding": "namespace",
-      "cidl_type": {
-        "Object": "DataValue"
-      },
+      "cidl_type": "JsonValue",
       "params": [
-        "id1",
-        "id2"
+        "key1",
+        "key2"
       ],
       "navigation_properties": [
         {
@@ -40,8 +38,12 @@
     "DataScientist": {
       "name": "DataScientist",
       "binding": "namespace",
-      "cidl_type": "JsonValue",
-      "params": [],
+      "cidl_type": {
+        "Object": "Scientist"
+      },
+      "params": [
+        "id"
+      ],
       "navigation_properties": [
         {
           "Model": {
@@ -52,7 +54,100 @@
         }
       ],
       "cruds": [],
-      "methods": {},
+      "methods": {
+        "get": {
+          "name": "get",
+          "is_static": true,
+          "http_verb": "GET",
+          "return_media": "Json",
+          "return_type": {
+            "Object": "DataScientist"
+          },
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "env",
+              "cidl_type": {
+                "Inject": "Env"
+              }
+            },
+            {
+              "name": "id",
+              "cidl_type": "Text"
+            }
+          ]
+        },
+        "getMetadata": {
+          "name": "getMetadata",
+          "is_static": false,
+          "http_verb": "GET",
+          "return_media": "Json",
+          "return_type": "JsonValue",
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "env",
+              "cidl_type": {
+                "Inject": "Env"
+              }
+            },
+            {
+              "name": "__datasource",
+              "cidl_type": {
+                "DataSource": "DataScientist"
+              }
+            }
+          ]
+        },
+        "post": {
+          "name": "post",
+          "is_static": true,
+          "http_verb": "POST",
+          "return_media": "Json",
+          "return_type": "Void",
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "env",
+              "cidl_type": {
+                "Inject": "Env"
+              }
+            },
+            {
+              "name": "value",
+              "cidl_type": {
+                "Partial": "DataScientist"
+              }
+            }
+          ]
+        },
+        "putMetadata": {
+          "name": "putMetadata",
+          "is_static": false,
+          "http_verb": "GET",
+          "return_media": "Json",
+          "return_type": "Void",
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "env",
+              "cidl_type": {
+                "Inject": "Env"
+              }
+            },
+            {
+              "name": "metadata",
+              "cidl_type": "JsonValue"
+            },
+            {
+              "name": "__datasource",
+              "cidl_type": {
+                "DataSource": "DataScientist"
+              }
+            }
+          ]
+        }
+      },
       "data_sources": {
         "withDatasets": {
           "hash": 0,
@@ -101,24 +196,20 @@
     }
   },
   "poos": {
-    "DataValue": {
-      "name": "DataValue",
+    "Scientist": {
+      "name": "Scientist",
       "attributes": [
         {
-          "name": "id",
+          "name": "firstname",
           "cidl_type": "Text"
         },
         {
-          "name": "name",
+          "name": "lastname",
           "cidl_type": "Text"
         },
         {
           "name": "age",
           "cidl_type": "Real"
-        },
-        {
-          "name": "favoriteColor",
-          "cidl_type": "Text"
         }
       ],
       "source_path": "./seed__kv.cloesce.ts"

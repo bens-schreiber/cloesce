@@ -1,7 +1,5 @@
 {
-    "version": "v0.0.4",
     "project_name": "runner",
-    "language": "TypeScript",
     "wrangler_env": {
         "name": "Env",
         "source_path": "./seed__nullability.cloesce.ts",
@@ -38,8 +36,8 @@
             "methods": {
                 "primitiveTypes": {
                     "name": "primitiveTypes",
-                    "is_static": false,
                     "http_verb": "POST",
+                    "is_static": false,
                     "return_media": "Json",
                     "return_type": {
                         "Nullable": "Boolean"
@@ -57,19 +55,13 @@
                             "cidl_type": {
                                 "Nullable": "Text"
                             }
-                        },
-                        {
-                            "name": "__dataSource",
-                            "cidl_type": {
-                                "DataSource": "NullabilityChecks"
-                            }
                         }
                     ]
                 },
                 "modelTypes": {
                     "name": "modelTypes",
-                    "is_static": false,
                     "http_verb": "POST",
+                    "is_static": false,
                     "return_media": "Json",
                     "return_type": {
                         "Nullable": {
@@ -85,19 +77,13 @@
                                     "Object": "NullabilityChecks"
                                 }
                             }
-                        },
-                        {
-                            "name": "__dataSource",
-                            "cidl_type": {
-                                "DataSource": "NullabilityChecks"
-                            }
                         }
                     ]
                 },
                 "injectableTypes": {
                     "name": "injectableTypes",
-                    "is_static": false,
                     "http_verb": "POST",
+                    "is_static": false,
                     "return_media": "Json",
                     "return_type": "Void",
                     "parameters_media": "Json",
@@ -109,19 +95,13 @@
                                     "Inject": "Env"
                                 }
                             }
-                        },
-                        {
-                            "name": "__dataSource",
-                            "cidl_type": {
-                                "DataSource": "NullabilityChecks"
-                            }
                         }
                     ]
                 },
                 "arrayTypes": {
                     "name": "arrayTypes",
-                    "is_static": false,
                     "http_verb": "POST",
+                    "is_static": false,
                     "return_media": "Json",
                     "return_type": {
                         "Nullable": {
@@ -147,19 +127,13 @@
                                     }
                                 }
                             }
-                        },
-                        {
-                            "name": "__dataSource",
-                            "cidl_type": {
-                                "DataSource": "NullabilityChecks"
-                            }
                         }
                     ]
                 },
                 "httpResultTypes": {
                     "name": "httpResultTypes",
-                    "is_static": false,
                     "http_verb": "POST",
+                    "is_static": false,
                     "return_media": "Json",
                     "return_type": {
                         "Nullable": {
@@ -182,12 +156,6 @@
                                         "Nullable": "Integer"
                                     }
                                 }
-                            }
-                        },
-                        {
-                            "name": "__dataSource",
-                            "cidl_type": {
-                                "DataSource": "NullabilityChecks"
                             }
                         }
                     ]

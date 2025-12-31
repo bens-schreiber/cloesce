@@ -38,7 +38,9 @@ export class BlobHaver {
     __datasource: "none" = "none",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<BlobHaver>> {
+    
     const baseUrl = new URL(`http://localhost:5002/api/BlobHaver/get`);
+    
 
     baseUrl.searchParams.append('id', String(id));
     baseUrl.searchParams.append('__datasource', String(__datasource));
@@ -56,12 +58,14 @@ export class BlobHaver {
     );
   }
   async getBlob1(
-    __dataSource: "none" = "none",
+    __datasource: "none" = "none",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Uint8Array>> {
-    const baseUrl = new URL(`http://localhost:5002/api/BlobHaver/${this.id}/getBlob1`);
+    const id = encodeURIComponent(String(this.id));
+    const baseUrl = new URL(`http://localhost:5002/api/BlobHaver/${id}/getBlob1`);
+    
 
-    baseUrl.searchParams.append('__dataSource', String(__dataSource));
+    baseUrl.searchParams.append('__datasource', String(__datasource));
 
     const res = await fetchImpl(baseUrl, {
       method: "GET",
@@ -79,6 +83,7 @@ export class BlobHaver {
     stream: ReadableStream<Uint8Array>,
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<void>> {
+    
     const baseUrl = new URL(`http://localhost:5002/api/BlobHaver/inputStream`);
     const payload: any = {};
 
@@ -102,7 +107,9 @@ export class BlobHaver {
     __datasource: "none" = "none",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<BlobHaver[]>> {
+    
     const baseUrl = new URL(`http://localhost:5002/api/BlobHaver/list`);
+    
 
     baseUrl.searchParams.append('__datasource', String(__datasource));
 
@@ -123,6 +130,7 @@ export class BlobHaver {
     __datasource: "none" = "none",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<BlobHaver>> {
+    
     const baseUrl = new URL(`http://localhost:5002/api/BlobHaver/save`);
     const payload: any = {};
 
@@ -144,12 +152,14 @@ export class BlobHaver {
     );
   }
   async yieldStream(
-    __dataSource: "none" = "none",
+    __datasource: "none" = "none",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<ReadableStream<Uint8Array>>> {
-    const baseUrl = new URL(`http://localhost:5002/api/BlobHaver/${this.id}/yieldStream`);
+    const id = encodeURIComponent(String(this.id));
+    const baseUrl = new URL(`http://localhost:5002/api/BlobHaver/${id}/yieldStream`);
+    
 
-    baseUrl.searchParams.append('__dataSource', String(__dataSource));
+    baseUrl.searchParams.append('__datasource', String(__datasource));
 
     const res = await fetchImpl(baseUrl, {
       method: "GET",

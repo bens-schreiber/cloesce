@@ -1,8 +1,6 @@
 {
   "hash": 1370722617160899709,
-  "version": "v0.0.4",
   "project_name": "runner",
-  "language": "TypeScript",
   "wrangler_env": {
     "name": "Env",
     "source_path": "./seed__horse_tinder.cloesce.ts",
@@ -44,10 +42,10 @@
         {
           "hash": 8622586494915120333,
           "var_name": "likes",
-          "model_name": "Like",
+          "model_reference": "Like",
           "kind": {
             "OneToMany": {
-              "reference": "horseId1"
+              "attribute_reference": "horseId1"
             }
           }
         }
@@ -96,7 +94,7 @@
               }
             },
             {
-              "name": "__dataSource",
+              "name": "__datasource",
               "cidl_type": {
                 "DataSource": "Horse"
               }
@@ -198,10 +196,10 @@
         {
           "hash": 16105777593012263721,
           "var_name": "horse2",
-          "model_name": "Horse",
+          "model_reference": "Horse",
           "kind": {
             "OneToOne": {
-              "reference": "horseId2"
+              "attribute_reference": "horseId2"
             }
           }
         }
@@ -212,8 +210,8 @@
       "source_path": "./seed__horse_tinder.cloesce.ts"
     }
   },
+  "services": {},
   "kv_models": {},
   "poos": {},
-  "services": {},
   "app_source": null
 }

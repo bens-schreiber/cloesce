@@ -11,15 +11,16 @@ export class NullabilityChecks {
   async arrayTypes(
     a: number[] | null,
     b: NullabilityChecks[] | null,
-    __dataSource: "none" = "none",
+    __datasource: "none" = "none",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<string[] | null>> {
-    const baseUrl = new URL(`http://localhost:5002/api/NullabilityChecks/${this.id}/arrayTypes`);
+    const id = encodeURIComponent(String(this.id));
+    const baseUrl = new URL(`http://localhost:5002/api/NullabilityChecks/${id}/arrayTypes`);
     const payload: any = {};
 
     payload["a"] = a;
     payload["b"] = b;
-    baseUrl.searchParams.append('__dataSource', String(__dataSource));
+    baseUrl.searchParams.append('__datasource', String(__datasource));
 
     const res = await fetchImpl(baseUrl, {
       method: "POST",
@@ -37,14 +38,15 @@ export class NullabilityChecks {
   }
   async httpResultTypes(
     a: number | null | null,
-    __dataSource: "none" = "none",
+    __datasource: "none" = "none",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<NullabilityChecks[] | null | null>> {
-    const baseUrl = new URL(`http://localhost:5002/api/NullabilityChecks/${this.id}/httpResultTypes`);
+    const id = encodeURIComponent(String(this.id));
+    const baseUrl = new URL(`http://localhost:5002/api/NullabilityChecks/${id}/httpResultTypes`);
     const payload: any = {};
 
     payload["a"] = a;
-    baseUrl.searchParams.append('__dataSource', String(__dataSource));
+    baseUrl.searchParams.append('__datasource', String(__datasource));
 
     const res = await fetchImpl(baseUrl, {
       method: "POST",
@@ -61,13 +63,14 @@ export class NullabilityChecks {
     );
   }
   async injectableTypes(
-    __dataSource: "none" = "none",
+    __datasource: "none" = "none",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<void>> {
-    const baseUrl = new URL(`http://localhost:5002/api/NullabilityChecks/${this.id}/injectableTypes`);
+    const id = encodeURIComponent(String(this.id));
+    const baseUrl = new URL(`http://localhost:5002/api/NullabilityChecks/${id}/injectableTypes`);
     const payload: any = {};
 
-    baseUrl.searchParams.append('__dataSource', String(__dataSource));
+    baseUrl.searchParams.append('__datasource', String(__datasource));
 
     const res = await fetchImpl(baseUrl, {
       method: "POST",
@@ -85,14 +88,15 @@ export class NullabilityChecks {
   }
   async modelTypes(
     a: NullabilityChecks | null,
-    __dataSource: "none" = "none",
+    __datasource: "none" = "none",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<NullabilityChecks | null>> {
-    const baseUrl = new URL(`http://localhost:5002/api/NullabilityChecks/${this.id}/modelTypes`);
+    const id = encodeURIComponent(String(this.id));
+    const baseUrl = new URL(`http://localhost:5002/api/NullabilityChecks/${id}/modelTypes`);
     const payload: any = {};
 
     payload["a"] = a;
-    baseUrl.searchParams.append('__dataSource', String(__dataSource));
+    baseUrl.searchParams.append('__datasource', String(__datasource));
 
     const res = await fetchImpl(baseUrl, {
       method: "POST",
@@ -111,15 +115,16 @@ export class NullabilityChecks {
   async primitiveTypes(
     a: number | null,
     b: string | null,
-    __dataSource: "none" = "none",
+    __datasource: "none" = "none",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<boolean | null>> {
-    const baseUrl = new URL(`http://localhost:5002/api/NullabilityChecks/${this.id}/primitiveTypes`);
+    const id = encodeURIComponent(String(this.id));
+    const baseUrl = new URL(`http://localhost:5002/api/NullabilityChecks/${id}/primitiveTypes`);
     const payload: any = {};
 
     payload["a"] = a;
     payload["b"] = b;
-    baseUrl.searchParams.append('__dataSource', String(__dataSource));
+    baseUrl.searchParams.append('__datasource', String(__datasource));
 
     const res = await fetchImpl(baseUrl, {
       method: "POST",

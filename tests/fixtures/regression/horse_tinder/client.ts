@@ -13,7 +13,9 @@ export class Horse {
     id: number,
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Horse>> {
+    
     const baseUrl = new URL(`http://localhost:5002/api/Horse/get`);
+    
 
     baseUrl.searchParams.append('id', String(id));
 
@@ -31,14 +33,15 @@ export class Horse {
   }
   async like(
     horse: Horse,
-    __dataSource: "default" |"withLikes" |"none" = "none",
+    __datasource: "default" |"withLikes" |"none" = "none",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<void>> {
-    const baseUrl = new URL(`http://localhost:5002/api/Horse/${this.id}/like`);
+    const id = encodeURIComponent(String(this.id));
+    const baseUrl = new URL(`http://localhost:5002/api/Horse/${id}/like`);
     const payload: any = {};
 
     payload["horse"] = horse;
-    baseUrl.searchParams.append('__dataSource', String(__dataSource));
+    baseUrl.searchParams.append('__datasource', String(__datasource));
 
     const res = await fetchImpl(baseUrl, {
       method: "POST",
@@ -57,7 +60,9 @@ export class Horse {
   static async list(
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Horse[]>> {
+    
     const baseUrl = new URL(`http://localhost:5002/api/Horse/list`);
+    
 
 
     const res = await fetchImpl(baseUrl, {
@@ -76,6 +81,7 @@ export class Horse {
     horse: Horse,
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Horse>> {
+    
     const baseUrl = new URL(`http://localhost:5002/api/Horse/post`);
     const payload: any = {};
 
@@ -99,7 +105,7 @@ export class Horse {
   static fromJson(data: any): Horse {
     const res = Object.assign(new Horse(), data);
     for (let i = 0; i < res.likes?.length; i++) {
-      res.likes[i] = Like.fromJson(res.likes[i]);
+      res.likes[i] = .fromJson(res.likes[i]);
     }
     return res;
   }
@@ -113,7 +119,7 @@ export class Like {
 
   static fromJson(data: any): Like {
     const res = Object.assign(new Like(), data);
-    res["horse2"] &&= Horse.fromJson(res.horse2);
+    res["horse2"] &&= .fromJson(res.horse2);
     return res;
   }
 }

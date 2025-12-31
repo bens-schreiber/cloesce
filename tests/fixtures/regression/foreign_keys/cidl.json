@@ -1,8 +1,6 @@
 {
   "hash": 11505330283879565005,
-  "version": "v0.0.4",
   "project_name": "runner",
-  "language": "TypeScript",
   "wrangler_env": {
     "name": "Env",
     "source_path": "./seed__foreign_keys.cloesce.ts",
@@ -30,7 +28,7 @@
           "parameters_media": "Json",
           "parameters": [
             {
-              "name": "__dataSource",
+              "name": "__datasource",
               "cidl_type": {
                 "DataSource": "B"
               }
@@ -54,7 +52,7 @@
         {
           "hash": 7522322899197762685,
           "var_name": "students",
-          "model_name": "Student",
+          "model_reference": "Student",
           "kind": {
             "ManyToMany": {
               "unique_id": "StudentsCourses"
@@ -79,10 +77,10 @@
         {
           "hash": 14619809136778017828,
           "var_name": "dogs",
-          "model_name": "Dog",
+          "model_reference": "Dog",
           "kind": {
             "OneToMany": {
-              "reference": "personId"
+              "attribute_reference": "personId"
             }
           }
         }
@@ -123,7 +121,7 @@
           "parameters_media": "Json",
           "parameters": [
             {
-              "name": "__dataSource",
+              "name": "__datasource",
               "cidl_type": {
                 "DataSource": "Person"
               }
@@ -173,7 +171,7 @@
         {
           "hash": 16503297458927537581,
           "var_name": "courses",
-          "model_name": "Course",
+          "model_reference": "Course",
           "kind": {
             "ManyToMany": {
               "unique_id": "StudentsCourses"
@@ -217,7 +215,7 @@
           "parameters_media": "Json",
           "parameters": [
             {
-              "name": "__dataSource",
+              "name": "__datasource",
               "cidl_type": {
                 "DataSource": "Student"
               }
@@ -271,10 +269,10 @@
         {
           "hash": 13359034780033624503,
           "var_name": "b",
-          "model_name": "B",
+          "model_reference": "B",
           "kind": {
             "OneToOne": {
-              "reference": "bId"
+              "attribute_reference": "bId"
             }
           }
         }
@@ -315,7 +313,7 @@
           "parameters_media": "Json",
           "parameters": [
             {
-              "name": "__dataSource",
+              "name": "__datasource",
               "cidl_type": {
                 "DataSource": "A"
               }
@@ -386,7 +384,7 @@
           "parameters_media": "Json",
           "parameters": [
             {
-              "name": "__dataSource",
+              "name": "__datasource",
               "cidl_type": {
                 "DataSource": "Dog"
               }
@@ -399,8 +397,8 @@
       "source_path": "./seed__foreign_keys.cloesce.ts"
     }
   },
+  "services": {},
   "kv_models": {},
   "poos": {},
-  "services": {},
   "app_source": null
 }

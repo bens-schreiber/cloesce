@@ -26,7 +26,7 @@ export class CrudHaver {
   name: string;
 
   @POST
-  async notCrud(): Promise<void> {}
+  async notCrud(): Promise<void> { }
 }
 
 @CRUD(["SAVE", "GET", "LIST"])

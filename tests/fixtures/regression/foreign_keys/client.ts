@@ -12,6 +12,7 @@ export class A {
     a: A,
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<A>> {
+    
     const baseUrl = new URL(`http://localhost:5002/api/A/post`);
     const payload: any = {};
 
@@ -32,12 +33,14 @@ export class A {
     );
   }
   async refresh(
-    __dataSource: "withB" |"withoutB" |"none" = "none",
+    __datasource: "withB" |"withoutB" |"none" = "none",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<A>> {
-    const baseUrl = new URL(`http://localhost:5002/api/A/${this.id}/refresh`);
+    const id = encodeURIComponent(String(this.id));
+    const baseUrl = new URL(`http://localhost:5002/api/A/${id}/refresh`);
+    
 
-    baseUrl.searchParams.append('__dataSource', String(__dataSource));
+    baseUrl.searchParams.append('__datasource', String(__datasource));
 
     const res = await fetchImpl(baseUrl, {
       method: "GET",
@@ -55,6 +58,7 @@ export class A {
     a: A,
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<void>> {
+    
     const baseUrl = new URL(`http://localhost:5002/api/A/returnFatalIfParamsNotInstantiated`);
     const payload: any = {};
 
@@ -77,7 +81,7 @@ export class A {
 
   static fromJson(data: any): A {
     const res = Object.assign(new A(), data);
-    res["b"] &&= B.fromJson(res.b);
+    res["b"] &&= .fromJson(res.b);
     return res;
   }
 }
@@ -85,13 +89,14 @@ export class B {
   id: number;
 
   async testMethod(
-    __dataSource: "none" = "none",
+    __datasource: "none" = "none",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<void>> {
-    const baseUrl = new URL(`http://localhost:5002/api/B/${this.id}/testMethod`);
+    const id = encodeURIComponent(String(this.id));
+    const baseUrl = new URL(`http://localhost:5002/api/B/${id}/testMethod`);
     const payload: any = {};
 
-    baseUrl.searchParams.append('__dataSource', String(__dataSource));
+    baseUrl.searchParams.append('__datasource', String(__datasource));
 
     const res = await fetchImpl(baseUrl, {
       method: "POST",
@@ -121,7 +126,7 @@ export class Course {
   static fromJson(data: any): Course {
     const res = Object.assign(new Course(), data);
     for (let i = 0; i < res.students?.length; i++) {
-      res.students[i] = Student.fromJson(res.students[i]);
+      res.students[i] = .fromJson(res.students[i]);
     }
     return res;
   }
@@ -131,13 +136,14 @@ export class Dog {
   personId: number;
 
   async testMethod(
-    __dataSource: "none" = "none",
+    __datasource: "none" = "none",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<void>> {
-    const baseUrl = new URL(`http://localhost:5002/api/Dog/${this.id}/testMethod`);
+    const id = encodeURIComponent(String(this.id));
+    const baseUrl = new URL(`http://localhost:5002/api/Dog/${id}/testMethod`);
     const payload: any = {};
 
-    baseUrl.searchParams.append('__dataSource', String(__dataSource));
+    baseUrl.searchParams.append('__datasource', String(__datasource));
 
     const res = await fetchImpl(baseUrl, {
       method: "POST",
@@ -167,6 +173,7 @@ export class Person {
     person: Person,
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Person>> {
+    
     const baseUrl = new URL(`http://localhost:5002/api/Person/post`);
     const payload: any = {};
 
@@ -187,12 +194,14 @@ export class Person {
     );
   }
   async refresh(
-    __dataSource: "withDogs" |"none" = "none",
+    __datasource: "withDogs" |"none" = "none",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Person>> {
-    const baseUrl = new URL(`http://localhost:5002/api/Person/${this.id}/refresh`);
+    const id = encodeURIComponent(String(this.id));
+    const baseUrl = new URL(`http://localhost:5002/api/Person/${id}/refresh`);
+    
 
-    baseUrl.searchParams.append('__dataSource', String(__dataSource));
+    baseUrl.searchParams.append('__datasource', String(__datasource));
 
     const res = await fetchImpl(baseUrl, {
       method: "GET",
@@ -210,6 +219,7 @@ export class Person {
     person: Person,
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<void>> {
+    
     const baseUrl = new URL(`http://localhost:5002/api/Person/returnFatalIfParamsNotInstantiated`);
     const payload: any = {};
 
@@ -233,7 +243,7 @@ export class Person {
   static fromJson(data: any): Person {
     const res = Object.assign(new Person(), data);
     for (let i = 0; i < res.dogs?.length; i++) {
-      res.dogs[i] = Dog.fromJson(res.dogs[i]);
+      res.dogs[i] = .fromJson(res.dogs[i]);
     }
     return res;
   }
@@ -246,6 +256,7 @@ export class Student {
     student: Student,
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Student>> {
+    
     const baseUrl = new URL(`http://localhost:5002/api/Student/post`);
     const payload: any = {};
 
@@ -266,12 +277,14 @@ export class Student {
     );
   }
   async refresh(
-    __dataSource: "withCoursesStudents" |"withCoursesStudentsCourses" |"none" = "none",
+    __datasource: "withCoursesStudents" |"withCoursesStudentsCourses" |"none" = "none",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Student>> {
-    const baseUrl = new URL(`http://localhost:5002/api/Student/${this.id}/refresh`);
+    const id = encodeURIComponent(String(this.id));
+    const baseUrl = new URL(`http://localhost:5002/api/Student/${id}/refresh`);
+    
 
-    baseUrl.searchParams.append('__dataSource', String(__dataSource));
+    baseUrl.searchParams.append('__datasource', String(__datasource));
 
     const res = await fetchImpl(baseUrl, {
       method: "GET",
@@ -289,7 +302,7 @@ export class Student {
   static fromJson(data: any): Student {
     const res = Object.assign(new Student(), data);
     for (let i = 0; i < res.courses?.length; i++) {
-      res.courses[i] = Course.fromJson(res.courses[i]);
+      res.courses[i] = .fromJson(res.courses[i]);
     }
     return res;
   }

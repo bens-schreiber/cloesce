@@ -32,10 +32,10 @@
         {
           "hash": 8622586494915120333,
           "var_name": "likes",
-          "model_name": "Like",
+          "model_reference": "Like",
           "kind": {
             "OneToMany": {
-              "reference": "horseId1"
+              "attribute_reference": "horseId1"
             }
           }
         }
@@ -88,10 +88,10 @@
         {
           "hash": 16105777593012263721,
           "var_name": "horse2",
-          "model_name": "Horse",
+          "model_reference": "Horse",
           "kind": {
             "OneToOne": {
-              "reference": "horseId2"
+              "attribute_reference": "horseId2"
             }
           }
         }

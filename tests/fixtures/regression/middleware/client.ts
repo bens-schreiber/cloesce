@@ -17,7 +17,9 @@ export class Model {
   static async blockedMethod(
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<void>> {
+    
     const baseUrl = new URL(`http://localhost:5002/api/Model/blockedMethod`);
+    
 
 
     const res = await fetchImpl(baseUrl, {
@@ -35,7 +37,9 @@ export class Model {
   static async getInjectedThing(
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<InjectedThing>> {
+    
     const baseUrl = new URL(`http://localhost:5002/api/Model/getInjectedThing`);
+    
 
 
     const res = await fetchImpl(baseUrl, {
@@ -55,6 +59,7 @@ export class Model {
     __datasource: "none" = "none",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Model>> {
+    
     const baseUrl = new URL(`http://localhost:5002/api/Model/save`);
     const payload: any = {};
 

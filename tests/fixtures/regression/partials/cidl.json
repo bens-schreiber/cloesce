@@ -1,8 +1,6 @@
 {
   "hash": 6266598453096649310,
-  "version": "v0.0.4",
   "project_name": "runner",
-  "language": "TypeScript",
   "wrangler_env": {
     "name": "Env",
     "source_path": "./seed__partials.cloesce.ts",
@@ -49,7 +47,7 @@
           "parameters_media": "Json",
           "parameters": [
             {
-              "name": "__dataSource",
+              "name": "__datasource",
               "cidl_type": {
                 "DataSource": "Dog"
               }
@@ -86,8 +84,8 @@
       "source_path": "./seed__partials.cloesce.ts"
     }
   },
+  "services": {},
   "kv_models": {},
   "poos": {},
-  "services": {},
   "app_source": null
 }

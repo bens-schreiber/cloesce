@@ -1,7 +1,5 @@
 {
-    "version": "v0.0.4",
     "project_name": "runner",
-    "language": "TypeScript",
     "wrangler_env": {
         "name": "Env",
         "source_path": "./seed__crud.cloesce.ts",
@@ -29,19 +27,12 @@
             "methods": {
                 "notCrud": {
                     "name": "notCrud",
-                    "is_static": false,
                     "http_verb": "POST",
+                    "is_static": false,
                     "return_media": "Json",
                     "return_type": "Void",
                     "parameters_media": "Json",
-                    "parameters": [
-                        {
-                            "name": "__dataSource",
-                            "cidl_type": {
-                                "DataSource": "CrudHaver"
-                            }
-                        }
-                    ]
+                    "parameters": []
                 }
             },
             "data_sources": {},
@@ -72,19 +63,19 @@
             "navigation_properties": [
                 {
                     "var_name": "favoriteChild",
-                    "model_name": "Child",
+                    "model_reference": "Child",
                     "kind": {
                         "OneToOne": {
-                            "reference": "favoriteChildId"
+                            "attribute_reference": "favoriteChildId"
                         }
                     }
                 },
                 {
                     "var_name": "children",
-                    "model_name": "Child",
+                    "model_reference": "Child",
                     "kind": {
                         "OneToMany": {
-                            "reference": "parentId"
+                            "attribute_reference": "parentId"
                         }
                     }
                 }
@@ -124,10 +115,10 @@
             "navigation_properties": [
                 {
                     "var_name": "parent",
-                    "model_name": "Parent",
+                    "model_reference": "Parent",
                     "kind": {
                         "OneToOne": {
-                            "reference": "parentId"
+                            "attribute_reference": "parentId"
                         }
                     }
                 }

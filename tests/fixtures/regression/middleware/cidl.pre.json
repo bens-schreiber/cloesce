@@ -1,7 +1,5 @@
 {
-    "version": "v0.0.4",
     "project_name": "runner",
-    "language": "TypeScript",
     "wrangler_env": {
         "name": "Env",
         "source_path": "./seed__app.cloesce.ts",
@@ -21,8 +19,8 @@
             "methods": {
                 "blockedMethod": {
                     "name": "blockedMethod",
-                    "is_static": true,
                     "http_verb": "GET",
+                    "is_static": true,
                     "return_media": "Json",
                     "return_type": "Void",
                     "parameters_media": "Json",
@@ -30,8 +28,8 @@
                 },
                 "getInjectedThing": {
                     "name": "getInjectedThing",
-                    "is_static": true,
                     "http_verb": "GET",
+                    "is_static": true,
                     "return_media": "Json",
                     "return_type": {
                         "Object": "InjectedThing"

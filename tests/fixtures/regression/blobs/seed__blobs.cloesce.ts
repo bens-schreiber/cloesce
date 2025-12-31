@@ -6,8 +6,7 @@ import {
   GET,
   Service,
   POST,
-  Integer,
-  Stream,
+  Integer
 } from "cloesce/backend";
 import { D1Database } from "@cloudflare/workers-types";
 type Integer = number & { __kind: "Integer" };
@@ -48,7 +47,7 @@ export class BlobHaver {
   }
 
   @POST
-  static async inputStream(stream: Stream) {
+  static async inputStream(stream: ReadableStream) {
     if (!(stream instanceof ReadableStream)) {
       throw new Error("Did not receive a stream");
     }
@@ -71,7 +70,7 @@ export class BlobHaver {
   }
 
   @GET
-  yieldStream(): Stream {
+  yieldStream(): ReadableStream {
     return new ReadableStream({
       start(controller) {
         controller.enqueue(this.blob1);

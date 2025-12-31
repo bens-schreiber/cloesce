@@ -1,7 +1,5 @@
 {
-    "version": "v0.0.4",
     "project_name": "runner",
-    "language": "TypeScript",
     "wrangler_env": {
         "name": "Env",
         "source_path": "./seed__partials.cloesce.ts",
@@ -36,8 +34,8 @@
             "methods": {
                 "post": {
                     "name": "post",
-                    "is_static": true,
                     "http_verb": "POST",
+                    "is_static": true,
                     "return_media": "Json",
                     "return_type": {
                         "Object": "Dog"
@@ -60,21 +58,14 @@
                 },
                 "getPartialSelf": {
                     "name": "getPartialSelf",
-                    "is_static": false,
                     "http_verb": "GET",
+                    "is_static": false,
                     "return_media": "Json",
                     "return_type": {
                         "Partial": "Dog"
                     },
                     "parameters_media": "Json",
-                    "parameters": [
-                        {
-                            "name": "__dataSource",
-                            "cidl_type": {
-                                "DataSource": "Dog"
-                            }
-                        }
-                    ]
+                    "parameters": []
                 }
             },
             "data_sources": {},

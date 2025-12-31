@@ -1,7 +1,5 @@
 {
-    "version": "v0.0.4",
     "project_name": "runner",
-    "language": "TypeScript",
     "d1_models": {},
     "kv_models": {},
     "poos": {},
@@ -36,7 +34,7 @@
             "attributes": [
                 {
                     "var_name": "foo",
-                    "injected": "FooService"
+                    "inject_reference": "FooService"
                 }
             ],
             "methods": {

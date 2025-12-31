@@ -42,6 +42,7 @@ export class PooAcceptYield {
     c: PooC,
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<void>> {
+    
     const baseUrl = new URL(`http://localhost:5002/api/PooAcceptYield/acceptPoos`);
     const payload: any = {};
 
@@ -66,6 +67,7 @@ export class PooAcceptYield {
   static async yieldPoo(
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<PooC>> {
+    
     const baseUrl = new URL(`http://localhost:5002/api/PooAcceptYield/yieldPoo`);
     const payload: any = {};
 

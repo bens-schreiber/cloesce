@@ -1,7 +1,5 @@
 {
-    "version": "v0.0.4",
     "project_name": "runner",
-    "language": "TypeScript",
     "wrangler_env": {
         "name": "Env",
         "source_path": "./seed__poo.cloesce.ts",
@@ -21,8 +19,8 @@
             "methods": {
                 "acceptPoos": {
                     "name": "acceptPoos",
-                    "is_static": true,
                     "http_verb": "POST",
+                    "is_static": true,
                     "return_media": "Json",
                     "return_type": "Void",
                     "parameters_media": "Json",
@@ -49,8 +47,8 @@
                 },
                 "yieldPoo": {
                     "name": "yieldPoo",
-                    "is_static": true,
                     "http_verb": "POST",
+                    "is_static": true,
                     "return_media": "Json",
                     "return_type": {
                         "Object": "PooC"

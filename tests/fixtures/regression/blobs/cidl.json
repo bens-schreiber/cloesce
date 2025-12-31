@@ -1,8 +1,6 @@
 {
   "hash": 8447275917592500618,
-  "version": "v0.0.4",
   "project_name": "runner",
-  "language": "TypeScript",
   "wrangler_env": {
     "name": "Env",
     "source_path": "./seed__blobs.cloesce.ts",
@@ -71,7 +69,7 @@
           "parameters_media": "Json",
           "parameters": [
             {
-              "name": "__dataSource",
+              "name": "__datasource",
               "cidl_type": {
                 "DataSource": "BlobHaver"
               }
@@ -149,7 +147,7 @@
           "parameters_media": "Json",
           "parameters": [
             {
-              "name": "__dataSource",
+              "name": "__datasource",
               "cidl_type": {
                 "DataSource": "BlobHaver"
               }
@@ -166,8 +164,6 @@
       "source_path": "./seed__blobs.cloesce.ts"
     }
   },
-  "kv_models": {},
-  "poos": {},
   "services": {
     "BlobService": {
       "name": "BlobService",
@@ -191,5 +187,7 @@
       "source_path": "./seed__blobs.cloesce.ts"
     }
   },
+  "kv_models": {},
+  "poos": {},
   "app_source": null
 }

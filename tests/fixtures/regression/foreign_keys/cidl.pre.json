@@ -1,7 +1,5 @@
 {
-    "version": "v0.0.4",
     "project_name": "runner",
-    "language": "TypeScript",
     "wrangler_env": {
         "name": "Env",
         "source_path": "./seed__foreign_keys.cloesce.ts",
@@ -21,19 +19,12 @@
             "methods": {
                 "testMethod": {
                     "name": "testMethod",
-                    "is_static": false,
                     "http_verb": "POST",
+                    "is_static": false,
                     "return_media": "Json",
                     "return_type": "Void",
                     "parameters_media": "Json",
-                    "parameters": [
-                        {
-                            "name": "__dataSource",
-                            "cidl_type": {
-                                "DataSource": "B"
-                            }
-                        }
-                    ]
+                    "parameters": []
                 }
             },
             "data_sources": {},
@@ -58,10 +49,10 @@
             "navigation_properties": [
                 {
                     "var_name": "b",
-                    "model_name": "B",
+                    "model_reference": "B",
                     "kind": {
                         "OneToOne": {
-                            "reference": "bId"
+                            "attribute_reference": "bId"
                         }
                     }
                 }
@@ -69,8 +60,8 @@
             "methods": {
                 "post": {
                     "name": "post",
-                    "is_static": true,
                     "http_verb": "POST",
+                    "is_static": true,
                     "return_media": "Json",
                     "return_type": {
                         "Object": "A"
@@ -93,8 +84,8 @@
                 },
                 "returnFatalIfParamsNotInstantiated": {
                     "name": "returnFatalIfParamsNotInstantiated",
-                    "is_static": true,
                     "http_verb": "POST",
+                    "is_static": true,
                     "return_media": "Json",
                     "return_type": {
                         "HttpResult": "Void"
@@ -111,21 +102,14 @@
                 },
                 "refresh": {
                     "name": "refresh",
-                    "is_static": false,
                     "http_verb": "GET",
+                    "is_static": false,
                     "return_media": "Json",
                     "return_type": {
                         "Object": "A"
                     },
                     "parameters_media": "Json",
-                    "parameters": [
-                        {
-                            "name": "__dataSource",
-                            "cidl_type": {
-                                "DataSource": "A"
-                            }
-                        }
-                    ]
+                    "parameters": []
                 }
             },
             "data_sources": {
@@ -153,10 +137,10 @@
             "navigation_properties": [
                 {
                     "var_name": "dogs",
-                    "model_name": "Dog",
+                    "model_reference": "Dog",
                     "kind": {
                         "OneToMany": {
-                            "reference": "personId"
+                            "attribute_reference": "personId"
                         }
                     }
                 }
@@ -164,8 +148,8 @@
             "methods": {
                 "post": {
                     "name": "post",
-                    "is_static": true,
                     "http_verb": "POST",
+                    "is_static": true,
                     "return_media": "Json",
                     "return_type": {
                         "Object": "Person"
@@ -188,8 +172,8 @@
                 },
                 "returnFatalIfParamsNotInstantiated": {
                     "name": "returnFatalIfParamsNotInstantiated",
-                    "is_static": true,
                     "http_verb": "POST",
+                    "is_static": true,
                     "return_media": "Json",
                     "return_type": {
                         "HttpResult": "Void"
@@ -206,21 +190,14 @@
                 },
                 "refresh": {
                     "name": "refresh",
-                    "is_static": false,
                     "http_verb": "GET",
+                    "is_static": false,
                     "return_media": "Json",
                     "return_type": {
                         "Object": "Person"
                     },
                     "parameters_media": "Json",
-                    "parameters": [
-                        {
-                            "name": "__dataSource",
-                            "cidl_type": {
-                                "DataSource": "Person"
-                            }
-                        }
-                    ]
+                    "parameters": []
                 }
             },
             "data_sources": {
@@ -253,19 +230,12 @@
             "methods": {
                 "testMethod": {
                     "name": "testMethod",
-                    "is_static": false,
                     "http_verb": "POST",
+                    "is_static": false,
                     "return_media": "Json",
                     "return_type": "Void",
                     "parameters_media": "Json",
-                    "parameters": [
-                        {
-                            "name": "__dataSource",
-                            "cidl_type": {
-                                "DataSource": "Dog"
-                            }
-                        }
-                    ]
+                    "parameters": []
                 }
             },
             "data_sources": {},
@@ -282,7 +252,7 @@
             "navigation_properties": [
                 {
                     "var_name": "courses",
-                    "model_name": "Course",
+                    "model_reference": "Course",
                     "kind": {
                         "ManyToMany": {
                             "unique_id": "StudentsCourses"
@@ -293,8 +263,8 @@
             "methods": {
                 "post": {
                     "name": "post",
-                    "is_static": true,
                     "http_verb": "POST",
+                    "is_static": true,
                     "return_media": "Json",
                     "return_type": {
                         "Object": "Student"
@@ -317,21 +287,14 @@
                 },
                 "refresh": {
                     "name": "refresh",
-                    "is_static": false,
                     "http_verb": "GET",
+                    "is_static": false,
                     "return_media": "Json",
                     "return_type": {
                         "Object": "Student"
                     },
                     "parameters_media": "Json",
-                    "parameters": [
-                        {
-                            "name": "__dataSource",
-                            "cidl_type": {
-                                "DataSource": "Student"
-                            }
-                        }
-                    ]
+                    "parameters": []
                 }
             },
             "data_sources": {
@@ -367,7 +330,7 @@
             "navigation_properties": [
                 {
                     "var_name": "students",
-                    "model_name": "Student",
+                    "model_reference": "Student",
                     "kind": {
                         "ManyToMany": {
                             "unique_id": "StudentsCourses"

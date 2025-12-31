@@ -387,17 +387,7 @@ impl SemanticAnalysis {
 
             // Validate Methods
             for (method_name, method) in &model.methods {
-                let ds = validate_methods(&model.name, method_name, method, ast)?;
-
-                if !method.is_static {
-                    ensure!(
-                        ds == 1,
-                        GeneratorErrorKind::MissingOrExtraneousDataSource,
-                        "Instantiated model methods require one data source: {}.{}",
-                        model.name,
-                        method.name,
-                    )
-                }
+                validate_methods(&model.name, method_name, method, ast)?;
             }
         }
 
@@ -707,13 +697,12 @@ fn is_valid_data_source_ref(ast: &CloesceAst, o: &String) -> bool {
     ast.d1_models.contains_key(o) || ast.kv_models.contains_key(o)
 }
 
-/// Returns how many data sources to the namespace are in the method.
 fn validate_methods(
     namespace: &str,
     method_name: &str,
     method: &ApiMethod,
     ast: &CloesceAst,
-) -> Result<i32> {
+) -> Result<()> {
     // Validate record
     ensure!(
         *method_name == method.name,
@@ -761,7 +750,6 @@ fn validate_methods(
     }
 
     // Validate method params
-    let mut ds = 0;
     for param in &method.parameters {
         if let CidlType::DataSource(model_name) = &param.cidl_type {
             ensure!(
@@ -772,10 +760,6 @@ fn validate_methods(
                 method.name,
                 model_name
             );
-
-            if *model_name == namespace {
-                ds += 1;
-            }
 
             continue;
         }
@@ -820,7 +804,7 @@ fn validate_methods(
                     "{}.{} data source references {}",
                     namespace,
                     method.name,
-                    ds
+                    model_name
                 )
             }
             CidlType::Stream => {
@@ -846,7 +830,7 @@ fn validate_methods(
         }
     }
 
-    Ok(ds)
+    Ok(())
 }
 
 // Kahns algorithm for topological sort + cycle detection.

@@ -89,94 +89,102 @@ export class CidlExtractor {
           e.snippet = classDecl.getText();
         });
 
-        const decorator: Decorator | undefined = classDecl.getDecorators()[0];
-        const decoratorName: string | undefined = decorator?.getName();
+        // TODO: put CRUD list inside of the class decorator
+        checkDecorators: for (const decorator of classDecl.getDecorators()) {
+          const decoratorName = decorator.getName();
 
-        switch (decoratorName) {
-          case ClassDecoratorKind.D1: {
-            if (!classDecl.isExported()) return notExportedErr;
-            const result = D1ModelExtractor.extract(classDecl, sourceFile);
+          switch (decoratorName) {
+            case ClassDecoratorKind.D1: {
+              if (!classDecl.isExported()) return notExportedErr;
+              const result = D1ModelExtractor.extract(classDecl, sourceFile);
 
-            if (result.isLeft()) {
-              result.value.addContext(
-                (prev) => `${classDecl.getName()}.${prev}`,
-              );
-              return result;
-            }
-
-            const model = result.unwrap();
-            d1Models[model.name] = model;
-            break;
-          }
-
-          case ClassDecoratorKind.KV: {
-            if (!classDecl.isExported()) return notExportedErr;
-            const result = KVModelExtractor.extract(
-              classDecl,
-              sourceFile,
-              decorator,
-            );
-
-            if (result.isLeft()) {
-              result.value.addContext(
-                (prev) => `${classDecl.getName()}.${prev}`,
-              );
-              return result;
-            }
-
-            const model = result.unwrap();
-            kvModels[model.name] = model;
-            break;
-          }
-
-          case ClassDecoratorKind.Service: {
-            if (!classDecl.isExported()) return notExportedErr;
-            const result = ServiceExtractor.extract(classDecl, sourceFile);
-
-            if (result.isLeft()) {
-              result.value.addContext(
-                (prev) => `${classDecl.getName()}.${prev}`,
-              );
-              return result;
-            }
-
-            const service = result.unwrap();
-            services[service.name] = service;
-            break;
-          }
-
-          case ClassDecoratorKind.PlainOldObject: {
-            if (!classDecl.isExported()) return notExportedErr;
-            const result = CidlExtractor.poo(classDecl, sourceFile);
-
-            if (result.isLeft()) {
-              result.value.addContext(
-                (prev) => `${classDecl.getName()}.${prev}`,
-              );
-              return result;
-            }
-            poos[result.unwrap().name] = result.unwrap();
-            break;
-          }
-
-          case ClassDecoratorKind.WranglerEnv: {
-            // Error: invalid attribute modifier
-            for (const prop of classDecl.getProperties()) {
-              const modifierRes = checkAttributeModifier(prop);
-              if (modifierRes.isLeft()) {
-                return modifierRes;
+              if (result.isLeft()) {
+                result.value.addContext(
+                  (prev) => `${classDecl.getName()}.${prev}`,
+                );
+                return result;
               }
+
+              const model = result.unwrap();
+              d1Models[model.name] = model;
+              break checkDecorators;
             }
 
-            const result = CidlExtractor.env(classDecl, sourceFile);
-            if (result.isLeft()) {
-              return result;
+            case ClassDecoratorKind.KV: {
+              if (!classDecl.isExported()) return notExportedErr;
+              const result = KVModelExtractor.extract(
+                classDecl,
+                sourceFile,
+                decorator,
+              );
+
+              if (result.isLeft()) {
+                result.value.addContext(
+                  (prev) => `${classDecl.getName()}.${prev}`,
+                );
+                return result;
+              }
+
+              const model = result.unwrap();
+              kvModels[model.name] = model;
+              break checkDecorators;
             }
 
-            wranglerEnvs.push(result.unwrap());
-            break;
+            case ClassDecoratorKind.Service: {
+              if (!classDecl.isExported()) return notExportedErr;
+              const result = ServiceExtractor.extract(classDecl, sourceFile);
+
+              if (result.isLeft()) {
+                result.value.addContext(
+                  (prev) => `${classDecl.getName()}.${prev}`,
+                );
+                return result;
+              }
+
+              const service = result.unwrap();
+              services[service.name] = service;
+              break checkDecorators;
+            }
+
+            case ClassDecoratorKind.PlainOldObject: {
+              if (!classDecl.isExported()) return notExportedErr;
+              const result = CidlExtractor.poo(classDecl, sourceFile);
+
+              if (result.isLeft()) {
+                result.value.addContext(
+                  (prev) => `${classDecl.getName()}.${prev}`,
+                );
+                return result;
+              }
+              poos[result.unwrap().name] = result.unwrap();
+              break checkDecorators;
+            }
+
+            case ClassDecoratorKind.WranglerEnv: {
+              // Error: invalid attribute modifier
+              for (const prop of classDecl.getProperties()) {
+                const modifierRes = checkAttributeModifier(prop);
+                if (modifierRes.isLeft()) {
+                  return modifierRes;
+                }
+              }
+
+              const result = CidlExtractor.env(classDecl, sourceFile);
+              if (result.isLeft()) {
+                return result;
+              }
+
+              wranglerEnvs.push(result.unwrap());
+              break checkDecorators;
+            }
+
+            default: {
+              continue;
+            }
           }
         }
+
+
       }
     }
 

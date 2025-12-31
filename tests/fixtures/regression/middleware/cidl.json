@@ -1,8 +1,6 @@
 {
   "hash": 13896337731609429158,
-  "version": "v0.0.4",
   "project_name": "runner",
-  "language": "TypeScript",
   "wrangler_env": {
     "name": "Env",
     "source_path": "./seed__app.cloesce.ts",
@@ -82,6 +80,7 @@
       "source_path": "./seed__app.cloesce.ts"
     }
   },
+  "services": {},
   "kv_models": {},
   "poos": {
     "InjectedThing": {
@@ -95,6 +94,5 @@
       "source_path": "./seed__app.cloesce.ts"
     }
   },
-  "services": {},
   "app_source": "./seed__app.cloesce.ts"
 }

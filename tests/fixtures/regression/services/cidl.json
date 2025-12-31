@@ -1,12 +1,8 @@
 {
   "hash": 0,
-  "version": "v0.0.4",
   "project_name": "runner",
-  "language": "TypeScript",
   "wrangler_env": null,
   "d1_models": {},
-  "kv_models": {},
-  "poos": {},
   "services": {
     "FooService": {
       "name": "FooService",
@@ -38,7 +34,7 @@
       "attributes": [
         {
           "var_name": "foo",
-          "injected": "FooService"
+          "inject_reference": "FooService"
         }
       ],
       "methods": {
@@ -55,5 +51,7 @@
       "source_path": "./seed__app.cloesce.ts"
     }
   },
+  "kv_models": {},
+  "poos": {},
   "app_source": "./seed__app.cloesce.ts"
 }

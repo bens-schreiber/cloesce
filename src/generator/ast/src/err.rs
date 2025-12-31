@@ -53,7 +53,6 @@ pub enum GeneratorErrorKind {
     UnknownObject,
     UnexpectedVoid,
     UnexpectedInject,
-    MissingOrExtraneousDataSource,
     NotYetSupported,
     InvalidMapping,
     MismatchedForeignKeyTypes,
@@ -106,11 +105,6 @@ impl GeneratorErrorKind {
             GeneratorErrorKind::UnexpectedInject => (
                 "Attributes and return types cannot be injected values.",
                 "Remove the value.",
-                GeneratorPhase::ModelAnalysis,
-            ),
-            GeneratorErrorKind::MissingOrExtraneousDataSource => (
-                "All instantiated methods must have one data source parameter.",
-                "Add a data source parameter, or remove extras.",
                 GeneratorPhase::ModelAnalysis,
             ),
             GeneratorErrorKind::NotYetSupported => (

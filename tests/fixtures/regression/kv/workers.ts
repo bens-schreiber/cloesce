@@ -7,7 +7,7 @@ import { DataScientist } from "./seed__kv.cloesce.ts";
 import { JsonValue } from "./seed__kv.cloesce.ts";
 import { StreamValue } from "./seed__kv.cloesce.ts";
 import { TextValue } from "./seed__kv.cloesce.ts";
-import { DataValue } from "./seed__kv.cloesce.ts";
+import { Scientist } from "./seed__kv.cloesce.ts";
 
 const app = new CloesceApp();
 const constructorRegistry = {
@@ -16,7 +16,7 @@ const constructorRegistry = {
 	JsonValue: JsonValue,
 	StreamValue: StreamValue,
 	TextValue: TextValue,
-	DataValue: DataValue
+	Scientist: Scientist
 };
 
 async function fetch(request: Request, env: any, ctx: any): Promise<Response> {

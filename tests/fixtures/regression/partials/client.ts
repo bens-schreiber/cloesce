@@ -9,12 +9,14 @@ export class Dog {
   age: number;
 
   async getPartialSelf(
-    __dataSource: "none" = "none",
+    __datasource: "none" = "none",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<DeepPartial<Dog>>> {
-    const baseUrl = new URL(`http://localhost:5002/api/Dog/${this.id}/getPartialSelf`);
+    const id = encodeURIComponent(String(this.id));
+    const baseUrl = new URL(`http://localhost:5002/api/Dog/${id}/getPartialSelf`);
+    
 
-    baseUrl.searchParams.append('__dataSource', String(__dataSource));
+    baseUrl.searchParams.append('__datasource', String(__datasource));
 
     const res = await fetchImpl(baseUrl, {
       method: "GET",
@@ -32,6 +34,7 @@ export class Dog {
     dog: DeepPartial<Dog>,
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Dog>> {
+    
     const baseUrl = new URL(`http://localhost:5002/api/Dog/post`);
     const payload: any = {};
 

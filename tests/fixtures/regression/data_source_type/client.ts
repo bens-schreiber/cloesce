@@ -20,7 +20,8 @@ export class Foo {
     noDs: "none" = "none",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<void>> {
-    const baseUrl = new URL(`http://localhost:5002/api/Foo/${this.id}/bar`);
+    const id = encodeURIComponent(String(this.id));
+    const baseUrl = new URL(`http://localhost:5002/api/Foo/${id}/bar`);
     const payload: any = {};
 
     baseUrl.searchParams.append('customDs', String(customDs));

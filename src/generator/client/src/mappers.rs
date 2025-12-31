@@ -33,17 +33,19 @@ impl ClientLanguageTypeMapper for TypeScriptMapper {
             CidlType::Void => "void".to_string(),
             CidlType::Partial(name) => format!("DeepPartial<{name}>"),
             CidlType::DataSource(model_name) => {
-                let mut ds = ast
-                    .d1_models
-                    .get(model_name)
-                    .unwrap()
-                    .data_sources
-                    .keys()
-                    .map(|k| format!("\"{k}\""))
-                    .collect::<Vec<_>>();
+                let ds = {
+                    if let Some(d1_model) = ast.d1_models.get(model_name) {
+                        &d1_model.data_sources
+                    } else if let Some(kv_model) = ast.kv_models.get(model_name) {
+                        &kv_model.data_sources
+                    } else {
+                        unreachable!("Model {model_name} not found for DataSource type");
+                    }
+                };
 
-                ds.push("\"none\"".to_string());
-                format!("{} = \"none\"", ds.join(" |")) // default to none
+                let mut format_ds = ds.keys().map(|k| format!("\"{k}\"")).collect::<Vec<_>>();
+                format_ds.push("\"none\"".to_string());
+                format!("{} = \"none\"", format_ds.join(" |")) // default to none
             }
             CidlType::Stream => "ReadableStream<Uint8Array>".to_string(),
             _ => panic!("Invalid type {:?}", ty),

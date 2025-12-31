@@ -1,7 +1,5 @@
 {
-    "version": "v0.0.4",
     "project_name": "runner",
-    "language": "TypeScript",
     "wrangler_env": {
         "name": "Env",
         "source_path": "./seed__blobs.cloesce.ts",
@@ -36,24 +34,17 @@
             "methods": {
                 "getBlob1": {
                     "name": "getBlob1",
-                    "is_static": false,
                     "http_verb": "GET",
+                    "is_static": false,
                     "return_media": "Json",
                     "return_type": "Blob",
                     "parameters_media": "Json",
-                    "parameters": [
-                        {
-                            "name": "__dataSource",
-                            "cidl_type": {
-                                "DataSource": "BlobHaver"
-                            }
-                        }
-                    ]
+                    "parameters": []
                 },
                 "inputStream": {
                     "name": "inputStream",
-                    "is_static": true,
                     "http_verb": "POST",
+                    "is_static": true,
                     "return_media": "Json",
                     "return_type": "Void",
                     "parameters_media": "Json",
@@ -66,19 +57,12 @@
                 },
                 "yieldStream": {
                     "name": "yieldStream",
-                    "is_static": false,
                     "http_verb": "GET",
+                    "is_static": false,
                     "return_media": "Json",
                     "return_type": "Stream",
                     "parameters_media": "Json",
-                    "parameters": [
-                        {
-                            "name": "__dataSource",
-                            "cidl_type": {
-                                "DataSource": "BlobHaver"
-                            }
-                        }
-                    ]
+                    "parameters": []
                 }
             },
             "data_sources": {},

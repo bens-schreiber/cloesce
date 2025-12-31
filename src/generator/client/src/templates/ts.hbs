@@ -98,10 +98,9 @@ export class {{this.name}} {
     {{/each}}
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<{{map_cidl_type this.return_type}}>> {
-    const baseUrl = new URL(`{{../../domain}}/{{#if this.is_static}}{{../name}}/{{this.name}}{{else}}{{../name}}/${this.{{../primary_key.name}}}/{{this.name}}{{/if}}`);
-    {{#unless (is_get_request this.http_verb)}}
-    const payload: any = {};
-    {{/unless}}
+    {{#unless this.is_static}}const id = encodeURIComponent(String(this.{{../primary_key.name}}));{{/unless}}
+    const baseUrl = new URL(`{{../../domain}}/{{../name}}/{{#unless this.is_static}}${id}/{{/unless}}{{this.name}}`);
+    {{#unless (is_get_request this.http_verb)}}const payload: any = {};{{/unless}}
 
     {{#each this.parameters}}
       {{#if (is_serializable cidl_type) }}
@@ -190,10 +189,9 @@ export class {{this.name}} {
     {{/each}}
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<{{map_cidl_type this.return_type}}>> {
-    const baseUrl = new URL(`{{../../domain}}/{{#if this.is_static}}{{../name}}/{{this.name}}{{else}}{{../name}}/${this.key}/{{this.name}}{{/if}}`);
-    {{#unless (is_get_request this.http_verb)}}
-    const payload: any = {};
-    {{/unless}}
+    {{#unless this.is_static}}const key = encodeURIComponent(String(this.key));{{/unless}}
+    const baseUrl = new URL(`{{../../domain}}/{{../name}}/{{#unless this.is_static}}${key}/{{/unless}}{{this.name}}`);
+    {{#unless (is_get_request this.http_verb)}}const payload: any = {};{{/unless}}
 
     {{#each this.parameters}}
       {{#if (is_serializable cidl_type) }}

@@ -13,7 +13,9 @@ export class Weather {
     __datasource: "none" = "none",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Weather>> {
+    
     const baseUrl = new URL(`http://localhost:5002/api/Weather/get`);
+    
 
     baseUrl.searchParams.append('id', String(id));
     baseUrl.searchParams.append('__datasource', String(__datasource));
@@ -35,6 +37,7 @@ export class Weather {
     __datasource: "none" = "none",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Weather>> {
+    
     const baseUrl = new URL(`http://localhost:5002/api/Weather/save`);
     const payload: any = {};
 

@@ -11,6 +11,7 @@ import {
   NO_DATA_SOURCE,
   Service,
   MediaType,
+  KVModel,
 } from "../ast.js";
 import { RuntimeValidator } from "./validator.js";
 import Either from "../either.js";
@@ -39,7 +40,7 @@ export class RuntimeContainer {
     public readonly ast: CloesceAst,
     public readonly constructorRegistry: ConstructorRegistry,
     public readonly wasm: OrmWasmExports,
-  ) {}
+  ) { }
 
   static async init(
     ast: CloesceAst,
@@ -265,12 +266,12 @@ export class CloesceApp {
       }
     })();
 
-    if (hydrated.isLeft()) {
+    if (hydrated!.isLeft()) {
       return hydrated.value;
     }
 
     // Method dispatch
-    return await methodDispatch(hydrated.unwrap(), di, route, params);
+    return await methodDispatch(hydrated!.unwrap(), di, route, params);
   }
 
   /**
@@ -355,12 +356,12 @@ export class CloesceApp {
 }
 
 export type MatchedRoute = {
-  kind: "d1" | "service"; // | "kv";
+  kind: "d1" | "kv" | "service";
   namespace: string;
   method: ApiMethod;
   id: string | null;
   d1Model?: D1Model;
-  // kvModel?: KVModel;
+  kvModel?: KVModel;
   service?: Service;
 };
 
@@ -413,6 +414,24 @@ function matchRoute(
     });
   }
 
+  const kvModel = ast.kv_models[namespace];
+  if (kvModel) {
+    const method = kvModel.methods[methodName];
+    if (!method) return notFound(RouterError.UnknownRoute);
+
+    if (request.method !== method.http_verb) {
+      return notFound(RouterError.UnmatchedHttpVerb);
+    }
+
+    return Either.right({
+      kind: "kv",
+      namespace,
+      method,
+      kvModel,
+      id,
+    });
+  }
+
   const service = ast.services[namespace];
   if (service) {
     const method = service.methods[methodName];
@@ -454,7 +473,7 @@ async function validateRequest(
     exit(400, c, "Invalid Request Body");
 
   // Models must have an ID on instantiated methods.
-  const isModel = route.kind === "d1";
+  const isModel = route.kind === "d1" || route.kind === "kv";
   if (isModel && !route.method.is_static && route.id == null) {
     return invalidRequest(RouterError.InstantiatedMethodMissingId);
   }
