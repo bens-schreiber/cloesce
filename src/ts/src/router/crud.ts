@@ -1,5 +1,5 @@
 import { D1Database } from "@cloudflare/workers-types";
-import { IncludeTree, Orm } from "../ui/backend.js";
+import { IncludeTree, D1Orm } from "../ui/backend.js";
 import { HttpResult } from "../ui/common.js";
 import { NO_DATA_SOURCE } from "../ast.js";
 
@@ -41,7 +41,7 @@ async function upsert(
   d1: D1Database,
 ): Promise<HttpResult<unknown>> {
   const includeTree = findIncludeTree(dataSource, ctor);
-  const orm = Orm.fromD1(d1);
+  const orm = D1Orm.fromD1(d1);
 
   const result = await orm.upsert(ctor, body, includeTree);
   if (result.isLeft()) return HttpResult.fail(500, result.value);
@@ -60,7 +60,7 @@ async function _get(
 ): Promise<HttpResult<unknown>> {
   const includeTree = findIncludeTree(dataSource, ctor);
 
-  const orm = Orm.fromD1(d1);
+  const orm = D1Orm.fromD1(d1);
   const res = await orm.get(ctor, id, includeTree);
 
   return res.isRight()
@@ -75,7 +75,7 @@ async function list(
 ): Promise<HttpResult<unknown>> {
   const includeTree = findIncludeTree(dataSource, ctor);
 
-  const orm = Orm.fromD1(d1);
+  const orm = D1Orm.fromD1(d1);
   const res = await orm.list(ctor, { includeTree });
   return HttpResult.ok(200, res);
 }

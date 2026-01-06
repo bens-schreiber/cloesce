@@ -6,6 +6,6 @@ export {
   HttpResult,
   requestBody,
   b64ToU8,
-  KValue as KVModel,
+  KValue,
 } from "./common.js";
 export { MediaType } from "../ast.js";

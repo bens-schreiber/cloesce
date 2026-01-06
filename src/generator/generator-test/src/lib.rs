@@ -6,47 +6,34 @@ use std::{
 use indexmap::IndexMap;
 
 use ast::{
-    ApiMethod, CidlType, CloesceAst, CrudKind, D1Model, D1ModelAttribute, D1NavigationProperty,
-    D1NavigationPropertyKind, DataSource, HttpVerb, IncludeTree, KVModel, KVNavigationProperty,
-    MediaType, NamedTypedValue, WranglerEnv, WranglerSpec,
+    ApiMethod, CidlType, CloesceAst, D1Column, DataSource, HttpVerb, IncludeTree, KeyValue,
+    MediaType, Model, NamedTypedValue, NavigationProperty, NavigationPropertyKind, R2Object,
+    WranglerEnv, WranglerSpec,
 };
 use wrangler::WranglerDefault;
 
-pub fn create_ast(d1_models: Vec<D1Model>, kv_models: Vec<KVModel>) -> CloesceAst {
-    let d1_map = d1_models
+pub fn create_ast(models: Vec<Model>) -> CloesceAst {
+    let model_map = models
         .into_iter()
         .map(|m| (m.name.clone(), m))
-        .collect::<IndexMap<String, D1Model>>();
-
-    let kv_map = kv_models
-        .into_iter()
-        .map(|m| (m.name.clone(), m))
-        .collect::<BTreeMap<String, KVModel>>();
+        .collect::<IndexMap<String, Model>>();
 
     CloesceAst {
         project_name: "test".to_string(),
-        d1_models: d1_map,
-        kv_models: kv_map,
+        models: model_map,
         poos: BTreeMap::default(),
         services: IndexMap::default(),
         wrangler_env: Some(WranglerEnv {
             name: "TestEnv".to_string(),
             source_path: PathBuf::default(),
             d1_binding: Some("TEST_DB".to_string()),
-            kv_bindings: Vec::new(),
+            r2_bindings: vec!["r2_namespace".to_string()],
+            kv_bindings: vec!["kv_namespace".to_string()],
             vars: HashMap::new(),
         }),
         app_source: None,
         hash: 0,
     }
-}
-
-pub fn create_ast_d1(d1_models: Vec<D1Model>) -> CloesceAst {
-    create_ast(d1_models, vec![])
-}
-
-pub fn create_ast_kv(kv_models: Vec<KVModel>) -> CloesceAst {
-    create_ast(vec![], kv_models)
 }
 
 pub fn create_spec(ast: &CloesceAst) -> WranglerSpec {
@@ -96,34 +83,40 @@ impl IncludeTreeBuilder {
     }
 }
 
-pub struct D1ModelBuilder {
+pub struct ModelBuilder {
     name: String,
-    attributes: Vec<D1ModelAttribute>,
-    navigation_properties: Vec<D1NavigationProperty>,
     primary_key: Option<NamedTypedValue>,
+    columns: Vec<D1Column>,
+    navigation_properties: Vec<NavigationProperty>,
+    key_params: Vec<String>,
+    kv_objects: Vec<KeyValue>,
+    r2_objects: Vec<R2Object>,
     methods: BTreeMap<String, ApiMethod>,
     data_sources: BTreeMap<String, DataSource>,
 }
 
-impl D1ModelBuilder {
+impl ModelBuilder {
     pub fn new(name: impl Into<String>) -> Self {
         Self {
             name: name.into(),
-            attributes: Vec::new(),
+            primary_key: None,
+            columns: Vec::new(),
             navigation_properties: Vec::new(),
+            key_params: Vec::new(),
+            kv_objects: Vec::new(),
+            r2_objects: Vec::new(),
             methods: BTreeMap::new(),
             data_sources: BTreeMap::new(),
-            primary_key: None,
         }
     }
 
-    pub fn attribute(
+    pub fn col(
         mut self,
         name: impl Into<String>,
         cidl_type: CidlType,
         foreign_key: Option<String>,
     ) -> Self {
-        self.attributes.push(D1ModelAttribute {
+        self.columns.push(D1Column {
             value: NamedTypedValue {
                 name: name.into(),
                 cidl_type,
@@ -138,9 +131,9 @@ impl D1ModelBuilder {
         mut self,
         var_name: impl Into<String>,
         model_reference: impl Into<String>,
-        foreign_key: D1NavigationPropertyKind,
+        foreign_key: NavigationPropertyKind,
     ) -> Self {
-        self.navigation_properties.push(D1NavigationProperty {
+        self.navigation_properties.push(NavigationProperty {
             var_name: var_name.into(),
             model_reference: model_reference.into(),
             kind: foreign_key,
@@ -157,7 +150,44 @@ impl D1ModelBuilder {
         self
     }
 
-    pub fn id(self) -> Self {
+    pub fn key_param(mut self, name: impl Into<String>) -> Self {
+        self.key_params.push(name.into());
+        self
+    }
+
+    pub fn kv_object(
+        mut self,
+        format: impl Into<String>,
+        namespace_binding: impl Into<String>,
+        name: impl Into<String>,
+        cidl_type: CidlType,
+    ) -> Self {
+        self.kv_objects.push(KeyValue {
+            format: format.into(),
+            namespace_binding: namespace_binding.into(),
+            value: NamedTypedValue {
+                name: name.into(),
+                cidl_type,
+            },
+        });
+        self
+    }
+
+    pub fn r2_object(
+        mut self,
+        format: impl Into<String>,
+        bucket_binding: impl Into<String>,
+        var_name: impl Into<String>,
+    ) -> Self {
+        self.r2_objects.push(R2Object {
+            format: format.into(),
+            bucket_binding: bucket_binding.into(),
+            var_name: var_name.into(),
+        });
+        self
+    }
+
+    pub fn id_pk(self) -> Self {
         self.pk("id", CidlType::Integer)
     }
 
@@ -196,107 +226,19 @@ impl D1ModelBuilder {
         self
     }
 
-    pub fn build(self) -> D1Model {
-        D1Model {
+    pub fn build(self) -> Model {
+        Model {
             name: self.name,
-            attributes: self.attributes,
+            primary_key: self.primary_key,
+            columns: self.columns,
             navigation_properties: self.navigation_properties,
+            key_params: self.key_params,
+            kv_objects: self.kv_objects,
+            r2_objects: self.r2_objects,
             methods: self.methods,
             data_sources: self.data_sources,
-            source_path: PathBuf::default(),
-            primary_key: self.primary_key.unwrap(),
-            cruds: vec![],
             hash: 0,
-        }
-    }
-}
-
-pub struct KVModelBuilder {
-    name: String,
-    binding: String,
-    cidl_type: CidlType,
-    params: Vec<String>,
-    navigation_properties: Vec<KVNavigationProperty>,
-    cruds: Vec<CrudKind>,
-    methods: BTreeMap<String, ApiMethod>,
-    data_sources: BTreeMap<String, DataSource>,
-}
-
-impl KVModelBuilder {
-    pub fn new(name: impl Into<String>, binding: impl Into<String>, cidl_type: CidlType) -> Self {
-        Self {
-            name: name.into(),
-            binding: binding.into(),
-            cidl_type,
-            params: Vec::new(),
-            navigation_properties: Vec::new(),
-            cruds: Vec::new(),
-            methods: BTreeMap::new(),
-            data_sources: BTreeMap::new(),
-        }
-    }
-
-    pub fn param(mut self, p: impl Into<String>) -> Self {
-        self.params.push(p.into());
-        self
-    }
-
-    pub fn nav_p(mut self, name: impl Into<String>, cidl_type: CidlType) -> Self {
-        self.navigation_properties
-            .push(KVNavigationProperty::KValue(NamedTypedValue {
-                name: name.into(),
-                cidl_type,
-            }));
-        self
-    }
-
-    pub fn model_nav_p(
-        mut self,
-        model_reference: impl Into<String>,
-        var_name: impl Into<String>,
-        many: bool,
-    ) -> Self {
-        self.navigation_properties
-            .push(KVNavigationProperty::Model {
-                model_reference: model_reference.into(),
-                var_name: var_name.into(),
-                many,
-            });
-        self
-    }
-
-    pub fn crud(mut self, crud: CrudKind) -> Self {
-        self.cruds.push(crud);
-        self
-    }
-
-    pub fn method(mut self, name: impl Into<String>, api_method: ApiMethod) -> Self {
-        self.methods.insert(name.into(), api_method);
-        self
-    }
-
-    pub fn data_source(mut self, name: impl Into<String> + Copy, tree: ast::IncludeTree) -> Self {
-        self.data_sources.insert(
-            name.into(),
-            DataSource {
-                name: name.into(),
-                tree,
-                hash: 0,
-            },
-        );
-        self
-    }
-
-    pub fn build(self) -> KVModel {
-        KVModel {
-            name: self.name,
-            binding: self.binding,
-            cidl_type: self.cidl_type,
-            params: self.params,
-            navigation_properties: self.navigation_properties,
-            cruds: self.cruds,
-            methods: self.methods,
-            data_sources: self.data_sources,
+            cruds: vec![],
             source_path: PathBuf::default(),
         }
     }

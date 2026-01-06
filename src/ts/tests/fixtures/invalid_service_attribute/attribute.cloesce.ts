@@ -1,5 +1,5 @@
 // @ts-nocheck
-// InvalidServiceAttribute
+// InvalidServiceProperty
 @Service
 export class FooService {
   invalid: string;

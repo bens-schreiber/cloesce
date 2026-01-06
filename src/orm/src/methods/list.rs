@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use ast::{D1Model, D1NavigationPropertyKind, fail};
+use ast::{Model, NavigationPropertyKind, fail};
 use sea_query::{
     ColumnRef, CommonTableExpression, Expr, IntoCondition, IntoIden, Query, SelectStatement,
     SqliteQueryBuilder, TableRef, WithClause,
@@ -25,6 +25,13 @@ pub fn list_models(
         Some(m) => m,
         None => fail!(OrmErrorKind::UnknownModel, "{}", model_name),
     };
+    if model.primary_key.is_none() {
+        fail!(
+            OrmErrorKind::ModelMissingD1,
+            "Model '{}' is not a D1 model.",
+            model_name
+        )
+    }
 
     let mut query = Query::select();
     if custom_from.is_some() {
@@ -76,7 +83,7 @@ pub fn list_models(
 
 #[allow(clippy::too_many_arguments)]
 fn dfs(
-    model: &D1Model,
+    model: &Model,
     tree: Option<&IncludeTreeJson>,
     query: &mut SelectStatement,
     path: &mut Vec<String>,
@@ -93,7 +100,7 @@ fn dfs(
         }
     };
 
-    let pk = &model.primary_key.name;
+    let pk = &model.primary_key.as_ref().unwrap().name;
 
     // Primary Key
     {
@@ -108,10 +115,10 @@ fn dfs(
     };
 
     // Columns
-    for attr in &model.attributes {
+    for col in &model.columns {
         query.expr_as(
-            Expr::col((alias(&model_alias), alias(&attr.value.name))),
-            alias(join_path(&attr.value.name)),
+            Expr::col((alias(&model_alias), alias(&col.value.name))),
+            alias(join_path(&col.value.name)),
         );
     }
 
@@ -130,32 +137,28 @@ fn dfs(
         let mut child_m2m_alias = None;
 
         match &nav.kind {
-            D1NavigationPropertyKind::OneToOne {
-                attribute_reference,
-            } => {
-                let nav_model_pk = &child.primary_key.name;
+            NavigationPropertyKind::OneToOne { column_reference } => {
+                let nav_model_pk = &child.primary_key.as_ref().unwrap().name;
                 left_join_as(
                     query,
                     &child.name,
                     &child_alias,
-                    Expr::col((alias(&model_alias), alias(attribute_reference)))
+                    Expr::col((alias(&model_alias), alias(column_reference)))
                         .equals((alias(&child_alias), alias(nav_model_pk))),
                 );
             }
-            D1NavigationPropertyKind::OneToMany {
-                attribute_reference,
-            } => {
+            NavigationPropertyKind::OneToMany { column_reference } => {
                 left_join_as(
                     query,
                     &child.name,
                     &child_alias,
                     Expr::col((alias(&model_alias), alias(pk)))
-                        .equals((alias(&child_alias), alias(attribute_reference))),
+                        .equals((alias(&child_alias), alias(column_reference))),
                 );
             }
-            D1NavigationPropertyKind::ManyToMany { unique_id } => {
+            NavigationPropertyKind::ManyToMany { unique_id } => {
                 let nav_model_pk = &child.primary_key;
-                let pk = &model.primary_key.name;
+                let pk = &model.primary_key.as_ref().unwrap().name;
                 let m2m_alias = generate_alias(unique_id, alias_counter);
 
                 left_join_as(
@@ -170,8 +173,12 @@ fn dfs(
                     query,
                     &child.name,
                     &child_alias,
-                    Expr::col((alias(&m2m_alias), alias(format!("{}.{}", child.name, pk))))
-                        .equals((alias(&child_alias), alias(&nav_model_pk.name))),
+                    Expr::col((alias(&m2m_alias), alias(format!("{}.{}", child.name, pk)))).equals(
+                        (
+                            alias(&child_alias),
+                            alias(&nav_model_pk.as_ref().unwrap().name),
+                        ),
+                    ),
                 );
 
                 child_m2m_alias = Some(m2m_alias);
@@ -224,8 +231,8 @@ fn left_join_as(
 
 #[cfg(test)]
 mod test {
-    use ast::{CidlType, D1NavigationPropertyKind};
-    use generator_test::{D1ModelBuilder, IncludeTreeBuilder, expected_str};
+    use ast::{CidlType, NavigationPropertyKind};
+    use generator_test::{IncludeTreeBuilder, ModelBuilder, expected_str};
     use serde_json::json;
     use sqlx::SqlitePool;
 
@@ -236,9 +243,9 @@ mod test {
     #[sqlx::test]
     async fn scalar_model(db: SqlitePool) {
         // Arrange
-        let ast_model = D1ModelBuilder::new("Person")
-            .id()
-            .attribute("name", CidlType::Text, None)
+        let ast_model = ModelBuilder::new("Person")
+            .id_pk()
+            .col("name", CidlType::Text, None)
             .build();
 
         let meta = vec![ast_model]
@@ -263,9 +270,9 @@ mod test {
     #[sqlx::test]
     async fn custom_from(db: SqlitePool) {
         // Arrange
-        let ast_model = D1ModelBuilder::new("Person")
-            .id()
-            .attribute("name", CidlType::Text, None)
+        let ast_model = ModelBuilder::new("Person")
+            .id_pk()
+            .col("name", CidlType::Text, None)
             .build();
 
         let meta = vec![ast_model]
@@ -295,18 +302,18 @@ mod test {
     async fn one_to_one(db: SqlitePool) {
         // Arrange
         let meta: ModelMeta = vec![
-            D1ModelBuilder::new("Person")
-                .id()
-                .attribute("dogId", CidlType::Integer, Some("Dog".into()))
+            ModelBuilder::new("Person")
+                .id_pk()
+                .col("dogId", CidlType::Integer, Some("Dog".into()))
                 .nav_p(
                     "dog",
                     "Dog",
-                    D1NavigationPropertyKind::OneToOne {
-                        attribute_reference: "dogId".into(),
+                    NavigationPropertyKind::OneToOne {
+                        column_reference: "dogId".into(),
                     },
                 )
                 .build(),
-            D1ModelBuilder::new("Dog").id().build(),
+            ModelBuilder::new("Dog").id_pk().build(),
         ]
         .into_iter()
         .map(|m| (m.name.clone(), m))
@@ -340,39 +347,39 @@ mod test {
     #[sqlx::test]
     fn one_to_many(db: SqlitePool) {
         let meta: ModelMeta = vec![
-            D1ModelBuilder::new("Dog")
-                .id()
-                .attribute("personId", CidlType::Integer, Some("Person".into()))
+            ModelBuilder::new("Dog")
+                .id_pk()
+                .col("personId", CidlType::Integer, Some("Person".into()))
                 .build(),
-            D1ModelBuilder::new("Cat")
-                .attribute("personId", CidlType::Integer, Some("Person".into()))
-                .id()
+            ModelBuilder::new("Cat")
+                .col("personId", CidlType::Integer, Some("Person".into()))
+                .id_pk()
                 .build(),
-            D1ModelBuilder::new("Person")
-                .id()
+            ModelBuilder::new("Person")
+                .id_pk()
                 .nav_p(
                     "dogs",
                     "Dog",
-                    D1NavigationPropertyKind::OneToMany {
-                        attribute_reference: "personId".into(),
+                    NavigationPropertyKind::OneToMany {
+                        column_reference: "personId".into(),
                     },
                 )
                 .nav_p(
                     "cats",
                     "Cat",
-                    D1NavigationPropertyKind::OneToMany {
-                        attribute_reference: "personId".into(),
+                    NavigationPropertyKind::OneToMany {
+                        column_reference: "personId".into(),
                     },
                 )
-                .attribute("bossId", CidlType::Integer, Some("Boss".into()))
+                .col("bossId", CidlType::Integer, Some("Boss".into()))
                 .build(),
-            D1ModelBuilder::new("Boss")
-                .id()
+            ModelBuilder::new("Boss")
+                .id_pk()
                 .nav_p(
                     "persons",
                     "Person",
-                    D1NavigationPropertyKind::OneToMany {
-                        attribute_reference: "bossId".into(),
+                    NavigationPropertyKind::OneToMany {
+                        column_reference: "bossId".into(),
                     },
                 )
                 .build(),
@@ -412,12 +419,12 @@ mod test {
     #[sqlx::test]
     async fn many_to_many(db: SqlitePool) {
         let meta: ModelMeta = vec![
-            D1ModelBuilder::new("Student")
-                .id()
+            ModelBuilder::new("Student")
+                .id_pk()
                 .nav_p(
                     "courses",
                     "Course".to_string(),
-                    D1NavigationPropertyKind::ManyToMany {
+                    NavigationPropertyKind::ManyToMany {
                         unique_id: "StudentsCourses".into(),
                     },
                 )
@@ -426,12 +433,12 @@ mod test {
                     IncludeTreeBuilder::default().add_node("courses").build(),
                 )
                 .build(),
-            D1ModelBuilder::new("Course")
-                .id()
+            ModelBuilder::new("Course")
+                .id_pk()
                 .nav_p(
                     "students",
                     "Student".to_string(),
-                    D1NavigationPropertyKind::ManyToMany {
+                    NavigationPropertyKind::ManyToMany {
                         unique_id: "StudentsCourses".into(),
                     },
                 )
@@ -468,28 +475,28 @@ mod test {
 
     #[sqlx::test]
     async fn views_auto_alias(db: SqlitePool) {
-        let horse_model = D1ModelBuilder::new("Horse")
-            .id()
-            .attribute("name", CidlType::Text, None)
-            .attribute("bio", CidlType::nullable(CidlType::Text), None)
+        let horse_model = ModelBuilder::new("Horse")
+            .id_pk()
+            .col("name", CidlType::Text, None)
+            .col("bio", CidlType::nullable(CidlType::Text), None)
             .nav_p(
                 "matches",
                 "Match",
-                D1NavigationPropertyKind::OneToMany {
-                    attribute_reference: "horseId1".into(),
+                NavigationPropertyKind::OneToMany {
+                    column_reference: "horseId1".into(),
                 },
             )
             .build();
 
-        let match_model = D1ModelBuilder::new("Match")
-            .id()
-            .attribute("horseId1", CidlType::Integer, Some("Horse".into()))
-            .attribute("horseId2", CidlType::Integer, Some("Horse".into()))
+        let match_model = ModelBuilder::new("Match")
+            .id_pk()
+            .col("horseId1", CidlType::Integer, Some("Horse".into()))
+            .col("horseId2", CidlType::Integer, Some("Horse".into()))
             .nav_p(
                 "horse2",
                 "Horse",
-                D1NavigationPropertyKind::OneToOne {
-                    attribute_reference: "horseId2".into(),
+                NavigationPropertyKind::OneToOne {
+                    column_reference: "horseId2".into(),
                 },
             )
             .build();

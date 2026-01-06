@@ -3,8 +3,8 @@ import { MediaType } from "../ast.js";
 type DeepPartialInner<T> = T extends (infer U)[]
   ? DeepPartialInner<U>[]
   : T extends object
-    ? { [K in keyof T]?: DeepPartialInner<T[K]> }
-    : T | (null extends T ? null : never);
+  ? { [K in keyof T]?: DeepPartialInner<T[K]> }
+  : T | (null extends T ? null : never);
 
 /**
  * Recursively makes all properties of a type optional — including nested objects and arrays.
@@ -68,6 +68,7 @@ export type DeepPartial<T> = DeepPartialInner<T> & { __brand?: "Partial" };
 export class KValue<V> {
   key!: string;
   value!: V;
+  raw: unknown;
   metadata: unknown;
 }
 
@@ -123,7 +124,7 @@ export class HttpResult<T = unknown> {
     public data?: T,
     public message?: string,
     public mediaType?: MediaType,
-  ) {}
+  ) { }
 
   static ok<T>(status: number, data?: T, init?: HeadersInit): HttpResult {
     const headers: Headers = new Headers(init);

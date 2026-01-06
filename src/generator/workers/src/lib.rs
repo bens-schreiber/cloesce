@@ -65,10 +65,7 @@ impl WorkersGenerator {
         };
 
         [
-            imports(&ast.d1_models, workers_dir, |(name, model)| {
-                (name.clone(), model.source_path.clone())
-            }),
-            imports(&ast.kv_models, workers_dir, |(name, model)| {
+            imports(&ast.models, workers_dir, |(name, model)| {
                 (name.clone(), model.source_path.clone())
             }),
             imports(&ast.poos, workers_dir, |(name, poo)| {
@@ -85,10 +82,9 @@ impl WorkersGenerator {
     /// Generates the constructor registry
     fn registry(ast: &CloesceAst) -> String {
         let symbols = ast
-            .d1_models
+            .models
             .values()
             .map(|m| &m.name)
-            .chain(ast.kv_models.values().map(|m| &m.name))
             .chain(ast.poos.values().map(|p| &p.name))
             .chain(ast.services.values().map(|s| &s.name));
 
@@ -136,37 +132,53 @@ impl WorkersGenerator {
             }
         };
 
-        for d1_model in ast.d1_models.values_mut() {
-            for crud in &d1_model.cruds {
+        for model in ast.models.values_mut() {
+            for crud in &model.cruds {
                 let method = match crud {
-                    CrudKind::GET => ApiMethod {
-                        name: "get".into(),
-                        is_static: true,
-                        http_verb: HttpVerb::GET,
-                        return_type: CidlType::http(CidlType::Object(d1_model.name.clone())),
-                        parameters: vec![
-                            NamedTypedValue {
-                                name: d1_model.primary_key.name.clone(),
-                                cidl_type: d1_model.primary_key.cidl_type.clone(),
-                            },
-                            NamedTypedValue {
-                                name: "__datasource".into(),
-                                cidl_type: CidlType::DataSource(d1_model.name.clone()),
-                            },
-                        ],
-                        parameters_media: MediaType::default(),
-                        return_media: MediaType::default(),
-                    },
+                    CrudKind::GET => {
+                        let mut parameters = vec![NamedTypedValue {
+                            name: "__datasource".into(),
+                            cidl_type: CidlType::DataSource(model.name.clone()),
+                        }];
+
+                        for key in &model.key_params {
+                            parameters.push(NamedTypedValue {
+                                name: key.clone(),
+                                cidl_type: CidlType::Text,
+                            });
+                        }
+
+                        if model.has_d1() {
+                            let pk = model.primary_key.as_ref().expect("PK to exist");
+                            parameters.push(NamedTypedValue {
+                                name: pk.name.clone(),
+                                cidl_type: pk.cidl_type.clone(),
+                            });
+                        }
+
+                        // Data source should be last
+                        parameters.reverse();
+
+                        ApiMethod {
+                            name: "get".into(),
+                            is_static: true,
+                            http_verb: HttpVerb::GET,
+                            return_type: CidlType::http(CidlType::Object(model.name.clone())),
+                            parameters,
+                            parameters_media: MediaType::default(),
+                            return_media: MediaType::default(),
+                        }
+                    }
                     CrudKind::LIST => ApiMethod {
                         name: "list".into(),
                         is_static: true,
                         http_verb: HttpVerb::GET,
                         return_type: CidlType::http(CidlType::array(CidlType::Object(
-                            d1_model.name.clone(),
+                            model.name.clone(),
                         ))),
                         parameters: vec![NamedTypedValue {
                             name: "__datasource".into(),
-                            cidl_type: CidlType::DataSource(d1_model.name.clone()),
+                            cidl_type: CidlType::DataSource(model.name.clone()),
                         }],
                         parameters_media: MediaType::default(),
                         return_media: MediaType::default(),
@@ -175,15 +187,15 @@ impl WorkersGenerator {
                         name: "save".into(),
                         is_static: true,
                         http_verb: HttpVerb::POST,
-                        return_type: CidlType::http(CidlType::Object(d1_model.name.clone())),
+                        return_type: CidlType::http(CidlType::Object(model.name.clone())),
                         parameters: vec![
                             NamedTypedValue {
                                 name: "model".into(),
-                                cidl_type: CidlType::Partial(d1_model.name.clone()),
+                                cidl_type: CidlType::Partial(model.name.clone()),
                             },
                             NamedTypedValue {
                                 name: "__datasource".into(),
-                                cidl_type: CidlType::DataSource(d1_model.name.clone()),
+                                cidl_type: CidlType::DataSource(model.name.clone()),
                             },
                         ],
                         parameters_media: MediaType::default(),
@@ -191,28 +203,21 @@ impl WorkersGenerator {
                     },
                 };
 
-                if d1_model.methods.contains_key(&method.name) {
+                if model.methods.contains_key(&method.name) {
                     // Don't overwrite an existing method
                     tracing::warn!(
                         "Found an overwritten CRUD method {}.{}, skipping.",
-                        d1_model.name,
+                        model.name,
                         method.name
                     );
                     continue;
                 }
 
-                d1_model.methods.insert(method.name.clone(), method);
+                model.methods.insert(method.name.clone(), method);
             }
 
-            for method in d1_model.methods.values_mut() {
-                set_datasource_param(method, &d1_model.name);
-                set_media_types(method);
-            }
-        }
-
-        for kv_model in ast.kv_models.values_mut() {
-            for method in kv_model.methods.values_mut() {
-                set_datasource_param(method, &kv_model.name);
+            for method in model.methods.values_mut() {
+                set_datasource_param(method, &model.name);
                 set_media_types(method);
             }
         }
@@ -224,7 +229,7 @@ impl WorkersGenerator {
         }
     }
 
-    pub fn create(ast: &mut CloesceAst, workers_path: &Path) -> String {
+    pub fn generate(ast: &mut CloesceAst, workers_path: &Path) -> String {
         let linked_sources = Self::link(ast, workers_path);
         let constructor_registry = Self::registry(ast);
 

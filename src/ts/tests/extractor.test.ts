@@ -2,12 +2,12 @@ import { describe, test, expect } from "vitest";
 import { Project } from "ts-morph";
 import {
   CidlExtractor,
-  D1ModelExtractor,
-  KVModelExtractor,
+  ModelExtractor,
   ServiceExtractor,
 } from "../src/extractor/extract";
 import { CidlType, DataSource, Service } from "../src/ast";
-import { KVModelBuilder } from "./builder";
+import { ModelBuilder } from "./builder";
+
 
 function cloesceProject(): Project {
   const project = new Project({
@@ -189,7 +189,7 @@ describe("WranglerEnv", () => {
   });
 });
 
-describe("Data Source", () => {
+describe("Model", () => {
   test("Finds Include Tree", () => {
     // Arrange
     const project = cloesceProject();
@@ -197,7 +197,7 @@ describe("Data Source", () => {
       "test.ts",
       `
       import { IncludeTree } from "./src/ui/backend";
-      @D1
+      @Model
       class Foo {
       @PrimaryKey
       id: number;
@@ -210,7 +210,7 @@ describe("Data Source", () => {
 
     // Act
     const classDecl = sourceFile.getClass("Foo")!;
-    const res = D1ModelExtractor.extract(classDecl, sourceFile);
+    const res = ModelExtractor.extract(classDecl, sourceFile);
 
     // Assert
     expect(res.isRight()).toBe(true);
@@ -220,6 +220,51 @@ describe("Data Source", () => {
       tree: {},
     } as DataSource);
   });
+
+  test("Extracts Primary Key, Columns, Key Params and KV", () => {
+    // Arrange
+    const project = cloesceProject();
+    const sourceFile = project.createSourceFile(
+      "test.ts",
+      `
+      import { KValue, Integer } from "./src/ui/backend";
+      @Model
+      class Foo {
+        @PrimaryKey
+        id: Integer;
+
+        name: string;
+        real: number;
+        boolOrNull: boolean | null;
+
+        @KeyParam
+        kvId: string;
+
+        @KV("value/Foo/{id}/{kvId}", "namespace")
+        value: KValue<unknown>;
+      }
+      `,
+    );
+
+    // Act
+    const classDecl = sourceFile.getClass("Foo")!;
+    const res = ModelExtractor.extract(classDecl, sourceFile);
+
+    // Assert
+    expect(res.isRight(), `Error: ${JSON.stringify(res)}`).toBe(true);
+
+    res.unwrap().source_path = "";
+    expect(res.unwrap()).toEqual(ModelBuilder
+      .model("Foo")
+      .idPk()
+      .col("name", "Text")
+      .col("real", "Real")
+      .col("boolOrNull", { Nullable: "Boolean" })
+      .keyParam("kvId")
+      .kvObject("value/Foo/{id}/{kvId}", "namespace", "value", "JsonValue")
+      .build()
+    )
+  })
 });
 
 describe("Services", () => {
@@ -259,68 +304,3 @@ describe("Services", () => {
   });
 });
 
-describe("KV Models", () => {
-  test("Produces KV Model", () => {
-    // Arrange
-    const project = cloesceProject();
-    const sourceFile = project.createSourceFile(
-      "test.ts",
-      `
-          @KV("MY_KV_NAMESPACE")
-          class FooKV extends KValue<unknown> {
-            id: string;
-          }
-
-          @KV("ANOTHER_KV_NAMESPACE")
-          class BarKV extends KValue<string> {
-            key1: string;
-            key2: string;
-            key3: string;
-
-            value1: KValue<number>;
-            value2: FooKV;
-            value3: FooKV[];
-            value4: KValue<ReadableStream>;
-
-            @DataSource
-            static readonly default: IncludeTree<BarKV> = {
-              value1: {},
-              value2: {},
-              value3: {},
-              value4: {},
-            };
-          }
-          `,
-    );
-
-    // Act
-    const classDecl = sourceFile.getClass("BarKV")!;
-    const res = KVModelExtractor.extract(
-      classDecl,
-      sourceFile,
-      classDecl.getDecorators()[0],
-    );
-
-    // Assert
-    expect(res.isRight()).toBe(true);
-
-    const model = new KVModelBuilder("BarKV", "ANOTHER_KV_NAMESPACE", "Text")
-      .param("key1")
-      .param("key2")
-      .param("key3")
-      .navP("value1", "Real")
-      .modelNavP("FooKV", "value2", false)
-      .modelNavP("FooKV", "value3", true)
-      .navP("value4", "Stream")
-      .dataSource("default", {
-        value1: {},
-        value2: {},
-        value3: {},
-        value4: {},
-      })
-      .build();
-    model.source_path = sourceFile.getFilePath().toString();
-
-    expect(res.unwrap()).toEqual(model);
-  });
-});

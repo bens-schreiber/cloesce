@@ -12,17 +12,12 @@ export {
   DependencyContainer as DependencyInjector,
 } from "../router/router.js";
 export type { MiddlewareFn, ResultMiddlewareFn } from "../router/router.js";
-export { HttpResult, KValue as KVModel } from "./common.js";
-export type { DeepPartial } from "./common.js";
+export { HttpResult, KValue } from "./common.js";
+export type { DeepPartial, } from "./common.js";
 export type { CrudKind } from "../ast.js";
 
-export const D1: ClassDecorator = () => {};
-
-export const KV = (_binding: string): ClassDecorator => {
-  return () => {};
-};
-
-export const Service: ClassDecorator = () => {};
+export const Model: ClassDecorator = () => { };
+export const Service: ClassDecorator = () => { };
 
 /**
  * Declares a Wrangler environment definition.
@@ -45,7 +40,7 @@ export const Service: ClassDecorator = () => {};
  * foo(＠Inject env: WranglerEnv) {...}
  * ```
  */
-export const WranglerEnv: ClassDecorator = () => {};
+export const WranglerEnv: ClassDecorator = () => { };
 
 /**
  * Marks a property as the SQL primary key for a model.
@@ -63,37 +58,48 @@ export const WranglerEnv: ClassDecorator = () => {};
  * }
  * ```
  */
-export const PrimaryKey: PropertyDecorator = () => {};
+export const PrimaryKey: PropertyDecorator = () => { };
+
+
+export const KeyParam: PropertyDecorator = () => { };
+
+export const KV =
+  (_keyFormat?: string, _namespaceBinding?: string): PropertyDecorator =>
+    () => { };
+
+export const R2 =
+  (_keyFormat?: string, _bucketBinding?: string): PropertyDecorator =>
+    () => { };
 
 /**
  * Exposes a class method as an HTTP GET endpoint.
  * The method will appear in both backend and generated client APIs.
  */
-export const GET: MethodDecorator = () => {};
+export const GET: MethodDecorator = () => { };
 
 /**
  * Exposes a class method as an HTTP POST endpoint.
  * The method will appear in both backend and generated client APIs.
  */
-export const POST: MethodDecorator = () => {};
+export const POST: MethodDecorator = () => { };
 
 /**
  * Exposes a class method as an HTTP PUT endpoint.
  * The method will appear in both backend and generated client APIs.
  */
-export const PUT: MethodDecorator = () => {};
+export const PUT: MethodDecorator = () => { };
 
 /**
  * Exposes a class method as an HTTP PATCH endpoint.
  * The method will appear in both backend and generated client APIs.
  */
-export const PATCH: MethodDecorator = () => {};
+export const PATCH: MethodDecorator = () => { };
 
 /**
  * Exposes a class method as an HTTP DEL endpoint.
  * The method will appear in both backend and generated client APIs.
  */
-export const DELETE: MethodDecorator = () => {};
+export const DELETE: MethodDecorator = () => { };
 
 /**
  * Declares a static property as a data source.
@@ -135,8 +141,7 @@ export const DELETE: MethodDecorator = () => {};
  * // => Person { id: 1, dogId: 2, dog: { id: 2, name: "Fido" } }[]
  * ```
  */
-
-export const DataSource: PropertyDecorator = () => {};
+export const DataSource: PropertyDecorator = () => { };
 
 /**
  * Declares a one-to-many relationship between models.
@@ -152,7 +157,7 @@ export const DataSource: PropertyDecorator = () => {};
  */
 export const OneToMany =
   (_foreignKeyColumn: string): PropertyDecorator =>
-  () => {};
+    () => { };
 
 /**
  * Declares a one-to-one relationship between models.
@@ -168,7 +173,7 @@ export const OneToMany =
  */
 export const OneToOne =
   (_foreignKeyColumn: string): PropertyDecorator =>
-  () => {};
+    () => { };
 
 /**
  * Declares a many-to-many relationship between models.
@@ -184,7 +189,7 @@ export const OneToOne =
  */
 export const ManyToMany =
   (_uniqueId: string): PropertyDecorator =>
-  () => {};
+    () => { };
 
 /**
  * Declares a foreign key relationship between models.
@@ -202,7 +207,7 @@ export const ManyToMany =
  */
 export const ForeignKey =
   <T>(_Model: T | string): PropertyDecorator =>
-  () => {};
+    () => { };
 
 /**
  * Marks a method parameter for dependency injection.
@@ -221,7 +226,7 @@ export const ForeignKey =
  * }
  * ```
  */
-export const Inject: ParameterDecorator = () => {};
+export const Inject: ParameterDecorator = () => { };
 
 /**
  * Enables automatic CRUD method generation for a model.
@@ -253,7 +258,7 @@ export const Inject: ParameterDecorator = () => {};
  */
 export const CRUD =
   (_kinds: CrudKind[]): ClassDecorator =>
-  () => {};
+    () => { };
 
 type Primitive = string | number | boolean | bigint | symbol | null | undefined;
 
@@ -286,10 +291,10 @@ type Primitive = string | number | boolean | bigint | symbol | null | undefined;
 export type IncludeTree<T> = (T extends Primitive
   ? never
   : {
-      [K in keyof T]?: T[K] extends (infer U)[]
-        ? IncludeTree<NonNullable<U>>
-        : IncludeTree<NonNullable<T[K]>>;
-    }) & { __brand?: "IncludeTree" };
+    [K in keyof T]?: T[K] extends (infer U)[]
+    ? IncludeTree<NonNullable<U>>
+    : IncludeTree<NonNullable<T[K]>>;
+  }) & { __brand?: "IncludeTree" };
 
 /**
  * Represents the name of a `＠DataSource` available on a model type `T`,
@@ -340,18 +345,16 @@ export type DataSourceOf<T extends object> = (
  */
 export type Integer = number & { __brand?: "Integer" };
 
-/**
- * Exposes the ORM primitives Cloesce uses to interact with D1 databases.
- */
-export class Orm {
-  private constructor(private db: D1Database) {}
+
+export class D1Orm {
+  private constructor(private db: D1Database) { }
 
   /**
    * Creates an instance of an `Orm`
    * @param db The database to use for ORM calls.
    */
-  static fromD1(db: D1Database): Orm {
-    return new Orm(db);
+  static fromD1(db: D1Database): D1Orm {
+    return new D1Orm(db);
   }
 
   /**
@@ -549,7 +552,8 @@ export class Orm {
     includeTree?: IncludeTree<T> | null,
   ): string {
     const { ast } = RuntimeContainer.get();
-    return `${this.listQuery<T>(ctor, { includeTree })} WHERE [${ast.d1_models[ctor.name].primary_key.name}] = ?`;
+    // TODO: handle missing primary key
+    return `${this.listQuery<T>(ctor, { includeTree })} WHERE [${ast.models[ctor.name].primary_key!.name}] = ?`;
   }
 
   /**
@@ -589,7 +593,7 @@ export class Orm {
       from?: string;
     },
   ): Promise<T[]> {
-    const sql = Orm.listQuery(ctor, opts);
+    const sql = D1Orm.listQuery(ctor, opts);
 
     const stmt = this.db.prepare(sql);
     const records = await stmt.all();
@@ -599,7 +603,7 @@ export class Orm {
       );
     }
 
-    return Orm.mapSql(ctor, records.results, opts.includeTree ?? null);
+    return D1Orm.mapSql(ctor, records.results, opts.includeTree ?? null);
   }
 
   /**
@@ -620,7 +624,7 @@ export class Orm {
     id: any,
     includeTree?: IncludeTree<T> | null,
   ): Promise<T | null> {
-    const sql = Orm.getQuery(ctor, includeTree);
+    const sql = D1Orm.getQuery(ctor, includeTree);
     const record = await this.db.prepare(sql).bind(id).run();
 
     if (!record.success) {
@@ -631,7 +635,7 @@ export class Orm {
       return null;
     }
 
-    const mapped = Orm.mapSql(ctor, record.results, includeTree);
+    const mapped = D1Orm.mapSql(ctor, record.results, includeTree);
     return mapped[0];
   }
 }

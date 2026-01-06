@@ -1,13 +1,13 @@
 // @ts-nocheck
 // InvalidDataSourceDefinition
 
-@D1
+@Model
 export class Bar {
   @PrimaryKey
   id: number;
 }
 
-@D1
+@Model
 export class Foo {
   @PrimaryKey
   id: number;

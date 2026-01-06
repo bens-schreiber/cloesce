@@ -1,7 +1,7 @@
 #![allow(clippy::missing_safety_doc)]
 mod methods;
 
-use ast::D1Model;
+use ast::Model;
 
 use methods::upsert::UpsertModel;
 
@@ -12,7 +12,7 @@ use std::slice;
 use std::str;
 
 type D1Result = Vec<Map<String, serde_json::Value>>;
-type ModelMeta = HashMap<String, D1Model>;
+type ModelMeta = HashMap<String, Model>;
 type IncludeTreeJson = Map<String, serde_json::Value>;
 
 /// WASM memory allocation handler. A subsequent [dealloc] must be called to prevent memory leaks.
@@ -44,7 +44,10 @@ pub unsafe extern "C" fn set_meta_ptr(ptr: *mut u8, cap: usize) -> i32 {
 
     let parsed: ModelMeta = match serde_json::from_slice(slice) {
         Ok(val) => val,
-        Err(_) => return 1,
+        Err(e) => {
+            yield_error(e);
+            return 1;
+        }
     };
 
     META.with(|meta| {

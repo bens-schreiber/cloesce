@@ -60,6 +60,11 @@ impl WranglerGenerator {
                         serde_json::to_value(&spec.kv_namespaces).expect("JSON to serialize");
                 }
 
+                if !spec.r2_buckets.is_empty() {
+                    val["r2_buckets"] =
+                        serde_json::to_value(&spec.kv_namespaces).expect("JSON to serialize");
+                }
+
                 if !spec.vars.is_empty() {
                     val["vars"] = serde_json::to_value(&spec.vars).expect("JSON to serialize");
                 }
@@ -90,6 +95,13 @@ impl WranglerGenerator {
                         table.insert(
                             "kv_namespaces".to_string(),
                             toml::Value::try_from(&spec.kv_namespaces).expect("TOML to serialize"),
+                        );
+                    }
+
+                    if !spec.r2_buckets.is_empty() {
+                        table.insert(
+                            "r2_buckets".to_string(),
+                            toml::Value::try_from(&spec.r2_buckets).expect("TOML to serialize"),
                         );
                     }
 
@@ -218,6 +230,36 @@ impl WranglerDefault {
                         tracing::warn!(
                             "KV Namespace with binding {} was missing, added a default. See https://developers.cloudflare.com/workers/platform/storage/#namespaces",
                             kv_binding
+                        );
+                    }
+                }
+            }
+
+            for r2_binding in &env.r2_bindings {
+                let r2 = spec
+                    .r2_buckets
+                    .iter_mut()
+                    .find(|bucket| bucket.binding.as_deref() == Some(r2_binding));
+
+                match r2 {
+                    Some(bucket) => {
+                        if bucket.bucket_name.is_none() {
+                            bucket.bucket_name = Some("replace_with_r2_bucket_name".into());
+                            tracing::warn!(
+                                "R2 Bucket with binding {} is missing a bucket name. See https://developers.cloudflare.com/r2/get-started/",
+                                r2_binding
+                            );
+                        }
+                    }
+                    None => {
+                        spec.r2_buckets.push(ast::R2Bucket {
+                            binding: Some(r2_binding.clone()),
+                            bucket_name: Some("replace_with_r2_bucket_name".into()),
+                        });
+
+                        tracing::warn!(
+                            "R2 Bucket with binding {} was missing, added a default. See https://developers.cloudflare.com/r2/get-started/",
+                            r2_binding
                         );
                     }
                 }

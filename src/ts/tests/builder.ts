@@ -1,33 +1,28 @@
 import {
-  D1Model,
+  Model,
   CloesceAst,
   CidlIncludeTree,
   NamedTypedValue,
   HttpVerb,
   CidlType,
   NavigationPropertyKind,
-  D1ModelAttribute,
+  D1Column,
   DataSource,
-  D1NavigationProperty,
+  NavigationProperty,
   ApiMethod,
   Service,
   ServiceAttribute,
   MediaType,
-  KVModel,
-  KVNavigationProperty,
-  CrudKind,
+  KeyValue,
+  AstR2Object,
 } from "../src/ast";
 
 export function createAst(args?: {
-  d1Models?: D1Model[];
-  kvModels?: KVModel[];
+  models?: Model[];
   services?: Service[];
 }): CloesceAst {
-  const d1ModelsMap = Object.fromEntries(
-    args?.d1Models?.map((m) => [m.name, m]) ?? [],
-  );
-  const kvModelsMap = Object.fromEntries(
-    args?.kvModels?.map((m) => [m.name, m]) ?? [],
+  const modelsMap = Object.fromEntries(
+    args?.models?.map((m) => [m.name, m]) ?? [],
   );
   const serviceMap = Object.fromEntries(
     args?.services?.map((s) => [s.name, s]) ?? [],
@@ -35,8 +30,7 @@ export function createAst(args?: {
 
   return {
     project_name: "test",
-    d1_models: d1ModelsMap,
-    kv_models: kvModelsMap,
+    models: modelsMap,
     services: serviceMap,
     poos: {},
     wrangler_env: {
@@ -44,6 +38,7 @@ export function createAst(args?: {
       source_path: "source.ts",
       d1_binding: "db",
       kv_bindings: [],
+      r2_bindings: [],
       vars: {},
     },
     app_source: null,
@@ -101,28 +96,31 @@ export class IncludeTreeBuilder {
   }
 }
 
-export class D1ModelBuilder extends ApiMethodBuilder {
+export class ModelBuilder {
   private name: string;
-  private attributes: D1ModelAttribute[] = [];
-  private navigation_properties: D1NavigationProperty[] = [];
   private primary_key: NamedTypedValue | null = null;
+  private columns: D1Column[] = [];
+  private navigation_properties: NavigationProperty[] = [];
+  private key_params: string[] = [];
+  private kv_objects: KeyValue[] = [];
+  private r2_objects: AstR2Object[] = [];
+  private methods: Record<string, ApiMethod> = {};
   private data_sources: Record<string, DataSource> = {};
 
   constructor(name: string) {
-    super();
     this.name = name;
   }
 
-  static model(name: string) {
-    return new D1ModelBuilder(name);
+  static model(name: string): ModelBuilder {
+    return new ModelBuilder(name);
   }
 
-  attribute(
+  col(
     name: string,
     cidl_type: CidlType,
     foreign_key: string | null = null,
   ): this {
-    this.attributes.push({
+    this.columns.push({
       value: { name, cidl_type },
       foreign_key_reference: foreign_key,
     });
@@ -147,11 +145,62 @@ export class D1ModelBuilder extends ApiMethodBuilder {
     return this;
   }
 
-  id(): this {
+  idPk(): this {
     return this.pk("id", "Integer");
   }
 
-  dataSource(name: string, tree: CidlIncludeTree): this {
+  keyParam(name: string): this {
+    this.key_params.push(name);
+    return this;
+  }
+
+  kvObject(
+    format: string,
+    namespace_binding: string,
+    name: string,
+    cidl_type: CidlType,
+  ): this {
+    this.kv_objects.push({
+      format,
+      namespace_binding,
+      value: { name, cidl_type },
+    });
+    return this;
+  }
+
+  r2Object(
+    format: string,
+    bucket_binding: string,
+    var_name: string,
+  ): this {
+    this.r2_objects.push({
+      format,
+      bucket_binding,
+      var_name,
+    });
+    return this;
+  }
+
+  method(
+    name: string,
+    http_verb: HttpVerb,
+    is_static: boolean,
+    parameters: NamedTypedValue[],
+    return_type: CidlType,
+  ): this {
+    this.methods[name] = {
+      name,
+      http_verb,
+      is_static,
+      parameters,
+      return_type,
+      return_media: MediaType.Json,
+      parameters_media: MediaType.Json,
+    };
+    return this;
+  }
+
+  dataSource(name: string, tree: any): this {
     this.data_sources[name] = {
       name,
       tree,
@@ -159,82 +208,18 @@ export class D1ModelBuilder extends ApiMethodBuilder {
     return this;
   }
 
-  build(): D1Model {
-    if (!this.primary_key) {
-      throw new Error(`Model '${this.name}' has no primary key`);
-    }
-
+  build(): Model {
     return {
       name: this.name,
-      attributes: this.attributes,
-      navigation_properties: this.navigation_properties,
       primary_key: this.primary_key,
+      columns: this.columns,
+      navigation_properties: this.navigation_properties,
+      key_params: this.key_params,
+      kv_objects: this.kv_objects,
+      r2_objects: this.r2_objects,
       methods: this.methods,
       data_sources: this.data_sources,
       cruds: [],
-      source_path: "",
-    };
-  }
-}
-
-export class KVModelBuilder {
-  private name: string;
-  private binding: string;
-  private cidl_type: CidlType;
-  private params: string[] = [];
-  private navigation_properties: KVNavigationProperty[] = [];
-  private cruds: CrudKind[] = [];
-  private methods: Record<string, ApiMethod> = {};
-  private data_sources: Record<string, DataSource> = {};
-
-  constructor(name: string, binding: string, cidl_type: CidlType) {
-    this.name = name;
-    this.binding = binding;
-    this.cidl_type = cidl_type;
-  }
-
-  param(p: string): this {
-    this.params.push(p);
-    return this;
-  }
-
-  navP(name: string, cidl_type: CidlType): this {
-    this.navigation_properties.push({
-      KValue: { name, cidl_type },
-    });
-    return this;
-  }
-
-  modelNavP(model_reference: string, var_name: string, many: boolean): this {
-    this.navigation_properties.push({
-      Model: { model_reference, var_name, many },
-    });
-    return this;
-  }
-
-  method(name: string, api_method: ApiMethod): this {
-    this.methods[name] = api_method;
-    return this;
-  }
-
-  dataSource(name: string, tree: CidlIncludeTree): this {
-    this.data_sources[name] = {
-      name,
-      tree,
-    };
-    return this;
-  }
-
-  build(): KVModel {
-    return {
-      name: this.name,
-      binding: this.binding,
-      cidl_type: this.cidl_type,
-      params: [...this.params],
-      navigation_properties: [...this.navigation_properties],
-      cruds: [...this.cruds],
-      methods: { ...this.methods },
-      data_sources: { ...this.data_sources },
       source_path: "",
     };
   }

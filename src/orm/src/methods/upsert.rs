@@ -1,8 +1,6 @@
 use std::collections::HashMap;
 
-use ast::{
-    CidlType, D1Model, D1NavigationProperty, D1NavigationPropertyKind, NamedTypedValue, fail,
-};
+use ast::{CidlType, Model, NamedTypedValue, NavigationProperty, NavigationPropertyKind, fail};
 use base64::Engine;
 use base64::prelude::BASE64_STANDARD;
 use sea_query::{Alias, OnConflict, SimpleExpr, SqliteQueryBuilder, SubQueryStatement, Values};
@@ -65,13 +63,17 @@ impl<'a> UpsertModel<'a> {
         let select_root_id_stmt = {
             // unwrap: root model is guaranteed to exist if we've gotten this far
             let model = meta.get(model_name).unwrap();
-            let root_id_path = format!("{}.{}", model.name, model.primary_key.name);
+            let root_id_path = format!(
+                "{}.{}",
+                model.name,
+                model.primary_key.as_ref().unwrap().name
+            );
 
             // The root id is either a value, or a variable in the temp table.
-            match new_model.get(&model.primary_key.name) {
+            match new_model.get(&model.primary_key.as_ref().unwrap().name) {
                 Some(value) => Query::select()
                     .expr_as(
-                        match model.primary_key.cidl_type {
+                        match model.primary_key.as_ref().unwrap().cidl_type {
                             CidlType::Integer => Expr::val(value.as_i64().unwrap()),
                             CidlType::Real => Expr::val(value.as_f64().unwrap()),
                             _ => Expr::val(value.as_str().unwrap()),
@@ -134,17 +136,31 @@ impl<'a> UpsertModel<'a> {
             Some(m) => m,
             None => fail!(OrmErrorKind::UnknownModel, "{}", model_name),
         };
+        if model.primary_key.is_none() {
+            fail!(
+                OrmErrorKind::ModelMissingD1,
+                "Model '{}' is not a D1 model.",
+                model_name
+            )
+        }
 
-        let mut builder =
-            UpsertBuilder::new(model_name, model.attributes.len(), &model.primary_key);
+        let mut builder = UpsertBuilder::new(
+            model_name,
+            model.columns.len(),
+            model.primary_key.as_ref().unwrap(),
+        );
 
         // Primary key
-        let pk = new_model.get(&model.primary_key.name);
+        let pk = new_model.get(&model.primary_key.as_ref().unwrap().name);
         match pk {
             Some(val) => {
                 builder.push_pk(val);
             }
-            None if matches!(model.primary_key.cidl_type, CidlType::Integer) => {
+            None if matches!(
+                model.primary_key.as_ref().unwrap().cidl_type,
+                CidlType::Integer
+            ) =>
+            {
                 // Generated id
             }
             _ => {
@@ -160,7 +176,7 @@ impl<'a> UpsertModel<'a> {
         let (one_to_ones, others): (Vec<_>, Vec<_>) = model
             .navigation_properties
             .iter()
-            .partition(|n| matches!(n.kind, D1NavigationPropertyKind::OneToOne { .. }));
+            .partition(|n| matches!(n.kind, NavigationPropertyKind::OneToOne { .. }));
 
         // This table is dependent on it's 1:1 references, so they must be traversed before
         // table insertion (granted the include tree references them).
@@ -173,16 +189,13 @@ impl<'a> UpsertModel<'a> {
                 let Some(Value::Object(nested_tree)) = include_tree.get(&nav.var_name) else {
                     continue;
                 };
-                let D1NavigationPropertyKind::OneToOne {
-                    attribute_reference,
-                } = &nav.kind
-                else {
+                let NavigationPropertyKind::OneToOne { column_reference } = &nav.kind else {
                     continue;
                 };
                 // Recursively handle nested inserts
 
                 nav_ref_to_path.insert(
-                    attribute_reference,
+                    column_reference,
                     self.dfs(
                         Some(&model.name),
                         &nav.model_reference,
@@ -202,11 +215,11 @@ impl<'a> UpsertModel<'a> {
                 format!(
                     "{}.{}",
                     path.rsplit_once('.').map(|(h, _)| h).unwrap_or(&path),
-                    self.meta.get(p).unwrap().primary_key.name
+                    self.meta.get(p).unwrap().primary_key.as_ref().unwrap().name
                 )
             });
 
-            for attr in &model.attributes {
+            for attr in &model.columns {
                 let path_key = nav_ref_to_path
                     .get(&attr.value.name)
                     .or(parent_id_path.as_ref());
@@ -254,10 +267,7 @@ impl<'a> UpsertModel<'a> {
                 };
 
                 match (&nav.kind, new_model.get(&nav.var_name)) {
-                    (
-                        D1NavigationPropertyKind::OneToMany { .. },
-                        Some(Value::Array(nav_models)),
-                    ) => {
+                    (NavigationPropertyKind::OneToMany { .. }, Some(Value::Array(nav_models))) => {
                         for nav_model in nav_models.iter().filter_map(|v| v.as_object()) {
                             self.dfs(
                                 Some(&model.name),
@@ -269,7 +279,7 @@ impl<'a> UpsertModel<'a> {
                         }
                     }
                     (
-                        D1NavigationPropertyKind::ManyToMany { unique_id },
+                        NavigationPropertyKind::ManyToMany { unique_id },
                         Some(Value::Array(nav_models)),
                     ) => {
                         for nav_model in nav_models.iter().filter_map(|v| v.as_object()) {
@@ -299,12 +309,13 @@ impl<'a> UpsertModel<'a> {
     fn insert_jct(
         &mut self,
         path: &str,
-        nav: &D1NavigationProperty,
+        nav: &NavigationProperty,
         unique_id: &str,
-        model: &D1Model,
+        model: &Model,
     ) -> Result<()> {
         let nav_meta = self.meta.get(&nav.model_reference).unwrap();
-        let nav_pk = &nav_meta.primary_key;
+        let nav_pk = nav_meta.primary_key.as_ref().unwrap();
+        let model_pk = model.primary_key.as_ref().unwrap();
 
         // Resolve both sides of the M:M relationship
         let pairs = [
@@ -314,9 +325,9 @@ impl<'a> UpsertModel<'a> {
                 format!("{path}.{}.{}", nav.var_name, nav_pk.name),
             ),
             (
-                format!("{}.{}", model.name, model.primary_key.name),
-                &model.primary_key.cidl_type,
-                format!("{path}.{}", model.primary_key.name),
+                format!("{}.{}", model.name, model_pk.name),
+                &model_pk.cidl_type,
+                format!("{path}.{}", model_pk.name),
             ),
         ];
 
@@ -352,11 +363,11 @@ impl<'a> UpsertModel<'a> {
         &mut self,
         pk: Option<&Value>,
         path: &str,
-        model: &D1Model,
+        model: &Model,
         builder: UpsertBuilder,
     ) -> Result<String> {
         self.acc.push(builder.build()?);
-        let id_path = format!("{path}.{}", model.primary_key.name);
+        let id_path = format!("{path}.{}", model.primary_key.as_ref().unwrap().name);
 
         // Add this models primary key to the context so dependents can resolve it
         match pk {
@@ -634,8 +645,8 @@ fn bytes_to_sqlite(bytes: &[u8]) -> SimpleExpr {
 mod test {
     use std::collections::HashMap;
 
-    use ast::{CidlType, D1NavigationPropertyKind};
-    use generator_test::{D1ModelBuilder, expected_str};
+    use ast::{CidlType, NavigationPropertyKind};
+    use generator_test::{ModelBuilder, expected_str};
     use serde_json::{Value, json};
     use sqlx::SqlitePool;
 
@@ -644,11 +655,11 @@ mod test {
     #[sqlx::test]
     async fn upsert_scalar_model(db: SqlitePool) {
         // Arrange
-        let ast_model = D1ModelBuilder::new("Horse")
-            .id()
-            .attribute("color", CidlType::Text, None)
-            .attribute("age", CidlType::Integer, None)
-            .attribute("address", CidlType::nullable(CidlType::Text), None)
+        let ast_model = ModelBuilder::new("Horse")
+            .id_pk()
+            .col("color", CidlType::Text, None)
+            .col("age", CidlType::Integer, None)
+            .col("address", CidlType::nullable(CidlType::Text), None)
             .build();
 
         let new_model = json!({
@@ -702,11 +713,11 @@ mod test {
     #[sqlx::test]
     async fn update_scalar_model(db: SqlitePool) {
         // Arrange
-        let ast_model = D1ModelBuilder::new("Horse")
-            .id()
-            .attribute("color", CidlType::Text, None)
-            .attribute("age", CidlType::Integer, None)
-            .attribute("address", CidlType::nullable(CidlType::Text), None)
+        let ast_model = ModelBuilder::new("Horse")
+            .id_pk()
+            .col("color", CidlType::Text, None)
+            .col("age", CidlType::Integer, None)
+            .col("address", CidlType::nullable(CidlType::Text), None)
             .build();
 
         let new_model = json!({
@@ -748,10 +759,10 @@ mod test {
     #[sqlx::test]
     async fn upsert_blob_b64(db: SqlitePool) {
         // Arrange
-        let ast_model = D1ModelBuilder::new("Picture")
-            .id()
-            .attribute("metadata", CidlType::Text, None)
-            .attribute("blob", CidlType::Blob, None)
+        let ast_model = ModelBuilder::new("Picture")
+            .id_pk()
+            .col("metadata", CidlType::Text, None)
+            .col("blob", CidlType::Blob, None)
             .build();
 
         let mut meta = HashMap::new();
@@ -798,10 +809,10 @@ mod test {
     #[sqlx::test]
     async fn upsert_blob_u8_arr(db: SqlitePool) {
         // Arrange
-        let ast_model = D1ModelBuilder::new("Picture")
-            .id()
-            .attribute("metadata", CidlType::Text, None)
-            .attribute("blob", CidlType::Blob, None)
+        let ast_model = ModelBuilder::new("Picture")
+            .id_pk()
+            .col("metadata", CidlType::Text, None)
+            .col("blob", CidlType::Blob, None)
             .build();
 
         let mut meta = HashMap::new();
@@ -852,18 +863,18 @@ mod test {
     #[sqlx::test]
     async fn nav_props_no_include_tree(db: SqlitePool) {
         // Arrange
-        let ast_person = D1ModelBuilder::new("Person")
-            .id()
-            .attribute("horseId", CidlType::Integer, Some("Horse".into()))
+        let ast_person = ModelBuilder::new("Person")
+            .id_pk()
+            .col("horseId", CidlType::Integer, Some("Horse".into()))
             .nav_p(
                 "horse",
                 "Horse",
-                D1NavigationPropertyKind::OneToOne {
-                    attribute_reference: "horseId".to_string(),
+                NavigationPropertyKind::OneToOne {
+                    column_reference: "horseId".to_string(),
                 },
             )
             .build();
-        let ast_horse = D1ModelBuilder::new("Horse").id().build();
+        let ast_horse = ModelBuilder::new("Horse").id_pk().build();
 
         let new_model = json!({
             "id": 1,
@@ -912,18 +923,18 @@ mod test {
     #[sqlx::test]
     async fn one_to_one(db: SqlitePool) {
         // Arrange
-        let ast_person = D1ModelBuilder::new("Person")
-            .id()
-            .attribute("horseId", CidlType::Integer, Some("Horse".into()))
+        let ast_person = ModelBuilder::new("Person")
+            .id_pk()
+            .col("horseId", CidlType::Integer, Some("Horse".into()))
             .nav_p(
                 "horse",
                 "Horse",
-                D1NavigationPropertyKind::OneToOne {
-                    attribute_reference: "horseId".to_string(),
+                NavigationPropertyKind::OneToOne {
+                    column_reference: "horseId".to_string(),
                 },
             )
             .build();
-        let ast_horse = D1ModelBuilder::new("Horse").id().build();
+        let ast_horse = ModelBuilder::new("Horse").id_pk().build();
 
         let new_model = json!({
             "id": 1,
@@ -978,19 +989,19 @@ mod test {
     #[sqlx::test]
     async fn one_to_many(db: SqlitePool) {
         // Arrange
-        let ast_person = D1ModelBuilder::new("Person")
-            .id()
+        let ast_person = ModelBuilder::new("Person")
+            .id_pk()
             .nav_p(
                 "horses",
                 "Horse",
-                D1NavigationPropertyKind::OneToMany {
-                    attribute_reference: "personId".to_string(),
+                NavigationPropertyKind::OneToMany {
+                    column_reference: "personId".to_string(),
                 },
             )
             .build();
-        let ast_horse = D1ModelBuilder::new("Horse")
-            .id()
-            .attribute("personId", CidlType::Integer, Some("Person".into()))
+        let ast_horse = ModelBuilder::new("Horse")
+            .id_pk()
+            .col("personId", CidlType::Integer, Some("Person".into()))
             .build();
 
         let new_model = json!({
@@ -1072,25 +1083,25 @@ mod test {
     #[sqlx::test]
     async fn many_to_many(db: SqlitePool) {
         // Arrange
-        let ast_person = D1ModelBuilder::new("Person")
-            .id()
+        let ast_person = ModelBuilder::new("Person")
+            .id_pk()
             .nav_p(
                 "horses",
                 "Horse",
-                D1NavigationPropertyKind::ManyToMany {
+                NavigationPropertyKind::ManyToMany {
                     unique_id: "PersonsHorses".to_string(),
                 },
             )
             .build();
-        let ast_horse = D1ModelBuilder::new("Horse")
+        let ast_horse = ModelBuilder::new("Horse")
             .nav_p(
                 "persons",
                 "Person",
-                D1NavigationPropertyKind::ManyToMany {
+                NavigationPropertyKind::ManyToMany {
                     unique_id: "PersonsHorses".to_string(),
                 },
             )
-            .id()
+            .id_pk()
             .build();
 
         let new_model = json!({
@@ -1169,33 +1180,33 @@ mod test {
     #[sqlx::test]
     async fn topological_ordering_is_correct(db: SqlitePool) {
         // Arrange
-        let ast_person = D1ModelBuilder::new("Person")
-            .id()
-            .attribute("horseId", CidlType::Integer, Some("Horse".into()))
+        let ast_person = ModelBuilder::new("Person")
+            .id_pk()
+            .col("horseId", CidlType::Integer, Some("Horse".into()))
             .nav_p(
                 "horse",
                 "Horse",
-                D1NavigationPropertyKind::OneToOne {
-                    attribute_reference: "horseId".to_string(),
+                NavigationPropertyKind::OneToOne {
+                    column_reference: "horseId".to_string(),
                 },
             )
             .build();
 
-        let ast_horse = D1ModelBuilder::new("Horse")
-            .id()
+        let ast_horse = ModelBuilder::new("Horse")
+            .id_pk()
             .nav_p(
                 "awards",
                 "Award",
-                D1NavigationPropertyKind::OneToMany {
-                    attribute_reference: "horseId".to_string(),
+                NavigationPropertyKind::OneToMany {
+                    column_reference: "horseId".to_string(),
                 },
             )
             .build();
 
-        let ast_award = D1ModelBuilder::new("Award")
-            .id()
-            .attribute("horseId", CidlType::Integer, Some("Horse".into()))
-            .attribute("title", CidlType::Text, None)
+        let ast_award = ModelBuilder::new("Award")
+            .id_pk()
+            .col("horseId", CidlType::Integer, Some("Horse".into()))
+            .col("title", CidlType::Text, None)
             .build();
 
         let mut meta = std::collections::HashMap::new();
@@ -1275,7 +1286,7 @@ mod test {
     #[sqlx::test]
     async fn insert_missing_pk_autogenerates(db: SqlitePool) {
         // Arrange
-        let person = D1ModelBuilder::new("Person").id().build();
+        let person = ModelBuilder::new("Person").id_pk().build();
         let mut meta = std::collections::HashMap::new();
         meta.insert(person.name.clone(), person);
 
@@ -1322,19 +1333,19 @@ mod test {
 
     #[sqlx::test]
     async fn insert_missing_one_to_one_fk_autogenerates(db: SqlitePool) {
-        let person = D1ModelBuilder::new("Person")
-            .id()
-            .attribute("horseId", CidlType::Integer, Some("Horse".into()))
+        let person = ModelBuilder::new("Person")
+            .id_pk()
+            .col("horseId", CidlType::Integer, Some("Horse".into()))
             .nav_p(
                 "horse",
                 "Horse",
-                D1NavigationPropertyKind::OneToOne {
-                    attribute_reference: "horseId".into(),
+                NavigationPropertyKind::OneToOne {
+                    column_reference: "horseId".into(),
                 },
             )
             .build();
 
-        let horse = D1ModelBuilder::new("Horse").id().build();
+        let horse = ModelBuilder::new("Horse").id_pk().build();
 
         let mut meta = std::collections::HashMap::new();
         meta.insert(person.name.clone(), person);
@@ -1406,20 +1417,20 @@ mod test {
     #[sqlx::test]
     async fn insert_missing_one_to_many_fk_autogenerates(db: SqlitePool) {
         // Arrange
-        let person = D1ModelBuilder::new("Person")
-            .id()
+        let person = ModelBuilder::new("Person")
+            .id_pk()
             .nav_p(
                 "horses",
                 "Horse",
-                D1NavigationPropertyKind::OneToMany {
-                    attribute_reference: "personId".into(),
+                NavigationPropertyKind::OneToMany {
+                    column_reference: "personId".into(),
                 },
             )
             .build();
 
-        let horse = D1ModelBuilder::new("Horse")
-            .id()
-            .attribute("personId", CidlType::Integer, Some("Person".into()))
+        let horse = ModelBuilder::new("Horse")
+            .id_pk()
+            .col("personId", CidlType::Integer, Some("Person".into()))
             .build();
 
         let mut meta = std::collections::HashMap::new();
@@ -1494,26 +1505,26 @@ mod test {
     #[sqlx::test]
     async fn insert_missing_many_to_many_pk_fk_autogenerates(db: SqlitePool) {
         // Arrange
-        let person = D1ModelBuilder::new("Person")
-            .id()
+        let person = ModelBuilder::new("Person")
+            .id_pk()
             .nav_p(
                 "horses",
                 "Horse",
-                D1NavigationPropertyKind::ManyToMany {
+                NavigationPropertyKind::ManyToMany {
                     unique_id: "PersonsHorses".to_string(),
                 },
             )
             .build();
 
-        let horse = D1ModelBuilder::new("Horse")
+        let horse = ModelBuilder::new("Horse")
             .nav_p(
                 "persons",
                 "Person",
-                D1NavigationPropertyKind::ManyToMany {
+                NavigationPropertyKind::ManyToMany {
                     unique_id: "PersonsHorses".to_string(),
                 },
             )
-            .id()
+            .id_pk()
             .build();
 
         let mut meta = std::collections::HashMap::new();

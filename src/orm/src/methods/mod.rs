@@ -39,6 +39,7 @@ impl Display for OrmError {
 #[repr(u32)]
 pub enum OrmErrorKind {
     UnknownModel,
+    ModelMissingD1,
     MissingPrimaryKey,
     MissingAttribute,
     TypeMismatch,
@@ -96,17 +97,15 @@ pub async fn test_sql(
     // Generate and run schema migration
     let migration_ast = {
         use ast::{CloesceAst, MigrationsAst, MigrationsModel};
-        use generator_test::{create_ast_d1, create_spec};
+        use generator_test::{create_ast, create_spec};
         use semantic::SemanticAnalysis;
 
-        let mut ast = create_ast_d1(models.drain().map(|(_, m)| m).collect::<Vec<_>>());
+        let mut ast = create_ast(models.drain().map(|(_, m)| m).collect::<Vec<_>>());
         let spec = create_spec(&ast);
         SemanticAnalysis::analyze(&mut ast, &spec).unwrap();
 
-        let CloesceAst {
-            hash, d1_models, ..
-        } = ast;
-        let migrations_models = d1_models
+        let CloesceAst { hash, models, .. } = ast;
+        let migrations_models = models
             .into_iter()
             .map(|(name, model)| {
                 (
@@ -114,8 +113,8 @@ pub async fn test_sql(
                     MigrationsModel {
                         hash: model.hash,
                         name: model.name,
-                        primary_key: model.primary_key,
-                        attributes: model.attributes,
+                        primary_key: model.primary_key.unwrap(),
+                        columns: model.columns,
                         navigation_properties: model.navigation_properties,
                         data_sources: model.data_sources,
                     },

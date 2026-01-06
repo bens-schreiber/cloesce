@@ -2,16 +2,15 @@ import { D1Database } from "@cloudflare/workers-types";
 
 import { OrmWasmExports, mapSql, loadOrmWasm } from "./wasm.js";
 import { proxyCrud } from "./crud.js";
-import { HttpResult, IncludeTree, Orm } from "../ui/backend.js";
+import { HttpResult, IncludeTree, D1Orm } from "../ui/backend.js";
 import { KeysOfType } from "../ui/common.js";
 import {
   CloesceAst,
-  D1Model,
+  Model,
   ApiMethod,
   NO_DATA_SOURCE,
   Service,
   MediaType,
-  KVModel,
 } from "../ast.js";
 import { RuntimeValidator } from "./validator.js";
 import Either from "../either.js";
@@ -241,7 +240,9 @@ export class CloesceApp {
 
           return Either.right(di.get(route.namespace));
         }
-        case "d1": {
+        case "model": {
+          // TODO: KV + R2
+
           // It's been verified by the compiler that wrangler_env and a d1 binding exists
           // if a D1 model is present
           //
@@ -258,7 +259,7 @@ export class CloesceApp {
           return await hydrateD1Model(
             ctorReg,
             d1,
-            route.d1Model!,
+            route.model!,
             route.id!,
             dataSource!,
           );
@@ -356,12 +357,11 @@ export class CloesceApp {
 }
 
 export type MatchedRoute = {
-  kind: "d1" | "kv" | "service";
+  kind: "model" | "service";
   namespace: string;
   method: ApiMethod;
   id: string | null;
-  d1Model?: D1Model;
-  kvModel?: KVModel;
+  model?: Model;
   service?: Service;
 };
 
@@ -394,11 +394,11 @@ function matchRoute(
   // Route format: /{namespace}/{id?}/{method}
   const namespace = parts[0];
   const methodName = parts[parts.length - 1];
-  const id = parts.length === 3 ? parts[1] : null;
+  const id = parts.length === 3 ? decodeURIComponent(parts[1]) : null;
 
-  const d1Model = ast.d1_models[namespace];
-  if (d1Model) {
-    const method = d1Model.methods[methodName];
+  const model = ast.models[namespace];
+  if (model) {
+    const method = model.methods[methodName];
     if (!method) return notFound(RouterError.UnknownRoute);
 
     if (request.method !== method.http_verb) {
@@ -406,28 +406,10 @@ function matchRoute(
     }
 
     return Either.right({
-      kind: "d1",
+      kind: "model",
       namespace,
       method,
-      d1Model,
-      id,
-    });
-  }
-
-  const kvModel = ast.kv_models[namespace];
-  if (kvModel) {
-    const method = kvModel.methods[methodName];
-    if (!method) return notFound(RouterError.UnknownRoute);
-
-    if (request.method !== method.http_verb) {
-      return notFound(RouterError.UnmatchedHttpVerb);
-    }
-
-    return Either.right({
-      kind: "kv",
-      namespace,
-      method,
-      kvModel,
+      model,
       id,
     });
   }
@@ -473,8 +455,7 @@ async function validateRequest(
     exit(400, c, "Invalid Request Body");
 
   // Models must have an ID on instantiated methods.
-  const isModel = route.kind === "d1" || route.kind === "kv";
-  if (isModel && !route.method.is_static && route.id == null) {
+  if (route.kind === "model" && !route.method.is_static && route.id == null) {
     return invalidRequest(RouterError.InstantiatedMethodMissingId);
   }
 
@@ -544,7 +525,7 @@ async function validateRequest(
         p.cidl_type.DataSource === route.namespace,
     )
     .map((p) => params[p.name] as string)[0];
-  if (route.kind === "d1" && !route.method.is_static && !dataSource) {
+  if (route.kind === "model" && !route.method.is_static && !dataSource) {
     return invalidRequest(RouterError.InstantiatedMethodMissingDataSource);
   }
 
@@ -561,7 +542,7 @@ async function validateRequest(
 async function hydrateD1Model(
   constructorRegistry: ConstructorRegistry,
   d1: D1Database,
-  model: D1Model,
+  model: Model,
   id: string,
   dataSource: string,
 ): Promise<Either<HttpResult, object>> {
@@ -583,7 +564,7 @@ async function hydrateD1Model(
         : (constructorRegistry[model.name] as any)[dataSource];
 
     records = await d1
-      .prepare(Orm.getQuery(constructorRegistry[model.name], includeTree))
+      .prepare(D1Orm.getQuery(constructorRegistry[model.name], includeTree))
       .bind(id)
       .run();
 

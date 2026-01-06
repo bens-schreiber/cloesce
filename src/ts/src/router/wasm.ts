@@ -1,4 +1,4 @@
-import { CidlIncludeTree, CloesceAst, D1Model } from "../ast.js";
+import { CidlIncludeTree, CloesceAst, Model } from "../ast.js";
 import { IncludeTree } from "../ui/backend.js";
 import { RuntimeContainer } from "./router.js";
 import Either from "../either.js";
@@ -55,7 +55,7 @@ export class WasmResource {
     private wasm: OrmWasmExports,
     public ptr: number,
     public len: number,
-  ) {}
+  ) { }
   free() {
     this.wasm.dealloc(this.ptr, this.len);
   }
@@ -80,17 +80,23 @@ export async function loadOrmWasm(
   // Load WASM
   const wasmInstance = (wasm ??
     (await WebAssembly.instantiate(mod))) as WebAssembly.Instance & {
-    exports: OrmWasmExports;
-  };
+      exports: OrmWasmExports;
+    };
 
   const modelMeta = WasmResource.fromString(
-    JSON.stringify(ast.d1_models),
+    JSON.stringify(ast.models),
     wasmInstance.exports,
   );
 
   if (wasmInstance.exports.set_meta_ptr(modelMeta.ptr, modelMeta.len) != 0) {
     modelMeta.free();
-    throw Error("The WASM Module failed to load due to an invalid CIDL");
+    const resPtr = wasmInstance.exports.get_return_ptr();
+    const resLen = wasmInstance.exports.get_return_len();
+    const errorMsg = new TextDecoder().decode(
+      new Uint8Array(wasmInstance.exports.memory.buffer, resPtr, resLen),
+    );
+
+    throw Error(`"The WASM Module failed to load due to an invalid CIDL: ${errorMsg}`);
   }
 
   // Intentionally leak `modelMeta`, it should exist for the programs lifetime.
@@ -149,14 +155,14 @@ export function mapSql<T extends object>(
   const parsed: any[] = JSON.parse(jsonResults.value);
   return Either.right(
     parsed.map((obj: any) =>
-      instantiateDepthFirst(obj, ast.d1_models[ctor.name], includeTree),
+      instantiateDepthFirst(obj, ast.models[ctor.name], includeTree),
     ) as T[],
   );
 
   // TODO: Lazy instantiation via Proxy?
   function instantiateDepthFirst(
     m: any,
-    meta: D1Model,
+    meta: Model,
     includeTree: IncludeTree<any> | null,
   ) {
     m = Object.assign(new constructorRegistry[meta.name](), m);
@@ -169,7 +175,7 @@ export function mapSql<T extends object>(
       const nestedIncludeTree = includeTree[navProp.var_name];
       if (!nestedIncludeTree) continue;
 
-      const nestedMeta = ast.d1_models[navProp.model_reference];
+      const nestedMeta = ast.models[navProp.model_reference];
 
       // One to Many, Many to Many
       if (Array.isArray(m[navProp.var_name])) {

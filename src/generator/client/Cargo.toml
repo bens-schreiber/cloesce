@@ -7,3 +7,9 @@ edition = "2024"
 ast = { path = "../ast" }
 handlebars = "6.3.2"
 serde_json = { workspace = true }
+
+[dev-dependencies]
+generator-test = { path = "../generator-test" }
+semantic = { path = "../semantic" }
+workers = { path = "../workers" }
+insta = "1.45.1"

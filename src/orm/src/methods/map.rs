@@ -1,5 +1,5 @@
-use ast::D1Model;
-use ast::D1NavigationPropertyKind;
+use ast::Model;
+use ast::NavigationPropertyKind;
 use ast::fail;
 use indexmap::IndexMap;
 use serde_json::Map;
@@ -22,8 +22,15 @@ pub fn map_sql(
         Some(m) => m,
         None => fail!(OrmErrorKind::UnknownModel, "{}", model_name),
     };
+    let Some(pk) = model.primary_key.as_ref() else {
+        fail!(
+            OrmErrorKind::ModelMissingD1,
+            "Model {} is not a D1 model",
+            model_name
+        )
+    };
 
-    let pk_name = &model.primary_key.name;
+    let pk_name = &pk.name;
     let mut result_map = IndexMap::new();
 
     // Scan each row for the root model (`model_name`)'s primary key
@@ -42,9 +49,9 @@ pub fn map_sql(
             // Set primary key
             m.insert(pk_name.clone(), pk_value.clone());
 
-            // Set scalar attributes
-            for attr in &model.attributes {
-                let attr_name = &attr.value.name;
+            // Set scalar columns
+            for col in &model.columns {
+                let attr_name = &col.value.name;
                 let val = row.get(attr_name).or_else(|| row.get(attr_name)).cloned();
                 if let Some(v) = val {
                     m.insert(attr_name.clone(), v);
@@ -53,8 +60,8 @@ pub fn map_sql(
 
             // Initialize OneToMany / ManyToMany arrays as empty
             for nav in &model.navigation_properties {
-                if matches!(nav.kind, D1NavigationPropertyKind::OneToMany { .. })
-                    || matches!(nav.kind, D1NavigationPropertyKind::ManyToMany { .. })
+                if matches!(nav.kind, NavigationPropertyKind::OneToMany { .. })
+                    || matches!(nav.kind, NavigationPropertyKind::ManyToMany { .. })
                 {
                     m.insert(nav.var_name.clone(), serde_json::Value::Array(vec![]));
                 }
@@ -77,7 +84,7 @@ pub fn map_sql(
 
 fn process_navigation_properties(
     model_json: &mut Map<String, Value>,
-    model: &D1Model,
+    model: &Model,
     prefix: &str,
     include_tree: &Map<String, Value>,
     row: &Map<String, Value>,
@@ -95,7 +102,7 @@ fn process_navigation_properties(
         };
 
         // Nested properties always use their navigation path prefix (e.g. "cat.toy.id")
-        let nested_pk_name = &nested_model.primary_key.name;
+        let nested_pk_name = &nested_model.primary_key.as_ref().unwrap().name;
         let prefixed_key = if prefix.is_empty() {
             format!("{}.{}", nav_prop.var_name, nested_pk_name)
         } else {
@@ -112,9 +119,9 @@ fn process_navigation_properties(
         let mut nested_model_json = serde_json::Map::new();
         nested_model_json.insert(nested_pk_name.clone(), nested_pk_value.clone());
 
-        // Set nested scalar attributes
-        for attr in &nested_model.attributes {
-            let attr_name = &attr.value.name;
+        // Set nested scalar columns
+        for col in &nested_model.columns {
+            let attr_name = &col.value.name;
             let val = row
                 .get(&format!("{}.{}.{}", prefix, nav_prop.var_name, attr_name))
                 .or_else(|| row.get(&format!("{}.{}", nav_prop.var_name, attr_name)))
@@ -128,10 +135,10 @@ fn process_navigation_properties(
         for nested_nav_prop in &nested_model.navigation_properties {
             if matches!(
                 nested_nav_prop.kind,
-                D1NavigationPropertyKind::OneToMany { .. }
+                NavigationPropertyKind::OneToMany { .. }
             ) || matches!(
                 nested_nav_prop.kind,
-                D1NavigationPropertyKind::ManyToMany { .. }
+                NavigationPropertyKind::ManyToMany { .. }
             ) {
                 nested_model_json.insert(nested_nav_prop.var_name.clone(), Value::Array(vec![]));
             }
@@ -154,8 +161,8 @@ fn process_navigation_properties(
             )?;
         }
 
-        if matches!(nav_prop.kind, D1NavigationPropertyKind::OneToMany { .. })
-            || matches!(nav_prop.kind, D1NavigationPropertyKind::ManyToMany { .. })
+        if matches!(nav_prop.kind, NavigationPropertyKind::OneToMany { .. })
+            || matches!(nav_prop.kind, NavigationPropertyKind::ManyToMany { .. })
         {
             if let Value::Array(arr) = model_json.get_mut(&nav_prop.var_name).unwrap() {
                 let already_exists = arr
@@ -176,8 +183,8 @@ fn process_navigation_properties(
 
 #[cfg(test)]
 mod tests {
-    use ast::{CidlType, D1NavigationPropertyKind};
-    use generator_test::D1ModelBuilder;
+    use ast::{CidlType, NavigationPropertyKind};
+    use generator_test::ModelBuilder;
     use serde_json::{Map, Value, json};
     use std::collections::HashMap;
 
@@ -186,21 +193,21 @@ mod tests {
     #[test]
     fn no_records_returns_empty() {
         // Arrange
-        let horse = D1ModelBuilder::new("Horse")
-            .id()
-            .attribute("name", CidlType::nullable(CidlType::Text), None)
+        let horse = ModelBuilder::new("Horse")
+            .id_pk()
+            .col("name", CidlType::nullable(CidlType::Text), None)
             .nav_p(
                 "riders",
                 "Rider",
-                D1NavigationPropertyKind::OneToMany {
-                    attribute_reference: "id".into(),
+                NavigationPropertyKind::OneToMany {
+                    column_reference: "id".into(),
                 },
             )
             .build();
 
-        let rider = D1ModelBuilder::new("Rider")
-            .id()
-            .attribute("nickname", CidlType::nullable(CidlType::Text), None)
+        let rider = ModelBuilder::new("Rider")
+            .id_pk()
+            .col("nickname", CidlType::nullable(CidlType::Text), None)
             .build();
 
         let meta = HashMap::from([("Horse".to_string(), horse), ("Rider".to_string(), rider)]);
@@ -218,9 +225,9 @@ mod tests {
     #[test]
     fn flat() {
         // Arrange
-        let horse = D1ModelBuilder::new("Horse")
-            .id()
-            .attribute("name", CidlType::nullable(CidlType::Text), None)
+        let horse = ModelBuilder::new("Horse")
+            .id_pk()
+            .col("name", CidlType::nullable(CidlType::Text), None)
             .build();
 
         let meta = HashMap::from([("Horse".to_string(), horse)]);
@@ -246,21 +253,21 @@ mod tests {
     #[test]
     fn assigns_scalar_attributes_and_navigation_arrays() {
         // Arrange
-        let horse = D1ModelBuilder::new("Horse")
-            .id()
-            .attribute("name", CidlType::nullable(CidlType::Text), None)
+        let horse = ModelBuilder::new("Horse")
+            .id_pk()
+            .col("name", CidlType::nullable(CidlType::Text), None)
             .nav_p(
                 "riders",
                 "Rider",
-                D1NavigationPropertyKind::OneToMany {
-                    attribute_reference: "id".into(),
+                NavigationPropertyKind::OneToMany {
+                    column_reference: "id".into(),
                 },
             )
             .build();
 
-        let rider = D1ModelBuilder::new("Rider")
-            .id()
-            .attribute("nickname", CidlType::nullable(CidlType::Text), None)
+        let rider = ModelBuilder::new("Rider")
+            .id_pk()
+            .col("nickname", CidlType::nullable(CidlType::Text), None)
             .build();
 
         let meta = HashMap::from([("Horse".to_string(), horse), ("Rider".to_string(), rider)]);
@@ -309,21 +316,21 @@ mod tests {
     #[test]
     fn merges_duplicate_rows_with_arrays() {
         // Arrange
-        let horse = D1ModelBuilder::new("Horse")
-            .id()
-            .attribute("name", CidlType::nullable(CidlType::Text), None)
+        let horse = ModelBuilder::new("Horse")
+            .id_pk()
+            .col("name", CidlType::nullable(CidlType::Text), None)
             .nav_p(
                 "riders",
                 "Rider",
-                D1NavigationPropertyKind::OneToMany {
-                    attribute_reference: "id".into(),
+                NavigationPropertyKind::OneToMany {
+                    column_reference: "id".into(),
                 },
             )
             .build();
 
-        let rider = D1ModelBuilder::new("Rider")
-            .id()
-            .attribute("nickname", CidlType::nullable(CidlType::Text), None)
+        let rider = ModelBuilder::new("Rider")
+            .id_pk()
+            .col("nickname", CidlType::nullable(CidlType::Text), None)
             .build();
 
         let meta = HashMap::from([("Horse".to_string(), horse), ("Rider".to_string(), rider)]);

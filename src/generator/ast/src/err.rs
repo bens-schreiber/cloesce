@@ -55,6 +55,7 @@ pub enum GeneratorErrorKind {
     UnexpectedInject,
     NotYetSupported,
     InvalidMapping,
+    MissingPrimaryKey,
     MismatchedForeignKeyTypes,
     MismatchedNavigationPropertyTypes,
     InvalidNavigationPropertyReference,
@@ -70,7 +71,9 @@ pub enum GeneratorErrorKind {
     InvalidStream,
     InvalidModelReference,
     InvalidKVTree,
-    MismatchedKVModelNamespaces,
+    InvalidKeyFormat,
+    UnknownKeyReference,
+    UnsupportedCrudOperation,
 }
 
 impl GeneratorErrorKind {
@@ -115,6 +118,11 @@ impl GeneratorErrorKind {
             GeneratorErrorKind::InvalidMapping => {
                 ("CIDL is ill-formatted", "", GeneratorPhase::ModelAnalysis)
             }
+            GeneratorErrorKind::MissingPrimaryKey => (
+                "Models which have columns defined must have a primary key.",
+                "Add a primary key to the Model definition.",
+                GeneratorPhase::ModelAnalysis,
+            ),
             GeneratorErrorKind::MismatchedForeignKeyTypes => (
                 "Mismatched foreign keys",
                 "Foreign keys must be the same type as their reference",
@@ -165,9 +173,19 @@ impl GeneratorErrorKind {
                 "Remove the shared dependency.",
                 GeneratorPhase::ModelAnalysis,
             ),
-            GeneratorErrorKind::MismatchedKVModelNamespaces => (
-                "KV Models that share dependencies must use the same KV namespace.",
-                "Ensure that all dependent Models use the same KV namespace.",
+            GeneratorErrorKind::InvalidKeyFormat => (
+                "KV Model keys must be formatted correctly.",
+                "Ensure your key format wraps dynamic segments in curly braces, e.g., `user:{userId}:settings`.",
+                GeneratorPhase::ModelAnalysis,
+            ),
+            GeneratorErrorKind::UnknownKeyReference => (
+                "KeyFormat references an unknown attribute.",
+                "Ensure all dynamic segments in the key format correspond to defined attributes in the Model.",
+                GeneratorPhase::ModelAnalysis,
+            ),
+            GeneratorErrorKind::UnsupportedCrudOperation => (
+                "The specified CRUD operation is not supported for this Model type.",
+                "Refer to the documentation for supported operations on this Model type.",
                 GeneratorPhase::ModelAnalysis,
             ),
 

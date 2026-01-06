@@ -33,15 +33,11 @@ impl ClientLanguageTypeMapper for TypeScriptMapper {
             CidlType::Void => "void".to_string(),
             CidlType::Partial(name) => format!("DeepPartial<{name}>"),
             CidlType::DataSource(model_name) => {
-                let ds = {
-                    if let Some(d1_model) = ast.d1_models.get(model_name) {
-                        &d1_model.data_sources
-                    } else if let Some(kv_model) = ast.kv_models.get(model_name) {
-                        &kv_model.data_sources
-                    } else {
-                        unreachable!("Model {model_name} not found for DataSource type");
-                    }
-                };
+                let ds = &ast
+                    .models
+                    .get(model_name)
+                    .expect("Model to exist")
+                    .data_sources;
 
                 let mut format_ds = ds.keys().map(|k| format!("\"{k}\"")).collect::<Vec<_>>();
                 format_ds.push("\"none\"".to_string());

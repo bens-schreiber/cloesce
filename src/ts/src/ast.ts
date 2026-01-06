@@ -35,7 +35,7 @@ export interface NamedTypedValue {
   cidl_type: CidlType;
 }
 
-export interface D1ModelAttribute {
+export interface D1Column {
   value: NamedTypedValue;
   foreign_key_reference: string | null;
 }
@@ -67,29 +67,44 @@ export interface ApiMethod {
 }
 
 export type NavigationPropertyKind =
-  | { OneToOne: { attribute_reference: string } }
-  | { OneToMany: { attribute_reference: string } }
+  | { OneToOne: { column_reference: string } }
+  | { OneToMany: { column_reference: string } }
   | { ManyToMany: { unique_id: string } };
 
-export interface D1NavigationProperty {
+export interface NavigationProperty {
   var_name: string;
   model_reference: string;
   kind: NavigationPropertyKind;
 }
 
 export function getNavigationPropertyCidlType(
-  nav: D1NavigationProperty,
+  nav: NavigationProperty,
 ): CidlType {
   return "OneToOne" in nav.kind
     ? { Object: nav.model_reference }
     : { Array: { Object: nav.model_reference } };
 }
 
-export interface D1Model {
+export interface KeyValue {
+  format: string;
+  namespace_binding: string;
+  value: NamedTypedValue;
+}
+
+export interface AstR2Object {
+  format: string;
+  bucket_binding: string;
+  var_name: string;
+}
+
+export interface Model {
   name: string;
-  primary_key: NamedTypedValue;
-  attributes: D1ModelAttribute[];
-  navigation_properties: D1NavigationProperty[];
+  primary_key: NamedTypedValue | null;
+  columns: D1Column[];
+  navigation_properties: NavigationProperty[];
+  key_params: string[];
+  kv_objects: KeyValue[];
+  r2_objects: AstR2Object[];
   methods: Record<string, ApiMethod>;
   data_sources: Record<string, DataSource>;
   cruds: CrudKind[];
@@ -99,28 +114,6 @@ export interface D1Model {
 export interface PlainOldObject {
   name: string;
   attributes: NamedTypedValue[];
-  source_path: string;
-}
-
-export type KVNavigationProperty =
-  | { KValue: NamedTypedValue }
-  | {
-      Model: {
-        model_reference: string;
-        var_name: string;
-        many: boolean;
-      };
-    };
-
-export interface KVModel {
-  name: string;
-  binding: string;
-  cidl_type: CidlType;
-  params: string[];
-  navigation_properties: KVNavigationProperty[];
-  cruds: CrudKind[];
-  methods: Record<string, ApiMethod>;
-  data_sources: Record<string, DataSource>;
   source_path: string;
 }
 
@@ -151,14 +144,14 @@ export interface WranglerEnv {
   source_path: string;
   d1_binding?: string; // TODO: multiple D1 bindings
   kv_bindings: string[];
+  r2_bindings: string[];
   vars: Record<string, CidlType>;
 }
 
 export interface CloesceAst {
   project_name: string;
   wrangler_env?: WranglerEnv;
-  d1_models: Record<string, D1Model>;
-  kv_models: Record<string, KVModel>;
+  models: Record<string, Model>;
   poos: Record<string, PlainOldObject>;
   services: Record<string, Service>;
   app_source: string | null;

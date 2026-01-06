@@ -150,9 +150,9 @@ impl MigrationsIntent for MigrationsCli {
                 model_name,
                 options,
             } => Self::rename_or_drop(&model_name, options, "model"),
-            MigrationsDilemma::RenameOrDropAttribute {
+            MigrationsDilemma::RenameOrDropColumn {
                 model_name,
-                attribute_name,
+                column_name: attribute_name,
                 options,
             } => {
                 let target = format!("{model_name}.{attribute_name}");
@@ -247,7 +247,7 @@ fn generate_wrangler(
 fn generate_workers(ast: &mut CloesceAst, workers_path: &Path) -> Result<()> {
     let mut file = open_file_or_create(workers_path)?;
 
-    let workers = WorkersGenerator::create(ast, workers_path);
+    let workers = WorkersGenerator::generate(ast, workers_path);
     file.write_all(workers.as_bytes())
         .expect("Could not write to file");
     Ok(())
@@ -255,7 +255,7 @@ fn generate_workers(ast: &mut CloesceAst, workers_path: &Path) -> Result<()> {
 
 fn generate_client(ast: &CloesceAst, client_path: &Path, domain: &str) -> Result<()> {
     let mut file = open_file_or_create(client_path)?;
-    file.write_all(ClientGenerator::generate_client_api(ast, domain.to_string()).as_bytes())
+    file.write_all(ClientGenerator::generate(ast, domain.to_string()).as_bytes())
         .expect("Could not write to file");
     Ok(())
 }

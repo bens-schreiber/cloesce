@@ -1,0 +1,302 @@
+---
+source: client/tests/snaphot_tests.rs
+expression: client_code
+---
+// GENERATED CODE. DO NOT MODIFY.
+
+import { HttpResult, DeepPartial, MediaType, requestBody, b64ToU8, KValue, R2Object } from "cloesce/client";
+
+export class BasicPoo {
+  field1: string;
+  field2: number;
+
+  static fromJson(data: any): BasicPoo {
+    const res = Object.assign(new BasicPoo(), data);
+    return res;
+  }
+}
+export class PooWithComposition {
+  field1: BasicPoo;
+  field2: BasicModel;
+
+  static fromJson(data: any): PooWithComposition {
+    const res = Object.assign(new PooWithComposition(), data);
+    res["field1"] &&= BasicPoo.fromJson(res.field1);
+    res["field2"] &&= BasicModel.fromJson(res.field2);
+    return res;
+  }
+}
+
+export class BasicService {
+  static async downloadData(
+    fetchImpl: typeof fetch = fetch
+  ): Promise<HttpResult<ReadableStream<Uint8Array>>> {
+    const baseUrl = new URL("http://example.com/api/BasicService/downloadData");
+
+
+    const res = await fetchImpl(baseUrl, {
+      method: "GET",
+      duplex: "half",
+    });
+
+    return await HttpResult.fromResponse(
+      res,
+      MediaType.Octet,
+      ReadableStream<Uint8Array>,
+      false
+    );
+  }
+  static async instanceMethod(
+    input: number,
+    fetchImpl: typeof fetch = fetch
+  ): Promise<HttpResult<number>> {
+    const baseUrl = new URL("http://example.com/api/BasicService/instanceMethod");
+    const payload: any = {};
+
+    payload["input"] = input;
+
+    const res = await fetchImpl(baseUrl, {
+      method: "POST",
+      duplex: "half",
+      headers: { "Content-Type": "application/json" },
+      body: requestBody(MediaType.Json, payload),
+    });
+
+    return await HttpResult.fromResponse(
+      res,
+      MediaType.Json,
+      undefined,
+      false
+    );
+  }
+  static async staticMethod(
+    input: string,
+    fetchImpl: typeof fetch = fetch
+  ): Promise<HttpResult<string>> {
+    const baseUrl = new URL("http://example.com/api/BasicService/staticMethod");
+
+    baseUrl.searchParams.append("input", String(input));
+
+    const res = await fetchImpl(baseUrl, {
+      method: "GET",
+      duplex: "half",
+    });
+
+    return await HttpResult.fromResponse(
+      res,
+      MediaType.Json,
+      undefined,
+      false
+    );
+  }
+  static async uploadData(
+    data: ReadableStream<Uint8Array>,
+    fetchImpl: typeof fetch = fetch
+  ): Promise<HttpResult<boolean>> {
+    const baseUrl = new URL("http://example.com/api/BasicService/uploadData");
+    const payload: any = {};
+
+    payload["data"] = data;
+
+    const res = await fetchImpl(baseUrl, {
+      method: "POST",
+      duplex: "half",
+      headers: { "Content-Type": "application/octet-stream" },
+      body: requestBody(MediaType.Octet, payload),
+    });
+
+    return await HttpResult.fromResponse(
+      res,
+      MediaType.Json,
+      undefined,
+      false
+    );
+  }
+}
+
+export class BasicModel {
+  id: number;
+  fk_to_model: number;
+
+
+  static fromJson(data: any): BasicModel {
+    const res = Object.assign(new BasicModel(), data);
+    return res;
+  }
+}
+export class HasOneToOne {
+  id: number;
+  basicModelId: number;
+  oneToOneNav: BasicModel | undefined;
+
+
+  static fromJson(data: any): HasOneToOne {
+    const res = Object.assign(new HasOneToOne(), data);
+    res["oneToOneNav"] &&= BasicModel.fromJson(res.oneToOneNav);
+    return res;
+  }
+}
+export class HasSqlColumnTypes {
+  id: number;
+  string: string;
+  integer: number;
+  real: number;
+  boolean: boolean;
+  date: Date;
+  stringNull: string | null;
+  integerNull: number | null;
+  realNull: number | null;
+  booleanNull: boolean | null;
+  dateNull: Date | null;
+
+
+  static fromJson(data: any): HasSqlColumnTypes {
+    const res = Object.assign(new HasSqlColumnTypes(), data);
+    return res;
+  }
+}
+export class ManyToManyModelA {
+  id: number;
+  manyToManyNav: ManyToManyModelB[];
+
+
+  static fromJson(data: any): ManyToManyModelA {
+    const res = Object.assign(new ManyToManyModelA(), data);
+    for (let i = 0; i < res.manyToManyNav?.length; i++) {
+      res.manyToManyNav[i] = ManyToManyModelB.fromJson(res.manyToManyNav[i]);
+    }
+    return res;
+  }
+}
+export class ManyToManyModelB {
+  id: number;
+  manyToManyNav: ManyToManyModelA[];
+
+
+  static fromJson(data: any): ManyToManyModelB {
+    const res = Object.assign(new ManyToManyModelB(), data);
+    for (let i = 0; i < res.manyToManyNav?.length; i++) {
+      res.manyToManyNav[i] = ManyToManyModelA.fromJson(res.manyToManyNav[i]);
+    }
+    return res;
+  }
+}
+export class ModelWithCruds {
+  id: number;
+  name: string;
+
+  static async get(
+    id: number,
+    __datasource: "none" = "none",
+    fetchImpl: typeof fetch = fetch
+  ): Promise<HttpResult<ModelWithCruds>> {
+    const baseUrl = new URL(
+      `http://example.com/api/ModelWithCruds/get`
+    );
+
+    baseUrl.searchParams.append("id", String(id));
+    baseUrl.searchParams.append("__datasource", String(__datasource));
+
+    const res = await fetchImpl(baseUrl, {
+      method: "GET",
+      duplex: "half",
+    });
+
+    return await HttpResult.fromResponse(
+      res,
+      MediaType.Json,
+      ModelWithCruds,
+      false
+    );
+  }
+  static async list(
+    __datasource: "none" = "none",
+    fetchImpl: typeof fetch = fetch
+  ): Promise<HttpResult<ModelWithCruds[]>> {
+    const baseUrl = new URL(
+      `http://example.com/api/ModelWithCruds/list`
+    );
+
+    baseUrl.searchParams.append("__datasource", String(__datasource));
+
+    const res = await fetchImpl(baseUrl, {
+      method: "GET",
+      duplex: "half",
+    });
+
+    return await HttpResult.fromResponse(
+      res,
+      MediaType.Json,
+      ModelWithCruds,
+      true
+    );
+  }
+  static async save(
+    model: DeepPartial<ModelWithCruds>,
+    __datasource: "none" = "none",
+    fetchImpl: typeof fetch = fetch
+  ): Promise<HttpResult<ModelWithCruds>> {
+    const baseUrl = new URL(
+      `http://example.com/api/ModelWithCruds/save`
+    );
+    const payload: any = {};
+
+    payload["model"] = model;
+    baseUrl.searchParams.append("__datasource", String(__datasource));
+
+    const res = await fetchImpl(baseUrl, {
+      method: "POST",
+      duplex: "half",
+      headers: { "Content-Type": "application/json" },
+      body: requestBody(MediaType.Json, payload),
+    });
+
+    return await HttpResult.fromResponse(
+      res,
+      MediaType.Json,
+      ModelWithCruds,
+      false
+    );
+  }
+
+  static fromJson(data: any): ModelWithCruds {
+    const res = Object.assign(new ModelWithCruds(), data);
+    return res;
+  }
+}
+export class ModelWithKv {
+  id1: string;
+  id2: string;
+  someValue: KValue<unknown>;
+  anotherValue: KValue<unknown>;
+
+
+  static fromJson(data: any): ModelWithKv {
+    const res = Object.assign(new ModelWithKv(), data);
+    return res;
+  }
+}
+export class ModelWithR2 {
+  id: number;
+  id: string;
+  : R2Object;
+
+
+  static fromJson(data: any): ModelWithR2 {
+    const res = Object.assign(new ModelWithR2(), data);
+    return res;
+  }
+}
+export class OneToManyModel {
+  id: number;
+  oneToManyNav: BasicModel[];
+
+
+  static fromJson(data: any): OneToManyModel {
+    const res = Object.assign(new OneToManyModel(), data);
+    for (let i = 0; i < res.oneToManyNav?.length; i++) {
+      res.oneToManyNav[i] = BasicModel.fromJson(res.oneToManyNav[i]);
+    }
+    return res;
+  }
+}

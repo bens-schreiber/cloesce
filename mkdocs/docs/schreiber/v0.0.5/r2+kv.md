@@ -1,142 +1,168 @@
-# Thoughts on R2 and KV Models
+# Thoughts on R2 and KV
 
-In the Cloesce abstract, we describe a tool that  "orchestrates the database, backend, client and infrastructure". In this version, we will change the word "database" to be "data".
+In the Cloesce abstract, we describe a tool that  "orchestrates the database, backend, client and infrastructure". In this version, we will change the word "database" to be a more generic term "data".
 
-For our purposes, data can be defined as anything that can be stored and retrieved in some persistent way. This includes relational databases (D1), object storage (R2), key-value stores (KV), and potentially other storage mechanisms Cloudflare may introduce (e.g., graph databases, document stores, whatever durable objects is, etc).
+For our purposes, data can be defined as anything that can be stored and retrieved in some persistent way. This includes relational databases (D1), object storage (R2) and key-value stores (KV).
 
-With that in mind, Cloesce should be capable of orchestrating not just D1 (via the established `Model` concept), but also R2 buckets and KV namespaces (and later, Durable Objects). From this version on, `Model` will refer to the surrounding paradigm of data orchestration, introducing R2 Models and KV Models as first-class citizens alongside D1 Models.
+With that in mind, Cloesce should be capable of orchestrating not just D1, but also R2 buckets and KV namespaces. The current `Model` paradigm must be extended to support these new data stores. A `Model` should be able to define not just tables and columns, but also R2 buckets and KV namespaces, in any structure the user desires (e.g, a `Model` could have D1 data, R2 data and KV data all in one, or just R2 data, D1 data, any combination).
 
-## KV Models
+## KV 
 
-Cloudflare KV is a simple persistent storage platform capable of associating a key (which must be a string) with a value (which can be text, json, bytes, etc). Additionally, JSON metadata can be stored with each key. KV is schema-less, meaning you can throw any value into any key and face no problems. Cloesce will not try to create a schema layer over KV (though it would be interesting to explore some kind of key format protocol, TBD).
+Cloudflare KV is a simple storage platform capable of associating a key (which must be a string) with a value (which can be text, json, bytes, etc). Additionally, JSON metadata can be stored with each key. KV is schema-less, meaning you can throw any value into any key and face no problems. Cloesce will not try to enforce a schema on KV data, but instead will provide a simple interface to store and retrieve data.
 
-Even though KV is schema-less, the client should still be able to expect data to come in some kind of format (even a format that means no format). To make this work, KV Models will take in a generic type that the frontend will expect. We will also introduce a new `JsonValue` type to the CIDL, meaning "I don't know what the format of this is but it is JSON".
+Looking at the properties of KV, several features stand out:
+- Data can be listed by key prefix, ie list all keys that start with "user"
+- Data can have expiration times set, after which the data is automatically deleted
+- Data can have metadata associated with it
+- If a value does not exist for a given key, null is returned (no error is thrown)
 
-Unlike D1 models, KV Models will have no attributes. This is because the only "attributes" are key, value and metadata. Hydration of a KV Model will be simple (compared to D1): call `KV_NAMESPACE.get(key)`, which will return `null` if the key doesn't exist, or the key value and metadata if it does.
-
-When fetching from KV, a type hint must be specified `"text" | "json" | "arraybuffer" | "stream"`. Cloesce will be capable of determining the correct way to fetch your data based off the generic type passed in. A string value would be text, byte array an array buffer, anything else in JSON. Streams are a special case however, because a KV Model must be serializeable, and a stream value would impede that. Thus, if the generic type for the model is a stream, the `value` attribute will not be generated on the client (though it will exist on the backend and be hydrated as a ReadableStream).
-
-Below is the proposed v0.0.5 implementation:
-
+Let's first consider a Model that defines only KV data:
 
 ```ts
-/** KV BASE CLASS */
-class KVModel<V> {
+/**
+ * Return type for any KV value.
+ * 
+ * V can be any Cloesce serializeable type. There is no guarantee that the value
+ * is actually of type V.
+ */
+class KValue<V> {
     key: string;
-    value: V; // V must be a serializeable CIDL Type
+    raw: unknown;
+    value: V | null; // No guarantees it is a V.
     metadata: unknown;
 }
+
+@Model
+class User {
+    @KeyParam
+    id: string;
+
+    @KeyFormat("user:{id}", "namespace")
+    userData: KValue<unknown>; // `unknown` can represent any JSON Value.
+
+    @KeyFormat("favoriteNumber:user:{id}", "namespace")
+    favoriteNumber: KValue<number>; // Cloesce will try to cast to number. No promises.
+
+    @KeyFormat("user", "namespace")
+    allUsers: KValue<unknown>[]; // List all keys with prefix "user" and then hydrates them.
+
+    @DataSource
+    static readonly default: IncludeTree<User> = {
+        userData: {},
+        favoriteNumber: {},
+        allUsers: {}
+    }
+}
 ```
+
+In this example, `User` consists of four fields:
+- `id`: Decorated with `@KeyParam`, this field is used to fill in the `{id}` placeholder in the `@KeyFormat` decorators.
+- `userData`: This field represents a KV entry with a key formatted as "user:{id}" in the "namespace" KV namespace. The value can be any JSON-serializable type, denoted by the `unknown` type.
+- `favoriteNumber`: This field represents a KV entry with a key formatted as "favoriteNumber:user:{id}" in the "namespace" KV namespace. The value is expected to be a number, but Cloesce will attempt to cast it to a number without guarantees (NaN is possible).
+- `allUsers`: This field represents a list of all KV entries with the prefix "user" in the "namespace" KV namespace. Cloesce will list all keys with this prefix and hydrate them into an array of `KValue<unknown>`.
+
+Many `KeyParam` decorators can be defined, all of type string. The Cloesce runtime will substitute them into the `KeyFormat` strings as needed.
+
+Noteably, Cloesce does not care if all fields are non-null. If a key does not exist in KV, the corresponding field will simply be `null`. This allows for a flexible data model that can evolve over time without breaking existing data, contrary to D1 models which require strict schema adherence.
+
+### KV with D1
+
+Cloesce models can also combine KV data with D1 data. For example, consider a `User` model that stores basic user information in D1, but stores user preferences in KV:
 
 ```ts
-/** BASIC EXAMPLE*/
-@KV("MY_KV_NAMESPACE")
-class Config extends KVModel<Json> {
+@Model("my-database")
+class User {
+    @PrimaryKey
+    id: string;
 
-    // This could be done with @CRUD(["SAVE"])
-    @POST
-    static post(@Inject kv: KVNamespace, value: MyConfigDto, metadata: unknown): Config {
-        kv.put("config-key", value, { metadata: metadata });
-        return this;
-    }
+    name: string;
 
-    // This could be done with @CRUD(["GET"])
-    @GET
-    get(): Config {
-        // key, value, metadata are supplied by the Cloesce Routers hydration
-        return this;
-    }
+    @KeyFormat("userPreferences:{name}:{id}", "namespace")
+    preferences: KValue<unknown>; // User preferences stored in KV.
 
-    // This could be done with @CRUD(["DELETE"])
-    @DELETE
-    delete(@Inject kv: KVNamespace) {
-        kv.delete("config-key");
+    @DataSource
+    static readonly default: IncludeTree<User> = {
+        preferences: {}
     }
 }
 ```
+
+D1 columns can be used within a `KeyFormat` string, allowing for dynamic key generation based on D1 data. In this example, the `preferences` field uses both the `name` and `id` fields from D1 to construct the KV key.
+
+Importantly, a D1 row must actually exist for the KV data to be accessed. If there is no D1 row for a given primary key, a 404 will be returned from the API. `preferences` on the other hand can be null even if the D1 row exists.
+
+### CRUD
+
+CRUD operations should be supported when integrating with KV data. `GET` will take in the necessary key parameters, and `SAVE` will take validated JSON data to store in KV.
+
+However, the `LIST` operation doesn't make as much sense when dealing with purely KV fields. Thus, it won't be supported unless a D1 model is also present to provide context for listing.
+
+## R2
+
+Cloudflare R2 is an object storage platform that allows for storing and retrieving large binary objects. R2 is schema-less, similar to KV, meaning you can store any type of data in any bucket. R2 also supports a similiar feature set to KV, such as prefix listing and metadata.
+
+To represent R2 data in Cloesce models, we can use the Cloudflare `R2Object` type, which contains the objects key, size, etag, lastModified, metadata and other properties. Unlike KV, no generic type parameters are needed since R2 objects are binary blobs. Only a `ReadableStream` will be returned when retrieving the object data such that large files can be streamed efficiently without buffering the entire file in memory.
+
+Let's consider a Model that defines only R2 data:
 
 ```ts
-@KV("MY_KV_NAMESPACE")
-class KVModelA extends KVModel<string> {
-    // ...
-}
+@Model
+class UserProfilePicture {
+    @KeyParam
+    userId: string;
 
-@KV("MY_KV_NAMESPACE")
-class KVModelB extends KVModel<Json> {
-    // ...
+    @KeyFormat("profile-pictures/{userId}.png", "user-bucket")
+    profilePicture: R2Object | null; // R2 object or null if not found.
+
+    @KeyFormat("profile-pictures/", "user-bucket")
+    allPictures: R2Object[]; // List all objects in the bucket.
+
+    @DataSource
+    static readonly default: IncludeTree<UserProfilePicture> = {
+        profilePicture: {},
+        allPictures: {}
+    }
 }
 ```
 
+In this example, `UserProfilePicture` consists of three fields:
+- `userId`: Decorated with `@KeyParam`, this field is used to fill in the `{userId}` placeholder in the `@KeyFormat` decorator.
+- `profilePicture`: This field represents an R2 object with a key formatted as "profile-pictures/{userId}.png" in the "user-bucket" R2 bucket. The value is of type `R2Object` or `null` if the object is not found.
+- `allPictures`: This field represents a list of all R2 objects in the "user-bucket" R2 bucket with the prefix "profile-pictures/". Cloesce will list all objects with this prefix and hydrate them into an array of `R2Object`.
 
-## R2 Models
+### R2 with D1
+
+Cloesce models can also combine R2 data with D1 data. For example, consider a `User` model that stores basic user information in D1, but stores user profile pictures in R2:
 
 ```ts
+@Model("my-database")
+class User {
+    @PrimaryKey
+    id: string;
 
-// Cloudflare response to a `head` query 
-class R2Object {
-  key: string;
-  version: string;
-  size: number;
-  etag: string;
-  httpEtag: string;
-  checksums: R2Checksums;
-  uploaded: Date;
-  httpMetadata?: R2HTTPMetadata;
-  customMetadata?: Record<string, string>;
-  range?: R2Range;
-  storageClass: string;
-  ssecKeyMd5?: string;
-}
+    name: string;
 
-/** R2 BASE CLASS */
-class R2Model {
-  head: R2Object;
+    @KeyFormat("profile-pictures/{id}.png", "user-bucket")
+    profilePicture: R2Object | null; // User profile picture stored in R2.
 
-  // NOTE: Does not exist on the client.
-  value: ReadableStream;
-}
-```
-
-```ts
-/** BASIC EXAMPLE*/
-@R2("MY_R2_BUCKET")
-class Picture extends R2Model {
-    @POST
-    static async post(@Inject r2: R2Bucket, key: string): Promise<Picture> {
-        await r2.put(key, ""); // Empty body
-        const head = await r2.head(key);
-        if (head === null) {
-            throw new Error("r2 failed");
-        }
-
-        return { head };
-    }
-
-    @PUT
-    async put(stream: Stream) {
-        await r2.put(this.head.key, stream);
-    }
-
-    @POST
-    async getValue(): Stream {
-        return this.value;
-    }
-
-    // This could be done with @CRUD(["GET"])
-    @GET
-    static async get(@Inject r2: R2Bucket, key: string): Promise<Picture | null> {
-        const res = await r2.get(key);
-        if (res === null) {
-            return null;
-        }
-
-        return { ... }; // ...convert the R2ObjectBody to a Picture
-    }
-
-    // This could be done with @CRUD(["DELETE"])
-    @DELETE
-    async delete(@Inject r2: R2Bucket) {
-        await r2.delete(this.head.key);
+    @DataSource
+    static readonly default: IncludeTree<User> = {
+        profilePicture: {}
     }
 }
 ```
+
+Just like in KV, D1 columns can be used within a `KeyFormat` string, allowing for dynamic key generation based on D1 data. In this example, the `profilePicture` field uses the `id` field from D1 to construct the R2 object key.
+
+D1 is still the source of truth for the existence of a user. If there is no D1 row for a given primary key, a 404 will be returned from the API. `profilePicture` on the other hand can be null even if the D1 row exists.
+
+### CRUD
+
+- `GET`: Retrieve R2 metadata and all other associated fields/columns. Object data is not streamed since mixing JSON and binary data is not feasible.
+- `SAVE`: Save will ignore R2 fields since uploading binary data is not feasible in a JSON API. It is up to the user to upload R2 objects separately.
+- `LIST`: Similiar to KV, listing R2 objects only makes sense when a D1 model is present to provide context. Thus, it won't be supported unless a D1 model is also present.
+
+### Signed URLs
+
+R2 supports generating signed URLs for secure, temporary access to objects (upload and download). In the future, this should be supported for Cloesce, but is out of scope for v0.0.5.
+

@@ -138,20 +138,6 @@ pub struct NamedTypedValue {
     pub cidl_type: CidlType,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
-pub struct D1ModelAttribute {
-    #[serde(default)]
-    pub hash: u64,
-
-    /// Symbol name and Cloesce type of the attribute.
-    /// Represents both the column name and type.
-    pub value: NamedTypedValue,
-
-    /// If the attribute is a foreign key, the referenced model name.
-    /// Otherwise, None.
-    pub foreign_key_reference: Option<String>,
-}
-
 /// The expected media type for request/response bodies.
 /// An API endpoint may expect data in some format, and return data in some format.
 /// Defaults to JSON.
@@ -201,14 +187,14 @@ pub struct DataSource {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Hash)]
-pub enum D1NavigationPropertyKind {
-    OneToOne { attribute_reference: String },
-    OneToMany { attribute_reference: String },
+pub enum NavigationPropertyKind {
+    OneToOne { column_reference: String },
+    OneToMany { column_reference: String },
     ManyToMany { unique_id: String },
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct D1NavigationProperty {
+pub struct NavigationProperty {
     #[serde(default)]
     pub hash: u64,
 
@@ -218,7 +204,21 @@ pub struct D1NavigationProperty {
     /// Referenced model name.
     pub model_reference: String,
 
-    pub kind: D1NavigationPropertyKind,
+    pub kind: NavigationPropertyKind,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct D1Column {
+    #[serde(default)]
+    pub hash: u64,
+
+    /// Symbol name and Cloesce type of the attribute.
+    /// Represents both the column name and type.
+    pub value: NamedTypedValue,
+
+    /// If the attribute is a foreign key, the referenced model name.
+    /// Otherwise, None.
+    pub foreign_key_reference: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Hash, PartialEq, Eq, Debug)]
@@ -228,21 +228,38 @@ pub enum CrudKind {
     SAVE,
 }
 
+#[derive(Serialize, Deserialize, Debug)]
+pub struct KeyValue {
+    pub format: String,
+    pub namespace_binding: String,
+    pub value: NamedTypedValue,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct R2Object {
+    pub format: String,
+    pub var_name: String,
+    pub bucket_binding: String,
+}
+
 #[serde_as]
 #[derive(Serialize, Deserialize, Debug)]
-pub struct D1Model {
+pub struct Model {
     #[serde(default)]
     pub hash: u64,
 
     /// The symbol that defines the model in the source code.
     pub name: String,
 
-    /// Primary key attribute of the model.
+    /// Primary key column of the model.
     // TODO: Composite primary keys
-    pub primary_key: NamedTypedValue,
+    pub primary_key: Option<NamedTypedValue>,
+    pub columns: Vec<D1Column>,
+    pub navigation_properties: Vec<NavigationProperty>,
 
-    pub attributes: Vec<D1ModelAttribute>,
-    pub navigation_properties: Vec<D1NavigationProperty>,
+    pub key_params: Vec<String>,
+    pub kv_objects: Vec<KeyValue>,
+    pub r2_objects: Vec<R2Object>,
 
     /// API definitions.
     #[serde_as(as = "MapPreventDuplicates<_, _>")]
@@ -255,47 +272,18 @@ pub struct D1Model {
     pub source_path: PathBuf,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
-pub enum KVNavigationProperty {
-    KValue(NamedTypedValue),
-    Model {
-        model_reference: String,
-        var_name: String,
-        many: bool,
-    },
-}
+impl Model {
+    pub fn has_d1(&self) -> bool {
+        !self.columns.is_empty() || self.primary_key.is_some()
+    }
 
-#[serde_as]
-#[derive(Serialize, Deserialize, Debug)]
-pub struct KVModel {
-    /// The symbol that defines the model in the source code.
-    pub name: String,
+    pub fn has_kv(&self) -> bool {
+        !self.kv_objects.is_empty()
+    }
 
-    /// Binding to a KV namespace.
-    pub binding: String,
-
-    /// The "type hint" of the values stored in the KV namespace.
-    /// KV namespaces are schemaless, so this is only a hint for code generation.
-    pub cidl_type: CidlType,
-
-    /// Key parameters
-    /// ex: Users/{userId}/Settings/{settingId} => ["userId", "settingId"]
-    pub params: Vec<String>,
-
-    /// Hydrated attributes of the model.
-    pub navigation_properties: Vec<KVNavigationProperty>,
-
-    /// CRUD operations to generate.
-    pub cruds: Vec<CrudKind>,
-
-    /// API definitions.
-    #[serde_as(as = "MapPreventDuplicates<_, _>")]
-    pub methods: BTreeMap<String, ApiMethod>,
-
-    #[serde_as(as = "MapPreventDuplicates<_, _>")]
-    pub data_sources: BTreeMap<String, DataSource>,
-
-    pub source_path: PathBuf,
+    pub fn has_r2(&self) -> bool {
+        !self.r2_objects.is_empty()
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -344,6 +332,7 @@ pub struct WranglerEnv {
     pub d1_binding: Option<String>,
 
     pub kv_bindings: Vec<String>,
+    pub r2_bindings: Vec<String>,
     pub vars: HashMap<String, CidlType>,
 }
 
@@ -357,11 +346,8 @@ pub struct CloesceAst {
     pub wrangler_env: Option<WranglerEnv>,
 
     // TODO: MapPreventDuplicates is not supported for IndexMap
-    pub d1_models: IndexMap<String, D1Model>,
+    pub models: IndexMap<String, Model>,
     pub services: IndexMap<String, Service>,
-
-    #[serde_as(as = "MapPreventDuplicates<_, _>")]
-    pub kv_models: BTreeMap<String, KVModel>,
 
     #[serde_as(as = "MapPreventDuplicates<_, _>")]
     pub poos: BTreeMap<String, PlainOldObject>,
@@ -388,24 +374,25 @@ impl CloesceAst {
     }
 
     pub fn to_migrations_json(self) -> String {
-        let Self {
-            hash,
-            d1_models: models,
-            ..
-        } = self;
+        let Self { hash, models, .. } = self;
 
         let migrations_models: IndexMap<String, MigrationsModel> = models
             .into_iter()
-            .map(|(name, model)| {
+            .filter_map(|(name, model)| {
+                let Some(pk) = model.primary_key else {
+                    // Skip non-D1 models
+                    return None;
+                };
+
                 let m = MigrationsModel {
                     hash: model.hash,
                     name: model.name,
-                    primary_key: model.primary_key,
-                    attributes: model.attributes,
+                    primary_key: pk,
+                    columns: model.columns,
                     navigation_properties: model.navigation_properties,
                     data_sources: model.data_sources,
                 };
-                (name, m)
+                Some((name, m))
             })
             .collect();
 
@@ -426,23 +413,23 @@ impl CloesceAst {
         }
 
         let mut root_h = FxHasher::default();
-        for model in self.d1_models.values_mut() {
+        for model in self.models.values_mut() {
             let mut model_h = FxHasher::default();
             model_h.write(b"Model");
             model.primary_key.hash(&mut model_h);
             model.name.hash(&mut model_h);
 
-            for attr in model.attributes.iter_mut() {
-                let attr_h = {
+            for col in model.columns.iter_mut() {
+                let col_h = {
                     let mut h = FxHasher::default();
-                    h.write(b"ModelAttribute");
-                    attr.value.hash(&mut h);
-                    attr.foreign_key_reference.hash(&mut h);
+                    h.write(b"ModelColumn");
+                    col.value.hash(&mut h);
+                    col.foreign_key_reference.hash(&mut h);
                     h.finish()
                 };
 
-                attr.hash = attr_h;
-                model_h.write_u64(attr_h);
+                col.hash = col_h;
+                model_h.write_u64(col_h);
             }
 
             for ds in model.data_sources.values_mut() {
@@ -497,8 +484,8 @@ pub struct MigrationsModel {
     pub hash: u64,
     pub name: String,
     pub primary_key: NamedTypedValue,
-    pub attributes: Vec<D1ModelAttribute>,
-    pub navigation_properties: Vec<D1NavigationProperty>,
+    pub columns: Vec<D1Column>,
+    pub navigation_properties: Vec<NavigationProperty>,
     pub data_sources: BTreeMap<String, DataSource>,
 }
 
@@ -544,6 +531,12 @@ pub struct KVNamespace {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
+pub struct R2Bucket {
+    pub binding: Option<String>,
+    pub bucket_name: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
 pub struct WranglerSpec {
     pub name: Option<String>,
     pub compatibility_date: Option<String>,
@@ -554,6 +547,9 @@ pub struct WranglerSpec {
 
     #[serde(default)]
     pub kv_namespaces: Vec<KVNamespace>,
+
+    #[serde(default)]
+    pub r2_buckets: Vec<R2Bucket>,
 
     #[serde(default)]
     pub vars: HashMap<String, String>,

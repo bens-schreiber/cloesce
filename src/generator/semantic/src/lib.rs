@@ -1,9 +1,9 @@
-use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
+use std::collections::{BTreeMap, HashMap, VecDeque};
 
 use ast::err::{GeneratorErrorKind, Result};
 use ast::{
-    ApiMethod, CidlType, CloesceAst, D1Model, D1NavigationPropertyKind, HttpVerb,
-    KVNavigationProperty, NamedTypedValue, WranglerSpec, ensure, fail,
+    ApiMethod, CidlType, CloesceAst, CrudKind, HttpVerb, Model, NamedTypedValue,
+    NavigationPropertyKind, WranglerSpec, ensure, fail,
 };
 
 type AdjacencyList<'a> = BTreeMap<&'a str, Vec<&'a str>>;
@@ -20,27 +20,12 @@ impl SemanticAnalysis {
     ///
     /// Returns a set of all objects that have blobs (be it a direct attribute or composition)
     ///
-    /// Returns error on
-    /// - Missing WranglerEnv when models are defined
-    /// - Inconsistent WranglerEnv bindings with WranglerSpec
-    /// - Missing WranglerEnv vars in WranglerSpec
-    /// - Model attributes with invalid SQL types
-    /// - Primary keys with invalid SQL types
-    /// - Invalid Model or Method map K/V
-    /// - Unknown navigation property model references
-    /// - Unknown model references in method parameters
-    /// - Invalid method parameter types
-    /// - Unknown or invalid foreign key references
-    /// - Missing navigation property attributes
-    /// - Cyclical dependencies
-    /// - Invalid data source type
-    /// - Invalid data source reference
+    /// Returns a [GeneratorErrorKind] on failure.
     pub fn analyze(ast: &mut CloesceAst, spec: &WranglerSpec) -> Result<()> {
         // Wrangler must be validated first so that the env can be used in later validations
         Self::wrangler(ast, spec)?;
 
-        Self::d1_models(ast)?;
-        Self::kv_models(ast)?;
+        Self::models(ast)?;
         Self::poos(ast)?;
         Self::services(ast)?;
         Ok(())
@@ -51,13 +36,20 @@ impl SemanticAnalysis {
             Some(env) => env,
 
             // No models => no wrangler needed
-            None if ast.d1_models.is_empty() && ast.kv_models.is_empty() => return Ok(()),
+            None if ast.models.is_empty() => return Ok(()),
 
             _ => fail!(
                 GeneratorErrorKind::MissingWranglerEnv,
                 "The AST is missing a WranglerEnv but models are defined"
             ),
         };
+
+        let (has_d1, has_r2, has_kv) = ast
+            .models
+            .iter()
+            .fold((false, false, false), |(d1, r2, kv), (_, m)| {
+                (d1 || m.has_d1(), r2 || m.has_r2(), kv || m.has_kv())
+            });
 
         for var in env.vars.keys() {
             ensure!(
@@ -70,7 +62,7 @@ impl SemanticAnalysis {
 
         // If D1 models are defined, ensure a D1 database binding exists
         ensure!(
-            !spec.d1_databases.is_empty() || ast.d1_models.is_empty(),
+            !spec.d1_databases.is_empty() || !has_d1,
             GeneratorErrorKind::MissingWranglerD1Binding,
             "No D1 database binding is defined, but D1 models are defined in the WranglerEnv ({})",
             env.source_path.display()
@@ -91,7 +83,7 @@ impl SemanticAnalysis {
 
         // If KV models are defined, ensure a KV namespace binding exists
         ensure!(
-            !spec.kv_namespaces.is_empty() || ast.kv_models.is_empty(),
+            !spec.kv_namespaces.is_empty() || !has_kv,
             GeneratorErrorKind::MissingWranglerKVNamespace,
             "No KV namespace binding is defined, but KV models are defined in the WranglerEnv ({})",
             env.source_path.display()
@@ -108,6 +100,14 @@ impl SemanticAnalysis {
                 env.source_path.display()
             )
         }
+
+        // If R2 models are defined, ensure an R2 bucket binding exists
+        ensure!(
+            !spec.r2_buckets.is_empty() || !has_r2,
+            GeneratorErrorKind::MissingWranglerKVNamespace,
+            "No R2 bucket binding is defined, but R2 models are defined in the WranglerEnv ({})",
+            env.source_path.display()
+        );
 
         Ok(())
     }
@@ -190,164 +190,28 @@ impl SemanticAnalysis {
         Ok(())
     }
 
-    fn d1_models(ast: &mut CloesceAst) -> Result<()> {
-        // TODO: Use env to check binding on each model (multiple databases)
-        let Some(_env) = &ast.wrangler_env else {
-            return Ok(()); // No D1 models
-        };
+    fn models(ast: &mut CloesceAst) -> Result<()> {
+        if ast.wrangler_env.is_none() {
+            return Ok(());
+        }
 
-        let ensure_valid_sql_type = |model: &D1Model, value: &NamedTypedValue| {
-            let inner = match &value.cidl_type {
-                CidlType::Nullable(inner) if matches!(inner.as_ref(), CidlType::Void) => {
-                    fail!(GeneratorErrorKind::NullSqlType)
-                }
-                CidlType::Nullable(inner) => inner.as_ref(),
-                other => other,
-            };
+        let mut d1_models = Vec::new();
 
-            ensure!(
-                matches!(
-                    inner,
-                    CidlType::Integer
-                        | CidlType::Real
-                        | CidlType::Text
-                        | CidlType::Blob
-                        | CidlType::Boolean
-                        | CidlType::DateIso
-                ),
-                GeneratorErrorKind::InvalidSqlType,
-                "{}.{}",
-                model.name,
-                value.name
-            );
-
-            Ok(())
-        };
-
-        // Topo sort and cycle detection
-        let mut in_degree = BTreeMap::<&str, usize>::new();
-        let mut graph = BTreeMap::<&str, Vec<&str>>::new();
-
-        // Maps a model name and a foreign key reference to the model it is referencing
-        // Ie, Person.dogId => { (Person, dogId): "Dog" }
-        let mut model_attr_ref_to_fk_model = HashMap::<(&str, &str), &str>::new();
-        let mut unvalidated_navs = Vec::new();
-
-        // Maps a m2m unique id to the models that reference the id
-        let mut m2m = HashMap::<&String, Vec<&String>>::new();
-
-        // Validate Models
-        for (model_name, model) in &ast.d1_models {
+        for (model_name, model) in &ast.models {
             ensure!(
                 *model_name == model.name,
                 GeneratorErrorKind::InvalidMapping,
-                "Model record key did not match it's model name? {} : {}",
+                "{} : {}",
                 model_name,
                 model.name
             );
 
-            graph.entry(&model.name).or_default();
-            in_degree.entry(&model.name).or_insert(0);
-
-            // Validate PK
-            ensure!(
-                !model.primary_key.cidl_type.is_nullable(),
-                GeneratorErrorKind::NullPrimaryKey,
-                "{}.{}",
-                model.name,
-                model.primary_key.name
-            );
-            ensure_valid_sql_type(model, &model.primary_key)?;
-
-            // Validate attributes
-            for a in &model.attributes {
-                ensure_valid_sql_type(model, &a.value)?;
-
-                if let Some(fk_model_name) = &a.foreign_key_reference {
-                    let Some(fk_model) = ast.d1_models.get(fk_model_name.as_str()) else {
-                        fail!(
-                            GeneratorErrorKind::InvalidModelReference,
-                            "{}.{} => {}?",
-                            model.name,
-                            a.value.name,
-                            fk_model_name
-                        );
-                    };
-
-                    // Validate the types are equal
-                    ensure!(
-                        *a.value.cidl_type.root_type() == fk_model.primary_key.cidl_type,
-                        GeneratorErrorKind::MismatchedForeignKeyTypes,
-                        "{}.{} ({:?}) != {}.{} ({:?})",
-                        model.name,
-                        a.value.name,
-                        a.value.cidl_type,
-                        fk_model_name,
-                        fk_model.primary_key.name,
-                        fk_model.primary_key.cidl_type
-                    );
-
-                    model_attr_ref_to_fk_model
-                        .insert((&model.name, a.value.name.as_str()), fk_model_name);
-
-                    // Nullable FK's do not constrain table creation order, and thus
-                    // can be left out of the topo sort
-                    if !a.value.cidl_type.is_nullable() {
-                        // One To One: Person has a Dog ..(sql)=> Person has a fk to Dog
-                        // Dog must come before Person
-                        graph.entry(fk_model_name).or_default().push(&model.name);
-                        in_degree.entry(&model.name).and_modify(|d| *d += 1);
-                    }
-                }
+            if model.has_d1() {
+                d1_models.push(model);
             }
 
-            // Validate navigation props
-            for nav in &model.navigation_properties {
-                ensure!(
-                    ast.d1_models.contains_key(nav.model_reference.as_str()),
-                    GeneratorErrorKind::InvalidModelReference,
-                    "{} => {}?",
-                    model.name,
-                    nav.model_reference
-                );
-
-                match &nav.kind {
-                    D1NavigationPropertyKind::OneToOne {
-                        attribute_reference,
-                    } => {
-                        // Validate the nav prop's reference is consistent
-                        if let Some(&fk_model) =
-                            model_attr_ref_to_fk_model.get(&(&model.name, attribute_reference))
-                        {
-                            ensure!(
-                                fk_model == nav.model_reference,
-                                GeneratorErrorKind::MismatchedNavigationPropertyTypes,
-                                "({}.{}) does not match type ({})",
-                                model.name,
-                                nav.var_name,
-                                fk_model
-                            );
-                        } else {
-                            fail!(
-                                GeneratorErrorKind::InvalidNavigationPropertyReference,
-                                "{}.{} references {}.{} which does not exist or is not a foreign key to {}",
-                                model.name,
-                                nav.var_name,
-                                nav.model_reference,
-                                attribute_reference,
-                                model.name
-                            );
-                        }
-                    }
-                    D1NavigationPropertyKind::OneToMany {
-                        attribute_reference: _,
-                    } => {
-                        unvalidated_navs.push((&model.name, &nav.model_reference, nav));
-                    }
-                    D1NavigationPropertyKind::ManyToMany { unique_id } => {
-                        m2m.entry(unique_id).or_default().push(&model.name);
-                    }
-                }
+            if model.has_kv() || model.has_r2() {
+                Self::kv_r2_models(ast, model)?;
             }
 
             // Validate Data Sources (BFS)
@@ -371,7 +235,7 @@ impl SemanticAnalysis {
                             );
                         };
 
-                        let Some(child_model) = ast.d1_models.get(model_name) else {
+                        let Some(child_model) = ast.models.get(model_name) else {
                             fail!(
                                 GeneratorErrorKind::InvalidModelReference,
                                 "{} => {}?",
@@ -389,20 +253,172 @@ impl SemanticAnalysis {
             for (method_name, method) in &model.methods {
                 validate_methods(&model.name, method_name, method, ast)?;
             }
+
+            // Validate CRUD
+            for crud in &model.cruds {
+                if matches!(crud, CrudKind::LIST) && !model.has_d1() {
+                    fail!(
+                        GeneratorErrorKind::UnsupportedCrudOperation,
+                        "{} has LIST CRUD but is not a D1 backed model",
+                        model.name
+                    );
+                }
+            }
+        }
+
+        // Sort models by SQL insertion order
+        if !d1_models.is_empty() {
+            let rank = Self::d1_models(ast, d1_models)?;
+            ast.models
+                .sort_by_key(|k, _| rank.get(k.as_str()).unwrap_or(&usize::MAX));
+        }
+
+        Ok(())
+    }
+
+    fn d1_models(ast: &CloesceAst, d1_models: Vec<&Model>) -> Result<HashMap<String, usize>> {
+        // Topo sort and cycle detection
+        let mut in_degree = BTreeMap::<&str, usize>::new();
+        let mut graph = BTreeMap::<&str, Vec<&str>>::new();
+
+        // Maps a model name and a foreign key reference to the model it is referencing
+        // Ie, Person.dogId => { (Person, dogId): "Dog" }
+        let mut model_attr_ref_to_fk_model = HashMap::<(&str, &str), &str>::new();
+        let mut unvalidated_navs = Vec::new();
+
+        // Maps a m2m unique id to the models that reference the id
+        let mut m2m = HashMap::<&String, Vec<&String>>::new();
+
+        // Validate Models D1 grammar
+        for model in &d1_models {
+            if !model.has_d1() {
+                continue;
+            }
+
+            let Some(primary_key) = &model.primary_key else {
+                fail!(GeneratorErrorKind::MissingPrimaryKey, "{}", model.name);
+            };
+
+            graph.entry(&model.name).or_default();
+            in_degree.entry(&model.name).or_insert(0);
+
+            // Validate PK
+            ensure!(
+                !primary_key.cidl_type.is_nullable(),
+                GeneratorErrorKind::NullPrimaryKey,
+                "{}.{}",
+                model.name,
+                primary_key.name
+            );
+            ensure_valid_sql_type(model, primary_key)?;
+
+            // Validate columns
+            for col in &model.columns {
+                ensure_valid_sql_type(model, &col.value)?;
+
+                if let Some(fk_model_name) = &col.foreign_key_reference {
+                    let Some(fk_model) = ast.models.get(fk_model_name.as_str()) else {
+                        fail!(
+                            GeneratorErrorKind::InvalidModelReference,
+                            "{}.{} => {}?",
+                            model.name,
+                            col.value.name,
+                            fk_model_name
+                        );
+                    };
+
+                    let Some(fk_model_pk) = fk_model.primary_key.as_ref() else {
+                        fail!(
+                            GeneratorErrorKind::InvalidModelReference,
+                            "{}.{} => {} has no primary key?",
+                            model.name,
+                            col.value.name,
+                            fk_model_name
+                        );
+                    };
+
+                    // Validate the types are equal
+                    ensure!(
+                        *col.value.cidl_type.root_type() == fk_model_pk.cidl_type,
+                        GeneratorErrorKind::MismatchedForeignKeyTypes,
+                        "{}.{} ({:?}) != {}.{} ({:?})",
+                        model.name,
+                        col.value.name,
+                        col.value.cidl_type,
+                        fk_model_name,
+                        fk_model_pk.name,
+                        fk_model_pk.cidl_type
+                    );
+
+                    model_attr_ref_to_fk_model
+                        .insert((&model.name, col.value.name.as_str()), fk_model_name);
+
+                    // Nullable FK's do not constrain table creation order, and thus
+                    // can be left out of the topo sort
+                    if !col.value.cidl_type.is_nullable() {
+                        // One To One: Person has a Dog ..(sql)=> Person has a fk to Dog
+                        // Dog must come before Person
+                        graph.entry(fk_model_name).or_default().push(&model.name);
+                        in_degree.entry(&model.name).and_modify(|d| *d += 1);
+                    }
+                }
+            }
+
+            // Validate navigation props
+            for nav in &model.navigation_properties {
+                ensure!(
+                    ast.models.contains_key(nav.model_reference.as_str()),
+                    GeneratorErrorKind::InvalidModelReference,
+                    "{} => {}?",
+                    model.name,
+                    nav.model_reference
+                );
+
+                match &nav.kind {
+                    NavigationPropertyKind::OneToOne { column_reference } => {
+                        // Validate the nav prop's reference is consistent
+                        if let Some(&fk_model) =
+                            model_attr_ref_to_fk_model.get(&(&model.name, column_reference))
+                        {
+                            ensure!(
+                                fk_model == nav.model_reference,
+                                GeneratorErrorKind::MismatchedNavigationPropertyTypes,
+                                "({}.{}) does not match type ({})",
+                                model.name,
+                                nav.var_name,
+                                fk_model
+                            );
+                        } else {
+                            fail!(
+                                GeneratorErrorKind::InvalidNavigationPropertyReference,
+                                "{}.{} references {}.{} which does not exist or is not a foreign key to {}",
+                                model.name,
+                                nav.var_name,
+                                nav.model_reference,
+                                column_reference,
+                                model.name
+                            );
+                        }
+                    }
+                    NavigationPropertyKind::OneToMany { .. } => {
+                        unvalidated_navs.push((&model.name, &nav.model_reference, nav));
+                    }
+                    NavigationPropertyKind::ManyToMany { unique_id } => {
+                        m2m.entry(unique_id).or_default().push(&model.name);
+                    }
+                }
+            }
         }
 
         // Validate 1:M nav props
         for (model_name, nav_model, nav) in unvalidated_navs {
-            let D1NavigationPropertyKind::OneToMany {
-                attribute_reference,
-            } = &nav.kind
-            else {
+            let NavigationPropertyKind::OneToMany { column_reference } = &nav.kind else {
                 continue;
             };
 
-            // Validate the nav props reference is consistent to an attribute
+            // Validate the nav props reference is consistent to an column
             // on another model
-            let Some(&fk_model) = model_attr_ref_to_fk_model.get(&(nav_model, attribute_reference))
+            let Some(&fk_model) = model_attr_ref_to_fk_model.get(&(nav_model, column_reference))
             else {
                 fail!(
                     GeneratorErrorKind::InvalidNavigationPropertyReference,
@@ -410,7 +426,7 @@ impl SemanticAnalysis {
                     model_name,
                     nav.var_name,
                     nav_model,
-                    attribute_reference,
+                    column_reference,
                     model_name
                 );
             };
@@ -424,7 +440,7 @@ impl SemanticAnalysis {
                 model_name,
                 nav.var_name,
                 nav_model,
-                attribute_reference,
+                column_reference,
             );
 
             // One To Many: Person has many Dogs (sql)=> Dog has an fk to  Person
@@ -456,188 +472,86 @@ impl SemanticAnalysis {
             }
         }
 
-        // Sort models by SQL insertion order
-        let rank = kahns(graph, in_degree, ast.d1_models.len())?;
-        ast.d1_models
-            .sort_by_key(|k, _| rank.get(k.as_str()).unwrap());
-
-        Ok(())
+        kahns(graph, in_degree, d1_models.len())
     }
 
-    fn kv_models(ast: &CloesceAst) -> Result<()> {
-        let Some(env) = &ast.wrangler_env else {
-            return Ok(()); // No KV models
-        };
+    fn kv_r2_models(ast: &CloesceAst, model: &Model) -> Result<()> {
+        // Validate KV key format
+        for kv in &model.kv_objects {
+            let vars = extract_braced(&kv.format)?;
 
-        // Tree validation
-        let mut in_degree = BTreeMap::<&str, usize>::new();
-
-        let kv_binding_set = env.kv_bindings.iter().collect::<HashSet<&String>>();
-
-        // Validate models
-        for (model_name, model) in &ast.kv_models {
-            ensure!(
-                *model_name == model.name,
-                GeneratorErrorKind::InvalidMapping,
-                "KV Model record key did not match it's model name? {} : {}",
-                model_name,
-                model.name
-            );
-
-            ensure!(
-                kv_binding_set.contains(&model.binding),
-                GeneratorErrorKind::InconsistentWranglerBinding,
-                "KV Model {} binding {} not found in WranglerEnv bindings",
-                model.name,
-                model.binding
-            );
-
-            ensure!(
-                !matches!(model.cidl_type, CidlType::Inject(_)),
-                GeneratorErrorKind::UnexpectedInject,
-                r#"KV Model "{}"'s type cannot be an injected instance."#,
-                model.name
-            );
-
-            // Attributes
-            for attr in &model.navigation_properties {
-                match attr {
-                    KVNavigationProperty::KValue(ntv) => match ntv.cidl_type.root_type() {
-                        CidlType::Inject(_) => fail!(
-                            GeneratorErrorKind::UnexpectedInject,
-                            r#"KV Model attribute "{}.{}"'s type cannot be an injected instance."#,
-                            model.name,
-                            ntv.name
-                        ),
-                        CidlType::Object(o) | CidlType::Partial(o) => {
-                            ensure!(
-                                is_valid_object_ref(ast, o),
-                                GeneratorErrorKind::UnknownObject,
-                                "{}.{} => {}?",
-                                model.name,
-                                ntv.name,
-                                o
-                            )
-                        }
-                        CidlType::DataSource(reference) => ensure!(
-                            is_valid_data_source_ref(ast, reference),
-                            GeneratorErrorKind::InvalidModelReference,
-                            "{}.{} => {}?",
-                            model.name,
-                            ntv.name,
-                            reference
-                        ),
-                        _ => {}
-                    },
-                    KVNavigationProperty::Model {
-                        model_reference,
-                        var_name,
-                        many,
-                    } => {
-                        let Some(ref_model) = ast.kv_models.get(model_reference.as_str()) else {
-                            fail!(
-                                GeneratorErrorKind::InvalidModelReference,
-                                "{}.{} => {}?",
-                                model.name,
-                                var_name,
-                                model_reference
-                            );
-                        };
-
-                        // namespaces must be equal
-                        ensure!(
-                            ref_model.binding == model.binding,
-                            GeneratorErrorKind::MismatchedKVModelNamespaces,
-                            "{}.{} ({}) != {}.{} ({})",
-                            model.name,
-                            var_name,
-                            model.binding,
-                            model_reference,
-                            var_name,
-                            ref_model.binding
-                        );
-
-                        ensure!(
-                            !*many || !ref_model.params.is_empty(),
-                            GeneratorErrorKind::InvalidKVTree,
-                            r#"KV Model "{}" is referenced as many in "{}.{}", but has no key parameters."#,
-                            model_reference,
-                            model.name,
-                            var_name
-                        );
-
-                        in_degree
-                            .entry(model_reference.as_str())
-                            .and_modify(|d| *d += 1)
-                            .or_insert(1);
-                    }
-                }
+            for var in vars {
+                ensure!(
+                    model.columns.iter().any(|col| col.value.name == var)
+                        || model.key_params.contains(&var)
+                        || model
+                            .primary_key
+                            .as_ref()
+                            .map(|pk| pk.name == var)
+                            .unwrap_or(false),
+                    GeneratorErrorKind::UnknownKeyReference,
+                    "{}.{} => {} missing key param for variable {}",
+                    model.name,
+                    kv.value.name,
+                    kv.format,
+                    var
+                )
             }
 
-            // Data Sources
-            for ds in model.data_sources.values() {
-                let mut q = VecDeque::new();
-                q.push_back((&ds.tree, model));
-
-                while let Some((node, parent_model)) = q.pop_front() {
-                    for (var_name, child) in &node.0 {
-                        let found_match =
-                            parent_model
-                                .navigation_properties
-                                .iter()
-                                .find(|attr| match attr {
-                                    KVNavigationProperty::Model { var_name: v, .. } => {
-                                        *v == *var_name
-                                    }
-                                    KVNavigationProperty::KValue(named_typed_value) => {
-                                        named_typed_value.name == *var_name
-                                    }
-                                });
-
-                        let Some(found_match) = found_match else {
-                            fail!(
-                                GeneratorErrorKind::UnknownIncludeTreeReference,
-                                "{}.{}",
-                                model.name,
-                                var_name
-                            );
-                        };
-
-                        match found_match {
-                            KVNavigationProperty::KValue(_) => {
-                                // KValues do not have attributes to traverse
-                            }
-                            KVNavigationProperty::Model {
-                                model_reference, ..
-                            } => {
-                                let Some(child_model) = ast.kv_models.get(model_reference.as_str())
-                                else {
-                                    unreachable!(
-                                        "Model references should be validated before data sources"
-                                    )
-                                };
-
-                                q.push_back((child, child_model));
-                            }
-                        }
-                    }
+            // Validate value type
+            match &kv.value.cidl_type {
+                CidlType::Object(o) | CidlType::Partial(o) => {
+                    ensure!(
+                        is_valid_object_ref(ast, o),
+                        GeneratorErrorKind::UnknownObject,
+                        "{}.{} => {}?",
+                        model.name,
+                        kv.value.name,
+                        o
+                    );
                 }
-            }
-
-            // Methods
-            for (method_name, method) in &model.methods {
-                validate_methods(model_name, method_name, method, ast)?;
+                CidlType::Inject(o) => {
+                    fail!(
+                        GeneratorErrorKind::UnexpectedInject,
+                        "{}.{} => {}?",
+                        model.name,
+                        kv.value.name,
+                        o
+                    )
+                }
+                CidlType::DataSource(reference) => ensure!(
+                    is_valid_data_source_ref(ast, reference),
+                    GeneratorErrorKind::InvalidModelReference,
+                    "{}.{} => {}?",
+                    model.name,
+                    kv.value.name,
+                    reference
+                ),
+                _ => {}
             }
         }
 
-        // KV Models must be a tree (in degree <= 1)
-        if let Some((name, deg)) = in_degree.iter().find(|(_, deg)| **deg > 1) {
-            fail!(
-                GeneratorErrorKind::InvalidKVTree,
-                r#"KV Model "{}" has an in degree of {}."#,
-                name,
-                deg
-            )
+        // Validate R2 Key format
+        for r2 in &model.r2_objects {
+            let vars = extract_braced(&r2.format)?;
+
+            for var in vars {
+                ensure!(
+                    model.columns.iter().any(|col| col.value.name == var)
+                        || model.key_params.contains(&var)
+                        || model
+                            .primary_key
+                            .as_ref()
+                            .map(|pk| pk.name == var)
+                            .unwrap_or(false),
+                    GeneratorErrorKind::UnknownKeyReference,
+                    "{}.{} => {} missing key param for variable {}",
+                    model.name,
+                    r2.var_name,
+                    r2.format,
+                    var
+                )
+            }
         }
 
         Ok(())
@@ -689,12 +603,69 @@ impl SemanticAnalysis {
     }
 }
 
+fn extract_braced(s: &str) -> Result<Vec<String>> {
+    let mut out = Vec::new();
+    let mut current = None;
+
+    for c in s.chars() {
+        match (current.as_mut(), c) {
+            (None, '{') => current = Some(String::new()),
+            (Some(_), '{') => {
+                fail!(GeneratorErrorKind::InvalidKeyFormat, "nested brace in key");
+            }
+            (Some(buf), '}') => {
+                out.push(std::mem::take(buf));
+                current = None;
+            }
+            (Some(buf), c) => buf.push(c),
+            _ => {}
+        }
+    }
+
+    if current.is_some() {
+        fail!(
+            GeneratorErrorKind::InvalidKeyFormat,
+            "unclosed brace in key"
+        );
+    }
+
+    Ok(out)
+}
+
+fn ensure_valid_sql_type(model: &Model, value: &NamedTypedValue) -> Result<()> {
+    let inner = match &value.cidl_type {
+        CidlType::Nullable(inner) if matches!(inner.as_ref(), CidlType::Void) => {
+            fail!(GeneratorErrorKind::NullSqlType)
+        }
+        CidlType::Nullable(inner) => inner.as_ref(),
+        other => other,
+    };
+
+    ensure!(
+        matches!(
+            inner,
+            CidlType::Integer
+                | CidlType::Real
+                | CidlType::Text
+                | CidlType::Blob
+                | CidlType::Boolean
+                | CidlType::DateIso
+        ),
+        GeneratorErrorKind::InvalidSqlType,
+        "{}.{}",
+        model.name,
+        value.name
+    );
+
+    Ok(())
+}
+
 fn is_valid_object_ref(ast: &CloesceAst, o: &String) -> bool {
-    ast.d1_models.contains_key(o) || ast.poos.contains_key(o) || ast.kv_models.contains_key(o)
+    ast.models.contains_key(o) || ast.poos.contains_key(o)
 }
 
 fn is_valid_data_source_ref(ast: &CloesceAst, o: &String) -> bool {
-    ast.d1_models.contains_key(o) || ast.kv_models.contains_key(o)
+    ast.models.contains_key(o)
 }
 
 fn validate_methods(
@@ -799,7 +770,7 @@ fn validate_methods(
             }
             CidlType::DataSource(model_name) => {
                 ensure!(
-                    ast.d1_models.contains_key(model_name),
+                    ast.models.contains_key(model_name),
                     GeneratorErrorKind::InvalidModelReference,
                     "{}.{} data source references {}",
                     namespace,

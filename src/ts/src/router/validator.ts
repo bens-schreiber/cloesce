@@ -29,7 +29,7 @@ export class RuntimeValidator {
   constructor(
     private ast: CloesceAst,
     private ctorReg: ConstructorRegistry,
-  ) {}
+  ) { }
 
   static validate(
     value: any,
@@ -109,34 +109,34 @@ export class RuntimeValidator {
       return rightIf(
         () => value,
         typeof value === "string" &&
-          (value === NO_DATA_SOURCE ||
-            this.ast.d1_models[objectName]?.data_sources[value] !== undefined),
+        (value === NO_DATA_SOURCE ||
+          this.ast.models[objectName]?.data_sources[value] !== undefined),
       );
     }
 
     const objName = getObjectName(cidlType);
 
     // Models
-    if (objName && this.ast.d1_models[objName]) {
-      const model = this.ast.d1_models[objName];
+    if (objName && this.ast.models[objName]) {
+      const model = this.ast.models[objName];
       if (!model || typeof value !== "object") return Either.left(null);
       const valueObj = value as Record<string, unknown>;
 
       // Validate + instantiate PK
       {
         const pk = model.primary_key;
-        const res = this.recurse(valueObj[pk.name], pk.cidl_type, isPartial);
+        const res = this.recurse(valueObj[pk!.name], pk!.cidl_type, isPartial);
 
         if (res.isLeft()) {
           return res;
         }
 
-        value[pk.name] = res.unwrap();
+        value[pk!.name] = res.unwrap();
       }
 
       // Validate + instantiate attributes
-      for (let i = 0; i < model.attributes.length; i++) {
-        const attr = model.attributes[i];
+      for (let i = 0; i < model.columns.length; i++) {
+        const attr = model.columns[i];
         const res = this.recurse(
           valueObj[attr.value.name],
           attr.value.cidl_type,

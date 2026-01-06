@@ -18,41 +18,43 @@ import {
   CidlType,
   DataSource,
   HttpVerb,
-  D1Model,
-  D1ModelAttribute,
+  Model,
+  D1Column,
   ApiMethod,
   NamedTypedValue,
-  D1NavigationProperty,
+  NavigationProperty,
   WranglerEnv,
   PlainOldObject,
   CrudKind,
   Service,
   defaultMediaType,
-  KVModel,
   ServiceAttribute,
-  KVNavigationProperty,
+  KeyValue,
+  AstR2Object,
 } from "../ast.js";
 import { TypeFormatFlags } from "typescript";
 import { ExtractorError, ExtractorErrorCode } from "./err.js";
 import { HttpResult, KValue } from "../ui/common.js";
 import Either from "../either.js";
 
-enum AttributeDecoratorKind {
+enum PropertyDecoratorKind {
   PrimaryKey = "PrimaryKey",
   ForeignKey = "ForeignKey",
   OneToOne = "OneToOne",
   OneToMany = "OneToMany",
   ManyToMany = "ManyToMany",
   DataSource = "DataSource",
+  KeyParam = "KeyParam",
+  KV = "KV",
+  R2 = "R2",
 }
 
 enum ClassDecoratorKind {
-  D1 = "D1",
+  Model = "Model",
   WranglerEnv = "WranglerEnv",
   PlainOldObject = "PlainOldObject",
   Service = "Service",
   CRUD = "CRUD",
-  KV = "KV",
 }
 
 enum ParameterDecoratorKind {
@@ -64,11 +66,10 @@ export class CidlExtractor {
     projectName: string,
     project: Project,
   ): Either<ExtractorError, CloesceAst> {
-    const d1Models: Record<string, D1Model> = {};
+    const models: Record<string, Model> = {};
     const poos: Record<string, PlainOldObject> = {};
     const wranglerEnvs: WranglerEnv[] = [];
     const services: Record<string, Service> = {};
-    const kvModels: Record<string, KVModel> = {};
     let app_source: string | null = null;
 
     for (const sourceFile of project.getSourceFiles()) {
@@ -94,9 +95,9 @@ export class CidlExtractor {
           const decoratorName = decorator.getName();
 
           switch (decoratorName) {
-            case ClassDecoratorKind.D1: {
+            case ClassDecoratorKind.Model: {
               if (!classDecl.isExported()) return notExportedErr;
-              const result = D1ModelExtractor.extract(classDecl, sourceFile);
+              const result = ModelExtractor.extract(classDecl, sourceFile);
 
               if (result.isLeft()) {
                 result.value.addContext(
@@ -106,27 +107,7 @@ export class CidlExtractor {
               }
 
               const model = result.unwrap();
-              d1Models[model.name] = model;
-              break checkDecorators;
-            }
-
-            case ClassDecoratorKind.KV: {
-              if (!classDecl.isExported()) return notExportedErr;
-              const result = KVModelExtractor.extract(
-                classDecl,
-                sourceFile,
-                decorator,
-              );
-
-              if (result.isLeft()) {
-                result.value.addContext(
-                  (prev) => `${classDecl.getName()}.${prev}`,
-                );
-                return result;
-              }
-
-              const model = result.unwrap();
-              kvModels[model.name] = model;
+              models[model.name] = model;
               break checkDecorators;
             }
 
@@ -161,9 +142,9 @@ export class CidlExtractor {
             }
 
             case ClassDecoratorKind.WranglerEnv: {
-              // Error: invalid attribute modifier
+              // Error: invalid property modifier
               for (const prop of classDecl.getProperties()) {
-                const modifierRes = checkAttributeModifier(prop);
+                const modifierRes = checkPropertyModifier(prop);
                 if (modifierRes.isLeft()) {
                   return modifierRes;
                 }
@@ -199,8 +180,7 @@ export class CidlExtractor {
     return Either.right({
       project_name: projectName,
       wrangler_env: wranglerEnvs[0],
-      d1_models: d1Models,
-      kv_models: kvModels,
+      models: models,
       poos,
       services,
       app_source,
@@ -254,8 +234,8 @@ export class CidlExtractor {
         return typeRes;
       }
 
-      // Error: invalid attribute modifier
-      const modifierRes = checkAttributeModifier(prop);
+      // Error: invalid property modifier
+      const modifierRes = checkPropertyModifier(prop);
       if (modifierRes.isLeft()) {
         return modifierRes;
       }
@@ -280,8 +260,9 @@ export class CidlExtractor {
     sourceFile: SourceFile,
   ): Either<ExtractorError, WranglerEnv> {
     const vars: Record<string, CidlType> = {};
-    let d1_binding;
-    const kv_bindings = [];
+    let d1_binding: string | undefined = undefined;
+    const kv_bindings: string[] = [];
+    const r2_bindings: string[] = [];
 
     for (const prop of classDecl.getProperties()) {
       // TODO: Support multiple D1 bindings
@@ -317,6 +298,7 @@ export class CidlExtractor {
       source_path: sourceFile.getFilePath().toString(),
       d1_binding,
       kv_bindings,
+      r2_bindings,
       vars,
     });
   }
@@ -436,7 +418,7 @@ export class CidlExtractor {
       return Either.right(wrapNullable("Stream", nullable));
     }
 
-    if (symbolName === Promise.name || aliasName === "IncludeTree") {
+    if (symbolName === Promise.name || aliasName === "IncludeTree" || symbolName === KValue.name) {
       return wrapGeneric(genericTy, nullable, (inner) => inner);
     }
 
@@ -560,18 +542,21 @@ export class CidlExtractor {
   }
 }
 
-export class D1ModelExtractor {
+export class ModelExtractor {
   static extract(
     classDecl: ClassDeclaration,
     sourceFile: SourceFile,
-  ): Either<ExtractorError, D1Model> {
+  ): Either<ExtractorError, Model> {
     const name = classDecl.getName()!;
-    const attributes: D1ModelAttribute[] = [];
-    const navigation_properties: D1NavigationProperty[] = [];
+    const columns: D1Column[] = [];
+    const key_params: string[] = [];
+    const kv_objects: KeyValue[] = [];
+    const r2_objects: AstR2Object[] = [];
+    const navigation_properties: NavigationProperty[] = [];
     const data_sources: Record<string, DataSource> = {};
     const methods: Record<string, ApiMethod> = {};
     const cruds: Set<CrudKind> = new Set<CrudKind>();
-    let primary_key: NamedTypedValue | undefined = undefined;
+    let primary_key: NamedTypedValue | null = null;
 
     // Extract crud methods
     const crudDecorator = classDecl
@@ -593,17 +578,17 @@ export class D1ModelExtractor {
         return typeRes;
       }
 
-      const checkModifierRes = checkAttributeModifier(prop);
+      const checkModifierRes = checkPropertyModifier(prop);
 
-      // No decorators means this is a standard attribute
+      // No decorators means this is a standard property
       if (decorators.length === 0) {
-        // Error: invalid attribute modifier
+        // Error: invalid property modifier
         if (checkModifierRes.isLeft()) {
           return checkModifierRes;
         }
 
         const cidl_type = typeRes.unwrap();
-        attributes.push({
+        columns.push({
           foreign_key_reference: null,
           value: {
             name: prop.getName(),
@@ -617,10 +602,10 @@ export class D1ModelExtractor {
       const decorator = decorators[0];
       const decoratorName = getDecoratorName(decorator);
 
-      // Error: invalid attribute modifier
+      // Error: invalid property modifier
       if (
         checkModifierRes.isLeft() &&
-        decoratorName !== AttributeDecoratorKind.DataSource
+        decoratorName !== PropertyDecoratorKind.DataSource
       ) {
         return checkModifierRes;
       }
@@ -628,15 +613,15 @@ export class D1ModelExtractor {
       // Process decorator
       const cidl_type = typeRes.unwrap();
       switch (decoratorName) {
-        case AttributeDecoratorKind.PrimaryKey: {
+        case PropertyDecoratorKind.PrimaryKey: {
           primary_key = {
             name: prop.getName(),
             cidl_type,
           };
           break;
         }
-        case AttributeDecoratorKind.ForeignKey: {
-          attributes.push({
+        case PropertyDecoratorKind.ForeignKey: {
+          columns.push({
             foreign_key_reference: getDecoratorArgument(decorator, 0) ?? null,
             value: {
               name: prop.getName(),
@@ -645,7 +630,7 @@ export class D1ModelExtractor {
           });
           break;
         }
-        case AttributeDecoratorKind.OneToOne: {
+        case PropertyDecoratorKind.OneToOne: {
           const reference = getDecoratorArgument(decorator, 0);
 
           // Error: One to one navigation properties requre a reference
@@ -675,11 +660,11 @@ export class D1ModelExtractor {
           navigation_properties.push({
             var_name: prop.getName(),
             model_reference: model_name,
-            kind: { OneToOne: { attribute_reference: reference } },
+            kind: { OneToOne: { column_reference: reference } },
           });
           break;
         }
-        case AttributeDecoratorKind.OneToMany: {
+        case PropertyDecoratorKind.OneToMany: {
           const reference = getDecoratorArgument(decorator, 0);
           // Error: One to one navigation properties requre a reference
           if (!reference) {
@@ -708,11 +693,11 @@ export class D1ModelExtractor {
           navigation_properties.push({
             var_name: prop.getName(),
             model_reference: model_name,
-            kind: { OneToMany: { attribute_reference: reference } },
+            kind: { OneToMany: { column_reference: reference } },
           });
           break;
         }
-        case AttributeDecoratorKind.ManyToMany: {
+        case PropertyDecoratorKind.ManyToMany: {
           const unique_id = getDecoratorArgument(decorator, 0);
 
           // Error: many to many attribtues require a unique id
@@ -741,7 +726,7 @@ export class D1ModelExtractor {
           });
           break;
         }
-        case AttributeDecoratorKind.DataSource: {
+        case PropertyDecoratorKind.DataSource: {
           const isIncludeTree =
             prop
               .getType()
@@ -772,13 +757,45 @@ export class D1ModelExtractor {
           };
           break;
         }
-      }
-    }
+        case PropertyDecoratorKind.KeyParam: {
+          key_params.push(prop.getName());
+          break;
+        }
+        case PropertyDecoratorKind.KV: {
+          // Format and namespace binding are required
+          const format = getDecoratorArgument(decorator, 0);
+          const namespace_binding = getDecoratorArgument(decorator, 1);
+          if (!format || !namespace_binding) {
+            return err(ExtractorErrorCode.InvalidTypescriptSyntax, (e) => {
+              e.snippet = prop.getText();
+              e.context = prop.getName();
+            });
+          }
 
-    if (primary_key == undefined) {
-      return err(ExtractorErrorCode.MissingPrimaryKey, (e) => {
-        e.snippet = classDecl.getText();
-      });
+          // Ensure that the prop type is KValue<T>
+          const symbolName = prop.getType().getSymbol()?.getName();
+          if (symbolName !== KValue.name) {
+            return err(ExtractorErrorCode.MissingKValue, (e) => {
+              e.snippet = prop.getText();
+              e.context = prop.getName();
+            });
+          }
+
+          kv_objects.push({
+            format,
+            namespace_binding,
+            value: {
+              name: prop.getName(),
+              cidl_type,
+            },
+          });
+          break;
+        }
+        case PropertyDecoratorKind.R2: {
+          throw new Error("Not supported yet");
+        }
+
+      }
     }
 
     // Process methods
@@ -804,212 +821,12 @@ export class D1ModelExtractor {
 
     return Either.right({
       name,
-      attributes,
+      columns,
       primary_key,
       navigation_properties,
-      methods,
-      data_sources,
-      cruds: Array.from(cruds).sort(),
-      source_path: sourceFile.getFilePath().toString(),
-    });
-  }
-}
-
-export class KVModelExtractor {
-  static extract(
-    classDecl: ClassDeclaration,
-    sourceFile: SourceFile,
-    decorator: Decorator,
-  ): Either<ExtractorError, KVModel> {
-    const name = classDecl.getName()!;
-    const cruds: Set<CrudKind> = new Set<CrudKind>();
-    const params: string[] = [];
-    const navigation_properties: KVNavigationProperty[] = [];
-    const data_sources: Record<string, DataSource> = {};
-    const methods: Record<string, ApiMethod> = {};
-    let binding: string | undefined = undefined;
-
-    // KVModels must extend KValue
-    const extendsKValue = classDecl
-      .getHeritageClauses()
-      .flatMap((h) => h.getTypeNodes())
-      .find((t) => t.getExpression().getText() === KValue.name);
-    if (!extendsKValue) {
-      return err(ExtractorErrorCode.MissingKVModelBaseClass, (e) => {
-        e.context = classDecl.getName();
-        e.snippet = classDecl.getText();
-      });
-    }
-
-    // Type Hint
-    const generics = [...extendsKValue.getTypeArguments()];
-    const typeHintRes = CidlExtractor.cidlType(generics[0].getType());
-    if (typeHintRes.isLeft()) {
-      typeHintRes.value.addContext((prev) => `KVModel base type ${prev}`);
-      return typeHintRes;
-    }
-
-    // Extract crud methods
-    const crudDecorator = classDecl
-      .getDecorators()
-      .find((d) => getDecoratorName(d) === ClassDecoratorKind.CRUD);
-    if (crudDecorator) {
-      setCrudKinds(crudDecorator, cruds);
-    }
-
-    // Extract binding from class decorator
-    const bindingArg = decorator.getArguments()[0];
-    if (bindingArg && MorphNode.isStringLiteral(bindingArg)) {
-      binding = bindingArg.getLiteralValue();
-    } else {
-      return err(ExtractorErrorCode.MissingKVNamespace, (e) => {
-        e.context = classDecl.getName();
-        e.snippet = classDecl.getText();
-      });
-    }
-
-    for (const prop of classDecl.getProperties()) {
-      // Data source
-      const propDecorator: Decorator | undefined = prop.getDecorators()[0];
-      if (
-        propDecorator &&
-        getDecoratorName(propDecorator) === AttributeDecoratorKind.DataSource
-      ) {
-        const isIncludeTree =
-          prop
-            .getType()
-            .getText(
-              undefined,
-              TypeFormatFlags.UseAliasDefinedOutsideCurrentScope,
-            ) === `IncludeTree<${name}>`;
-
-        // Error: data sources must be static include trees
-        if (!prop.isStatic() || !isIncludeTree) {
-          return err(ExtractorErrorCode.InvalidDataSourceDefinition, (e) => {
-            e.snippet = prop.getText();
-            e.context = prop.getName();
-          });
-        }
-
-        const initializer = prop.getInitializer();
-        if (!initializer?.isKind(SyntaxKind.ObjectLiteralExpression)) {
-          return err(ExtractorErrorCode.InvalidDataSourceDefinition, (e) => {
-            e.snippet = prop.getText();
-            e.context = prop.getName();
-          });
-        }
-
-        data_sources[prop.getName()] = {
-          name: prop.getName(),
-          tree: parseIncludeTree(initializer),
-        };
-        continue;
-      }
-
-      // Error: invalid attribute modifier
-      const modifierRes = checkAttributeModifier(prop);
-      if (modifierRes.isLeft()) {
-        return modifierRes;
-      }
-
-      // Key param
-      const propType = prop.getType();
-      if (propType.isString()) {
-        params.push(prop.getName());
-        continue;
-      }
-
-      // Navigation property
-
-      // Case 1: Type is a KValue<V> and V is a valid Cidl type
-      const generics = [
-        ...propType.getAliasTypeArguments(),
-        ...propType.getTypeArguments(),
-      ];
-      if (generics.length === 1 && propType.getText().startsWith(KValue.name)) {
-        const genericTy = generics[0];
-        const typeRes = CidlExtractor.cidlType(genericTy);
-
-        // Error: invalid type
-        if (typeRes.isLeft()) {
-          typeRes.value.snippet = prop.getText();
-          typeRes.value.context = prop.getName();
-          return typeRes;
-        }
-
-        navigation_properties.push({
-          KValue: {
-            name: prop.getName(),
-            cidl_type: typeRes.unwrap(),
-          },
-        });
-        continue;
-      }
-
-      // Case 2: Type is a Model that extends KValue
-      const checkType = propType.isArray()
-        ? propType.getArrayElementTypeOrThrow()
-        : propType;
-      const extendsKValue = checkType
-        .getSymbol()
-        ?.getDeclarations()
-        .some((decl) => {
-          if (MorphNode.isClassDeclaration(decl)) {
-            return decl
-              .getHeritageClauses()
-              .flatMap((h) => h.getTypeNodes())
-              .some((t) => t.getExpression().getText() === KValue.name);
-          }
-          return false;
-        });
-      if (extendsKValue) {
-        navigation_properties.push({
-          Model: {
-            model_reference: checkType.getText(
-              undefined,
-              TypeFormatFlags.UseAliasDefinedOutsideCurrentScope,
-            ),
-            var_name: prop.getName(),
-            many: propType.isArray(),
-          },
-        });
-        continue;
-      }
-
-      // Error: Not a valid key param or navigation property
-      return err(ExtractorErrorCode.InvalidKVModelAttribute, (e) => {
-        e.snippet = prop.getText();
-        e.context = prop.getName();
-      });
-    }
-
-    // Process methods
-    for (const m of classDecl.getMethods()) {
-      const httpVerb = m
-        .getDecorators()
-        .map(getDecoratorName)
-        .find((name) =>
-          Object.values(HttpVerb).includes(name as HttpVerb),
-        ) as HttpVerb;
-
-      if (!httpVerb) {
-        continue;
-      }
-
-      const result = CidlExtractor.method(m, httpVerb);
-      if (result.isLeft()) {
-        result.value.addContext((prev) => `${m.getName()} ${prev}`);
-        return result;
-      }
-      methods[result.unwrap().name] = result.unwrap();
-    }
-
-    return Either.right({
-      name,
-      binding,
-      cidl_type: typeHintRes.unwrap(),
-      params,
-      navigation_properties,
+      key_params,
+      kv_objects,
+      r2_objects,
       methods,
       data_sources,
       cruds: Array.from(cruds).sort(),
@@ -1026,7 +843,7 @@ export class ServiceExtractor {
     const attributes: ServiceAttribute[] = [];
     const methods: Record<string, ApiMethod> = {};
 
-    // Attributes
+    // Properties
     for (const prop of classDecl.getProperties()) {
       const typeRes = CidlExtractor.cidlType(prop.getType(), true);
 
@@ -1038,14 +855,14 @@ export class ServiceExtractor {
       }
 
       if (typeof typeRes.value === "string" || !("Inject" in typeRes.value)) {
-        return err(ExtractorErrorCode.InvalidServiceAttribute, (e) => {
+        return err(ExtractorErrorCode.InvalidServiceProperty, (e) => {
           e.context = prop.getName();
           e.snippet = prop.getText();
         });
       }
 
-      // Error: invalid attribute modifier
-      const checkModifierRes = checkAttributeModifier(prop);
+      // Error: invalid property modifier
+      const checkModifierRes = checkPropertyModifier(prop);
       if (checkModifierRes.isLeft()) {
         return checkModifierRes;
       }
@@ -1187,12 +1004,12 @@ function parseIncludeTree(
   return result;
 }
 
-function checkAttributeModifier(
+function checkPropertyModifier(
   prop: PropertyDeclaration,
 ): Either<ExtractorError, null> {
-  // Error: attributes must be just 'public'
+  // Error: properties must be just 'public'
   if (prop.getScope() != Scope.Public || prop.isReadonly() || prop.isStatic()) {
-    return err(ExtractorErrorCode.InvalidAttributeModifier, (e) => {
+    return err(ExtractorErrorCode.InvalidPropertyModifier, (e) => {
       e.context = prop.getName();
       e.snippet = prop.getText();
     });

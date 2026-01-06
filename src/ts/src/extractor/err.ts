@@ -6,21 +6,17 @@ export enum ExtractorErrorCode {
   InvalidDataSourceDefinition,
   InvalidPartialType,
   InvalidIncludeTree,
-  InvalidAttributeModifier,
+  InvalidPropertyModifier,
   InvalidApiMethodModifier,
   UnknownNavigationPropertyReference,
   InvalidNavigationPropertyReference,
   MissingNavigationPropertyReference,
   MissingManyToManyUniqueId,
-  MissingPrimaryKey,
   TooManyWranglerEnvs,
   MissingFile,
-  InvalidServiceAttribute,
-  MissingKVNamespace,
-  MissingKVModelBaseClass,
-  MissingKVKeyParamDecorator,
-  InvalidKVKeyParamType,
-  InvalidKVModelAttribute,
+  InvalidServiceProperty,
+  InvalidTypescriptSyntax,
+  MissingKValue,
 }
 
 const errorInfoMap: Record<
@@ -59,7 +55,7 @@ const errorInfoMap: Record<
     suggestion:
       "Include trees must only contain references to a model's navigation properties.",
   },
-  [ExtractorErrorCode.InvalidAttributeModifier]: {
+  [ExtractorErrorCode.InvalidPropertyModifier]: {
     description:
       "Attributes can only be public on a Model, Plain Old Object or Wrangler Environment",
     suggestion: "Change the attribute modifier to just `public`",
@@ -88,10 +84,6 @@ const errorInfoMap: Record<
     suggestion:
       "Define a unique identifier field for the Many-to-Many relationship",
   },
-  [ExtractorErrorCode.MissingPrimaryKey]: {
-    description: "Missing primary key on a model",
-    suggestion: "Add a primary key field to your model (e.g., `id: number`)",
-  },
   [ExtractorErrorCode.TooManyWranglerEnvs]: {
     description: "Too many wrangler environments defined in the project",
     suggestion: "Consolidate or remove unused @WranglerEnv's",
@@ -100,36 +92,20 @@ const errorInfoMap: Record<
     description: "A specified input file could not be found",
     suggestion: "Verify the input file path is correct",
   },
-  [ExtractorErrorCode.InvalidServiceAttribute]: {
+  [ExtractorErrorCode.InvalidServiceProperty]: {
     description:
       "Services must contain only dependency injected instances as attributes.",
     suggestion: "Remove the attribute.",
   },
-  [ExtractorErrorCode.MissingKVNamespace]: {
-    description:
-      "KV Models require a KV Namespace to be defined in their decorator",
-    suggestion: "Add a namespace (e.g., @KVModel('MY_KV_NAMESPACE'))",
+  [ExtractorErrorCode.InvalidTypescriptSyntax]: {
+    description: "The TypeScript syntax is invalid.",
+    suggestion: "Fix the TypeScript syntax errors.",
   },
-  [ExtractorErrorCode.MissingKVModelBaseClass]: {
-    description:
-      "KV Models must extend from the KVModel base class with a generic value type.",
-    suggestion: "Extend from KVModel<T> with a valid value type.",
+  [ExtractorErrorCode.MissingKValue]: {
+    description: "All KV decorated fields must be of type KValue<T>",
+    suggestion: "Change the field type to KValue<T>.",
   },
-  [ExtractorErrorCode.MissingKVKeyParamDecorator]: {
-    description:
-      "KV Model key parameters must be decorated with the @KeyParam decorator.",
-    suggestion: "Add the @KeyParam decorator to the key parameter attribute.",
-  },
-  [ExtractorErrorCode.InvalidKVKeyParamType]: {
-    description:
-      "KV Model key parameters must be of type string, number, or boolean.",
-    suggestion: "Change the key parameter type to string, number, or boolean.",
-  },
-  [ExtractorErrorCode.InvalidKVModelAttribute]: {
-    description:
-      "KV Model attributes must be of a supported CIDL type (KValue or Model).",
-    suggestion: "Change the attribute to a supported CIDL type.",
-  },
+
 };
 
 export function getErrorInfo(code: ExtractorErrorCode) {
@@ -140,7 +116,7 @@ export class ExtractorError {
   context?: string;
   snippet?: string;
 
-  constructor(public code: ExtractorErrorCode) {}
+  constructor(public code: ExtractorErrorCode) { }
 
   addContext(fn: (val: string | undefined) => string | undefined) {
     this.context = fn(this.context ?? "");

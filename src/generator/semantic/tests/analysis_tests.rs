@@ -4,19 +4,19 @@ use std::{
 };
 
 use ast::{
-    CidlType, D1NavigationPropertyKind, HttpVerb, MigrationsAst, NamedTypedValue, Service,
+    CidlType, HttpVerb, MigrationsAst, NamedTypedValue, NavigationPropertyKind, Service,
     ServiceAttribute, WranglerEnv, err::GeneratorErrorKind,
 };
-use generator_test::{D1ModelBuilder, KVModelBuilder, create_ast_d1, create_ast_kv, create_spec};
+use generator_test::{ModelBuilder, create_ast, create_spec};
 use semantic::SemanticAnalysis;
 use wrangler::WranglerGenerator;
 
 #[test]
 fn cloesce_serializes_to_migrations() {
     // Arrange
-    let mut ast = create_ast_d1(vec![
-        D1ModelBuilder::new("Dog").id().build(),
-        D1ModelBuilder::new("Person").id().build(),
+    let mut ast = create_ast(vec![
+        ModelBuilder::new("Dog").id_pk().build(),
+        ModelBuilder::new("Person").id_pk().build(),
     ]);
     ast.set_merkle_hash();
 
@@ -34,10 +34,13 @@ fn cloesce_serializes_to_migrations() {
 #[test]
 fn null_primary_key_error() {
     // Arrange
-    let mut model = D1ModelBuilder::new("Dog").id().build();
-    model.primary_key.cidl_type = CidlType::nullable(CidlType::Integer);
+    let mut model = ModelBuilder::new("Dog").build();
+    model.primary_key = Some(NamedTypedValue {
+        name: "id".into(),
+        cidl_type: CidlType::nullable(CidlType::Integer),
+    });
 
-    let mut ast = create_ast_d1(vec![model]);
+    let mut ast = create_ast(vec![model]);
     let spec = create_spec(&ast);
 
     // Act
@@ -50,12 +53,12 @@ fn null_primary_key_error() {
 #[test]
 fn mismatched_foreign_keys_error() {
     // Arrange
-    let mut ast = create_ast_d1(vec![
-        D1ModelBuilder::new("Person")
-            .id()
-            .attribute("dogId", CidlType::Text, Some("Dog".into()))
+    let mut ast = create_ast(vec![
+        ModelBuilder::new("Person")
+            .id_pk()
+            .col("dogId", CidlType::Text, Some("Dog".into()))
             .build(),
-        D1ModelBuilder::new("Dog").id().build(),
+        ModelBuilder::new("Dog").id_pk().build(),
     ]);
     let spec = create_spec(&ast);
 
@@ -72,19 +75,19 @@ fn mismatched_foreign_keys_error() {
 #[test]
 fn model_cycle_detection_error() {
     // Arrange
-    let mut ast = create_ast_d1(vec![
+    let mut ast = create_ast(vec![
         // A -> B -> C -> A
-        D1ModelBuilder::new("A")
-            .id()
-            .attribute("bId", CidlType::Integer, Some("B".to_string()))
+        ModelBuilder::new("A")
+            .id_pk()
+            .col("bId", CidlType::Integer, Some("B".to_string()))
             .build(),
-        D1ModelBuilder::new("B")
-            .id()
-            .attribute("cId", CidlType::Integer, Some("C".to_string()))
+        ModelBuilder::new("B")
+            .id_pk()
+            .col("cId", CidlType::Integer, Some("C".to_string()))
             .build(),
-        D1ModelBuilder::new("C")
-            .id()
-            .attribute("aId", CidlType::Integer, Some("A".to_string()))
+        ModelBuilder::new("C")
+            .id_pk()
+            .col("aId", CidlType::Integer, Some("A".to_string()))
             .build(),
     ]);
     let spec = create_spec(&ast);
@@ -100,7 +103,7 @@ fn model_cycle_detection_error() {
 #[test]
 fn service_cycle_detection_error() {
     // Arrange
-    let mut ast = create_ast_d1(vec![]);
+    let mut ast = create_ast(vec![]);
     let services = vec![
         // A -> B -> C -> A
         Service {
@@ -147,18 +150,18 @@ fn service_cycle_detection_error() {
 fn model_attr_nullability_prevents_cycle_error() {
     // Arrange
     // A -> B -> C -> Nullable<A>
-    let mut ast = create_ast_d1(vec![
-        D1ModelBuilder::new("A")
-            .id()
-            .attribute("bId", CidlType::Integer, Some("B".to_string()))
+    let mut ast = create_ast(vec![
+        ModelBuilder::new("A")
+            .id_pk()
+            .col("bId", CidlType::Integer, Some("B".to_string()))
             .build(),
-        D1ModelBuilder::new("B")
-            .id()
-            .attribute("cId", CidlType::Integer, Some("C".to_string()))
+        ModelBuilder::new("B")
+            .id_pk()
+            .col("cId", CidlType::Integer, Some("C".to_string()))
             .build(),
-        D1ModelBuilder::new("C")
-            .id()
-            .attribute(
+        ModelBuilder::new("C")
+            .id_pk()
+            .col(
                 "aId",
                 CidlType::nullable(CidlType::Integer),
                 Some("A".to_string()),
@@ -174,15 +177,15 @@ fn model_attr_nullability_prevents_cycle_error() {
 #[test]
 fn one_to_one_nav_property_unknown_attribute_reference_error() {
     // Arrange
-    let mut ast = create_ast_d1(vec![
-        D1ModelBuilder::new("Dog").id().build(),
-        D1ModelBuilder::new("Person")
-            .id()
+    let mut ast = create_ast(vec![
+        ModelBuilder::new("Dog").id_pk().build(),
+        ModelBuilder::new("Person")
+            .id_pk()
             .nav_p(
                 "dog",
                 "Dog",
-                D1NavigationPropertyKind::OneToOne {
-                    attribute_reference: "dogId".to_string(),
+                NavigationPropertyKind::OneToOne {
+                    column_reference: "dogId".to_string(),
                 },
             )
             .build(),
@@ -202,17 +205,17 @@ fn one_to_one_nav_property_unknown_attribute_reference_error() {
 #[test]
 fn one_to_one_mismatched_fk_and_nav_type_error() {
     // Arrange: attribute dogId references Dog, but nav prop type is Cat -> mismatch
-    let mut ast = create_ast_d1(vec![
-        D1ModelBuilder::new("Dog").id().build(),
-        D1ModelBuilder::new("Cat").id().build(),
-        D1ModelBuilder::new("Person")
-            .id()
-            .attribute("dogId", CidlType::Integer, Some("Dog".into()))
+    let mut ast = create_ast(vec![
+        ModelBuilder::new("Dog").id_pk().build(),
+        ModelBuilder::new("Cat").id_pk().build(),
+        ModelBuilder::new("Person")
+            .id_pk()
+            .col("dogId", CidlType::Integer, Some("Dog".into()))
             .nav_p(
                 "dog",
                 "Cat", // incorrect: says Cat but fk points to Dog
-                D1NavigationPropertyKind::OneToOne {
-                    attribute_reference: "dogId".to_string(),
+                NavigationPropertyKind::OneToOne {
+                    column_reference: "dogId".to_string(),
                 },
             )
             .build(),
@@ -233,15 +236,15 @@ fn one_to_one_mismatched_fk_and_nav_type_error() {
 fn one_to_many_unresolved_reference_error() {
     // Arrange:
     // Person declares OneToMany to Dog referencing Dog.personId, but Dog has no personId FK attr.
-    let mut ast = create_ast_d1(vec![
-        D1ModelBuilder::new("Dog").id().build(), // no personId attribute
-        D1ModelBuilder::new("Person")
-            .id()
+    let mut ast = create_ast(vec![
+        ModelBuilder::new("Dog").id_pk().build(), // no personId attribute
+        ModelBuilder::new("Person")
+            .id_pk()
             .nav_p(
                 "dogs",
                 "Dog",
-                D1NavigationPropertyKind::OneToMany {
-                    attribute_reference: "personId".into(),
+                NavigationPropertyKind::OneToMany {
+                    column_reference: "personId".into(),
                 },
             )
             .build(),
@@ -261,19 +264,19 @@ fn one_to_many_unresolved_reference_error() {
 fn junction_table_builder_errors() {
     // Missing second nav property case: only one side of many-to-many
     {
-        let mut ast = create_ast_d1(vec![
-            D1ModelBuilder::new("Student")
-                .id()
+        let mut ast = create_ast(vec![
+            ModelBuilder::new("Student")
+                .id_pk()
                 .nav_p(
                     "courses",
                     "Course",
-                    D1NavigationPropertyKind::ManyToMany {
+                    NavigationPropertyKind::ManyToMany {
                         unique_id: "OnlyOne".into(),
                     },
                 )
                 .build(),
             // Course exists, but doesn't declare the reciprocal nav property
-            D1ModelBuilder::new("Course").id().build(),
+            ModelBuilder::new("Course").id_pk().build(),
         ]);
         let spec = create_spec(&ast);
 
@@ -286,34 +289,34 @@ fn junction_table_builder_errors() {
 
     // Too many models case: three models register the same junction id
     {
-        let mut ast = create_ast_d1(vec![
-            D1ModelBuilder::new("A")
-                .id()
+        let mut ast = create_ast(vec![
+            ModelBuilder::new("A")
+                .id_pk()
                 .nav_p(
                     "bs",
                     "B",
-                    D1NavigationPropertyKind::ManyToMany {
+                    NavigationPropertyKind::ManyToMany {
                         unique_id: "TriJ".into(),
                     },
                 )
                 .build(),
-            D1ModelBuilder::new("B")
-                .id()
+            ModelBuilder::new("B")
+                .id_pk()
                 .nav_p(
                     "as",
                     "A",
-                    D1NavigationPropertyKind::ManyToMany {
+                    NavigationPropertyKind::ManyToMany {
                         unique_id: "TriJ".into(),
                     },
                 )
                 .build(),
             // Third model C tries to use the same junction id -> should error
-            D1ModelBuilder::new("C")
-                .id()
+            ModelBuilder::new("C")
+                .id_pk()
                 .nav_p(
                     "as",
                     "A",
-                    D1NavigationPropertyKind::ManyToMany {
+                    NavigationPropertyKind::ManyToMany {
                         unique_id: "TriJ".into(),
                     },
                 )
@@ -332,8 +335,8 @@ fn junction_table_builder_errors() {
 #[test]
 fn instantiated_stream_method() {
     // Arrange
-    let model = D1ModelBuilder::new("Dog")
-        .id()
+    let model = ModelBuilder::new("Dog")
+        .id_pk()
         .method(
             "uploadPhoto",
             HttpVerb::POST,
@@ -352,7 +355,7 @@ fn instantiated_stream_method() {
         )
         .build();
 
-    let mut ast = create_ast_d1(vec![model]);
+    let mut ast = create_ast(vec![model]);
     let spec = create_spec(&ast);
 
     // Act
@@ -365,8 +368,8 @@ fn instantiated_stream_method() {
 #[test]
 fn static_stream_method() {
     // Arrange
-    let model = D1ModelBuilder::new("Dog")
-        .id()
+    let model = ModelBuilder::new("Dog")
+        .id_pk()
         .method(
             "uploadPhoto",
             HttpVerb::POST,
@@ -379,7 +382,7 @@ fn static_stream_method() {
         )
         .build();
 
-    let mut ast = create_ast_d1(vec![model]);
+    let mut ast = create_ast(vec![model]);
     let spec = create_spec(&ast);
 
     // Act
@@ -392,8 +395,8 @@ fn static_stream_method() {
 #[test]
 fn invalid_stream_method() {
     // Arrange
-    let model = D1ModelBuilder::new("Dog")
-        .id()
+    let model = ModelBuilder::new("Dog")
+        .id_pk()
         .method(
             "uploadPhoto",
             HttpVerb::POST,
@@ -412,7 +415,7 @@ fn invalid_stream_method() {
         )
         .build();
 
-    let mut ast = create_ast_d1(vec![model]);
+    let mut ast = create_ast(vec![model]);
     let spec = create_spec(&ast);
 
     // Act
@@ -428,12 +431,13 @@ fn invalid_stream_method() {
 #[test]
 fn missing_variable_in_wrangler() {
     // Arrange
-    let mut ast = create_ast_d1(vec![D1ModelBuilder::new("User").id().build()]);
+    let mut ast = create_ast(vec![ModelBuilder::new("User").id_pk().build()]);
     ast.wrangler_env = Some(WranglerEnv {
         name: "Env".into(),
         source_path: "source.ts".into(),
         d1_binding: None,
         kv_bindings: vec![],
+        r2_bindings: vec![],
         vars: [
             ("API_KEY".into(), ast::CidlType::Text),
             ("TIMEOUT".into(), ast::CidlType::Integer),
@@ -447,19 +451,19 @@ fn missing_variable_in_wrangler() {
         WranglerGenerator::Json(serde_json::from_str("{}").unwrap()).as_spec(),
     ];
 
-    // Act + Assert
     for spec in specs {
-        assert!(matches!(
-            SemanticAnalysis::analyze(&mut ast, &spec).unwrap_err().kind,
-            GeneratorErrorKind::MissingWranglerVariable
-        ));
+        // Act
+        let res = SemanticAnalysis::analyze(&mut ast, &spec).unwrap_err().kind;
+
+        // Assert
+        assert!(matches!(res, GeneratorErrorKind::MissingWranglerVariable));
     }
 }
 
 #[test]
 fn missing_env_in_ast() {
     // Arrange
-    let mut ast = create_ast_d1(vec![D1ModelBuilder::new("User").id().build()]);
+    let mut ast = create_ast(vec![ModelBuilder::new("User").id_pk().build()]);
     ast.wrangler_env = None;
 
     let specs = vec![
@@ -467,39 +471,41 @@ fn missing_env_in_ast() {
         WranglerGenerator::Json(serde_json::from_str("{}").unwrap()).as_spec(),
     ];
 
-    // Act + Assert
     for spec in specs {
-        assert!(matches!(
-            SemanticAnalysis::analyze(&mut ast, &spec).unwrap_err().kind,
-            GeneratorErrorKind::MissingWranglerEnv
-        ));
+        // Act
+        let res = SemanticAnalysis::analyze(&mut ast, &spec).unwrap_err().kind;
+
+        // Assert
+        assert!(matches!(res, GeneratorErrorKind::MissingWranglerEnv));
     }
 }
 
 #[test]
 fn missing_d1_binding_in_wrangler() {
     // Arrange
-    let mut ast = create_ast_d1(vec![D1ModelBuilder::new("User").id().build()]);
+    let mut ast = create_ast(vec![ModelBuilder::new("User").id_pk().build()]);
 
     let specs = vec![
         WranglerGenerator::Toml(toml::from_str("").unwrap()).as_spec(),
         WranglerGenerator::Json(serde_json::from_str("{}").unwrap()).as_spec(),
     ];
 
-    // Act + Assert
     for spec in specs {
-        assert!(matches!(
-            SemanticAnalysis::analyze(&mut ast, &spec).unwrap_err().kind,
-            GeneratorErrorKind::MissingWranglerD1Binding
-        ));
+        // Act
+        let res = SemanticAnalysis::analyze(&mut ast, &spec).unwrap_err().kind;
+
+        // Assert
+        assert!(matches!(res, GeneratorErrorKind::MissingWranglerD1Binding));
     }
 }
 
 #[test]
 fn missing_kv_bindings_in_wrangler() {
     // Arrange
-    let mut ast = create_ast_kv(vec![
-        KVModelBuilder::new("MyKV", "MY_KV_BINDING", CidlType::JsonValue).build(),
+    let mut ast = create_ast(vec![
+        ModelBuilder::new("Settings")
+            .kv_object("settings", "my_binding", "settings", CidlType::JsonValue)
+            .build(),
     ]);
 
     let specs = vec![
@@ -507,102 +513,194 @@ fn missing_kv_bindings_in_wrangler() {
         WranglerGenerator::Json(serde_json::from_str("{}").unwrap()).as_spec(),
     ];
 
-    // Act + Assert
     for spec in specs {
+        // Act
+        let res = SemanticAnalysis::analyze(&mut ast, &spec).unwrap_err().kind;
+
+        // Assert
         assert!(matches!(
-            SemanticAnalysis::analyze(&mut ast, &spec).unwrap_err().kind,
+            res,
             GeneratorErrorKind::MissingWranglerKVNamespace
         ));
     }
 }
 
 #[test]
-fn detect_kv_graph() {
+fn kv_object_valid_key_format() {
     // Arrange
-    let mut ast = create_ast_kv(vec![
-        // A -> B; C -> B
-        KVModelBuilder::new("A", "KV1", CidlType::JsonValue)
-            .model_nav_p("B", "b", false)
-            .build(),
-        KVModelBuilder::new("B", "KV1", CidlType::JsonValue).build(),
-        KVModelBuilder::new("C", "KV1", CidlType::JsonValue)
-            .model_nav_p("B", "b", false)
+    let mut ast = create_ast(vec![
+        ModelBuilder::new("Settings")
+            .id_pk()
+            .col("userId", CidlType::Integer, None)
+            .key_param("tenant")
+            .kv_object(
+                "settings/{tenant}/{userId}",
+                "my_kv",
+                "config",
+                CidlType::JsonValue,
+            )
             .build(),
     ]);
     ast.wrangler_env = Some(WranglerEnv {
         name: "Env".into(),
         source_path: "source.ts".into(),
-        d1_binding: None,
-        kv_bindings: [("KV1".into())].into_iter().collect(),
-        vars: HashMap::default(),
+        d1_binding: Some("my_d1".into()),
+        kv_bindings: vec!["my_kv".into()],
+        r2_bindings: vec![],
+        vars: HashMap::new(),
     });
 
     let spec = create_spec(&ast);
 
     // Act
-    let res = SemanticAnalysis::analyze(&mut ast, &spec);
+    let result = SemanticAnalysis::analyze(&mut ast, &spec);
 
     // Assert
-    assert!(matches!(
-        res.unwrap_err().kind,
-        GeneratorErrorKind::InvalidKVTree
-    ));
+    result.expect("analysis to pass");
 }
 
 #[test]
-fn mismatched_kv_namespaces() {
+fn kv_object_missing_key_param_error() {
     // Arrange
-    let mut ast = create_ast_kv(vec![
-        KVModelBuilder::new("A", "KV1", CidlType::JsonValue)
-            .model_nav_p("B", "b", false)
+    let mut ast = create_ast(vec![
+        ModelBuilder::new("Settings")
+            .id_pk()
+            .kv_object(
+                "settings/{tenant}/{userId}",
+                "my_kv",
+                "config",
+                CidlType::JsonValue,
+            )
             .build(),
-        KVModelBuilder::new("B", "KV2", CidlType::JsonValue).build(), // different namespace
     ]);
     ast.wrangler_env = Some(WranglerEnv {
         name: "Env".into(),
         source_path: "source.ts".into(),
-        d1_binding: None,
-        kv_bindings: [("KV1".into()), ("KV2".into())].into_iter().collect(),
-        vars: HashMap::default(),
+        d1_binding: Some("my_d1".into()),
+        kv_bindings: vec!["my_kv".into()],
+        r2_bindings: vec![],
+        vars: HashMap::new(),
     });
-
     let spec = create_spec(&ast);
 
     // Act
-    let res = SemanticAnalysis::analyze(&mut ast, &spec);
+    let err = SemanticAnalysis::analyze(&mut ast, &spec).unwrap_err();
 
     // Assert
-    assert!(matches!(
-        res.unwrap_err().kind,
-        GeneratorErrorKind::MismatchedKVModelNamespaces
-    ));
+    assert!(matches!(err.kind, GeneratorErrorKind::UnknownKeyReference));
 }
 
 #[test]
-fn kv_attribute_model_many_missing_param() {
+fn kv_object_with_primary_key_in_format() {
     // Arrange
-    let mut ast = create_ast_kv(vec![
-        KVModelBuilder::new("A", "KV1", CidlType::JsonValue)
-            .model_nav_p("B", "b", true) // many=true, but B not defined with array type
+    let mut ast = create_ast(vec![
+        ModelBuilder::new("User")
+            .id_pk()
+            .kv_object(
+                "user/{id}/preferences",
+                "my_kv",
+                "prefs",
+                CidlType::JsonValue,
+            )
             .build(),
-        KVModelBuilder::new("B", "KV1", CidlType::JsonValue).build(),
     ]);
     ast.wrangler_env = Some(WranglerEnv {
         name: "Env".into(),
         source_path: "source.ts".into(),
-        d1_binding: None,
-        kv_bindings: [("KV1".into())].into_iter().collect(),
-        vars: HashMap::default(),
+        d1_binding: Some("my_d1".into()),
+        kv_bindings: vec!["my_kv".into()],
+        r2_bindings: vec![],
+        vars: HashMap::new(),
     });
-
     let spec = create_spec(&ast);
 
     // Act
-    let res = SemanticAnalysis::analyze(&mut ast, &spec);
+    let result = SemanticAnalysis::analyze(&mut ast, &spec);
 
     // Assert
-    assert!(matches!(
-        res.unwrap_err().kind,
-        GeneratorErrorKind::InvalidKVTree
-    ));
+    result.expect("analysis to pass");
+}
+
+#[test]
+fn kv_object_with_column_in_format() {
+    // Arrange
+    let mut ast = create_ast(vec![
+        ModelBuilder::new("Session")
+            .id_pk()
+            .col("token", CidlType::Text, None)
+            .kv_object("session/{token}", "my_kv", "data", CidlType::JsonValue)
+            .build(),
+    ]);
+    ast.wrangler_env = Some(WranglerEnv {
+        name: "Env".into(),
+        source_path: "source.ts".into(),
+        d1_binding: Some("my_d1".into()),
+        kv_bindings: vec!["my_kv".into()],
+        r2_bindings: vec![],
+        vars: HashMap::new(),
+    });
+    let spec = create_spec(&ast);
+
+    // Act
+    let result = SemanticAnalysis::analyze(&mut ast, &spec);
+
+    // Assert
+    result.expect("analysis to pass");
+}
+
+#[test]
+fn kv_object_invalid_nested_braces_error() {
+    // Arrange
+    let mut ast = create_ast(vec![
+        ModelBuilder::new("Settings")
+            .id_pk()
+            .kv_object(
+                "settings/{{nested}}",
+                "my_kv",
+                "config",
+                CidlType::JsonValue,
+            )
+            .build(),
+    ]);
+    ast.wrangler_env = Some(WranglerEnv {
+        name: "Env".into(),
+        source_path: "source.ts".into(),
+        d1_binding: Some("my_d1".into()),
+        kv_bindings: vec!["my_kv".into()],
+        r2_bindings: vec![],
+        vars: HashMap::new(),
+    });
+    let spec = create_spec(&ast);
+
+    // Act
+    let err = SemanticAnalysis::analyze(&mut ast, &spec).unwrap_err();
+
+    // Assert
+    assert!(matches!(err.kind, GeneratorErrorKind::InvalidKeyFormat));
+}
+
+#[test]
+fn kv_object_unclosed_brace_error() {
+    // Arrange
+    let mut ast = create_ast(vec![
+        ModelBuilder::new("Settings")
+            .id_pk()
+            .kv_object("settings/{unclosed", "my_kv", "config", CidlType::JsonValue)
+            .build(),
+    ]);
+    ast.wrangler_env = Some(WranglerEnv {
+        name: "Env".into(),
+        source_path: "source.ts".into(),
+        d1_binding: Some("my_d1".into()),
+        kv_bindings: vec!["my_kv".into()],
+        r2_bindings: vec![],
+        vars: HashMap::new(),
+    });
+    let spec = create_spec(&ast);
+
+    // Act
+    let err = SemanticAnalysis::analyze(&mut ast, &spec).unwrap_err();
+
+    // Assert
+    assert!(matches!(err.kind, GeneratorErrorKind::InvalidKeyFormat));
 }

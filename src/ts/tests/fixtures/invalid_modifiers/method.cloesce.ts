@@ -1,11 +1,11 @@
 // @ts-nocheck
 // InvalidApiMethodModifier
 
-@D1
+@Model
 export class Foo {
   @PrimaryKey
   id: number;
 
   @POST
-  private method() {}
+  private method() { }
 }

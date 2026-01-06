@@ -1,5 +1,5 @@
 // @ts-nocheck
 // MissingExport
 
-@D1
-class Model {}
+@Model
+class ModelDef { }
