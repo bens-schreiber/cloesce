@@ -842,7 +842,7 @@ fn kahns<'a>(
     Ok(rank)
 }
 
-fn valid_include_tree_reference<'a>(model: &'a Model, var_name: String) -> Result<Option<&'a str>> {
+fn valid_include_tree_reference(model: &Model, var_name: String) -> Result<Option<&str>> {
     if let Some(nav) = model
         .navigation_properties
         .iter()
@@ -851,21 +851,11 @@ fn valid_include_tree_reference<'a>(model: &'a Model, var_name: String) -> Resul
         return Ok(Some(&nav.model_reference));
     }
 
-    if model
-        .kv_objects
-        .iter()
-        .find(|kv| kv.value.name == var_name)
-        .is_some()
-    {
+    if model.kv_objects.iter().any(|kv| kv.value.name == var_name) {
         return Ok(None);
     }
 
-    if model
-        .r2_objects
-        .iter()
-        .find(|r2| r2.var_name == var_name)
-        .is_some()
-    {
+    if model.r2_objects.iter().any(|r2| r2.var_name == var_name) {
         return Ok(None);
     }
 

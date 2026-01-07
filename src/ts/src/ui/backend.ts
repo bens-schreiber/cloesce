@@ -1,7 +1,6 @@
 import type {
-  ReadableStream as CFReadableStream,
+  ReadableStream,
   R2Bucket,
-  R2Object,
   D1Database,
   KVNamespace,
 } from "@cloudflare/workers-types";
@@ -395,18 +394,10 @@ export class Orm {
     }
 
     const instance = Object.assign(new constructorRegistry[model.name](), base);
-    model.key_params.forEach((keyParam) => {
-      base[keyParam] = keyParams[keyParam];
-    });
-
-    if (!includeTree) {
-      return instance;
-    }
-
     const promises: Promise<void>[] = [];
     const env: any = this.env;
 
-    recurse(instance, model, includeTree);
+    recurse(instance, model, includeTree ?? {});
     await Promise.all(promises);
 
     return instance;
@@ -440,12 +431,22 @@ export class Orm {
               value: stream,
               raw: stream,
               metadata: null,
-            } satisfies KValue<CFReadableStream>;
+            } satisfies KValue<ReadableStream>;
           }),
         );
       } else {
         current[kv.value.name] = await Promise.all(
-          res.keys.map((k: any) => namespace.getWithMetadata(k.name)),
+          res.keys.map(async (k: any) => {
+            const kvRes = await namespace.getWithMetadata(k.name, {
+              type: "json",
+            });
+            return {
+              key: k.name,
+              value: kvRes.value,
+              raw: kvRes.value,
+              metadata: kvRes.metadata,
+            } satisfies KValue<unknown>;
+          }),
         );
       }
     }
@@ -463,7 +464,7 @@ export class Orm {
           value: res,
           raw: res,
           metadata: null,
-        } satisfies KValue<CFReadableStream>;
+        } satisfies KValue<ReadableStream>;
       } else {
         const res = await namespace.getWithMetadata(key, { type: "json" });
         current[kv.value.name] = {
@@ -503,12 +504,20 @@ export class Orm {
       }
 
       // Assign key params
-      meta.key_params.forEach((keyParam) => {
+      for (const keyParam of meta.key_params) {
         current[keyParam] = keyParams[keyParam];
-      });
+      }
 
       // Hydrate KV objects
       for (const kv of meta.kv_objects) {
+        if (tree[kv.value.name] === undefined) {
+          if (kv.list_prefix) {
+            current[kv.value.name] = [];
+          }
+
+          continue;
+        }
+
         const key = resolveKey(kv.format, current);
         const namespace: KVNamespace = env[kv.namespace_binding];
 
@@ -521,6 +530,14 @@ export class Orm {
 
       // Hydrate R2 objects
       for (const r2 of meta.r2_objects) {
+        if (tree[r2.var_name] === undefined) {
+          if (r2.list_prefix) {
+            current[r2.var_name] = [];
+          }
+
+          continue;
+        }
+
         const key = resolveKey(r2.format, current);
         const bucket: R2Bucket = env[r2.bucket_binding];
 
@@ -528,14 +545,20 @@ export class Orm {
           promises.push(
             (async () => {
               const list = await bucket.list({ prefix: key });
-              current[r2.var_name] = list.objects satisfies R2Object[];
+
+              current[r2.var_name] = await Promise.all(
+                list.objects.map(async (obj) => {
+                  const fullObj = await bucket.get(obj.key);
+                  return fullObj;
+                }),
+              );
             })(),
           );
         } else {
           promises.push(
             (async () => {
-              const obj = await bucket.head(key);
-              current[r2.var_name] = obj satisfies R2Object | null;
+              const obj = await bucket.get(key);
+              current[r2.var_name] = obj;
             })(),
           );
         }

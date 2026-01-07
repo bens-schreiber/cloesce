@@ -55,7 +55,7 @@ export class WasmResource {
     private wasm: OrmWasmExports,
     public ptr: number,
     public len: number,
-  ) { }
+  ) {}
 
   free() {
     this.wasm.dealloc(this.ptr, this.len);
@@ -81,8 +81,8 @@ export async function loadOrmWasm(
   // Load WASM
   const wasmInstance = (wasm ??
     (await WebAssembly.instantiate(mod))) as WebAssembly.Instance & {
-      exports: OrmWasmExports;
-    };
+    exports: OrmWasmExports;
+  };
 
   const modelMeta = WasmResource.fromString(
     JSON.stringify(ast.models),
