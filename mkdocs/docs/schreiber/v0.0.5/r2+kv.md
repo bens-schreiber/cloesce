@@ -37,13 +37,13 @@ class User {
     @KeyParam
     id: string;
 
-    @KeyFormat("user:{id}", "namespace")
+    @KV("user:{id}", "namespace")
     userData: KValue<unknown>; // `unknown` can represent any JSON Value.
 
-    @KeyFormat("favoriteNumber:user:{id}", "namespace")
+    @KV("favoriteNumber:user:{id}", "namespace")
     favoriteNumber: KValue<number>; // Cloesce will try to cast to number. No promises.
 
-    @KeyFormat("user", "namespace")
+    @KV("user", "namespace")
     allUsers: KValue<unknown>[]; // List all keys with prefix "user" and then hydrates them.
 
     @DataSource
@@ -56,12 +56,12 @@ class User {
 ```
 
 In this example, `User` consists of four fields:
-- `id`: Decorated with `@KeyParam`, this field is used to fill in the `{id}` placeholder in the `@KeyFormat` decorators.
+- `id`: Decorated with `@KeyParam`, this field is used to fill in the `{id}` placeholder in the `@KV` decorators.
 - `userData`: This field represents a KV entry with a key formatted as "user:{id}" in the "namespace" KV namespace. The value can be any JSON-serializable type, denoted by the `unknown` type.
 - `favoriteNumber`: This field represents a KV entry with a key formatted as "favoriteNumber:user:{id}" in the "namespace" KV namespace. The value is expected to be a number, but Cloesce will attempt to cast it to a number without guarantees (NaN is possible).
 - `allUsers`: This field represents a list of all KV entries with the prefix "user" in the "namespace" KV namespace. Cloesce will list all keys with this prefix and hydrate them into an array of `KValue<unknown>`.
 
-Many `KeyParam` decorators can be defined, all of type string. The Cloesce runtime will substitute them into the `KeyFormat` strings as needed.
+Many `KeyParam` decorators can be defined, all of type string. The Cloesce runtime will substitute them into the `KV` formats as needed.
 
 Noteably, Cloesce does not care if all fields are non-null. If a key does not exist in KV, the corresponding field will simply be `null`. This allows for a flexible data model that can evolve over time without breaking existing data, contrary to D1 models which require strict schema adherence.
 
@@ -70,14 +70,14 @@ Noteably, Cloesce does not care if all fields are non-null. If a key does not ex
 Cloesce models can also combine KV data with D1 data. For example, consider a `User` model that stores basic user information in D1, but stores user preferences in KV:
 
 ```ts
-@Model("my-database")
+@Model
 class User {
     @PrimaryKey
     id: string;
 
     name: string;
 
-    @KeyFormat("userPreferences:{name}:{id}", "namespace")
+    @KV("userPreferences:{name}:{id}", "namespace")
     preferences: KValue<unknown>; // User preferences stored in KV.
 
     @DataSource
@@ -87,7 +87,7 @@ class User {
 }
 ```
 
-D1 columns can be used within a `KeyFormat` string, allowing for dynamic key generation based on D1 data. In this example, the `preferences` field uses both the `name` and `id` fields from D1 to construct the KV key.
+D1 columns can be used within a `KV` string, allowing for dynamic key generation based on D1 data. In this example, the `preferences` field uses both the `name` and `id` fields from D1 to construct the KV key.
 
 Importantly, a D1 row must actually exist for the KV data to be accessed. If there is no D1 row for a given primary key, a 404 will be returned from the API. `preferences` on the other hand can be null even if the D1 row exists.
 
@@ -111,10 +111,10 @@ class UserProfilePicture {
     @KeyParam
     userId: string;
 
-    @KeyFormat("profile-pictures/{userId}.png", "user-bucket")
+    @R2("profile-pictures/{userId}.png", "user-bucket")
     profilePicture: R2Object | null; // R2 object or null if not found.
 
-    @KeyFormat("profile-pictures/", "user-bucket")
+    @R2("profile-pictures/", "user-bucket")
     allPictures: R2Object[]; // List all objects in the bucket.
 
     @DataSource
@@ -126,7 +126,7 @@ class UserProfilePicture {
 ```
 
 In this example, `UserProfilePicture` consists of three fields:
-- `userId`: Decorated with `@KeyParam`, this field is used to fill in the `{userId}` placeholder in the `@KeyFormat` decorator.
+- `userId`: Decorated with `@KeyParam`, this field is used to fill in the `{userId}` placeholder in the `@KV` decorator.
 - `profilePicture`: This field represents an R2 object with a key formatted as "profile-pictures/{userId}.png" in the "user-bucket" R2 bucket. The value is of type `R2Object` or `null` if the object is not found.
 - `allPictures`: This field represents a list of all R2 objects in the "user-bucket" R2 bucket with the prefix "profile-pictures/". Cloesce will list all objects with this prefix and hydrate them into an array of `R2Object`.
 
@@ -142,7 +142,7 @@ class User {
 
     name: string;
 
-    @KeyFormat("profile-pictures/{id}.png", "user-bucket")
+    @R2("profile-pictures/{id}.png", "user-bucket")
     profilePicture: R2Object | null; // User profile picture stored in R2.
 
     @DataSource
@@ -152,7 +152,7 @@ class User {
 }
 ```
 
-Just like in KV, D1 columns can be used within a `KeyFormat` string, allowing for dynamic key generation based on D1 data. In this example, the `profilePicture` field uses the `id` field from D1 to construct the R2 object key.
+Just like in KV, D1 columns can be used within a `R2` format string, allowing for dynamic key generation based on D1 data. In this example, the `profilePicture` field uses the `id` field from D1 to construct the R2 object key.
 
 D1 is still the source of truth for the existence of a user. If there is no D1 row for a given primary key, a 404 will be returned from the API. `profilePicture` on the other hand can be null even if the D1 row exists.
 
@@ -166,3 +166,33 @@ D1 is still the source of truth for the existence of a user. If there is no D1 r
 
 R2 supports generating signed URLs for secure, temporary access to objects (upload and download). In the future, this should be supported for Cloesce, but is out of scope for v0.0.5.
 
+
+## Sending Key Params over HTTP
+
+The Cloesce router expects method invocations to hit endpoints in the form of `/{Model}/{Id}/{Method}` or `/{Model}/{Method}` static methods. With the addition of the `@KeyParam` decorator, multiple key parameters may be needed to uniquely identify a model instance. 
+
+To accommodate this, the router will be updated to accept multiple key parameters in the URL path. The order of the key parameters will be the model primary key first (if applicable), followed by any additional `@KeyParam` decorated fields in the order they are defined in the model.
+
+For example, consider the following model:
+
+```ts
+@Model
+class User {
+    @KeyParam
+    userId: string;
+
+    @KeyParam
+    profileId: string;
+
+    @KeyParam
+    configId: string;
+
+    // ...
+}
+```
+
+To access a method on this model, the endpoint would be structured as follows:
+
+`UserProfile / {userId} / {profileId} / {configId} / {Method}`
+
+Later this pattern will be expanded on when composite primary keys are supported.

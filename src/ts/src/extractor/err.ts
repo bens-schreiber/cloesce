@@ -105,7 +105,6 @@ const errorInfoMap: Record<
     description: "All KV decorated fields must be of type KValue<T>",
     suggestion: "Change the field type to KValue<T>.",
   },
-
 };
 
 export function getErrorInfo(code: ExtractorErrorCode) {
@@ -116,7 +115,7 @@ export class ExtractorError {
   context?: string;
   snippet?: string;
 
-  constructor(public code: ExtractorErrorCode) { }
+  constructor(public code: ExtractorErrorCode) {}
 
   addContext(fn: (val: string | undefined) => string | undefined) {
     this.context = fn(this.context ?? "");

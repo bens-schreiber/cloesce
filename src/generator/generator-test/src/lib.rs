@@ -160,6 +160,7 @@ impl ModelBuilder {
         format: impl Into<String>,
         namespace_binding: impl Into<String>,
         name: impl Into<String>,
+        list_prefix: bool,
         cidl_type: CidlType,
     ) -> Self {
         self.kv_objects.push(KeyValue {
@@ -169,6 +170,7 @@ impl ModelBuilder {
                 name: name.into(),
                 cidl_type,
             },
+            list_prefix,
         });
         self
     }
@@ -178,11 +180,13 @@ impl ModelBuilder {
         format: impl Into<String>,
         bucket_binding: impl Into<String>,
         var_name: impl Into<String>,
+        list_prefix: bool,
     ) -> Self {
         self.r2_objects.push(R2Object {
             format: format.into(),
             bucket_binding: bucket_binding.into(),
             var_name: var_name.into(),
+            list_prefix,
         });
         self
     }

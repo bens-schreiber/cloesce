@@ -1,124 +1,61 @@
 import {
-    KV, KValue, WranglerEnv, PlainOldObject, DataSource, IncludeTree, POST, Inject, DeepPartial, GET
+    KV, KValue, WranglerEnv, DataSource, IncludeTree, KeyParam, Model, PrimaryKey, GET
 } from "cloesce/backend";
-import { KVNamespace } from "@cloudflare/workers-types";
-class KValue<V> {
-    key: string;
-    value: V;
-    metadata: unknown;
-}
+import { D1Database } from "@cloudflare/workers-types";
+
+class KValue<T> { }
 class KVNamespace { }
 
 @WranglerEnv
 export class Env {
+    db: D1Database;
     namespace: KVNamespace;
     otherNamespace: KVNamespace;
 }
 
-@KV("namespace")
-export class TextValue extends KValue<string> { }
-
-@KV("namespace")
-export class JsonValue extends KValue<unknown> { }
-
-@KV("namespace")
-export class StreamValue extends KValue<ReadableStream> { }
-
-@PlainOldObject
-export class Scientist {
-    firstname: string;
-    lastname: string;
-    age: number;
-}
-
-@KV("namespace")
-export class Data extends KValue<unknown> {
-    key1: string;
-    key2: string;
-
-    settings: KValue<unknown>;
-}
-
-// TODO: CRUD operations
-@KV("namespace")
-export class DataScientist extends KValue<Scientist> {
+@CRUD(["SAVE", "GET"])
+@Model
+export class PureKVModel {
+    @KeyParam
     id: string;
-    datasets: Data[];
+
+    @KV("path/to/data/{id}", "namespace")
+    data: KValue<unknown>;
+
+    @KV("path/to/other/{id}", "otherNamespace")
+    otherData: KValue<string>;
 
     @DataSource
-    static readonly withDatasets: IncludeTree<DataScientist> = {
-        datasets: {
-            settings: {}
-        },
+    static readonly default: IncludeTree<PureKVModel> = {
+        data: {},
+        otherData: {}
     };
+}
 
-    @POST
-    static async post(@Inject env: Env, value: DeepPartial<DataScientist>) {
-        const kv = env.namespace;
+@CRUD(["SAVE", "GET", "LIST"])
+@Model
+export class D1BackedModel {
+    @PrimaryKey
+    id: number;
 
-        value.id ??= crypto.randomUUID();
-        const key = `DataScientist/${value.id}`;
-        await kv.put(key, JSON.stringify(value));
+    @KeyParam
+    keyParam: string;
 
-        for (const data of value.datasets ?? []) {
-            data.key1 ??= crypto.randomUUID();
-            data.key2 ??= crypto.randomUUID();
-            const dataKey = `${key}/datasets/${data.key1}/${data.key2}`;
-            await kv.put(dataKey, JSON.stringify(data));
+    someColumn: number;
+    someOtherColumn: string;
 
-            if (data.settings) {
-                const settingsKey = `${dataKey}/settings`;
-                await kv.put(settingsKey, JSON.stringify(data.settings));
-            }
+    @KV("d1Backed/{id}/{keyParam}/{someColumn}/{someOtherColumn}", "namespace")
+    kvData: KValue<unknown>;
+
+    @GET
+    instanceMethod(): D1BackedModel {
+        if (this.kvData === undefined) {
+            throw new Error("kvData is undefined");
         }
-    }
 
-    @GET
-    static async get(@Inject env: Env, id: string): Promise<DataScientist> {
-        const kv = env.namespace;
-        const key = `DataScientist/${id}`;
-        const value = await kv.get(key);
-        if (!value) {
-            throw new Error("Not found");
-        }
-        const scientist: DataScientist = JSON.parse(value);
-
-        // Load datasets
-        const datasets: Data[] = [];
-        let cursor: string | null = null;
-        do {
-            const listResult = await kv.list({
-                prefix: `${key}/datasets/`,
-                cursor,
-            });
-            for (const item of listResult.keys) {
-                const dataValue = await kv.get(item.name);
-                if (dataValue) {
-                    const data: Data = JSON.parse(dataValue);
-                    // Load settings
-                    const settingsKey = `${item.name}/settings`;
-                    const settingsValue = await kv.get(settingsKey);
-                    if (settingsValue) {
-                        data.settings = JSON.parse(settingsValue);
-                    }
-                    datasets.push(data);
-                }
-            }
-            cursor = listResult.cursor || null;
-        } while (cursor);
-
-        scientist.datasets = datasets;
-        return scientist;
-    }
-
-    @GET
-    async putMetadata(@Inject env: Env, metadata: unknown): Promise<void> {
-        const kv = env.namespace;
-        await kv.put(this.key, this.value, { metadata });
-    }
-
-    @GET
-    async getMetadata(@Inject env: Env): Promise<unknown> {
-        return this.metadata;
+        return this;
     }
 }
+
+
+

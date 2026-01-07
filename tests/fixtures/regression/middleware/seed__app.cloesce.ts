@@ -22,7 +22,7 @@ export class Env {
   db: D1Database;
 }
 
-@D1
+@Model
 @CRUD(["SAVE"])
 export class Model {
   @PrimaryKey

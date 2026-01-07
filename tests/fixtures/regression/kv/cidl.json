@@ -1,59 +1,58 @@
 {
-  "hash": 0,
+  "hash": 13468236154706247040,
   "project_name": "runner",
   "wrangler_env": {
     "name": "Env",
     "source_path": "./seed__kv.cloesce.ts",
-    "d1_binding": null,
+    "d1_binding": "db",
     "kv_bindings": [
       "namespace",
       "otherNamespace"
     ],
+    "r2_bindings": [],
     "vars": {}
   },
-  "d1_models": {},
-  "services": {},
-  "kv_models": {
-    "Data": {
-      "name": "Data",
-      "binding": "namespace",
-      "cidl_type": "JsonValue",
-      "params": [
-        "key1",
-        "key2"
-      ],
-      "navigation_properties": [
+  "models": {
+    "D1BackedModel": {
+      "hash": 13702850169640110521,
+      "name": "D1BackedModel",
+      "primary_key": {
+        "name": "id",
+        "cidl_type": "Real"
+      },
+      "columns": [
         {
-          "KValue": {
-            "name": "settings",
+          "hash": 1999042468264969055,
+          "value": {
+            "name": "someColumn",
+            "cidl_type": "Real"
+          },
+          "foreign_key_reference": null
+        },
+        {
+          "hash": 5739512274815634865,
+          "value": {
+            "name": "someOtherColumn",
+            "cidl_type": "Text"
+          },
+          "foreign_key_reference": null
+        }
+      ],
+      "navigation_properties": [],
+      "key_params": [
+        "keyParam"
+      ],
+      "kv_objects": [
+        {
+          "format": "d1Backed/{id}/{keyParam}/{someColumn}/{someOtherColumn}",
+          "namespace_binding": "namespace",
+          "value": {
+            "name": "kvData",
             "cidl_type": "JsonValue"
           }
         }
       ],
-      "cruds": [],
-      "methods": {},
-      "data_sources": {},
-      "source_path": "./seed__kv.cloesce.ts"
-    },
-    "DataScientist": {
-      "name": "DataScientist",
-      "binding": "namespace",
-      "cidl_type": {
-        "Object": "Scientist"
-      },
-      "params": [
-        "id"
-      ],
-      "navigation_properties": [
-        {
-          "Model": {
-            "model_reference": "Data",
-            "var_name": "datasets",
-            "many": true
-          }
-        }
-      ],
-      "cruds": [],
+      "r2_objects": [],
       "methods": {
         "get": {
           "name": "get",
@@ -61,159 +60,201 @@
           "http_verb": "GET",
           "return_media": "Json",
           "return_type": {
-            "Object": "DataScientist"
+            "HttpResult": {
+              "Object": "D1BackedModel"
+            }
           },
           "parameters_media": "Json",
           "parameters": [
             {
-              "name": "env",
-              "cidl_type": {
-                "Inject": "Env"
-              }
+              "name": "id",
+              "cidl_type": "Real"
             },
             {
-              "name": "id",
+              "name": "keyParam",
               "cidl_type": "Text"
-            }
-          ]
-        },
-        "getMetadata": {
-          "name": "getMetadata",
-          "is_static": false,
-          "http_verb": "GET",
-          "return_media": "Json",
-          "return_type": "JsonValue",
-          "parameters_media": "Json",
-          "parameters": [
-            {
-              "name": "env",
-              "cidl_type": {
-                "Inject": "Env"
-              }
             },
             {
               "name": "__datasource",
               "cidl_type": {
-                "DataSource": "DataScientist"
+                "DataSource": "D1BackedModel"
               }
             }
           ]
         },
-        "post": {
-          "name": "post",
+        "instanceMethod": {
+          "name": "instanceMethod",
+          "is_static": false,
+          "http_verb": "GET",
+          "return_media": "Json",
+          "return_type": {
+            "Object": "D1BackedModel"
+          },
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "__datasource",
+              "cidl_type": {
+                "DataSource": "D1BackedModel"
+              }
+            }
+          ]
+        },
+        "list": {
+          "name": "list",
+          "is_static": true,
+          "http_verb": "GET",
+          "return_media": "Json",
+          "return_type": {
+            "HttpResult": {
+              "Array": {
+                "Object": "D1BackedModel"
+              }
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "__datasource",
+              "cidl_type": {
+                "DataSource": "D1BackedModel"
+              }
+            }
+          ]
+        },
+        "save": {
+          "name": "save",
           "is_static": true,
           "http_verb": "POST",
           "return_media": "Json",
-          "return_type": "Void",
-          "parameters_media": "Json",
-          "parameters": [
-            {
-              "name": "env",
-              "cidl_type": {
-                "Inject": "Env"
-              }
-            },
-            {
-              "name": "value",
-              "cidl_type": {
-                "Partial": "DataScientist"
-              }
+          "return_type": {
+            "HttpResult": {
+              "Object": "D1BackedModel"
             }
-          ]
-        },
-        "putMetadata": {
-          "name": "putMetadata",
-          "is_static": false,
-          "http_verb": "GET",
-          "return_media": "Json",
-          "return_type": "Void",
+          },
           "parameters_media": "Json",
           "parameters": [
             {
-              "name": "env",
+              "name": "model",
               "cidl_type": {
-                "Inject": "Env"
+                "Partial": "D1BackedModel"
               }
-            },
-            {
-              "name": "metadata",
-              "cidl_type": "JsonValue"
             },
             {
               "name": "__datasource",
               "cidl_type": {
-                "DataSource": "DataScientist"
+                "DataSource": "D1BackedModel"
+              }
+            }
+          ]
+        }
+      },
+      "data_sources": {},
+      "cruds": [
+        "GET",
+        "LIST",
+        "SAVE"
+      ],
+      "source_path": "./seed__kv.cloesce.ts"
+    },
+    "PureKVModel": {
+      "hash": 6611921539549597485,
+      "name": "PureKVModel",
+      "primary_key": null,
+      "columns": [],
+      "navigation_properties": [],
+      "key_params": [
+        "id"
+      ],
+      "kv_objects": [
+        {
+          "format": "path/to/data/{id}",
+          "namespace_binding": "namespace",
+          "value": {
+            "name": "data",
+            "cidl_type": "JsonValue"
+          }
+        },
+        {
+          "format": "path/to/other/{id}",
+          "namespace_binding": "otherNamespace",
+          "value": {
+            "name": "otherData",
+            "cidl_type": "Text"
+          }
+        }
+      ],
+      "r2_objects": [],
+      "methods": {
+        "get": {
+          "name": "get",
+          "is_static": true,
+          "http_verb": "GET",
+          "return_media": "Json",
+          "return_type": {
+            "HttpResult": {
+              "Object": "PureKVModel"
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "id",
+              "cidl_type": "Text"
+            },
+            {
+              "name": "__datasource",
+              "cidl_type": {
+                "DataSource": "PureKVModel"
+              }
+            }
+          ]
+        },
+        "save": {
+          "name": "save",
+          "is_static": true,
+          "http_verb": "POST",
+          "return_media": "Json",
+          "return_type": {
+            "HttpResult": {
+              "Object": "PureKVModel"
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "model",
+              "cidl_type": {
+                "Partial": "PureKVModel"
+              }
+            },
+            {
+              "name": "__datasource",
+              "cidl_type": {
+                "DataSource": "PureKVModel"
               }
             }
           ]
         }
       },
       "data_sources": {
-        "withDatasets": {
-          "hash": 0,
-          "name": "withDatasets",
+        "default": {
+          "hash": 17997894496222874802,
+          "name": "default",
           "tree": {
-            "datasets": {
-              "settings": {}
-            }
+            "data": {},
+            "otherData": {}
           }
         }
       },
-      "source_path": "./seed__kv.cloesce.ts"
-    },
-    "JsonValue": {
-      "name": "JsonValue",
-      "binding": "namespace",
-      "cidl_type": "JsonValue",
-      "params": [],
-      "navigation_properties": [],
-      "cruds": [],
-      "methods": {},
-      "data_sources": {},
-      "source_path": "./seed__kv.cloesce.ts"
-    },
-    "StreamValue": {
-      "name": "StreamValue",
-      "binding": "namespace",
-      "cidl_type": "Stream",
-      "params": [],
-      "navigation_properties": [],
-      "cruds": [],
-      "methods": {},
-      "data_sources": {},
-      "source_path": "./seed__kv.cloesce.ts"
-    },
-    "TextValue": {
-      "name": "TextValue",
-      "binding": "namespace",
-      "cidl_type": "Text",
-      "params": [],
-      "navigation_properties": [],
-      "cruds": [],
-      "methods": {},
-      "data_sources": {},
-      "source_path": "./seed__kv.cloesce.ts"
-    }
-  },
-  "poos": {
-    "Scientist": {
-      "name": "Scientist",
-      "attributes": [
-        {
-          "name": "firstname",
-          "cidl_type": "Text"
-        },
-        {
-          "name": "lastname",
-          "cidl_type": "Text"
-        },
-        {
-          "name": "age",
-          "cidl_type": "Real"
-        }
+      "cruds": [
+        "GET",
+        "SAVE"
       ],
       "source_path": "./seed__kv.cloesce.ts"
     }
   },
+  "services": {},
+  "poos": {},
   "app_source": null
 }

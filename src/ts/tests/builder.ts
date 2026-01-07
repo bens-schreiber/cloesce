@@ -158,12 +158,14 @@ export class ModelBuilder {
     format: string,
     namespace_binding: string,
     name: string,
+    list_prefix: boolean,
     cidl_type: CidlType,
   ): this {
     this.kv_objects.push({
       format,
       namespace_binding,
       value: { name, cidl_type },
+      list_prefix,
     });
     return this;
   }
@@ -172,11 +174,13 @@ export class ModelBuilder {
     format: string,
     bucket_binding: string,
     var_name: string,
+    list_prefix: boolean,
   ): this {
     this.r2_objects.push({
       format,
       bucket_binding,
       var_name,
+      list_prefix,
     });
     return this;
   }

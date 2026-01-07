@@ -6,7 +6,7 @@ import {
 } from "../src/router/router";
 import { HttpVerb, MediaType, Model, NamedTypedValue } from "../src/ast";
 import { CloesceApp, HttpResult } from "../src/ui/backend";
-import { mapSql } from "../src/router/wasm";
+import { mapSqlJson } from "../src/router/wasm";
 import fs from "fs";
 import path from "path";
 import {
@@ -203,7 +203,7 @@ describe("Match Route", () => {
     );
   });
 
-  test("Matches static method on D1 Model", () => {
+  test("Matches static method", () => {
     // Arrange
     const request = createRequest("http://foo.com/api/Model/method", "POST");
     const ast = createAst({
@@ -221,7 +221,8 @@ describe("Match Route", () => {
     // Assert
     expect(res.isRight()).toBe(true);
     expect(res.unwrap()).toEqual({
-      id: null,
+      primaryKey: null,
+      keyParams: {},
       method: ast.models["Model"].methods["method"],
       model: ast.models["Model"],
       namespace: "Model",
@@ -229,7 +230,7 @@ describe("Match Route", () => {
     });
   });
 
-  test("Matches instantiated method on Model", () => {
+  test("Matches instantiated method", () => {
     // Arrange
     const request = createRequest("http://foo.com/api/Model/0/method", "POST");
     const ast = createAst({
@@ -247,7 +248,43 @@ describe("Match Route", () => {
     // Assert
     expect(res.isRight()).toBe(true);
     expect(res.unwrap()).toEqual({
-      id: "0",
+      primaryKey: "0",
+      keyParams: {},
+      model: ast.models["Model"],
+      method: ast.models["Model"].methods["method"],
+      namespace: "Model",
+      kind: "model",
+    });
+  });
+
+  test("Matches instantiated method with key params", () => {
+    // Arrange
+    const request = createRequest(
+      "http://foo.com/api/Model/0/value1/value2/method",
+      "POST",
+    );
+    const ast = createAst({
+      models: [
+        ModelBuilder.model("Model")
+          .idPk()
+          .method("method", HttpVerb.POST, false, [], "Void")
+          .keyParam("key1")
+          .keyParam("key2")
+          .build(),
+      ],
+    });
+
+    // Act
+    const res = _cloesceInternal.matchRoute(request, ast, "api");
+
+    // Assert
+    expect(res.isRight()).toBe(true);
+    expect(res.unwrap()).toEqual({
+      primaryKey: "0",
+      keyParams: {
+        key1: "value1",
+        key2: "value2",
+      },
       model: ast.models["Model"],
       method: ast.models["Model"].methods["method"],
       namespace: "Model",
@@ -272,7 +309,8 @@ describe("Match Route", () => {
     // Assert
     expect(res.isRight()).toBe(true);
     expect(res.unwrap()).toEqual({
-      id: null,
+      primaryKey: null,
+      keyParams: {},
       method: ast.services["Service"].methods["method"],
       service: ast.services["Service"],
       kind: "service",
@@ -297,7 +335,8 @@ describe("Match Route", () => {
     // Assert
     expect(res.isRight()).toBe(true);
     expect(res.unwrap()).toEqual({
-      id: null,
+      primaryKey: null,
+      keyParams: {},
       method: ast.services["Service"].methods["method"],
       service: ast.services["Service"],
       kind: "service",
@@ -324,7 +363,7 @@ describe("Namespace Middleware", () => {
     const di = createDi();
     const d1 = mockD1();
 
-    class Foo { }
+    class Foo {}
 
     app.onNamespace(Foo, async () => {
       return HttpResult.fail(500, "oogly boogly");
@@ -361,7 +400,7 @@ describe("Namespace Middleware", () => {
     const di = createDi();
     const d1 = mockD1();
 
-    class Foo { }
+    class Foo {}
 
     app.onNamespace(Foo, async () => {
       return HttpResult.fail(500, "oogly boogly");
@@ -384,7 +423,7 @@ describe("Namespace Middleware", () => {
 });
 
 describe("Request Validation", () => {
-  test("Instantiated D1 Model Method Missing Id => 400", async () => {
+  test("Instantiated model method missing id => 400", async () => {
     // Arrange
     const request = createRequest("http://foo.com/api/Foo/method", "POST", {});
     const model = ModelBuilder.model("Foo")
@@ -395,13 +434,15 @@ describe("Request Validation", () => {
       models: [model],
     });
 
-    class Foo { }
+    class Foo {}
     const ctorReg = createCtorReg([Foo]);
     const route: MatchedRoute = {
       kind: "model",
       namespace: Foo.name,
+      model,
       method: model.methods["method"],
-      id: null,
+      primaryKey: null,
+      keyParams: {},
     };
 
     // Act
@@ -415,7 +456,7 @@ describe("Request Validation", () => {
     // Assert
     expect(res.isLeft()).toBe(true);
     expect(extractErrorCode(res.unwrapLeft().message)).toEqual(
-      RouterError.InstantiatedMethodMissingId,
+      RouterError.InstantiatedMethodMissingPrimaryKey,
     );
   });
 
@@ -430,13 +471,14 @@ describe("Request Validation", () => {
       models: [model],
     });
 
-    class Foo { }
+    class Foo {}
     const ctorReg = createCtorReg([Foo]);
     const route: MatchedRoute = {
       kind: "model",
       namespace: Foo.name,
       method: model.methods["method"],
-      id: null,
+      primaryKey: null,
+      keyParams: {},
     };
 
     // Act
@@ -476,13 +518,14 @@ describe("Request Validation", () => {
       models: [model],
     });
 
-    class Foo { }
+    class Foo {}
     const ctorReg = createCtorReg([Foo]);
     const route: MatchedRoute = {
       kind: "model",
       namespace: Foo.name,
       method: model.methods["method"],
-      id: null,
+      primaryKey: null,
+      keyParams: {},
     };
 
     // Act
@@ -519,139 +562,139 @@ describe("Request Validation", () => {
     noGetRequests?: boolean; // TODO: allow
     ctorReg?: Record<string, new () => any>;
   }[] = [
-      // // Primitives
-      {
-        params: [
-          {
-            name: "int",
-            cidl_type: "Integer",
-          },
-          {
-            name: "string",
-            cidl_type: "Text",
-          },
-          {
-            name: "bool",
-            cidl_type: "Boolean",
-          },
-          {
-            name: "date",
-            cidl_type: "DateIso",
-          },
-          {
-            name: "float",
-            cidl_type: "Real",
-          },
-        ],
-        jsonValue: {
-          int: "0",
-          string: "hello",
-          bool: "false",
-          date: new Date(now).toISOString(),
-          float: "0.99",
+    // // Primitives
+    {
+      params: [
+        {
+          name: "int",
+          cidl_type: "Integer",
         },
-        instanceValues: {
-          int: 0,
-          string: "hello",
-          bool: false,
-          date: new Date(now),
-          float: 0.99,
+        {
+          name: "string",
+          cidl_type: "Text",
         },
+        {
+          name: "bool",
+          cidl_type: "Boolean",
+        },
+        {
+          name: "date",
+          cidl_type: "DateIso",
+        },
+        {
+          name: "float",
+          cidl_type: "Real",
+        },
+      ],
+      jsonValue: {
+        int: "0",
+        string: "hello",
+        bool: "false",
+        date: new Date(now).toISOString(),
+        float: "0.99",
       },
+      instanceValues: {
+        int: 0,
+        string: "hello",
+        bool: false,
+        date: new Date(now),
+        float: 0.99,
+      },
+    },
 
-      // // Data Sources
-      {
-        params: [
-          {
-            name: "ds",
-            cidl_type: { DataSource: "TestCase" },
-          },
-        ],
-        jsonValue: {
-          ds: "none",
+    // // Data Sources
+    {
+      params: [
+        {
+          name: "ds",
+          cidl_type: { DataSource: "TestCase" },
         },
-        instanceValues: {
-          ds: "none",
-        },
+      ],
+      jsonValue: {
+        ds: "none",
       },
+      instanceValues: {
+        ds: "none",
+      },
+    },
 
-      // Models, Partials
-      {
-        params: [
-          {
-            name: "scalar",
-            cidl_type: { Object: "Scalar" },
-          },
-          {
-            name: "manyScalars",
-            cidl_type: { Object: "ManyScalars" },
-          },
-          {
-            name: "partialScalar",
-            cidl_type: { Partial: "Scalar" },
-          },
-          {
-            name: "partialManyScalars",
-            cidl_type: { Partial: "ManyScalars" },
-          },
-        ],
-        jsonValue: {
-          scalar: {
-            id: "0",
-            manyScalarsId: "0",
-          },
-          manyScalars: {
-            id: "0",
-            scalars: [
-              {
-                id: "1",
-                manyScalarsId: "0",
-              },
-              {
-                id: "2",
-                manyScalarsId: "0",
-              },
-            ],
-          },
-          partialScalar: {},
-          partialManyScalars: {
-            id: "1234",
-          },
+    // Models, Partials
+    {
+      params: [
+        {
+          name: "scalar",
+          cidl_type: { Object: "Scalar" },
         },
-        instanceValues: {
-          scalar: Object.assign(new Scalar(), { id: 0, manyScalarsId: 0 }),
-          manyScalars: Object.assign(new ManyScalars(), {
-            id: 0,
-            scalars: [
-              Object.assign(new Scalar(), { id: 1, manyScalarsId: 0 }),
-              Object.assign(new Scalar(), { id: 2, manyScalarsId: 0 }),
-            ],
-          }),
-          partialScalar: {},
-          partialManyScalars: {
-            id: 1234,
-            scalars: [],
-          },
+        {
+          name: "manyScalars",
+          cidl_type: { Object: "ManyScalars" },
         },
-        models: [
-          ModelBuilder.model("Scalar")
-            .idPk()
-            .col("manyScalarsId", "Integer", "ManyScalars")
-            .build(),
-          ModelBuilder.model("ManyScalars")
-            .idPk()
-            .navP("scalars", "Scalar", {
-              OneToMany: { column_reference: "manyScalarsId" },
-            })
-            .build(),
-        ],
-        ctorReg: {
-          Scalar: Scalar,
-          ManyScalars: ManyScalars,
+        {
+          name: "partialScalar",
+          cidl_type: { Partial: "Scalar" },
         },
-        noGetRequests: true,
+        {
+          name: "partialManyScalars",
+          cidl_type: { Partial: "ManyScalars" },
+        },
+      ],
+      jsonValue: {
+        scalar: {
+          id: "0",
+          manyScalarsId: "0",
+        },
+        manyScalars: {
+          id: "0",
+          scalars: [
+            {
+              id: "1",
+              manyScalarsId: "0",
+            },
+            {
+              id: "2",
+              manyScalarsId: "0",
+            },
+          ],
+        },
+        partialScalar: {},
+        partialManyScalars: {
+          id: "1234",
+        },
       },
-    ];
+      instanceValues: {
+        scalar: Object.assign(new Scalar(), { id: 0, manyScalarsId: 0 }),
+        manyScalars: Object.assign(new ManyScalars(), {
+          id: 0,
+          scalars: [
+            Object.assign(new Scalar(), { id: 1, manyScalarsId: 0 }),
+            Object.assign(new Scalar(), { id: 2, manyScalarsId: 0 }),
+          ],
+        }),
+        partialScalar: {},
+        partialManyScalars: {
+          id: 1234,
+          scalars: [],
+        },
+      },
+      models: [
+        ModelBuilder.model("Scalar")
+          .idPk()
+          .col("manyScalarsId", "Integer", "ManyScalars")
+          .build(),
+        ModelBuilder.model("ManyScalars")
+          .idPk()
+          .navP("scalars", "Scalar", {
+            OneToMany: { column_reference: "manyScalarsId" },
+          })
+          .build(),
+      ],
+      ctorReg: {
+        Scalar: Scalar,
+        ManyScalars: ManyScalars,
+      },
+      noGetRequests: true,
+    },
+  ];
 
   const expandedCases = cases.flatMap((testCase) => {
     const canBeGetRequest = testCase.noGetRequests ? [false] : [true, false];
@@ -721,7 +764,8 @@ describe("Request Validation", () => {
       namespace: "TestCase",
       model,
       method: model.methods["testMethod"],
-      id: null,
+      primaryKey: null,
+      keyParams: {},
     };
 
     // Act
@@ -761,7 +805,7 @@ describe("Method Middleware", () => {
     const d1 = mockD1();
 
     class Foo {
-      method() { }
+      method() {}
     }
 
     app.onMethod(Foo, "method", async () => {
@@ -808,7 +852,8 @@ describe("Method Dispatch", () => {
       kind: "model",
       namespace: "Foo",
       method: model.methods["method"],
-      id: null,
+      primaryKey: null,
+      keyParams: {},
     };
 
     // Act
@@ -837,7 +882,8 @@ describe("Method Dispatch", () => {
       kind: "model",
       namespace: "Foo",
       method: model.methods["testMethod"],
-      id: null,
+      primaryKey: null,
+      keyParams: {},
     };
 
     // Act
@@ -867,7 +913,8 @@ describe("Method Dispatch", () => {
       kind: "model",
       namespace: "Foo",
       method: model.methods["testMethod"],
-      id: null,
+      primaryKey: null,
+      keyParams: {},
     };
 
     // Act
@@ -897,7 +944,8 @@ describe("Method Dispatch", () => {
       kind: "model",
       namespace: "Foo",
       method: model.methods["testMethod"],
-      id: null,
+      primaryKey: null,
+      keyParams: {},
     };
 
     // Act
@@ -920,7 +968,8 @@ describe("Method Dispatch", () => {
       kind: "model",
       namespace: "Foo",
       method: model.methods["testMethod"],
-      id: null,
+      primaryKey: null,
+      keyParams: {},
     };
 
     const crud = {
@@ -1049,18 +1098,17 @@ describe("Result Middleware", () => {
   });
 });
 
-describe("mapSql", () => {
+describe("mapSqlJson", () => {
   afterEach(() => {
     _cloesceInternal.RuntimeContainer.dispose();
   });
 
   test("handles recursive navigation properties", async () => {
+    // Arrange
     const wasm = await WebAssembly.instantiate(
       fs.readFileSync(path.resolve("./dist/orm.wasm")),
       {},
     );
-
-    // Build models with ModelBuilder
     const Horse = ModelBuilder.model("Horse")
       .col("name", "Text")
       .col("bio", { Nullable: "Text" })
@@ -1127,8 +1175,10 @@ describe("mapSql", () => {
       .addWithChildren("likes", (b) => b.addNode("horse2"))
       .build();
 
-    const result = mapSql(ctor["Horse"], records, includeTree);
+    // Act
+    const result = mapSqlJson(ctor["Horse"], records, includeTree);
 
+    // Assert
     expect(result.value.length).toBe(1);
 
     const horse: any = result.value[0];

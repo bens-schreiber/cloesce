@@ -2,4 +2,4 @@
 // MissingExport
 
 @Model
-class ModelDef { }
+class ModelDef {}

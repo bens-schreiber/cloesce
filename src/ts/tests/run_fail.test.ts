@@ -22,7 +22,10 @@ describe("Extractor Run-Fail", () => {
       const actualName = getErrorNameFromCode(
         (res.value as ExtractorError).code,
       );
-      expect(actualName, `Expected "${expectedName}" but got "${actualName}"`).toBe(expectedName);
+      expect(
+        actualName,
+        `Expected "${expectedName}" but got "${actualName}"`,
+      ).toBe(expectedName);
     });
   }
 });
@@ -32,9 +35,9 @@ const files = fs
   .flatMap((dir) =>
     dir.isDirectory()
       ? fs
-        .readdirSync(path.join(FIXTURE_ROOT, dir.name))
-        .filter((f) => f.endsWith(".cloesce.ts"))
-        .map((f) => path.join(FIXTURE_ROOT, dir.name, f))
+          .readdirSync(path.join(FIXTURE_ROOT, dir.name))
+          .filter((f) => f.endsWith(".cloesce.ts"))
+          .map((f) => path.join(FIXTURE_ROOT, dir.name, f))
       : [],
   );
 

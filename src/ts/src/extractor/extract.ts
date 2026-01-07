@@ -164,8 +164,6 @@ export class CidlExtractor {
             }
           }
         }
-
-
       }
     }
 
@@ -418,7 +416,11 @@ export class CidlExtractor {
       return Either.right(wrapNullable("Stream", nullable));
     }
 
-    if (symbolName === Promise.name || aliasName === "IncludeTree" || symbolName === KValue.name) {
+    if (
+      symbolName === Promise.name ||
+      aliasName === "IncludeTree" ||
+      symbolName === KValue.name
+    ) {
       return wrapGeneric(genericTy, nullable, (inner) => inner);
     }
 
@@ -773,7 +775,10 @@ export class ModelExtractor {
           }
 
           // Ensure that the prop type is KValue<T>
-          const symbolName = prop.getType().getSymbol()?.getName();
+          const ty = prop.getType();
+          const isArray = ty.isArray();
+          const elementType = isArray ? ty.getArrayElementTypeOrThrow() : ty;
+          const symbolName = elementType.getSymbol()?.getName();
           if (symbolName !== KValue.name) {
             return err(ExtractorErrorCode.MissingKValue, (e) => {
               e.snippet = prop.getText();
@@ -786,15 +791,15 @@ export class ModelExtractor {
             namespace_binding,
             value: {
               name: prop.getName(),
-              cidl_type,
+              cidl_type: isArray ? (cidl_type as any).Array : cidl_type,
             },
+            list_prefix: isArray,
           });
           break;
         }
         case PropertyDecoratorKind.R2: {
           throw new Error("Not supported yet");
         }
-
       }
     }
 
@@ -803,9 +808,9 @@ export class ModelExtractor {
       const httpVerb = m
         .getDecorators()
         .map(getDecoratorName)
-        .find((name) =>
-          Object.values(HttpVerb).includes(name as HttpVerb),
-        ) as HttpVerb;
+        .find((name) => Object.values(HttpVerb).includes(name as HttpVerb)) as
+        | HttpVerb
+        | undefined;
 
       if (!httpVerb) {
         continue;

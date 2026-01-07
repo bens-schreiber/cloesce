@@ -625,7 +625,7 @@ impl MigrateTables {
         intent: &dyn MigrationsIntent,
     ) -> String {
         let _empty = IndexMap::default();
-        let lm_models = lm_ast.map(|a| &a.d1_models).unwrap_or(&_empty);
+        let lm_models = lm_ast.map(|a| &a.models).unwrap_or(&_empty);
 
         // Partition all models into three sets, discarding the rest.
         let (creates, create_jcts, alters, drops) = {
@@ -635,7 +635,7 @@ impl MigrateTables {
             let mut drops = vec![];
 
             // Altered and newly created models
-            for model in ast.d1_models.values() {
+            for model in ast.models.values() {
                 match lm_models.get(&model.name) {
                     Some(lm_model) if lm_model.hash != model.hash => {
                         alters.push((model, lm_model));
@@ -646,7 +646,7 @@ impl MigrateTables {
                                 continue;
                             };
 
-                            let jct_model = ast.d1_models.get(&nav.model_reference).unwrap();
+                            let jct_model = ast.models.get(&nav.model_reference).unwrap();
                             create_m2ms.insert(
                                 unique_id,
                                 if jct_model.name > model.name {
@@ -667,7 +667,7 @@ impl MigrateTables {
 
             // Dropped models
             for lm_model in lm_models.values() {
-                if ast.d1_models.get(&lm_model.name).is_none() {
+                if ast.models.get(&lm_model.name).is_none() {
                     drops.push(lm_model);
                     continue;
                 }
@@ -701,13 +701,10 @@ impl MigrateTables {
         let mut res = String::new();
         for (title, stmts) in [
             ("Dropped Models", &Self::drop(drops)),
-            (
-                "Altered Models",
-                &Self::alter(alters, &ast.d1_models, intent),
-            ),
+            ("Altered Models", &Self::alter(alters, &ast.models, intent)),
             (
                 "New Models",
-                &Self::create(creates, &ast.d1_models, create_jcts),
+                &Self::create(creates, &ast.models, create_jcts),
             ),
         ] {
             if stmts.is_empty() {

@@ -16,7 +16,7 @@ import {
 } from "cloesce/backend";
 import { D1Database } from "@cloudflare/workers-types";
 type Integer = number & { __kind: "Integer" };
-class HttpResult<T = unknown> {}
+class HttpResult<T = unknown> { }
 
 @WranglerEnv
 export class Env {
@@ -24,16 +24,16 @@ export class Env {
 }
 
 //#region OneToOne
-@D1
+@Model
 export class B {
   @PrimaryKey
   id: Integer;
 
   @POST
-  testMethod() {}
+  testMethod() { }
 }
 
-@D1
+@Model
 export class A {
   @PrimaryKey
   id: Integer;
@@ -83,7 +83,7 @@ export class A {
 //#endregion
 
 //#region OneToMany
-@D1
+@Model
 export class Person {
   @PrimaryKey
   id: Integer;
@@ -128,7 +128,7 @@ export class Person {
   }
 }
 
-@D1
+@Model
 export class Dog {
   @PrimaryKey
   id: Integer;
@@ -137,12 +137,12 @@ export class Dog {
   personId: Integer;
 
   @POST
-  testMethod() {}
+  testMethod() { }
 }
 //#endregion
 
 //#region ManyToMany
-@D1
+@Model
 export class Student {
   @PrimaryKey
   id: Integer;
@@ -172,7 +172,7 @@ export class Student {
   }
 }
 
-@D1
+@Model
 export class Course {
   @PrimaryKey
   id: Integer;

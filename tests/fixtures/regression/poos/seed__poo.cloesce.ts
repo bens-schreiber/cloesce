@@ -30,13 +30,13 @@ export class Env {
   db: D1Database;
 }
 
-@D1
+@Model
 export class PooAcceptYield {
   @PrimaryKey
   id: Integer;
 
   @POST
-  static acceptPoos(a: PooA, b: PooB, c: PooC) {}
+  static acceptPoos(a: PooA, b: PooB, c: PooC) { }
 
   @POST
   static yieldPoo(): PooC {

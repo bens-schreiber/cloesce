@@ -3,202 +3,118 @@
     "wrangler_env": {
         "name": "Env",
         "source_path": "./seed__kv.cloesce.ts",
+        "d1_binding": "db",
         "kv_bindings": [
             "namespace",
             "otherNamespace"
         ],
+        "r2_bindings": [],
         "vars": {}
     },
-    "d1_models": {},
-    "kv_models": {
-        "TextValue": {
-            "name": "TextValue",
-            "binding": "namespace",
-            "cidl_type": "Text",
-            "params": [],
+    "models": {
+        "PureKVModel": {
+            "name": "PureKVModel",
+            "columns": [],
+            "primary_key": null,
             "navigation_properties": [],
-            "methods": {},
-            "data_sources": {},
-            "cruds": [],
-            "source_path": "./seed__kv.cloesce.ts"
-        },
-        "JsonValue": {
-            "name": "JsonValue",
-            "binding": "namespace",
-            "cidl_type": "JsonValue",
-            "params": [],
-            "navigation_properties": [],
-            "methods": {},
-            "data_sources": {},
-            "cruds": [],
-            "source_path": "./seed__kv.cloesce.ts"
-        },
-        "StreamValue": {
-            "name": "StreamValue",
-            "binding": "namespace",
-            "cidl_type": "Stream",
-            "params": [],
-            "navigation_properties": [],
-            "methods": {},
-            "data_sources": {},
-            "cruds": [],
-            "source_path": "./seed__kv.cloesce.ts"
-        },
-        "Data": {
-            "name": "Data",
-            "binding": "namespace",
-            "cidl_type": "JsonValue",
-            "params": [
-                "key1",
-                "key2"
+            "key_params": [
+                "id"
             ],
-            "navigation_properties": [
+            "kv_objects": [
                 {
-                    "KValue": {
-                        "name": "settings",
+                    "format": "path/to/data/{id}",
+                    "namespace_binding": "namespace",
+                    "value": {
+                        "name": "data",
+                        "cidl_type": "JsonValue"
+                    }
+                },
+                {
+                    "format": "path/to/other/{id}",
+                    "namespace_binding": "otherNamespace",
+                    "value": {
+                        "name": "otherData",
+                        "cidl_type": "Text"
+                    }
+                }
+            ],
+            "r2_objects": [],
+            "methods": {},
+            "data_sources": {
+                "default": {
+                    "name": "default",
+                    "tree": {
+                        "data": {},
+                        "otherData": {}
+                    }
+                }
+            },
+            "cruds": [
+                "GET",
+                "SAVE"
+            ],
+            "source_path": "./seed__kv.cloesce.ts"
+        },
+        "D1BackedModel": {
+            "name": "D1BackedModel",
+            "columns": [
+                {
+                    "foreign_key_reference": null,
+                    "value": {
+                        "name": "someColumn",
+                        "cidl_type": "Real"
+                    }
+                },
+                {
+                    "foreign_key_reference": null,
+                    "value": {
+                        "name": "someOtherColumn",
+                        "cidl_type": "Text"
+                    }
+                }
+            ],
+            "primary_key": {
+                "name": "id",
+                "cidl_type": "Real"
+            },
+            "navigation_properties": [],
+            "key_params": [
+                "keyParam"
+            ],
+            "kv_objects": [
+                {
+                    "format": "d1Backed/{id}/{keyParam}/{someColumn}/{someOtherColumn}",
+                    "namespace_binding": "namespace",
+                    "value": {
+                        "name": "kvData",
                         "cidl_type": "JsonValue"
                     }
                 }
             ],
-            "methods": {},
-            "data_sources": {},
-            "cruds": [],
-            "source_path": "./seed__kv.cloesce.ts"
-        },
-        "DataScientist": {
-            "name": "DataScientist",
-            "binding": "namespace",
-            "cidl_type": {
-                "Object": "Scientist"
-            },
-            "params": [
-                "id"
-            ],
-            "navigation_properties": [
-                {
-                    "Model": {
-                        "model_reference": "Data",
-                        "var_name": "datasets",
-                        "many": true
-                    }
-                }
-            ],
+            "r2_objects": [],
             "methods": {
-                "post": {
-                    "name": "post",
-                    "http_verb": "POST",
-                    "is_static": true,
-                    "return_media": "Json",
-                    "return_type": "Void",
-                    "parameters_media": "Json",
-                    "parameters": [
-                        {
-                            "name": "env",
-                            "cidl_type": {
-                                "Inject": "Env"
-                            }
-                        },
-                        {
-                            "name": "value",
-                            "cidl_type": {
-                                "Partial": "DataScientist"
-                            }
-                        }
-                    ]
-                },
-                "get": {
-                    "name": "get",
+                "instanceMethod": {
+                    "name": "instanceMethod",
                     "http_verb": "GET",
-                    "is_static": true,
+                    "is_static": false,
                     "return_media": "Json",
                     "return_type": {
-                        "Object": "DataScientist"
+                        "Object": "D1BackedModel"
                     },
                     "parameters_media": "Json",
-                    "parameters": [
-                        {
-                            "name": "env",
-                            "cidl_type": {
-                                "Inject": "Env"
-                            }
-                        },
-                        {
-                            "name": "id",
-                            "cidl_type": "Text"
-                        }
-                    ]
-                },
-                "putMetadata": {
-                    "name": "putMetadata",
-                    "http_verb": "GET",
-                    "is_static": false,
-                    "return_media": "Json",
-                    "return_type": "Void",
-                    "parameters_media": "Json",
-                    "parameters": [
-                        {
-                            "name": "env",
-                            "cidl_type": {
-                                "Inject": "Env"
-                            }
-                        },
-                        {
-                            "name": "metadata",
-                            "cidl_type": "JsonValue"
-                        }
-                    ]
-                },
-                "getMetadata": {
-                    "name": "getMetadata",
-                    "http_verb": "GET",
-                    "is_static": false,
-                    "return_media": "Json",
-                    "return_type": "JsonValue",
-                    "parameters_media": "Json",
-                    "parameters": [
-                        {
-                            "name": "env",
-                            "cidl_type": {
-                                "Inject": "Env"
-                            }
-                        }
-                    ]
+                    "parameters": []
                 }
             },
-            "data_sources": {
-                "withDatasets": {
-                    "name": "withDatasets",
-                    "tree": {
-                        "datasets": {
-                            "settings": {}
-                        }
-                    }
-                }
-            },
-            "cruds": [],
-            "source_path": "./seed__kv.cloesce.ts"
-        }
-    },
-    "poos": {
-        "Scientist": {
-            "name": "Scientist",
-            "attributes": [
-                {
-                    "name": "firstname",
-                    "cidl_type": "Text"
-                },
-                {
-                    "name": "lastname",
-                    "cidl_type": "Text"
-                },
-                {
-                    "name": "age",
-                    "cidl_type": "Real"
-                }
+            "data_sources": {},
+            "cruds": [
+                "GET",
+                "LIST",
+                "SAVE"
             ],
             "source_path": "./seed__kv.cloesce.ts"
         }
     },
+    "poos": {},
     "services": {},
     "app_source": null
 }

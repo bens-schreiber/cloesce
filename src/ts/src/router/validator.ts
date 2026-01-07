@@ -29,7 +29,7 @@ export class RuntimeValidator {
   constructor(
     private ast: CloesceAst,
     private ctorReg: ConstructorRegistry,
-  ) { }
+  ) {}
 
   static validate(
     value: any,
@@ -109,8 +109,8 @@ export class RuntimeValidator {
       return rightIf(
         () => value,
         typeof value === "string" &&
-        (value === NO_DATA_SOURCE ||
-          this.ast.models[objectName]?.data_sources[value] !== undefined),
+          (value === NO_DATA_SOURCE ||
+            this.ast.models[objectName]?.data_sources[value] !== undefined),
       );
     }
 

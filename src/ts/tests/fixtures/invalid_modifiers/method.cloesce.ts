@@ -7,5 +7,5 @@ export class Foo {
   id: number;
 
   @POST
-  private method() { }
+  private method() {}
 }

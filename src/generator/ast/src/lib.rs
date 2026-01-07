@@ -233,6 +233,9 @@ pub struct KeyValue {
     pub format: String,
     pub namespace_binding: String,
     pub value: NamedTypedValue,
+
+    /// If true, treat the key as a prefix for listing multiple keys.
+    pub list_prefix: bool,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -240,6 +243,9 @@ pub struct R2Object {
     pub format: String,
     pub var_name: String,
     pub bucket_binding: String,
+
+    /// If true, treat the key as a prefix for listing multiple keys.
+    pub list_prefix: bool,
 }
 
 #[serde_as]
@@ -398,7 +404,7 @@ impl CloesceAst {
 
         let migrations_ast = MigrationsAst {
             hash,
-            d1_models: migrations_models,
+            models: migrations_models,
         };
 
         serde_json::to_string_pretty(&migrations_ast).expect("serialize migrations ast to work")
@@ -495,7 +501,9 @@ pub struct MigrationsModel {
 #[derive(Serialize, Deserialize)]
 pub struct MigrationsAst {
     pub hash: u64,
-    pub d1_models: IndexMap<String, MigrationsModel>,
+
+    #[serde(deserialize_with = "skip_if_null_primary_key")]
+    pub models: IndexMap<String, MigrationsModel>,
 }
 
 impl MigrationsAst {
@@ -553,4 +561,42 @@ pub struct WranglerSpec {
 
     #[serde(default)]
     pub vars: HashMap<String, String>,
+}
+
+fn skip_if_null_primary_key<'de, D>(
+    deserializer: D,
+) -> std::result::Result<IndexMap<String, MigrationsModel>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    #[derive(Deserialize)]
+    struct Temp {
+        hash: u64,
+        name: String,
+        primary_key: Option<NamedTypedValue>,
+        columns: Vec<D1Column>,
+        navigation_properties: Vec<NavigationProperty>,
+        data_sources: BTreeMap<String, DataSource>,
+    }
+
+    let temps: IndexMap<String, Temp> = Deserialize::deserialize(deserializer)?;
+
+    Ok(temps
+        .into_iter()
+        .filter_map(|(key, t)| {
+            t.primary_key.map(|pk| {
+                (
+                    key,
+                    MigrationsModel {
+                        hash: t.hash,
+                        name: t.name,
+                        primary_key: pk,
+                        columns: t.columns,
+                        navigation_properties: t.navigation_properties,
+                        data_sources: t.data_sources,
+                    },
+                )
+            })
+        })
+        .collect())
 }

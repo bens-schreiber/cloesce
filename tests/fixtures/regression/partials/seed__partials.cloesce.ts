@@ -16,7 +16,7 @@ export class Env {
   db: D1Database;
 }
 
-@D1
+@Model
 export class Dog {
   @PrimaryKey
   id: Integer;

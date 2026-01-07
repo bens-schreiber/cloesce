@@ -26,9 +26,9 @@ fn cloesce_serializes_to_migrations() {
 
     // Assert
     assert!(migrations_ast.hash != 0u64);
-    assert!(migrations_ast.d1_models.contains_key("Dog"));
-    assert!(migrations_ast.d1_models.contains_key("Person"));
-    assert!(migrations_ast.d1_models[0].hash != 0u64);
+    assert!(migrations_ast.models.contains_key("Dog"));
+    assert!(migrations_ast.models.contains_key("Person"));
+    assert!(migrations_ast.models[0].hash != 0u64);
 }
 
 #[test]
@@ -504,7 +504,13 @@ fn missing_kv_bindings_in_wrangler() {
     // Arrange
     let mut ast = create_ast(vec![
         ModelBuilder::new("Settings")
-            .kv_object("settings", "my_binding", "settings", CidlType::JsonValue)
+            .kv_object(
+                "settings",
+                "my_binding",
+                "settings",
+                false,
+                CidlType::JsonValue,
+            )
             .build(),
     ]);
 
@@ -537,6 +543,7 @@ fn kv_object_valid_key_format() {
                 "settings/{tenant}/{userId}",
                 "my_kv",
                 "config",
+                false,
                 CidlType::JsonValue,
             )
             .build(),
@@ -569,6 +576,7 @@ fn kv_object_missing_key_param_error() {
                 "settings/{tenant}/{userId}",
                 "my_kv",
                 "config",
+                false,
                 CidlType::JsonValue,
             )
             .build(),
@@ -600,6 +608,7 @@ fn kv_object_with_primary_key_in_format() {
                 "user/{id}/preferences",
                 "my_kv",
                 "prefs",
+                false,
                 CidlType::JsonValue,
             )
             .build(),
@@ -628,7 +637,13 @@ fn kv_object_with_column_in_format() {
         ModelBuilder::new("Session")
             .id_pk()
             .col("token", CidlType::Text, None)
-            .kv_object("session/{token}", "my_kv", "data", CidlType::JsonValue)
+            .kv_object(
+                "session/{token}",
+                "my_kv",
+                "data",
+                false,
+                CidlType::JsonValue,
+            )
             .build(),
     ]);
     ast.wrangler_env = Some(WranglerEnv {
@@ -658,6 +673,7 @@ fn kv_object_invalid_nested_braces_error() {
                 "settings/{{nested}}",
                 "my_kv",
                 "config",
+                false,
                 CidlType::JsonValue,
             )
             .build(),
@@ -685,7 +701,13 @@ fn kv_object_unclosed_brace_error() {
     let mut ast = create_ast(vec![
         ModelBuilder::new("Settings")
             .id_pk()
-            .kv_object("settings/{unclosed", "my_kv", "config", CidlType::JsonValue)
+            .kv_object(
+                "settings/{unclosed",
+                "my_kv",
+                "config",
+                false,
+                CidlType::JsonValue,
+            )
             .build(),
     ]);
     ast.wrangler_env = Some(WranglerEnv {

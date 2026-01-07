@@ -1,8 +1,6 @@
-import { D1Database } from "@cloudflare/workers-types";
-
-import { OrmWasmExports, mapSql, loadOrmWasm } from "./wasm.js";
+import { OrmWasmExports, loadOrmWasm } from "./wasm.js";
 import { proxyCrud } from "./crud.js";
-import { HttpResult, IncludeTree, D1Orm } from "../ui/backend.js";
+import { HttpResult, IncludeTree, Orm } from "../ui/backend.js";
 import { KeysOfType } from "../ui/common.js";
 import {
   CloesceAst,
@@ -85,7 +83,8 @@ export enum RouterError {
   UnknownPrefix,
   UnknownRoute,
   UnmatchedHttpVerb,
-  InstantiatedMethodMissingId,
+  InstantiatedMethodMissingPrimaryKey,
+  InstantiatedMethodMissingKeyParam,
   RequestMissingBody,
   RequestBodyMissingParameters,
   RequestBodyInvalidParameter,
@@ -241,27 +240,64 @@ export class CloesceApp {
           return Either.right(di.get(route.namespace));
         }
         case "model": {
-          // TODO: KV + R2
+          const model = route.model!;
+          const modelCtor = ctorReg[model.name];
 
-          // It's been verified by the compiler that wrangler_env and a d1 binding exists
-          // if a D1 model is present
-          //
-          // TODO: Support multiple D1 bindings
-          const d1: D1Database = env[ast.wrangler_env!.d1_binding!];
+          const includeTree: IncludeTree<any> | null =
+            dataSource === NO_DATA_SOURCE
+              ? null
+              : (ctorReg[model.name] as any)[dataSource!];
 
-          // Proxy CRUD
-          if (route.method.is_static) {
-            return Either.right(
-              proxyCrud(ctorReg[route.namespace], ctorReg[route.namespace], d1),
-            );
+          const orm = Orm.fromEnv(env);
+
+          // Hydrate D1
+          let res = {};
+          if (model.primary_key !== null) {
+            // It's been verified by the compiler a d1 binding exists
+            // if a D1 model is present
+            if (route.method.is_static) {
+              return Either.right(proxyCrud(modelCtor, modelCtor, env));
+            }
+
+            // Error state: If some outside force tweaked the database schema, the query may fail.
+            // Otherwise, this indicates a bug in the compiler or runtime.
+            const malformedQuery = (e: any) =>
+              exit(
+                500,
+                RouterError.InvalidDatabaseQuery,
+                `Error in hydration query, is the database out of sync with the backend?: ${e instanceof Error ? e.message : String(e)}`,
+              );
+
+            // Query DB
+            let json;
+            try {
+              const res: any | null = await orm.get(
+                modelCtor,
+                route.primaryKey!,
+                includeTree,
+              );
+
+              // Error state: If no record is found for the id, return a 404
+              if (!res) {
+                return exit(404, RouterError.ModelNotFound, "Record not found");
+              }
+
+              json = res;
+            } catch (e) {
+              return malformedQuery(e);
+            }
+
+            return Either.right(json);
           }
 
-          return await hydrateD1Model(
-            ctorReg,
-            d1,
-            route.model!,
-            route.id!,
-            dataSource!,
+          // Hydrate KV + R2 + instantiate objects
+          return Either.right(
+            orm.hydrate(
+              ctorReg[route.model!.name],
+              res,
+              route.keyParams,
+              includeTree,
+            ),
           );
         }
       }
@@ -360,7 +396,8 @@ export type MatchedRoute = {
   kind: "model" | "service";
   namespace: string;
   method: ApiMethod;
-  id: string | null;
+  primaryKey: string | null;
+  keyParams: Record<string, string>;
   model?: Model;
   service?: Service;
 };
@@ -391,10 +428,13 @@ function matchRoute(
     return notFound(RouterError.UnknownPrefix);
   }
 
-  // Route format: /{namespace}/{id?}/{method}
+  // Route format: /{namespace}/...{id}/{method}
   const namespace = parts[0];
   const methodName = parts[parts.length - 1];
-  const id = parts.length === 3 ? decodeURIComponent(parts[1]) : null;
+  const id =
+    parts.length > 2
+      ? parts.slice(1, parts.length - 1).map(decodeURIComponent)
+      : [];
 
   const model = ast.models[namespace];
   if (model) {
@@ -405,21 +445,27 @@ function matchRoute(
       return notFound(RouterError.UnmatchedHttpVerb);
     }
 
+    // For now, primary key is always the first ID segment
+    // and the rest are key params.
+    const primaryKey: string | null = id[0] ?? null;
+    const keyParams = Object.fromEntries(
+      id.slice(1).map((v, i) => [model.key_params[i], decodeURIComponent(v)]),
+    );
+
     return Either.right({
       kind: "model",
       namespace,
       method,
       model,
-      id,
+      primaryKey,
+      keyParams,
     });
   }
 
   const service = ast.services[namespace];
   if (service) {
     const method = service.methods[methodName];
-
-    // Services do not have IDs.
-    if (!method || id) return notFound(RouterError.UnknownRoute);
+    if (!method || id.length > 0) return notFound(RouterError.UnknownRoute);
 
     if (request.method !== method.http_verb) {
       return notFound(RouterError.UnmatchedHttpVerb);
@@ -430,7 +476,8 @@ function matchRoute(
       namespace,
       method,
       service,
-      id: null,
+      primaryKey: null,
+      keyParams: {},
     });
   }
 
@@ -454,9 +501,22 @@ async function validateRequest(
   const invalidRequest = (c: RouterError) =>
     exit(400, c, "Invalid Request Body");
 
-  // Models must have an ID on instantiated methods.
-  if (route.kind === "model" && !route.method.is_static && route.id == null) {
-    return invalidRequest(RouterError.InstantiatedMethodMissingId);
+  // Validate instantiated model ids
+  if (route.kind === "model" && !route.method.is_static) {
+    const model = route.model!;
+    if (model.primary_key !== null && route.primaryKey === null) {
+      return invalidRequest(RouterError.InstantiatedMethodMissingPrimaryKey);
+    }
+
+    if (model.key_params.length !== Object.keys(route.keyParams).length) {
+      return invalidRequest(RouterError.InstantiatedMethodMissingKeyParam);
+    }
+
+    for (const keyParam of model.key_params) {
+      if (!(keyParam in route.keyParams)) {
+        return invalidRequest(RouterError.InstantiatedMethodMissingKeyParam);
+      }
+    }
   }
 
   // Filter out injected parameters
@@ -516,7 +576,7 @@ async function validateRequest(
     }
   }
 
-  // A data source is required for instantiated d1 model methods
+  // A data source is required for instantiated model methods
   const dataSource: string | undefined = requiredParams
     .filter(
       (p) =>
@@ -530,68 +590,6 @@ async function validateRequest(
   }
 
   return Either.right({ params, dataSource: dataSource ?? null });
-}
-
-/**
- * Queries D1 for a particular model's ID, then transforms the SQL column output into
- * an instance of a model using the provided include tree and metadata as a guide.
- * @returns 404 if no record was found for the provided ID
- * @returns 500 if the D1 database is not synced with Cloesce and yields an error
- * @returns The instantiated model on success
- */
-async function hydrateD1Model(
-  constructorRegistry: ConstructorRegistry,
-  d1: D1Database,
-  model: Model,
-  id: string,
-  dataSource: string,
-): Promise<Either<HttpResult, object>> {
-  // Error state: If some outside force tweaked the database schema, the query may fail.
-  // Otherwise, this indicates a bug in the compiler or runtime.
-  const malformedQuery = (e: any) =>
-    exit(
-      500,
-      RouterError.InvalidDatabaseQuery,
-      `Error in hydration query, is the database out of sync with the backend?: ${e instanceof Error ? e.message : String(e)}`,
-    );
-
-  // Query DB
-  let records;
-  try {
-    let includeTree: IncludeTree<any> | null =
-      dataSource === NO_DATA_SOURCE
-        ? null
-        : (constructorRegistry[model.name] as any)[dataSource];
-
-    records = await d1
-      .prepare(D1Orm.getQuery(constructorRegistry[model.name], includeTree))
-      .bind(id)
-      .run();
-
-    // Error state: If no record is found for the id, return a 404
-    if (!records?.results) {
-      return exit(404, RouterError.ModelNotFound, "Record not found");
-    }
-
-    if (records.error) {
-      return malformedQuery(records.error);
-    }
-  } catch (e) {
-    return malformedQuery(e);
-  }
-
-  // Hydrate
-  const models = mapSql(
-    constructorRegistry[model.name],
-    records.results,
-    model.data_sources[dataSource]?.tree ?? {},
-  );
-
-  if (models.isLeft()) {
-    return malformedQuery(models.value);
-  }
-
-  return Either.right(models.unwrap()[0]);
 }
 
 /**

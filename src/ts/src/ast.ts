@@ -89,12 +89,14 @@ export interface KeyValue {
   format: string;
   namespace_binding: string;
   value: NamedTypedValue;
+  list_prefix: boolean;
 }
 
 export interface AstR2Object {
   format: string;
   bucket_binding: string;
   var_name: string;
+  list_prefix: boolean;
 }
 
 export interface Model {

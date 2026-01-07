@@ -48,7 +48,7 @@ fn as_migration(ast: CloesceAst) -> MigrationsAst {
 
     MigrationsAst {
         hash,
-        d1_models: migrations_models,
+        models: migrations_models,
     }
 }
 

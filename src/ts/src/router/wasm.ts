@@ -1,4 +1,4 @@
-import { CidlIncludeTree, CloesceAst, Model } from "../ast.js";
+import { CidlIncludeTree, CloesceAst } from "../ast.js";
 import { IncludeTree } from "../ui/backend.js";
 import { RuntimeContainer } from "./router.js";
 import Either from "../either.js";
@@ -51,11 +51,12 @@ export interface OrmWasmExports {
  * RAII for wasm memory
  */
 export class WasmResource {
-  constructor(
+  private constructor(
     private wasm: OrmWasmExports,
     public ptr: number,
     public len: number,
   ) { }
+
   free() {
     this.wasm.dealloc(this.ptr, this.len);
   }
@@ -96,7 +97,9 @@ export async function loadOrmWasm(
       new Uint8Array(wasmInstance.exports.memory.buffer, resPtr, resLen),
     );
 
-    throw Error(`"The WASM Module failed to load due to an invalid CIDL: ${errorMsg}`);
+    throw Error(
+      `"The WASM Module failed to load due to an invalid CIDL: ${errorMsg}`,
+    );
   }
 
   // Intentionally leak `modelMeta`, it should exist for the programs lifetime.
@@ -135,14 +138,14 @@ export function invokeOrmWasm(
 
 /**
  * Calls the object relational mapping function to turn a row of SQL records into
- * an instantiated object.
+ * JSON
  */
-export function mapSql<T extends object>(
+export function mapSqlJson<T extends object>(
   ctor: new () => T,
   records: Record<string, any>[],
   includeTree: IncludeTree<T> | CidlIncludeTree | null,
 ): Either<string, T[]> {
-  const { ast, constructorRegistry, wasm } = RuntimeContainer.get();
+  const { wasm } = RuntimeContainer.get();
   const args = [
     WasmResource.fromString(ctor.name, wasm),
     WasmResource.fromString(JSON.stringify(records), wasm),
@@ -152,51 +155,5 @@ export function mapSql<T extends object>(
   const jsonResults = invokeOrmWasm(wasm.map_sql, args, wasm);
   if (jsonResults.isLeft()) return jsonResults;
 
-  const parsed: any[] = JSON.parse(jsonResults.value);
-  return Either.right(
-    parsed.map((obj: any) =>
-      instantiateDepthFirst(obj, ast.models[ctor.name], includeTree),
-    ) as T[],
-  );
-
-  // TODO: Lazy instantiation via Proxy?
-  function instantiateDepthFirst(
-    m: any,
-    meta: Model,
-    includeTree: IncludeTree<any> | null,
-  ) {
-    m = Object.assign(new constructorRegistry[meta.name](), m);
-
-    if (!includeTree) {
-      return m;
-    }
-
-    for (const navProp of meta.navigation_properties) {
-      const nestedIncludeTree = includeTree[navProp.var_name];
-      if (!nestedIncludeTree) continue;
-
-      const nestedMeta = ast.models[navProp.model_reference];
-
-      // One to Many, Many to Many
-      if (Array.isArray(m[navProp.var_name])) {
-        for (let i = 0; i < m[navProp.var_name].length; i++) {
-          m[navProp.var_name][i] = instantiateDepthFirst(
-            m[navProp.var_name][i],
-            nestedMeta,
-            nestedIncludeTree,
-          );
-        }
-      }
-      // One to one
-      else if (m[navProp.var_name]) {
-        m[navProp.var_name] = instantiateDepthFirst(
-          m[navProp.var_name],
-          nestedMeta,
-          nestedIncludeTree,
-        );
-      }
-    }
-
-    return m;
-  }
+  return Either.right(JSON.parse(jsonResults.value));
 }

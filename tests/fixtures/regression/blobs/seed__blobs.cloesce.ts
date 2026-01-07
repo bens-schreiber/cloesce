@@ -32,7 +32,7 @@ export class BlobService {
   }
 }
 
-@D1
+@Model
 @CRUD(["SAVE", "GET", "LIST"])
 export class BlobHaver {
   @PrimaryKey

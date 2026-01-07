@@ -336,7 +336,7 @@ async function generate(config: WasmConfig) {
   const wasi = new WASI({
     version: "preview1",
     args: ["generate", ...config.args],
-    env: { ...process.env, ...config.env } as Record<string, string>,
+    env: { ...process.env, ...config.env },
     preopens: { ".": root },
   });
 

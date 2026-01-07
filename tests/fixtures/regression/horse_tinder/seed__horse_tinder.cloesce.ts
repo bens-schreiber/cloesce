@@ -21,7 +21,7 @@ export class Env {
   motd: string;
 }
 
-@D1
+@Model
 class Horse {
   @PrimaryKey
   id: Integer;
@@ -75,7 +75,7 @@ class Horse {
   }
 }
 
-@D1
+@Model
 class Like {
   @PrimaryKey
   id: Integer;

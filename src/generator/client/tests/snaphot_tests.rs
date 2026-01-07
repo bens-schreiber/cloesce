@@ -88,14 +88,73 @@ fn test_client_code_generation_snapshot() {
         ModelBuilder::new("ModelWithKv")
             .key_param("id1")
             .key_param("id2")
-            .kv_object("{id1}", "kv_namespace", "someValue", CidlType::JsonValue)
-            .kv_object("{id2}", "kv_namespace", "anotherValue", CidlType::JsonValue)
+            .kv_object(
+                "{id1}",
+                "kv_namespace",
+                "someValue",
+                false,
+                CidlType::JsonValue,
+            )
+            .kv_object("", "kv_namespace", "manyValues", true, CidlType::JsonValue)
+            .kv_object(
+                "constant",
+                "kv_namespace",
+                "streamValue",
+                false,
+                CidlType::Stream,
+            )
+            .method(
+                "instanceMethod",
+                HttpVerb::POST,
+                false,
+                vec![NamedTypedValue {
+                    name: "input".into(),
+                    cidl_type: CidlType::Text,
+                }],
+                CidlType::Text,
+            )
+            .method(
+                "staticMethod",
+                HttpVerb::GET,
+                true,
+                vec![NamedTypedValue {
+                    name: "input".into(),
+                    cidl_type: CidlType::Integer,
+                }],
+                CidlType::Integer,
+            )
             .build(),
         // R2
         ModelBuilder::new("ModelWithR2")
             .id_pk()
-            .key_param("id")
-            .r2_object("{id}", "r2_namespace", "fileData")
+            .key_param("r2Id")
+            .r2_object("r2/{id}/{r2Id}", "r2_namespace", "fileData", false)
+            .r2_object("r2", "r2_namespace", "manyFileDatas", true)
+            .build(),
+        // Hybrid (D1, KV, R2)
+        ModelBuilder::new("ToyotaPrius")
+            .id_pk()
+            .col("modelYear", CidlType::Integer, None)
+            .key_param("ownerId")
+            .key_param("vehicleId")
+            .kv_object(
+                "{ownerId}/{modelYear}",
+                "owner_metadata",
+                "metadata",
+                false,
+                CidlType::JsonValue,
+            )
+            .r2_object("{vehicleId}", "vehicle_photos", "photoData", false)
+            .method(
+                "instanceMethod",
+                HttpVerb::POST,
+                false,
+                vec![NamedTypedValue {
+                    name: "input".into(),
+                    cidl_type: CidlType::Text,
+                }],
+                CidlType::Text,
+            )
             .build(),
     ]);
 

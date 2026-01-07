@@ -124,7 +124,7 @@ pub async fn test_sql(
 
         MigrationsAst {
             hash,
-            d1_models: migrations_models,
+            models: migrations_models,
         }
     };
 

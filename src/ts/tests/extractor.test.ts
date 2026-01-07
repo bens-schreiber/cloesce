@@ -8,7 +8,6 @@ import {
 import { CidlType, DataSource, Service } from "../src/ast";
 import { ModelBuilder } from "./builder";
 
-
 function cloesceProject(): Project {
   const project = new Project({
     compilerOptions: {
@@ -172,10 +171,14 @@ describe("WranglerEnv", () => {
     const sourceFile = project.createSourceFile(
       "test.ts",
       `
-       import { D1Database } from "@cloudflare/workers-types";
+       import { D1Database, KVNamespace } from "@cloudflare/workers-types";
         @WranglerEnv
         class Env {
           db: D1Database;
+          kv1: KVNamespace;
+          kv2: KVNamespace;
+          var1: string;
+          var2: number;
         }
       `,
     );
@@ -186,6 +189,17 @@ describe("WranglerEnv", () => {
 
     // Assert
     expect(res.isRight()).toBe(true);
+    expect(res.unwrap()).toEqual({
+      name: "Env",
+      d1_binding: "db",
+      kv_bindings: ["kv1", "kv2"],
+      r2_bindings: [],
+      vars: {
+        var1: "Text",
+        var2: "Real",
+      },
+      source_path: sourceFile.getFilePath().toString(),
+    });
   });
 });
 
@@ -242,6 +256,9 @@ describe("Model", () => {
 
         @KV("value/Foo/{id}/{kvId}", "namespace")
         value: KValue<unknown>;
+
+        @KV("value/Foo", "namespace")
+        allValues: KValue<unknown>[];
       }
       `,
     );
@@ -254,17 +271,24 @@ describe("Model", () => {
     expect(res.isRight(), `Error: ${JSON.stringify(res)}`).toBe(true);
 
     res.unwrap().source_path = "";
-    expect(res.unwrap()).toEqual(ModelBuilder
-      .model("Foo")
-      .idPk()
-      .col("name", "Text")
-      .col("real", "Real")
-      .col("boolOrNull", { Nullable: "Boolean" })
-      .keyParam("kvId")
-      .kvObject("value/Foo/{id}/{kvId}", "namespace", "value", "JsonValue")
-      .build()
-    )
-  })
+    expect(res.unwrap()).toEqual(
+      ModelBuilder.model("Foo")
+        .idPk()
+        .col("name", "Text")
+        .col("real", "Real")
+        .col("boolOrNull", { Nullable: "Boolean" })
+        .keyParam("kvId")
+        .kvObject(
+          "value/Foo/{id}/{kvId}",
+          "namespace",
+          "value",
+          false,
+          "JsonValue",
+        )
+        .kvObject("value/Foo", "namespace", "allValues", true, "JsonValue")
+        .build(),
+    );
+  });
 });
 
 describe("Services", () => {
@@ -303,4 +327,3 @@ describe("Services", () => {
     } as Service);
   });
 });
-

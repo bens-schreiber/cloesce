@@ -19,7 +19,7 @@ export class Env {
 }
 
 @CRUD(["SAVE", "GET", "LIST"])
-@D1
+@Model
 export class CrudHaver {
   @PrimaryKey
   id: Integer;
@@ -30,7 +30,7 @@ export class CrudHaver {
 }
 
 @CRUD(["SAVE", "GET", "LIST"])
-@D1
+@Model
 export class Parent {
   @PrimaryKey
   id: Integer;
@@ -51,7 +51,7 @@ export class Parent {
   };
 }
 
-@D1
+@Model
 export class Child {
   @PrimaryKey
   id: Integer;

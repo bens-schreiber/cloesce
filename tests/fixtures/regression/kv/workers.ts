@@ -1,22 +1,14 @@
 // GENERATED CODE. DO NOT MODIFY.
 import { CloesceApp } from "cloesce/backend";
 import cidl from "./cidl.json";
+import { D1BackedModel } from "./seed__kv.cloesce.ts";
+import { PureKVModel } from "./seed__kv.cloesce.ts";
 
-import { Data } from "./seed__kv.cloesce.ts";
-import { DataScientist } from "./seed__kv.cloesce.ts";
-import { JsonValue } from "./seed__kv.cloesce.ts";
-import { StreamValue } from "./seed__kv.cloesce.ts";
-import { TextValue } from "./seed__kv.cloesce.ts";
-import { Scientist } from "./seed__kv.cloesce.ts";
 
 const app = new CloesceApp();
 const constructorRegistry = {
-	Data: Data,
-	DataScientist: DataScientist,
-	JsonValue: JsonValue,
-	StreamValue: StreamValue,
-	TextValue: TextValue,
-	Scientist: Scientist
+	D1BackedModel: D1BackedModel,
+	PureKVModel: PureKVModel
 };
 
 async function fetch(request: Request, env: any, ctx: any): Promise<Response> {

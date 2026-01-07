@@ -268,8 +268,62 @@ export class ModelWithKv {
   id1: string;
   id2: string;
   someValue: KValue<unknown>;
-  anotherValue: KValue<unknown>;
+  manyValues: KValue<unknown>[];
+  streamValue: KValue<void>;
 
+  async instanceMethod(
+    input: string,
+    __datasource: "none" = "none",
+    fetchImpl: typeof fetch = fetch
+  ): Promise<HttpResult<string>> {
+    const id = [
+      encodeURIComponent(String(this.id1)),
+      encodeURIComponent(String(this.id2)),
+    ].join("/");
+    const baseUrl = new URL(
+      `http://example.com/api/ModelWithKv/${id}/instanceMethod`
+    );
+    const payload: any = {};
+
+    payload["input"] = input;
+    baseUrl.searchParams.append("__datasource", String(__datasource));
+
+    const res = await fetchImpl(baseUrl, {
+      method: "POST",
+      duplex: "half",
+      headers: { "Content-Type": "application/json" },
+      body: requestBody(MediaType.Json, payload),
+    });
+
+    return await HttpResult.fromResponse(
+      res,
+      MediaType.Json,
+      undefined,
+      false
+    );
+  }
+  static async staticMethod(
+    input: number,
+    fetchImpl: typeof fetch = fetch
+  ): Promise<HttpResult<number>> {
+    const baseUrl = new URL(
+      `http://example.com/api/ModelWithKv/staticMethod`
+    );
+
+    baseUrl.searchParams.append("input", String(input));
+
+    const res = await fetchImpl(baseUrl, {
+      method: "GET",
+      duplex: "half",
+    });
+
+    return await HttpResult.fromResponse(
+      res,
+      MediaType.Json,
+      undefined,
+      false
+    );
+  }
 
   static fromJson(data: any): ModelWithKv {
     const res = Object.assign(new ModelWithKv(), data);
@@ -278,8 +332,9 @@ export class ModelWithKv {
 }
 export class ModelWithR2 {
   id: number;
-  id: string;
-  : R2Object;
+  r2Id: string;
+  fileData: R2Object;
+  manyFileDatas: R2Object[];
 
 
   static fromJson(data: any): ModelWithR2 {
@@ -297,6 +352,52 @@ export class OneToManyModel {
     for (let i = 0; i < res.oneToManyNav?.length; i++) {
       res.oneToManyNav[i] = BasicModel.fromJson(res.oneToManyNav[i]);
     }
+    return res;
+  }
+}
+export class ToyotaPrius {
+  id: number;
+  modelYear: number;
+  ownerId: string;
+  vehicleId: string;
+  metadata: KValue<unknown>;
+  photoData: R2Object;
+
+  async instanceMethod(
+    input: string,
+    __datasource: "none" = "none",
+    fetchImpl: typeof fetch = fetch
+  ): Promise<HttpResult<string>> {
+    const id = [
+      encodeURIComponent(String(this.id)),
+      encodeURIComponent(String(this.ownerId)),
+      encodeURIComponent(String(this.vehicleId)),
+    ].join("/");
+    const baseUrl = new URL(
+      `http://example.com/api/ToyotaPrius/${id}/instanceMethod`
+    );
+    const payload: any = {};
+
+    payload["input"] = input;
+    baseUrl.searchParams.append("__datasource", String(__datasource));
+
+    const res = await fetchImpl(baseUrl, {
+      method: "POST",
+      duplex: "half",
+      headers: { "Content-Type": "application/json" },
+      body: requestBody(MediaType.Json, payload),
+    });
+
+    return await HttpResult.fromResponse(
+      res,
+      MediaType.Json,
+      undefined,
+      false
+    );
+  }
+
+  static fromJson(data: any): ToyotaPrius {
+    const res = Object.assign(new ToyotaPrius(), data);
     return res;
   }
 }

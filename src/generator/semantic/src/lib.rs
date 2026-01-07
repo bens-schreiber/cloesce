@@ -221,18 +221,10 @@ impl SemanticAnalysis {
 
                 while let Some((node, parent_model)) = q.pop_front() {
                     for (var_name, child) in &node.0 {
-                        let Some(model_name) = parent_model
-                            .navigation_properties
-                            .iter()
-                            .find(|nav| nav.var_name == *var_name)
-                            .map(|nav| &nav.model_reference)
+                        let Some(model_name) =
+                            valid_include_tree_reference(parent_model, var_name.clone())?
                         else {
-                            fail!(
-                                GeneratorErrorKind::UnknownIncludeTreeReference,
-                                "{}.{}",
-                                model.name,
-                                var_name
-                            );
+                            continue;
                         };
 
                         let Some(child_model) = ast.models.get(model_name) else {
@@ -848,4 +840,39 @@ fn kahns<'a>(
     }
 
     Ok(rank)
+}
+
+fn valid_include_tree_reference<'a>(model: &'a Model, var_name: String) -> Result<Option<&'a str>> {
+    if let Some(nav) = model
+        .navigation_properties
+        .iter()
+        .find(|nav| nav.var_name == var_name)
+    {
+        return Ok(Some(&nav.model_reference));
+    }
+
+    if model
+        .kv_objects
+        .iter()
+        .find(|kv| kv.value.name == var_name)
+        .is_some()
+    {
+        return Ok(None);
+    }
+
+    if model
+        .r2_objects
+        .iter()
+        .find(|r2| r2.var_name == var_name)
+        .is_some()
+    {
+        return Ok(None);
+    }
+
+    fail!(
+        GeneratorErrorKind::UnknownIncludeTreeReference,
+        "{}.{}",
+        model.name,
+        var_name
+    );
 }

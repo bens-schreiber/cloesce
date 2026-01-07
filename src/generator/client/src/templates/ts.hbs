@@ -95,10 +95,10 @@ export class {{this.name}} {
   {{this}}: string;
 {{/each}}
 {{#each this.kv_objects}}
-  {{value.name}}: KValue<{{map_cidl_type value.cidl_type}}>;
+  {{value.name}}: {{#unless (is_stream value.cidl_type)}}KValue<{{map_cidl_type value.cidl_type}}>{{else}}KValue<void>{{/unless}}{{#if list_prefix }}[]{{/if}};
 {{/each}}
 {{#each this.r2_objects}}
-  {{this.value.name}}: R2Object;
+  {{var_name}}: R2Object{{#if list_prefix}}[]{{/if}};
 {{/each}}
 
 {{#each this.methods}}
@@ -111,7 +111,14 @@ export class {{this.name}} {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<{{map_cidl_type this.return_type}}>> {
 {{#unless this.is_static}}
-    const id = encodeURIComponent(String(this.{{../primary_key.name}}));
+    const id = [
+  {{#if ../primary_key}}
+      encodeURIComponent(String(this.{{../primary_key.name}})),
+  {{/if}}
+  {{#each ../key_params}}
+      encodeURIComponent(String(this.{{this}})),
+  {{/each}}
+    ].join("/");
 {{/unless}}
     const baseUrl = new URL(
       `{{../../domain}}/{{../name}}/{{#unless this.is_static}}${id}/{{/unless}}{{this.name}}`

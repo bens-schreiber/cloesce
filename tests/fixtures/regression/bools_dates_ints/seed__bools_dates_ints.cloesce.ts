@@ -7,7 +7,7 @@ export class Env {
   db: D1Database;
 }
 
-@D1
+@Model
 @CRUD(["SAVE", "GET"])
 export class Weather {
   @PrimaryKey

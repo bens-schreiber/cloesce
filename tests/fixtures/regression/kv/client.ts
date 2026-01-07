@@ -1,55 +1,29 @@
 // GENERATED CODE. DO NOT MODIFY.
 
-import { HttpResult, DeepPartial, MediaType, requestBody, b64ToU8 } from "cloesce/client";
-export class Scientist {
-  firstname: string;
-  lastname: string;
-  age: number;
-
-  static fromJson(data: any): Scientist {
-    const res = Object.assign(new Scientist(), data);
-    return res;
-  }
-}
+import { HttpResult, DeepPartial, MediaType, requestBody, b64ToU8, KValue, R2Object } from "cloesce/client";
 
 
 
-export class Data {
-  key: string;
-  value: unknown;
-  metadata: unknown;
-  key1: string;
-  key2: string;
-  settings: {
-    key: string;
-    value: unknown;
-    metadata: unknown;
-  };
-
-
-  static fromJson(data: any): Data {
-    const res = Object.assign(new Data(), data);
-
-
-    return res;
-  }
-}
-export class DataScientist {
-  key: string;
-  value: Scientist;
-  metadata: unknown;
-  id: string;
-  datasets: [];
+export class D1BackedModel {
+  id: number;
+  someColumn: number;
+  someOtherColumn: string;
+  keyParam: string;
+  kvData: KValue<unknown>;
 
   static async get(
-    id: string,
+    id: number,
+    keyParam: string,
+    __datasource: "none" = "none",
     fetchImpl: typeof fetch = fetch
-  ): Promise<HttpResult<DataScientist>> {
-    
-    const baseUrl = new URL(`http://localhost:5002/api/DataScientist/get`);
-    
+  ): Promise<HttpResult<D1BackedModel>> {
+    const baseUrl = new URL(
+      `http://localhost:5002/api/D1BackedModel/get`
+    );
 
-    baseUrl.searchParams.append('id', String(id));
+    baseUrl.searchParams.append("id", String(id));
+    baseUrl.searchParams.append("keyParam", String(keyParam));
+    baseUrl.searchParams.append("__datasource", String(__datasource));
 
     const res = await fetchImpl(baseUrl, {
       method: "GET",
@@ -57,21 +31,25 @@ export class DataScientist {
     });
 
     return await HttpResult.fromResponse(
-      res, 
+      res,
       MediaType.Json,
-      DataScientist,
+      D1BackedModel,
       false
     );
   }
-  async getMetadata(
-    __datasource: "withDatasets" |"none" = "none",
+  async instanceMethod(
+    __datasource: "none" = "none",
     fetchImpl: typeof fetch = fetch
-  ): Promise<HttpResult<unknown>> {
-    const key = encodeURIComponent(String(this.key));
-    const baseUrl = new URL(`http://localhost:5002/api/DataScientist/${key}/getMetadata`);
-    
+  ): Promise<HttpResult<D1BackedModel>> {
+    const id = [
+      encodeURIComponent(String(this.id)),
+      encodeURIComponent(String(this.keyParam)),
+    ].join("/");
+    const baseUrl = new URL(
+      `http://localhost:5002/api/D1BackedModel/${id}/instanceMethod`
+    );
 
-    baseUrl.searchParams.append('__datasource', String(__datasource));
+    baseUrl.searchParams.append("__datasource", String(__datasource));
 
     const res = await fetchImpl(baseUrl, {
       method: "GET",
@@ -79,47 +57,83 @@ export class DataScientist {
     });
 
     return await HttpResult.fromResponse(
-      res, 
+      res,
       MediaType.Json,
-      undefined,
+      D1BackedModel,
       false
     );
   }
-  static async post(
-    value: DeepPartial<DataScientist>,
+  static async list(
+    __datasource: "none" = "none",
     fetchImpl: typeof fetch = fetch
-  ): Promise<HttpResult<void>> {
-    
-    const baseUrl = new URL(`http://localhost:5002/api/DataScientist/post`);
+  ): Promise<HttpResult<D1BackedModel[]>> {
+    const baseUrl = new URL(
+      `http://localhost:5002/api/D1BackedModel/list`
+    );
+
+    baseUrl.searchParams.append("__datasource", String(__datasource));
+
+    const res = await fetchImpl(baseUrl, {
+      method: "GET",
+      duplex: "half",
+    });
+
+    return await HttpResult.fromResponse(
+      res,
+      MediaType.Json,
+      D1BackedModel,
+      true
+    );
+  }
+  static async save(
+    model: DeepPartial<D1BackedModel>,
+    __datasource: "none" = "none",
+    fetchImpl: typeof fetch = fetch
+  ): Promise<HttpResult<D1BackedModel>> {
+    const baseUrl = new URL(
+      `http://localhost:5002/api/D1BackedModel/save`
+    );
     const payload: any = {};
 
-    payload["value"] = value;
+    payload["model"] = model;
+    baseUrl.searchParams.append("__datasource", String(__datasource));
 
     const res = await fetchImpl(baseUrl, {
       method: "POST",
       duplex: "half",
       headers: { "Content-Type": "application/json" },
-      body: requestBody(MediaType.Json, payload)
+      body: requestBody(MediaType.Json, payload),
     });
 
     return await HttpResult.fromResponse(
-      res, 
+      res,
       MediaType.Json,
-      undefined,
+      D1BackedModel,
       false
     );
   }
-  async putMetadata(
-    metadata: unknown,
-    __datasource: "withDatasets" |"none" = "none",
-    fetchImpl: typeof fetch = fetch
-  ): Promise<HttpResult<void>> {
-    const key = encodeURIComponent(String(this.key));
-    const baseUrl = new URL(`http://localhost:5002/api/DataScientist/${key}/putMetadata`);
-    
 
-    baseUrl.searchParams.append('metadata', String(metadata));
-    baseUrl.searchParams.append('__datasource', String(__datasource));
+  static fromJson(data: any): D1BackedModel {
+    const res = Object.assign(new D1BackedModel(), data);
+    return res;
+  }
+}
+export class PureKVModel {
+  id: string;
+  data: KValue<unknown>;
+  otherData: KValue<string>;
+
+  static async get(
+    id: string,
+    __datasource: "default" |"none" = "none",
+    fetchImpl: typeof fetch = fetch
+  ): Promise<HttpResult<PureKVModel>> {
+    const baseUrl = new URL(
+      `http://localhost:5002/api/PureKVModel/get`
+    );
+
+    baseUrl.searchParams.append("id", String(id));
+    baseUrl.searchParams.append("__datasource", String(__datasource));
 
     const res = await fetchImpl(baseUrl, {
       method: "GET",
@@ -127,60 +141,42 @@ export class DataScientist {
     });
 
     return await HttpResult.fromResponse(
-      res, 
+      res,
       MediaType.Json,
-      undefined,
+      PureKVModel,
+      false
+    );
+  }
+  static async save(
+    model: DeepPartial<PureKVModel>,
+    __datasource: "default" |"none" = "none",
+    fetchImpl: typeof fetch = fetch
+  ): Promise<HttpResult<PureKVModel>> {
+    const baseUrl = new URL(
+      `http://localhost:5002/api/PureKVModel/save`
+    );
+    const payload: any = {};
+
+    payload["model"] = model;
+    baseUrl.searchParams.append("__datasource", String(__datasource));
+
+    const res = await fetchImpl(baseUrl, {
+      method: "POST",
+      duplex: "half",
+      headers: { "Content-Type": "application/json" },
+      body: requestBody(MediaType.Json, payload),
+    });
+
+    return await HttpResult.fromResponse(
+      res,
+      MediaType.Json,
+      PureKVModel,
       false
     );
   }
 
-  static fromJson(data: any): DataScientist {
-    const res = Object.assign(new DataScientist(), data);
-
-    res["DataScientist"] &&= Scientist.fromJson(res.DataScientist);
-    for (let i = 0; i < res.datasets?.length; i++) {
-      res.datasets[i] = Data.fromJson(res.datasets[i]);
-    }
-
-    return res;
-  }
-}
-export class JsonValue {
-  key: string;
-  value: unknown;
-  metadata: unknown;
-
-
-  static fromJson(data: any): JsonValue {
-    const res = Object.assign(new JsonValue(), data);
-
-
-    return res;
-  }
-}
-export class StreamValue {
-  key: string;
-  
-  metadata: unknown;
-
-
-  static fromJson(data: any): StreamValue {
-    const res = Object.assign(new StreamValue(), data);
-
-
-    return res;
-  }
-}
-export class TextValue {
-  key: string;
-  value: string;
-  metadata: unknown;
-
-
-  static fromJson(data: any): TextValue {
-    const res = Object.assign(new TextValue(), data);
-
-
+  static fromJson(data: any): PureKVModel {
+    const res = Object.assign(new PureKVModel(), data);
     return res;
   }
 }
