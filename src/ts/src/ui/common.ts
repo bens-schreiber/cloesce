@@ -203,17 +203,16 @@ export class HttpResult<T = unknown> {
     async function data() {
       switch (mediaType) {
         case MediaType.Json: {
-          let json = await response.json();
+          const data = await response.json();
 
-          if (array && Array.isArray(json)) {
-            for (let i = 0; i < json.length; i++) {
-              json[i] = instantiate(json[i], ctor);
+          if (array && Array.isArray(data)) {
+            for (let i = 0; i < data.length; i++) {
+              data[i] = instantiate(data[i], ctor);
             }
-          } else {
-            json = instantiate(json, ctor);
+            return data;
           }
 
-          return json;
+          return instantiate(data, ctor);
         }
         case MediaType.Octet: {
           return response.body;

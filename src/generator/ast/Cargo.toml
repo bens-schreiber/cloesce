@@ -9,5 +9,3 @@ indexmap = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 serde_with = "3.14.1"
-toml = { workspace = true }
-tracing = { workspace = true }

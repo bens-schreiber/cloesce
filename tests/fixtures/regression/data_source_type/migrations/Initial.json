@@ -1,14 +1,14 @@
 {
-  "hash": 6349253276655467602,
-  "d1_models": {
+  "hash": 14175612364686524542,
+  "models": {
     "Foo": {
-      "hash": 5030820420179718148,
+      "hash": 1388019735020654723,
       "name": "Foo",
       "primary_key": {
         "name": "id",
         "cidl_type": "Integer"
       },
-      "attributes": [],
+      "columns": [],
       "navigation_properties": [],
       "data_sources": {
         "baz": {
@@ -19,24 +19,24 @@
       }
     },
     "NoDs": {
-      "hash": 13267258502866568209,
+      "hash": 11605062406260251798,
       "name": "NoDs",
       "primary_key": {
         "name": "id",
         "cidl_type": "Integer"
       },
-      "attributes": [],
+      "columns": [],
       "navigation_properties": [],
       "data_sources": {}
     },
     "OneDs": {
-      "hash": 12534124635817757359,
+      "hash": 8891323950658693934,
       "name": "OneDs",
       "primary_key": {
         "name": "id",
         "cidl_type": "Integer"
       },
-      "attributes": [],
+      "columns": [],
       "navigation_properties": [],
       "data_sources": {
         "default": {

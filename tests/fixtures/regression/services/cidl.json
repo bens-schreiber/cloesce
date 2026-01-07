@@ -2,7 +2,7 @@
   "hash": 0,
   "project_name": "runner",
   "wrangler_env": null,
-  "d1_models": {},
+  "models": {},
   "services": {
     "FooService": {
       "name": "FooService",
@@ -51,7 +51,6 @@
       "source_path": "./seed__app.cloesce.ts"
     }
   },
-  "kv_models": {},
   "poos": {},
   "app_source": "./seed__app.cloesce.ts"
 }

@@ -1,23 +1,27 @@
 {
-  "hash": 6349253276655467602,
+  "hash": 14175612364686524542,
   "project_name": "runner",
   "wrangler_env": {
     "name": "Env",
     "source_path": "./seed__ds.cloesce.ts",
     "d1_binding": "db",
     "kv_bindings": [],
+    "r2_bindings": [],
     "vars": {}
   },
-  "d1_models": {
+  "models": {
     "Foo": {
-      "hash": 5030820420179718148,
+      "hash": 1388019735020654723,
       "name": "Foo",
       "primary_key": {
         "name": "id",
         "cidl_type": "Integer"
       },
-      "attributes": [],
+      "columns": [],
       "navigation_properties": [],
+      "key_params": [],
+      "kv_objects": [],
+      "r2_objects": [],
       "methods": {
         "bar": {
           "name": "bar",
@@ -59,28 +63,34 @@
       "source_path": "./seed__ds.cloesce.ts"
     },
     "NoDs": {
-      "hash": 13267258502866568209,
+      "hash": 11605062406260251798,
       "name": "NoDs",
       "primary_key": {
         "name": "id",
         "cidl_type": "Integer"
       },
-      "attributes": [],
+      "columns": [],
       "navigation_properties": [],
+      "key_params": [],
+      "kv_objects": [],
+      "r2_objects": [],
       "methods": {},
       "data_sources": {},
       "cruds": [],
       "source_path": "./seed__ds.cloesce.ts"
     },
     "OneDs": {
-      "hash": 12534124635817757359,
+      "hash": 8891323950658693934,
       "name": "OneDs",
       "primary_key": {
         "name": "id",
         "cidl_type": "Integer"
       },
-      "attributes": [],
+      "columns": [],
       "navigation_properties": [],
+      "key_params": [],
+      "kv_objects": [],
+      "r2_objects": [],
       "methods": {},
       "data_sources": {
         "default": {
@@ -94,7 +104,6 @@
     }
   },
   "services": {},
-  "kv_models": {},
   "poos": {
     "Poo": {
       "name": "Poo",

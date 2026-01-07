@@ -1,6 +1,6 @@
 import { D1Database } from "@cloudflare/workers-types";
 import {
-  D1,
+  Model,
   GET,
   POST,
   PrimaryKey,
@@ -43,27 +43,27 @@ class Horse {
   };
 
   @POST
-  static async post(@Inject { db }: Env, horse: Horse): Promise<Horse> {
-    const orm = Orm.fromD1(db);
+  static async post(@Inject env: Env, horse: Horse): Promise<Horse> {
+    const orm = Orm.fromEnv(env);
     await orm.upsert(Horse, horse, null);
     return (await orm.get(Horse, horse.id, null)).value;
   }
 
   @GET
-  static async get(@Inject { db }: Env, id: Integer): Promise<Horse> {
-    const orm = Orm.fromD1(db);
+  static async get(@Inject env: Env, id: Integer): Promise<Horse> {
+    const orm = Orm.fromEnv(env);
     return (await orm.get(Horse, id, Horse.default)).value;
   }
 
   @GET
-  static async list(@Inject { db }: Env): Promise<Horse[]> {
-    const orm = Orm.fromD1(db);
+  static async list(@Inject env: Env): Promise<Horse[]> {
+    const orm = Orm.fromEnv(env);
     return (await orm.list(Horse, Horse.default)).value;
   }
 
   @POST
-  async like(@Inject { db }: Env, horse: Horse) {
-    const orm = Orm.fromD1(db);
+  async like(@Inject env: Env, horse: Horse) {
+    const orm = Orm.fromEnv(env);
     await orm.upsert(
       Like,
       {

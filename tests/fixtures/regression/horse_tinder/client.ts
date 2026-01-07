@@ -1,6 +1,7 @@
 // GENERATED CODE. DO NOT MODIFY.
 
-import { HttpResult, DeepPartial, MediaType, requestBody, b64ToU8 } from "cloesce/client";
+import { HttpResult, DeepPartial, MediaType, requestBody, b64ToU8, KValue, R2Object } from "cloesce/client";
+
 
 
 export class Horse {
@@ -13,11 +14,11 @@ export class Horse {
     id: number,
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Horse>> {
-    
-    const baseUrl = new URL(`http://localhost:5002/api/Horse/get`);
-    
+    const baseUrl = new URL(
+      `http://localhost:5002/api/Horse/get`
+    );
 
-    baseUrl.searchParams.append('id', String(id));
+    baseUrl.searchParams.append("id", String(id));
 
     const res = await fetchImpl(baseUrl, {
       method: "GET",
@@ -25,7 +26,7 @@ export class Horse {
     });
 
     return await HttpResult.fromResponse(
-      res, 
+      res,
       MediaType.Json,
       Horse,
       false
@@ -36,22 +37,26 @@ export class Horse {
     __datasource: "default" |"withLikes" |"none" = "none",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<void>> {
-    const id = encodeURIComponent(String(this.id));
-    const baseUrl = new URL(`http://localhost:5002/api/Horse/${id}/like`);
+    const id = [
+      encodeURIComponent(String(this.id)),
+    ].join("/");
+    const baseUrl = new URL(
+      `http://localhost:5002/api/Horse/${id}/like`
+    );
     const payload: any = {};
 
     payload["horse"] = horse;
-    baseUrl.searchParams.append('__datasource', String(__datasource));
+    baseUrl.searchParams.append("__datasource", String(__datasource));
 
     const res = await fetchImpl(baseUrl, {
       method: "POST",
       duplex: "half",
       headers: { "Content-Type": "application/json" },
-      body: requestBody(MediaType.Json, payload)
+      body: requestBody(MediaType.Json, payload),
     });
 
     return await HttpResult.fromResponse(
-      res, 
+      res,
       MediaType.Json,
       undefined,
       false
@@ -60,9 +65,9 @@ export class Horse {
   static async list(
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Horse[]>> {
-    
-    const baseUrl = new URL(`http://localhost:5002/api/Horse/list`);
-    
+    const baseUrl = new URL(
+      `http://localhost:5002/api/Horse/list`
+    );
 
 
     const res = await fetchImpl(baseUrl, {
@@ -71,7 +76,7 @@ export class Horse {
     });
 
     return await HttpResult.fromResponse(
-      res, 
+      res,
       MediaType.Json,
       Horse,
       true
@@ -81,8 +86,9 @@ export class Horse {
     horse: Horse,
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Horse>> {
-    
-    const baseUrl = new URL(`http://localhost:5002/api/Horse/post`);
+    const baseUrl = new URL(
+      `http://localhost:5002/api/Horse/post`
+    );
     const payload: any = {};
 
     payload["horse"] = horse;
@@ -91,11 +97,11 @@ export class Horse {
       method: "POST",
       duplex: "half",
       headers: { "Content-Type": "application/json" },
-      body: requestBody(MediaType.Json, payload)
+      body: requestBody(MediaType.Json, payload),
     });
 
     return await HttpResult.fromResponse(
-      res, 
+      res,
       MediaType.Json,
       Horse,
       false
@@ -105,7 +111,7 @@ export class Horse {
   static fromJson(data: any): Horse {
     const res = Object.assign(new Horse(), data);
     for (let i = 0; i < res.likes?.length; i++) {
-      res.likes[i] = .fromJson(res.likes[i]);
+      res.likes[i] = Like.fromJson(res.likes[i]);
     }
     return res;
   }
@@ -119,8 +125,7 @@ export class Like {
 
   static fromJson(data: any): Like {
     const res = Object.assign(new Like(), data);
-    res["horse2"] &&= .fromJson(res.horse2);
+    res["horse2"] &&= Horse.fromJson(res.horse2);
     return res;
   }
 }
-

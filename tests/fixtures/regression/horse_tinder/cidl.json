@@ -1,26 +1,27 @@
 {
-  "hash": 1370722617160899709,
+  "hash": 10144195263362320661,
   "project_name": "runner",
   "wrangler_env": {
     "name": "Env",
     "source_path": "./seed__horse_tinder.cloesce.ts",
     "d1_binding": "db",
     "kv_bindings": [],
+    "r2_bindings": [],
     "vars": {
       "motd": "Text"
     }
   },
-  "d1_models": {
+  "models": {
     "Horse": {
-      "hash": 2773434116584790482,
+      "hash": 3509499429413686064,
       "name": "Horse",
       "primary_key": {
         "name": "id",
         "cidl_type": "Integer"
       },
-      "attributes": [
+      "columns": [
         {
-          "hash": 5774566402684976635,
+          "hash": 12056908550303509781,
           "value": {
             "name": "name",
             "cidl_type": "Text"
@@ -28,7 +29,7 @@
           "foreign_key_reference": null
         },
         {
-          "hash": 18314765902643741747,
+          "hash": 11595263782990034596,
           "value": {
             "name": "bio",
             "cidl_type": {
@@ -45,11 +46,14 @@
           "model_reference": "Like",
           "kind": {
             "OneToMany": {
-              "attribute_reference": "horseId1"
+              "column_reference": "horseId1"
             }
           }
         }
       ],
+      "key_params": [],
+      "kv_objects": [],
+      "r2_objects": [],
       "methods": {
         "get": {
           "name": "get",
@@ -62,7 +66,7 @@
           "parameters_media": "Json",
           "parameters": [
             {
-              "name": "{ db }",
+              "name": "env",
               "cidl_type": {
                 "Inject": "Env"
               }
@@ -82,7 +86,7 @@
           "parameters_media": "Json",
           "parameters": [
             {
-              "name": "{ db }",
+              "name": "env",
               "cidl_type": {
                 "Inject": "Env"
               }
@@ -114,7 +118,7 @@
           "parameters_media": "Json",
           "parameters": [
             {
-              "name": "{ db }",
+              "name": "env",
               "cidl_type": {
                 "Inject": "Env"
               }
@@ -132,7 +136,7 @@
           "parameters_media": "Json",
           "parameters": [
             {
-              "name": "{ db }",
+              "name": "env",
               "cidl_type": {
                 "Inject": "Env"
               }
@@ -168,15 +172,15 @@
       "source_path": "./seed__horse_tinder.cloesce.ts"
     },
     "Like": {
-      "hash": 14509074532401779292,
+      "hash": 5720215631442755773,
       "name": "Like",
       "primary_key": {
         "name": "id",
         "cidl_type": "Integer"
       },
-      "attributes": [
+      "columns": [
         {
-          "hash": 4854163086161148575,
+          "hash": 12694925679217116412,
           "value": {
             "name": "horseId1",
             "cidl_type": "Integer"
@@ -184,7 +188,7 @@
           "foreign_key_reference": "Horse"
         },
         {
-          "hash": 6539715335795530220,
+          "hash": 14380477928784389193,
           "value": {
             "name": "horseId2",
             "cidl_type": "Integer"
@@ -199,11 +203,14 @@
           "model_reference": "Horse",
           "kind": {
             "OneToOne": {
-              "attribute_reference": "horseId2"
+              "column_reference": "horseId2"
             }
           }
         }
       ],
+      "key_params": [],
+      "kv_objects": [],
+      "r2_objects": [],
       "methods": {},
       "data_sources": {},
       "cruds": [],
@@ -211,7 +218,6 @@
     }
   },
   "services": {},
-  "kv_models": {},
   "poos": {},
   "app_source": null
 }

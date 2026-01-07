@@ -5,17 +5,21 @@
         "source_path": "./seed__foreign_keys.cloesce.ts",
         "d1_binding": "db",
         "kv_bindings": [],
+        "r2_bindings": [],
         "vars": {}
     },
-    "d1_models": {
+    "models": {
         "B": {
             "name": "B",
-            "attributes": [],
+            "columns": [],
             "primary_key": {
                 "name": "id",
                 "cidl_type": "Integer"
             },
             "navigation_properties": [],
+            "key_params": [],
+            "kv_objects": [],
+            "r2_objects": [],
             "methods": {
                 "testMethod": {
                     "name": "testMethod",
@@ -33,7 +37,7 @@
         },
         "A": {
             "name": "A",
-            "attributes": [
+            "columns": [
                 {
                     "foreign_key_reference": "B",
                     "value": {
@@ -52,11 +56,14 @@
                     "model_reference": "B",
                     "kind": {
                         "OneToOne": {
-                            "attribute_reference": "bId"
+                            "column_reference": "bId"
                         }
                     }
                 }
             ],
+            "key_params": [],
+            "kv_objects": [],
+            "r2_objects": [],
             "methods": {
                 "post": {
                     "name": "post",
@@ -69,7 +76,7 @@
                     "parameters_media": "Json",
                     "parameters": [
                         {
-                            "name": "{ db }",
+                            "name": "env",
                             "cidl_type": {
                                 "Inject": "Env"
                             }
@@ -129,7 +136,7 @@
         },
         "Person": {
             "name": "Person",
-            "attributes": [],
+            "columns": [],
             "primary_key": {
                 "name": "id",
                 "cidl_type": "Integer"
@@ -140,11 +147,14 @@
                     "model_reference": "Dog",
                     "kind": {
                         "OneToMany": {
-                            "attribute_reference": "personId"
+                            "column_reference": "personId"
                         }
                     }
                 }
             ],
+            "key_params": [],
+            "kv_objects": [],
+            "r2_objects": [],
             "methods": {
                 "post": {
                     "name": "post",
@@ -157,7 +167,7 @@
                     "parameters_media": "Json",
                     "parameters": [
                         {
-                            "name": "{ db }",
+                            "name": "env",
                             "cidl_type": {
                                 "Inject": "Env"
                             }
@@ -213,7 +223,7 @@
         },
         "Dog": {
             "name": "Dog",
-            "attributes": [
+            "columns": [
                 {
                     "foreign_key_reference": "Person",
                     "value": {
@@ -227,6 +237,9 @@
                 "cidl_type": "Integer"
             },
             "navigation_properties": [],
+            "key_params": [],
+            "kv_objects": [],
+            "r2_objects": [],
             "methods": {
                 "testMethod": {
                     "name": "testMethod",
@@ -244,7 +257,7 @@
         },
         "Student": {
             "name": "Student",
-            "attributes": [],
+            "columns": [],
             "primary_key": {
                 "name": "id",
                 "cidl_type": "Integer"
@@ -260,6 +273,9 @@
                     }
                 }
             ],
+            "key_params": [],
+            "kv_objects": [],
+            "r2_objects": [],
             "methods": {
                 "post": {
                     "name": "post",
@@ -272,7 +288,7 @@
                     "parameters_media": "Json",
                     "parameters": [
                         {
-                            "name": "{ db }",
+                            "name": "env",
                             "cidl_type": {
                                 "Inject": "Env"
                             }
@@ -322,7 +338,7 @@
         },
         "Course": {
             "name": "Course",
-            "attributes": [],
+            "columns": [],
             "primary_key": {
                 "name": "id",
                 "cidl_type": "Integer"
@@ -338,13 +354,15 @@
                     }
                 }
             ],
+            "key_params": [],
+            "kv_objects": [],
+            "r2_objects": [],
             "methods": {},
             "data_sources": {},
             "cruds": [],
             "source_path": "./seed__foreign_keys.cloesce.ts"
         }
     },
-    "kv_models": {},
     "poos": {},
     "services": {},
     "app_source": null

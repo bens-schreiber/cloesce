@@ -1,6 +1,7 @@
 // GENERATED CODE. DO NOT MODIFY.
 
-import { HttpResult, DeepPartial, MediaType, requestBody, b64ToU8 } from "cloesce/client";
+import { HttpResult, DeepPartial, MediaType, requestBody, b64ToU8, KValue, R2Object } from "cloesce/client";
+
 export class PooA {
   name: string;
   major: string;
@@ -42,8 +43,9 @@ export class PooAcceptYield {
     c: PooC,
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<void>> {
-    
-    const baseUrl = new URL(`http://localhost:5002/api/PooAcceptYield/acceptPoos`);
+    const baseUrl = new URL(
+      `http://localhost:5002/api/PooAcceptYield/acceptPoos`
+    );
     const payload: any = {};
 
     payload["a"] = a;
@@ -54,11 +56,11 @@ export class PooAcceptYield {
       method: "POST",
       duplex: "half",
       headers: { "Content-Type": "application/json" },
-      body: requestBody(MediaType.Json, payload)
+      body: requestBody(MediaType.Json, payload),
     });
 
     return await HttpResult.fromResponse(
-      res, 
+      res,
       MediaType.Json,
       undefined,
       false
@@ -67,8 +69,9 @@ export class PooAcceptYield {
   static async yieldPoo(
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<PooC>> {
-    
-    const baseUrl = new URL(`http://localhost:5002/api/PooAcceptYield/yieldPoo`);
+    const baseUrl = new URL(
+      `http://localhost:5002/api/PooAcceptYield/yieldPoo`
+    );
     const payload: any = {};
 
 
@@ -76,11 +79,11 @@ export class PooAcceptYield {
       method: "POST",
       duplex: "half",
       headers: { "Content-Type": "application/json" },
-      body: requestBody(MediaType.Json, payload)
+      body: requestBody(MediaType.Json, payload),
     });
 
     return await HttpResult.fromResponse(
-      res, 
+      res,
       MediaType.Json,
       PooC,
       false
@@ -92,4 +95,3 @@ export class PooAcceptYield {
     return res;
   }
 }
-

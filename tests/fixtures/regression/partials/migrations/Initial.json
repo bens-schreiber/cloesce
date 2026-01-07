@@ -1,16 +1,16 @@
 {
-  "hash": 6266598453096649310,
-  "d1_models": {
+  "hash": 13770848679796492454,
+  "models": {
     "Dog": {
-      "hash": 13091719692277049822,
+      "hash": 10054987048785466557,
       "name": "Dog",
       "primary_key": {
         "name": "id",
         "cidl_type": "Integer"
       },
-      "attributes": [
+      "columns": [
         {
-          "hash": 5774566402684976635,
+          "hash": 12056908550303509781,
           "value": {
             "name": "name",
             "cidl_type": "Text"
@@ -18,7 +18,7 @@
           "foreign_key_reference": null
         },
         {
-          "hash": 3365517128407119927,
+          "hash": 9647859276092761937,
           "value": {
             "name": "age",
             "cidl_type": "Integer"

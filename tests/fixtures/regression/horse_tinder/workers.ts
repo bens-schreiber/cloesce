@@ -5,7 +5,6 @@ import { Horse } from "./seed__horse_tinder.cloesce.ts";
 import { Like } from "./seed__horse_tinder.cloesce.ts";
 
 
-
 const app = new CloesceApp();
 const constructorRegistry = {
 	Horse: Horse,

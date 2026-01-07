@@ -27,7 +27,8 @@
                     "value": {
                         "name": "data",
                         "cidl_type": "JsonValue"
-                    }
+                    },
+                    "list_prefix": false
                 },
                 {
                     "format": "path/to/other/{id}",
@@ -35,7 +36,8 @@
                     "value": {
                         "name": "otherData",
                         "cidl_type": "Text"
-                    }
+                    },
+                    "list_prefix": false
                 }
             ],
             "r2_objects": [],
@@ -88,7 +90,8 @@
                     "value": {
                         "name": "kvData",
                         "cidl_type": "JsonValue"
-                    }
+                    },
+                    "list_prefix": false
                 }
             ],
             "r2_objects": [],

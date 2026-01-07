@@ -250,8 +250,7 @@ export class CloesceApp {
 
           const orm = Orm.fromEnv(env);
 
-          // Hydrate D1
-          let res = {};
+          // D1
           if (model.primary_key !== null) {
             // It's been verified by the compiler a d1 binding exists
             // if a D1 model is present
@@ -269,32 +268,36 @@ export class CloesceApp {
               );
 
             // Query DB
-            let json;
             try {
-              const res: any | null = await orm.get(
+              const result = await orm.get(
                 modelCtor,
                 route.primaryKey!,
                 includeTree,
               );
 
+              // Error state: If the query itself failed, return a 500
+              if (result.isLeft()) {
+                return malformedQuery(result.value.error);
+              }
+
+              const model: any | null = result.unwrap();
+
               // Error state: If no record is found for the id, return a 404
-              if (!res) {
+              if (!model) {
                 return exit(404, RouterError.ModelNotFound, "Record not found");
               }
 
-              json = res;
+              return Either.right(model);
             } catch (e) {
               return malformedQuery(e);
             }
-
-            return Either.right(json);
           }
 
-          // Hydrate KV + R2 + instantiate objects
+          // Hydrate KV + R2
           return Either.right(
             orm.hydrate(
               ctorReg[route.model!.name],
-              res,
+              {}, // empty base, no D1
               route.keyParams,
               includeTree,
             ),
@@ -330,20 +333,20 @@ export class CloesceApp {
 
     // Note: Services are in topological order
     for (const name in ast.services) {
-      const service: any = ast.services[name];
+      const serviceMeta: Service = ast.services[name];
+      const service: any = {};
 
-      for (const attr of service.attributes) {
-        const injected = di.get(attr.injected);
+      for (const attr of serviceMeta.attributes) {
+        const injected = di.get(attr.inject_reference);
         if (!injected) {
           return exit(
             500,
             RouterError.MissingDependency,
-            `An injected parameter was missing from the instance registry: ${JSON.stringify(attr.injected)}`,
+            `An injected parameter was missing from the instance registry: ${JSON.stringify(attr.inject_reference)}`,
           )
             .unwrapLeft()
             .toResponse();
         }
-
         service[attr.var_name] = injected;
       }
 

@@ -1,4 +1,4 @@
-import { D1, POST, PrimaryKey, WranglerEnv, Inject } from "cloesce/backend";
+import { Model, POST, PrimaryKey, WranglerEnv, Inject } from "cloesce/backend";
 import { D1Database } from "@cloudflare/workers-types";
 class HttpResult<T = unknown> { }
 type Integer = number & { __kind: "Integer" };

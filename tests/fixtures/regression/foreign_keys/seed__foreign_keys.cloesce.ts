@@ -1,5 +1,5 @@
 import {
-  D1,
+  Model,
   POST,
   PrimaryKey,
   WranglerEnv,
@@ -53,8 +53,8 @@ export class A {
   static readonly withoutB: IncludeTree<A> = {};
 
   @POST
-  static async post(@Inject { db }: Env, a: A): Promise<A> {
-    const orm = Orm.fromD1(db);
+  static async post(@Inject env: Env, a: A): Promise<A> {
+    const orm = Orm.fromEnv(env);
     await orm.upsert(A, a, A.withB);
     return (await orm.get(A, a.id, A.withB)).value;
   }
@@ -97,8 +97,8 @@ export class Person {
   };
 
   @POST
-  static async post(@Inject { db }: Env, person: Person): Promise<Person> {
-    const orm = Orm.fromD1(db);
+  static async post(@Inject env: Env, person: Person): Promise<Person> {
+    const orm = Orm.fromEnv(env);
     await orm.upsert(Person, person, Person.withDogs);
     return (await orm.get(Person, person.id, Person.withDogs)).value;
   }
@@ -160,8 +160,8 @@ export class Student {
     };
 
   @POST
-  static async post(@Inject { db }: Env, student: Student): Promise<Student> {
-    const orm = Orm.fromD1(db);
+  static async post(@Inject env: Env, student: Student): Promise<Student> {
+    const orm = Orm.fromEnv(env);
     await orm.upsert(Student, student, Student.withCoursesStudents);
     return student;
   }

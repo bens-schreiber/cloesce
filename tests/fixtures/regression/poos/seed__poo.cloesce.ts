@@ -1,5 +1,5 @@
 import {
-  D1,
+  Model,
   POST,
   PrimaryKey,
   WranglerEnv,

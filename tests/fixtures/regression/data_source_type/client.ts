@@ -1,6 +1,7 @@
 // GENERATED CODE. DO NOT MODIFY.
 
-import { HttpResult, DeepPartial, MediaType, requestBody, b64ToU8 } from "cloesce/client";
+import { HttpResult, DeepPartial, MediaType, requestBody, b64ToU8, KValue, R2Object } from "cloesce/client";
+
 export class Poo {
   ds: "baz" |"none" = "none";
 
@@ -20,23 +21,27 @@ export class Foo {
     noDs: "none" = "none",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<void>> {
-    const id = encodeURIComponent(String(this.id));
-    const baseUrl = new URL(`http://localhost:5002/api/Foo/${id}/bar`);
+    const id = [
+      encodeURIComponent(String(this.id)),
+    ].join("/");
+    const baseUrl = new URL(
+      `http://localhost:5002/api/Foo/${id}/bar`
+    );
     const payload: any = {};
 
-    baseUrl.searchParams.append('customDs', String(customDs));
-    baseUrl.searchParams.append('oneDs', String(oneDs));
-    baseUrl.searchParams.append('noDs', String(noDs));
+    baseUrl.searchParams.append("customDs", String(customDs));
+    baseUrl.searchParams.append("oneDs", String(oneDs));
+    baseUrl.searchParams.append("noDs", String(noDs));
 
     const res = await fetchImpl(baseUrl, {
       method: "POST",
       duplex: "half",
       headers: { "Content-Type": "application/json" },
-      body: requestBody(MediaType.Json, payload)
+      body: requestBody(MediaType.Json, payload),
     });
 
     return await HttpResult.fromResponse(
-      res, 
+      res,
       MediaType.Json,
       undefined,
       false
@@ -66,4 +71,3 @@ export class OneDs {
     return res;
   }
 }
-

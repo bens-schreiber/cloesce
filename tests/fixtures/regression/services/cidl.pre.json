@@ -1,7 +1,6 @@
 {
     "project_name": "runner",
-    "d1_models": {},
-    "kv_models": {},
+    "models": {},
     "poos": {},
     "services": {
         "FooService": {

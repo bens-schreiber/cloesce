@@ -1,24 +1,25 @@
 {
-  "hash": 230919284813790918,
+  "hash": 16551069560551514791,
   "project_name": "runner",
   "wrangler_env": {
     "name": "Env",
     "source_path": "./seed__crud.cloesce.ts",
     "d1_binding": "db",
     "kv_bindings": [],
+    "r2_bindings": [],
     "vars": {}
   },
-  "d1_models": {
+  "models": {
     "CrudHaver": {
-      "hash": 5296265612493794740,
+      "hash": 16497283824177894047,
       "name": "CrudHaver",
       "primary_key": {
         "name": "id",
         "cidl_type": "Integer"
       },
-      "attributes": [
+      "columns": [
         {
-          "hash": 5774566402684976635,
+          "hash": 12056908550303509781,
           "value": {
             "name": "name",
             "cidl_type": "Text"
@@ -27,6 +28,9 @@
         }
       ],
       "navigation_properties": [],
+      "key_params": [],
+      "kv_objects": [],
+      "r2_objects": [],
       "methods": {
         "get": {
           "name": "get",
@@ -126,15 +130,15 @@
       "source_path": "./seed__crud.cloesce.ts"
     },
     "Parent": {
-      "hash": 14180494664470354532,
+      "hash": 9758938401003026415,
       "name": "Parent",
       "primary_key": {
         "name": "id",
         "cidl_type": "Integer"
       },
-      "attributes": [
+      "columns": [
         {
-          "hash": 9273244738491655717,
+          "hash": 15556638154300732071,
           "value": {
             "name": "favoriteChildId",
             "cidl_type": {
@@ -151,7 +155,7 @@
           "model_reference": "Child",
           "kind": {
             "OneToOne": {
-              "attribute_reference": "favoriteChildId"
+              "column_reference": "favoriteChildId"
             }
           }
         },
@@ -161,11 +165,14 @@
           "model_reference": "Child",
           "kind": {
             "OneToMany": {
-              "attribute_reference": "parentId"
+              "column_reference": "parentId"
             }
           }
         }
       ],
+      "key_params": [],
+      "kv_objects": [],
+      "r2_objects": [],
       "methods": {
         "get": {
           "name": "get",
@@ -258,15 +265,15 @@
       "source_path": "./seed__crud.cloesce.ts"
     },
     "Child": {
-      "hash": 9682775697977483777,
+      "hash": 2823647866772793242,
       "name": "Child",
       "primary_key": {
         "name": "id",
         "cidl_type": "Integer"
       },
-      "attributes": [
+      "columns": [
         {
-          "hash": 9359384940981507483,
+          "hash": 17200147533970366456,
           "value": {
             "name": "parentId",
             "cidl_type": "Integer"
@@ -281,11 +288,14 @@
           "model_reference": "Parent",
           "kind": {
             "OneToOne": {
-              "attribute_reference": "parentId"
+              "column_reference": "parentId"
             }
           }
         }
       ],
+      "key_params": [],
+      "kv_objects": [],
+      "r2_objects": [],
       "methods": {},
       "data_sources": {},
       "cruds": [],
@@ -293,7 +303,6 @@
     }
   },
   "services": {},
-  "kv_models": {},
   "poos": {},
   "app_source": null
 }

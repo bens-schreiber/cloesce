@@ -1,7 +1,7 @@
 import {
   CloesceApp,
   WranglerEnv,
-  D1,
+  Model,
   PrimaryKey,
   CRUD,
   Inject,
@@ -24,7 +24,7 @@ export class Env {
 
 @Model
 @CRUD(["SAVE"])
-export class Model {
+export class Foo {
   @PrimaryKey
   id: Integer;
 
@@ -46,13 +46,13 @@ app.onRequest((di) => {
   }
 });
 
-app.onNamespace(Model, (di) => {
+app.onNamespace(Foo, (di) => {
   di.set(InjectedThing.name, {
     value: "hello world",
   });
 });
 
-app.onMethod(Model, "blockedMethod", (di) => {
+app.onMethod(Foo, "blockedMethod", (di) => {
   return HttpResult.fail(401, "Blocked method");
 });
 

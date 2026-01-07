@@ -4,7 +4,6 @@ import cidl from "./cidl.json";
 import { Dog } from "./seed__partials.cloesce.ts";
 
 
-
 const app = new CloesceApp();
 const constructorRegistry = {
 	Dog: Dog

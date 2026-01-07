@@ -5,17 +5,21 @@
         "source_path": "./seed__ds.cloesce.ts",
         "d1_binding": "db",
         "kv_bindings": [],
+        "r2_bindings": [],
         "vars": {}
     },
-    "d1_models": {
+    "models": {
         "NoDs": {
             "name": "NoDs",
-            "attributes": [],
+            "columns": [],
             "primary_key": {
                 "name": "id",
                 "cidl_type": "Integer"
             },
             "navigation_properties": [],
+            "key_params": [],
+            "kv_objects": [],
+            "r2_objects": [],
             "methods": {},
             "data_sources": {},
             "cruds": [],
@@ -23,12 +27,15 @@
         },
         "OneDs": {
             "name": "OneDs",
-            "attributes": [],
+            "columns": [],
             "primary_key": {
                 "name": "id",
                 "cidl_type": "Integer"
             },
             "navigation_properties": [],
+            "key_params": [],
+            "kv_objects": [],
+            "r2_objects": [],
             "methods": {},
             "data_sources": {
                 "default": {
@@ -41,12 +48,15 @@
         },
         "Foo": {
             "name": "Foo",
-            "attributes": [],
+            "columns": [],
             "primary_key": {
                 "name": "id",
                 "cidl_type": "Integer"
             },
             "navigation_properties": [],
+            "key_params": [],
+            "kv_objects": [],
+            "r2_objects": [],
             "methods": {
                 "bar": {
                     "name": "bar",
@@ -87,7 +97,6 @@
             "source_path": "./seed__ds.cloesce.ts"
         }
     },
-    "kv_models": {},
     "poos": {
         "Poo": {
             "name": "Poo",

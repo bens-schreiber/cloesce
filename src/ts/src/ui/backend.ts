@@ -3,12 +3,14 @@ import type {
   R2Bucket,
   D1Database,
   KVNamespace,
+  D1Result,
 } from "@cloudflare/workers-types";
 
 import { DeepPartial, KValue, KeysOfType, u8ToB64 } from "./common.js";
 import { RuntimeContainer } from "../router/router.js";
 import { WasmResource, mapSqlJson, invokeOrmWasm } from "../router/wasm.js";
 import { CrudKind, Model as AstModel } from "../ast.js";
+import Either from "../either.js";
 
 /**
  * cloesce/backend
@@ -24,6 +26,7 @@ export type { CrudKind } from "../ast.js";
 
 export const Model: ClassDecorator = () => {};
 export const Service: ClassDecorator = () => {};
+export const PlainOldObject: ClassDecorator = () => {};
 
 /**
  * Declares a Wrangler environment definition.
@@ -385,7 +388,7 @@ export class Orm {
     base: any,
     keyParams: Record<string, string>,
     includeTree: IncludeTree<T> | null = null,
-  ) {
+  ): Promise<T> {
     const { ast, constructorRegistry } = RuntimeContainer.get();
     const model = ast.models[ctor.name];
 
@@ -393,7 +396,10 @@ export class Orm {
       throw new Error(`Model ${ctor.name} not found in AST`);
     }
 
-    const instance = Object.assign(new constructorRegistry[model.name](), base);
+    const instance: T = Object.assign(
+      new constructorRegistry[model.name](),
+      base,
+    );
     const promises: Promise<void>[] = [];
     const env: any = this.env;
 
@@ -503,6 +509,23 @@ export class Orm {
         }
       }
 
+      // Hydrate columns
+      for (const col of meta.columns) {
+        switch (col.value.cidl_type) {
+          case "DateIso": {
+            current[col.value.name] = new Date(current[col.value.name]);
+            break;
+          }
+          case "Blob": {
+            const arr: number[] = current[col.value.name];
+            current[col.value.name] = new Uint8Array(arr);
+          }
+          default: {
+            break;
+          }
+        }
+      }
+
       // Assign key params
       for (const keyParam of meta.key_params) {
         current[keyParam] = keyParams[keyParam];
@@ -577,12 +600,17 @@ export class Orm {
    * @param records D1 Result records
    * @param includeTree Include tree to define the relationships to join.
    */
-  static mapSql<T extends object>(
+  async mapSql<T extends object>(
     ctor: new () => T,
     records: Record<string, any>[],
     includeTree: IncludeTree<T> | null = null,
-  ): T[] {
-    return mapSqlJson(ctor, records, includeTree).unwrap();
+  ): Promise<T[]> {
+    const base = mapSqlJson(ctor, records, includeTree).unwrap();
+    for (const key in base) {
+      base[key] = await this.hydrate(ctor, base[key], {}, includeTree);
+    }
+
+    return base;
   }
 
   /**
@@ -632,7 +660,7 @@ export class Orm {
     ctor: new () => T,
     newModel: DeepPartial<T>,
     includeTree: IncludeTree<T> | null = null,
-  ): Promise<any> {
+  ): Promise<Either<D1Result, any>> {
     const { wasm } = RuntimeContainer.get();
     const args = [
       WasmResource.fromString(ctor.name, wasm),
@@ -647,7 +675,7 @@ export class Orm {
 
     const upsertQueryRes = invokeOrmWasm(wasm.upsert_model, args, wasm);
     if (upsertQueryRes.isLeft()) {
-      throw new Error(`Upsert failed: ${upsertQueryRes.value}`);
+      throw new Error(`Upsert failed internally: ${upsertQueryRes.value}`);
     }
 
     const statements = JSON.parse(upsertQueryRes.unwrap()) as {
@@ -671,11 +699,12 @@ export class Orm {
 
     const failed = batchRes.find((r) => !r.success);
     if (failed) {
-      throw new Error("Upsert failed: " + (failed.error ?? "unknown error"));
+      // throw new Error("Upsert failed: " + (failed.error ?? "unknown error"));
+      return Either.left(failed);
     }
 
     const rootModelId = batchRes[selectIndex!].results[0] as { id: any };
-    return rootModelId.id;
+    return Either.right(rootModelId.id);
   }
 
   /**
@@ -801,18 +830,21 @@ export class Orm {
       includeTree?: IncludeTree<T> | null;
       from?: string;
     },
-  ): Promise<T[]> {
+  ): Promise<Either<D1Result, T[]>> {
     const sql = Orm.listQuery(ctor, opts);
 
     const stmt = this.db.prepare(sql);
     const records = await stmt.all();
     if (!records.success) {
-      throw new Error(
-        "List query failed: " + (records.error ?? "unknown error"),
-      );
+      return Either.left(records);
     }
 
-    return Orm.mapSql(ctor, records.results, opts.includeTree ?? null);
+    const mapped = await this.mapSql(
+      ctor,
+      records.results,
+      opts.includeTree ?? null,
+    );
+    return Either.right(mapped);
   }
 
   /**
@@ -832,7 +864,7 @@ export class Orm {
     ctor: new () => T,
     id: any,
     includeTree?: IncludeTree<T> | null,
-  ): Promise<T | null> {
+  ): Promise<Either<D1Result, T | null>> {
     const sql = Orm.getQuery(ctor, includeTree);
     const record = await this.db.prepare(sql).bind(id).run();
 
@@ -841,10 +873,10 @@ export class Orm {
     }
 
     if (record.results.length === 0) {
-      return null;
+      return Either.right(null);
     }
 
-    const mapped = Orm.mapSql(ctor, record.results, includeTree);
-    return mapped[0];
+    const mapped = await this.mapSql(ctor, record.results, includeTree);
+    return Either.right(mapped[0]);
   }
 }

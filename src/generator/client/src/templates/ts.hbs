@@ -171,7 +171,7 @@ export class {{this.name}} {
     }
 {{/if}}
 {{/each}}
-{{#each this.attributes}}
+{{#each this.columns}}
 {{#if (is_blob_array value.cidl_type)}}
     for (let i = 0; i < res.{{value.name}}.length; i++) {
       res.{{value.name}}[i] = b64ToU8(res.{{value.name}}[i]);

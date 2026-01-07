@@ -1,6 +1,7 @@
 // GENERATED CODE. DO NOT MODIFY.
 
-import { HttpResult, DeepPartial, MediaType, requestBody, b64ToU8 } from "cloesce/client";
+import { HttpResult, DeepPartial, MediaType, requestBody, b64ToU8, KValue, R2Object } from "cloesce/client";
+
 
 
 export class Child {
@@ -11,7 +12,7 @@ export class Child {
 
   static fromJson(data: any): Child {
     const res = Object.assign(new Child(), data);
-    res["parent"] &&= .fromJson(res.parent);
+    res["parent"] &&= Parent.fromJson(res.parent);
     return res;
   }
 }
@@ -24,12 +25,12 @@ export class CrudHaver {
     __datasource: "none" = "none",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<CrudHaver>> {
-    
-    const baseUrl = new URL(`http://localhost:5002/api/CrudHaver/get`);
-    
+    const baseUrl = new URL(
+      `http://localhost:5002/api/CrudHaver/get`
+    );
 
-    baseUrl.searchParams.append('id', String(id));
-    baseUrl.searchParams.append('__datasource', String(__datasource));
+    baseUrl.searchParams.append("id", String(id));
+    baseUrl.searchParams.append("__datasource", String(__datasource));
 
     const res = await fetchImpl(baseUrl, {
       method: "GET",
@@ -37,7 +38,7 @@ export class CrudHaver {
     });
 
     return await HttpResult.fromResponse(
-      res, 
+      res,
       MediaType.Json,
       CrudHaver,
       false
@@ -47,11 +48,11 @@ export class CrudHaver {
     __datasource: "none" = "none",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<CrudHaver[]>> {
-    
-    const baseUrl = new URL(`http://localhost:5002/api/CrudHaver/list`);
-    
+    const baseUrl = new URL(
+      `http://localhost:5002/api/CrudHaver/list`
+    );
 
-    baseUrl.searchParams.append('__datasource', String(__datasource));
+    baseUrl.searchParams.append("__datasource", String(__datasource));
 
     const res = await fetchImpl(baseUrl, {
       method: "GET",
@@ -59,7 +60,7 @@ export class CrudHaver {
     });
 
     return await HttpResult.fromResponse(
-      res, 
+      res,
       MediaType.Json,
       CrudHaver,
       true
@@ -69,21 +70,25 @@ export class CrudHaver {
     __datasource: "none" = "none",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<void>> {
-    const id = encodeURIComponent(String(this.id));
-    const baseUrl = new URL(`http://localhost:5002/api/CrudHaver/${id}/notCrud`);
+    const id = [
+      encodeURIComponent(String(this.id)),
+    ].join("/");
+    const baseUrl = new URL(
+      `http://localhost:5002/api/CrudHaver/${id}/notCrud`
+    );
     const payload: any = {};
 
-    baseUrl.searchParams.append('__datasource', String(__datasource));
+    baseUrl.searchParams.append("__datasource", String(__datasource));
 
     const res = await fetchImpl(baseUrl, {
       method: "POST",
       duplex: "half",
       headers: { "Content-Type": "application/json" },
-      body: requestBody(MediaType.Json, payload)
+      body: requestBody(MediaType.Json, payload),
     });
 
     return await HttpResult.fromResponse(
-      res, 
+      res,
       MediaType.Json,
       undefined,
       false
@@ -94,22 +99,23 @@ export class CrudHaver {
     __datasource: "none" = "none",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<CrudHaver>> {
-    
-    const baseUrl = new URL(`http://localhost:5002/api/CrudHaver/save`);
+    const baseUrl = new URL(
+      `http://localhost:5002/api/CrudHaver/save`
+    );
     const payload: any = {};
 
     payload["model"] = model;
-    baseUrl.searchParams.append('__datasource', String(__datasource));
+    baseUrl.searchParams.append("__datasource", String(__datasource));
 
     const res = await fetchImpl(baseUrl, {
       method: "POST",
       duplex: "half",
       headers: { "Content-Type": "application/json" },
-      body: requestBody(MediaType.Json, payload)
+      body: requestBody(MediaType.Json, payload),
     });
 
     return await HttpResult.fromResponse(
-      res, 
+      res,
       MediaType.Json,
       CrudHaver,
       false
@@ -132,12 +138,12 @@ export class Parent {
     __datasource: "withChildren" |"none" = "none",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Parent>> {
-    
-    const baseUrl = new URL(`http://localhost:5002/api/Parent/get`);
-    
+    const baseUrl = new URL(
+      `http://localhost:5002/api/Parent/get`
+    );
 
-    baseUrl.searchParams.append('id', String(id));
-    baseUrl.searchParams.append('__datasource', String(__datasource));
+    baseUrl.searchParams.append("id", String(id));
+    baseUrl.searchParams.append("__datasource", String(__datasource));
 
     const res = await fetchImpl(baseUrl, {
       method: "GET",
@@ -145,7 +151,7 @@ export class Parent {
     });
 
     return await HttpResult.fromResponse(
-      res, 
+      res,
       MediaType.Json,
       Parent,
       false
@@ -155,11 +161,11 @@ export class Parent {
     __datasource: "withChildren" |"none" = "none",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Parent[]>> {
-    
-    const baseUrl = new URL(`http://localhost:5002/api/Parent/list`);
-    
+    const baseUrl = new URL(
+      `http://localhost:5002/api/Parent/list`
+    );
 
-    baseUrl.searchParams.append('__datasource', String(__datasource));
+    baseUrl.searchParams.append("__datasource", String(__datasource));
 
     const res = await fetchImpl(baseUrl, {
       method: "GET",
@@ -167,7 +173,7 @@ export class Parent {
     });
 
     return await HttpResult.fromResponse(
-      res, 
+      res,
       MediaType.Json,
       Parent,
       true
@@ -178,22 +184,23 @@ export class Parent {
     __datasource: "withChildren" |"none" = "none",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Parent>> {
-    
-    const baseUrl = new URL(`http://localhost:5002/api/Parent/save`);
+    const baseUrl = new URL(
+      `http://localhost:5002/api/Parent/save`
+    );
     const payload: any = {};
 
     payload["model"] = model;
-    baseUrl.searchParams.append('__datasource', String(__datasource));
+    baseUrl.searchParams.append("__datasource", String(__datasource));
 
     const res = await fetchImpl(baseUrl, {
       method: "POST",
       duplex: "half",
       headers: { "Content-Type": "application/json" },
-      body: requestBody(MediaType.Json, payload)
+      body: requestBody(MediaType.Json, payload),
     });
 
     return await HttpResult.fromResponse(
-      res, 
+      res,
       MediaType.Json,
       Parent,
       false
@@ -202,11 +209,10 @@ export class Parent {
 
   static fromJson(data: any): Parent {
     const res = Object.assign(new Parent(), data);
-    res["favoriteChild"] &&= .fromJson(res.favoriteChild);
+    res["favoriteChild"] &&= Child.fromJson(res.favoriteChild);
     for (let i = 0; i < res.children?.length; i++) {
-      res.children[i] = .fromJson(res.children[i]);
+      res.children[i] = Child.fromJson(res.children[i]);
     }
     return res;
   }
 }
-

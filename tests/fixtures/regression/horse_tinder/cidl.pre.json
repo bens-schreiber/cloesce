@@ -5,14 +5,15 @@
         "source_path": "./seed__horse_tinder.cloesce.ts",
         "d1_binding": "db",
         "kv_bindings": [],
+        "r2_bindings": [],
         "vars": {
             "motd": "Text"
         }
     },
-    "d1_models": {
+    "models": {
         "Horse": {
             "name": "Horse",
-            "attributes": [
+            "columns": [
                 {
                     "foreign_key_reference": null,
                     "value": {
@@ -40,11 +41,14 @@
                     "model_reference": "Like",
                     "kind": {
                         "OneToMany": {
-                            "attribute_reference": "horseId1"
+                            "column_reference": "horseId1"
                         }
                     }
                 }
             ],
+            "key_params": [],
+            "kv_objects": [],
+            "r2_objects": [],
             "methods": {
                 "post": {
                     "name": "post",
@@ -57,7 +61,7 @@
                     "parameters_media": "Json",
                     "parameters": [
                         {
-                            "name": "{ db }",
+                            "name": "env",
                             "cidl_type": {
                                 "Inject": "Env"
                             }
@@ -81,7 +85,7 @@
                     "parameters_media": "Json",
                     "parameters": [
                         {
-                            "name": "{ db }",
+                            "name": "env",
                             "cidl_type": {
                                 "Inject": "Env"
                             }
@@ -105,7 +109,7 @@
                     "parameters_media": "Json",
                     "parameters": [
                         {
-                            "name": "{ db }",
+                            "name": "env",
                             "cidl_type": {
                                 "Inject": "Env"
                             }
@@ -121,7 +125,7 @@
                     "parameters_media": "Json",
                     "parameters": [
                         {
-                            "name": "{ db }",
+                            "name": "env",
                             "cidl_type": {
                                 "Inject": "Env"
                             }
@@ -156,7 +160,7 @@
         },
         "Like": {
             "name": "Like",
-            "attributes": [
+            "columns": [
                 {
                     "foreign_key_reference": "Horse",
                     "value": {
@@ -182,18 +186,20 @@
                     "model_reference": "Horse",
                     "kind": {
                         "OneToOne": {
-                            "attribute_reference": "horseId2"
+                            "column_reference": "horseId2"
                         }
                     }
                 }
             ],
+            "key_params": [],
+            "kv_objects": [],
+            "r2_objects": [],
             "methods": {},
             "data_sources": {},
             "cruds": [],
             "source_path": "./seed__horse_tinder.cloesce.ts"
         }
     },
-    "kv_models": {},
     "poos": {},
     "services": {},
     "app_source": null

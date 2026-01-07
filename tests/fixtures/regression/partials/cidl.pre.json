@@ -5,12 +5,13 @@
         "source_path": "./seed__partials.cloesce.ts",
         "d1_binding": "db",
         "kv_bindings": [],
+        "r2_bindings": [],
         "vars": {}
     },
-    "d1_models": {
+    "models": {
         "Dog": {
             "name": "Dog",
-            "attributes": [
+            "columns": [
                 {
                     "foreign_key_reference": null,
                     "value": {
@@ -31,6 +32,9 @@
                 "cidl_type": "Integer"
             },
             "navigation_properties": [],
+            "key_params": [],
+            "kv_objects": [],
+            "r2_objects": [],
             "methods": {
                 "post": {
                     "name": "post",
@@ -43,7 +47,7 @@
                     "parameters_media": "Json",
                     "parameters": [
                         {
-                            "name": "{ db }",
+                            "name": "env",
                             "cidl_type": {
                                 "Inject": "Env"
                             }
@@ -73,7 +77,6 @@
             "source_path": "./seed__partials.cloesce.ts"
         }
     },
-    "kv_models": {},
     "poos": {},
     "services": {},
     "app_source": null

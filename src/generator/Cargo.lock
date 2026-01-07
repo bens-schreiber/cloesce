@@ -91,8 +91,6 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_with",
- "toml",
- "tracing",
 ]
 
 [[package]]

@@ -5,12 +5,13 @@
         "source_path": "./seed__crud.cloesce.ts",
         "d1_binding": "db",
         "kv_bindings": [],
+        "r2_bindings": [],
         "vars": {}
     },
-    "d1_models": {
+    "models": {
         "CrudHaver": {
             "name": "CrudHaver",
-            "attributes": [
+            "columns": [
                 {
                     "foreign_key_reference": null,
                     "value": {
@@ -24,6 +25,9 @@
                 "cidl_type": "Integer"
             },
             "navigation_properties": [],
+            "key_params": [],
+            "kv_objects": [],
+            "r2_objects": [],
             "methods": {
                 "notCrud": {
                     "name": "notCrud",
@@ -45,7 +49,7 @@
         },
         "Parent": {
             "name": "Parent",
-            "attributes": [
+            "columns": [
                 {
                     "foreign_key_reference": "Child",
                     "value": {
@@ -66,7 +70,7 @@
                     "model_reference": "Child",
                     "kind": {
                         "OneToOne": {
-                            "attribute_reference": "favoriteChildId"
+                            "column_reference": "favoriteChildId"
                         }
                     }
                 },
@@ -75,11 +79,14 @@
                     "model_reference": "Child",
                     "kind": {
                         "OneToMany": {
-                            "attribute_reference": "parentId"
+                            "column_reference": "parentId"
                         }
                     }
                 }
             ],
+            "key_params": [],
+            "kv_objects": [],
+            "r2_objects": [],
             "methods": {},
             "data_sources": {
                 "withChildren": {
@@ -99,7 +106,7 @@
         },
         "Child": {
             "name": "Child",
-            "attributes": [
+            "columns": [
                 {
                     "foreign_key_reference": "Parent",
                     "value": {
@@ -118,18 +125,20 @@
                     "model_reference": "Parent",
                     "kind": {
                         "OneToOne": {
-                            "attribute_reference": "parentId"
+                            "column_reference": "parentId"
                         }
                     }
                 }
             ],
+            "key_params": [],
+            "kv_objects": [],
+            "r2_objects": [],
             "methods": {},
             "data_sources": {},
             "cruds": [],
             "source_path": "./seed__crud.cloesce.ts"
         }
     },
-    "kv_models": {},
     "poos": {},
     "services": {},
     "app_source": null

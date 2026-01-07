@@ -1,6 +1,6 @@
 import { D1Database } from "@cloudflare/workers-types";
 import {
-  D1,
+  Model,
   POST,
   GET,
   Inject,
@@ -25,8 +25,8 @@ export class Dog {
   age: Integer;
 
   @POST
-  static async post(@Inject { db }: Env, dog: DeepPartial<Dog>): Promise<Dog> {
-    const orm = Orm.fromD1(db);
+  static async post(@Inject env: Env, dog: DeepPartial<Dog>): Promise<Dog> {
+    const orm = Orm.fromEnv(env);
     const res = await orm.upsert(Dog, dog, null);
     return (await orm.get(Dog, res.value, null)).value;
   }

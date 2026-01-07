@@ -70,7 +70,6 @@ pub enum GeneratorErrorKind {
     InconsistentWranglerBinding,
     InvalidStream,
     InvalidModelReference,
-    InvalidKVTree,
     InvalidKeyFormat,
     UnknownKeyReference,
     UnsupportedCrudOperation,
@@ -166,11 +165,6 @@ impl GeneratorErrorKind {
             GeneratorErrorKind::InvalidModelReference => (
                 "Unknown or invalid Model reference.",
                 "References to a Model must be a defined matching type.",
-                GeneratorPhase::ModelAnalysis,
-            ),
-            GeneratorErrorKind::InvalidKVTree => (
-                "KV Models cannot share dependencies (e.g., must be a directed tree)",
-                "Remove the shared dependency.",
                 GeneratorPhase::ModelAnalysis,
             ),
             GeneratorErrorKind::InvalidKeyFormat => (

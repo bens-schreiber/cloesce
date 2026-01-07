@@ -1,25 +1,25 @@
 {
-  "hash": 11505330283879565005,
-  "d1_models": {
+  "hash": 1972991810136208241,
+  "models": {
     "B": {
-      "hash": 6294104789386767043,
+      "hash": 4631908692780450632,
       "name": "B",
       "primary_key": {
         "name": "id",
         "cidl_type": "Integer"
       },
-      "attributes": [],
+      "columns": [],
       "navigation_properties": [],
       "data_sources": {}
     },
     "Course": {
-      "hash": 5418376037924256986,
+      "hash": 1775575352698084697,
       "name": "Course",
       "primary_key": {
         "name": "id",
         "cidl_type": "Integer"
       },
-      "attributes": [],
+      "columns": [],
       "navigation_properties": [
         {
           "hash": 7522322899197762685,
@@ -35,13 +35,13 @@
       "data_sources": {}
     },
     "Person": {
-      "hash": 9738043568918276035,
+      "hash": 10656214504113312273,
       "name": "Person",
       "primary_key": {
         "name": "id",
         "cidl_type": "Integer"
       },
-      "attributes": [],
+      "columns": [],
       "navigation_properties": [
         {
           "hash": 14619809136778017828,
@@ -49,7 +49,7 @@
           "model_reference": "Dog",
           "kind": {
             "OneToMany": {
-              "attribute_reference": "personId"
+              "column_reference": "personId"
             }
           }
         }
@@ -65,13 +65,13 @@
       }
     },
     "Student": {
-      "hash": 16702929639147618453,
+      "hash": 7546379683369971548,
       "name": "Student",
       "primary_key": {
         "name": "id",
         "cidl_type": "Integer"
       },
-      "attributes": [],
+      "columns": [],
       "navigation_properties": [
         {
           "hash": 16503297458927537581,
@@ -108,15 +108,15 @@
       }
     },
     "A": {
-      "hash": 12099806380270748571,
+      "hash": 13284691691514683419,
       "name": "A",
       "primary_key": {
         "name": "id",
         "cidl_type": "Integer"
       },
-      "attributes": [
+      "columns": [
         {
-          "hash": 17839369392057298877,
+          "hash": 7233387911336606235,
           "value": {
             "name": "bId",
             "cidl_type": "Integer"
@@ -131,7 +131,7 @@
           "model_reference": "B",
           "kind": {
             "OneToOne": {
-              "attribute_reference": "bId"
+              "column_reference": "bId"
             }
           }
         }
@@ -152,15 +152,15 @@
       }
     },
     "Dog": {
-      "hash": 9257794273236604936,
+      "hash": 7734451209746023667,
       "name": "Dog",
       "primary_key": {
         "name": "id",
         "cidl_type": "Integer"
       },
-      "attributes": [
+      "columns": [
         {
-          "hash": 6417117313588463867,
+          "hash": 14257879906577322840,
           "value": {
             "name": "personId",
             "cidl_type": "Integer"

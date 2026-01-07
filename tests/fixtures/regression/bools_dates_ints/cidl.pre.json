@@ -5,12 +5,13 @@
         "source_path": "./seed__bools_dates_ints.cloesce.ts",
         "d1_binding": "db",
         "kv_bindings": [],
+        "r2_bindings": [],
         "vars": {}
     },
-    "d1_models": {
+    "models": {
         "Weather": {
             "name": "Weather",
-            "attributes": [
+            "columns": [
                 {
                     "foreign_key_reference": null,
                     "value": {
@@ -31,6 +32,9 @@
                 "cidl_type": "Integer"
             },
             "navigation_properties": [],
+            "key_params": [],
+            "kv_objects": [],
+            "r2_objects": [],
             "methods": {},
             "data_sources": {},
             "cruds": [
@@ -40,7 +44,6 @@
             "source_path": "./seed__bools_dates_ints.cloesce.ts"
         }
     },
-    "kv_models": {},
     "poos": {},
     "services": {},
     "app_source": null
