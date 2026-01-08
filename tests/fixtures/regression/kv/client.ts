@@ -11,92 +11,16 @@ export class D1BackedModel {
   keyParam: string;
   kvData: KValue<unknown>;
 
-  static async get(
-    id: number,
-    keyParam: string,
-    __datasource: "none" = "none",
-    fetchImpl: typeof fetch = fetch
-  ): Promise<HttpResult<D1BackedModel>> {
-    const baseUrl = new URL(
-      `http://localhost:5002/api/D1BackedModel/get`
-    );
-
-    baseUrl.searchParams.append("id", String(id));
-    baseUrl.searchParams.append("keyParam", String(keyParam));
-    baseUrl.searchParams.append("__datasource", String(__datasource));
-
-    const res = await fetchImpl(baseUrl, {
-      method: "GET",
-      duplex: "half",
-    });
-
-    return await HttpResult.fromResponse(
-      res,
-      MediaType.Json,
-      D1BackedModel,
-      false
-    );
-  }
-  async instanceMethod(
-    __datasource: "none" = "none",
-    fetchImpl: typeof fetch = fetch
-  ): Promise<HttpResult<D1BackedModel>> {
-    const id = [
-      encodeURIComponent(String(this.id)),
-      encodeURIComponent(String(this.keyParam)),
-    ].join("/");
-    const baseUrl = new URL(
-      `http://localhost:5002/api/D1BackedModel/${id}/instanceMethod`
-    );
-
-    baseUrl.searchParams.append("__datasource", String(__datasource));
-
-    const res = await fetchImpl(baseUrl, {
-      method: "GET",
-      duplex: "half",
-    });
-
-    return await HttpResult.fromResponse(
-      res,
-      MediaType.Json,
-      D1BackedModel,
-      false
-    );
-  }
-  static async list(
-    __datasource: "none" = "none",
-    fetchImpl: typeof fetch = fetch
-  ): Promise<HttpResult<D1BackedModel[]>> {
-    const baseUrl = new URL(
-      `http://localhost:5002/api/D1BackedModel/list`
-    );
-
-    baseUrl.searchParams.append("__datasource", String(__datasource));
-
-    const res = await fetchImpl(baseUrl, {
-      method: "GET",
-      duplex: "half",
-    });
-
-    return await HttpResult.fromResponse(
-      res,
-      MediaType.Json,
-      D1BackedModel,
-      true
-    );
-  }
-  static async save(
+  static async post(
     model: DeepPartial<D1BackedModel>,
-    __datasource: "none" = "none",
     fetchImpl: typeof fetch = fetch
-  ): Promise<HttpResult<D1BackedModel>> {
+  ): Promise<HttpResult<void>> {
     const baseUrl = new URL(
-      `http://localhost:5002/api/D1BackedModel/save`
+      `http://localhost:5002/api/D1BackedModel/post`
     );
     const payload: any = {};
 
     payload["model"] = model;
-    baseUrl.searchParams.append("__datasource", String(__datasource));
 
     const res = await fetchImpl(baseUrl, {
       method: "POST",
@@ -108,7 +32,7 @@ export class D1BackedModel {
     return await HttpResult.fromResponse(
       res,
       MediaType.Json,
-      D1BackedModel,
+      undefined,
       false
     );
   }
@@ -123,42 +47,20 @@ export class PureKVModel {
   data: KValue<unknown>;
   otherData: KValue<string>;
 
-  static async get(
+  static async post(
     id: string,
-    __datasource: "default" |"none" = "none",
+    data: unknown,
+    otherData: string,
     fetchImpl: typeof fetch = fetch
-  ): Promise<HttpResult<PureKVModel>> {
+  ): Promise<HttpResult<void>> {
     const baseUrl = new URL(
-      `http://localhost:5002/api/PureKVModel/get`
-    );
-
-    baseUrl.searchParams.append("id", String(id));
-    baseUrl.searchParams.append("__datasource", String(__datasource));
-
-    const res = await fetchImpl(baseUrl, {
-      method: "GET",
-      duplex: "half",
-    });
-
-    return await HttpResult.fromResponse(
-      res,
-      MediaType.Json,
-      PureKVModel,
-      false
-    );
-  }
-  static async save(
-    model: DeepPartial<PureKVModel>,
-    __datasource: "default" |"none" = "none",
-    fetchImpl: typeof fetch = fetch
-  ): Promise<HttpResult<PureKVModel>> {
-    const baseUrl = new URL(
-      `http://localhost:5002/api/PureKVModel/save`
+      `http://localhost:5002/api/PureKVModel/post`
     );
     const payload: any = {};
 
-    payload["model"] = model;
-    baseUrl.searchParams.append("__datasource", String(__datasource));
+    payload["id"] = id;
+    payload["data"] = data;
+    payload["otherData"] = otherData;
 
     const res = await fetchImpl(baseUrl, {
       method: "POST",
@@ -170,7 +72,7 @@ export class PureKVModel {
     return await HttpResult.fromResponse(
       res,
       MediaType.Json,
-      PureKVModel,
+      undefined,
       false
     );
   }

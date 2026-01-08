@@ -41,7 +41,36 @@
                 }
             ],
             "r2_objects": [],
-            "methods": {},
+            "methods": {
+                "post": {
+                    "name": "post",
+                    "http_verb": "POST",
+                    "is_static": true,
+                    "return_media": "Json",
+                    "return_type": "Void",
+                    "parameters_media": "Json",
+                    "parameters": [
+                        {
+                            "name": "env",
+                            "cidl_type": {
+                                "Inject": "Env"
+                            }
+                        },
+                        {
+                            "name": "id",
+                            "cidl_type": "Text"
+                        },
+                        {
+                            "name": "data",
+                            "cidl_type": "JsonValue"
+                        },
+                        {
+                            "name": "otherData",
+                            "cidl_type": "Text"
+                        }
+                    ]
+                }
+            },
             "data_sources": {
                 "default": {
                     "name": "default",
@@ -51,10 +80,7 @@
                     }
                 }
             },
-            "cruds": [
-                "GET",
-                "SAVE"
-            ],
+            "cruds": [],
             "source_path": "./seed__kv.cloesce.ts"
         },
         "D1BackedModel": {
@@ -96,24 +122,31 @@
             ],
             "r2_objects": [],
             "methods": {
-                "instanceMethod": {
-                    "name": "instanceMethod",
-                    "http_verb": "GET",
-                    "is_static": false,
+                "post": {
+                    "name": "post",
+                    "http_verb": "POST",
+                    "is_static": true,
                     "return_media": "Json",
-                    "return_type": {
-                        "Object": "D1BackedModel"
-                    },
+                    "return_type": "Void",
                     "parameters_media": "Json",
-                    "parameters": []
+                    "parameters": [
+                        {
+                            "name": "env",
+                            "cidl_type": {
+                                "Inject": "Env"
+                            }
+                        },
+                        {
+                            "name": "model",
+                            "cidl_type": {
+                                "Partial": "D1BackedModel"
+                            }
+                        }
+                    ]
                 }
             },
             "data_sources": {},
-            "cruds": [
-                "GET",
-                "LIST",
-                "SAVE"
-            ],
+            "cruds": [],
             "source_path": "./seed__kv.cloesce.ts"
         }
     },

@@ -1,6 +1,6 @@
 import { OrmWasmExports, loadOrmWasm } from "./wasm.js";
 import { proxyCrud } from "./crud.js";
-import { HttpResult, IncludeTree, Orm } from "../ui/backend.js";
+import { HttpResult, IncludeTree } from "../ui/backend.js";
 import { KeysOfType } from "../ui/common.js";
 import {
   CloesceAst,
@@ -12,6 +12,7 @@ import {
 } from "../ast.js";
 import { RuntimeValidator } from "./validator.js";
 import Either from "../either.js";
+import { Orm } from "../ui/backend.js";
 
 /**
  * Dependency injection container, mapping an object type name to an instance of that object.
@@ -243,6 +244,11 @@ export class CloesceApp {
           const model = route.model!;
           const modelCtor = ctorReg[model.name];
 
+          // Static methods operate on the class itself, no hydration needed
+          if (route.method.is_static) {
+            return Either.right(proxyCrud(modelCtor, modelCtor, env));
+          }
+
           const includeTree: IncludeTree<any> | null =
             dataSource === NO_DATA_SOURCE
               ? null
@@ -252,12 +258,6 @@ export class CloesceApp {
 
           // D1
           if (model.primary_key !== null) {
-            // It's been verified by the compiler a d1 binding exists
-            // if a D1 model is present
-            if (route.method.is_static) {
-              return Either.right(proxyCrud(modelCtor, modelCtor, env));
-            }
-
             // Error state: If some outside force tweaked the database schema, the query may fail.
             // Otherwise, this indicates a bug in the compiler or runtime.
             const malformedQuery = (e: any) =>
@@ -293,9 +293,9 @@ export class CloesceApp {
             }
           }
 
-          // Hydrate KV + R2
+          // KV + R2
           return Either.right(
-            orm.hydrate(
+            await orm.hydrate(
               ctorReg[route.model!.name],
               {}, // empty base, no D1
               route.keyParams,

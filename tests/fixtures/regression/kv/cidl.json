@@ -55,107 +55,31 @@
       ],
       "r2_objects": [],
       "methods": {
-        "get": {
-          "name": "get",
-          "is_static": true,
-          "http_verb": "GET",
-          "return_media": "Json",
-          "return_type": {
-            "HttpResult": {
-              "Object": "D1BackedModel"
-            }
-          },
-          "parameters_media": "Json",
-          "parameters": [
-            {
-              "name": "id",
-              "cidl_type": "Real"
-            },
-            {
-              "name": "keyParam",
-              "cidl_type": "Text"
-            },
-            {
-              "name": "__datasource",
-              "cidl_type": {
-                "DataSource": "D1BackedModel"
-              }
-            }
-          ]
-        },
-        "instanceMethod": {
-          "name": "instanceMethod",
-          "is_static": false,
-          "http_verb": "GET",
-          "return_media": "Json",
-          "return_type": {
-            "Object": "D1BackedModel"
-          },
-          "parameters_media": "Json",
-          "parameters": [
-            {
-              "name": "__datasource",
-              "cidl_type": {
-                "DataSource": "D1BackedModel"
-              }
-            }
-          ]
-        },
-        "list": {
-          "name": "list",
-          "is_static": true,
-          "http_verb": "GET",
-          "return_media": "Json",
-          "return_type": {
-            "HttpResult": {
-              "Array": {
-                "Object": "D1BackedModel"
-              }
-            }
-          },
-          "parameters_media": "Json",
-          "parameters": [
-            {
-              "name": "__datasource",
-              "cidl_type": {
-                "DataSource": "D1BackedModel"
-              }
-            }
-          ]
-        },
-        "save": {
-          "name": "save",
+        "post": {
+          "name": "post",
           "is_static": true,
           "http_verb": "POST",
           "return_media": "Json",
-          "return_type": {
-            "HttpResult": {
-              "Object": "D1BackedModel"
-            }
-          },
+          "return_type": "Void",
           "parameters_media": "Json",
           "parameters": [
+            {
+              "name": "env",
+              "cidl_type": {
+                "Inject": "Env"
+              }
+            },
             {
               "name": "model",
               "cidl_type": {
                 "Partial": "D1BackedModel"
-              }
-            },
-            {
-              "name": "__datasource",
-              "cidl_type": {
-                "DataSource": "D1BackedModel"
               }
             }
           ]
         }
       },
       "data_sources": {},
-      "cruds": [
-        "GET",
-        "LIST",
-        "SAVE"
-      ],
+      "cruds": [],
       "source_path": "./seed__kv.cloesce.ts"
     },
     "PureKVModel": {
@@ -189,53 +113,31 @@
       ],
       "r2_objects": [],
       "methods": {
-        "get": {
-          "name": "get",
+        "post": {
+          "name": "post",
           "is_static": true,
-          "http_verb": "GET",
+          "http_verb": "POST",
           "return_media": "Json",
-          "return_type": {
-            "HttpResult": {
-              "Object": "PureKVModel"
-            }
-          },
+          "return_type": "Void",
           "parameters_media": "Json",
           "parameters": [
+            {
+              "name": "env",
+              "cidl_type": {
+                "Inject": "Env"
+              }
+            },
             {
               "name": "id",
               "cidl_type": "Text"
             },
             {
-              "name": "__datasource",
-              "cidl_type": {
-                "DataSource": "PureKVModel"
-              }
-            }
-          ]
-        },
-        "save": {
-          "name": "save",
-          "is_static": true,
-          "http_verb": "POST",
-          "return_media": "Json",
-          "return_type": {
-            "HttpResult": {
-              "Object": "PureKVModel"
-            }
-          },
-          "parameters_media": "Json",
-          "parameters": [
-            {
-              "name": "model",
-              "cidl_type": {
-                "Partial": "PureKVModel"
-              }
+              "name": "data",
+              "cidl_type": "JsonValue"
             },
             {
-              "name": "__datasource",
-              "cidl_type": {
-                "DataSource": "PureKVModel"
-              }
+              "name": "otherData",
+              "cidl_type": "Text"
             }
           ]
         }
@@ -250,10 +152,7 @@
           }
         }
       },
-      "cruds": [
-        "GET",
-        "SAVE"
-      ],
+      "cruds": [],
       "source_path": "./seed__kv.cloesce.ts"
     }
   },

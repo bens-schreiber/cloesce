@@ -93,9 +93,9 @@ Importantly, a D1 row must actually exist for the KV data to be accessed. If the
 
 ### CRUD
 
-CRUD operations should be supported when integrating with KV data. `GET` will take in the necessary key parameters, and `SAVE` will take validated JSON data to store in KV.
-
-However, the `LIST` operation doesn't make as much sense when dealing with purely KV fields. Thus, it won't be supported unless a D1 model is also present to provide context for listing.
+- `GET`: Retrieve KV values and all other associated fields/columns.
+- `SAVE`: Save will upload KV values along with metadata if provided.
+- `LIST`: Listing KV values only makes sense when a D1 model is present to provide context. Thus, it won't be supported unless a D1 model is also present.
 
 ## R2
 
