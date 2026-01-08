@@ -6,17 +6,17 @@ export enum ExtractorErrorCode {
   InvalidDataSourceDefinition,
   InvalidPartialType,
   InvalidIncludeTree,
-  InvalidAttributeModifier,
+  InvalidPropertyModifier,
   InvalidApiMethodModifier,
   UnknownNavigationPropertyReference,
   InvalidNavigationPropertyReference,
   MissingNavigationPropertyReference,
   MissingManyToManyUniqueId,
-  MissingPrimaryKey,
-  MissingDatabaseBinding,
   TooManyWranglerEnvs,
   MissingFile,
-  InvalidServiceAttribute,
+  InvalidServiceProperty,
+  InvalidTypescriptSyntax,
+  MissingKValue,
 }
 
 const errorInfoMap: Record<
@@ -55,7 +55,7 @@ const errorInfoMap: Record<
     suggestion:
       "Include trees must only contain references to a model's navigation properties.",
   },
-  [ExtractorErrorCode.InvalidAttributeModifier]: {
+  [ExtractorErrorCode.InvalidPropertyModifier]: {
     description:
       "Attributes can only be public on a Model, Plain Old Object or Wrangler Environment",
     suggestion: "Change the attribute modifier to just `public`",
@@ -84,14 +84,6 @@ const errorInfoMap: Record<
     suggestion:
       "Define a unique identifier field for the Many-to-Many relationship",
   },
-  [ExtractorErrorCode.MissingPrimaryKey]: {
-    description: "Missing primary key on a model",
-    suggestion: "Add a primary key field to your model (e.g., `id: number`)",
-  },
-  [ExtractorErrorCode.MissingDatabaseBinding]: {
-    description: "Missing a database binding in the WranglerEnv definition",
-    suggestion: "Add a `D1Database` to your WranglerEnv",
-  },
   [ExtractorErrorCode.TooManyWranglerEnvs]: {
     description: "Too many wrangler environments defined in the project",
     suggestion: "Consolidate or remove unused @WranglerEnv's",
@@ -100,10 +92,18 @@ const errorInfoMap: Record<
     description: "A specified input file could not be found",
     suggestion: "Verify the input file path is correct",
   },
-  [ExtractorErrorCode.InvalidServiceAttribute]: {
+  [ExtractorErrorCode.InvalidServiceProperty]: {
     description:
       "Services must contain only dependency injected instances as attributes.",
     suggestion: "Remove the attribute.",
+  },
+  [ExtractorErrorCode.InvalidTypescriptSyntax]: {
+    description: "The TypeScript syntax is invalid.",
+    suggestion: "Fix the TypeScript syntax errors.",
+  },
+  [ExtractorErrorCode.MissingKValue]: {
+    description: "All KV decorated fields must be of type KValue<T>",
+    suggestion: "Change the field type to KValue<T>.",
   },
 };
 

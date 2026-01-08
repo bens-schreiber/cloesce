@@ -1,5 +1,5 @@
 import {
-  D1,
+  Model,
   POST,
   PrimaryKey,
   WranglerEnv,
@@ -16,7 +16,7 @@ import {
 } from "cloesce/backend";
 import { D1Database } from "@cloudflare/workers-types";
 type Integer = number & { __kind: "Integer" };
-class HttpResult<T = unknown> {}
+class HttpResult<T = unknown> { }
 
 @WranglerEnv
 export class Env {
@@ -24,16 +24,16 @@ export class Env {
 }
 
 //#region OneToOne
-@D1
+@Model
 export class B {
   @PrimaryKey
   id: Integer;
 
   @POST
-  testMethod() {}
+  testMethod() { }
 }
 
-@D1
+@Model
 export class A {
   @PrimaryKey
   id: Integer;
@@ -53,8 +53,8 @@ export class A {
   static readonly withoutB: IncludeTree<A> = {};
 
   @POST
-  static async post(@Inject { db }: Env, a: A): Promise<A> {
-    const orm = Orm.fromD1(db);
+  static async post(@Inject env: Env, a: A): Promise<A> {
+    const orm = Orm.fromEnv(env);
     await orm.upsert(A, a, A.withB);
     return (await orm.get(A, a.id, A.withB)).value;
   }
@@ -83,7 +83,7 @@ export class A {
 //#endregion
 
 //#region OneToMany
-@D1
+@Model
 export class Person {
   @PrimaryKey
   id: Integer;
@@ -97,8 +97,8 @@ export class Person {
   };
 
   @POST
-  static async post(@Inject { db }: Env, person: Person): Promise<Person> {
-    const orm = Orm.fromD1(db);
+  static async post(@Inject env: Env, person: Person): Promise<Person> {
+    const orm = Orm.fromEnv(env);
     await orm.upsert(Person, person, Person.withDogs);
     return (await orm.get(Person, person.id, Person.withDogs)).value;
   }
@@ -128,7 +128,7 @@ export class Person {
   }
 }
 
-@D1
+@Model
 export class Dog {
   @PrimaryKey
   id: Integer;
@@ -137,12 +137,12 @@ export class Dog {
   personId: Integer;
 
   @POST
-  testMethod() {}
+  testMethod() { }
 }
 //#endregion
 
 //#region ManyToMany
-@D1
+@Model
 export class Student {
   @PrimaryKey
   id: Integer;
@@ -160,8 +160,8 @@ export class Student {
     };
 
   @POST
-  static async post(@Inject { db }: Env, student: Student): Promise<Student> {
-    const orm = Orm.fromD1(db);
+  static async post(@Inject env: Env, student: Student): Promise<Student> {
+    const orm = Orm.fromEnv(env);
     await orm.upsert(Student, student, Student.withCoursesStudents);
     return student;
   }
@@ -172,7 +172,7 @@ export class Student {
   }
 }
 
-@D1
+@Model
 export class Course {
   @PrimaryKey
   id: Integer;

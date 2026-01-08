@@ -1,7 +1,5 @@
 {
-    "version": "v0.0.4",
     "project_name": "runner",
-    "language": "TypeScript",
     "models": {},
     "poos": {},
     "services": {
@@ -35,7 +33,7 @@
             "attributes": [
                 {
                     "var_name": "foo",
-                    "injected": "FooService"
+                    "inject_reference": "FooService"
                 }
             ],
             "methods": {

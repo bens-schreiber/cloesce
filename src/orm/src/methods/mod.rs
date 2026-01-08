@@ -39,6 +39,7 @@ impl Display for OrmError {
 #[repr(u32)]
 pub enum OrmErrorKind {
     UnknownModel,
+    ModelMissingD1,
     MissingPrimaryKey,
     MissingAttribute,
     TypeMismatch,
@@ -86,34 +87,22 @@ use std::fmt::Display;
 use crate::ModelMeta;
 
 #[cfg(test)]
-#[macro_export]
-macro_rules! expected_str {
-    ($got:expr, $expected:expr) => {{
-        let got_val = &$got;
-        let expected_val = &$expected;
-        assert!(
-            got_val.to_string().contains(&expected_val.to_string()),
-            "Expected: \n`{}`, \n\ngot:\n{:?}",
-            expected_val,
-            got_val
-        );
-    }};
-}
-
-#[cfg(test)]
 pub async fn test_sql(
     mut models: ModelMeta,
     stmts: Vec<(String, Vec<serde_json::Value>)>,
     db: sqlx::SqlitePool,
 ) -> std::result::Result<(), sqlx::Error> {
-    use d1::D1Generator;
+    use migrations::{MigrationsDilemma, MigrationsGenerator, MigrationsIntent};
 
     // Generate and run schema migration
     let migration_ast = {
-        use ast::{CloesceAst, MigrationsAst, MigrationsModel, builder::create_ast};
+        use ast::{CloesceAst, MigrationsAst, MigrationsModel};
+        use generator_test::{create_ast, create_spec};
+        use semantic::SemanticAnalysis;
 
         let mut ast = create_ast(models.drain().map(|(_, m)| m).collect::<Vec<_>>());
-        ast.semantic_analysis().unwrap();
+        let spec = create_spec(&ast);
+        SemanticAnalysis::analyze(&mut ast, &spec).unwrap();
 
         let CloesceAst { hash, models, .. } = ast;
         let migrations_models = models
@@ -124,8 +113,8 @@ pub async fn test_sql(
                     MigrationsModel {
                         hash: model.hash,
                         name: model.name,
-                        primary_key: model.primary_key,
-                        attributes: model.attributes,
+                        primary_key: model.primary_key.unwrap(),
+                        columns: model.columns,
                         navigation_properties: model.navigation_properties,
                         data_sources: model.data_sources,
                     },
@@ -140,13 +129,13 @@ pub async fn test_sql(
     };
 
     struct MockMigrationsIntent;
-    impl d1::MigrationsIntent for MockMigrationsIntent {
-        fn ask(&self, _: d1::MigrationsDilemma) -> Option<usize> {
+    impl MigrationsIntent for MockMigrationsIntent {
+        fn ask(&self, _: MigrationsDilemma) -> Option<usize> {
             panic!()
         }
     }
 
-    let migration = D1Generator::migrate(&migration_ast, None, &MockMigrationsIntent);
+    let migration = MigrationsGenerator::migrate(&migration_ast, None, &MockMigrationsIntent);
     sqlx::query(&migration).execute(&db).await.unwrap();
 
     let mut tx = db.begin().await?;

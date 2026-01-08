@@ -1,6 +1,7 @@
 // GENERATED CODE. DO NOT MODIFY.
 
-import { HttpResult, DeepPartial, MediaType, requestBody, b64ToU8 } from "cloesce/client";
+import { HttpResult, DeepPartial, MediaType, requestBody, b64ToU8, KValue, R2Object } from "cloesce/client";
+
 
 export class BlobService {
   static async incrementBlob(
@@ -16,16 +17,16 @@ export class BlobService {
       method: "POST",
       duplex: "half",
       headers: { "Content-Type": "application/json" },
-      body: requestBody(MediaType.Json, payload)
+      body: requestBody(MediaType.Json, payload),
     });
 
     return await HttpResult.fromResponse(
-      res, 
+      res,
       MediaType.Json,
       Uint8Array,
       false
     );
-    }
+  }
 }
 
 export class BlobHaver {
@@ -38,10 +39,12 @@ export class BlobHaver {
     __datasource: "none" = "none",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<BlobHaver>> {
-    const baseUrl = new URL(`http://localhost:5002/api/BlobHaver/get`);
+    const baseUrl = new URL(
+      `http://localhost:5002/api/BlobHaver/get`
+    );
 
-    baseUrl.searchParams.append('id', String(id));
-    baseUrl.searchParams.append('__datasource', String(__datasource));
+    baseUrl.searchParams.append("id", String(id));
+    baseUrl.searchParams.append("__datasource", String(__datasource));
 
     const res = await fetchImpl(baseUrl, {
       method: "GET",
@@ -49,19 +52,24 @@ export class BlobHaver {
     });
 
     return await HttpResult.fromResponse(
-      res, 
+      res,
       MediaType.Json,
       BlobHaver,
       false
     );
   }
   async getBlob1(
-    __dataSource: "none" = "none",
+    __datasource: "none" = "none",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Uint8Array>> {
-    const baseUrl = new URL(`http://localhost:5002/api/BlobHaver/${this.id}/getBlob1`);
+    const id = [
+      encodeURIComponent(String(this.id)),
+    ].join("/");
+    const baseUrl = new URL(
+      `http://localhost:5002/api/BlobHaver/${id}/getBlob1`
+    );
 
-    baseUrl.searchParams.append('__dataSource', String(__dataSource));
+    baseUrl.searchParams.append("__datasource", String(__datasource));
 
     const res = await fetchImpl(baseUrl, {
       method: "GET",
@@ -69,7 +77,7 @@ export class BlobHaver {
     });
 
     return await HttpResult.fromResponse(
-      res, 
+      res,
       MediaType.Json,
       Uint8Array,
       false
@@ -79,7 +87,9 @@ export class BlobHaver {
     stream: ReadableStream<Uint8Array>,
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<void>> {
-    const baseUrl = new URL(`http://localhost:5002/api/BlobHaver/inputStream`);
+    const baseUrl = new URL(
+      `http://localhost:5002/api/BlobHaver/inputStream`
+    );
     const payload: any = {};
 
     payload["stream"] = stream;
@@ -88,11 +98,11 @@ export class BlobHaver {
       method: "POST",
       duplex: "half",
       headers: { "Content-Type": "application/octet-stream" },
-      body: requestBody(MediaType.Octet, payload)
+      body: requestBody(MediaType.Octet, payload),
     });
 
     return await HttpResult.fromResponse(
-      res, 
+      res,
       MediaType.Json,
       undefined,
       false
@@ -102,9 +112,11 @@ export class BlobHaver {
     __datasource: "none" = "none",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<BlobHaver[]>> {
-    const baseUrl = new URL(`http://localhost:5002/api/BlobHaver/list`);
+    const baseUrl = new URL(
+      `http://localhost:5002/api/BlobHaver/list`
+    );
 
-    baseUrl.searchParams.append('__datasource', String(__datasource));
+    baseUrl.searchParams.append("__datasource", String(__datasource));
 
     const res = await fetchImpl(baseUrl, {
       method: "GET",
@@ -112,7 +124,7 @@ export class BlobHaver {
     });
 
     return await HttpResult.fromResponse(
-      res, 
+      res,
       MediaType.Json,
       BlobHaver,
       true
@@ -123,33 +135,40 @@ export class BlobHaver {
     __datasource: "none" = "none",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<BlobHaver>> {
-    const baseUrl = new URL(`http://localhost:5002/api/BlobHaver/save`);
+    const baseUrl = new URL(
+      `http://localhost:5002/api/BlobHaver/save`
+    );
     const payload: any = {};
 
     payload["model"] = model;
-    baseUrl.searchParams.append('__datasource', String(__datasource));
+    baseUrl.searchParams.append("__datasource", String(__datasource));
 
     const res = await fetchImpl(baseUrl, {
       method: "POST",
       duplex: "half",
       headers: { "Content-Type": "application/json" },
-      body: requestBody(MediaType.Json, payload)
+      body: requestBody(MediaType.Json, payload),
     });
 
     return await HttpResult.fromResponse(
-      res, 
+      res,
       MediaType.Json,
       BlobHaver,
       false
     );
   }
   async yieldStream(
-    __dataSource: "none" = "none",
+    __datasource: "none" = "none",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<ReadableStream<Uint8Array>>> {
-    const baseUrl = new URL(`http://localhost:5002/api/BlobHaver/${this.id}/yieldStream`);
+    const id = [
+      encodeURIComponent(String(this.id)),
+    ].join("/");
+    const baseUrl = new URL(
+      `http://localhost:5002/api/BlobHaver/${id}/yieldStream`
+    );
 
-    baseUrl.searchParams.append('__dataSource', String(__dataSource));
+    baseUrl.searchParams.append("__datasource", String(__datasource));
 
     const res = await fetchImpl(baseUrl, {
       method: "GET",
@@ -157,7 +176,7 @@ export class BlobHaver {
     });
 
     return await HttpResult.fromResponse(
-      res, 
+      res,
       MediaType.Octet,
       ReadableStream<Uint8Array>,
       false

@@ -1,0 +1,33 @@
+{
+  "hash": 13468236154706247040,
+  "models": {
+    "D1BackedModel": {
+      "hash": 13702850169640110521,
+      "name": "D1BackedModel",
+      "primary_key": {
+        "name": "id",
+        "cidl_type": "Real"
+      },
+      "columns": [
+        {
+          "hash": 1999042468264969055,
+          "value": {
+            "name": "someColumn",
+            "cidl_type": "Real"
+          },
+          "foreign_key_reference": null
+        },
+        {
+          "hash": 5739512274815634865,
+          "value": {
+            "name": "someOtherColumn",
+            "cidl_type": "Text"
+          },
+          "foreign_key_reference": null
+        }
+      ],
+      "navigation_properties": [],
+      "data_sources": {}
+    }
+  }
+}

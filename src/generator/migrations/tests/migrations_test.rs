@@ -1,27 +1,11 @@
 use std::collections::HashMap;
 
-use ast::{
-    CidlType, CloesceAst, MigrationsAst, MigrationsModel, NavigationPropertyKind,
-    builder::{IncludeTreeBuilder, ModelBuilder, create_ast},
-};
+use ast::{CidlType, CloesceAst, MigrationsAst, MigrationsModel, NavigationPropertyKind};
+use generator_test::{IncludeTreeBuilder, ModelBuilder, create_ast, expected_str};
+use migrations::{MigrationsDilemma, MigrationsGenerator, MigrationsIntent};
 
-use d1::{D1Generator, MigrationsIntent};
 use indexmap::IndexMap;
 use sqlx::SqlitePool;
-
-/// Compares two strings disregarding tabs, amount of spaces, and amount of newlines.
-/// Ensures that some expr is present in another expr.
-macro_rules! expected_str {
-    ($got:expr, $expected:expr) => {{
-        let clean = |s: &str| s.chars().filter(|c| !c.is_whitespace()).collect::<String>();
-        assert!(
-            clean(&$got.to_string()).contains(&clean(&$expected.to_string())),
-            "Expected:\n`{}`\n\ngot:\n`{}`",
-            $expected,
-            $got
-        );
-    }};
-}
 
 async fn exists_in_db(db: &SqlitePool, name: &str) -> bool {
     sqlx::query_scalar::<_, i64>(
@@ -53,8 +37,8 @@ fn as_migration(ast: CloesceAst) -> MigrationsAst {
             let m = MigrationsModel {
                 hash: model.hash,
                 name: model.name,
-                primary_key: model.primary_key,
-                attributes: model.attributes,
+                primary_key: model.primary_key.unwrap(),
+                columns: model.columns,
                 navigation_properties: model.navigation_properties,
                 data_sources: model.data_sources,
             };
@@ -80,16 +64,16 @@ struct MockMigrationsIntent {
 }
 
 impl MigrationsIntent for MockMigrationsIntent {
-    fn ask(&self, dilemma: d1::MigrationsDilemma) -> Option<usize> {
+    fn ask(&self, dilemma: MigrationsDilemma) -> Option<usize> {
         let (key, opts) = match &dilemma {
-            d1::MigrationsDilemma::RenameOrDropModel {
+            MigrationsDilemma::RenameOrDropModel {
                 model_name,
                 options,
             } => ((model_name.clone(), None), options),
-            d1::MigrationsDilemma::RenameOrDropAttribute {
+            MigrationsDilemma::RenameOrDropColumn {
                 model_name,
                 options,
-                attribute_name,
+                column_name: attribute_name,
             } => ((model_name.clone(), Some(attribute_name.clone())), options),
         };
 
@@ -108,10 +92,10 @@ async fn migrate_models_scalars(db: SqlitePool) {
         let ast = {
             let mut ast = create_ast(vec![
                 ModelBuilder::new("User")
-                    .id()
-                    .attribute("name", CidlType::nullable(CidlType::Text), None)
-                    .attribute("age", CidlType::Integer, None)
-                    .attribute("address", CidlType::Text, None)
+                    .id_pk()
+                    .col("name", CidlType::nullable(CidlType::Text), None)
+                    .col("age", CidlType::Integer, None)
+                    .col("address", CidlType::Text, None)
                     .build(),
             ]);
             ast.set_merkle_hash();
@@ -119,7 +103,8 @@ async fn migrate_models_scalars(db: SqlitePool) {
         };
 
         // Act
-        let sql = D1Generator::migrate(&ast, Some(&empty_ast), &MockMigrationsIntent::default());
+        let sql =
+            MigrationsGenerator::migrate(&ast, Some(&empty_ast), &MockMigrationsIntent::default());
 
         // Assert
         expected_str!(sql, "CREATE TABLE IF NOT EXISTS");
@@ -137,7 +122,8 @@ async fn migrate_models_scalars(db: SqlitePool) {
     // Drop
     {
         // Act
-        let sql = D1Generator::migrate(&empty_ast, Some(&ast), &MockMigrationsIntent::default());
+        let sql =
+            MigrationsGenerator::migrate(&empty_ast, Some(&ast), &MockMigrationsIntent::default());
 
         // Assert
         expected_str!(sql, "DROP TABLE IF EXISTS \"User\"");
@@ -157,13 +143,13 @@ async fn migrate_models_one_to_one(db: SqlitePool) {
         let ast = {
             let mut ast = create_ast(vec![
                 ModelBuilder::new("Person")
-                    .id()
-                    .attribute("dogId", CidlType::Integer, Some("Dog".into()))
+                    .id_pk()
+                    .col("dogId", CidlType::Integer, Some("Dog".into()))
                     .nav_p(
                         "dog",
                         "Dog",
                         NavigationPropertyKind::OneToOne {
-                            reference: "dogId".into(),
+                            column_reference: "dogId".into(),
                         },
                     )
                     .data_source(
@@ -171,14 +157,15 @@ async fn migrate_models_one_to_one(db: SqlitePool) {
                         IncludeTreeBuilder::default().add_node("dog").build(),
                     )
                     .build(),
-                ModelBuilder::new("Dog").id().build(),
+                ModelBuilder::new("Dog").id_pk().build(),
             ]);
             ast.set_merkle_hash();
             as_migration(ast)
         };
 
         // Act
-        let sql = D1Generator::migrate(&ast, Some(&empty_ast), &MockMigrationsIntent::default());
+        let sql =
+            MigrationsGenerator::migrate(&ast, Some(&empty_ast), &MockMigrationsIntent::default());
 
         // Assert
         expected_str!(
@@ -196,7 +183,8 @@ async fn migrate_models_one_to_one(db: SqlitePool) {
     // Drop
     {
         // Act
-        let sql = D1Generator::migrate(&empty_ast, Some(&ast), &MockMigrationsIntent::default());
+        let sql =
+            MigrationsGenerator::migrate(&empty_ast, Some(&ast), &MockMigrationsIntent::default());
 
         // Assert
         query(&db, &sql).await.expect("Drop query to work");
@@ -216,30 +204,30 @@ async fn migrate_models_one_to_many(db: SqlitePool) {
         let ast = {
             let mut ast = create_ast(vec![
                 ModelBuilder::new("Dog")
-                    .id()
-                    .attribute("personId", CidlType::Integer, Some("Person".into()))
+                    .id_pk()
+                    .col("personId", CidlType::Integer, Some("Person".into()))
                     .build(),
                 ModelBuilder::new("Cat")
-                    .attribute("personId", CidlType::Integer, Some("Person".into()))
-                    .id()
+                    .col("personId", CidlType::Integer, Some("Person".into()))
+                    .id_pk()
                     .build(),
                 ModelBuilder::new("Person")
-                    .id()
+                    .id_pk()
                     .nav_p(
                         "dogs",
                         "Dog",
                         NavigationPropertyKind::OneToMany {
-                            reference: "personId".into(),
+                            column_reference: "personId".into(),
                         },
                     )
                     .nav_p(
                         "cats",
                         "Cat",
                         NavigationPropertyKind::OneToMany {
-                            reference: "personId".into(),
+                            column_reference: "personId".into(),
                         },
                     )
-                    .attribute("bossId", CidlType::Integer, Some("Boss".into()))
+                    .col("bossId", CidlType::Integer, Some("Boss".into()))
                     .data_source(
                         "default",
                         IncludeTreeBuilder::default()
@@ -249,12 +237,12 @@ async fn migrate_models_one_to_many(db: SqlitePool) {
                     )
                     .build(),
                 ModelBuilder::new("Boss")
-                    .id()
+                    .id_pk()
                     .nav_p(
                         "persons",
                         "Person",
                         NavigationPropertyKind::OneToMany {
-                            reference: "bossId".into(),
+                            column_reference: "bossId".into(),
                         },
                     )
                     .data_source(
@@ -270,7 +258,8 @@ async fn migrate_models_one_to_many(db: SqlitePool) {
         };
 
         // Act
-        let sql = D1Generator::migrate(&ast, Some(&empty_ast), &MockMigrationsIntent::default());
+        let sql =
+            MigrationsGenerator::migrate(&ast, Some(&empty_ast), &MockMigrationsIntent::default());
 
         // Assert
         expected_str!(
@@ -302,7 +291,8 @@ async fn migrate_models_one_to_many(db: SqlitePool) {
     // Drop
     {
         // Act
-        let sql = D1Generator::migrate(&empty_ast, Some(&ast), &MockMigrationsIntent::default());
+        let sql =
+            MigrationsGenerator::migrate(&empty_ast, Some(&ast), &MockMigrationsIntent::default());
 
         query(&db, &sql).await.expect("Drop tables query to work");
         assert!(!exists_in_db(&db, "Boss").await);
@@ -322,7 +312,7 @@ async fn migrate_models_many_to_many(db: SqlitePool) {
         let ast = {
             let mut ast = create_ast(vec![
                 ModelBuilder::new("Student")
-                    .id()
+                    .id_pk()
                     .nav_p(
                         "courses",
                         "Course".to_string(),
@@ -336,7 +326,7 @@ async fn migrate_models_many_to_many(db: SqlitePool) {
                     )
                     .build(),
                 ModelBuilder::new("Course")
-                    .id()
+                    .id_pk()
                     .nav_p(
                         "students",
                         "Student".to_string(),
@@ -355,7 +345,8 @@ async fn migrate_models_many_to_many(db: SqlitePool) {
         };
 
         // Act
-        let sql = D1Generator::migrate(&ast, Some(&empty_ast), &MockMigrationsIntent::default());
+        let sql =
+            MigrationsGenerator::migrate(&ast, Some(&empty_ast), &MockMigrationsIntent::default());
 
         // Assert
         expected_str!(sql, r#"CREATE TABLE IF NOT EXISTS "StudentsCourses""#);
@@ -380,7 +371,8 @@ async fn migrate_models_many_to_many(db: SqlitePool) {
     // Drop
     {
         // Act
-        let sql = D1Generator::migrate(&empty_ast, Some(&ast), &MockMigrationsIntent::default());
+        let sql =
+            MigrationsGenerator::migrate(&empty_ast, Some(&ast), &MockMigrationsIntent::default());
 
         // Assert
         query(&db, &sql).await.expect("Drop tables query to work");
@@ -393,14 +385,14 @@ async fn migrate_with_alterations(db: SqlitePool) {
     let mut base_ast = {
         let ast = as_migration(create_ast(vec![
             ModelBuilder::new("User")
-                .id()
-                .attribute("name", CidlType::nullable(CidlType::Text), None)
-                .attribute("age", CidlType::Integer, None)
-                .attribute("address", CidlType::Text, None)
+                .id_pk()
+                .col("name", CidlType::nullable(CidlType::Text), None)
+                .col("age", CidlType::Integer, None)
+                .col("address", CidlType::Text, None)
                 .build(),
         ]));
 
-        let sql = D1Generator::migrate(&ast, None, &MockMigrationsIntent::default());
+        let sql = MigrationsGenerator::migrate(&ast, None, &MockMigrationsIntent::default());
         query(&db, &sql)
             .await
             .expect("Create table queries to work");
@@ -414,10 +406,10 @@ async fn migrate_with_alterations(db: SqlitePool) {
         let new = {
             let mut ast = create_ast(vec![
                 ModelBuilder::new("User")
-                    .id()
-                    .attribute("first_name", CidlType::nullable(CidlType::Text), None) // changed name
-                    .attribute("age", CidlType::Text, None) // changed type
-                    .attribute("favorite_color", CidlType::Text, None) // added column
+                    .id_pk()
+                    .col("first_name", CidlType::nullable(CidlType::Text), None) // changed name
+                    .col("age", CidlType::Text, None) // changed type
+                    .col("favorite_color", CidlType::Text, None) // added column
                     // dropped column "address"
                     .build(),
             ]);
@@ -435,7 +427,7 @@ async fn migrate_with_alterations(db: SqlitePool) {
             .insert(("User".into(), Some("address".into())), None);
 
         // Act
-        let sql = D1Generator::migrate(&new, Some(&base_ast), &intent);
+        let sql = MigrationsGenerator::migrate(&new, Some(&base_ast), &intent);
 
         // Assert
         expected_str!(
@@ -462,19 +454,20 @@ ALTER TABLE "User" ADD COLUMN "age" text"#
         let new = {
             let mut ast = create_ast(vec![
                 ModelBuilder::new("User")
-                    .id()
-                    .attribute("first_name", CidlType::nullable(CidlType::Text), None)
-                    .attribute("age", CidlType::Text, None)
-                    .attribute("favorite_color", CidlType::Text, None)
+                    .id_pk()
+                    .col("first_name", CidlType::nullable(CidlType::Text), None)
+                    .col("age", CidlType::Text, None)
+                    .col("favorite_color", CidlType::Text, None)
                     .build(),
             ]);
-            ast.models[0].primary_key.cidl_type = CidlType::Text; // new PK type
+            ast.models[0].primary_key.as_mut().unwrap().cidl_type = CidlType::Text; // new PK type
             ast.set_merkle_hash();
             as_migration(ast)
         };
 
         // Act
-        let sql = D1Generator::migrate(&new, Some(&base_ast), &MockMigrationsIntent::default());
+        let sql =
+            MigrationsGenerator::migrate(&new, Some(&base_ast), &MockMigrationsIntent::default());
 
         // Assert
         expected_str!(sql, r#"ALTER TABLE "User" RENAME TO "User_"#);
@@ -499,22 +492,23 @@ ALTER TABLE "User" ADD COLUMN "age" text"#
         // Arrange
         let new = {
             let mut ast = create_ast(vec![
-                ModelBuilder::new("Dog").id().build(), // added Dog
+                ModelBuilder::new("Dog").id_pk().build(), // added Dog
                 ModelBuilder::new("User")
-                    .id()
-                    .attribute("first_name", CidlType::nullable(CidlType::Text), None)
-                    .attribute("age", CidlType::Text, None)
-                    .attribute("favorite_color", CidlType::Text, None)
-                    .attribute("dog_id", CidlType::Integer, Some("Dog".into())) // added Dog FK
+                    .id_pk()
+                    .col("first_name", CidlType::nullable(CidlType::Text), None)
+                    .col("age", CidlType::Text, None)
+                    .col("favorite_color", CidlType::Text, None)
+                    .col("dog_id", CidlType::Integer, Some("Dog".into())) // added Dog FK
                     .build(),
             ]);
-            ast.models[1].primary_key.cidl_type = CidlType::Text;
+            ast.models[1].primary_key.as_mut().unwrap().cidl_type = CidlType::Text;
             ast.set_merkle_hash();
             as_migration(ast)
         };
 
         // Act
-        let sql = D1Generator::migrate(&new, Some(&base_ast), &MockMigrationsIntent::default());
+        let sql =
+            MigrationsGenerator::migrate(&new, Some(&base_ast), &MockMigrationsIntent::default());
 
         // Assert
         expected_str!(sql, r#"ALTER TABLE "User" RENAME TO "User_"#);
@@ -536,7 +530,7 @@ async fn migrate_alter_drop_m2m(db: SqlitePool) {
     let m2m_ast = {
         let mut ast = create_ast(vec![
             ModelBuilder::new("Student")
-                .id()
+                .id_pk()
                 .nav_p(
                     "courses",
                     "Course",
@@ -546,7 +540,7 @@ async fn migrate_alter_drop_m2m(db: SqlitePool) {
                 )
                 .build(),
             ModelBuilder::new("Course")
-                .id()
+                .id_pk()
                 .nav_p(
                     "students",
                     "Student",
@@ -559,7 +553,7 @@ async fn migrate_alter_drop_m2m(db: SqlitePool) {
         ast.set_merkle_hash();
         let migration = as_migration(ast);
 
-        let sql = D1Generator::migrate(&migration, None, &MockMigrationsIntent::default());
+        let sql = MigrationsGenerator::migrate(&migration, None, &MockMigrationsIntent::default());
         query(&db, &sql)
             .await
             .expect("Create table queries to work");
@@ -570,15 +564,15 @@ async fn migrate_alter_drop_m2m(db: SqlitePool) {
 
     let no_m2m_ast = {
         let mut ast = create_ast(vec![
-            ModelBuilder::new("Student").id().build(),
-            ModelBuilder::new("Course").id().build(),
+            ModelBuilder::new("Student").id_pk().build(),
+            ModelBuilder::new("Course").id_pk().build(),
         ]);
         ast.set_merkle_hash();
         as_migration(ast)
     };
 
     // Act
-    let sql = D1Generator::migrate(
+    let sql = MigrationsGenerator::migrate(
         &no_m2m_ast,
         Some(&m2m_ast),
         &MockMigrationsIntent::default(),
@@ -597,13 +591,13 @@ async fn migrate_alter_add_m2m(db: SqlitePool) {
     // Arrange
     let no_m2m_ast = {
         let mut ast = create_ast(vec![
-            ModelBuilder::new("Student").id().build(),
-            ModelBuilder::new("Course").id().build(),
+            ModelBuilder::new("Student").id_pk().build(),
+            ModelBuilder::new("Course").id_pk().build(),
         ]);
         ast.set_merkle_hash();
         let migration = as_migration(ast);
 
-        let sql = D1Generator::migrate(&migration, None, &MockMigrationsIntent::default());
+        let sql = MigrationsGenerator::migrate(&migration, None, &MockMigrationsIntent::default());
         query(&db, &sql)
             .await
             .expect("Create table queries to work");
@@ -614,7 +608,7 @@ async fn migrate_alter_add_m2m(db: SqlitePool) {
     let m2m_ast = {
         let mut ast = create_ast(vec![
             ModelBuilder::new("Student")
-                .id()
+                .id_pk()
                 .nav_p(
                     "courses",
                     "Course",
@@ -624,7 +618,7 @@ async fn migrate_alter_add_m2m(db: SqlitePool) {
                 )
                 .build(),
             ModelBuilder::new("Course")
-                .id()
+                .id_pk()
                 .nav_p(
                     "students",
                     "Student",
@@ -639,7 +633,7 @@ async fn migrate_alter_add_m2m(db: SqlitePool) {
     };
 
     // Act
-    let sql = D1Generator::migrate(
+    let sql = MigrationsGenerator::migrate(
         &m2m_ast,
         Some(&no_m2m_ast),
         &MockMigrationsIntent::default(),

@@ -1,0 +1,13 @@
+[package]
+name = "semantic"
+version = "0.0.1"
+edition = "2024"
+
+[dependencies]
+ast = { path = "../ast" }
+
+[dev-dependencies]
+generator-test = { path = "../generator-test" }
+serde_json = { workspace = true }
+wrangler = { path = "../wrangler" }
+toml = { workspace = true }

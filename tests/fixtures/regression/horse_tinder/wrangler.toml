@@ -5,7 +5,7 @@ name = "cloesce"
 [[d1_databases]]
 binding = "db"
 database_id = "replace_with_db_id"
-database_name = "default"
+database_name = "replace_with_db_name"
 
 [vars]
 motd = "default_string"

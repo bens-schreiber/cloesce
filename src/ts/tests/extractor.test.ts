@@ -1,7 +1,12 @@
 import { describe, test, expect } from "vitest";
 import { Project } from "ts-morph";
-import { CidlExtractor } from "../src/extractor/extract";
+import {
+  CidlExtractor,
+  ModelExtractor,
+  ServiceExtractor,
+} from "../src/extractor/extract";
 import { CidlType, DataSource, Service } from "../src/ast";
+import { ModelBuilder } from "./builder";
 
 function cloesceProject(): Project {
   const project = new Project({
@@ -166,10 +171,14 @@ describe("WranglerEnv", () => {
     const sourceFile = project.createSourceFile(
       "test.ts",
       `
-       import { D1Database } from "@cloudflare/workers-types/experimental/index.js";
+       import { D1Database, KVNamespace } from "@cloudflare/workers-types";
         @WranglerEnv
         class Env {
           db: D1Database;
+          kv1: KVNamespace;
+          kv2: KVNamespace;
+          var1: string;
+          var2: number;
         }
       `,
     );
@@ -180,10 +189,21 @@ describe("WranglerEnv", () => {
 
     // Assert
     expect(res.isRight()).toBe(true);
+    expect(res.unwrap()).toEqual({
+      name: "Env",
+      d1_binding: "db",
+      kv_bindings: ["kv1", "kv2"],
+      r2_bindings: [],
+      vars: {
+        var1: "Text",
+        var2: "Real",
+      },
+      source_path: sourceFile.getFilePath().toString(),
+    });
   });
 });
 
-describe("Data Source", () => {
+describe("Model", () => {
   test("Finds Include Tree", () => {
     // Arrange
     const project = cloesceProject();
@@ -191,7 +211,7 @@ describe("Data Source", () => {
       "test.ts",
       `
       import { IncludeTree } from "./src/ui/backend";
-      @D1
+      @Model
       class Foo {
       @PrimaryKey
       id: number;
@@ -204,7 +224,7 @@ describe("Data Source", () => {
 
     // Act
     const classDecl = sourceFile.getClass("Foo")!;
-    const res = CidlExtractor.model(classDecl, sourceFile);
+    const res = ModelExtractor.extract(classDecl, sourceFile);
 
     // Assert
     expect(res.isRight()).toBe(true);
@@ -213,6 +233,61 @@ describe("Data Source", () => {
       name: "default",
       tree: {},
     } as DataSource);
+  });
+
+  test("Extracts Primary Key, Columns, Key Params and KV", () => {
+    // Arrange
+    const project = cloesceProject();
+    const sourceFile = project.createSourceFile(
+      "test.ts",
+      `
+      import { KValue, Integer } from "./src/ui/backend";
+      @Model
+      class Foo {
+        @PrimaryKey
+        id: Integer;
+
+        name: string;
+        real: number;
+        boolOrNull: boolean | null;
+
+        @KeyParam
+        kvId: string;
+
+        @KV("value/Foo/{id}/{kvId}", "namespace")
+        value: KValue<unknown>;
+
+        @KV("value/Foo", "namespace")
+        allValues: KValue<unknown>[];
+      }
+      `,
+    );
+
+    // Act
+    const classDecl = sourceFile.getClass("Foo")!;
+    const res = ModelExtractor.extract(classDecl, sourceFile);
+
+    // Assert
+    expect(res.isRight(), `Error: ${JSON.stringify(res)}`).toBe(true);
+
+    res.unwrap().source_path = "";
+    expect(res.unwrap()).toEqual(
+      ModelBuilder.model("Foo")
+        .idPk()
+        .col("name", "Text")
+        .col("real", "Real")
+        .col("boolOrNull", { Nullable: "Boolean" })
+        .keyParam("kvId")
+        .kvObject(
+          "value/Foo/{id}/{kvId}",
+          "namespace",
+          "value",
+          false,
+          "JsonValue",
+        )
+        .kvObject("value/Foo", "namespace", "allValues", true, "JsonValue")
+        .build(),
+    );
   });
 });
 
@@ -223,8 +298,6 @@ describe("Services", () => {
     const sourceFile = project.createSourceFile(
       "test.ts",
       `
-          import { IncludeTree } from "./src/ui/backend";
-
           @Service
           class BarService {}
 
@@ -237,7 +310,7 @@ describe("Services", () => {
 
     // Act
     const classDecl = sourceFile.getClass("FooService")!;
-    const res = CidlExtractor.service(classDecl, sourceFile);
+    const res = ServiceExtractor.extract(classDecl, sourceFile);
 
     // Assert
     expect(res.isRight()).toBe(true);
@@ -246,7 +319,7 @@ describe("Services", () => {
       attributes: [
         {
           var_name: "barService",
-          injected: "BarService",
+          inject_reference: "BarService",
         },
       ],
       methods: {},

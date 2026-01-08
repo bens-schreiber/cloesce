@@ -1,5 +1,5 @@
 // @ts-nocheck
-// InvalidAttributeModifier
+// InvalidPropertyModifier
 
 @PlainOldObject
 export class Foo {

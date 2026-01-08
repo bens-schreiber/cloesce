@@ -51,59 +51,25 @@ type DeepPartialInner<T> = T extends (infer U)[]
  */
 export type DeepPartial<T> = DeepPartialInner<T> & { __brand?: "Partial" };
 
-export class Either<L, R> {
-  private constructor(
-    private readonly inner: { ok: true; right: R } | { ok: false; left: L },
-  ) {}
-
-  get value(): L | R {
-    return this.inner.ok ? this.inner.right : this.inner.left;
-  }
-
-  static left<R>(): Either<void, R>;
-  static left<L, R = never>(value: L): Either<L, R>;
-
-  static left<L, R = never>(value?: L): Either<L | void, R> {
-    return new Either({ ok: false, left: value as L | void });
-  }
-
-  static right<R, L = never>(value: R): Either<L, R> {
-    return new Either({ ok: true, right: value });
-  }
-
-  isLeft(): this is Either<L, never> {
-    return !this.inner.ok;
-  }
-
-  isRight(): this is Either<never, R> {
-    return this.inner.ok;
-  }
-
-  unwrap(): R {
-    if (!this.inner.ok) {
-      throw new Error("Tried to unwrap a Left value");
-    }
-    return this.inner.right;
-  }
-
-  unwrapLeft(): L {
-    if (this.inner.ok) {
-      throw new Error("Tried to unwrapLeft a Right value");
-    }
-    return this.inner.left;
-  }
-
-  map<B>(fn: (val: R) => B): Either<L, B> {
-    return this.inner.ok
-      ? Either.right(fn(this.inner.right))
-      : Either.left(this.inner.left);
-  }
-
-  mapLeft<B>(fn: (val: L) => B): Either<B, R> {
-    return this.inner.ok
-      ? Either.right(this.inner.right)
-      : Either.left(fn(this.inner.left));
-  }
+/**
+ * Base class for a Cloudflare KV model or navigation property.
+ *
+ * Consists of a `key`, `value`, and optional `metadata`.
+ *
+ * @template V The type of the value stored in the KValue. Note that KV is schema-less,
+ * so this type is not enforced at runtime, but serves as the type the client expects.
+ *
+ * @remarks
+ * - The `key` is a string that uniquely identifies the entry in the KV store.
+ * - The `value` is of generic type `V`, allowing flexibility in the type of data stored.
+ * - `V` must be serializable to JSON.
+ * - The `metadata` can hold any additional information associated with the KV entry.
+ */
+export class KValue<V> {
+  key!: string;
+  value!: V | null;
+  raw: unknown | null;
+  metadata: unknown | null;
 }
 
 /**
@@ -116,9 +82,19 @@ export function requestBody(
 ): undefined | string | ReadableStream<Uint8Array> {
   switch (mediaType) {
     case MediaType.Json: {
-      return JSON.stringify(data ?? {}, (_, v) =>
-        v instanceof Uint8Array ? u8ToB64(v) : v,
-      );
+      return JSON.stringify(data ?? {}, (_, v) => {
+        // Convert Uint8Arrays to base64 strings
+        if (v instanceof Uint8Array) {
+          return u8ToB64(v);
+        }
+
+        // ReadableStreams are not serializable, toss them
+        if (v instanceof ReadableStream) {
+          return undefined;
+        }
+
+        return v;
+      });
     }
     case MediaType.Octet: {
       // JSON structure isn't needed; assume the first
@@ -227,17 +203,16 @@ export class HttpResult<T = unknown> {
     async function data() {
       switch (mediaType) {
         case MediaType.Json: {
-          let json = await response.json();
+          const data = await response.json();
 
-          if (array) {
-            for (let i = 0; i < json.length; i++) {
-              json[i] = instantiate(json[i], ctor);
+          if (array && Array.isArray(data)) {
+            for (let i = 0; i < data.length; i++) {
+              data[i] = instantiate(data[i], ctor);
             }
-          } else {
-            json = instantiate(json, ctor);
+            return data;
           }
 
-          return json;
+          return instantiate(data, ctor);
         }
         case MediaType.Octet: {
           return response.body;
@@ -253,8 +228,6 @@ export class HttpResult<T = unknown> {
     );
   }
 }
-
-export type Stream = ReadableStream<Uint8Array>;
 
 export function b64ToU8(b64: string): Uint8Array {
   // Prefer Buffer in Node.js environments

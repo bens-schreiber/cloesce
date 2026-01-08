@@ -5,15 +5,17 @@ use std::{
 };
 
 use clap::{Parser, Subcommand};
+use client::ClientGenerator;
+use semantic::SemanticAnalysis;
 use tracing_subscriber::FmtSubscriber;
 
 use ast::{
-    CloesceAst, MigrationsAst,
+    CloesceAst, MigrationsAst, WranglerSpec,
     err::{GeneratorErrorKind, Result},
 };
-use d1::{D1Generator, MigrationsDilemma, MigrationsIntent};
+use migrations::{MigrationsDilemma, MigrationsGenerator, MigrationsIntent};
 use workers::WorkersGenerator;
-use wrangler::WranglerFormat;
+use wrangler::{WranglerDefault, WranglerGenerator};
 
 #[derive(Parser)]
 #[command(name = "generate", version = "0.0.3")]
@@ -24,10 +26,6 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    Validate {
-        pre_cidl_path: PathBuf,
-        cidl_path: PathBuf,
-    },
     Generate {
         pre_cidl_path: PathBuf,
         cidl_path: PathBuf,
@@ -87,14 +85,6 @@ Suggested fix: {}
 
 fn run_cli() -> Result<()> {
     match Cli::parse().command {
-        Commands::Validate {
-            pre_cidl_path,
-            cidl_path,
-        } => {
-            let ast = validate_cidl(&pre_cidl_path)?;
-            write_cidl(ast, &cidl_path)?;
-            tracing::info!("Validation OK.");
-        }
         Commands::Migrations {
             cidl_path,
             migrated_cidl_path,
@@ -111,7 +101,7 @@ fn run_cli() -> Result<()> {
                 .transpose()?;
             let ast = MigrationsAst::from_json(&cidl_path)?;
 
-            let generated_sql = D1Generator::migrate(&ast, lm_ast.as_ref(), &MigrationsCli);
+            let generated_sql = MigrationsGenerator::migrate(&ast, lm_ast.as_ref(), &MigrationsCli);
 
             migrated_cidl_file
                 .write_all(ast.to_json().as_bytes())
@@ -130,10 +120,21 @@ fn run_cli() -> Result<()> {
             client_path,
             workers_domain,
         } => {
-            let mut ast = validate_cidl(&pre_cidl_path)?;
-            generate_wrangler(&wrangler_path, &ast)?;
+            // Parsing
+            let wrangler = WranglerGenerator::from_path(&wrangler_path);
+            let mut spec = wrangler.as_spec();
+            let mut ast = CloesceAst::from_json(&pre_cidl_path)?;
+
+            // Analysis
+            WranglerDefault::set_defaults(&mut spec, &ast);
+            SemanticAnalysis::analyze(&mut ast, &spec)?;
+
+            // Code Generation
+            generate_wrangler(&wrangler_path, wrangler, spec)?;
             generate_workers(&mut ast, &workers_path)?;
             generate_client(&ast, &client_path, &workers_domain)?;
+
+            ast.set_merkle_hash();
             write_cidl(ast, &cidl_path)?;
         }
     }
@@ -149,9 +150,9 @@ impl MigrationsIntent for MigrationsCli {
                 model_name,
                 options,
             } => Self::rename_or_drop(&model_name, options, "model"),
-            MigrationsDilemma::RenameOrDropAttribute {
+            MigrationsDilemma::RenameOrDropColumn {
                 model_name,
-                attribute_name,
+                column_name: attribute_name,
                 options,
             } => {
                 let target = format!("{model_name}.{attribute_name}");
@@ -214,14 +215,6 @@ impl MigrationsCli {
     }
 }
 
-fn validate_cidl(pre_cidl_path: &Path) -> Result<CloesceAst> {
-    let mut ast = CloesceAst::from_json(pre_cidl_path)?;
-    ast.semantic_analysis()?;
-    ast.set_merkle_hash();
-
-    Ok(ast)
-}
-
 fn write_cidl(ast: CloesceAst, cidl_path: &Path) -> Result<()> {
     let mut cidl_file = open_file_or_create(cidl_path)?;
     cidl_file
@@ -231,12 +224,11 @@ fn write_cidl(ast: CloesceAst, cidl_path: &Path) -> Result<()> {
     Ok(())
 }
 
-fn generate_wrangler(wrangler_path: &Path, ast: &CloesceAst) -> Result<()> {
-    let mut wrangler = WranglerFormat::from_path(wrangler_path);
-    let mut spec = wrangler.as_spec();
-    spec.generate_defaults(ast);
-    spec.validate_bindings(ast)?;
-
+fn generate_wrangler(
+    wrangler_path: &Path,
+    mut wrangler: WranglerGenerator,
+    spec: WranglerSpec,
+) -> Result<()> {
     let wrangler_file = std::fs::OpenOptions::new()
         .write(true)
         .create(true)
@@ -248,14 +240,14 @@ fn generate_wrangler(wrangler_path: &Path, ast: &CloesceAst) -> Result<()> {
                 .with_context(e.to_string())
         })?;
 
-    wrangler.update(spec, wrangler_file);
+    wrangler.generate(spec, wrangler_file);
     Ok(())
 }
 
 fn generate_workers(ast: &mut CloesceAst, workers_path: &Path) -> Result<()> {
     let mut file = open_file_or_create(workers_path)?;
 
-    let workers = WorkersGenerator::create(ast, workers_path);
+    let workers = WorkersGenerator::generate(ast, workers_path);
     file.write_all(workers.as_bytes())
         .expect("Could not write to file");
     Ok(())
@@ -263,7 +255,7 @@ fn generate_workers(ast: &mut CloesceAst, workers_path: &Path) -> Result<()> {
 
 fn generate_client(ast: &CloesceAst, client_path: &Path, domain: &str) -> Result<()> {
     let mut file = open_file_or_create(client_path)?;
-    file.write_all(client::generate_client_api(ast, domain.to_string()).as_bytes())
+    file.write_all(ClientGenerator::generate(ast, domain.to_string()).as_bytes())
         .expect("Could not write to file");
     Ok(())
 }

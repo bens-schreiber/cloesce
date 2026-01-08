@@ -44,7 +44,10 @@ pub unsafe extern "C" fn set_meta_ptr(ptr: *mut u8, cap: usize) -> i32 {
 
     let parsed: ModelMeta = match serde_json::from_slice(slice) {
         Ok(val) => val,
-        Err(_) => return 1,
+        Err(e) => {
+            yield_error(e);
+            return 1;
+        }
     };
 
     META.with(|meta| {
@@ -69,14 +72,14 @@ pub extern "C" fn get_return_ptr() -> *const u8 {
     unsafe { RETURN_PTR }
 }
 
-/// Maps ORM friendly SQL rows to a [Model]. Requires a previous call to [set_meta_ptr].
+/// Maps ORM friendly SQL rows to a [D1Model]. Requires a previous call to [set_meta_ptr].
 ///
 /// Panics on any error.
 ///
 /// Returns 0 on pass 1 on fail. Stores result in [RETURN_PTR]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn map_sql(
-    // Model Name
+    // D1Model Name
     model_name_ptr: *const u8,
     model_name_len: usize,
 
@@ -134,11 +137,11 @@ pub unsafe extern "C" fn map_sql(
 /// Returns 0 on pass 1 on fail. Stores result in [RETURN_PTR].
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn upsert_model(
-    // Model Name
+    // D1Model Name
     model_name_ptr: *const u8,
     model_name_len: usize,
 
-    // New Model
+    // New D1Model
     new_model_ptr: *const u8,
     new_model_len: usize,
 
@@ -188,7 +191,7 @@ pub unsafe extern "C" fn upsert_model(
 
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn list_models(
-    // Model Name
+    // D1Model Name
     model_name_ptr: *const u8,
     model_name_len: usize,
 

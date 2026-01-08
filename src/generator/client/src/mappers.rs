@@ -9,6 +9,7 @@ pub struct TypeScriptMapper;
 impl ClientLanguageTypeMapper for TypeScriptMapper {
     fn cidl_type(&self, ty: &CidlType, ast: &CloesceAst) -> String {
         match ty {
+            CidlType::JsonValue => "unknown".to_string(),
             CidlType::Integer => "number".to_string(),
             CidlType::Real => "number".to_string(),
             CidlType::Text => "string".to_string(),
@@ -32,17 +33,15 @@ impl ClientLanguageTypeMapper for TypeScriptMapper {
             CidlType::Void => "void".to_string(),
             CidlType::Partial(name) => format!("DeepPartial<{name}>"),
             CidlType::DataSource(model_name) => {
-                let mut ds = ast
+                let ds = &ast
                     .models
                     .get(model_name)
-                    .unwrap()
-                    .data_sources
-                    .keys()
-                    .map(|k| format!("\"{k}\""))
-                    .collect::<Vec<_>>();
+                    .expect("Model to exist")
+                    .data_sources;
 
-                ds.push("\"none\"".to_string());
-                format!("{} = \"none\"", ds.join(" |")) // default to none
+                let mut format_ds = ds.keys().map(|k| format!("\"{k}\"")).collect::<Vec<_>>();
+                format_ds.push("\"none\"".to_string());
+                format!("{} = \"none\"", format_ds.join(" |")) // default to none
             }
             CidlType::Stream => "ReadableStream<Uint8Array>".to_string(),
             _ => panic!("Invalid type {:?}", ty),

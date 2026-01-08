@@ -41,6 +41,7 @@ describe("BlobHaver", () => {
       blob1: new Uint8Array([1, 2, 3, 4]),
       blob2: new Uint8Array([5, 6, 7, 8]),
     });
+
     expect(res.ok, withRes("POST should be OK", res)).toBe(true);
     expect(res.data).toStrictEqual(
       Object.assign(new BlobHaver(), {
@@ -71,7 +72,7 @@ describe("BlobHaver", () => {
     const got: number[] = Array.from(res.data);
     const expected = [1, 2, 3, 4];
     expect(
-      expected.length !== got.length || !expected.every((v, i) => v === got[i]),
+      expected.length === got.length && expected.every((v, i) => v === got[i]),
     );
   });
 });

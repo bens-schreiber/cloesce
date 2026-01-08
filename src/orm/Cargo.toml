@@ -14,10 +14,11 @@ sea-query = "0.32.7"
 serde = "1.0.219"
 serde_json = "1.0.143"
 
-
 [dev-dependencies]
 sqlx = { version = "0.8", features = ["sqlite", "runtime-tokio"] }
-d1 = { path = "../generator/d1" }
+migrations = { path = "../generator/migrations" }
+generator-test = { path = "../generator/generator-test" }
+semantic = { path = "../generator/semantic" }
 
 [profile.dev]
 opt-level = 0

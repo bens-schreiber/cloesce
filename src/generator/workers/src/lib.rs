@@ -1,7 +1,8 @@
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use ast::{ApiMethod, CidlType, CloesceAst, CrudKind, HttpVerb, MediaType, NamedTypedValue};
 
+// TODO: This is all hardcoded to TypeScript workers
 pub struct WorkersGenerator;
 impl WorkersGenerator {
     /// Generates all model source imports as well as the Cloesce App
@@ -36,41 +37,23 @@ impl WorkersGenerator {
             Ok(rel_str)
         }
 
-        let model_imports = ast
-            .models
-            .values()
-            .map(|m| {
-                // If the relative path is not possible, just use the file name.
-                let path = rel_path(&m.source_path, workers_dir)
-                    .unwrap_or_else(|_| m.source_path.clone().to_string_lossy().to_string());
-                format!("import {{ {} }} from \"{}\";", m.name, path)
-            })
-            .collect::<Vec<_>>()
-            .join("\n");
-
-        let poo_imports = ast
-            .poos
-            .values()
-            .map(|p| {
-                // If the relative path is not possible, just use the file name.
-                let path = rel_path(&p.source_path, workers_dir)
-                    .unwrap_or_else(|_| p.source_path.clone().to_string_lossy().to_string());
-                format!("import {{ {} }} from \"{}\";", p.name, path)
-            })
-            .collect::<Vec<_>>()
-            .join("\n");
-
-        let service_imports = ast
-            .services
-            .values()
-            .map(|s| {
-                // If the relative path is not possible, just use the file name.
-                let path = rel_path(&s.source_path, workers_dir)
-                    .unwrap_or_else(|_| s.source_path.clone().to_string_lossy().to_string());
-                format!("import {{ {} }} from \"{}\";", s.name, path)
-            })
-            .collect::<Vec<_>>()
-            .join("\n");
+        /// Generates import statements for a collection of source items
+        fn imports<I, F>(items: I, workers_dir: &Path, f: F) -> String
+        where
+            I: IntoIterator,
+            F: Fn(I::Item) -> (String, PathBuf),
+        {
+            items
+                .into_iter()
+                .map(|item| {
+                    let (name, path) = f(item);
+                    let path = rel_path(&path, workers_dir)
+                        .unwrap_or_else(|_| path.to_string_lossy().to_string());
+                    format!("import {{ {} }} from \"{}\";", name, path)
+                })
+                .collect::<Vec<_>>()
+                .join("\n")
+        }
 
         let app_import = match &ast.app_source {
             Some(p) => {
@@ -81,27 +64,36 @@ impl WorkersGenerator {
             None => "const app = new CloesceApp();".into(),
         };
 
-        [model_imports, poo_imports, service_imports, app_import].join("\n")
+        [
+            imports(&ast.models, workers_dir, |(name, model)| {
+                (name.clone(), model.source_path.clone())
+            }),
+            imports(&ast.poos, workers_dir, |(name, poo)| {
+                (name.clone(), poo.source_path.clone())
+            }),
+            imports(&ast.services, workers_dir, |(name, service)| {
+                (name.clone(), service.source_path.clone())
+            }),
+            app_import,
+        ]
+        .join("\n")
     }
 
     /// Generates the constructor registry
     fn registry(ast: &CloesceAst) -> String {
-        let mut constructor_registry = Vec::new();
-        for model in ast.models.values() {
-            constructor_registry.push(format!("\t{}: {}", &model.name, &model.name));
-        }
-
-        for poo in ast.poos.values() {
-            constructor_registry.push(format!("\t{}: {}", &poo.name, &poo.name));
-        }
-
-        for service in ast.services.values() {
-            constructor_registry.push(format!("\t{}: {}", &service.name, &service.name));
-        }
+        let symbols = ast
+            .models
+            .values()
+            .map(|m| &m.name)
+            .chain(ast.poos.values().map(|p| &p.name))
+            .chain(ast.services.values().map(|s| &s.name));
 
         format!(
             "const constructorRegistry = {{\n{}\n}};",
-            constructor_registry.join(",\n")
+            symbols
+                .map(|name| format!("\t{}: {}", name, name))
+                .collect::<Vec<_>>()
+                .join(",\n")
         )
     }
 
@@ -110,39 +102,73 @@ impl WorkersGenerator {
     /// Public for tests
     pub fn finalize_api_methods(ast: &mut CloesceAst) {
         let set_media_types = |method: &mut ApiMethod| {
-            // Return Media Type
             method.return_media = match method.return_type.root_type() {
                 CidlType::Stream => MediaType::Octet,
                 _ => MediaType::Json,
             };
 
-            method.parameters_media = match method.parameters.as_slice() {
-                [p] if matches!(p.cidl_type, CidlType::Stream) => MediaType::Octet,
-                _ => MediaType::Json,
+            method.parameters_media = if method
+                .parameters
+                .iter()
+                .any(|p| matches!(p.cidl_type.root_type(), CidlType::Stream))
+            {
+                MediaType::Octet
+            } else {
+                MediaType::Json
             };
+        };
+
+        let set_datasource_param = |method: &mut ApiMethod, model_name: &str| {
+            if !method.is_static
+                && !method
+                    .parameters
+                    .iter()
+                    .any(|p| matches!(p.cidl_type, CidlType::DataSource(_)))
+            {
+                method.parameters.push(NamedTypedValue {
+                    name: "__datasource".into(),
+                    cidl_type: CidlType::DataSource(model_name.into()),
+                });
+            }
         };
 
         for model in ast.models.values_mut() {
             for crud in &model.cruds {
                 let method = match crud {
-                    CrudKind::GET => ApiMethod {
-                        name: "get".into(),
-                        is_static: true,
-                        http_verb: HttpVerb::GET,
-                        return_type: CidlType::http(CidlType::Object(model.name.clone())),
-                        parameters: vec![
-                            NamedTypedValue {
-                                name: model.primary_key.name.clone(),
-                                cidl_type: model.primary_key.cidl_type.clone(),
-                            },
-                            NamedTypedValue {
-                                name: "__datasource".into(),
-                                cidl_type: CidlType::DataSource(model.name.clone()),
-                            },
-                        ],
-                        parameters_media: MediaType::default(),
-                        return_media: MediaType::default(),
-                    },
+                    CrudKind::GET => {
+                        let mut parameters = vec![NamedTypedValue {
+                            name: "__datasource".into(),
+                            cidl_type: CidlType::DataSource(model.name.clone()),
+                        }];
+
+                        for key in &model.key_params {
+                            parameters.push(NamedTypedValue {
+                                name: key.clone(),
+                                cidl_type: CidlType::Text,
+                            });
+                        }
+
+                        if model.has_d1() {
+                            let pk = model.primary_key.as_ref().expect("PK to exist");
+                            parameters.push(NamedTypedValue {
+                                name: pk.name.clone(),
+                                cidl_type: pk.cidl_type.clone(),
+                            });
+                        }
+
+                        // Data source should be last
+                        parameters.reverse();
+
+                        ApiMethod {
+                            name: "get".into(),
+                            is_static: true,
+                            http_verb: HttpVerb::GET,
+                            return_type: CidlType::http(CidlType::Object(model.name.clone())),
+                            parameters,
+                            parameters_media: MediaType::default(),
+                            return_media: MediaType::default(),
+                        }
+                    }
                     CrudKind::LIST => ApiMethod {
                         name: "list".into(),
                         is_static: true,
@@ -191,6 +217,7 @@ impl WorkersGenerator {
             }
 
             for method in model.methods.values_mut() {
+                set_datasource_param(method, &model.name);
                 set_media_types(method);
             }
         }
@@ -202,7 +229,7 @@ impl WorkersGenerator {
         }
     }
 
-    pub fn create(ast: &mut CloesceAst, workers_path: &Path) -> String {
+    pub fn generate(ast: &mut CloesceAst, workers_path: &Path) -> String {
         let linked_sources = Self::link(ast, workers_path);
         let constructor_registry = Self::registry(ast);
 

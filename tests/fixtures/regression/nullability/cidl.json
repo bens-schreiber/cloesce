@@ -1,25 +1,25 @@
 {
-  "hash": 10133679158382118118,
-  "version": "v0.0.4",
+  "hash": 15129335377925298214,
   "project_name": "runner",
-  "language": "TypeScript",
   "wrangler_env": {
     "name": "Env",
     "source_path": "./seed__nullability.cloesce.ts",
-    "db_binding": "db",
+    "d1_binding": "db",
+    "kv_bindings": [],
+    "r2_bindings": [],
     "vars": {}
   },
   "models": {
     "NullabilityChecks": {
-      "hash": 5712226491349635149,
+      "hash": 1864818088460337102,
       "name": "NullabilityChecks",
       "primary_key": {
         "name": "id",
         "cidl_type": "Integer"
       },
-      "attributes": [
+      "columns": [
         {
-          "hash": 5387430967312361113,
+          "hash": 11669773114930894259,
           "value": {
             "name": "notNullableString",
             "cidl_type": "Text"
@@ -27,7 +27,7 @@
           "foreign_key_reference": null
         },
         {
-          "hash": 11825005746933419692,
+          "hash": 12569259787924476539,
           "value": {
             "name": "nullableString",
             "cidl_type": {
@@ -38,6 +38,9 @@
         }
       ],
       "navigation_properties": [],
+      "key_params": [],
+      "kv_objects": [],
+      "r2_objects": [],
       "methods": {
         "arrayTypes": {
           "name": "arrayTypes",
@@ -70,7 +73,7 @@
               }
             },
             {
-              "name": "__dataSource",
+              "name": "__datasource",
               "cidl_type": {
                 "DataSource": "NullabilityChecks"
               }
@@ -106,7 +109,7 @@
               }
             },
             {
-              "name": "__dataSource",
+              "name": "__datasource",
               "cidl_type": {
                 "DataSource": "NullabilityChecks"
               }
@@ -130,7 +133,7 @@
               }
             },
             {
-              "name": "__dataSource",
+              "name": "__datasource",
               "cidl_type": {
                 "DataSource": "NullabilityChecks"
               }
@@ -158,7 +161,7 @@
               }
             },
             {
-              "name": "__dataSource",
+              "name": "__datasource",
               "cidl_type": {
                 "DataSource": "NullabilityChecks"
               }
@@ -188,7 +191,7 @@
               }
             },
             {
-              "name": "__dataSource",
+              "name": "__datasource",
               "cidl_type": {
                 "DataSource": "NullabilityChecks"
               }
@@ -201,7 +204,7 @@
       "source_path": "./seed__nullability.cloesce.ts"
     }
   },
-  "poos": {},
   "services": {},
+  "poos": {},
   "app_source": null
 }

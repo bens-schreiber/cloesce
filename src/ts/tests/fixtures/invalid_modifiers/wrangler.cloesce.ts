@@ -1,5 +1,5 @@
 // @ts-nocheck
-// InvalidAttributeModifier
+// InvalidPropertyModifier
 
 @WranglerEnv
 export class Foo {

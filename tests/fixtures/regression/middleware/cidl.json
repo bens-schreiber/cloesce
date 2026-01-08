@@ -1,24 +1,27 @@
 {
-  "hash": 13896337731609429158,
-  "version": "v0.0.4",
+  "hash": 14803987991985266137,
   "project_name": "runner",
-  "language": "TypeScript",
   "wrangler_env": {
     "name": "Env",
     "source_path": "./seed__app.cloesce.ts",
-    "db_binding": "db",
+    "d1_binding": "db",
+    "kv_bindings": [],
+    "r2_bindings": [],
     "vars": {}
   },
   "models": {
-    "Model": {
-      "hash": 598144920838359046,
-      "name": "Model",
+    "Foo": {
+      "hash": 2291516488856648612,
+      "name": "Foo",
       "primary_key": {
         "name": "id",
         "cidl_type": "Integer"
       },
-      "attributes": [],
+      "columns": [],
       "navigation_properties": [],
+      "key_params": [],
+      "kv_objects": [],
+      "r2_objects": [],
       "methods": {
         "blockedMethod": {
           "name": "blockedMethod",
@@ -54,7 +57,7 @@
           "return_media": "Json",
           "return_type": {
             "HttpResult": {
-              "Object": "Model"
+              "Object": "Foo"
             }
           },
           "parameters_media": "Json",
@@ -62,13 +65,13 @@
             {
               "name": "model",
               "cidl_type": {
-                "Partial": "Model"
+                "Partial": "Foo"
               }
             },
             {
               "name": "__datasource",
               "cidl_type": {
-                "DataSource": "Model"
+                "DataSource": "Foo"
               }
             }
           ]
@@ -81,6 +84,7 @@
       "source_path": "./seed__app.cloesce.ts"
     }
   },
+  "services": {},
   "poos": {
     "InjectedThing": {
       "name": "InjectedThing",
@@ -93,6 +97,5 @@
       "source_path": "./seed__app.cloesce.ts"
     }
   },
-  "services": {},
   "app_source": "./seed__app.cloesce.ts"
 }

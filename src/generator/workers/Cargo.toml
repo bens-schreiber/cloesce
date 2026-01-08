@@ -6,6 +6,8 @@ edition = "2024"
 [dependencies]
 ast = { path = "../ast" }
 tracing = { workspace = true }
-wrangler = { path = "../wrangler" }
 pathdiff = { version = "0.2.3" }
 indexmap = { workspace = true }
+
+[dev-dependencies]
+generator-test = { path = "../generator-test" }

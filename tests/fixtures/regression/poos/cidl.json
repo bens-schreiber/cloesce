@@ -1,24 +1,27 @@
 {
-  "hash": 18302944908339792316,
-  "version": "v0.0.4",
+  "hash": 14722648820501403073,
   "project_name": "runner",
-  "language": "TypeScript",
   "wrangler_env": {
     "name": "Env",
     "source_path": "./seed__poo.cloesce.ts",
-    "db_binding": "db",
+    "d1_binding": "db",
+    "kv_bindings": [],
+    "r2_bindings": [],
     "vars": {}
   },
   "models": {
     "PooAcceptYield": {
-      "hash": 13918985504312867645,
+      "hash": 12256789407706551234,
       "name": "PooAcceptYield",
       "primary_key": {
         "name": "id",
         "cidl_type": "Integer"
       },
-      "attributes": [],
+      "columns": [],
       "navigation_properties": [],
+      "key_params": [],
+      "kv_objects": [],
+      "r2_objects": [],
       "methods": {
         "acceptPoos": {
           "name": "acceptPoos",
@@ -65,6 +68,7 @@
       "source_path": "./seed__poo.cloesce.ts"
     }
   },
+  "services": {},
   "poos": {
     "PooA": {
       "name": "PooA",
@@ -111,6 +115,5 @@
       "source_path": "./seed__poo.cloesce.ts"
     }
   },
-  "services": {},
   "app_source": null
 }

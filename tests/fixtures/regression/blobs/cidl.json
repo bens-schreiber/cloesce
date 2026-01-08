@@ -1,25 +1,25 @@
 {
-  "hash": 8447275917592500618,
-  "version": "v0.0.4",
+  "hash": 9596228406543438623,
   "project_name": "runner",
-  "language": "TypeScript",
   "wrangler_env": {
     "name": "Env",
     "source_path": "./seed__blobs.cloesce.ts",
-    "db_binding": "db",
+    "d1_binding": "db",
+    "kv_bindings": [],
+    "r2_bindings": [],
     "vars": {}
   },
   "models": {
     "BlobHaver": {
-      "hash": 17711648149110095680,
+      "hash": 16516887753193349306,
       "name": "BlobHaver",
       "primary_key": {
         "name": "id",
         "cidl_type": "Integer"
       },
-      "attributes": [
+      "columns": [
         {
-          "hash": 3614122834570409634,
+          "hash": 9896464982256051644,
           "value": {
             "name": "blob1",
             "cidl_type": "Blob"
@@ -27,7 +27,7 @@
           "foreign_key_reference": null
         },
         {
-          "hash": 1356319928856589796,
+          "hash": 7638662076542231806,
           "value": {
             "name": "blob2",
             "cidl_type": "Blob"
@@ -36,6 +36,9 @@
         }
       ],
       "navigation_properties": [],
+      "key_params": [],
+      "kv_objects": [],
+      "r2_objects": [],
       "methods": {
         "get": {
           "name": "get",
@@ -70,7 +73,7 @@
           "parameters_media": "Json",
           "parameters": [
             {
-              "name": "__dataSource",
+              "name": "__datasource",
               "cidl_type": {
                 "DataSource": "BlobHaver"
               }
@@ -148,7 +151,7 @@
           "parameters_media": "Json",
           "parameters": [
             {
-              "name": "__dataSource",
+              "name": "__datasource",
               "cidl_type": {
                 "DataSource": "BlobHaver"
               }
@@ -165,7 +168,6 @@
       "source_path": "./seed__blobs.cloesce.ts"
     }
   },
-  "poos": {},
   "services": {
     "BlobService": {
       "name": "BlobService",
@@ -189,5 +191,6 @@
       "source_path": "./seed__blobs.cloesce.ts"
     }
   },
+  "poos": {},
   "app_source": null
 }

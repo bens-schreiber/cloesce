@@ -1,6 +1,6 @@
 import { startWrangler, stopWrangler } from "../src/setup.js";
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { Model } from "../../fixtures/regression/middleware/client.js";
+import { Foo } from "../../fixtures/regression/middleware/client.js";
 
 beforeAll(async () => {
   // NOTE: e2e is called from proj root
@@ -13,7 +13,7 @@ afterAll(async () => {
 
 describe("Global Middleware", () => {
   it("Rejects POST requests", async () => {
-    const res = await Model.save({}, "none");
+    const res = await Foo.save({}, "none");
     expect(res.ok).toBe(false);
     expect(res.status).toBe(401);
     expect(res.message).toBe("POST methods aren't allowed.");
@@ -24,7 +24,7 @@ describe("Global Middleware", () => {
 
 describe("Model + Method Middleware", () => {
   it("Rejects method", async () => {
-    const res = await Model.blockedMethod();
+    const res = await Foo.blockedMethod();
 
     expect(res.ok).toBe(false);
     expect(res.status).toBe(401);
@@ -33,7 +33,7 @@ describe("Model + Method Middleware", () => {
   });
 
   it("Model middleware passes injected dep", async () => {
-    const res = await Model.getInjectedThing();
+    const res = await Foo.getInjectedThing();
 
     expect(res.ok).toBe(true);
     expect(res.data).toEqual({

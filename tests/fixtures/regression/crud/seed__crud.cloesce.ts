@@ -1,5 +1,5 @@
 import {
-  D1,
+  Model,
   PrimaryKey,
   WranglerEnv,
   CRUD,
@@ -19,18 +19,18 @@ export class Env {
 }
 
 @CRUD(["SAVE", "GET", "LIST"])
-@D1
+@Model
 export class CrudHaver {
   @PrimaryKey
   id: Integer;
   name: string;
 
   @POST
-  async notCrud(): Promise<void> {}
+  async notCrud(): Promise<void> { }
 }
 
 @CRUD(["SAVE", "GET", "LIST"])
-@D1
+@Model
 export class Parent {
   @PrimaryKey
   id: Integer;
@@ -51,7 +51,7 @@ export class Parent {
   };
 }
 
-@D1
+@Model
 export class Child {
   @PrimaryKey
   id: Integer;

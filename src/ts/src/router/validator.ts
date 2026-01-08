@@ -5,8 +5,9 @@ import {
   getNavigationPropertyCidlType,
   isNullableType,
 } from "../ast";
-import { Either, b64ToU8 } from "../ui/common";
+import { b64ToU8 } from "../ui/common";
 import { ConstructorRegistry } from "./router";
+import Either from "../either";
 
 /**
  * Runtime type validation, asserting that the structure of a value follows the
@@ -68,6 +69,11 @@ export class RuntimeValidator {
       cidlType = (cidlType as any).Nullable;
     }
 
+    // JsonValue accepts anything
+    if (cidlType === "JsonValue") {
+      return Either.right(value);
+    }
+
     // Primitives
     if (typeof cidlType === "string") {
       switch (cidlType) {
@@ -119,18 +125,18 @@ export class RuntimeValidator {
       // Validate + instantiate PK
       {
         const pk = model.primary_key;
-        const res = this.recurse(valueObj[pk.name], pk.cidl_type, isPartial);
+        const res = this.recurse(valueObj[pk!.name], pk!.cidl_type, isPartial);
 
         if (res.isLeft()) {
           return res;
         }
 
-        value[pk.name] = res.unwrap();
+        value[pk!.name] = res.unwrap();
       }
 
       // Validate + instantiate attributes
-      for (let i = 0; i < model.attributes.length; i++) {
-        const attr = model.attributes[i];
+      for (let i = 0; i < model.columns.length; i++) {
+        const attr = model.columns[i];
         const res = this.recurse(
           valueObj[attr.value.name],
           attr.value.cidl_type,

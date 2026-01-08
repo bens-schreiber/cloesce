@@ -8,8 +8,8 @@ import {
   SyntaxKind,
   ClassDeclaration,
   Decorator,
-  Expression,
   Scope,
+  ObjectLiteralExpression,
 } from "ts-morph";
 
 import {
@@ -19,7 +19,7 @@ import {
   DataSource,
   HttpVerb,
   Model,
-  ModelAttribute,
+  D1Column,
   ApiMethod,
   NamedTypedValue,
   NavigationProperty,
@@ -28,22 +28,29 @@ import {
   CrudKind,
   Service,
   defaultMediaType,
+  ServiceAttribute,
+  KeyValue,
+  AstR2Object,
 } from "../ast.js";
 import { TypeFormatFlags } from "typescript";
 import { ExtractorError, ExtractorErrorCode } from "./err.js";
-import { Either } from "../ui/common.js";
+import { HttpResult, KValue } from "../ui/common.js";
+import Either from "../either.js";
 
-enum AttributeDecoratorKind {
+enum PropertyDecoratorKind {
   PrimaryKey = "PrimaryKey",
   ForeignKey = "ForeignKey",
   OneToOne = "OneToOne",
   OneToMany = "OneToMany",
   ManyToMany = "ManyToMany",
   DataSource = "DataSource",
+  KeyParam = "KeyParam",
+  KV = "KV",
+  R2 = "R2",
 }
 
 enum ClassDecoratorKind {
-  D1 = "D1",
+  Model = "Model",
   WranglerEnv = "WranglerEnv",
   PlainOldObject = "PlainOldObject",
   Service = "Service",
@@ -55,12 +62,10 @@ enum ParameterDecoratorKind {
 }
 
 export class CidlExtractor {
-  constructor(
-    public projectName: string,
-    public version: string,
-  ) {}
-
-  extract(project: Project): Either<ExtractorError, CloesceAst> {
+  static extract(
+    projectName: string,
+    project: Project,
+  ): Either<ExtractorError, CloesceAst> {
     const models: Record<string, Model> = {};
     const poos: Record<string, PlainOldObject> = {};
     const wranglerEnvs: WranglerEnv[] = [];
@@ -68,10 +73,9 @@ export class CidlExtractor {
     let app_source: string | null = null;
 
     for (const sourceFile of project.getSourceFiles()) {
-      if (
-        sourceFile.getBaseName() === "app.cloesce.ts" ||
-        sourceFile.getBaseName() === "seed__app.cloesce.ts" // hardcoding for tests
-      ) {
+      // Check if this is the app source file
+      const sourceFiles = ["app.cloesce.ts", "seed__app.cloesce.ts"];
+      if (sourceFiles.includes(sourceFile.getBaseName())) {
         const app = CidlExtractor.app(sourceFile);
         if (app.isLeft()) {
           return app;
@@ -86,64 +90,79 @@ export class CidlExtractor {
           e.snippet = classDecl.getText();
         });
 
-        if (hasDecorator(classDecl, ClassDecoratorKind.D1)) {
-          if (!classDecl.isExported()) return notExportedErr;
-          const result = CidlExtractor.model(classDecl, sourceFile);
+        // TODO: put CRUD list inside of the class decorator
+        checkDecorators: for (const decorator of classDecl.getDecorators()) {
+          const decoratorName = decorator.getName();
 
-          // Error: propogate from models
-          if (result.isLeft()) {
-            result.value.addContext((prev) => `${classDecl.getName()}.${prev}`);
-            return result;
-          }
+          switch (decoratorName) {
+            case ClassDecoratorKind.Model: {
+              if (!classDecl.isExported()) return notExportedErr;
+              const result = ModelExtractor.extract(classDecl, sourceFile);
 
-          const model = result.unwrap();
-          models[model.name] = model;
-          continue;
-        }
+              if (result.isLeft()) {
+                result.value.addContext(
+                  (prev) => `${classDecl.getName()}.${prev}`,
+                );
+                return result;
+              }
 
-        if (hasDecorator(classDecl, ClassDecoratorKind.Service)) {
-          if (!classDecl.isExported()) return notExportedErr;
-          const result = CidlExtractor.service(classDecl, sourceFile);
+              const model = result.unwrap();
+              models[model.name] = model;
+              break checkDecorators;
+            }
 
-          // Error: propogate from service
-          if (result.isLeft()) {
-            result.value.addContext((prev) => `${classDecl.getName()}.${prev}`);
-            return result;
-          }
+            case ClassDecoratorKind.Service: {
+              if (!classDecl.isExported()) return notExportedErr;
+              const result = ServiceExtractor.extract(classDecl, sourceFile);
 
-          const service = result.unwrap();
-          services[service.name] = service;
-          continue;
-        }
+              if (result.isLeft()) {
+                result.value.addContext(
+                  (prev) => `${classDecl.getName()}.${prev}`,
+                );
+                return result;
+              }
 
-        if (hasDecorator(classDecl, ClassDecoratorKind.PlainOldObject)) {
-          if (!classDecl.isExported()) return notExportedErr;
-          const result = CidlExtractor.poo(classDecl, sourceFile);
+              const service = result.unwrap();
+              services[service.name] = service;
+              break checkDecorators;
+            }
 
-          // Error: propogate from models
-          if (result.isLeft()) {
-            result.value.addContext((prev) => `${classDecl.getName()}.${prev}`);
-            return result;
-          }
-          poos[result.unwrap().name] = result.unwrap();
-          continue;
-        }
+            case ClassDecoratorKind.PlainOldObject: {
+              if (!classDecl.isExported()) return notExportedErr;
+              const result = CidlExtractor.poo(classDecl, sourceFile);
 
-        if (hasDecorator(classDecl, ClassDecoratorKind.WranglerEnv)) {
-          // Error: invalid attribute modifier
-          for (const prop of classDecl.getProperties()) {
-            const modifierRes = checkAttributeModifier(prop);
-            if (modifierRes.isLeft()) {
-              return modifierRes;
+              if (result.isLeft()) {
+                result.value.addContext(
+                  (prev) => `${classDecl.getName()}.${prev}`,
+                );
+                return result;
+              }
+              poos[result.unwrap().name] = result.unwrap();
+              break checkDecorators;
+            }
+
+            case ClassDecoratorKind.WranglerEnv: {
+              // Error: invalid property modifier
+              for (const prop of classDecl.getProperties()) {
+                const modifierRes = checkPropertyModifier(prop);
+                if (modifierRes.isLeft()) {
+                  return modifierRes;
+                }
+              }
+
+              const result = CidlExtractor.env(classDecl, sourceFile);
+              if (result.isLeft()) {
+                return result;
+              }
+
+              wranglerEnvs.push(result.unwrap());
+              break checkDecorators;
+            }
+
+            default: {
+              continue;
             }
           }
-
-          const result = CidlExtractor.env(classDecl, sourceFile);
-          if (result.isLeft()) {
-            return result;
-          }
-
-          wranglerEnvs.push(result.unwrap());
         }
       }
     }
@@ -157,11 +176,9 @@ export class CidlExtractor {
     }
 
     return Either.right({
-      version: this.version,
-      project_name: this.projectName,
-      language: "TypeScript",
+      project_name: projectName,
       wrangler_env: wranglerEnvs[0],
-      models,
+      models: models,
       poos,
       services,
       app_source,
@@ -198,480 +215,6 @@ export class CidlExtractor {
     return err(ExtractorErrorCode.AppMissingDefaultExport);
   }
 
-  static model(
-    classDecl: ClassDeclaration,
-    sourceFile: SourceFile,
-  ): Either<ExtractorError, Model> {
-    const name = classDecl.getName()!;
-    const attributes: ModelAttribute[] = [];
-    const navigation_properties: NavigationProperty[] = [];
-    const data_sources: Record<string, DataSource> = {};
-    const methods: Record<string, ApiMethod> = {};
-    const cruds: Set<CrudKind> = new Set<CrudKind>();
-    let primary_key: NamedTypedValue | undefined = undefined;
-
-    // Extract crud methods
-    const crudDecorator = classDecl
-      .getDecorators()
-      .find((d) => getDecoratorName(d) === ClassDecoratorKind.CRUD);
-    if (crudDecorator) {
-      setCrudKinds(crudDecorator, cruds);
-    }
-
-    // Iterate attribtutes
-    for (const prop of classDecl.getProperties()) {
-      const decorators = prop.getDecorators();
-      const typeRes = CidlExtractor.cidlType(prop.getType());
-
-      // Error: invalid property type
-      if (typeRes.isLeft()) {
-        typeRes.value.context = prop.getName();
-        typeRes.value.snippet = prop.getText();
-        return typeRes;
-      }
-
-      const checkModifierRes = checkAttributeModifier(prop);
-
-      // No decorators means this is a standard attribute
-      if (decorators.length === 0) {
-        // Error: invalid attribute modifier
-        if (checkModifierRes.isLeft()) {
-          return checkModifierRes;
-        }
-
-        const cidl_type = typeRes.unwrap();
-        attributes.push({
-          foreign_key_reference: null,
-          value: {
-            name: prop.getName(),
-            cidl_type,
-          },
-        });
-        continue;
-      }
-
-      // TODO: Limiting to one decorator. Can't get too fancy on us.
-      const decorator = decorators[0];
-      const decoratorName = getDecoratorName(decorator);
-
-      // Error: invalid attribute modifier
-      if (
-        checkModifierRes.isLeft() &&
-        decoratorName !== AttributeDecoratorKind.DataSource
-      ) {
-        return checkModifierRes;
-      }
-
-      // Process decorator
-      const cidl_type = typeRes.unwrap();
-      switch (decoratorName) {
-        case AttributeDecoratorKind.PrimaryKey: {
-          primary_key = {
-            name: prop.getName(),
-            cidl_type,
-          };
-          break;
-        }
-        case AttributeDecoratorKind.ForeignKey: {
-          attributes.push({
-            foreign_key_reference: getDecoratorArgument(decorator, 0) ?? null,
-            value: {
-              name: prop.getName(),
-              cidl_type,
-            },
-          });
-          break;
-        }
-        case AttributeDecoratorKind.OneToOne: {
-          const reference = getDecoratorArgument(decorator, 0);
-
-          // Error: One to one navigation properties requre a reference
-          if (!reference) {
-            return err(
-              ExtractorErrorCode.MissingNavigationPropertyReference,
-              (e) => {
-                e.snippet = prop.getText();
-                e.context = prop.getName();
-              },
-            );
-          }
-
-          let model_name = getObjectName(cidl_type);
-
-          // Error: navigation properties require a model reference
-          if (!model_name) {
-            return err(
-              ExtractorErrorCode.MissingNavigationPropertyReference,
-              (e) => {
-                e.snippet = prop.getText();
-                e.context = prop.getName();
-              },
-            );
-          }
-
-          navigation_properties.push({
-            var_name: prop.getName(),
-            model_name,
-            kind: { OneToOne: { reference } },
-          });
-          break;
-        }
-        case AttributeDecoratorKind.OneToMany: {
-          const reference = getDecoratorArgument(decorator, 0);
-          // Error: One to one navigation properties requre a reference
-          if (!reference) {
-            return err(
-              ExtractorErrorCode.MissingNavigationPropertyReference,
-              (e) => {
-                e.snippet = prop.getText();
-                e.context = prop.getName();
-              },
-            );
-          }
-
-          let model_name = getObjectName(cidl_type);
-
-          // Error: navigation properties require a model reference
-          if (!model_name) {
-            return err(
-              ExtractorErrorCode.MissingNavigationPropertyReference,
-              (e) => {
-                e.snippet = prop.getText();
-                e.context = prop.getName();
-              },
-            );
-          }
-
-          navigation_properties.push({
-            var_name: prop.getName(),
-            model_name,
-            kind: { OneToMany: { reference } },
-          });
-          break;
-        }
-        case AttributeDecoratorKind.ManyToMany: {
-          const unique_id = getDecoratorArgument(decorator, 0);
-
-          // Error: many to many attribtues require a unique id
-          if (!unique_id)
-            return err(ExtractorErrorCode.MissingManyToManyUniqueId, (e) => {
-              e.snippet = prop.getText();
-              e.context = prop.getName();
-            });
-
-          // Error: navigation properties require a model reference
-          let model_name = getObjectName(cidl_type);
-          if (!model_name) {
-            return err(
-              ExtractorErrorCode.MissingNavigationPropertyReference,
-              (e) => {
-                e.snippet = prop.getText();
-                e.context = prop.getName();
-              },
-            );
-          }
-
-          navigation_properties.push({
-            var_name: prop.getName(),
-            model_name,
-            kind: { ManyToMany: { unique_id } },
-          });
-          break;
-        }
-        case AttributeDecoratorKind.DataSource: {
-          const isIncludeTree =
-            prop
-              .getType()
-              .getText(
-                undefined,
-                TypeFormatFlags.UseAliasDefinedOutsideCurrentScope,
-              ) === `IncludeTree<${name}>`;
-
-          // Error: data sources must be static include trees
-          if (!prop.isStatic() || !isIncludeTree) {
-            return err(ExtractorErrorCode.InvalidDataSourceDefinition, (e) => {
-              e.snippet = prop.getText();
-              e.context = prop.getName();
-            });
-          }
-
-          const initializer = prop.getInitializer();
-
-          const treeRes = CidlExtractor.includeTree(
-            initializer,
-            classDecl,
-            sourceFile,
-          );
-
-          if (treeRes.isLeft()) {
-            treeRes.value.addContext((prev) => `${prop.getName()} ${prev}`);
-            treeRes.value.snippet = prop.getText();
-            return treeRes;
-          }
-
-          data_sources[prop.getName()] = {
-            name: prop.getName(),
-            tree: treeRes.unwrap(),
-          };
-          break;
-        }
-      }
-    }
-
-    if (primary_key == undefined) {
-      return err(ExtractorErrorCode.MissingPrimaryKey, (e) => {
-        e.snippet = classDecl.getText();
-      });
-    }
-
-    // Process methods
-    for (const m of classDecl.getMethods()) {
-      const httpVerb = m
-        .getDecorators()
-        .map((d) => getDecoratorName(d))
-        .find((name) =>
-          Object.values(HttpVerb).includes(name as HttpVerb),
-        ) as HttpVerb;
-
-      if (!httpVerb) {
-        continue;
-      }
-
-      const result = CidlExtractor.modelMethod(name, m, httpVerb);
-      if (result.isLeft()) {
-        result.value.addContext((prev) => `${m.getName()} ${prev}`);
-        return result;
-      }
-      methods[result.unwrap().name] = result.unwrap();
-    }
-
-    return Either.right({
-      name,
-      attributes,
-      primary_key,
-      navigation_properties,
-      methods,
-      data_sources,
-      cruds: Array.from(cruds).sort(),
-      source_path: sourceFile.getFilePath().toString(),
-    });
-  }
-
-  static modelMethod(
-    modelName: string,
-    method: MethodDeclaration,
-    verb: HttpVerb,
-  ): Either<ExtractorError, ApiMethod> {
-    // Error: invalid method scope, must be public
-    if (method.getScope() != Scope.Public) {
-      return err(ExtractorErrorCode.InvalidApiMethodModifier, (e) => {
-        e.context = method.getName();
-        e.snippet = method.getText();
-      });
-    }
-
-    let needsDataSource = !method.isStatic();
-    const parameters: NamedTypedValue[] = [];
-
-    for (const param of method.getParameters()) {
-      // Handle injected param
-      if (param.getDecorator(ParameterDecoratorKind.Inject)) {
-        const typeRes = CidlExtractor.cidlType(param.getType(), true);
-
-        // Error: invalid type
-        if (typeRes.isLeft()) {
-          typeRes.value.snippet = method.getText();
-          typeRes.value.context = param.getName();
-          return typeRes;
-        }
-
-        parameters.push({
-          name: param.getName(),
-          cidl_type: typeRes.unwrap(),
-        });
-        continue;
-      }
-
-      // Handle all other params
-      const typeRes = CidlExtractor.cidlType(param.getType());
-
-      // Error: invalid type
-      if (typeRes.isLeft()) {
-        typeRes.value.snippet = method.getText();
-        typeRes.value.context = param.getName();
-        return typeRes;
-      }
-      if (typeof typeRes.value !== "string" && "DataSource" in typeRes.value) {
-        needsDataSource = false;
-      }
-
-      parameters.push({
-        name: param.getName(),
-        cidl_type: typeRes.unwrap(),
-      });
-    }
-
-    const typeRes = CidlExtractor.cidlType(method.getReturnType());
-
-    // Error: invalid type
-    if (typeRes.isLeft()) {
-      typeRes.value.snippet = method.getText();
-      return typeRes;
-    }
-
-    // Sugaring: add data source
-    if (needsDataSource) {
-      parameters.push({
-        name: "__dataSource",
-        cidl_type: { DataSource: modelName },
-      });
-    }
-
-    return Either.right({
-      name: method.getName(),
-      is_static: method.isStatic(),
-      http_verb: verb,
-      return_media: defaultMediaType(),
-      return_type: typeRes.unwrap(),
-      parameters_media: defaultMediaType(),
-      parameters,
-    });
-  }
-
-  static service(
-    classDecl: ClassDeclaration,
-    sourceFile: SourceFile,
-  ): Either<ExtractorError, Service> {
-    const attributes = [];
-    const methods: Record<string, ApiMethod> = {};
-
-    // Attributes
-    for (const prop of classDecl.getProperties()) {
-      const typeRes = CidlExtractor.cidlType(prop.getType(), true);
-
-      // Error: invalid property type
-      if (typeRes.isLeft()) {
-        typeRes.value.context = prop.getName();
-        typeRes.value.snippet = prop.getText();
-        return typeRes;
-      }
-
-      if (typeof typeRes.value === "string" || !("Inject" in typeRes.value)) {
-        return err(ExtractorErrorCode.InvalidServiceAttribute, (e) => {
-          e.context = prop.getName();
-          e.snippet = prop.getText();
-        });
-      }
-
-      const checkModifierRes = checkAttributeModifier(prop);
-      if (checkModifierRes.isLeft()) {
-        return checkModifierRes;
-      }
-
-      attributes.push({
-        var_name: prop.getName(),
-        injected: typeRes.value.Inject,
-      });
-    }
-
-    // Methods
-    for (const m of classDecl.getMethods()) {
-      const httpVerb = m
-        .getDecorators()
-        .map((d) => getDecoratorName(d))
-        .find((name) =>
-          Object.values(HttpVerb).includes(name as HttpVerb),
-        ) as HttpVerb;
-
-      if (!httpVerb) {
-        continue;
-      }
-
-      const res = CidlExtractor.serviceMethod(m, httpVerb);
-      if (res.isLeft()) {
-        return res;
-      }
-
-      const serviceMethod = res.unwrap();
-      methods[serviceMethod.name] = serviceMethod;
-    }
-
-    return Either.right({
-      name: classDecl.getName()!,
-      attributes,
-      methods,
-      source_path: sourceFile.getFilePath().toString(),
-    });
-  }
-
-  static serviceMethod(
-    method: MethodDeclaration,
-    verb: HttpVerb,
-  ): Either<ExtractorError, ApiMethod> {
-    // Error: invalid method scope, must be public
-    if (method.getScope() != Scope.Public) {
-      return err(ExtractorErrorCode.InvalidApiMethodModifier, (e) => {
-        e.context = method.getName();
-        e.snippet = method.getText();
-      });
-    }
-
-    const parameters = [];
-
-    for (const param of method.getParameters()) {
-      // Handle injected param
-      if (param.getDecorator(ParameterDecoratorKind.Inject)) {
-        const typeRes = CidlExtractor.cidlType(param.getType(), true);
-
-        // Error: invalid type
-        if (typeRes.isLeft()) {
-          typeRes.value.snippet = method.getText();
-          typeRes.value.context = param.getName();
-          return typeRes;
-        }
-
-        parameters.push({
-          name: param.getName(),
-          cidl_type: typeRes.unwrap(),
-        });
-        continue;
-      }
-
-      // Handle all other params
-      const typeRes = CidlExtractor.cidlType(param.getType());
-
-      // Error: invalid type
-      if (typeRes.isLeft()) {
-        typeRes.value.snippet = method.getText();
-        typeRes.value.context = param.getName();
-        return typeRes;
-      }
-
-      parameters.push({
-        name: param.getName(),
-        cidl_type: typeRes.unwrap(),
-      });
-    }
-
-    const typeRes = CidlExtractor.cidlType(method.getReturnType());
-
-    // Error: invalid type
-    if (typeRes.isLeft()) {
-      typeRes.value.snippet = method.getText();
-      return typeRes;
-    }
-
-    return Either.right({
-      name: method.getName(),
-      http_verb: verb,
-      is_static: method.isStatic(),
-      return_media: defaultMediaType(),
-      return_type: typeRes.unwrap(),
-      parameters_media: defaultMediaType(),
-      parameters,
-    });
-  }
-
   static poo(
     classDecl: ClassDeclaration,
     sourceFile: SourceFile,
@@ -689,8 +232,8 @@ export class CidlExtractor {
         return typeRes;
       }
 
-      // Error: invalid attribute modifier
-      const modifierRes = checkAttributeModifier(prop);
+      // Error: invalid property modifier
+      const modifierRes = checkPropertyModifier(prop);
       if (modifierRes.isLeft()) {
         return modifierRes;
       }
@@ -715,9 +258,12 @@ export class CidlExtractor {
     sourceFile: SourceFile,
   ): Either<ExtractorError, WranglerEnv> {
     const vars: Record<string, CidlType> = {};
-    let binding;
+    let d1_binding: string | undefined = undefined;
+    const kv_bindings: string[] = [];
+    const r2_bindings: string[] = [];
 
     for (const prop of classDecl.getProperties()) {
+      // TODO: Support multiple D1 bindings
       if (
         prop
           .getType()
@@ -726,7 +272,12 @@ export class CidlExtractor {
             TypeFormatFlags.UseAliasDefinedOutsideCurrentScope,
           ) === "D1Database"
       ) {
-        binding = prop.getName();
+        d1_binding = prop.getName();
+        continue;
+      }
+
+      if (prop.getType().getSymbol()?.getName() === "KVNamespace") {
+        kv_bindings.push(prop.getName());
         continue;
       }
 
@@ -740,14 +291,12 @@ export class CidlExtractor {
       vars[prop.getName()] = ty.unwrap();
     }
 
-    if (!binding) {
-      return err(ExtractorErrorCode.MissingDatabaseBinding);
-    }
-
     return Either.right({
       name: classDecl.getName()!,
       source_path: sourceFile.getFilePath().toString(),
-      db_binding: binding,
+      d1_binding,
+      kv_bindings,
+      r2_bindings,
       vars,
     });
   }
@@ -762,7 +311,6 @@ export class CidlExtractor {
     Boolean: "Boolean",
     Date: "DateIso",
     Uint8Array: "Blob",
-    Stream: "Stream",
   };
 
   static cidlType(
@@ -772,6 +320,11 @@ export class CidlExtractor {
     // Void
     if (type.isVoid()) {
       return Either.right("Void");
+    }
+
+    // Unknown
+    if (type.isUnknown()) {
+      return Either.right("JsonValue");
     }
 
     // Null
@@ -859,8 +412,15 @@ export class CidlExtractor {
       );
     }
 
-    if (symbolName === "Promise" || aliasName === "IncludeTree") {
-      // Unwrap promises
+    if (symbolName === ReadableStream.name) {
+      return Either.right(wrapNullable("Stream", nullable));
+    }
+
+    if (
+      symbolName === Promise.name ||
+      aliasName === "IncludeTree" ||
+      symbolName === KValue.name
+    ) {
       return wrapGeneric(genericTy, nullable, (inner) => inner);
     }
 
@@ -868,7 +428,7 @@ export class CidlExtractor {
       return wrapGeneric(genericTy, nullable, (inner) => ({ Array: inner }));
     }
 
-    if (symbolName === "HttpResult") {
+    if (symbolName === HttpResult.name) {
       return wrapGeneric(genericTy, nullable, (inner) => ({
         HttpResult: inner,
       }));
@@ -915,90 +475,437 @@ export class CidlExtractor {
     }
   }
 
-  static includeTree(
-    expr: Expression | undefined,
-    currentClass: ClassDeclaration,
-    sf: SourceFile,
-  ): Either<ExtractorError, CidlIncludeTree> {
-    // Include trees must be of the expected form
-    if (
-      !expr ||
-      !expr.isKind ||
-      !expr.isKind(SyntaxKind.ObjectLiteralExpression)
-    ) {
-      return err(ExtractorErrorCode.InvalidIncludeTree);
+  static method(
+    method: MethodDeclaration,
+    verb: HttpVerb,
+  ): Either<ExtractorError, ApiMethod> {
+    // Error: invalid method scope, must be public
+    if (method.getScope() != Scope.Public) {
+      return err(ExtractorErrorCode.InvalidApiMethodModifier, (e) => {
+        e.context = method.getName();
+        e.snippet = method.getText();
+      });
     }
 
-    const result: CidlIncludeTree = {};
-    for (const prop of expr.getProperties()) {
-      if (!prop.isKind(SyntaxKind.PropertyAssignment)) continue;
+    const parameters = [];
 
-      // Error: navigation property not found
-      const navProp = findPropertyByName(currentClass, prop.getName());
-      if (!navProp) {
-        return err(
-          ExtractorErrorCode.UnknownNavigationPropertyReference,
-          (e) => {
-            e.snippet = expr.getText();
-            e.context = prop.getName();
-          },
-        );
+    for (const param of method.getParameters()) {
+      // Handle injected param
+      if (param.getDecorator(ParameterDecoratorKind.Inject)) {
+        const typeRes = CidlExtractor.cidlType(param.getType(), true);
+
+        // Error: invalid type
+        if (typeRes.isLeft()) {
+          typeRes.value.snippet = method.getText();
+          typeRes.value.context = param.getName();
+          return typeRes;
+        }
+
+        parameters.push({
+          name: param.getName(),
+          cidl_type: typeRes.unwrap(),
+        });
+        continue;
       }
 
-      const typeRes = CidlExtractor.cidlType(navProp.getType());
+      // Handle all other params
+      const typeRes = CidlExtractor.cidlType(param.getType());
 
-      // Error: invalid referenced nav prop type
+      // Error: invalid type
       if (typeRes.isLeft()) {
-        typeRes.value.snippet = navProp.getText();
-        typeRes.value.context = prop.getName();
+        typeRes.value.snippet = method.getText();
+        typeRes.value.context = param.getName();
         return typeRes;
       }
 
-      // Error: invalid referenced nav prop type
-      const cidl_type = typeRes.unwrap();
-      if (typeof cidl_type === "string") {
-        return err(
-          ExtractorErrorCode.InvalidNavigationPropertyReference,
-          (e) => {
-            e.snippet = navProp.getText();
-            e.context = prop.getName();
-          },
-        );
-      }
-
-      // Recurse for nested includes
-      const initializer = (prop as any).getInitializer?.();
-      let nestedTree: CidlIncludeTree = {};
-      if (initializer?.isKind?.(SyntaxKind.ObjectLiteralExpression)) {
-        const targetModel = getObjectName(cidl_type);
-        const targetClass = currentClass
-          .getSourceFile()
-          .getProject()
-          .getSourceFiles()
-          .flatMap((f) => f.getClasses())
-          .find((c) => c.getName() === targetModel);
-
-        if (targetClass) {
-          const treeRes = CidlExtractor.includeTree(
-            initializer,
-            targetClass,
-            sf,
-          );
-
-          // Error: Propogated from `includeTree`
-          if (treeRes.isLeft()) {
-            treeRes.value.snippet = expr.getText();
-            return treeRes;
-          }
-
-          nestedTree = treeRes.unwrap();
-        }
-      }
-
-      result[navProp.getName()] = nestedTree;
+      parameters.push({
+        name: param.getName(),
+        cidl_type: typeRes.unwrap(),
+      });
     }
 
-    return Either.right(result);
+    const typeRes = CidlExtractor.cidlType(method.getReturnType());
+
+    // Error: invalid type
+    if (typeRes.isLeft()) {
+      typeRes.value.snippet = method.getText();
+      return typeRes;
+    }
+
+    return Either.right({
+      name: method.getName(),
+      http_verb: verb,
+      is_static: method.isStatic(),
+      return_media: defaultMediaType(),
+      return_type: typeRes.unwrap(),
+      parameters_media: defaultMediaType(),
+      parameters,
+    });
+  }
+}
+
+export class ModelExtractor {
+  static extract(
+    classDecl: ClassDeclaration,
+    sourceFile: SourceFile,
+  ): Either<ExtractorError, Model> {
+    const name = classDecl.getName()!;
+    const columns: D1Column[] = [];
+    const key_params: string[] = [];
+    const kv_objects: KeyValue[] = [];
+    const r2_objects: AstR2Object[] = [];
+    const navigation_properties: NavigationProperty[] = [];
+    const data_sources: Record<string, DataSource> = {};
+    const methods: Record<string, ApiMethod> = {};
+    const cruds: Set<CrudKind> = new Set<CrudKind>();
+    let primary_key: NamedTypedValue | null = null;
+
+    // Extract crud methods
+    const crudDecorator = classDecl
+      .getDecorators()
+      .find((d) => getDecoratorName(d) === ClassDecoratorKind.CRUD);
+    if (crudDecorator) {
+      setCrudKinds(crudDecorator, cruds);
+    }
+
+    // Iterate attribtutes
+    for (const prop of classDecl.getProperties()) {
+      const decorators = prop.getDecorators();
+      const typeRes = CidlExtractor.cidlType(prop.getType());
+
+      // Error: invalid property type
+      if (typeRes.isLeft()) {
+        typeRes.value.context = prop.getName();
+        typeRes.value.snippet = prop.getText();
+        return typeRes;
+      }
+
+      const checkModifierRes = checkPropertyModifier(prop);
+
+      // No decorators means this is a standard property
+      if (decorators.length === 0) {
+        // Error: invalid property modifier
+        if (checkModifierRes.isLeft()) {
+          return checkModifierRes;
+        }
+
+        const cidl_type = typeRes.unwrap();
+        columns.push({
+          foreign_key_reference: null,
+          value: {
+            name: prop.getName(),
+            cidl_type,
+          },
+        });
+        continue;
+      }
+
+      // TODO: Limiting to one decorator. Can't get too fancy on us.
+      const decorator = decorators[0];
+      const decoratorName = getDecoratorName(decorator);
+
+      // Error: invalid property modifier
+      if (
+        checkModifierRes.isLeft() &&
+        decoratorName !== PropertyDecoratorKind.DataSource
+      ) {
+        return checkModifierRes;
+      }
+
+      // Process decorator
+      const cidl_type = typeRes.unwrap();
+      switch (decoratorName) {
+        case PropertyDecoratorKind.PrimaryKey: {
+          primary_key = {
+            name: prop.getName(),
+            cidl_type,
+          };
+          break;
+        }
+        case PropertyDecoratorKind.ForeignKey: {
+          columns.push({
+            foreign_key_reference: getDecoratorArgument(decorator, 0) ?? null,
+            value: {
+              name: prop.getName(),
+              cidl_type,
+            },
+          });
+          break;
+        }
+        case PropertyDecoratorKind.OneToOne: {
+          const reference = getDecoratorArgument(decorator, 0);
+
+          // Error: One to one navigation properties requre a reference
+          if (!reference) {
+            return err(
+              ExtractorErrorCode.MissingNavigationPropertyReference,
+              (e) => {
+                e.snippet = prop.getText();
+                e.context = prop.getName();
+              },
+            );
+          }
+
+          let model_name = getObjectName(cidl_type);
+
+          // Error: navigation properties require a model reference
+          if (!model_name) {
+            return err(
+              ExtractorErrorCode.MissingNavigationPropertyReference,
+              (e) => {
+                e.snippet = prop.getText();
+                e.context = prop.getName();
+              },
+            );
+          }
+
+          navigation_properties.push({
+            var_name: prop.getName(),
+            model_reference: model_name,
+            kind: { OneToOne: { column_reference: reference } },
+          });
+          break;
+        }
+        case PropertyDecoratorKind.OneToMany: {
+          const reference = getDecoratorArgument(decorator, 0);
+          // Error: One to one navigation properties requre a reference
+          if (!reference) {
+            return err(
+              ExtractorErrorCode.MissingNavigationPropertyReference,
+              (e) => {
+                e.snippet = prop.getText();
+                e.context = prop.getName();
+              },
+            );
+          }
+
+          let model_name = getObjectName(cidl_type);
+
+          // Error: navigation properties require a model reference
+          if (!model_name) {
+            return err(
+              ExtractorErrorCode.MissingNavigationPropertyReference,
+              (e) => {
+                e.snippet = prop.getText();
+                e.context = prop.getName();
+              },
+            );
+          }
+
+          navigation_properties.push({
+            var_name: prop.getName(),
+            model_reference: model_name,
+            kind: { OneToMany: { column_reference: reference } },
+          });
+          break;
+        }
+        case PropertyDecoratorKind.ManyToMany: {
+          const unique_id = getDecoratorArgument(decorator, 0);
+
+          // Error: many to many attribtues require a unique id
+          if (!unique_id)
+            return err(ExtractorErrorCode.MissingManyToManyUniqueId, (e) => {
+              e.snippet = prop.getText();
+              e.context = prop.getName();
+            });
+
+          // Error: navigation properties require a model reference
+          let model_name = getObjectName(cidl_type);
+          if (!model_name) {
+            return err(
+              ExtractorErrorCode.MissingNavigationPropertyReference,
+              (e) => {
+                e.snippet = prop.getText();
+                e.context = prop.getName();
+              },
+            );
+          }
+
+          navigation_properties.push({
+            var_name: prop.getName(),
+            model_reference: model_name,
+            kind: { ManyToMany: { unique_id } },
+          });
+          break;
+        }
+        case PropertyDecoratorKind.DataSource: {
+          const isIncludeTree =
+            prop
+              .getType()
+              .getText(
+                undefined,
+                TypeFormatFlags.UseAliasDefinedOutsideCurrentScope,
+              ) === `IncludeTree<${name}>`;
+
+          // Error: data sources must be static include trees
+          if (!prop.isStatic() || !isIncludeTree) {
+            return err(ExtractorErrorCode.InvalidDataSourceDefinition, (e) => {
+              e.snippet = prop.getText();
+              e.context = prop.getName();
+            });
+          }
+
+          const initializer = prop.getInitializer();
+          if (!initializer?.isKind(SyntaxKind.ObjectLiteralExpression)) {
+            return err(ExtractorErrorCode.InvalidDataSourceDefinition, (e) => {
+              e.snippet = prop.getText();
+              e.context = prop.getName();
+            });
+          }
+
+          data_sources[prop.getName()] = {
+            name: prop.getName(),
+            tree: parseIncludeTree(initializer),
+          };
+          break;
+        }
+        case PropertyDecoratorKind.KeyParam: {
+          key_params.push(prop.getName());
+          break;
+        }
+        case PropertyDecoratorKind.KV: {
+          // Format and namespace binding are required
+          const format = getDecoratorArgument(decorator, 0);
+          const namespace_binding = getDecoratorArgument(decorator, 1);
+          if (!format || !namespace_binding) {
+            return err(ExtractorErrorCode.InvalidTypescriptSyntax, (e) => {
+              e.snippet = prop.getText();
+              e.context = prop.getName();
+            });
+          }
+
+          // Ensure that the prop type is KValue<T>
+          const ty = prop.getType();
+          const isArray = ty.isArray();
+          const elementType = isArray ? ty.getArrayElementTypeOrThrow() : ty;
+          const symbolName = elementType.getSymbol()?.getName();
+          if (symbolName !== KValue.name) {
+            return err(ExtractorErrorCode.MissingKValue, (e) => {
+              e.snippet = prop.getText();
+              e.context = prop.getName();
+            });
+          }
+
+          kv_objects.push({
+            format,
+            namespace_binding,
+            value: {
+              name: prop.getName(),
+              cidl_type: isArray ? (cidl_type as any).Array : cidl_type,
+            },
+            list_prefix: isArray,
+          });
+          break;
+        }
+        case PropertyDecoratorKind.R2: {
+          throw new Error("Not supported yet");
+        }
+      }
+    }
+
+    // Process methods
+    for (const m of classDecl.getMethods()) {
+      const httpVerb = m
+        .getDecorators()
+        .map(getDecoratorName)
+        .find((name) => Object.values(HttpVerb).includes(name as HttpVerb)) as
+        | HttpVerb
+        | undefined;
+
+      if (!httpVerb) {
+        continue;
+      }
+
+      const result = CidlExtractor.method(m, httpVerb);
+      if (result.isLeft()) {
+        result.value.addContext((prev) => `${m.getName()} ${prev}`);
+        return result;
+      }
+      methods[result.unwrap().name] = result.unwrap();
+    }
+
+    return Either.right({
+      name,
+      columns,
+      primary_key,
+      navigation_properties,
+      key_params,
+      kv_objects,
+      r2_objects,
+      methods,
+      data_sources,
+      cruds: Array.from(cruds).sort(),
+      source_path: sourceFile.getFilePath().toString(),
+    });
+  }
+}
+
+export class ServiceExtractor {
+  static extract(
+    classDecl: ClassDeclaration,
+    sourceFile: SourceFile,
+  ): Either<ExtractorError, Service> {
+    const attributes: ServiceAttribute[] = [];
+    const methods: Record<string, ApiMethod> = {};
+
+    // Properties
+    for (const prop of classDecl.getProperties()) {
+      const typeRes = CidlExtractor.cidlType(prop.getType(), true);
+
+      // Error: invalid property type
+      if (typeRes.isLeft()) {
+        typeRes.value.context = prop.getName();
+        typeRes.value.snippet = prop.getText();
+        return typeRes;
+      }
+
+      if (typeof typeRes.value === "string" || !("Inject" in typeRes.value)) {
+        return err(ExtractorErrorCode.InvalidServiceProperty, (e) => {
+          e.context = prop.getName();
+          e.snippet = prop.getText();
+        });
+      }
+
+      // Error: invalid property modifier
+      const checkModifierRes = checkPropertyModifier(prop);
+      if (checkModifierRes.isLeft()) {
+        return checkModifierRes;
+      }
+
+      attributes.push({
+        var_name: prop.getName(),
+        inject_reference: typeRes.value.Inject,
+      });
+    }
+
+    // Methods
+    for (const m of classDecl.getMethods()) {
+      const httpVerb = m
+        .getDecorators()
+        .map(getDecoratorName)
+        .find((name) =>
+          Object.values(HttpVerb).includes(name as HttpVerb),
+        ) as HttpVerb;
+
+      if (!httpVerb) {
+        continue;
+      }
+
+      const res = CidlExtractor.method(m, httpVerb);
+      if (res.isLeft()) {
+        return res;
+      }
+
+      const serviceMethod = res.unwrap();
+      methods[serviceMethod.name] = serviceMethod;
+    }
+
+    return Either.right({
+      name: classDecl.getName()!,
+      attributes,
+      methods,
+      source_path: sourceFile.getFilePath().toString(),
+    });
   }
 }
 
@@ -1080,30 +987,34 @@ function setCrudKinds(d: Decorator, cruds: Set<CrudKind>) {
   }
 }
 
-function findPropertyByName(
-  cls: ClassDeclaration,
-  name: string,
-): PropertyDeclaration | undefined {
-  const exactMatch = cls.getProperties().find((p) => p.getName() === name);
-  return exactMatch;
-}
+function parseIncludeTree(
+  objLiteral: ObjectLiteralExpression,
+): CidlIncludeTree {
+  const result: CidlIncludeTree = {};
 
-function hasDecorator(
-  node: { getDecorators(): Decorator[] },
-  name: string,
-): boolean {
-  return node.getDecorators().some((d) => {
-    const decoratorName = getDecoratorName(d);
-    return decoratorName === name || decoratorName.endsWith("." + name);
+  objLiteral.getProperties().forEach((prop) => {
+    if (prop.isKind(SyntaxKind.PropertyAssignment)) {
+      const name = prop.getName();
+      const init = prop.getInitializer();
+
+      // Check if it's a nested object literal
+      if (init?.isKind(SyntaxKind.ObjectLiteralExpression)) {
+        result[name] = parseIncludeTree(init); // Recurse
+      } else {
+        result[name] = {}; // Empty object by default
+      }
+    }
   });
+
+  return result;
 }
 
-function checkAttributeModifier(
+function checkPropertyModifier(
   prop: PropertyDeclaration,
 ): Either<ExtractorError, null> {
-  // Error: attributes must be just 'public'
+  // Error: properties must be just 'public'
   if (prop.getScope() != Scope.Public || prop.isReadonly() || prop.isStatic()) {
-    return err(ExtractorErrorCode.InvalidAttributeModifier, (e) => {
+    return err(ExtractorErrorCode.InvalidPropertyModifier, (e) => {
       e.context = prop.getName();
       e.snippet = prop.getText();
     });

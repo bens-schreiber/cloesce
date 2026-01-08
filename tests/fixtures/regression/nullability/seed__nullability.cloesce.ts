@@ -1,6 +1,6 @@
-import { D1, POST, PrimaryKey, WranglerEnv, Inject } from "cloesce/backend";
+import { Model, POST, PrimaryKey, WranglerEnv, Inject } from "cloesce/backend";
 import { D1Database } from "@cloudflare/workers-types";
-class HttpResult<T = unknown> {}
+class HttpResult<T = unknown> { }
 type Integer = number & { __kind: "Integer" };
 
 @WranglerEnv
@@ -8,7 +8,7 @@ export class Env {
   db: D1Database;
 }
 
-@D1
+@Model
 export class NullabilityChecks {
   @PrimaryKey
   id: Integer;
@@ -27,7 +27,7 @@ export class NullabilityChecks {
   }
 
   @POST
-  injectableTypes(@Inject env: Env | null) {}
+  injectableTypes(@Inject env: Env | null) { }
 
   @POST
   arrayTypes(

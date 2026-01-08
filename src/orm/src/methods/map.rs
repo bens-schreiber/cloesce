@@ -22,8 +22,15 @@ pub fn map_sql(
         Some(m) => m,
         None => fail!(OrmErrorKind::UnknownModel, "{}", model_name),
     };
+    let Some(pk) = model.primary_key.as_ref() else {
+        fail!(
+            OrmErrorKind::ModelMissingD1,
+            "Model {} is not a D1 model",
+            model_name
+        )
+    };
 
-    let pk_name = &model.primary_key.name;
+    let pk_name = &pk.name;
     let mut result_map = IndexMap::new();
 
     // Scan each row for the root model (`model_name`)'s primary key
@@ -42,9 +49,9 @@ pub fn map_sql(
             // Set primary key
             m.insert(pk_name.clone(), pk_value.clone());
 
-            // Set scalar attributes
-            for attr in &model.attributes {
-                let attr_name = &attr.value.name;
+            // Set scalar columns
+            for col in &model.columns {
+                let attr_name = &col.value.name;
                 let val = row.get(attr_name).or_else(|| row.get(attr_name)).cloned();
                 if let Some(v) = val {
                     m.insert(attr_name.clone(), v);
@@ -89,13 +96,13 @@ fn process_navigation_properties(
             continue;
         }
 
-        let nested_model = match meta.get(&nav_prop.model_name) {
+        let nested_model = match meta.get(&nav_prop.model_reference) {
             Some(m) => m,
-            None => fail!(OrmErrorKind::UnknownModel, "{}", nav_prop.model_name),
+            None => fail!(OrmErrorKind::UnknownModel, "{}", nav_prop.model_reference),
         };
 
         // Nested properties always use their navigation path prefix (e.g. "cat.toy.id")
-        let nested_pk_name = &nested_model.primary_key.name;
+        let nested_pk_name = &nested_model.primary_key.as_ref().unwrap().name;
         let prefixed_key = if prefix.is_empty() {
             format!("{}.{}", nav_prop.var_name, nested_pk_name)
         } else {
@@ -112,9 +119,9 @@ fn process_navigation_properties(
         let mut nested_model_json = serde_json::Map::new();
         nested_model_json.insert(nested_pk_name.clone(), nested_pk_value.clone());
 
-        // Set nested scalar attributes
-        for attr in &nested_model.attributes {
-            let attr_name = &attr.value.name;
+        // Set nested scalar columns
+        for col in &nested_model.columns {
+            let attr_name = &col.value.name;
             let val = row
                 .get(&format!("{}.{}.{}", prefix, nav_prop.var_name, attr_name))
                 .or_else(|| row.get(&format!("{}.{}", nav_prop.var_name, attr_name)))
@@ -176,7 +183,8 @@ fn process_navigation_properties(
 
 #[cfg(test)]
 mod tests {
-    use ast::{CidlType, NavigationPropertyKind, builder::ModelBuilder};
+    use ast::{CidlType, NavigationPropertyKind};
+    use generator_test::ModelBuilder;
     use serde_json::{Map, Value, json};
     use std::collections::HashMap;
 
@@ -186,20 +194,20 @@ mod tests {
     fn no_records_returns_empty() {
         // Arrange
         let horse = ModelBuilder::new("Horse")
-            .id()
-            .attribute("name", CidlType::nullable(CidlType::Text), None)
+            .id_pk()
+            .col("name", CidlType::nullable(CidlType::Text), None)
             .nav_p(
                 "riders",
                 "Rider",
                 NavigationPropertyKind::OneToMany {
-                    reference: "id".into(),
+                    column_reference: "id".into(),
                 },
             )
             .build();
 
         let rider = ModelBuilder::new("Rider")
-            .id()
-            .attribute("nickname", CidlType::nullable(CidlType::Text), None)
+            .id_pk()
+            .col("nickname", CidlType::nullable(CidlType::Text), None)
             .build();
 
         let meta = HashMap::from([("Horse".to_string(), horse), ("Rider".to_string(), rider)]);
@@ -218,8 +226,8 @@ mod tests {
     fn flat() {
         // Arrange
         let horse = ModelBuilder::new("Horse")
-            .id()
-            .attribute("name", CidlType::nullable(CidlType::Text), None)
+            .id_pk()
+            .col("name", CidlType::nullable(CidlType::Text), None)
             .build();
 
         let meta = HashMap::from([("Horse".to_string(), horse)]);
@@ -246,20 +254,20 @@ mod tests {
     fn assigns_scalar_attributes_and_navigation_arrays() {
         // Arrange
         let horse = ModelBuilder::new("Horse")
-            .id()
-            .attribute("name", CidlType::nullable(CidlType::Text), None)
+            .id_pk()
+            .col("name", CidlType::nullable(CidlType::Text), None)
             .nav_p(
                 "riders",
                 "Rider",
                 NavigationPropertyKind::OneToMany {
-                    reference: "id".into(),
+                    column_reference: "id".into(),
                 },
             )
             .build();
 
         let rider = ModelBuilder::new("Rider")
-            .id()
-            .attribute("nickname", CidlType::nullable(CidlType::Text), None)
+            .id_pk()
+            .col("nickname", CidlType::nullable(CidlType::Text), None)
             .build();
 
         let meta = HashMap::from([("Horse".to_string(), horse), ("Rider".to_string(), rider)]);
@@ -309,20 +317,20 @@ mod tests {
     fn merges_duplicate_rows_with_arrays() {
         // Arrange
         let horse = ModelBuilder::new("Horse")
-            .id()
-            .attribute("name", CidlType::nullable(CidlType::Text), None)
+            .id_pk()
+            .col("name", CidlType::nullable(CidlType::Text), None)
             .nav_p(
                 "riders",
                 "Rider",
                 NavigationPropertyKind::OneToMany {
-                    reference: "id".into(),
+                    column_reference: "id".into(),
                 },
             )
             .build();
 
         let rider = ModelBuilder::new("Rider")
-            .id()
-            .attribute("nickname", CidlType::nullable(CidlType::Text), None)
+            .id_pk()
+            .col("nickname", CidlType::nullable(CidlType::Text), None)
             .build();
 
         let meta = HashMap::from([("Horse".to_string(), horse), ("Rider".to_string(), rider)]);

@@ -9,6 +9,7 @@ export type CidlType =
   | "DateIso"
   | "Boolean"
   | "Stream"
+  | "JsonValue"
   | { DataSource: string }
   | { Inject: string }
   | { Object: string }
@@ -34,7 +35,7 @@ export interface NamedTypedValue {
   cidl_type: CidlType;
 }
 
-export interface ModelAttribute {
+export interface D1Column {
   value: NamedTypedValue;
   foreign_key_reference: string | null;
 }
@@ -66,13 +67,13 @@ export interface ApiMethod {
 }
 
 export type NavigationPropertyKind =
-  | { OneToOne: { reference: string } }
-  | { OneToMany: { reference: string } }
+  | { OneToOne: { column_reference: string } }
+  | { OneToMany: { column_reference: string } }
   | { ManyToMany: { unique_id: string } };
 
 export interface NavigationProperty {
   var_name: string;
-  model_name: string;
+  model_reference: string;
   kind: NavigationPropertyKind;
 }
 
@@ -80,15 +81,32 @@ export function getNavigationPropertyCidlType(
   nav: NavigationProperty,
 ): CidlType {
   return "OneToOne" in nav.kind
-    ? { Object: nav.model_name }
-    : { Array: { Object: nav.model_name } };
+    ? { Object: nav.model_reference }
+    : { Array: { Object: nav.model_reference } };
+}
+
+export interface KeyValue {
+  format: string;
+  namespace_binding: string;
+  value: NamedTypedValue;
+  list_prefix: boolean;
+}
+
+export interface AstR2Object {
+  format: string;
+  bucket_binding: string;
+  var_name: string;
+  list_prefix: boolean;
 }
 
 export interface Model {
   name: string;
-  primary_key: NamedTypedValue;
-  attributes: ModelAttribute[];
+  primary_key: NamedTypedValue | null;
+  columns: D1Column[];
   navigation_properties: NavigationProperty[];
+  key_params: string[];
+  kv_objects: KeyValue[];
+  r2_objects: AstR2Object[];
   methods: Record<string, ApiMethod>;
   data_sources: Record<string, DataSource>;
   cruds: CrudKind[];
@@ -103,7 +121,7 @@ export interface PlainOldObject {
 
 export interface ServiceAttribute {
   var_name: string;
-  injected: string;
+  inject_reference: string;
 }
 
 export interface Service {
@@ -126,15 +144,14 @@ export interface DataSource {
 export interface WranglerEnv {
   name: string;
   source_path: string;
-  db_binding: string;
+  d1_binding?: string; // TODO: multiple D1 bindings
+  kv_bindings: string[];
+  r2_bindings: string[];
   vars: Record<string, CidlType>;
 }
 
 export interface CloesceAst {
-  [x: string]: any;
-  version: string;
   project_name: string;
-  language: string;
   wrangler_env?: WranglerEnv;
   models: Record<string, Model>;
   poos: Record<string, PlainOldObject>;

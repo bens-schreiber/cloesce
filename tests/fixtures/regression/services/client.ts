@@ -1,6 +1,7 @@
 // GENERATED CODE. DO NOT MODIFY.
 
-import { HttpResult, DeepPartial, MediaType, requestBody, b64ToU8 } from "cloesce/client";
+import { HttpResult, DeepPartial, MediaType, requestBody, b64ToU8, KValue, R2Object } from "cloesce/client";
+
 
 export class BarService {
   static async useFoo(
@@ -15,12 +16,12 @@ export class BarService {
     });
 
     return await HttpResult.fromResponse(
-      res, 
+      res,
       MediaType.Json,
       undefined,
       false
     );
-    }
+  }
 }
 export class FooService {
   static async instantiatedMethod(
@@ -35,12 +36,12 @@ export class FooService {
     });
 
     return await HttpResult.fromResponse(
-      res, 
+      res,
       MediaType.Json,
       undefined,
       false
     );
-    }
+  }
   static async staticMethod(
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<string>> {
@@ -53,11 +54,11 @@ export class FooService {
     });
 
     return await HttpResult.fromResponse(
-      res, 
+      res,
       MediaType.Json,
       undefined,
       false
     );
-    }
+  }
 }
 

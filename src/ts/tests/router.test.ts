@@ -6,7 +6,7 @@ import {
 } from "../src/router/router";
 import { HttpVerb, MediaType, Model, NamedTypedValue } from "../src/ast";
 import { CloesceApp, HttpResult } from "../src/ui/backend";
-import { mapSql } from "../src/router/wasm";
+import { mapSqlJson } from "../src/router/wasm";
 import fs from "fs";
 import path from "path";
 import {
@@ -69,7 +69,7 @@ describe("Global Middleware", () => {
     const app = new CloesceApp();
     const request = createRequest("http://foo.com");
     const env = mockWranglerEnv();
-    const ast = createAst([]);
+    const ast = createAst();
     const constructorRegistry = createCtorReg();
     const di = createDi();
     const d1 = mockD1();
@@ -98,7 +98,7 @@ describe("Global Middleware", () => {
     const app = new CloesceApp();
     const request = createRequest("http://foo.com");
     const env = mockWranglerEnv();
-    const ast = createAst([]);
+    const ast = createAst();
     const constructorRegistry = createCtorReg();
     const di = createDi();
     const d1 = mockD1();
@@ -133,7 +133,7 @@ describe("Match Route", () => {
   test("Unknown Prefix => 404", () => {
     // Arrange
     const request = createRequest("http://foo.com/does/not/match");
-    const ast = createAst([]);
+    const ast = createAst();
 
     // Act
     const res = _cloesceInternal.matchRoute(request, ast, "api");
@@ -149,7 +149,7 @@ describe("Match Route", () => {
   test("Unknown Route => 404", () => {
     // Arrange
     const request = createRequest("http://foo.com/api/Model/method");
-    const ast = createAst([]);
+    const ast = createAst();
 
     // Act
     const res = _cloesceInternal.matchRoute(request, ast, "api");
@@ -165,7 +165,9 @@ describe("Match Route", () => {
   test("Unknown Method => 404", () => {
     // Arrange
     const request = createRequest("http://foo.com/api/Model/method");
-    const ast = createAst([ModelBuilder.model("Model").id().build()]);
+    const ast = createAst({
+      models: [ModelBuilder.model("Model").idPk().build()],
+    });
 
     // Act
     const res = _cloesceInternal.matchRoute(request, ast, "api");
@@ -181,12 +183,14 @@ describe("Match Route", () => {
   test("Unmatched Verb => 404", () => {
     // Arrange
     const request = createRequest("http://foo.com/api/Model/method");
-    const ast = createAst([
-      ModelBuilder.model("Model")
-        .id()
-        .method("method", HttpVerb.DELETE, false, [], "Void")
-        .build(),
-    ]);
+    const ast = createAst({
+      models: [
+        ModelBuilder.model("Model")
+          .idPk()
+          .method("method", HttpVerb.DELETE, false, [], "Void")
+          .build(),
+      ],
+    });
 
     // Act
     const res = _cloesceInternal.matchRoute(request, ast, "api");
@@ -199,15 +203,17 @@ describe("Match Route", () => {
     );
   });
 
-  test("Matches static method on Model", () => {
+  test("Matches static method", () => {
     // Arrange
     const request = createRequest("http://foo.com/api/Model/method", "POST");
-    const ast = createAst([
-      ModelBuilder.model("Model")
-        .id()
-        .method("method", HttpVerb.POST, true, [], "Void")
-        .build(),
-    ]);
+    const ast = createAst({
+      models: [
+        ModelBuilder.model("Model")
+          .idPk()
+          .method("method", HttpVerb.POST, true, [], "Void")
+          .build(),
+      ],
+    });
 
     // Act
     const res = _cloesceInternal.matchRoute(request, ast, "api");
@@ -215,7 +221,8 @@ describe("Match Route", () => {
     // Assert
     expect(res.isRight()).toBe(true);
     expect(res.unwrap()).toEqual({
-      id: null,
+      primaryKey: null,
+      keyParams: {},
       method: ast.models["Model"].methods["method"],
       model: ast.models["Model"],
       namespace: "Model",
@@ -223,15 +230,17 @@ describe("Match Route", () => {
     });
   });
 
-  test("Matches instantiated method on Model", () => {
+  test("Matches instantiated method", () => {
     // Arrange
     const request = createRequest("http://foo.com/api/Model/0/method", "POST");
-    const ast = createAst([
-      ModelBuilder.model("Model")
-        .id()
-        .method("method", HttpVerb.POST, false, [], "Void")
-        .build(),
-    ]);
+    const ast = createAst({
+      models: [
+        ModelBuilder.model("Model")
+          .idPk()
+          .method("method", HttpVerb.POST, false, [], "Void")
+          .build(),
+      ],
+    });
 
     // Act
     const res = _cloesceInternal.matchRoute(request, ast, "api");
@@ -239,7 +248,43 @@ describe("Match Route", () => {
     // Assert
     expect(res.isRight()).toBe(true);
     expect(res.unwrap()).toEqual({
-      id: "0",
+      primaryKey: "0",
+      keyParams: {},
+      model: ast.models["Model"],
+      method: ast.models["Model"].methods["method"],
+      namespace: "Model",
+      kind: "model",
+    });
+  });
+
+  test("Matches instantiated method with key params", () => {
+    // Arrange
+    const request = createRequest(
+      "http://foo.com/api/Model/0/value1/value2/method",
+      "POST",
+    );
+    const ast = createAst({
+      models: [
+        ModelBuilder.model("Model")
+          .idPk()
+          .method("method", HttpVerb.POST, false, [], "Void")
+          .keyParam("key1")
+          .keyParam("key2")
+          .build(),
+      ],
+    });
+
+    // Act
+    const res = _cloesceInternal.matchRoute(request, ast, "api");
+
+    // Assert
+    expect(res.isRight()).toBe(true);
+    expect(res.unwrap()).toEqual({
+      primaryKey: "0",
+      keyParams: {
+        key1: "value1",
+        key2: "value2",
+      },
       model: ast.models["Model"],
       method: ast.models["Model"].methods["method"],
       namespace: "Model",
@@ -250,14 +295,13 @@ describe("Match Route", () => {
   test("Matches static method on Service", () => {
     // Arrange
     const request = createRequest("http://foo.com/api/Service/method", "POST");
-    const ast = createAst(
-      [],
-      [
+    const ast = createAst({
+      services: [
         ServiceBuilder.service("Service")
           .method("method", HttpVerb.POST, true, [], "Void")
           .build(),
       ],
-    );
+    });
 
     // Act
     const res = _cloesceInternal.matchRoute(request, ast, "api");
@@ -265,7 +309,8 @@ describe("Match Route", () => {
     // Assert
     expect(res.isRight()).toBe(true);
     expect(res.unwrap()).toEqual({
-      id: null,
+      primaryKey: null,
+      keyParams: {},
       method: ast.services["Service"].methods["method"],
       service: ast.services["Service"],
       kind: "service",
@@ -276,14 +321,13 @@ describe("Match Route", () => {
   test("Matches instantiated method on Service", () => {
     // Arrange
     const request = createRequest("http://foo.com/api/Service/method", "POST");
-    const ast = createAst(
-      [],
-      [
+    const ast = createAst({
+      services: [
         ServiceBuilder.service("Service")
           .method("method", HttpVerb.POST, false, [], "Void")
           .build(),
       ],
-    );
+    });
 
     // Act
     const res = _cloesceInternal.matchRoute(request, ast, "api");
@@ -291,7 +335,8 @@ describe("Match Route", () => {
     // Assert
     expect(res.isRight()).toBe(true);
     expect(res.unwrap()).toEqual({
-      id: null,
+      primaryKey: null,
+      keyParams: {},
       method: ast.services["Service"].methods["method"],
       service: ast.services["Service"],
       kind: "service",
@@ -306,12 +351,14 @@ describe("Namespace Middleware", () => {
     const app = new CloesceApp();
     const request = createRequest("http://foo.com/api/Foo/method", "POST");
     const env = mockWranglerEnv();
-    const ast = createAst([
-      ModelBuilder.model("Foo")
-        .id()
-        .method("method", HttpVerb.POST, true, [], "Void")
-        .build(),
-    ]);
+    const ast = createAst({
+      models: [
+        ModelBuilder.model("Foo")
+          .idPk()
+          .method("method", HttpVerb.POST, true, [], "Void")
+          .build(),
+      ],
+    });
     const constructorRegistry = createCtorReg();
     const di = createDi();
     const d1 = mockD1();
@@ -342,14 +389,13 @@ describe("Namespace Middleware", () => {
     const app = new CloesceApp();
     const request = createRequest("http://foo.com/api/Foo/method", "POST");
     const env = mockWranglerEnv();
-    const ast = createAst(
-      [],
-      [
+    const ast = createAst({
+      services: [
         ServiceBuilder.service("Foo")
           .method("method", HttpVerb.POST, true, [], "Void")
           .build(),
       ],
-    );
+    });
     const constructorRegistry = createCtorReg();
     const di = createDi();
     const d1 = mockD1();
@@ -377,22 +423,26 @@ describe("Namespace Middleware", () => {
 });
 
 describe("Request Validation", () => {
-  test("Instantiated Method Missing Id => 400", async () => {
+  test("Instantiated model method missing id => 400", async () => {
     // Arrange
     const request = createRequest("http://foo.com/api/Foo/method", "POST", {});
     const model = ModelBuilder.model("Foo")
-      .id()
+      .idPk()
       .method("method", HttpVerb.POST, false, [], "Void")
       .build();
-    const ast = createAst([model]);
+    const ast = createAst({
+      models: [model],
+    });
 
     class Foo {}
     const ctorReg = createCtorReg([Foo]);
     const route: MatchedRoute = {
       kind: "model",
       namespace: Foo.name,
+      model,
       method: model.methods["method"],
-      id: null,
+      primaryKey: null,
+      keyParams: {},
     };
 
     // Act
@@ -406,7 +456,7 @@ describe("Request Validation", () => {
     // Assert
     expect(res.isLeft()).toBe(true);
     expect(extractErrorCode(res.unwrapLeft().message)).toEqual(
-      RouterError.InstantiatedMethodMissingId,
+      RouterError.InstantiatedMethodMissingPrimaryKey,
     );
   });
 
@@ -414,10 +464,12 @@ describe("Request Validation", () => {
     // Arrange
     const request = createRequest("http://foo.com/api/Foo/method", "POST");
     const model = ModelBuilder.model("Foo")
-      .id()
+      .idPk()
       .method("method", HttpVerb.POST, true, [], "Void")
       .build();
-    const ast = createAst([model]);
+    const ast = createAst({
+      models: [model],
+    });
 
     class Foo {}
     const ctorReg = createCtorReg([Foo]);
@@ -425,7 +477,8 @@ describe("Request Validation", () => {
       kind: "model",
       namespace: Foo.name,
       method: model.methods["method"],
-      id: null,
+      primaryKey: null,
+      keyParams: {},
     };
 
     // Act
@@ -447,7 +500,7 @@ describe("Request Validation", () => {
     // Arrange
     const request = createRequest("http://foo.com/api/Foo/method", "POST", {});
     const model = ModelBuilder.model("Foo")
-      .id()
+      .idPk()
       .method(
         "method",
         HttpVerb.POST,
@@ -461,7 +514,9 @@ describe("Request Validation", () => {
         "Void",
       )
       .build();
-    const ast = createAst([model]);
+    const ast = createAst({
+      models: [model],
+    });
 
     class Foo {}
     const ctorReg = createCtorReg([Foo]);
@@ -469,7 +524,8 @@ describe("Request Validation", () => {
       kind: "model",
       namespace: Foo.name,
       method: model.methods["method"],
-      id: null,
+      primaryKey: null,
+      keyParams: {},
     };
 
     // Act
@@ -622,13 +678,13 @@ describe("Request Validation", () => {
       },
       models: [
         ModelBuilder.model("Scalar")
-          .id()
-          .attribute("manyScalarsId", "Integer", "ManyScalars")
+          .idPk()
+          .col("manyScalarsId", "Integer", "ManyScalars")
           .build(),
         ModelBuilder.model("ManyScalars")
-          .id()
+          .idPk()
           .navP("scalars", "Scalar", {
-            OneToMany: { reference: "manyScalarsId" },
+            OneToMany: { column_reference: "manyScalarsId" },
           })
           .build(),
       ],
@@ -677,7 +733,7 @@ describe("Request Validation", () => {
   test.each(expandedCases)("validates parameters %#", async (testCase) => {
     // Arrange
     const model = ModelBuilder.model("TestCase")
-      .id()
+      .idPk()
       .method(
         "testMethod",
         testCase.isGetRequest ? HttpVerb.GET : HttpVerb.POST,
@@ -686,7 +742,9 @@ describe("Request Validation", () => {
         "Void",
       )
       .build();
-    const ast = createAst([model, ...(testCase.models ?? [])]);
+    const ast = createAst({
+      models: [model, ...(testCase.models ?? [])],
+    });
 
     const url = new URL("https://foo.com/api");
     if (testCase.isGetRequest) {
@@ -704,9 +762,10 @@ describe("Request Validation", () => {
     const route: MatchedRoute = {
       kind: "model",
       namespace: "TestCase",
-      model: model,
+      model,
       method: model.methods["testMethod"],
-      id: null,
+      primaryKey: null,
+      keyParams: {},
     };
 
     // Act
@@ -733,12 +792,14 @@ describe("Method Middleware", () => {
       JSON.stringify({}),
     );
     const env = mockWranglerEnv();
-    const ast = createAst([
-      ModelBuilder.model("Foo")
-        .id()
-        .method("method", HttpVerb.POST, true, [], "Void")
-        .build(),
-    ]);
+    const ast = createAst({
+      models: [
+        ModelBuilder.model("Foo")
+          .idPk()
+          .method("method", HttpVerb.POST, true, [], "Void")
+          .build(),
+      ],
+    });
     const constructorRegistry = createCtorReg();
     const di = createDi();
     const d1 = mockD1();
@@ -771,7 +832,7 @@ describe("Method Dispatch", () => {
   test("Missing Dependency => 500", async () => {
     // Arrange
     const model = ModelBuilder.model("Foo")
-      .id()
+      .idPk()
       .method(
         "method",
         HttpVerb.POST,
@@ -791,7 +852,8 @@ describe("Method Dispatch", () => {
       kind: "model",
       namespace: "Foo",
       method: model.methods["method"],
-      id: null,
+      primaryKey: null,
+      keyParams: {},
     };
 
     // Act
@@ -812,7 +874,7 @@ describe("Method Dispatch", () => {
 
     const di = createDi();
     const model = ModelBuilder.model("Foo")
-      .id()
+      .idPk()
       .method("testMethod", HttpVerb.GET, true, [], "Void")
       .build();
 
@@ -820,7 +882,8 @@ describe("Method Dispatch", () => {
       kind: "model",
       namespace: "Foo",
       method: model.methods["testMethod"],
-      id: null,
+      primaryKey: null,
+      keyParams: {},
     };
 
     // Act
@@ -842,7 +905,7 @@ describe("Method Dispatch", () => {
     const di = createDi();
 
     const model = ModelBuilder.model("Foo")
-      .id()
+      .idPk()
       .method("testMethod", HttpVerb.GET, true, [], { HttpResult: "Void" })
       .build();
 
@@ -850,7 +913,8 @@ describe("Method Dispatch", () => {
       kind: "model",
       namespace: "Foo",
       method: model.methods["testMethod"],
-      id: null,
+      primaryKey: null,
+      keyParams: {},
     };
 
     // Act
@@ -872,7 +936,7 @@ describe("Method Dispatch", () => {
     const di = createDi();
 
     const model = ModelBuilder.model("Foo")
-      .id()
+      .idPk()
       .method("testMethod", HttpVerb.GET, true, [], "Text")
       .build();
 
@@ -880,7 +944,8 @@ describe("Method Dispatch", () => {
       kind: "model",
       namespace: "Foo",
       method: model.methods["testMethod"],
-      id: null,
+      primaryKey: null,
+      keyParams: {},
     };
 
     // Act
@@ -895,7 +960,7 @@ describe("Method Dispatch", () => {
   test("handles thrown errors", async () => {
     // Arrange – Error object
     const model = ModelBuilder.model("Foo")
-      .id()
+      .idPk()
       .method("testMethod", HttpVerb.GET, true, [], "Text")
       .build();
 
@@ -903,7 +968,8 @@ describe("Method Dispatch", () => {
       kind: "model",
       namespace: "Foo",
       method: model.methods["testMethod"],
-      id: null,
+      primaryKey: null,
+      keyParams: {},
     };
 
     const crud = {
@@ -937,12 +1003,14 @@ describe("Result Middleware", () => {
       JSON.stringify({}),
     );
     const env = mockWranglerEnv();
-    const ast = createAst([
-      ModelBuilder.model("Foo")
-        .id()
-        .method("method", HttpVerb.POST, true, [], "Void")
-        .build(),
-    ]);
+    const ast = createAst({
+      models: [
+        ModelBuilder.model("Foo")
+          .idPk()
+          .method("method", HttpVerb.POST, true, [], "Void")
+          .build(),
+      ],
+    });
 
     class Foo {
       static method() {
@@ -986,12 +1054,14 @@ describe("Result Middleware", () => {
       JSON.stringify({}),
     );
     const env = mockWranglerEnv();
-    const ast = createAst([
-      ModelBuilder.model("Foo")
-        .id()
-        .method("method", HttpVerb.POST, true, [], "Void")
-        .build(),
-    ]);
+    const ast = createAst({
+      models: [
+        ModelBuilder.model("Foo")
+          .idPk()
+          .method("method", HttpVerb.POST, true, [], "Void")
+          .build(),
+      ],
+    });
 
     class Foo {
       static method() {
@@ -1025,106 +1095,5 @@ describe("Result Middleware", () => {
     // Assert
     expect(res.status).toBe(500);
     expect(await res.text()).toBe("short-circuited");
-  });
-});
-
-describe("mapSql", () => {
-  afterEach(() => {
-    _cloesceInternal.RuntimeContainer.dispose();
-  });
-
-  test("handles recursive navigation properties", async () => {
-    const wasm = await WebAssembly.instantiate(
-      fs.readFileSync(path.resolve("./dist/orm.wasm")),
-      {},
-    );
-
-    // Build models with ModelBuilder
-    const Horse = ModelBuilder.model("Horse")
-      .attribute("name", "Text")
-      .attribute("bio", { Nullable: "Text" })
-      .navP("likes", "Like", { OneToMany: { reference: "horseId1" } })
-      .id()
-      .build();
-
-    const Like = ModelBuilder.model("Like")
-      .attribute("horseId1", "Integer", "Horse")
-      .attribute("horseId2", "Integer", "Horse")
-      .navP("horse2", "Horse", { OneToOne: { reference: "horseId2" } })
-      .id()
-      .build();
-
-    const ast = createAst([Horse, Like]);
-
-    const ctor = {
-      Horse: class {
-        id?: string;
-        name?: string;
-        bio?: string | null;
-        likes?: any[];
-      },
-      Like: class {
-        id?: string;
-        horseId1?: string;
-        horseId2?: string;
-        horse2?: any;
-      },
-    };
-
-    await _cloesceInternal.RuntimeContainer.init(ast, ctor, wasm.instance);
-
-    const records = [
-      {
-        id: "1",
-        name: "Lightning",
-        bio: "Fast horse",
-        "likes.id": "10",
-        "likes.horseId1": "1",
-        "likes.horseId2": "2",
-        "likes.horse2.id": "2",
-        "likes.horse2.name": "Thunder",
-        "likes.horse2.bio": "Strong horse",
-      },
-      {
-        id: "1",
-        name: "Lightning",
-        bio: "Fast horse",
-        "likes.id": "11",
-        "likes.horseId1": "1",
-        "likes.horseId2": "3",
-        "likes.horse2.id": "3",
-        "likes.horse2.name": "Storm",
-        "likes.horse2.bio": null,
-      },
-    ];
-
-    const includeTree = IncludeTreeBuilder.new()
-      .addWithChildren("likes", (b) => b.addNode("horse2"))
-      .build();
-
-    const result = mapSql(ctor["Horse"], records, includeTree);
-
-    expect(result.value.length).toBe(1);
-
-    const horse: any = result.value[0];
-    expect(horse).toMatchObject({
-      id: "1",
-      name: "Lightning",
-      bio: "Fast horse",
-      likes: [
-        {
-          id: "10",
-          horseId1: "1",
-          horseId2: "2",
-          horse2: { id: "2", name: "Thunder", bio: "Strong horse" },
-        },
-        {
-          id: "11",
-          horseId1: "1",
-          horseId2: "3",
-          horse2: { id: "3", name: "Storm", bio: null },
-        },
-      ],
-    });
   });
 });

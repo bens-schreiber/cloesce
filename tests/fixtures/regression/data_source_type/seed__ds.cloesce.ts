@@ -1,5 +1,5 @@
 import {
-  D1,
+  Model,
   POST,
   PrimaryKey,
   WranglerEnv,
@@ -16,13 +16,13 @@ export class Env {
   db: D1Database;
 }
 
-@D1
+@Model
 export class NoDs {
   @PrimaryKey
   id: Integer;
 }
 
-@D1
+@Model
 export class OneDs {
   @PrimaryKey
   id: Integer;
@@ -31,7 +31,7 @@ export class OneDs {
   static readonly default: IncludeTree<OneDs> = {};
 }
 
-@D1
+@Model
 export class Foo {
   @PrimaryKey
   id: Integer;
@@ -44,7 +44,7 @@ export class Foo {
     customDs: DataSourceOf<Foo>,
     oneDs: DataSourceOf<OneDs>,
     noDs: DataSourceOf<NoDs>
-  ) {}
+  ) { }
 }
 
 @PlainOldObject

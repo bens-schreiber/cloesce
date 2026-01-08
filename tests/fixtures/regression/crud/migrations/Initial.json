@@ -1,16 +1,16 @@
 {
-  "hash": 11231265921349769574,
+  "hash": 16551069560551514791,
   "models": {
     "CrudHaver": {
-      "hash": 5296265612493794740,
+      "hash": 16497283824177894047,
       "name": "CrudHaver",
       "primary_key": {
         "name": "id",
         "cidl_type": "Integer"
       },
-      "attributes": [
+      "columns": [
         {
-          "hash": 5774566402684976635,
+          "hash": 12056908550303509781,
           "value": {
             "name": "name",
             "cidl_type": "Text"
@@ -22,15 +22,15 @@
       "data_sources": {}
     },
     "Parent": {
-      "hash": 7318046172721680760,
+      "hash": 9758938401003026415,
       "name": "Parent",
       "primary_key": {
         "name": "id",
         "cidl_type": "Integer"
       },
-      "attributes": [
+      "columns": [
         {
-          "hash": 10702265416126128589,
+          "hash": 15556638154300732071,
           "value": {
             "name": "favoriteChildId",
             "cidl_type": {
@@ -44,20 +44,20 @@
         {
           "hash": 10900103892837471402,
           "var_name": "favoriteChild",
-          "model_name": "Child",
+          "model_reference": "Child",
           "kind": {
             "OneToOne": {
-              "reference": "favoriteChildId"
+              "column_reference": "favoriteChildId"
             }
           }
         },
         {
           "hash": 15999549826759912293,
           "var_name": "children",
-          "model_name": "Child",
+          "model_reference": "Child",
           "kind": {
             "OneToMany": {
-              "reference": "parentId"
+              "column_reference": "parentId"
             }
           }
         }
@@ -74,15 +74,15 @@
       }
     },
     "Child": {
-      "hash": 9682775697977483777,
+      "hash": 2823647866772793242,
       "name": "Child",
       "primary_key": {
         "name": "id",
         "cidl_type": "Integer"
       },
-      "attributes": [
+      "columns": [
         {
-          "hash": 9359384940981507483,
+          "hash": 17200147533970366456,
           "value": {
             "name": "parentId",
             "cidl_type": "Integer"
@@ -94,10 +94,10 @@
         {
           "hash": 112683149846054066,
           "var_name": "parent",
-          "model_name": "Parent",
+          "model_reference": "Parent",
           "kind": {
             "OneToOne": {
-              "reference": "parentId"
+              "column_reference": "parentId"
             }
           }
         }

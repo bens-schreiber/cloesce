@@ -1,6 +1,7 @@
 // GENERATED CODE. DO NOT MODIFY.
 
-import { HttpResult, DeepPartial, MediaType, requestBody, b64ToU8 } from "cloesce/client";
+import { HttpResult, DeepPartial, MediaType, requestBody, b64ToU8, KValue, R2Object } from "cloesce/client";
+
 
 
 export class Dog {
@@ -9,12 +10,17 @@ export class Dog {
   age: number;
 
   async getPartialSelf(
-    __dataSource: "none" = "none",
+    __datasource: "none" = "none",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<DeepPartial<Dog>>> {
-    const baseUrl = new URL(`http://localhost:5002/api/Dog/${this.id}/getPartialSelf`);
+    const id = [
+      encodeURIComponent(String(this.id)),
+    ].join("/");
+    const baseUrl = new URL(
+      `http://localhost:5002/api/Dog/${id}/getPartialSelf`
+    );
 
-    baseUrl.searchParams.append('__dataSource', String(__dataSource));
+    baseUrl.searchParams.append("__datasource", String(__datasource));
 
     const res = await fetchImpl(baseUrl, {
       method: "GET",
@@ -22,7 +28,7 @@ export class Dog {
     });
 
     return await HttpResult.fromResponse(
-      res, 
+      res,
       MediaType.Json,
       DeepPartial<Dog>,
       false
@@ -32,7 +38,9 @@ export class Dog {
     dog: DeepPartial<Dog>,
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Dog>> {
-    const baseUrl = new URL(`http://localhost:5002/api/Dog/post`);
+    const baseUrl = new URL(
+      `http://localhost:5002/api/Dog/post`
+    );
     const payload: any = {};
 
     payload["dog"] = dog;
@@ -41,11 +49,11 @@ export class Dog {
       method: "POST",
       duplex: "half",
       headers: { "Content-Type": "application/json" },
-      body: requestBody(MediaType.Json, payload)
+      body: requestBody(MediaType.Json, payload),
     });
 
     return await HttpResult.fromResponse(
-      res, 
+      res,
       MediaType.Json,
       Dog,
       false

@@ -1,14 +1,14 @@
 {
-  "hash": 13896337731609429158,
+  "hash": 14803987991985266137,
   "models": {
-    "Model": {
-      "hash": 598144920838359046,
-      "name": "Model",
+    "Foo": {
+      "hash": 2291516488856648612,
+      "name": "Foo",
       "primary_key": {
         "name": "id",
         "cidl_type": "Integer"
       },
-      "attributes": [],
+      "columns": [],
       "navigation_properties": [],
       "data_sources": {}
     }

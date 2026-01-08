@@ -6,37 +6,68 @@ import {
   HttpVerb,
   CidlType,
   NavigationPropertyKind,
-  ModelAttribute,
+  D1Column,
   DataSource,
   NavigationProperty,
   ApiMethod,
   Service,
   ServiceAttribute,
   MediaType,
+  KeyValue,
+  AstR2Object,
 } from "../src/ast";
 
-export function createAst(
-  models: Model[],
-  services: Service[] = [],
-): CloesceAst {
-  const modelsMap = Object.fromEntries(models.map((m) => [m.name, m]));
-  const serviceMap = Object.fromEntries(services.map((s) => [s.name, s]));
+export function createAst(args?: {
+  models?: Model[];
+  services?: Service[];
+}): CloesceAst {
+  const modelsMap = Object.fromEntries(
+    args?.models?.map((m) => [m.name, m]) ?? [],
+  );
+  const serviceMap = Object.fromEntries(
+    args?.services?.map((s) => [s.name, s]) ?? [],
+  );
 
   return {
-    version: "1.0",
     project_name: "test",
-    language: "TypeScript",
     models: modelsMap,
+    services: serviceMap,
     poos: {},
     wrangler_env: {
       name: "Env",
       source_path: "source.ts",
-      db_binding: "db",
+      d1_binding: "db",
+      kv_bindings: [],
+      r2_bindings: [],
       vars: {},
     },
-    services: serviceMap,
     app_source: null,
   };
+}
+
+abstract class ApiMethodBuilder {
+  protected methods: Record<string, ApiMethod> = {};
+
+  method(
+    name: string,
+    http_verb: HttpVerb,
+    is_static: boolean,
+    parameters: NamedTypedValue[],
+    return_type: CidlType,
+    return_media: MediaType = MediaType.Json,
+    parameters_media: MediaType = MediaType.Json,
+  ): this {
+    this.methods[name] = {
+      name,
+      http_verb,
+      is_static,
+      parameters,
+      return_type,
+      return_media,
+      parameters_media,
+    };
+    return this;
+  }
 }
 
 export class IncludeTreeBuilder {
@@ -67,9 +98,12 @@ export class IncludeTreeBuilder {
 
 export class ModelBuilder {
   private name: string;
-  private attributes: ModelAttribute[] = [];
-  private navigation_properties: NavigationProperty[] = [];
   private primary_key: NamedTypedValue | null = null;
+  private columns: D1Column[] = [];
+  private navigation_properties: NavigationProperty[] = [];
+  private key_params: string[] = [];
+  private kv_objects: KeyValue[] = [];
+  private r2_objects: AstR2Object[] = [];
   private methods: Record<string, ApiMethod> = {};
   private data_sources: Record<string, DataSource> = {};
 
@@ -77,16 +111,16 @@ export class ModelBuilder {
     this.name = name;
   }
 
-  static model(name: string) {
+  static model(name: string): ModelBuilder {
     return new ModelBuilder(name);
   }
 
-  attribute(
+  col(
     name: string,
     cidl_type: CidlType,
     foreign_key: string | null = null,
   ): this {
-    this.attributes.push({
+    this.columns.push({
       value: { name, cidl_type },
       foreign_key_reference: foreign_key,
     });
@@ -95,12 +129,12 @@ export class ModelBuilder {
 
   navP(
     var_name: string,
-    model_name: string,
+    model_reference: string,
     kind: NavigationPropertyKind,
   ): this {
     this.navigation_properties.push({
       var_name,
-      model_name,
+      model_reference,
       kind,
     });
     return this;
@@ -111,8 +145,44 @@ export class ModelBuilder {
     return this;
   }
 
-  id(): this {
+  idPk(): this {
     return this.pk("id", "Integer");
+  }
+
+  keyParam(name: string): this {
+    this.key_params.push(name);
+    return this;
+  }
+
+  kvObject(
+    format: string,
+    namespace_binding: string,
+    name: string,
+    list_prefix: boolean,
+    cidl_type: CidlType,
+  ): this {
+    this.kv_objects.push({
+      format,
+      namespace_binding,
+      value: { name, cidl_type },
+      list_prefix,
+    });
+    return this;
+  }
+
+  r2Object(
+    format: string,
+    bucket_binding: string,
+    var_name: string,
+    list_prefix: boolean,
+  ): this {
+    this.r2_objects.push({
+      format,
+      bucket_binding,
+      var_name,
+      list_prefix,
+    });
+    return this;
   }
 
   method(
@@ -121,22 +191,20 @@ export class ModelBuilder {
     is_static: boolean,
     parameters: NamedTypedValue[],
     return_type: CidlType,
-    parameters_media: MediaType = MediaType.Json,
-    return_media: MediaType = MediaType.Json,
   ): this {
     this.methods[name] = {
       name,
       http_verb,
       is_static,
       parameters,
-      parameters_media,
       return_type,
-      return_media,
+      return_media: MediaType.Json,
+      parameters_media: MediaType.Json,
     };
     return this;
   }
 
-  dataSource(name: string, tree: CidlIncludeTree): this {
+  dataSource(name: string, tree: any): this {
     this.data_sources[name] = {
       name,
       tree,
@@ -145,15 +213,14 @@ export class ModelBuilder {
   }
 
   build(): Model {
-    if (!this.primary_key) {
-      throw new Error(`Model '${this.name}' has no primary key`);
-    }
-
     return {
       name: this.name,
-      attributes: this.attributes,
-      navigation_properties: this.navigation_properties,
       primary_key: this.primary_key,
+      columns: this.columns,
+      navigation_properties: this.navigation_properties,
+      key_params: this.key_params,
+      kv_objects: this.kv_objects,
+      r2_objects: this.r2_objects,
       methods: this.methods,
       data_sources: this.data_sources,
       cruds: [],
@@ -162,12 +229,12 @@ export class ModelBuilder {
   }
 }
 
-export class ServiceBuilder {
+export class ServiceBuilder extends ApiMethodBuilder {
   private name: string;
   private attributes: ServiceAttribute[] = [];
-  private methods: Record<string, ApiMethod> = {};
 
   constructor(name: string) {
+    super();
     this.name = name;
   }
 
@@ -175,29 +242,8 @@ export class ServiceBuilder {
     return new ServiceBuilder(name);
   }
 
-  inject(var_name: string, injected: string): this {
-    this.attributes.push({ var_name, injected });
-    return this;
-  }
-
-  method(
-    name: string,
-    http_verb: HttpVerb,
-    is_static: boolean,
-    parameters: NamedTypedValue[],
-    return_type: CidlType,
-    return_media: MediaType = MediaType.Json,
-    parameters_media: MediaType = MediaType.Json,
-  ): this {
-    this.methods[name] = {
-      name,
-      http_verb,
-      is_static,
-      parameters,
-      return_type,
-      return_media,
-      parameters_media,
-    };
+  inject(var_name: string, inject_reference: string): this {
+    this.attributes.push({ var_name, inject_reference });
     return this;
   }
 

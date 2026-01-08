@@ -1,6 +1,4 @@
-pub mod builder;
 pub mod err;
-pub mod semantic;
 
 use std::collections::BTreeMap;
 use std::collections::HashMap;
@@ -12,11 +10,9 @@ use err::GeneratorErrorKind;
 use err::Result;
 use indexmap::IndexMap;
 use rustc_hash::FxHasher;
-use semantic::SemanticAnalysis;
 use serde::Deserialize;
 use serde::Serialize;
-use serde_with::MapPreventDuplicates;
-use serde_with::serde_as;
+use serde_with::{MapPreventDuplicates, serde_as};
 
 #[macro_export]
 macro_rules! cidl_type_contains {
@@ -41,7 +37,6 @@ macro_rules! cidl_type_contains {
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
 pub enum CidlType {
-    /// No type
     Void,
 
     /// SQLite integer
@@ -65,6 +60,9 @@ pub enum CidlType {
     /// A Binary Large Object that is not to be buffered in memory,
     /// but rather piped to some destination.
     Stream,
+
+    /// Any valid JSON value
+    JsonValue,
 
     /// A dependency injected instance, containing a type name.
     Inject(String),
@@ -133,19 +131,16 @@ pub enum HttpVerb {
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash)]
 pub struct NamedTypedValue {
+    /// Symbol name of the value.
     pub name: String,
+
+    /// Cloesce type associated with the value.
     pub cidl_type: CidlType,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
-pub struct ModelAttribute {
-    #[serde(default)]
-    pub hash: u64,
-
-    pub value: NamedTypedValue,
-    pub foreign_key_reference: Option<String>,
-}
-
+/// The expected media type for request/response bodies.
+/// An API endpoint may expect data in some format, and return data in some format.
+/// Defaults to JSON.
 #[derive(Serialize, Deserialize, Debug, Default)]
 pub enum MediaType {
     #[default]
@@ -156,14 +151,21 @@ pub enum MediaType {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ApiMethod {
+    /// Symbol name of the method.
     pub name: String,
+
+    /// If true, the method is static (instantiated on a class, not an instance).
+    /// Static methods require no hydration or data source.
     pub is_static: bool,
+
     pub http_verb: HttpVerb,
 
+    /// The media format the client should use to read the response body.
     #[serde(default)]
     pub return_media: MediaType,
     pub return_type: CidlType,
 
+    /// The media format the client should use to send the request body.
     #[serde(default)]
     pub parameters_media: MediaType,
     pub parameters: Vec<NamedTypedValue>,
@@ -172,19 +174,22 @@ pub struct ApiMethod {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct IncludeTree(pub BTreeMap<String, IncludeTree>);
 
+/// A tree of model symbol names to include when hydrating a data source.
 #[derive(Serialize, Deserialize, Debug)]
 pub struct DataSource {
     #[serde(default)]
     pub hash: u64,
 
+    /// The symbol name of the data source, e.g., "withUserDetails"
     pub name: String,
+
     pub tree: IncludeTree,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Hash)]
 pub enum NavigationPropertyKind {
-    OneToOne { reference: String },
-    OneToMany { reference: String },
+    OneToOne { column_reference: String },
+    OneToMany { column_reference: String },
     ManyToMany { unique_id: String },
 }
 
@@ -193,9 +198,27 @@ pub struct NavigationProperty {
     #[serde(default)]
     pub hash: u64,
 
+    /// Symbol name of the navigation property.
     pub var_name: String,
-    pub model_name: String,
+
+    /// Referenced model name.
+    pub model_reference: String,
+
     pub kind: NavigationPropertyKind,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct D1Column {
+    #[serde(default)]
+    pub hash: u64,
+
+    /// Symbol name and Cloesce type of the attribute.
+    /// Represents both the column name and type.
+    pub value: NamedTypedValue,
+
+    /// If the attribute is a foreign key, the referenced model name.
+    /// Otherwise, None.
+    pub foreign_key_reference: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Hash, PartialEq, Eq, Debug)]
@@ -205,17 +228,46 @@ pub enum CrudKind {
     SAVE,
 }
 
+#[derive(Serialize, Deserialize, Debug)]
+pub struct KeyValue {
+    pub format: String,
+    pub namespace_binding: String,
+    pub value: NamedTypedValue,
+
+    /// If true, treat the key as a prefix for listing multiple keys.
+    pub list_prefix: bool,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct R2Object {
+    pub format: String,
+    pub var_name: String,
+    pub bucket_binding: String,
+
+    /// If true, treat the key as a prefix for listing multiple keys.
+    pub list_prefix: bool,
+}
+
 #[serde_as]
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Model {
     #[serde(default)]
     pub hash: u64,
 
+    /// The symbol that defines the model in the source code.
     pub name: String,
-    pub primary_key: NamedTypedValue,
-    pub attributes: Vec<ModelAttribute>,
+
+    /// Primary key column of the model.
+    // TODO: Composite primary keys
+    pub primary_key: Option<NamedTypedValue>,
+    pub columns: Vec<D1Column>,
     pub navigation_properties: Vec<NavigationProperty>,
 
+    pub key_params: Vec<String>,
+    pub kv_objects: Vec<KeyValue>,
+    pub r2_objects: Vec<R2Object>,
+
+    /// API definitions.
     #[serde_as(as = "MapPreventDuplicates<_, _>")]
     pub methods: BTreeMap<String, ApiMethod>,
 
@@ -223,22 +275,42 @@ pub struct Model {
     pub data_sources: BTreeMap<String, DataSource>,
 
     pub cruds: Vec<CrudKind>,
-
     pub source_path: PathBuf,
+}
+
+impl Model {
+    pub fn has_d1(&self) -> bool {
+        !self.columns.is_empty() || self.primary_key.is_some()
+    }
+
+    pub fn has_kv(&self) -> bool {
+        !self.kv_objects.is_empty()
+    }
+
+    pub fn has_r2(&self) -> bool {
+        !self.r2_objects.is_empty()
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ServiceAttribute {
+    /// Symbol name of the class field.
     pub var_name: String,
-    pub injected: String,
+
+    /// Symbol of the injected class.
+    pub inject_reference: String,
 }
 
 #[serde_as]
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Service {
+    /// The symbol that defines the service in the source code.
     pub name: String,
+
+    /// Class fields which are all injected dependencies.
     pub attributes: Vec<ServiceAttribute>,
 
+    /// API definitions.
     #[serde_as(as = "MapPreventDuplicates<_, _>")]
     pub methods: BTreeMap<String, ApiMethod>,
 
@@ -247,21 +319,26 @@ pub struct Service {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct PlainOldObject {
+    /// The symbol that defines the POO in the source code.
     pub name: String,
-    pub attributes: Vec<NamedTypedValue>,
-    pub source_path: PathBuf,
-}
 
-#[derive(Serialize, Deserialize)]
-pub enum InputLanguage {
-    TypeScript,
+    /// Class fields of any serializable type.
+    pub attributes: Vec<NamedTypedValue>,
+
+    pub source_path: PathBuf,
 }
 
 #[derive(Serialize, Deserialize)]
 pub struct WranglerEnv {
+    /// Class name of the Wrangler environment.
     pub name: String,
     pub source_path: PathBuf,
-    pub db_binding: String,
+
+    // TODO: Many database bindings
+    pub d1_binding: Option<String>,
+
+    pub kv_bindings: Vec<String>,
+    pub r2_bindings: Vec<String>,
     pub vars: HashMap<String, CidlType>,
 }
 
@@ -271,19 +348,15 @@ pub struct CloesceAst {
     #[serde(default)]
     pub hash: u64,
 
-    pub version: String,
     pub project_name: String,
-    pub language: InputLanguage,
     pub wrangler_env: Option<WranglerEnv>,
 
     // TODO: MapPreventDuplicates is not supported for IndexMap
     pub models: IndexMap<String, Model>,
-
-    // TODO: MapPreventDuplicates is not supported for IndexMap
-    pub poos: IndexMap<String, PlainOldObject>,
-
-    // TODO: MapPreventDuplicates is not supported for IndexMap
     pub services: IndexMap<String, Service>,
+
+    #[serde_as(as = "MapPreventDuplicates<_, _>")]
+    pub poos: BTreeMap<String, PlainOldObject>,
 
     pub app_source: Option<PathBuf>,
 }
@@ -311,16 +384,21 @@ impl CloesceAst {
 
         let migrations_models: IndexMap<String, MigrationsModel> = models
             .into_iter()
-            .map(|(name, model)| {
+            .filter_map(|(name, model)| {
+                let Some(pk) = model.primary_key else {
+                    // Skip non-D1 models
+                    return None;
+                };
+
                 let m = MigrationsModel {
                     hash: model.hash,
                     name: model.name,
-                    primary_key: model.primary_key,
-                    attributes: model.attributes,
+                    primary_key: pk,
+                    columns: model.columns,
                     navigation_properties: model.navigation_properties,
                     data_sources: model.data_sources,
                 };
-                (name, m)
+                Some((name, m))
             })
             .collect();
 
@@ -330,10 +408,6 @@ impl CloesceAst {
         };
 
         serde_json::to_string_pretty(&migrations_ast).expect("serialize migrations ast to work")
-    }
-
-    pub fn semantic_analysis(&mut self) -> Result<()> {
-        SemanticAnalysis::analyze(self)
     }
 
     /// Traverses the AST setting the `hash` field as a merkle hash, meaning a parents hash depends on it's childrens hashes.
@@ -351,17 +425,17 @@ impl CloesceAst {
             model.primary_key.hash(&mut model_h);
             model.name.hash(&mut model_h);
 
-            for attr in model.attributes.iter_mut() {
-                let attr_h = {
+            for col in model.columns.iter_mut() {
+                let col_h = {
                     let mut h = FxHasher::default();
-                    h.write(b"ModelAttribute");
-                    attr.value.hash(&mut h);
-                    attr.foreign_key_reference.hash(&mut h);
+                    h.write(b"ModelColumn");
+                    col.value.hash(&mut h);
+                    col.foreign_key_reference.hash(&mut h);
                     h.finish()
                 };
 
-                attr.hash = attr_h;
-                model_h.write_u64(attr_h);
+                col.hash = col_h;
+                model_h.write_u64(col_h);
             }
 
             for ds in model.data_sources.values_mut() {
@@ -389,7 +463,7 @@ impl CloesceAst {
                 let nav_h = {
                     let mut h = FxHasher::default();
                     h.write(b"ModelNavigationProperty");
-                    nav.model_name.hash(&mut h);
+                    nav.model_reference.hash(&mut h);
                     nav.var_name.hash(&mut h);
                     nav.kind.hash(&mut h);
                     h.finish()
@@ -416,17 +490,19 @@ pub struct MigrationsModel {
     pub hash: u64,
     pub name: String,
     pub primary_key: NamedTypedValue,
-    pub attributes: Vec<ModelAttribute>,
+    pub columns: Vec<D1Column>,
     pub navigation_properties: Vec<NavigationProperty>,
     pub data_sources: BTreeMap<String, DataSource>,
 }
 
-/// A subset of [CloesceAst] suited for migrations.
+/// A subset of [CloesceAst] suited for D1 migrations.
 ///
 /// Assumed that the tree is semantically valid.
 #[derive(Serialize, Deserialize)]
 pub struct MigrationsAst {
     pub hash: u64,
+
+    #[serde(deserialize_with = "skip_if_null_primary_key")]
     pub models: IndexMap<String, MigrationsModel>,
 }
 
@@ -447,4 +523,80 @@ impl MigrationsAst {
     pub fn to_json(&self) -> String {
         serde_json::to_string_pretty(self).expect("serialize self to work")
     }
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
+pub struct D1Database {
+    pub binding: Option<String>,
+    pub database_name: Option<String>,
+    pub database_id: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
+pub struct KVNamespace {
+    pub binding: Option<String>,
+    pub id: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
+pub struct R2Bucket {
+    pub binding: Option<String>,
+    pub bucket_name: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
+pub struct WranglerSpec {
+    pub name: Option<String>,
+    pub compatibility_date: Option<String>,
+    pub main: Option<String>,
+
+    #[serde(default)]
+    pub d1_databases: Vec<D1Database>,
+
+    #[serde(default)]
+    pub kv_namespaces: Vec<KVNamespace>,
+
+    #[serde(default)]
+    pub r2_buckets: Vec<R2Bucket>,
+
+    #[serde(default)]
+    pub vars: HashMap<String, String>,
+}
+
+fn skip_if_null_primary_key<'de, D>(
+    deserializer: D,
+) -> std::result::Result<IndexMap<String, MigrationsModel>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    #[derive(Deserialize)]
+    struct Temp {
+        hash: u64,
+        name: String,
+        primary_key: Option<NamedTypedValue>,
+        columns: Vec<D1Column>,
+        navigation_properties: Vec<NavigationProperty>,
+        data_sources: BTreeMap<String, DataSource>,
+    }
+
+    let temps: IndexMap<String, Temp> = Deserialize::deserialize(deserializer)?;
+
+    Ok(temps
+        .into_iter()
+        .filter_map(|(key, t)| {
+            t.primary_key.map(|pk| {
+                (
+                    key,
+                    MigrationsModel {
+                        hash: t.hash,
+                        name: t.name,
+                        primary_key: pk,
+                        columns: t.columns,
+                        navigation_properties: t.navigation_properties,
+                        data_sources: t.data_sources,
+                    },
+                )
+            })
+        })
+        .collect())
 }

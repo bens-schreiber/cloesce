@@ -7,7 +7,7 @@ import {
 
 beforeAll(async () => {
   // NOTE: e2e is called from proj root
-  await startWrangler("../fixtures/regression/services");
+  await startWrangler("../fixtures/regression/services", false);
 }, 30_000);
 
 afterAll(async () => {

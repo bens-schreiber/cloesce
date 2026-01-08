@@ -1,7 +1,7 @@
 // @ts-nocheck
-// InvalidAttributeModifier
+// InvalidPropertyModifier
 
-@D1
+@Model
 export class Foo {
   @PrimaryKey
   private id: number;

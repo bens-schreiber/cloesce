@@ -1,9 +1,7 @@
-import { D1Database } from "@cloudflare/workers-types/experimental/index.js";
-
-import { OrmWasmExports, mapSql, loadOrmWasm } from "./wasm.js";
+import { OrmWasmExports, loadOrmWasm } from "./wasm.js";
 import { proxyCrud } from "./crud.js";
-import { HttpResult, IncludeTree, Orm } from "../ui/backend.js";
-import { Either, KeysOfType } from "../ui/common.js";
+import { HttpResult, IncludeTree } from "../ui/backend.js";
+import { KeysOfType } from "../ui/common.js";
 import {
   CloesceAst,
   Model,
@@ -13,6 +11,8 @@ import {
   MediaType,
 } from "../ast.js";
 import { RuntimeValidator } from "./validator.js";
+import Either from "../either.js";
+import { Orm } from "../ui/backend.js";
 
 /**
  * Dependency injection container, mapping an object type name to an instance of that object.
@@ -29,7 +29,7 @@ export type DependencyContainer = Map<string, any>;
 export type ConstructorRegistry = Record<string, new () => any>;
 
 /**
- * Singleton instance containing the cidl, constructor registry, and wasm binary.
+ * Singleton instance containing the CIDL, constructor registry, and wasm binary.
  * These values are guaranteed to never change throughout a workers lifetime.
  */
 export class RuntimeContainer {
@@ -84,7 +84,8 @@ export enum RouterError {
   UnknownPrefix,
   UnknownRoute,
   UnmatchedHttpVerb,
-  InstantiatedMethodMissingId,
+  InstantiatedMethodMissingPrimaryKey,
+  InstantiatedMethodMissingKeyParam,
   RequestMissingBody,
   RequestBodyMissingParameters,
   RequestBodyInvalidParameter,
@@ -132,7 +133,7 @@ export class CloesceApp {
   private namespaceMiddleware: Map<string, MiddlewareFn[]> = new Map();
 
   /**
-   * Registers middleware for a specific namespace (being, a model or service)
+   * Registers middleware for a specific namespace (model or service)
    *
    * Runs before request validation and method middleware.
    *
@@ -204,7 +205,7 @@ export class CloesceApp {
     }
     const route = routeRes.unwrap();
 
-    // Model middleware
+    // Namespace middleware
     for (const m of this.namespaceMiddleware.get(route.namespace) ?? []) {
       const res = await m(di);
       if (res) {
@@ -231,40 +232,86 @@ export class CloesceApp {
 
     // Hydration
     const hydrated = await (async () => {
-      if (route.kind == "model") {
-        // TODO: Support multiple D1 bindings
-        // It's been verified by the compiler that wrangler_env exists if a D1 model is present
-        const d1: D1Database = env[ast.wrangler_env!.db_binding];
+      switch (route.kind) {
+        case "service": {
+          if (route.method.is_static) {
+            return Either.right(ctorReg[route.namespace]);
+          }
 
-        // Proxy CRUD
-        if (route.method.is_static) {
+          return Either.right(di.get(route.namespace));
+        }
+        case "model": {
+          const model = route.model!;
+          const modelCtor = ctorReg[model.name];
+
+          // Static methods operate on the class itself, no hydration needed
+          if (route.method.is_static) {
+            return Either.right(proxyCrud(modelCtor, modelCtor, env));
+          }
+
+          const includeTree: IncludeTree<any> | null =
+            dataSource === NO_DATA_SOURCE
+              ? null
+              : (ctorReg[model.name] as any)[dataSource!];
+
+          const orm = Orm.fromEnv(env);
+
+          // D1
+          if (model.primary_key !== null) {
+            // Error state: If some outside force tweaked the database schema, the query may fail.
+            // Otherwise, this indicates a bug in the compiler or runtime.
+            const malformedQuery = (e: any) =>
+              exit(
+                500,
+                RouterError.InvalidDatabaseQuery,
+                `Error in hydration query, is the database out of sync with the backend?: ${e instanceof Error ? e.message : String(e)}`,
+              );
+
+            // Query DB
+            try {
+              const result = await orm.get(
+                modelCtor,
+                route.primaryKey!,
+                includeTree,
+              );
+
+              // Error state: If the query itself failed, return a 500
+              if (result.isLeft()) {
+                return malformedQuery(result.value.error);
+              }
+
+              const model: any | null = result.unwrap();
+
+              // Error state: If no record is found for the id, return a 404
+              if (!model) {
+                return exit(404, RouterError.ModelNotFound, "Record not found");
+              }
+
+              return Either.right(model);
+            } catch (e) {
+              return malformedQuery(e);
+            }
+          }
+
+          // KV + R2
           return Either.right(
-            proxyCrud(ctorReg[route.namespace], ctorReg[route.namespace], d1),
+            await orm.hydrate(
+              ctorReg[route.model!.name],
+              {}, // empty base, no D1
+              route.keyParams,
+              includeTree,
+            ),
           );
         }
-
-        return await hydrateModelD1(
-          ctorReg,
-          d1,
-          route.model!,
-          route.id!,
-          dataSource!,
-        );
       }
-
-      // Services
-      if (route.method.is_static) {
-        return Either.right(ctorReg[route.namespace]);
-      }
-      return Either.right(di.get(route.namespace));
     })();
 
-    if (hydrated.isLeft()) {
+    if (hydrated!.isLeft()) {
       return hydrated.value;
     }
 
     // Method dispatch
-    return await methodDispatch(hydrated.unwrap(), di, route, params);
+    return await methodDispatch(hydrated!.unwrap(), di, route, params);
   }
 
   /**
@@ -286,20 +333,20 @@ export class CloesceApp {
 
     // Note: Services are in topological order
     for (const name in ast.services) {
-      const service: any = ast.services[name];
+      const serviceMeta: Service = ast.services[name];
+      const service: any = {};
 
-      for (const attr of service.attributes) {
-        const injected = di.get(attr.injected);
+      for (const attr of serviceMeta.attributes) {
+        const injected = di.get(attr.inject_reference);
         if (!injected) {
           return exit(
             500,
             RouterError.MissingDependency,
-            `An injected parameter was missing from the instance registry: ${JSON.stringify(attr.injected)}`,
+            `An injected parameter was missing from the instance registry: ${JSON.stringify(attr.inject_reference)}`,
           )
             .unwrapLeft()
             .toResponse();
         }
-
         service[attr.var_name] = injected;
       }
 
@@ -352,7 +399,8 @@ export type MatchedRoute = {
   kind: "model" | "service";
   namespace: string;
   method: ApiMethod;
-  id: string | null;
+  primaryKey: string | null;
+  keyParams: Record<string, string>;
   model?: Model;
   service?: Service;
 };
@@ -383,10 +431,13 @@ function matchRoute(
     return notFound(RouterError.UnknownPrefix);
   }
 
-  // Extract pattern
+  // Route format: /{namespace}/...{id}/{method}
   const namespace = parts[0];
   const methodName = parts[parts.length - 1];
-  const id = parts.length === 3 ? parts[1] : null;
+  const id =
+    parts.length > 2
+      ? parts.slice(1, parts.length - 1).map(decodeURIComponent)
+      : [];
 
   const model = ast.models[namespace];
   if (model) {
@@ -397,21 +448,27 @@ function matchRoute(
       return notFound(RouterError.UnmatchedHttpVerb);
     }
 
+    // For now, primary key is always the first ID segment
+    // and the rest are key params.
+    const primaryKey: string | null = id[0] ?? null;
+    const keyParams = Object.fromEntries(
+      id.slice(1).map((v, i) => [model.key_params[i], decodeURIComponent(v)]),
+    );
+
     return Either.right({
       kind: "model",
       namespace,
       method,
       model,
-      id,
+      primaryKey,
+      keyParams,
     });
   }
 
   const service = ast.services[namespace];
   if (service) {
     const method = service.methods[methodName];
-
-    // Services do not have IDs.
-    if (!method || id) return notFound(RouterError.UnknownRoute);
+    if (!method || id.length > 0) return notFound(RouterError.UnknownRoute);
 
     if (request.method !== method.http_verb) {
       return notFound(RouterError.UnmatchedHttpVerb);
@@ -422,7 +479,8 @@ function matchRoute(
       namespace,
       method,
       service,
-      id: null,
+      primaryKey: null,
+      keyParams: {},
     });
   }
 
@@ -446,9 +504,22 @@ async function validateRequest(
   const invalidRequest = (c: RouterError) =>
     exit(400, c, "Invalid Request Body");
 
-  // Models must have an ID on instantiated methods.
-  if (route.kind === "model" && !route.method.is_static && route.id == null) {
-    return invalidRequest(RouterError.InstantiatedMethodMissingId);
+  // Validate instantiated model ids
+  if (route.kind === "model" && !route.method.is_static) {
+    const model = route.model!;
+    if (model.primary_key !== null && route.primaryKey === null) {
+      return invalidRequest(RouterError.InstantiatedMethodMissingPrimaryKey);
+    }
+
+    if (model.key_params.length !== Object.keys(route.keyParams).length) {
+      return invalidRequest(RouterError.InstantiatedMethodMissingKeyParam);
+    }
+
+    for (const keyParam of model.key_params) {
+      if (!(keyParam in route.keyParams)) {
+        return invalidRequest(RouterError.InstantiatedMethodMissingKeyParam);
+      }
+    }
   }
 
   // Filter out injected parameters
@@ -491,8 +562,7 @@ async function validateRequest(
     return invalidRequest(RouterError.RequestBodyMissingParameters);
   }
 
-  // Validate all parameters type
-  // Octet streams can be passed as is
+  // Validate all parameters type. Octet streams need no validation.
   if (route.method.parameters_media !== MediaType.Octet) {
     for (const p of requiredParams) {
       const res = RuntimeValidator.validate(
@@ -523,68 +593,6 @@ async function validateRequest(
   }
 
   return Either.right({ params, dataSource: dataSource ?? null });
-}
-
-/**
- * Queries D1 for a particular model's ID, then transforms the SQL column output into
- * an instance of a model using the provided include tree and metadata as a guide.
- * @returns 404 if no record was found for the provided ID
- * @returns 500 if the D1 database is not synced with Cloesce and yields an error
- * @returns The instantiated model on success
- */
-async function hydrateModelD1(
-  constructorRegistry: ConstructorRegistry,
-  d1: D1Database,
-  model: Model,
-  id: string,
-  dataSource: string,
-): Promise<Either<HttpResult, object>> {
-  // Error state: If some outside force tweaked the database schema, the query may fail.
-  // Otherwise, this indicates a bug in the compiler or runtime.
-  const malformedQuery = (e: any) =>
-    exit(
-      500,
-      RouterError.InvalidDatabaseQuery,
-      `Error in hydration query, is the database out of sync with the backend?: ${e instanceof Error ? e.message : String(e)}`,
-    );
-
-  // Query DB
-  let records;
-  try {
-    let includeTree: IncludeTree<any> | null =
-      dataSource === NO_DATA_SOURCE
-        ? null
-        : (constructorRegistry[model.name] as any)[dataSource];
-
-    records = await d1
-      .prepare(Orm.getQuery(constructorRegistry[model.name], includeTree))
-      .bind(id)
-      .run();
-
-    // Error state: If no record is found for the id, return a 404
-    if (!records?.results) {
-      return exit(404, RouterError.ModelNotFound, "Record not found");
-    }
-
-    if (records.error) {
-      return malformedQuery(records.error);
-    }
-  } catch (e) {
-    return malformedQuery(e);
-  }
-
-  // Hydrate
-  const models = mapSql(
-    constructorRegistry[model.name],
-    records.results,
-    model.data_sources[dataSource]?.tree ?? {},
-  );
-
-  if (models.isLeft()) {
-    return malformedQuery(models.value);
-  }
-
-  return Either.right(models.unwrap()[0]);
 }
 
 /**

@@ -1,7 +1,7 @@
 // @ts-nocheck
 // UnknownType
 
-@D1
+@Model
 export class Foo {
   @PrimaryKey
   id: number;

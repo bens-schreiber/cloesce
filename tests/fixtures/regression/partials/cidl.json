@@ -1,25 +1,25 @@
 {
-  "hash": 6266598453096649310,
-  "version": "v0.0.4",
+  "hash": 13770848679796492454,
   "project_name": "runner",
-  "language": "TypeScript",
   "wrangler_env": {
     "name": "Env",
     "source_path": "./seed__partials.cloesce.ts",
-    "db_binding": "db",
+    "d1_binding": "db",
+    "kv_bindings": [],
+    "r2_bindings": [],
     "vars": {}
   },
   "models": {
     "Dog": {
-      "hash": 13091719692277049822,
+      "hash": 10054987048785466557,
       "name": "Dog",
       "primary_key": {
         "name": "id",
         "cidl_type": "Integer"
       },
-      "attributes": [
+      "columns": [
         {
-          "hash": 5774566402684976635,
+          "hash": 12056908550303509781,
           "value": {
             "name": "name",
             "cidl_type": "Text"
@@ -27,7 +27,7 @@
           "foreign_key_reference": null
         },
         {
-          "hash": 3365517128407119927,
+          "hash": 9647859276092761937,
           "value": {
             "name": "age",
             "cidl_type": "Integer"
@@ -36,6 +36,9 @@
         }
       ],
       "navigation_properties": [],
+      "key_params": [],
+      "kv_objects": [],
+      "r2_objects": [],
       "methods": {
         "getPartialSelf": {
           "name": "getPartialSelf",
@@ -48,7 +51,7 @@
           "parameters_media": "Json",
           "parameters": [
             {
-              "name": "__dataSource",
+              "name": "__datasource",
               "cidl_type": {
                 "DataSource": "Dog"
               }
@@ -66,7 +69,7 @@
           "parameters_media": "Json",
           "parameters": [
             {
-              "name": "{ db }",
+              "name": "env",
               "cidl_type": {
                 "Inject": "Env"
               }
@@ -85,7 +88,7 @@
       "source_path": "./seed__partials.cloesce.ts"
     }
   },
-  "poos": {},
   "services": {},
+  "poos": {},
   "app_source": null
 }

@@ -1,6 +1,7 @@
 // GENERATED CODE. DO NOT MODIFY.
 
-import { HttpResult, DeepPartial, MediaType, requestBody, b64ToU8 } from "cloesce/client";
+import { HttpResult, DeepPartial, MediaType, requestBody, b64ToU8, KValue, R2Object } from "cloesce/client";
+
 
 
 export class A {
@@ -12,7 +13,9 @@ export class A {
     a: A,
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<A>> {
-    const baseUrl = new URL(`http://localhost:5002/api/A/post`);
+    const baseUrl = new URL(
+      `http://localhost:5002/api/A/post`
+    );
     const payload: any = {};
 
     payload["a"] = a;
@@ -21,23 +24,28 @@ export class A {
       method: "POST",
       duplex: "half",
       headers: { "Content-Type": "application/json" },
-      body: requestBody(MediaType.Json, payload)
+      body: requestBody(MediaType.Json, payload),
     });
 
     return await HttpResult.fromResponse(
-      res, 
+      res,
       MediaType.Json,
       A,
       false
     );
   }
   async refresh(
-    __dataSource: "withB" |"withoutB" |"none" = "none",
+    __datasource: "withB" |"withoutB" |"none" = "none",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<A>> {
-    const baseUrl = new URL(`http://localhost:5002/api/A/${this.id}/refresh`);
+    const id = [
+      encodeURIComponent(String(this.id)),
+    ].join("/");
+    const baseUrl = new URL(
+      `http://localhost:5002/api/A/${id}/refresh`
+    );
 
-    baseUrl.searchParams.append('__dataSource', String(__dataSource));
+    baseUrl.searchParams.append("__datasource", String(__datasource));
 
     const res = await fetchImpl(baseUrl, {
       method: "GET",
@@ -45,7 +53,7 @@ export class A {
     });
 
     return await HttpResult.fromResponse(
-      res, 
+      res,
       MediaType.Json,
       A,
       false
@@ -55,7 +63,9 @@ export class A {
     a: A,
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<void>> {
-    const baseUrl = new URL(`http://localhost:5002/api/A/returnFatalIfParamsNotInstantiated`);
+    const baseUrl = new URL(
+      `http://localhost:5002/api/A/returnFatalIfParamsNotInstantiated`
+    );
     const payload: any = {};
 
     payload["a"] = a;
@@ -64,11 +74,11 @@ export class A {
       method: "POST",
       duplex: "half",
       headers: { "Content-Type": "application/json" },
-      body: requestBody(MediaType.Json, payload)
+      body: requestBody(MediaType.Json, payload),
     });
 
     return await HttpResult.fromResponse(
-      res, 
+      res,
       MediaType.Json,
       undefined,
       false
@@ -85,23 +95,28 @@ export class B {
   id: number;
 
   async testMethod(
-    __dataSource: "none" = "none",
+    __datasource: "none" = "none",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<void>> {
-    const baseUrl = new URL(`http://localhost:5002/api/B/${this.id}/testMethod`);
+    const id = [
+      encodeURIComponent(String(this.id)),
+    ].join("/");
+    const baseUrl = new URL(
+      `http://localhost:5002/api/B/${id}/testMethod`
+    );
     const payload: any = {};
 
-    baseUrl.searchParams.append('__dataSource', String(__dataSource));
+    baseUrl.searchParams.append("__datasource", String(__datasource));
 
     const res = await fetchImpl(baseUrl, {
       method: "POST",
       duplex: "half",
       headers: { "Content-Type": "application/json" },
-      body: requestBody(MediaType.Json, payload)
+      body: requestBody(MediaType.Json, payload),
     });
 
     return await HttpResult.fromResponse(
-      res, 
+      res,
       MediaType.Json,
       undefined,
       false
@@ -131,23 +146,28 @@ export class Dog {
   personId: number;
 
   async testMethod(
-    __dataSource: "none" = "none",
+    __datasource: "none" = "none",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<void>> {
-    const baseUrl = new URL(`http://localhost:5002/api/Dog/${this.id}/testMethod`);
+    const id = [
+      encodeURIComponent(String(this.id)),
+    ].join("/");
+    const baseUrl = new URL(
+      `http://localhost:5002/api/Dog/${id}/testMethod`
+    );
     const payload: any = {};
 
-    baseUrl.searchParams.append('__dataSource', String(__dataSource));
+    baseUrl.searchParams.append("__datasource", String(__datasource));
 
     const res = await fetchImpl(baseUrl, {
       method: "POST",
       duplex: "half",
       headers: { "Content-Type": "application/json" },
-      body: requestBody(MediaType.Json, payload)
+      body: requestBody(MediaType.Json, payload),
     });
 
     return await HttpResult.fromResponse(
-      res, 
+      res,
       MediaType.Json,
       undefined,
       false
@@ -167,7 +187,9 @@ export class Person {
     person: Person,
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Person>> {
-    const baseUrl = new URL(`http://localhost:5002/api/Person/post`);
+    const baseUrl = new URL(
+      `http://localhost:5002/api/Person/post`
+    );
     const payload: any = {};
 
     payload["person"] = person;
@@ -176,23 +198,28 @@ export class Person {
       method: "POST",
       duplex: "half",
       headers: { "Content-Type": "application/json" },
-      body: requestBody(MediaType.Json, payload)
+      body: requestBody(MediaType.Json, payload),
     });
 
     return await HttpResult.fromResponse(
-      res, 
+      res,
       MediaType.Json,
       Person,
       false
     );
   }
   async refresh(
-    __dataSource: "withDogs" |"none" = "none",
+    __datasource: "withDogs" |"none" = "none",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Person>> {
-    const baseUrl = new URL(`http://localhost:5002/api/Person/${this.id}/refresh`);
+    const id = [
+      encodeURIComponent(String(this.id)),
+    ].join("/");
+    const baseUrl = new URL(
+      `http://localhost:5002/api/Person/${id}/refresh`
+    );
 
-    baseUrl.searchParams.append('__dataSource', String(__dataSource));
+    baseUrl.searchParams.append("__datasource", String(__datasource));
 
     const res = await fetchImpl(baseUrl, {
       method: "GET",
@@ -200,7 +227,7 @@ export class Person {
     });
 
     return await HttpResult.fromResponse(
-      res, 
+      res,
       MediaType.Json,
       Person,
       false
@@ -210,7 +237,9 @@ export class Person {
     person: Person,
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<void>> {
-    const baseUrl = new URL(`http://localhost:5002/api/Person/returnFatalIfParamsNotInstantiated`);
+    const baseUrl = new URL(
+      `http://localhost:5002/api/Person/returnFatalIfParamsNotInstantiated`
+    );
     const payload: any = {};
 
     payload["person"] = person;
@@ -219,11 +248,11 @@ export class Person {
       method: "POST",
       duplex: "half",
       headers: { "Content-Type": "application/json" },
-      body: requestBody(MediaType.Json, payload)
+      body: requestBody(MediaType.Json, payload),
     });
 
     return await HttpResult.fromResponse(
-      res, 
+      res,
       MediaType.Json,
       undefined,
       false
@@ -246,7 +275,9 @@ export class Student {
     student: Student,
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Student>> {
-    const baseUrl = new URL(`http://localhost:5002/api/Student/post`);
+    const baseUrl = new URL(
+      `http://localhost:5002/api/Student/post`
+    );
     const payload: any = {};
 
     payload["student"] = student;
@@ -255,23 +286,28 @@ export class Student {
       method: "POST",
       duplex: "half",
       headers: { "Content-Type": "application/json" },
-      body: requestBody(MediaType.Json, payload)
+      body: requestBody(MediaType.Json, payload),
     });
 
     return await HttpResult.fromResponse(
-      res, 
+      res,
       MediaType.Json,
       Student,
       false
     );
   }
   async refresh(
-    __dataSource: "withCoursesStudents" |"withCoursesStudentsCourses" |"none" = "none",
+    __datasource: "withCoursesStudents" |"withCoursesStudentsCourses" |"none" = "none",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Student>> {
-    const baseUrl = new URL(`http://localhost:5002/api/Student/${this.id}/refresh`);
+    const id = [
+      encodeURIComponent(String(this.id)),
+    ].join("/");
+    const baseUrl = new URL(
+      `http://localhost:5002/api/Student/${id}/refresh`
+    );
 
-    baseUrl.searchParams.append('__dataSource', String(__dataSource));
+    baseUrl.searchParams.append("__datasource", String(__datasource));
 
     const res = await fetchImpl(baseUrl, {
       method: "GET",
@@ -279,7 +315,7 @@ export class Student {
     });
 
     return await HttpResult.fromResponse(
-      res, 
+      res,
       MediaType.Json,
       Student,
       false

@@ -1,6 +1,6 @@
 /**
  * cloesce/client
  */
-export type { DeepPartial, Stream } from "./common.js";
-export { HttpResult, Either, requestBody, b64ToU8 } from "./common.js";
+export type { DeepPartial } from "./common.js";
+export { HttpResult, requestBody, b64ToU8, KValue } from "./common.js";
 export { MediaType } from "../ast.js";

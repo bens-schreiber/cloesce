@@ -267,8 +267,7 @@ async function extract(
     const extractorStart = Date.now();
     debug("Extracting CIDL...");
 
-    const extractor = new CidlExtractor(cloesceProjectName, "v0.0.4");
-    const result = extractor.extract(project);
+    const result = CidlExtractor.extract(cloesceProjectName, project);
     if (result.isLeft()) {
       console.error(formatErr(result.value));
       process.exit(1);
@@ -286,8 +285,8 @@ async function extract(
         ast.app_source = "./" + path.basename(ast.app_source);
       }
 
-      for (const model of Object.values(ast.models)) {
-        model.source_path = "./" + path.basename(model.source_path);
+      for (const d1Model of Object.values(ast.models)) {
+        d1Model.source_path = "./" + path.basename(d1Model.source_path);
       }
 
       for (const poo of Object.values(ast.poos)) {
@@ -337,7 +336,7 @@ async function generate(config: WasmConfig) {
   const wasi = new WASI({
     version: "preview1",
     args: ["generate", ...config.args],
-    env: { ...process.env, ...config.env } as Record<string, string>,
+    env: { ...process.env, ...config.env },
     preopens: { ".": root },
   });
 

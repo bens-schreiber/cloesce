@@ -1,0 +1,9 @@
+[package]
+name = "generator-test"
+version = "0.0.1"
+edition = "2024"
+
+[dependencies]
+ast = { path = "../ast" }
+wrangler = { path = "../wrangler" }
+indexmap = { workspace = true }

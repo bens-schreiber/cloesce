@@ -1,16 +1,16 @@
 {
-  "hash": 8156365678891819022,
+  "hash": 11513542542314523995,
   "models": {
     "Weather": {
-      "hash": 1994866534909032805,
+      "hash": 13832862406689110475,
       "name": "Weather",
       "primary_key": {
         "name": "id",
         "cidl_type": "Integer"
       },
-      "attributes": [
+      "columns": [
         {
-          "hash": 16832578939214678454,
+          "hash": 4668177013190768849,
           "value": {
             "name": "date",
             "cidl_type": "DateIso"
@@ -18,7 +18,7 @@
           "foreign_key_reference": null
         },
         {
-          "hash": 8318310710067593117,
+          "hash": 14600652857753235127,
           "value": {
             "name": "isRaining",
             "cidl_type": "Boolean"

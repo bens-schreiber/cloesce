@@ -1,27 +1,30 @@
 {
-    "version": "v0.0.4",
     "project_name": "runner",
-    "language": "TypeScript",
     "wrangler_env": {
         "name": "Env",
         "source_path": "./seed__poo.cloesce.ts",
-        "db_binding": "db",
+        "d1_binding": "db",
+        "kv_bindings": [],
+        "r2_bindings": [],
         "vars": {}
     },
     "models": {
         "PooAcceptYield": {
             "name": "PooAcceptYield",
-            "attributes": [],
+            "columns": [],
             "primary_key": {
                 "name": "id",
                 "cidl_type": "Integer"
             },
             "navigation_properties": [],
+            "key_params": [],
+            "kv_objects": [],
+            "r2_objects": [],
             "methods": {
                 "acceptPoos": {
                     "name": "acceptPoos",
-                    "is_static": true,
                     "http_verb": "POST",
+                    "is_static": true,
                     "return_media": "Json",
                     "return_type": "Void",
                     "parameters_media": "Json",
@@ -48,8 +51,8 @@
                 },
                 "yieldPoo": {
                     "name": "yieldPoo",
-                    "is_static": true,
                     "http_verb": "POST",
+                    "is_static": true,
                     "return_media": "Json",
                     "return_type": {
                         "Object": "PooC"

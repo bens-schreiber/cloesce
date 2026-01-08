@@ -6,9 +6,10 @@ edition = "2024"
 [dependencies]
 ast = { path = "../ast" }
 clap = { version = "4.5.46", features = ["derive"] }
-d1 = { path = "../d1" }
+migrations = { path = "../migrations" }
 client = { path = "../client" }
 workers = { path = "../workers" }
 wrangler = { path = "../wrangler" }
+semantic = { path = "../semantic" }
 tracing-subscriber = "0.3.20"
 tracing = { workspace = true }

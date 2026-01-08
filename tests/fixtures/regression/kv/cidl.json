@@ -1,0 +1,162 @@
+{
+  "hash": 13468236154706247040,
+  "project_name": "runner",
+  "wrangler_env": {
+    "name": "Env",
+    "source_path": "./seed__kv.cloesce.ts",
+    "d1_binding": "db",
+    "kv_bindings": [
+      "namespace",
+      "otherNamespace"
+    ],
+    "r2_bindings": [],
+    "vars": {}
+  },
+  "models": {
+    "D1BackedModel": {
+      "hash": 13702850169640110521,
+      "name": "D1BackedModel",
+      "primary_key": {
+        "name": "id",
+        "cidl_type": "Real"
+      },
+      "columns": [
+        {
+          "hash": 1999042468264969055,
+          "value": {
+            "name": "someColumn",
+            "cidl_type": "Real"
+          },
+          "foreign_key_reference": null
+        },
+        {
+          "hash": 5739512274815634865,
+          "value": {
+            "name": "someOtherColumn",
+            "cidl_type": "Text"
+          },
+          "foreign_key_reference": null
+        }
+      ],
+      "navigation_properties": [],
+      "key_params": [
+        "keyParam"
+      ],
+      "kv_objects": [
+        {
+          "format": "d1Backed/{id}/{keyParam}/{someColumn}/{someOtherColumn}",
+          "namespace_binding": "namespace",
+          "value": {
+            "name": "kvData",
+            "cidl_type": "JsonValue"
+          },
+          "list_prefix": false
+        }
+      ],
+      "r2_objects": [],
+      "methods": {
+        "post": {
+          "name": "post",
+          "is_static": true,
+          "http_verb": "POST",
+          "return_media": "Json",
+          "return_type": "Void",
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "env",
+              "cidl_type": {
+                "Inject": "Env"
+              }
+            },
+            {
+              "name": "model",
+              "cidl_type": {
+                "Partial": "D1BackedModel"
+              }
+            }
+          ]
+        }
+      },
+      "data_sources": {},
+      "cruds": [],
+      "source_path": "./seed__kv.cloesce.ts"
+    },
+    "PureKVModel": {
+      "hash": 6611921539549597485,
+      "name": "PureKVModel",
+      "primary_key": null,
+      "columns": [],
+      "navigation_properties": [],
+      "key_params": [
+        "id"
+      ],
+      "kv_objects": [
+        {
+          "format": "path/to/data/{id}",
+          "namespace_binding": "namespace",
+          "value": {
+            "name": "data",
+            "cidl_type": "JsonValue"
+          },
+          "list_prefix": false
+        },
+        {
+          "format": "path/to/other/{id}",
+          "namespace_binding": "otherNamespace",
+          "value": {
+            "name": "otherData",
+            "cidl_type": "Text"
+          },
+          "list_prefix": false
+        }
+      ],
+      "r2_objects": [],
+      "methods": {
+        "post": {
+          "name": "post",
+          "is_static": true,
+          "http_verb": "POST",
+          "return_media": "Json",
+          "return_type": "Void",
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "env",
+              "cidl_type": {
+                "Inject": "Env"
+              }
+            },
+            {
+              "name": "id",
+              "cidl_type": "Text"
+            },
+            {
+              "name": "data",
+              "cidl_type": "JsonValue"
+            },
+            {
+              "name": "otherData",
+              "cidl_type": "Text"
+            }
+          ]
+        }
+      },
+      "data_sources": {
+        "default": {
+          "hash": 17997894496222874802,
+          "name": "default",
+          "tree": {
+            "data": {},
+            "otherData": {}
+          }
+        }
+      },
+      "cruds": [],
+      "source_path": "./seed__kv.cloesce.ts"
+    }
+  },
+  "services": {},
+  "poos": {},
+  "app_source": null
+}

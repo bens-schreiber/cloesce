@@ -1,17 +1,17 @@
 {
-    "version": "v0.0.4",
     "project_name": "runner",
-    "language": "TypeScript",
     "wrangler_env": {
         "name": "Env",
         "source_path": "./seed__crud.cloesce.ts",
-        "db_binding": "db",
+        "d1_binding": "db",
+        "kv_bindings": [],
+        "r2_bindings": [],
         "vars": {}
     },
     "models": {
         "CrudHaver": {
             "name": "CrudHaver",
-            "attributes": [
+            "columns": [
                 {
                     "foreign_key_reference": null,
                     "value": {
@@ -25,22 +25,18 @@
                 "cidl_type": "Integer"
             },
             "navigation_properties": [],
+            "key_params": [],
+            "kv_objects": [],
+            "r2_objects": [],
             "methods": {
                 "notCrud": {
                     "name": "notCrud",
-                    "is_static": false,
                     "http_verb": "POST",
+                    "is_static": false,
                     "return_media": "Json",
                     "return_type": "Void",
                     "parameters_media": "Json",
-                    "parameters": [
-                        {
-                            "name": "__dataSource",
-                            "cidl_type": {
-                                "DataSource": "CrudHaver"
-                            }
-                        }
-                    ]
+                    "parameters": []
                 }
             },
             "data_sources": {},
@@ -53,7 +49,7 @@
         },
         "Parent": {
             "name": "Parent",
-            "attributes": [
+            "columns": [
                 {
                     "foreign_key_reference": "Child",
                     "value": {
@@ -71,23 +67,26 @@
             "navigation_properties": [
                 {
                     "var_name": "favoriteChild",
-                    "model_name": "Child",
+                    "model_reference": "Child",
                     "kind": {
                         "OneToOne": {
-                            "reference": "favoriteChildId"
+                            "column_reference": "favoriteChildId"
                         }
                     }
                 },
                 {
                     "var_name": "children",
-                    "model_name": "Child",
+                    "model_reference": "Child",
                     "kind": {
                         "OneToMany": {
-                            "reference": "parentId"
+                            "column_reference": "parentId"
                         }
                     }
                 }
             ],
+            "key_params": [],
+            "kv_objects": [],
+            "r2_objects": [],
             "methods": {},
             "data_sources": {
                 "withChildren": {
@@ -107,7 +106,7 @@
         },
         "Child": {
             "name": "Child",
-            "attributes": [
+            "columns": [
                 {
                     "foreign_key_reference": "Parent",
                     "value": {
@@ -123,14 +122,17 @@
             "navigation_properties": [
                 {
                     "var_name": "parent",
-                    "model_name": "Parent",
+                    "model_reference": "Parent",
                     "kind": {
                         "OneToOne": {
-                            "reference": "parentId"
+                            "column_reference": "parentId"
                         }
                     }
                 }
             ],
+            "key_params": [],
+            "kv_objects": [],
+            "r2_objects": [],
             "methods": {},
             "data_sources": {},
             "cruds": [],

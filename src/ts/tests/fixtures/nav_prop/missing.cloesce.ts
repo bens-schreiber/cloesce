@@ -1,7 +1,7 @@
 // @ts-nocheck
 // MissingNavigationPropertyReference
 
-@D1
+@Model
 export class Foo {
   @PrimaryKey
   id: number;
