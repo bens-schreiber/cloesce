@@ -114,9 +114,8 @@ pub unsafe extern "C" fn upsert_model(
         }
     };
 
-    let res = META.with(|meta| {
-        UpsertModel::query(model_name, &meta.borrow(), new_model, include_tree.as_ref())
-    });
+    let res =
+        META.with(|meta| UpsertModel::query(model_name, &meta.borrow(), new_model, include_tree));
     match res {
         Ok(res) => {
             let bytes = serde_json::to_string(&res).unwrap().into_bytes();

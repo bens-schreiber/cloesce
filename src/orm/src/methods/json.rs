@@ -1,4 +1,4 @@
-use ast::{Model, NavigationPropertyKind};
+use ast::{CidlType, Model, NavigationPropertyKind};
 use sea_query::{ColumnRef, Expr, Func, IntoIden, Query, SimpleExpr, SqliteQueryBuilder, TableRef};
 use serde_json::Value;
 
@@ -15,7 +15,7 @@ pub fn as_json(
         None => fail!(OrmErrorKind::UnknownModel, "{}", model_name),
     };
 
-    let include_tree = include_tree.unwrap_or(serde_json::Map::default());
+    let include_tree = include_tree.unwrap_or_default();
     let expr = dfs(model, &include_tree, meta)?.build_as_array();
 
     // Hack to get just the SimpleExpr SQL string
@@ -48,6 +48,7 @@ fn dfs(
     builder.scalar(
         &pk.name,
         ColumnRef::TableColumn(alias(&model.name).into_iden(), alias(&pk.name).into_iden()),
+        pk.cidl_type.clone(),
     );
 
     // Columns
@@ -58,6 +59,7 @@ fn dfs(
                 alias(&model.name).into_iden(),
                 alias(&column.value.name).into_iden(),
             ),
+            column.value.cidl_type.clone(),
         );
     }
 
@@ -84,7 +86,7 @@ fn dfs(
                     alias(column_reference).into_iden(),
                 )));
 
-                builder.object(&nav.var_name, from, where_clause.into(), expr.build());
+                builder.object(&nav.var_name, from, where_clause, expr.build());
             }
             NavigationPropertyKind::OneToMany { column_reference } => {
                 let where_clause = Expr::col(ColumnRef::TableColumn(
@@ -96,7 +98,7 @@ fn dfs(
                     alias(&pk.name).into_iden(),
                 )));
 
-                builder.array(&nav.var_name, from, where_clause.into(), expr.build());
+                builder.array(&nav.var_name, from, where_clause, expr.build());
             }
             NavigationPropertyKind::ManyToMany => {
                 let join_alias = alias(nav.many_to_many_table_name(&model.name)).into_iden();
@@ -132,8 +134,8 @@ fn dfs(
                     &nav.var_name,
                     from,
                     TableRef::Table(join_alias),
-                    join_on.into(),
-                    where_clause.into(),
+                    join_on,
+                    where_clause,
                     expr.build(),
                 );
             }
@@ -152,14 +154,15 @@ struct JsonQueryObject {
 
 #[derive(Default)]
 struct JsonQueryBuilder {
-    pub scalars: Vec<(String, ColumnRef)>,
+    pub scalars: Vec<(String, ColumnRef, CidlType)>,
     pub objects: Vec<JsonQueryObject>,
     pub arrays: Vec<JsonQueryObject>,
 }
 
 impl JsonQueryBuilder {
-    pub fn scalar(&mut self, column_name: &str, column_ref: ColumnRef) {
-        self.scalars.push((column_name.to_string(), column_ref));
+    pub fn scalar(&mut self, column_name: &str, column_ref: ColumnRef, cidl_type: CidlType) {
+        self.scalars
+            .push((column_name.to_string(), column_ref, cidl_type));
     }
 
     pub fn object(
@@ -214,9 +217,15 @@ impl JsonQueryBuilder {
 
     pub fn build(self) -> SimpleExpr {
         let mut parts: Vec<SimpleExpr> = Vec::new();
-        for (name, column_ref) in self.scalars {
+        for (name, column_ref, cidl_type) in self.scalars {
+            let column_expr: SimpleExpr = match cidl_type.root_type() {
+                // if the cidl type is b64 it must be converted to hex for json serialization
+                CidlType::Blob => Func::cust("hex").arg(Expr::col(column_ref)).into(),
+                _ => Expr::col(column_ref).into(),
+            };
+
             parts.push(SimpleExpr::Value(name.into()));
-            parts.push(column_ref.into());
+            parts.push(column_expr);
         }
 
         for object in self.objects {
@@ -287,6 +296,12 @@ mod test {
         let ast_model = ModelBuilder::new("Person")
             .id_pk()
             .col("name", CidlType::Text, None)
+            .col("blob", CidlType::nullable(CidlType::Blob), None)
+            .col(
+                "favoriteRealNumber",
+                CidlType::nullable(CidlType::Real),
+                None,
+            )
             .build();
 
         let meta = vec![ast_model]
@@ -296,7 +311,9 @@ mod test {
 
         let include_tree = None;
 
-        let insert_query = r#"INSERT INTO Person (id, name) VALUES (1, 'Alice'), (2, 'Bob');"#;
+        let insert_query = r#"
+            INSERT INTO Person (id, name, blob, favoriteRealNumber) VALUES (1, 'Alice', X'48656C6C6F', 42.0), (2, 'Bob', NULL, NULL);
+        "#;
 
         // Act
         let expr = as_json("Person", include_tree, &meta).expect("as_json to work");
@@ -313,7 +330,7 @@ mod test {
         .await
         .expect("Upsert to work");
 
-        let expected = r#"[{"id":1,"name":"Alice"},{"id":2,"name":"Bob"}]"#;
+        let expected = r#"[{"id":1,"name":"Alice","blob":"48656C6C6F","favoriteRealNumber": 42.0},{"id":2,"name":"Bob","blob":"","favoriteRealNumber":null}]"#;
         let value: String = results[1][0].try_get(0).unwrap();
         expected_str!(value, expected);
     }

@@ -10,6 +10,7 @@ use serde_json::Map;
 use serde_json::Value;
 
 use crate::ModelMeta;
+use crate::methods::json::as_json;
 use crate::methods::{OrmErrorKind, alias};
 use crate::{IncludeTreeJson, ensure};
 
@@ -40,62 +41,51 @@ impl<'a> UpsertModel<'a> {
         model_name: &str,
         meta: &'a ModelMeta,
         new_model: Map<String, Value>,
-        include_tree: Option<&IncludeTreeJson>,
+        include_tree: Option<IncludeTreeJson>,
     ) -> Result<Vec<UpsertResult>> {
+        let include_tree = include_tree.unwrap_or_default();
         let mut stmts = {
             let mut generator = Self {
                 meta,
                 context: HashMap::default(),
                 acc: Vec::default(),
             };
-
             generator.dfs(
                 None,
                 model_name,
                 &new_model,
-                include_tree,
+                &include_tree,
                 model_name.to_string(),
             )?;
 
             generator.acc
         };
 
-        let select_root_id_stmt = {
+        let select_json = as_json(model_name, Some(include_tree), meta)?;
+        let select_root_model = {
             // unwrap: root model is guaranteed to exist if we've gotten this far
             let model = meta.get(model_name).unwrap();
-            let root_id_path = format!(
-                "{}.{}",
-                model.name,
-                model.primary_key.as_ref().unwrap().name
-            );
+            let pk_col = &model.primary_key.as_ref().unwrap().name;
 
-            // The root id is either a value, or a variable in the temp table.
-            match new_model.get(&model.primary_key.as_ref().unwrap().name) {
-                Some(value) => Query::select()
-                    .expr_as(
-                        match model.primary_key.as_ref().unwrap().cidl_type {
-                            CidlType::Integer => Expr::val(value.as_i64().unwrap()),
-                            CidlType::Real => Expr::val(value.as_f64().unwrap()),
-                            _ => Expr::val(value.as_str().unwrap()),
-                        },
-                        alias(VARIABLES_TABLE_COL_ID),
-                    )
-                    .to_owned(),
-                None => Query::select()
-                    .from(alias(VARIABLES_TABLE_NAME))
-                    .column(alias(VARIABLES_TABLE_COL_ID))
-                    .and_where(
-                        Expr::col(alias(VARIABLES_TABLE_COL_PATH)).eq(Expr::val(root_id_path)),
-                    )
-                    .to_owned(),
-            }
-            .build(SqliteQueryBuilder)
+            let mut select = Query::select();
+            select
+                .expr(Expr::cust(&select_json))
+                .from(alias(model_name))
+                .and_where(Expr::col(alias(pk_col)).eq(match new_model.get(pk_col) {
+                    Some(value) => validate_json_to_cidl(
+                        value,
+                        &model.primary_key.as_ref().unwrap().cidl_type,
+                        model_name,
+                        pk_col,
+                    )?,
+                    None => UpsertBuilder::value_from_ctx(&format!("{}.{}", model.name, pk_col)),
+                }));
+
+            select.build(SqliteQueryBuilder)
         };
 
-        let remove_vars_stmt = VariablesTable::delete_all();
-
-        stmts.push(select_root_id_stmt);
-        stmts.push((remove_vars_stmt, Values(vec![])));
+        stmts.push(select_root_model);
+        stmts.push((VariablesTable::delete_all(), Values(vec![])));
 
         // Convert from SeaQuery to serde_json
         let mut res = vec![];
@@ -129,7 +119,7 @@ impl<'a> UpsertModel<'a> {
         parent_model_name: Option<&String>,
         model_name: &str,
         new_model: &Map<String, Value>,
-        include_tree: Option<&IncludeTreeJson>,
+        include_tree: &IncludeTreeJson,
         path: String,
     ) -> Result<String> {
         let model = match self.meta.get(model_name) {
@@ -181,30 +171,28 @@ impl<'a> UpsertModel<'a> {
         // This table is dependent on it's 1:1 references, so they must be traversed before
         // table insertion (granted the include tree references them).
         let mut nav_ref_to_path = HashMap::new();
-        if let Some(include_tree) = include_tree {
-            for nav in one_to_ones {
-                let Some(Value::Object(nav_model)) = new_model.get(&nav.var_name) else {
-                    continue;
-                };
-                let Some(Value::Object(nested_tree)) = include_tree.get(&nav.var_name) else {
-                    continue;
-                };
-                let NavigationPropertyKind::OneToOne { column_reference } = &nav.kind else {
-                    continue;
-                };
-                // Recursively handle nested inserts
+        for nav in one_to_ones {
+            let Some(Value::Object(nested_tree)) = include_tree.get(&nav.var_name) else {
+                continue;
+            };
+            let Some(Value::Object(nav_model)) = new_model.get(&nav.var_name) else {
+                continue;
+            };
+            let NavigationPropertyKind::OneToOne { column_reference } = &nav.kind else {
+                continue;
+            };
 
-                nav_ref_to_path.insert(
-                    column_reference,
-                    self.dfs(
-                        Some(&model.name),
-                        &nav.model_reference,
-                        nav_model,
-                        Some(nested_tree),
-                        format!("{path}.{}", nav.var_name),
-                    )?,
-                );
-            }
+            // Recursively handle nested inserts
+            nav_ref_to_path.insert(
+                column_reference,
+                self.dfs(
+                    Some(&model.name),
+                    &nav.model_reference,
+                    nav_model,
+                    nested_tree,
+                    format!("{path}.{}", nav.var_name),
+                )?,
+            );
         }
 
         // Scalar attributes; attempt to retrieve FK's by value or context
@@ -260,41 +248,39 @@ impl<'a> UpsertModel<'a> {
         let id_path = self.upsert_table(pk, &path, model, builder)?;
 
         // Traverse navigation properties, using the include tree as a guide
-        if let Some(include_tree) = include_tree {
-            for nav in others {
-                let Some(Value::Object(nested_tree)) = include_tree.get(&nav.var_name) else {
-                    continue;
-                };
+        for nav in others {
+            let Some(Value::Object(nested_tree)) = include_tree.get(&nav.var_name) else {
+                continue;
+            };
 
-                match (&nav.kind, new_model.get(&nav.var_name)) {
-                    (NavigationPropertyKind::OneToMany { .. }, Some(Value::Array(nav_models))) => {
-                        for nav_model in nav_models.iter().filter_map(|v| v.as_object()) {
-                            self.dfs(
-                                Some(&model.name),
-                                &nav.model_reference,
-                                nav_model,
-                                Some(nested_tree),
-                                format!("{path}.{}", nav.var_name),
-                            )?;
-                        }
+            match (&nav.kind, new_model.get(&nav.var_name)) {
+                (NavigationPropertyKind::OneToMany { .. }, Some(Value::Array(nav_models))) => {
+                    for nav_model in nav_models.iter().filter_map(|v| v.as_object()) {
+                        self.dfs(
+                            Some(&model.name),
+                            &nav.model_reference,
+                            nav_model,
+                            nested_tree,
+                            format!("{path}.{}", nav.var_name),
+                        )?;
                     }
-                    (NavigationPropertyKind::ManyToMany, Some(Value::Array(nav_models))) => {
-                        for nav_model in nav_models.iter().filter_map(|v| v.as_object()) {
-                            self.dfs(
-                                Some(&model.name),
-                                &nav.model_reference,
-                                nav_model,
-                                Some(nested_tree),
-                                format!("{path}.{}", nav.var_name),
-                            )?;
+                }
+                (NavigationPropertyKind::ManyToMany, Some(Value::Array(nav_models))) => {
+                    for nav_model in nav_models.iter().filter_map(|v| v.as_object()) {
+                        self.dfs(
+                            Some(&model.name),
+                            &nav.model_reference,
+                            nav_model,
+                            nested_tree,
+                            format!("{path}.{}", nav.var_name),
+                        )?;
 
-                            let m2m_table_name = nav.many_to_many_table_name(model_name);
-                            self.insert_jct(&path, nav, &m2m_table_name, model)?;
-                        }
+                        let m2m_table_name = nav.many_to_many_table_name(model_name);
+                        self.insert_jct(&path, nav, &m2m_table_name, model)?;
                     }
-                    _ => {
-                        // Ignore
-                    }
+                }
+                _ => {
+                    // Ignore
                 }
             }
         }
@@ -331,12 +317,16 @@ impl<'a> UpsertModel<'a> {
 
         // Collect column/value pairs from context
         let mut entries = Vec::new();
-        for (var_name, cidl_type, path_key) in pairs {
-            let value = match self.context.get(&path_key).cloned().flatten() {
-                Some(v) => validate_json_to_cidl(&v, cidl_type, unique_id, &var_name)?,
-                None => UpsertBuilder::value_from_ctx(&path_key),
+        for (i, (var_name, cidl_type, path_key)) in pairs.iter().enumerate() {
+            let value = match self.context.get(path_key).cloned().flatten() {
+                Some(v) => validate_json_to_cidl(&v, cidl_type, unique_id, var_name)?,
+                None => UpsertBuilder::value_from_ctx(path_key),
             };
-            entries.push((var_name, value));
+
+            // m2m tables always have "left" and "right" columns
+            let col_name = if i == 0 { "left" } else { "right" };
+
+            entries.push((col_name.to_string(), value));
         }
 
         // Sort columns to ensure deterministic SQL
@@ -641,12 +631,12 @@ fn bytes_to_sqlite(bytes: &[u8]) -> SimpleExpr {
 
 #[cfg(test)]
 mod test {
-    use std::collections::HashMap;
+    use std::{collections::HashMap, str::FromStr as _};
 
     use ast::{CidlType, NavigationPropertyKind};
     use generator_test::{ModelBuilder, expected_str};
     use serde_json::{Value, json};
-    use sqlx::SqlitePool;
+    use sqlx::{Row, SqlitePool};
 
     use crate::methods::{test_sql, upsert::UpsertModel};
 
@@ -677,35 +667,38 @@ mod test {
         // Assert
         assert_eq!(res.len(), 3);
 
-        let res1 = &res[0];
+        let stmt1 = &res[0];
         expected_str!(
-            res1.query,
+            stmt1.query,
             r#"INSERT INTO "Horse" ("color", "age", "address", "id") VALUES (?, ?, null, ?)"#
         );
         expected_str!(
-            res1.query,
+            stmt1.query,
             r#"ON CONFLICT ("id") DO UPDATE SET "color" = "excluded"."color", "age" = "excluded"."age", "address" = "excluded"."address""#
         );
         assert_eq!(
-            *res1.values,
+            *stmt1.values,
             vec![Value::from("brown"), Value::from(7i64), Value::from(1i64)]
         );
 
-        let res2 = &res[1];
-        expected_str!(res2.query, r#"SELECT ? AS "id""#);
-        assert_eq!(*res2.values, vec![Value::from(1i64)]);
+        let stmt2 = &res[1];
+        expected_str!(stmt2.query, r#"WHERE "id" = ?"#);
+        assert_eq!(*stmt2.values, vec![Value::from(1i64)]);
 
-        let res3 = &res[2];
-        expected_str!(res3.query, r#"DELETE FROM "_cloesce_tmp""#);
-        assert_eq!(res3.values.len(), 0);
+        let stmt3 = &res[2];
+        expected_str!(stmt3.query, r#"DELETE FROM "_cloesce_tmp""#);
+        assert_eq!(stmt3.values.len(), 0);
 
-        test_sql(
+        let results = test_sql(
             meta,
             res.into_iter().map(|r| (r.query, r.values)).collect(),
             db,
         )
         .await
         .expect("Upsert to work");
+
+        let value = Value::from_str(results[1][0].try_get(0).unwrap()).unwrap();
+        assert_eq!(value, Value::Array(vec![new_model]));
     }
 
     #[sqlx::test]
@@ -734,16 +727,16 @@ mod test {
         // Assert
         assert_eq!(res.len(), 3);
 
-        let res1 = &res[0];
+        let stmt1 = &res[0];
         expected_str!(
-            res1.query,
+            stmt1.query,
             r#"UPDATE "Horse" SET "age" = ?, "address" = null WHERE "id" = ?"#
         );
-        assert_eq!(*res1.values, vec![Value::from(7), Value::from(1)]);
+        assert_eq!(*stmt1.values, vec![Value::from(7), Value::from(1)]);
 
-        let res2 = &res[1];
-        expected_str!(res2.query, r#"SELECT ? AS "id""#);
-        assert_eq!(*res2.values, vec![Value::from(1i64)]);
+        let stmt2 = &res[1];
+        expected_str!(stmt2.query, r#"WHERE "id" = ?"#);
+        assert_eq!(*stmt2.values, vec![Value::from(1i64)]);
 
         test_sql(
             meta,
@@ -766,7 +759,7 @@ mod test {
         let mut meta = HashMap::new();
         meta.insert(ast_model.name.clone(), ast_model);
 
-        let new_model = json!({
+        let mut new_model = json!({
             "id": 1,
             "metadata": "meta",
             "blob": "aGVsbG8gd29ybGQ="
@@ -784,24 +777,28 @@ mod test {
         // Assert
         assert_eq!(res.len(), 3);
 
-        let res1 = &res[0];
+        let stmt1 = &res[0];
         expected_str!(
-            res1.query,
+            stmt1.query,
             r#"INSERT INTO "Picture" ("metadata", "blob", "id") VALUES (?, X'68656C6C6F20776F726C64', ?) ON CONFLICT ("id") DO UPDATE SET "metadata" = "excluded"."metadata", "blob" = "excluded"."blob""#
         );
-        assert_eq!(*res1.values, vec![Value::from("meta"), Value::from(1i64),]);
+        assert_eq!(*stmt1.values, vec![Value::from("meta"), Value::from(1i64),]);
 
-        let res2 = &res[1];
-        expected_str!(res2.query, r#"SELECT ? AS "id""#);
-        assert_eq!(*res2.values, vec![Value::from(1i64)]);
+        let stmt2 = &res[1];
+        expected_str!(stmt2.query, r#"WHERE "id" = ?"#);
+        assert_eq!(*stmt2.values, vec![Value::from(1i64)]);
 
-        test_sql(
+        let results = test_sql(
             meta,
             res.into_iter().map(|r| (r.query, r.values)).collect(),
             db,
         )
         .await
         .expect("Upsert to work");
+
+        let value = Value::from_str(results[1][0].try_get(0).unwrap()).unwrap();
+        new_model["blob"] = "68656C6C6F20776F726C64".into();
+        assert_eq!(value, Value::Array(vec![new_model]));
     }
 
     #[sqlx::test]
@@ -838,16 +835,16 @@ mod test {
         // Assert
         assert_eq!(res.len(), 3);
 
-        let res1 = &res[0];
+        let stmt1 = &res[0];
         expected_str!(
-            res1.query,
+            stmt1.query,
             r#"INSERT INTO "Picture" ("metadata", "blob", "id") VALUES (?, X'68656C6C6F20776F726C64', ?) ON CONFLICT ("id") DO UPDATE SET "metadata" = "excluded"."metadata", "blob" = "excluded"."blob""#
         );
-        assert_eq!(*res1.values, vec![Value::from("meta"), Value::from(1i64),]);
+        assert_eq!(*stmt1.values, vec![Value::from("meta"), Value::from(1i64),]);
 
-        let res2 = &res[1];
-        expected_str!(res2.query, r#"SELECT ? AS "id""#);
-        assert_eq!(*res2.values, vec![Value::from(1i64)]);
+        let stmt2 = &res[1];
+        expected_str!(stmt2.query, r#"WHERE "id" = ?"#);
+        assert_eq!(*stmt2.values, vec![Value::from(1i64)]);
 
         test_sql(
             meta,
@@ -895,33 +892,36 @@ mod test {
             "Person",
             &meta,
             new_model.as_object().unwrap().clone(),
-            Some(&include_tree.as_object().unwrap().clone()),
+            Some(include_tree.as_object().unwrap().clone()),
         )
         .unwrap();
 
         // Assert
-        let res1 = &res[0];
-        expected_str!(res1.query, r#"INSERT INTO "Horse" ("id") VALUES (?)"#);
-        assert_eq!(*res1.values, vec![1]);
+        let stmt1 = &res[0];
+        expected_str!(stmt1.query, r#"INSERT INTO "Horse" ("id") VALUES (?)"#);
+        assert_eq!(*stmt1.values, vec![1]);
 
-        let res2 = &res[1];
+        let stmt2 = &res[1];
         expected_str!(
-            res2.query,
+            stmt2.query,
             r#"INSERT INTO "Person" ("horseId", "id") VALUES (?, ?) ON CONFLICT ("id") DO UPDATE SET "horseId" = "excluded"."horseId""#
         );
-        assert_eq!(*res2.values, vec![1, 1]);
+        assert_eq!(*stmt2.values, vec![1, 1]);
 
-        let res3 = &res[2];
-        expected_str!(res3.query, r#"SELECT ? AS "id""#);
-        assert_eq!(*res3.values, vec![1]);
+        let stmt3 = &res[2];
+        expected_str!(stmt3.query, r#"WHERE "id" = ?"#);
+        assert_eq!(*stmt3.values, vec![1]);
 
-        test_sql(
+        let results = test_sql(
             meta,
             res.into_iter().map(|r| (r.query, r.values)).collect(),
             db,
         )
         .await
         .expect("Upsert to work");
+
+        let value = Value::from_str(results[2][0].try_get(0).unwrap()).unwrap();
+        assert_eq!(value, Value::Array(vec![new_model]));
     }
 
     #[sqlx::test]
@@ -973,49 +973,52 @@ mod test {
             "Person",
             &meta,
             new_model.as_object().unwrap().clone(),
-            Some(&include_tree.as_object().unwrap().clone()),
+            Some(include_tree.as_object().unwrap().clone()),
         )
         .unwrap();
 
         // Assert
         assert_eq!(res.len(), 6);
 
-        let res1 = &res[0];
-        expected_str!(res1.query, r#"INSERT INTO "Person" ("id") VALUES (?)"#);
-        assert_eq!(*res1.values, vec![1]);
+        let stmt1 = &res[0];
+        expected_str!(stmt1.query, r#"INSERT INTO "Person" ("id") VALUES (?)"#);
+        assert_eq!(*stmt1.values, vec![1]);
 
-        let res2 = &res[1];
+        let stmt2 = &res[1];
         expected_str!(
-            res2.query,
+            stmt2.query,
             r#"INSERT INTO "Horse" ("personId", "id") VALUES (?, ?) ON CONFLICT ("id") DO UPDATE SET "personId" = "excluded"."personId""#
         );
-        assert_eq!(*res2.values, vec![1, 1]);
+        assert_eq!(*stmt2.values, vec![1, 1]);
 
-        let res3 = &res[2];
+        let stmt3 = &res[2];
         expected_str!(
-            res3.query,
+            stmt3.query,
             r#"INSERT INTO "Horse" ("personId", "id") VALUES (?, ?) ON CONFLICT ("id") DO UPDATE SET "personId" = "excluded"."personId""#
         );
-        assert_eq!(*res3.values, vec![1, 2]);
+        assert_eq!(*stmt3.values, vec![1, 2]);
 
-        let res4 = &res[3];
+        let stmt4 = &res[3];
         expected_str!(
-            res4.query,
+            stmt4.query,
             r#"INSERT INTO "Horse" ("personId", "id") VALUES (?, ?) ON CONFLICT ("id") DO UPDATE SET "personId" = "excluded"."personId""#
         );
-        assert_eq!(*res4.values, vec![1, 3]);
+        assert_eq!(*stmt4.values, vec![1, 3]);
 
-        let res5 = &res[4];
-        expected_str!(res5.query, r#"SELECT ? AS "id""#);
-        assert_eq!(*res5.values, vec![1]);
+        let stmt5 = &res[4];
+        expected_str!(stmt5.query, r#"WHERE "id" = ?"#);
+        assert_eq!(*stmt5.values, vec![1]);
 
-        test_sql(
+        let results = test_sql(
             meta,
             res.into_iter().map(|r| (r.query, r.values)).collect(),
             db,
         )
         .await
         .expect("Upsert to work");
+
+        let value = Value::from_str(results[4][0].try_get(0).unwrap()).unwrap();
+        assert_eq!(value, Value::Array(vec![new_model]));
     }
 
     #[sqlx::test]
@@ -1035,11 +1038,9 @@ mod test {
             "horses": [
                 {
                     "id": 1,
-                    "personId": 1
                 },
                 {
                     "id": 2,
-                    "personId": 1
                 },
             ]
         });
@@ -1057,50 +1058,53 @@ mod test {
             "Person",
             &meta,
             new_model.as_object().unwrap().clone(),
-            Some(&include_tree.as_object().unwrap().clone()),
+            Some(include_tree.as_object().unwrap().clone()),
         )
         .unwrap();
 
         // Assert
         assert_eq!(res.len(), 7);
 
-        let res1 = &res[0];
-        expected_str!(res1.query, r#"INSERT INTO "Person" ("id") VALUES (?)"#);
-        assert_eq!(*res1.values, vec![1]);
+        let stmt1 = &res[0];
+        expected_str!(stmt1.query, r#"INSERT INTO "Person" ("id") VALUES (?)"#);
+        assert_eq!(*stmt1.values, vec![1]);
 
-        let res2 = &res[1];
-        expected_str!(res2.query, r#"INSERT INTO "Horse" ("id") VALUES (?)"#);
-        assert_eq!(*res2.values, vec![1]);
+        let stmt2 = &res[1];
+        expected_str!(stmt2.query, r#"INSERT INTO "Horse" ("id") VALUES (?)"#);
+        assert_eq!(*stmt2.values, vec![1]);
 
-        let res3 = &res[2];
+        let stmt3 = &res[2];
         expected_str!(
-            res3.query,
-            r#"INSERT INTO "PersonsHorses" ("Horse.id", "Person.id") VALUES (?, ?) ON CONFLICT  DO NOTHING"#
+            stmt3.query,
+            r#"INSERT INTO "HorsePerson" ("left", "right") VALUES (?, ?) ON CONFLICT  DO NOTHING"#
         );
-        assert_eq!(*res3.values, vec![1, 1]);
+        assert_eq!(*stmt3.values, vec![1, 1]);
 
-        let res4 = &res[3];
-        expected_str!(res4.query, r#"INSERT INTO "Horse" ("id") VALUES (?)"#);
-        assert_eq!(*res4.values, vec![2]);
+        let stmt4 = &res[3];
+        expected_str!(stmt4.query, r#"INSERT INTO "Horse" ("id") VALUES (?)"#);
+        assert_eq!(*stmt4.values, vec![2]);
 
-        let res5 = &res[4];
+        let stmt5 = &res[4];
         expected_str!(
-            res5.query,
-            r#"INSERT INTO "PersonsHorses" ("Horse.id", "Person.id") VALUES (?, ?) ON CONFLICT  DO NOTHING"#
+            stmt5.query,
+            r#"INSERT INTO "HorsePerson" ("left", "right") VALUES (?, ?) ON CONFLICT  DO NOTHING"#
         );
-        assert_eq!(*res5.values, vec![2, 1]);
+        assert_eq!(*stmt5.values, vec![2, 1]);
 
-        let res6 = &res[5];
-        expected_str!(res6.query, r#"SELECT ? AS "id""#);
-        assert_eq!(*res6.values, vec![1]);
+        let stmt6 = &res[5];
+        expected_str!(stmt6.query, r#"WHERE "id" = ?"#);
+        assert_eq!(*stmt6.values, vec![1]);
 
-        test_sql(
+        let results = test_sql(
             meta,
             res.into_iter().map(|r| (r.query, r.values)).collect(),
             db,
         )
         .await
         .expect("Upsert to work");
+
+        let value = Value::from_str(results[5][0].try_get(0).unwrap()).unwrap();
+        assert_eq!(value, Value::Array(vec![new_model]));
     }
 
     #[sqlx::test]
@@ -1164,7 +1168,7 @@ mod test {
             "Person",
             &meta,
             new_model.as_object().unwrap().clone(),
-            Some(&include_tree.as_object().unwrap().clone()),
+            Some(include_tree.as_object().unwrap().clone()),
         )
         .unwrap();
 
@@ -1230,31 +1234,34 @@ mod test {
         // Assert
         assert_eq!(res.len(), 4);
 
-        let res1 = &res[0];
-        expected_str!(res1.query, r#"INSERT INTO "Person" DEFAULT VALUES"#);
-        assert_eq!(res1.values.len(), 0);
+        let stmt1 = &res[0];
+        expected_str!(stmt1.query, r#"INSERT INTO "Person" DEFAULT VALUES"#);
+        assert_eq!(stmt1.values.len(), 0);
 
-        let res2 = &res[1];
+        let stmt2 = &res[1];
         expected_str!(
-            res2.query,
+            stmt2.query,
             r#"REPLACE INTO "_cloesce_tmp" ("path", "id") VALUES (?, last_insert_rowid())"#
         );
-        assert_eq!(*res2.values, vec!["Person.id"]);
+        assert_eq!(*stmt2.values, vec!["Person.id"]);
 
-        let res3 = &res[2];
+        let stmt3 = &res[2];
         expected_str!(
-            res3.query,
+            stmt3.query,
             r#"SELECT "id" FROM "_cloesce_tmp" WHERE "path" = ?"#
         );
-        assert_eq!(*res3.values, vec!["Person.id"]);
+        assert_eq!(*stmt3.values, vec!["Person.id"]);
 
-        test_sql(
+        let results = test_sql(
             meta,
             res.into_iter().map(|r| (r.query, r.values)).collect(),
             db,
         )
         .await
         .expect("Upsert to work");
+
+        let value = Value::from_str(results[2][0].try_get(0).unwrap()).unwrap();
+        assert_eq!(value, Value::Array(vec![json!({"id": 1})]));
     }
 
     #[sqlx::test]
@@ -1292,52 +1299,58 @@ mod test {
             "Person",
             &meta,
             new_person.as_object().unwrap().clone(),
-            Some(include_tree.as_object().unwrap()),
+            Some(include_tree.as_object().unwrap().clone()),
         )
         .unwrap();
 
         // Assert
         assert_eq!(res.len(), 6);
 
-        let res1 = &res[0];
-        expected_str!(res1.query, r#"INSERT INTO "Horse" DEFAULT VALUES"#);
-        assert_eq!(res1.values.len(), 0);
+        let stmt1 = &res[0];
+        expected_str!(stmt1.query, r#"INSERT INTO "Horse" DEFAULT VALUES"#);
+        assert_eq!(stmt1.values.len(), 0);
 
-        let res2 = &res[1];
+        let stmt2 = &res[1];
         expected_str!(
-            res2.query,
+            stmt2.query,
             r#"REPLACE INTO "_cloesce_tmp" ("path", "id") VALUES (?, last_insert_rowid())"#
         );
-        assert_eq!(*res2.values, vec!["Person.horse.id"]);
+        assert_eq!(*stmt2.values, vec!["Person.horse.id"]);
 
-        let res3 = &res[2];
+        let stmt3 = &res[2];
         expected_str!(
-            res3.query,
+            stmt3.query,
             r#"INSERT INTO "Person" ("horseId") VALUES ((SELECT "id" FROM "_cloesce_tmp" WHERE "path" = ?))"#
         );
-        assert_eq!(*res3.values, vec!["Person.horse.id"]);
+        assert_eq!(*stmt3.values, vec!["Person.horse.id"]);
 
-        let res4 = &res[3];
+        let stmt4 = &res[3];
         expected_str!(
-            res4.query,
+            stmt4.query,
             r#"REPLACE INTO "_cloesce_tmp" ("path", "id") VALUES (?, last_insert_rowid())"#
         );
-        assert_eq!(*res4.values, vec!["Person.id"]);
+        assert_eq!(*stmt4.values, vec!["Person.id"]);
 
-        let res5 = &res[4];
+        let stmt5 = &res[4];
         expected_str!(
-            res5.query,
+            stmt5.query,
             r#"SELECT "id" FROM "_cloesce_tmp" WHERE "path" = ?"#
         );
-        assert_eq!(*res5.values, vec!["Person.id"]);
+        assert_eq!(*stmt5.values, vec!["Person.id"]);
 
-        test_sql(
+        let results = test_sql(
             meta,
             res.into_iter().map(|r| (r.query, r.values)).collect(),
             db,
         )
         .await
         .expect("Upsert to work");
+
+        let value = Value::from_str(results[4][0].try_get(0).unwrap()).unwrap();
+        assert_eq!(
+            value,
+            Value::Array(vec![json!({"id": 1, "horseId": 1, "horse": {"id": 1}})])
+        );
     }
 
     #[sqlx::test]
@@ -1381,51 +1394,59 @@ mod test {
             "Person",
             &meta,
             new_person.as_object().unwrap().clone(),
-            Some(include_tree.as_object().unwrap()),
+            Some(include_tree.as_object().unwrap().clone()),
         )
         .unwrap();
 
         // Assert
 
-        let res1 = &res[0];
-        expected_str!(res1.query, r#"INSERT INTO "Person" DEFAULT VALUES"#);
-        assert_eq!(res1.values.len(), 0);
+        let stmt1 = &res[0];
+        expected_str!(stmt1.query, r#"INSERT INTO "Person" DEFAULT VALUES"#);
+        assert_eq!(stmt1.values.len(), 0);
 
-        let res2 = &res[1];
+        let stmt2 = &res[1];
         expected_str!(
-            res2.query,
+            stmt2.query,
             r#"REPLACE INTO "_cloesce_tmp" ("path", "id") VALUES (?, last_insert_rowid())"#
         );
-        assert_eq!(*res2.values, vec!["Person.id"]);
+        assert_eq!(*stmt2.values, vec!["Person.id"]);
 
-        let res3 = &res[2];
+        let stmt3 = &res[2];
         expected_str!(
-            res3.query,
+            stmt3.query,
             r#"INSERT INTO "Horse" ("personId") VALUES ((SELECT "id" FROM "_cloesce_tmp" WHERE "path" = ?))"#
         );
-        assert_eq!(*res3.values, vec!["Person.id"]);
+        assert_eq!(*stmt3.values, vec!["Person.id"]);
 
-        let res4 = &res[3];
+        let stmt4 = &res[3];
         expected_str!(
-            res4.query,
+            stmt4.query,
             r#"REPLACE INTO "_cloesce_tmp" ("path", "id") VALUES (?, last_insert_rowid())"#
         );
-        assert_eq!(*res4.values, vec!["Person.horses.id"]);
+        assert_eq!(*stmt4.values, vec!["Person.horses.id"]);
 
-        let res5 = &res[4];
+        let stmt5 = &res[4];
         expected_str!(
-            res5.query,
+            stmt5.query,
             r#"SELECT "id" FROM "_cloesce_tmp" WHERE "path" = ?"#
         );
-        assert_eq!(*res5.values, vec!["Person.id"]);
+        assert_eq!(*stmt5.values, vec!["Person.id"]);
 
-        test_sql(
+        let results = test_sql(
             meta,
             res.into_iter().map(|r| (r.query, r.values)).collect(),
             db,
         )
         .await
         .expect("Upsert to work");
+
+        let value = Value::from_str(results[4][0].try_get(0).unwrap()).unwrap();
+        assert_eq!(
+            value,
+            Value::Array(vec![
+                json!({"id": 1, "horses": [ { "id": 1, "personId": 1 } ]})
+            ])
+        );
     }
 
     #[sqlx::test]
@@ -1462,72 +1483,84 @@ mod test {
             "Person",
             &meta,
             new_person.as_object().unwrap().clone(),
-            Some(include_tree.as_object().unwrap()),
+            Some(include_tree.as_object().unwrap().clone()),
         )
         .unwrap();
 
         // Assert
 
-        let res1 = &res[0];
-        expected_str!(res1.query, r#"INSERT INTO "Person" DEFAULT VALUES"#);
-        assert_eq!(res1.values.len(), 0);
+        let stmt1 = &res[0];
+        expected_str!(stmt1.query, r#"INSERT INTO "Person" DEFAULT VALUES"#);
+        assert_eq!(stmt1.values.len(), 0);
 
-        let res2 = &res[1];
+        let stmt2 = &res[1];
         expected_str!(
-            res2.query,
+            stmt2.query,
             r#"REPLACE INTO "_cloesce_tmp" ("path", "id") VALUES (?, last_insert_rowid())"#
         );
-        assert_eq!(*res2.values, vec!["Person.id"]);
+        assert_eq!(*stmt2.values, vec!["Person.id"]);
 
-        let res3 = &res[2];
-        expected_str!(res3.query, r#"INSERT INTO "Horse" DEFAULT VALUES"#);
-        assert_eq!(res3.values.len(), 0);
+        let stmt3 = &res[2];
+        expected_str!(stmt3.query, r#"INSERT INTO "Horse" DEFAULT VALUES"#);
+        assert_eq!(stmt3.values.len(), 0);
 
-        let res4 = &res[3];
+        let stmt4 = &res[3];
         expected_str!(
-            res4.query,
+            stmt4.query,
             r#"REPLACE INTO "_cloesce_tmp" ("path", "id") VALUES (?, last_insert_rowid())"#
         );
-        assert_eq!(*res4.values, vec!["Person.horses.id"]);
+        assert_eq!(*stmt4.values, vec!["Person.horses.id"]);
 
-        let res5 = &res[4];
+        let stmt5 = &res[4];
         expected_str!(
-            res5.query,
-            r#"INSERT INTO "PersonsHorses" ("Horse.id", "Person.id") VALUES ((SELECT "id" FROM "_cloesce_tmp" WHERE "path" = ?), (SELECT "id" FROM "_cloesce_tmp" WHERE "path" = ?)) ON CONFLICT  DO NOTHING"#
+            stmt5.query,
+            r#"INSERT INTO "HorsePerson" ("left", "right") VALUES ((SELECT "id" FROM "_cloesce_tmp" WHERE "path" = ?), (SELECT "id" FROM "_cloesce_tmp" WHERE "path" = ?)) ON CONFLICT  DO NOTHING"#
         );
-        assert_eq!(*res5.values, vec!["Person.horses.id", "Person.id"]);
+        assert_eq!(*stmt5.values, vec!["Person.horses.id", "Person.id"]);
 
-        let res6 = &res[5];
-        expected_str!(res6.query, r#"INSERT INTO "Horse" DEFAULT VALUES"#);
-        assert_eq!(res6.values.len(), 0);
+        let stmt6 = &res[5];
+        expected_str!(stmt6.query, r#"INSERT INTO "Horse" DEFAULT VALUES"#);
+        assert_eq!(stmt6.values.len(), 0);
 
-        let res7 = &res[6];
+        let stmt7 = &res[6];
         expected_str!(
-            res7.query,
+            stmt7.query,
             r#"REPLACE INTO "_cloesce_tmp" ("path", "id") VALUES (?, last_insert_rowid())"#
         );
-        assert_eq!(*res7.values, vec!["Person.horses.id"]);
+        assert_eq!(*stmt7.values, vec!["Person.horses.id"]);
 
-        let res8 = &res[7];
+        let stmt8 = &res[7];
         expected_str!(
-            res8.query,
-            r#"INSERT INTO "PersonsHorses" ("Horse.id", "Person.id") VALUES ((SELECT "id" FROM "_cloesce_tmp" WHERE "path" = ?), (SELECT "id" FROM "_cloesce_tmp" WHERE "path" = ?)) ON CONFLICT  DO NOTHING"#
+            stmt8.query,
+            r#"INSERT INTO "HorsePerson" ("left", "right") VALUES ((SELECT "id" FROM "_cloesce_tmp" WHERE "path" = ?), (SELECT "id" FROM "_cloesce_tmp" WHERE "path" = ?)) ON CONFLICT  DO NOTHING"#
         );
-        assert_eq!(*res8.values, vec!["Person.horses.id", "Person.id"]);
+        assert_eq!(*stmt8.values, vec!["Person.horses.id", "Person.id"]);
 
-        let res9 = &res[8];
+        let stmt9 = &res[8];
         expected_str!(
-            res9.query,
+            stmt9.query,
             r#"SELECT "id" FROM "_cloesce_tmp" WHERE "path" = ?"#
         );
-        assert_eq!(*res9.values, vec!["Person.id"]);
+        assert_eq!(*stmt9.values, vec!["Person.id"]);
 
-        test_sql(
+        let results = test_sql(
             meta,
             res.into_iter().map(|r| (r.query, r.values)).collect(),
             db,
         )
         .await
         .expect("Upsert to work");
+
+        let value = Value::from_str(results[8][0].try_get(0).unwrap()).unwrap();
+        assert_eq!(
+            value,
+            Value::Array(vec![json!({
+                "id": 1,
+                "horses": [
+                    { "id": 1 },
+                    { "id": 2 }
+                ]
+            })])
+        );
     }
 }
