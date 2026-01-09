@@ -316,9 +316,7 @@ async fn migrate_models_many_to_many(db: SqlitePool) {
                     .nav_p(
                         "courses",
                         "Course".to_string(),
-                        NavigationPropertyKind::ManyToMany {
-                            unique_id: "StudentsCourses".into(),
-                        },
+                        NavigationPropertyKind::ManyToMany,
                     )
                     .data_source(
                         "withCourses",
@@ -330,9 +328,7 @@ async fn migrate_models_many_to_many(db: SqlitePool) {
                     .nav_p(
                         "students",
                         "Student".to_string(),
-                        NavigationPropertyKind::ManyToMany {
-                            unique_id: "StudentsCourses".into(),
-                        },
+                        NavigationPropertyKind::ManyToMany,
                     )
                     .data_source(
                         "withStudents",
@@ -349,21 +345,21 @@ async fn migrate_models_many_to_many(db: SqlitePool) {
             MigrationsGenerator::migrate(&ast, Some(&empty_ast), &MockMigrationsIntent::default());
 
         // Assert
-        expected_str!(sql, r#"CREATE TABLE IF NOT EXISTS "StudentsCourses""#);
-        expected_str!(sql, r#""Student.id" integer NOT NULL"#);
-        expected_str!(sql, r#""Course.id" integer NOT NULL"#);
-        expected_str!(sql, r#"PRIMARY KEY ("Student.id", "Course.id")"#);
+        expected_str!(sql, r#"CREATE TABLE IF NOT EXISTS "CourseStudent""#);
+        expected_str!(sql, r#""left" integer NOT NULL"#);
+        expected_str!(sql, r#""right" integer NOT NULL"#);
+        expected_str!(sql, r#"PRIMARY KEY ("left", "right")"#);
         expected_str!(
             sql,
-            r#"FOREIGN KEY ("Student.id") REFERENCES "Student" ("id") ON DELETE RESTRICT ON UPDATE CASCADE"#
+            r#"FOREIGN KEY ("left") REFERENCES "Course" ("id") ON DELETE RESTRICT ON UPDATE CASCADE"#
         );
         expected_str!(
             sql,
-            r#"FOREIGN KEY ("Course.id") REFERENCES "Course" ("id") ON DELETE RESTRICT ON UPDATE CASCADE"#
+            r#"FOREIGN KEY ("right") REFERENCES "Student" ("id") ON DELETE RESTRICT ON UPDATE CASCADE"#
         );
 
         query(&db, &sql).await.expect("Insert tables query to work");
-        assert!(exists_in_db(&db, "StudentsCourses").await);
+        assert!(exists_in_db(&db, "CourseStudent").await);
 
         ast
     };
@@ -531,23 +527,11 @@ async fn migrate_alter_drop_m2m(db: SqlitePool) {
         let mut ast = create_ast(vec![
             ModelBuilder::new("Student")
                 .id_pk()
-                .nav_p(
-                    "courses",
-                    "Course",
-                    NavigationPropertyKind::ManyToMany {
-                        unique_id: "StudentsCourses".into(),
-                    },
-                )
+                .nav_p("courses", "Course", NavigationPropertyKind::ManyToMany)
                 .build(),
             ModelBuilder::new("Course")
                 .id_pk()
-                .nav_p(
-                    "students",
-                    "Student",
-                    NavigationPropertyKind::ManyToMany {
-                        unique_id: "StudentsCourses".into(),
-                    },
-                )
+                .nav_p("students", "Student", NavigationPropertyKind::ManyToMany)
                 .build(),
         ]);
         ast.set_merkle_hash();
@@ -609,23 +593,11 @@ async fn migrate_alter_add_m2m(db: SqlitePool) {
         let mut ast = create_ast(vec![
             ModelBuilder::new("Student")
                 .id_pk()
-                .nav_p(
-                    "courses",
-                    "Course",
-                    NavigationPropertyKind::ManyToMany {
-                        unique_id: "StudentsCourses".into(),
-                    },
-                )
+                .nav_p("courses", "Course", NavigationPropertyKind::ManyToMany)
                 .build(),
             ModelBuilder::new("Course")
                 .id_pk()
-                .nav_p(
-                    "students",
-                    "Student",
-                    NavigationPropertyKind::ManyToMany {
-                        unique_id: "StudentsCourses".into(),
-                    },
-                )
+                .nav_p("students", "Student", NavigationPropertyKind::ManyToMany)
                 .build(),
         ]);
         ast.set_merkle_hash();

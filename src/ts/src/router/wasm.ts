@@ -1,6 +1,4 @@
-import { CidlIncludeTree, CloesceAst } from "../ast.js";
-import { IncludeTree } from "../ui/backend.js";
-import { RuntimeContainer } from "./router.js";
+import { CloesceAst } from "../ast.js";
 import Either from "../either.js";
 
 // Requires the ORM binary to have been built
@@ -16,15 +14,6 @@ export interface OrmWasmExports {
   set_meta_ptr(ptr: number, len: number): number;
   alloc(len: number): number;
   dealloc(ptr: number, len: number): void;
-
-  map_sql(
-    model_name_ptr: number,
-    model_name_len: number,
-    sql_rows_ptr: number,
-    sql_rows_len: number,
-    include_tree_ptr: number,
-    include_tree_len: number,
-  ): boolean;
 
   upsert_model(
     model_name_ptr: number,
@@ -55,7 +44,7 @@ export class WasmResource {
     private wasm: OrmWasmExports,
     public ptr: number,
     public len: number,
-  ) {}
+  ) { }
 
   free() {
     this.wasm.dealloc(this.ptr, this.len);
@@ -81,8 +70,8 @@ export async function loadOrmWasm(
   // Load WASM
   const wasmInstance = (wasm ??
     (await WebAssembly.instantiate(mod))) as WebAssembly.Instance & {
-    exports: OrmWasmExports;
-  };
+      exports: OrmWasmExports;
+    };
 
   const modelMeta = WasmResource.fromString(
     JSON.stringify(ast.models),
@@ -134,26 +123,4 @@ export function invokeOrmWasm(
     args.forEach((a) => a.free());
     if (resPtr && resLen) wasm.dealloc(resPtr, resLen);
   }
-}
-
-/**
- * Calls the object relational mapping function to turn a row of SQL records into
- * JSON
- */
-export function mapSqlJson<T extends object>(
-  ctor: new () => T,
-  records: Record<string, any>[],
-  includeTree: IncludeTree<T> | CidlIncludeTree | null,
-): Either<string, T[]> {
-  const { wasm } = RuntimeContainer.get();
-  const args = [
-    WasmResource.fromString(ctor.name, wasm),
-    WasmResource.fromString(JSON.stringify(records), wasm),
-    WasmResource.fromString(JSON.stringify(includeTree), wasm),
-  ];
-
-  const jsonResults = invokeOrmWasm(wasm.map_sql, args, wasm);
-  if (jsonResults.isLeft()) return jsonResults;
-
-  return Either.right(JSON.parse(jsonResults.value));
 }

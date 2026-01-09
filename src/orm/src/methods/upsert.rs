@@ -278,10 +278,7 @@ impl<'a> UpsertModel<'a> {
                             )?;
                         }
                     }
-                    (
-                        NavigationPropertyKind::ManyToMany { unique_id },
-                        Some(Value::Array(nav_models)),
-                    ) => {
+                    (NavigationPropertyKind::ManyToMany, Some(Value::Array(nav_models))) => {
                         for nav_model in nav_models.iter().filter_map(|v| v.as_object()) {
                             self.dfs(
                                 Some(&model.name),
@@ -291,7 +288,8 @@ impl<'a> UpsertModel<'a> {
                                 format!("{path}.{}", nav.var_name),
                             )?;
 
-                            self.insert_jct(&path, nav, unique_id, model)?;
+                            let m2m_table_name = nav.many_to_many_table_name(model_name);
+                            self.insert_jct(&path, nav, &m2m_table_name, model)?;
                         }
                     }
                     _ => {
@@ -861,66 +859,6 @@ mod test {
     }
 
     #[sqlx::test]
-    async fn nav_props_no_include_tree(db: SqlitePool) {
-        // Arrange
-        let ast_person = ModelBuilder::new("Person")
-            .id_pk()
-            .col("horseId", CidlType::Integer, Some("Horse".into()))
-            .nav_p(
-                "horse",
-                "Horse",
-                NavigationPropertyKind::OneToOne {
-                    column_reference: "horseId".to_string(),
-                },
-            )
-            .build();
-        let ast_horse = ModelBuilder::new("Horse").id_pk().build();
-
-        let new_model = json!({
-            "id": 1,
-            "horseId": 1,
-            "horse": {
-                "id": 1,
-            }
-        });
-
-        let mut meta = HashMap::new();
-        meta.insert(ast_horse.name.clone(), ast_horse);
-        meta.insert(ast_person.name.clone(), ast_person);
-
-        // Act
-        let res = UpsertModel::query(
-            "Person",
-            &meta,
-            new_model.as_object().unwrap().clone(),
-            None,
-        )
-        .unwrap();
-
-        // Assert
-        assert_eq!(res.len(), 3);
-
-        let res1 = &res[0];
-        expected_str!(
-            res1.query,
-            r#"INSERT INTO "Person" ("horseId", "id") VALUES (?, ?)"#
-        );
-        assert_eq!(*res1.values, vec![1i64, 1i64]);
-
-        let res2 = &res[1];
-        expected_str!(res2.query, r#"SELECT ? AS "id""#);
-        assert_eq!(*res2.values, vec![1i64]);
-
-        test_sql(
-            meta,
-            res.into_iter().map(|r| (r.query, r.values)).collect(),
-            db,
-        )
-        .await
-        .unwrap_err();
-    }
-
-    #[sqlx::test]
     async fn one_to_one(db: SqlitePool) {
         // Arrange
         let ast_person = ModelBuilder::new("Person")
@@ -1085,22 +1023,10 @@ mod test {
         // Arrange
         let ast_person = ModelBuilder::new("Person")
             .id_pk()
-            .nav_p(
-                "horses",
-                "Horse",
-                NavigationPropertyKind::ManyToMany {
-                    unique_id: "PersonsHorses".to_string(),
-                },
-            )
+            .nav_p("horses", "Horse", NavigationPropertyKind::ManyToMany)
             .build();
         let ast_horse = ModelBuilder::new("Horse")
-            .nav_p(
-                "persons",
-                "Person",
-                NavigationPropertyKind::ManyToMany {
-                    unique_id: "PersonsHorses".to_string(),
-                },
-            )
+            .nav_p("persons", "Person", NavigationPropertyKind::ManyToMany)
             .id_pk()
             .build();
 
@@ -1507,23 +1433,11 @@ mod test {
         // Arrange
         let person = ModelBuilder::new("Person")
             .id_pk()
-            .nav_p(
-                "horses",
-                "Horse",
-                NavigationPropertyKind::ManyToMany {
-                    unique_id: "PersonsHorses".to_string(),
-                },
-            )
+            .nav_p("horses", "Horse", NavigationPropertyKind::ManyToMany)
             .build();
 
         let horse = ModelBuilder::new("Horse")
-            .nav_p(
-                "persons",
-                "Person",
-                NavigationPropertyKind::ManyToMany {
-                    unique_id: "PersonsHorses".to_string(),
-                },
-            )
+            .nav_p("persons", "Person", NavigationPropertyKind::ManyToMany)
             .id_pk()
             .build();
 

@@ -11,7 +11,6 @@ use std::collections::HashMap;
 use std::slice;
 use std::str;
 
-type D1Result = Vec<Map<String, serde_json::Value>>;
 type ModelMeta = HashMap<String, Model>;
 type IncludeTreeJson = Map<String, serde_json::Value>;
 
@@ -72,64 +71,6 @@ pub extern "C" fn get_return_ptr() -> *const u8 {
     unsafe { RETURN_PTR }
 }
 
-/// Maps ORM friendly SQL rows to a [D1Model]. Requires a previous call to [set_meta_ptr].
-///
-/// Panics on any error.
-///
-/// Returns 0 on pass 1 on fail. Stores result in [RETURN_PTR]
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn map_sql(
-    // D1Model Name
-    model_name_ptr: *const u8,
-    model_name_len: usize,
-
-    // SQL result rows
-    rows_ptr: *const u8,
-    rows_len: usize,
-
-    // Include Tree
-    include_tree_ptr: *const u8,
-    include_tree_len: usize,
-) -> i32 {
-    let model_name =
-        unsafe { str::from_utf8(slice::from_raw_parts(model_name_ptr, model_name_len)).unwrap() };
-    let rows_json = unsafe { str::from_utf8(slice::from_raw_parts(rows_ptr, rows_len)).unwrap() };
-    let include_tree_json = unsafe {
-        str::from_utf8(slice::from_raw_parts(include_tree_ptr, include_tree_len)).unwrap()
-    };
-
-    let rows = match serde_json::from_str::<D1Result>(rows_json) {
-        Ok(rows) => rows,
-        Err(e) => {
-            yield_error(e);
-            return 1;
-        }
-    };
-
-    let include_tree = match serde_json::from_str::<Option<IncludeTreeJson>>(include_tree_json) {
-        Ok(include_tree) => include_tree,
-        Err(e) => {
-            yield_error(e);
-            return 1;
-        }
-    };
-
-    let res = META.with(|meta| {
-        methods::map::map_sql(model_name, &meta.borrow(), &rows, include_tree.as_ref())
-    });
-    match res {
-        Ok(res) => {
-            let json_str = serde_json::to_string(&res).unwrap();
-            yield_result(json_str.into_bytes());
-            0
-        }
-        Err(e) => {
-            yield_error(e);
-            1
-        }
-    }
-}
-
 /// Creates an insert statement for the given model. Requires a previous call to [set_meta_ptr].
 ///
 /// Panics on any error.
@@ -180,80 +121,6 @@ pub unsafe extern "C" fn upsert_model(
         Ok(res) => {
             let bytes = serde_json::to_string(&res).unwrap().into_bytes();
             yield_result(bytes);
-            0
-        }
-        Err(e) => {
-            yield_error(e);
-            1
-        }
-    }
-}
-
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn list_models(
-    // D1Model Name
-    model_name_ptr: *const u8,
-    model_name_len: usize,
-
-    //  Include Tree
-    include_tree_ptr: *const u8,
-    include_tree_len: usize,
-
-    // Tag CTE
-    tag_cte_ptr: *const u8,
-    tag_cte_len: usize,
-
-    // Custom From Clause
-    custom_from_ptr: *const u8,
-    custom_from_len: usize,
-) -> i32 {
-    let model_name =
-        unsafe { str::from_utf8(slice::from_raw_parts(model_name_ptr, model_name_len)).unwrap() };
-    let include_tree_json = unsafe {
-        str::from_utf8(slice::from_raw_parts(include_tree_ptr, include_tree_len)).unwrap()
-    };
-    let tag_cte_raw =
-        unsafe { str::from_utf8(slice::from_raw_parts(tag_cte_ptr, tag_cte_len)).unwrap() };
-
-    let custom_from_raw =
-        unsafe { str::from_utf8(slice::from_raw_parts(custom_from_ptr, custom_from_len)).unwrap() };
-
-    let tag_cte = match serde_json::from_str::<Option<String>>(tag_cte_raw) {
-        Ok(tc) => tc,
-        Err(e) => {
-            yield_error(e);
-            return 1;
-        }
-    };
-
-    let custom_from = match serde_json::from_str::<Option<String>>(custom_from_raw) {
-        Ok(cf) => cf,
-        Err(e) => {
-            yield_error(e);
-            return 1;
-        }
-    };
-
-    let include_tree = match serde_json::from_str::<Option<IncludeTreeJson>>(include_tree_json) {
-        Ok(include_tree) => include_tree,
-        Err(e) => {
-            yield_error(e);
-            return 1;
-        }
-    };
-
-    let res = META.with(|meta| {
-        methods::list::list_models(
-            model_name,
-            include_tree.as_ref(),
-            custom_from,
-            tag_cte,
-            &meta.borrow(),
-        )
-    });
-    match res {
-        Ok(res) => {
-            yield_result(res.into_bytes());
             0
         }
         Err(e) => {

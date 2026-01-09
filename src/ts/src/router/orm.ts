@@ -8,13 +8,13 @@ import type {
 
 import { DeepPartial, KValue, u8ToB64 } from "../ui/common.js";
 import { RuntimeContainer } from "../router/router.js";
-import { WasmResource, mapSqlJson, invokeOrmWasm } from "../router/wasm.js";
+import { WasmResource, invokeOrmWasm } from "../router/wasm.js";
 import { Model as AstModel } from "../ast.js";
 import Either from "../either.js";
 import { IncludeTree } from "../ui/backend.js";
 
 export class Orm {
-  private constructor(private env: unknown) {}
+  private constructor(private env: unknown) { }
 
   /**
    * Creates an instance of an `Orm`
@@ -250,33 +250,6 @@ export class Orm {
   }
 
   /**
-   * Maps SQL records to an instantiated Model. The records must be flat
-   * (e.g., of the form "id, name, address") or derive from a Cloesce data source view
-   * (e.g., of the form "Horse.id, Horse.name, Horse.address")
-   *
-   * Assumes the data is formatted correctly, throwing an error otherwise.
-   *
-   * @param ctor The model constructor
-   * @param records D1 Result records
-   * @param includeTree Include tree to define the relationships to join.
-   */
-  async mapSql<T extends object>(
-    ctor: new () => T,
-    records: Record<string, any>[],
-    includeTree: IncludeTree<T> | null = null,
-  ): Promise<T[]> {
-    const base = mapSqlJson(ctor, records, includeTree).unwrap();
-
-    await Promise.all(
-      base.map(async (item, i) => {
-        base[i] = await this.hydrate(ctor, item, {}, includeTree);
-      }),
-    );
-
-    return base;
-  }
-
-  /**
    * Executes an "upsert" query, adding or augmenting a model in the database.
    *
    * If a model's primary key is not defined in `newModel`, the query is assumed to be an insert.
@@ -367,178 +340,5 @@ export class Orm {
 
     const rootModelId = batchRes[selectIndex!].results[0] as { id: any };
     return Either.right(rootModelId.id);
-  }
-
-  /**
-   * Returns a select query, creating a CTE view for the model using the provided include tree.
-   *
-   * @param ctor The model constructor.
-   * @param includeTree An include tree describing which related models to join.
-   * @param from An optional custom `FROM` clause to use instead of the base table.
-   * @param tagCte An optional CTE name to tag the query with. Defaults to "Model.view".
-   *
-   * ### Example:
-   * ```ts
-   * // Using a data source
-   * const query = Orm.listQuery(Person, "default");
-   *
-   * // Using a custom from statement
-   * const query = Orm.listQuery(Person, null, "SELECT * FROM Person WHERE age > 18");
-   * ```
-   *
-   * ### Example SQL output:
-   * ```sql
-   * WITH Person_view AS (
-   * SELECT
-   * "Person"."id" AS "id",
-   * ...
-   * FROM "Person"
-   * LEFT JOIN ...
-   * )
-   * SELECT * FROM Person_view
-   * ```
-   */
-  static listQuery<T extends object>(
-    ctor: new () => T,
-    opts: {
-      includeTree?: IncludeTree<T> | null;
-      from?: string;
-      tagCte?: string;
-    },
-  ): string {
-    const { wasm } = RuntimeContainer.get();
-    const args = [
-      WasmResource.fromString(ctor.name, wasm),
-      WasmResource.fromString(JSON.stringify(opts.includeTree ?? null), wasm),
-      WasmResource.fromString(JSON.stringify(opts.tagCte ?? null), wasm),
-      WasmResource.fromString(JSON.stringify(opts.from ?? null), wasm),
-    ];
-
-    const res = invokeOrmWasm(wasm.list_models, args, wasm);
-    if (res.isLeft()) {
-      throw new Error(`Error invoking the Cloesce WASM Binary: ${res.value}`);
-    }
-
-    return res.unwrap();
-  }
-
-  /**
-   * Returns a select query for a single model by primary key, creating a CTE view using the provided include tree.
-   *
-   * @param ctor The model constructor.
-   * @param includeTree An include tree describing which related models to join.
-   *
-   * ### Example:
-   * ```ts
-   * // Using a data source
-   * const query = Orm.getQuery(Person, "default");
-   * ```
-   *
-   * ### Example SQL output:
-   *
-   * ```sql
-   * WITH Person_view AS (
-   * SELECT
-   * "Person"."id" AS "id",
-   * ...
-   * FROM "Person"
-   * LEFT JOIN ...
-   * )
-   * SELECT * FROM Person_view WHERE [Person].[id] = ?
-   * ```
-   */
-  static getQuery<T extends object>(
-    ctor: new () => T,
-    includeTree?: IncludeTree<T> | null,
-  ): string {
-    const { ast } = RuntimeContainer.get();
-    // TODO: handle missing primary key
-    return `${this.listQuery<T>(ctor, { includeTree })} WHERE [${ast.models[ctor.name].primary_key!.name}] = ?`;
-  }
-
-  /**
-   * Retrieves all instances of a model from the database.
-   * @param ctor The model constructor.
-   * @param includeTree An include tree describing which related models to join.
-   * @param from An optional custom `FROM` clause to use instead of the base table.
-   * @returns Either an error string, or an array of model instances.
-   *
-   * ### Example:
-   * ```ts
-   * const orm = Orm.fromD1(env.db);
-   * const horses = await orm.list(Horse, Horse.default);
-   * ```
-   *
-   * ### Example with custom from:
-   * ```ts
-   * const orm = Orm.fromD1(env.db);
-   * const adultHorses = await orm.list(Horse, Horse.default, "SELECT * FROM Horse ORDER BY age DESC LIMIT 10");
-   * ```
-   *
-   * =>
-   *
-   * ```sql
-   * SELECT
-   *  "Horse"."id" AS "id",
-   * ...
-   * FROM (SELECT * FROM Horse ORDER BY age DESC LIMIT 10)
-   * LEFT JOIN ...
-   * ```
-   *
-   */
-  async list<T extends object>(
-    ctor: new () => T,
-    opts: {
-      includeTree?: IncludeTree<T> | null;
-      from?: string;
-    },
-  ): Promise<Either<D1Result, T[]>> {
-    const sql = Orm.listQuery(ctor, opts);
-
-    const stmt = this.db.prepare(sql);
-    const records = await stmt.all();
-    if (!records.success) {
-      return Either.left(records);
-    }
-
-    const mapped = await this.mapSql(
-      ctor,
-      records.results,
-      opts.includeTree ?? null,
-    );
-    return Either.right(mapped);
-  }
-
-  /**
-   * Retrieves a single model by primary key.
-   * @param ctor The model constructor.
-   * @param id The primary key value.
-   * @param includeTree An include tree describing which related models to join.
-   * @returns Either an error string, or the model instance (null if not found).
-   *
-   * ### Example:
-   * ```ts
-   * const orm = Orm.fromD1(env.db);
-   * const horse = await orm.get(Horse, 1, Horse.default);
-   * ```
-   */
-  async get<T extends object>(
-    ctor: new () => T,
-    id: any,
-    includeTree: IncludeTree<T> | null = null,
-  ): Promise<Either<D1Result, T | null>> {
-    const sql = Orm.getQuery(ctor, includeTree);
-    const record = await this.db.prepare(sql).bind(id).run();
-
-    if (!record.success) {
-      throw new Error("Get query failed: " + (record.error ?? "unknown error"));
-    }
-
-    if (record.results.length === 0) {
-      return Either.right(null);
-    }
-
-    const mapped = await this.mapSql(ctor, record.results, includeTree);
-    return Either.right(mapped[0]);
   }
 }

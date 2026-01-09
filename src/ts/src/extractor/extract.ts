@@ -700,15 +700,6 @@ export class ModelExtractor {
           break;
         }
         case PropertyDecoratorKind.ManyToMany: {
-          const unique_id = getDecoratorArgument(decorator, 0);
-
-          // Error: many to many attribtues require a unique id
-          if (!unique_id)
-            return err(ExtractorErrorCode.MissingManyToManyUniqueId, (e) => {
-              e.snippet = prop.getText();
-              e.context = prop.getName();
-            });
-
           // Error: navigation properties require a model reference
           let model_name = getObjectName(cidl_type);
           if (!model_name) {
@@ -724,7 +715,7 @@ export class ModelExtractor {
           navigation_properties.push({
             var_name: prop.getName(),
             model_reference: model_name,
-            kind: { ManyToMany: { unique_id } },
+            kind: "ManyToMany",
           });
           break;
         }

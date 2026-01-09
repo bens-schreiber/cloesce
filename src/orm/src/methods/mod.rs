@@ -1,5 +1,4 @@
-pub mod list;
-pub mod map;
+pub mod json;
 pub mod upsert;
 
 pub fn alias(name: impl Into<String>) -> sea_query::Alias {
@@ -84,6 +83,9 @@ pub type Result<T> = std::result::Result<T, OrmError>;
 use std::fmt::Display;
 
 #[cfg(test)]
+use sqlx::sqlite::SqliteRow;
+
+#[cfg(test)]
 use crate::ModelMeta;
 
 #[cfg(test)]
@@ -91,7 +93,7 @@ pub async fn test_sql(
     mut models: ModelMeta,
     stmts: Vec<(String, Vec<serde_json::Value>)>,
     db: sqlx::SqlitePool,
-) -> std::result::Result<(), sqlx::Error> {
+) -> std::result::Result<Vec<Vec<SqliteRow>>, sqlx::Error> {
     use migrations::{MigrationsDilemma, MigrationsGenerator, MigrationsIntent};
 
     // Generate and run schema migration
@@ -139,6 +141,7 @@ pub async fn test_sql(
     sqlx::query(&migration).execute(&db).await.unwrap();
 
     let mut tx = db.begin().await?;
+    let mut results = Vec::new();
     for (sql, values) in stmts {
         let mut query = sqlx::query(&sql);
         for value in values.iter() {
@@ -157,9 +160,10 @@ pub async fn test_sql(
                 _ => unimplemented!("Value type not implemented in test_sql"),
             };
         }
-        query.execute(&mut *tx).await?;
+        let rows = query.fetch_all(&mut *tx).await?;
+        results.push(rows);
     }
     tx.commit().await?;
 
-    Ok(())
+    Ok(results)
 }

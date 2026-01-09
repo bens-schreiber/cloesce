@@ -267,13 +267,7 @@ fn junction_table_builder_errors() {
         let mut ast = create_ast(vec![
             ModelBuilder::new("Student")
                 .id_pk()
-                .nav_p(
-                    "courses",
-                    "Course",
-                    NavigationPropertyKind::ManyToMany {
-                        unique_id: "OnlyOne".into(),
-                    },
-                )
+                .nav_p("courses", "Course", NavigationPropertyKind::ManyToMany)
                 .build(),
             // Course exists, but doesn't declare the reciprocal nav property
             ModelBuilder::new("Course").id_pk().build(),
@@ -292,34 +286,16 @@ fn junction_table_builder_errors() {
         let mut ast = create_ast(vec![
             ModelBuilder::new("A")
                 .id_pk()
-                .nav_p(
-                    "bs",
-                    "B",
-                    NavigationPropertyKind::ManyToMany {
-                        unique_id: "TriJ".into(),
-                    },
-                )
+                .nav_p("bs", "B", NavigationPropertyKind::ManyToMany)
                 .build(),
             ModelBuilder::new("B")
                 .id_pk()
-                .nav_p(
-                    "as",
-                    "A",
-                    NavigationPropertyKind::ManyToMany {
-                        unique_id: "TriJ".into(),
-                    },
-                )
+                .nav_p("as", "A", NavigationPropertyKind::ManyToMany)
                 .build(),
             // Third model C tries to use the same junction id -> should error
             ModelBuilder::new("C")
                 .id_pk()
-                .nav_p(
-                    "as",
-                    "A",
-                    NavigationPropertyKind::ManyToMany {
-                        unique_id: "TriJ".into(),
-                    },
-                )
+                .nav_p("as", "A", NavigationPropertyKind::ManyToMany)
                 .build(),
         ]);
         let spec = create_spec(&ast);
