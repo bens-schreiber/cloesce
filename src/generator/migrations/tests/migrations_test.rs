@@ -541,7 +541,7 @@ async fn migrate_alter_drop_m2m(db: SqlitePool) {
         query(&db, &sql)
             .await
             .expect("Create table queries to work");
-        assert!(exists_in_db(&db, "StudentsCourses").await);
+        assert!(exists_in_db(&db, "CourseStudent").await);
 
         migration
     };
@@ -567,7 +567,7 @@ async fn migrate_alter_drop_m2m(db: SqlitePool) {
         .await
         .expect("Create table queries to work");
 
-    assert!(!exists_in_db(&db, "StudentsCourses").await)
+    assert!(!exists_in_db(&db, "CourseStudent").await)
 }
 
 #[sqlx::test]
@@ -616,5 +616,5 @@ async fn migrate_alter_add_m2m(db: SqlitePool) {
         .await
         .expect("Create table queries to work");
 
-    assert!(exists_in_db(&db, "StudentsCourses").await)
+    assert!(exists_in_db(&db, "CourseStudent").await)
 }

@@ -281,19 +281,15 @@ fn junction_table_builder_errors() {
         ));
     }
 
-    // Too many models case: three models register the same junction id
+    // Too many models case: two many-to-many nav properties pointing to the same model
     {
         let mut ast = create_ast(vec![
             ModelBuilder::new("A")
                 .id_pk()
                 .nav_p("bs", "B", NavigationPropertyKind::ManyToMany)
+                .nav_p("bs2", "B", NavigationPropertyKind::ManyToMany)
                 .build(),
             ModelBuilder::new("B")
-                .id_pk()
-                .nav_p("as", "A", NavigationPropertyKind::ManyToMany)
-                .build(),
-            // Third model C tries to use the same junction id -> should error
-            ModelBuilder::new("C")
                 .id_pk()
                 .nav_p("as", "A", NavigationPropertyKind::ManyToMany)
                 .build(),
