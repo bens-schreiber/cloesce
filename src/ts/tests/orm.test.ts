@@ -281,25 +281,22 @@ describe("ORM Hydrate Tests", () => {
       expect(fullIncludeTree).toBeInstanceOf(TestModel);
       expect(fullIncludeTree.config).toEqual({
         key: baseConfigKV.key,
-        value: baseConfigKV.value,
         raw: baseConfigKV.value,
         metadata: JSON.stringify(baseConfigKV.metadata),
-      } satisfies KValue<unknown>);
+      });
       expect(fullIncludeTree.configList.length).toBe(2);
       expect(fullIncludeTree.configList).toEqual(
         expect.arrayContaining([
           {
             key: baseConfigKV.key,
-            value: baseConfigKV.value,
             raw: baseConfigKV.value,
             metadata: JSON.stringify(baseConfigKV.metadata),
-          } satisfies KValue<unknown>,
+          },
           {
             key: otherConfigItem.key,
-            value: otherConfigItem.value,
             raw: otherConfigItem.value,
             metadata: null,
-          } satisfies KValue<unknown>,
+          }
         ]),
       );
       expect(fullIncludeTree.configStream.value).toBeInstanceOf(ReadableStream);

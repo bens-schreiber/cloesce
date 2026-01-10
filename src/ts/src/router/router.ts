@@ -38,7 +38,7 @@ export class RuntimeContainer {
     public readonly ast: CloesceAst,
     public readonly constructorRegistry: ConstructorRegistry,
     public readonly wasm: OrmWasmExports,
-  ) {}
+  ) { }
 
   static async init(
     ast: CloesceAst,
@@ -569,46 +569,38 @@ async function hydrate(
 
   const orm = Orm.fromEnv(env);
 
-  // D1
-  if (model.primary_key !== null) {
-    // Error state: If some outside force tweaked the database schema, the query may fail.
-    // Otherwise, this indicates a bug in the compiler or runtime.
-    const malformedQuery = (e: any) =>
-      exit(
-        500,
-        RouterError.InvalidDatabaseQuery,
-        `Error in hydration query, is the database out of sync with the backend?: ${e instanceof Error ? e.message : String(e)}`,
-      );
 
-    // Query DB
-    try {
-      const result = await orm.get(modelCtor, {
-        id: route.primaryKey!,
-        includeTree,
-        keyParams: route.keyParams,
-      });
+  // Error state: If some outside force tweaked the database schema, the query may fail.
+  // Otherwise, this indicates a bug in the compiler or runtime.
+  const malformedQuery = (e: any) =>
+    exit(
+      500,
+      RouterError.InvalidDatabaseQuery,
+      `Error in hydration query, is the database out of sync with the backend?: ${e instanceof Error ? e.message : String(e)}`,
+    );
 
-      if (result === null) {
-        return exit(
-          404,
-          RouterError.ModelNotFound,
-          `Model instance of type ${model.name} with primary key ${route.primaryKey} not found`,
-        );
-      }
-
-      return Either.right(result);
-    } catch (e) {
-      return malformedQuery(JSON.stringify(e));
-    }
-  }
-
-  // KV + R2
-  return Either.right(
-    await orm.hydrate(ctorReg[route.model!.name], {
+  try {
+    const result = await orm.get(modelCtor, {
+      id: route.primaryKey,
       includeTree,
       keyParams: route.keyParams,
-    }),
-  );
+    });
+
+    // Result will only be null if the instance does not exist
+    // for a D1 query.
+    if (result === null) {
+      return exit(
+        404,
+        RouterError.ModelNotFound,
+        `Model instance of type ${model.name} with primary key ${route.primaryKey} not found`,
+      );
+    }
+
+    return Either.right(result);
+  } catch (e) {
+    return malformedQuery(JSON.stringify(e));
+  }
+
 }
 
 /**

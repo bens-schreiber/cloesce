@@ -11,6 +11,32 @@ export class D1BackedModel {
   keyParam: string;
   kvData: KValue<unknown>;
 
+  static async get(
+    id: number,
+    keyParam: string,
+    __datasource: "default" |"none" = "none",
+    fetchImpl: typeof fetch = fetch
+  ): Promise<HttpResult<D1BackedModel>> {
+    const baseUrl = new URL(
+      `http://localhost:5002/api/D1BackedModel/get`
+    );
+
+    baseUrl.searchParams.append("id", String(id));
+    baseUrl.searchParams.append("keyParam", String(keyParam));
+    baseUrl.searchParams.append("__datasource", String(__datasource));
+
+    const res = await fetchImpl(baseUrl, {
+      method: "GET",
+      duplex: "half",
+    });
+
+    return await HttpResult.fromResponse(
+      res,
+      MediaType.Json,
+      D1BackedModel,
+      false
+    );
+  }
   static async post(
     model: DeepPartial<D1BackedModel>,
     fetchImpl: typeof fetch = fetch
@@ -47,6 +73,30 @@ export class PureKVModel {
   data: KValue<unknown>;
   otherData: KValue<string>;
 
+  static async get(
+    id: string,
+    __datasource: "default" |"none" = "none",
+    fetchImpl: typeof fetch = fetch
+  ): Promise<HttpResult<PureKVModel>> {
+    const baseUrl = new URL(
+      `http://localhost:5002/api/PureKVModel/get`
+    );
+
+    baseUrl.searchParams.append("id", String(id));
+    baseUrl.searchParams.append("__datasource", String(__datasource));
+
+    const res = await fetchImpl(baseUrl, {
+      method: "GET",
+      duplex: "half",
+    });
+
+    return await HttpResult.fromResponse(
+      res,
+      MediaType.Json,
+      PureKVModel,
+      false
+    );
+  }
   static async post(
     id: string,
     data: unknown,

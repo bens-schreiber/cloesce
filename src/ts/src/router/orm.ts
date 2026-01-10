@@ -14,7 +14,7 @@ import { InternalError } from "../common.js";
 import { IncludeTree } from "../ui/backend.js";
 
 export class Orm {
-  private constructor(private env: unknown) {}
+  private constructor(private env: unknown) { }
 
   /**
    * Creates an instance of an `Orm`
@@ -122,10 +122,10 @@ export class Orm {
       keyParams?: Record<string, string>;
       includeTree?: IncludeTree<T> | null;
     } = {
-      base: {},
-      keyParams: {},
-      includeTree: null,
-    },
+        base: {},
+        keyParams: {},
+        includeTree: null,
+      },
   ): Promise<T> {
     const { ast, constructorRegistry } = RuntimeContainer.get();
     const model = ast.models[ctor.name];
@@ -175,12 +175,11 @@ export class Orm {
         current[kv.value.name] = await Promise.all(
           res.keys.map(async (k: any) => {
             const stream = await namespace.get(k.name, { type: "stream" });
-            return {
+            return Object.assign(new KValue, {
               key: k.name,
-              value: stream,
               raw: stream,
               metadata: null,
-            } satisfies KValue<ReadableStream>;
+            });
           }),
         );
       } else {
@@ -189,12 +188,11 @@ export class Orm {
             const kvRes = await namespace.getWithMetadata(k.name, {
               type: "json",
             });
-            return {
+            return Object.assign(new KValue, {
               key: k.name,
-              value: kvRes.value,
               raw: kvRes.value,
               metadata: kvRes.metadata,
-            } satisfies KValue<unknown>;
+            });
           }),
         );
       }
@@ -208,20 +206,18 @@ export class Orm {
     ) {
       if (kv.value.cidl_type === "Stream") {
         const res = await namespace.get(key, { type: "stream" });
-        current[kv.value.name] = {
+        current[kv.value.name] = Object.assign(new KValue, {
           key,
-          value: res,
           raw: res,
           metadata: null,
-        } satisfies KValue<ReadableStream>;
+        });
       } else {
         const res = await namespace.getWithMetadata(key, { type: "json" });
-        current[kv.value.name] = {
+        current[kv.value.name] = Object.assign(new KValue, {
           key,
-          value: res.value,
           raw: res.value,
           metadata: res.metadata,
-        } satisfies KValue<unknown>;
+        });
       }
     }
 
@@ -478,10 +474,10 @@ export class Orm {
       keyParams?: Record<string, string>;
       includeTree?: IncludeTree<T> | null;
     } = {
-      id: undefined,
-      keyParams: {},
-      includeTree: null,
-    },
+        id: undefined,
+        keyParams: {},
+        includeTree: null,
+      },
   ): Promise<T | null> {
     const { ast } = RuntimeContainer.get();
     const model = ast.models[ctor.name];

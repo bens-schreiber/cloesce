@@ -1,6 +1,7 @@
 import { IncludeTree, Orm } from "../ui/backend.js";
 import { HttpResult } from "../ui/common.js";
 import { NO_DATA_SOURCE } from "../ast.js";
+import { RuntimeContainer } from "./router.js";
 
 /**
  * Wraps an object in a Proxy that will intercept non-overriden CRUD methods,
@@ -25,7 +26,7 @@ export function proxyCrud(obj: any, ctor: any, env: any) {
       }
 
       if (method === "get") {
-        return (id: any, ds: string) => _get(ctor, id, ds, env);
+        return (...args: any[]) => _get(ctor, args, env);
       }
 
       return value;
@@ -49,18 +50,38 @@ async function upsert(
 
 async function _get(
   ctor: any,
-  id: any,
-  dataSource: string,
+  args: any[],
   env: any,
 ): Promise<HttpResult<unknown>> {
-  const includeTree = findIncludeTree(dataSource, ctor);
+  const { ast } = RuntimeContainer.get();
+  const model = ast.models[ctor.name];
+
+  const getArgs: {
+    id?: any,
+    keyParams?: Record<string, any>,
+    includeTree?: IncludeTree<any> | null,
+  } = {};
+
+  let argIndex = 0;
+  if (model.primary_key) {
+    // If there is a primary key, the first argument is the primary key.
+    getArgs.id = args[argIndex++];
+  }
+
+  if (model.key_params.length > 0) {
+    // All key params come after the primary key.
+    // Order is guaranteed by the compiler.
+    getArgs.keyParams = {};
+    for (const keyParam of model.key_params) {
+      getArgs.keyParams[keyParam] = args[argIndex++];
+    }
+  }
+
+  // The last argument is always the data source.
+  getArgs.includeTree = findIncludeTree(args[argIndex], ctor);
+
   const orm = Orm.fromEnv(env);
-
-  const result: any | null = await orm.get(ctor, {
-    id,
-    includeTree,
-  });
-
+  const result: any | null = await orm.get(ctor, getArgs);
   return !result ? HttpResult.fail(404) : HttpResult.ok(200, result);
 }
 
