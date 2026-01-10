@@ -5,7 +5,7 @@ use serde_json::Value;
 use super::{Result, alias};
 use crate::{IncludeTreeJson, ModelMeta, fail, methods::OrmErrorKind};
 
-pub fn as_json(
+pub fn select_as_json(
     model_name: &str,
     include_tree: Option<IncludeTreeJson>,
     meta: &ModelMeta,
@@ -288,7 +288,7 @@ mod test {
     use serde_json::json;
     use sqlx::{Row, sqlite::SqlitePool};
 
-    use crate::methods::{json::as_json, test_sql};
+    use crate::methods::{json::select_as_json, test_sql};
 
     #[sqlx::test]
     fn scalar_model(db: SqlitePool) {
@@ -316,7 +316,7 @@ mod test {
         "#;
 
         // Act
-        let expr = as_json("Person", include_tree, &meta).expect("as_json to work");
+        let expr = select_as_json("Person", include_tree, &meta).expect("as_json to work");
 
         // Assert
         let results = test_sql(
@@ -377,7 +377,7 @@ mod test {
         "#;
 
         // Act
-        let expr = as_json("Person", include_tree, &meta).expect("as_json to work");
+        let expr = select_as_json("Person", include_tree, &meta).expect("as_json to work");
 
         // Assert
         let results = test_sql(
@@ -438,7 +438,7 @@ mod test {
         "#;
 
         // Act
-        let expr = as_json("Author", include_tree, &meta).expect("as_json to work");
+        let expr = select_as_json("Author", include_tree, &meta).expect("as_json to work");
 
         // Assert
         let results = test_sql(
@@ -494,7 +494,7 @@ mod test {
         "#;
 
         // Act
-        let expr = as_json("Student", include_tree, &meta).expect("as_json to work");
+        let expr = select_as_json("Student", include_tree, &meta).expect("as_json to work");
 
         // Assert
         let results = test_sql(
@@ -580,7 +580,7 @@ mod test {
         "#;
 
         // Act
-        let expr = as_json("User", include_tree, &meta).expect("as_json to work");
+        let expr = select_as_json("User", include_tree, &meta).expect("as_json to work");
 
         // Assert
         let results = test_sql(

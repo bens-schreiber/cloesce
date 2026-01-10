@@ -10,7 +10,7 @@ use serde_json::Map;
 use serde_json::Value;
 
 use crate::ModelMeta;
-use crate::methods::json::as_json;
+use crate::methods::json::select_as_json;
 use crate::methods::{OrmErrorKind, alias};
 use crate::{IncludeTreeJson, ensure};
 
@@ -61,15 +61,16 @@ impl<'a> UpsertModel<'a> {
             generator.acc
         };
 
-        let select_json = as_json(model_name, Some(include_tree), meta)?;
+        let select_json = select_as_json(model_name, Some(include_tree), meta)?;
         let select_root_model = {
             // unwrap: root model is guaranteed to exist if we've gotten this far
             let model = meta.get(model_name).unwrap();
             let pk_col = &model.primary_key.as_ref().unwrap().name;
 
+            const RESULT_ALIAS: &str = "result";
             let mut select = Query::select();
             select
-                .expr(Expr::cust(&select_json))
+                .expr_as(Expr::cust(&select_json), alias(RESULT_ALIAS))
                 .from(alias(model_name))
                 .and_where(Expr::col(alias(pk_col)).eq(match new_model.get(pk_col) {
                     Some(value) => validate_json_to_cidl(
@@ -80,7 +81,6 @@ impl<'a> UpsertModel<'a> {
                     )?,
                     None => UpsertBuilder::value_from_ctx(&format!("{}.{}", model.name, pk_col)),
                 }));
-
             select.build(SqliteQueryBuilder)
         };
 
@@ -666,6 +666,10 @@ mod test {
 
         // Assert
         assert_eq!(res.len(), 3);
+
+        for r in &res {
+            println!("SQL: {}", r.query);
+        }
 
         let stmt1 = &res[0];
         expected_str!(

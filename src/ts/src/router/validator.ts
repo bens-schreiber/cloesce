@@ -7,7 +7,7 @@ import {
 } from "../ast";
 import { b64ToU8 } from "../ui/common";
 import { ConstructorRegistry } from "./router";
-import Either from "../either";
+import { Either } from "../common";
 
 /**
  * Runtime type validation, asserting that the structure of a value follows the

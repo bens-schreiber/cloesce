@@ -3,18 +3,17 @@ import type {
   R2Bucket,
   D1Database,
   KVNamespace,
-  D1Result,
 } from "@cloudflare/workers-types";
 
 import { DeepPartial, KValue, u8ToB64 } from "../ui/common.js";
 import { RuntimeContainer } from "../router/router.js";
 import { WasmResource, invokeOrmWasm } from "../router/wasm.js";
 import { Model as AstModel } from "../ast.js";
-import Either from "../either.js";
+import { InternalError } from "../common.js";
 import { IncludeTree } from "../ui/backend.js";
 
 export class Orm {
-  private constructor(private env: unknown) { }
+  private constructor(private env: unknown) {}
 
   /**
    * Creates an instance of an `Orm`
@@ -32,52 +31,52 @@ export class Orm {
     return (this.env as any)[ast.wrangler_env!.d1_binding!];
   }
 
-  /**
-   * Hydrates a base object into an instantiated object, including
-   * navigation properties, KV objects, and R2 objects as defined
-   * in the model AST.
-   *
-   * @param ctor The model constructor
-   * @param base The base object to hydrate
-   * @param keyParams Key parameters to assign during hydration
-   * @param includeTree Include tree to define the relationships to hydrate.
-   * @returns The hydrated model instance
-   */
   async hydrate<T extends object>(
     ctor: new () => T,
-    base: any,
-    keyParams: Record<string, string>,
-    includeTree: IncludeTree<T> | null = null,
+    args: {
+      base?: any;
+      keyParams?: Record<string, string>;
+      includeTree?: IncludeTree<T> | null;
+    } = {
+      base: {},
+      keyParams: {},
+      includeTree: null,
+    },
   ): Promise<T> {
     const { ast, constructorRegistry } = RuntimeContainer.get();
     const model = ast.models[ctor.name];
-
     if (!model) {
-      throw new Error(`Model ${ctor.name} not found in AST`);
+      return args.base ?? ({} as T);
     }
+    const env: any = this.env;
 
     const instance: T = Object.assign(
       new constructorRegistry[model.name](),
-      base,
+      args.base,
     );
     const promises: Promise<void>[] = [];
-    const env: any = this.env;
-
-    recurse(instance, model, includeTree ?? {});
+    recurse(instance, model, args.includeTree ?? {});
     await Promise.all(promises);
 
     return instance;
 
-    function resolveKey(format: string, current: any): string {
-      return format.replace(/\{([^}]+)\}/g, (_, paramName) => {
-        const paramValue = keyParams[paramName] ?? current[paramName];
-        if (!paramValue) {
-          throw new Error(
-            `Parameter ${paramName} was missing during hydration`,
-          );
-        }
-        return String(paramValue);
-      });
+    /**
+     * @returns null if any parameter could not be resolved
+     */
+    function resolveKey(
+      format: string,
+      current: any,
+      keyParams: Record<string, string>,
+    ): string | null {
+      try {
+        return format.replace(/\{([^}]+)\}/g, (_, paramName) => {
+          const paramValue = keyParams[paramName] ?? current[paramName];
+          if (!paramValue) throw null;
+          return String(paramValue);
+        });
+      } catch {
+        return null;
+      }
     }
 
     async function hydrateKVList(
@@ -142,10 +141,14 @@ export class Orm {
       }
     }
 
-    function recurse(current: any, meta: AstModel, tree: IncludeTree<any>) {
+    function recurse(
+      current: any,
+      meta: AstModel,
+      includeTree: IncludeTree<any>,
+    ) {
       // Hydrate navigation properties
       for (const navProp of meta.navigation_properties) {
-        const nestedTree = tree[navProp.var_name];
+        const nestedTree = includeTree[navProp.var_name];
         if (!nestedTree) continue;
 
         const nestedMeta = ast.models[navProp.model_reference];
@@ -171,6 +174,10 @@ export class Orm {
 
       // Hydrate columns
       for (const col of meta.columns) {
+        if (current[col.value.name] === undefined) {
+          continue;
+        }
+
         switch (col.value.cidl_type) {
           case "DateIso": {
             current[col.value.name] = new Date(current[col.value.name]);
@@ -186,22 +193,36 @@ export class Orm {
         }
       }
 
-      // Assign key params
+      if (!args.keyParams) {
+        return;
+      }
+
+      // Hydrate key params
       for (const keyParam of meta.key_params) {
-        current[keyParam] = keyParams[keyParam];
+        current[keyParam] = args.keyParams[keyParam];
       }
 
       // Hydrate KV objects
       for (const kv of meta.kv_objects) {
-        if (tree[kv.value.name] === undefined) {
+        // Include check
+        if (includeTree[kv.value.name] === undefined) {
+          if (kv.list_prefix) {
+            current[kv.value.name] = [];
+          }
+          continue;
+        }
+
+        const key = resolveKey(kv.format, current, args.keyParams);
+        if (!key) {
           if (kv.list_prefix) {
             current[kv.value.name] = [];
           }
 
+          // All key params must be resolvable.
+          // Fail silently by skipping hydration.
           continue;
         }
 
-        const key = resolveKey(kv.format, current);
         const namespace: KVNamespace = env[kv.namespace_binding];
 
         if (kv.list_prefix) {
@@ -213,15 +234,24 @@ export class Orm {
 
       // Hydrate R2 objects
       for (const r2 of meta.r2_objects) {
-        if (tree[r2.var_name] === undefined) {
+        if (includeTree[r2.var_name] === undefined) {
+          if (r2.list_prefix) {
+            current[r2.var_name] = [];
+          }
+          continue;
+        }
+
+        const key = resolveKey(r2.format, current, args.keyParams);
+        if (!key) {
           if (r2.list_prefix) {
             current[r2.var_name] = [];
           }
 
+          // All key params must be resolvable.
+          // Fail silently by skipping hydration.
           continue;
         }
 
-        const key = resolveKey(r2.format, current);
         const bucket: R2Bucket = env[r2.bucket_binding];
 
         if (r2.list_prefix) {
@@ -249,69 +279,29 @@ export class Orm {
     }
   }
 
-  /**
-   * Executes an "upsert" query, adding or augmenting a model in the database.
-   *
-   * If a model's primary key is not defined in `newModel`, the query is assumed to be an insert.
-   *
-   * If a model's primary key _is_ defined, but some attributes are missing, the query is assumed to be an update.
-   *
-   * Finally, if the primary key is defined, but all attributes are included, a SQLite upsert will be performed.
-   *
-   * In any other case, an  error will be thrown.
-   *
-   * ### Inserting a new Model
-   * ```ts
-   * const model = {name: "julio", lastname: "pumpkin"};
-   * const idRes = await orm.upsert(Person, model, null);
-   * ```
-   *
-   * ### Updating an existing model
-   * ```ts
-   * const model =  {id: 1, name: "timothy"};
-   * const idRes = await orm.upsert(Person, model, null);
-   * // (in db)=> {id: 1, name: "timothy", lastname: "pumpkin"}
-   * ```
-   *
-   * ### Upserting a model
-   * ```ts
-   * // (assume a Person already exists)
-   * const model = {
-   *  id: 1,
-   *  lastname: "burger", // updates last name
-   *  dog: {
-   *    name: "fido" // insert dog relationship
-   *  }
-   * };
-   * const idRes = await orm.upsert(Person, model, null);
-   * // (in db)=> Person: {id: 1, dogId: 1 ...}  ; Dog: {id: 1, name: "fido"}
-   * ```
-   *
-   * @param ctor A model constructor.
-   * @param newModel The new or augmented model.
-   * @param includeTree An include tree describing which foreign keys to join.
-   * @returns The primary key of the inserted model.
-   */
   async upsert<T extends object>(
     ctor: new () => T,
     newModel: DeepPartial<T>,
     includeTree: IncludeTree<T> | null = null,
-  ): Promise<Either<D1Result, any>> {
+  ): Promise<T | null> {
     const { wasm } = RuntimeContainer.get();
-    const args = [
-      WasmResource.fromString(ctor.name, wasm),
-      WasmResource.fromString(
-        JSON.stringify(newModel, (k, v) =>
-          v instanceof Uint8Array ? u8ToB64(v) : v,
+    const upsertQueryRes = invokeOrmWasm(
+      wasm.upsert_model,
+      [
+        WasmResource.fromString(ctor.name, wasm),
+        WasmResource.fromString(
+          JSON.stringify(newModel, (_, v) =>
+            // To serialize a Uint8Array s.t. WASM can read it, we convert it to a base64 string.
+            v instanceof Uint8Array ? u8ToB64(v) : v,
+          ),
+          wasm,
         ),
-        wasm,
-      ),
-      WasmResource.fromString(JSON.stringify(includeTree), wasm),
-    ];
-
-    const upsertQueryRes = invokeOrmWasm(wasm.upsert_model, args, wasm);
+        WasmResource.fromString(JSON.stringify(includeTree), wasm),
+      ],
+      wasm,
+    );
     if (upsertQueryRes.isLeft()) {
-      throw new Error(`Upsert failed internally: ${upsertQueryRes.value}`);
+      throw new InternalError(`Upsert failed: ${upsertQueryRes.value}`);
     }
 
     const statements = JSON.parse(upsertQueryRes.unwrap()) as {
@@ -319,7 +309,8 @@ export class Orm {
       values: any[];
     }[];
 
-    // One of these statements is a "SELECT", which is the root model id stmt.
+    // One of these statements (towards the end) is a "SELECT", which calls
+    // the `as_json` WASM function to get the upserted model as JSON.
     let selectIndex: number;
     for (let i = statements.length - 1; i >= 0; i--) {
       if (/^SELECT/i.test(statements[i].query)) {
@@ -335,10 +326,193 @@ export class Orm {
 
     const failed = batchRes.find((r) => !r.success);
     if (failed) {
-      return Either.left(failed);
+      // An error in the upsert should not be possible unless the AST is invalid.
+      throw new InternalError(
+        `Upsert failed during execution: ${failed.error}`,
+      );
     }
 
-    const rootModelId = batchRes[selectIndex!].results[0] as { id: any };
-    return Either.right(rootModelId.id);
+    // The result will always be aliased by "result"
+    const rootModelJson = batchRes[selectIndex!].results[0] as {
+      result: string;
+    };
+
+    // Hydrate and return the upserted model
+    return await this.hydrate(ctor, {
+      // TODO: Could be more efficient to parse once in `hydrate` instead of twice here
+      base: JSON.parse(rootModelJson.result)[0],
+      includeTree,
+    });
+  }
+
+  /**
+   * Using an include tree as the basis, generates a SQLite `json_object_array` expression
+   * that can be used to select a model and its related models as JSON, suitable for
+   * hydration back into TypeScript objects.
+   *
+   * NOTE: The JSON result will always be an array of objects.
+   *
+   * ```ts
+   * ＠Model
+   * class User {
+   * // ...
+   *  posts: Post[];
+   * }
+   *
+   * ＠Model
+   * class Post {
+   * // ...
+   *  comments: Comment[];
+   * }
+   *
+   * const includeTree = {
+   *   posts: {
+   *    comments: {},
+   * };
+   *
+   * const jsonExpr = Orm.asJson(User, includeTree);
+   * // => "json_object_array(...)"
+   *
+   * const query = `
+   * SELECT ${jsonExpr} AS result FROM User
+   * WHERE id = ?
+   * `;
+   *
+   * const userJson = await db.prepare(query).bind(1).first<{ result: string }>();
+   * // => "[User { id: 1, posts: [ Post { id: 1, comments: [ Comment { id: 1 }, ... ] }, ... ] }]"
+   * ```
+   * @param ctor Constructor of the model to generate the JSON expression for
+   * @param includeTree Include tree defining related models to include
+   * @returns A SQLite `json_object` expression as a string.
+   */
+  static asJson<T extends object>(
+    ctor: new () => T,
+    includeTree: IncludeTree<T> | null = null,
+  ): string {
+    const { wasm } = RuntimeContainer.get();
+    const asJsonRes = invokeOrmWasm(
+      wasm.as_json,
+      [
+        WasmResource.fromString(ctor.name, wasm),
+        WasmResource.fromString(JSON.stringify(includeTree), wasm),
+      ],
+      wasm,
+    );
+    if (asJsonRes.isLeft()) {
+      throw new InternalError(`as_json failed: ${asJsonRes.value}`);
+    }
+    return asJsonRes.unwrap();
+  }
+
+  async list<T extends object>(
+    ctor: new () => T,
+    includeTree: IncludeTree<T> | null = null,
+  ): Promise<T[]> {
+    const { ast } = RuntimeContainer.get();
+    const model = ast.models[ctor.name];
+    if (!model) {
+      return [];
+    }
+
+    if (model.primary_key === null) {
+      // Listing is not supported for models without primary keys (i.e., KV or R2 only).
+      return [];
+    }
+
+    const query = `
+      SELECT ${Orm.asJson(ctor, includeTree)} AS result
+      FROM ${model.name}
+    `;
+
+    const rows = await this.db.prepare(query).all();
+    if (rows.error) {
+      // An error in the query should not be possible unless the AST is invalid.
+      throw new InternalError(
+        `Failed to list models for ${ctor.name}: ${rows.error}`,
+      );
+    }
+
+    const results: Promise<T>[] = [];
+    for (const row of rows.results) {
+      // TODO: Could be more efficient to parse once in `hydrate` instead of twice here
+      const modelJson: object[] = JSON.parse(
+        (row as { result: string }).result,
+      );
+
+      results.push(
+        this.hydrate(ctor, {
+          base: modelJson[0],
+          includeTree,
+        }),
+      );
+    }
+
+    return await Promise.all(results);
+  }
+
+  /**
+   * Fetches a model by its primary key ID or key parameters.
+   * * If the model does not have a primary key, key parameters must be provided.
+   * * If the model has a primary key, the ID must be provided.
+   *
+   * @param ctor Constructor of the model to retrieve
+   * @param args Arguments for retrieval
+   * @returns The retrieved model instance, or `null` if not found
+   */
+  async get<T extends object>(
+    ctor: new () => T,
+    args: {
+      id?: any;
+      keyParams?: Record<string, string>;
+      includeTree?: IncludeTree<T> | null;
+    } = {
+      id: undefined,
+      keyParams: {},
+      includeTree: null,
+    },
+  ): Promise<T | null> {
+    const { ast } = RuntimeContainer.get();
+    const model = ast.models[ctor.name];
+    if (!model) {
+      return null;
+    }
+
+    // KV or R2 only
+    if (model.primary_key === null) {
+      return await this.hydrate(ctor, {
+        keyParams: args.keyParams,
+        includeTree: args.includeTree ?? null,
+      });
+    }
+
+    // D1 retrieval
+    const pkName = model.primary_key.name;
+    const query = `
+      SELECT ${Orm.asJson(ctor, args.includeTree ?? null)} AS result
+      FROM ${model.name}
+      WHERE ${pkName} = ?
+    `;
+
+    const row = await this.db.prepare(query).bind(args.id).run();
+
+    if (row.error) {
+      // An error in the query should not be possible unless the AST is invalid.
+      throw new InternalError(
+        `Failed to retrieve model ${ctor.name} with ${pkName}=${args.id}: ${row.error}`,
+      );
+    }
+
+    if (row.results.length < 1) {
+      return null;
+    }
+
+    // TODO: Could be more efficient to parse once in `hydrate` instead of twice here
+    const modelJson = JSON.parse((row.results[0] as { result: string }).result);
+
+    return await this.hydrate(ctor, {
+      base: modelJson[0],
+      keyParams: args.keyParams,
+      includeTree: args.includeTree ?? null,
+    });
   }
 }

@@ -1,11 +1,11 @@
 import { CloesceAst } from "../ast.js";
-import Either from "../either.js";
+import { Either } from "../common.js";
 
-// Requires the ORM binary to have been built
+// NOTE: Requires the ORM binary to have been built
 import mod from "../orm.wasm";
 
 /**
- * WASM ABI
+ * Cloesce WASM ABI
  */
 export interface OrmWasmExports {
   memory: WebAssembly.Memory;
@@ -24,34 +24,29 @@ export interface OrmWasmExports {
     include_tree_len: number,
   ): boolean;
 
-  list_models(
+  as_json(
     model_name_ptr: number,
     model_name_len: number,
     include_tree_ptr: number,
     include_tree_len: number,
-    tag_cte_ptr: number,
-    tag_cte_len: number,
-    custom_from_ptr: number,
-    custom_from_len: number,
   ): boolean;
 }
 
-/**
- * RAII for wasm memory
- */
 export class WasmResource {
   private constructor(
     private wasm: OrmWasmExports,
     public ptr: number,
     public len: number,
-  ) { }
+  ) {}
 
   free() {
     this.wasm.dealloc(this.ptr, this.len);
   }
 
   /**
-   * Copies a value from TS memory to WASM memory. A subsequent `free` is necessary.
+   * Copies a value from TS memory to WASM memory.
+   *
+   * A subsequent call to `free` is necessary.
    */
   static fromString(str: string, wasm: OrmWasmExports): WasmResource {
     const encoder = new TextEncoder();
@@ -70,8 +65,8 @@ export async function loadOrmWasm(
   // Load WASM
   const wasmInstance = (wasm ??
     (await WebAssembly.instantiate(mod))) as WebAssembly.Instance & {
-      exports: OrmWasmExports;
-    };
+    exports: OrmWasmExports;
+  };
 
   const modelMeta = WasmResource.fromString(
     JSON.stringify(ast.models),

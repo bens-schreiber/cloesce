@@ -3,6 +3,7 @@ mod methods;
 
 use ast::Model;
 
+use methods::json::select_as_json;
 use methods::upsert::UpsertModel;
 
 use serde_json::Map;
@@ -71,18 +72,20 @@ pub extern "C" fn get_return_ptr() -> *const u8 {
     unsafe { RETURN_PTR }
 }
 
-/// Creates an insert statement for the given model. Requires a previous call to [set_meta_ptr].
+/// Creates a series of insert, update and upsert statements, finally selecting the model.
+///
+/// Requires a previous call to [set_meta_ptr].
 ///
 /// Panics on any error.
 ///
 /// Returns 0 on pass 1 on fail. Stores result in [RETURN_PTR].
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn upsert_model(
-    // D1Model Name
+    // Model Name
     model_name_ptr: *const u8,
     model_name_len: usize,
 
-    // New D1Model
+    // New Model
     new_model_ptr: *const u8,
     new_model_len: usize,
 
@@ -116,6 +119,52 @@ pub unsafe extern "C" fn upsert_model(
 
     let res =
         META.with(|meta| UpsertModel::query(model_name, &meta.borrow(), new_model, include_tree));
+    match res {
+        Ok(res) => {
+            let bytes = serde_json::to_string(&res).unwrap().into_bytes();
+            yield_result(bytes);
+            0
+        }
+        Err(e) => {
+            yield_error(e);
+            1
+        }
+    }
+}
+
+/// Generates a SQL query for a models D1 columns and navigation properties with respect to an include tree,
+/// yielding a JSON array of results.
+///
+/// Requires a previous call to [set_meta_ptr].
+///
+/// Panics on any error.
+///
+/// Returns 0 on pass 1 on fail. Stores result in [RETURN_PTR].
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn as_json(
+    // Model Name
+    model_name_ptr: *const u8,
+    model_name_len: usize,
+
+    // Include Tree
+    include_tree_ptr: *const u8,
+    include_tree_len: usize,
+) -> i32 {
+    let model_name =
+        unsafe { str::from_utf8(slice::from_raw_parts(model_name_ptr, model_name_len)).unwrap() };
+    let include_tree = unsafe {
+        str::from_utf8(slice::from_raw_parts(include_tree_ptr, include_tree_len)).unwrap()
+    };
+
+    let include_tree = match serde_json::from_str::<Option<IncludeTreeJson>>(include_tree) {
+        Ok(include_tree) => include_tree,
+        Err(e) => {
+            yield_error(e);
+            return 1;
+        }
+    };
+
+    let res = META.with(|meta| select_as_json(model_name, include_tree, &meta.borrow()));
     match res {
         Ok(res) => {
             let bytes = serde_json::to_string(&res).unwrap().into_bytes();

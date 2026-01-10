@@ -43,19 +43,8 @@ async function upsert(
   const orm = Orm.fromEnv(env);
 
   // Upsert
-  const result = await orm.upsert(ctor, body, includeTree);
-  if (result.isLeft()) {
-    return HttpResult.fail(500, result.value.error);
-  }
-
-  // Get
-  const getResult = await orm.get(ctor, result.unwrap(), includeTree);
-  if (getResult.isLeft()) {
-    return HttpResult.fail(500, result.value.error);
-  }
-
-  const model: any | null = getResult.unwrap();
-  return !model ? HttpResult.fail(404) : HttpResult.ok(200, model);
+  const result: any | null = await orm.upsert(ctor, body, includeTree);
+  return !result ? HttpResult.fail(404) : HttpResult.ok(200, result);
 }
 
 async function _get(
@@ -65,16 +54,14 @@ async function _get(
   env: any,
 ): Promise<HttpResult<unknown>> {
   const includeTree = findIncludeTree(dataSource, ctor);
-
   const orm = Orm.fromEnv(env);
-  const result = await orm.get(ctor, id, includeTree);
 
-  if (result.isLeft()) {
-    return HttpResult.fail(500, result.value.error);
-  }
+  const result: any | null = await orm.get(ctor, {
+    id,
+    includeTree,
+  });
 
-  const model: any | null = result.unwrap();
-  return !model ? HttpResult.fail(404) : HttpResult.ok(200, model);
+  return !result ? HttpResult.fail(404) : HttpResult.ok(200, result);
 }
 
 async function list(
@@ -83,16 +70,10 @@ async function list(
   env: any,
 ): Promise<HttpResult<unknown>> {
   const includeTree = findIncludeTree(dataSource, ctor);
-
   const orm = Orm.fromEnv(env);
-  const result = await orm.list(ctor, { includeTree });
 
-  if (result.isLeft()) {
-    return HttpResult.fail(500, result.value.error);
-  }
-
-  const models: any[] = result.unwrap();
-  return HttpResult.ok(200, models);
+  const result: any[] = await orm.list(ctor, includeTree);
+  return HttpResult.ok(200, result);
 }
 
 function findIncludeTree(
