@@ -30,7 +30,7 @@ handlebars_helper!(get_content_type: |media: MediaType| match media {
 
 handlebars_helper!(is_blob: |cidl_type: CidlType| matches!(cidl_type.root_type(), CidlType::Blob));
 handlebars_helper!(is_one_to_one: |nav: NavigationProperty| matches!(nav.kind, NavigationPropertyKind::OneToOne {..}));
-handlebars_helper!(is_many_nav: |nav: NavigationProperty| matches!(nav.kind, NavigationPropertyKind::OneToMany {..} | NavigationPropertyKind::ManyToMany { .. }));
+handlebars_helper!(is_many_nav: |nav: NavigationProperty| matches!(nav.kind, NavigationPropertyKind::OneToMany {..} | NavigationPropertyKind::ManyToMany));
 handlebars_helper!(is_get_request: |verb: HttpVerb| matches!(verb, HttpVerb::GET));
 handlebars_helper!(is_serializable: |cidl_type: CidlType| !matches!(cidl_type.root_type(), CidlType::Inject(_)));
 handlebars_helper!(is_object: |cidl_type: CidlType| matches!(cidl_type.root_type(), CidlType::Object(_) | CidlType::Partial(_)));
@@ -113,7 +113,7 @@ fn register_helpers<'a>(
                         CidlType::Object(nav.model_reference)
                     }
                     NavigationPropertyKind::OneToMany { .. }
-                    | NavigationPropertyKind::ManyToMany { .. } => {
+                    | NavigationPropertyKind::ManyToMany => {
                         CidlType::array(CidlType::Object(nav.model_reference))
                     }
                 };

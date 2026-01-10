@@ -10,7 +10,7 @@ use serde_json::Map;
 use serde_json::Value;
 
 use crate::ModelMeta;
-use crate::methods::json::select_as_json;
+use crate::methods::select::SelectModel;
 use crate::methods::{OrmErrorKind, alias};
 use crate::{IncludeTreeJson, ensure};
 
@@ -24,8 +24,8 @@ pub struct UpsertModel<'a> {
 
 #[derive(Serialize)]
 pub struct UpsertResult {
-    query: String,
-    values: Vec<serde_json::Value>,
+    pub query: String,
+    pub values: Vec<serde_json::Value>,
 }
 
 impl<'a> UpsertModel<'a> {
@@ -61,18 +61,19 @@ impl<'a> UpsertModel<'a> {
             generator.acc
         };
 
-        let select_json = select_as_json(model_name, Some(include_tree), meta)?;
+        // Final select to return the upserted model
+        let select_query = SelectModel::query(model_name, None, Some(include_tree), meta)?
+            .trim_start_matches("SELECT ")
+            .to_string();
+
         let select_root_model = {
             // unwrap: root model is guaranteed to exist if we've gotten this far
             let model = meta.get(model_name).unwrap();
             let pk_col = &model.primary_key.as_ref().unwrap().name;
 
-            const RESULT_ALIAS: &str = "result";
             let mut select = Query::select();
-            select
-                .expr_as(Expr::cust(&select_json), alias(RESULT_ALIAS))
-                .from(alias(model_name))
-                .and_where(Expr::col(alias(pk_col)).eq(match new_model.get(pk_col) {
+            select.expr(Expr::cust(&select_query)).and_where(
+                Expr::col((alias(&model.name), alias(pk_col))).eq(match new_model.get(pk_col) {
                     Some(value) => validate_json_to_cidl(
                         value,
                         &model.primary_key.as_ref().unwrap().cidl_type,
@@ -80,7 +81,8 @@ impl<'a> UpsertModel<'a> {
                         pk_col,
                     )?,
                     None => UpsertBuilder::value_from_ctx(&format!("{}.{}", model.name, pk_col)),
-                }));
+                }),
+            );
             select.build(SqliteQueryBuilder)
         };
 
@@ -631,7 +633,7 @@ fn bytes_to_sqlite(bytes: &[u8]) -> SimpleExpr {
 
 #[cfg(test)]
 mod test {
-    use std::{collections::HashMap, str::FromStr as _};
+    use std::collections::HashMap;
 
     use ast::{CidlType, NavigationPropertyKind};
     use generator_test::{ModelBuilder, expected_str};
@@ -667,10 +669,6 @@ mod test {
         // Assert
         assert_eq!(res.len(), 3);
 
-        for r in &res {
-            println!("SQL: {}", r.query);
-        }
-
         let stmt1 = &res[0];
         expected_str!(
             stmt1.query,
@@ -686,7 +684,7 @@ mod test {
         );
 
         let stmt2 = &res[1];
-        expected_str!(stmt2.query, r#"WHERE "id" = ?"#);
+        expected_str!(stmt2.query, r#"WHERE "Horse"."id" = ?"#);
         assert_eq!(*stmt2.values, vec![Value::from(1i64)]);
 
         let stmt3 = &res[2];
@@ -701,8 +699,11 @@ mod test {
         .await
         .expect("Upsert to work");
 
-        let value = Value::from_str(results[1][0].try_get(0).unwrap()).unwrap();
-        assert_eq!(value, Value::Array(vec![new_model]));
+        let row = &results[1][0];
+        assert_eq!(row.try_get::<i64, _>("id").unwrap(), 1);
+        assert_eq!(row.try_get::<String, _>("color").unwrap(), "brown");
+        assert_eq!(row.try_get::<i64, _>("age").unwrap(), 7);
+        assert_eq!(row.try_get::<Option<String>, _>("address").unwrap(), None);
     }
 
     #[sqlx::test]
@@ -739,7 +740,7 @@ mod test {
         assert_eq!(*stmt1.values, vec![Value::from(7), Value::from(1)]);
 
         let stmt2 = &res[1];
-        expected_str!(stmt2.query, r#"WHERE "id" = ?"#);
+        expected_str!(stmt2.query, r#"WHERE "Horse"."id" = ?"#);
         assert_eq!(*stmt2.values, vec![Value::from(1i64)]);
 
         test_sql(
@@ -763,7 +764,7 @@ mod test {
         let mut meta = HashMap::new();
         meta.insert(ast_model.name.clone(), ast_model);
 
-        let mut new_model = json!({
+        let new_model = json!({
             "id": 1,
             "metadata": "meta",
             "blob": "aGVsbG8gd29ybGQ="
@@ -789,7 +790,7 @@ mod test {
         assert_eq!(*stmt1.values, vec![Value::from("meta"), Value::from(1i64),]);
 
         let stmt2 = &res[1];
-        expected_str!(stmt2.query, r#"WHERE "id" = ?"#);
+        expected_str!(stmt2.query, r#"WHERE "Picture"."id" = ?"#);
         assert_eq!(*stmt2.values, vec![Value::from(1i64)]);
 
         let results = test_sql(
@@ -800,9 +801,11 @@ mod test {
         .await
         .expect("Upsert to work");
 
-        let value = Value::from_str(results[1][0].try_get(0).unwrap()).unwrap();
-        new_model["blob"] = "68656C6C6F20776F726C64".into();
-        assert_eq!(value, Value::Array(vec![new_model]));
+        let row = &results[1][0];
+        assert_eq!(row.try_get::<i64, _>("id").unwrap(), 1);
+        assert_eq!(row.try_get::<String, _>("metadata").unwrap(), "meta");
+        let blob: Vec<u8> = row.try_get::<Vec<u8>, _>("blob").unwrap();
+        assert_eq!(blob, b"hello world");
     }
 
     #[sqlx::test]
@@ -847,7 +850,7 @@ mod test {
         assert_eq!(*stmt1.values, vec![Value::from("meta"), Value::from(1i64),]);
 
         let stmt2 = &res[1];
-        expected_str!(stmt2.query, r#"WHERE "id" = ?"#);
+        expected_str!(stmt2.query, r#"WHERE "Picture"."id" = ?"#);
         assert_eq!(*stmt2.values, vec![Value::from(1i64)]);
 
         test_sql(
@@ -913,7 +916,7 @@ mod test {
         assert_eq!(*stmt2.values, vec![1, 1]);
 
         let stmt3 = &res[2];
-        expected_str!(stmt3.query, r#"WHERE "id" = ?"#);
+        expected_str!(stmt3.query, r#"WHERE "Person"."id" = ?"#);
         assert_eq!(*stmt3.values, vec![1]);
 
         let results = test_sql(
@@ -924,8 +927,10 @@ mod test {
         .await
         .expect("Upsert to work");
 
-        let value = Value::from_str(results[2][0].try_get(0).unwrap()).unwrap();
-        assert_eq!(value, Value::Array(vec![new_model]));
+        let row = &results[2][0];
+        assert_eq!(row.try_get::<i64, _>("id").unwrap(), 1);
+        assert_eq!(row.try_get::<i64, _>("horseId").unwrap(), 1);
+        assert_eq!(row.try_get::<i64, _>("horse.id").unwrap(), 1);
     }
 
     #[sqlx::test]
@@ -1010,7 +1015,7 @@ mod test {
         assert_eq!(*stmt4.values, vec![1, 3]);
 
         let stmt5 = &res[4];
-        expected_str!(stmt5.query, r#"WHERE "id" = ?"#);
+        expected_str!(stmt5.query, r#"WHERE "Person"."id" = ?"#);
         assert_eq!(*stmt5.values, vec![1]);
 
         let results = test_sql(
@@ -1021,8 +1026,9 @@ mod test {
         .await
         .expect("Upsert to work");
 
-        let value = Value::from_str(results[4][0].try_get(0).unwrap()).unwrap();
-        assert_eq!(value, Value::Array(vec![new_model]));
+        let row = &results[4][0];
+        assert_eq!(row.try_get::<i64, _>("id").unwrap(), 1);
+        assert_eq!(row.try_get::<i64, _>("horses.id").unwrap(), 1);
     }
 
     #[sqlx::test]
@@ -1096,7 +1102,7 @@ mod test {
         assert_eq!(*stmt5.values, vec![2, 1]);
 
         let stmt6 = &res[5];
-        expected_str!(stmt6.query, r#"WHERE "id" = ?"#);
+        expected_str!(stmt6.query, r#"WHERE "Person"."id" = ?"#);
         assert_eq!(*stmt6.values, vec![1]);
 
         let results = test_sql(
@@ -1107,8 +1113,9 @@ mod test {
         .await
         .expect("Upsert to work");
 
-        let value = Value::from_str(results[5][0].try_get(0).unwrap()).unwrap();
-        assert_eq!(value, Value::Array(vec![new_model]));
+        let row = &results[5][0];
+        assert_eq!(row.try_get::<i64, _>("id").unwrap(), 1);
+        assert_eq!(row.try_get::<i64, _>("horses.id").unwrap(), 1);
     }
 
     #[sqlx::test]
@@ -1264,8 +1271,8 @@ mod test {
         .await
         .expect("Upsert to work");
 
-        let value = Value::from_str(results[2][0].try_get(0).unwrap()).unwrap();
-        assert_eq!(value, Value::Array(vec![json!({"id": 1})]));
+        let row = &results[2][0];
+        assert_eq!(row.try_get::<i64, _>("id").unwrap(), 1);
     }
 
     #[sqlx::test]
@@ -1350,11 +1357,9 @@ mod test {
         .await
         .expect("Upsert to work");
 
-        let value = Value::from_str(results[4][0].try_get(0).unwrap()).unwrap();
-        assert_eq!(
-            value,
-            Value::Array(vec![json!({"id": 1, "horseId": 1, "horse": {"id": 1}})])
-        );
+        let row = &results[4][0];
+        assert_eq!(row.try_get::<i64, _>("id").unwrap(), 1);
+        assert_eq!(row.try_get::<i64, _>("horseId").unwrap(), 1);
     }
 
     #[sqlx::test]
@@ -1444,13 +1449,10 @@ mod test {
         .await
         .expect("Upsert to work");
 
-        let value = Value::from_str(results[4][0].try_get(0).unwrap()).unwrap();
-        assert_eq!(
-            value,
-            Value::Array(vec![
-                json!({"id": 1, "horses": [ { "id": 1, "personId": 1 } ]})
-            ])
-        );
+        let row = &results[4][0];
+        assert_eq!(row.try_get::<i64, _>("id").unwrap(), 1);
+        assert_eq!(row.try_get::<i64, _>("horses.id").unwrap(), 1);
+        assert_eq!(row.try_get::<i64, _>("horses.personId").unwrap(), 1);
     }
 
     #[sqlx::test]
@@ -1555,16 +1557,8 @@ mod test {
         .await
         .expect("Upsert to work");
 
-        let value = Value::from_str(results[8][0].try_get(0).unwrap()).unwrap();
-        assert_eq!(
-            value,
-            Value::Array(vec![json!({
-                "id": 1,
-                "horses": [
-                    { "id": 1 },
-                    { "id": 2 }
-                ]
-            })])
-        );
+        let row = &results[8][0];
+        assert_eq!(row.try_get::<i64, _>("id").unwrap(), 1);
+        assert_eq!(row.try_get::<i64, _>("horses.id").unwrap(), 1);
     }
 }

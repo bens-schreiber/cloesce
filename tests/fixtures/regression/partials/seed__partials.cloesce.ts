@@ -27,8 +27,7 @@ export class Dog {
   @POST
   static async post(@Inject env: Env, dog: DeepPartial<Dog>): Promise<Dog> {
     const orm = Orm.fromEnv(env);
-    const res = await orm.upsert(Dog, dog, null);
-    return (await orm.get(Dog, res.value, null)).value;
+    return await orm.upsert(Dog, dog, null);
   }
 
   @GET

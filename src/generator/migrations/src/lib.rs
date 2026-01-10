@@ -166,10 +166,10 @@ impl MigrateTables {
             };
 
             const LEFT_NAME: &str = "left";
-            let mut left_col = typed_column(&LEFT_NAME, &left.primary_key.cidl_type, false);
+            let mut left_col = typed_column(LEFT_NAME, &left.primary_key.cidl_type, false);
 
             const RIGHT_NAME: &str = "right";
-            let mut right_col = typed_column(&RIGHT_NAME, &right.primary_key.cidl_type, false);
+            let mut right_col = typed_column(RIGHT_NAME, &right.primary_key.cidl_type, false);
 
             table
                 .table(alias(&id))

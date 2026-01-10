@@ -3,7 +3,8 @@ mod methods;
 
 use ast::Model;
 
-use methods::json::select_as_json;
+use methods::map::map_sql;
+use methods::select::SelectModel;
 use methods::upsert::UpsertModel;
 
 use serde_json::Map;
@@ -14,6 +15,7 @@ use std::str;
 
 type ModelMeta = HashMap<String, Model>;
 type IncludeTreeJson = Map<String, serde_json::Value>;
+type D1Result = Vec<Map<String, serde_json::Value>>;
 
 /// WASM memory allocation handler. A subsequent [dealloc] must be called to prevent memory leaks.
 #[unsafe(no_mangle)]
@@ -132,8 +134,7 @@ pub unsafe extern "C" fn upsert_model(
     }
 }
 
-/// Generates a SQL query for a models D1 columns and navigation properties with respect to an include tree,
-/// yielding a JSON array of results.
+/// Creates a series of joins to select a model.
 ///
 /// Requires a previous call to [set_meta_ptr].
 ///
@@ -141,10 +142,14 @@ pub unsafe extern "C" fn upsert_model(
 ///
 /// Returns 0 on pass 1 on fail. Stores result in [RETURN_PTR].
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn as_json(
+pub unsafe extern "C" fn select_model(
     // Model Name
     model_name_ptr: *const u8,
     model_name_len: usize,
+
+    // From
+    from_ptr: *const u8,
+    from_len: usize,
 
     // Include Tree
     include_tree_ptr: *const u8,
@@ -152,11 +157,13 @@ pub unsafe extern "C" fn as_json(
 ) -> i32 {
     let model_name =
         unsafe { str::from_utf8(slice::from_raw_parts(model_name_ptr, model_name_len)).unwrap() };
-    let include_tree = unsafe {
+    let from_raw = unsafe { str::from_utf8(slice::from_raw_parts(from_ptr, from_len)).unwrap() };
+    let include_tree_json = unsafe {
         str::from_utf8(slice::from_raw_parts(include_tree_ptr, include_tree_len)).unwrap()
     };
 
-    let include_tree = match serde_json::from_str::<Option<IncludeTreeJson>>(include_tree) {
+    let from = serde_json::from_str::<Option<String>>(from_raw).unwrap();
+    let include_tree = match serde_json::from_str::<Option<IncludeTreeJson>>(include_tree_json) {
         Ok(include_tree) => include_tree,
         Err(e) => {
             yield_error(e);
@@ -164,7 +171,66 @@ pub unsafe extern "C" fn as_json(
         }
     };
 
-    let res = META.with(|meta| select_as_json(model_name, include_tree, &meta.borrow()));
+    let res = META.with(|meta| SelectModel::query(model_name, from, include_tree, &meta.borrow()));
+    match res {
+        Ok(res) => {
+            let bytes = res.into_bytes();
+            yield_result(bytes);
+            0
+        }
+        Err(e) => {
+            yield_error(e);
+            1
+        }
+    }
+}
+
+/// Maps D1 results to a Cloesce model structure.
+///
+/// Requires a previous call to [set_meta_ptr].
+///
+/// Panics on any error.
+///
+/// Returns 0 on pass 1 on fail. Stores result in [RETURN_PTR].
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn map(
+    // Model name
+    model_name_ptr: *const u8,
+    model_name_len: usize,
+
+    // D1 Results
+    d1_results_ptr: *const u8,
+    d1_results_len: usize,
+
+    // Include tree
+    include_tree_ptr: *const u8,
+    include_tree_len: usize,
+) -> i32 {
+    let model_name =
+        unsafe { str::from_utf8(slice::from_raw_parts(model_name_ptr, model_name_len)).unwrap() };
+    let d1_results_raw =
+        unsafe { str::from_utf8(slice::from_raw_parts(d1_results_ptr, d1_results_len)).unwrap() };
+    let include_tree_json = unsafe {
+        str::from_utf8(slice::from_raw_parts(include_tree_ptr, include_tree_len)).unwrap()
+    };
+
+    let d1_results = match serde_json::from_str::<D1Result>(d1_results_raw) {
+        Ok(res) => res,
+        Err(e) => {
+            yield_error(e);
+            return 1;
+        }
+    };
+
+    let include_tree = match serde_json::from_str::<Option<IncludeTreeJson>>(include_tree_json) {
+        Ok(include_tree) => include_tree,
+        Err(e) => {
+            yield_error(e);
+            return 1;
+        }
+    };
+
+    let res = META.with(|meta| map_sql(model_name, d1_results, include_tree, &meta.borrow()));
     match res {
         Ok(res) => {
             let bytes = serde_json::to_string(&res).unwrap().into_bytes();

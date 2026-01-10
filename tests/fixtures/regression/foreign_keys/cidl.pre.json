@@ -266,11 +266,7 @@
                 {
                     "var_name": "courses",
                     "model_reference": "Course",
-                    "kind": {
-                        "ManyToMany": {
-                            "unique_id": "StudentsCourses"
-                        }
-                    }
+                    "kind": "ManyToMany"
                 }
             ],
             "key_params": [],
@@ -347,11 +343,7 @@
                 {
                     "var_name": "students",
                     "model_reference": "Student",
-                    "kind": {
-                        "ManyToMany": {
-                            "unique_id": "StudentsCourses"
-                        }
-                    }
+                    "kind": "ManyToMany"
                 }
             ],
             "key_params": [],

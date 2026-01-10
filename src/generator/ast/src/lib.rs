@@ -209,7 +209,7 @@ pub struct NavigationProperty {
 
 impl NavigationProperty {
     pub fn many_to_many_table_name(&self, parent_model_name: &str) -> String {
-        let mut names = vec![parent_model_name, &self.model_reference];
+        let mut names = [parent_model_name, &self.model_reference];
         names.sort();
         format!("{}{}", names[0], names[1])
     }

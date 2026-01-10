@@ -3,6 +3,7 @@ import type {
   R2Bucket,
   D1Database,
   KVNamespace,
+  D1Result,
 } from "@cloudflare/workers-types";
 
 import { DeepPartial, KValue, u8ToB64 } from "../ui/common.js";
@@ -29,6 +30,89 @@ export class Orm {
   private get db(): D1Database {
     const { ast } = RuntimeContainer.get();
     return (this.env as any)[ast.wrangler_env!.d1_binding!];
+  }
+
+  /**
+   * Maps D1 results into model instances. Capable of mapping a flat result set
+   * (ie, SELECT * FROM Model) or a joined result granted it is aliased as `select_model` would produce.
+   *
+   * Does not hydrate into an instance of the model; for that, use `hydrate` after mapping.
+   *
+   * @example
+   * ```ts
+   * const d1Result = await db.prepare("SELECT * FROM User").all();
+   * const users: User[] = Orm.map(User, d1Result.results);
+   * ```
+   *
+   * @example
+   * ```ts
+   * const d1Result = await db.prepare(`
+   *  ${Orm.select(User, null, { posts: {} })}
+   *  WHERE User.id = ?
+   * `).bind(1).all();
+   *
+   * const users: User[] = Orm.map(User, d1Result.results, { posts: {} });
+   * ```
+   *
+   * @param ctor Constructor of the model to map to
+   * @param d1Results Results from a D1 query
+   * @param includeTree Include tree specifying which navigation properties to include
+   * @returns Array of mapped model instances
+   */
+  static map<T extends object>(
+    ctor: new () => T,
+    d1Results: D1Result,
+    includeTree: IncludeTree<T> | null = null,
+  ): T[] {
+    const { wasm } = RuntimeContainer.get();
+    const d1ResultsRes = WasmResource.fromString(
+      JSON.stringify(d1Results.results),
+      wasm,
+    );
+    const includeTreeRes = WasmResource.fromString(
+      JSON.stringify(includeTree),
+      wasm,
+    );
+
+    const mapQueryRes = invokeOrmWasm(
+      wasm.map,
+      [WasmResource.fromString(ctor.name, wasm), d1ResultsRes, includeTreeRes],
+      wasm,
+    );
+
+    if (mapQueryRes.isLeft()) {
+      throw new InternalError(`Mapping failed: ${mapQueryRes.value}`);
+    }
+
+    return JSON.parse(mapQueryRes.unwrap()) as T[];
+  }
+
+  // Given a model, generates a sequence of joins to select it with its includes.
+  static select<T extends object>(
+    ctor: new () => T,
+    from: string | null = null,
+    includeTree: IncludeTree<T> | null = null,
+  ): string {
+    const { wasm } = RuntimeContainer.get();
+    const fromRes = WasmResource.fromString(JSON.stringify(from), wasm);
+    const includeTreeRes = WasmResource.fromString(
+      JSON.stringify(includeTree),
+      wasm,
+    );
+
+    const selectQueryRes = invokeOrmWasm(
+      wasm.select_model,
+      [WasmResource.fromString(ctor.name, wasm), fromRes, includeTreeRes],
+      wasm,
+    );
+
+    if (selectQueryRes.isLeft()) {
+      throw new InternalError(
+        `Select generation failed: ${selectQueryRes.value}`,
+      );
+    }
+
+    return selectQueryRes.unwrap();
   }
 
   async hydrate<T extends object>(
@@ -309,8 +393,7 @@ export class Orm {
       values: any[];
     }[];
 
-    // One of these statements (towards the end) is a "SELECT", which calls
-    // the `as_json` WASM function to get the upserted model as JSON.
+    // The SELECT statement towards the end will call `select_model` to retrieve the upserted model.
     let selectIndex: number;
     for (let i = statements.length - 1; i >= 0; i--) {
       if (/^SELECT/i.test(statements[i].query)) {
@@ -332,76 +415,13 @@ export class Orm {
       );
     }
 
-    // The result will always be aliased by "result"
-    const rootModelJson = batchRes[selectIndex!].results[0] as {
-      result: string;
-    };
+    const rootModelJson = Orm.map(ctor, batchRes[selectIndex!], includeTree)[0];
 
     // Hydrate and return the upserted model
     return await this.hydrate(ctor, {
-      // TODO: Could be more efficient to parse once in `hydrate` instead of twice here
-      base: JSON.parse(rootModelJson.result)[0],
+      base: rootModelJson,
       includeTree,
     });
-  }
-
-  /**
-   * Using an include tree as the basis, generates a SQLite `json_object_array` expression
-   * that can be used to select a model and its related models as JSON, suitable for
-   * hydration back into TypeScript objects.
-   *
-   * NOTE: The JSON result will always be an array of objects.
-   *
-   * ```ts
-   * ＠Model
-   * class User {
-   * // ...
-   *  posts: Post[];
-   * }
-   *
-   * ＠Model
-   * class Post {
-   * // ...
-   *  comments: Comment[];
-   * }
-   *
-   * const includeTree = {
-   *   posts: {
-   *    comments: {},
-   * };
-   *
-   * const jsonExpr = Orm.asJson(User, includeTree);
-   * // => "json_object_array(...)"
-   *
-   * const query = `
-   * SELECT ${jsonExpr} AS result FROM User
-   * WHERE id = ?
-   * `;
-   *
-   * const userJson = await db.prepare(query).bind(1).first<{ result: string }>();
-   * // => "[User { id: 1, posts: [ Post { id: 1, comments: [ Comment { id: 1 }, ... ] }, ... ] }]"
-   * ```
-   * @param ctor Constructor of the model to generate the JSON expression for
-   * @param includeTree Include tree defining related models to include
-   * @returns A SQLite `json_object` expression as a string.
-   */
-  static asJson<T extends object>(
-    ctor: new () => T,
-    includeTree: IncludeTree<T> | null = null,
-  ): string {
-    const { wasm } = RuntimeContainer.get();
-    const asJsonRes = invokeOrmWasm(
-      wasm.as_json,
-      [
-        WasmResource.fromString(ctor.name, wasm),
-        WasmResource.fromString(JSON.stringify(includeTree), wasm),
-      ],
-      wasm,
-    );
-    if (asJsonRes.isLeft()) {
-      throw new InternalError(`as_json failed: ${asJsonRes.value}`);
-    }
-    return asJsonRes.unwrap();
   }
 
   async list<T extends object>(
@@ -419,11 +439,7 @@ export class Orm {
       return [];
     }
 
-    const query = `
-      SELECT ${Orm.asJson(ctor, includeTree)} AS result
-      FROM ${model.name}
-    `;
-
+    const query = Orm.select(ctor, null, includeTree);
     const rows = await this.db.prepare(query).all();
     if (rows.error) {
       // An error in the query should not be possible unless the AST is invalid.
@@ -432,22 +448,18 @@ export class Orm {
       );
     }
 
-    const results: Promise<T>[] = [];
-    for (const row of rows.results) {
-      // TODO: Could be more efficient to parse once in `hydrate` instead of twice here
-      const modelJson: object[] = JSON.parse(
-        (row as { result: string }).result,
-      );
-
-      results.push(
-        this.hydrate(ctor, {
-          base: modelJson[0],
+    // Map and hydrate
+    const results = Orm.map(ctor, rows, includeTree);
+    await Promise.all(
+      results.map(async (modelJson, index) => {
+        results[index] = await this.hydrate(ctor, {
+          base: modelJson,
           includeTree,
-        }),
-      );
-    }
+        });
+      }),
+    );
 
-    return await Promise.all(results);
+    return results;
   }
 
   /**
@@ -488,29 +500,27 @@ export class Orm {
     // D1 retrieval
     const pkName = model.primary_key.name;
     const query = `
-      SELECT ${Orm.asJson(ctor, args.includeTree ?? null)} AS result
-      FROM ${model.name}
-      WHERE ${pkName} = ?
+      ${Orm.select(ctor, null, args.includeTree ?? null)}
+      WHERE  "${model.name}"."${pkName}" = ?
     `;
 
-    const row = await this.db.prepare(query).bind(args.id).run();
+    const rows = await this.db.prepare(query).bind(args.id).run();
 
-    if (row.error) {
+    if (rows.error) {
       // An error in the query should not be possible unless the AST is invalid.
       throw new InternalError(
-        `Failed to retrieve model ${ctor.name} with ${pkName}=${args.id}: ${row.error}`,
+        `Failed to retrieve model ${ctor.name} with ${pkName}=${args.id}: ${rows.error}`,
       );
     }
 
-    if (row.results.length < 1) {
+    if (rows.results.length < 1) {
       return null;
     }
 
-    // TODO: Could be more efficient to parse once in `hydrate` instead of twice here
-    const modelJson = JSON.parse((row.results[0] as { result: string }).result);
-
+    // Map and hydrate
+    const results = Orm.map(ctor, rows, args.includeTree ?? null);
     return await this.hydrate(ctor, {
-      base: modelJson[0],
+      base: results[0],
       keyParams: args.keyParams,
       includeTree: args.includeTree ?? null,
     });

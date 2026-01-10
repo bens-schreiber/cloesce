@@ -24,9 +24,20 @@ export interface OrmWasmExports {
     include_tree_len: number,
   ): boolean;
 
-  as_json(
+  select_model(
     model_name_ptr: number,
     model_name_len: number,
+    from_ptr: number,
+    from_len: number,
+    include_tree_ptr: number,
+    include_tree_len: number,
+  ): boolean;
+
+  map(
+    model_name_ptr: number,
+    model_name_len: number,
+    d1_result_ptr: number,
+    d1_result_len: number,
     include_tree_ptr: number,
     include_tree_len: number,
   ): boolean;
@@ -49,6 +60,7 @@ export class WasmResource {
    * A subsequent call to `free` is necessary.
    */
   static fromString(str: string, wasm: OrmWasmExports): WasmResource {
+    // TODO: Would be interesting to optimize this to avoid the intermediate copy
     const encoder = new TextEncoder();
     const bytes = encoder.encode(str);
     const ptr = wasm.alloc(bytes.length);

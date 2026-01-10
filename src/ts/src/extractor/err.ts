@@ -11,7 +11,6 @@ export enum ExtractorErrorCode {
   UnknownNavigationPropertyReference,
   InvalidNavigationPropertyReference,
   MissingNavigationPropertyReference,
-  MissingManyToManyUniqueId,
   TooManyWranglerEnvs,
   MissingFile,
   InvalidServiceProperty,
@@ -78,11 +77,6 @@ const errorInfoMap: Record<
     description: "Missing Navigation Property Reference",
     suggestion:
       "Navigation properties require a foreign key model attribute reference",
-  },
-  [ExtractorErrorCode.MissingManyToManyUniqueId]: {
-    description: "Missing unique id on Many to Many navigation property",
-    suggestion:
-      "Define a unique identifier field for the Many-to-Many relationship",
   },
   [ExtractorErrorCode.TooManyWranglerEnvs]: {
     description: "Too many wrangler environments defined in the project",

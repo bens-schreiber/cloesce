@@ -1,4 +1,5 @@
-pub mod json;
+pub mod map;
+pub mod select;
 pub mod upsert;
 
 pub fn alias(name: impl Into<String>) -> sea_query::Alias {

@@ -294,6 +294,14 @@ export class CloesceApp {
         const res = await m(di, httpResult);
 
         if (res) {
+          // Log any 500 errors
+          if (res.status === 500) {
+            console.error(
+              "A caught error occurred in the Cloesce Router: ",
+              res.message,
+            );
+          }
+
           return res.toResponse();
         }
       }
@@ -580,7 +588,15 @@ async function hydrate(
         keyParams: route.keyParams,
       });
 
-      return Either.right(model);
+      if (result === null) {
+        return exit(
+          404,
+          RouterError.ModelNotFound,
+          `Model instance of type ${model.name} with primary key ${route.primaryKey} not found`,
+        );
+      }
+
+      return Either.right(result);
     } catch (e) {
       return malformedQuery(JSON.stringify(e));
     }

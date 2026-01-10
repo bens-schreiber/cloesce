@@ -35,7 +35,7 @@ import {
 import { TypeFormatFlags } from "typescript";
 import { ExtractorError, ExtractorErrorCode } from "./err.js";
 import { HttpResult, KValue } from "../ui/common.js";
-import Either from "../either.js";
+import { Either } from "../common.js";
 
 enum PropertyDecoratorKind {
   PrimaryKey = "PrimaryKey",
