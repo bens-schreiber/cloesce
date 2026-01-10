@@ -5,11 +5,8 @@ export enum ExtractorErrorCode {
   MultipleGenericType,
   InvalidDataSourceDefinition,
   InvalidPartialType,
-  InvalidIncludeTree,
   InvalidPropertyModifier,
   InvalidApiMethodModifier,
-  UnknownNavigationPropertyReference,
-  InvalidNavigationPropertyReference,
   MissingNavigationPropertyReference,
   TooManyWranglerEnvs,
   MissingFile,
@@ -49,11 +46,6 @@ const errorInfoMap: Record<
     suggestion:
       "Declare your data source as `static readonly _: IncludeTree<Model>`",
   },
-  [ExtractorErrorCode.InvalidIncludeTree]: {
-    description: "Invalid Include Tree",
-    suggestion:
-      "Include trees must only contain references to a model's navigation properties.",
-  },
   [ExtractorErrorCode.InvalidPropertyModifier]: {
     description:
       "Attributes can only be public on a Model, Plain Old Object or Wrangler Environment",
@@ -63,15 +55,6 @@ const errorInfoMap: Record<
     description:
       "Model methods must be public if they are decorated as GET, POST, PUT, PATCH",
     suggestion: "Change the method modifier to just `public`",
-  },
-  [ExtractorErrorCode.UnknownNavigationPropertyReference]: {
-    description: "Unknown Navigation Property Reference",
-    suggestion:
-      "Verify that the navigation property reference model exists, or create a model.",
-  },
-  [ExtractorErrorCode.InvalidNavigationPropertyReference]: {
-    description: "Invalid Navigation Property Reference",
-    suggestion: "Ensure the navigation property points to a valid model field",
   },
   [ExtractorErrorCode.MissingNavigationPropertyReference]: {
     description: "Missing Navigation Property Reference",

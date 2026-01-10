@@ -304,35 +304,33 @@ impl<'a> UpsertModel<'a> {
         let model_pk = model.primary_key.as_ref().unwrap();
 
         // Resolve both sides of the M:M relationship
-        let pairs = [
+        let mut pairs = [
             (
+                nav.model_reference.as_str(),
                 format!("{}.{}", nav.model_reference, nav_pk.name),
                 &nav_pk.cidl_type,
                 format!("{path}.{}.{}", nav.var_name, nav_pk.name),
             ),
             (
+                model.name.as_str(),
                 format!("{}.{}", model.name, model_pk.name),
                 &model_pk.cidl_type,
                 format!("{path}.{}", model_pk.name),
             ),
         ];
+        pairs.sort_by(|a, b| a.0.cmp(b.0));
 
         // Collect column/value pairs from context
         let mut entries = Vec::new();
-        for (i, (var_name, cidl_type, path_key)) in pairs.iter().enumerate() {
+        for (i, (_, var_name, cidl_type, path_key)) in pairs.iter().enumerate() {
             let value = match self.context.get(path_key).cloned().flatten() {
                 Some(v) => validate_json_to_cidl(&v, cidl_type, unique_id, var_name)?,
                 None => UpsertBuilder::value_from_ctx(path_key),
             };
 
-            // m2m tables always have "left" and "right" columns
             let col_name = if i == 0 { "left" } else { "right" };
-
             entries.push((col_name.to_string(), value));
         }
-
-        // Sort columns to ensure deterministic SQL
-        entries.sort_by(|a, b| a.0.cmp(&b.0));
 
         // Build INSERT
         let mut insert = Query::insert();
