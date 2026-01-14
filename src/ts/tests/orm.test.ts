@@ -1,7 +1,7 @@
 import { describe, test, expect, afterEach, beforeAll, vi } from "vitest";
 import { Miniflare } from "miniflare";
 import { ModelBuilder, createAst } from "./builder";
-import { IncludeTree, KValue, Orm } from "../src/ui/backend";
+import { KValue, Orm } from "../src/ui/backend";
 import { _cloesceInternal } from "../src/router/router";
 import fs from "fs";
 import path from "path";
@@ -296,7 +296,7 @@ describe("ORM Hydrate Tests", () => {
             key: otherConfigItem.key,
             raw: otherConfigItem.value,
             metadata: null,
-          }
+          },
         ]),
       );
       expect(fullIncludeTree.configStream.value).toBeInstanceOf(ReadableStream);

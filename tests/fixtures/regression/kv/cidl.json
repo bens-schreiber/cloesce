@@ -83,24 +83,28 @@
             }
           ]
         },
-        "post": {
-          "name": "post",
+        "save": {
+          "name": "save",
           "is_static": true,
           "http_verb": "POST",
           "return_media": "Json",
-          "return_type": "Void",
+          "return_type": {
+            "HttpResult": {
+              "Object": "D1BackedModel"
+            }
+          },
           "parameters_media": "Json",
           "parameters": [
-            {
-              "name": "env",
-              "cidl_type": {
-                "Inject": "Env"
-              }
-            },
             {
               "name": "model",
               "cidl_type": {
                 "Partial": "D1BackedModel"
+              }
+            },
+            {
+              "name": "__datasource",
+              "cidl_type": {
+                "DataSource": "D1BackedModel"
               }
             }
           ]
@@ -116,7 +120,8 @@
         }
       },
       "cruds": [
-        "GET"
+        "GET",
+        "SAVE"
       ],
       "source_path": "./seed__kv.cloesce.ts"
     },
@@ -175,31 +180,29 @@
             }
           ]
         },
-        "post": {
-          "name": "post",
+        "save": {
+          "name": "save",
           "is_static": true,
           "http_verb": "POST",
           "return_media": "Json",
-          "return_type": "Void",
+          "return_type": {
+            "HttpResult": {
+              "Object": "PureKVModel"
+            }
+          },
           "parameters_media": "Json",
           "parameters": [
             {
-              "name": "env",
+              "name": "model",
               "cidl_type": {
-                "Inject": "Env"
+                "Partial": "PureKVModel"
               }
             },
             {
-              "name": "id",
-              "cidl_type": "Text"
-            },
-            {
-              "name": "data",
-              "cidl_type": "JsonValue"
-            },
-            {
-              "name": "otherData",
-              "cidl_type": "Text"
+              "name": "__datasource",
+              "cidl_type": {
+                "DataSource": "PureKVModel"
+              }
             }
           ]
         }
@@ -215,7 +218,8 @@
         }
       },
       "cruds": [
-        "GET"
+        "GET",
+        "SAVE"
       ],
       "source_path": "./seed__kv.cloesce.ts"
     }

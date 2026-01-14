@@ -27,8 +27,7 @@ export class Env {
     otherNamespace: KVNamespace;
 }
 
-// TODO: CRUD FOR KV
-@CRUD(["GET"])
+@CRUD(["GET", "SAVE"])
 @Model
 export class PureKVModel {
     @KeyParam
@@ -45,19 +44,9 @@ export class PureKVModel {
         data: {},
         otherData: {}
     };
-
-    @POST
-    static async post(@Inject env: Env, id: string, data: unknown, otherData: string) {
-        const kvKey = `path/to/data/${id}`;
-        await env.namespace.put(kvKey, JSON.stringify(data));
-
-        const otherKvKey = `path/to/other/${id}`;
-        await env.otherNamespace.put(otherKvKey, JSON.stringify(otherData));
-    }
 }
 
-// TODO: CRUD FOR KV
-@CRUD(["GET"])
+@CRUD(["GET", "SAVE"])
 @Model
 export class D1BackedModel {
     @PrimaryKey
@@ -76,16 +65,6 @@ export class D1BackedModel {
     static readonly default: IncludeTree<D1BackedModel> = {
         kvData: {}
     };
-
-    @POST
-    static async post(@Inject env: Env, model: DeepPartial<D1BackedModel>) {
-        const orm = Orm.fromEnv(env);
-        const newModel = await orm.upsert(D1BackedModel, model, {});
-
-        // upload kvData
-        const kvKey = `d1Backed/${newModel.id}/${model.keyParam}/${newModel.someColumn}/${newModel.someOtherColumn}`;
-        await env.namespace.put(kvKey, JSON.stringify(model.kvData.raw));
-    }
 }
 
 

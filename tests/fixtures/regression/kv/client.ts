@@ -37,16 +37,18 @@ export class D1BackedModel {
       false
     );
   }
-  static async post(
+  static async save(
     model: DeepPartial<D1BackedModel>,
+    __datasource: "default" |"none" = "none",
     fetchImpl: typeof fetch = fetch
-  ): Promise<HttpResult<void>> {
+  ): Promise<HttpResult<D1BackedModel>> {
     const baseUrl = new URL(
-      `http://localhost:5002/api/D1BackedModel/post`
+      `http://localhost:5002/api/D1BackedModel/save`
     );
     const payload: any = {};
 
     payload["model"] = model;
+    baseUrl.searchParams.append("__datasource", String(__datasource));
 
     const res = await fetchImpl(baseUrl, {
       method: "POST",
@@ -58,7 +60,7 @@ export class D1BackedModel {
     return await HttpResult.fromResponse(
       res,
       MediaType.Json,
-      undefined,
+      D1BackedModel,
       false
     );
   }
@@ -97,20 +99,18 @@ export class PureKVModel {
       false
     );
   }
-  static async post(
-    id: string,
-    data: unknown,
-    otherData: string,
+  static async save(
+    model: DeepPartial<PureKVModel>,
+    __datasource: "default" |"none" = "none",
     fetchImpl: typeof fetch = fetch
-  ): Promise<HttpResult<void>> {
+  ): Promise<HttpResult<PureKVModel>> {
     const baseUrl = new URL(
-      `http://localhost:5002/api/PureKVModel/post`
+      `http://localhost:5002/api/PureKVModel/save`
     );
     const payload: any = {};
 
-    payload["id"] = id;
-    payload["data"] = data;
-    payload["otherData"] = otherData;
+    payload["model"] = model;
+    baseUrl.searchParams.append("__datasource", String(__datasource));
 
     const res = await fetchImpl(baseUrl, {
       method: "POST",
@@ -122,7 +122,7 @@ export class PureKVModel {
     return await HttpResult.fromResponse(
       res,
       MediaType.Json,
-      undefined,
+      PureKVModel,
       false
     );
   }

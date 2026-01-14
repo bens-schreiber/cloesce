@@ -6,15 +6,9 @@ import {
 } from "../src/router/router";
 import { HttpVerb, MediaType, Model, NamedTypedValue } from "../src/ast";
 import { CloesceApp, HttpResult } from "../src/ui/backend";
-import { mapSqlJson } from "../src/router/wasm";
 import fs from "fs";
 import path from "path";
-import {
-  IncludeTreeBuilder,
-  ModelBuilder,
-  ServiceBuilder,
-  createAst,
-} from "./builder";
+import { ModelBuilder, ServiceBuilder, createAst } from "./builder";
 
 function createRequest(url: string, method?: string, body?: any) {
   return new Request(url, {
@@ -1071,7 +1065,7 @@ describe("Result Middleware", () => {
     const constructorRegistry = createCtorReg([Foo]);
 
     app.onResult(async (_di, _res) => {
-      return HttpResult.fail(500, "short-circuited");
+      return HttpResult.fail(500, "short-circuited (test worked correctly)");
     });
 
     app.onResult(async (_di, _res) => {
@@ -1094,6 +1088,6 @@ describe("Result Middleware", () => {
 
     // Assert
     expect(res.status).toBe(500);
-    expect(await res.text()).toBe("short-circuited");
+    expect(await res.text()).toBe("short-circuited (test worked correctly)");
   });
 });

@@ -38,7 +38,7 @@ export class RuntimeContainer {
     public readonly ast: CloesceAst,
     public readonly constructorRegistry: ConstructorRegistry,
     public readonly wasm: OrmWasmExports,
-  ) { }
+  ) {}
 
   static async init(
     ast: CloesceAst,
@@ -569,7 +569,6 @@ async function hydrate(
 
   const orm = Orm.fromEnv(env);
 
-
   // Error state: If some outside force tweaked the database schema, the query may fail.
   // Otherwise, this indicates a bug in the compiler or runtime.
   const malformedQuery = (e: any) =>
@@ -600,7 +599,6 @@ async function hydrate(
   } catch (e) {
     return malformedQuery(JSON.stringify(e));
   }
-
 }
 
 /**

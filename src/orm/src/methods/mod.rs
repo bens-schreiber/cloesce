@@ -2,6 +2,8 @@ pub mod map;
 pub mod select;
 pub mod upsert;
 
+use std::fmt::Display;
+
 pub fn alias(name: impl Into<String>) -> sea_query::Alias {
     sea_query::Alias::new(name)
 }
@@ -42,6 +44,7 @@ pub enum OrmErrorKind {
     ModelMissingD1,
     MissingPrimaryKey,
     MissingAttribute,
+    MissingKeyParameter,
     TypeMismatch,
 }
 
@@ -80,8 +83,6 @@ macro_rules! ensure {
 }
 
 pub type Result<T> = std::result::Result<T, OrmError>;
-
-use std::fmt::Display;
 
 #[cfg(test)]
 use sqlx::sqlite::SqliteRow;

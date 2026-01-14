@@ -334,7 +334,7 @@ mod tests {
             "best_rider": {}
         });
 
-        let upsert_stmts = UpsertModel::query(
+        let upsert_res = UpsertModel::query(
             "Horse",
             &meta(),
             new_model.as_object().unwrap().clone(),
@@ -344,7 +344,8 @@ mod tests {
 
         let results = test_sql(
             meta(),
-            upsert_stmts
+            upsert_res
+                .sql
                 .into_iter()
                 .map(|r| (r.query, r.values))
                 .collect(),
@@ -426,6 +427,7 @@ mod tests {
         let results = test_sql(
             meta(),
             upsert_stmts
+                .sql
                 .into_iter()
                 .map(|r| (r.query, r.values))
                 .collect(),
@@ -498,14 +500,10 @@ mod tests {
         )
         .expect("upsert to succeed");
 
-        for stmt in &upsert_stmts {
-            println!("SQL: {}", stmt.query);
-            println!("Values: {:?}", stmt.values);
-        }
-
         let results = test_sql(
             meta(),
             upsert_stmts
+                .sql
                 .into_iter()
                 .map(|r| (r.query, r.values))
                 .collect(),

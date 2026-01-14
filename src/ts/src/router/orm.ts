@@ -1,5 +1,4 @@
 import type {
-  ReadableStream,
   R2Bucket,
   D1Database,
   KVNamespace,
@@ -14,7 +13,7 @@ import { InternalError } from "../common.js";
 import { IncludeTree } from "../ui/backend.js";
 
 export class Orm {
-  private constructor(private env: unknown) { }
+  private constructor(private env: unknown) {}
 
   /**
    * Creates an instance of an `Orm`
@@ -122,10 +121,10 @@ export class Orm {
       keyParams?: Record<string, string>;
       includeTree?: IncludeTree<T> | null;
     } = {
-        base: {},
-        keyParams: {},
-        includeTree: null,
-      },
+      base: {},
+      keyParams: {},
+      includeTree: null,
+    },
   ): Promise<T> {
     const { ast, constructorRegistry } = RuntimeContainer.get();
     const model = ast.models[ctor.name];
@@ -144,25 +143,6 @@ export class Orm {
 
     return instance;
 
-    /**
-     * @returns null if any parameter could not be resolved
-     */
-    function resolveKey(
-      format: string,
-      current: any,
-      keyParams: Record<string, string>,
-    ): string | null {
-      try {
-        return format.replace(/\{([^}]+)\}/g, (_, paramName) => {
-          const paramValue = keyParams[paramName] ?? current[paramName];
-          if (!paramValue) throw null;
-          return String(paramValue);
-        });
-      } catch {
-        return null;
-      }
-    }
-
     async function hydrateKVList(
       namespace: KVNamespace,
       key: string,
@@ -175,7 +155,7 @@ export class Orm {
         current[kv.value.name] = await Promise.all(
           res.keys.map(async (k: any) => {
             const stream = await namespace.get(k.name, { type: "stream" });
-            return Object.assign(new KValue, {
+            return Object.assign(new KValue(), {
               key: k.name,
               raw: stream,
               metadata: null,
@@ -188,7 +168,7 @@ export class Orm {
             const kvRes = await namespace.getWithMetadata(k.name, {
               type: "json",
             });
-            return Object.assign(new KValue, {
+            return Object.assign(new KValue(), {
               key: k.name,
               raw: kvRes.value,
               metadata: kvRes.metadata,
@@ -206,14 +186,14 @@ export class Orm {
     ) {
       if (kv.value.cidl_type === "Stream") {
         const res = await namespace.get(key, { type: "stream" });
-        current[kv.value.name] = Object.assign(new KValue, {
+        current[kv.value.name] = Object.assign(new KValue(), {
           key,
           raw: res,
           metadata: null,
         });
       } else {
         const res = await namespace.getWithMetadata(key, { type: "json" });
-        current[kv.value.name] = Object.assign(new KValue, {
+        current[kv.value.name] = Object.assign(new KValue(), {
           key,
           raw: res.value,
           metadata: res.metadata,
@@ -365,11 +345,14 @@ export class Orm {
     includeTree: IncludeTree<T> | null = null,
   ): Promise<T | null> {
     const { wasm } = RuntimeContainer.get();
+
     const upsertQueryRes = invokeOrmWasm(
       wasm.upsert_model,
       [
         WasmResource.fromString(ctor.name, wasm),
         WasmResource.fromString(
+          // TODO: Stringify only objects in the include tree?
+          // Could try to track `this` in the reviver function
           JSON.stringify(newModel, (_, v) =>
             // To serialize a Uint8Array s.t. WASM can read it, we convert it to a base64 string.
             v instanceof Uint8Array ? u8ToB64(v) : v,
@@ -384,38 +367,114 @@ export class Orm {
       throw new InternalError(`Upsert failed: ${upsertQueryRes.value}`);
     }
 
-    const statements = JSON.parse(upsertQueryRes.unwrap()) as {
-      query: string;
-      values: any[];
-    }[];
+    const res = JSON.parse(upsertQueryRes.unwrap()) as {
+      sql: {
+        query: string;
+        values: any[];
+      }[];
+      kv_uploads: {
+        namespace_binding: string;
+        key: string;
+        value: any;
+        metadata: unknown;
+      }[];
+      kv_delayed_uploads: {
+        path: string[];
+        namespace_binding: string;
+        key: string;
+        value: any;
+        metadata: unknown;
+      }[];
+    };
 
-    // The SELECT statement towards the end will call `select_model` to retrieve the upserted model.
-    let selectIndex: number;
-    for (let i = statements.length - 1; i >= 0; i--) {
-      if (/^SELECT/i.test(statements[i].query)) {
-        selectIndex = i;
-        break;
-      }
-    }
+    const kvUploadPromises: Promise<void>[] = res.kv_uploads.map(
+      async (upload) => {
+        const namespace: KVNamespace | undefined = (this.env as any)[
+          upload.namespace_binding
+        ];
+        if (!namespace) {
+          throw new InternalError(
+            `KV Namespace binding "${upload.namespace_binding}" not found for upsert.`,
+          );
+        }
 
-    // Execute all statements in a batch.
-    const batchRes = await this.db.batch(
-      statements.map((s) => this.db.prepare(s.query).bind(...s.values)),
+        await namespace.put(upload.key, JSON.stringify(upload.value), {
+          metadata: upload.metadata,
+        });
+      },
     );
 
-    const failed = batchRes.find((r) => !r.success);
-    if (failed) {
-      // An error in the upsert should not be possible unless the AST is invalid.
-      throw new InternalError(
-        `Upsert failed during execution: ${failed.error}`,
-      );
+    const queries = res.sql.map((s) =>
+      this.db.prepare(s.query).bind(...s.values),
+    );
+
+    // Concurrently execute SQL with KV uploads.
+    const [batchRes] = await Promise.all([
+      queries.length > 0 ? this.db.batch(queries) : Promise.resolve([]),
+
+      ...kvUploadPromises,
+    ]);
+
+    let base = {};
+    if (queries.length > 0) {
+      const failed = batchRes.find((r) => !r.success);
+      if (failed) {
+        // An error in the upsert should not be possible unless the AST is invalid.
+        throw new InternalError(
+          `Upsert failed during execution: ${failed.error}`,
+        );
+      }
+
+      // A SELECT statement towards the end will call `select_model` to retrieve the upserted model.
+      let selectIndex: number;
+      for (let i = res.sql.length - 1; i >= 0; i--) {
+        if (/^SELECT/i.test(res.sql[i].query)) {
+          selectIndex = i;
+          break;
+        }
+      }
+
+      base = Orm.map(ctor, batchRes[selectIndex!], includeTree)[0];
     }
 
-    const rootModelJson = Orm.map(ctor, batchRes[selectIndex!], includeTree)[0];
+    // Upload all delayed KV uploads
+    await Promise.all(
+      res.kv_delayed_uploads.map(async (upload) => {
+        let current: any = base;
+        for (const pathPart of upload.path) {
+          current = current[pathPart];
+          if (current === undefined) {
+            throw new InternalError(
+              `Failed to resolve path ${upload.path.join(".")} for delayed KV upload.`,
+            );
+          }
+        }
+
+        const namespace: KVNamespace | undefined = (this.env as any)[
+          upload.namespace_binding
+        ];
+        if (!namespace) {
+          throw new InternalError(
+            `KV Namespace binding "${upload.namespace_binding}" not found for upsert.`,
+          );
+        }
+
+        const key = resolveKey(upload.key, current, {});
+        if (!key) {
+          throw new InternalError(
+            `Failed to resolve key format "${upload.key}" for delayed KV upload.`,
+          );
+        }
+
+        await namespace.put(key, JSON.stringify(upload.value), {
+          metadata: upload.metadata,
+        });
+      }),
+    );
 
     // Hydrate and return the upserted model
     return await this.hydrate(ctor, {
-      base: rootModelJson,
+      base: base,
       includeTree,
     });
   }
@@ -474,10 +533,10 @@ export class Orm {
       keyParams?: Record<string, string>;
       includeTree?: IncludeTree<T> | null;
     } = {
-        id: undefined,
-        keyParams: {},
-        includeTree: null,
-      },
+      id: undefined,
+      keyParams: {},
+      includeTree: null,
+    },
   ): Promise<T | null> {
     const { ast } = RuntimeContainer.get();
     const model = ast.models[ctor.name];
@@ -520,5 +579,24 @@ export class Orm {
       keyParams: args.keyParams,
       includeTree: args.includeTree ?? null,
     });
+  }
+}
+
+/**
+ * @returns null if any parameter could not be resolved
+ */
+function resolveKey(
+  format: string,
+  current: any,
+  keyParams: Record<string, string>,
+): string | null {
+  try {
+    return format.replace(/\{([^}]+)\}/g, (_, paramName) => {
+      const paramValue = keyParams[paramName] ?? current[paramName];
+      if (!paramValue) throw null;
+      return String(paramValue);
+    });
+  } catch {
+    return null;
   }
 }

@@ -57,9 +57,9 @@ async function _get(
   const model = ast.models[ctor.name];
 
   const getArgs: {
-    id?: any,
-    keyParams?: Record<string, any>,
-    includeTree?: IncludeTree<any> | null,
+    id?: any;
+    keyParams?: Record<string, any>;
+    includeTree?: IncludeTree<any> | null;
   } = {};
 
   let argIndex = 0;

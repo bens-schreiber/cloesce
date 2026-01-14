@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use ast::{CidlType, Model, NamedTypedValue, NavigationProperty, NavigationPropertyKind, fail};
 use base64::Engine;
 use base64::prelude::BASE64_STANDARD;
-use sea_query::{Alias, OnConflict, SimpleExpr, SqliteQueryBuilder, SubQueryStatement, Values};
+use sea_query::{Alias, OnConflict, SimpleExpr, SqliteQueryBuilder, SubQueryStatement};
 use sea_query::{Expr, Query};
 use serde::Serialize;
 use serde_json::Map;
@@ -16,16 +16,42 @@ use crate::{IncludeTreeJson, ensure};
 
 use super::Result;
 
-pub struct UpsertModel<'a> {
-    meta: &'a ModelMeta,
-    context: HashMap<String, Option<Value>>,
-    acc: Vec<(String, Values)>,
+#[derive(Serialize)]
+pub struct SqlStatement {
+    pub query: String,
+    pub values: Vec<serde_json::Value>,
+}
+
+#[derive(Serialize, Debug, PartialEq)]
+pub struct KvUpload {
+    pub namespace_binding: String,
+    pub key: String,
+    pub value: Value,
+    pub metadata: Value,
+}
+
+#[derive(Serialize, Debug, PartialEq)]
+pub struct DelayedKvUpload {
+    pub path: Vec<String>,
+    pub namespace_binding: String,
+    pub key: String,
+    pub value: Value,
+    pub metadata: Value,
 }
 
 #[derive(Serialize)]
 pub struct UpsertResult {
-    pub query: String,
-    pub values: Vec<serde_json::Value>,
+    pub sql: Vec<SqlStatement>,
+    kv_uploads: Vec<KvUpload>,
+    kv_delayed_uploads: Vec<DelayedKvUpload>,
+}
+
+pub struct UpsertModel<'a> {
+    meta: &'a ModelMeta,
+    context: HashMap<String, Option<Value>>,
+    sql_acc: Vec<SqlStatement>,
+    kv_upload_acc: Vec<KvUpload>,
+    kv_delayed_upload_acc: Vec<DelayedKvUpload>,
 }
 
 impl<'a> UpsertModel<'a> {
@@ -38,129 +64,159 @@ impl<'a> UpsertModel<'a> {
     ///
     /// Returns a string of SQL statements, or a descriptive error string.
     pub fn query(
-        model_name: &str,
+        model_name: &'a str,
         meta: &'a ModelMeta,
         new_model: Map<String, Value>,
         include_tree: Option<IncludeTreeJson>,
-    ) -> Result<Vec<UpsertResult>> {
+    ) -> Result<UpsertResult> {
         let include_tree = include_tree.unwrap_or_default();
-        let mut stmts = {
-            let mut generator = Self {
-                meta,
-                context: HashMap::default(),
-                acc: Vec::default(),
-            };
-            generator.dfs(
-                None,
-                model_name,
-                &new_model,
-                &include_tree,
-                model_name.to_string(),
-            )?;
 
-            generator.acc
+        let mut generator = Self {
+            meta,
+            context: HashMap::default(),
+            sql_acc: Vec::default(),
+            kv_upload_acc: Vec::default(),
+            kv_delayed_upload_acc: Vec::default(),
         };
+        generator.dfs(
+            None,
+            model_name,
+            new_model,
+            &include_tree,
+            model_name.to_string(),
+        )?;
 
-        // Final select to return the upserted model
-        let select_query = SelectModel::query(model_name, None, Some(include_tree), meta)?
-            .trim_start_matches("SELECT ")
-            .to_string();
-
-        let select_root_model = {
-            // unwrap: root model is guaranteed to exist if we've gotten this far
-            let model = meta.get(model_name).unwrap();
-            let pk_col = &model.primary_key.as_ref().unwrap().name;
+        // unwrap: root model is guaranteed to exist if we've gotten this far
+        let model = meta.get(model_name).unwrap();
+        if let Some(pk_col) = &model.primary_key {
+            // Final select to return the upserted model
+            let select_query = SelectModel::query(model_name, None, Some(include_tree), meta)?
+                .trim_start_matches("SELECT ")
+                .to_string();
 
             let mut select = Query::select();
-            select.expr(Expr::cust(&select_query)).and_where(
-                Expr::col((alias(&model.name), alias(pk_col))).eq(match new_model.get(pk_col) {
-                    Some(value) => validate_json_to_cidl(
-                        value,
-                        &model.primary_key.as_ref().unwrap().cidl_type,
-                        model_name,
-                        pk_col,
-                    )?,
-                    None => UpsertBuilder::value_from_ctx(&format!("{}.{}", model.name, pk_col)),
-                }),
-            );
-            select.build(SqliteQueryBuilder)
-        };
+            let select_root_model = select
+                .expr(Expr::cust(&select_query))
+                .and_where(
+                    Expr::col((alias(&model.name), alias(&pk_col.name))).eq(
+                        match generator
+                            .context
+                            .get(&format!("{}.{}", model.name, pk_col.name))
+                        {
+                            Some(Some(value)) => validate_json_to_cidl(
+                                value,
+                                &model.primary_key.as_ref().unwrap().cidl_type,
+                                model_name,
+                                &pk_col.name,
+                            )?,
+                            _ => SqlUpsertBuilder::value_from_ctx(&format!(
+                                "{}.{}",
+                                model.name, pk_col.name
+                            )),
+                        },
+                    ),
+                )
+                .to_owned();
 
-        stmts.push(select_root_model);
-        stmts.push((VariablesTable::delete_all(), Values(vec![])));
-
-        // Convert from SeaQuery to serde_json
-        let mut res = vec![];
-        for (stmt, values) in stmts {
-            let mut serde_values: Vec<Value> = vec![];
-            for v in values {
-                match v {
-                    sea_query::Value::Int(Some(i)) => serde_values.push(Value::from(i)),
-                    sea_query::Value::Int(None) => serde_values.push(Value::Null),
-                    sea_query::Value::BigInt(Some(i)) => serde_values.push(Value::from(i)),
-                    sea_query::Value::BigInt(None) => serde_values.push(Value::Null),
-                    sea_query::Value::String(Some(s)) => serde_values.push(Value::String(*s)),
-                    sea_query::Value::String(None) => serde_values.push(Value::Null),
-                    sea_query::Value::Float(Some(f)) => serde_values.push(Value::from(f)),
-                    sea_query::Value::Double(Some(d)) => serde_values.push(Value::from(d)),
-                    _ => unimplemented!("Value type not implemented in upsert serde conversion"),
-                }
-            }
-
-            res.push(UpsertResult {
-                query: stmt,
-                values: serde_values,
+            generator.sql_acc.push(build_sqlite(select_root_model));
+            generator.sql_acc.push(SqlStatement {
+                query: VariablesTable::delete_all(),
+                values: vec![],
             });
         }
 
-        Ok(res)
+        Ok(UpsertResult {
+            sql: generator.sql_acc,
+            kv_uploads: generator.kv_upload_acc,
+            kv_delayed_uploads: generator.kv_delayed_upload_acc,
+        })
     }
 
+    // post order traversal for sql dependencies
     fn dfs(
         &mut self,
         parent_model_name: Option<&String>,
         model_name: &str,
-        new_model: &Map<String, Value>,
+        mut new_model: Map<String, Value>,
         include_tree: &IncludeTreeJson,
         path: String,
-    ) -> Result<String> {
+    ) -> Result<()> {
         let model = match self.meta.get(model_name) {
             Some(m) => m,
             None => fail!(OrmErrorKind::UnknownModel, "{}", model_name),
         };
-        if model.primary_key.is_none() {
-            fail!(
-                OrmErrorKind::ModelMissingD1,
-                "Model '{}' is not a D1 model.",
-                model_name
-            )
+
+        // KV objects
+        for kv in &model.kv_objects {
+            // TODO: Lists?
+            let Some(Value::Object(mut kv_object)) = new_model.remove(&kv.value.name) else {
+                fail!(
+                    OrmErrorKind::TypeMismatch,
+                    "{}.{} must be an object",
+                    model.name,
+                    kv.value.name
+                )
+            };
+
+            let Some(value) = kv_object.remove("raw") else {
+                fail!(
+                    OrmErrorKind::MissingAttribute,
+                    "{}.{} missing 'raw' field",
+                    model.name,
+                    kv.value.name
+                )
+            };
+            let metadata = kv_object.remove("metadata").unwrap_or(Value::Null);
+
+            let (key, placeholders_remain) =
+                key_format_interpolation(&kv.format, &new_model, model)?;
+
+            if placeholders_remain {
+                let path_parts: Vec<String> = path.split('.').skip(1).map(String::from).collect();
+                self.kv_delayed_upload_acc.push(DelayedKvUpload {
+                    path: path_parts,
+                    namespace_binding: kv.namespace_binding.clone(),
+                    key,
+                    value,
+                    metadata,
+                })
+            } else {
+                self.kv_upload_acc.push(KvUpload {
+                    namespace_binding: kv.namespace_binding.clone(),
+                    key,
+                    value,
+                    metadata,
+                })
+            }
         }
 
-        let mut builder = UpsertBuilder::new(
+        let Some(pk_meta) = &model.primary_key else {
+            return Ok(());
+        };
+
+        let mut builder = SqlUpsertBuilder::new(
             model_name,
             model.columns.len(),
             model.primary_key.as_ref().unwrap(),
         );
 
         // Primary key
-        let pk = new_model.get(&model.primary_key.as_ref().unwrap().name);
-        match pk {
-            Some(val) => {
-                builder.push_pk(val);
-            }
+        let pk_val = match new_model.remove(&pk_meta.name) {
+            Some(val) => Some(val),
             None if matches!(
                 model.primary_key.as_ref().unwrap().cidl_type,
                 CidlType::Integer
             ) =>
             {
-                // Generated id
+                // Assume auto-generated
+                None
             }
             _ => {
                 fail!(
                     OrmErrorKind::MissingPrimaryKey,
                     "{}.{}",
                     model.name,
-                    serde_json::to_string(new_model).unwrap()
+                    serde_json::to_string(&new_model).unwrap()
                 );
             }
         };
@@ -177,7 +233,7 @@ impl<'a> UpsertModel<'a> {
             let Some(Value::Object(nested_tree)) = include_tree.get(&nav.var_name) else {
                 continue;
             };
-            let Some(Value::Object(nav_model)) = new_model.get(&nav.var_name) else {
+            let Some(Value::Object(nav_model)) = new_model.remove(&nav.var_name) else {
                 continue;
             };
             let NavigationPropertyKind::OneToOne { column_reference } = &nav.kind else {
@@ -185,16 +241,23 @@ impl<'a> UpsertModel<'a> {
             };
 
             // Recursively handle nested inserts
-            nav_ref_to_path.insert(
-                column_reference,
-                self.dfs(
-                    Some(&model.name),
-                    &nav.model_reference,
-                    nav_model,
-                    nested_tree,
-                    format!("{path}.{}", nav.var_name),
-                )?,
-            );
+            self.dfs(
+                Some(&model.name),
+                &nav.model_reference,
+                nav_model,
+                nested_tree,
+                format!("{path}.{}", nav.var_name),
+            )?;
+
+            let nav_model_pk = self
+                .meta
+                .get(&nav.model_reference)
+                .expect("nav model to exist")
+                .primary_key
+                .as_ref()
+                .expect("nav model to have a primary key");
+            let ctx_path = format!("{path}.{}.{}", nav.var_name, nav_model_pk.name);
+            nav_ref_to_path.insert(column_reference, ctx_path);
         }
 
         // Scalar attributes; attempt to retrieve FK's by value or context
@@ -214,14 +277,17 @@ impl<'a> UpsertModel<'a> {
                     .get(&attr.value.name)
                     .or(parent_id_path.as_ref());
 
-                match (new_model.get(&attr.value.name), &attr.foreign_key_reference) {
+                match (
+                    new_model.remove(&attr.value.name),
+                    &attr.foreign_key_reference,
+                ) {
                     (Some(value), _) => {
                         // A value was provided in `new_model`
                         builder.push_val(&attr.value.name, value, &attr.value.cidl_type)?;
                     }
                     (None, Some(_)) if path_key.is_some() => {
                         let path_key = path_key.unwrap();
-                        let ctx = self.context.get(path_key).unwrap();
+                        let ctx = self.context.get(path_key).expect("Context path missing");
                         builder.push_val_ctx(
                             ctx,
                             &attr.value.name,
@@ -229,7 +295,7 @@ impl<'a> UpsertModel<'a> {
                             path_key,
                         )?;
                     }
-                    (None, None) if pk.is_some() => {
+                    (None, None) if pk_val.is_some() => {
                         // PK is provided, but an attribute is missing. Assume
                         // this must be an update query.
                     }
@@ -246,8 +312,8 @@ impl<'a> UpsertModel<'a> {
             }
         }
 
-        // All dependencies haev been resolved by this point.
-        let id_path = self.upsert_table(pk, &path, model, builder)?;
+        // All sql dependencies have been resolved by this point.
+        self.upsert_table(pk_val, &path, pk_meta, builder)?;
 
         // Traverse navigation properties, using the include tree as a guide
         for nav in others {
@@ -255,24 +321,32 @@ impl<'a> UpsertModel<'a> {
                 continue;
             };
 
-            match (&nav.kind, new_model.get(&nav.var_name)) {
+            match (&nav.kind, new_model.remove(&nav.var_name)) {
                 (NavigationPropertyKind::OneToMany { .. }, Some(Value::Array(nav_models))) => {
-                    for nav_model in nav_models.iter().filter_map(|v| v.as_object()) {
+                    for nav_model in nav_models {
+                        let Value::Object(obj) = nav_model else {
+                            continue;
+                        };
+
                         self.dfs(
                             Some(&model.name),
                             &nav.model_reference,
-                            nav_model,
+                            obj,
                             nested_tree,
                             format!("{path}.{}", nav.var_name),
                         )?;
                     }
                 }
                 (NavigationPropertyKind::ManyToMany, Some(Value::Array(nav_models))) => {
-                    for nav_model in nav_models.iter().filter_map(|v| v.as_object()) {
+                    for nav_model in nav_models {
+                        let Value::Object(obj) = nav_model else {
+                            continue;
+                        };
+
                         self.dfs(
                             Some(&model.name),
                             &nav.model_reference,
-                            nav_model,
+                            obj,
                             nested_tree,
                             format!("{path}.{}", nav.var_name),
                         )?;
@@ -287,7 +361,7 @@ impl<'a> UpsertModel<'a> {
             }
         }
 
-        Ok(id_path)
+        Ok(())
     }
 
     /// Inserts a M:M junction table, consisting of the passed in models
@@ -325,7 +399,7 @@ impl<'a> UpsertModel<'a> {
         for (i, (_, var_name, cidl_type, path_key)) in pairs.iter().enumerate() {
             let value = match self.context.get(path_key).cloned().flatten() {
                 Some(v) => validate_json_to_cidl(&v, cidl_type, unique_id, var_name)?,
-                None => UpsertBuilder::value_from_ctx(path_key),
+                None => SqlUpsertBuilder::value_from_ctx(path_key),
             };
 
             let col_name = if i == 0 { "left" } else { "right" };
@@ -340,7 +414,7 @@ impl<'a> UpsertModel<'a> {
             .columns(entries.iter().map(|(col, _)| alias(col)))
             .values_panic(entries.into_iter().map(|(_, val)| val));
 
-        self.acc.push(insert.build(SqliteQueryBuilder));
+        self.sql_acc.push(build_sqlite(insert));
         Ok(())
     }
 
@@ -349,26 +423,26 @@ impl<'a> UpsertModel<'a> {
     /// Returns an error if foreign key values exist that can not be resolved.
     fn upsert_table(
         &mut self,
-        pk: Option<&Value>,
+        pk_val: Option<Value>,
         path: &str,
-        model: &Model,
-        builder: UpsertBuilder,
-    ) -> Result<String> {
-        self.acc.push(builder.build()?);
-        let id_path = format!("{path}.{}", model.primary_key.as_ref().unwrap().name);
-
+        primary_key: &NamedTypedValue,
+        builder: SqlUpsertBuilder,
+    ) -> Result<()> {
         // Add this models primary key to the context so dependents can resolve it
-        match pk {
+        let id_path = format!("{path}.{}", primary_key.name);
+        self.sql_acc.push(builder.build(&pk_val)?);
+
+        match pk_val {
             None => {
-                self.acc.push(VariablesTable::insert_rowid(&id_path));
+                self.sql_acc.push(VariablesTable::insert_rowid(&id_path));
                 self.context.insert(id_path.clone(), None);
             }
             Some(val) => {
-                self.context.insert(id_path.clone(), Some(val.clone()));
+                self.context.insert(id_path.clone(), Some(val));
             }
         }
 
-        Ok(id_path)
+        Ok(())
     }
 }
 
@@ -392,55 +466,52 @@ impl VariablesTable {
             .to_string(SqliteQueryBuilder)
     }
 
-    fn insert_rowid(path: &str) -> (String, Values) {
-        Query::insert()
-            .into_table(alias(VARIABLES_TABLE_NAME))
-            .columns(vec![alias("path"), alias("id")])
-            .values_panic(vec![
-                Expr::val(path).into(),
-                Expr::cust("last_insert_rowid()"),
-            ])
-            .replace()
-            .build(SqliteQueryBuilder)
+    fn insert_rowid(path: &str) -> SqlStatement {
+        build_sqlite(
+            Query::insert()
+                .into_table(alias(VARIABLES_TABLE_NAME))
+                .columns(vec![alias("path"), alias("id")])
+                .values_panic(vec![
+                    Expr::val(path).into(),
+                    Expr::cust("last_insert_rowid()"),
+                ])
+                .replace()
+                .to_owned(),
+        )
     }
 }
 
-struct UpsertBuilder<'a> {
+struct SqlUpsertBuilder<'a> {
     model_name: &'a str,
     scalar_len: usize,
     cols: Vec<Alias>,
     vals: Vec<SimpleExpr>,
-    pk_val: Option<&'a Value>,
     pk_ntv: &'a NamedTypedValue,
 }
 
-impl<'a> UpsertBuilder<'a> {
+impl<'a> SqlUpsertBuilder<'a> {
     fn new(
         model_name: &'a str,
         scalar_len: usize,
         pk_ntv: &'a NamedTypedValue,
-    ) -> UpsertBuilder<'a> {
+    ) -> SqlUpsertBuilder<'a> {
         Self {
             scalar_len,
             model_name,
             pk_ntv,
             cols: Vec::default(),
             vals: Vec::default(),
-            pk_val: None,
         }
-    }
-
-    /// Sets the primary key value
-    fn push_pk(&mut self, val: &'a Value) {
-        self.pk_val = Some(val);
     }
 
     /// Adds a column and value to the insert statement.
     ///
+    /// TODO: Copies the value
+    ///
     /// Returns an error if the value does not match the meta type.
-    fn push_val(&mut self, var_name: &str, value: &Value, cidl_type: &CidlType) -> Result<()> {
+    fn push_val(&mut self, var_name: &str, value: Value, cidl_type: &CidlType) -> Result<()> {
         self.cols.push(alias(var_name));
-        let val = validate_json_to_cidl(value, cidl_type, self.model_name, var_name)?;
+        let val = validate_json_to_cidl(&value, cidl_type, self.model_name, var_name)?;
         self.vals.push(val);
         Ok(())
     }
@@ -459,7 +530,7 @@ impl<'a> UpsertBuilder<'a> {
                 self.vals.push(Self::value_from_ctx(path));
             }
             Some(v) => {
-                self.push_val(var_name, v, cidl_type)?;
+                self.push_val(var_name, v.clone(), cidl_type)?;
             }
         }
         Ok(())
@@ -478,9 +549,9 @@ impl<'a> UpsertBuilder<'a> {
     }
 
     /// Creates a SQL query, being either an update, insert, or upsert.
-    fn build(self) -> Result<(String, Values)> {
-        let pk_expr = self
-            .pk_val
+    fn build(self, pk_val: &Option<Value>) -> Result<SqlStatement> {
+        let pk_expr = pk_val
+            .as_ref()
             .map(|v| {
                 validate_json_to_cidl(
                     v,
@@ -503,7 +574,7 @@ impl<'a> UpsertBuilder<'a> {
                 .values(self.cols.into_iter().zip(self.vals))
                 .and_where(Expr::col(alias(&self.pk_ntv.name)).eq(pk_expr));
 
-            return Ok(update.build(SqliteQueryBuilder));
+            return Ok(build_sqlite(update));
         }
 
         let mut insert = {
@@ -525,7 +596,7 @@ impl<'a> UpsertBuilder<'a> {
         };
 
         // Some id exists, and some column is being inserted, so this must be an upsert (either insert or update).
-        if self.pk_val.is_some() && !self.cols.is_empty() {
+        if pk_val.is_some() && !self.cols.is_empty() {
             insert.on_conflict(
                 OnConflict::column(alias(&self.pk_ntv.name))
                     .update_columns(self.cols)
@@ -533,7 +604,7 @@ impl<'a> UpsertBuilder<'a> {
             );
         }
 
-        Ok(insert.build(SqliteQueryBuilder))
+        Ok(build_sqlite(insert))
     }
 }
 
@@ -619,6 +690,66 @@ fn validate_json_to_cidl(
     }
 }
 
+/// Validates that each parameter in a key format (a string with `{placeholders}`)
+/// exists in the new model as a stringifiable value.
+///
+/// Primary keys can be missing and will be left in the key format for later resolution.
+///
+/// Returns None if any required parameter is missing, otherwise returns the formatted key
+/// and if any placeholders remain.
+fn key_format_interpolation(
+    key_format: &str,
+    new_model: &Map<String, Value>,
+    meta: &Model,
+) -> Result<(String, bool)> {
+    let mut key = key_format.to_string();
+    let mut placeholders_remain = false;
+
+    for cap in key_format.match_indices('{') {
+        let end_brace = match key_format[cap.0..].find('}') {
+            Some(idx) => cap.0 + idx,
+            None => panic!("Unclosed brace in key format: {}", key_format),
+        };
+        let param_name = &key_format[cap.0 + 1..end_brace];
+        let param_value = match new_model.get(param_name) {
+            Some(v) => v,
+            None => {
+                if let Some(pk) = &meta.primary_key
+                    && pk.name == param_name
+                {
+                    placeholders_remain = true;
+                    continue;
+                }
+
+                fail!(
+                    OrmErrorKind::MissingKeyParameter,
+                    "{}.{} requires parameter '{}'",
+                    meta.name,
+                    key_format,
+                    param_name
+                )
+            }
+        };
+
+        let replacement = match param_value {
+            Value::String(s) => s.clone(),
+            Value::Number(n) => n.to_string(),
+            Value::Bool(b) => b.to_string(),
+            _ => fail!(
+                OrmErrorKind::TypeMismatch,
+                "{}.{} parameter '{}' must be string, number, or boolean",
+                meta.name,
+                key_format,
+                param_name
+            ),
+        };
+
+        key = key.replace(&format!("{{{}}}", param_name), &replacement);
+    }
+
+    Ok((key, placeholders_remain))
+}
+
 /// Convert a byte array to a sqlite hex string suitable
 /// for [CidlType::Blob] columns
 fn bytes_to_sqlite(bytes: &[u8]) -> SimpleExpr {
@@ -627,6 +758,32 @@ fn bytes_to_sqlite(bytes: &[u8]) -> SimpleExpr {
         .map(|b| format!("{:02X}", b))
         .collect::<String>();
     SimpleExpr::Custom(format!("X'{}'", hex))
+}
+
+/// Convert a SeaQuery value to a serde_json value
+fn sea_query_to_serde(v: sea_query::Value) -> serde_json::Value {
+    match v {
+        sea_query::Value::Int(Some(i)) => Value::from(i),
+        sea_query::Value::Int(None) => Value::Null,
+        sea_query::Value::BigInt(Some(i)) => Value::from(i),
+        sea_query::Value::BigInt(None) => Value::Null,
+        sea_query::Value::String(Some(s)) => Value::String(*s),
+        sea_query::Value::String(None) => Value::Null,
+        sea_query::Value::Float(Some(f)) => Value::from(f),
+        sea_query::Value::Double(Some(d)) => Value::from(d),
+        _ => unimplemented!("Value type not implemented in upsert serde conversion"),
+    }
+}
+
+fn build_sqlite<T: sea_query::QueryStatementWriter>(qb: T) -> SqlStatement {
+    let (query, vs) = qb.build(SqliteQueryBuilder);
+    SqlStatement {
+        query,
+        values: vs
+            .into_iter()
+            .map(sea_query_to_serde)
+            .collect::<Vec<serde_json::Value>>(),
+    }
 }
 
 #[cfg(test)]
@@ -638,7 +795,68 @@ mod test {
     use serde_json::{Value, json};
     use sqlx::{Row, SqlitePool};
 
-    use crate::methods::{test_sql, upsert::UpsertModel};
+    use crate::methods::{
+        OrmErrorKind, test_sql,
+        upsert::{DelayedKvUpload, KvUpload, UpsertModel, key_format_interpolation},
+    };
+
+    #[test]
+    fn test_key_format_interpolation() {
+        // Substitutes
+        {
+            // Arrange
+            let key_format = "User/{id}/{foo}/{bar}";
+            let new_model = json!({
+                "id": 1,
+                "foo": "hello",
+                "bar": false
+            });
+
+            // Act
+            let res = key_format_interpolation(
+                key_format,
+                new_model.as_object().unwrap(),
+                &ModelBuilder::new("User").id_pk().build(),
+            );
+
+            // Assert
+            assert_eq!(res.unwrap(), ("User/1/hello/false".to_string(), false));
+        }
+
+        // Returns placeholder on missing PK
+        {
+            // Arrange
+            let model = ModelBuilder::new("User").id_pk().build();
+            let key_format = "User/{id}/";
+            let new_model = json!({});
+
+            // Act
+            let res = key_format_interpolation(key_format, new_model.as_object().unwrap(), &model);
+
+            // Assert
+            assert_eq!(res.unwrap(), (key_format.to_string(), true));
+        }
+
+        // Returns OrmError on missing required param
+        {
+            // Arrange
+            let model = ModelBuilder::new("User").id_pk().build();
+            let key_format = "User/{id}/{foo}/";
+            let new_model = json!({
+                "id": 1
+            });
+
+            // Act
+            let res = key_format_interpolation(key_format, new_model.as_object().unwrap(), &model);
+
+            // Assert
+            assert!(res.is_err());
+            assert!(matches!(
+                res.err().unwrap().kind,
+                OrmErrorKind::MissingKeyParameter
+            ));
+        }
+    }
 
     #[sqlx::test]
     async fn upsert_scalar_model(db: SqlitePool) {
@@ -662,7 +880,8 @@ mod test {
 
         // Act
         let res = UpsertModel::query("Horse", &meta, new_model.as_object().unwrap().clone(), None)
-            .unwrap();
+            .unwrap()
+            .sql;
 
         // Assert
         assert_eq!(res.len(), 3);
@@ -725,7 +944,8 @@ mod test {
 
         // Act
         let res = UpsertModel::query("Horse", &meta, new_model.as_object().unwrap().clone(), None)
-            .unwrap();
+            .unwrap()
+            .sql;
 
         // Assert
         assert_eq!(res.len(), 3);
@@ -775,7 +995,8 @@ mod test {
             new_model.as_object().unwrap().clone(),
             None,
         )
-        .unwrap();
+        .unwrap()
+        .sql;
 
         // Assert
         assert_eq!(res.len(), 3);
@@ -835,7 +1056,8 @@ mod test {
             new_model.as_object().unwrap().clone(),
             None,
         )
-        .unwrap();
+        .unwrap()
+        .sql;
 
         // Assert
         assert_eq!(res.len(), 3);
@@ -899,7 +1121,8 @@ mod test {
             new_model.as_object().unwrap().clone(),
             Some(include_tree.as_object().unwrap().clone()),
         )
-        .unwrap();
+        .unwrap()
+        .sql;
 
         // Assert
         let stmt1 = &res[0];
@@ -982,7 +1205,8 @@ mod test {
             new_model.as_object().unwrap().clone(),
             Some(include_tree.as_object().unwrap().clone()),
         )
-        .unwrap();
+        .unwrap()
+        .sql;
 
         // Assert
         assert_eq!(res.len(), 6);
@@ -1068,7 +1292,8 @@ mod test {
             new_model.as_object().unwrap().clone(),
             Some(include_tree.as_object().unwrap().clone()),
         )
-        .unwrap();
+        .unwrap()
+        .sql;
 
         // Assert
         assert_eq!(res.len(), 7);
@@ -1179,7 +1404,8 @@ mod test {
             new_model.as_object().unwrap().clone(),
             Some(include_tree.as_object().unwrap().clone()),
         )
-        .unwrap();
+        .unwrap()
+        .sql;
 
         // Assert
         assert_eq!(res.len(), 6);
@@ -1238,7 +1464,8 @@ mod test {
             new_person.as_object().unwrap().clone(),
             None,
         )
-        .unwrap();
+        .unwrap()
+        .sql;
 
         // Assert
         assert_eq!(res.len(), 4);
@@ -1310,7 +1537,8 @@ mod test {
             new_person.as_object().unwrap().clone(),
             Some(include_tree.as_object().unwrap().clone()),
         )
-        .unwrap();
+        .unwrap()
+        .sql;
 
         // Assert
         assert_eq!(res.len(), 6);
@@ -1403,10 +1631,10 @@ mod test {
             new_person.as_object().unwrap().clone(),
             Some(include_tree.as_object().unwrap().clone()),
         )
-        .unwrap();
+        .unwrap()
+        .sql;
 
         // Assert
-
         let stmt1 = &res[0];
         expected_str!(stmt1.query, r#"INSERT INTO "Person" DEFAULT VALUES"#);
         assert_eq!(stmt1.values.len(), 0);
@@ -1489,7 +1717,8 @@ mod test {
             new_person.as_object().unwrap().clone(),
             Some(include_tree.as_object().unwrap().clone()),
         )
-        .unwrap();
+        .unwrap()
+        .sql;
 
         // Assert
 
@@ -1558,5 +1787,206 @@ mod test {
         let row = &results[8][0];
         assert_eq!(row.try_get::<i64, _>("id").unwrap(), 1);
         assert_eq!(row.try_get::<i64, _>("horses.id").unwrap(), 1);
+    }
+
+    #[sqlx::test]
+    async fn kv_objects(db: SqlitePool) {
+        // Arrange
+        let person_model = ModelBuilder::new("Person")
+            .id_pk()
+            .col("name", CidlType::Text, None)
+            .col("horseId", CidlType::Integer, Some("Horse".into()))
+            .nav_p(
+                "horse",
+                "Horse",
+                NavigationPropertyKind::OneToOne {
+                    column_reference: "horseId".to_string(),
+                },
+            )
+            // requires primary key to be set
+            .kv_object(
+                "person/{id}/profile",
+                "PERSON_KV",
+                "profile",
+                false,
+                CidlType::Text,
+            )
+            .build();
+
+        let horse_model = ModelBuilder::new("Horse")
+            .id_pk()
+            .nav_p(
+                "awards",
+                "Award",
+                NavigationPropertyKind::OneToMany {
+                    column_reference: "horseId".to_string(),
+                },
+            )
+            // requires primary key to be set
+            .kv_object(
+                "horse/{id}/stats",
+                "HORSE_KV",
+                "stats",
+                false,
+                CidlType::Text,
+            )
+            .build();
+
+        let award_model = ModelBuilder::new("Award")
+            .id_pk()
+            .col("horseId", CidlType::Integer, Some("Horse".into()))
+            .col("title", CidlType::Text, None)
+            // requires primary key to be set
+            .kv_object(
+                "award/{id}/certificate",
+                "AWARD_KV",
+                "certificate",
+                false,
+                CidlType::Text,
+            )
+            .build();
+
+        let mut meta = HashMap::new();
+        meta.insert(person_model.name.clone(), person_model);
+        meta.insert(horse_model.name.clone(), horse_model);
+        meta.insert(award_model.name.clone(), award_model);
+
+        let new_model = json!({
+            "id": 100,
+            "name": "Alice",
+            "profile": {
+                "raw": {"bio": "Horse trainer"},
+                "metadata": {"version": 1}
+            },
+            "horse": {
+                // id is not set
+
+                "stats": {
+                    "raw": {"wins": 10, "losses": 2},
+                    "metadata": null
+                },
+                "awards": [
+                    {
+                        "id": 500,
+                        "title": "Best in Show",
+                        "certificate": {
+                            "raw": {"issuer": "Racing Association"},
+                            "metadata": {"year": 2024}
+                        }
+                    },
+                    {
+                        "id": 501,
+                        "title": "Speed Champion",
+                        "certificate": {
+                            "raw": {"issuer": "Speed League"},
+                            "metadata": {"year": 2024}
+                        }
+                    }
+                ]
+            }
+        });
+
+        let include_tree = json!({
+            "horse": {
+                "awards": {}
+            }
+        });
+
+        // Act
+        let result = UpsertModel::query(
+            "Person",
+            &meta,
+            new_model.as_object().unwrap().clone(),
+            Some(include_tree.as_object().unwrap().clone()),
+        )
+        .unwrap();
+
+        // Assert
+        assert_eq!(
+            result.kv_uploads,
+            vec![
+                KvUpload {
+                    namespace_binding: "PERSON_KV".to_string(),
+                    key: "person/100/profile".to_string(),
+                    value: json!({"bio": "Horse trainer"}),
+                    metadata: json!({"version": 1}),
+                },
+                KvUpload {
+                    namespace_binding: "AWARD_KV".to_string(),
+                    key: "award/500/certificate".to_string(),
+                    value: json!({"issuer": "Racing Association"}),
+                    metadata: json!({"year": 2024}),
+                },
+                KvUpload {
+                    namespace_binding: "AWARD_KV".to_string(),
+                    key: "award/501/certificate".to_string(),
+                    value: json!({"issuer": "Speed League"}),
+                    metadata: json!({"year": 2024}),
+                },
+            ]
+        );
+
+        assert_eq!(
+            result.kv_delayed_uploads,
+            vec![DelayedKvUpload {
+                path: vec!["horse".to_string()],
+                namespace_binding: "HORSE_KV".to_string(),
+                key: "horse/{id}/stats".to_string(),
+                value: json!({"wins": 10, "losses": 2}),
+                metadata: Value::Null,
+            }]
+        );
+
+        test_sql(
+            meta,
+            result
+                .sql
+                .into_iter()
+                .map(|r| (r.query, r.values))
+                .collect(),
+            db,
+        )
+        .await
+        .expect("Upsert to work");
+    }
+
+    #[test]
+    fn pure_kv_object() {
+        // Arrange
+        // (an object that has only KV properties, no table columns or pk)
+        let model = ModelBuilder::new("Config")
+            .key_param("key")
+            .kv_object("config/{key}", "CONFIG_KV", "data", false, CidlType::Text)
+            .build();
+
+        let mut meta = HashMap::new();
+        meta.insert(model.name.clone(), model);
+        let new_model = json!({
+            "key": "site-settings",
+            "data": {
+                "raw": {"theme": "dark", "itemsPerPage": 20},
+                "metadata": {"version": 3}
+            }
+        });
+
+        // Act
+        let result = UpsertModel::query(
+            "Config",
+            &meta,
+            new_model.as_object().unwrap().clone(),
+            None,
+        )
+        .unwrap();
+
+        // Assert
+        assert_eq!(
+            result.kv_uploads,
+            vec![KvUpload {
+                namespace_binding: "CONFIG_KV".to_string(),
+                key: "config/site-settings".to_string(),
+                value: json!({"theme": "dark", "itemsPerPage": 20}),
+                metadata: json!({"version": 3}),
+            },]
+        );
     }
 }

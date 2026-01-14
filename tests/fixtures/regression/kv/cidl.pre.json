@@ -41,36 +41,7 @@
                 }
             ],
             "r2_objects": [],
-            "methods": {
-                "post": {
-                    "name": "post",
-                    "http_verb": "POST",
-                    "is_static": true,
-                    "return_media": "Json",
-                    "return_type": "Void",
-                    "parameters_media": "Json",
-                    "parameters": [
-                        {
-                            "name": "env",
-                            "cidl_type": {
-                                "Inject": "Env"
-                            }
-                        },
-                        {
-                            "name": "id",
-                            "cidl_type": "Text"
-                        },
-                        {
-                            "name": "data",
-                            "cidl_type": "JsonValue"
-                        },
-                        {
-                            "name": "otherData",
-                            "cidl_type": "Text"
-                        }
-                    ]
-                }
-            },
+            "methods": {},
             "data_sources": {
                 "default": {
                     "name": "default",
@@ -81,7 +52,8 @@
                 }
             },
             "cruds": [
-                "GET"
+                "GET",
+                "SAVE"
             ],
             "source_path": "./seed__kv.cloesce.ts"
         },
@@ -123,30 +95,7 @@
                 }
             ],
             "r2_objects": [],
-            "methods": {
-                "post": {
-                    "name": "post",
-                    "http_verb": "POST",
-                    "is_static": true,
-                    "return_media": "Json",
-                    "return_type": "Void",
-                    "parameters_media": "Json",
-                    "parameters": [
-                        {
-                            "name": "env",
-                            "cidl_type": {
-                                "Inject": "Env"
-                            }
-                        },
-                        {
-                            "name": "model",
-                            "cidl_type": {
-                                "Partial": "D1BackedModel"
-                            }
-                        }
-                    ]
-                }
-            },
+            "methods": {},
             "data_sources": {
                 "default": {
                     "name": "default",
@@ -156,7 +105,8 @@
                 }
             },
             "cruds": [
-                "GET"
+                "GET",
+                "SAVE"
             ],
             "source_path": "./seed__kv.cloesce.ts"
         }
