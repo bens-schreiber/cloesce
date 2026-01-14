@@ -11,7 +11,7 @@ import {
   MediaType,
 } from "../ast.js";
 import { RuntimeValidator } from "./validator.js";
-import Either from "../either.js";
+import { Either, InternalError } from "../common.js";
 import { Orm } from "../ui/backend.js";
 
 /**
@@ -144,11 +144,13 @@ export class CloesceApp {
    * @param m - The middleware function to register.
    */
   public onNamespace<T>(ctor: new () => T, m: MiddlewareFn) {
-    if (this.namespaceMiddleware.has(ctor.name)) {
-      this.namespaceMiddleware.get(ctor.name)!.push(m);
-    } else {
-      this.namespaceMiddleware.set(ctor.name, [m]);
+    const existing = this.namespaceMiddleware.get(ctor.name);
+    if (existing) {
+      existing.push(m);
+      return;
     }
+
+    this.namespaceMiddleware.set(ctor.name, [m]);
   }
 
   private methodMiddleware: Map<string, Map<string, MiddlewareFn[]>> =
@@ -171,16 +173,19 @@ export class CloesceApp {
     method: KeysOfType<T, (...args: any) => any>,
     m: MiddlewareFn,
   ) {
-    if (!this.methodMiddleware.has(ctor.name)) {
-      this.methodMiddleware.set(ctor.name, new Map());
+    let classMap = this.methodMiddleware.get(ctor.name);
+    if (!classMap) {
+      classMap = new Map();
+      this.methodMiddleware.set(ctor.name, classMap);
     }
 
-    const methods = this.methodMiddleware.get(ctor.name)!;
-    if (!methods.has(method)) {
-      methods.set(method, []);
+    let methodArray = classMap.get(method);
+    if (!methodArray) {
+      methodArray = [];
+      classMap.set(method, methodArray);
     }
 
-    methods.get(method)!.push(m);
+    methodArray.push(m);
   }
 
   private async router(
@@ -231,87 +236,14 @@ export class CloesceApp {
     }
 
     // Hydration
-    const hydrated = await (async () => {
-      switch (route.kind) {
-        case "service": {
-          if (route.method.is_static) {
-            return Either.right(ctorReg[route.namespace]);
-          }
+    const hydrated = await hydrate(di, ctorReg, route, dataSource, env);
 
-          return Either.right(di.get(route.namespace));
-        }
-        case "model": {
-          const model = route.model!;
-          const modelCtor = ctorReg[model.name];
-
-          // Static methods operate on the class itself, no hydration needed
-          if (route.method.is_static) {
-            return Either.right(proxyCrud(modelCtor, modelCtor, env));
-          }
-
-          const includeTree: IncludeTree<any> | null =
-            dataSource === NO_DATA_SOURCE
-              ? null
-              : (ctorReg[model.name] as any)[dataSource!];
-
-          const orm = Orm.fromEnv(env);
-
-          // D1
-          if (model.primary_key !== null) {
-            // Error state: If some outside force tweaked the database schema, the query may fail.
-            // Otherwise, this indicates a bug in the compiler or runtime.
-            const malformedQuery = (e: any) =>
-              exit(
-                500,
-                RouterError.InvalidDatabaseQuery,
-                `Error in hydration query, is the database out of sync with the backend?: ${e instanceof Error ? e.message : String(e)}`,
-              );
-
-            // Query DB
-            try {
-              const result = await orm.get(
-                modelCtor,
-                route.primaryKey!,
-                includeTree,
-              );
-
-              // Error state: If the query itself failed, return a 500
-              if (result.isLeft()) {
-                return malformedQuery(result.value.error);
-              }
-
-              const model: any | null = result.unwrap();
-
-              // Error state: If no record is found for the id, return a 404
-              if (!model) {
-                return exit(404, RouterError.ModelNotFound, "Record not found");
-              }
-
-              return Either.right(model);
-            } catch (e) {
-              return malformedQuery(e);
-            }
-          }
-
-          // KV + R2
-          return Either.right(
-            await orm.hydrate(
-              ctorReg[route.model!.name],
-              {}, // empty base, no D1
-              route.keyParams,
-              includeTree,
-            ),
-          );
-        }
-      }
-    })();
-
-    if (hydrated!.isLeft()) {
+    if (hydrated.isLeft()) {
       return hydrated.value;
     }
 
     // Method dispatch
-    return await methodDispatch(hydrated!.unwrap(), di, route, params);
+    return await methodDispatch(hydrated.unwrap(), di, route, params);
   }
 
   /**
@@ -362,6 +294,14 @@ export class CloesceApp {
         const res = await m(di, httpResult);
 
         if (res) {
+          // Log any 500 errors
+          if (res.status === 500) {
+            console.error(
+              "A caught error occurred in the Cloesce Router: ",
+              res.message,
+            );
+          }
+
           return res.toResponse();
         }
       }
@@ -550,7 +490,7 @@ async function validateRequest(
           break;
         }
         default: {
-          throw new Error("not implemented");
+          throw new InternalError("not implemented");
         }
       }
     } catch {
@@ -593,6 +533,72 @@ async function validateRequest(
   }
 
   return Either.right({ params, dataSource: dataSource ?? null });
+}
+
+/**
+ * Hydrates a model or service instance for method dispatch.
+ * @returns 500 or the hydrated instance
+ */
+async function hydrate(
+  di: DependencyContainer,
+  ctorReg: ConstructorRegistry,
+  route: MatchedRoute,
+  dataSource: string | null,
+  env: any,
+): Promise<Either<HttpResult, any>> {
+  if (route.kind === "service") {
+    if (route.method.is_static) {
+      return Either.right(ctorReg[route.namespace]);
+    }
+
+    return Either.right(di.get(route.namespace));
+  }
+
+  const model = route.model!;
+  const modelCtor = ctorReg[model.name];
+
+  // Static methods operate on the class itself, no hydration needed
+  if (route.method.is_static) {
+    return Either.right(proxyCrud(modelCtor, modelCtor, env));
+  }
+
+  const includeTree: IncludeTree<any> | null =
+    dataSource === NO_DATA_SOURCE
+      ? null
+      : (ctorReg[model.name] as any)[dataSource!];
+
+  const orm = Orm.fromEnv(env);
+
+  // Error state: If some outside force tweaked the database schema, the query may fail.
+  // Otherwise, this indicates a bug in the compiler or runtime.
+  const malformedQuery = (e: any) =>
+    exit(
+      500,
+      RouterError.InvalidDatabaseQuery,
+      `Error in hydration query, is the database out of sync with the backend?: ${e instanceof Error ? e.message : String(e)}`,
+    );
+
+  try {
+    const result = await orm.get(modelCtor, {
+      id: route.primaryKey,
+      includeTree,
+      keyParams: route.keyParams,
+    });
+
+    // Result will only be null if the instance does not exist
+    // for a D1 query.
+    if (result === null) {
+      return exit(
+        404,
+        RouterError.ModelNotFound,
+        `Model instance of type ${model.name} with primary key ${route.primaryKey} not found`,
+      );
+    }
+
+    return Either.right(result);
+  } catch (e) {
+    return malformedQuery(JSON.stringify(e));
+  }
 }
 
 /**

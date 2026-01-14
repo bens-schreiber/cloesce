@@ -3,6 +3,8 @@ mod methods;
 
 use ast::Model;
 
+use methods::map::map_sql;
+use methods::select::SelectModel;
 use methods::upsert::UpsertModel;
 
 use serde_json::Map;
@@ -11,9 +13,9 @@ use std::collections::HashMap;
 use std::slice;
 use std::str;
 
-type D1Result = Vec<Map<String, serde_json::Value>>;
 type ModelMeta = HashMap<String, Model>;
 type IncludeTreeJson = Map<String, serde_json::Value>;
+type D1Result = Vec<Map<String, serde_json::Value>>;
 
 /// WASM memory allocation handler. A subsequent [dealloc] must be called to prevent memory leaks.
 #[unsafe(no_mangle)]
@@ -72,76 +74,20 @@ pub extern "C" fn get_return_ptr() -> *const u8 {
     unsafe { RETURN_PTR }
 }
 
-/// Maps ORM friendly SQL rows to a [D1Model]. Requires a previous call to [set_meta_ptr].
+/// Creates a series of insert, update and upsert statements, finally selecting the model.
 ///
-/// Panics on any error.
-///
-/// Returns 0 on pass 1 on fail. Stores result in [RETURN_PTR]
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn map_sql(
-    // D1Model Name
-    model_name_ptr: *const u8,
-    model_name_len: usize,
-
-    // SQL result rows
-    rows_ptr: *const u8,
-    rows_len: usize,
-
-    // Include Tree
-    include_tree_ptr: *const u8,
-    include_tree_len: usize,
-) -> i32 {
-    let model_name =
-        unsafe { str::from_utf8(slice::from_raw_parts(model_name_ptr, model_name_len)).unwrap() };
-    let rows_json = unsafe { str::from_utf8(slice::from_raw_parts(rows_ptr, rows_len)).unwrap() };
-    let include_tree_json = unsafe {
-        str::from_utf8(slice::from_raw_parts(include_tree_ptr, include_tree_len)).unwrap()
-    };
-
-    let rows = match serde_json::from_str::<D1Result>(rows_json) {
-        Ok(rows) => rows,
-        Err(e) => {
-            yield_error(e);
-            return 1;
-        }
-    };
-
-    let include_tree = match serde_json::from_str::<Option<IncludeTreeJson>>(include_tree_json) {
-        Ok(include_tree) => include_tree,
-        Err(e) => {
-            yield_error(e);
-            return 1;
-        }
-    };
-
-    let res = META.with(|meta| {
-        methods::map::map_sql(model_name, &meta.borrow(), &rows, include_tree.as_ref())
-    });
-    match res {
-        Ok(res) => {
-            let json_str = serde_json::to_string(&res).unwrap();
-            yield_result(json_str.into_bytes());
-            0
-        }
-        Err(e) => {
-            yield_error(e);
-            1
-        }
-    }
-}
-
-/// Creates an insert statement for the given model. Requires a previous call to [set_meta_ptr].
+/// Requires a previous call to [set_meta_ptr].
 ///
 /// Panics on any error.
 ///
 /// Returns 0 on pass 1 on fail. Stores result in [RETURN_PTR].
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn upsert_model(
-    // D1Model Name
+    // Model Name
     model_name_ptr: *const u8,
     model_name_len: usize,
 
-    // New D1Model
+    // New Model
     new_model_ptr: *const u8,
     new_model_len: usize,
 
@@ -173,9 +119,8 @@ pub unsafe extern "C" fn upsert_model(
         }
     };
 
-    let res = META.with(|meta| {
-        UpsertModel::query(model_name, &meta.borrow(), new_model, include_tree.as_ref())
-    });
+    let res =
+        META.with(|meta| UpsertModel::query(model_name, &meta.borrow(), new_model, include_tree));
     match res {
         Ok(res) => {
             let bytes = serde_json::to_string(&res).unwrap().into_bytes();
@@ -189,45 +134,88 @@ pub unsafe extern "C" fn upsert_model(
     }
 }
 
+/// Creates a series of joins to select a model.
+///
+/// Requires a previous call to [set_meta_ptr].
+///
+/// Panics on any error.
+///
+/// Returns 0 on pass 1 on fail. Stores result in [RETURN_PTR].
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn list_models(
-    // D1Model Name
+pub unsafe extern "C" fn select_model(
+    // Model Name
     model_name_ptr: *const u8,
     model_name_len: usize,
 
-    //  Include Tree
+    // From
+    from_ptr: *const u8,
+    from_len: usize,
+
+    // Include Tree
     include_tree_ptr: *const u8,
     include_tree_len: usize,
-
-    // Tag CTE
-    tag_cte_ptr: *const u8,
-    tag_cte_len: usize,
-
-    // Custom From Clause
-    custom_from_ptr: *const u8,
-    custom_from_len: usize,
 ) -> i32 {
     let model_name =
         unsafe { str::from_utf8(slice::from_raw_parts(model_name_ptr, model_name_len)).unwrap() };
+    let from_raw = unsafe { str::from_utf8(slice::from_raw_parts(from_ptr, from_len)).unwrap() };
     let include_tree_json = unsafe {
         str::from_utf8(slice::from_raw_parts(include_tree_ptr, include_tree_len)).unwrap()
     };
-    let tag_cte_raw =
-        unsafe { str::from_utf8(slice::from_raw_parts(tag_cte_ptr, tag_cte_len)).unwrap() };
 
-    let custom_from_raw =
-        unsafe { str::from_utf8(slice::from_raw_parts(custom_from_ptr, custom_from_len)).unwrap() };
-
-    let tag_cte = match serde_json::from_str::<Option<String>>(tag_cte_raw) {
-        Ok(tc) => tc,
+    let from = serde_json::from_str::<Option<String>>(from_raw).unwrap();
+    let include_tree = match serde_json::from_str::<Option<IncludeTreeJson>>(include_tree_json) {
+        Ok(include_tree) => include_tree,
         Err(e) => {
             yield_error(e);
             return 1;
         }
     };
 
-    let custom_from = match serde_json::from_str::<Option<String>>(custom_from_raw) {
-        Ok(cf) => cf,
+    let res = META.with(|meta| SelectModel::query(model_name, from, include_tree, &meta.borrow()));
+    match res {
+        Ok(res) => {
+            let bytes = res.into_bytes();
+            yield_result(bytes);
+            0
+        }
+        Err(e) => {
+            yield_error(e);
+            1
+        }
+    }
+}
+
+/// Maps D1 results to a Cloesce model structure.
+///
+/// Requires a previous call to [set_meta_ptr].
+///
+/// Panics on any error.
+///
+/// Returns 0 on pass 1 on fail. Stores result in [RETURN_PTR].
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn map(
+    // Model name
+    model_name_ptr: *const u8,
+    model_name_len: usize,
+
+    // D1 Results
+    d1_results_ptr: *const u8,
+    d1_results_len: usize,
+
+    // Include tree
+    include_tree_ptr: *const u8,
+    include_tree_len: usize,
+) -> i32 {
+    let model_name =
+        unsafe { str::from_utf8(slice::from_raw_parts(model_name_ptr, model_name_len)).unwrap() };
+    let d1_results_raw =
+        unsafe { str::from_utf8(slice::from_raw_parts(d1_results_ptr, d1_results_len)).unwrap() };
+    let include_tree_json = unsafe {
+        str::from_utf8(slice::from_raw_parts(include_tree_ptr, include_tree_len)).unwrap()
+    };
+
+    let d1_results = match serde_json::from_str::<D1Result>(d1_results_raw) {
+        Ok(res) => res,
         Err(e) => {
             yield_error(e);
             return 1;
@@ -242,18 +230,11 @@ pub unsafe extern "C" fn list_models(
         }
     };
 
-    let res = META.with(|meta| {
-        methods::list::list_models(
-            model_name,
-            include_tree.as_ref(),
-            custom_from,
-            tag_cte,
-            &meta.borrow(),
-        )
-    });
+    let res = META.with(|meta| map_sql(model_name, d1_results, include_tree, &meta.borrow()));
     match res {
         Ok(res) => {
-            yield_result(res.into_bytes());
+            let bytes = serde_json::to_string(&res).unwrap().into_bytes();
+            yield_result(bytes);
             0
         }
         Err(e) => {

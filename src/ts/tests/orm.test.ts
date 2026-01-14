@@ -1,7 +1,7 @@
 import { describe, test, expect, afterEach, beforeAll, vi } from "vitest";
 import { Miniflare } from "miniflare";
 import { ModelBuilder, createAst } from "./builder";
-import { IncludeTree, KValue, Orm } from "../src/ui/backend";
+import { KValue, Orm } from "../src/ui/backend";
 import { _cloesceInternal } from "../src/router/router";
 import fs from "fs";
 import path from "path";
@@ -86,7 +86,9 @@ describe("ORM Hydrate Tests", () => {
 
     {
       // Act
-      const noIncludeTree = await instance.hydrate(TestModel, base, {});
+      const noIncludeTree = await instance.hydrate(TestModel, {
+        base,
+      });
 
       // Assert
       expect(noIncludeTree).toBeInstanceOf(TestModel);
@@ -95,9 +97,12 @@ describe("ORM Hydrate Tests", () => {
 
     {
       // Act
-      const depth1IncludeTree = await instance.hydrate(TestModel, base, {}, {
-        depth1: {},
-      } satisfies IncludeTree<TestModel>);
+      const depth1IncludeTree = await instance.hydrate(TestModel, {
+        base,
+        includeTree: {
+          depth1: {},
+        },
+      });
 
       // Assert
       expect(depth1IncludeTree).toBeInstanceOf(TestModel);
@@ -106,11 +111,14 @@ describe("ORM Hydrate Tests", () => {
 
     {
       // Act
-      const fullIncludeTree = await instance.hydrate(TestModel, base, {}, {
-        depth1: {
-          depth2: {},
+      const fullIncludeTree = await instance.hydrate(TestModel, {
+        base,
+        includeTree: {
+          depth1: {
+            depth2: {},
+          },
         },
-      } satisfies IncludeTree<TestModel>);
+      });
 
       // Assert
       expect(fullIncludeTree).toBeInstanceOf(TestModel);
@@ -230,9 +238,12 @@ describe("ORM Hydrate Tests", () => {
 
     {
       // Act
-      const noIncludeTree = await instance.hydrate(TestModel, base, {
-        configId: configId,
-        imageId: imageId,
+      const noIncludeTree = await instance.hydrate(TestModel, {
+        base,
+        keyParams: {
+          configId: configId,
+          imageId: imageId,
+        },
       });
 
       // Assert
@@ -247,45 +258,45 @@ describe("ORM Hydrate Tests", () => {
       // Act
       const fullIncludeTree: TestModel = await instance.hydrate(
         TestModel,
-        base,
+
         {
-          configId: configId,
-          imageId: imageId,
+          base,
+          keyParams: {
+            configId: configId,
+            imageId: imageId,
+          },
+          includeTree: {
+            config: {},
+            configStream: {},
+            configList: {},
+            emptyConfig: {},
+            image: {},
+            imageList: {},
+            emptyImage: {},
+          },
         },
-        {
-          config: {},
-          configStream: {},
-          configList: {},
-          emptyConfig: {},
-          image: {},
-          imageList: {},
-          emptyImage: {},
-        } satisfies IncludeTree<TestModel>,
       );
 
       // Assert
       expect(fullIncludeTree).toBeInstanceOf(TestModel);
       expect(fullIncludeTree.config).toEqual({
         key: baseConfigKV.key,
-        value: baseConfigKV.value,
         raw: baseConfigKV.value,
         metadata: JSON.stringify(baseConfigKV.metadata),
-      } satisfies KValue<unknown>);
+      });
       expect(fullIncludeTree.configList.length).toBe(2);
       expect(fullIncludeTree.configList).toEqual(
         expect.arrayContaining([
           {
             key: baseConfigKV.key,
-            value: baseConfigKV.value,
             raw: baseConfigKV.value,
             metadata: JSON.stringify(baseConfigKV.metadata),
-          } satisfies KValue<unknown>,
+          },
           {
             key: otherConfigItem.key,
-            value: otherConfigItem.value,
             raw: otherConfigItem.value,
             metadata: null,
-          } satisfies KValue<unknown>,
+          },
         ]),
       );
       expect(fullIncludeTree.configStream.value).toBeInstanceOf(ReadableStream);

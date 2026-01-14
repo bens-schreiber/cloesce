@@ -19,12 +19,12 @@ CREATE TABLE IF NOT EXISTS "Dog" (
   FOREIGN KEY ("personId") REFERENCES "Person" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
 );
 
-CREATE TABLE IF NOT EXISTS "StudentsCourses" (
-  "Student.id" integer NOT NULL,
-  "Course.id" integer NOT NULL,
-  PRIMARY KEY ("Student.id", "Course.id"),
-  FOREIGN KEY ("Student.id") REFERENCES "Student" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
-  FOREIGN KEY ("Course.id") REFERENCES "Course" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
+CREATE TABLE IF NOT EXISTS "CourseStudent" (
+  "left" integer NOT NULL,
+  "right" integer NOT NULL,
+  PRIMARY KEY ("left", "right"),
+  FOREIGN KEY ("left") REFERENCES "Course" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
+  FOREIGN KEY ("right") REFERENCES "Student" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
 );
 
 --- Cloesce Temporary Table

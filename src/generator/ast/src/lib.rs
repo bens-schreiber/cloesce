@@ -190,7 +190,7 @@ pub struct DataSource {
 pub enum NavigationPropertyKind {
     OneToOne { column_reference: String },
     OneToMany { column_reference: String },
-    ManyToMany { unique_id: String },
+    ManyToMany,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -205,6 +205,14 @@ pub struct NavigationProperty {
     pub model_reference: String,
 
     pub kind: NavigationPropertyKind,
+}
+
+impl NavigationProperty {
+    pub fn many_to_many_table_name(&self, parent_model_name: &str) -> String {
+        let mut names = [parent_model_name, &self.model_reference];
+        names.sort();
+        format!("{}{}", names[0], names[1])
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug)]

@@ -20,6 +20,7 @@ import {
   ExtractorErrorCode,
   getErrorInfo,
 } from "./extractor/err.js";
+import { CloesceAst } from "./ast.js";
 
 let debugPhase: "extractor" | "npm cloesce" = "npm cloesce";
 function debug(...args: any[]) {
@@ -273,7 +274,7 @@ async function extract(
       process.exit(1);
     }
 
-    let ast = result.unwrap();
+    const ast: CloesceAst = result.unwrap();
 
     if (truncate) {
       if (ast.wrangler_env) {
@@ -285,8 +286,8 @@ async function extract(
         ast.app_source = "./" + path.basename(ast.app_source);
       }
 
-      for (const d1Model of Object.values(ast.models)) {
-        d1Model.source_path = "./" + path.basename(d1Model.source_path);
+      for (const model of Object.values(ast.models)) {
+        model.source_path = "./" + path.basename(model.source_path);
       }
 
       for (const poo of Object.values(ast.poos)) {

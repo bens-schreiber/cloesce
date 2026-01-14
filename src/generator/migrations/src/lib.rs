@@ -90,11 +90,11 @@ enum AlterKind<'a> {
     },
 
     AddManyToMany {
-        unique_id: &'a String,
+        m2m_table_name: String,
         model_name: &'a String,
     },
     DropManyToMany {
-        unique_id: &'a String,
+        m2m_table_name: String,
     },
 }
 
@@ -105,7 +105,7 @@ impl MigrateTables {
     fn create(
         sorted_models: Vec<&MigrationsModel>,
         model_lookup: &IndexMap<String, MigrationsModel>,
-        jcts: HashMap<&String, (&MigrationsModel, &MigrationsModel)>,
+        jcts: HashMap<String, (&MigrationsModel, &MigrationsModel)>,
     ) -> Vec<String> {
         let mut res = vec![];
 
@@ -156,36 +156,38 @@ impl MigrateTables {
             tracing::info!("Created table \"{}\"", model.name);
         }
 
-        for (id, (a, b)) in jcts {
+        for (id, jct) in jcts {
             let mut table = Table::create();
 
-            let col_a_name = format!("{}.{}", a.name, a.primary_key.name);
-            let mut col_a = typed_column(&col_a_name, &a.primary_key.cidl_type, false);
+            let (left, right) = if jct.0.name < jct.1.name {
+                (jct.0, jct.1)
+            } else {
+                (jct.1, jct.0)
+            };
 
-            let col_b_name = format!("{}.{}", b.name, b.primary_key.name);
-            let mut col_b = typed_column(&col_b_name, &b.primary_key.cidl_type, false);
+            const LEFT_NAME: &str = "left";
+            let mut left_col = typed_column(LEFT_NAME, &left.primary_key.cidl_type, false);
+
+            const RIGHT_NAME: &str = "right";
+            let mut right_col = typed_column(RIGHT_NAME, &right.primary_key.cidl_type, false);
 
             table
-                .table(alias(id))
+                .table(alias(&id))
                 .if_not_exists()
-                .col(col_a.not_null())
-                .col(col_b.not_null())
-                .primary_key(
-                    Index::create()
-                        .col(alias(&col_a_name))
-                        .col(alias(&col_b_name)),
-                )
+                .col(left_col.not_null())
+                .col(right_col.not_null())
+                .primary_key(Index::create().col(alias(LEFT_NAME)).col(alias(RIGHT_NAME)))
                 .foreign_key(
                     ForeignKey::create()
-                        .from(alias(id), alias(&col_a_name))
-                        .to(alias(&a.name), alias(&a.primary_key.name))
+                        .from(alias(&id), alias(LEFT_NAME))
+                        .to(alias(&left.name), alias(&left.primary_key.name))
                         .on_update(sea_query::ForeignKeyAction::Cascade)
                         .on_delete(sea_query::ForeignKeyAction::Restrict),
                 )
                 .foreign_key(
                     ForeignKey::create()
-                        .from(alias(id), alias(&col_b_name))
-                        .to(alias(&b.name), alias(&b.primary_key.name))
+                        .from(alias(&id), alias(RIGHT_NAME))
+                        .to(alias(&right.name), alias(&right.primary_key.name))
                         .on_update(sea_query::ForeignKeyAction::Cascade)
                         .on_delete(sea_query::ForeignKeyAction::Restrict),
                 );
@@ -194,8 +196,8 @@ impl MigrateTables {
             tracing::info!(
                 "Created junction table \"{}\" between models \"{}\" \"{}\"",
                 id,
-                a.name,
-                b.name
+                left.name,
+                right.name
             );
         }
 
@@ -281,43 +283,39 @@ impl MigrateTables {
                         needs_drop_intent.push(lm_col);
                     }
                     AlterKind::AddManyToMany {
-                        unique_id,
+                        m2m_table_name,
                         model_name,
                     } => {
-                        if !visited_m2ms.insert(unique_id) {
+                        if !visited_m2ms.insert(m2m_table_name.clone()) {
                             continue;
                         }
 
                         let mut jcts = HashMap::new();
 
                         let join = model_lookup.get(model_name).unwrap();
-                        jcts.insert(
-                            unique_id,
-                            if model.name > join.name {
-                                (model, join)
-                            } else {
-                                (join, model)
-                            },
-                        );
+                        jcts.insert(m2m_table_name.clone(), (model, join));
 
                         res.extend(Self::create(vec![], model_lookup, jcts));
                         tracing::warn!(
                             "Created a many to many table \"{}\" between models: \"{}\" \"{}\"",
-                            unique_id,
+                            m2m_table_name,
                             model.name,
                             join.name
                         );
                     }
-                    AlterKind::DropManyToMany { unique_id } => {
-                        if !visited_m2ms.insert(unique_id) {
+                    AlterKind::DropManyToMany { m2m_table_name } => {
+                        if !visited_m2ms.insert(m2m_table_name.clone()) {
                             continue;
                         }
 
                         res.push(to_sqlite(
-                            Table::drop().table(alias(unique_id)).if_exists().to_owned(),
+                            Table::drop()
+                                .table(alias(&m2m_table_name))
+                                .if_exists()
+                                .to_owned(),
                         ));
 
-                        tracing::info!("Dropped a many to many table \"{}\"", unique_id,);
+                        tracing::info!("Dropped a many to many table \"{}\"", m2m_table_name,);
                     }
                     AlterKind::RebuildTable => {
                         let has_fk_col = model
@@ -345,7 +343,7 @@ impl MigrateTables {
                         // Create the new model
                         {
                             let create_stmts =
-                                Self::create(vec![model], model_lookup, HashMap::default()); // todo: m2ms
+                                Self::create(vec![model], model_lookup, HashMap::default());
                             for stmt in create_stmts {
                                 res.push(stmt);
                             }
@@ -552,30 +550,31 @@ impl MigrateTables {
                 .navigation_properties
                 .iter()
                 .filter_map(|n| match &n.kind {
-                    NavigationPropertyKind::ManyToMany { unique_id } => Some((unique_id, n)),
+                    NavigationPropertyKind::ManyToMany => {
+                        Some((n.many_to_many_table_name(&lm_model.name), n))
+                    }
                     _ => None,
                 })
-                .collect::<HashMap<&String, &NavigationProperty>>();
+                .collect::<HashMap<String, &NavigationProperty>>();
 
             for nav in &model.navigation_properties {
-                let NavigationPropertyKind::ManyToMany { unique_id } = &nav.kind else {
+                let NavigationPropertyKind::ManyToMany = &nav.kind else {
                     continue;
                 };
 
-                if lm_m2ms.remove(unique_id).is_none() {
+                let m2m_table_name = nav.many_to_many_table_name(&model.name);
+                if lm_m2ms.remove(&m2m_table_name).is_none() {
                     alterations.push(AlterKind::AddManyToMany {
-                        unique_id,
+                        m2m_table_name,
                         model_name: &nav.model_reference,
                     });
                 };
             }
 
-            for unvisited_lm_nav in lm_m2ms.into_values() {
-                let NavigationPropertyKind::ManyToMany { unique_id } = &unvisited_lm_nav.kind
-                else {
-                    unreachable!()
-                };
-                alterations.push(AlterKind::DropManyToMany { unique_id });
+            for (unvisited_m2m, _) in lm_m2ms.into_iter() {
+                alterations.push(AlterKind::DropManyToMany {
+                    m2m_table_name: unvisited_m2m,
+                });
             }
 
             alterations
@@ -588,18 +587,20 @@ impl MigrateTables {
 
         // Insertion order is dependency before dependent, drop order
         // is dependent before dependency (reverse of insertion)
-        for &model in sorted_lm_models.iter().rev() {
+        for &lm_model in sorted_lm_models.iter().rev() {
             // Drop M2M's
-            for m2m_id in model
+            for m2m_id in lm_model
                 .navigation_properties
                 .iter()
                 .filter_map(|n| match &n.kind {
-                    NavigationPropertyKind::ManyToMany { unique_id } => Some(unique_id),
+                    NavigationPropertyKind::ManyToMany => {
+                        Some(n.many_to_many_table_name(&lm_model.name))
+                    }
                     _ => None,
                 })
             {
                 res.push(to_sqlite(
-                    Table::drop().table(alias(m2m_id)).if_exists().to_owned(),
+                    Table::drop().table(alias(&m2m_id)).if_exists().to_owned(),
                 ));
                 tracing::info!("Dropped a many to many table \"{}\"", m2m_id);
             }
@@ -607,11 +608,11 @@ impl MigrateTables {
             // Drop table
             res.push(to_sqlite(
                 Table::drop()
-                    .table(alias(&model.name))
+                    .table(alias(&lm_model.name))
                     .if_exists()
                     .to_owned(),
             ));
-            tracing::info!("Dropped a table \"{}\"", model.name);
+            tracing::info!("Dropped a table \"{}\"", lm_model.name);
         }
 
         res
@@ -642,13 +643,14 @@ impl MigrateTables {
                     }
                     None => {
                         for nav in &model.navigation_properties {
-                            let NavigationPropertyKind::ManyToMany { unique_id } = &nav.kind else {
+                            let NavigationPropertyKind::ManyToMany = &nav.kind else {
                                 continue;
                             };
 
+                            let m2m_table_name = nav.many_to_many_table_name(&model.name);
                             let jct_model = ast.models.get(&nav.model_reference).unwrap();
                             create_m2ms.insert(
-                                unique_id,
+                                m2m_table_name,
                                 if jct_model.name > model.name {
                                     (jct_model, model)
                                 } else {

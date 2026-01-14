@@ -69,7 +69,7 @@ export interface ApiMethod {
 export type NavigationPropertyKind =
   | { OneToOne: { column_reference: string } }
   | { OneToMany: { column_reference: string } }
-  | { ManyToMany: { unique_id: string } };
+  | "ManyToMany";
 
 export interface NavigationProperty {
   var_name: string;
@@ -80,7 +80,7 @@ export interface NavigationProperty {
 export function getNavigationPropertyCidlType(
   nav: NavigationProperty,
 ): CidlType {
-  return "OneToOne" in nav.kind
+  return typeof nav.kind !== "string" && "OneToOne" in nav.kind
     ? { Object: nav.model_reference }
     : { Array: { Object: nav.model_reference } };
 }

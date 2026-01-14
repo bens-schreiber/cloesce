@@ -5,9 +5,11 @@ import {
   getNavigationPropertyCidlType,
   isNullableType,
 } from "../ast";
-import { b64ToU8 } from "../ui/common";
+import { b64ToU8, KValue } from "../ui/common";
 import { ConstructorRegistry } from "./router";
-import Either from "../either";
+import { Either } from "../common";
+
+// TODO: Create a "cleaned" object only with the values checked, discarding any extra.
 
 /**
  * Runtime type validation, asserting that the structure of a value follows the
@@ -45,6 +47,11 @@ export class RuntimeValidator {
     cidlType: any,
     isPartial: boolean,
   ): Either<null, any> {
+    // JsonValue accepts anything
+    if (cidlType === "JsonValue") {
+      return Either.right(value);
+    }
+
     isPartial ||= typeof cidlType !== "string" && "Partial" in cidlType;
 
     if (value === undefined) {
@@ -67,11 +74,6 @@ export class RuntimeValidator {
     // Unwrap nullable types
     if (nullable) {
       cidlType = (cidlType as any).Nullable;
-    }
-
-    // JsonValue accepts anything
-    if (cidlType === "JsonValue") {
-      return Either.right(value);
     }
 
     // Primitives
@@ -123,9 +125,9 @@ export class RuntimeValidator {
       const valueObj = value as Record<string, unknown>;
 
       // Validate + instantiate PK
-      {
+      if (model.primary_key !== null) {
         const pk = model.primary_key;
-        const res = this.recurse(valueObj[pk!.name], pk!.cidl_type, isPartial);
+        const res = this.recurse(valueObj[pk.name], pk.cidl_type, isPartial);
 
         if (res.isLeft()) {
           return res;
@@ -161,6 +163,60 @@ export class RuntimeValidator {
           return res;
         }
         value[nav.var_name] = res.unwrap();
+      }
+
+      // Validate KV Objects
+      for (let i = 0; i < model.kv_objects.length; i++) {
+        const kvObjMeta = model.kv_objects[i];
+        const kvObj: any = valueObj[kvObjMeta.value.name];
+        if (kvObj === undefined) {
+          // only allowed if partial
+          if (isPartial) {
+            continue;
+          } else {
+            return Either.left(null);
+          }
+        }
+
+        if (typeof kvObj !== "object") {
+          return Either.left(null);
+        }
+
+        // value["raw"] should exist and be of type kvObj.value.cidl_type
+        const rawRes = this.recurse(
+          kvObj.raw,
+          kvObjMeta.value.cidl_type,
+          isPartial,
+        );
+
+        if (rawRes.isLeft()) {
+          return rawRes;
+        }
+
+        // if value["metadata"] exists, it should be a JsonValue
+        const metadataRes = this.recurse(
+          kvObj.metadata,
+          "JsonValue",
+          isPartial,
+        );
+
+        if (metadataRes.isLeft()) {
+          return metadataRes;
+        }
+
+        // key must exist and be a string
+        // TODO: validate it follows the format?
+        const keyRes = this.recurse(kvObj.key, "Text", isPartial);
+
+        if (keyRes.isLeft()) {
+          return keyRes;
+        }
+
+        value[kvObjMeta.value.name] = Object.assign(new KValue(), {
+          key: keyRes.unwrap(),
+          raw: rawRes.unwrap(),
+          metadata: metadataRes.unwrap(),
+        });
       }
 
       // Don't instantiate partials

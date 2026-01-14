@@ -69,9 +69,7 @@ fn test_client_code_generation_snapshot() {
             .nav_p(
                 "manyToManyNav",
                 "ManyToManyModelB",
-                ast::NavigationPropertyKind::ManyToMany {
-                    unique_id: "mtm_ab".into(),
-                },
+                ast::NavigationPropertyKind::ManyToMany,
             )
             .build(),
         ModelBuilder::new("ManyToManyModelB")
@@ -79,9 +77,7 @@ fn test_client_code_generation_snapshot() {
             .nav_p(
                 "manyToManyNav",
                 "ManyToManyModelA",
-                ast::NavigationPropertyKind::ManyToMany {
-                    unique_id: "mtm_ab".into(),
-                },
+                ast::NavigationPropertyKind::ManyToMany,
             )
             .build(),
         // KV

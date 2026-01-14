@@ -1,5 +1,4 @@
 import type {
-  ReadableStream,
   R2Bucket,
   D1Database,
   KVNamespace,
@@ -8,9 +7,9 @@ import type {
 
 import { DeepPartial, KValue, u8ToB64 } from "../ui/common.js";
 import { RuntimeContainer } from "../router/router.js";
-import { WasmResource, mapSqlJson, invokeOrmWasm } from "../router/wasm.js";
+import { WasmResource, invokeOrmWasm } from "../router/wasm.js";
 import { Model as AstModel } from "../ast.js";
-import Either from "../either.js";
+import { InternalError } from "../common.js";
 import { IncludeTree } from "../ui/backend.js";
 
 export class Orm {
@@ -33,52 +32,116 @@ export class Orm {
   }
 
   /**
-   * Hydrates a base object into an instantiated object, including
-   * navigation properties, KV objects, and R2 objects as defined
-   * in the model AST.
+   * Maps D1 results into model instances. Capable of mapping a flat result set
+   * (ie, SELECT * FROM Model) or a joined result granted it is aliased as `select_model` would produce.
    *
-   * @param ctor The model constructor
-   * @param base The base object to hydrate
-   * @param keyParams Key parameters to assign during hydration
-   * @param includeTree Include tree to define the relationships to hydrate.
-   * @returns The hydrated model instance
+   * Does not hydrate into an instance of the model; for that, use `hydrate` after mapping.
+   *
+   * @example
+   * ```ts
+   * const d1Result = await db.prepare("SELECT * FROM User").all();
+   * const users: User[] = Orm.map(User, d1Result.results);
+   * ```
+   *
+   * @example
+   * ```ts
+   * const d1Result = await db.prepare(`
+   *  ${Orm.select(User, null, { posts: {} })}
+   *  WHERE User.id = ?
+   * `).bind(1).all();
+   *
+   * const users: User[] = Orm.map(User, d1Result.results, { posts: {} });
+   * ```
+   *
+   * @param ctor Constructor of the model to map to
+   * @param d1Results Results from a D1 query
+   * @param includeTree Include tree specifying which navigation properties to include
+   * @returns Array of mapped model instances
    */
+  static map<T extends object>(
+    ctor: new () => T,
+    d1Results: D1Result,
+    includeTree: IncludeTree<T> | null = null,
+  ): T[] {
+    const { wasm } = RuntimeContainer.get();
+    const d1ResultsRes = WasmResource.fromString(
+      JSON.stringify(d1Results.results),
+      wasm,
+    );
+    const includeTreeRes = WasmResource.fromString(
+      JSON.stringify(includeTree),
+      wasm,
+    );
+
+    const mapQueryRes = invokeOrmWasm(
+      wasm.map,
+      [WasmResource.fromString(ctor.name, wasm), d1ResultsRes, includeTreeRes],
+      wasm,
+    );
+
+    if (mapQueryRes.isLeft()) {
+      throw new InternalError(`Mapping failed: ${mapQueryRes.value}`);
+    }
+
+    return JSON.parse(mapQueryRes.unwrap()) as T[];
+  }
+
+  // Given a model, generates a sequence of joins to select it with its includes.
+  static select<T extends object>(
+    ctor: new () => T,
+    from: string | null = null,
+    includeTree: IncludeTree<T> | null = null,
+  ): string {
+    const { wasm } = RuntimeContainer.get();
+    const fromRes = WasmResource.fromString(JSON.stringify(from), wasm);
+    const includeTreeRes = WasmResource.fromString(
+      JSON.stringify(includeTree),
+      wasm,
+    );
+
+    const selectQueryRes = invokeOrmWasm(
+      wasm.select_model,
+      [WasmResource.fromString(ctor.name, wasm), fromRes, includeTreeRes],
+      wasm,
+    );
+
+    if (selectQueryRes.isLeft()) {
+      throw new InternalError(
+        `Select generation failed: ${selectQueryRes.value}`,
+      );
+    }
+
+    return selectQueryRes.unwrap();
+  }
+
   async hydrate<T extends object>(
     ctor: new () => T,
-    base: any,
-    keyParams: Record<string, string>,
-    includeTree: IncludeTree<T> | null = null,
+    args: {
+      base?: any;
+      keyParams?: Record<string, string>;
+      includeTree?: IncludeTree<T> | null;
+    } = {
+      base: {},
+      keyParams: {},
+      includeTree: null,
+    },
   ): Promise<T> {
     const { ast, constructorRegistry } = RuntimeContainer.get();
     const model = ast.models[ctor.name];
-
     if (!model) {
-      throw new Error(`Model ${ctor.name} not found in AST`);
+      return args.base ?? ({} as T);
     }
+    const env: any = this.env;
 
     const instance: T = Object.assign(
       new constructorRegistry[model.name](),
-      base,
+      args.base,
     );
     const promises: Promise<void>[] = [];
-    const env: any = this.env;
-
-    recurse(instance, model, includeTree ?? {});
+    recurse(instance, model, args.includeTree ?? {});
     await Promise.all(promises);
 
     return instance;
-
-    function resolveKey(format: string, current: any): string {
-      return format.replace(/\{([^}]+)\}/g, (_, paramName) => {
-        const paramValue = keyParams[paramName] ?? current[paramName];
-        if (!paramValue) {
-          throw new Error(
-            `Parameter ${paramName} was missing during hydration`,
-          );
-        }
-        return String(paramValue);
-      });
-    }
 
     async function hydrateKVList(
       namespace: KVNamespace,
@@ -92,12 +155,11 @@ export class Orm {
         current[kv.value.name] = await Promise.all(
           res.keys.map(async (k: any) => {
             const stream = await namespace.get(k.name, { type: "stream" });
-            return {
+            return Object.assign(new KValue(), {
               key: k.name,
-              value: stream,
               raw: stream,
               metadata: null,
-            } satisfies KValue<ReadableStream>;
+            });
           }),
         );
       } else {
@@ -106,12 +168,11 @@ export class Orm {
             const kvRes = await namespace.getWithMetadata(k.name, {
               type: "json",
             });
-            return {
+            return Object.assign(new KValue(), {
               key: k.name,
-              value: kvRes.value,
               raw: kvRes.value,
               metadata: kvRes.metadata,
-            } satisfies KValue<unknown>;
+            });
           }),
         );
       }
@@ -125,27 +186,29 @@ export class Orm {
     ) {
       if (kv.value.cidl_type === "Stream") {
         const res = await namespace.get(key, { type: "stream" });
-        current[kv.value.name] = {
+        current[kv.value.name] = Object.assign(new KValue(), {
           key,
-          value: res,
           raw: res,
           metadata: null,
-        } satisfies KValue<ReadableStream>;
+        });
       } else {
         const res = await namespace.getWithMetadata(key, { type: "json" });
-        current[kv.value.name] = {
+        current[kv.value.name] = Object.assign(new KValue(), {
           key,
-          value: res.value,
           raw: res.value,
           metadata: res.metadata,
-        } satisfies KValue<unknown>;
+        });
       }
     }
 
-    function recurse(current: any, meta: AstModel, tree: IncludeTree<any>) {
+    function recurse(
+      current: any,
+      meta: AstModel,
+      includeTree: IncludeTree<any>,
+    ) {
       // Hydrate navigation properties
       for (const navProp of meta.navigation_properties) {
-        const nestedTree = tree[navProp.var_name];
+        const nestedTree = includeTree[navProp.var_name];
         if (!nestedTree) continue;
 
         const nestedMeta = ast.models[navProp.model_reference];
@@ -171,6 +234,10 @@ export class Orm {
 
       // Hydrate columns
       for (const col of meta.columns) {
+        if (current[col.value.name] === undefined) {
+          continue;
+        }
+
         switch (col.value.cidl_type) {
           case "DateIso": {
             current[col.value.name] = new Date(current[col.value.name]);
@@ -186,22 +253,36 @@ export class Orm {
         }
       }
 
-      // Assign key params
+      if (!args.keyParams) {
+        return;
+      }
+
+      // Hydrate key params
       for (const keyParam of meta.key_params) {
-        current[keyParam] = keyParams[keyParam];
+        current[keyParam] = args.keyParams[keyParam];
       }
 
       // Hydrate KV objects
       for (const kv of meta.kv_objects) {
-        if (tree[kv.value.name] === undefined) {
+        // Include check
+        if (includeTree[kv.value.name] === undefined) {
+          if (kv.list_prefix) {
+            current[kv.value.name] = [];
+          }
+          continue;
+        }
+
+        const key = resolveKey(kv.format, current, args.keyParams);
+        if (!key) {
           if (kv.list_prefix) {
             current[kv.value.name] = [];
           }
 
+          // All key params must be resolvable.
+          // Fail silently by skipping hydration.
           continue;
         }
 
-        const key = resolveKey(kv.format, current);
         const namespace: KVNamespace = env[kv.namespace_binding];
 
         if (kv.list_prefix) {
@@ -213,15 +294,24 @@ export class Orm {
 
       // Hydrate R2 objects
       for (const r2 of meta.r2_objects) {
-        if (tree[r2.var_name] === undefined) {
+        if (includeTree[r2.var_name] === undefined) {
+          if (r2.list_prefix) {
+            current[r2.var_name] = [];
+          }
+          continue;
+        }
+
+        const key = resolveKey(r2.format, current, args.keyParams);
+        if (!key) {
           if (r2.list_prefix) {
             current[r2.var_name] = [];
           }
 
+          // All key params must be resolvable.
+          // Fail silently by skipping hydration.
           continue;
         }
 
-        const key = resolveKey(r2.format, current);
         const bucket: R2Bucket = env[r2.bucket_binding];
 
         if (r2.list_prefix) {
@@ -249,296 +339,264 @@ export class Orm {
     }
   }
 
-  /**
-   * Maps SQL records to an instantiated Model. The records must be flat
-   * (e.g., of the form "id, name, address") or derive from a Cloesce data source view
-   * (e.g., of the form "Horse.id, Horse.name, Horse.address")
-   *
-   * Assumes the data is formatted correctly, throwing an error otherwise.
-   *
-   * @param ctor The model constructor
-   * @param records D1 Result records
-   * @param includeTree Include tree to define the relationships to join.
-   */
-  async mapSql<T extends object>(
-    ctor: new () => T,
-    records: Record<string, any>[],
-    includeTree: IncludeTree<T> | null = null,
-  ): Promise<T[]> {
-    const base = mapSqlJson(ctor, records, includeTree).unwrap();
-
-    await Promise.all(
-      base.map(async (item, i) => {
-        base[i] = await this.hydrate(ctor, item, {}, includeTree);
-      }),
-    );
-
-    return base;
-  }
-
-  /**
-   * Executes an "upsert" query, adding or augmenting a model in the database.
-   *
-   * If a model's primary key is not defined in `newModel`, the query is assumed to be an insert.
-   *
-   * If a model's primary key _is_ defined, but some attributes are missing, the query is assumed to be an update.
-   *
-   * Finally, if the primary key is defined, but all attributes are included, a SQLite upsert will be performed.
-   *
-   * In any other case, an  error will be thrown.
-   *
-   * ### Inserting a new Model
-   * ```ts
-   * const model = {name: "julio", lastname: "pumpkin"};
-   * const idRes = await orm.upsert(Person, model, null);
-   * ```
-   *
-   * ### Updating an existing model
-   * ```ts
-   * const model =  {id: 1, name: "timothy"};
-   * const idRes = await orm.upsert(Person, model, null);
-   * // (in db)=> {id: 1, name: "timothy", lastname: "pumpkin"}
-   * ```
-   *
-   * ### Upserting a model
-   * ```ts
-   * // (assume a Person already exists)
-   * const model = {
-   *  id: 1,
-   *  lastname: "burger", // updates last name
-   *  dog: {
-   *    name: "fido" // insert dog relationship
-   *  }
-   * };
-   * const idRes = await orm.upsert(Person, model, null);
-   * // (in db)=> Person: {id: 1, dogId: 1 ...}  ; Dog: {id: 1, name: "fido"}
-   * ```
-   *
-   * @param ctor A model constructor.
-   * @param newModel The new or augmented model.
-   * @param includeTree An include tree describing which foreign keys to join.
-   * @returns The primary key of the inserted model.
-   */
   async upsert<T extends object>(
     ctor: new () => T,
     newModel: DeepPartial<T>,
     includeTree: IncludeTree<T> | null = null,
-  ): Promise<Either<D1Result, any>> {
+  ): Promise<T | null> {
     const { wasm } = RuntimeContainer.get();
-    const args = [
-      WasmResource.fromString(ctor.name, wasm),
-      WasmResource.fromString(
-        JSON.stringify(newModel, (k, v) =>
-          v instanceof Uint8Array ? u8ToB64(v) : v,
+
+    const upsertQueryRes = invokeOrmWasm(
+      wasm.upsert_model,
+      [
+        WasmResource.fromString(ctor.name, wasm),
+        WasmResource.fromString(
+          // TODO: Stringify only objects in the include tree?
+          // Could try to track `this` in the reviver function
+          JSON.stringify(newModel, (_, v) =>
+            // To serialize a Uint8Array s.t. WASM can read it, we convert it to a base64 string.
+            v instanceof Uint8Array ? u8ToB64(v) : v,
+          ),
+          wasm,
         ),
-        wasm,
-      ),
-      WasmResource.fromString(JSON.stringify(includeTree), wasm),
-    ];
-
-    const upsertQueryRes = invokeOrmWasm(wasm.upsert_model, args, wasm);
+        WasmResource.fromString(JSON.stringify(includeTree), wasm),
+      ],
+      wasm,
+    );
     if (upsertQueryRes.isLeft()) {
-      throw new Error(`Upsert failed internally: ${upsertQueryRes.value}`);
+      throw new InternalError(`Upsert failed: ${upsertQueryRes.value}`);
     }
 
-    const statements = JSON.parse(upsertQueryRes.unwrap()) as {
-      query: string;
-      values: any[];
-    }[];
+    const res = JSON.parse(upsertQueryRes.unwrap()) as {
+      sql: {
+        query: string;
+        values: any[];
+      }[];
+      kv_uploads: {
+        namespace_binding: string;
+        key: string;
+        value: any;
+        metadata: unknown;
+      }[];
+      kv_delayed_uploads: {
+        path: string[];
+        namespace_binding: string;
+        key: string;
+        value: any;
+        metadata: unknown;
+      }[];
+    };
 
-    // One of these statements is a "SELECT", which is the root model id stmt.
-    let selectIndex: number;
-    for (let i = statements.length - 1; i >= 0; i--) {
-      if (/^SELECT/i.test(statements[i].query)) {
-        selectIndex = i;
-        break;
-      }
-    }
+    const kvUploadPromises: Promise<void>[] = res.kv_uploads.map(
+      async (upload) => {
+        const namespace: KVNamespace | undefined = (this.env as any)[
+          upload.namespace_binding
+        ];
+        if (!namespace) {
+          throw new InternalError(
+            `KV Namespace binding "${upload.namespace_binding}" not found for upsert.`,
+          );
+        }
 
-    // Execute all statements in a batch.
-    const batchRes = await this.db.batch(
-      statements.map((s) => this.db.prepare(s.query).bind(...s.values)),
+        await namespace.put(upload.key, JSON.stringify(upload.value), {
+          metadata: upload.metadata,
+        });
+      },
     );
 
-    const failed = batchRes.find((r) => !r.success);
-    if (failed) {
-      return Either.left(failed);
+    const queries = res.sql.map((s) =>
+      this.db.prepare(s.query).bind(...s.values),
+    );
+
+    // Concurrently execute SQL with KV uploads.
+    const [batchRes] = await Promise.all([
+      queries.length > 0 ? this.db.batch(queries) : Promise.resolve([]),
+
+      ...kvUploadPromises,
+    ]);
+
+    let base = {};
+    if (queries.length > 0) {
+      const failed = batchRes.find((r) => !r.success);
+      if (failed) {
+        // An error in the upsert should not be possible unless the AST is invalid.
+        throw new InternalError(
+          `Upsert failed during execution: ${failed.error}`,
+        );
+      }
+
+      // A SELECT statement towards the end will call `select_model` to retrieve the upserted model.
+      let selectIndex: number;
+      for (let i = res.sql.length - 1; i >= 0; i--) {
+        if (/^SELECT/i.test(res.sql[i].query)) {
+          selectIndex = i;
+          break;
+        }
+      }
+
+      base = Orm.map(ctor, batchRes[selectIndex!], includeTree)[0];
     }
 
-    const rootModelId = batchRes[selectIndex!].results[0] as { id: any };
-    return Either.right(rootModelId.id);
+    // Upload all delayed KV uploads
+    await Promise.all(
+      res.kv_delayed_uploads.map(async (upload) => {
+        let current: any = base;
+        for (const pathPart of upload.path) {
+          current = current[pathPart];
+          if (current === undefined) {
+            throw new InternalError(
+              `Failed to resolve path ${upload.path.join(".")} for delayed KV upload.`,
+            );
+          }
+        }
+
+        const namespace: KVNamespace | undefined = (this.env as any)[
+          upload.namespace_binding
+        ];
+        if (!namespace) {
+          throw new InternalError(
+            `KV Namespace binding "${upload.namespace_binding}" not found for upsert.`,
+          );
+        }
+
+        const key = resolveKey(upload.key, current, {});
+        if (!key) {
+          throw new InternalError(
+            `Failed to resolve key format "${upload.key}" for delayed KV upload.`,
+          );
+        }
+
+        await namespace.put(key, JSON.stringify(upload.value), {
+          metadata: upload.metadata,
+        });
+      }),
+    );
+
+    // Hydrate and return the upserted model
+    return await this.hydrate(ctor, {
+      base: base,
+      includeTree,
+    });
   }
 
-  /**
-   * Returns a select query, creating a CTE view for the model using the provided include tree.
-   *
-   * @param ctor The model constructor.
-   * @param includeTree An include tree describing which related models to join.
-   * @param from An optional custom `FROM` clause to use instead of the base table.
-   * @param tagCte An optional CTE name to tag the query with. Defaults to "Model.view".
-   *
-   * ### Example:
-   * ```ts
-   * // Using a data source
-   * const query = Orm.listQuery(Person, "default");
-   *
-   * // Using a custom from statement
-   * const query = Orm.listQuery(Person, null, "SELECT * FROM Person WHERE age > 18");
-   * ```
-   *
-   * ### Example SQL output:
-   * ```sql
-   * WITH Person_view AS (
-   * SELECT
-   * "Person"."id" AS "id",
-   * ...
-   * FROM "Person"
-   * LEFT JOIN ...
-   * )
-   * SELECT * FROM Person_view
-   * ```
-   */
-  static listQuery<T extends object>(
-    ctor: new () => T,
-    opts: {
-      includeTree?: IncludeTree<T> | null;
-      from?: string;
-      tagCte?: string;
-    },
-  ): string {
-    const { wasm } = RuntimeContainer.get();
-    const args = [
-      WasmResource.fromString(ctor.name, wasm),
-      WasmResource.fromString(JSON.stringify(opts.includeTree ?? null), wasm),
-      WasmResource.fromString(JSON.stringify(opts.tagCte ?? null), wasm),
-      WasmResource.fromString(JSON.stringify(opts.from ?? null), wasm),
-    ];
-
-    const res = invokeOrmWasm(wasm.list_models, args, wasm);
-    if (res.isLeft()) {
-      throw new Error(`Error invoking the Cloesce WASM Binary: ${res.value}`);
-    }
-
-    return res.unwrap();
-  }
-
-  /**
-   * Returns a select query for a single model by primary key, creating a CTE view using the provided include tree.
-   *
-   * @param ctor The model constructor.
-   * @param includeTree An include tree describing which related models to join.
-   *
-   * ### Example:
-   * ```ts
-   * // Using a data source
-   * const query = Orm.getQuery(Person, "default");
-   * ```
-   *
-   * ### Example SQL output:
-   *
-   * ```sql
-   * WITH Person_view AS (
-   * SELECT
-   * "Person"."id" AS "id",
-   * ...
-   * FROM "Person"
-   * LEFT JOIN ...
-   * )
-   * SELECT * FROM Person_view WHERE [Person].[id] = ?
-   * ```
-   */
-  static getQuery<T extends object>(
-    ctor: new () => T,
-    includeTree?: IncludeTree<T> | null,
-  ): string {
-    const { ast } = RuntimeContainer.get();
-    // TODO: handle missing primary key
-    return `${this.listQuery<T>(ctor, { includeTree })} WHERE [${ast.models[ctor.name].primary_key!.name}] = ?`;
-  }
-
-  /**
-   * Retrieves all instances of a model from the database.
-   * @param ctor The model constructor.
-   * @param includeTree An include tree describing which related models to join.
-   * @param from An optional custom `FROM` clause to use instead of the base table.
-   * @returns Either an error string, or an array of model instances.
-   *
-   * ### Example:
-   * ```ts
-   * const orm = Orm.fromD1(env.db);
-   * const horses = await orm.list(Horse, Horse.default);
-   * ```
-   *
-   * ### Example with custom from:
-   * ```ts
-   * const orm = Orm.fromD1(env.db);
-   * const adultHorses = await orm.list(Horse, Horse.default, "SELECT * FROM Horse ORDER BY age DESC LIMIT 10");
-   * ```
-   *
-   * =>
-   *
-   * ```sql
-   * SELECT
-   *  "Horse"."id" AS "id",
-   * ...
-   * FROM (SELECT * FROM Horse ORDER BY age DESC LIMIT 10)
-   * LEFT JOIN ...
-   * ```
-   *
-   */
   async list<T extends object>(
     ctor: new () => T,
-    opts: {
-      includeTree?: IncludeTree<T> | null;
-      from?: string;
-    },
-  ): Promise<Either<D1Result, T[]>> {
-    const sql = Orm.listQuery(ctor, opts);
-
-    const stmt = this.db.prepare(sql);
-    const records = await stmt.all();
-    if (!records.success) {
-      return Either.left(records);
+    includeTree: IncludeTree<T> | null = null,
+  ): Promise<T[]> {
+    const { ast } = RuntimeContainer.get();
+    const model = ast.models[ctor.name];
+    if (!model) {
+      return [];
     }
 
-    const mapped = await this.mapSql(
-      ctor,
-      records.results,
-      opts.includeTree ?? null,
+    if (model.primary_key === null) {
+      // Listing is not supported for models without primary keys (i.e., KV or R2 only).
+      return [];
+    }
+
+    const query = Orm.select(ctor, null, includeTree);
+    const rows = await this.db.prepare(query).all();
+    if (rows.error) {
+      // An error in the query should not be possible unless the AST is invalid.
+      throw new InternalError(
+        `Failed to list models for ${ctor.name}: ${rows.error}`,
+      );
+    }
+
+    // Map and hydrate
+    const results = Orm.map(ctor, rows, includeTree);
+    await Promise.all(
+      results.map(async (modelJson, index) => {
+        results[index] = await this.hydrate(ctor, {
+          base: modelJson,
+          includeTree,
+        });
+      }),
     );
-    return Either.right(mapped);
+
+    return results;
   }
 
   /**
-   * Retrieves a single model by primary key.
-   * @param ctor The model constructor.
-   * @param id The primary key value.
-   * @param includeTree An include tree describing which related models to join.
-   * @returns Either an error string, or the model instance (null if not found).
+   * Fetches a model by its primary key ID or key parameters.
+   * * If the model does not have a primary key, key parameters must be provided.
+   * * If the model has a primary key, the ID must be provided.
    *
-   * ### Example:
-   * ```ts
-   * const orm = Orm.fromD1(env.db);
-   * const horse = await orm.get(Horse, 1, Horse.default);
-   * ```
+   * @param ctor Constructor of the model to retrieve
+   * @param args Arguments for retrieval
+   * @returns The retrieved model instance, or `null` if not found
    */
   async get<T extends object>(
     ctor: new () => T,
-    id: any,
-    includeTree: IncludeTree<T> | null = null,
-  ): Promise<Either<D1Result, T | null>> {
-    const sql = Orm.getQuery(ctor, includeTree);
-    const record = await this.db.prepare(sql).bind(id).run();
-
-    if (!record.success) {
-      throw new Error("Get query failed: " + (record.error ?? "unknown error"));
+    args: {
+      id?: any;
+      keyParams?: Record<string, string>;
+      includeTree?: IncludeTree<T> | null;
+    } = {
+      id: undefined,
+      keyParams: {},
+      includeTree: null,
+    },
+  ): Promise<T | null> {
+    const { ast } = RuntimeContainer.get();
+    const model = ast.models[ctor.name];
+    if (!model) {
+      return null;
     }
 
-    if (record.results.length === 0) {
-      return Either.right(null);
+    // KV or R2 only
+    if (model.primary_key === null) {
+      return await this.hydrate(ctor, {
+        keyParams: args.keyParams,
+        includeTree: args.includeTree ?? null,
+      });
     }
 
-    const mapped = await this.mapSql(ctor, record.results, includeTree);
-    return Either.right(mapped[0]);
+    // D1 retrieval
+    const pkName = model.primary_key.name;
+    const query = `
+      ${Orm.select(ctor, null, args.includeTree ?? null)}
+      WHERE  "${model.name}"."${pkName}" = ?
+    `;
+
+    const rows = await this.db.prepare(query).bind(args.id).run();
+
+    if (rows.error) {
+      // An error in the query should not be possible unless the AST is invalid.
+      throw new InternalError(
+        `Failed to retrieve model ${ctor.name} with ${pkName}=${args.id}: ${rows.error}`,
+      );
+    }
+
+    if (rows.results.length < 1) {
+      return null;
+    }
+
+    // Map and hydrate
+    const results = Orm.map(ctor, rows, args.includeTree ?? null);
+    return await this.hydrate(ctor, {
+      base: results[0],
+      keyParams: args.keyParams,
+      includeTree: args.includeTree ?? null,
+    });
+  }
+}
+
+/**
+ * @returns null if any parameter could not be resolved
+ */
+function resolveKey(
+  format: string,
+  current: any,
+  keyParams: Record<string, string>,
+): string | null {
+  try {
+    return format.replace(/\{([^}]+)\}/g, (_, paramName) => {
+      const paramValue = keyParams[paramName] ?? current[paramName];
+      if (!paramValue) throw null;
+      return String(paramValue);
+    });
+  } catch {
+    return null;
   }
 }

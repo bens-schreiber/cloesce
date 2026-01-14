@@ -67,9 +67,12 @@ export type DeepPartial<T> = DeepPartialInner<T> & { __brand?: "Partial" };
  */
 export class KValue<V> {
   key!: string;
-  value!: V | null;
   raw: unknown | null;
   metadata: unknown | null;
+
+  get value(): V | null {
+    return this.raw as V | null;
+  }
 }
 
 /**

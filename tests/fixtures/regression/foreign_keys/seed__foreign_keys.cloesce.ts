@@ -56,7 +56,10 @@ export class A {
   static async post(@Inject env: Env, a: A): Promise<A> {
     const orm = Orm.fromEnv(env);
     await orm.upsert(A, a, A.withB);
-    return (await orm.get(A, a.id, A.withB)).value;
+    return await orm.get(A, {
+      id: a.id,
+      includeTree: A.withB,
+    });
   }
 
   @POST
@@ -99,8 +102,7 @@ export class Person {
   @POST
   static async post(@Inject env: Env, person: Person): Promise<Person> {
     const orm = Orm.fromEnv(env);
-    await orm.upsert(Person, person, Person.withDogs);
-    return (await orm.get(Person, person.id, Person.withDogs)).value;
+    return await orm.upsert(Person, person, Person.withDogs);
   }
 
   @POST
@@ -147,7 +149,7 @@ export class Student {
   @PrimaryKey
   id: Integer;
 
-  @ManyToMany("StudentsCourses")
+  @ManyToMany
   courses: Course[];
 
   @DataSource static readonly withCoursesStudents: IncludeTree<Student> = {
@@ -162,8 +164,7 @@ export class Student {
   @POST
   static async post(@Inject env: Env, student: Student): Promise<Student> {
     const orm = Orm.fromEnv(env);
-    await orm.upsert(Student, student, Student.withCoursesStudents);
-    return student;
+    return await orm.upsert(Student, student, Student.withCoursesStudents);
   }
 
   @GET
@@ -177,7 +178,7 @@ export class Course {
   @PrimaryKey
   id: Integer;
 
-  @ManyToMany("StudentsCourses")
+  @ManyToMany
   students: Student[];
 }
 //#endregion

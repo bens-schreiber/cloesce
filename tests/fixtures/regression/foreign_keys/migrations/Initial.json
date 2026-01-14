@@ -1,5 +1,5 @@
 {
-  "hash": 1972991810136208241,
+  "hash": 15322665465883360060,
   "models": {
     "B": {
       "hash": 4631908692780450632,
@@ -13,7 +13,7 @@
       "data_sources": {}
     },
     "Course": {
-      "hash": 1775575352698084697,
+      "hash": 13717697900918874344,
       "name": "Course",
       "primary_key": {
         "name": "id",
@@ -22,14 +22,10 @@
       "columns": [],
       "navigation_properties": [
         {
-          "hash": 7522322899197762685,
+          "hash": 7559203103497934557,
           "var_name": "students",
           "model_reference": "Student",
-          "kind": {
-            "ManyToMany": {
-              "unique_id": "StudentsCourses"
-            }
-          }
+          "kind": "ManyToMany"
         }
       ],
       "data_sources": {}
@@ -65,7 +61,7 @@
       }
     },
     "Student": {
-      "hash": 7546379683369971548,
+      "hash": 12352578893746392979,
       "name": "Student",
       "primary_key": {
         "name": "id",
@@ -74,14 +70,10 @@
       "columns": [],
       "navigation_properties": [
         {
-          "hash": 16503297458927537581,
+          "hash": 4289972809395887785,
           "var_name": "courses",
           "model_reference": "Course",
-          "kind": {
-            "ManyToMany": {
-              "unique_id": "StudentsCourses"
-            }
-          }
+          "kind": "ManyToMany"
         }
       ],
       "data_sources": {

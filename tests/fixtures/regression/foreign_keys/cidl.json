@@ -1,5 +1,5 @@
 {
-  "hash": 1972991810136208241,
+  "hash": 15322665465883360060,
   "project_name": "runner",
   "wrangler_env": {
     "name": "Env",
@@ -45,7 +45,7 @@
       "source_path": "./seed__foreign_keys.cloesce.ts"
     },
     "Course": {
-      "hash": 1775575352698084697,
+      "hash": 13717697900918874344,
       "name": "Course",
       "primary_key": {
         "name": "id",
@@ -54,14 +54,10 @@
       "columns": [],
       "navigation_properties": [
         {
-          "hash": 7522322899197762685,
+          "hash": 7559203103497934557,
           "var_name": "students",
           "model_reference": "Student",
-          "kind": {
-            "ManyToMany": {
-              "unique_id": "StudentsCourses"
-            }
-          }
+          "kind": "ManyToMany"
         }
       ],
       "key_params": [],
@@ -170,7 +166,7 @@
       "source_path": "./seed__foreign_keys.cloesce.ts"
     },
     "Student": {
-      "hash": 7546379683369971548,
+      "hash": 12352578893746392979,
       "name": "Student",
       "primary_key": {
         "name": "id",
@@ -179,14 +175,10 @@
       "columns": [],
       "navigation_properties": [
         {
-          "hash": 16503297458927537581,
+          "hash": 4289972809395887785,
           "var_name": "courses",
           "model_reference": "Course",
-          "kind": {
-            "ManyToMany": {
-              "unique_id": "StudentsCourses"
-            }
-          }
+          "kind": "ManyToMany"
         }
       ],
       "key_params": [],

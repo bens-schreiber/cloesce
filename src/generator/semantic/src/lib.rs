@@ -279,7 +279,7 @@ impl SemanticAnalysis {
         let mut unvalidated_navs = Vec::new();
 
         // Maps a m2m unique id to the models that reference the id
-        let mut m2m = HashMap::<&String, Vec<&String>>::new();
+        let mut m2m = HashMap::<String, Vec<&String>>::new();
 
         // Validate Models D1 grammar
         for model in &d1_models {
@@ -395,8 +395,9 @@ impl SemanticAnalysis {
                     NavigationPropertyKind::OneToMany { .. } => {
                         unvalidated_navs.push((&model.name, &nav.model_reference, nav));
                     }
-                    NavigationPropertyKind::ManyToMany { unique_id } => {
-                        m2m.entry(unique_id).or_default().push(&model.name);
+                    NavigationPropertyKind::ManyToMany => {
+                        let id = nav.many_to_many_table_name(&model.name);
+                        m2m.entry(id).or_default().push(&model.name);
                     }
                 }
             }

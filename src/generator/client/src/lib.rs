@@ -30,7 +30,7 @@ handlebars_helper!(get_content_type: |media: MediaType| match media {
 
 handlebars_helper!(is_blob: |cidl_type: CidlType| matches!(cidl_type.root_type(), CidlType::Blob));
 handlebars_helper!(is_one_to_one: |nav: NavigationProperty| matches!(nav.kind, NavigationPropertyKind::OneToOne {..}));
-handlebars_helper!(is_many_nav: |nav: NavigationProperty| matches!(nav.kind, NavigationPropertyKind::OneToMany {..} | NavigationPropertyKind::ManyToMany { .. }));
+handlebars_helper!(is_many_nav: |nav: NavigationProperty| matches!(nav.kind, NavigationPropertyKind::OneToMany {..} | NavigationPropertyKind::ManyToMany));
 handlebars_helper!(is_get_request: |verb: HttpVerb| matches!(verb, HttpVerb::GET));
 handlebars_helper!(is_serializable: |cidl_type: CidlType| !matches!(cidl_type.root_type(), CidlType::Inject(_)));
 handlebars_helper!(is_object: |cidl_type: CidlType| matches!(cidl_type.root_type(), CidlType::Object(_) | CidlType::Partial(_)));
@@ -76,109 +76,109 @@ impl ClientGenerator {
 }
 
 fn register_helpers<'a>(
-    handlebars: &mut Handlebars<'a>,
+    hbs: &mut Handlebars<'a>,
     mapper: Arc<dyn ClientLanguageTypeMapper + Send + Sync>,
     ast: &'a CloesceAst,
 ) {
-    handlebars.register_helper("is_serializable", Box::new(is_serializable));
-    handlebars.register_helper("is_blob", Box::new(is_blob));
-    handlebars.register_helper("is_one_to_one", Box::new(is_one_to_one));
-    handlebars.register_helper("is_many_nav", Box::new(is_many_nav));
-    handlebars.register_helper("get_content_type", Box::new(get_content_type));
-    handlebars.register_helper("has_array", Box::new(has_array));
-    handlebars.register_helper("needs_constructor", Box::new(needs_constructor));
-    handlebars.register_helper("get_object_name", Box::new(get_object_name));
-    handlebars.register_helper("is_object", Box::new(is_object));
-    handlebars.register_helper("is_object_array", Box::new(is_object_array));
-    handlebars.register_helper("is_blob_array", Box::new(is_blob_array));
-    handlebars.register_helper("is_url_param", Box::new(is_url_param));
-    handlebars.register_helper("is_get_request", Box::new(is_get_request));
-    handlebars.register_helper("is_stream", Box::new(is_stream));
-    handlebars.register_helper("is_some", Box::new(is_some));
+    let simple_helpers: Vec<(&str, Box<dyn handlebars::HelperDef + Send + Sync>)> = vec![
+        ("is_serializable", Box::new(is_serializable)),
+        ("is_blob", Box::new(is_blob)),
+        ("is_one_to_one", Box::new(is_one_to_one)),
+        ("get_content_type", Box::new(get_content_type)),
+        ("has_array", Box::new(has_array)),
+        ("needs_constructor", Box::new(needs_constructor)),
+        ("get_object_name", Box::new(get_object_name)),
+        ("is_object", Box::new(is_object)),
+        ("is_object_array", Box::new(is_object_array)),
+        ("is_blob_array", Box::new(is_blob_array)),
+        ("is_url_param", Box::new(is_url_param)),
+        ("is_get_request", Box::new(is_get_request)),
+        ("is_stream", Box::new(is_stream)),
+        ("is_some", Box::new(is_some)),
+    ];
 
-    let mapper1 = mapper.clone();
-    handlebars.register_helper(
+    for (name, helper) in simple_helpers {
+        hbs.register_helper(name, helper);
+    }
+
+    hbs.register_helper(
         "get_nav_cidl_type",
-        Box::new(
-            move |h: &handlebars::Helper<'_>,
-                  _: &Handlebars,
-                  _: &handlebars::Context,
-                  _: &mut handlebars::RenderContext<'_, '_>,
-                  out: &mut dyn handlebars::Output| {
-                let nav: NavigationProperty =
-                    serde_json::from_value(h.param(0).unwrap().value().clone()).unwrap();
+        make_mapper_helper(
+            mapper.clone(),
+            ast,
+            |value: Value, mapper: &dyn ClientLanguageTypeMapper, ast: &CloesceAst| -> String {
+                let nav: NavigationProperty = serde_json::from_value(value).unwrap();
 
                 let cidl_type = match nav.kind {
                     NavigationPropertyKind::OneToOne { .. } => {
                         CidlType::Object(nav.model_reference)
                     }
                     NavigationPropertyKind::OneToMany { .. }
-                    | NavigationPropertyKind::ManyToMany { .. } => {
+                    | NavigationPropertyKind::ManyToMany => {
                         CidlType::array(CidlType::Object(nav.model_reference))
                     }
                 };
 
-                let rendered = mapper1.cidl_type(&cidl_type, ast);
-                out.write(&rendered)?;
-                Ok(())
+                mapper.cidl_type(&cidl_type, ast)
             },
         ),
     );
 
-    let mapper2 = mapper.clone();
-    handlebars.register_helper(
+    hbs.register_helper(
         "map_cidl_type",
-        Box::new(
-            move |h: &handlebars::Helper<'_>,
-                  _: &Handlebars,
-                  _: &handlebars::Context,
-                  _: &mut handlebars::RenderContext<'_, '_>,
-                  out: &mut dyn handlebars::Output| {
-                let cidl_type: CidlType =
-                    serde_json::from_value(h.param(0).unwrap().value().clone()).unwrap();
-
-                let rendered = mapper2.cidl_type(&cidl_type, ast);
-                out.write(&rendered)?;
-                Ok(())
+        make_mapper_helper(
+            mapper.clone(),
+            ast,
+            |value: Value, mapper: &dyn ClientLanguageTypeMapper, ast: &CloesceAst| -> String {
+                let cidl_type: CidlType = serde_json::from_value(value).unwrap();
+                mapper.cidl_type(&cidl_type, ast)
             },
         ),
     );
 
-    let mapper3 = mapper.clone();
-    handlebars.register_helper(
+    hbs.register_helper(
         "map_root_cidl_type",
-        Box::new(
-            move |h: &handlebars::Helper<'_>,
-                  _: &Handlebars,
-                  _: &handlebars::Context,
-                  _: &mut handlebars::RenderContext<'_, '_>,
-                  out: &mut dyn handlebars::Output| {
-                let cidl_type: CidlType =
-                    serde_json::from_value(h.param(0).unwrap().value().clone()).unwrap();
-
-                let rendered = mapper3.cidl_type(cidl_type.root_type(), ast);
-                out.write(&rendered)?;
-                Ok(())
+        make_mapper_helper(
+            mapper.clone(),
+            ast,
+            |value: Value, mapper: &dyn ClientLanguageTypeMapper, ast: &CloesceAst| -> String {
+                let cidl_type: CidlType = serde_json::from_value(value).unwrap();
+                mapper.cidl_type(cidl_type.root_type(), ast)
             },
         ),
     );
 
-    let mapper4 = mapper.clone();
-    handlebars.register_helper(
+    hbs.register_helper(
         "get_media_type",
-        Box::new(
-            move |h: &handlebars::Helper<'_>,
-                  _: &Handlebars,
-                  _: &handlebars::Context,
-                  _: &mut handlebars::RenderContext<'_, '_>,
-                  out: &mut dyn handlebars::Output| {
-                let media_type: MediaType =
-                    serde_json::from_value(h.param(0).unwrap().value().clone()).unwrap();
-
-                let rendered = mapper4.media_type(&media_type);
-                out.write(&rendered)?;
-                Ok(())
+        make_mapper_helper(
+            mapper.clone(),
+            ast,
+            |value: Value, mapper: &dyn ClientLanguageTypeMapper, _ast: &CloesceAst| -> String {
+                let media_type: MediaType = serde_json::from_value(value).unwrap();
+                mapper.media_type(&media_type)
             },
         ),
     );
+
+    fn make_mapper_helper<'a, F>(
+        mapper: Arc<dyn ClientLanguageTypeMapper + Send + Sync + 'a>,
+        ast: &'a CloesceAst,
+        f: F,
+    ) -> Box<dyn handlebars::HelperDef + Send + Sync + 'a>
+    where
+        F: Fn(Value, &dyn ClientLanguageTypeMapper, &CloesceAst) -> String + Send + Sync + 'a,
+    {
+        Box::new(
+            move |h: &handlebars::Helper<'_>,
+                  _hb: &Handlebars<'_>,
+                  _ctx: &handlebars::Context,
+                  _rc: &mut handlebars::RenderContext<'_, '_>,
+                  out: &mut dyn handlebars::Output| {
+                let value = h.param(0).unwrap().value().clone();
+                let rendered = f(value, mapper.as_ref(), ast);
+                out.write(&rendered)?;
+                Ok(())
+            },
+        )
+    }
 }

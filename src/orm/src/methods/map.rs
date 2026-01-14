@@ -14,9 +14,9 @@ use super::Result;
 
 pub fn map_sql(
     model_name: &str,
+    rows: D1Result,
+    include_tree: Option<IncludeTreeJson>,
     meta: &ModelMeta,
-    rows: &D1Result,
-    include_tree: Option<&IncludeTreeJson>,
 ) -> Result<Vec<Value>> {
     let model = match meta.get(model_name) {
         Some(m) => m,
@@ -61,7 +61,7 @@ pub fn map_sql(
             // Initialize OneToMany / ManyToMany arrays as empty
             for nav in &model.navigation_properties {
                 if matches!(nav.kind, NavigationPropertyKind::OneToMany { .. })
-                    || matches!(nav.kind, NavigationPropertyKind::ManyToMany { .. })
+                    || matches!(nav.kind, NavigationPropertyKind::ManyToMany)
                 {
                     m.insert(nav.var_name.clone(), serde_json::Value::Array(vec![]));
                 }
@@ -72,9 +72,11 @@ pub fn map_sql(
 
         // Given some include tree, we can traverse navigation properties, adding only those that
         // appear in the tree.
-        if let Some(tree) = include_tree
-            && let Value::Object(model_json) = model_json
-        {
+        let Some(tree) = include_tree.as_ref() else {
+            continue;
+        };
+
+        if let Value::Object(model_json) = model_json {
             process_navigation_properties(model_json, model, "", tree, row, meta)?;
         }
     }
@@ -86,7 +88,7 @@ fn process_navigation_properties(
     model_json: &mut Map<String, Value>,
     model: &Model,
     prefix: &str,
-    include_tree: &Map<String, Value>,
+    include_tree: &IncludeTreeJson,
     row: &Map<String, Value>,
     meta: &ModelMeta,
 ) -> Result<()> {
@@ -136,10 +138,8 @@ fn process_navigation_properties(
             if matches!(
                 nested_nav_prop.kind,
                 NavigationPropertyKind::OneToMany { .. }
-            ) || matches!(
-                nested_nav_prop.kind,
-                NavigationPropertyKind::ManyToMany { .. }
-            ) {
+            ) || matches!(nested_nav_prop.kind, NavigationPropertyKind::ManyToMany)
+            {
                 nested_model_json.insert(nested_nav_prop.var_name.clone(), Value::Array(vec![]));
             }
         }
@@ -162,7 +162,7 @@ fn process_navigation_properties(
         }
 
         if matches!(nav_prop.kind, NavigationPropertyKind::OneToMany { .. })
-            || matches!(nav_prop.kind, NavigationPropertyKind::ManyToMany { .. })
+            || matches!(nav_prop.kind, NavigationPropertyKind::ManyToMany)
         {
             if let Value::Array(arr) = model_json.get_mut(&nav_prop.var_name).unwrap() {
                 let already_exists = arr
@@ -184,11 +184,57 @@ fn process_navigation_properties(
 #[cfg(test)]
 mod tests {
     use ast::{CidlType, NavigationPropertyKind};
+    use base64::{Engine, prelude::BASE64_STANDARD};
     use generator_test::ModelBuilder;
     use serde_json::{Map, Value, json};
+    use sqlx::{Column, Row, SqlitePool, TypeInfo, sqlite::SqliteRow};
     use std::collections::HashMap;
 
-    use crate::methods::map::map_sql;
+    use crate::{
+        ModelMeta,
+        methods::{map::map_sql, test_sql, upsert::UpsertModel},
+    };
+
+    pub fn rows_to_json(rows: &[SqliteRow]) -> Vec<Map<String, Value>> {
+        rows.iter()
+            .map(|row| {
+                let mut map = Map::new();
+
+                for col in row.columns() {
+                    let name = col.name().to_string();
+                    let type_info = col.type_info().name();
+
+                    let value = match type_info {
+                        "TEXT" => row
+                            .try_get::<String, _>(name.as_str())
+                            .map(Value::String)
+                            .unwrap_or(Value::Null),
+
+                        "INTEGER" => row
+                            .try_get::<i64, _>(name.as_str())
+                            .map(Value::from)
+                            .unwrap_or(Value::Null),
+
+                        "REAL" => row
+                            .try_get::<f64, _>(name.as_str())
+                            .map(Value::from)
+                            .unwrap_or(Value::Null),
+
+                        "BLOB" => row
+                            .try_get::<Vec<u8>, _>(name.as_str())
+                            .map(|b| Value::String(BASE64_STANDARD.encode(&b)))
+                            .unwrap_or(Value::Null),
+
+                        _ => Value::Null,
+                    };
+
+                    map.insert(name, value);
+                }
+
+                map
+            })
+            .collect()
+    }
 
     #[test]
     fn no_records_returns_empty() {
@@ -213,10 +259,9 @@ mod tests {
         let meta = HashMap::from([("Horse".to_string(), horse), ("Rider".to_string(), rider)]);
 
         let rows: Vec<Map<String, Value>> = vec![];
-        let include_tree: Option<Map<String, Value>> = None;
 
         // Act
-        let result = map_sql("Horse", &meta, &rows, include_tree.as_ref()).unwrap();
+        let result = map_sql("Horse", rows, None, &meta).unwrap();
 
         // Assert
         assert_eq!(result.len(), 0);
@@ -239,10 +284,8 @@ mod tests {
         .into_iter()
         .collect::<Map<String, Value>>();
 
-        let include_tree: Option<Map<String, Value>> = None;
-
         // Act
-        let result = map_sql("Horse", &meta, &vec![row], include_tree.as_ref()).unwrap();
+        let result = map_sql("Horse", vec![row], None, &meta).unwrap();
         let horse = result.first().unwrap().as_object().unwrap();
 
         // Assert
@@ -250,134 +293,236 @@ mod tests {
         assert_eq!(horse.get("name"), Some(&json!("Lightning")));
     }
 
-    #[test]
-    fn assigns_scalar_attributes_and_navigation_arrays() {
+    #[sqlx::test]
+    async fn one_to_one(db: SqlitePool) {
         // Arrange
-        let horse = ModelBuilder::new("Horse")
-            .id_pk()
-            .col("name", CidlType::nullable(CidlType::Text), None)
-            .nav_p(
-                "riders",
-                "Rider",
-                NavigationPropertyKind::OneToMany {
-                    column_reference: "id".into(),
-                },
-            )
-            .build();
-
-        let rider = ModelBuilder::new("Rider")
-            .id_pk()
-            .col("nickname", CidlType::nullable(CidlType::Text), None)
-            .build();
-
-        let meta = HashMap::from([("Horse".to_string(), horse), ("Rider".to_string(), rider)]);
-
-        // rows vector
-        let rows: Vec<Map<String, Value>> = vec![
+        let meta = || {
             vec![
-                ("id".to_string(), json!("1")),
-                ("name".to_string(), json!("Thunder")),
-                ("riders.id".to_string(), json!("r1")),
-                ("riders.nickname".to_string(), json!("Speedy")),
+                ModelBuilder::new("Horse")
+                    .id_pk()
+                    .col("name", CidlType::nullable(CidlType::Text), None)
+                    .col("best_rider_id", CidlType::Integer, Some("Rider".into()))
+                    .nav_p(
+                        "best_rider",
+                        "Rider",
+                        NavigationPropertyKind::OneToOne {
+                            column_reference: "best_rider_id".into(),
+                        },
+                    )
+                    .build(),
+                ModelBuilder::new("Rider")
+                    .id_pk()
+                    .col("nickname", CidlType::nullable(CidlType::Text), None)
+                    .build(),
             ]
             .into_iter()
-            .collect(),
-            vec![
-                ("id".to_string(), json!("1")),
-                ("name".to_string(), json!("Thunder")),
-                ("riders.id".to_string(), json!("r2")),
-                ("riders.nickname".to_string(), json!("Flash")),
-            ]
-            .into_iter()
-            .collect(),
-        ];
+            .map(|m| (m.name.clone(), m))
+            .collect::<ModelMeta>()
+        };
 
-        let include_tree: Option<Map<String, Value>> = Some(
-            vec![("riders".to_string(), json!({}))]
+        let new_model = json!({
+            "id": 1,
+            "name": "Shadowfax",
+            "best_rider_id": 1,
+            "best_rider": {
+                "id": 1,
+                "nickname": "Gandalf"
+            }
+        });
+
+        let include_tree = json!({
+            "best_rider": {}
+        });
+
+        let upsert_res = UpsertModel::query(
+            "Horse",
+            &meta(),
+            new_model.as_object().unwrap().clone(),
+            Some(include_tree.as_object().unwrap().clone()),
+        )
+        .expect("upsert to succeed");
+
+        let results = test_sql(
+            meta(),
+            upsert_res
+                .sql
                 .into_iter()
+                .map(|r| (r.query, r.values))
                 .collect(),
-        );
+            db,
+        )
+        .await
+        .expect("test_sql to succeed");
+
+        let select_rows = rows_to_json(results.get(results.len() - 2).unwrap());
 
         // Act
-        let result = map_sql("Horse", &meta, &rows, include_tree.as_ref()).unwrap();
-        let horse = result.first().unwrap().as_object().unwrap();
+        let result = map_sql(
+            "Horse",
+            select_rows,
+            Some(include_tree.as_object().unwrap().clone()),
+            &meta(),
+        )
+        .expect("map_sql to succeed");
 
-        // Assert
-        assert_eq!(horse.get("id"), Some(&json!("1")));
-        assert_eq!(horse.get("name"), Some(&json!("Thunder")));
-
-        let riders = horse.get("riders").unwrap().as_array().unwrap();
-        let ids: Vec<&Value> = riders.iter().map(|r| &r["id"]).collect();
-
-        assert!(ids.contains(&&json!("r1")));
-        assert!(ids.contains(&&json!("r2")));
+        assert_eq!(result, vec![new_model]);
     }
 
-    #[test]
-    fn merges_duplicate_rows_with_arrays() {
+    #[sqlx::test]
+    async fn one_to_many(db: SqlitePool) {
         // Arrange
-        let horse = ModelBuilder::new("Horse")
-            .id_pk()
-            .col("name", CidlType::nullable(CidlType::Text), None)
-            .nav_p(
-                "riders",
-                "Rider",
-                NavigationPropertyKind::OneToMany {
-                    column_reference: "id".into(),
+        let meta = || {
+            vec![
+                ModelBuilder::new("Horse")
+                    .id_pk()
+                    .col("name", CidlType::nullable(CidlType::Text), None)
+                    .nav_p(
+                        "riders",
+                        "Rider",
+                        NavigationPropertyKind::OneToMany {
+                            column_reference: "horse_id".into(),
+                        },
+                    )
+                    .build(),
+                ModelBuilder::new("Rider")
+                    .id_pk()
+                    .col("nickname", CidlType::nullable(CidlType::Text), None)
+                    .col("horse_id", CidlType::Integer, Some("Horse".into()))
+                    .build(),
+            ]
+            .into_iter()
+            .map(|m| (m.name.clone(), m))
+            .collect::<ModelMeta>()
+        };
+
+        let new_model = json!({
+            "id": 1,
+            "name": "Black Beauty",
+            "riders": [
+                {
+                    "id": 1,
+                    "nickname": "Alice",
+                    "horse_id": 1
                 },
-            )
-            .build();
-
-        let rider = ModelBuilder::new("Rider")
-            .id_pk()
-            .col("nickname", CidlType::nullable(CidlType::Text), None)
-            .build();
-
-        let meta = HashMap::from([("Horse".to_string(), horse), ("Rider".to_string(), rider)]);
-
-        let rows: Vec<Map<String, Value>> = vec![
-            vec![
-                ("id".to_string(), json!("1")),
-                ("name".to_string(), json!("hoarse")),
-                ("riders.id".to_string(), json!("r1")),
-                ("riders.nickname".to_string(), json!("Speedy")),
+                {
+                    "id": 2,
+                    "nickname": "Bob",
+                    "horse_id": 1
+                }
             ]
-            .into_iter()
-            .collect(),
-            vec![
-                ("id".to_string(), json!("1")),
-                ("name".to_string(), json!("hoarse")),
-                ("riders.id".to_string(), json!("r1")),
-                ("riders.nickname".to_string(), json!("Speedy")),
-            ]
-            .into_iter()
-            .collect(),
-            vec![
-                ("id".to_string(), json!("1")),
-                ("name".to_string(), json!("hoarse")),
-                ("riders.id".to_string(), json!("r2")),
-                ("riders.nickname".to_string(), json!("Flash")),
-            ]
-            .into_iter()
-            .collect(),
-        ];
+        });
 
-        let include_tree = Some(
-            vec![("riders".to_string(), json!({}))]
+        let include_tree = json!({
+            "riders": {}
+        });
+
+        let upsert_stmts = UpsertModel::query(
+            "Horse",
+            &meta(),
+            new_model.as_object().unwrap().clone(),
+            Some(include_tree.as_object().unwrap().clone()),
+        )
+        .expect("upsert to succeed");
+
+        let results = test_sql(
+            meta(),
+            upsert_stmts
+                .sql
                 .into_iter()
-                .collect::<Map<String, Value>>(),
-        );
+                .map(|r| (r.query, r.values))
+                .collect(),
+            db,
+        )
+        .await
+        .expect("test_sql to succeed");
+
+        let select_rows = rows_to_json(results.get(results.len() - 2).unwrap());
 
         // Act
-        let result = map_sql("Horse", &meta, &rows, include_tree.as_ref()).unwrap();
-        let horse = result.first().unwrap().as_object().unwrap();
-        let riders = horse.get("riders").unwrap().as_array().unwrap();
+        let result = map_sql(
+            "Horse",
+            select_rows,
+            Some(include_tree.as_object().unwrap().clone()),
+            &meta(),
+        )
+        .expect("map_sql to succeed");
 
-        // Assert
-        assert_eq!(riders.len(), 2);
+        assert_eq!(result, vec![new_model]);
+    }
 
-        let ids: Vec<&Value> = riders.iter().map(|r| &r["id"]).collect();
-        assert!(ids.contains(&&json!("r1")));
-        assert!(ids.contains(&&json!("r2")));
+    #[sqlx::test]
+    async fn many_to_many(db: SqlitePool) {
+        // Arrange
+        let meta = || {
+            vec![
+                ModelBuilder::new("Student")
+                    .id_pk()
+                    .col("name", CidlType::nullable(CidlType::Text), None)
+                    .nav_p("courses", "Course", NavigationPropertyKind::ManyToMany)
+                    .build(),
+                ModelBuilder::new("Course")
+                    .id_pk()
+                    .col("title", CidlType::nullable(CidlType::Text), None)
+                    .nav_p("students", "Student", NavigationPropertyKind::ManyToMany)
+                    .build(),
+            ]
+            .into_iter()
+            .map(|m| (m.name.clone(), m))
+            .collect::<ModelMeta>()
+        };
+
+        let new_model = json!({
+            "id": 1,
+            "name": "John Doe",
+            "courses": [
+                {
+                    "id": 1,
+                    "title": "Math 101",
+                    "students": []
+                },
+                {
+                    "id": 2,
+                    "title": "History 201",
+                    "students": []
+                }
+            ]
+        });
+
+        let include_tree = json!({
+            "courses": {}
+        });
+
+        let upsert_stmts = UpsertModel::query(
+            "Student",
+            &meta(),
+            new_model.as_object().unwrap().clone(),
+            Some(include_tree.as_object().unwrap().clone()),
+        )
+        .expect("upsert to succeed");
+
+        let results = test_sql(
+            meta(),
+            upsert_stmts
+                .sql
+                .into_iter()
+                .map(|r| (r.query, r.values))
+                .collect(),
+            db,
+        )
+        .await
+        .expect("test_sql to succeed");
+
+        let select_rows = rows_to_json(results.get(results.len() - 2).unwrap());
+
+        // Act
+        let result = map_sql(
+            "Student",
+            select_rows,
+            Some(include_tree.as_object().unwrap().clone()),
+            &meta(),
+        )
+        .expect("map_sql to succeed");
+
+        assert_eq!(result, vec![new_model]);
     }
 }

@@ -1,4 +1,14 @@
-export default class Either<L, R> {
+/**
+ * Denotes that some error occured internally in Cloesce that should not happen.
+ */
+export class InternalError extends Error {
+  constructor(description: string) {
+    super(`An internal Cloesce error occurred: ${description}`);
+    Object.setPrototypeOf(this, InternalError.prototype);
+  }
+}
+
+export class Either<L, R> {
   private constructor(
     private readonly inner: { ok: true; right: R } | { ok: false; left: L },
   ) {}

@@ -5,13 +5,9 @@ export enum ExtractorErrorCode {
   MultipleGenericType,
   InvalidDataSourceDefinition,
   InvalidPartialType,
-  InvalidIncludeTree,
   InvalidPropertyModifier,
   InvalidApiMethodModifier,
-  UnknownNavigationPropertyReference,
-  InvalidNavigationPropertyReference,
   MissingNavigationPropertyReference,
-  MissingManyToManyUniqueId,
   TooManyWranglerEnvs,
   MissingFile,
   InvalidServiceProperty,
@@ -50,11 +46,6 @@ const errorInfoMap: Record<
     suggestion:
       "Declare your data source as `static readonly _: IncludeTree<Model>`",
   },
-  [ExtractorErrorCode.InvalidIncludeTree]: {
-    description: "Invalid Include Tree",
-    suggestion:
-      "Include trees must only contain references to a model's navigation properties.",
-  },
   [ExtractorErrorCode.InvalidPropertyModifier]: {
     description:
       "Attributes can only be public on a Model, Plain Old Object or Wrangler Environment",
@@ -65,24 +56,10 @@ const errorInfoMap: Record<
       "Model methods must be public if they are decorated as GET, POST, PUT, PATCH",
     suggestion: "Change the method modifier to just `public`",
   },
-  [ExtractorErrorCode.UnknownNavigationPropertyReference]: {
-    description: "Unknown Navigation Property Reference",
-    suggestion:
-      "Verify that the navigation property reference model exists, or create a model.",
-  },
-  [ExtractorErrorCode.InvalidNavigationPropertyReference]: {
-    description: "Invalid Navigation Property Reference",
-    suggestion: "Ensure the navigation property points to a valid model field",
-  },
   [ExtractorErrorCode.MissingNavigationPropertyReference]: {
     description: "Missing Navigation Property Reference",
     suggestion:
       "Navigation properties require a foreign key model attribute reference",
-  },
-  [ExtractorErrorCode.MissingManyToManyUniqueId]: {
-    description: "Missing unique id on Many to Many navigation property",
-    suggestion:
-      "Define a unique identifier field for the Many-to-Many relationship",
   },
   [ExtractorErrorCode.TooManyWranglerEnvs]: {
     description: "Too many wrangler environments defined in the project",

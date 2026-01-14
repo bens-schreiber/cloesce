@@ -1,12 +1,12 @@
 {
-  "hash": 13468236154706247040,
+  "hash": 16162253099424807530,
   "models": {
     "D1BackedModel": {
-      "hash": 13702850169640110521,
+      "hash": 15352229634040773385,
       "name": "D1BackedModel",
       "primary_key": {
         "name": "id",
-        "cidl_type": "Real"
+        "cidl_type": "Integer"
       },
       "columns": [
         {
@@ -27,7 +27,15 @@
         }
       ],
       "navigation_properties": [],
-      "data_sources": {}
+      "data_sources": {
+        "default": {
+          "hash": 480366780526763046,
+          "name": "default",
+          "tree": {
+            "kvData": {}
+          }
+        }
+      }
     }
   }
 }

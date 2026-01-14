@@ -164,8 +164,7 @@ export class {{this.name}} {
 {{#each this.navigation_properties}}
 {{#if (is_one_to_one this)}}
     res["{{var_name}}"] &&= {{this.model_reference}}.fromJson(res.{{var_name}});
-{{/if}}
-{{#if (is_many_nav this)}}
+{{else}}
     for (let i = 0; i < res.{{var_name}}?.length; i++) {
       res.{{var_name}}[i] = {{this.model_reference}}.fromJson(res.{{var_name}}[i]);
     }

@@ -173,21 +173,7 @@ export const OneToOne =
   (_foreignKeyColumn: string): PropertyDecorator =>
   () => {};
 
-/**
- * Declares a many-to-many relationship between models.
- *
- * The argument is a unique identifier for the generated
- * junction table used to connect the two entities.
- *
- * Example:
- * ```ts
- * ＠ManyToMany("StudentsCourses")
- * courses: Course[];
- * ```
- */
-export const ManyToMany =
-  (_uniqueId: string): PropertyDecorator =>
-  () => {};
+export const ManyToMany = (): PropertyDecorator => () => {};
 
 /**
  * Declares a foreign key relationship between models.

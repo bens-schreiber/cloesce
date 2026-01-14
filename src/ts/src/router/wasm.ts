@@ -1,13 +1,11 @@
-import { CidlIncludeTree, CloesceAst } from "../ast.js";
-import { IncludeTree } from "../ui/backend.js";
-import { RuntimeContainer } from "./router.js";
-import Either from "../either.js";
+import { CloesceAst } from "../ast.js";
+import { Either } from "../common.js";
 
-// Requires the ORM binary to have been built
+// NOTE: Requires the ORM binary to have been built
 import mod from "../orm.wasm";
 
 /**
- * WASM ABI
+ * Cloesce WASM ABI
  */
 export interface OrmWasmExports {
   memory: WebAssembly.Memory;
@@ -16,15 +14,6 @@ export interface OrmWasmExports {
   set_meta_ptr(ptr: number, len: number): number;
   alloc(len: number): number;
   dealloc(ptr: number, len: number): void;
-
-  map_sql(
-    model_name_ptr: number,
-    model_name_len: number,
-    sql_rows_ptr: number,
-    sql_rows_len: number,
-    include_tree_ptr: number,
-    include_tree_len: number,
-  ): boolean;
 
   upsert_model(
     model_name_ptr: number,
@@ -35,21 +24,25 @@ export interface OrmWasmExports {
     include_tree_len: number,
   ): boolean;
 
-  list_models(
+  select_model(
     model_name_ptr: number,
     model_name_len: number,
+    from_ptr: number,
+    from_len: number,
     include_tree_ptr: number,
     include_tree_len: number,
-    tag_cte_ptr: number,
-    tag_cte_len: number,
-    custom_from_ptr: number,
-    custom_from_len: number,
+  ): boolean;
+
+  map(
+    model_name_ptr: number,
+    model_name_len: number,
+    d1_result_ptr: number,
+    d1_result_len: number,
+    include_tree_ptr: number,
+    include_tree_len: number,
   ): boolean;
 }
 
-/**
- * RAII for wasm memory
- */
 export class WasmResource {
   private constructor(
     private wasm: OrmWasmExports,
@@ -62,9 +55,12 @@ export class WasmResource {
   }
 
   /**
-   * Copies a value from TS memory to WASM memory. A subsequent `free` is necessary.
+   * Copies a value from TS memory to WASM memory.
+   *
+   * A subsequent call to `free` is necessary.
    */
   static fromString(str: string, wasm: OrmWasmExports): WasmResource {
+    // TODO: Would be interesting to optimize this to avoid the intermediate copy
     const encoder = new TextEncoder();
     const bytes = encoder.encode(str);
     const ptr = wasm.alloc(bytes.length);
@@ -134,26 +130,4 @@ export function invokeOrmWasm(
     args.forEach((a) => a.free());
     if (resPtr && resLen) wasm.dealloc(resPtr, resLen);
   }
-}
-
-/**
- * Calls the object relational mapping function to turn a row of SQL records into
- * JSON
- */
-export function mapSqlJson<T extends object>(
-  ctor: new () => T,
-  records: Record<string, any>[],
-  includeTree: IncludeTree<T> | CidlIncludeTree | null,
-): Either<string, T[]> {
-  const { wasm } = RuntimeContainer.get();
-  const args = [
-    WasmResource.fromString(ctor.name, wasm),
-    WasmResource.fromString(JSON.stringify(records), wasm),
-    WasmResource.fromString(JSON.stringify(includeTree), wasm),
-  ];
-
-  const jsonResults = invokeOrmWasm(wasm.map_sql, args, wasm);
-  if (jsonResults.isLeft()) return jsonResults;
-
-  return Either.right(JSON.parse(jsonResults.value));
 }
