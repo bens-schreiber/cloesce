@@ -37,7 +37,7 @@ impl<'a> SelectModel<'a> {
             )
         }
 
-        const CUSTOM_FROM: &str = "__cte_custom_from_placeholder__";
+        const CUSTOM_FROM: &str = "__custom_from_placeholder__";
         let mut query = Query::select();
         match from {
             Some(_) => {
