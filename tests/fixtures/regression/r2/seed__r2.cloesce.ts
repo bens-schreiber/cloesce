@@ -40,17 +40,13 @@ export class PureR2Model {
     allData: R2ObjectBody[];
 
     @PUT
-    async uploadData(@Inject env: Env, stream: ReadableStream, @Inject req: Request) {
-        await env.bucket1.put(`path/to/data/${this.id}`, req.body, {
-            httpMetadata: { contentType: req.headers.get("content-type") || undefined },
-        });
+    async uploadData(@Inject env: Env, stream: ReadableStream) {
+        await env.bucket1.put(`path/to/data/${this.id}`, stream);
     }
 
     @PUT
-    async uploadOtherData(@Inject env: Env, stream: ReadableStream, @Inject req: Request) {
-        await env.bucket2.put(`path/to/other/${this.id}`, stream, {
-            httpMetadata: { contentType: req.headers.get("content-type") || undefined },
-        });
+    async uploadOtherData(@Inject env: Env, stream: ReadableStream) {
+        await env.bucket2.put(`path/to/other/${this.id}`, stream);
     }
 
     @DataSource
@@ -77,10 +73,8 @@ export class D1BackedModel {
     r2Data: R2ObjectBody;
 
     @PUT
-    async uploadData(@Inject env: Env, stream: ReadableStream, @Inject req: Request) {
-        await env.bucket1.put(`d1Backed/${this.id}/${this.keyParam}/${this.someColumn}/${this.someOtherColumn}`, stream, {
-            httpMetadata: { contentType: req.headers.get("content-type") || undefined },
-        });
+    async uploadData(@Inject env: Env, stream: ReadableStream) {
+        await env.bucket1.put(`d1Backed/${this.id}/${this.keyParam}/${this.someColumn}/${this.someOtherColumn}`, stream);
     }
 
     @DataSource

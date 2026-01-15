@@ -147,12 +147,6 @@
               "cidl_type": "Stream"
             },
             {
-              "name": "req",
-              "cidl_type": {
-                "Inject": "Request"
-              }
-            },
-            {
               "name": "__datasource",
               "cidl_type": {
                 "DataSource": "D1BackedModel"
@@ -251,12 +245,6 @@
               "cidl_type": "Stream"
             },
             {
-              "name": "req",
-              "cidl_type": {
-                "Inject": "Request"
-              }
-            },
-            {
               "name": "__datasource",
               "cidl_type": {
                 "DataSource": "PureR2Model"
@@ -281,12 +269,6 @@
             {
               "name": "stream",
               "cidl_type": "Stream"
-            },
-            {
-              "name": "req",
-              "cidl_type": {
-                "Inject": "Request"
-              }
             },
             {
               "name": "__datasource",

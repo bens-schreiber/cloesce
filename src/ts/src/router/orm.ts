@@ -461,7 +461,6 @@ export class Orm {
 
         const nestedMeta = ast.models[navProp.model_reference];
         const value = currentModel[navProp.var_name];
-        const newValue = (newModel as any)[navProp.var_name];
 
         if (Array.isArray(value)) {
           for (let i = 0; i < value.length; i++) {
