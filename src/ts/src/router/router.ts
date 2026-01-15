@@ -388,11 +388,14 @@ function matchRoute(
       return notFound(RouterError.UnmatchedHttpVerb);
     }
 
-    // For now, primary key is always the first ID segment
-    // and the rest are key params.
-    const primaryKey: string | null = id[0] ?? null;
+    const hasPrimaryKey = model.primary_key !== null;
+    const offset = hasPrimaryKey ? 1 : 0;
+    const primaryKey = hasPrimaryKey ? (id[0] ?? null) : null;
+
     const keyParams = Object.fromEntries(
-      id.slice(1).map((v, i) => [model.key_params[i], decodeURIComponent(v)]),
+      id
+        .slice(offset)
+        .map((v, i) => [model.key_params[i], decodeURIComponent(v)]),
     );
 
     return Either.right({

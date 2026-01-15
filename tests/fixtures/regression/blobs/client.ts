@@ -84,7 +84,7 @@ export class BlobHaver {
     );
   }
   static async inputStream(
-    stream: ReadableStream<Uint8Array>,
+    stream: Uint8Array,
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<void>> {
     const baseUrl = new URL(
@@ -178,7 +178,7 @@ export class BlobHaver {
     return await HttpResult.fromResponse(
       res,
       MediaType.Octet,
-      ReadableStream<Uint8Array>,
+      Uint8Array,
       false
     );
   }

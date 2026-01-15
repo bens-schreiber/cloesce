@@ -106,6 +106,7 @@
             },
             "cruds": [
                 "GET",
+                "LIST",
                 "SAVE"
             ],
             "source_path": "./seed__kv.cloesce.ts"

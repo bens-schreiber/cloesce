@@ -1,0 +1,16 @@
+compatibility_date = "2025-10-02"
+main = "workers.ts"
+name = "cloesce"
+
+[[d1_databases]]
+binding = "db"
+database_id = "replace_with_db_id"
+database_name = "replace_with_db_name"
+
+[[r2_buckets]]
+binding = "bucket1"
+bucket_name = "replace-with-r2-bucket-name"
+
+[[r2_buckets]]
+binding = "bucket2"
+bucket_name = "replace-with-r2-bucket-name"

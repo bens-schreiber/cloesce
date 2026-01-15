@@ -24,14 +24,7 @@ describe("BlobService", () => {
 
 describe("BlobHaver", () => {
   it("POST Stream", async () => {
-    const stream = new ReadableStream({
-      start(controller) {
-        controller.enqueue(new Uint8Array([1, 2, 3, 4, 5]));
-        controller.close();
-      },
-    });
-
-    const res = await BlobHaver.inputStream(stream);
+    const res = await BlobHaver.inputStream(new Uint8Array([1, 2, 3, 4, 5]));
     expect(res.ok, withRes("POST should be OK", res)).toBe(true);
   });
 

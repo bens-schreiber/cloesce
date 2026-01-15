@@ -43,7 +43,7 @@ impl ClientLanguageTypeMapper for TypeScriptMapper {
                 format_ds.push("\"none\"".to_string());
                 format!("{} = \"none\"", format_ds.join(" |")) // default to none
             }
-            CidlType::Stream => "ReadableStream<Uint8Array>".to_string(),
+            CidlType::Stream => "Uint8Array".to_string(),
             _ => panic!("Invalid type {:?}", ty),
         }
     }

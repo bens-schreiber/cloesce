@@ -235,13 +235,13 @@ describe("Model", () => {
     } as DataSource);
   });
 
-  test("Extracts Primary Key, Columns, Key Params and KV", () => {
+  test("Extracts Primary Key, Columns, Key Params, KV, R2", () => {
     // Arrange
     const project = cloesceProject();
     const sourceFile = project.createSourceFile(
       "test.ts",
       `
-      import { KValue, Integer } from "./src/ui/backend";
+      import { KValue, Integer, R2ObjectBody } from "./src/ui/backend";
       @Model
       class Foo {
         @PrimaryKey
@@ -259,6 +259,12 @@ describe("Model", () => {
 
         @KV("value/Foo", "namespace")
         allValues: KValue<unknown>[];
+
+        @R2("files/Foo/{id}", "bucket")
+        fileData: R2ObjectBody;
+
+        @R2("files/Foo", "bucket")
+        allFiles: R2ObjectBody[];
       }
       `,
     );
@@ -286,6 +292,8 @@ describe("Model", () => {
           "JsonValue",
         )
         .kvObject("value/Foo", "namespace", "allValues", true, "JsonValue")
+        .r2Object("files/Foo/{id}", "bucket", "fileData", false)
+        .r2Object("files/Foo", "bucket", "allFiles", true)
         .build(),
     );
   });

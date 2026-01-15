@@ -13,6 +13,7 @@ export { HttpResult, KValue } from "./common.js";
 export type { DeepPartial } from "./common.js";
 export type { CrudKind } from "../ast.js";
 export { Orm } from "../router/orm.js";
+export { R2ObjectBody } from "@cloudflare/workers-types";
 
 export const Model: ClassDecorator = () => {};
 export const Service: ClassDecorator = () => {};

@@ -13,6 +13,7 @@ export enum ExtractorErrorCode {
   InvalidServiceProperty,
   InvalidTypescriptSyntax,
   MissingKValue,
+  MissingR2ObjectBody,
 }
 
 const errorInfoMap: Record<
@@ -81,6 +82,10 @@ const errorInfoMap: Record<
   [ExtractorErrorCode.MissingKValue]: {
     description: "All KV decorated fields must be of type KValue<T>",
     suggestion: "Change the field type to KValue<T>.",
+  },
+  [ExtractorErrorCode.MissingR2ObjectBody]: {
+    description: "All R2 decorated fields must be of type R2ObjectBody.",
+    suggestion: "Change the field type to R2ObjectBody.",
   },
 };
 

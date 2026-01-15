@@ -253,13 +253,11 @@ export class Orm {
         }
       }
 
-      if (!args.keyParams) {
-        return;
-      }
-
       // Hydrate key params
-      for (const keyParam of meta.key_params) {
-        current[keyParam] = args.keyParams[keyParam];
+      if (args.keyParams) {
+        for (const keyParam of meta.key_params) {
+          current[keyParam] = args.keyParams[keyParam];
+        }
       }
 
       // Hydrate KV objects
@@ -272,7 +270,7 @@ export class Orm {
           continue;
         }
 
-        const key = resolveKey(kv.format, current, args.keyParams);
+        const key = resolveKey(kv.format, current, args.keyParams ?? {});
         if (!key) {
           if (kv.list_prefix) {
             current[kv.value.name] = [];
@@ -301,7 +299,7 @@ export class Orm {
           continue;
         }
 
-        const key = resolveKey(r2.format, current, args.keyParams);
+        const key = resolveKey(r2.format, current, args.keyParams ?? {});
         if (!key) {
           if (r2.list_prefix) {
             current[r2.var_name] = [];
@@ -344,7 +342,8 @@ export class Orm {
     newModel: DeepPartial<T>,
     includeTree: IncludeTree<T> | null = null,
   ): Promise<T | null> {
-    const { wasm } = RuntimeContainer.get();
+    const { wasm, ast } = RuntimeContainer.get();
+    const meta = ast.models[ctor.name];
 
     const upsertQueryRes = invokeOrmWasm(
       wasm.upsert_model,
@@ -435,6 +434,51 @@ export class Orm {
       }
 
       base = Orm.map(ctor, batchRes[selectIndex!], includeTree)[0];
+    }
+
+    // Base needs to include all of the key params from newModel and its includes.
+    const q: Array<{ model: any; meta: AstModel; tree: IncludeTree<any> }> = [
+      { model: base, meta, tree: includeTree ?? {} },
+    ]!;
+    while (q.length > 0) {
+      const {
+        model: currentModel,
+        meta: currentMeta,
+        tree: currentTree,
+      } = q.shift()!;
+
+      // Key params
+      for (const keyParam of currentMeta.key_params) {
+        if (currentModel[keyParam] === undefined) {
+          currentModel[keyParam] = (newModel as any)[keyParam];
+        }
+      }
+
+      // Navigation properties
+      for (const navProp of currentMeta.navigation_properties) {
+        const nestedTree = currentTree[navProp.var_name];
+        if (!nestedTree) continue;
+
+        const nestedMeta = ast.models[navProp.model_reference];
+        const value = currentModel[navProp.var_name];
+        const newValue = (newModel as any)[navProp.var_name];
+
+        if (Array.isArray(value)) {
+          for (let i = 0; i < value.length; i++) {
+            q.push({
+              model: value[i],
+              meta: nestedMeta,
+              tree: nestedTree,
+            });
+          }
+        } else if (value) {
+          q.push({
+            model: value,
+            meta: nestedMeta,
+            tree: nestedTree,
+          });
+        }
+      }
     }
 
     // Upload all delayed KV uploads

@@ -281,6 +281,11 @@ export class CidlExtractor {
         continue;
       }
 
+      if (prop.getType().getSymbol()?.getName() === "R2Bucket") {
+        r2_bindings.push(prop.getName());
+        continue;
+      }
+
       const ty = CidlExtractor.cidlType(prop.getType());
       if (ty.isLeft()) {
         ty.value.context = prop.getName();
@@ -789,7 +794,35 @@ export class ModelExtractor {
           break;
         }
         case PropertyDecoratorKind.R2: {
-          throw new Error("Not supported yet");
+          // Format and bucket binding are required
+          const format = getDecoratorArgument(decorator, 0);
+          const bucket_binding = getDecoratorArgument(decorator, 1);
+          if (!format || !bucket_binding) {
+            return err(ExtractorErrorCode.InvalidTypescriptSyntax, (e) => {
+              e.snippet = prop.getText();
+              e.context = prop.getName();
+            });
+          }
+
+          // Type must be R2ObjectBody
+          const ty = prop.getType();
+          const isArray = ty.isArray();
+          const elementType = isArray ? ty.getArrayElementTypeOrThrow() : ty;
+          const symbolName = elementType.getSymbol()?.getName();
+          if (symbolName !== "R2ObjectBody") {
+            return err(ExtractorErrorCode.MissingR2ObjectBody, (e) => {
+              e.snippet = prop.getText();
+              e.context = prop.getName();
+            });
+          }
+
+          r2_objects.push({
+            format,
+            bucket_binding,
+            var_name: prop.getName(),
+            list_prefix: isArray,
+          });
+          break;
         }
       }
     }
