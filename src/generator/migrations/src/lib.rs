@@ -209,8 +209,6 @@ impl MigrateTables {
     /// Some alterations cannot occur in SQLite without dropping the table, in which a
     /// full rebuild and copy of data will occur.
     ///
-    /// TODO: Sophisticated warnings and logs about alteration choices
-    ///
     /// Poses a [MigrationsDilemma::RenameOrDropModel], determining if a dropped model is
     /// actually just a rename. If that is the case, removes from `drop` and `add` lists, undergoing
     /// table alteration on the (model, last migrated model) pair.

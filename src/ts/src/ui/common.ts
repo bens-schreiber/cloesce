@@ -82,7 +82,7 @@ export class KValue<V> {
 export function requestBody(
   mediaType: MediaType,
   data: any | string | undefined,
-): undefined | string | ReadableStream<Uint8Array> {
+): BodyInit | undefined {
   switch (mediaType) {
     case MediaType.Json: {
       return JSON.stringify(data ?? {}, (_, v) => {
@@ -91,18 +91,13 @@ export function requestBody(
           return u8ToB64(v);
         }
 
-        // ReadableStreams are not serializable, toss them
-        if (v instanceof ReadableStream) {
-          return undefined;
-        }
-
         return v;
       });
     }
     case MediaType.Octet: {
       // JSON structure isn't needed; assume the first
       // value is the stream data
-      return Object.values(data)[0] as ReadableStream<Uint8Array>;
+      return Object.values(data)[0] as BodyInit;
     }
   }
 }

@@ -30,7 +30,7 @@ export class PooWithComposition {
 export class BasicService {
   static async downloadData(
     fetchImpl: typeof fetch = fetch
-  ): Promise<HttpResult<ReadableStream<Uint8Array>>> {
+  ): Promise<HttpResult<Uint8Array>> {
     const baseUrl = new URL("http://example.com/api/BasicService/downloadData");
 
 
@@ -42,7 +42,7 @@ export class BasicService {
     return await HttpResult.fromResponse(
       res,
       MediaType.Octet,
-      ReadableStream<Uint8Array>,
+      Uint8Array,
       false
     );
   }
@@ -90,7 +90,7 @@ export class BasicService {
     );
   }
   static async uploadData(
-    data: ReadableStream<Uint8Array>,
+    data: Uint8Array,
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<boolean>> {
     const baseUrl = new URL("http://example.com/api/BasicService/uploadData");

@@ -772,16 +772,16 @@ fn validate_methods(
                 )
             }
             CidlType::Stream => {
-                let valid_params_len = if method.is_static {
-                    // There should only be the stream param
-                    method.parameters.len() == 1
-                } else {
-                    // There should be a data source and the stream param
-                    method.parameters.len() < 3
-                };
+                let required_params = method
+                    .parameters
+                    .iter()
+                    .filter(|p| {
+                        !matches!(p.cidl_type, CidlType::Inject(_) | CidlType::DataSource(_))
+                    })
+                    .count();
 
                 ensure!(
-                    valid_params_len && matches!(param.cidl_type, CidlType::Stream),
+                    required_params == 1 && matches!(param.cidl_type, CidlType::Stream),
                     GeneratorErrorKind::InvalidStream,
                     "{}.{}",
                     namespace,

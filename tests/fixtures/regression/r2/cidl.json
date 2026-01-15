@@ -1,20 +1,20 @@
 {
-  "hash": 16162253099424807530,
+  "hash": 2327162294965326794,
   "project_name": "runner",
   "wrangler_env": {
     "name": "Env",
-    "source_path": "./seed__kv.cloesce.ts",
+    "source_path": "./seed__r2.cloesce.ts",
     "d1_binding": "db",
-    "kv_bindings": [
-      "namespace",
-      "otherNamespace"
+    "kv_bindings": [],
+    "r2_bindings": [
+      "bucket1",
+      "bucket2"
     ],
-    "r2_bindings": [],
     "vars": {}
   },
   "models": {
     "D1BackedModel": {
-      "hash": 15352229634040773385,
+      "hash": 3458397548065808129,
       "name": "D1BackedModel",
       "primary_key": {
         "name": "id",
@@ -42,18 +42,15 @@
       "key_params": [
         "keyParam"
       ],
-      "kv_objects": [
+      "kv_objects": [],
+      "r2_objects": [
         {
           "format": "d1Backed/{id}/{keyParam}/{someColumn}/{someOtherColumn}",
-          "namespace_binding": "namespace",
-          "value": {
-            "name": "kvData",
-            "cidl_type": "JsonValue"
-          },
+          "var_name": "r2Data",
+          "bucket_binding": "bucket1",
           "list_prefix": false
         }
       ],
-      "r2_objects": [],
       "methods": {
         "get": {
           "name": "get",
@@ -130,14 +127,40 @@
               }
             }
           ]
+        },
+        "uploadData": {
+          "name": "uploadData",
+          "is_static": false,
+          "http_verb": "PUT",
+          "return_media": "Json",
+          "return_type": "Void",
+          "parameters_media": "Octet",
+          "parameters": [
+            {
+              "name": "env",
+              "cidl_type": {
+                "Inject": "Env"
+              }
+            },
+            {
+              "name": "stream",
+              "cidl_type": "Stream"
+            },
+            {
+              "name": "__datasource",
+              "cidl_type": {
+                "DataSource": "D1BackedModel"
+              }
+            }
+          ]
         }
       },
       "data_sources": {
         "default": {
-          "hash": 480366780526763046,
+          "hash": 11550479417874734565,
           "name": "default",
           "tree": {
-            "kvData": {}
+            "r2Data": {}
           }
         }
       },
@@ -146,38 +169,38 @@
         "LIST",
         "SAVE"
       ],
-      "source_path": "./seed__kv.cloesce.ts"
+      "source_path": "./seed__r2.cloesce.ts"
     },
-    "PureKVModel": {
-      "hash": 6611921539549597485,
-      "name": "PureKVModel",
+    "PureR2Model": {
+      "hash": 18244951545139998472,
+      "name": "PureR2Model",
       "primary_key": null,
       "columns": [],
       "navigation_properties": [],
       "key_params": [
         "id"
       ],
-      "kv_objects": [
+      "kv_objects": [],
+      "r2_objects": [
         {
           "format": "path/to/data/{id}",
-          "namespace_binding": "namespace",
-          "value": {
-            "name": "data",
-            "cidl_type": "JsonValue"
-          },
+          "var_name": "data",
+          "bucket_binding": "bucket1",
           "list_prefix": false
         },
         {
           "format": "path/to/other/{id}",
-          "namespace_binding": "otherNamespace",
-          "value": {
-            "name": "otherData",
-            "cidl_type": "Text"
-          },
+          "var_name": "otherData",
+          "bucket_binding": "bucket2",
           "list_prefix": false
+        },
+        {
+          "format": "path/",
+          "var_name": "allData",
+          "bucket_binding": "bucket1",
+          "list_prefix": true
         }
       ],
-      "r2_objects": [],
       "methods": {
         "get": {
           "name": "get",
@@ -186,7 +209,7 @@
           "return_media": "Json",
           "return_type": {
             "HttpResult": {
-              "Object": "PureKVModel"
+              "Object": "PureR2Model"
             }
           },
           "parameters_media": "Json",
@@ -198,33 +221,59 @@
             {
               "name": "__datasource",
               "cidl_type": {
-                "DataSource": "PureKVModel"
+                "DataSource": "PureR2Model"
               }
             }
           ]
         },
-        "save": {
-          "name": "save",
-          "is_static": true,
-          "http_verb": "POST",
+        "uploadData": {
+          "name": "uploadData",
+          "is_static": false,
+          "http_verb": "PUT",
           "return_media": "Json",
-          "return_type": {
-            "HttpResult": {
-              "Object": "PureKVModel"
-            }
-          },
-          "parameters_media": "Json",
+          "return_type": "Void",
+          "parameters_media": "Octet",
           "parameters": [
             {
-              "name": "model",
+              "name": "env",
               "cidl_type": {
-                "Partial": "PureKVModel"
+                "Inject": "Env"
               }
+            },
+            {
+              "name": "stream",
+              "cidl_type": "Stream"
             },
             {
               "name": "__datasource",
               "cidl_type": {
-                "DataSource": "PureKVModel"
+                "DataSource": "PureR2Model"
+              }
+            }
+          ]
+        },
+        "uploadOtherData": {
+          "name": "uploadOtherData",
+          "is_static": false,
+          "http_verb": "PUT",
+          "return_media": "Json",
+          "return_type": "Void",
+          "parameters_media": "Octet",
+          "parameters": [
+            {
+              "name": "env",
+              "cidl_type": {
+                "Inject": "Env"
+              }
+            },
+            {
+              "name": "stream",
+              "cidl_type": "Stream"
+            },
+            {
+              "name": "__datasource",
+              "cidl_type": {
+                "DataSource": "PureR2Model"
               }
             }
           ]
@@ -232,19 +281,19 @@
       },
       "data_sources": {
         "default": {
-          "hash": 17997894496222874802,
+          "hash": 14302061763060449193,
           "name": "default",
           "tree": {
+            "allData": {},
             "data": {},
             "otherData": {}
           }
         }
       },
       "cruds": [
-        "GET",
-        "SAVE"
+        "GET"
       ],
-      "source_path": "./seed__kv.cloesce.ts"
+      "source_path": "./seed__r2.cloesce.ts"
     }
   },
   "services": {},

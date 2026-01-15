@@ -7,10 +7,6 @@ import {
     KeyParam,
     Model,
     PrimaryKey,
-    Inject,
-    DeepPartial,
-    Orm,
-    POST,
     CRUD
 } from "cloesce/backend";
 import { D1Database } from "@cloudflare/workers-types";
@@ -46,7 +42,7 @@ export class PureKVModel {
     };
 }
 
-@CRUD(["GET", "SAVE"])
+@CRUD(["GET", "SAVE", "LIST"])
 @Model
 export class D1BackedModel {
     @PrimaryKey

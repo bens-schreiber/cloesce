@@ -63,4 +63,16 @@ describe("D1BackedModel", () => {
     expect(res.data?.keyParam).toBe("key1");
     expect(res.data?.kvData.raw).toEqual(data);
   });
+
+  it("LIST", async () => {
+    // D1BackedModel takes a key param and thus cannot list KV components
+    const res = await D1BackedModel.list("default");
+
+    expect(res.ok, withRes("LIST should be OK", res)).toBe(true);
+    expect(res.data.length).toBeGreaterThan(0);
+    const item = res.data[0];
+    expect(item.id).toBeDefined();
+    expect(item.keyParam).toBeUndefined();
+    expect(item.kvData).toBeUndefined();
+  });
 });

@@ -379,8 +379,8 @@ fn invalid_stream_method() {
                     cidl_type: CidlType::Stream,
                 },
                 NamedTypedValue {
-                    name: "ds".into(),
-                    cidl_type: CidlType::DataSource("Dog".into()),
+                    name: "id".into(),
+                    cidl_type: CidlType::Integer,
                 },
             ],
             CidlType::Stream,

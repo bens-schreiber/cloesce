@@ -9,7 +9,7 @@ export class D1BackedModel {
   someColumn: number;
   someOtherColumn: string;
   keyParam: string;
-  kvData: KValue<unknown>;
+  r2Data: R2Object;
 
   static async get(
     id: number,
@@ -86,24 +86,56 @@ export class D1BackedModel {
       false
     );
   }
+  async uploadData(
+    stream: Uint8Array,
+    __datasource: "default" |"none" = "none",
+    fetchImpl: typeof fetch = fetch
+  ): Promise<HttpResult<void>> {
+    const id = [
+      encodeURIComponent(String(this.id)),
+      encodeURIComponent(String(this.keyParam)),
+    ].join("/");
+    const baseUrl = new URL(
+      `http://localhost:5002/api/D1BackedModel/${id}/uploadData`
+    );
+    const payload: any = {};
+
+    payload["stream"] = stream;
+    baseUrl.searchParams.append("__datasource", String(__datasource));
+
+    const res = await fetchImpl(baseUrl, {
+      method: "PUT",
+      duplex: "half",
+      headers: { "Content-Type": "application/octet-stream" },
+      body: requestBody(MediaType.Octet, payload),
+    });
+
+    return await HttpResult.fromResponse(
+      res,
+      MediaType.Json,
+      undefined,
+      false
+    );
+  }
 
   static fromJson(data: any): D1BackedModel {
     const res = Object.assign(new D1BackedModel(), data);
     return res;
   }
 }
-export class PureKVModel {
+export class PureR2Model {
   id: string;
-  data: KValue<unknown>;
-  otherData: KValue<string>;
+  data: R2Object;
+  otherData: R2Object;
+  allData: R2Object[];
 
   static async get(
     id: string,
     __datasource: "default" |"none" = "none",
     fetchImpl: typeof fetch = fetch
-  ): Promise<HttpResult<PureKVModel>> {
+  ): Promise<HttpResult<PureR2Model>> {
     const baseUrl = new URL(
-      `http://localhost:5002/api/PureKVModel/get`
+      `http://localhost:5002/api/PureR2Model/get`
     );
 
     baseUrl.searchParams.append("id", String(id));
@@ -117,40 +149,73 @@ export class PureKVModel {
     return await HttpResult.fromResponse(
       res,
       MediaType.Json,
-      PureKVModel,
+      PureR2Model,
       false
     );
   }
-  static async save(
-    model: DeepPartial<PureKVModel>,
+  async uploadData(
+    stream: Uint8Array,
     __datasource: "default" |"none" = "none",
     fetchImpl: typeof fetch = fetch
-  ): Promise<HttpResult<PureKVModel>> {
+  ): Promise<HttpResult<void>> {
+    const id = [
+      encodeURIComponent(String(this.id)),
+    ].join("/");
     const baseUrl = new URL(
-      `http://localhost:5002/api/PureKVModel/save`
+      `http://localhost:5002/api/PureR2Model/${id}/uploadData`
     );
     const payload: any = {};
 
-    payload["model"] = model;
+    payload["stream"] = stream;
     baseUrl.searchParams.append("__datasource", String(__datasource));
 
     const res = await fetchImpl(baseUrl, {
-      method: "POST",
+      method: "PUT",
       duplex: "half",
-      headers: { "Content-Type": "application/json" },
-      body: requestBody(MediaType.Json, payload),
+      headers: { "Content-Type": "application/octet-stream" },
+      body: requestBody(MediaType.Octet, payload),
     });
 
     return await HttpResult.fromResponse(
       res,
       MediaType.Json,
-      PureKVModel,
+      undefined,
+      false
+    );
+  }
+  async uploadOtherData(
+    stream: Uint8Array,
+    __datasource: "default" |"none" = "none",
+    fetchImpl: typeof fetch = fetch
+  ): Promise<HttpResult<void>> {
+    const id = [
+      encodeURIComponent(String(this.id)),
+    ].join("/");
+    const baseUrl = new URL(
+      `http://localhost:5002/api/PureR2Model/${id}/uploadOtherData`
+    );
+    const payload: any = {};
+
+    payload["stream"] = stream;
+    baseUrl.searchParams.append("__datasource", String(__datasource));
+
+    const res = await fetchImpl(baseUrl, {
+      method: "PUT",
+      duplex: "half",
+      headers: { "Content-Type": "application/octet-stream" },
+      body: requestBody(MediaType.Octet, payload),
+    });
+
+    return await HttpResult.fromResponse(
+      res,
+      MediaType.Json,
+      undefined,
       false
     );
   }
 
-  static fromJson(data: any): PureKVModel {
-    const res = Object.assign(new PureKVModel(), data);
+  static fromJson(data: any): PureR2Model {
+    const res = Object.assign(new PureR2Model(), data);
     return res;
   }
 }
