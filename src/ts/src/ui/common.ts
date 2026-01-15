@@ -82,7 +82,7 @@ export class KValue<V> {
 export function requestBody(
   mediaType: MediaType,
   data: any | string | undefined,
-): undefined | string | Uint8Array {
+): BodyInit | undefined {
   switch (mediaType) {
     case MediaType.Json: {
       return JSON.stringify(data ?? {}, (_, v) => {
@@ -97,7 +97,7 @@ export function requestBody(
     case MediaType.Octet: {
       // JSON structure isn't needed; assume the first
       // value is the stream data
-      return Object.values(data)[0] as Uint8Array;
+      return Object.values(data)[0] as BodyInit;
     }
   }
 }
