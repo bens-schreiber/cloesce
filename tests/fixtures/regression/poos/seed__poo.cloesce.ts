@@ -28,7 +28,6 @@ export class Env {
 
 @Model
 export class PooAcceptYield {
-  @PrimaryKey
   id: Integer;
 
   @POST

@@ -33,7 +33,6 @@ export class BlobService {
 
 @Model(["SAVE", "GET", "LIST"])
 export class BlobHaver {
-  @PrimaryKey
   id: Integer;
 
   blob1: Uint8Array;

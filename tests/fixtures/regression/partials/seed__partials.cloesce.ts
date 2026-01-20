@@ -18,7 +18,6 @@ export class Env {
 
 @Model
 export class Dog {
-  @PrimaryKey
   id: Integer;
 
   name: string;

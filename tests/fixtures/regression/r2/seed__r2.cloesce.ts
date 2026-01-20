@@ -1,11 +1,9 @@
 import {
     R2,
     WranglerEnv,
-    DataSource,
     IncludeTree,
     KeyParam,
     Model,
-    PrimaryKey,
     PUT,
     Inject
 } from "cloesce/backend";
@@ -56,7 +54,6 @@ export class PureR2Model {
 
 @Model(["GET", "SAVE", "LIST"])
 export class D1BackedModel {
-    @PrimaryKey
     id: Integer;
 
     @KeyParam

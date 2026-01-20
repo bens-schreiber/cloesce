@@ -241,7 +241,6 @@ export class CidlExtractor {
 
     // Iterate properties
     for (const prop of classDecl.getProperties()) {
-      const decorators = prop.getDecorators();
       const typeRes = CidlExtractor.cidlType(prop.getType());
 
       // Error: invalid property type
@@ -289,9 +288,33 @@ export class CidlExtractor {
         return checkModifierRes;
       }
 
-      // Scalar columns
+      // Infer decorator
+      if (prop.getDecorators().length < 1) {
+        // Primary Key (name is "id" or "{model_name}Id", regardless of case or underscore)
+        const normalizedPropName = prop
+          .getName()
+          .toLowerCase()
+          .replace(/_/g, "");
+        const normalizedIdName = "id";
+        const normalizedModelIdName = `${name.toLowerCase()}id`;
+        if (
+          normalizedPropName === normalizedIdName ||
+          normalizedPropName === normalizedModelIdName
+        ) {
+          // Add a primary key decorator
+          prop.addDecorator({
+            name: PropertyDecoratorKind.PrimaryKey,
+            arguments: [],
+          });
+        }
+      }
+
+      const decorators = prop.getDecorators();
+
+      // Scalar column
       if (decorators.length === 0) {
         const cidl_type = typeRes.unwrap();
+
         columns.push({
           foreign_key_reference: null,
           value: {

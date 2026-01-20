@@ -1,4 +1,4 @@
-import { Model, PrimaryKey, WranglerEnv } from "cloesce/backend";
+import { Model, WranglerEnv } from "cloesce/backend";
 import { D1Database } from "@cloudflare/workers-types";
 type Integer = number & { __kind: "Integer" };
 
@@ -9,7 +9,6 @@ export class Env {
 
 @Model(["SAVE", "GET"])
 export class Weather {
-  @PrimaryKey
   id: Integer;
 
   date: Date;

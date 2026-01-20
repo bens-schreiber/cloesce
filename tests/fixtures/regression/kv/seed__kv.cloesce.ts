@@ -41,7 +41,6 @@ export class PureKVModel {
 
 @Model(["GET", "SAVE", "LIST"])
 export class D1BackedModel {
-    @PrimaryKey
     id: Integer;
 
     @KeyParam

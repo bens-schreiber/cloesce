@@ -10,7 +10,6 @@ export class Env {
 
 @Model
 export class NullabilityChecks {
-  @PrimaryKey
   id: Integer;
 
   notNullableString: string;

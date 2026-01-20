@@ -1,10 +1,8 @@
 import {
   Model,
   POST,
-  PrimaryKey,
   WranglerEnv,
   DataSourceOf,
-  DataSource,
   IncludeTree,
 } from "cloesce/backend";
 import { D1Database } from "@cloudflare/workers-types";
@@ -17,13 +15,11 @@ export class Env {
 
 @Model
 export class NoDs {
-  @PrimaryKey
   id: Integer;
 }
 
 @Model
 export class OneDs {
-  @PrimaryKey
   id: Integer;
 
   static readonly default: IncludeTree<OneDs> = {};
@@ -31,7 +27,6 @@ export class OneDs {
 
 @Model
 export class Foo {
-  @PrimaryKey
   id: Integer;
 
   static readonly baz: IncludeTree<Foo> = {};

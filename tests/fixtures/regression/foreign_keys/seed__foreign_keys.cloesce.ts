@@ -1,11 +1,9 @@
 import {
   Model,
   POST,
-  PrimaryKey,
   WranglerEnv,
   ForeignKey,
   OneToOne,
-  DataSource,
   OneToMany,
   ManyToMany,
   IncludeTree,
@@ -26,7 +24,6 @@ export class Env {
 //#region OneToOne
 @Model
 export class B {
-  @PrimaryKey
   id: Integer;
 
   @POST
@@ -35,7 +32,6 @@ export class B {
 
 @Model
 export class A {
-  @PrimaryKey
   id: Integer;
 
   @ForeignKey(B)
@@ -86,7 +82,6 @@ export class A {
 //#region OneToMany
 @Model
 export class Person {
-  @PrimaryKey
   id: Integer;
 
   @OneToMany("personId")
@@ -129,7 +124,6 @@ export class Person {
 
 @Model
 export class Dog {
-  @PrimaryKey
   id: Integer;
 
   @ForeignKey(Person)
@@ -143,7 +137,6 @@ export class Dog {
 //#region ManyToMany
 @Model
 export class Student {
-  @PrimaryKey
   id: Integer;
 
   @ManyToMany
@@ -172,7 +165,6 @@ export class Student {
 
 @Model
 export class Course {
-  @PrimaryKey
   id: Integer;
 
   @ManyToMany

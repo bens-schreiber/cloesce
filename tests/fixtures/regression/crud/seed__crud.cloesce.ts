@@ -19,7 +19,6 @@ export class Env {
 
 @Model(["SAVE", "GET", "LIST"])
 export class CrudHaver {
-  @PrimaryKey
   id: Integer;
   name: string;
 
@@ -29,7 +28,6 @@ export class CrudHaver {
 
 @Model(["SAVE", "GET", "LIST"])
 export class Parent {
-  @PrimaryKey
   id: Integer;
 
   @ForeignKey("Child")
@@ -49,7 +47,6 @@ export class Parent {
 
 @Model
 export class Child {
-  @PrimaryKey
   id: Integer;
 
   @ForeignKey(Parent)

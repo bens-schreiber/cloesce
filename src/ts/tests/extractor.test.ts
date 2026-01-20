@@ -204,7 +204,7 @@ describe("Model", () => {
   test("Finds Include Tree", () => {
     // Arrange
     const project = cloesceProject();
-    const sourceFile = project.createSourceFile(
+    project.createSourceFile(
       "test.ts",
       `
       import { IncludeTree } from "./src/ui/backend";
@@ -219,7 +219,6 @@ describe("Model", () => {
     );
 
     // Act
-    const classDecl = sourceFile.getClass("Foo")!;
     const res = CidlExtractor.extract("Foo", project);
 
     // Assert
@@ -234,10 +233,44 @@ describe("Model", () => {
     } as DataSource);
   });
 
+  test("Infers primary key", () => {
+    // Arrange
+    const project = cloesceProject();
+    project.createSourceFile(
+      "test.ts",
+      `
+      @Model
+      export class Foo {
+        id: number;
+      }
+
+      @Model
+      export class Bar {
+        bAr_ID: number;
+      }
+      `,
+    );
+
+    // Act
+    const res = CidlExtractor.extract("FooBar", project);
+
+    // Assert
+    expect(res.isRight()).toBe(true);
+    const cidl = res.unwrap();
+    expect(cidl.models["Foo"]).toBeDefined();
+
+    const fooModel = cidl.models["Foo"];
+    expect(fooModel.primary_key).toEqual({ cidl_type: "Real", name: "id" });
+
+    expect(cidl.models["Bar"]).toBeDefined();
+    const barModel = cidl.models["Bar"];
+    expect(barModel.primary_key).toEqual({ cidl_type: "Real", name: "bAr_ID" });
+  });
+
   test("Extracts Model", () => {
     // Arrange
     const project = cloesceProject();
-    const sourceFile = project.createSourceFile(
+    project.createSourceFile(
       "test.ts",
       `
       import { KValue, Integer, R2ObjectBody } from "./src/ui/backend";
@@ -318,7 +351,6 @@ describe("Services", () => {
           }
           `,
     );
-    const classDecl = sourceFile.getClass("FooService")!;
 
     // Act
     const res = CidlExtractor.extract("FooService", project);

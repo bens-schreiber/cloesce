@@ -3,7 +3,6 @@
 
 @Model
 export class Foo {
-  @PrimaryKey
   id: number;
 
   @OneToOne() // missing generic

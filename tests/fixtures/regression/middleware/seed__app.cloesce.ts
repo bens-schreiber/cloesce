@@ -21,7 +21,6 @@ export class Env {
 
 @Model(["SAVE"])
 export class Foo {
-  @PrimaryKey
   id: Integer;
 
   @GET
