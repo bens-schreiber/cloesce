@@ -68,6 +68,7 @@ describe("CIDL Type", () => {
           isInteger: Integer | null;
           isBool: boolean | null;
           isDateIso: Date | null;
+          notNullable: Foo | undefined;
         }
         `,
     );
@@ -91,6 +92,7 @@ describe("CIDL Type", () => {
       { Nullable: "Integer" },
       { Nullable: "Boolean" },
       { Nullable: "DateIso" },
+      { Object: "Foo" },
     ] as CidlType[]);
   });
 
@@ -265,6 +267,62 @@ describe("Model", () => {
     expect(cidl.models["Bar"]).toBeDefined();
     const barModel = cidl.models["Bar"];
     expect(barModel.primary_key).toEqual({ cidl_type: "Real", name: "bAr_ID" });
+  });
+
+  test("Infers foreign key", () => {
+    // Arrange
+    const project = cloesceProject();
+    project.createSourceFile(
+      "test.ts",
+      `
+      @Model
+      export class Foo {
+        id: number;
+      }
+
+      @Model
+      export class Bar {
+        id: number;
+        
+        fooId: number;
+        foo: Foo | undefined;
+      }
+      `,
+    );
+
+    // Act
+    const res = CidlExtractor.extract("FooBar", project);
+
+    // Assert
+    expect(res.isRight()).toBe(true);
+    const cidl = res.unwrap();
+    expect(cidl.models["Bar"]).toBeDefined();
+
+    const barModel = cidl.models["Bar"];
+    expect(barModel.columns).toEqual(
+      expect.arrayContaining([
+        {
+          value: {
+            name: "fooId",
+            cidl_type: "Real",
+          },
+          foreign_key_reference: "Foo",
+        },
+      ]),
+    );
+    expect(barModel.navigation_properties).toEqual(
+      expect.arrayContaining([
+        {
+          kind: {
+            OneToOne: {
+              column_reference: "fooId",
+            },
+          },
+          model_reference: "Foo",
+          var_name: "foo",
+        },
+      ]),
+    );
   });
 
   test("Extracts Model", () => {

@@ -34,10 +34,7 @@ export class B {
 export class A {
   id: Integer;
 
-  @ForeignKey(B)
   bId: Integer;
-
-  @OneToOne("bId")
   b: B | undefined;
 
   static readonly withB: IncludeTree<A> = {

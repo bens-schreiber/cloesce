@@ -250,6 +250,8 @@ export class CidlExtractor {
         return typeRes;
       }
 
+      const cidl_type = typeRes.unwrap();
+
       // Include Trees
       const isIncludeTree =
         prop
@@ -290,15 +292,12 @@ export class CidlExtractor {
 
       // Infer decorator
       if (prop.getDecorators().length < 1) {
-        // Primary Key (name is "id" or "{model_name}Id", regardless of case or underscore)
-        const normalizedPropName = prop
-          .getName()
-          .toLowerCase()
-          .replace(/_/g, "");
-        const normalizedIdName = "id";
+        const normalizedPropName = normalizeName(prop.getName());
+
+        // Primary Key
         const normalizedModelIdName = `${name.toLowerCase()}id`;
         if (
-          normalizedPropName === normalizedIdName ||
+          normalizedPropName === "id" ||
           normalizedPropName === normalizedModelIdName
         ) {
           // Add a primary key decorator
@@ -307,14 +306,65 @@ export class CidlExtractor {
             arguments: [],
           });
         }
+
+        // Foreign Key
+        else if (normalizedPropName.endsWith("id")) {
+          const referencedNavName = prop
+            .getName()
+            .slice(
+              0,
+              prop.getName().length -
+                (normalizedPropName.endsWith("_id") ? 3 : 2),
+            );
+
+          const navModelProperty = classDecl
+            .getProperties()
+            .find((p) => p.getName() === referencedNavName);
+          if (navModelProperty) {
+            const navModelTypeRes = CidlExtractor.cidlType(
+              navModelProperty?.getType()!,
+            );
+            if (navModelTypeRes.isLeft()) {
+              navModelTypeRes.value.context = prop.getName();
+              navModelTypeRes.value.snippet = prop.getText();
+              return navModelTypeRes;
+            }
+
+            const navModelType = navModelTypeRes.unwrap();
+            const objectName = getObjectName(navModelType);
+
+            if (objectName) {
+              // Add a foreign key decorator
+              prop.addDecorator({
+                name: PropertyDecoratorKind.ForeignKey,
+                arguments: [objectName],
+              });
+            }
+          }
+        }
+
+        // One to One
+        else if (getObjectName(cidl_type) !== undefined) {
+          const normalizedPropIdName = `${normalizedPropName}id`;
+          const hasForeignKeyProp = classDecl.getProperties().find((p) => {
+            const norm = normalizeName(p.getName());
+            return norm === normalizedPropIdName;
+          });
+
+          if (hasForeignKeyProp) {
+            // Add a one to one decorator
+            prop.addDecorator({
+              name: PropertyDecoratorKind.OneToOne,
+              arguments: [hasForeignKeyProp.getName()],
+            });
+          }
+        }
       }
 
       const decorators = prop.getDecorators();
 
       // Scalar column
       if (decorators.length === 0) {
-        const cidl_type = typeRes.unwrap();
-
         columns.push({
           foreign_key_reference: null,
           value: {
@@ -329,7 +379,6 @@ export class CidlExtractor {
       const decoratorName = getDecoratorName(decorator);
 
       // Process decorator
-      const cidl_type = typeRes.unwrap();
       switch (decoratorName) {
         case PropertyDecoratorKind.PrimaryKey: {
           primary_key = {
@@ -362,7 +411,7 @@ export class CidlExtractor {
             );
           }
 
-          let model_name = getObjectName(cidl_type);
+          const model_name = getObjectName(cidl_type);
 
           // Error: navigation properties require a model reference
           if (!model_name) {
@@ -753,7 +802,7 @@ export class CidlExtractor {
       if (
         objectName &&
         !this.extractedPoos.has(objectName) &&
-        !this.modelDecls.has(objectName)
+        !this.modelDecls.has(name)
       ) {
         const res = this.poo(
           classDecl.getSourceFile().getClassOrThrow(objectName),
@@ -995,8 +1044,6 @@ export class CidlExtractor {
       wrapper: (inner: CidlType) => CidlType,
     ): Either<ExtractorError, CidlType> {
       const res = CidlExtractor.cidlType(t, inject);
-
-      // Error: propogated from `cidlType`
       return res.map((inner) => wrapNullable(wrapper(inner), isNullable));
     }
 
@@ -1004,7 +1051,7 @@ export class CidlExtractor {
       if (!ty.isUnion()) return [ty, false];
 
       const unions = ty.getUnionTypes();
-      const nonNulls = unions.filter((t) => !t.isNull() && !t.isUndefined());
+      const nonNulls = unions.filter((t) => !t.isNull());
       const hasNullable = nonNulls.length < unions.length;
 
       // Booleans seperate into [null, true, false] from the `getUnionTypes` call
@@ -1015,7 +1062,8 @@ export class CidlExtractor {
         return [nonNulls[0].getApparentType(), hasNullable];
       }
 
-      return [nonNulls[0] ?? ty, hasNullable];
+      const stripUndefined = nonNulls.filter((t) => !t.isUndefined());
+      return [stripUndefined[0] ?? ty, hasNullable];
     }
   }
 }
@@ -1114,4 +1162,8 @@ function checkPropertyModifier(
     });
   }
   return Either.right(null);
+}
+
+function normalizeName(name: string): string {
+  return name.toLowerCase().replace(/_/g, "");
 }

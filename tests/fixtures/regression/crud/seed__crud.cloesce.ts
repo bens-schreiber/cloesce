@@ -30,10 +30,7 @@ export class CrudHaver {
 export class Parent {
   id: Integer;
 
-  @ForeignKey("Child")
   favoriteChildId: Integer | null;
-
-  @OneToOne("favoriteChildId")
   favoriteChild: Child | undefined;
 
   @OneToMany("parentId")
@@ -49,9 +46,7 @@ export class Parent {
 export class Child {
   id: Integer;
 
-  @ForeignKey(Parent)
-  parentId: Integer;
 
-  @OneToOne("parentId")
+  parentId: Integer;
   parent: Parent | undefined;
 }
