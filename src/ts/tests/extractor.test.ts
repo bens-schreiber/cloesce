@@ -1,10 +1,6 @@
 import { describe, test, expect } from "vitest";
 import { Project } from "ts-morph";
-import {
-  CidlExtractor,
-  ModelExtractor,
-  ServiceExtractor,
-} from "../src/extractor/extract";
+import { CidlExtractor } from "../src/extractor/extract";
 import { CidlType, DataSource, Service } from "../src/ast";
 import { ModelBuilder } from "./builder";
 
@@ -161,6 +157,7 @@ describe("Middleware", () => {
 
     // Assert
     expect(res.isRight()).toBe(true);
+    // TODO: assert app exists
   });
 });
 
@@ -212,7 +209,7 @@ describe("Model", () => {
       `
       import { IncludeTree } from "./src/ui/backend";
       @Model
-      class Foo {
+      export class Foo {
       @PrimaryKey
       id: number;
 
@@ -224,26 +221,29 @@ describe("Model", () => {
 
     // Act
     const classDecl = sourceFile.getClass("Foo")!;
-    const res = ModelExtractor.extract(classDecl, sourceFile);
+    const res = CidlExtractor.extract("Foo", project);
 
     // Assert
     expect(res.isRight()).toBe(true);
+    const cidl = res.unwrap();
+    expect(cidl.models["Foo"]).toBeDefined();
+    const fooModel = cidl.models["Foo"];
 
-    expect(res.unwrap().data_sources["default"]).toStrictEqual({
+    expect(fooModel.data_sources["default"]).toStrictEqual({
       name: "default",
       tree: {},
     } as DataSource);
   });
 
-  test("Extracts Primary Key, Columns, Key Params, KV, R2", () => {
+  test("Extracts Model", () => {
     // Arrange
     const project = cloesceProject();
     const sourceFile = project.createSourceFile(
       "test.ts",
       `
       import { KValue, Integer, R2ObjectBody } from "./src/ui/backend";
-      @Model
-      class Foo {
+      @Model(["GET", "SAVE"])
+      export class Foo {
         @PrimaryKey
         id: Integer;
 
@@ -270,16 +270,20 @@ describe("Model", () => {
     );
 
     // Act
-    const classDecl = sourceFile.getClass("Foo")!;
-    const res = ModelExtractor.extract(classDecl, sourceFile);
+    const res = CidlExtractor.extract("Foo", project);
 
     // Assert
-    expect(res.isRight(), `Error: ${JSON.stringify(res)}`).toBe(true);
+    expect(res.isRight()).toBe(true);
+    const cidl = res.unwrap();
+    expect(cidl.models["Foo"]).toBeDefined();
 
-    res.unwrap().source_path = "";
-    expect(res.unwrap()).toEqual(
+    const fooModel = cidl.models["Foo"];
+    fooModel.source_path = "";
+    expect(fooModel).toEqual(
       ModelBuilder.model("Foo")
         .idPk()
+        .crud("GET")
+        .crud("SAVE")
         .col("name", "Text")
         .col("real", "Real")
         .col("boolOrNull", { Nullable: "Boolean" })
@@ -307,22 +311,25 @@ describe("Services", () => {
       "test.ts",
       `
           @Service
-          class BarService {}
+          export class BarService {}
 
           @Service
-          class FooService {
+          export class FooService {
             barService: BarService;
           }
           `,
     );
+    const classDecl = sourceFile.getClass("FooService")!;
 
     // Act
-    const classDecl = sourceFile.getClass("FooService")!;
-    const res = ServiceExtractor.extract(classDecl, sourceFile);
+    const res = CidlExtractor.extract("FooService", project);
 
     // Assert
     expect(res.isRight()).toBe(true);
-    expect(res.unwrap()).toEqual({
+    const cidl = res.unwrap();
+    expect(cidl.services["FooService"]).toBeDefined();
+    const fooService = cidl.services["FooService"];
+    expect(fooService).toEqual({
       name: "FooService",
       attributes: [
         {

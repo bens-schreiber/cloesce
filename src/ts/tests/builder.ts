@@ -15,6 +15,7 @@ import {
   MediaType,
   KeyValue,
   AstR2Object,
+  CrudKind,
 } from "../src/ast";
 
 export function createAst(args?: {
@@ -106,6 +107,7 @@ export class ModelBuilder {
   private r2_objects: AstR2Object[] = [];
   private methods: Record<string, ApiMethod> = {};
   private data_sources: Record<string, DataSource> = {};
+  private cruds: CrudKind[] = [];
 
   constructor(name: string) {
     this.name = name;
@@ -212,6 +214,11 @@ export class ModelBuilder {
     return this;
   }
 
+  crud(kind: CrudKind): this {
+    this.cruds.push(kind);
+    return this;
+  }
+
   build(): Model {
     return {
       name: this.name,
@@ -223,7 +230,7 @@ export class ModelBuilder {
       r2_objects: this.r2_objects,
       methods: this.methods,
       data_sources: this.data_sources,
-      cruds: [],
+      cruds: this.cruds,
       source_path: "",
     };
   }

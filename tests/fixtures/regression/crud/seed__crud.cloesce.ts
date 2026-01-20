@@ -2,7 +2,6 @@ import {
   Model,
   PrimaryKey,
   WranglerEnv,
-  CRUD,
   POST,
   ForeignKey,
   OneToMany,
@@ -18,8 +17,7 @@ export class Env {
   db: D1Database;
 }
 
-@CRUD(["SAVE", "GET", "LIST"])
-@Model
+@Model(["SAVE", "GET", "LIST"])
 export class CrudHaver {
   @PrimaryKey
   id: Integer;
@@ -29,8 +27,7 @@ export class CrudHaver {
   async notCrud(): Promise<void> { }
 }
 
-@CRUD(["SAVE", "GET", "LIST"])
-@Model
+@Model(["SAVE", "GET", "LIST"])
 export class Parent {
   @PrimaryKey
   id: Integer;

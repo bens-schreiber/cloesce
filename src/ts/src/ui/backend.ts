@@ -15,9 +15,11 @@ export type { CrudKind } from "../ast.js";
 export { Orm } from "../router/orm.js";
 export { R2ObjectBody } from "@cloudflare/workers-types";
 
-export const Model: ClassDecorator = () => {};
+export const Model =
+  (_kinds: CrudKind[]): ClassDecorator =>
+  () => {};
+
 export const Service: ClassDecorator = () => {};
-export const PlainOldObject: ClassDecorator = () => {};
 
 /**
  * Declares a Wrangler environment definition.
@@ -212,38 +214,6 @@ export const ForeignKey =
  * ```
  */
 export const Inject: ParameterDecorator = () => {};
-
-/**
- * Enables automatic CRUD method generation for a model.
- *
- * The argument is a list of CRUD operation kinds
- * (e.g. `"SAVE"`, `"GET"`, `"LIST"`) to generate for the model.
- *
- * Cloesce will emit corresponding backend methods and frontend
- * client bindings automatically, removing the need to manually
- * define common API operations.
- *
- * CRUD Operations:
- * - **"SAVE"** — Performs an *upsert* (insert, update, or both) for a model instance.
- * - **"GET"** — Retrieves a single record by its primary key, optionally using a `DataSource`.
- * - **"LIST"** — Retrieves all records for the model, using the specified `DataSource`.
- *
- * The generated methods are static, exposed through both the backend
- * and the frontend client API.
- *
- * Example:
- * ```ts
- * ＠CRUD(["SAVE", "GET", "LIST"])
- * ＠D1
- * export class CrudHaver {
- *   ＠PrimaryKey id: number;
- *   name: string;
- * }
- * ```
- */
-export const CRUD =
-  (_kinds: CrudKind[]): ClassDecorator =>
-  () => {};
 
 type Primitive = string | number | boolean | bigint | symbol | null | undefined;
 

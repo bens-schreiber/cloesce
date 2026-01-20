@@ -6,8 +6,7 @@ import {
     IncludeTree,
     KeyParam,
     Model,
-    PrimaryKey,
-    CRUD
+    PrimaryKey
 } from "cloesce/backend";
 import { D1Database } from "@cloudflare/workers-types";
 
@@ -23,8 +22,7 @@ export class Env {
     otherNamespace: KVNamespace;
 }
 
-@CRUD(["GET", "SAVE"])
-@Model
+@Model(["GET", "SAVE"])
 export class PureKVModel {
     @KeyParam
     id: string;
@@ -42,8 +40,7 @@ export class PureKVModel {
     };
 }
 
-@CRUD(["GET", "SAVE", "LIST"])
-@Model
+@Model(["GET", "SAVE", "LIST"])
 export class D1BackedModel {
     @PrimaryKey
     id: Integer;

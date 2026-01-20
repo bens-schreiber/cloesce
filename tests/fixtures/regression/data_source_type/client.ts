@@ -19,6 +19,7 @@ export class Foo {
     customDs: "baz" |"none" = "none",
     oneDs: "default" |"none" = "none",
     noDs: "none" = "none",
+    poo: Poo,
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<void>> {
     const id = [
@@ -32,6 +33,7 @@ export class Foo {
     baseUrl.searchParams.append("customDs", String(customDs));
     baseUrl.searchParams.append("oneDs", String(oneDs));
     baseUrl.searchParams.append("noDs", String(noDs));
+    payload["poo"] = poo;
 
     const res = await fetchImpl(baseUrl, {
       method: "POST",

@@ -2,7 +2,6 @@ import {
   Model,
   PrimaryKey,
   WranglerEnv,
-  CRUD,
   GET,
   Service,
   POST,
@@ -32,8 +31,7 @@ export class BlobService {
   }
 }
 
-@Model
-@CRUD(["SAVE", "GET", "LIST"])
+@Model(["SAVE", "GET", "LIST"])
 export class BlobHaver {
   @PrimaryKey
   id: Integer;

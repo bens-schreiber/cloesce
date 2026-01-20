@@ -3,16 +3,13 @@ import {
   WranglerEnv,
   Model,
   PrimaryKey,
-  CRUD,
   Inject,
-  PlainOldObject,
   GET,
   HttpResult,
 } from "cloesce/backend";
 import { D1Database } from "@cloudflare/workers-types";
 type Integer = number & { __kind: "Integer" };
 
-@PlainOldObject
 export class InjectedThing {
   value: string;
 }
@@ -22,8 +19,7 @@ export class Env {
   db: D1Database;
 }
 
-@Model
-@CRUD(["SAVE"])
+@Model(["SAVE"])
 export class Foo {
   @PrimaryKey
   id: Integer;

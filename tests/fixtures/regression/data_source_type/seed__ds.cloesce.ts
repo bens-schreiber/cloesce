@@ -6,7 +6,6 @@ import {
   DataSourceOf,
   DataSource,
   IncludeTree,
-  PlainOldObject,
 } from "cloesce/backend";
 import { D1Database } from "@cloudflare/workers-types";
 type Integer = number & { __kind: "Integer" };
@@ -43,11 +42,11 @@ export class Foo {
   bar(
     customDs: DataSourceOf<Foo>,
     oneDs: DataSourceOf<OneDs>,
-    noDs: DataSourceOf<NoDs>
+    noDs: DataSourceOf<NoDs>,
+    poo: Poo,
   ) { }
 }
 
-@PlainOldObject
 export class Poo {
   ds: DataSourceOf<Foo>;
 }

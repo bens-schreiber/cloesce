@@ -6,7 +6,6 @@ import {
     KeyParam,
     Model,
     PrimaryKey,
-    CRUD,
     PUT,
     Inject
 } from "cloesce/backend";
@@ -24,8 +23,7 @@ export class Env {
     bucket2: R2Bucket;
 }
 
-@CRUD(["GET"])
-@Model
+@Model(["GET"])
 export class PureR2Model {
     @KeyParam
     id: string;
@@ -57,8 +55,7 @@ export class PureR2Model {
     };
 }
 
-@CRUD(["GET", "SAVE", "LIST"])
-@Model
+@Model(["GET", "SAVE", "LIST"])
 export class D1BackedModel {
     @PrimaryKey
     id: Integer;

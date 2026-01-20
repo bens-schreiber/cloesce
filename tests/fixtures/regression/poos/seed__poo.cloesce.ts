@@ -3,23 +3,19 @@ import {
   POST,
   PrimaryKey,
   WranglerEnv,
-  PlainOldObject,
 } from "cloesce/backend";
 import { D1Database } from "@cloudflare/workers-types";
 type Integer = number & { __kind: "Integer" };
 
-@PlainOldObject
 export class PooA {
   name: string;
   major: string;
 }
 
-@PlainOldObject
 export class PooB {
   color: string;
 }
 
-@PlainOldObject
 export class PooC {
   a: PooA;
   b: PooB[];
