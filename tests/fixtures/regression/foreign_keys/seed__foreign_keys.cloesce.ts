@@ -81,7 +81,6 @@ export class A {
 export class Person {
   id: Integer;
 
-  @OneToMany("personId")
   dogs: Dog[];
 
   static readonly withDogs: IncludeTree<Person> = {

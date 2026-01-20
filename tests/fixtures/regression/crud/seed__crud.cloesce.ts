@@ -33,7 +33,6 @@ export class Parent {
   favoriteChildId: Integer | null;
   favoriteChild: Child | undefined;
 
-  @OneToMany("parentId")
   children: Child[];
 
   static readonly withChildren: IncludeTree<Parent> = {

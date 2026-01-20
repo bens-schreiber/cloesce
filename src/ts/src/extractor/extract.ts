@@ -292,13 +292,13 @@ export class CidlExtractor {
 
       // Infer decorator
       if (prop.getDecorators().length < 1) {
+        const objectName = getObjectName(cidl_type);
         const normalizedPropName = normalizeName(prop.getName());
 
         // Primary Key
-        const normalizedModelIdName = `${name.toLowerCase()}id`;
         if (
           normalizedPropName === "id" ||
-          normalizedPropName === normalizedModelIdName
+          normalizedPropName === `${name.toLowerCase()}id`
         ) {
           // Add a primary key decorator
           prop.addDecorator({
@@ -317,12 +317,13 @@ export class CidlExtractor {
                 (normalizedPropName.endsWith("_id") ? 3 : 2),
             );
 
-          const navModelProperty = classDecl
+          const oneToOneProperty = classDecl
             .getProperties()
             .find((p) => p.getName() === referencedNavName);
-          if (navModelProperty) {
+
+          if (oneToOneProperty) {
             const navModelTypeRes = CidlExtractor.cidlType(
-              navModelProperty?.getType()!,
+              oneToOneProperty?.getType()!,
             );
             if (navModelTypeRes.isLeft()) {
               navModelTypeRes.value.context = prop.getName();
@@ -341,10 +342,66 @@ export class CidlExtractor {
               });
             }
           }
+
+          if (objectName !== undefined) {
+            const oneToManyClassDecl = this.modelDecls.get(objectName)?.[0];
+            const containsOneToManyProp = oneToManyClassDecl
+              ?.getProperties()
+              .find((p) => {
+                const tyRes = CidlExtractor.cidlType(p.getType());
+                if (tyRes.isLeft()) {
+                  return false;
+                }
+
+                const ty = tyRes.unwrap();
+                const navObjectName = getObjectName(ty);
+                if (navObjectName !== name) {
+                  return false;
+                }
+
+                if (typeof ty === "string" || !("Array" in ty)) {
+                  return false;
+                }
+
+                return true;
+              });
+
+            if (containsOneToManyProp) {
+              // Add a foreign key decorator
+              prop.addDecorator({
+                name: PropertyDecoratorKind.ForeignKey,
+                arguments: [objectName],
+              });
+            }
+          }
+        }
+
+        // One to Many
+        else if (
+          objectName !== undefined &&
+          typeof cidl_type !== "string" &&
+          "Array" in cidl_type
+        ) {
+          const referencedModelDecl = this.modelDecls.get(objectName)?.[0];
+          const normalizedModelIdName = `${normalizeName(name)}id`;
+          const hasForeignKeyProp = referencedModelDecl
+            ?.getProperties()
+            .find((p) => {
+              const norm = normalizeName(p.getName());
+              return norm === normalizedModelIdName;
+            });
+
+          if (hasForeignKeyProp) {
+            // Add a one to many decorator
+            prop.addDecorator({
+              name: PropertyDecoratorKind.OneToMany,
+              arguments: [hasForeignKeyProp.getName()],
+            });
+          }
         }
 
         // One to One
-        else if (getObjectName(cidl_type) !== undefined) {
+        else if (objectName !== undefined) {
           const normalizedPropIdName = `${normalizedPropName}id`;
           const hasForeignKeyProp = classDecl.getProperties().find((p) => {
             const norm = normalizeName(p.getName());

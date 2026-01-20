@@ -269,7 +269,7 @@ describe("Model", () => {
     expect(barModel.primary_key).toEqual({ cidl_type: "Real", name: "bAr_ID" });
   });
 
-  test("Infers foreign key", () => {
+  test("Infers 1:1 foreign key", () => {
     // Arrange
     const project = cloesceProject();
     project.createSourceFile(
@@ -320,6 +320,52 @@ describe("Model", () => {
           },
           model_reference: "Foo",
           var_name: "foo",
+        },
+      ]),
+    );
+  });
+
+  test("Infers 1:M foreign key", () => {
+    // Arrange
+    const project = cloesceProject();
+    project.createSourceFile(
+      "test.ts",
+      `
+      @Model
+      export class Bar {
+        id: number;
+        
+        fooId: number;
+        foo: Foo | undefined;
+      }
+
+      @Model
+      export class Foo {
+        id: number;
+        bars: Bar[];
+      }
+      `,
+    );
+
+    // Act
+    const res = CidlExtractor.extract("FooBar", project);
+
+    // Assert
+    expect(res.isRight()).toBe(true);
+    const cidl = res.unwrap();
+    expect(cidl.models["Foo"]).toBeDefined();
+
+    const fooModel = cidl.models["Foo"];
+    expect(fooModel.navigation_properties).toEqual(
+      expect.arrayContaining([
+        {
+          kind: {
+            OneToMany: {
+              column_reference: "fooId",
+            },
+          },
+          model_reference: "Bar",
+          var_name: "bars",
         },
       ]),
     );
