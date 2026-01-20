@@ -44,12 +44,10 @@ export class A {
   @OneToOne("bId")
   b: B | undefined;
 
-  @DataSource
   static readonly withB: IncludeTree<A> = {
     b: {},
   };
 
-  @DataSource
   static readonly withoutB: IncludeTree<A> = {};
 
   @POST
@@ -94,7 +92,6 @@ export class Person {
   @OneToMany("personId")
   dogs: Dog[];
 
-  @DataSource
   static readonly withDogs: IncludeTree<Person> = {
     dogs: {},
   };
@@ -152,11 +149,11 @@ export class Student {
   @ManyToMany
   courses: Course[];
 
-  @DataSource static readonly withCoursesStudents: IncludeTree<Student> = {
+  static readonly withCoursesStudents: IncludeTree<Student> = {
     courses: { students: {} },
   };
 
-  @DataSource static readonly withCoursesStudentsCourses: IncludeTree<Student> =
+  static readonly withCoursesStudentsCourses: IncludeTree<Student> =
     {
       courses: { students: { courses: {} } },
     };

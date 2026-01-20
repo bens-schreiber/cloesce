@@ -43,7 +43,6 @@ enum PropertyDecoratorKind {
   OneToOne = "OneToOne",
   OneToMany = "OneToMany",
   ManyToMany = "ManyToMany",
-  DataSource = "DataSource",
   KeyParam = "KeyParam",
   KV = "KV",
   R2 = "R2",
@@ -229,9 +228,18 @@ export class CidlExtractor {
     let primary_key: NamedTypedValue | null = null;
 
     // Extract crud methods
-    setCrudKinds(decorator, cruds);
+    const arg = decorator.getArguments()[0];
+    if (arg && MorphNode.isArrayLiteralExpression(arg)) {
+      for (const a of arg.getElements()) {
+        cruds.add(
+          (MorphNode.isStringLiteral(a)
+            ? a.getLiteralValue()
+            : a.getText()) as CrudKind,
+        );
+      }
+    }
 
-    // Iterate attribtutes
+    // Iterate properties
     for (const prop of classDecl.getProperties()) {
       const decorators = prop.getDecorators();
       const typeRes = CidlExtractor.cidlType(prop.getType());
@@ -243,15 +251,46 @@ export class CidlExtractor {
         return typeRes;
       }
 
-      const checkModifierRes = checkPropertyModifier(prop);
-
-      // No decorators means this is a standard property
-      if (decorators.length === 0) {
-        // Error: invalid property modifier
-        if (checkModifierRes.isLeft()) {
-          return checkModifierRes;
+      // Include Trees
+      const isIncludeTree =
+        prop
+          .getType()
+          .getText(
+            undefined,
+            TypeFormatFlags.UseAliasDefinedOutsideCurrentScope,
+          ) === `IncludeTree<${name}>`;
+      if (isIncludeTree) {
+        // Error: data sources must be static include trees
+        if (!prop.isStatic()) {
+          return err(ExtractorErrorCode.InvalidDataSourceDefinition, (e) => {
+            e.snippet = prop.getText();
+            e.context = prop.getName();
+          });
         }
 
+        const initializer = prop.getInitializer();
+        if (!initializer?.isKind(SyntaxKind.ObjectLiteralExpression)) {
+          return err(ExtractorErrorCode.InvalidDataSourceDefinition, (e) => {
+            e.snippet = prop.getText();
+            e.context = prop.getName();
+          });
+        }
+
+        data_sources[prop.getName()] = {
+          name: prop.getName(),
+          tree: parseIncludeTree(initializer),
+        };
+        continue;
+      }
+
+      const checkModifierRes = checkPropertyModifier(prop);
+      // Error: invalid property modifier
+      if (checkModifierRes.isLeft()) {
+        return checkModifierRes;
+      }
+
+      // Scalar columns
+      if (decorators.length === 0) {
         const cidl_type = typeRes.unwrap();
         columns.push({
           foreign_key_reference: null,
@@ -265,14 +304,6 @@ export class CidlExtractor {
 
       const decorator = decorators[0];
       const decoratorName = getDecoratorName(decorator);
-
-      // Error: invalid property modifier
-      if (
-        checkModifierRes.isLeft() &&
-        decoratorName !== PropertyDecoratorKind.DataSource
-      ) {
-        return checkModifierRes;
-      }
 
       // Process decorator
       const cidl_type = typeRes.unwrap();
@@ -379,37 +410,6 @@ export class CidlExtractor {
             model_reference: model_name,
             kind: "ManyToMany",
           });
-          break;
-        }
-        case PropertyDecoratorKind.DataSource: {
-          const isIncludeTree =
-            prop
-              .getType()
-              .getText(
-                undefined,
-                TypeFormatFlags.UseAliasDefinedOutsideCurrentScope,
-              ) === `IncludeTree<${name}>`;
-
-          // Error: data sources must be static include trees
-          if (!prop.isStatic() || !isIncludeTree) {
-            return err(ExtractorErrorCode.InvalidDataSourceDefinition, (e) => {
-              e.snippet = prop.getText();
-              e.context = prop.getName();
-            });
-          }
-
-          const initializer = prop.getInitializer();
-          if (!initializer?.isKind(SyntaxKind.ObjectLiteralExpression)) {
-            return err(ExtractorErrorCode.InvalidDataSourceDefinition, (e) => {
-              e.snippet = prop.getText();
-              e.context = prop.getName();
-            });
-          }
-
-          data_sources[prop.getName()] = {
-            name: prop.getName(),
-            tree: parseIncludeTree(initializer),
-          };
           break;
         }
         case PropertyDecoratorKind.KeyParam: {
@@ -1056,23 +1056,6 @@ function getObjectName(t: CidlType): string | undefined {
   }
 
   return undefined;
-}
-
-function setCrudKinds(d: Decorator, cruds: Set<CrudKind>) {
-  const arg = d.getArguments()[0];
-  if (!arg) {
-    return;
-  }
-
-  if (MorphNode.isArrayLiteralExpression(arg)) {
-    for (const a of arg.getElements()) {
-      cruds.add(
-        (MorphNode.isStringLiteral(a)
-          ? a.getLiteralValue()
-          : a.getText()) as CrudKind,
-      );
-    }
-  }
 }
 
 function parseIncludeTree(

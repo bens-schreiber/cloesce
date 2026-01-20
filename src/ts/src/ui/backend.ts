@@ -103,48 +103,6 @@ export const PATCH: MethodDecorator = () => {};
 export const DELETE: MethodDecorator = () => {};
 
 /**
- * Declares a static property as a data source.
- *
- * Data sources describe SQL left joins related to each
- * models navigation properties.
- *
- * Example:
- * ```ts
- * ＠D1
- * export class Dog {
- *   ＠PrimaryKey
- *   id: number;
- *
- *   name: string;
- * }
- *
- * ＠D1
- * export class Person {
- *   ＠PrimaryKey
- *   id: number;
- *
- *   @ForeignKey(Dog)
- *   dogId: number;
- *
- *   @OneToOne("dogId")
- *   dog: Dog | undefined;
- *
- *   ＠DataSource
- *   static readonly default: IncludeTree<Person> = {
- *     dog: {}, // join Dog table when querying Person with `default` data source
- *   };
- * }
- *
- * // When queried via the ORM or client API:
- * const orm = Orm.fromD1(env.db);
- * const people = await orm.list(Person, Person.default);
- *
- * // => Person { id: 1, dogId: 2, dog: { id: 2, name: "Fido" } }[]
- * ```
- */
-export const DataSource: PropertyDecorator = () => {};
-
-/**
  * Declares a one-to-many relationship between models.
  *
  * The argument is the foreign key property name on the

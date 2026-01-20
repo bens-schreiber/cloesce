@@ -33,7 +33,6 @@ export class PureKVModel {
     @KV("path/to/other/{id}", "otherNamespace")
     otherData: KValue<string>;
 
-    @DataSource
     static readonly default: IncludeTree<PureKVModel> = {
         data: {},
         otherData: {}
@@ -54,7 +53,6 @@ export class D1BackedModel {
     @KV("d1Backed/{id}/{keyParam}/{someColumn}/{someOtherColumn}", "namespace")
     kvData: KValue<unknown>;
 
-    @DataSource
     static readonly default: IncludeTree<D1BackedModel> = {
         kvData: {}
     };

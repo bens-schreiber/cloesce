@@ -26,7 +26,6 @@ export class OneDs {
   @PrimaryKey
   id: Integer;
 
-  @DataSource
   static readonly default: IncludeTree<OneDs> = {};
 }
 
@@ -35,7 +34,6 @@ export class Foo {
   @PrimaryKey
   id: Integer;
 
-  @DataSource
   static readonly baz: IncludeTree<Foo> = {};
 
   @POST

@@ -41,7 +41,6 @@ export class Parent {
   @OneToMany("parentId")
   children: Child[];
 
-  @DataSource
   static readonly withChildren: IncludeTree<Parent> = {
     favoriteChild: {},
     children: {},

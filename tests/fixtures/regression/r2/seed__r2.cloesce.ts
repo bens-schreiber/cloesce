@@ -47,7 +47,6 @@ export class PureR2Model {
         await env.bucket2.put(`path/to/other/${this.id}`, stream);
     }
 
-    @DataSource
     static readonly default: IncludeTree<PureR2Model> = {
         data: {},
         otherData: {},
@@ -74,7 +73,6 @@ export class D1BackedModel {
         await env.bucket1.put(`d1Backed/${this.id}/${this.keyParam}/${this.someColumn}/${this.someOtherColumn}`, stream);
     }
 
-    @DataSource
     static readonly default: IncludeTree<D1BackedModel> = {
         r2Data: {}
     };
