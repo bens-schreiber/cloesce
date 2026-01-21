@@ -1,12 +1,15 @@
-import { describe, test, expect, vi, beforeAll } from "vitest";
+import { describe, test, expect, vi, beforeAll, afterEach } from "vitest";
 import {
   MatchedRoute,
   RouterError,
+  RuntimeContainer,
   _cloesceInternal,
 } from "../src/router/router";
 import { HttpVerb, MediaType, Model, NamedTypedValue } from "../src/ast";
 import { CloesceApp, HttpResult } from "../src/ui/backend";
 import { ModelBuilder, ServiceBuilder, createAst } from "./builder";
+import fs from "fs";
+import path from "path";
 
 function createRequest(url: string, method?: string, body?: any) {
   return new Request(url, {
@@ -272,6 +275,10 @@ describe("Match Route", () => {
 });
 
 describe("Namespace Middleware", () => {
+  afterEach(() => {
+    _cloesceInternal.RuntimeContainer.dispose();
+  });
+
   test("Exits early on Model", async () => {
     // Arrange
     const env = mockWranglerEnv();
@@ -284,10 +291,16 @@ describe("Namespace Middleware", () => {
       ],
     });
     const constructorRegistry = createCtorReg();
-    const app = await CloesceApp.init(ast, constructorRegistry);
+
+    const wasm = await WebAssembly.instantiate(
+      fs.readFileSync(path.resolve("./dist/orm.wasm")),
+      {},
+    );
+    await RuntimeContainer.init(ast, constructorRegistry, wasm.instance);
+    const app = new CloesceApp();
+
     const request = createRequest("http://foo.com/api/Foo/method", "POST");
     const di = createDi();
-    const d1 = mockD1();
 
     class Foo {}
 
@@ -302,7 +315,6 @@ describe("Namespace Middleware", () => {
       ast,
       constructorRegistry,
       di,
-      d1,
     );
 
     // Assert
@@ -321,10 +333,16 @@ describe("Namespace Middleware", () => {
       ],
     });
     const constructorRegistry = createCtorReg();
-    const app = await CloesceApp.init(ast, constructorRegistry);
+
+    const wasm = await WebAssembly.instantiate(
+      fs.readFileSync(path.resolve("./dist/orm.wasm")),
+      {},
+    );
+    await RuntimeContainer.init(ast, constructorRegistry, wasm.instance);
+    const app = new CloesceApp();
+
     const request = createRequest("http://foo.com/api/Foo/method", "POST");
     const di = createDi();
-    const d1 = mockD1();
 
     class Foo {}
 
@@ -339,7 +357,6 @@ describe("Namespace Middleware", () => {
       ast,
       constructorRegistry,
       di,
-      d1,
     );
 
     // Assert
@@ -709,6 +726,10 @@ describe("Request Validation", () => {
 });
 
 describe("Method Middleware", () => {
+  afterEach(() => {
+    _cloesceInternal.RuntimeContainer.dispose();
+  });
+
   test("Exits early", async () => {
     // Arrange
     const env = mockWranglerEnv();
@@ -721,7 +742,14 @@ describe("Method Middleware", () => {
       ],
     });
     const constructorRegistry = createCtorReg();
-    const app = await CloesceApp.init(ast, constructorRegistry);
+
+    const wasm = await WebAssembly.instantiate(
+      fs.readFileSync(path.resolve("./dist/orm.wasm")),
+      {},
+    );
+    await RuntimeContainer.init(ast, constructorRegistry, wasm.instance);
+    const app = new CloesceApp();
+
     const request = createRequest(
       "http://foo.com/api/Foo/method",
       "POST",
@@ -746,7 +774,6 @@ describe("Method Middleware", () => {
       ast,
       constructorRegistry,
       di,
-      d1,
     );
 
     // Assert

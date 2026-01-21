@@ -748,7 +748,7 @@ export class CidlExtractor {
       if (
         objectName &&
         !this.extractedPoos.has(objectName) &&
-        !this.modelDecls.has(name)
+        !this.modelDecls.has(objectName)
       ) {
         const res = this.poo(
           classDecl.getSourceFile().getClassOrThrow(objectName),

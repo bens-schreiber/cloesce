@@ -182,10 +182,10 @@ export class CloesceApp {
 
   private async router(
     request: Request,
-    di: DependencyContainer,
+    env: any,
     ast: CloesceAst,
     ctorReg: ConstructorRegistry,
-    env: any,
+    di: DependencyContainer,
   ): Promise<HttpResult<unknown>> {
     // Global middleware
     for (const m of this.globalMiddleware) {
@@ -274,7 +274,7 @@ export class CloesceApp {
     }
 
     try {
-      const httpResult = await this.router(request, di, ast, ctorReg, env);
+      const httpResult = await this.router(request, env, ast, ctorReg, di);
 
       // Log any 500 errors
       if (httpResult.status === 500) {
@@ -368,7 +368,7 @@ function matchRoute(
 
     const hasPrimaryKey = model.primary_key !== null;
     const offset = hasPrimaryKey ? 1 : 0;
-    const primaryKey = hasPrimaryKey ? (id[0] ?? null) : null;
+    const primaryKey = hasPrimaryKey ? (id.at(0) ?? null) : null;
 
     const keyParams = Object.fromEntries(
       id
@@ -501,15 +501,20 @@ async function validateRequest(
   }
 
   // A data source is required for instantiated model methods
-  const dataSource: string | undefined = requiredParams
+  const dataSource = requiredParams
     .filter(
       (p) =>
         typeof p.cidl_type === "object" &&
         "DataSource" in p.cidl_type &&
         p.cidl_type.DataSource === route.namespace,
     )
-    .map((p) => params[p.name] as string)[0];
-  if (route.kind === "model" && !route.method.is_static && !dataSource) {
+    .map((p) => params[p.name] as string)
+    .at(0);
+  if (
+    route.kind === "model" &&
+    !route.method.is_static &&
+    dataSource === undefined
+  ) {
     return invalidRequest(RouterError.InstantiatedMethodMissingDataSource);
   }
 

@@ -616,7 +616,7 @@ export class Orm {
     // Map and hydrate
     const results = Orm.map(ctor, rows, args.includeTree ?? null);
     return await this.hydrate(ctor, {
-      base: results[0],
+      base: results.at(0),
       keyParams: args.keyParams,
       includeTree: args.includeTree ?? null,
     });
