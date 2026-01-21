@@ -1,9 +1,8 @@
 // @ts-nocheck
 // InvalidApiMethodModifier
 
-@Model
+@Model()
 export class Foo {
-  @PrimaryKey
   id: number;
 
   @POST

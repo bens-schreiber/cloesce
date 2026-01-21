@@ -97,5 +97,5 @@
       "source_path": "./seed__app.cloesce.ts"
     }
   },
-  "app_source": "./seed__app.cloesce.ts"
+  "main_source": "./seed__app.cloesce.ts"
 }

@@ -215,11 +215,9 @@ export class Orm {
         const value = current[navProp.var_name];
 
         if (Array.isArray(value)) {
+          const ctor = constructorRegistry[nestedMeta.name];
           current[navProp.var_name] = value.map((child) => {
-            const instance = Object.assign(
-              new constructorRegistry[nestedMeta.name](),
-              child,
-            );
+            const instance = Object.assign(new ctor(), child);
             recurse(instance, nestedMeta, nestedTree);
             return instance;
           });
@@ -618,7 +616,7 @@ export class Orm {
     // Map and hydrate
     const results = Orm.map(ctor, rows, args.includeTree ?? null);
     return await this.hydrate(ctor, {
-      base: results[0],
+      base: results.at(0),
       keyParams: args.keyParams,
       includeTree: args.includeTree ?? null,
     });

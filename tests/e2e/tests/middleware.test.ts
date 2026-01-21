@@ -18,7 +18,6 @@ describe("Global Middleware", () => {
     expect(res.status).toBe(401);
     expect(res.message).toBe("POST methods aren't allowed.");
     expect(res.data).toBeUndefined();
-    expect(res.headers.get("X-Cloesce-Test")).toBe("true");
   });
 });
 

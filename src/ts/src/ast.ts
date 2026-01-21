@@ -156,5 +156,5 @@ export interface CloesceAst {
   models: Record<string, Model>;
   poos: Record<string, PlainOldObject>;
   services: Record<string, Service>;
-  app_source: string | null;
+  main_source: string | null;
 }

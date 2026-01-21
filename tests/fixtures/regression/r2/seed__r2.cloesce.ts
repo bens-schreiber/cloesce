@@ -1,12 +1,9 @@
 import {
     R2,
     WranglerEnv,
-    DataSource,
     IncludeTree,
     KeyParam,
     Model,
-    PrimaryKey,
-    CRUD,
     PUT,
     Inject
 } from "cloesce/backend";
@@ -24,8 +21,7 @@ export class Env {
     bucket2: R2Bucket;
 }
 
-@CRUD(["GET"])
-@Model
+@Model(["GET"])
 export class PureR2Model {
     @KeyParam
     id: string;
@@ -49,7 +45,6 @@ export class PureR2Model {
         await env.bucket2.put(`path/to/other/${this.id}`, stream);
     }
 
-    @DataSource
     static readonly default: IncludeTree<PureR2Model> = {
         data: {},
         otherData: {},
@@ -57,10 +52,8 @@ export class PureR2Model {
     };
 }
 
-@CRUD(["GET", "SAVE", "LIST"])
-@Model
+@Model(["GET", "SAVE", "LIST"])
 export class D1BackedModel {
-    @PrimaryKey
     id: Integer;
 
     @KeyParam
@@ -77,7 +70,6 @@ export class D1BackedModel {
         await env.bucket1.put(`d1Backed/${this.id}/${this.keyParam}/${this.someColumn}/${this.someOtherColumn}`, stream);
     }
 
-    @DataSource
     static readonly default: IncludeTree<D1BackedModel> = {
         r2Data: {}
     };

@@ -83,6 +83,12 @@
                             "cidl_type": {
                                 "DataSource": "NoDs"
                             }
+                        },
+                        {
+                            "name": "poo",
+                            "cidl_type": {
+                                "Object": "Poo"
+                            }
                         }
                     ]
                 }
@@ -112,5 +118,5 @@
         }
     },
     "services": {},
-    "app_source": null
+    "main_source": null
 }

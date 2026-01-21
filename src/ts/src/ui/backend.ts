@@ -15,9 +15,11 @@ export type { CrudKind } from "../ast.js";
 export { Orm } from "../router/orm.js";
 export { R2ObjectBody } from "@cloudflare/workers-types";
 
-export const Model: ClassDecorator = () => {};
+export const Model =
+  (_kinds: CrudKind[] = []): ClassDecorator =>
+  () => {};
+
 export const Service: ClassDecorator = () => {};
-export const PlainOldObject: ClassDecorator = () => {};
 
 /**
  * Declares a Wrangler environment definition.
@@ -100,96 +102,18 @@ export const PATCH: MethodDecorator = () => {};
  */
 export const DELETE: MethodDecorator = () => {};
 
-/**
- * Declares a static property as a data source.
- *
- * Data sources describe SQL left joins related to each
- * models navigation properties.
- *
- * Example:
- * ```ts
- * ＠D1
- * export class Dog {
- *   ＠PrimaryKey
- *   id: number;
- *
- *   name: string;
- * }
- *
- * ＠D1
- * export class Person {
- *   ＠PrimaryKey
- *   id: number;
- *
- *   @ForeignKey(Dog)
- *   dogId: number;
- *
- *   @OneToOne("dogId")
- *   dog: Dog | undefined;
- *
- *   ＠DataSource
- *   static readonly default: IncludeTree<Person> = {
- *     dog: {}, // join Dog table when querying Person with `default` data source
- *   };
- * }
- *
- * // When queried via the ORM or client API:
- * const orm = Orm.fromD1(env.db);
- * const people = await orm.list(Person, Person.default);
- *
- * // => Person { id: 1, dogId: 2, dog: { id: 2, name: "Fido" } }[]
- * ```
- */
-export const DataSource: PropertyDecorator = () => {};
+export function OneToMany<T>(
+  _selector: (model: T) => T[keyof T],
+): PropertyDecorator {
+  return () => {};
+}
 
-/**
- * Declares a one-to-many relationship between models.
- *
- * The argument is the foreign key property name on the
- * related model.
- *
- * Example:
- * ```ts
- * ＠OneToMany("personId")
- * dogs: Dog[];
- * ```
- */
-export const OneToMany =
-  (_foreignKeyColumn: string): PropertyDecorator =>
-  () => {};
+export function OneToOne<T>(
+  _selector: (model: T) => T[keyof T],
+): PropertyDecorator {
+  return () => {};
+}
 
-/**
- * Declares a one-to-one relationship between models.
- *
- * The argument is the foreign key property name that links
- * the two tables.
- *
- * Example:
- * ```ts
- * ＠OneToOne("dogId")
- * dog: Dog | undefined;
- * ```
- */
-export const OneToOne =
-  (_foreignKeyColumn: string): PropertyDecorator =>
-  () => {};
-
-export const ManyToMany = (): PropertyDecorator => () => {};
-
-/**
- * Declares a foreign key relationship between models.
- * Directly translates to a SQLite foreign key.
- *
- * The argument must reference either a model class or the
- * name of a model class as a string. The property type must
- * match the target model’s primary key type.
- *
- * Example:
- * ```ts
- * ＠ForeignKey(Dog)
- * dogId: number;
- * ```
- */
 export const ForeignKey =
   <T>(_Model: T | string): PropertyDecorator =>
   () => {};
@@ -212,38 +136,6 @@ export const ForeignKey =
  * ```
  */
 export const Inject: ParameterDecorator = () => {};
-
-/**
- * Enables automatic CRUD method generation for a model.
- *
- * The argument is a list of CRUD operation kinds
- * (e.g. `"SAVE"`, `"GET"`, `"LIST"`) to generate for the model.
- *
- * Cloesce will emit corresponding backend methods and frontend
- * client bindings automatically, removing the need to manually
- * define common API operations.
- *
- * CRUD Operations:
- * - **"SAVE"** — Performs an *upsert* (insert, update, or both) for a model instance.
- * - **"GET"** — Retrieves a single record by its primary key, optionally using a `DataSource`.
- * - **"LIST"** — Retrieves all records for the model, using the specified `DataSource`.
- *
- * The generated methods are static, exposed through both the backend
- * and the frontend client API.
- *
- * Example:
- * ```ts
- * ＠CRUD(["SAVE", "GET", "LIST"])
- * ＠D1
- * export class CrudHaver {
- *   ＠PrimaryKey id: number;
- *   name: string;
- * }
- * ```
- */
-export const CRUD =
-  (_kinds: CrudKind[]): ClassDecorator =>
-  () => {};
 
 type Primitive = string | number | boolean | bigint | symbol | null | undefined;
 

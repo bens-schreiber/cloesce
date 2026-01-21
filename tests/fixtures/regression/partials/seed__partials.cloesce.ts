@@ -4,7 +4,6 @@ import {
   POST,
   GET,
   Inject,
-  PrimaryKey,
   Orm,
   WranglerEnv,
   DeepPartial,
@@ -16,9 +15,8 @@ export class Env {
   db: D1Database;
 }
 
-@Model
+@Model()
 export class Dog {
-  @PrimaryKey
   id: Integer;
 
   name: string;

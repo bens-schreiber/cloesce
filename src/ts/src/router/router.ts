@@ -99,35 +99,27 @@ export enum RouterError {
 export class CloesceApp {
   public routePrefix: string = "api";
 
+  public static async init(
+    ast: CloesceAst,
+    ctorReg: ConstructorRegistry,
+  ): Promise<CloesceApp> {
+    await RuntimeContainer.init(ast, ctorReg);
+    return new CloesceApp();
+  }
+
   private globalMiddleware: MiddlewareFn[] = [];
 
   /**
-   * Registers global middleware which runs before any route matching.
+   * Registers global middleware that runs before all requests.
+   *
+   * Runs before namespace middleware, request validation, and method middleware.
    *
    * TODO: Middleware may violate the API contract and return unexpected types
    *
    * @param m - The middleware function to register.
    */
-  public onRequest(m: MiddlewareFn) {
+  public onRun(m: MiddlewareFn) {
     this.globalMiddleware.push(m);
-  }
-
-  private resultMiddleware: ResultMiddlewareFn[] = [];
-
-  /**
-   * Registers middleware which runs after the response is generated, but before
-   * it is returned to the client.
-   *
-   * Optionally, return a new HttpResult to short-circuit the response.
-   *
-   * Errors thrown in response middleware are caught and returned as a 500 response.
-   *
-   * TODO: Middleware may violate the API contract and return unexpected types
-   *
-   * @param m - The middleware function to register.
-   */
-  public onResult(m: ResultMiddlewareFn) {
-    this.resultMiddleware.push(m);
   }
 
   private namespaceMiddleware: Map<string, MiddlewareFn[]> = new Map();
@@ -249,13 +241,8 @@ export class CloesceApp {
   /**
    * Runs the Cloesce app. Intended to be called from the generated workers code.
    */
-  public async run(
-    request: Request,
-    env: any,
-    ast: CloesceAst,
-    ctorReg: ConstructorRegistry,
-  ): Promise<Response> {
-    await RuntimeContainer.init(ast, ctorReg);
+  public async run(request: Request, env: any): Promise<Response> {
+    const { ast, constructorRegistry: ctorReg } = RuntimeContainer.get();
 
     const di: DependencyContainer = new Map();
     if (ast.wrangler_env) {
@@ -287,23 +274,14 @@ export class CloesceApp {
     }
 
     try {
-      let httpResult = await this.router(request, env, ast, ctorReg, di);
+      const httpResult = await this.router(request, env, ast, ctorReg, di);
 
-      // Response middleware
-      for (const m of this.resultMiddleware) {
-        const res = await m(di, httpResult);
-
-        if (res) {
-          // Log any 500 errors
-          if (res.status === 500) {
-            console.error(
-              "A caught error occurred in the Cloesce Router: ",
-              res.message,
-            );
-          }
-
-          return res.toResponse();
-        }
+      // Log any 500 errors
+      if (httpResult.status === 500) {
+        console.error(
+          "A caught error occurred in the Cloesce Router: ",
+          httpResult.message,
+        );
       }
 
       return httpResult.toResponse();
@@ -390,7 +368,7 @@ function matchRoute(
 
     const hasPrimaryKey = model.primary_key !== null;
     const offset = hasPrimaryKey ? 1 : 0;
-    const primaryKey = hasPrimaryKey ? (id[0] ?? null) : null;
+    const primaryKey = hasPrimaryKey ? (id.at(0) ?? null) : null;
 
     const keyParams = Object.fromEntries(
       id
@@ -523,15 +501,20 @@ async function validateRequest(
   }
 
   // A data source is required for instantiated model methods
-  const dataSource: string | undefined = requiredParams
+  const dataSource = requiredParams
     .filter(
       (p) =>
         typeof p.cidl_type === "object" &&
         "DataSource" in p.cidl_type &&
         p.cidl_type.DataSource === route.namespace,
     )
-    .map((p) => params[p.name] as string)[0];
-  if (route.kind === "model" && !route.method.is_static && !dataSource) {
+    .map((p) => params[p.name] as string)
+    .at(0);
+  if (
+    route.kind === "model" &&
+    !route.method.is_static &&
+    dataSource === undefined
+  ) {
     return invalidRequest(RouterError.InstantiatedMethodMissingDataSource);
   }
 

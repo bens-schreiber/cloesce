@@ -4,13 +4,14 @@ import cidl from "./cidl.json";
 import { Dog } from "./seed__partials.cloesce.ts";
 
 
-const app = new CloesceApp();
-const constructorRegistry = {
+
+const constructorRegistry: Record<string, new () => any> = {
 	Dog: Dog
 };
 
 async function fetch(request: Request, env: any, ctx: any): Promise<Response> {
-    return await app.run(request, env, cidl as any, constructorRegistry);
+    const app = await CloesceApp.init(cidl as any, constructorRegistry);
+    return await app.run(request, env);
 }
 
 export default { fetch };

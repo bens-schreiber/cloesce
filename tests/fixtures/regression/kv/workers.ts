@@ -5,14 +5,15 @@ import { D1BackedModel } from "./seed__kv.cloesce.ts";
 import { PureKVModel } from "./seed__kv.cloesce.ts";
 
 
-const app = new CloesceApp();
-const constructorRegistry = {
+
+const constructorRegistry: Record<string, new () => any> = {
 	D1BackedModel: D1BackedModel,
 	PureKVModel: PureKVModel
 };
 
 async function fetch(request: Request, env: any, ctx: any): Promise<Response> {
-    return await app.run(request, env, cidl as any, constructorRegistry);
+    const app = await CloesceApp.init(cidl as any, constructorRegistry);
+    return await app.run(request, env);
 }
 
 export default { fetch };

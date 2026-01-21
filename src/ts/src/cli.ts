@@ -282,8 +282,8 @@ async function extract(
           "./" + path.basename(ast.wrangler_env.source_path);
       }
 
-      if (ast.app_source) {
-        ast.app_source = "./" + path.basename(ast.app_source);
+      if (ast.main_source) {
+        ast.main_source = "./" + path.basename(ast.main_source);
       }
 
       for (const model of Object.values(ast.models)) {

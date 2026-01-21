@@ -1,9 +1,8 @@
 // @ts-nocheck
 // MultipleGenericType
 
-@Model
+@Model()
 export class Foo {
-  @PrimaryKey
   id: number;
 
   @POST

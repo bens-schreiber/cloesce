@@ -1,9 +1,8 @@
 // @ts-nocheck
 // UnknownType
 
-@Model
+@Model()
 export class Foo {
-  @PrimaryKey
   id: number;
   bad: Bar<number>; // invalid type
 }

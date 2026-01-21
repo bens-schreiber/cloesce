@@ -1,13 +1,8 @@
 import {
   Model,
   POST,
-  PrimaryKey,
   WranglerEnv,
   ForeignKey,
-  OneToOne,
-  DataSource,
-  OneToMany,
-  ManyToMany,
   IncludeTree,
   GET,
   Orm,
@@ -24,32 +19,25 @@ export class Env {
 }
 
 //#region OneToOne
-@Model
+@Model()
 export class B {
-  @PrimaryKey
   id: Integer;
 
   @POST
   testMethod() { }
 }
 
-@Model
+@Model()
 export class A {
-  @PrimaryKey
   id: Integer;
 
-  @ForeignKey(B)
   bId: Integer;
-
-  @OneToOne("bId")
   b: B | undefined;
 
-  @DataSource
   static readonly withB: IncludeTree<A> = {
     b: {},
   };
 
-  @DataSource
   static readonly withoutB: IncludeTree<A> = {};
 
   @POST
@@ -86,15 +74,12 @@ export class A {
 //#endregion
 
 //#region OneToMany
-@Model
+@Model()
 export class Person {
-  @PrimaryKey
   id: Integer;
 
-  @OneToMany("personId")
   dogs: Dog[];
 
-  @DataSource
   static readonly withDogs: IncludeTree<Person> = {
     dogs: {},
   };
@@ -130,9 +115,8 @@ export class Person {
   }
 }
 
-@Model
+@Model()
 export class Dog {
-  @PrimaryKey
   id: Integer;
 
   @ForeignKey(Person)
@@ -144,19 +128,16 @@ export class Dog {
 //#endregion
 
 //#region ManyToMany
-@Model
+@Model()
 export class Student {
-  @PrimaryKey
   id: Integer;
-
-  @ManyToMany
   courses: Course[];
 
-  @DataSource static readonly withCoursesStudents: IncludeTree<Student> = {
+  static readonly withCoursesStudents: IncludeTree<Student> = {
     courses: { students: {} },
   };
 
-  @DataSource static readonly withCoursesStudentsCourses: IncludeTree<Student> =
+  static readonly withCoursesStudentsCourses: IncludeTree<Student> =
     {
       courses: { students: { courses: {} } },
     };
@@ -173,12 +154,9 @@ export class Student {
   }
 }
 
-@Model
+@Model()
 export class Course {
-  @PrimaryKey
   id: Integer;
-
-  @ManyToMany
   students: Student[];
 }
 //#endregion

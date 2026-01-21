@@ -4,13 +4,14 @@ import cidl from "./cidl.json";
 import { NullabilityChecks } from "./seed__nullability.cloesce.ts";
 
 
-const app = new CloesceApp();
-const constructorRegistry = {
+
+const constructorRegistry: Record<string, new () => any> = {
 	NullabilityChecks: NullabilityChecks
 };
 
 async function fetch(request: Request, env: any, ctx: any): Promise<Response> {
-    return await app.run(request, env, cidl as any, constructorRegistry);
+    const app = await CloesceApp.init(cidl as any, constructorRegistry);
+    return await app.run(request, env);
 }
 
 export default { fetch };

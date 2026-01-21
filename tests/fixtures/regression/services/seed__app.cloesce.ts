@@ -5,6 +5,8 @@ import {
   HttpResult,
 } from "cloesce/backend";
 
+class ExecutionContext { }
+
 @Service
 export class FooService {
   @GET
@@ -28,16 +30,21 @@ export class BarService {
   }
 }
 
-const app: CloesceApp = new CloesceApp();
+export default async function main(
+  request: Request,
+  env: any,
+  app: CloesceApp,
+  _ctx: ExecutionContext,
+): Promise<Response> {
+  app.onRun((di: Map<string, any>) => {
+    if (!di.has(BarService.name)) {
+      return HttpResult.fail(500, "Bar Service was not injected");
+    }
 
-app.onRequest((di: Map<string, any>) => {
-  if (!di.has(BarService.name)) {
-    return HttpResult.fail(500, "Bar Service was not injected");
-  }
+    if (!di.has(FooService.name)) {
+      return HttpResult.fail(500, "Foo Service was not injected");
+    }
+  });
 
-  if (!di.has(FooService.name)) {
-    return HttpResult.fail(500, "Foo Service was not injected");
-  }
-});
-
-export default app;
+  return await app.run(request, env);
+}

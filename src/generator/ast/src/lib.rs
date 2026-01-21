@@ -366,7 +366,7 @@ pub struct CloesceAst {
     #[serde_as(as = "MapPreventDuplicates<_, _>")]
     pub poos: BTreeMap<String, PlainOldObject>,
 
-    pub app_source: Option<PathBuf>,
+    pub main_source: Option<PathBuf>,
 }
 
 impl CloesceAst {
