@@ -1,7 +1,7 @@
 // @ts-nocheck
 // InvalidPropertyModifier
 
-@Model
+@Model()
 export class Foo {
   private id: number;
 }

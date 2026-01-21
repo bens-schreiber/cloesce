@@ -1,4 +1,4 @@
-import { describe, test, expect, vi, beforeAll, afterEach } from "vitest";
+import { describe, test, expect, vi, beforeAll } from "vitest";
 import {
   MatchedRoute,
   RouterError,
@@ -6,8 +6,6 @@ import {
 } from "../src/router/router";
 import { HttpVerb, MediaType, Model, NamedTypedValue } from "../src/ast";
 import { CloesceApp, HttpResult } from "../src/ui/backend";
-import fs from "fs";
-import path from "path";
 import { ModelBuilder, ServiceBuilder, createAst } from "./builder";
 
 function createRequest(url: string, method?: string, body?: any) {
@@ -55,72 +53,6 @@ function extractErrorCode(str) {
 
 beforeAll(() => {
   vi.mock("../orm.wasm", () => ({ default: new ArrayBuffer(0) }));
-});
-
-describe("Global Middleware", () => {
-  test("Exits early", async () => {
-    // Arrange
-    const app = new CloesceApp();
-    const request = createRequest("http://foo.com");
-    const env = mockWranglerEnv();
-    const ast = createAst();
-    const constructorRegistry = createCtorReg();
-    const di = createDi();
-    const d1 = mockD1();
-
-    app.onRequest(async (_di) => {
-      return HttpResult.fail(500, "oogly boogly");
-    });
-
-    // Act
-    const res: HttpResult = await (app as any).router(
-      request,
-      env,
-      ast,
-      constructorRegistry,
-      di,
-      d1,
-    );
-
-    // Assert
-    expect(res.status).toBe(500);
-    expect(res.message).toBe("oogly boogly");
-  });
-
-  test("FIFO Order Middleware", async () => {
-    // Arrange
-    const app = new CloesceApp();
-    const request = createRequest("http://foo.com");
-    const env = mockWranglerEnv();
-    const ast = createAst();
-    const constructorRegistry = createCtorReg();
-    const di = createDi();
-    const d1 = mockD1();
-
-    app.onRequest(async (di) => {
-      di.set(CloesceApp.name, "boop");
-    });
-
-    app.onRequest(async (di) => {
-      if (di.get(CloesceApp.name)) {
-        return HttpResult.ok(200);
-      }
-      return HttpResult.fail(500, "fail");
-    });
-
-    // Act
-    const res: HttpResult = await (app as any).router(
-      request,
-      env,
-      ast,
-      constructorRegistry,
-      di,
-      d1,
-    );
-
-    // Assert
-    expect(res.status).toBe(200);
-  });
 });
 
 describe("Match Route", () => {
@@ -342,8 +274,6 @@ describe("Match Route", () => {
 describe("Namespace Middleware", () => {
   test("Exits early on Model", async () => {
     // Arrange
-    const app = new CloesceApp();
-    const request = createRequest("http://foo.com/api/Foo/method", "POST");
     const env = mockWranglerEnv();
     const ast = createAst({
       models: [
@@ -354,6 +284,8 @@ describe("Namespace Middleware", () => {
       ],
     });
     const constructorRegistry = createCtorReg();
+    const app = new CloesceApp(ast, constructorRegistry, env);
+    const request = createRequest("http://foo.com/api/Foo/method", "POST");
     const di = createDi();
     const d1 = mockD1();
 
@@ -380,8 +312,6 @@ describe("Namespace Middleware", () => {
 
   test("Exits early on Service", async () => {
     // Arrange
-    const app = new CloesceApp();
-    const request = createRequest("http://foo.com/api/Foo/method", "POST");
     const env = mockWranglerEnv();
     const ast = createAst({
       services: [
@@ -391,6 +321,8 @@ describe("Namespace Middleware", () => {
       ],
     });
     const constructorRegistry = createCtorReg();
+    const app = new CloesceApp(ast, constructorRegistry, env);
+    const request = createRequest("http://foo.com/api/Foo/method", "POST");
     const di = createDi();
     const d1 = mockD1();
 
@@ -779,12 +711,6 @@ describe("Request Validation", () => {
 describe("Method Middleware", () => {
   test("Exits early", async () => {
     // Arrange
-    const app = new CloesceApp();
-    const request = createRequest(
-      "http://foo.com/api/Foo/method",
-      "POST",
-      JSON.stringify({}),
-    );
     const env = mockWranglerEnv();
     const ast = createAst({
       models: [
@@ -795,6 +721,13 @@ describe("Method Middleware", () => {
       ],
     });
     const constructorRegistry = createCtorReg();
+    const app = new CloesceApp(ast, constructorRegistry, env);
+    const request = createRequest(
+      "http://foo.com/api/Foo/method",
+      "POST",
+      JSON.stringify({}),
+    );
+
     const di = createDi();
     const d1 = mockD1();
 
@@ -980,114 +913,5 @@ describe("Method Dispatch", () => {
     // Assert
     expect(extractErrorCode(res.message)).toBe(RouterError.UncaughtException);
     expect(res.status).toBe(500);
-  });
-});
-
-describe("Result Middleware", () => {
-  afterEach(() => {
-    _cloesceInternal.RuntimeContainer.dispose();
-  });
-
-  test("Does not short-circuit", async () => {
-    // Arrange
-    const app = new CloesceApp();
-    const request = createRequest(
-      "http://foo.com/api/Foo/method",
-      "POST",
-      JSON.stringify({}),
-    );
-    const env = mockWranglerEnv();
-    const ast = createAst({
-      models: [
-        ModelBuilder.model("Foo")
-          .idPk()
-          .method("method", HttpVerb.POST, true, [], "Void")
-          .build(),
-      ],
-    });
-
-    class Foo {
-      static method() {
-        return "original";
-      }
-    }
-    const constructorRegistry = createCtorReg([Foo]);
-
-    app.onResult(async (_di, res) => {
-      res.data = `middleware 1: ${res.data}`;
-    });
-
-    app.onResult(async (_di, res) => {
-      res.data = `middleware 2: ${res.data}`;
-    });
-
-    const wasm = await WebAssembly.instantiate(
-      fs.readFileSync(path.resolve("./dist/orm.wasm")),
-      {},
-    );
-    await _cloesceInternal.RuntimeContainer.init(
-      ast,
-      constructorRegistry,
-      wasm.instance,
-    );
-
-    // Act
-    const res = await app.run(request, env, ast, constructorRegistry);
-
-    // Assert
-    expect(res.status).toBe(200);
-    expect(await res.json()).toBe("middleware 2: middleware 1: original");
-  });
-
-  test("Does short-circuit", async () => {
-    // Arrange
-    const app = new CloesceApp();
-    const request = createRequest(
-      "http://foo.com/api/Foo/method",
-      "POST",
-      JSON.stringify({}),
-    );
-    const env = mockWranglerEnv();
-    const ast = createAst({
-      models: [
-        ModelBuilder.model("Foo")
-          .idPk()
-          .method("method", HttpVerb.POST, true, [], "Void")
-          .build(),
-      ],
-    });
-
-    class Foo {
-      static method() {
-        return "original";
-      }
-    }
-    const constructorRegistry = createCtorReg([Foo]);
-
-    app.onResult(async (_di, _res) => {
-      return HttpResult.fail(500, "short-circuited (test worked correctly)");
-    });
-
-    app.onResult(async (_di, _res) => {
-      // Should not be called
-      throw new Error("Should not be called");
-    });
-
-    const wasm = await WebAssembly.instantiate(
-      fs.readFileSync(path.resolve("./dist/orm.wasm")),
-      {},
-    );
-    await _cloesceInternal.RuntimeContainer.init(
-      ast,
-      constructorRegistry,
-      wasm.instance,
-    );
-
-    // Act
-    const res = await app.run(request, env, ast, constructorRegistry);
-
-    // Assert
-    expect(res.status).toBe(500);
-    expect(await res.text()).toBe("short-circuited (test worked correctly)");
   });
 });

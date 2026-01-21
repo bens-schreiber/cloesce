@@ -141,25 +141,24 @@ describe("CIDL Type", () => {
   });
 });
 
-describe("Middleware", () => {
-  test("Finds app export", () => {
+describe("Main", () => {
+  test("Finds main export", () => {
     // Arrange
     const project = cloesceProject();
     const sourceFile = project.createSourceFile(
       "test.ts",
       `
-    import { CloesceApp } from "./src/ui/backend";
-    const app = new CloesceApp();
-    export default app;
+    export default async function main(request: Request, env: any, app: CloesceApp, ctx: ExecutionContext): Promise<Response> { }
   `,
     );
 
     // Act
-    const res = CidlExtractor.app(sourceFile);
+    const res = CidlExtractor.extract("app", project);
 
     // Assert
     expect(res.isRight()).toBe(true);
-    // TODO: assert app exists
+    const cidl = res.unwrap();
+    expect(cidl.main_source).toEqual(sourceFile.getFilePath().toString());
   });
 });
 
@@ -210,7 +209,7 @@ describe("Model", () => {
       "test.ts",
       `
       import { IncludeTree } from "./src/ui/backend";
-      @Model
+      @Model()
       export class Foo {
       @PrimaryKey
       id: number;
@@ -241,12 +240,12 @@ describe("Model", () => {
     project.createSourceFile(
       "test.ts",
       `
-      @Model
+      @Model()
       export class Foo {
         id: number;
       }
 
-      @Model
+      @Model()
       export class Bar {
         bAr_ID: number;
       }
@@ -275,12 +274,12 @@ describe("Model", () => {
     project.createSourceFile(
       "test.ts",
       `
-      @Model
+      @Model()
       export class Foo {
         id: number;
       }
 
-      @Model
+      @Model()
       export class Bar {
         id: number;
         
@@ -331,7 +330,7 @@ describe("Model", () => {
     project.createSourceFile(
       "test.ts",
       `
-      @Model
+      @Model()
       export class Bar {
         id: number;
         
@@ -339,7 +338,7 @@ describe("Model", () => {
         foo: Foo | undefined;
       }
 
-      @Model
+      @Model()
       export class Foo {
         id: number;
         bars: Bar[];
@@ -403,13 +402,13 @@ describe("Model", () => {
     project.createSourceFile(
       "test.ts",
       `
-      @Model
+      @Model()
       export class Bar {
         id: number;
         foos: Foo[];
       }
 
-      @Model
+      @Model()
       export class Foo {
         id: number;
         bars: Bar[];
@@ -455,7 +454,7 @@ describe("Model", () => {
       "test.ts",
       `
       import { OneToOne, OneToMany } from "./src/ui/backend";
-      @Model
+      @Model()
       export class Bar {
         id: number;
         
@@ -466,7 +465,7 @@ describe("Model", () => {
         foo: Foo | undefined;
       }
 
-      @Model
+      @Model()
       export class Foo {
         id: number;
 

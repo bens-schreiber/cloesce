@@ -6,15 +6,16 @@ import { Parent } from "./seed__crud.cloesce.ts";
 import { Child } from "./seed__crud.cloesce.ts";
 
 
-const app = new CloesceApp();
-const constructorRegistry = {
+
+const constructorRegistry: Record<string, new () => any> = {
 	CrudHaver: CrudHaver,
 	Parent: Parent,
 	Child: Child
 };
 
 async function fetch(request: Request, env: any, ctx: any): Promise<Response> {
-    return await app.run(request, env, cidl as any, constructorRegistry);
+    const app = await CloesceApp.init(cidl as any, constructorRegistry);
+    return await app.run(request, env);
 }
 
 export default { fetch };

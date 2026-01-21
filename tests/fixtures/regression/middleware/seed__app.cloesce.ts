@@ -8,6 +8,7 @@ import {
 } from "cloesce/backend";
 import { D1Database } from "@cloudflare/workers-types";
 type Integer = number & { __kind: "Integer" };
+class ExecutionContext { }
 
 export class InjectedThing {
   value: string;
@@ -31,27 +32,28 @@ export class Foo {
   }
 }
 
-const app: CloesceApp = new CloesceApp();
-
-app.onRequest((di) => {
-  const request = di.get("Request") as Request;
+export default async function main(
+  request: Request,
+  env: Env,
+  app: CloesceApp,
+  _ctx: ExecutionContext,
+): Promise<Response> {
   if (request.method === "POST") {
-    return HttpResult.fail(401, "POST methods aren't allowed.");
+    return HttpResult.fail(401, "POST methods aren't allowed.").toResponse();
   }
-});
 
-app.onNamespace(Foo, (di) => {
-  di.set(InjectedThing.name, {
-    value: "hello world",
+  app.onNamespace(Foo, (di) => {
+    di.set(InjectedThing.name, {
+      value: "hello world",
+    });
   });
-});
 
-app.onMethod(Foo, "blockedMethod", (di) => {
-  return HttpResult.fail(401, "Blocked method");
-});
+  app.onMethod(Foo, "blockedMethod", (_di) => {
+    return HttpResult.fail(401, "Blocked method");
+  });
 
-app.onResult((_di, result: HttpResult) => {
+  const result = await app.run(request, env);
   result.headers.set("X-Cloesce-Test", "true");
-});
 
-export default app;
+  return result;
+}

@@ -8,7 +8,7 @@ export class Env {
   db: D1Database;
 }
 
-@Model
+@Model()
 export class NullabilityChecks {
   id: Integer;
 

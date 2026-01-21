@@ -69,5 +69,5 @@
         }
     },
     "services": {},
-    "app_source": "./seed__app.cloesce.ts"
+    "main_source": "./seed__app.cloesce.ts"
 }

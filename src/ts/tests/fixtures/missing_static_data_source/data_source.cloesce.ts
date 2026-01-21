@@ -1,7 +1,7 @@
 // @ts-nocheck
 // InvalidDataSourceDefinition
 
-@Model
+@Model()
 export class Foo {
   id: number;
 

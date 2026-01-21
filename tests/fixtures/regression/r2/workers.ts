@@ -5,14 +5,15 @@ import { D1BackedModel } from "./seed__r2.cloesce.ts";
 import { PureR2Model } from "./seed__r2.cloesce.ts";
 
 
-const app = new CloesceApp();
-const constructorRegistry = {
+
+const constructorRegistry: Record<string, new () => any> = {
 	D1BackedModel: D1BackedModel,
 	PureR2Model: PureR2Model
 };
 
 async function fetch(request: Request, env: any, ctx: any): Promise<Response> {
-    return await app.run(request, env, cidl as any, constructorRegistry);
+    const app = await CloesceApp.init(cidl as any, constructorRegistry);
+    return await app.run(request, env);
 }
 
 export default { fetch };

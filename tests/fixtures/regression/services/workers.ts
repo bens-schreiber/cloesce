@@ -5,14 +5,15 @@ import cidl from "./cidl.json";
 
 import { FooService } from "./seed__app.cloesce.ts";
 import { BarService } from "./seed__app.cloesce.ts";
-import app from "./seed__app.cloesce.ts"
-const constructorRegistry = {
+import main from "./seed__app.cloesce.ts"
+const constructorRegistry: Record<string, new () => any> = {
 	FooService: FooService,
 	BarService: BarService
 };
 
 async function fetch(request: Request, env: any, ctx: any): Promise<Response> {
-    return await app.run(request, env, cidl as any, constructorRegistry);
+    const app = await CloesceApp.init(cidl as any, constructorRegistry);
+    return await main(request, env, app, ctx);
 }
 
 export default { fetch };

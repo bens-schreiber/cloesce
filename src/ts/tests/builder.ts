@@ -42,7 +42,7 @@ export function createAst(args?: {
       r2_bindings: [],
       vars: {},
     },
-    app_source: null,
+    main_source: null,
   };
 }
 

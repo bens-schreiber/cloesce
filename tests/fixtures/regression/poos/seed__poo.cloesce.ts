@@ -25,7 +25,7 @@ export class Env {
   db: D1Database;
 }
 
-@Model
+@Model()
 export class PooAcceptYield {
   id: Integer;
 

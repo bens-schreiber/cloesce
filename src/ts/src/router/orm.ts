@@ -215,11 +215,9 @@ export class Orm {
         const value = current[navProp.var_name];
 
         if (Array.isArray(value)) {
+          const ctor = constructorRegistry[nestedMeta.name];
           current[navProp.var_name] = value.map((child) => {
-            const instance = Object.assign(
-              new constructorRegistry[nestedMeta.name](),
-              child,
-            );
+            const instance = Object.assign(new ctor(), child);
             recurse(instance, nestedMeta, nestedTree);
             return instance;
           });

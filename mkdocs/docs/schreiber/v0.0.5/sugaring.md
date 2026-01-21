@@ -131,7 +131,7 @@ class Course {
 The Many to Many decorator will be dropped entirely, as it is no longer necessary.
 
 
-## Refactors
+## Decorator Refactors
 
 ### Plain Old Objects
 
@@ -180,4 +180,59 @@ export class User {...}
 
 Data sources are explicitly marked with `@DataSource`, but this can be removed because all Data Sources are of type `IncludeTree<T>`.
 
+## Middleware / CloesceApp Refactor
 
+Middleware looks like this:
+```ts
+const app: CloesceApp = new CloesceApp();
+
+app.onRequest((di) => {
+  const request = di.get("Request") as Request;
+  if (request.method === "POST") {
+    return HttpResult.fail(401, "POST methods aren't allowed.");
+  }
+});
+
+app.onNamespace(Foo, (di) => {
+  di.set(InjectedThing.name, {
+    value: "hello world",
+  });
+});
+
+app.onMethod(Foo, "blockedMethod", (di) => {
+  return HttpResult.fail(401, "Blocked method");
+});
+
+app.onResult((_di, result: HttpResult) => {
+  result.headers.set("X-Cloesce-Test", "true");
+});
+
+export default app;
+```
+
+Although this is fairly elegant, we can improve by giving the developer more control.
+```ts
+export default function main(request: Request, env: WranglerEnv, app: CloesceApp, ctx: ExecutionContext): Response {
+    if (request.method === "POST") {
+        return HttpResult.fail(401, "POST methods aren't allowed.");
+    }
+    
+    app.onNamespace(Foo, (di) => {
+        di.set(InjectedThing.name, {
+        value: "hello world",
+        });
+    });
+    
+    app.onMethod(Foo, "blockedMethod", (di) => {
+        return HttpResult.fail(401, "Blocked method");
+    });
+    
+    const result = app.run(request, env, ctx);
+    result.headers.set("X-Cloesce-Test", "true");
+    return result;
+}
+```
+
+This pattern allows for pre and post-processing of requests and results without the need for dedicated middleware hooks, simplifying the API while increasing flexibility. One could even completely circumvent Cloesce's request handling if desired.
+
+We will also remove the need to define a `app.cloesce.ts` file explicitly-- if a `main` function is exported from any `.cloesce` file, it will be used as the entry point. If no `main` is found, a default one will be provided that simply runs the app.

@@ -1,7 +1,7 @@
 // @ts-nocheck
 // UnknownType
 
-@Model
+@Model()
 export class Foo {
   id: number;
 

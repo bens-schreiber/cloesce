@@ -1,7 +1,7 @@
 // @ts-nocheck
 // InvalidApiMethodModifier
 
-@Model
+@Model()
 export class Foo {
   id: number;
 

@@ -62,7 +62,7 @@ export class CidlExtractor {
   private constructor(
     private modelDecls: Map<string, [ClassDeclaration, Decorator]>,
     private extractedPoos: Map<string, PlainOldObject> = new Map(),
-  ) { }
+  ) {}
 
   static extract(
     projectName: string,
@@ -71,19 +71,18 @@ export class CidlExtractor {
     const modelDecls: Map<string, [ClassDeclaration, Decorator]> = new Map();
     const serviceDecls: Map<string, ClassDeclaration> = new Map();
     const wranglerEnvs: WranglerEnv[] = [];
-    let app_source: string | null = null;
+    let main_source: string | null = null;
 
     // TODO: Concurrently across several threads?
     for (const sourceFile of project.getSourceFiles()) {
-      // Check if this is the app source file
-      const sourceFiles = ["app.cloesce.ts", "seed__app.cloesce.ts"];
-      if (sourceFiles.includes(sourceFile.getBaseName())) {
-        const app = CidlExtractor.app(sourceFile);
-        if (app.isLeft()) {
-          return app;
-        }
-
-        app_source = app.unwrap();
+      // Extract main source
+      const mainRes = CidlExtractor.main(sourceFile);
+      if (mainRes.isLeft()) {
+        return mainRes;
+      }
+      const main = mainRes.unwrap();
+      if (main) {
+        main_source = main;
       }
 
       for (const classDecl of sourceFile.getClasses()) {
@@ -177,38 +176,70 @@ export class CidlExtractor {
       models,
       poos,
       services,
-      app_source,
+      main_source,
     });
   }
 
-  static app(sourceFile: SourceFile): Either<ExtractorError, string> {
+  /**
+   * @returns An error if the main function is invalid, or the source code of the app function if valid.
+   * Undefined if no main function is defined.
+   */
+  private static main(
+    sourceFile: SourceFile,
+  ): Either<ExtractorError, string | undefined> {
     const symbol = sourceFile.getDefaultExportSymbol();
     const decl = symbol?.getDeclarations()[0];
 
-    if (!decl) {
-      return err(ExtractorErrorCode.AppMissingDefaultExport);
+    if (!decl || !MorphNode.isFunctionDeclaration(decl)) {
+      return Either.right(undefined);
     }
 
-    const getTypeText = (): string | undefined => {
-      let type = undefined;
-      if (MorphNode.isExportAssignment(decl)) {
-        type = decl.getExpression()?.getType();
-      }
-      if (MorphNode.isVariableDeclaration(decl)) {
-        type = decl.getInitializer()?.getType();
-      }
-      return type?.getText(
-        undefined,
-        TypeFormatFlags.UseAliasDefinedOutsideCurrentScope,
-      );
-    };
-
-    const typeText = getTypeText();
-    if (typeText === "CloesceApp") {
-      return Either.right(sourceFile.getFilePath().toString());
+    // Must be named "main"
+    const name = decl.getName();
+    if (name !== "main") {
+      return Either.right(undefined);
     }
 
-    return err(ExtractorErrorCode.AppMissingDefaultExport);
+    // Must be async
+    if (!decl.isAsync()) {
+      return err(ExtractorErrorCode.InvalidMain);
+    }
+
+    // Must have exactly 4 parameters
+    const params = decl.getParameters();
+    if (params.length !== 4) {
+      return err(ExtractorErrorCode.InvalidMain);
+    }
+
+    // Expected parameter types in order
+    // WranglerEnv does not have a required type annotation
+    const expectedTypes = ["Request", null, "CloesceApp", "ExecutionContext"];
+
+    for (let i = 0; i < params.length; i++) {
+      const param = params[i];
+      const expectedType = expectedTypes[i];
+
+      if (expectedType === null) {
+        continue;
+      }
+
+      const paramType = param
+        .getType()
+        .getText(undefined, TypeFormatFlags.UseAliasDefinedOutsideCurrentScope);
+      if (paramType !== expectedType) {
+        return err(ExtractorErrorCode.InvalidMain);
+      }
+    }
+
+    // Must return Response
+    const returnType = decl
+      .getReturnType()
+      .getText(undefined, TypeFormatFlags.UseAliasDefinedOutsideCurrentScope);
+    if (returnType !== "Promise<Response>") {
+      return err(ExtractorErrorCode.InvalidMain);
+    }
+
+    return Either.right(sourceFile.getFilePath().toString());
   }
 
   private model(
@@ -314,7 +345,7 @@ export class CidlExtractor {
             .slice(
               0,
               prop.getName().length -
-              (normalizedPropName.endsWith("_id") ? 3 : 2),
+                (normalizedPropName.endsWith("_id") ? 3 : 2),
             );
 
           const oneToOneProperty = classDecl

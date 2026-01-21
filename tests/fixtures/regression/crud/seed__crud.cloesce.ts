@@ -36,7 +36,7 @@ export class Parent {
   };
 }
 
-@Model
+@Model()
 export class Child {
   id: Integer;
   parentId: Integer;

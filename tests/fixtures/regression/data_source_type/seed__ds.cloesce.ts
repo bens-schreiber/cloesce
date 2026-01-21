@@ -13,19 +13,19 @@ export class Env {
   db: D1Database;
 }
 
-@Model
+@Model()
 export class NoDs {
   id: Integer;
 }
 
-@Model
+@Model()
 export class OneDs {
   id: Integer;
 
   static readonly default: IncludeTree<OneDs> = {};
 }
 
-@Model
+@Model()
 export class Foo {
   id: Integer;
 

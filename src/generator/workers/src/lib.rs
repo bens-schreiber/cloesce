@@ -5,7 +5,7 @@ use ast::{ApiMethod, CidlType, CloesceAst, CrudKind, HttpVerb, MediaType, NamedT
 // TODO: This is all hardcoded to TypeScript workers
 pub struct WorkersGenerator;
 impl WorkersGenerator {
-    /// Generates all model source imports as well as the Cloesce App
+    /// Generates all model source imports as well as the main source import
     ///
     /// Public for tests
     pub fn link(ast: &CloesceAst, workers_path: &Path) -> String {
@@ -55,13 +55,13 @@ impl WorkersGenerator {
                 .join("\n")
         }
 
-        let app_import = match &ast.app_source {
+        let main_import = match &ast.main_source {
             Some(p) => {
                 let path = rel_path(p, workers_dir)
                     .unwrap_or_else(|_| p.clone().to_string_lossy().to_string());
-                format!("import app from \"{path}\"")
+                format!("import main from \"{path}\"")
             }
-            None => "const app = new CloesceApp();".into(),
+            None => String::default(),
         };
 
         [
@@ -74,7 +74,7 @@ impl WorkersGenerator {
             imports(&ast.services, workers_dir, |(name, service)| {
                 (name.clone(), service.source_path.clone())
             }),
-            app_import,
+            main_import,
         ]
         .join("\n")
     }
@@ -89,7 +89,7 @@ impl WorkersGenerator {
             .chain(ast.services.values().map(|s| &s.name));
 
         format!(
-            "const constructorRegistry = {{\n{}\n}};",
+            "const constructorRegistry: Record<string, new () => any> = {{\n{}\n}};",
             symbols
                 .map(|name| format!("\t{}: {}", name, name))
                 .collect::<Vec<_>>()
@@ -235,6 +235,11 @@ impl WorkersGenerator {
 
         Self::finalize_api_methods(ast);
 
+        let fetch_impl = match &ast.main_source {
+            Some(_) => "return await main(request, env, app, ctx);",
+            None => "return await app.run(request, env);",
+        };
+
         format!(
             r#"// GENERATED CODE. DO NOT MODIFY.
 import {{ CloesceApp }} from "cloesce/backend";
@@ -243,7 +248,8 @@ import cidl from "./cidl.json";
 {constructor_registry}
 
 async function fetch(request: Request, env: any, ctx: any): Promise<Response> {{
-    return await app.run(request, env, cidl as any, constructorRegistry);
+    const app = await CloesceApp.init(cidl as any, constructorRegistry);
+    {fetch_impl}
 }}
 
 export default {{ fetch }};"#

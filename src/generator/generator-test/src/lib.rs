@@ -31,7 +31,7 @@ pub fn create_ast(models: Vec<Model>) -> CloesceAst {
             kv_bindings: vec!["kv_namespace".to_string()],
             vars: HashMap::new(),
         }),
-        app_source: None,
+        main_source: None,
         hash: 0,
     }
 }

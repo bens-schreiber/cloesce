@@ -16,7 +16,7 @@ export { Orm } from "../router/orm.js";
 export { R2ObjectBody } from "@cloudflare/workers-types";
 
 export const Model =
-  (_kinds: CrudKind[]): ClassDecorator =>
+  (_kinds: CrudKind[] = []): ClassDecorator =>
   () => {};
 
 export const Service: ClassDecorator = () => {};

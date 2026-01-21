@@ -1,7 +1,7 @@
 // @ts-nocheck
 // InvalidSelectorSyntax
 
-@Model
+@Model()
 export class Foo {
   id: number;
 

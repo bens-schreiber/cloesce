@@ -1,6 +1,6 @@
 export enum ExtractorErrorCode {
   MissingExport,
-  AppMissingDefaultExport,
+  InvalidMain,
   UnknownType,
   MultipleGenericType,
   InvalidDataSourceDefinition,
@@ -26,9 +26,10 @@ const errorInfoMap: Record<
     description: "All Cloesce types must be exported.",
     suggestion: "Add `export` to the class definition.",
   },
-  [ExtractorErrorCode.AppMissingDefaultExport]: {
-    description: "app.cloesce.ts does not export a CloesceApp by default",
-    suggestion: "Export an instantiated CloesceApp in app.cloesce.ts",
+  [ExtractorErrorCode.InvalidMain]: {
+    description: "The main function must follow the expected signature.",
+    suggestion:
+      "Change to: export default async function main(request: Request, env: WranglerEnv, app: CloesceApp, ctx: ExecutionContext): Promise<Response> {...}",
   },
   [ExtractorErrorCode.UnknownType]: {
     description: "Encountered an unknown or unsupported type",
