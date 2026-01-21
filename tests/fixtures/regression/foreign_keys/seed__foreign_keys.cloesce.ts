@@ -134,8 +134,6 @@ export class Dog {
 @Model
 export class Student {
   id: Integer;
-
-  @ManyToMany
   courses: Course[];
 
   static readonly withCoursesStudents: IncludeTree<Student> = {
@@ -162,8 +160,6 @@ export class Student {
 @Model
 export class Course {
   id: Integer;
-
-  @ManyToMany
   students: Student[];
 }
 //#endregion

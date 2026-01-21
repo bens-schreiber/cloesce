@@ -62,7 +62,7 @@ export class CidlExtractor {
   private constructor(
     private modelDecls: Map<string, [ClassDeclaration, Decorator]>,
     private extractedPoos: Map<string, PlainOldObject> = new Map(),
-  ) {}
+  ) { }
 
   static extract(
     projectName: string,
@@ -314,7 +314,7 @@ export class CidlExtractor {
             .slice(
               0,
               prop.getName().length -
-                (normalizedPropName.endsWith("_id") ? 3 : 2),
+              (normalizedPropName.endsWith("_id") ? 3 : 2),
             );
 
           const oneToOneProperty = classDecl
@@ -376,7 +376,7 @@ export class CidlExtractor {
           }
         }
 
-        // One to Many
+        // One to Many + Many to Many
         else if (
           objectName !== undefined &&
           typeof cidl_type !== "string" &&
@@ -384,18 +384,42 @@ export class CidlExtractor {
         ) {
           const referencedModelDecl = this.modelDecls.get(objectName)?.[0];
           const normalizedModelIdName = `${normalizeName(name)}id`;
-          const hasForeignKeyProp = referencedModelDecl
-            ?.getProperties()
-            .find((p) => {
-              const norm = normalizeName(p.getName());
-              return norm === normalizedModelIdName;
-            });
 
+          let hasForeignKeyProp: PropertyDeclaration | null = null;
+          let hasManyToManyProp: PropertyDeclaration | null = null;
+          for (const prop of referencedModelDecl?.getProperties() ?? []) {
+            const tyRes = CidlExtractor.cidlType(prop.getType());
+            if (tyRes.isLeft()) {
+              continue;
+            }
+
+            const ty = tyRes.unwrap();
+            const navObjectName = getObjectName(ty);
+            const normalizedPropName = normalizeName(prop.getName());
+
+            if (typeof ty !== "string" && "Array" in ty && navObjectName === name) {
+              // Many to Many
+              hasManyToManyProp = prop;
+            }
+            else if (normalizedPropName === normalizedModelIdName) {
+              // One to Many
+              hasForeignKeyProp = prop;
+            }
+          }
+
+          // Add a one to many decorator
           if (hasForeignKeyProp) {
-            // Add a one to many decorator
             prop.addDecorator({
               name: PropertyDecoratorKind.OneToMany,
               arguments: [hasForeignKeyProp.getName()],
+            });
+          }
+
+          // Add a many to many decorator
+          else if (hasManyToManyProp) {
+            prop.addDecorator({
+              name: PropertyDecoratorKind.ManyToMany,
+              arguments: [],
             });
           }
         }

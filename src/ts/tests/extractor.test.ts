@@ -369,6 +369,88 @@ describe("Model", () => {
         },
       ]),
     );
+
+    const barModel = cidl.models["Bar"];
+    expect(barModel.columns).toEqual(
+      expect.arrayContaining([
+        {
+          value: {
+            name: "fooId",
+            cidl_type: "Real",
+          },
+          foreign_key_reference: "Foo",
+        },
+      ]),
+    );
+    expect(barModel.navigation_properties).toEqual(
+      expect.arrayContaining([
+        {
+          kind: {
+            OneToOne: {
+              column_reference: "fooId",
+            },
+          },
+          model_reference: "Foo",
+          var_name: "foo",
+        },
+      ]),
+    );
+  });
+
+  test("Infers M:M foreign key", () => {
+    // Arrange
+    const project = cloesceProject();
+    project.createSourceFile(
+      "test.ts",
+      `
+      @Model
+      export class Bar {
+        id: number;
+        foos: Foo[];
+      }
+
+      @Model
+      export class Foo {
+        id: number;
+        bars: Bar[];
+      }
+      `,
+    );
+
+    // Act
+    const res = CidlExtractor.extract("FooBar", project);
+
+    // Assert
+    expect(res.isRight()).toBe(true);
+    const cidl = res.unwrap();
+    expect(cidl.models["Foo"]).toBeDefined();
+
+    const fooModel = cidl.models["Foo"];
+    expect(fooModel.navigation_properties).toEqual(
+      expect.arrayContaining([
+        {
+          kind:
+            "ManyToMany"
+          ,
+          model_reference: "Bar",
+          var_name: "bars",
+        },
+      ]),
+    );
+
+    const barModel = cidl.models["Bar"];
+    expect(barModel.navigation_properties).toEqual(
+      expect.arrayContaining([
+        {
+          kind:
+            "ManyToMany"
+          ,
+          model_reference: "Foo",
+          var_name: "foos",
+        },
+      ]),
+    );
+
   });
 
   test("Extracts Model", () => {

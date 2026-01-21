@@ -1,12 +1,7 @@
 import {
   Model,
-  PrimaryKey,
   WranglerEnv,
   POST,
-  ForeignKey,
-  OneToMany,
-  OneToOne,
-  DataSource,
   IncludeTree,
 } from "cloesce/backend";
 import { D1Database } from "@cloudflare/workers-types";
@@ -44,8 +39,6 @@ export class Parent {
 @Model
 export class Child {
   id: Integer;
-
-
   parentId: Integer;
   parent: Parent | undefined;
 }

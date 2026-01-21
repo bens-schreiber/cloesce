@@ -17,9 +17,9 @@ export { R2ObjectBody } from "@cloudflare/workers-types";
 
 export const Model =
   (_kinds: CrudKind[]): ClassDecorator =>
-  () => {};
+    () => { };
 
-export const Service: ClassDecorator = () => {};
+export const Service: ClassDecorator = () => { };
 
 /**
  * Declares a Wrangler environment definition.
@@ -42,7 +42,7 @@ export const Service: ClassDecorator = () => {};
  * foo(＠Inject env: WranglerEnv) {...}
  * ```
  */
-export const WranglerEnv: ClassDecorator = () => {};
+export const WranglerEnv: ClassDecorator = () => { };
 
 /**
  * Marks a property as the SQL primary key for a model.
@@ -60,47 +60,47 @@ export const WranglerEnv: ClassDecorator = () => {};
  * }
  * ```
  */
-export const PrimaryKey: PropertyDecorator = () => {};
+export const PrimaryKey: PropertyDecorator = () => { };
 
-export const KeyParam: PropertyDecorator = () => {};
+export const KeyParam: PropertyDecorator = () => { };
 
 export const KV =
   (_keyFormat?: string, _namespaceBinding?: string): PropertyDecorator =>
-  () => {};
+    () => { };
 
 export const R2 =
   (_keyFormat?: string, _bucketBinding?: string): PropertyDecorator =>
-  () => {};
+    () => { };
 
 /**
  * Exposes a class method as an HTTP GET endpoint.
  * The method will appear in both backend and generated client APIs.
  */
-export const GET: MethodDecorator = () => {};
+export const GET: MethodDecorator = () => { };
 
 /**
  * Exposes a class method as an HTTP POST endpoint.
  * The method will appear in both backend and generated client APIs.
  */
-export const POST: MethodDecorator = () => {};
+export const POST: MethodDecorator = () => { };
 
 /**
  * Exposes a class method as an HTTP PUT endpoint.
  * The method will appear in both backend and generated client APIs.
  */
-export const PUT: MethodDecorator = () => {};
+export const PUT: MethodDecorator = () => { };
 
 /**
  * Exposes a class method as an HTTP PATCH endpoint.
  * The method will appear in both backend and generated client APIs.
  */
-export const PATCH: MethodDecorator = () => {};
+export const PATCH: MethodDecorator = () => { };
 
 /**
  * Exposes a class method as an HTTP DEL endpoint.
  * The method will appear in both backend and generated client APIs.
  */
-export const DELETE: MethodDecorator = () => {};
+export const DELETE: MethodDecorator = () => { };
 
 /**
  * Declares a one-to-many relationship between models.
@@ -116,7 +116,7 @@ export const DELETE: MethodDecorator = () => {};
  */
 export const OneToMany =
   (_foreignKeyColumn: string): PropertyDecorator =>
-  () => {};
+    () => { };
 
 /**
  * Declares a one-to-one relationship between models.
@@ -132,9 +132,7 @@ export const OneToMany =
  */
 export const OneToOne =
   (_foreignKeyColumn: string): PropertyDecorator =>
-  () => {};
-
-export const ManyToMany = (): PropertyDecorator => () => {};
+    () => { };
 
 /**
  * Declares a foreign key relationship between models.
@@ -152,7 +150,7 @@ export const ManyToMany = (): PropertyDecorator => () => {};
  */
 export const ForeignKey =
   <T>(_Model: T | string): PropertyDecorator =>
-  () => {};
+    () => { };
 
 /**
  * Marks a method parameter for dependency injection.
@@ -171,7 +169,7 @@ export const ForeignKey =
  * }
  * ```
  */
-export const Inject: ParameterDecorator = () => {};
+export const Inject: ParameterDecorator = () => { };
 
 type Primitive = string | number | boolean | bigint | symbol | null | undefined;
 
@@ -204,10 +202,10 @@ type Primitive = string | number | boolean | bigint | symbol | null | undefined;
 export type IncludeTree<T> = (T extends Primitive
   ? never
   : {
-      [K in keyof T]?: T[K] extends (infer U)[]
-        ? IncludeTree<NonNullable<U>>
-        : IncludeTree<NonNullable<T[K]>>;
-    }) & { __brand?: "IncludeTree" };
+    [K in keyof T]?: T[K] extends (infer U)[]
+    ? IncludeTree<NonNullable<U>>
+    : IncludeTree<NonNullable<T[K]>>;
+  }) & { __brand?: "IncludeTree" };
 
 /**
  * Represents the name of a `＠DataSource` available on a model type `T`,
