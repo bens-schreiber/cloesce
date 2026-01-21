@@ -62,7 +62,7 @@ export class CidlExtractor {
   private constructor(
     private modelDecls: Map<string, [ClassDeclaration, Decorator]>,
     private extractedPoos: Map<string, PlainOldObject> = new Map(),
-  ) {}
+  ) { }
 
   static extract(
     projectName: string,
@@ -345,7 +345,7 @@ export class CidlExtractor {
             .slice(
               0,
               prop.getName().length -
-                (normalizedPropName.endsWith("_id") ? 3 : 2),
+              (normalizedPropName.endsWith("_id") ? 3 : 2),
             );
 
           const oneToOneProperty = classDecl
@@ -445,7 +445,7 @@ export class CidlExtractor {
           if (hasForeignKeyProp) {
             prop.addDecorator({
               name: PropertyDecoratorKind.OneToMany,
-              arguments: [`(_m: any) => m.${hasForeignKeyProp!.getName()}`],
+              arguments: [`(m: any) => m.${hasForeignKeyProp!.getName()}`],
             });
           }
 

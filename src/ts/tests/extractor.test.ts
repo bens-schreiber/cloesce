@@ -1,7 +1,7 @@
 import { describe, test, expect } from "vitest";
 import { Project } from "ts-morph";
 import { CidlExtractor } from "../src/extractor/extract";
-import { CidlType, DataSource, Service } from "../src/ast";
+import { CidlType, DataSource, PlainOldObject, Service } from "../src/ast";
 import { ModelBuilder } from "./builder";
 
 function cloesceProject(): Project {
@@ -590,6 +590,111 @@ describe("Model", () => {
         .r2Object("files/Foo", "bucket", "allFiles", true)
         .build(),
     );
+  });
+});
+
+describe("Plain Old Objects", () => {
+  test("Extracts Plain Old Objects from model references", () => {
+    // Arrange
+    const project = cloesceProject();
+    const sourceFile = project.createSourceFile(
+      "test.ts",
+      `
+          export class Bar {
+            id: number;
+            name: string;
+          }
+
+          export class Foo {
+            bar: Bar;
+            optionalBar: Bar | null;
+          }
+
+          @Model
+          export class Baz {
+            id: number;
+
+            @POST
+            async method(foo: Foo, bar: Bar | null): Promise<void> { }
+          }
+          `,
+    );
+
+    // Act
+    const res = CidlExtractor.extract("Foo", project);
+
+    // Assert
+    expect(res.isRight()).toBe(true);
+    const cidl = res.unwrap();
+    expect(cidl.poos).toStrictEqual(
+      {
+        Foo: {
+          name: "Foo",
+          attributes: [
+            {
+              name: "bar",
+              cidl_type: { Object: "Bar" },
+            },
+            {
+              name: "optionalBar",
+              cidl_type: { Nullable: { Object: "Bar" } },
+            },
+          ],
+          source_path: sourceFile.getFilePath().toString(),
+        },
+        Bar: {
+          name: "Bar",
+          attributes: [
+            {
+              name: "id",
+              cidl_type: "Real",
+            },
+            {
+              name: "name",
+              cidl_type: "Text",
+            },
+          ],
+          source_path: sourceFile.getFilePath().toString(),
+        },
+      } satisfies Record<string, PlainOldObject>,
+    );
+
+
+  });
+
+  test("Does not extract Plain Old Object without references", () => {
+    // Arrange
+    const project = cloesceProject();
+    project.createSourceFile(
+      "test.ts",
+      `
+          export class Bar {
+            id: number;
+            name: string;
+          }
+
+          export class Foo {
+            bar: Bar;
+            optionalBar: Bar | null;
+          }
+
+          @Model
+          export class Baz {
+            id: number;
+
+            @POST
+            async method(): Promise<void> { }
+          }
+          `,
+    );
+
+    // Act
+    const res = CidlExtractor.extract("Foo", project);
+
+    // Assert
+    expect(res.isRight()).toBe(true);
+    const cidl = res.unwrap();
+    expect(cidl.poos).toStrictEqual({});
   });
 });
 

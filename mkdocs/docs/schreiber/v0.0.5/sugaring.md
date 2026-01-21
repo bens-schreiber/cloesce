@@ -212,7 +212,7 @@ export default app;
 
 Although this is fairly elegant, we can improve by giving the developer more control.
 ```ts
-export default function main(request: Request, env: WranglerEnv, app: CloesceApp, ctx: ExecutionContext): Response {
+export default async function main(request: Request, env: WranglerEnv, app: CloesceApp, ctx: ExecutionContext): Promise<Response> {
     if (request.method === "POST") {
         return HttpResult.fail(401, "POST methods aren't allowed.");
     }
@@ -227,7 +227,7 @@ export default function main(request: Request, env: WranglerEnv, app: CloesceApp
         return HttpResult.fail(401, "Blocked method");
     });
     
-    const result = app.run(request, env, ctx);
+    const result = await app.run(request, env);
     result.headers.set("X-Cloesce-Test", "true");
     return result;
 }
