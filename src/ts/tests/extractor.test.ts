@@ -626,40 +626,36 @@ describe("Plain Old Objects", () => {
     // Assert
     expect(res.isRight()).toBe(true);
     const cidl = res.unwrap();
-    expect(cidl.poos).toStrictEqual(
-      {
-        Foo: {
-          name: "Foo",
-          attributes: [
-            {
-              name: "bar",
-              cidl_type: { Object: "Bar" },
-            },
-            {
-              name: "optionalBar",
-              cidl_type: { Nullable: { Object: "Bar" } },
-            },
-          ],
-          source_path: sourceFile.getFilePath().toString(),
-        },
-        Bar: {
-          name: "Bar",
-          attributes: [
-            {
-              name: "id",
-              cidl_type: "Real",
-            },
-            {
-              name: "name",
-              cidl_type: "Text",
-            },
-          ],
-          source_path: sourceFile.getFilePath().toString(),
-        },
-      } satisfies Record<string, PlainOldObject>,
-    );
-
-
+    expect(cidl.poos).toStrictEqual({
+      Foo: {
+        name: "Foo",
+        attributes: [
+          {
+            name: "bar",
+            cidl_type: { Object: "Bar" },
+          },
+          {
+            name: "optionalBar",
+            cidl_type: { Nullable: { Object: "Bar" } },
+          },
+        ],
+        source_path: sourceFile.getFilePath().toString(),
+      },
+      Bar: {
+        name: "Bar",
+        attributes: [
+          {
+            name: "id",
+            cidl_type: "Real",
+          },
+          {
+            name: "name",
+            cidl_type: "Text",
+          },
+        ],
+        source_path: sourceFile.getFilePath().toString(),
+      },
+    } satisfies Record<string, PlainOldObject>);
   });
 
   test("Does not extract Plain Old Object without references", () => {

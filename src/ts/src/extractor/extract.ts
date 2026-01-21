@@ -62,7 +62,7 @@ export class CidlExtractor {
   private constructor(
     private modelDecls: Map<string, [ClassDeclaration, Decorator]>,
     private extractedPoos: Map<string, PlainOldObject> = new Map(),
-  ) { }
+  ) {}
 
   static extract(
     projectName: string,
@@ -322,160 +322,9 @@ export class CidlExtractor {
       }
 
       // Infer decorator
-      if (prop.getDecorators().length < 1) {
-        const objectName = getObjectName(cidl_type);
-        const normalizedPropName = normalizeName(prop.getName());
-
-        // Primary Key
-        if (
-          normalizedPropName === "id" ||
-          normalizedPropName === `${name.toLowerCase()}id`
-        ) {
-          // Add a primary key decorator
-          prop.addDecorator({
-            name: PropertyDecoratorKind.PrimaryKey,
-            arguments: [],
-          });
-        }
-
-        // Foreign Key
-        else if (normalizedPropName.endsWith("id")) {
-          const referencedNavName = prop
-            .getName()
-            .slice(
-              0,
-              prop.getName().length -
-              (normalizedPropName.endsWith("_id") ? 3 : 2),
-            );
-
-          const oneToOneProperty = classDecl
-            .getProperties()
-            .find((p) => p.getName() === referencedNavName);
-
-          if (oneToOneProperty) {
-            const navModelTypeRes = CidlExtractor.cidlType(
-              oneToOneProperty?.getType(),
-            );
-            if (navModelTypeRes.isLeft()) {
-              navModelTypeRes.value.context = prop.getName();
-              navModelTypeRes.value.snippet = prop.getText();
-              return navModelTypeRes;
-            }
-
-            const navModelType = navModelTypeRes.unwrap();
-            const objectName = getObjectName(navModelType);
-
-            if (objectName) {
-              // Add a foreign key decorator
-              prop.addDecorator({
-                name: PropertyDecoratorKind.ForeignKey,
-                arguments: [objectName],
-              });
-            }
-          }
-
-          if (objectName !== undefined) {
-            const oneToManyClassDecl = this.modelDecls.get(objectName)?.[0];
-            const containsOneToManyProp = oneToManyClassDecl
-              ?.getProperties()
-              .find((p) => {
-                const tyRes = CidlExtractor.cidlType(p.getType());
-                if (tyRes.isLeft()) {
-                  return false;
-                }
-
-                const ty = tyRes.unwrap();
-                const navObjectName = getObjectName(ty);
-                if (navObjectName !== name) {
-                  return false;
-                }
-
-                if (typeof ty === "string" || !("Array" in ty)) {
-                  return false;
-                }
-
-                return true;
-              });
-
-            if (containsOneToManyProp) {
-              // Add a foreign key decorator
-              prop.addDecorator({
-                name: PropertyDecoratorKind.ForeignKey,
-                arguments: [objectName],
-              });
-            }
-          }
-        }
-
-        // One to Many + Many to Many
-        else if (
-          objectName !== undefined &&
-          typeof cidl_type !== "string" &&
-          "Array" in cidl_type
-        ) {
-          const referencedModelDecl = this.modelDecls.get(objectName)?.[0];
-          const normalizedModelIdName = `${normalizeName(name)}id`;
-
-          let hasForeignKeyProp: PropertyDeclaration | null = null;
-          let hasManyToManyProp: PropertyDeclaration | null = null;
-          for (const prop of referencedModelDecl?.getProperties() ?? []) {
-            const tyRes = CidlExtractor.cidlType(prop.getType());
-            if (tyRes.isLeft()) {
-              continue;
-            }
-
-            const ty = tyRes.unwrap();
-            const navObjectName = getObjectName(ty);
-            const normalizedPropName = normalizeName(prop.getName());
-
-            if (
-              typeof ty !== "string" &&
-              "Array" in ty &&
-              navObjectName === name
-            ) {
-              // Many to Many
-              hasManyToManyProp = prop;
-            } else if (normalizedPropName === normalizedModelIdName) {
-              // One to Many
-              hasForeignKeyProp = prop;
-            }
-          }
-
-          // Add a one to many decorator
-          if (hasForeignKeyProp) {
-            prop.addDecorator({
-              name: PropertyDecoratorKind.OneToMany,
-              arguments: [`(m: any) => m.${hasForeignKeyProp!.getName()}`],
-            });
-          }
-
-          // Add a many to many decorator
-          else if (hasManyToManyProp) {
-            prop.addDecorator({
-              name: PropertyDecoratorKind.ManyToMany,
-              arguments: [],
-            });
-          }
-        }
-
-        // One to One
-        else if (objectName !== undefined) {
-          const normalizedPropIdName = `${normalizedPropName}id`;
-          const hasForeignKeyProp = classDecl.getProperties().find((p) => {
-            const norm = normalizeName(p.getName());
-            return norm === normalizedPropIdName;
-          });
-
-          if (hasForeignKeyProp) {
-            // Add a one to one decorator
-            prop.addDecorator({
-              name: PropertyDecoratorKind.OneToOne,
-              arguments: [`(_m: any) => m.${hasForeignKeyProp.getName()}`],
-            });
-          }
-        }
+      if (prop.getDecorators().length === 0) {
+        this.inferModelDecorator(prop, classDecl, cidl_type);
       }
-
       const decorators = prop.getDecorators();
 
       // Scalar column
@@ -1161,6 +1010,228 @@ export class CidlExtractor {
 
       const stripUndefined = nonNulls.filter((t) => !t.isUndefined());
       return [stripUndefined[0] ?? ty, hasNullable];
+    }
+  }
+
+  /**
+   * Mutates the property declaration to add inferred decorators based on naming conventions.
+   */
+  private inferModelDecorator(
+    prop: PropertyDeclaration,
+    classDecl: ClassDeclaration,
+    cidlType: CidlType,
+  ): Either<ExtractorError, void> | void {
+    const className = classDecl.getName()!;
+    const objectName = getObjectName(cidlType);
+    const normalizedPropName = normalizeName(prop.getName());
+
+    // Primary Key
+    if (
+      normalizedPropName === "id" ||
+      normalizedPropName === `${className.toLowerCase()}id`
+    ) {
+      // Add a primary key decorator
+      prop.addDecorator({
+        name: PropertyDecoratorKind.PrimaryKey,
+        arguments: [],
+      });
+      return;
+    }
+
+    // Foreign Key
+    if (normalizedPropName.endsWith("id")) {
+      const referencedNavName = prop
+        .getName()
+        .slice(
+          0,
+          prop.getName().length - (normalizedPropName.endsWith("_id") ? 3 : 2),
+        );
+
+      const oneToOneProperties = classDecl
+        .getProperties()
+        .filter((p) => p.getName() === referencedNavName);
+
+      if (oneToOneProperties.length > 1) {
+        console.warn(`
+          Cannot infer ForeignKey relationship due to ambiguity, model ${className}, property ${prop.getName()}
+          could match ${oneToOneProperties.map((p) => p.getName()).join(", ")}
+          `);
+        return;
+      }
+
+      // If a one to one property exists with the expected name, use that
+      if (oneToOneProperties[0] !== undefined) {
+        const oneToOneProperty = oneToOneProperties[0];
+
+        const navModelTypeRes = CidlExtractor.cidlType(
+          oneToOneProperty?.getType(),
+        );
+        if (navModelTypeRes.isLeft()) {
+          navModelTypeRes.value.context = prop.getName();
+          navModelTypeRes.value.snippet = prop.getText();
+          return navModelTypeRes;
+        }
+
+        const navModelType = navModelTypeRes.unwrap();
+        const objectName = getObjectName(navModelType);
+
+        if (objectName) {
+          // Add a foreign key decorator
+          prop.addDecorator({
+            name: PropertyDecoratorKind.ForeignKey,
+            arguments: [objectName],
+          });
+
+          return;
+        }
+      }
+
+      if (objectName !== undefined) {
+        const oneToManyClassDecl = this.modelDecls.get(objectName)?.[0];
+        const containsOneToManyProp = oneToManyClassDecl
+          ?.getProperties()
+          .filter((p) => {
+            const tyRes = CidlExtractor.cidlType(p.getType());
+            if (tyRes.isLeft()) {
+              return false;
+            }
+
+            const ty = tyRes.unwrap();
+            const navObjectName = getObjectName(ty);
+            if (navObjectName !== className) {
+              return false;
+            }
+
+            if (typeof ty === "string" || !("Array" in ty)) {
+              return false;
+            }
+
+            return true;
+          });
+
+        if (containsOneToManyProp) {
+          if (containsOneToManyProp.length > 1) {
+            console.warn(`
+              Cannot infer ForeignKey relationship due to ambiguity, model ${className}, property ${prop.getName()}
+              could match ${containsOneToManyProp.map((p) => p.getName()).join(", ")}
+              `);
+            return;
+          }
+
+          // Add a foreign key decorator
+          prop.addDecorator({
+            name: PropertyDecoratorKind.ForeignKey,
+            arguments: [objectName],
+          });
+          return;
+        }
+      }
+    }
+
+    // One to Many + Many to Many
+    if (
+      objectName !== undefined &&
+      typeof cidlType !== "string" &&
+      "Array" in cidlType
+    ) {
+      const referencedModelDecl = this.modelDecls.get(objectName)?.[0];
+      const normalizedModelIdName = `${normalizeName(className)}id`;
+
+      const foreignKeyProps: PropertyDeclaration[] = [];
+      const manyToManyProps: PropertyDeclaration[] = [];
+
+      for (const prop of referencedModelDecl?.getProperties() ?? []) {
+        const tyRes = CidlExtractor.cidlType(prop.getType());
+        if (tyRes.isLeft()) {
+          continue;
+        }
+
+        const ty = tyRes.unwrap();
+        const navObjectName = getObjectName(ty);
+        const normalizedPropName = normalizeName(prop.getName());
+
+        if (
+          typeof ty !== "string" &&
+          "Array" in ty &&
+          navObjectName === className
+        ) {
+          // Many to Many
+          manyToManyProps.push(prop);
+        } else if (normalizedPropName === normalizedModelIdName) {
+          // One to Many
+          foreignKeyProps.push(prop);
+        }
+      }
+
+      if (foreignKeyProps.length > 1) {
+        console.warn(`
+          Cannot infer OneToMany relationship due to ambiguity, model ${className}, property ${prop.getName()}
+          could match ${foreignKeyProps.map((p) => p.getName()).join(", ")}
+          `);
+        return;
+      }
+
+      if (manyToManyProps.length > 1) {
+        console.warn(`
+          Cannot infer ManyToMany relationship due to ambiguity, model ${className}, property ${prop.getName()}
+          could match ${manyToManyProps.map((p) => p.getName()).join(", ")}
+          `);
+        return;
+      }
+
+      const hasForeignKeyProp = foreignKeyProps.at(0);
+      const hasManyToManyProp = manyToManyProps.at(0);
+      if (hasForeignKeyProp && hasManyToManyProp) {
+        console.warn(`
+          Cannot infer relationship due to ambiguity, model ${className}, property ${prop.getName()}
+          could be OneToMany or ManyToMany
+          `);
+        return;
+      }
+
+      if (hasForeignKeyProp) {
+        // Add a one to many decorator
+        prop.addDecorator({
+          name: PropertyDecoratorKind.OneToMany,
+          arguments: [`(m: any) => m.${hasForeignKeyProp.getName()}`],
+        });
+        return;
+      }
+
+      if (hasManyToManyProp) {
+        // Add a many to many decorator
+        prop.addDecorator({
+          name: PropertyDecoratorKind.ManyToMany,
+          arguments: [],
+        });
+        return;
+      }
+    }
+
+    // One to One
+    if (objectName !== undefined) {
+      const normalizedPropIdName = `${normalizedPropName}id`;
+      const foreignKeyProps = classDecl.getProperties().filter((p) => {
+        const norm = normalizeName(p.getName());
+        return norm === normalizedPropIdName;
+      });
+
+      if (foreignKeyProps.length > 0) {
+        console.warn(`
+          Cannot infer OneToOne relationship due to ambiguity, model ${className}, property ${prop.getName()}
+          could match ${foreignKeyProps.map((p) => p.getName()).join(", ")}
+          `);
+      }
+
+      if (foreignKeyProps.at(0) !== undefined) {
+        const foreignKey = foreignKeyProps[0];
+        // Add a one to one decorator
+        prop.addDecorator({
+          name: PropertyDecoratorKind.OneToOne,
+          arguments: [`(_m: any) => m.${foreignKey.getName()}`],
+        });
+        return;
+      }
     }
   }
 }

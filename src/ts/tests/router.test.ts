@@ -284,7 +284,7 @@ describe("Namespace Middleware", () => {
       ],
     });
     const constructorRegistry = createCtorReg();
-    const app = new CloesceApp(ast, constructorRegistry, env);
+    const app = await CloesceApp.init(ast, constructorRegistry);
     const request = createRequest("http://foo.com/api/Foo/method", "POST");
     const di = createDi();
     const d1 = mockD1();
@@ -321,7 +321,7 @@ describe("Namespace Middleware", () => {
       ],
     });
     const constructorRegistry = createCtorReg();
-    const app = new CloesceApp(ast, constructorRegistry, env);
+    const app = await CloesceApp.init(ast, constructorRegistry);
     const request = createRequest("http://foo.com/api/Foo/method", "POST");
     const di = createDi();
     const d1 = mockD1();
@@ -721,7 +721,7 @@ describe("Method Middleware", () => {
       ],
     });
     const constructorRegistry = createCtorReg();
-    const app = new CloesceApp(ast, constructorRegistry, env);
+    const app = await CloesceApp.init(ast, constructorRegistry);
     const request = createRequest(
       "http://foo.com/api/Foo/method",
       "POST",
