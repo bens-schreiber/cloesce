@@ -2,11 +2,9 @@ import {
     KV,
     KValue,
     WranglerEnv,
-    DataSource,
     IncludeTree,
     KeyParam,
     Model,
-    PrimaryKey
 } from "cloesce/backend";
 import { D1Database } from "@cloudflare/workers-types";
 

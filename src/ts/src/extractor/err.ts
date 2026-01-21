@@ -7,7 +7,9 @@ export enum ExtractorErrorCode {
   InvalidPartialType,
   InvalidPropertyModifier,
   InvalidApiMethodModifier,
-  MissingNavigationPropertyReference,
+  InvalidSelectorSyntax,
+  InvalidOneToOneSelector,
+  InvalidNavigationProperty,
   TooManyWranglerEnvs,
   MissingFile,
   InvalidServiceProperty,
@@ -57,11 +59,6 @@ const errorInfoMap: Record<
       "Model methods must be public if they are decorated as GET, POST, PUT, PATCH",
     suggestion: "Change the method modifier to just `public`",
   },
-  [ExtractorErrorCode.MissingNavigationPropertyReference]: {
-    description: "Missing Navigation Property Reference",
-    suggestion:
-      "Navigation properties require a foreign key model attribute reference",
-  },
   [ExtractorErrorCode.TooManyWranglerEnvs]: {
     description: "Too many wrangler environments defined in the project",
     suggestion: "Consolidate or remove unused @WranglerEnv's",
@@ -86,6 +83,22 @@ const errorInfoMap: Record<
   [ExtractorErrorCode.MissingR2ObjectBody]: {
     description: "All R2 decorated fields must be of type R2ObjectBody.",
     suggestion: "Change the field type to R2ObjectBody.",
+  },
+  [ExtractorErrorCode.InvalidSelectorSyntax]: {
+    description: "The selector syntax is invalid.",
+    suggestion:
+      "Selectors should be of the form `N<T>(m => m.property)` where T is a model type and N is OneToOne or OneToMany.",
+  },
+  [ExtractorErrorCode.InvalidOneToOneSelector]: {
+    description:
+      "OneToOne selectors must select a model constructor or name string.",
+    suggestion:
+      "Ensure the selector is of the form `OneToOne<T>(...)` where T is a model type or a string representing the model name.",
+  },
+  [ExtractorErrorCode.InvalidNavigationProperty]: {
+    description:
+      "A navigation property must be of type T, T | undefined, or T[] where T is a model type.",
+    suggestion: "Change the property type to be of the correct form.",
   },
 };
 

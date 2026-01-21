@@ -1,6 +1,5 @@
 import {
   Model,
-  PrimaryKey,
   WranglerEnv,
   GET,
   Service,

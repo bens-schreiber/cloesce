@@ -429,9 +429,7 @@ describe("Model", () => {
     expect(fooModel.navigation_properties).toEqual(
       expect.arrayContaining([
         {
-          kind:
-            "ManyToMany"
-          ,
+          kind: "ManyToMany",
           model_reference: "Bar",
           var_name: "bars",
         },
@@ -442,18 +440,93 @@ describe("Model", () => {
     expect(barModel.navigation_properties).toEqual(
       expect.arrayContaining([
         {
-          kind:
-            "ManyToMany"
-          ,
+          kind: "ManyToMany",
           model_reference: "Foo",
           var_name: "foos",
         },
       ]),
     );
-
   });
 
-  test("Extracts Model", () => {
+  test("Explicit 1:1 and 1:M", () => {
+    // Arrange
+    const project = cloesceProject();
+    project.createSourceFile(
+      "test.ts",
+      `
+      import { OneToOne, OneToMany } from "./src/ui/backend";
+      @Model
+      export class Bar {
+        id: number;
+        
+        @ForeignKey(Foo)
+        fooId: number;
+
+        @OneToOne<Bar>(b => b.id)
+        foo: Foo | undefined;
+      }
+
+      @Model
+      export class Foo {
+        id: number;
+
+        @OneToMany<Bar>(f => f.fooId)
+        bars: Bar[];
+      }
+      `,
+    );
+
+    // Act
+    const res = CidlExtractor.extract("FooBar", project);
+
+    // Assert
+    expect(res.isRight()).toBe(true);
+    const cidl = res.unwrap();
+    expect(cidl.models["Foo"]).toBeDefined();
+
+    const fooModel = cidl.models["Foo"];
+    expect(fooModel.navigation_properties).toEqual(
+      expect.arrayContaining([
+        {
+          kind: {
+            OneToMany: {
+              column_reference: "fooId",
+            },
+          },
+          model_reference: "Bar",
+          var_name: "bars",
+        },
+      ]),
+    );
+
+    const barModel = cidl.models["Bar"];
+    expect(barModel.columns).toEqual(
+      expect.arrayContaining([
+        {
+          value: {
+            name: "fooId",
+            cidl_type: "Real",
+          },
+          foreign_key_reference: "Foo",
+        },
+      ]),
+    );
+    expect(barModel.navigation_properties).toEqual(
+      expect.arrayContaining([
+        {
+          kind: {
+            OneToOne: {
+              column_reference: "id",
+            },
+          },
+          model_reference: "Foo",
+          var_name: "foo",
+        },
+      ]),
+    );
+  });
+
+  test("Extracts KV, R2", () => {
     // Arrange
     const project = cloesceProject();
     project.createSourceFile(

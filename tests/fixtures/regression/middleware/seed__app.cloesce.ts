@@ -2,7 +2,6 @@ import {
   CloesceApp,
   WranglerEnv,
   Model,
-  PrimaryKey,
   Inject,
   GET,
   HttpResult,

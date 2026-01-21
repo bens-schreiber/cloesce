@@ -4,7 +4,6 @@ import {
   POST,
   GET,
   Inject,
-  PrimaryKey,
   Orm,
   WranglerEnv,
   DeepPartial,

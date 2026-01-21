@@ -1,10 +1,10 @@
 // @ts-nocheck
-// MissingNavigationPropertyReference
+// InvalidSelectorSyntax
 
 @Model
 export class Foo {
   id: number;
 
-  @OneToOne() // missing generic
+  @OneToOne() // missing selector
   bar: Bar;
 }

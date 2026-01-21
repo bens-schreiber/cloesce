@@ -323,7 +323,7 @@ export class CidlExtractor {
 
           if (oneToOneProperty) {
             const navModelTypeRes = CidlExtractor.cidlType(
-              oneToOneProperty?.getType()!,
+              oneToOneProperty?.getType(),
             );
             if (navModelTypeRes.isLeft()) {
               navModelTypeRes.value.context = prop.getName();
@@ -397,11 +397,14 @@ export class CidlExtractor {
             const navObjectName = getObjectName(ty);
             const normalizedPropName = normalizeName(prop.getName());
 
-            if (typeof ty !== "string" && "Array" in ty && navObjectName === name) {
+            if (
+              typeof ty !== "string" &&
+              "Array" in ty &&
+              navObjectName === name
+            ) {
               // Many to Many
               hasManyToManyProp = prop;
-            }
-            else if (normalizedPropName === normalizedModelIdName) {
+            } else if (normalizedPropName === normalizedModelIdName) {
               // One to Many
               hasForeignKeyProp = prop;
             }
@@ -411,7 +414,7 @@ export class CidlExtractor {
           if (hasForeignKeyProp) {
             prop.addDecorator({
               name: PropertyDecoratorKind.OneToMany,
-              arguments: [hasForeignKeyProp.getName()],
+              arguments: [`(_m: any) => m.${hasForeignKeyProp!.getName()}`],
             });
           }
 
@@ -436,7 +439,7 @@ export class CidlExtractor {
             // Add a one to one decorator
             prop.addDecorator({
               name: PropertyDecoratorKind.OneToOne,
-              arguments: [hasForeignKeyProp.getName()],
+              arguments: [`(_m: any) => m.${hasForeignKeyProp.getName()}`],
             });
           }
         }
@@ -479,69 +482,54 @@ export class CidlExtractor {
           break;
         }
         case PropertyDecoratorKind.OneToOne: {
-          const reference = getDecoratorArgument(decorator, 0);
-
-          // Error: One to one navigation properties requre a reference
-          if (!reference) {
-            return err(
-              ExtractorErrorCode.MissingNavigationPropertyReference,
-              (e) => {
-                e.snippet = prop.getText();
-                e.context = prop.getName();
-              },
-            );
+          const selector = getSelectorPropertyName(decorator);
+          if (selector.isLeft()) {
+            return err(ExtractorErrorCode.InvalidSelectorSyntax, (e) => {
+              e.snippet = prop.getText();
+              e.context = prop.getName();
+            });
           }
 
           const model_name = getObjectName(cidl_type);
 
           // Error: navigation properties require a model reference
           if (!model_name) {
-            return err(
-              ExtractorErrorCode.MissingNavigationPropertyReference,
-              (e) => {
-                e.snippet = prop.getText();
-                e.context = prop.getName();
-              },
-            );
+            return err(ExtractorErrorCode.InvalidSelectorSyntax, (e) => {
+              e.snippet = prop.getText();
+              e.context = prop.getName();
+            });
           }
 
           navigation_properties.push({
             var_name: prop.getName(),
             model_reference: model_name,
-            kind: { OneToOne: { column_reference: reference } },
+            kind: { OneToOne: { column_reference: selector.unwrap() } },
           });
           break;
         }
         case PropertyDecoratorKind.OneToMany: {
-          const reference = getDecoratorArgument(decorator, 0);
-          // Error: One to one navigation properties requre a reference
-          if (!reference) {
-            return err(
-              ExtractorErrorCode.MissingNavigationPropertyReference,
-              (e) => {
-                e.snippet = prop.getText();
-                e.context = prop.getName();
-              },
-            );
+          const selector = getSelectorPropertyName(decorator);
+          if (selector.isLeft()) {
+            return err(ExtractorErrorCode.InvalidSelectorSyntax, (e) => {
+              e.snippet = prop.getText();
+              e.context = prop.getName();
+            });
           }
 
           let model_name = getObjectName(cidl_type);
 
           // Error: navigation properties require a model reference
           if (!model_name) {
-            return err(
-              ExtractorErrorCode.MissingNavigationPropertyReference,
-              (e) => {
-                e.snippet = prop.getText();
-                e.context = prop.getName();
-              },
-            );
+            return err(ExtractorErrorCode.InvalidNavigationProperty, (e) => {
+              e.snippet = prop.getText();
+              e.context = prop.getName();
+            });
           }
 
           navigation_properties.push({
             var_name: prop.getName(),
             model_reference: model_name,
-            kind: { OneToMany: { column_reference: reference } },
+            kind: { OneToMany: { column_reference: selector.unwrap() } },
           });
           break;
         }
@@ -549,13 +537,10 @@ export class CidlExtractor {
           // Error: navigation properties require a model reference
           let model_name = getObjectName(cidl_type);
           if (!model_name) {
-            return err(
-              ExtractorErrorCode.MissingNavigationPropertyReference,
-              (e) => {
-                e.snippet = prop.getText();
-                e.context = prop.getName();
-              },
-            );
+            return err(ExtractorErrorCode.InvalidNavigationProperty, (e) => {
+              e.snippet = prop.getText();
+              e.context = prop.getName();
+            });
           }
 
           navigation_properties.push({
@@ -1247,4 +1232,22 @@ function checkPropertyModifier(
 
 function normalizeName(name: string): string {
   return name.toLowerCase().replace(/_/g, "");
+}
+
+export function getSelectorPropertyName(
+  decorator: Decorator,
+): Either<ExtractorError, string> {
+  const call = decorator.getCallExpression();
+  const selector = call?.getArguments()[0];
+
+  if (!selector?.isKind(SyntaxKind.ArrowFunction)) {
+    return err(ExtractorErrorCode.InvalidSelectorSyntax);
+  }
+
+  const body = selector.getBody();
+  if (!body.isKind(SyntaxKind.PropertyAccessExpression)) {
+    return err(ExtractorErrorCode.InvalidSelectorSyntax);
+  }
+
+  return Either.right(body.getName());
 }

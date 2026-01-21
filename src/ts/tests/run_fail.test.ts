@@ -25,7 +25,7 @@ describe("Extractor Run-Fail", () => {
       expect(
         actualName,
         `Expected "${expectedName}" but got "${actualName}"`,
-      ).toBe(expectedName);
+      ).toStrictEqual(expectedName);
     });
   }
 });

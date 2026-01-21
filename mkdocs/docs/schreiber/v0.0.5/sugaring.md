@@ -128,7 +128,7 @@ class Course {
 }
 ```
 
-The Many to Many decorator will be dropped entirely, and the relationship will be inferred from the presence of the navigation properties on both sides.
+The Many to Many decorator will be dropped entirely, as it is no longer necessary.
 
 
 ## Refactors
