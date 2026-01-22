@@ -630,7 +630,6 @@ export class CidlExtractor {
     }
 
     const parameters = [];
-
     for (const param of method.getParameters()) {
       // Handle injected param
       if (param.getDecorator(ParameterDecoratorKind.Inject)) {
@@ -1304,6 +1303,10 @@ function getObjectName(t: CidlType): string | undefined {
   const root = getRootType(t);
   if (typeof root !== "string" && "Object" in root) {
     return root["Object"];
+  }
+
+  if (typeof root !== "string" && "Partial" in root) {
+    return root["Partial"];
   }
 
   return undefined;
