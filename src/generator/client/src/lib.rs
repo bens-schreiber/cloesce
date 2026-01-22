@@ -14,7 +14,6 @@ use serde_json::Value;
 handlebars_helper!(needs_constructor: |cidl_type: CidlType| matches!(cidl_type.root_type(),
     CidlType::Object(_)
     | CidlType::Blob
-    | CidlType::Partial(_)
     | CidlType::DateIso
     | CidlType::Stream
 ));
@@ -30,7 +29,6 @@ handlebars_helper!(get_content_type: |media: MediaType| match media {
 
 handlebars_helper!(is_blob: |cidl_type: CidlType| matches!(cidl_type.root_type(), CidlType::Blob));
 handlebars_helper!(is_one_to_one: |nav: NavigationProperty| matches!(nav.kind, NavigationPropertyKind::OneToOne {..}));
-handlebars_helper!(is_many_nav: |nav: NavigationProperty| matches!(nav.kind, NavigationPropertyKind::OneToMany {..} | NavigationPropertyKind::ManyToMany));
 handlebars_helper!(is_get_request: |verb: HttpVerb| matches!(verb, HttpVerb::GET));
 handlebars_helper!(is_serializable: |cidl_type: CidlType| !matches!(cidl_type.root_type(), CidlType::Inject(_)));
 handlebars_helper!(is_object: |cidl_type: CidlType| matches!(cidl_type.root_type(), CidlType::Object(_) | CidlType::Partial(_)));
@@ -43,9 +41,7 @@ handlebars_helper!(is_blob_array: |cidl_type: CidlType| matches!(cidl_type.root_
 // If a parameter should be placed in the url instead of the body.
 // True for any [CidlType::DataSource] or given the verb [HttpVerb::GET]
 handlebars_helper!(is_url_param: |cidl_type: CidlType, verb: HttpVerb| matches!(verb, HttpVerb::GET) || matches!(cidl_type, CidlType::DataSource(_)));
-
 handlebars_helper!(is_stream: |cidl_type: CidlType| matches!(cidl_type.root_type(), CidlType::Stream));
-
 handlebars_helper!(is_some: |val: Value| !val.is_null());
 
 const TYPESCRIPT_TEMPLATE: &str = include_str!("./templates/ts.hbs");

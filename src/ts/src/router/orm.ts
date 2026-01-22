@@ -5,12 +5,11 @@ import type {
   D1Result,
 } from "@cloudflare/workers-types";
 
-import { DeepPartial, KValue, u8ToB64 } from "../ui/common.js";
 import { RuntimeContainer } from "../router/router.js";
 import { WasmResource, invokeOrmWasm } from "../router/wasm.js";
 import { Model as AstModel } from "../ast.js";
-import { InternalError } from "../common.js";
-import { IncludeTree } from "../ui/backend.js";
+import { InternalError, u8ToB64 } from "../common.js";
+import { IncludeTree, DeepPartial, KValue } from "../ui/backend.js";
 
 export class Orm {
   private constructor(private env: unknown) {}
@@ -89,13 +88,21 @@ export class Orm {
   // Given a model, generates a sequence of joins to select it with its includes.
   static select<T extends object>(
     ctor: new () => T,
-    from: string | null = null,
-    includeTree: IncludeTree<T> | null = null,
+    args: {
+      from?: string | null;
+      includeTree?: IncludeTree<T> | null;
+    } = {
+      from: null,
+      includeTree: null,
+    },
   ): string {
     const { wasm } = RuntimeContainer.get();
-    const fromRes = WasmResource.fromString(JSON.stringify(from), wasm);
+    const fromRes = WasmResource.fromString(
+      JSON.stringify(args.from ?? null),
+      wasm,
+    );
     const includeTreeRes = WasmResource.fromString(
-      JSON.stringify(includeTree),
+      JSON.stringify(args.includeTree ?? null),
       wasm,
     );
 
@@ -535,7 +542,9 @@ export class Orm {
       return [];
     }
 
-    const query = Orm.select(ctor, null, includeTree);
+    const query = Orm.select(ctor, {
+      includeTree,
+    });
     const rows = await this.db.prepare(query).all();
     if (rows.error) {
       // An error in the query should not be possible unless the AST is invalid.
@@ -596,7 +605,7 @@ export class Orm {
     // D1 retrieval
     const pkName = model.primary_key.name;
     const query = `
-      ${Orm.select(ctor, null, args.includeTree ?? null)}
+      ${Orm.select(ctor, { includeTree: args.includeTree })}
       WHERE  "${model.name}"."${pkName}" = ?
     `;
 

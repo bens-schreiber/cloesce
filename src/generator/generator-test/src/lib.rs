@@ -224,7 +224,6 @@ impl ModelBuilder {
             DataSource {
                 name: name.into(),
                 tree,
-                hash: 0,
             },
         );
         self

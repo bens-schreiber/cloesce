@@ -1,16 +1,16 @@
 {
-  "hash": 127502279,
+  "hash": 467465533,
   "models": {
     "Horse": {
-      "hash": 3827956065,
+      "hash": 3657052422,
       "name": "Horse",
       "primary_key": {
         "name": "id",
         "cidl_type": "Integer"
       },
-      "attributes": [
+      "columns": [
         {
-          "hash": 1153465351,
+          "hash": 2597947162,
           "value": {
             "name": "name",
             "cidl_type": "Text"
@@ -18,7 +18,7 @@
           "foreign_key_reference": null
         },
         {
-          "hash": 675170808,
+          "hash": 1493448060,
           "value": {
             "name": "bio",
             "cidl_type": {
@@ -30,55 +30,37 @@
       ],
       "navigation_properties": [
         {
-          "hash": 2570171470,
+          "hash": 2570374470,
           "var_name": "likes",
-          "model_name": "Like",
+          "model_reference": "Like",
           "kind": {
             "OneToMany": {
-              "reference": "horseId1"
+              "column_reference": "horse1Id"
             }
           }
         }
-      ],
-      "data_sources": {
-        "default": {
-          "hash": 3878327916,
-          "name": "default",
-          "tree": {
-            "likes": {
-              "horse2": {}
-            }
-          }
-        },
-        "withLikes": {
-          "hash": 3840396315,
-          "name": "withLikes",
-          "tree": {
-            "likes": {}
-          }
-        }
-      }
+      ]
     },
     "Like": {
-      "hash": 359914738,
+      "hash": 834734523,
       "name": "Like",
       "primary_key": {
         "name": "id",
         "cidl_type": "Integer"
       },
-      "attributes": [
+      "columns": [
         {
-          "hash": 3102592533,
+          "hash": 2725542772,
           "value": {
-            "name": "horseId1",
+            "name": "horse1Id",
             "cidl_type": "Integer"
           },
           "foreign_key_reference": "Horse"
         },
         {
-          "hash": 1434448106,
+          "hash": 925246428,
           "value": {
-            "name": "horseId2",
+            "name": "horse2Id",
             "cidl_type": "Integer"
           },
           "foreign_key_reference": "Horse"
@@ -86,17 +68,16 @@
       ],
       "navigation_properties": [
         {
-          "hash": 2037094087,
+          "hash": 1041142720,
           "var_name": "horse2",
-          "model_name": "Horse",
+          "model_reference": "Horse",
           "kind": {
             "OneToOne": {
-              "reference": "horseId2"
+              "column_reference": "horse2Id"
             }
           }
         }
-      ],
-      "data_sources": {}
+      ]
     }
   }
 }

@@ -40,7 +40,6 @@ fn as_migration(ast: CloesceAst) -> MigrationsAst {
                 primary_key: model.primary_key.unwrap(),
                 columns: model.columns,
                 navigation_properties: model.navigation_properties,
-                data_sources: model.data_sources,
             };
             (name, m)
         })

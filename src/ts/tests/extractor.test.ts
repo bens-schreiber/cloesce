@@ -11,7 +11,6 @@ function cloesceProject(): Project {
     },
   });
 
-  project.addSourceFileAtPath("./src/ui/common.ts");
   project.addSourceFileAtPath("./src/ui/backend.ts");
   return project;
 }
@@ -600,28 +599,31 @@ describe("Plain Old Objects", () => {
     const sourceFile = project.createSourceFile(
       "test.ts",
       `
+          import { DeepPartial } from "./src/ui/backend";
           export class Bar {
-            id: number;
             name: string;
           }
 
           export class Foo {
-            bar: Bar;
-            optionalBar: Bar | null;
+            name: string;
+          }
+          
+          export class Baz  {
+            name: string;
           }
 
           @Model
-          export class Baz {
+          export class MyModel {
             id: number;
 
             @POST
-            async method(foo: Foo, bar: Bar | null): Promise<void> { }
+            async method(foo: Foo, bar: Bar | null, baz: DeepPartial<Baz>): Promise<void> { }
           }
           `,
     );
 
     // Act
-    const res = CidlExtractor.extract("Foo", project);
+    const res = CidlExtractor.extract("project", project);
 
     // Assert
     expect(res.isRight()).toBe(true);
@@ -631,12 +633,8 @@ describe("Plain Old Objects", () => {
         name: "Foo",
         attributes: [
           {
-            name: "bar",
-            cidl_type: { Object: "Bar" },
-          },
-          {
-            name: "optionalBar",
-            cidl_type: { Nullable: { Object: "Bar" } },
+            name: "name",
+            cidl_type: "Text",
           },
         ],
         source_path: sourceFile.getFilePath().toString(),
@@ -645,9 +643,15 @@ describe("Plain Old Objects", () => {
         name: "Bar",
         attributes: [
           {
-            name: "id",
-            cidl_type: "Real",
+            name: "name",
+            cidl_type: "Text",
           },
+        ],
+        source_path: sourceFile.getFilePath().toString(),
+      },
+      Baz: {
+        name: "Baz",
+        attributes: [
           {
             name: "name",
             cidl_type: "Text",
@@ -655,7 +659,7 @@ describe("Plain Old Objects", () => {
         ],
         source_path: sourceFile.getFilePath().toString(),
       },
-    } satisfies Record<string, PlainOldObject>);
+    });
   });
 
   test("Does not extract Plain Old Object without references", () => {

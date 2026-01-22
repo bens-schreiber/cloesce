@@ -1,8 +1,8 @@
 {
-  "hash": 16162253099424807530,
+  "hash": 864487073929629472,
   "models": {
     "D1BackedModel": {
-      "hash": 15352229634040773385,
+      "hash": 15131870847274583393,
       "name": "D1BackedModel",
       "primary_key": {
         "name": "id",
@@ -26,16 +26,7 @@
           "foreign_key_reference": null
         }
       ],
-      "navigation_properties": [],
-      "data_sources": {
-        "default": {
-          "hash": 480366780526763046,
-          "name": "default",
-          "tree": {
-            "kvData": {}
-          }
-        }
-      }
+      "navigation_properties": []
     }
   }
 }

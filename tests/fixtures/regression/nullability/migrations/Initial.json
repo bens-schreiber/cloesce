@@ -28,8 +28,7 @@
           "foreign_key_reference": null
         }
       ],
-      "navigation_properties": [],
-      "data_sources": {}
+      "navigation_properties": []
     }
   }
 }

@@ -95,8 +95,8 @@ impl GeneratorErrorKind {
                 GeneratorPhase::ModelAnalysis,
             ),
             GeneratorErrorKind::UnknownObject => (
-                "Objects must be decorated appropriately as a Model, PlainOldObject, or Inject",
-                "Consider using a decorator on the object.",
+                "Found a reference to an unknown object.",
+                "Consider marking the object as a Model or injected dependency.",
                 GeneratorPhase::ModelAnalysis,
             ),
             GeneratorErrorKind::UnexpectedVoid => (

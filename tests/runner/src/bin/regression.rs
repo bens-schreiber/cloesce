@@ -62,16 +62,51 @@ fn main() {
 }
 
 fn run_integration_test(fixture: Fixture, domain: &str) -> Result<bool, bool> {
-    let (pre_cidl_changed, pre_cidl_path) = fixture.extract_cidl().map_err(|(e, _)| e)?;
+    let (pre_cidl_changed, pre_cidl_path) = match fixture.extract_cidl() {
+        Ok(res) => res,
+        Err(err) => {
+            eprintln!(
+                "Error extracting CIDL for fixture {}: {}",
+                fixture.fixture_id, err
+            );
+            return Err(true);
+        }
+    };
 
-    let (generated_changed, cidl_path) = fixture
-        .generate_all(&pre_cidl_path, domain)
-        .map_err(|(e, _)| e)?;
+    let (generated_changed, cidl_path) = match fixture.generate_all(&pre_cidl_path, domain) {
+        Ok(res) => res,
+        Err(err) => {
+            eprintln!(
+                "Error generating files for fixture {}: {}",
+                fixture.fixture_id, err
+            );
+            return Err(true);
+        }
+    };
 
     let (migrated_cidl_changed, migrated_sql_changed) = {
         let (s1, s2) = fixture.migrate(&cidl_path);
-        let (cidl, _) = s1.map_err(|(e, _)| e)?;
-        let (sql, _) = s2.map_err(|(e, _)| e)?;
+        let cidl = match s1 {
+            Ok((res, _)) => res,
+            Err(err) => {
+                eprintln!(
+                    "Error migrating CIDL for fixture {}: {}",
+                    fixture.fixture_id, err
+                );
+                return Err(true);
+            }
+        };
+        let sql = match s2 {
+            Ok((res, _)) => res,
+            Err(err) => {
+                eprintln!(
+                    "Error migrating SQL for fixture {}: {}",
+                    fixture.fixture_id, err
+                );
+                return Err(true);
+            }
+        };
+
         (cidl, sql)
     };
 
