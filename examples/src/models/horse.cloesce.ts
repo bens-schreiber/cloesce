@@ -45,12 +45,12 @@ export class Horse {
     });
 
     const sql = `
-    WITH PersonView as (${selectHorse})
-    SELECT * FROM PersonView
+    WITH HorseView as (${selectHorse})
+    SELECT * FROM HorseView
     WHERE [likes.horse2.id] = ?
     AND [id] IN (
       SELECT [likes.horse2.id]
-      FROM PersonView
+      FROM HorseView
       WHERE [id] = ?
     )`;
 
