@@ -1,5 +1,5 @@
 {
-  "hash": 16551069560551514791,
+  "hash": 105106903023423602,
   "project_name": "runner",
   "wrangler_env": {
     "name": "Env",
@@ -130,7 +130,7 @@
       "source_path": "./seed__crud.cloesce.ts"
     },
     "Parent": {
-      "hash": 9758938401003026415,
+      "hash": 5450491838968991115,
       "name": "Parent",
       "primary_key": {
         "name": "id",
@@ -249,7 +249,6 @@
       },
       "data_sources": {
         "withChildren": {
-          "hash": 8308376731714560896,
           "name": "withChildren",
           "tree": {
             "children": {},

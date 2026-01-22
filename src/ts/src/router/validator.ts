@@ -5,9 +5,9 @@ import {
   getNavigationPropertyCidlType,
   isNullableType,
 } from "../ast";
-import { b64ToU8, KValue } from "../ui/common";
 import { ConstructorRegistry } from "./router";
-import { Either } from "../common";
+import { Either, b64ToU8 } from "../common";
+import { KValue } from "../ui/backend";
 
 // TODO: Create a "cleaned" object only with the values checked, discarding any extra.
 

@@ -9,12 +9,8 @@ use similar::TextDiff;
 // Compares unified file diffs, creating a `.new` snapshot file if a diff is found
 ///
 /// Returns if a `.new` file created
-fn diff_file(fixture_id: &String, out: OutputFile, new_contents: String, fail: bool) -> TestOutput {
-    let name = if fail {
-        format!("{}_{}_fail.out", fixture_id, out.base_name)
-    } else {
-        out.base_name.clone()
-    };
+fn diff_file(out: OutputFile, new_contents: String) -> TestOutput {
+    let name = out.base_name.clone();
 
     let new_path = out.path.with_file_name(format!("snap___{}", name));
     let old_path = out.path.with_file_name(name);
@@ -91,7 +87,7 @@ impl Drop for OutputFile {
 }
 
 type TestOutput = (bool, PathBuf);
-type TestResult = Result<TestOutput, TestOutput>;
+type TestResult = Result<TestOutput, String>;
 
 pub struct Fixture {
     /// The path of a fixture entry point, ie a seed source file
@@ -121,7 +117,7 @@ impl Fixture {
 
         match res {
             Ok(_) => Ok(self.read_out_and_diff(out)),
-            Err(err) => Err(self.read_fail_and_diff(out, err)),
+            Err(err) => Err(err),
         }
     }
 
@@ -151,24 +147,24 @@ impl Fixture {
         let mut has_diff = false;
 
         let cidl_path = {
-            match &cmd {
+            match cmd {
                 Ok(_) => {
                     let (diff, path) = self.read_out_and_diff(cidl_out);
                     has_diff |= diff;
 
                     path
                 }
-                Err(err) => return Err(self.read_fail_and_diff(cidl_out, err.clone())),
+                Err(err) => return Err(err),
             }
         };
 
         for out in [wrangler_out, workers_out, client_out] {
-            match &cmd {
+            match cmd {
                 Ok(_) => {
                     let (diff, _) = self.read_out_and_diff(out);
                     has_diff |= diff;
                 }
-                Err(err) => return Err(self.read_fail_and_diff(out, err.clone())),
+                Err(err) => return Err(err),
             }
         }
 
@@ -200,12 +196,12 @@ impl Fixture {
 
         let cidl_res = match &res {
             Ok(_) => Ok(self.read_out_and_diff(migrated_cidl)),
-            Err(err) => Err(self.read_fail_and_diff(migrated_cidl, err.clone())),
+            Err(err) => Err(err.clone()),
         };
 
         let sql_res = match res {
             Ok(_) => Ok(self.read_out_and_diff(migrated_sql)),
-            Err(err) => Err(self.read_fail_and_diff(migrated_sql, err)),
+            Err(err) => Err(err),
         };
 
         (cidl_res, sql_res)
@@ -223,20 +219,6 @@ impl Fixture {
 
     fn read_out_and_diff(&self, out: OutputFile) -> TestOutput {
         let contents = fs::read(&out.path).expect("temp file to be readable");
-        diff_file(
-            &self.fixture_id,
-            out,
-            String::from_utf8_lossy(&contents).to_string(),
-            false,
-        )
-    }
-
-    fn read_fail_and_diff(&self, out: OutputFile, err: String) -> TestOutput {
-        let normalized = err
-            .find("==== CLOESCE ERROR ====")
-            .map(|pos| err[pos..].to_string())
-            .unwrap_or_else(|| err.to_string());
-
-        diff_file(&self.fixture_id, out, normalized, true)
+        diff_file(out, String::from_utf8_lossy(&contents).to_string())
     }
 }

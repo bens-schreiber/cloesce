@@ -34,7 +34,6 @@ import {
 } from "../ast.js";
 import { TypeFormatFlags } from "typescript";
 import { ExtractorError, ExtractorErrorCode } from "./err.js";
-import { HttpResult, KValue } from "../ui/common.js";
 import { Either } from "../common.js";
 
 enum PropertyDecoratorKind {
@@ -202,13 +201,18 @@ export class CidlExtractor {
 
     // Must be async
     if (!decl.isAsync()) {
-      return err(ExtractorErrorCode.InvalidMain);
+      return err(
+        ExtractorErrorCode.InvalidMain,
+        (e) => (e.context = "Missing async modifier"),
+      );
     }
 
     // Must have exactly 4 parameters
     const params = decl.getParameters();
     if (params.length !== 4) {
-      return err(ExtractorErrorCode.InvalidMain);
+      return err(ExtractorErrorCode.InvalidMain, (e) => {
+        e.context = `Expected 4 parameters, got ${params.length}`;
+      });
     }
 
     // Expected parameter types in order
@@ -223,11 +227,17 @@ export class CidlExtractor {
         continue;
       }
 
-      const paramType = param
-        .getType()
-        .getText(undefined, TypeFormatFlags.UseAliasDefinedOutsideCurrentScope);
-      if (paramType !== expectedType) {
-        return err(ExtractorErrorCode.InvalidMain);
+      const paramType = param.getType();
+
+      const symbol =
+        paramType.getAliasSymbol() ??
+        paramType.getSymbol() ??
+        paramType.getTargetType()?.getSymbol();
+
+      if (symbol?.getName() !== expectedType) {
+        return err(ExtractorErrorCode.InvalidMain, (e) => {
+          e.context = `Expected parameter ${i + 1} to be of type ${expectedType}, got ${paramType}`;
+        });
       }
     }
 
@@ -236,7 +246,9 @@ export class CidlExtractor {
       .getReturnType()
       .getText(undefined, TypeFormatFlags.UseAliasDefinedOutsideCurrentScope);
     if (returnType !== "Promise<Response>") {
-      return err(ExtractorErrorCode.InvalidMain);
+      return err(ExtractorErrorCode.InvalidMain, (e) => {
+        e.context = `Expected return type to be Promise<Response>, got ${returnType}`;
+      });
     }
 
     return Either.right(sourceFile.getFilePath().toString());
@@ -450,7 +462,7 @@ export class CidlExtractor {
           const isArray = ty.isArray();
           const elementType = isArray ? ty.getArrayElementTypeOrThrow() : ty;
           const symbolName = elementType.getSymbol()?.getName();
-          if (symbolName !== KValue.name) {
+          if (symbolName !== "KValue") {
             return err(ExtractorErrorCode.MissingKValue, (e) => {
               e.snippet = prop.getText();
               e.context = prop.getName();
@@ -958,7 +970,7 @@ export class CidlExtractor {
     if (
       symbolName === Promise.name ||
       aliasName === "IncludeTree" ||
-      symbolName === KValue.name
+      symbolName === "KValue"
     ) {
       return wrapGeneric(genericTy, nullable, (inner) => inner);
     }
@@ -967,7 +979,7 @@ export class CidlExtractor {
       return wrapGeneric(genericTy, nullable, (inner) => ({ Array: inner }));
     }
 
-    if (symbolName === HttpResult.name) {
+    if (symbolName === "HttpResult") {
       return wrapGeneric(genericTy, nullable, (inner) => ({
         HttpResult: inner,
       }));
@@ -1216,7 +1228,7 @@ export class CidlExtractor {
         return norm === normalizedPropIdName;
       });
 
-      if (foreignKeyProps.length > 0) {
+      if (foreignKeyProps.length > 1) {
         console.warn(`
           Cannot infer OneToOne relationship due to ambiguity, model ${className}, property ${prop.getName()}
           could match ${foreignKeyProps.map((p) => p.getName()).join(", ")}

@@ -1,5 +1,5 @@
 {
-  "hash": 16551069560551514791,
+  "hash": 105106903023423602,
   "models": {
     "CrudHaver": {
       "hash": 16497283824177894047,
@@ -18,11 +18,10 @@
           "foreign_key_reference": null
         }
       ],
-      "navigation_properties": [],
-      "data_sources": {}
+      "navigation_properties": []
     },
     "Parent": {
-      "hash": 9758938401003026415,
+      "hash": 5450491838968991115,
       "name": "Parent",
       "primary_key": {
         "name": "id",
@@ -61,17 +60,7 @@
             }
           }
         }
-      ],
-      "data_sources": {
-        "withChildren": {
-          "hash": 8308376731714560896,
-          "name": "withChildren",
-          "tree": {
-            "children": {},
-            "favoriteChild": {}
-          }
-        }
-      }
+      ]
     },
     "Child": {
       "hash": 2823647866772793242,
@@ -101,8 +90,7 @@
             }
           }
         }
-      ],
-      "data_sources": {}
+      ]
     }
   }
 }

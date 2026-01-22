@@ -1,5 +1,5 @@
 {
-  "hash": 2327162294965326794,
+  "hash": 9234581653163423090,
   "project_name": "runner",
   "wrangler_env": {
     "name": "Env",
@@ -14,7 +14,7 @@
   },
   "models": {
     "D1BackedModel": {
-      "hash": 3458397548065808129,
+      "hash": 15131870847274583393,
       "name": "D1BackedModel",
       "primary_key": {
         "name": "id",
@@ -157,7 +157,6 @@
       },
       "data_sources": {
         "default": {
-          "hash": 11550479417874734565,
           "name": "default",
           "tree": {
             "r2Data": {}
@@ -172,7 +171,7 @@
       "source_path": "./seed__r2.cloesce.ts"
     },
     "PureR2Model": {
-      "hash": 18244951545139998472,
+      "hash": 3824269534873160298,
       "name": "PureR2Model",
       "primary_key": null,
       "columns": [],
@@ -281,7 +280,6 @@
       },
       "data_sources": {
         "default": {
-          "hash": 14302061763060449193,
           "name": "default",
           "tree": {
             "allData": {},

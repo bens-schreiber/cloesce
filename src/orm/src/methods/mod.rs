@@ -120,7 +120,6 @@ pub async fn test_sql(
                         primary_key: model.primary_key.unwrap(),
                         columns: model.columns,
                         navigation_properties: model.navigation_properties,
-                        data_sources: model.data_sources,
                     },
                 )
             })

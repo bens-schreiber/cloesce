@@ -1,8 +1,8 @@
 {
-  "hash": 2327162294965326794,
+  "hash": 9234581653163423090,
   "models": {
     "D1BackedModel": {
-      "hash": 3458397548065808129,
+      "hash": 15131870847274583393,
       "name": "D1BackedModel",
       "primary_key": {
         "name": "id",
@@ -26,16 +26,7 @@
           "foreign_key_reference": null
         }
       ],
-      "navigation_properties": [],
-      "data_sources": {
-        "default": {
-          "hash": 11550479417874734565,
-          "name": "default",
-          "tree": {
-            "r2Data": {}
-          }
-        }
-      }
+      "navigation_properties": []
     }
   }
 }

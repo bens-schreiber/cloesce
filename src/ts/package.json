@@ -44,9 +44,6 @@
     "*": {
       "backend": [
         "dist/ui/backend.d.ts"
-      ],
-      "client": [
-        "dist/ui/client.d.ts"
       ]
     }
   },

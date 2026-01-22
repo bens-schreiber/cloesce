@@ -177,9 +177,6 @@ pub struct IncludeTree(pub BTreeMap<String, IncludeTree>);
 /// A tree of model symbol names to include when hydrating a data source.
 #[derive(Serialize, Deserialize, Debug)]
 pub struct DataSource {
-    #[serde(default)]
-    pub hash: u64,
-
     /// The symbol name of the data source, e.g., "withUserDetails"
     pub name: String,
 
@@ -404,7 +401,6 @@ impl CloesceAst {
                     primary_key: pk,
                     columns: model.columns,
                     navigation_properties: model.navigation_properties,
-                    data_sources: model.data_sources,
                 };
                 Some((name, m))
             })
@@ -446,27 +442,6 @@ impl CloesceAst {
                 model_h.write_u64(col_h);
             }
 
-            for ds in model.data_sources.values_mut() {
-                let ds_h = {
-                    let mut h = FxHasher::default();
-                    h.write(b"ModelDataSource");
-                    ds.name.hash(&mut h);
-
-                    fn dfs(node: &IncludeTree, h: &mut FxHasher) {
-                        for (k, v) in &node.0 {
-                            dfs(v, h);
-                            k.hash(h);
-                        }
-                    }
-
-                    dfs(&ds.tree, &mut h);
-                    h.finish()
-                };
-
-                ds.hash = ds_h;
-                model_h.write_u64(ds_h);
-            }
-
             for nav in model.navigation_properties.iter_mut() {
                 let nav_h = {
                     let mut h = FxHasher::default();
@@ -500,7 +475,6 @@ pub struct MigrationsModel {
     pub primary_key: NamedTypedValue,
     pub columns: Vec<D1Column>,
     pub navigation_properties: Vec<NavigationProperty>,
-    pub data_sources: BTreeMap<String, DataSource>,
 }
 
 /// A subset of [CloesceAst] suited for D1 migrations.
@@ -584,7 +558,6 @@ where
         primary_key: Option<NamedTypedValue>,
         columns: Vec<D1Column>,
         navigation_properties: Vec<NavigationProperty>,
-        data_sources: BTreeMap<String, DataSource>,
     }
 
     let temps: IndexMap<String, Temp> = Deserialize::deserialize(deserializer)?;
@@ -601,7 +574,6 @@ where
                         primary_key: pk,
                         columns: t.columns,
                         navigation_properties: t.navigation_properties,
-                        data_sources: t.data_sources,
                     },
                 )
             })

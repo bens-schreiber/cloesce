@@ -1,5 +1,5 @@
 {
-  "hash": 16162253099424807530,
+  "hash": 864487073929629472,
   "project_name": "runner",
   "wrangler_env": {
     "name": "Env",
@@ -14,7 +14,7 @@
   },
   "models": {
     "D1BackedModel": {
-      "hash": 15352229634040773385,
+      "hash": 15131870847274583393,
       "name": "D1BackedModel",
       "primary_key": {
         "name": "id",
@@ -134,7 +134,6 @@
       },
       "data_sources": {
         "default": {
-          "hash": 480366780526763046,
           "name": "default",
           "tree": {
             "kvData": {}
@@ -149,7 +148,7 @@
       "source_path": "./seed__kv.cloesce.ts"
     },
     "PureKVModel": {
-      "hash": 6611921539549597485,
+      "hash": 16650423527422880089,
       "name": "PureKVModel",
       "primary_key": null,
       "columns": [],
@@ -232,7 +231,6 @@
       },
       "data_sources": {
         "default": {
-          "hash": 17997894496222874802,
           "name": "default",
           "tree": {
             "data": {},

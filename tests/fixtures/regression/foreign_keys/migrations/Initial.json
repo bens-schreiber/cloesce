@@ -1,5 +1,5 @@
 {
-  "hash": 15322665465883360060,
+  "hash": 12969325067576523993,
   "models": {
     "B": {
       "hash": 4631908692780450632,
@@ -9,8 +9,7 @@
         "cidl_type": "Integer"
       },
       "columns": [],
-      "navigation_properties": [],
-      "data_sources": {}
+      "navigation_properties": []
     },
     "Course": {
       "hash": 13717697900918874344,
@@ -27,11 +26,10 @@
           "model_reference": "Student",
           "kind": "ManyToMany"
         }
-      ],
-      "data_sources": {}
+      ]
     },
     "Person": {
-      "hash": 10656214504113312273,
+      "hash": 3115193583229976533,
       "name": "Person",
       "primary_key": {
         "name": "id",
@@ -49,19 +47,10 @@
             }
           }
         }
-      ],
-      "data_sources": {
-        "withDogs": {
-          "hash": 11013912170547516633,
-          "name": "withDogs",
-          "tree": {
-            "dogs": {}
-          }
-        }
-      }
+      ]
     },
     "Student": {
-      "hash": 12352578893746392979,
+      "hash": 14637071863453399234,
       "name": "Student",
       "primary_key": {
         "name": "id",
@@ -75,32 +64,10 @@
           "model_reference": "Course",
           "kind": "ManyToMany"
         }
-      ],
-      "data_sources": {
-        "withCoursesStudents": {
-          "hash": 15362216910619578223,
-          "name": "withCoursesStudents",
-          "tree": {
-            "courses": {
-              "students": {}
-            }
-          }
-        },
-        "withCoursesStudentsCourses": {
-          "hash": 16584024046484066689,
-          "name": "withCoursesStudentsCourses",
-          "tree": {
-            "courses": {
-              "students": {
-                "courses": {}
-              }
-            }
-          }
-        }
-      }
+      ]
     },
     "A": {
-      "hash": 13284691691514683419,
+      "hash": 466023394421909929,
       "name": "A",
       "primary_key": {
         "name": "id",
@@ -127,21 +94,7 @@
             }
           }
         }
-      ],
-      "data_sources": {
-        "withB": {
-          "hash": 451073249129749226,
-          "name": "withB",
-          "tree": {
-            "b": {}
-          }
-        },
-        "withoutB": {
-          "hash": 15416663048272091191,
-          "name": "withoutB",
-          "tree": {}
-        }
-      }
+      ]
     },
     "Dog": {
       "hash": 7734451209746023667,
@@ -160,8 +113,7 @@
           "foreign_key_reference": "Person"
         }
       ],
-      "navigation_properties": [],
-      "data_sources": {}
+      "navigation_properties": []
     }
   }
 }

@@ -11,7 +11,6 @@ function cloesceProject(): Project {
     },
   });
 
-  project.addSourceFileAtPath("./src/ui/common.ts");
   project.addSourceFileAtPath("./src/ui/backend.ts");
   return project;
 }
