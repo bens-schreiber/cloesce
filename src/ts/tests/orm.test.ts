@@ -1,10 +1,9 @@
 import { describe, test, expect, afterEach, beforeAll, vi } from "vitest";
 import { Miniflare } from "miniflare";
 import { ModelBuilder, createAst } from "./builder";
-import { KValue, Orm } from "../src/ui/backend";
-import { _cloesceInternal } from "../src/router/router";
-import fs from "fs";
-import path from "path";
+import { KValue, Orm } from "../src/ui/backend.js";
+import { _cloesceInternal } from "../src/router/router.js";
+
 import { R2ObjectBody } from "@cloudflare/workers-types";
 
 describe("ORM Hydrate Tests", () => {
@@ -71,11 +70,8 @@ describe("ORM Hydrate Tests", () => {
       Depth1Model: Depth1Model,
       Depth2Model: Depth2Model,
     };
-    const wasm = await WebAssembly.instantiate(
-      fs.readFileSync(path.resolve("./dist/orm.wasm")),
-      {},
-    );
-    await _cloesceInternal.RuntimeContainer.init(ast, ctorReg, wasm.instance);
+
+    await _cloesceInternal.RuntimeContainer.init(ast, ctorReg);
 
     const env = {};
     const instance = Orm.fromEnv(env);
@@ -218,12 +214,7 @@ describe("ORM Hydrate Tests", () => {
       TestModel: TestModel,
     };
 
-    const wasm = await WebAssembly.instantiate(
-      fs.readFileSync(path.resolve("./dist/orm.wasm")),
-      {},
-    );
-
-    await _cloesceInternal.RuntimeContainer.init(ast, ctorReg, wasm.instance);
+    await _cloesceInternal.RuntimeContainer.init(ast, ctorReg);
 
     const env = {
       namespace1: namespace1,

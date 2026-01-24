@@ -2,7 +2,7 @@ import { CloesceAst } from "../ast.js";
 import { Either } from "../common.js";
 
 // NOTE: Requires the ORM binary to have been built
-import * as mod from "../orm.wasm";
+import * as mod from "../../dist/orm.wasm";
 
 /**
  * Cloesce WASM ABI
@@ -48,7 +48,7 @@ export class WasmResource {
     private wasm: OrmWasmExports,
     public ptr: number,
     public len: number,
-  ) { }
+  ) {}
 
   free() {
     this.wasm.dealloc(this.ptr, this.len);
@@ -73,12 +73,23 @@ export class WasmResource {
 export async function loadOrmWasm(ast: CloesceAst): Promise<OrmWasmExports> {
   // Load WASM
   let exports: OrmWasmExports;
-  if (mod.memory && mod.alloc && mod.dealloc && mod.set_meta_ptr && mod.get_return_ptr && mod.get_return_len) {
+  if (
+    mod.memory &&
+    mod.alloc &&
+    mod.dealloc &&
+    mod.set_meta_ptr &&
+    mod.get_return_ptr &&
+    mod.get_return_len
+  ) {
     exports = mod;
   } else {
-    exports = ((await WebAssembly.instantiate(mod.default)) as unknown as WebAssembly.Instance & {
-      exports: OrmWasmExports;
-    }).exports;
+    exports = (
+      (await WebAssembly.instantiate(
+        mod.default,
+      )) as unknown as WebAssembly.Instance & {
+        exports: OrmWasmExports;
+      }
+    ).exports;
   }
 
   const modelMeta = WasmResource.fromString(

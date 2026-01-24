@@ -1,4 +1,4 @@
-import { describe, test, expect, vi, afterEach } from "vitest";
+import { describe, test, expect, vi, afterEach, beforeAll } from "vitest";
 import {
   MatchedRoute,
   RouterError,
