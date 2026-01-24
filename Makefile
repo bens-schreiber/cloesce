@@ -22,3 +22,6 @@ format:
 	cd ../generator && cargo fmt --all && \
 	cd ../../tests/e2e && npm run format:fix && \
 	cd ../runner && cargo fmt --all
+
+.PHONY: all
+all: format build test

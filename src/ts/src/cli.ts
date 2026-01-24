@@ -78,7 +78,6 @@ const cmds = subcommands({
         await generate(generateConfig);
       },
     }),
-
     extract: command({
       name: "extract",
       description: "Extract models and write cidl.pre.json",
@@ -103,10 +102,6 @@ const cmds = subcommands({
           long: "truncateSourcePaths",
           description: "Sets all source paths to just their file name",
         }),
-        skipTsCheck: flag({
-          long: "skipTsCheck",
-          description: "Skip TypeScript compilation checks",
-        }),
       },
       handler: async (args) => {
         const config: CloesceConfig = {
@@ -120,7 +115,6 @@ const cmds = subcommands({
 
         await extract(config, {
           truncateSourcePaths: args.truncateSourcePaths,
-          skipTsCheck: args.skipTsCheck,
         });
       },
     }),
@@ -197,7 +191,6 @@ async function extract(
   config: CloesceConfig,
   args: {
     truncateSourcePaths?: boolean;
-    skipTsCheck?: boolean;
   } = {},
 ) {
   const startTime = Date.now();
@@ -248,21 +241,6 @@ async function extract(
     new ExtractorError(ExtractorErrorCode.MissingFile);
   }
   debug(`Found ${fileCount} .cloesce.ts files`);
-
-  // Run typescript compiler checks to before extraction
-  if (!args.skipTsCheck) {
-    const tscStart = Date.now();
-    debug("Running TypeScript compiler checks...");
-
-    const diagnostics = project.getPreEmitDiagnostics();
-    if (diagnostics.length > 0) {
-      console.error("TypeScript errors detected in provided files:");
-      console.error(project.formatDiagnosticsWithColorAndContext(diagnostics));
-      process.exit(1);
-    }
-
-    debug(`TypeScript checks completed in ${Date.now() - tscStart}ms`);
-  }
 
   try {
     const extractorStart = Date.now();
