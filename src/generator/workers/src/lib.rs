@@ -252,6 +252,7 @@ async function fetch(request: Request, env: any, ctx: any): Promise<Response> {{
     {fetch_impl}
 }}
 
+export {{cidl, constructorRegistry}}
 export default {{ fetch }};"#
         )
     }

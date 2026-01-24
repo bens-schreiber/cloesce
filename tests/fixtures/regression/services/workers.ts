@@ -16,4 +16,5 @@ async function fetch(request: Request, env: any, ctx: any): Promise<Response> {
     return await main(request, env, app, ctx);
 }
 
+export {cidl, constructorRegistry}
 export default { fetch };
