@@ -12,6 +12,7 @@ use indexmap::IndexMap;
 use rustc_hash::FxHasher;
 use serde::Deserialize;
 use serde::Serialize;
+use serde_json::Value;
 use serde_with::{MapPreventDuplicates, serde_as};
 
 #[macro_export]
@@ -542,7 +543,7 @@ pub struct WranglerSpec {
     pub r2_buckets: Vec<R2Bucket>,
 
     #[serde(default)]
-    pub vars: HashMap<String, String>,
+    pub vars: HashMap<String, Value>,
 }
 
 fn skip_if_null_primary_key<'de, D>(

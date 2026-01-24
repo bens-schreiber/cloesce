@@ -56,7 +56,7 @@ export class HttpResult<T = unknown> {
     public mediaType?: MediaType,
   ) {}
 
-  static ok<T>(status: number, data?: T, init?: HeadersInit): HttpResult {
+  static ok<T>(status: number, data?: T, init?: HeadersInit): HttpResult<T> {
     const headers: Headers = new Headers(init);
     return new HttpResult<T>(true, status, headers, data, undefined);
   }

@@ -8,6 +8,7 @@ import {
   NO_DATA_SOURCE,
   Service,
   MediaType,
+  CrudKind,
 } from "../ast.js";
 import { RuntimeValidator } from "./validator.js";
 import { Either, InternalError } from "../common.js";
@@ -37,7 +38,7 @@ export class RuntimeContainer {
     public readonly ast: CloesceAst,
     public readonly constructorRegistry: ConstructorRegistry,
     public readonly wasm: OrmWasmExports,
-  ) {}
+  ) { }
 
   static async init(
     ast: CloesceAst,
@@ -161,7 +162,7 @@ export class CloesceApp {
    */
   public onMethod<T>(
     ctor: new () => T,
-    method: KeysOfType<T, (...args: any) => any>,
+    method: KeysOfType<T, (...args: any) => any> | CrudKind,
     m: MiddlewareFn,
   ) {
     let classMap = this.methodMiddleware.get(ctor.name);
