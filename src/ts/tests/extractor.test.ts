@@ -544,16 +544,16 @@ describe("Model", () => {
         kvId: string;
 
         @KV("value/Foo/{id}/{kvId}", "namespace")
-        value: KValue<unknown>;
+        value: KValue<unknown> | undefined;
 
         @KV("value/Foo", "namespace")
         allValues: KValue<unknown>[];
 
         @R2("files/Foo/{id}", "bucket")
-        fileData: R2ObjectBody;
+        fileData: R2ObjectBody | undefined;
 
         @R2("files/Foo", "bucket")
-        allFiles: R2ObjectBody[];
+        allFiles: R2ObjectBody[] | undefined;
       }
       `,
     );

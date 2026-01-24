@@ -458,7 +458,7 @@ export class CidlExtractor {
           }
 
           // Ensure that the prop type is KValue<T>
-          const ty = prop.getType();
+          const [ty, _] = unwrapNullable(prop.getType());
           const isArray = ty.isArray();
           const elementType = isArray ? ty.getArrayElementTypeOrThrow() : ty;
           const symbolName = elementType.getSymbol()?.getName();
@@ -492,7 +492,7 @@ export class CidlExtractor {
           }
 
           // Type must be R2ObjectBody
-          const ty = prop.getType();
+          const [ty, _] = unwrapNullable(prop.getType());
           const isArray = ty.isArray();
           const elementType = isArray ? ty.getArrayElementTypeOrThrow() : ty;
           const symbolName = elementType.getSymbol()?.getName();
@@ -1003,25 +1003,6 @@ export class CidlExtractor {
       const res = CidlExtractor.cidlType(t, inject);
       return res.map((inner) => wrapNullable(wrapper(inner), isNullable));
     }
-
-    function unwrapNullable(ty: Type): [Type, boolean] {
-      if (!ty.isUnion()) return [ty, false];
-
-      const unions = ty.getUnionTypes();
-      const nonNulls = unions.filter((t) => !t.isNull());
-      const hasNullable = nonNulls.length < unions.length;
-
-      // Booleans seperate into [null, true, false] from the `getUnionTypes` call
-      if (
-        nonNulls.length === 2 &&
-        nonNulls.every((t) => t.isBooleanLiteral())
-      ) {
-        return [nonNulls[0].getApparentType(), hasNullable];
-      }
-
-      const stripUndefined = nonNulls.filter((t) => !t.isUndefined());
-      return [stripUndefined[0] ?? ty, hasNullable];
-    }
   }
 
   /**
@@ -1351,7 +1332,7 @@ function normalizeName(name: string): string {
   return name.toLowerCase().replace(/_/g, "");
 }
 
-export function getSelectorPropertyName(
+function getSelectorPropertyName(
   decorator: Decorator,
 ): Either<ExtractorError, string> {
   const call = decorator.getCallExpression();
@@ -1367,4 +1348,26 @@ export function getSelectorPropertyName(
   }
 
   return Either.right(body.getName());
+}
+
+/**
+ * Unwraps nullable types from a union type,
+ * e.g. `T | null | undefined` becomes `T`.
+ * @param ty Type to unwrap
+ * @returns A tuple containing the unwrapped type and a boolean indicating if it was nullable.
+ */
+function unwrapNullable(ty: Type): [Type, boolean] {
+  if (!ty.isUnion()) return [ty, false];
+
+  const unions = ty.getUnionTypes();
+  const nonNulls = unions.filter((t) => !t.isNull());
+  const hasNullable = nonNulls.length < unions.length;
+
+  // Booleans seperate into [null, true, false] from the `getUnionTypes` call
+  if (nonNulls.length === 2 && nonNulls.every((t) => t.isBooleanLiteral())) {
+    return [nonNulls[0].getApparentType(), hasNullable];
+  }
+
+  const stripUndefined = nonNulls.filter((t) => !t.isUndefined());
+  return [stripUndefined[0] ?? ty, hasNullable];
 }
