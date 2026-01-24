@@ -14,7 +14,7 @@ afterAll(async () => {
 describe("Basic", () => {
   let model: CrudHaver;
   it("POST", async () => {
-    const res = await CrudHaver.save({
+    const res = await CrudHaver.SAVE({
       name: "tim",
     });
     expect(res.ok, withRes("POST should be OK", res)).toBe(true);
@@ -27,7 +27,7 @@ describe("Basic", () => {
 
   it("POST Update", async () => {
     model.name = "julio";
-    const res = await CrudHaver.save(model);
+    const res = await CrudHaver.SAVE(model);
     expect(res.ok, withRes("POST should be OK", res)).toBe(true);
     expect(res.data).toEqual({
       id: 1,
@@ -37,7 +37,7 @@ describe("Basic", () => {
   });
 
   it("GET a model", async () => {
-    const res = await CrudHaver.get(1);
+    const res = await CrudHaver.GET(1);
     expect(res.ok, withRes("GET should be OK", res)).toBe(true);
     expect(res.data).toEqual(model);
   });
@@ -46,7 +46,7 @@ describe("Basic", () => {
   it("POST 3 Models", async () => {
     await Promise.all(
       models.map(async (m) => {
-        const res = await CrudHaver.save({ name: m });
+        const res = await CrudHaver.SAVE({ name: m });
         expect(res.ok, withRes("POST should be OK", res)).toBe(true);
         expect(res.data.name).toEqual(m);
       }),
@@ -54,7 +54,7 @@ describe("Basic", () => {
   });
 
   it("List 3 models", async () => {
-    const res = await CrudHaver.list();
+    const res = await CrudHaver.LIST();
     expect(res.ok, withRes("LIST should be OK", res)).toBe(true);
     expect(res.data.length, withRes("Should be 4 results", res)).toBe(4); // including the one from the prev test
     models.forEach((m) =>
@@ -66,7 +66,7 @@ describe("Basic", () => {
 describe("Parent with children", () => {
   let model: Parent;
   it("POST", async () => {
-    const res = await Parent.save(
+    const res = await Parent.SAVE(
       {
         favoriteChildId: null,
         children: [{}, {}, {}], // should be able to leave blank, creating 3 children
@@ -90,7 +90,7 @@ describe("Parent with children", () => {
 
   it("POST Update", async () => {
     model.favoriteChildId = model.children[0].id;
-    const res = await Parent.save(model, "withChildren");
+    const res = await Parent.SAVE(model, "withChildren");
 
     expect(res.ok, withRes("POST should be OK", res)).toBe(true);
     expect(res.data, withRes("Data should be equal", res)).toEqual({
@@ -111,13 +111,13 @@ describe("Parent with children", () => {
   });
 
   it("GET", async () => {
-    const res = await Parent.get(1, "withChildren");
+    const res = await Parent.GET(1, "withChildren");
     expect(res.ok, withRes("GET should be OK", res)).toBe(true);
     expect(res.data, withRes("Data should be equal", res)).toEqual(model);
   });
 
   it("LIST", async () => {
-    const res = await Parent.list("withChildren");
+    const res = await Parent.LIST("withChildren");
     expect(res.ok, withRes("LIST should be OK", res)).toBe(true);
     expect(res.data.length).toEqual(1);
     expect(res.data[0], withRes("Data should be equal", res)).toEqual(model);

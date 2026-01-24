@@ -90,12 +90,12 @@ async function loadHorsesForBrowsing(): Promise<void> {
   try {
     const currentUserId = parseInt(currentUserIdInput.value);
 
-    const userResult = await Horse.get(currentUserId, "default");
+    const userResult = await Horse.GET(currentUserId, "default");
     if (userResult.ok && userResult.data) {
       currentUserHorse = userResult.data;
     }
 
-    const result = await Horse.list("default");
+    const result = await Horse.LIST("default");
     if (result.ok && result.data) {
       horses = result.data.filter((h) => h.id !== currentUserId);
       currentIndex = 0;
@@ -104,9 +104,8 @@ async function loadHorsesForBrowsing(): Promise<void> {
       horseCard.innerHTML = "<p><strong>Error loading horses</strong></p>";
     }
   } catch (error) {
-    horseCard.innerHTML = `<p><strong>Error: ${
-      (error as Error).message
-    }</strong></p>`;
+    horseCard.innerHTML = `<p><strong>Error: ${(error as Error).message
+      }</strong></p>`;
 
     throw error;
   }
@@ -129,8 +128,8 @@ function displayCurrentHorse(): void {
   const likesInfo =
     horse.likes?.length > 0
       ? `<p><em>Likes: ${horse.likes
-          .map((l) => l.horse2?.name ?? "Unknown")
-          .join(", ")}</em></p>`
+        .map((l) => l.horse2?.name ?? "Unknown")
+        .join(", ")}</em></p>`
       : "";
 
   horseCard.innerHTML = `
@@ -177,7 +176,7 @@ async function addNewHorse(form: HTMLFormElement): Promise<void> {
   } as Horse;
 
   try {
-    const result = await Horse.save(horse);
+    const result = await Horse.SAVE(horse);
     if (result.ok) {
       showMessage(`${horse.name} added successfully!`);
       form.reset();
@@ -191,16 +190,15 @@ async function addNewHorse(form: HTMLFormElement): Promise<void> {
 
 async function loadAllHorses(): Promise<void> {
   try {
-    const result = await Horse.list("default");
+    const result = await Horse.LIST("default");
     if (result.ok && result.data) {
       displayAllHorses(result.data);
     } else {
       horsesList.innerHTML = "<p><strong>Error loading horses</strong></p>";
     }
   } catch (error) {
-    horsesList.innerHTML = `<p><strong>Error: ${
-      (error as Error).message
-    }</strong></p>`;
+    horsesList.innerHTML = `<p><strong>Error: ${(error as Error).message
+      }</strong></p>`;
   }
 }
 
@@ -215,8 +213,8 @@ function displayAllHorses(horseData: Horse[]): void {
       const likesInfo =
         horse.likes?.length > 0
           ? `<li><em>Likes: ${horse.likes
-              .map((l) => l.horse2?.name ?? "Unknown")
-              .join(", ")}</em></li>`
+            .map((l) => l.horse2?.name ?? "Unknown")
+            .join(", ")}</em></li>`
           : "";
 
       return `
@@ -244,13 +242,12 @@ function showMatches(matches: Horse[]): void {
     <h3>💖 Your Matches</h3>
     <ul>
       ${matches
-        .map(
-          (horse) =>
-            `<li><strong>${horse.name}</strong> (ID: ${horse.id})<br><em>${
-              horse.bio ?? "No bio"
-            }</em></li>`
-        )
-        .join("")}
+      .map(
+        (horse) =>
+          `<li><strong>${horse.name}</strong> (ID: ${horse.id})<br><em>${horse.bio ?? "No bio"
+          }</em></li>`
+      )
+      .join("")}
     </ul>
   `;
 }

@@ -160,7 +160,7 @@ impl WorkersGenerator {
                         parameters.reverse();
 
                         ApiMethod {
-                            name: "get".into(),
+                            name: "GET".into(),
                             is_static: true,
                             http_verb: HttpVerb::GET,
                             return_type: CidlType::http(CidlType::Object(model.name.clone())),
@@ -170,7 +170,7 @@ impl WorkersGenerator {
                         }
                     }
                     CrudKind::LIST => ApiMethod {
-                        name: "list".into(),
+                        name: "LIST".into(),
                         is_static: true,
                         http_verb: HttpVerb::GET,
                         return_type: CidlType::http(CidlType::array(CidlType::Object(
@@ -184,7 +184,7 @@ impl WorkersGenerator {
                         return_media: MediaType::default(),
                     },
                     CrudKind::SAVE => ApiMethod {
-                        name: "save".into(),
+                        name: "SAVE".into(),
                         is_static: true,
                         http_verb: HttpVerb::POST,
                         return_type: CidlType::http(CidlType::Object(model.name.clone())),

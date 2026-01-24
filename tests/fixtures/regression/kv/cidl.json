@@ -55,8 +55,8 @@
       ],
       "r2_objects": [],
       "methods": {
-        "get": {
-          "name": "get",
+        "GET": {
+          "name": "GET",
           "is_static": true,
           "http_verb": "GET",
           "return_media": "Json",
@@ -83,8 +83,8 @@
             }
           ]
         },
-        "list": {
-          "name": "list",
+        "LIST": {
+          "name": "LIST",
           "is_static": true,
           "http_verb": "GET",
           "return_media": "Json",
@@ -105,8 +105,8 @@
             }
           ]
         },
-        "save": {
-          "name": "save",
+        "SAVE": {
+          "name": "SAVE",
           "is_static": true,
           "http_verb": "POST",
           "return_media": "Json",
@@ -178,8 +178,8 @@
       ],
       "r2_objects": [],
       "methods": {
-        "get": {
-          "name": "get",
+        "GET": {
+          "name": "GET",
           "is_static": true,
           "http_verb": "GET",
           "return_media": "Json",
@@ -202,8 +202,8 @@
             }
           ]
         },
-        "save": {
-          "name": "save",
+        "SAVE": {
+          "name": "SAVE",
           "is_static": true,
           "http_verb": "POST",
           "return_media": "Json",

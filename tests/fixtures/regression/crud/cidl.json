@@ -32,8 +32,8 @@
       "kv_objects": [],
       "r2_objects": [],
       "methods": {
-        "get": {
-          "name": "get",
+        "GET": {
+          "name": "GET",
           "is_static": true,
           "http_verb": "GET",
           "return_media": "Json",
@@ -56,8 +56,8 @@
             }
           ]
         },
-        "list": {
-          "name": "list",
+        "LIST": {
+          "name": "LIST",
           "is_static": true,
           "http_verb": "GET",
           "return_media": "Json",
@@ -78,24 +78,8 @@
             }
           ]
         },
-        "notCrud": {
-          "name": "notCrud",
-          "is_static": false,
-          "http_verb": "POST",
-          "return_media": "Json",
-          "return_type": "Void",
-          "parameters_media": "Json",
-          "parameters": [
-            {
-              "name": "__datasource",
-              "cidl_type": {
-                "DataSource": "CrudHaver"
-              }
-            }
-          ]
-        },
-        "save": {
-          "name": "save",
+        "SAVE": {
+          "name": "SAVE",
           "is_static": true,
           "http_verb": "POST",
           "return_media": "Json",
@@ -112,6 +96,22 @@
                 "Partial": "CrudHaver"
               }
             },
+            {
+              "name": "__datasource",
+              "cidl_type": {
+                "DataSource": "CrudHaver"
+              }
+            }
+          ]
+        },
+        "notCrud": {
+          "name": "notCrud",
+          "is_static": false,
+          "http_verb": "POST",
+          "return_media": "Json",
+          "return_type": "Void",
+          "parameters_media": "Json",
+          "parameters": [
             {
               "name": "__datasource",
               "cidl_type": {
@@ -174,8 +174,8 @@
       "kv_objects": [],
       "r2_objects": [],
       "methods": {
-        "get": {
-          "name": "get",
+        "GET": {
+          "name": "GET",
           "is_static": true,
           "http_verb": "GET",
           "return_media": "Json",
@@ -198,8 +198,8 @@
             }
           ]
         },
-        "list": {
-          "name": "list",
+        "LIST": {
+          "name": "LIST",
           "is_static": true,
           "http_verb": "GET",
           "return_media": "Json",
@@ -220,8 +220,8 @@
             }
           ]
         },
-        "save": {
-          "name": "save",
+        "SAVE": {
+          "name": "SAVE",
           "is_static": true,
           "http_verb": "POST",
           "return_media": "Json",

@@ -20,7 +20,7 @@ describe("PureKVModel", () => {
   const otherData = "some string data";
 
   it("POST", async () => {
-    const res = await PureKVModel.save({
+    const res = await PureKVModel.SAVE({
       id,
       data: { raw: data },
       otherData: { raw: otherData },
@@ -29,7 +29,7 @@ describe("PureKVModel", () => {
   });
 
   it("GET", async () => {
-    const res = await PureKVModel.get(id, "default");
+    const res = await PureKVModel.GET(id, "default");
     expect(res.ok, withRes("GET should be OK", res)).toBe(true);
     expect(res.data).toBeDefined();
     expect(res.data?.id).toBe(id);
@@ -51,12 +51,12 @@ describe("D1BackedModel", () => {
         raw: data,
       },
     };
-    const res = await D1BackedModel.save(model, "default");
+    const res = await D1BackedModel.SAVE(model, "default");
     expect(res.ok, withRes("POST should be OK", res)).toBe(true);
   });
 
   it("GET", async () => {
-    const res = await D1BackedModel.get(1, keyParam, "default");
+    const res = await D1BackedModel.GET(1, keyParam, "default");
     expect(res.ok, withRes("GET should be OK", res)).toBe(true);
     expect(res.data).toBeDefined();
     expect(res.data?.id).toBe(1);
@@ -66,7 +66,7 @@ describe("D1BackedModel", () => {
 
   it("LIST", async () => {
     // D1BackedModel takes a key param and thus cannot list KV components
-    const res = await D1BackedModel.list("default");
+    const res = await D1BackedModel.LIST("default");
 
     expect(res.ok, withRes("LIST should be OK", res)).toBe(true);
     expect(res.data.length).toBeGreaterThan(0);

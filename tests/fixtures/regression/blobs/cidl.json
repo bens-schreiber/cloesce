@@ -40,8 +40,8 @@
       "kv_objects": [],
       "r2_objects": [],
       "methods": {
-        "get": {
-          "name": "get",
+        "GET": {
+          "name": "GET",
           "is_static": true,
           "http_verb": "GET",
           "return_media": "Json",
@@ -55,6 +55,54 @@
             {
               "name": "id",
               "cidl_type": "Integer"
+            },
+            {
+              "name": "__datasource",
+              "cidl_type": {
+                "DataSource": "BlobHaver"
+              }
+            }
+          ]
+        },
+        "LIST": {
+          "name": "LIST",
+          "is_static": true,
+          "http_verb": "GET",
+          "return_media": "Json",
+          "return_type": {
+            "HttpResult": {
+              "Array": {
+                "Object": "BlobHaver"
+              }
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "__datasource",
+              "cidl_type": {
+                "DataSource": "BlobHaver"
+              }
+            }
+          ]
+        },
+        "SAVE": {
+          "name": "SAVE",
+          "is_static": true,
+          "http_verb": "POST",
+          "return_media": "Json",
+          "return_type": {
+            "HttpResult": {
+              "Object": "BlobHaver"
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "model",
+              "cidl_type": {
+                "Partial": "BlobHaver"
+              }
             },
             {
               "name": "__datasource",
@@ -91,54 +139,6 @@
             {
               "name": "stream",
               "cidl_type": "Stream"
-            }
-          ]
-        },
-        "list": {
-          "name": "list",
-          "is_static": true,
-          "http_verb": "GET",
-          "return_media": "Json",
-          "return_type": {
-            "HttpResult": {
-              "Array": {
-                "Object": "BlobHaver"
-              }
-            }
-          },
-          "parameters_media": "Json",
-          "parameters": [
-            {
-              "name": "__datasource",
-              "cidl_type": {
-                "DataSource": "BlobHaver"
-              }
-            }
-          ]
-        },
-        "save": {
-          "name": "save",
-          "is_static": true,
-          "http_verb": "POST",
-          "return_media": "Json",
-          "return_type": {
-            "HttpResult": {
-              "Object": "BlobHaver"
-            }
-          },
-          "parameters_media": "Json",
-          "parameters": [
-            {
-              "name": "model",
-              "cidl_type": {
-                "Partial": "BlobHaver"
-              }
-            },
-            {
-              "name": "__datasource",
-              "cidl_type": {
-                "DataSource": "BlobHaver"
-              }
             }
           ]
         },

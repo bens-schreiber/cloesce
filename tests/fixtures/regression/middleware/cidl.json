@@ -23,6 +23,32 @@
       "kv_objects": [],
       "r2_objects": [],
       "methods": {
+        "SAVE": {
+          "name": "SAVE",
+          "is_static": true,
+          "http_verb": "POST",
+          "return_media": "Json",
+          "return_type": {
+            "HttpResult": {
+              "Object": "Foo"
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "model",
+              "cidl_type": {
+                "Partial": "Foo"
+              }
+            },
+            {
+              "name": "__datasource",
+              "cidl_type": {
+                "DataSource": "Foo"
+              }
+            }
+          ]
+        },
         "blockedMethod": {
           "name": "blockedMethod",
           "is_static": true,
@@ -46,32 +72,6 @@
               "name": "thing",
               "cidl_type": {
                 "Inject": "InjectedThing"
-              }
-            }
-          ]
-        },
-        "save": {
-          "name": "save",
-          "is_static": true,
-          "http_verb": "POST",
-          "return_media": "Json",
-          "return_type": {
-            "HttpResult": {
-              "Object": "Foo"
-            }
-          },
-          "parameters_media": "Json",
-          "parameters": [
-            {
-              "name": "model",
-              "cidl_type": {
-                "Partial": "Foo"
-              }
-            },
-            {
-              "name": "__datasource",
-              "cidl_type": {
-                "DataSource": "Foo"
               }
             }
           ]

@@ -26,7 +26,6 @@ export class NullabilityChecks {
 
     const res = await fetchImpl(baseUrl, {
       method: "POST",
-      duplex: "half",
       headers: { "Content-Type": "application/json" },
       body: requestBody(MediaType.Json, payload),
     });
@@ -56,7 +55,6 @@ export class NullabilityChecks {
 
     const res = await fetchImpl(baseUrl, {
       method: "POST",
-      duplex: "half",
       headers: { "Content-Type": "application/json" },
       body: requestBody(MediaType.Json, payload),
     });
@@ -84,7 +82,6 @@ export class NullabilityChecks {
 
     const res = await fetchImpl(baseUrl, {
       method: "POST",
-      duplex: "half",
       headers: { "Content-Type": "application/json" },
       body: requestBody(MediaType.Json, payload),
     });
@@ -114,7 +111,6 @@ export class NullabilityChecks {
 
     const res = await fetchImpl(baseUrl, {
       method: "POST",
-      duplex: "half",
       headers: { "Content-Type": "application/json" },
       body: requestBody(MediaType.Json, payload),
     });
@@ -146,7 +142,6 @@ export class NullabilityChecks {
 
     const res = await fetchImpl(baseUrl, {
       method: "POST",
-      duplex: "half",
       headers: { "Content-Type": "application/json" },
       body: requestBody(MediaType.Json, payload),
     });

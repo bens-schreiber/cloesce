@@ -6,13 +6,13 @@ export class Weather {
   date: Date;
   isRaining: boolean;
 
-  static async get(
+  static async GET(
     id: number,
     __datasource: "none" = "none",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Weather>> {
     const baseUrl = new URL(
-      `http://localhost:5002/api/Weather/get`
+      `http://localhost:5002/api/Weather/GET`
     );
 
     baseUrl.searchParams.append("id", String(id));
@@ -20,7 +20,6 @@ export class Weather {
 
     const res = await fetchImpl(baseUrl, {
       method: "GET",
-      duplex: "half",
     });
 
     return await HttpResult.fromResponse(
@@ -30,13 +29,13 @@ export class Weather {
       false
     );
   }
-  static async save(
+  static async SAVE(
     model: DeepPartial<Weather>,
     __datasource: "none" = "none",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Weather>> {
     const baseUrl = new URL(
-      `http://localhost:5002/api/Weather/save`
+      `http://localhost:5002/api/Weather/SAVE`
     );
     const payload: any = {};
 
@@ -45,7 +44,6 @@ export class Weather {
 
     const res = await fetchImpl(baseUrl, {
       method: "POST",
-      duplex: "half",
       headers: { "Content-Type": "application/json" },
       body: requestBody(MediaType.Json, payload),
     });

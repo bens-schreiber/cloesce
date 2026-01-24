@@ -19,7 +19,6 @@ export class A {
 
     const res = await fetchImpl(baseUrl, {
       method: "POST",
-      duplex: "half",
       headers: { "Content-Type": "application/json" },
       body: requestBody(MediaType.Json, payload),
     });
@@ -46,7 +45,6 @@ export class A {
 
     const res = await fetchImpl(baseUrl, {
       method: "GET",
-      duplex: "half",
     });
 
     return await HttpResult.fromResponse(
@@ -69,7 +67,6 @@ export class A {
 
     const res = await fetchImpl(baseUrl, {
       method: "POST",
-      duplex: "half",
       headers: { "Content-Type": "application/json" },
       body: requestBody(MediaType.Json, payload),
     });
@@ -107,7 +104,6 @@ export class B {
 
     const res = await fetchImpl(baseUrl, {
       method: "POST",
-      duplex: "half",
       headers: { "Content-Type": "application/json" },
       body: requestBody(MediaType.Json, payload),
     });
@@ -158,7 +154,6 @@ export class Dog {
 
     const res = await fetchImpl(baseUrl, {
       method: "POST",
-      duplex: "half",
       headers: { "Content-Type": "application/json" },
       body: requestBody(MediaType.Json, payload),
     });
@@ -193,7 +188,6 @@ export class Person {
 
     const res = await fetchImpl(baseUrl, {
       method: "POST",
-      duplex: "half",
       headers: { "Content-Type": "application/json" },
       body: requestBody(MediaType.Json, payload),
     });
@@ -220,7 +214,6 @@ export class Person {
 
     const res = await fetchImpl(baseUrl, {
       method: "GET",
-      duplex: "half",
     });
 
     return await HttpResult.fromResponse(
@@ -243,7 +236,6 @@ export class Person {
 
     const res = await fetchImpl(baseUrl, {
       method: "POST",
-      duplex: "half",
       headers: { "Content-Type": "application/json" },
       body: requestBody(MediaType.Json, payload),
     });
@@ -281,7 +273,6 @@ export class Student {
 
     const res = await fetchImpl(baseUrl, {
       method: "POST",
-      duplex: "half",
       headers: { "Content-Type": "application/json" },
       body: requestBody(MediaType.Json, payload),
     });
@@ -308,7 +299,6 @@ export class Student {
 
     const res = await fetchImpl(baseUrl, {
       method: "GET",
-      duplex: "half",
     });
 
     return await HttpResult.fromResponse(

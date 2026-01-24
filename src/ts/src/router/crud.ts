@@ -16,15 +16,15 @@ export function proxyCrud(obj: any, ctor: any, env: any) {
       }
 
       // Fallback to CRUD methods
-      if (method === "save") {
+      if (method === "SAVE") {
         return (body: object, ds: string) => upsert(ctor, body, ds, env);
       }
 
-      if (method === "list") {
+      if (method === "LIST") {
         return (ds: string) => list(ctor, ds, env);
       }
 
-      if (method === "get") {
+      if (method === "GET") {
         return (...args: any[]) => _get(ctor, args, env);
       }
 

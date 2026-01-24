@@ -17,13 +17,13 @@ export class CrudHaver {
   id: number;
   name: string;
 
-  static async get(
+  static async GET(
     id: number,
     __datasource: "none" = "none",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<CrudHaver>> {
     const baseUrl = new URL(
-      `http://localhost:5002/api/CrudHaver/get`
+      `http://localhost:5002/api/CrudHaver/GET`
     );
 
     baseUrl.searchParams.append("id", String(id));
@@ -31,7 +31,6 @@ export class CrudHaver {
 
     const res = await fetchImpl(baseUrl, {
       method: "GET",
-      duplex: "half",
     });
 
     return await HttpResult.fromResponse(
@@ -41,19 +40,18 @@ export class CrudHaver {
       false
     );
   }
-  static async list(
+  static async LIST(
     __datasource: "none" = "none",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<CrudHaver[]>> {
     const baseUrl = new URL(
-      `http://localhost:5002/api/CrudHaver/list`
+      `http://localhost:5002/api/CrudHaver/LIST`
     );
 
     baseUrl.searchParams.append("__datasource", String(__datasource));
 
     const res = await fetchImpl(baseUrl, {
       method: "GET",
-      duplex: "half",
     });
 
     return await HttpResult.fromResponse(
@@ -61,6 +59,32 @@ export class CrudHaver {
       MediaType.Json,
       CrudHaver,
       true
+    );
+  }
+  static async SAVE(
+    model: DeepPartial<CrudHaver>,
+    __datasource: "none" = "none",
+    fetchImpl: typeof fetch = fetch
+  ): Promise<HttpResult<CrudHaver>> {
+    const baseUrl = new URL(
+      `http://localhost:5002/api/CrudHaver/SAVE`
+    );
+    const payload: any = {};
+
+    payload["model"] = model;
+    baseUrl.searchParams.append("__datasource", String(__datasource));
+
+    const res = await fetchImpl(baseUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: requestBody(MediaType.Json, payload),
+    });
+
+    return await HttpResult.fromResponse(
+      res,
+      MediaType.Json,
+      CrudHaver,
+      false
     );
   }
   async notCrud(
@@ -79,7 +103,6 @@ export class CrudHaver {
 
     const res = await fetchImpl(baseUrl, {
       method: "POST",
-      duplex: "half",
       headers: { "Content-Type": "application/json" },
       body: requestBody(MediaType.Json, payload),
     });
@@ -88,33 +111,6 @@ export class CrudHaver {
       res,
       MediaType.Json,
       undefined,
-      false
-    );
-  }
-  static async save(
-    model: DeepPartial<CrudHaver>,
-    __datasource: "none" = "none",
-    fetchImpl: typeof fetch = fetch
-  ): Promise<HttpResult<CrudHaver>> {
-    const baseUrl = new URL(
-      `http://localhost:5002/api/CrudHaver/save`
-    );
-    const payload: any = {};
-
-    payload["model"] = model;
-    baseUrl.searchParams.append("__datasource", String(__datasource));
-
-    const res = await fetchImpl(baseUrl, {
-      method: "POST",
-      duplex: "half",
-      headers: { "Content-Type": "application/json" },
-      body: requestBody(MediaType.Json, payload),
-    });
-
-    return await HttpResult.fromResponse(
-      res,
-      MediaType.Json,
-      CrudHaver,
       false
     );
   }
@@ -130,13 +126,13 @@ export class Parent {
   favoriteChild: Child | undefined;
   children: Child[];
 
-  static async get(
+  static async GET(
     id: number,
     __datasource: "withChildren" |"none" = "none",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Parent>> {
     const baseUrl = new URL(
-      `http://localhost:5002/api/Parent/get`
+      `http://localhost:5002/api/Parent/GET`
     );
 
     baseUrl.searchParams.append("id", String(id));
@@ -144,7 +140,6 @@ export class Parent {
 
     const res = await fetchImpl(baseUrl, {
       method: "GET",
-      duplex: "half",
     });
 
     return await HttpResult.fromResponse(
@@ -154,19 +149,18 @@ export class Parent {
       false
     );
   }
-  static async list(
+  static async LIST(
     __datasource: "withChildren" |"none" = "none",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Parent[]>> {
     const baseUrl = new URL(
-      `http://localhost:5002/api/Parent/list`
+      `http://localhost:5002/api/Parent/LIST`
     );
 
     baseUrl.searchParams.append("__datasource", String(__datasource));
 
     const res = await fetchImpl(baseUrl, {
       method: "GET",
-      duplex: "half",
     });
 
     return await HttpResult.fromResponse(
@@ -176,13 +170,13 @@ export class Parent {
       true
     );
   }
-  static async save(
+  static async SAVE(
     model: DeepPartial<Parent>,
     __datasource: "withChildren" |"none" = "none",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Parent>> {
     const baseUrl = new URL(
-      `http://localhost:5002/api/Parent/save`
+      `http://localhost:5002/api/Parent/SAVE`
     );
     const payload: any = {};
 
@@ -191,7 +185,6 @@ export class Parent {
 
     const res = await fetchImpl(baseUrl, {
       method: "POST",
-      duplex: "half",
       headers: { "Content-Type": "application/json" },
       body: requestBody(MediaType.Json, payload),
     });
