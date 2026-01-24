@@ -40,13 +40,9 @@ export class RuntimeContainer {
     public readonly wasm: OrmWasmExports,
   ) {}
 
-  static async init(
-    ast: CloesceAst,
-    constructorRegistry: ConstructorRegistry,
-    wasm?: WebAssembly.Instance,
-  ) {
+  static async init(ast: CloesceAst, constructorRegistry: ConstructorRegistry) {
     if (this.instance) return;
-    const wasmAbi = await loadOrmWasm(ast, wasm);
+    const wasmAbi = await loadOrmWasm(ast);
     this.instance = new RuntimeContainer(ast, constructorRegistry, wasmAbi);
   }
 

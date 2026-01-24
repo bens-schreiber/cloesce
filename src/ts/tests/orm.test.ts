@@ -7,10 +7,6 @@ import fs from "fs";
 import path from "path";
 import { R2ObjectBody } from "@cloudflare/workers-types";
 
-beforeAll(() => {
-  vi.mock("../orm.wasm", () => ({ default: new ArrayBuffer(0) }));
-});
-
 describe("ORM Hydrate Tests", () => {
   afterEach(() => {
     _cloesceInternal.RuntimeContainer.dispose();

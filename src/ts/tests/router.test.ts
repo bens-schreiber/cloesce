@@ -1,4 +1,4 @@
-import { describe, test, expect, vi, beforeAll, afterEach } from "vitest";
+import { describe, test, expect, vi, afterEach } from "vitest";
 import {
   MatchedRoute,
   RouterError,
@@ -53,10 +53,6 @@ function extractErrorCode(str) {
   const match = str.match(/\(ErrorCode:\s*(\d+)\)/);
   return match ? Number(match[1]) : null;
 }
-
-beforeAll(() => {
-  vi.mock("../orm.wasm", () => ({ default: new ArrayBuffer(0) }));
-});
 
 describe("Match Route", () => {
   test("Unknown Prefix => 404", () => {
@@ -296,7 +292,7 @@ describe("Namespace Middleware", () => {
       fs.readFileSync(path.resolve("./dist/orm.wasm")),
       {},
     );
-    await RuntimeContainer.init(ast, constructorRegistry, wasm.instance);
+    await RuntimeContainer.init(ast, constructorRegistry);
     const app = new CloesceApp();
 
     const request = createRequest("http://foo.com/api/Foo/method", "POST");
@@ -338,7 +334,7 @@ describe("Namespace Middleware", () => {
       fs.readFileSync(path.resolve("./dist/orm.wasm")),
       {},
     );
-    await RuntimeContainer.init(ast, constructorRegistry, wasm.instance);
+    await RuntimeContainer.init(ast, constructorRegistry);
     const app = new CloesceApp();
 
     const request = createRequest("http://foo.com/api/Foo/method", "POST");
@@ -747,7 +743,7 @@ describe("Method Middleware", () => {
       fs.readFileSync(path.resolve("./dist/orm.wasm")),
       {},
     );
-    await RuntimeContainer.init(ast, constructorRegistry, wasm.instance);
+    await RuntimeContainer.init(ast, constructorRegistry);
     const app = new CloesceApp();
 
     const request = createRequest(

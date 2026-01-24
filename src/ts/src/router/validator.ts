@@ -4,10 +4,10 @@ import {
   NO_DATA_SOURCE,
   getNavigationPropertyCidlType,
   isNullableType,
-} from "../ast";
-import { ConstructorRegistry } from "./router";
-import { Either, b64ToU8 } from "../common";
-import { KValue } from "../ui/backend";
+} from "../ast.js";
+import { ConstructorRegistry } from "./router.js";
+import { Either, b64ToU8 } from "../common.js";
+import { KValue } from "../ui/backend.js";
 
 // TODO: Create a "cleaned" object only with the values checked, discarding any extra.
 
@@ -31,7 +31,7 @@ export class RuntimeValidator {
   constructor(
     private ast: CloesceAst,
     private ctorReg: ConstructorRegistry,
-  ) {}
+  ) { }
 
   static validate(
     value: any,
@@ -111,8 +111,8 @@ export class RuntimeValidator {
       return rightIf(
         () => value,
         typeof value === "string" &&
-          (value === NO_DATA_SOURCE ||
-            this.ast.models[objectName]?.data_sources[value] !== undefined),
+        (value === NO_DATA_SOURCE ||
+          this.ast.models[objectName]?.data_sources[value] !== undefined),
       );
     }
 

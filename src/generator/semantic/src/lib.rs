@@ -704,7 +704,9 @@ fn validate_methods(
             o
         ),
         CidlType::Stream => ensure!(
-            matches!(method.return_type, CidlType::Stream),
+            // Stream or HttpResult<Stream>
+            matches!(method.return_type, CidlType::Stream)
+                || matches!(&method.return_type, CidlType::HttpResult(boxed) if matches!(**boxed, CidlType::Stream)),
             GeneratorErrorKind::InvalidStream,
             "{}.{}",
             namespace,

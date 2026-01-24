@@ -2,7 +2,7 @@ import { CloesceAst } from "../ast.js";
 import { Either } from "../common.js";
 
 // NOTE: Requires the ORM binary to have been built
-import mod from "../orm.wasm";
+import * as mod from "../orm.wasm";
 
 /**
  * Cloesce WASM ABI
@@ -48,7 +48,7 @@ export class WasmResource {
     private wasm: OrmWasmExports,
     public ptr: number,
     public len: number,
-  ) {}
+  ) { }
 
   free() {
     this.wasm.dealloc(this.ptr, this.len);
@@ -70,27 +70,28 @@ export class WasmResource {
   }
 }
 
-export async function loadOrmWasm(
-  ast: CloesceAst,
-  wasm?: WebAssembly.Instance,
-): Promise<OrmWasmExports> {
+export async function loadOrmWasm(ast: CloesceAst): Promise<OrmWasmExports> {
   // Load WASM
-  const wasmInstance = (wasm ??
-    (await WebAssembly.instantiate(mod))) as WebAssembly.Instance & {
-    exports: OrmWasmExports;
-  };
+  let exports: OrmWasmExports;
+  if (mod.memory && mod.alloc && mod.dealloc && mod.set_meta_ptr && mod.get_return_ptr && mod.get_return_len) {
+    exports = mod;
+  } else {
+    exports = ((await WebAssembly.instantiate(mod.default)) as unknown as WebAssembly.Instance & {
+      exports: OrmWasmExports;
+    }).exports;
+  }
 
   const modelMeta = WasmResource.fromString(
     JSON.stringify(ast.models),
-    wasmInstance.exports,
+    exports,
   );
 
-  if (wasmInstance.exports.set_meta_ptr(modelMeta.ptr, modelMeta.len) != 0) {
+  if (exports.set_meta_ptr(modelMeta.ptr, modelMeta.len) != 0) {
     modelMeta.free();
-    const resPtr = wasmInstance.exports.get_return_ptr();
-    const resLen = wasmInstance.exports.get_return_len();
+    const resPtr = exports.get_return_ptr();
+    const resLen = exports.get_return_len();
     const errorMsg = new TextDecoder().decode(
-      new Uint8Array(wasmInstance.exports.memory.buffer, resPtr, resLen),
+      new Uint8Array(exports.memory.buffer, resPtr, resLen),
     );
 
     throw Error(
@@ -99,7 +100,7 @@ export async function loadOrmWasm(
   }
 
   // Intentionally leak `modelMeta`, it should exist for the programs lifetime.
-  return wasmInstance.exports;
+  return exports;
 }
 
 /**

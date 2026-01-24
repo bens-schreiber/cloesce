@@ -4,7 +4,6 @@ import {
   POST,
   Inject,
   OneToMany,
-  OneToOne,
   ForeignKey,
   IncludeTree,
   Orm,

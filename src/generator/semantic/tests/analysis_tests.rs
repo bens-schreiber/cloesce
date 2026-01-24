@@ -698,3 +698,30 @@ fn kv_object_unclosed_brace_error() {
     // Assert
     assert!(matches!(err.kind, GeneratorErrorKind::InvalidKeyFormat));
 }
+
+#[test]
+fn http_result_stream_return_type() {
+    // Arrange
+    let model = ModelBuilder::new("Dog")
+        .id_pk()
+        .method(
+            "downloadPhoto",
+            HttpVerb::GET,
+            true,
+            vec![NamedTypedValue {
+                name: "ds".into(),
+                cidl_type: CidlType::DataSource("Dog".into()),
+            }],
+            CidlType::http(CidlType::Stream),
+        )
+        .build();
+
+    let mut ast = create_ast(vec![model]);
+    let spec = create_spec(&ast);
+
+    // Act
+    let res = SemanticAnalysis::analyze(&mut ast, &spec);
+
+    // Assert
+    res.unwrap();
+}
