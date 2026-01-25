@@ -235,7 +235,13 @@ export class CloesceApp {
   }
 
   /**
-   * Runs the Cloesce app. Intended to be called from the generated workers code.
+   * Runs the Cloesce Router, handling dependency injection, routing, validation,
+   * hydration, and method dispatch.
+   *
+   * @param request - The incoming Request object.
+   * @param env - The Wrangler environment bindings.
+   *
+   * @returns A Response object representing the result of the request.
    */
   public async run(request: Request, env: any): Promise<Response> {
     const { ast, constructorRegistry: ctorReg } = RuntimeContainer.get();

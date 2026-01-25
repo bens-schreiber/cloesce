@@ -662,6 +662,47 @@ describe("Plain Old Objects", () => {
     });
   });
 
+  test("Extracts Plain Old Object from KValue", () => {
+    // Arrange
+    const project = cloesceProject();
+    const sourceFile = project.createSourceFile(
+      "test.ts",
+      `
+          import { KValue } from "./src/ui/backend";
+          export class Bar {
+            name: string;
+          }
+
+          @Model
+          export class MyModel {
+            id: number;
+
+            @KV("bar/{id}", "namespace")
+            bar: KValue<Bar> | undefined;
+          }
+          `,
+    );
+
+    // Act
+    const res = CidlExtractor.extract("MyModel", project);
+
+    // Assert
+    expect(res.isRight()).toBe(true);
+    const cidl = res.unwrap();
+    expect(cidl.poos).toStrictEqual({
+      Bar: {
+        name: "Bar",
+        attributes: [
+          {
+            name: "name",
+            cidl_type: "Text",
+          },
+        ],
+        source_path: sourceFile.getFilePath().toString(),
+      },
+    });
+  });
+
   test("Does not extract Plain Old Object without references", () => {
     // Arrange
     const project = cloesceProject();

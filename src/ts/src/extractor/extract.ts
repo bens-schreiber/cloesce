@@ -353,6 +353,7 @@ export class CidlExtractor {
 
       const decorator = decorators[0];
       const decoratorName = getDecoratorName(decorator);
+      const model_reference = getObjectName(cidl_type);
 
       // Process decorator
       switch (decoratorName) {
@@ -382,10 +383,8 @@ export class CidlExtractor {
             });
           }
 
-          const model_name = getObjectName(cidl_type);
-
           // Error: navigation properties require a model reference
-          if (!model_name) {
+          if (!model_reference) {
             return err(ExtractorErrorCode.InvalidSelectorSyntax, (e) => {
               e.snippet = prop.getText();
               e.context = prop.getName();
@@ -394,7 +393,7 @@ export class CidlExtractor {
 
           navigation_properties.push({
             var_name: prop.getName(),
-            model_reference: model_name,
+            model_reference,
             kind: { OneToOne: { column_reference: selector.unwrap() } },
           });
           break;
@@ -408,10 +407,8 @@ export class CidlExtractor {
             });
           }
 
-          let model_name = getObjectName(cidl_type);
-
           // Error: navigation properties require a model reference
-          if (!model_name) {
+          if (!model_reference) {
             return err(ExtractorErrorCode.InvalidNavigationProperty, (e) => {
               e.snippet = prop.getText();
               e.context = prop.getName();
@@ -420,15 +417,14 @@ export class CidlExtractor {
 
           navigation_properties.push({
             var_name: prop.getName(),
-            model_reference: model_name,
+            model_reference,
             kind: { OneToMany: { column_reference: selector.unwrap() } },
           });
           break;
         }
         case PropertyDecoratorKind.ManyToMany: {
           // Error: navigation properties require a model reference
-          let model_name = getObjectName(cidl_type);
-          if (!model_name) {
+          if (!model_reference) {
             return err(ExtractorErrorCode.InvalidNavigationProperty, (e) => {
               e.snippet = prop.getText();
               e.context = prop.getName();
@@ -437,7 +433,7 @@ export class CidlExtractor {
 
           navigation_properties.push({
             var_name: prop.getName(),
-            model_reference: model_name,
+            model_reference,
             kind: "ManyToMany",
           });
           break;
@@ -467,6 +463,23 @@ export class CidlExtractor {
               e.snippet = prop.getText();
               e.context = prop.getName();
             });
+          }
+
+          if (model_reference) {
+            if (
+              !this.extractedPoos.has(model_reference) &&
+              !this.modelDecls.has(model_reference)
+            ) {
+              const res = this.poo(
+                classDecl.getSourceFile().getClassOrThrow(model_reference),
+                classDecl.getSourceFile(),
+              );
+
+              if (res.isLeft()) {
+                res.value.addContext((prev) => `${prop.getName()}.${prev}`);
+                return res;
+              }
+            }
           }
 
           kv_objects.push({
