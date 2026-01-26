@@ -311,7 +311,6 @@ async function generate(config: WasmConfig) {
     fs.writeFileSync(wranglerPath, "");
   }
   debug(`Using wrangler.toml at ${wranglerPath}`);
-
   const wasi = new WASI({
     version: "preview1",
     args: ["generate", ...config.args],

@@ -376,7 +376,7 @@ async fn migrate_models_many_to_many(db: SqlitePool) {
 }
 
 #[sqlx::test]
-async fn migrate_with_alterations(db: SqlitePool) {
+async fn migrate_with_rebuild(db: SqlitePool) {
     let mut base_ast = {
         let ast = as_migration(create_ast(vec![
             ModelBuilder::new("User")
@@ -517,6 +517,67 @@ ALTER TABLE "User" ADD COLUMN "age" text"#
         assert!(exists_in_db(&db, "User").await);
         assert!(exists_in_db(&db, "Dog").await);
     }
+}
+
+#[sqlx::test]
+async fn migrate_with_rename(db: SqlitePool) {
+    // Arrange
+    let base_ast = {
+        let mut ast = create_ast(vec![
+            ModelBuilder::new("User")
+                .id_pk()
+                .col("name", CidlType::nullable(CidlType::Text), None)
+                .col("age", CidlType::Integer, None)
+                .col("address", CidlType::Text, None)
+                .build(),
+            ModelBuilder::new("UserSettings")
+                .id_pk()
+                .col("userId", CidlType::Integer, Some("User".into()))
+                .build(),
+        ]);
+        ast.set_merkle_hash();
+        let migration = as_migration(ast);
+
+        let sql = MigrationsGenerator::migrate(&migration, None, &MockMigrationsIntent::default());
+        query(&db, &sql)
+            .await
+            .expect("Create table queries to work");
+
+        migration
+    };
+
+    let new = {
+        let mut ast = create_ast(vec![
+            ModelBuilder::new("AppUser")
+                .id_pk()
+                .col("name", CidlType::nullable(CidlType::Text), None)
+                .col("age", CidlType::Integer, None)
+                .col("address", CidlType::Text, None)
+                .build(),
+            ModelBuilder::new("UserSettings")
+                .id_pk()
+                .col("userId", CidlType::Integer, Some("AppUser".into()))
+                .build(),
+        ]);
+        ast.set_merkle_hash();
+        as_migration(ast)
+    };
+
+    let mut intent = MockMigrationsIntent::default();
+    intent
+        .answers
+        .insert(("User".into(), None), Some("AppUser".into()));
+
+    // Act
+    let sql = MigrationsGenerator::migrate(&new, Some(&base_ast), &intent);
+
+    // Assert
+    expected_str!(sql, r#"ALTER TABLE "User" RENAME TO "AppUser""#);
+    assert!(sql.matches('\n').count() < 5); // should have less than 5 newlines (i.e., should be a single ALTER TABLE statement)
+
+    query(&db, &sql).await.expect("Alter table queries to work");
+    assert!(exists_in_db(&db, "AppUser").await);
+    assert!(!exists_in_db(&db, "User").await);
 }
 
 #[sqlx::test]
