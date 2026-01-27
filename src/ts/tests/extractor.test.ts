@@ -787,8 +787,9 @@ describe("Services", () => {
       `
           import { HttpResult, Inject } from "./src/ui/backend";
 
-          const InjectedThingSymbol = Symbol("InjectedThing");
-          type InjectedThing = typeof InjectedThingSymbol;
+          class InjectedThing {
+            value: string;
+          }
 
           @Service
           export class BarService {

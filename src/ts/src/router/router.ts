@@ -14,13 +14,32 @@ import { RuntimeValidator } from "./validator.js";
 import { Either, InternalError } from "../common.js";
 import { Orm, KeysOfType, HttpResult } from "../ui/backend.js";
 
-export type DependencyKey = symbol | Function;
+export type DependencyKey<T> = Function | (new () => T) | { name: string };
+
 /**
  * Dependency injection container, mapping an object type name to an instance of that object.
  *
  * Comes with the WranglerEnv and Request by default.
  */
-export type DependencyContainer = Map<DependencyKey, any>;
+export class DependencyContainer {
+  private container = new Map<string, any>();
+
+  set<T>(key: DependencyKey<T>, instance: T) {
+    this.container.set(key.name, instance);
+  }
+
+  get<T>(key: DependencyKey<T>): T | undefined {
+    return this.container.get(key.name);
+  }
+
+  has<T>(key: DependencyKey<T>): boolean {
+    return this.container.has(key.name);
+  }
+
+  delete<T>(key: DependencyKey<T>): boolean {
+    return this.container.delete(key.name);
+  }
+}
 
 /**
  * Map of Plain Old Objects, Models and Services to their constructor.
@@ -116,7 +135,7 @@ export class CloesceApp {
     this.onRouteMiddleware.push(m);
   }
 
-  private namespaceMiddleware: Map<DependencyKey, MiddlewareFn[]> = new Map();
+  private namespaceMiddleware: Map<Function, MiddlewareFn[]> = new Map();
 
   /**
    * Registers middleware for a specific namespace (model or service)
@@ -127,7 +146,7 @@ export class CloesceApp {
    * @param ctor - The namespace's constructor (used to derive its name).
    * @param m - The middleware function to register.
    */
-  public onNamespace<T>(key: DependencyKey, m: MiddlewareFn) {
+  public onNamespace<T>(key: Function, m: MiddlewareFn) {
     const existing = this.namespaceMiddleware.get(key);
     if (existing) {
       existing.push(m);
@@ -137,7 +156,7 @@ export class CloesceApp {
     this.namespaceMiddleware.set(key, [m]);
   }
 
-  private methodMiddleware: Map<DependencyKey, Map<string, MiddlewareFn[]>> =
+  private methodMiddleware: Map<Function, Map<string, MiddlewareFn[]>> =
     new Map();
 
   /**
@@ -151,7 +170,7 @@ export class CloesceApp {
    * @param m - The middleware function to register.
    */
   public onMethod<T>(
-    key: DependencyKey,
+    key: Function,
     method: KeysOfType<T, (...args: any) => any> | CrudKind,
     m: MiddlewareFn,
   ) {
@@ -200,7 +219,7 @@ export class CloesceApp {
       const service: any = {};
 
       for (const attr of serviceMeta.attributes) {
-        const injected = findInjected(ctorReg, di, attr.inject_reference);
+        const injected = findInjected(di, attr.inject_reference);
         service[attr.var_name] = injected;
       }
 
@@ -208,7 +227,7 @@ export class CloesceApp {
       const instance = Object.assign(new serviceCtor(), service);
       if (serviceMeta.initializer) {
         const params = serviceMeta.initializer.map((param) =>
-          findInjected(ctorReg, di, param),
+          findInjected(di, param),
         );
 
         const res = await instance.init(...params);
@@ -253,7 +272,7 @@ export class CloesceApp {
     }
 
     // Method dispatch
-    return await methodDispatch(hydrated.unwrap(), di, ctorReg, route, params);
+    return await methodDispatch(hydrated.unwrap(), di, route, params);
   }
 
   /**
@@ -269,7 +288,7 @@ export class CloesceApp {
     const { ast, constructorRegistry: ctorReg } = RuntimeContainer.get();
 
     // DI will always contain the WranglerEnv and Request.
-    const di: DependencyContainer = new Map();
+    const di = new DependencyContainer();
     if (ast.wrangler_env) {
       const ctor = ctorReg[ast.wrangler_env.name];
       di.set(ctor, env);
@@ -597,7 +616,6 @@ async function hydrate(
 async function methodDispatch(
   obj: any,
   di: DependencyContainer,
-  ctorReg: ConstructorRegistry,
   route: MatchedRoute,
   params: Record<string, unknown>,
 ): Promise<HttpResult<unknown>> {
@@ -610,7 +628,6 @@ async function methodDispatch(
 
     // Assume injected parameter
     const injected = findInjected(
-      ctorReg,
       di,
       (param.cidl_type as { Inject: string }).Inject,
     );
@@ -651,27 +668,16 @@ function exit(
 }
 
 /**
- * Finds an injected dependency from the DI container as a symbol or constructor.
+ * Finds an injected dependency from the DI container.
  * @returns The injected dependency, or undefined if not found.
  */
-function findInjected(
-  ctorReg: ConstructorRegistry,
-  di: DependencyContainer,
-  key: any,
-): any | undefined {
-  let injected: any | undefined;
-  if (di.has(Symbol.for(key))) {
-    injected = di.get(Symbol.for(key));
-  } else {
-    injected = di.get(ctorReg[key]);
-  }
-
+function findInjected(di: DependencyContainer, key: string): any | undefined {
+  const injected = di.get({ name: key });
   if (injected === undefined) {
     console.warn(
       `Unable to find injected dependency for ${key}. Leaving as undefined.`,
     );
   }
-
   return injected;
 }
 

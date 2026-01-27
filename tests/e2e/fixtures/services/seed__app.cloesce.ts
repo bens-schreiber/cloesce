@@ -8,8 +8,9 @@ import {
   DependencyContainer,
 } from "cloesce/backend";
 
-const InjectedThingSymbol = Symbol.for("InjectedThing");
-type InjectedThing = typeof InjectedThingSymbol;
+class InjectedThing {
+  value: string;
+}
 
 @Service
 export class FooService {
@@ -58,7 +59,9 @@ export default async function main(
   _ctx: ExecutionContext,
 ): Promise<Response> {
   app.onRoute((di) => {
-    di.set(InjectedThingSymbol, "I am an injected thing");
+    di.set(InjectedThing, {
+      value: "This is an injected thing",
+    });
   });
 
   app.onNamespace(FooService, (di: DependencyContainer) => {

@@ -7,7 +7,7 @@ import {
   _cloesceInternal,
 } from "../src/router/router";
 import { HttpVerb, MediaType, Model, NamedTypedValue } from "../src/ast";
-import { CloesceApp, HttpResult } from "../src/ui/backend";
+import { CloesceApp, HttpResult, DependencyContainer } from "../src/ui/backend";
 import { ModelBuilder, ServiceBuilder, createAst } from "./builder";
 
 function createRequest(url: string, method?: string, body?: any) {
@@ -38,7 +38,7 @@ function mockWranglerEnv() {
 }
 
 function createDi() {
-  return new Map<DependencyKey, any>();
+  return new DependencyContainer();
 }
 
 function mockD1() {
@@ -779,7 +779,6 @@ describe("Method Dispatch", () => {
       .idPk()
       .method("testMethod", HttpVerb.GET, true, [], "Void")
       .build();
-    const ctorReg = createCtorReg();
 
     const route: MatchedRoute = {
       kind: "model",
@@ -790,13 +789,7 @@ describe("Method Dispatch", () => {
     };
 
     // Act
-    const res = await _cloesceInternal.methodDispatch(
-      crud,
-      di,
-      ctorReg,
-      route,
-      {},
-    );
+    const res = await _cloesceInternal.methodDispatch(crud, di, route, {});
 
     // Assert
     expect(res).toStrictEqual(HttpResult.ok(200).setMediaType(MediaType.Json));
@@ -812,7 +805,6 @@ describe("Method Dispatch", () => {
     };
 
     const di = createDi();
-    const ctorReg = createCtorReg();
 
     const model = ModelBuilder.model("Foo")
       .idPk()
@@ -828,13 +820,7 @@ describe("Method Dispatch", () => {
     };
 
     // Act
-    const res = await _cloesceInternal.methodDispatch(
-      crud,
-      di,
-      ctorReg,
-      route,
-      {},
-    );
+    const res = await _cloesceInternal.methodDispatch(crud, di, route, {});
 
     // Assert
     expect(res).toStrictEqual(
@@ -850,7 +836,6 @@ describe("Method Dispatch", () => {
       },
     };
     const di = createDi();
-    const ctorReg = createCtorReg();
 
     const model = ModelBuilder.model("Foo")
       .idPk()
@@ -866,13 +851,7 @@ describe("Method Dispatch", () => {
     };
 
     // Act
-    const res = await _cloesceInternal.methodDispatch(
-      crud,
-      di,
-      ctorReg,
-      route,
-      {},
-    );
+    const res = await _cloesceInternal.methodDispatch(crud, di, route, {});
 
     // Assert
     expect(res).toStrictEqual(
@@ -902,16 +881,9 @@ describe("Method Dispatch", () => {
     };
 
     const di = createDi();
-    const ctorReg = createCtorReg();
 
     // Act
-    const res = await _cloesceInternal.methodDispatch(
-      crud,
-      di,
-      ctorReg,
-      route,
-      {},
-    );
+    const res = await _cloesceInternal.methodDispatch(crud, di, route, {});
 
     // Assert
     expect(extractErrorCode(res.message)).toBe(RouterError.UncaughtException);

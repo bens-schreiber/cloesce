@@ -940,8 +940,7 @@ export class CidlExtractor {
 
     // No generics -> inject or object
     if (generics.length === 0) {
-      const text = symbolLiteral(unwrappedType) ?? tyText;
-      const base = inject ? { Inject: text } : { Object: text };
+      const base = inject ? { Inject: tyText } : { Object: tyText };
       return Either.right(wrapNullable(base, nullable));
     }
 
@@ -1043,39 +1042,6 @@ export class CidlExtractor {
     ): Either<ExtractorError, CidlType> {
       const res = CidlExtractor.cidlType(t, inject);
       return res.map((inner) => wrapNullable(wrapper(inner), isNullable));
-    }
-
-    function symbolLiteral(t: Type): string | null {
-      const symbol = t.getSymbol() ?? t.getAliasSymbol();
-      if (!symbol) {
-        return null;
-      }
-
-      const declarations = symbol.getDeclarations();
-      if (declarations.length === 0) {
-        return null;
-      }
-
-      const decl = declarations[0];
-      if (!MorphNode.isVariableDeclaration(decl)) {
-        return null;
-      }
-
-      const initializer = decl.getInitializer();
-      if (!MorphNode.isCallExpression(initializer)) {
-        return null;
-      }
-
-      const args = initializer.getArguments();
-      if (args.length === 0) {
-        return null;
-      }
-
-      if (!MorphNode.isStringLiteral(args[0])) {
-        return null;
-      }
-
-      return args[0].getLiteralValue();
     }
   }
 
