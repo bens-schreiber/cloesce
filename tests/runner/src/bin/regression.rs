@@ -32,7 +32,12 @@ async fn main() {
         .map(Fixture::new)
         .collect::<Vec<_>>();
 
+    let subscriber = tracing_subscriber::FmtSubscriber::builder().finish();
+    tracing::subscriber::set_global_default(subscriber)
+        .expect("Failed to set global default subscriber");
+
     // Build generator
+    tracing::info!("Building generator...");
     let cmd = Command::new("cargo")
         .current_dir("../../src/generator")
         .args(["build", "--release"])
@@ -46,6 +51,7 @@ async fn main() {
             panic!("Failed to execute cargo build: {}", err);
         }
     }
+    tracing::info!("Finished building generator.");
 
     let mut tasks = Vec::with_capacity(fixtures.len());
     for fixture in fixtures {
@@ -126,6 +132,11 @@ fn run_integration_test(fixture: Fixture, domain: &str) -> Result<bool, bool> {
 
         (cidl, sql)
     };
+
+    tracing::info!(
+        "Finished regression test for fixture {}",
+        fixture.fixture_id
+    );
 
     Ok(pre_cidl_changed | generated_changed | migrated_cidl_changed | migrated_sql_changed)
 }

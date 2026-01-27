@@ -104,6 +104,7 @@ impl Fixture {
     pub fn extract_cidl(&self) -> TestResult {
         let out = OutputFile::new(&self.path, "cidl.pre.json");
 
+        tracing::info!("Extracting CIDL for fixture {}", self.fixture_id);
         let res = self.run_command(
             Command::new("node")
                 .current_dir("../e2e")
@@ -133,6 +134,7 @@ impl Fixture {
         let workers_out = OutputFile::new(&self.path, "workers.ts");
         let client_out = OutputFile::new(&self.path, "client.ts");
 
+        tracing::info!("Generating outputs for fixture {}", self.fixture_id);
         let cmd = self.run_command(
             Command::new("./target/release/generator")
                 .arg("generate")
@@ -184,6 +186,7 @@ impl Fixture {
 
         let cidl_path = cidl.canonicalize().unwrap();
 
+        tracing::info!("Migrating CIDL for fixture {}", self.fixture_id);
         let res = self.run_command(
             Command::new("./target/release/generator")
                 .arg("migrations")
