@@ -136,7 +136,7 @@ impl Fixture {
 
         tracing::info!("Generating outputs for fixture {}", self.fixture_id);
         let cmd = self.run_command(
-            Command::new("./target/release/generator")
+            Command::new("./target/release/cli")
                 .arg("generate")
                 .arg(&pre_cidl_canon)
                 .arg(cidl_out.path())
@@ -188,7 +188,7 @@ impl Fixture {
 
         tracing::info!("Migrating CIDL for fixture {}", self.fixture_id);
         let res = self.run_command(
-            Command::new("./target/release/generator")
+            Command::new("./target/release/cli")
                 .arg("migrations")
                 .arg(&cidl_path)
                 .arg(migrated_cidl.path())
