@@ -83,6 +83,7 @@ export class D1BackedModel {
 
   static fromJson(data: any): D1BackedModel {
     const res = Object.assign(new D1BackedModel(), data);
+    if (res.kvData) res.kvData = Object.assign(new KValue<unknown>(), res.kvData);
     return res;
   }
 }
@@ -143,6 +144,8 @@ export class PureKVModel {
 
   static fromJson(data: any): PureKVModel {
     const res = Object.assign(new PureKVModel(), data);
+    if (res.data) res.data = Object.assign(new KValue<unknown>(), res.data);
+    if (res.otherData) res.otherData = Object.assign(new KValue<string>(), res.otherData);
     return res;
   }
 }

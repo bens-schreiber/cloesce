@@ -315,6 +315,9 @@ export class ModelWithKv {
 
   static fromJson(data: any): ModelWithKv {
     const res = Object.assign(new ModelWithKv(), data);
+    if (res.someValue) res.someValue = Object.assign(new KValue<unknown>(), res.someValue);
+    if (res.manyValues) res.manyValues = Object.assign(new KValue<unknown>(), res.manyValues);
+    
     return res;
   }
 }
@@ -385,6 +388,7 @@ export class ToyotaPrius {
 
   static fromJson(data: any): ToyotaPrius {
     const res = Object.assign(new ToyotaPrius(), data);
+    if (res.metadata) res.metadata = Object.assign(new KValue<unknown>(), res.metadata);
     return res;
   }
 }

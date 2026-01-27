@@ -174,6 +174,23 @@ export class {{this.name}} {
     res.{{value.name}} = b64ToU8(res.{{value.name}});
 {{/if}}
 {{/each}}
+{{#each this.kv_objects}}
+{{#if (has_array this.value.cidl_type)}}
+    for (let i = 0; i < res.{{value.name}}.length; i++) {
+{{#if (is_object_array this.value.cidl_type)}}
+      const obj = {{get_object_name this.value.cidl_type}}.fromJson(res.{{value.name}}[i]);
+      if (obj) res.{{value.name}}[i] = Object.assign(new KValue<{{map_cidl_type this.value.cidl_type}}>(), obj);
+{{else}}
+      res.{{value.name}}[i] = Object.assign(new KValue<{{map_cidl_type this.value.cidl_type}}>(), res.{{value.name}}[i]);
+{{/if}}
+{{else}}
+{{#if (is_object this.value.cidl_type)}}
+    if (res.{{value.name}}) res.{{value.name}} = Object.assign(new KValue<{{map_cidl_type this.value.cidl_type}}>(), {{get_object_name this.value.cidl_type}}.fromJson(res.{{value.name}}););
+{{else}}
+    {{#unless (is_stream this.value.cidl_type)}}if (res.{{value.name}}) res.{{value.name}} = Object.assign(new KValue<{{map_cidl_type this.value.cidl_type}}>(), res.{{value.name}});{{/unless}}
+{{/if}}
+{{/if}}
+{{/each}}
     return res;
   }
 }

@@ -30,8 +30,8 @@ describe("PureKVModel", () => {
     expect(res.ok, withRes("GET should be OK", res)).toBe(true);
     expect(res.data).toBeDefined();
     expect(res.data?.id).toBe(id);
-    expect(res.data?.data.raw).toEqual(data);
-    expect(res.data?.otherData.raw).toBe(otherData);
+    expect(res.data?.data.value).toEqual(data);
+    expect(res.data?.otherData.value).toBe(otherData);
   });
 });
 
@@ -58,7 +58,7 @@ describe("D1BackedModel", () => {
     expect(res.data).toBeDefined();
     expect(res.data?.id).toBe(1);
     expect(res.data?.keyParam).toBe("key1");
-    expect(res.data?.kvData.raw).toEqual(data);
+    expect(res.data?.kvData.value).toEqual(data);
   });
 
   it("LIST", async () => {
