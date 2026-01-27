@@ -1,5 +1,6 @@
-import { describe, test, expect, vi, afterEach, beforeAll } from "vitest";
+import { describe, test, expect, vi, afterEach } from "vitest";
 import {
+  DependencyKey,
   MatchedRoute,
   RouterError,
   RuntimeContainer,
@@ -8,8 +9,6 @@ import {
 import { HttpVerb, MediaType, Model, NamedTypedValue } from "../src/ast";
 import { CloesceApp, HttpResult } from "../src/ui/backend";
 import { ModelBuilder, ServiceBuilder, createAst } from "./builder";
-import fs from "fs";
-import path from "path";
 
 function createRequest(url: string, method?: string, body?: any) {
   return new Request(url, {
@@ -39,7 +38,7 @@ function mockWranglerEnv() {
 }
 
 function createDi() {
-  return new Map<string, any>();
+  return new Map<DependencyKey, any>();
 }
 
 function mockD1() {
@@ -287,18 +286,14 @@ describe("Namespace Middleware", () => {
       ],
     });
     const constructorRegistry = createCtorReg();
+    class Foo {}
+    constructorRegistry[Foo.name] = Foo;
 
-    const wasm = await WebAssembly.instantiate(
-      fs.readFileSync(path.resolve("./dist/orm.wasm")),
-      {},
-    );
     await RuntimeContainer.init(ast, constructorRegistry);
     const app = new CloesceApp();
 
     const request = createRequest("http://foo.com/api/Foo/method", "POST");
     const di = createDi();
-
-    class Foo {}
 
     app.onNamespace(Foo, async () => {
       return HttpResult.fail(500, "oogly boogly");
@@ -329,18 +324,14 @@ describe("Namespace Middleware", () => {
       ],
     });
     const constructorRegistry = createCtorReg();
+    class Foo {}
+    constructorRegistry[Foo.name] = Foo;
 
-    const wasm = await WebAssembly.instantiate(
-      fs.readFileSync(path.resolve("./dist/orm.wasm")),
-      {},
-    );
     await RuntimeContainer.init(ast, constructorRegistry);
     const app = new CloesceApp();
 
     const request = createRequest("http://foo.com/api/Foo/method", "POST");
     const di = createDi();
-
-    class Foo {}
 
     app.onNamespace(Foo, async () => {
       return HttpResult.fail(500, "oogly boogly");
@@ -738,11 +729,11 @@ describe("Method Middleware", () => {
       ],
     });
     const constructorRegistry = createCtorReg();
+    class Foo {
+      method() {}
+    }
+    constructorRegistry[Foo.name] = Foo;
 
-    const wasm = await WebAssembly.instantiate(
-      fs.readFileSync(path.resolve("./dist/orm.wasm")),
-      {},
-    );
     await RuntimeContainer.init(ast, constructorRegistry);
     const app = new CloesceApp();
 
@@ -754,10 +745,6 @@ describe("Method Middleware", () => {
 
     const di = createDi();
     const d1 = mockD1();
-
-    class Foo {
-      method() {}
-    }
 
     app.onMethod(Foo, "method", async () => {
       return HttpResult.fail(500, "oogly boogly");
@@ -779,41 +766,6 @@ describe("Method Middleware", () => {
 });
 
 describe("Method Dispatch", () => {
-  test("Missing Dependency => 500", async () => {
-    // Arrange
-    const model = ModelBuilder.model("Foo")
-      .idPk()
-      .method(
-        "method",
-        HttpVerb.POST,
-        true,
-        [
-          {
-            name: "db",
-            cidl_type: { Inject: "D1Database" },
-          },
-        ],
-        "Void",
-      )
-      .build();
-
-    const di = createDi();
-    const route: MatchedRoute = {
-      kind: "model",
-      namespace: "Foo",
-      method: model.methods["method"],
-      primaryKey: null,
-      keyParams: {},
-    };
-
-    // Act
-    const res = await _cloesceInternal.methodDispatch({}, di, route, {});
-
-    // Assert
-    expect(res.ok).toBe(false);
-    expect(extractErrorCode(res.message)).toBe(RouterError.MissingDependency);
-  });
-
   test("Void Return Type => 200, no data", async () => {
     // Arrange
     const crud = {
@@ -827,6 +779,7 @@ describe("Method Dispatch", () => {
       .idPk()
       .method("testMethod", HttpVerb.GET, true, [], "Void")
       .build();
+    const ctorReg = createCtorReg();
 
     const route: MatchedRoute = {
       kind: "model",
@@ -837,7 +790,13 @@ describe("Method Dispatch", () => {
     };
 
     // Act
-    const res = await _cloesceInternal.methodDispatch(crud, di, route, {});
+    const res = await _cloesceInternal.methodDispatch(
+      crud,
+      di,
+      ctorReg,
+      route,
+      {},
+    );
 
     // Assert
     expect(res).toStrictEqual(HttpResult.ok(200).setMediaType(MediaType.Json));
@@ -853,6 +812,7 @@ describe("Method Dispatch", () => {
     };
 
     const di = createDi();
+    const ctorReg = createCtorReg();
 
     const model = ModelBuilder.model("Foo")
       .idPk()
@@ -868,7 +828,13 @@ describe("Method Dispatch", () => {
     };
 
     // Act
-    const res = await _cloesceInternal.methodDispatch(crud, di, route, {});
+    const res = await _cloesceInternal.methodDispatch(
+      crud,
+      di,
+      ctorReg,
+      route,
+      {},
+    );
 
     // Assert
     expect(res).toStrictEqual(
@@ -884,6 +850,7 @@ describe("Method Dispatch", () => {
       },
     };
     const di = createDi();
+    const ctorReg = createCtorReg();
 
     const model = ModelBuilder.model("Foo")
       .idPk()
@@ -899,7 +866,13 @@ describe("Method Dispatch", () => {
     };
 
     // Act
-    const res = await _cloesceInternal.methodDispatch(crud, di, route, {});
+    const res = await _cloesceInternal.methodDispatch(
+      crud,
+      di,
+      ctorReg,
+      route,
+      {},
+    );
 
     // Assert
     expect(res).toStrictEqual(
@@ -929,9 +902,16 @@ describe("Method Dispatch", () => {
     };
 
     const di = createDi();
+    const ctorReg = createCtorReg();
 
     // Act
-    const res = await _cloesceInternal.methodDispatch(crud, di, route, {});
+    const res = await _cloesceInternal.methodDispatch(
+      crud,
+      di,
+      ctorReg,
+      route,
+      {},
+    );
 
     // Assert
     expect(extractErrorCode(res.message)).toBe(RouterError.UncaughtException);

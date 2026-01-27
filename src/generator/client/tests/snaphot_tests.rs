@@ -240,6 +240,7 @@ fn test_client_code_generation_snapshot() {
                     var_name: "db".into(),
                     inject_reference: "D1Database".into(),
                 }],
+                initializer: None,
                 methods,
                 source_path: PathBuf::default(),
             },

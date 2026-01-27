@@ -103,14 +103,18 @@ impl Fixture {
 
     pub fn extract_cidl(&self) -> TestResult {
         let out = OutputFile::new(&self.path, "cidl.pre.json");
+
         let res = self.run_command(
             Command::new("node")
+                .current_dir("../e2e")
                 .arg("../../src/ts/dist/cli.js")
                 .arg("extract")
                 .arg("--in")
                 .arg(&self.path)
                 .arg("--out")
                 .arg(out.path())
+                .arg("--project-name")
+                .arg("runner")
                 .arg("--truncateSourcePaths"),
         );
 
@@ -130,9 +134,7 @@ impl Fixture {
         let client_out = OutputFile::new(&self.path, "client.ts");
 
         let cmd = self.run_command(
-            Command::new("cargo")
-                .arg("--quiet")
-                .arg("run")
+            Command::new("./target/release/generator")
                 .arg("generate")
                 .arg(&pre_cidl_canon)
                 .arg(cidl_out.path())
@@ -183,9 +185,7 @@ impl Fixture {
         let cidl_path = cidl.canonicalize().unwrap();
 
         let res = self.run_command(
-            Command::new("cargo")
-                .arg("--quiet")
-                .arg("run")
+            Command::new("./target/release/generator")
                 .arg("migrations")
                 .arg(&cidl_path)
                 .arg(migrated_cidl.path())

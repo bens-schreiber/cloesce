@@ -7,11 +7,11 @@ import {
   Student,
   Course,
   B,
-} from "../../fixtures/regression/foreign_keys/client.js";
+} from "../fixtures/foreign_keys/client";
 
 beforeAll(async () => {
   // NOTE: e2e is called from proj root
-  await startWrangler("../fixtures/regression/foreign_keys");
+  await startWrangler("./fixtures/foreign_keys");
 }, 30_000);
 
 afterAll(async () => {
@@ -45,8 +45,8 @@ describe("POST and refresh A", () => {
   it("POST A", async () => {
     const res = await A.post(a);
     expect(res.ok, withRes("POST should be OK", res)).toBe(true);
-    expect(res.data.id, withRes("POST id should match input", res)).toBe(a.id);
-    b = res.data.b;
+    expect(res.data!.id, withRes("POST id should match input", res)).toBe(a.id);
+    b = res.data!.b!;
   });
 
   it("Object to be instantiated on backend", async () => {
@@ -77,7 +77,7 @@ describe("POST and refresh Person", () => {
   it("POST Person", async () => {
     const res = await Person.post(person);
     expect(res.ok).toBe(true);
-    expect(res.data.dogs.length).toBe(1);
+    expect(res.data!.dogs.length).toBe(1);
   });
 
   testRefresh(person, ["withDogs", "none"], {
@@ -93,7 +93,7 @@ describe("POST and refresh Student", () => {
   it("POST Student", async () => {
     const res = await Student.post(student);
     expect(res.ok, withRes("Expected POST to work", res)).toBe(true);
-    expect(res.data.courses.length).toBe(1);
+    expect(res.data!.courses.length).toBe(1);
   });
 
   testRefresh(

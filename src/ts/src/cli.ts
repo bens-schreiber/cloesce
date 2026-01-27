@@ -226,15 +226,32 @@ async function extract(
     config.projectName ?? readPackageJsonProjectName(projectRoot);
 
   const project = new Project({
-    skipAddingFilesFromTsConfig: true,
     compilerOptions: {
       skipLibCheck: true,
-      strictNullChecks: true,
       experimentalDecorators: true,
       emitDecoratorMetadata: true,
+      strict: true,
     },
   });
-  findCloesceProject(root, searchPaths, project);
+
+  project.addSourceFilesAtPaths(
+    searchPaths.flatMap((p) => {
+      const full = path.isAbsolute(p) ? p : path.resolve(root, p);
+
+      if (!fs.existsSync(full)) {
+        console.warn(`Warning: Path "${p}" does not exist`);
+        return [];
+      }
+
+      const stats = fs.statSync(full);
+
+      if (stats.isFile()) {
+        return /\.cloesce\.ts$/i.test(full) ? [full] : [];
+      }
+
+      return [path.join(full, "**/*.cloesce.ts")];
+    }),
+  );
 
   const fileCount = project.getSourceFiles().length;
   if (fileCount === 0) {
@@ -421,50 +438,6 @@ function readPackageJsonProjectName(cwd: string): string {
   }
 
   return projectName;
-}
-
-function findCloesceProject(
-  root: string,
-  searchPaths: string[],
-  project: Project,
-): void {
-  for (const searchPath of searchPaths) {
-    let fullPath: string;
-
-    if (path.isAbsolute(searchPath) || searchPath.startsWith(root)) {
-      fullPath = path.normalize(searchPath);
-    } else {
-      fullPath = path.resolve(root, searchPath);
-    }
-
-    if (!fs.existsSync(fullPath)) {
-      console.warn(`Warning: Path "${searchPath}" does not exist`);
-      continue;
-    }
-
-    const stats = fs.statSync(fullPath);
-    if (stats.isFile() && /\.cloesce\.ts$/i.test(fullPath)) {
-      debug(`Found file: ${fullPath}`);
-
-      project.addSourceFileAtPath(fullPath);
-    } else if (stats.isDirectory()) {
-      debug(`Searching directory: ${fullPath}`);
-      walkDirectory(fullPath);
-    }
-  }
-
-  function walkDirectory(dir: string): void {
-    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-      const fullPath = path.join(dir, entry.name);
-      if (entry.isDirectory() && !entry.name.startsWith(".")) {
-        debug(`Entering directory: ${fullPath}`);
-        walkDirectory(fullPath);
-      } else if (entry.isFile() && /\.cloesce\.ts$/i.test(entry.name)) {
-        debug(`Found file: ${fullPath}`);
-        project.addSourceFileAtPath(fullPath);
-      }
-    }
-  }
 }
 
 function formatErr(e: ExtractorError): string {

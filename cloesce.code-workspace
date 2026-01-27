@@ -23,10 +23,6 @@
 		{
 			"name": "examples",
 			"path": "examples"
-		},
-		{
-			"name": "fixtures",
-			"path": "tests/fixtures"
 		}
 	],
 	"settings": {}

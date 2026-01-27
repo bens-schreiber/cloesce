@@ -1,0 +1,81 @@
+{
+  "hash": 0,
+  "project_name": "runner",
+  "wrangler_env": null,
+  "models": {},
+  "services": {
+    "FooService": {
+      "name": "FooService",
+      "attributes": [],
+      "initializer": null,
+      "methods": {
+        "instantiatedMethod": {
+          "name": "instantiatedMethod",
+          "is_static": false,
+          "http_verb": "GET",
+          "return_media": "Json",
+          "return_type": "Text",
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "thing",
+              "cidl_type": {
+                "Inject": "InjectedThing"
+              }
+            }
+          ]
+        },
+        "staticMethod": {
+          "name": "staticMethod",
+          "is_static": true,
+          "http_verb": "GET",
+          "return_media": "Json",
+          "return_type": "Text",
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "thing",
+              "cidl_type": {
+                "Inject": "InjectedThing"
+              }
+            }
+          ]
+        }
+      },
+      "source_path": "./seed__app.cloesce.ts"
+    },
+    "BarService": {
+      "name": "BarService",
+      "attributes": [
+        {
+          "var_name": "foo",
+          "inject_reference": "FooService"
+        }
+      ],
+      "initializer": [
+        "FooService"
+      ],
+      "methods": {
+        "useFoo": {
+          "name": "useFoo",
+          "is_static": false,
+          "http_verb": "GET",
+          "return_media": "Json",
+          "return_type": "Text",
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "injectedThing",
+              "cidl_type": {
+                "Inject": "InjectedThing"
+              }
+            }
+          ]
+        }
+      },
+      "source_path": "./seed__app.cloesce.ts"
+    }
+  },
+  "poos": {},
+  "main_source": "./seed__app.cloesce.ts"
+}

@@ -1,0 +1,49 @@
+import { KV, KValue, WranglerEnv, KeyParam, Model } from "cloesce/backend";
+import { D1Database } from "@cloudflare/workers-types";
+
+class KValue<T> {}
+class KVNamespace {}
+type Integer = number & { __kind: "Integer" };
+type IncludeTree<T> = { [K in keyof T] };
+
+@WranglerEnv
+export class Env {
+  db: D1Database;
+  namespace: KVNamespace;
+  otherNamespace: KVNamespace;
+}
+
+@Model(["GET", "SAVE"])
+export class PureKVModel {
+  @KeyParam
+  id: string;
+
+  @KV("path/to/data/{id}", "namespace")
+  data: KValue<unknown>;
+
+  @KV("path/to/other/{id}", "otherNamespace")
+  otherData: KValue<string>;
+
+  static readonly default: IncludeTree<PureKVModel> = {
+    data: {},
+    otherData: {},
+  };
+}
+
+@Model(["GET", "SAVE", "LIST"])
+export class D1BackedModel {
+  id: Integer;
+
+  @KeyParam
+  keyParam: string;
+
+  someColumn: number;
+  someOtherColumn: string;
+
+  @KV("d1Backed/{id}/{keyParam}/{someColumn}/{someOtherColumn}", "namespace")
+  kvData: KValue<unknown>;
+
+  static readonly default: IncludeTree<D1BackedModel> = {
+    kvData: {},
+  };
+}

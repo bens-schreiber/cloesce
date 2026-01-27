@@ -4,7 +4,7 @@ import { CidlExtractor } from "../src/extractor/extract";
 import { CidlType, DataSource, Service } from "../src/ast";
 import { ModelBuilder } from "./builder";
 
-function cloesceProject(): Project {
+export function cloesceProject(): Project {
   const project = new Project({
     compilerOptions: {
       strict: true,
@@ -23,6 +23,7 @@ describe("CIDL Type", () => {
     const sourceFile = project.createSourceFile(
       "test.ts",
       `
+      import { Integer } from "./src/ui/backend";
       class Foo {
         isReal: number;
         isInteger: Integer;
@@ -774,6 +775,53 @@ describe("Services", () => {
       ],
       methods: {},
       source_path: sourceFile.getFilePath().toString(),
+      initializer: null,
     } as Service);
+  });
+
+  test("Finds initializer", () => {
+    // Arrange
+    const project = cloesceProject();
+    project.createSourceFile(
+      "test.ts",
+      `
+          import { HttpResult, Inject } from "./src/ui/backend";
+
+          const InjectedThingSymbol = Symbol("InjectedThing");
+          type InjectedThing = typeof InjectedThingSymbol;
+
+          @Service
+          export class BarService {
+
+            // HttpResult<void> return type
+            async init(): Promise<HttpResult<void>> {}
+          }
+
+          @Service
+          export class FooService {
+            barService: BarService;
+            fooBar: string;
+
+            // Void return type
+            async init(@Inject injectedThing: InjectedThing) {
+              this.fooBar = "initialized";
+              return;
+            }
+          }
+          `,
+    );
+
+    // Act
+    const res = CidlExtractor.extract("FooService", project);
+
+    // Assert
+    expect(res.isRight()).toBe(true);
+    const cidl = res.unwrap();
+    expect(cidl.services["BarService"]).toBeDefined();
+    const barService = cidl.services["BarService"];
+    expect(barService.initializer).toEqual([]);
+    expect(cidl.services["FooService"]).toBeDefined();
+    const fooService = cidl.services["FooService"];
+    expect(fooService.initializer).toEqual(["InjectedThing"]);
   });
 });

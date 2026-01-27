@@ -1,13 +1,10 @@
 import { startWrangler, stopWrangler, withRes } from "../src/setup.js";
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import {
-  FooService,
-  BarService,
-} from "../../fixtures/regression/services/client.js";
+import { FooService, BarService } from "../fixtures/services/client";
 
 beforeAll(async () => {
   // NOTE: e2e is called from proj root
-  await startWrangler("../fixtures/regression/services", false);
+  await startWrangler("./fixtures/services", false);
 }, 30_000);
 
 afterAll(async () => {
@@ -32,6 +29,8 @@ describe("Use Injected Dependency: BarService", () => {
   it("Returns Foo's instantiated method", async () => {
     const res = await BarService.useFoo();
     expect(res.ok, withRes("Expected GET to work", res)).toBe(true);
-    expect(res.data).toEqual("foo's instantiated invocation from BarService");
+    expect(res.data).toEqual(
+      "foo's instantiated invocation from BarService, someCrap: just some crap",
+    );
   });
 });

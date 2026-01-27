@@ -316,6 +316,9 @@ pub struct Service {
     /// Class fields which are all injected dependencies.
     pub attributes: Vec<ServiceAttribute>,
 
+    /// Injected symbols required to initialize the service.
+    pub initializer: Option<Vec<String>>,
+
     /// API definitions.
     #[serde_as(as = "MapPreventDuplicates<_, _>")]
     pub methods: BTreeMap<String, ApiMethod>,

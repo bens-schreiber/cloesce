@@ -1,8 +1,8 @@
 {
   "devDependencies": {
+    "cloesce": "file:../../src/ts",
     "@cloudflare/workers-types": "^4.20250906.0",
     "@types/node": "^24.3.1",
-    "cloesce": "file:../../src/ts",
     "oxlint": "^1.32.0",
     "prettier": "^3.6.2",
     "ts-node": "^10.9.2",

@@ -101,9 +101,8 @@ export class HttpResult<T = unknown> {
       case MediaType.Octet: {
         this.headers.set("Content-Type", "application/octet-stream");
 
-        // JSON structure isn't needed; assume the first
-        // value is the stream data
-        body = Object.values(this.data ?? {})[0] as BodyInit;
+        // Assume proper BodyInit
+        body = this.data as BodyInit;
         break;
       }
       case undefined: {

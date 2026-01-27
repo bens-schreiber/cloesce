@@ -242,9 +242,8 @@ export class CidlExtractor {
     }
 
     // Must return Response
-    const returnType = decl
-      .getReturnType()
-      .getText(undefined, TypeFormatFlags.UseAliasDefinedOutsideCurrentScope);
+    const returnType = getTypeText(decl.getReturnType());
+
     if (returnType !== "Promise<Response>") {
       return err(ExtractorErrorCode.InvalidMain, (e) => {
         e.context = `Expected return type to be Promise<Response>, got ${returnType}`;
@@ -297,12 +296,7 @@ export class CidlExtractor {
 
       // Include Trees
       const isIncludeTree =
-        prop
-          .getType()
-          .getText(
-            undefined,
-            TypeFormatFlags.UseAliasDefinedOutsideCurrentScope,
-          ) === `IncludeTree<${name}>`;
+        getTypeText(prop.getType()) === `IncludeTree<${name}>`;
       if (isIncludeTree) {
         // Error: data sources must be static include trees
         if (!prop.isStatic()) {
@@ -569,6 +563,7 @@ export class CidlExtractor {
   ): Either<ExtractorError, Service> {
     const attributes: ServiceAttribute[] = [];
     const methods: Record<string, ApiMethod> = {};
+    let initializer: string[] | null = null;
 
     // Properties
     for (const prop of classDecl.getProperties()) {
@@ -581,27 +576,69 @@ export class CidlExtractor {
         return typeRes;
       }
 
-      if (typeof typeRes.value === "string" || !("Inject" in typeRes.value)) {
-        return err(ExtractorErrorCode.InvalidServiceProperty, (e) => {
-          e.context = prop.getName();
-          e.snippet = prop.getText();
-        });
-      }
-
       // Error: invalid property modifier
       const checkModifierRes = checkPropertyModifier(prop);
       if (checkModifierRes.isLeft()) {
         return checkModifierRes;
       }
 
-      attributes.push({
-        var_name: prop.getName(),
-        inject_reference: typeRes.value.Inject,
-      });
+      if (typeof typeRes.value === "object" && "Inject" in typeRes.value) {
+        attributes.push({
+          var_name: prop.getName(),
+          inject_reference: typeRes.value.Inject,
+        });
+      }
     }
 
     // Methods
     for (const m of classDecl.getMethods()) {
+      if (m.getName() === "init") {
+        // Must not be static
+        if (m.isStatic()) {
+          return err(ExtractorErrorCode.InvalidServiceInitializer, (e) => {
+            e.context = m.getName();
+            e.snippet = m.getText();
+          });
+        }
+
+        const apiMethodRes = this.method(m, HttpVerb.POST); // Verb doesn't matter here
+        if (apiMethodRes.isLeft()) {
+          return apiMethodRes;
+        }
+
+        const method = apiMethodRes.unwrap();
+
+        // Return type must be HttpResult<void> | undefined
+        const rt = method.return_type;
+        const isVoid =
+          rt === "Void" ||
+          (typeof rt === "object" &&
+            rt !== null &&
+            "HttpResult" in rt &&
+            rt.HttpResult === "Void");
+        if (!isVoid) {
+          return err(ExtractorErrorCode.InvalidServiceInitializer, (e) => {
+            e.context = m.getName();
+            e.snippet = m.getText();
+          });
+        }
+
+        // All parameters must be injected
+        for (const param of m.getParameters()) {
+          if (!param.getDecorator(ParameterDecoratorKind.Inject)) {
+            return err(ExtractorErrorCode.InvalidServiceInitializer, (e) => {
+              e.context = `${m.getName()} parameter ${param.getName()}`;
+              e.snippet = m.getText();
+            });
+          }
+        }
+
+        initializer = method.parameters.map(
+          (p) => (p.cidl_type as { Inject: string }).Inject,
+        );
+        continue;
+      }
+
       const httpVerb = m
         .getDecorators()
         .map(getDecoratorName)
@@ -627,6 +664,7 @@ export class CidlExtractor {
       attributes,
       methods,
       source_path: sourceFile.getFilePath().toString(),
+      initializer,
     });
   }
 
@@ -644,26 +682,9 @@ export class CidlExtractor {
 
     const parameters = [];
     for (const param of method.getParameters()) {
-      // Handle injected param
-      if (param.getDecorator(ParameterDecoratorKind.Inject)) {
-        const typeRes = CidlExtractor.cidlType(param.getType(), true);
-
-        // Error: invalid type
-        if (typeRes.isLeft()) {
-          typeRes.value.snippet = method.getText();
-          typeRes.value.context = param.getName();
-          return typeRes;
-        }
-
-        parameters.push({
-          name: param.getName(),
-          cidl_type: typeRes.unwrap(),
-        });
-        continue;
-      }
-
-      // Handle all other params
-      const typeRes = CidlExtractor.cidlType(param.getType());
+      const injected =
+        param.getDecorator(ParameterDecoratorKind.Inject) != null;
+      const typeRes = CidlExtractor.cidlType(param.getType(), injected);
 
       // Error: invalid type
       if (typeRes.isLeft()) {
@@ -821,14 +842,7 @@ export class CidlExtractor {
       }
 
       // TODO: Support multiple D1 bindings
-      if (
-        prop
-          .getType()
-          .getText(
-            undefined,
-            TypeFormatFlags.UseAliasDefinedOutsideCurrentScope,
-          ) === "D1Database"
-      ) {
+      if (getTypeText(prop.getType()) === "D1Database") {
         d1_binding = prop.getName();
         continue;
       }
@@ -880,6 +894,11 @@ export class CidlExtractor {
     type: Type,
     inject: boolean = false,
   ): Either<ExtractorError, CidlType> {
+    // Any
+    if (type.isAny()) {
+      return Either.left(new ExtractorError(ExtractorErrorCode.UnknownType));
+    }
+
     // Void
     if (type.isVoid()) {
       return Either.right("Void");
@@ -899,6 +918,7 @@ export class CidlExtractor {
     const [unwrappedType, nullable] = unwrapNullable(type);
     const tyText = unwrappedType
       .getText(undefined, TypeFormatFlags.UseAliasDefinedOutsideCurrentScope)
+      .replace(/^typeof\s+/, "")
       .split("|")[0]
       .trim();
 
@@ -920,23 +940,38 @@ export class CidlExtractor {
 
     // No generics -> inject or object
     if (generics.length === 0) {
-      const base = inject ? { Inject: tyText } : { Object: tyText };
+      const text = symbolLiteral(unwrappedType) ?? tyText;
+      const base = inject ? { Inject: text } : { Object: text };
       return Either.right(wrapNullable(base, nullable));
     }
 
     // Single generic
     const genericTy = generics[0];
+    const genericTyText = getTypeText(genericTy);
+
     const symbolName = unwrappedType.getSymbol()?.getName();
     const aliasName = unwrappedType.getAliasSymbol()?.getName();
 
     if (aliasName === "DataSourceOf") {
+      const [_, genericTyNullable] = unwrapNullable(genericTy);
+      const genericTyGenerics = [
+        ...genericTy.getAliasTypeArguments(),
+        ...genericTy.getTypeArguments(),
+      ];
+
+      // Expect DataSourceOf to be of the exact form DataSource<Model>
+      if (
+        genericTyNullable ||
+        genericTy.isUnion() ||
+        genericTyGenerics.length > 0
+      ) {
+        return err(ExtractorErrorCode.UnknownType);
+      }
+
       return Either.right(
         wrapNullable(
           {
-            DataSource: genericTy.getText(
-              undefined,
-              TypeFormatFlags.UseAliasDefinedOutsideCurrentScope,
-            ),
+            DataSource: genericTyText,
           },
           nullable,
         ),
@@ -956,19 +991,13 @@ export class CidlExtractor {
         genericTy.isUnion() ||
         genericTyGenerics.length > 0
       ) {
-        return err(ExtractorErrorCode.InvalidPartialType);
+        return err(ExtractorErrorCode.UnknownType);
       }
 
       return Either.right(
         wrapNullable(
           {
-            Partial: genericTy
-              .getText(
-                undefined,
-                TypeFormatFlags.UseAliasDefinedOutsideCurrentScope,
-              )
-              .split("|")[0]
-              .trim(),
+            Partial: genericTyText,
           },
           nullable,
         ),
@@ -997,7 +1026,6 @@ export class CidlExtractor {
       }));
     }
 
-    // Error: unknown type
     return err(ExtractorErrorCode.UnknownType);
 
     function wrapNullable(inner: CidlType, isNullable: boolean): CidlType {
@@ -1015,6 +1043,39 @@ export class CidlExtractor {
     ): Either<ExtractorError, CidlType> {
       const res = CidlExtractor.cidlType(t, inject);
       return res.map((inner) => wrapNullable(wrapper(inner), isNullable));
+    }
+
+    function symbolLiteral(t: Type): string | null {
+      const symbol = t.getSymbol() ?? t.getAliasSymbol();
+      if (!symbol) {
+        return null;
+      }
+
+      const declarations = symbol.getDeclarations();
+      if (declarations.length === 0) {
+        return null;
+      }
+
+      const decl = declarations[0];
+      if (!MorphNode.isVariableDeclaration(decl)) {
+        return null;
+      }
+
+      const initializer = decl.getInitializer();
+      if (!MorphNode.isCallExpression(initializer)) {
+        return null;
+      }
+
+      const args = initializer.getArguments();
+      if (args.length === 0) {
+        return null;
+      }
+
+      if (!MorphNode.isStringLiteral(args[0])) {
+        return null;
+      }
+
+      return args[0].getLiteralValue();
     }
   }
 
@@ -1383,4 +1444,12 @@ function unwrapNullable(ty: Type): [Type, boolean] {
 
   const stripUndefined = nonNulls.filter((t) => !t.isUndefined());
   return [stripUndefined[0] ?? ty, hasNullable];
+}
+
+function getTypeText(type: Type): string {
+  return type
+    .getText(undefined, TypeFormatFlags.UseAliasDefinedOutsideCurrentScope)
+    .replace(/^typeof\s+/, "")
+    .split("|")[0]
+    .trim();
 }

@@ -14,7 +14,7 @@ struct Cli {
 fn main() -> io::Result<()> {
     let cli = Cli::parse();
 
-    let pattern = "../fixtures/*/**";
+    let pattern = "../e2e/fixtures/*";
     let fixtures = glob(pattern)
         .expect("valid glob pattern")
         .filter_map(Result::ok)

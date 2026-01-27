@@ -1,13 +1,10 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { startWrangler, stopWrangler, withRes } from "../src/setup";
-import {
-  BlobHaver,
-  BlobService,
-} from "../../fixtures/regression/blobs/client.js";
+import { BlobHaver, BlobService } from "../fixtures/blobs/client";
 
 beforeAll(async () => {
   // NOTE: e2e is called from proj root
-  await startWrangler("../fixtures/regression/blobs");
+  await startWrangler("./fixtures/blobs");
 }, 30_000);
 
 afterAll(async () => {
@@ -43,7 +40,7 @@ describe("BlobHaver", () => {
         blob2: new Uint8Array([5, 6, 7, 8]),
       }),
     );
-    blobHaver = res.data;
+    blobHaver = res.data!;
   });
 
   it("GET Blob", async () => {
@@ -62,7 +59,7 @@ describe("BlobHaver", () => {
     const res = await blobHaver.yieldStream();
     expect(res.ok, withRes("GET should be OK", res)).toBe(true);
 
-    const got: number[] = Array.from(res.data);
+    const got = (await res.data!.getReader().read()).value!;
     const expected = [1, 2, 3, 4];
     expect(
       expected.length === got.length && expected.every((v, i) => v === got[i]),

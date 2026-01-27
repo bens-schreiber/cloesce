@@ -4,7 +4,6 @@ export enum ExtractorErrorCode {
   UnknownType,
   MultipleGenericType,
   InvalidDataSourceDefinition,
-  InvalidPartialType,
   InvalidPropertyModifier,
   InvalidApiMethodModifier,
   InvalidSelectorSyntax,
@@ -16,6 +15,7 @@ export enum ExtractorErrorCode {
   InvalidTypescriptSyntax,
   MissingKValue,
   MissingR2ObjectBody,
+  InvalidServiceInitializer,
 }
 
 const errorInfoMap: Record<
@@ -33,10 +33,6 @@ const errorInfoMap: Record<
   },
   [ExtractorErrorCode.UnknownType]: {
     description: "Encountered an unknown or unsupported type",
-    suggestion: "Refer to the documentation on valid Cloesce TS types",
-  },
-  [ExtractorErrorCode.InvalidPartialType]: {
-    description: "Partial types must only contain a model or plain old object",
     suggestion: "Refer to the documentation on valid Cloesce TS types",
   },
   [ExtractorErrorCode.MultipleGenericType]: {
@@ -100,6 +96,11 @@ const errorInfoMap: Record<
     description:
       "A navigation property must be of type T, T | undefined, or T[] where T is a model type.",
     suggestion: "Change the property type to be of the correct form.",
+  },
+  [ExtractorErrorCode.InvalidServiceInitializer]: {
+    description:
+      "Service initializers must be instance methods that accept only injected dependencies as parameters and return HttpResult<void> | undefined",
+    suggestion: "Update the initializer to match the expected signature.",
   },
 };
 

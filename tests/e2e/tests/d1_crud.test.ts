@@ -1,10 +1,10 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { startWrangler, stopWrangler, withRes } from "../src/setup";
-import { CrudHaver, Parent } from "../../fixtures/regression/crud/client";
+import { CrudHaver, Parent } from "../fixtures/crud/client";
 
 beforeAll(async () => {
   // NOTE: e2e is called from proj root
-  await startWrangler("../fixtures/regression/crud");
+  await startWrangler("./fixtures/crud");
 }, 30_000);
 
 afterAll(async () => {
@@ -22,7 +22,7 @@ describe("Basic", () => {
       id: 1,
       name: "tim",
     });
-    model = res.data;
+    model = res.data!;
   });
 
   it("POST Update", async () => {
@@ -33,7 +33,7 @@ describe("Basic", () => {
       id: 1,
       name: "julio",
     });
-    model = res.data;
+    model = res.data!;
   });
 
   it("GET a model", async () => {
@@ -48,7 +48,7 @@ describe("Basic", () => {
       models.map(async (m) => {
         const res = await CrudHaver.SAVE({ name: m });
         expect(res.ok, withRes("POST should be OK", res)).toBe(true);
-        expect(res.data.name).toEqual(m);
+        expect(res.data!.name).toEqual(m);
       }),
     );
   });
@@ -56,9 +56,9 @@ describe("Basic", () => {
   it("List 3 models", async () => {
     const res = await CrudHaver.LIST();
     expect(res.ok, withRes("LIST should be OK", res)).toBe(true);
-    expect(res.data.length, withRes("Should be 4 results", res)).toBe(4); // including the one from the prev test
+    expect(res.data!.length, withRes("Should be 4 results", res)).toBe(4); // including the one from the prev test
     models.forEach((m) =>
-      expect(res.data.map((d: CrudHaver) => d.name)).toContain(m),
+      expect(res.data!.map((d: CrudHaver) => d.name)).toContain(m),
     );
   });
 });
@@ -85,7 +85,7 @@ describe("Parent with children", () => {
       ],
     });
 
-    model = res.data;
+    model = res.data!;
   });
 
   it("POST Update", async () => {
@@ -107,7 +107,7 @@ describe("Parent with children", () => {
       ],
     });
 
-    model = res.data;
+    model = res.data!;
   });
 
   it("GET", async () => {
@@ -119,7 +119,7 @@ describe("Parent with children", () => {
   it("LIST", async () => {
     const res = await Parent.LIST("withChildren");
     expect(res.ok, withRes("LIST should be OK", res)).toBe(true);
-    expect(res.data.length).toEqual(1);
-    expect(res.data[0], withRes("Data should be equal", res)).toEqual(model);
+    expect(res.data!.length).toEqual(1);
+    expect(res.data![0], withRes("Data should be equal", res)).toEqual(model);
   });
 });

@@ -1,13 +1,10 @@
 import { startWrangler, stopWrangler, withRes } from "../src/setup.js";
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import {
-  PureR2Model,
-  D1BackedModel,
-} from "../../fixtures/regression/r2/client.js";
+import { PureR2Model, D1BackedModel } from "../fixtures/r2/client";
 
 beforeAll(async () => {
   // NOTE: e2e is called from proj root
-  await startWrangler("../fixtures/regression/r2");
+  await startWrangler("./fixtures/r2");
 }, 30_000);
 
 afterAll(async () => {
@@ -86,9 +83,9 @@ describe("D1 Backed Model", () => {
   it("lists models", async () => {
     const res = await D1BackedModel.LIST("default");
     expect(res.ok, withRes("LIST should be OK", res)).toBe(true);
-    expect(res.data.length).toBeGreaterThan(0);
+    expect(res.data!.length).toBeGreaterThan(0);
 
-    const found = res.data.find((m) => m.id === model.id);
+    const found = res.data!.find((m) => m.id === model.id)!;
     expect(found).toBeDefined();
     expect(found.r2Data).toBeUndefined(); // model takes a keyparam and thus cannot list R2 components
   });

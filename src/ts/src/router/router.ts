@@ -14,12 +14,13 @@ import { RuntimeValidator } from "./validator.js";
 import { Either, InternalError } from "../common.js";
 import { Orm, KeysOfType, HttpResult } from "../ui/backend.js";
 
+export type DependencyKey = symbol | Function;
 /**
  * Dependency injection container, mapping an object type name to an instance of that object.
  *
  * Comes with the WranglerEnv and Request by default.
  */
-export type DependencyContainer = Map<string, any>;
+export type DependencyContainer = Map<DependencyKey, any>;
 
 /**
  * Map of Plain Old Objects, Models and Services to their constructor.
@@ -66,12 +67,12 @@ export type RequestParamMap = Record<string, unknown>;
 
 export type MiddlewareFn = (
   di: DependencyContainer,
-) => Promise<HttpResult | void>;
+) => Promise<HttpResult | void> | HttpResult | void;
 
 export type ResultMiddlewareFn = (
   di: DependencyContainer,
   result: HttpResult,
-) => Promise<HttpResult | void>;
+) => Promise<HttpResult | void> | HttpResult | void;
 
 /**
  * Expected states in which the router may exit.
@@ -86,7 +87,6 @@ export enum RouterError {
   RequestBodyMissingParameters,
   RequestBodyInvalidParameter,
   InstantiatedMethodMissingDataSource,
-  MissingDependency,
   InvalidDatabaseQuery,
   ModelNotFound,
   UncaughtException,
@@ -103,45 +103,41 @@ export class CloesceApp {
     return new CloesceApp();
   }
 
-  private globalMiddleware: MiddlewareFn[] = [];
+  private onRouteMiddleware: MiddlewareFn[] = [];
 
   /**
-   * Registers global middleware that runs before all requests.
+   * Registers middleware than runs on every valid route.
    *
-   * Runs before namespace middleware, request validation, and method middleware.
-   *
-   * TODO: Middleware may violate the API contract and return unexpected types
+   * Runs before service initialization.
    *
    * @param m - The middleware function to register.
    */
-  public onRun(m: MiddlewareFn) {
-    this.globalMiddleware.push(m);
+  public onRoute(m: MiddlewareFn) {
+    this.onRouteMiddleware.push(m);
   }
 
-  private namespaceMiddleware: Map<string, MiddlewareFn[]> = new Map();
+  private namespaceMiddleware: Map<DependencyKey, MiddlewareFn[]> = new Map();
 
   /**
    * Registers middleware for a specific namespace (model or service)
    *
-   * Runs before request validation and method middleware.
-   *
-   * TODO: Middleware may violate the API contract and return unexpected types
+   * Runs before request validation and method middleware, and after services are initialized.
    *
    * @typeParam T - The namespace type
    * @param ctor - The namespace's constructor (used to derive its name).
    * @param m - The middleware function to register.
    */
-  public onNamespace<T>(ctor: new () => T, m: MiddlewareFn) {
-    const existing = this.namespaceMiddleware.get(ctor.name);
+  public onNamespace<T>(key: DependencyKey, m: MiddlewareFn) {
+    const existing = this.namespaceMiddleware.get(key);
     if (existing) {
       existing.push(m);
       return;
     }
 
-    this.namespaceMiddleware.set(ctor.name, [m]);
+    this.namespaceMiddleware.set(key, [m]);
   }
 
-  private methodMiddleware: Map<string, Map<string, MiddlewareFn[]>> =
+  private methodMiddleware: Map<DependencyKey, Map<string, MiddlewareFn[]>> =
     new Map();
 
   /**
@@ -149,22 +145,20 @@ export class CloesceApp {
    *
    * Runs after namespace middleware and request validation.
    *
-   * TODO: Middleware may violate the API contract and return unexpected types
-   *
    * @typeParam T - The namespace type
    * @param ctor - The namespace constructor
    * @param method - The method name on the namespace.
    * @param m - The middleware function to register.
    */
   public onMethod<T>(
-    ctor: new () => T,
+    key: DependencyKey,
     method: KeysOfType<T, (...args: any) => any> | CrudKind,
     m: MiddlewareFn,
   ) {
-    let classMap = this.methodMiddleware.get(ctor.name);
+    let classMap = this.methodMiddleware.get(key);
     if (!classMap) {
       classMap = new Map();
-      this.methodMiddleware.set(ctor.name, classMap);
+      this.methodMiddleware.set(key, classMap);
     }
 
     let methodArray = classMap.get(method);
@@ -183,14 +177,6 @@ export class CloesceApp {
     ctorReg: ConstructorRegistry,
     di: DependencyContainer,
   ): Promise<HttpResult<unknown>> {
-    // Global middleware
-    for (const m of this.globalMiddleware) {
-      const res = await m(di);
-      if (res) {
-        return res;
-      }
-    }
-
     // Route match
     const routeRes = matchRoute(request, ast, this.routePrefix);
     if (routeRes.isLeft()) {
@@ -198,8 +184,44 @@ export class CloesceApp {
     }
     const route = routeRes.unwrap();
 
+    // Route middleware
+    for (const m of this.onRouteMiddleware) {
+      const res = await m(di);
+      if (res) {
+        return res;
+      }
+    }
+
+    // Initialize services
+    // Note: Services are in topological order
+    for (const name in ast.services) {
+      const serviceMeta: Service = ast.services[name];
+      const serviceCtor = ctorReg[name];
+      const service: any = {};
+
+      for (const attr of serviceMeta.attributes) {
+        const injected = findInjected(ctorReg, di, attr.inject_reference);
+        service[attr.var_name] = injected;
+      }
+
+      // Inject services
+      const instance = Object.assign(new serviceCtor(), service);
+      if (serviceMeta.initializer) {
+        const params = serviceMeta.initializer.map((param) =>
+          findInjected(ctorReg, di, param),
+        );
+
+        const res = await instance.init(...params);
+        if (res) {
+          return res;
+        }
+      }
+      di.set(serviceCtor, instance);
+    }
+
     // Namespace middleware
-    for (const m of this.namespaceMiddleware.get(route.namespace) ?? []) {
+    for (const m of this.namespaceMiddleware.get(ctorReg[route.namespace]) ??
+      []) {
       const res = await m(di);
       if (res) {
         return res;
@@ -215,7 +237,7 @@ export class CloesceApp {
 
     // Method middleware
     for (const m of this.methodMiddleware
-      .get(route.namespace)
+      .get(ctorReg[route.namespace])
       ?.get(route.method.name) ?? []) {
       const res = await m(di);
       if (res) {
@@ -231,7 +253,7 @@ export class CloesceApp {
     }
 
     // Method dispatch
-    return await methodDispatch(hydrated.unwrap(), di, route, params);
+    return await methodDispatch(hydrated.unwrap(), di, ctorReg, route, params);
   }
 
   /**
@@ -246,34 +268,13 @@ export class CloesceApp {
   public async run(request: Request, env: any): Promise<Response> {
     const { ast, constructorRegistry: ctorReg } = RuntimeContainer.get();
 
+    // DI will always contain the WranglerEnv and Request.
     const di: DependencyContainer = new Map();
     if (ast.wrangler_env) {
-      di.set(ast.wrangler_env.name, env);
+      const ctor = ctorReg[ast.wrangler_env.name];
+      di.set(ctor, env);
     }
-    di.set("Request", request);
-
-    // Note: Services are in topological order
-    for (const name in ast.services) {
-      const serviceMeta: Service = ast.services[name];
-      const service: any = {};
-
-      for (const attr of serviceMeta.attributes) {
-        const injected = di.get(attr.inject_reference);
-        if (!injected) {
-          return exit(
-            500,
-            RouterError.MissingDependency,
-            `An injected parameter was missing from the instance registry: ${JSON.stringify(attr.inject_reference)}`,
-          )
-            .unwrapLeft()
-            .toResponse();
-        }
-        service[attr.var_name] = injected;
-      }
-
-      // Inject services
-      di.set(name, Object.assign(new ctorReg[name](), service));
-    }
+    di.set(Request, request);
 
     try {
       const httpResult = await this.router(request, env, ast, ctorReg, di);
@@ -305,7 +306,6 @@ export class CloesceApp {
       }
 
       const res = HttpResult.fail(500, JSON.stringify(debug));
-
       console.error(
         "An uncaught error occurred in the Cloesce Router: ",
         debug,
@@ -535,11 +535,12 @@ async function hydrate(
   env: any,
 ): Promise<Either<HttpResult, any>> {
   if (route.kind === "service") {
+    const ctor = ctorReg[route.namespace];
     if (route.method.is_static) {
-      return Either.right(ctorReg[route.namespace]);
+      return Either.right(ctor);
     }
 
-    return Either.right(di.get(route.namespace));
+    return Either.right(di.get(ctor));
   }
 
   const model = route.model!;
@@ -596,6 +597,7 @@ async function hydrate(
 async function methodDispatch(
   obj: any,
   di: DependencyContainer,
+  ctorReg: ConstructorRegistry,
   route: MatchedRoute,
   params: Record<string, unknown>,
 ): Promise<HttpResult<unknown>> {
@@ -606,18 +608,12 @@ async function methodDispatch(
       continue;
     }
 
-    // Injected type
-    const injected = di.get((param.cidl_type as any)["Inject"]);
-    if (!injected) {
-      // Error state: Injected parameters cannot be found at compile time, only at runtime.
-      // If a injected reference does not exist, throw a 500.
-      return exit(
-        500,
-        RouterError.MissingDependency,
-        `An injected parameter was missing from the instance registry: ${JSON.stringify(param.cidl_type)}`,
-      ).unwrapLeft();
-    }
-
+    // Assume injected parameter
+    const injected = findInjected(
+      ctorReg,
+      di,
+      (param.cidl_type as { Inject: string }).Inject,
+    );
     paramArray.push(injected);
   }
 
@@ -652,6 +648,31 @@ function exit(
   return Either.left(
     HttpResult.fail(status, `${message} (ErrorCode: ${state}${debugMessage})`),
   );
+}
+
+/**
+ * Finds an injected dependency from the DI container as a symbol or constructor.
+ * @returns The injected dependency, or undefined if not found.
+ */
+function findInjected(
+  ctorReg: ConstructorRegistry,
+  di: DependencyContainer,
+  key: any,
+): any | undefined {
+  let injected: any | undefined;
+  if (di.has(Symbol.for(key))) {
+    injected = di.get(Symbol.for(key));
+  } else {
+    injected = di.get(ctorReg[key]);
+  }
+
+  if (injected === undefined) {
+    console.warn(
+      `Unable to find injected dependency for ${key}. Leaving as undefined.`,
+    );
+  }
+
+  return injected;
 }
 
 /**

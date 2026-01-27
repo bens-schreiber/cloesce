@@ -1,13 +1,10 @@
 import { startWrangler, stopWrangler, withRes } from "../src/setup.js";
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import {
-  PureKVModel,
-  D1BackedModel,
-} from "../../fixtures/regression/kv/client.js";
+import { PureKVModel, D1BackedModel } from "../fixtures/kv/client";
 
 beforeAll(async () => {
   // NOTE: e2e is called from proj root
-  await startWrangler("../fixtures/regression/kv");
+  await startWrangler("./fixtures/kv");
 }, 30_000);
 
 afterAll(async () => {
@@ -69,8 +66,8 @@ describe("D1BackedModel", () => {
     const res = await D1BackedModel.LIST("default");
 
     expect(res.ok, withRes("LIST should be OK", res)).toBe(true);
-    expect(res.data.length).toBeGreaterThan(0);
-    const item = res.data[0];
+    expect(res.data!.length).toBeGreaterThan(0);
+    const item = res.data![0];
     expect(item.id).toBeDefined();
     expect(item.keyParam).toBeUndefined();
     expect(item.kvData).toBeUndefined();
