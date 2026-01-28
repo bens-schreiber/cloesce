@@ -1,0 +1,101 @@
+{
+  "hash": 14803987991985266137,
+  "project_name": "runner",
+  "wrangler_env": {
+    "name": "Env",
+    "source_path": "./seed__app.cloesce.ts",
+    "d1_binding": "db",
+    "kv_bindings": [],
+    "r2_bindings": [],
+    "vars": {}
+  },
+  "models": {
+    "Foo": {
+      "hash": 2291516488856648612,
+      "name": "Foo",
+      "primary_key": {
+        "name": "id",
+        "cidl_type": "Integer"
+      },
+      "columns": [],
+      "navigation_properties": [],
+      "key_params": [],
+      "kv_objects": [],
+      "r2_objects": [],
+      "methods": {
+        "SAVE": {
+          "name": "SAVE",
+          "is_static": true,
+          "http_verb": "POST",
+          "return_media": "Json",
+          "return_type": {
+            "HttpResult": {
+              "Object": "Foo"
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "model",
+              "cidl_type": {
+                "Partial": "Foo"
+              }
+            },
+            {
+              "name": "__datasource",
+              "cidl_type": {
+                "DataSource": "Foo"
+              }
+            }
+          ]
+        },
+        "blockedMethod": {
+          "name": "blockedMethod",
+          "is_static": true,
+          "http_verb": "GET",
+          "return_media": "Json",
+          "return_type": "Void",
+          "parameters_media": "Json",
+          "parameters": []
+        },
+        "getInjectedThing": {
+          "name": "getInjectedThing",
+          "is_static": true,
+          "http_verb": "GET",
+          "return_media": "Json",
+          "return_type": {
+            "Object": "InjectedThing"
+          },
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "thing",
+              "cidl_type": {
+                "Inject": "InjectedThing"
+              }
+            }
+          ]
+        }
+      },
+      "data_sources": {},
+      "cruds": [
+        "SAVE"
+      ],
+      "source_path": "./seed__app.cloesce.ts"
+    }
+  },
+  "services": {},
+  "poos": {
+    "InjectedThing": {
+      "name": "InjectedThing",
+      "attributes": [
+        {
+          "name": "value",
+          "cidl_type": "Text"
+        }
+      ],
+      "source_path": "./seed__app.cloesce.ts"
+    }
+  },
+  "main_source": "./seed__app.cloesce.ts"
+}

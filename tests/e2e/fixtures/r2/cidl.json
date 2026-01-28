@@ -1,0 +1,300 @@
+{
+  "hash": 9234581653163423090,
+  "project_name": "runner",
+  "wrangler_env": {
+    "name": "Env",
+    "source_path": "./seed__r2.cloesce.ts",
+    "d1_binding": "db",
+    "kv_bindings": [],
+    "r2_bindings": [
+      "bucket1",
+      "bucket2"
+    ],
+    "vars": {}
+  },
+  "models": {
+    "D1BackedModel": {
+      "hash": 15131870847274583393,
+      "name": "D1BackedModel",
+      "primary_key": {
+        "name": "id",
+        "cidl_type": "Integer"
+      },
+      "columns": [
+        {
+          "hash": 1999042468264969055,
+          "value": {
+            "name": "someColumn",
+            "cidl_type": "Real"
+          },
+          "foreign_key_reference": null
+        },
+        {
+          "hash": 5739512274815634865,
+          "value": {
+            "name": "someOtherColumn",
+            "cidl_type": "Text"
+          },
+          "foreign_key_reference": null
+        }
+      ],
+      "navigation_properties": [],
+      "key_params": [
+        "keyParam"
+      ],
+      "kv_objects": [],
+      "r2_objects": [
+        {
+          "format": "d1Backed/{id}/{keyParam}/{someColumn}/{someOtherColumn}",
+          "var_name": "r2Data",
+          "bucket_binding": "bucket1",
+          "list_prefix": false
+        }
+      ],
+      "methods": {
+        "GET": {
+          "name": "GET",
+          "is_static": true,
+          "http_verb": "GET",
+          "return_media": "Json",
+          "return_type": {
+            "HttpResult": {
+              "Object": "D1BackedModel"
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "id",
+              "cidl_type": "Integer"
+            },
+            {
+              "name": "keyParam",
+              "cidl_type": "Text"
+            },
+            {
+              "name": "__datasource",
+              "cidl_type": {
+                "DataSource": "D1BackedModel"
+              }
+            }
+          ]
+        },
+        "LIST": {
+          "name": "LIST",
+          "is_static": true,
+          "http_verb": "GET",
+          "return_media": "Json",
+          "return_type": {
+            "HttpResult": {
+              "Array": {
+                "Object": "D1BackedModel"
+              }
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "__datasource",
+              "cidl_type": {
+                "DataSource": "D1BackedModel"
+              }
+            }
+          ]
+        },
+        "SAVE": {
+          "name": "SAVE",
+          "is_static": true,
+          "http_verb": "POST",
+          "return_media": "Json",
+          "return_type": {
+            "HttpResult": {
+              "Object": "D1BackedModel"
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "model",
+              "cidl_type": {
+                "Partial": "D1BackedModel"
+              }
+            },
+            {
+              "name": "__datasource",
+              "cidl_type": {
+                "DataSource": "D1BackedModel"
+              }
+            }
+          ]
+        },
+        "uploadData": {
+          "name": "uploadData",
+          "is_static": false,
+          "http_verb": "PUT",
+          "return_media": "Json",
+          "return_type": "Void",
+          "parameters_media": "Octet",
+          "parameters": [
+            {
+              "name": "env",
+              "cidl_type": {
+                "Inject": "Env"
+              }
+            },
+            {
+              "name": "stream",
+              "cidl_type": "Stream"
+            },
+            {
+              "name": "__datasource",
+              "cidl_type": {
+                "DataSource": "D1BackedModel"
+              }
+            }
+          ]
+        }
+      },
+      "data_sources": {
+        "default": {
+          "name": "default",
+          "tree": {
+            "r2Data": {}
+          }
+        }
+      },
+      "cruds": [
+        "GET",
+        "LIST",
+        "SAVE"
+      ],
+      "source_path": "./seed__r2.cloesce.ts"
+    },
+    "PureR2Model": {
+      "hash": 3824269534873160298,
+      "name": "PureR2Model",
+      "primary_key": null,
+      "columns": [],
+      "navigation_properties": [],
+      "key_params": [
+        "id"
+      ],
+      "kv_objects": [],
+      "r2_objects": [
+        {
+          "format": "path/to/data/{id}",
+          "var_name": "data",
+          "bucket_binding": "bucket1",
+          "list_prefix": false
+        },
+        {
+          "format": "path/to/other/{id}",
+          "var_name": "otherData",
+          "bucket_binding": "bucket2",
+          "list_prefix": false
+        },
+        {
+          "format": "path/",
+          "var_name": "allData",
+          "bucket_binding": "bucket1",
+          "list_prefix": true
+        }
+      ],
+      "methods": {
+        "GET": {
+          "name": "GET",
+          "is_static": true,
+          "http_verb": "GET",
+          "return_media": "Json",
+          "return_type": {
+            "HttpResult": {
+              "Object": "PureR2Model"
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "id",
+              "cidl_type": "Text"
+            },
+            {
+              "name": "__datasource",
+              "cidl_type": {
+                "DataSource": "PureR2Model"
+              }
+            }
+          ]
+        },
+        "uploadData": {
+          "name": "uploadData",
+          "is_static": false,
+          "http_verb": "PUT",
+          "return_media": "Json",
+          "return_type": "Void",
+          "parameters_media": "Octet",
+          "parameters": [
+            {
+              "name": "env",
+              "cidl_type": {
+                "Inject": "Env"
+              }
+            },
+            {
+              "name": "stream",
+              "cidl_type": "Stream"
+            },
+            {
+              "name": "__datasource",
+              "cidl_type": {
+                "DataSource": "PureR2Model"
+              }
+            }
+          ]
+        },
+        "uploadOtherData": {
+          "name": "uploadOtherData",
+          "is_static": false,
+          "http_verb": "PUT",
+          "return_media": "Json",
+          "return_type": "Void",
+          "parameters_media": "Octet",
+          "parameters": [
+            {
+              "name": "env",
+              "cidl_type": {
+                "Inject": "Env"
+              }
+            },
+            {
+              "name": "stream",
+              "cidl_type": "Stream"
+            },
+            {
+              "name": "__datasource",
+              "cidl_type": {
+                "DataSource": "PureR2Model"
+              }
+            }
+          ]
+        }
+      },
+      "data_sources": {
+        "default": {
+          "name": "default",
+          "tree": {
+            "allData": {},
+            "data": {},
+            "otherData": {}
+          }
+        }
+      },
+      "cruds": [
+        "GET"
+      ],
+      "source_path": "./seed__r2.cloesce.ts"
+    }
+  },
+  "services": {},
+  "poos": {},
+  "main_source": null
+}

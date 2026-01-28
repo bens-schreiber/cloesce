@@ -6,21 +6,18 @@ const PORT = 5002;
 const DEBUG_PORT = 9230;
 let wranglerProcess: ChildProcess;
 
-/**
- * Copies a fixture, runs migrations, builds, and starts a wrangler server.
- */
 export async function startWrangler(
   fixturesPath: string,
   withMigrations: boolean = true,
 ) {
-  await fs.rm(".generated", { recursive: true, force: true });
-  await fs.cp(fixturesPath, ".generated", { recursive: true });
+  await fs.rm(`${fixturesPath}/.wrangler`, { recursive: true, force: true });
+  await fs.rm(`${fixturesPath}/dist`, { recursive: true, force: true });
 
   if (withMigrations) {
     await runCmd(
       "Applying D1 migrations",
       "echo y | npx wrangler d1 migrations apply db",
-      { cwd: ".generated" },
+      { cwd: fixturesPath },
     );
   }
 
@@ -28,7 +25,7 @@ export async function startWrangler(
     "Building Wrangler",
     "npx wrangler --config wrangler.toml build",
     {
-      cwd: ".generated",
+      cwd: fixturesPath,
     },
   );
 
@@ -45,7 +42,7 @@ export async function startWrangler(
       String(DEBUG_PORT),
     ],
     {
-      cwd: ".generated",
+      cwd: fixturesPath,
       stdio: "inherit",
     },
   );

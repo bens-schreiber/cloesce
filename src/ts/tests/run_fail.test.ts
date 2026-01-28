@@ -1,9 +1,9 @@
 import fs from "fs";
 import path from "path";
 import { describe, test, expect } from "vitest";
-import { Project } from "ts-morph";
 import { CidlExtractor } from "../src/extractor/extract";
 import { ExtractorError, ExtractorErrorCode } from "../src/extractor/err";
+import { cloesceProject } from "./extractor.test";
 
 const FIXTURE_ROOT = path.resolve(__dirname, "fixtures");
 
@@ -13,7 +13,7 @@ describe("Extractor Run-Fail", () => {
     const expectedName = lines[1].replace("//", "").trim();
 
     test.concurrent(path.relative(FIXTURE_ROOT, file), () => {
-      const project = new Project({ compilerOptions: { strict: true } });
+      const project = cloesceProject();
       project.addSourceFileAtPath(file);
 
       const res = CidlExtractor.extract("proj", project);

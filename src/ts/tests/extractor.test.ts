@@ -1,10 +1,10 @@
 import { describe, test, expect } from "vitest";
 import { Project } from "ts-morph";
 import { CidlExtractor } from "../src/extractor/extract";
-import { CidlType, DataSource, PlainOldObject, Service } from "../src/ast";
+import { CidlType, DataSource, Service } from "../src/ast";
 import { ModelBuilder } from "./builder";
 
-function cloesceProject(): Project {
+export function cloesceProject(): Project {
   const project = new Project({
     compilerOptions: {
       strict: true,
@@ -23,6 +23,7 @@ describe("CIDL Type", () => {
     const sourceFile = project.createSourceFile(
       "test.ts",
       `
+      import { Integer } from "./src/ui/backend";
       class Foo {
         isReal: number;
         isInteger: Integer;
@@ -544,16 +545,16 @@ describe("Model", () => {
         kvId: string;
 
         @KV("value/Foo/{id}/{kvId}", "namespace")
-        value: KValue<unknown>;
+        value: KValue<unknown> | undefined;
 
         @KV("value/Foo", "namespace")
         allValues: KValue<unknown>[];
 
         @R2("files/Foo/{id}", "bucket")
-        fileData: R2ObjectBody;
+        fileData: R2ObjectBody | undefined;
 
         @R2("files/Foo", "bucket")
-        allFiles: R2ObjectBody[];
+        allFiles: R2ObjectBody[] | undefined;
       }
       `,
     );
@@ -662,6 +663,47 @@ describe("Plain Old Objects", () => {
     });
   });
 
+  test("Extracts Plain Old Object from KValue", () => {
+    // Arrange
+    const project = cloesceProject();
+    const sourceFile = project.createSourceFile(
+      "test.ts",
+      `
+          import { KValue } from "./src/ui/backend";
+          export class Bar {
+            name: string;
+          }
+
+          @Model
+          export class MyModel {
+            id: number;
+
+            @KV("bar/{id}", "namespace")
+            bar: KValue<Bar> | undefined;
+          }
+          `,
+    );
+
+    // Act
+    const res = CidlExtractor.extract("MyModel", project);
+
+    // Assert
+    expect(res.isRight()).toBe(true);
+    const cidl = res.unwrap();
+    expect(cidl.poos).toStrictEqual({
+      Bar: {
+        name: "Bar",
+        attributes: [
+          {
+            name: "name",
+            cidl_type: "Text",
+          },
+        ],
+        source_path: sourceFile.getFilePath().toString(),
+      },
+    });
+  });
+
   test("Does not extract Plain Old Object without references", () => {
     // Arrange
     const project = cloesceProject();
@@ -733,6 +775,54 @@ describe("Services", () => {
       ],
       methods: {},
       source_path: sourceFile.getFilePath().toString(),
+      initializer: null,
     } as Service);
+  });
+
+  test("Finds initializer", () => {
+    // Arrange
+    const project = cloesceProject();
+    project.createSourceFile(
+      "test.ts",
+      `
+          import { HttpResult, Inject } from "./src/ui/backend";
+
+          class InjectedThing {
+            value: string;
+          }
+
+          @Service
+          export class BarService {
+
+            // HttpResult<void> return type
+            async init(): Promise<HttpResult<void>> {}
+          }
+
+          @Service
+          export class FooService {
+            barService: BarService;
+            fooBar: string;
+
+            // Void return type
+            async init(@Inject injectedThing: InjectedThing) {
+              this.fooBar = "initialized";
+              return;
+            }
+          }
+          `,
+    );
+
+    // Act
+    const res = CidlExtractor.extract("FooService", project);
+
+    // Assert
+    expect(res.isRight()).toBe(true);
+    const cidl = res.unwrap();
+    expect(cidl.services["BarService"]).toBeDefined();
+    const barService = cidl.services["BarService"];
+    expect(barService.initializer).toEqual([]);
+    expect(cidl.services["FooService"]).toBeDefined();
+    const fooService = cidl.services["FooService"];
+    expect(fooService.initializer).toEqual(["InjectedThing"]);
   });
 });

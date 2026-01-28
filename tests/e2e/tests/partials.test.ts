@@ -1,10 +1,10 @@
 import { startWrangler, stopWrangler, withRes } from "../src/setup.js";
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { Dog } from "../../fixtures/regression/partials/client.js";
+import { Dog } from "../fixtures/partials/client";
 
 beforeAll(async () => {
   // NOTE: e2e is called from proj root
-  await startWrangler("../fixtures/regression/partials");
+  await startWrangler("./fixtures/partials");
 }, 30_000);
 
 afterAll(async () => {

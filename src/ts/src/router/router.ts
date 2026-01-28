@@ -8,17 +8,38 @@ import {
   NO_DATA_SOURCE,
   Service,
   MediaType,
+  CrudKind,
 } from "../ast.js";
 import { RuntimeValidator } from "./validator.js";
 import { Either, InternalError } from "../common.js";
 import { Orm, KeysOfType, HttpResult } from "../ui/backend.js";
+
+export type DependencyKey<T> = Function | (new () => T) | { name: string };
 
 /**
  * Dependency injection container, mapping an object type name to an instance of that object.
  *
  * Comes with the WranglerEnv and Request by default.
  */
-export type DependencyContainer = Map<string, any>;
+export class DependencyContainer {
+  private container = new Map<string, any>();
+
+  set<T>(key: DependencyKey<T>, instance: T) {
+    this.container.set(key.name, instance);
+  }
+
+  get<T>(key: DependencyKey<T>): T | undefined {
+    return this.container.get(key.name);
+  }
+
+  has<T>(key: DependencyKey<T>): boolean {
+    return this.container.has(key.name);
+  }
+
+  delete<T>(key: DependencyKey<T>): boolean {
+    return this.container.delete(key.name);
+  }
+}
 
 /**
  * Map of Plain Old Objects, Models and Services to their constructor.
@@ -39,13 +60,9 @@ export class RuntimeContainer {
     public readonly wasm: OrmWasmExports,
   ) {}
 
-  static async init(
-    ast: CloesceAst,
-    constructorRegistry: ConstructorRegistry,
-    wasm?: WebAssembly.Instance,
-  ) {
+  static async init(ast: CloesceAst, constructorRegistry: ConstructorRegistry) {
     if (this.instance) return;
-    const wasmAbi = await loadOrmWasm(ast, wasm);
+    const wasmAbi = await loadOrmWasm(ast);
     this.instance = new RuntimeContainer(ast, constructorRegistry, wasmAbi);
   }
 
@@ -69,12 +86,12 @@ export type RequestParamMap = Record<string, unknown>;
 
 export type MiddlewareFn = (
   di: DependencyContainer,
-) => Promise<HttpResult | void>;
+) => Promise<HttpResult | void> | HttpResult | void;
 
 export type ResultMiddlewareFn = (
   di: DependencyContainer,
   result: HttpResult,
-) => Promise<HttpResult | void>;
+) => Promise<HttpResult | void> | HttpResult | void;
 
 /**
  * Expected states in which the router may exit.
@@ -89,7 +106,6 @@ export enum RouterError {
   RequestBodyMissingParameters,
   RequestBodyInvalidParameter,
   InstantiatedMethodMissingDataSource,
-  MissingDependency,
   InvalidDatabaseQuery,
   ModelNotFound,
   UncaughtException,
@@ -106,45 +122,41 @@ export class CloesceApp {
     return new CloesceApp();
   }
 
-  private globalMiddleware: MiddlewareFn[] = [];
+  private onRouteMiddleware: MiddlewareFn[] = [];
 
   /**
-   * Registers global middleware that runs before all requests.
+   * Registers middleware than runs on every valid route.
    *
-   * Runs before namespace middleware, request validation, and method middleware.
-   *
-   * TODO: Middleware may violate the API contract and return unexpected types
+   * Runs before service initialization.
    *
    * @param m - The middleware function to register.
    */
-  public onRun(m: MiddlewareFn) {
-    this.globalMiddleware.push(m);
+  public onRoute(m: MiddlewareFn) {
+    this.onRouteMiddleware.push(m);
   }
 
-  private namespaceMiddleware: Map<string, MiddlewareFn[]> = new Map();
+  private namespaceMiddleware: Map<Function, MiddlewareFn[]> = new Map();
 
   /**
    * Registers middleware for a specific namespace (model or service)
    *
-   * Runs before request validation and method middleware.
-   *
-   * TODO: Middleware may violate the API contract and return unexpected types
+   * Runs before request validation and method middleware, and after services are initialized.
    *
    * @typeParam T - The namespace type
    * @param ctor - The namespace's constructor (used to derive its name).
    * @param m - The middleware function to register.
    */
-  public onNamespace<T>(ctor: new () => T, m: MiddlewareFn) {
-    const existing = this.namespaceMiddleware.get(ctor.name);
+  public onNamespace<T>(key: Function, m: MiddlewareFn) {
+    const existing = this.namespaceMiddleware.get(key);
     if (existing) {
       existing.push(m);
       return;
     }
 
-    this.namespaceMiddleware.set(ctor.name, [m]);
+    this.namespaceMiddleware.set(key, [m]);
   }
 
-  private methodMiddleware: Map<string, Map<string, MiddlewareFn[]>> =
+  private methodMiddleware: Map<Function, Map<string, MiddlewareFn[]>> =
     new Map();
 
   /**
@@ -152,22 +164,20 @@ export class CloesceApp {
    *
    * Runs after namespace middleware and request validation.
    *
-   * TODO: Middleware may violate the API contract and return unexpected types
-   *
    * @typeParam T - The namespace type
    * @param ctor - The namespace constructor
    * @param method - The method name on the namespace.
    * @param m - The middleware function to register.
    */
   public onMethod<T>(
-    ctor: new () => T,
-    method: KeysOfType<T, (...args: any) => any>,
+    key: Function,
+    method: KeysOfType<T, (...args: any) => any> | CrudKind,
     m: MiddlewareFn,
   ) {
-    let classMap = this.methodMiddleware.get(ctor.name);
+    let classMap = this.methodMiddleware.get(key);
     if (!classMap) {
       classMap = new Map();
-      this.methodMiddleware.set(ctor.name, classMap);
+      this.methodMiddleware.set(key, classMap);
     }
 
     let methodArray = classMap.get(method);
@@ -186,14 +196,6 @@ export class CloesceApp {
     ctorReg: ConstructorRegistry,
     di: DependencyContainer,
   ): Promise<HttpResult<unknown>> {
-    // Global middleware
-    for (const m of this.globalMiddleware) {
-      const res = await m(di);
-      if (res) {
-        return res;
-      }
-    }
-
     // Route match
     const routeRes = matchRoute(request, ast, this.routePrefix);
     if (routeRes.isLeft()) {
@@ -201,8 +203,44 @@ export class CloesceApp {
     }
     const route = routeRes.unwrap();
 
+    // Route middleware
+    for (const m of this.onRouteMiddleware) {
+      const res = await m(di);
+      if (res) {
+        return res;
+      }
+    }
+
+    // Initialize services
+    // Note: Services are in topological order
+    for (const name in ast.services) {
+      const serviceMeta: Service = ast.services[name];
+      const serviceCtor = ctorReg[name];
+      const service: any = {};
+
+      for (const attr of serviceMeta.attributes) {
+        const injected = findInjected(di, attr.inject_reference);
+        service[attr.var_name] = injected;
+      }
+
+      // Inject services
+      const instance = Object.assign(new serviceCtor(), service);
+      if (serviceMeta.initializer) {
+        const params = serviceMeta.initializer.map((param) =>
+          findInjected(di, param),
+        );
+
+        const res = await instance.init(...params);
+        if (res) {
+          return res;
+        }
+      }
+      di.set(serviceCtor, instance);
+    }
+
     // Namespace middleware
-    for (const m of this.namespaceMiddleware.get(route.namespace) ?? []) {
+    for (const m of this.namespaceMiddleware.get(ctorReg[route.namespace]) ??
+      []) {
       const res = await m(di);
       if (res) {
         return res;
@@ -218,7 +256,7 @@ export class CloesceApp {
 
     // Method middleware
     for (const m of this.methodMiddleware
-      .get(route.namespace)
+      .get(ctorReg[route.namespace])
       ?.get(route.method.name) ?? []) {
       const res = await m(di);
       if (res) {
@@ -238,39 +276,24 @@ export class CloesceApp {
   }
 
   /**
-   * Runs the Cloesce app. Intended to be called from the generated workers code.
+   * Runs the Cloesce Router, handling dependency injection, routing, validation,
+   * hydration, and method dispatch.
+   *
+   * @param request - The incoming Request object.
+   * @param env - The Wrangler environment bindings.
+   *
+   * @returns A Response object representing the result of the request.
    */
   public async run(request: Request, env: any): Promise<Response> {
     const { ast, constructorRegistry: ctorReg } = RuntimeContainer.get();
 
-    const di: DependencyContainer = new Map();
+    // DI will always contain the WranglerEnv and Request.
+    const di = new DependencyContainer();
     if (ast.wrangler_env) {
-      di.set(ast.wrangler_env.name, env);
+      const ctor = ctorReg[ast.wrangler_env.name];
+      di.set(ctor, env);
     }
-    di.set("Request", request);
-
-    // Note: Services are in topological order
-    for (const name in ast.services) {
-      const serviceMeta: Service = ast.services[name];
-      const service: any = {};
-
-      for (const attr of serviceMeta.attributes) {
-        const injected = di.get(attr.inject_reference);
-        if (!injected) {
-          return exit(
-            500,
-            RouterError.MissingDependency,
-            `An injected parameter was missing from the instance registry: ${JSON.stringify(attr.inject_reference)}`,
-          )
-            .unwrapLeft()
-            .toResponse();
-        }
-        service[attr.var_name] = injected;
-      }
-
-      // Inject services
-      di.set(name, Object.assign(new ctorReg[name](), service));
-    }
+    di.set(Request, request);
 
     try {
       const httpResult = await this.router(request, env, ast, ctorReg, di);
@@ -302,7 +325,6 @@ export class CloesceApp {
       }
 
       const res = HttpResult.fail(500, JSON.stringify(debug));
-
       console.error(
         "An uncaught error occurred in the Cloesce Router: ",
         debug,
@@ -532,11 +554,12 @@ async function hydrate(
   env: any,
 ): Promise<Either<HttpResult, any>> {
   if (route.kind === "service") {
+    const ctor = ctorReg[route.namespace];
     if (route.method.is_static) {
-      return Either.right(ctorReg[route.namespace]);
+      return Either.right(ctor);
     }
 
-    return Either.right(di.get(route.namespace));
+    return Either.right(di.get(ctor));
   }
 
   const model = route.model!;
@@ -603,18 +626,11 @@ async function methodDispatch(
       continue;
     }
 
-    // Injected type
-    const injected = di.get((param.cidl_type as any)["Inject"]);
-    if (!injected) {
-      // Error state: Injected parameters cannot be found at compile time, only at runtime.
-      // If a injected reference does not exist, throw a 500.
-      return exit(
-        500,
-        RouterError.MissingDependency,
-        `An injected parameter was missing from the instance registry: ${JSON.stringify(param.cidl_type)}`,
-      ).unwrapLeft();
-    }
-
+    // Assume injected parameter
+    const injected = findInjected(
+      di,
+      (param.cidl_type as { Inject: string }).Inject,
+    );
     paramArray.push(injected);
   }
 
@@ -649,6 +665,20 @@ function exit(
   return Either.left(
     HttpResult.fail(status, `${message} (ErrorCode: ${state}${debugMessage})`),
   );
+}
+
+/**
+ * Finds an injected dependency from the DI container.
+ * @returns The injected dependency, or undefined if not found.
+ */
+function findInjected(di: DependencyContainer, key: string): any | undefined {
+  const injected = di.get({ name: key });
+  if (injected === undefined) {
+    console.warn(
+      `Unable to find injected dependency for ${key}. Leaving as undefined.`,
+    );
+  }
+  return injected;
 }
 
 /**

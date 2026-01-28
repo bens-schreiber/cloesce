@@ -1,8 +1,9 @@
+use std::process::Command;
+
 use clap::Parser;
+use futures::future::join_all;
 use glob::glob;
 use runner::Fixture;
-
-use std::thread;
 
 #[derive(Parser)]
 #[command(name = "regression", version = "0.0.1")]
@@ -18,10 +19,11 @@ struct Cli {
 }
 
 /// Runs the regression tests, passing each fixture through the entire compilation process.
-fn main() {
+#[tokio::main]
+async fn main() {
     let cli = Cli::parse();
 
-    let pattern = format!("../fixtures/regression/{}/seed__*", cli.fixture);
+    let pattern = format!("../e2e/fixtures/{}/seed__*", cli.fixture);
 
     let fixtures = glob(&pattern)
         .expect("valid glob pattern")
@@ -30,20 +32,41 @@ fn main() {
         .map(Fixture::new)
         .collect::<Vec<_>>();
 
-    // todo: thread pool
-    let handles: Vec<_> = fixtures
-        .into_iter()
-        .map(|fixture| {
-            let domain = cli.domain.clone();
-            thread::spawn(move || -> bool {
-                run_integration_test(fixture, &domain).unwrap_or_else(|err| err)
-            })
-        })
-        .collect();
+    let subscriber = tracing_subscriber::FmtSubscriber::builder().finish();
+    tracing::subscriber::set_global_default(subscriber)
+        .expect("Failed to set global default subscriber");
+
+    // Build generator
+    tracing::info!("Building generator...");
+    let cmd = Command::new("cargo")
+        .current_dir("../../src/generator")
+        .args(["build", "--release"])
+        .status();
+    match cmd {
+        Ok(status) if status.success() => {}
+        Ok(status) => {
+            panic!("Failed to build generator. Exit code: {}", status);
+        }
+        Err(err) => {
+            panic!("Failed to execute cargo build: {}", err);
+        }
+    }
+    tracing::info!("Finished building generator.");
+
+    let mut tasks = Vec::with_capacity(fixtures.len());
+    for fixture in fixtures {
+        let domain = cli.domain.clone();
+
+        tasks.push(tokio::task::spawn_blocking(move || {
+            run_integration_test(fixture, &domain).unwrap_or(true)
+        }));
+    }
 
     let mut changed = false;
-    for handle in handles {
-        changed |= handle.join().expect("thread to exit without panicing");
+    let results = join_all(tasks).await;
+
+    for result in results {
+        changed |= result.expect("Task panicked");
     }
 
     if changed {
@@ -109,6 +132,11 @@ fn run_integration_test(fixture: Fixture, domain: &str) -> Result<bool, bool> {
 
         (cidl, sql)
     };
+
+    tracing::info!(
+        "Finished regression test for fixture {}",
+        fixture.fixture_id
+    );
 
     Ok(pre_cidl_changed | generated_changed | migrated_cidl_changed | migrated_sql_changed)
 }

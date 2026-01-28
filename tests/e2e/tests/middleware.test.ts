@@ -1,10 +1,10 @@
 import { startWrangler, stopWrangler } from "../src/setup.js";
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { Foo } from "../../fixtures/regression/middleware/client.js";
+import { Foo } from "../fixtures/middleware/client";
 
 beforeAll(async () => {
   // NOTE: e2e is called from proj root
-  await startWrangler("../fixtures/regression/middleware");
+  await startWrangler("./fixtures/middleware");
 }, 30_000);
 
 afterAll(async () => {
@@ -13,7 +13,7 @@ afterAll(async () => {
 
 describe("Global Middleware", () => {
   it("Rejects POST requests", async () => {
-    const res = await Foo.save({}, "none");
+    const res = await Foo.SAVE({}, "none");
     expect(res.ok).toBe(false);
     expect(res.status).toBe(401);
     expect(res.message).toBe("POST methods aren't allowed.");

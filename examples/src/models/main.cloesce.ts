@@ -15,8 +15,8 @@ export default async function main(
 ): Promise<Response> {
 
   // Preflight
-  app.onRun(async (di) => {
-    const request = di.get(Request.name) as Request;
+  app.onRoute(async (di) => {
+    const request = di.get(Request) as Request;
 
     if (request.method === "OPTIONS") {
       return HttpResult.ok(200, undefined, {

@@ -1,6 +1,6 @@
 {
   "name": "cloesce",
-  "version": "0.0.5-unstable.6",
+  "version": "0.0.5-unstable.22",
   "description": "A tool to extract and compile TypeScript code into something wrangler can consume and deploy for D1 Databases and Cloudflare Workers",
   "type": "module",
   "license": "Apache-2.0",
@@ -25,6 +25,7 @@
     "prettier": "^3.6.2",
     "ts-node": "^10.9.2",
     "typescript": "^5.6.0",
+    "vite-plugin-wasm": "^3.5.0",
     "vitest": "^3.2.4"
   },
   "exports": {

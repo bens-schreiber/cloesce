@@ -64,6 +64,15 @@ impl WorkersGenerator {
             None => String::default(),
         };
 
+        let env_import = match &ast.wrangler_env {
+            Some(env) => {
+                let path = rel_path(&env.source_path, workers_dir)
+                    .unwrap_or_else(|_| env.source_path.to_string_lossy().to_string());
+                format!("import {{ {} }} from \"{}\";", env.name, path)
+            }
+            None => String::default(),
+        };
+
         [
             imports(&ast.models, workers_dir, |(name, model)| {
                 (name.clone(), model.source_path.clone())
@@ -74,6 +83,7 @@ impl WorkersGenerator {
             imports(&ast.services, workers_dir, |(name, service)| {
                 (name.clone(), service.source_path.clone())
             }),
+            env_import,
             main_import,
         ]
         .join("\n")
@@ -86,7 +96,8 @@ impl WorkersGenerator {
             .values()
             .map(|m| &m.name)
             .chain(ast.poos.values().map(|p| &p.name))
-            .chain(ast.services.values().map(|s| &s.name));
+            .chain(ast.services.values().map(|s| &s.name))
+            .chain(ast.wrangler_env.as_ref().map(|e| &e.name));
 
         format!(
             "const constructorRegistry: Record<string, new () => any> = {{\n{}\n}};",
@@ -160,7 +171,7 @@ impl WorkersGenerator {
                         parameters.reverse();
 
                         ApiMethod {
-                            name: "get".into(),
+                            name: "GET".into(),
                             is_static: true,
                             http_verb: HttpVerb::GET,
                             return_type: CidlType::http(CidlType::Object(model.name.clone())),
@@ -170,7 +181,7 @@ impl WorkersGenerator {
                         }
                     }
                     CrudKind::LIST => ApiMethod {
-                        name: "list".into(),
+                        name: "LIST".into(),
                         is_static: true,
                         http_verb: HttpVerb::GET,
                         return_type: CidlType::http(CidlType::array(CidlType::Object(
@@ -184,7 +195,7 @@ impl WorkersGenerator {
                         return_media: MediaType::default(),
                     },
                     CrudKind::SAVE => ApiMethod {
-                        name: "save".into(),
+                        name: "SAVE".into(),
                         is_static: true,
                         http_verb: HttpVerb::POST,
                         return_type: CidlType::http(CidlType::Object(model.name.clone())),
@@ -252,6 +263,7 @@ async function fetch(request: Request, env: any, ctx: any): Promise<Response> {{
     {fetch_impl}
 }}
 
+export {{cidl, constructorRegistry}}
 export default {{ fetch }};"#
         )
     }

@@ -223,12 +223,14 @@ impl MigrateTables {
 
         let mut res = vec![];
         let mut visited_m2ms = HashSet::new();
+        let mut renamed = HashSet::new();
 
         for (model, lm_model) in alter_models {
             let mut needs_rename_intent = HashMap::<&String, &D1Column>::new();
             let mut needs_drop_intent = vec![];
+            let alterations = identify_alterations(model, lm_model, &renamed);
 
-            for kind in identify_alterations(model, lm_model) {
+            for kind in alterations {
                 match kind {
                     AlterKind::RenameTable => {
                         res.push(to_sqlite(
@@ -237,6 +239,13 @@ impl MigrateTables {
                                 .to_owned(),
                         ));
 
+                        // Mark the model as renamed, meaning other models do not
+                        // need to rebuild if they reference this one.
+                        if model.primary_key.name == lm_model.primary_key.name
+                            && model.primary_key.cidl_type == lm_model.primary_key.cidl_type
+                        {
+                            renamed.insert((&lm_model.name, &model.name));
+                        }
                         tracing::info!("Renamed table \"{}\" to \"{}\"", lm_model.name, model.name);
                     }
                     AlterKind::AddColumn { col } => {
@@ -328,6 +337,11 @@ impl MigrateTables {
                             res.push(PRAGMA_FK_OFF.into());
                         }
 
+                        tracing::warn!(
+                            "TABLE REBUILD! Rebuilding a table \"{}\" by migrating existing data to a new table schema.",
+                            lm_model.name
+                        );
+
                         // Rename the last migrated model to "<name>_<hash>"
                         let name_hash = &format!("{}_{}", lm_model.name, lm_model.hash);
                         {
@@ -417,11 +431,6 @@ impl MigrateTables {
                             res.push(PRAGMA_FK_ON.into());
                             res.push(PRAGMA_FK_CHECK.into());
                         }
-
-                        tracing::warn!(
-                            "Rebuilt a table \"{}\" by moving data to the new version.",
-                            lm_model.name
-                        );
                     }
                 }
             }
@@ -491,6 +500,7 @@ impl MigrateTables {
         fn identify_alterations<'a>(
             model: &'a MigrationsModel,
             lm_model: &'a MigrationsModel,
+            renamed: &HashSet<(&String, &String)>,
         ) -> Vec<AlterKind<'a>> {
             let mut alterations = vec![];
 
@@ -521,6 +531,17 @@ impl MigrateTables {
                 };
 
                 if lm_col.hash == col.hash {
+                    continue;
+                }
+
+                if let (Some(model_fk_ref), Some(lm_fk_ref)) =
+                    (&col.foreign_key_reference, &lm_col.foreign_key_reference)
+                    && renamed.contains(&(lm_fk_ref, model_fk_ref))
+                    && lm_col.value.cidl_type == col.value.cidl_type
+                {
+                    // If the last migrated column and current column share the same foreign key reference,
+                    // and that reference is marked as renamed only, and no type change occurred,
+                    // skip because SQLite will have already handled the rename.
                     continue;
                 }
 
@@ -689,7 +710,14 @@ impl MigrateTables {
                         return true;
                     };
 
-                    alters.push((creates.remove(solution), lm_model));
+                    // Topological order must be preserved in the alters list.
+                    let model = creates.remove(solution);
+                    let model_index = ast.models.get_full(&model.name).unwrap().0;
+                    let insert_index = alters
+                        .iter()
+                        .position(|(m, _)| ast.models.get_full(&m.name).unwrap().0 > model_index)
+                        .unwrap_or(alters.len());
+                    alters.insert(insert_index, (model, lm_model));
                     false
                 });
             }
@@ -701,11 +729,11 @@ impl MigrateTables {
         let mut res = String::new();
         for (title, stmts) in [
             ("Dropped Models", &Self::drop(drops)),
-            ("Altered Models", &Self::alter(alters, &ast.models, intent)),
             (
                 "New Models",
                 &Self::create(creates, &ast.models, create_jcts),
             ),
+            ("Altered Models", &Self::alter(alters, &ast.models, intent)),
         ] {
             if stmts.is_empty() {
                 continue;

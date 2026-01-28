@@ -22,24 +22,21 @@ jobs:
       - uses: actions/checkout@v4
 
       # --- Rust Setup ---
-      - uses: actions-rs/toolchain@v1
+      - uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: stable
           components: rustfmt, clippy
-          override: true
-
+          targets: wasm32-unknown-unknown, wasm32-wasip1
+      
       - uses: actions/cache@v3
         with:
           path: |
-            ${{ env.CARGO_HOME }}/registry
-            ${{ env.CARGO_HOME }}/git
+            ~/.cargo/registry
+            ~/.cargo/git
             src/orm/target
             src/generator/target
           key: cargo-${{ hashFiles('**/Cargo.lock') }}
 
-      - run: rustup target add wasm32-unknown-unknown
-      - run: rustup target add wasm32-wasip1
-
+      # --- ORM ---
       - name: Check & Build & Test ORM
         working-directory: src/orm
         run: |
@@ -48,6 +45,7 @@ jobs:
           cargo build --target wasm32-unknown-unknown --release
           cargo test
 
+      # --- Generator ---
       - name: Check & Build & Test Generator
         working-directory: src/generator
         run: |
@@ -67,6 +65,7 @@ jobs:
           path: ~/.npm
           key: npm-cache-${{ hashFiles('**/package-lock.json') }}
 
+      # --- Frontend TS ---    
       - name: Check & Build & Test Frontend TS
         working-directory: src/ts
         run: |
@@ -75,6 +74,13 @@ jobs:
           npm run typecheck
           npm run build
           npm test
+
+      # --- Build E2E Tests ---
+      - name: Build E2E
+        working-directory: tests/e2e
+        run: |
+          npm install
+          npm run format -- --check
 
       # --- Integration Tests ---
       - name: Regression Tests
@@ -85,6 +91,4 @@ jobs:
       - name: Check & Test E2E
         working-directory: tests/e2e
         run: |
-          npm install
-          npm run format -- --check
           npm test

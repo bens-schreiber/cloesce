@@ -1,10 +1,10 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { startWrangler, stopWrangler, withRes } from "../src/setup";
-import { CrudHaver, Parent } from "../../fixtures/regression/crud/client";
+import { CrudHaver, Parent } from "../fixtures/crud/client";
 
 beforeAll(async () => {
   // NOTE: e2e is called from proj root
-  await startWrangler("../fixtures/regression/crud");
+  await startWrangler("./fixtures/crud");
 }, 30_000);
 
 afterAll(async () => {
@@ -14,7 +14,7 @@ afterAll(async () => {
 describe("Basic", () => {
   let model: CrudHaver;
   it("POST", async () => {
-    const res = await CrudHaver.save({
+    const res = await CrudHaver.SAVE({
       name: "tim",
     });
     expect(res.ok, withRes("POST should be OK", res)).toBe(true);
@@ -22,22 +22,22 @@ describe("Basic", () => {
       id: 1,
       name: "tim",
     });
-    model = res.data;
+    model = res.data!;
   });
 
   it("POST Update", async () => {
     model.name = "julio";
-    const res = await CrudHaver.save(model);
+    const res = await CrudHaver.SAVE(model);
     expect(res.ok, withRes("POST should be OK", res)).toBe(true);
     expect(res.data).toEqual({
       id: 1,
       name: "julio",
     });
-    model = res.data;
+    model = res.data!;
   });
 
   it("GET a model", async () => {
-    const res = await CrudHaver.get(1);
+    const res = await CrudHaver.GET(1);
     expect(res.ok, withRes("GET should be OK", res)).toBe(true);
     expect(res.data).toEqual(model);
   });
@@ -46,19 +46,19 @@ describe("Basic", () => {
   it("POST 3 Models", async () => {
     await Promise.all(
       models.map(async (m) => {
-        const res = await CrudHaver.save({ name: m });
+        const res = await CrudHaver.SAVE({ name: m });
         expect(res.ok, withRes("POST should be OK", res)).toBe(true);
-        expect(res.data.name).toEqual(m);
+        expect(res.data!.name).toEqual(m);
       }),
     );
   });
 
   it("List 3 models", async () => {
-    const res = await CrudHaver.list();
+    const res = await CrudHaver.LIST();
     expect(res.ok, withRes("LIST should be OK", res)).toBe(true);
-    expect(res.data.length, withRes("Should be 4 results", res)).toBe(4); // including the one from the prev test
+    expect(res.data!.length, withRes("Should be 4 results", res)).toBe(4); // including the one from the prev test
     models.forEach((m) =>
-      expect(res.data.map((d: CrudHaver) => d.name)).toContain(m),
+      expect(res.data!.map((d: CrudHaver) => d.name)).toContain(m),
     );
   });
 });
@@ -66,7 +66,7 @@ describe("Basic", () => {
 describe("Parent with children", () => {
   let model: Parent;
   it("POST", async () => {
-    const res = await Parent.save(
+    const res = await Parent.SAVE(
       {
         favoriteChildId: null,
         children: [{}, {}, {}], // should be able to leave blank, creating 3 children
@@ -85,12 +85,12 @@ describe("Parent with children", () => {
       ],
     });
 
-    model = res.data;
+    model = res.data!;
   });
 
   it("POST Update", async () => {
     model.favoriteChildId = model.children[0].id;
-    const res = await Parent.save(model, "withChildren");
+    const res = await Parent.SAVE(model, "withChildren");
 
     expect(res.ok, withRes("POST should be OK", res)).toBe(true);
     expect(res.data, withRes("Data should be equal", res)).toEqual({
@@ -107,19 +107,19 @@ describe("Parent with children", () => {
       ],
     });
 
-    model = res.data;
+    model = res.data!;
   });
 
   it("GET", async () => {
-    const res = await Parent.get(1, "withChildren");
+    const res = await Parent.GET(1, "withChildren");
     expect(res.ok, withRes("GET should be OK", res)).toBe(true);
     expect(res.data, withRes("Data should be equal", res)).toEqual(model);
   });
 
   it("LIST", async () => {
-    const res = await Parent.list("withChildren");
+    const res = await Parent.LIST("withChildren");
     expect(res.ok, withRes("LIST should be OK", res)).toBe(true);
-    expect(res.data.length).toEqual(1);
-    expect(res.data[0], withRes("Data should be equal", res)).toEqual(model);
+    expect(res.data!.length).toEqual(1);
+    expect(res.data![0], withRes("Data should be equal", res)).toEqual(model);
   });
 });

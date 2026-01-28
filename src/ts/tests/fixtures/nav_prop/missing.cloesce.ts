@@ -1,5 +1,6 @@
 // @ts-nocheck
 // InvalidSelectorSyntax
+class Bar {}
 
 @Model()
 export class Foo {

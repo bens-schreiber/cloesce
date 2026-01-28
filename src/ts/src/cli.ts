@@ -78,7 +78,6 @@ const cmds = subcommands({
         await generate(generateConfig);
       },
     }),
-
     extract: command({
       name: "extract",
       description: "Extract models and write cidl.pre.json",
@@ -103,10 +102,6 @@ const cmds = subcommands({
           long: "truncateSourcePaths",
           description: "Sets all source paths to just their file name",
         }),
-        skipTsCheck: flag({
-          long: "skipTsCheck",
-          description: "Skip TypeScript compilation checks",
-        }),
       },
       handler: async (args) => {
         const config: CloesceConfig = {
@@ -120,7 +115,6 @@ const cmds = subcommands({
 
         await extract(config, {
           truncateSourcePaths: args.truncateSourcePaths,
-          skipTsCheck: args.skipTsCheck,
         });
       },
     }),
@@ -197,7 +191,6 @@ async function extract(
   config: CloesceConfig,
   args: {
     truncateSourcePaths?: boolean;
-    skipTsCheck?: boolean;
   } = {},
 ) {
   const startTime = Date.now();
@@ -233,36 +226,38 @@ async function extract(
     config.projectName ?? readPackageJsonProjectName(projectRoot);
 
   const project = new Project({
-    skipAddingFilesFromTsConfig: true,
     compilerOptions: {
       skipLibCheck: true,
-      strictNullChecks: true,
       experimentalDecorators: true,
       emitDecoratorMetadata: true,
+      strict: true,
     },
   });
-  findCloesceProject(root, searchPaths, project);
+
+  project.addSourceFilesAtPaths(
+    searchPaths.flatMap((p) => {
+      const full = path.isAbsolute(p) ? p : path.resolve(root, p);
+
+      if (!fs.existsSync(full)) {
+        console.warn(`Warning: Path "${p}" does not exist`);
+        return [];
+      }
+
+      const stats = fs.statSync(full);
+
+      if (stats.isFile()) {
+        return /\.cloesce\.ts$/i.test(full) ? [full] : [];
+      }
+
+      return [path.join(full, "**/*.cloesce.ts")];
+    }),
+  );
 
   const fileCount = project.getSourceFiles().length;
   if (fileCount === 0) {
     new ExtractorError(ExtractorErrorCode.MissingFile);
   }
   debug(`Found ${fileCount} .cloesce.ts files`);
-
-  // Run typescript compiler checks to before extraction
-  if (!args.skipTsCheck) {
-    const tscStart = Date.now();
-    debug("Running TypeScript compiler checks...");
-
-    const diagnostics = project.getPreEmitDiagnostics();
-    if (diagnostics.length > 0) {
-      console.error("TypeScript errors detected in provided files:");
-      console.error(project.formatDiagnosticsWithColorAndContext(diagnostics));
-      process.exit(1);
-    }
-
-    debug(`TypeScript checks completed in ${Date.now() - tscStart}ms`);
-  }
 
   try {
     const extractorStart = Date.now();
@@ -333,7 +328,6 @@ async function generate(config: WasmConfig) {
     fs.writeFileSync(wranglerPath, "");
   }
   debug(`Using wrangler.toml at ${wranglerPath}`);
-
   const wasi = new WASI({
     version: "preview1",
     args: ["generate", ...config.args],
@@ -444,50 +438,6 @@ function readPackageJsonProjectName(cwd: string): string {
   }
 
   return projectName;
-}
-
-function findCloesceProject(
-  root: string,
-  searchPaths: string[],
-  project: Project,
-): void {
-  for (const searchPath of searchPaths) {
-    let fullPath: string;
-
-    if (path.isAbsolute(searchPath) || searchPath.startsWith(root)) {
-      fullPath = path.normalize(searchPath);
-    } else {
-      fullPath = path.resolve(root, searchPath);
-    }
-
-    if (!fs.existsSync(fullPath)) {
-      console.warn(`Warning: Path "${searchPath}" does not exist`);
-      continue;
-    }
-
-    const stats = fs.statSync(fullPath);
-    if (stats.isFile() && /\.cloesce\.ts$/i.test(fullPath)) {
-      debug(`Found file: ${fullPath}`);
-
-      project.addSourceFileAtPath(fullPath);
-    } else if (stats.isDirectory()) {
-      debug(`Searching directory: ${fullPath}`);
-      walkDirectory(fullPath);
-    }
-  }
-
-  function walkDirectory(dir: string): void {
-    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-      const fullPath = path.join(dir, entry.name);
-      if (entry.isDirectory() && !entry.name.startsWith(".")) {
-        debug(`Entering directory: ${fullPath}`);
-        walkDirectory(fullPath);
-      } else if (entry.isFile() && /\.cloesce\.ts$/i.test(entry.name)) {
-        debug(`Found file: ${fullPath}`);
-        project.addSourceFileAtPath(fullPath);
-      }
-    }
-  }
 }
 
 function formatErr(e: ExtractorError): string {

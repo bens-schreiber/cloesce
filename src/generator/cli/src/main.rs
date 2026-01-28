@@ -1,5 +1,5 @@
 use std::{
-    io::{self, Write},
+    io::{self, Read, Write},
     panic,
     path::{Path, PathBuf},
 };
@@ -170,11 +170,13 @@ impl MigrationsCli {
         print!("> ");
         io::stdout().flush().unwrap();
 
-        let mut line = String::new();
-        if io::stdin().read_line(&mut line).is_err() {
-            eprintln!("Error reading input. Aborting migrations.");
-            std::process::abort();
-        }
+        let line = match read_stdin_line() {
+            Ok(line) => line,
+            Err(_) => {
+                eprintln!("Error reading input. Aborting migrations.");
+                std::process::abort();
+            }
+        };
 
         match line.trim().to_lowercase().as_str() {
             "d" | "drop" => {
@@ -189,11 +191,13 @@ impl MigrationsCli {
                 print!("> ");
                 io::stdout().flush().unwrap();
 
-                let mut input = String::new();
-                if io::stdin().read_line(&mut input).is_err() {
-                    tracing::error!("Error reading input. Aborting migrations.");
-                    std::process::abort();
-                }
+                let input = match read_stdin_line() {
+                    Ok(line) => line,
+                    Err(_) => {
+                        eprintln!("Error reading input. Aborting migrations.");
+                        std::process::abort();
+                    }
+                };
 
                 let idx = input.trim().parse::<usize>().unwrap_or_else(|_| {
                     tracing::error!("Invalid selection. Aborting migrations.");
@@ -281,4 +285,29 @@ fn open_file_or_create(path: &Path) -> Result<std::fs::File> {
             .to_error()
             .with_context(e.to_string())
     })
+}
+
+pub fn read_stdin_line() -> io::Result<String> {
+    let mut buf = [0u8; 1];
+    let mut out = String::new();
+
+    loop {
+        match io::stdin().read(&mut buf) {
+            Ok(0) => break, // EOF
+            Ok(_) => {
+                let c = buf[0] as char;
+                out.push(c);
+                if c == '\n' {
+                    break;
+                }
+            }
+            Err(e) if e.kind() == io::ErrorKind::WouldBlock => {
+                std::thread::sleep(std::time::Duration::from_millis(10));
+                continue;
+            }
+            Err(e) => return Err(e),
+        }
+    }
+
+    Ok(out)
 }

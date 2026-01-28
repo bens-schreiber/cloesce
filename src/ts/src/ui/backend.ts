@@ -56,7 +56,7 @@ export class HttpResult<T = unknown> {
     public mediaType?: MediaType,
   ) {}
 
-  static ok<T>(status: number, data?: T, init?: HeadersInit): HttpResult {
+  static ok<T>(status: number, data?: T, init?: HeadersInit): HttpResult<T> {
     const headers: Headers = new Headers(init);
     return new HttpResult<T>(true, status, headers, data, undefined);
   }
@@ -101,9 +101,8 @@ export class HttpResult<T = unknown> {
       case MediaType.Octet: {
         this.headers.set("Content-Type", "application/octet-stream");
 
-        // JSON structure isn't needed; assume the first
-        // value is the stream data
-        body = Object.values(this.data ?? {})[0] as BodyInit;
+        // Assume proper BodyInit
+        body = this.data as BodyInit;
         break;
       }
       case undefined: {

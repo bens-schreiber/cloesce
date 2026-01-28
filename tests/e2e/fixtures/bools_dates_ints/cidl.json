@@ -1,0 +1,105 @@
+{
+  "hash": 11513542542314523995,
+  "project_name": "runner",
+  "wrangler_env": {
+    "name": "Env",
+    "source_path": "./seed__bools_dates_ints.cloesce.ts",
+    "d1_binding": "db",
+    "kv_bindings": [],
+    "r2_bindings": [],
+    "vars": {}
+  },
+  "models": {
+    "Weather": {
+      "hash": 13832862406689110475,
+      "name": "Weather",
+      "primary_key": {
+        "name": "id",
+        "cidl_type": "Integer"
+      },
+      "columns": [
+        {
+          "hash": 4668177013190768849,
+          "value": {
+            "name": "date",
+            "cidl_type": "DateIso"
+          },
+          "foreign_key_reference": null
+        },
+        {
+          "hash": 14600652857753235127,
+          "value": {
+            "name": "isRaining",
+            "cidl_type": "Boolean"
+          },
+          "foreign_key_reference": null
+        }
+      ],
+      "navigation_properties": [],
+      "key_params": [],
+      "kv_objects": [],
+      "r2_objects": [],
+      "methods": {
+        "GET": {
+          "name": "GET",
+          "is_static": true,
+          "http_verb": "GET",
+          "return_media": "Json",
+          "return_type": {
+            "HttpResult": {
+              "Object": "Weather"
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "id",
+              "cidl_type": "Integer"
+            },
+            {
+              "name": "__datasource",
+              "cidl_type": {
+                "DataSource": "Weather"
+              }
+            }
+          ]
+        },
+        "SAVE": {
+          "name": "SAVE",
+          "is_static": true,
+          "http_verb": "POST",
+          "return_media": "Json",
+          "return_type": {
+            "HttpResult": {
+              "Object": "Weather"
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "model",
+              "cidl_type": {
+                "Partial": "Weather"
+              }
+            },
+            {
+              "name": "__datasource",
+              "cidl_type": {
+                "DataSource": "Weather"
+              }
+            }
+          ]
+        }
+      },
+      "data_sources": {},
+      "cruds": [
+        "GET",
+        "SAVE"
+      ],
+      "source_path": "./seed__bools_dates_ints.cloesce.ts"
+    }
+  },
+  "services": {},
+  "poos": {},
+  "main_source": null
+}

@@ -1,0 +1,79 @@
+{
+    "project_name": "runner",
+    "models": {},
+    "poos": {},
+    "services": {
+        "FooService": {
+            "name": "FooService",
+            "attributes": [],
+            "methods": {
+                "staticMethod": {
+                    "name": "staticMethod",
+                    "http_verb": "GET",
+                    "is_static": true,
+                    "return_media": "Json",
+                    "return_type": "Text",
+                    "parameters_media": "Json",
+                    "parameters": [
+                        {
+                            "name": "thing",
+                            "cidl_type": {
+                                "Inject": "InjectedThing"
+                            }
+                        }
+                    ]
+                },
+                "instantiatedMethod": {
+                    "name": "instantiatedMethod",
+                    "http_verb": "GET",
+                    "is_static": false,
+                    "return_media": "Json",
+                    "return_type": "Text",
+                    "parameters_media": "Json",
+                    "parameters": [
+                        {
+                            "name": "thing",
+                            "cidl_type": {
+                                "Inject": "InjectedThing"
+                            }
+                        }
+                    ]
+                }
+            },
+            "source_path": "./seed__app.cloesce.ts",
+            "initializer": null
+        },
+        "BarService": {
+            "name": "BarService",
+            "attributes": [
+                {
+                    "var_name": "foo",
+                    "inject_reference": "FooService"
+                }
+            ],
+            "methods": {
+                "useFoo": {
+                    "name": "useFoo",
+                    "http_verb": "GET",
+                    "is_static": false,
+                    "return_media": "Json",
+                    "return_type": "Text",
+                    "parameters_media": "Json",
+                    "parameters": [
+                        {
+                            "name": "injectedThing",
+                            "cidl_type": {
+                                "Inject": "InjectedThing"
+                            }
+                        }
+                    ]
+                }
+            },
+            "source_path": "./seed__app.cloesce.ts",
+            "initializer": [
+                "FooService"
+            ]
+        }
+    },
+    "main_source": "./seed__app.cloesce.ts"
+}

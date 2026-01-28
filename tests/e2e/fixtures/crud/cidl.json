@@ -1,0 +1,307 @@
+{
+  "hash": 105106903023423602,
+  "project_name": "runner",
+  "wrangler_env": {
+    "name": "Env",
+    "source_path": "./seed__crud.cloesce.ts",
+    "d1_binding": "db",
+    "kv_bindings": [],
+    "r2_bindings": [],
+    "vars": {}
+  },
+  "models": {
+    "CrudHaver": {
+      "hash": 16497283824177894047,
+      "name": "CrudHaver",
+      "primary_key": {
+        "name": "id",
+        "cidl_type": "Integer"
+      },
+      "columns": [
+        {
+          "hash": 12056908550303509781,
+          "value": {
+            "name": "name",
+            "cidl_type": "Text"
+          },
+          "foreign_key_reference": null
+        }
+      ],
+      "navigation_properties": [],
+      "key_params": [],
+      "kv_objects": [],
+      "r2_objects": [],
+      "methods": {
+        "GET": {
+          "name": "GET",
+          "is_static": true,
+          "http_verb": "GET",
+          "return_media": "Json",
+          "return_type": {
+            "HttpResult": {
+              "Object": "CrudHaver"
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "id",
+              "cidl_type": "Integer"
+            },
+            {
+              "name": "__datasource",
+              "cidl_type": {
+                "DataSource": "CrudHaver"
+              }
+            }
+          ]
+        },
+        "LIST": {
+          "name": "LIST",
+          "is_static": true,
+          "http_verb": "GET",
+          "return_media": "Json",
+          "return_type": {
+            "HttpResult": {
+              "Array": {
+                "Object": "CrudHaver"
+              }
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "__datasource",
+              "cidl_type": {
+                "DataSource": "CrudHaver"
+              }
+            }
+          ]
+        },
+        "SAVE": {
+          "name": "SAVE",
+          "is_static": true,
+          "http_verb": "POST",
+          "return_media": "Json",
+          "return_type": {
+            "HttpResult": {
+              "Object": "CrudHaver"
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "model",
+              "cidl_type": {
+                "Partial": "CrudHaver"
+              }
+            },
+            {
+              "name": "__datasource",
+              "cidl_type": {
+                "DataSource": "CrudHaver"
+              }
+            }
+          ]
+        },
+        "notCrud": {
+          "name": "notCrud",
+          "is_static": false,
+          "http_verb": "POST",
+          "return_media": "Json",
+          "return_type": "Void",
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "__datasource",
+              "cidl_type": {
+                "DataSource": "CrudHaver"
+              }
+            }
+          ]
+        }
+      },
+      "data_sources": {},
+      "cruds": [
+        "GET",
+        "LIST",
+        "SAVE"
+      ],
+      "source_path": "./seed__crud.cloesce.ts"
+    },
+    "Parent": {
+      "hash": 5450491838968991115,
+      "name": "Parent",
+      "primary_key": {
+        "name": "id",
+        "cidl_type": "Integer"
+      },
+      "columns": [
+        {
+          "hash": 15556638154300732071,
+          "value": {
+            "name": "favoriteChildId",
+            "cidl_type": {
+              "Nullable": "Integer"
+            }
+          },
+          "foreign_key_reference": "Child"
+        }
+      ],
+      "navigation_properties": [
+        {
+          "hash": 10900103892837471402,
+          "var_name": "favoriteChild",
+          "model_reference": "Child",
+          "kind": {
+            "OneToOne": {
+              "column_reference": "favoriteChildId"
+            }
+          }
+        },
+        {
+          "hash": 15999549826759912293,
+          "var_name": "children",
+          "model_reference": "Child",
+          "kind": {
+            "OneToMany": {
+              "column_reference": "parentId"
+            }
+          }
+        }
+      ],
+      "key_params": [],
+      "kv_objects": [],
+      "r2_objects": [],
+      "methods": {
+        "GET": {
+          "name": "GET",
+          "is_static": true,
+          "http_verb": "GET",
+          "return_media": "Json",
+          "return_type": {
+            "HttpResult": {
+              "Object": "Parent"
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "id",
+              "cidl_type": "Integer"
+            },
+            {
+              "name": "__datasource",
+              "cidl_type": {
+                "DataSource": "Parent"
+              }
+            }
+          ]
+        },
+        "LIST": {
+          "name": "LIST",
+          "is_static": true,
+          "http_verb": "GET",
+          "return_media": "Json",
+          "return_type": {
+            "HttpResult": {
+              "Array": {
+                "Object": "Parent"
+              }
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "__datasource",
+              "cidl_type": {
+                "DataSource": "Parent"
+              }
+            }
+          ]
+        },
+        "SAVE": {
+          "name": "SAVE",
+          "is_static": true,
+          "http_verb": "POST",
+          "return_media": "Json",
+          "return_type": {
+            "HttpResult": {
+              "Object": "Parent"
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "model",
+              "cidl_type": {
+                "Partial": "Parent"
+              }
+            },
+            {
+              "name": "__datasource",
+              "cidl_type": {
+                "DataSource": "Parent"
+              }
+            }
+          ]
+        }
+      },
+      "data_sources": {
+        "withChildren": {
+          "name": "withChildren",
+          "tree": {
+            "children": {},
+            "favoriteChild": {}
+          }
+        }
+      },
+      "cruds": [
+        "GET",
+        "LIST",
+        "SAVE"
+      ],
+      "source_path": "./seed__crud.cloesce.ts"
+    },
+    "Child": {
+      "hash": 2823647866772793242,
+      "name": "Child",
+      "primary_key": {
+        "name": "id",
+        "cidl_type": "Integer"
+      },
+      "columns": [
+        {
+          "hash": 17200147533970366456,
+          "value": {
+            "name": "parentId",
+            "cidl_type": "Integer"
+          },
+          "foreign_key_reference": "Parent"
+        }
+      ],
+      "navigation_properties": [
+        {
+          "hash": 112683149846054066,
+          "var_name": "parent",
+          "model_reference": "Parent",
+          "kind": {
+            "OneToOne": {
+              "column_reference": "parentId"
+            }
+          }
+        }
+      ],
+      "key_params": [],
+      "kv_objects": [],
+      "r2_objects": [],
+      "methods": {},
+      "data_sources": {},
+      "cruds": [],
+      "source_path": "./seed__crud.cloesce.ts"
+    }
+  },
+  "services": {},
+  "poos": {},
+  "main_source": null
+}

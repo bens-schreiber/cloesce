@@ -51,8 +51,34 @@ impl WranglerGenerator {
                 }
 
                 if !spec.d1_databases.is_empty() {
-                    val["d1_databases"] =
-                        serde_json::to_value(&spec.d1_databases).expect("JSON to serialize");
+                    let existing = if let Some(arr) =
+                        val.get_mut("d1_databases").and_then(|v| v.as_array_mut())
+                    {
+                        arr
+                    } else {
+                        val["d1_databases"] = JsonValue::Array(vec![]);
+                        val["d1_databases"].as_array_mut().unwrap()
+                    };
+
+                    for db in &spec.d1_databases {
+                        let binding = db.binding.as_deref();
+
+                        if let Some(existing_db) = existing
+                            .iter_mut()
+                            .find(|e| e.get("binding").and_then(|b| b.as_str()) == binding)
+                        {
+                            // Only overwrite known fields
+                            if let Some(id) = &db.database_id {
+                                existing_db["database_id"] = id.clone().into();
+                            }
+                            if let Some(name) = &db.database_name {
+                                existing_db["database_name"] = name.clone().into();
+                            }
+                        } else {
+                            // Insert new entry
+                            existing.push(serde_json::to_value(db).unwrap());
+                        }
+                    }
                 }
 
                 if !spec.kv_namespaces.is_empty() {
@@ -85,10 +111,29 @@ impl WranglerGenerator {
                     }
 
                     if !spec.d1_databases.is_empty() {
-                        table.insert(
-                            "d1_databases".to_string(),
-                            toml::Value::try_from(&spec.d1_databases).expect("TOML to serialize"),
-                        );
+                        let arr = table
+                            .entry("d1_databases")
+                            .or_insert_with(|| toml::Value::Array(vec![]))
+                            .as_array_mut()
+                            .expect("d1_databases must be an array");
+
+                        for db in &spec.d1_databases {
+                            let binding = db.binding.as_deref();
+
+                            if let Some(existing) = arr
+                                .iter_mut()
+                                .find(|e| e.get("binding").and_then(|b| b.as_str()) == binding)
+                            {
+                                if let Some(id) = &db.database_id {
+                                    existing["database_id"] = toml::Value::String(id.clone());
+                                }
+                                if let Some(name) = &db.database_name {
+                                    existing["database_name"] = toml::Value::String(name.clone());
+                                }
+                            } else {
+                                arr.push(toml::Value::try_from(db).unwrap());
+                            }
+                        }
                     }
 
                     if !spec.kv_namespaces.is_empty() {

@@ -129,6 +129,7 @@ export interface Service {
   attributes: ServiceAttribute[];
   methods: Record<string, ApiMethod>;
   source_path: string;
+  initializer: string[] | null;
 }
 
 export interface CidlIncludeTree {

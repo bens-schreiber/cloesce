@@ -4,10 +4,10 @@ import {
   NO_DATA_SOURCE,
   getNavigationPropertyCidlType,
   isNullableType,
-} from "../ast";
-import { ConstructorRegistry } from "./router";
-import { Either, b64ToU8 } from "../common";
-import { KValue } from "../ui/backend";
+} from "../ast.js";
+import { ConstructorRegistry } from "./router.js";
+import { Either, b64ToU8 } from "../common.js";
+import { KValue } from "../ui/backend.js";
 
 // TODO: Create a "cleaned" object only with the values checked, discarding any extra.
 

@@ -1,15 +1,14 @@
-import { describe, test, expect, vi, beforeAll, afterEach } from "vitest";
+import { describe, test, expect, vi, afterEach } from "vitest";
 import {
+  DependencyKey,
   MatchedRoute,
   RouterError,
   RuntimeContainer,
   _cloesceInternal,
 } from "../src/router/router";
 import { HttpVerb, MediaType, Model, NamedTypedValue } from "../src/ast";
-import { CloesceApp, HttpResult } from "../src/ui/backend";
+import { CloesceApp, HttpResult, DependencyContainer } from "../src/ui/backend";
 import { ModelBuilder, ServiceBuilder, createAst } from "./builder";
-import fs from "fs";
-import path from "path";
 
 function createRequest(url: string, method?: string, body?: any) {
   return new Request(url, {
@@ -39,7 +38,7 @@ function mockWranglerEnv() {
 }
 
 function createDi() {
-  return new Map<string, any>();
+  return new DependencyContainer();
 }
 
 function mockD1() {
@@ -53,10 +52,6 @@ function extractErrorCode(str) {
   const match = str.match(/\(ErrorCode:\s*(\d+)\)/);
   return match ? Number(match[1]) : null;
 }
-
-beforeAll(() => {
-  vi.mock("../orm.wasm", () => ({ default: new ArrayBuffer(0) }));
-});
 
 describe("Match Route", () => {
   test("Unknown Prefix => 404", () => {
@@ -291,18 +286,14 @@ describe("Namespace Middleware", () => {
       ],
     });
     const constructorRegistry = createCtorReg();
+    class Foo {}
+    constructorRegistry[Foo.name] = Foo;
 
-    const wasm = await WebAssembly.instantiate(
-      fs.readFileSync(path.resolve("./dist/orm.wasm")),
-      {},
-    );
-    await RuntimeContainer.init(ast, constructorRegistry, wasm.instance);
+    await RuntimeContainer.init(ast, constructorRegistry);
     const app = new CloesceApp();
 
     const request = createRequest("http://foo.com/api/Foo/method", "POST");
     const di = createDi();
-
-    class Foo {}
 
     app.onNamespace(Foo, async () => {
       return HttpResult.fail(500, "oogly boogly");
@@ -333,18 +324,14 @@ describe("Namespace Middleware", () => {
       ],
     });
     const constructorRegistry = createCtorReg();
+    class Foo {}
+    constructorRegistry[Foo.name] = Foo;
 
-    const wasm = await WebAssembly.instantiate(
-      fs.readFileSync(path.resolve("./dist/orm.wasm")),
-      {},
-    );
-    await RuntimeContainer.init(ast, constructorRegistry, wasm.instance);
+    await RuntimeContainer.init(ast, constructorRegistry);
     const app = new CloesceApp();
 
     const request = createRequest("http://foo.com/api/Foo/method", "POST");
     const di = createDi();
-
-    class Foo {}
 
     app.onNamespace(Foo, async () => {
       return HttpResult.fail(500, "oogly boogly");
@@ -742,12 +729,12 @@ describe("Method Middleware", () => {
       ],
     });
     const constructorRegistry = createCtorReg();
+    class Foo {
+      method() {}
+    }
+    constructorRegistry[Foo.name] = Foo;
 
-    const wasm = await WebAssembly.instantiate(
-      fs.readFileSync(path.resolve("./dist/orm.wasm")),
-      {},
-    );
-    await RuntimeContainer.init(ast, constructorRegistry, wasm.instance);
+    await RuntimeContainer.init(ast, constructorRegistry);
     const app = new CloesceApp();
 
     const request = createRequest(
@@ -758,10 +745,6 @@ describe("Method Middleware", () => {
 
     const di = createDi();
     const d1 = mockD1();
-
-    class Foo {
-      method() {}
-    }
 
     app.onMethod(Foo, "method", async () => {
       return HttpResult.fail(500, "oogly boogly");
@@ -783,41 +766,6 @@ describe("Method Middleware", () => {
 });
 
 describe("Method Dispatch", () => {
-  test("Missing Dependency => 500", async () => {
-    // Arrange
-    const model = ModelBuilder.model("Foo")
-      .idPk()
-      .method(
-        "method",
-        HttpVerb.POST,
-        true,
-        [
-          {
-            name: "db",
-            cidl_type: { Inject: "D1Database" },
-          },
-        ],
-        "Void",
-      )
-      .build();
-
-    const di = createDi();
-    const route: MatchedRoute = {
-      kind: "model",
-      namespace: "Foo",
-      method: model.methods["method"],
-      primaryKey: null,
-      keyParams: {},
-    };
-
-    // Act
-    const res = await _cloesceInternal.methodDispatch({}, di, route, {});
-
-    // Assert
-    expect(res.ok).toBe(false);
-    expect(extractErrorCode(res.message)).toBe(RouterError.MissingDependency);
-  });
-
   test("Void Return Type => 200, no data", async () => {
     // Arrange
     const crud = {

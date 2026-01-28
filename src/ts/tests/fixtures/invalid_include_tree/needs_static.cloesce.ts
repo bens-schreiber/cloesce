@@ -1,5 +1,6 @@
 // @ts-nocheck
 // InvalidDataSourceDefinition
+import { IncludeTree } from "../../../src/ui/backend";
 
 @Model()
 export class Foo {

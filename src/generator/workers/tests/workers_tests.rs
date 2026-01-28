@@ -78,9 +78,9 @@ fn finalize_adds_crud_methods_to_model() {
     // Assert
     let user = ast.models.get("User").unwrap();
 
-    assert!(user.methods.contains_key("get"));
-    assert!(user.methods.contains_key("list"));
-    assert!(user.methods.contains_key("save"));
+    assert!(user.methods.contains_key("GET"));
+    assert!(user.methods.contains_key("LIST"));
+    assert!(user.methods.contains_key("SAVE"));
 }
 
 #[test]
@@ -246,7 +246,7 @@ fn finalize_get_crud_adds_primary_key_for_d1_model() {
 
     // Assert
     let user = ast.models.get("User").unwrap();
-    let get_method = user.methods.get("get").unwrap();
+    let get_method = user.methods.get("GET").unwrap();
 
     // Should have datasource parameter
     assert!(
@@ -284,7 +284,7 @@ fn finalize_get_crud_adds_key_params() {
 
     // Assert
     let product = ast.models.get("Product").unwrap();
-    let get_method = product.methods.get("get").unwrap();
+    let get_method = product.methods.get("GET").unwrap();
 
     // Should have datasource parameter
     assert!(

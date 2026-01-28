@@ -33,7 +33,6 @@ export class BasicService {
 
     const res = await fetchImpl(baseUrl, {
       method: "GET",
-      duplex: "half",
     });
 
     return await HttpResult.fromResponse(
@@ -54,7 +53,6 @@ export class BasicService {
 
     const res = await fetchImpl(baseUrl, {
       method: "POST",
-      duplex: "half",
       headers: { "Content-Type": "application/json" },
       body: requestBody(MediaType.Json, payload),
     });
@@ -76,7 +74,6 @@ export class BasicService {
 
     const res = await fetchImpl(baseUrl, {
       method: "GET",
-      duplex: "half",
     });
 
     return await HttpResult.fromResponse(
@@ -97,7 +94,6 @@ export class BasicService {
 
     const res = await fetchImpl(baseUrl, {
       method: "POST",
-      duplex: "half",
       headers: { "Content-Type": "application/octet-stream" },
       body: requestBody(MediaType.Octet, payload),
     });
@@ -182,13 +178,13 @@ export class ModelWithCruds {
   id: number;
   name: string;
 
-  static async get(
+  static async GET(
     id: number,
     __datasource: "none" = "none",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<ModelWithCruds>> {
     const baseUrl = new URL(
-      `http://example.com/api/ModelWithCruds/get`
+      `http://example.com/api/ModelWithCruds/GET`
     );
 
     baseUrl.searchParams.append("id", String(id));
@@ -196,7 +192,6 @@ export class ModelWithCruds {
 
     const res = await fetchImpl(baseUrl, {
       method: "GET",
-      duplex: "half",
     });
 
     return await HttpResult.fromResponse(
@@ -206,19 +201,18 @@ export class ModelWithCruds {
       false
     );
   }
-  static async list(
+  static async LIST(
     __datasource: "none" = "none",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<ModelWithCruds[]>> {
     const baseUrl = new URL(
-      `http://example.com/api/ModelWithCruds/list`
+      `http://example.com/api/ModelWithCruds/LIST`
     );
 
     baseUrl.searchParams.append("__datasource", String(__datasource));
 
     const res = await fetchImpl(baseUrl, {
       method: "GET",
-      duplex: "half",
     });
 
     return await HttpResult.fromResponse(
@@ -228,13 +222,13 @@ export class ModelWithCruds {
       true
     );
   }
-  static async save(
+  static async SAVE(
     model: DeepPartial<ModelWithCruds>,
     __datasource: "none" = "none",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<ModelWithCruds>> {
     const baseUrl = new URL(
-      `http://example.com/api/ModelWithCruds/save`
+      `http://example.com/api/ModelWithCruds/SAVE`
     );
     const payload: any = {};
 
@@ -243,7 +237,6 @@ export class ModelWithCruds {
 
     const res = await fetchImpl(baseUrl, {
       method: "POST",
-      duplex: "half",
       headers: { "Content-Type": "application/json" },
       body: requestBody(MediaType.Json, payload),
     });
@@ -287,7 +280,6 @@ export class ModelWithKv {
 
     const res = await fetchImpl(baseUrl, {
       method: "POST",
-      duplex: "half",
       headers: { "Content-Type": "application/json" },
       body: requestBody(MediaType.Json, payload),
     });
@@ -311,7 +303,6 @@ export class ModelWithKv {
 
     const res = await fetchImpl(baseUrl, {
       method: "GET",
-      duplex: "half",
     });
 
     return await HttpResult.fromResponse(
@@ -324,6 +315,9 @@ export class ModelWithKv {
 
   static fromJson(data: any): ModelWithKv {
     const res = Object.assign(new ModelWithKv(), data);
+    if (res.someValue) res.someValue = Object.assign(new KValue<unknown>(), res.someValue);
+    if (res.manyValues) res.manyValues = Object.assign(new KValue<unknown>(), res.manyValues);
+    
     return res;
   }
 }
@@ -380,7 +374,6 @@ export class ToyotaPrius {
 
     const res = await fetchImpl(baseUrl, {
       method: "POST",
-      duplex: "half",
       headers: { "Content-Type": "application/json" },
       body: requestBody(MediaType.Json, payload),
     });
@@ -395,6 +388,7 @@ export class ToyotaPrius {
 
   static fromJson(data: any): ToyotaPrius {
     const res = Object.assign(new ToyotaPrius(), data);
+    if (res.metadata) res.metadata = Object.assign(new KValue<unknown>(), res.metadata);
     return res;
   }
 }

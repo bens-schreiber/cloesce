@@ -103,16 +103,20 @@ impl Fixture {
 
     pub fn extract_cidl(&self) -> TestResult {
         let out = OutputFile::new(&self.path, "cidl.pre.json");
+
+        tracing::info!("Extracting CIDL for fixture {}", self.fixture_id);
         let res = self.run_command(
             Command::new("node")
+                .current_dir("../e2e")
                 .arg("../../src/ts/dist/cli.js")
                 .arg("extract")
                 .arg("--in")
                 .arg(&self.path)
                 .arg("--out")
                 .arg(out.path())
-                .arg("--truncateSourcePaths")
-                .arg("--skipTsCheck"),
+                .arg("--project-name")
+                .arg("runner")
+                .arg("--truncateSourcePaths"),
         );
 
         match res {
@@ -130,10 +134,9 @@ impl Fixture {
         let workers_out = OutputFile::new(&self.path, "workers.ts");
         let client_out = OutputFile::new(&self.path, "client.ts");
 
+        tracing::info!("Generating outputs for fixture {}", self.fixture_id);
         let cmd = self.run_command(
-            Command::new("cargo")
-                .arg("--quiet")
-                .arg("run")
+            Command::new("./target/release/cli")
                 .arg("generate")
                 .arg(&pre_cidl_canon)
                 .arg(cidl_out.path())
@@ -183,10 +186,9 @@ impl Fixture {
 
         let cidl_path = cidl.canonicalize().unwrap();
 
+        tracing::info!("Migrating CIDL for fixture {}", self.fixture_id);
         let res = self.run_command(
-            Command::new("cargo")
-                .arg("--quiet")
-                .arg("run")
+            Command::new("./target/release/cli")
                 .arg("migrations")
                 .arg(&cidl_path)
                 .arg(migrated_cidl.path())
