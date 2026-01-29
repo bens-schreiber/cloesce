@@ -351,7 +351,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "runner"
+name = "regression"
 version = "0.1.0"
 dependencies = [
  "clap",

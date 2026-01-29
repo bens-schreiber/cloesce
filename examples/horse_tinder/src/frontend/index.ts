@@ -15,7 +15,6 @@ const messages = getElement("messages");
 const messageText = getElement("message-text");
 const currentUserIdInput = getElement<HTMLInputElement>("current-user-id");
 
-// Helper to get elements with type safety
 function getElement<T extends HTMLElement = HTMLElement>(id: string): T {
   const element = document.getElementById(id);
   if (!element) throw new Error(`Element with id "${id}" not found`);
@@ -65,7 +64,6 @@ getElement("btn-matches").addEventListener("click", async () => {
   }
 });
 
-// Functions
 function showView(view: "browse" | "add" | "list"): void {
   browseView.style.display = "none";
   addView.style.display = "none";

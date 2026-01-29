@@ -1,7 +1,7 @@
 {
   "name": "cloesce",
   "version": "0.0.5-unstable.22",
-  "description": "A tool to extract and compile TypeScript code into something wrangler can consume and deploy for D1 Databases and Cloudflare Workers",
+  "description": "Compile simple TypeScript classes into a full stack Cloudflare project.",
   "type": "module",
   "license": "Apache-2.0",
   "scripts": {

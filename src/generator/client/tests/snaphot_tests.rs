@@ -12,7 +12,7 @@ use workers::WorkersGenerator;
 /**
  * Snapshot tests for client code generation.
  *
- * Note that the regression tests (cloesce/tests/runner) also cover client code generation.
+ * Note that the regression tests (cloesce/tests/regression) also cover client code generation.
  */
 #[test]
 fn test_client_code_generation_snapshot() {

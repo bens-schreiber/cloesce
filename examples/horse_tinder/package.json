@@ -1,5 +1,5 @@
 {
-  "name": "examples",
+  "name": "horse_tinder",
   "version": "0.0.4",
   "description": "A basic Cloesce project",
   "type": "module",
@@ -7,7 +7,7 @@
     "frontend": "vite ./src/frontend"
   },
   "dependencies": {
-    "cloesce": "../src/ts",
+    "cloesce": "../../src/ts",
     "wrangler": "^4.34.0"
   },
   "devDependencies": {

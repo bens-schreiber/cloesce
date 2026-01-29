@@ -3,7 +3,7 @@ use std::process::Command;
 use clap::Parser;
 use futures::future::join_all;
 use glob::glob;
-use runner::Fixture;
+use regression::Fixture;
 
 #[derive(Parser)]
 #[command(name = "regression", version = "0.0.1")]
