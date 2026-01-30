@@ -342,3 +342,6 @@ tmp/
 tmp.*
 examples/*/package-lock.json
 src/ts/package-lock.json
+
+# ----------- MDBOOK VVV  ----------- 
+book

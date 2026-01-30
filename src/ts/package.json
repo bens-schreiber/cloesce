@@ -1,6 +1,6 @@
 {
   "name": "cloesce",
-  "version": "0.0.5-unstable.22",
+  "version": "0.0.5-unstable.27",
   "description": "Compile simple TypeScript classes into a full stack Cloudflare project.",
   "type": "module",
   "license": "Apache-2.0",
