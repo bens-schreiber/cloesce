@@ -41,8 +41,8 @@ class User {
 
 ## Contributing
 
-Cloesce is very much a work in progress. We welcome contributions on all levels, from documentation improvements to new features, bug fixes and suggestions. Join our [Discord](https://discord.gg/saVTbcGHwF) to discuss ideas, report issues, or get help getting started.
+Cloesce is a work in progress. We welcome contributions at all levels, from documentation improvements to new features, bug fixes, and suggestions. Join our [Discord](https://discord.gg/saVTbcGHwF) to discuss ideas, report issues, or get help getting started. [Create an issue](https://github.com/bens-schreiber/cloesce/issues/new) on GitHub if you find a bug or have a feature request.
 
 ## Coalesce
 
-Check out [Coalesce](https://coalesce.intellitect.com), an accelerated web app framework by [IntelliTect](https://intellitect.com) which Cloesce takes much of its inspiration from (Cloesce = Cloudflare + Coalesce).
+Check out [Coalesce](https://coalesce.intellitect.com), an accelerated web app framework for Vue.js and Entity Framework by [IntelliTect](https://intellitect.com). Cloesce takes much of its inspiration from Coalesce (Cloesce = Cloudflare + Coalesce).
