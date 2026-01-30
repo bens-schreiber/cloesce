@@ -11,6 +11,8 @@
     - [D1 Navigation Properties](./ch2-2-navigation-properties.md)
     - [Include Trees](./ch2-3-include-trees.md)
     - [KV and R2 Models](./ch2-4-kv-and-r2-models.md)
+    - [Model Methods](./ch2-5-model-methods.md)
+    - [Cloesce ORM](./ch2-6-cloesce-orm.md)
 - [Services](./ch3-0-services.md)
 - [Testing](./ch4-0-testing.md)
 - [Compiler Reference](./ch5-0-compiler-reference.md)

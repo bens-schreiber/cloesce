@@ -67,7 +67,7 @@ The `file` property is of type `R2Object`, which represents an object stored in 
 
 Include Trees can also be used with R2 models to specify which properties to include when fetching data.
 
-## Mixing D1, KV, and R2 in a Single Model
+## Mixing Data Together
 
 Cloesce allows you to combine D1, KV and R2 properties into a single model. This provides flexibility in how you structure your data and choose the appropriate storage mechanism for each property.
 
