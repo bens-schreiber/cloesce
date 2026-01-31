@@ -58,7 +58,7 @@ export class RuntimeContainer {
     public readonly ast: CloesceAst,
     public readonly constructorRegistry: ConstructorRegistry,
     public readonly wasm: OrmWasmExports,
-  ) {}
+  ) { }
 
   static async init(ast: CloesceAst, constructorRegistry: ConstructorRegistry) {
     if (this.instance) return;
@@ -146,7 +146,7 @@ export class CloesceApp {
    * @param ctor - The namespace's constructor (used to derive its name).
    * @param m - The middleware function to register.
    */
-  public onNamespace<T>(key: Function, m: MiddlewareFn) {
+  public onNamespace(key: Function, m: MiddlewareFn) {
     const existing = this.namespaceMiddleware.get(key);
     if (existing) {
       existing.push(m);

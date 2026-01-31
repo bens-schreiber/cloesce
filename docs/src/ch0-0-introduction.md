@@ -1,9 +1,9 @@
 # Introduction
 
-> *Note*: Cloesce is under active development, expanding its feature set as it pushes towards full
+> *Alpha Note*: Cloesce is under active development, expanding its feature set as it pushes towards full
 > Cloudflare support, across any language. In this alpha, breaking changes can occur between releases.
 
-*The Cloesce Compiler* enables a data-first approach to building full-stack applications on Cloudflare. Developers define their data models and relationships once, in a high level language, and Cloesce deterministically generates the required cloud infrastructure, backend services, and client code, ensuring consistency and correctness across the entire stack.
+*The Cloesce Compiler* enables a data-first approach to building full-stack applications on Cloudflare. Developers define their data Models and relationships once, in a high level language, and Cloesce deterministically generates the required cloud infrastructure, backend services, and client code, ensuring consistency and correctness across the entire stack.
 
 Inspired by modern ORMs like [Entity Framework](https://learn.microsoft.com/en-us/ef/), web frameworks that utilize Dependency Injection such as [NestJS](https://nestjs.com/) and [ASP.NET](https://dotnet.microsoft.com/en-us/apps/aspnet),  interface definition and API contract tools like [Swagger Codegen](https://swagger.io/tools/swagger-codegen/) and [gRPC](https://grpc.io/), and many Infrastructure as Code frameworks, Cloesce brings these concepts together into a single deterministic compilation step.
 

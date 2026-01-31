@@ -30,13 +30,13 @@ export default async function main(
 ): Promise<Response> {...}
 ```
 
-Just like a standard Cloudflare Worker, this function receives a `Request`, `Env` and `ExecutionContext` object. Additionally, it receives a `CloesceApp` instance that you can use to handle routing and model operations.
+Just like a standard Cloudflare Worker, this function receives a `Request`, `Env` and `ExecutionContext` object. Additionally, it receives a `CloesceApp` instance that you can use to handle routing and Model operations.
 
 > *TIP*: It is not always necessary to define a custom main function. If you do not need custom logic before Cloesce handles the request, you can omit main entirely and a default implementation will be used.
 
 ## Example Models
 
-In `src/data/models.ts` you will find two example models, `Weather` and `WeatherReport`.
+In `src/data/Models.ts` you will find two example Models, `Weather` and `WeatherReport`.
 
 <details>
     <summary>Weather Code Snippet</summary>

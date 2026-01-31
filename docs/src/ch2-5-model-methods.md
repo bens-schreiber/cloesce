@@ -1,10 +1,10 @@
 # Model Methods
 
-To Cloesce, models are more than just data containers; they are also the API through which the client interacts with the backend. In this section, we will talk about how the Cloesce runtime routes and hydrates models.
+To Cloesce, Models are more than just data containers; they are also the API through which the client interacts with the backend. In this section, we will talk about how the Cloesce runtime routes and hydrates Models.
 
 ## Static and Instance Methods
 
-A model class in Cloesce may have both static and instance methods. A static method is the most simple, it simply exists on the same namespace as the model class itself. An instance method exists on an actual instance of the model. Static and instance methods must be decorated with a HTTP Verb such as `@GET`, `@POST`, etc. to be visible to the runtime.
+A Model class in Cloesce may have both static and instance methods. A static method is the most simple, it simply exists on the same namespace as the Model class itself. An instance method exists on an actual instance of the Model. Static and instance methods must be decorated with a HTTP Verb such as `@GET`, `@POST`, etc. to be visible to the runtime.
 
 ```typescript
 import { Model, Integer, HttpResult } from "cloesce/backend";
@@ -33,15 +33,15 @@ export class User {
 }
 ```
 
-After compilation via `npx cloesce compile`, the above model will have two API endpoints:
+After compilation via `npx cloesce compile`, the above Model will have two API endpoints:
 - `GET /User/echo?input=yourInput` - Calls the static `echo` method.
 - `GET /User/{id}/greet` - Calls the instance `greet` method on the `User` instance with the specified `id`.
 
-> *ALPHA NOTE*: GET methods currently do not support complex types as parameters (such as other models, arrays, etc). Only primitive types like `string`, `number`, `boolean`, etc are supported. This limitation will be lifted in future releases.
+> *Alpha Note*: GET methods currently do not support complex types as parameters (such as other Models, arrays, etc). Only primitive types like `string`, `number`, `boolean`, etc are supported. This limitation will be lifted in future releases.
 
 ## CRUD Methods
 
-When creating models, you will find yourself writing the same CRUD (Create, Read, Update, Delete) operations over and over again. To save you this effort, Cloesce automatically generates standard CRUD methods if included in the model decorator. These methods are exposed as API endpoints. Internally, they simply run the Cloesce ORM operations available to the developer.
+When creating Models, you will find yourself writing the same CRUD (Create, Read, Update, Delete) operations over and over again. To save you this effort, Cloesce automatically generates standard CRUD methods if included in the Model decorator. These methods are exposed as API endpoints. Internally, they simply run the Cloesce ORM operations available to the developer.
 
 ```typescript
 import { Model, Integer } from "cloesce/backend";
@@ -53,20 +53,20 @@ export class User {
 }
 ```
 
-The above `User` model will have the following API endpoints generated automatically:
+The above `User` Model will have the following API endpoints generated automatically:
 - `GET /User/{id}/GET` - Fetch a `User` by its primary key.
 - `POST /User/SAVE` - Create or update a `User`. The `User` data is passed in the request body as JSON.
 - `GET /User/LIST` - List all `User` instances.
 
 All CRUD methods take an optional `IncludeTree` in the request to specify which navigation properties to include in the response.
 
-> *NOTE*: R2 does not support CRUD methods for streaming the object body, instead it only sends the metadata.
+> *Note*: R2 does not support CRUD methods for streaming the object body, instead it only sends the metadata.
 
-> *ALPHA NOTE*: Delete is not yet supported as a generated CRUD method.
+> *Alpha Note*: Delete is not yet supported as a generated CRUD method.
 
 ## Runtime Validation
 
-When a model method is invoked via an API call, the Cloesce runtime automatically performs validation on the input parameters and the return value based on what it has extracted from the model definition during compilation. This ensures that the data being passed to and from the method adheres to the expected types and constraints defined in the model.
+When a Model method is invoked via an API call, the Cloesce runtime automatically performs validation on the input parameters and the return value based on what it has extracted from the Model definition during compilation. This ensures that the data being passed to and from the method adheres to the expected types and constraints defined in the Model.
 
 There are many valid types for method parameters in Cloesce, such as:
 
@@ -78,15 +78,43 @@ There are many valid types for method parameters in Cloesce, such as:
 | `boolean` | Boolean values (true/false) |
 | `Date` | Date and time values |
 | `Uint8Array` | Binary data |
-| `DataSourceOf<T>` | Data source for model type `T` |
+| `DataSourceOf<T>` | Data source for Model type `T` |
 | `unknown` | JSON data of unknown structure |
-| `DeepPartial<T>` | Partial version of model type `T` where anything can be missing |
+| `DeepPartial<T>` | Partial version of Model type `T` where anything can be missing |
 | Plain Old Objects | Objects with properties of supported types |
-| Model types | Custom models (e.g., `User`, `Post`) |
+| Model types | Custom Models (e.g., `User`, `Post`) |
 | Arrays | Arrays of any supported type (e.g., `string[]`, `User[]`) |
 | Nullable unions | Nullable versions of any type (e.g., `string \| null`, `User \| null`) |
 | `HttpResult<T>` | HTTP result wrapping any supported type `T` |
 | `ReadableStream` | Stream of data |
+
+## Plain Old Objects
+
+Cloesce supports the use of Plain Old Objects (POOs) as method parameters and return types. A POO is simply an object with properties that are of supported types. This allows developers to return or accept complex data structures without needing to define a full Model for them.
+
+```typescript
+import { Model, Integer, HttpResult } from "cloesce/backend";
+
+export class Profile {
+    bio: string;
+    age: Integer;
+    interests: string[];
+}
+
+@Model()
+export class User {
+    id: Integer;
+    name: string;
+
+    @POST
+    updateProfile(profile: Profile): HttpResult<string> {
+        // Update the user's profile with the provided data
+        return HttpResult.ok("Profile updated successfully.");
+    }
+}
+```
+
+> *Note*: Plain old objects can only consist of serializeable properties supported by Cloesce. They must be exported. They cannot contain streams.
 
 ## HttpResult
 
@@ -94,11 +122,11 @@ Every method response in Cloesce is converted to a `HttpResult` internally. This
 
 ## DeepPartial
 
-Cloesce provides a special utility type called `DeepPartial<T>`, which allows for the creation of objects where all properties of type `T` are optional, and this optionality is applied recursively to nested objects. This is particularly useful for update operations where you may only want to provide a subset of the properties of a model.
+Cloesce provides a special utility type called `DeepPartial<T>`, which allows for the creation of objects where all properties of type `T` are optional, and this optionality is applied recursively to nested objects. This is particularly useful for update operations where you may only want to provide a subset of the properties of a Model.
 
 ## Stream Input and Output
 
-Cloesce supports streaming data both as input parameters and return values in model methods. This is particularly useful for handling large files or data streams without loading everything into memory at once. Streams can be hinted to Cloesce using the `ReadableStream` type.
+Cloesce supports streaming data both as input parameters and return values in Model methods. This is particularly useful for handling large files or data streams without loading everything into memory at once. Streams can be hinted to Cloesce using the `ReadableStream` type.
 
 If a method parameter is of type `ReadableStream`, no other validation is performed on the input data. Additionally, no other parameters are allowed in the method signature when using a stream input (aside from injected dependencies, which are discussed later).
 

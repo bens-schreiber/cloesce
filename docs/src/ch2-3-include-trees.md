@@ -1,10 +1,10 @@
 # Include Trees
 
-In the previous section, we discussed how to define navigation properties in our models to represent relationships between entities. However, if you try to fetch a model instance with navigation properties, you will notice that the navigation properties are not populated by default. This is where include trees come into play.
+In the previous section, we discussed how to define navigation properties in our Models to represent relationships between entities. However, if you try to fetch a Model instance with navigation properties, you will notice that the navigation properties are not populated by default. This is where include trees come into play.
 
 ## What are Include Trees?
 
-Include Trees are Cloesce's response to the overfetching and recursive relationship challenges faced in data retrieval. For example, in the model definition below how should Cloesce know how deep to go when fetching a `Person` and their associated `Dog`?
+Include Trees are Cloesce's response to the overfetching and recursive relationship challenges faced in data retrieval. For example, in the Model definition below how should Cloesce know how deep to go when fetching a `Person` and their associated `Dog`?
 
 ```typescript
 import { Model, Integer } from "cloesce/backend";
@@ -32,7 +32,7 @@ By default, all scalar properties (e.g., `string`, `number`, `boolean`, etc.) ar
 
 It is common to type navigation properties as possibly `undefined` to indicate that they may not be populated unless explicitly included.
 
-> *ALPHA NOTE*: No default include behavior is implemented yet. All navigation properties must be explicitly included using Include Trees.
+> *Alpha Note*: No default include behavior is implemented yet. All navigation properties must be explicitly included using Include Trees.
 
 ## Using Include Trees
 
@@ -65,8 +65,8 @@ export class Person {
 }
 ```
 
-In this example, we defined a static property `withDogs` on the `Person` model that represents an Include Tree. This tree specifies that when fetching a `Person`, we want to include their `dogs`, but we do not want to include the `owner` property of each `Dog`.
+In this example, we defined a static property `withDogs` on the `Person` Model that represents an Include Tree. This tree specifies that when fetching a `Person`, we want to include their `dogs`, but we do not want to include the `owner` property of each `Dog`.
 
 During Cloesce's extraction phase, the compiler recognizes the `IncludeTree` type and processes the structure accordingly. Client code generation will then have the option to use this Include Tree when querying for `Person` instances.
 
-Include Trees are not limited to only D1 models; they can be used with KV and R2 as well.
+Include Trees are not limited to only D1 Models; they can be used with KV and R2 as well.
