@@ -58,7 +58,7 @@ export class RuntimeContainer {
     public readonly ast: CloesceAst,
     public readonly constructorRegistry: ConstructorRegistry,
     public readonly wasm: OrmWasmExports,
-  ) { }
+  ) {}
 
   static async init(ast: CloesceAst, constructorRegistry: ConstructorRegistry) {
     if (this.instance) return;
