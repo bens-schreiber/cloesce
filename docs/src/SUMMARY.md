@@ -17,3 +17,5 @@
 - [Middleware](./ch4-0-middleware.md)
 - [Testing](./ch5-0-testing.md)
 - [Compiler Reference](./ch6-0-compiler-reference.md)
+    - [Future Vision](./ch6-1-future-vision.md)
+    - [Architecture Overview](./ch6-2-architecture-overview.md)
