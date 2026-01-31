@@ -16,7 +16,15 @@ jobs:
       - name: Install Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
       
+      - name: Cache cargo binaries
+        uses: actions/cache@v4
+        id: cache-cargo-bins
+        with:
+          path: ~/.cargo/bin
+          key: ${{ runner.os }}-cargo-bins-${{ hashFiles('**/Cargo.lock') }}-mdbook-langtabs
+      
       - name: Install mdBook and plugins
+        if: steps.cache-cargo-bins.outputs.cache-hit != 'true'
         run: |
           cargo install mdbook
           cargo install mdbook-langtabs
@@ -24,6 +32,7 @@ jobs:
       - name: Build mdBook
         run: |
           cd docs
+          mdbook-langtabs install
           mdbook build
       
       - name: Deploy to Cloudflare Pages
@@ -31,5 +40,5 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages deploy docs/book --project-name=cloesce
+          command: pages deploy docs/book --project-name=YOUR_PROJECT_NAME
           gitHubToken: ${{ secrets.GITHUB_TOKEN }}
