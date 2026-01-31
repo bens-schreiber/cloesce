@@ -1,4 +1,4 @@
-name: Deploy mdBook to Cloudflare Pages
+name: Deploy docs
 
 on: [push]
 
@@ -40,5 +40,5 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages deploy docs/book --project-name=YOUR_PROJECT_NAME
+          command: pages deploy docs/book --project-name=cloesce
           gitHubToken: ${{ secrets.GITHUB_TOKEN }}
