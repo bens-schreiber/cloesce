@@ -4,7 +4,7 @@ In this section, we will create a simple Cloesce Model backed by a D1 database. 
 
 ## Defining the User Model
 
-The Cloesce Compiler is built on three phases: Extraction, Analysis and Code Generation. During Extraction, the compiler scans your source files for Model definitions. Models are defined using the `@Model()` decorator. Let's create a `User` Model in `src/data/Models.ts`:
+Compiling with Cloesce is composed of three phases: Extraction, Analysis and Code Generation. During Extraction, the compiler scans your source files for Model definitions. Models are defined using the `@Model()` decorator. Let's create a `User` Model in `src/data/Models.ts`:
 
 ```typescript
 import { Model, Integer, PrimaryKey } from "cloesce/backend";
