@@ -1,7 +1,5 @@
 name: Deploy docs
-
 on: [push]
-
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -13,13 +11,21 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
       
-      - name: Install Rust
-        uses: actions-rust-lang/setup-rust-toolchain@v1
-        
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+      
+      - name: Cache cargo binaries
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/bin
+          key: ${{ runner.os }}-cargo-binaries-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-binaries-
+      
       - name: Install mdBook and plugins
         run: |
-          cargo install mdbook
-          cargo install mdbook-langtabs
+          cargo install mdbook --locked || true
+          cargo install mdbook-langtabs --locked || true
       
       - name: Build mdBook
         working-directory: docs
