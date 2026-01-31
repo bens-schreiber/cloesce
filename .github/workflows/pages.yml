@@ -21,7 +21,7 @@ jobs:
         id: cache-cargo-bins
         with:
           path: ~/.cargo/bin
-          key: ${{ runner.os }}-cargo-bins-${{ hashFiles('**/Cargo.lock') }}-mdbook-langtabs
+          key: ${{ runner.os }}-cargo-bins-mdbook
       
       - name: Install mdBook and plugins
         if: steps.cache-cargo-bins.outputs.cache-hit != 'true'
@@ -30,8 +30,8 @@ jobs:
           cargo install mdbook-langtabs
       
       - name: Build mdBook
+        working-directory: docs
         run: |
-          cd docs
           mdbook-langtabs install
           mdbook build
       
