@@ -16,10 +16,9 @@ Equally important is the evolution of WASI. With the upcoming WASI Preview 3 int
 
 Cloesce is intended to be the easiest, fastest and most productive way to build applications on Cloudflare Workers. To achieve this, Cloesce must not limit developers from leveraging the capabilities of the Workers platform. Future versions of Cloesce will aim to enhance the full range of Workers features, including:
 - Durable Objects and Web Socket API generation
-- Native D1 sharding and multi-database support
+- Native solution for D1 sharding
 - Worker to Worker communication
-- Hyperdrive support
-- Queues
+- Hyperdrive + PostgreSQL support
 - ... and more as Cloudflare continues to expand the Workers platform.
 
 ## Designed for AI Integration
