@@ -1,0 +1,24 @@
+{
+  // Visit https://aka.ms/tsconfig to read more about this file
+  "compilerOptions": {
+    "module": "ESNext",
+    "target": "ES2020",
+    "moduleResolution": "node",
+    "types": [],
+    "skipLibCheck": true,
+
+    // Cloesce required options
+    "resolveJsonModule": true,
+    "strict": true,
+    "strictPropertyInitialization": false,
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+    "allowSyntheticDefaultImports": true,
+    "paths": {
+      "@data/*": ["./src/data/*"],
+      "@generated/*": ["./.generated/*"],
+    },
+    "outDir": "dist",
+  },
+  "include": [".generated/*.ts", "src/**/*.ts", "test/**/*.ts"],
+}

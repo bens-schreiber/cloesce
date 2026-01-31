@@ -1,0 +1,7 @@
+{
+    "paths": [
+        "./src/data"
+    ],
+    "workersUrl": "http://localhost:5000/api",
+    "migrationsPath": "./migrations"
+}

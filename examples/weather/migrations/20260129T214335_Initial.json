@@ -1,0 +1,105 @@
+{
+  "hash": 2826470379,
+  "models": {
+    "WeatherReport": {
+      "hash": 3668638754,
+      "name": "WeatherReport",
+      "primary_key": {
+        "name": "id",
+        "cidl_type": "Integer"
+      },
+      "columns": [
+        {
+          "hash": 90683512,
+          "value": {
+            "name": "title",
+            "cidl_type": "Text"
+          },
+          "foreign_key_reference": null
+        },
+        {
+          "hash": 3777069187,
+          "value": {
+            "name": "description",
+            "cidl_type": "Text"
+          },
+          "foreign_key_reference": null
+        }
+      ],
+      "navigation_properties": [
+        {
+          "hash": 3343327299,
+          "var_name": "weatherEntries",
+          "model_reference": "Weather",
+          "kind": {
+            "OneToMany": {
+              "column_reference": "weatherReportId"
+            }
+          }
+        }
+      ]
+    },
+    "Weather": {
+      "hash": 2346087479,
+      "name": "Weather",
+      "primary_key": {
+        "name": "id",
+        "cidl_type": "Integer"
+      },
+      "columns": [
+        {
+          "hash": 676155788,
+          "value": {
+            "name": "weatherReportId",
+            "cidl_type": "Integer"
+          },
+          "foreign_key_reference": "WeatherReport"
+        },
+        {
+          "hash": 4041584566,
+          "value": {
+            "name": "dateTime",
+            "cidl_type": "DateIso"
+          },
+          "foreign_key_reference": null
+        },
+        {
+          "hash": 2512564604,
+          "value": {
+            "name": "location",
+            "cidl_type": "Text"
+          },
+          "foreign_key_reference": null
+        },
+        {
+          "hash": 419029274,
+          "value": {
+            "name": "temperature",
+            "cidl_type": "Real"
+          },
+          "foreign_key_reference": null
+        },
+        {
+          "hash": 299071578,
+          "value": {
+            "name": "condition",
+            "cidl_type": "Text"
+          },
+          "foreign_key_reference": null
+        }
+      ],
+      "navigation_properties": [
+        {
+          "hash": 2907111568,
+          "var_name": "weatherReport",
+          "model_reference": "WeatherReport",
+          "kind": {
+            "OneToOne": {
+              "column_reference": "weatherReportId"
+            }
+          }
+        }
+      ]
+    }
+  }
+}

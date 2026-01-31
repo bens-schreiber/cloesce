@@ -37,7 +37,7 @@ export class {{this.name}} {
 {{/if}}
 {{/each}}
     fetchImpl: typeof fetch = fetch
-  ): Promise<HttpResult<{{map_cidl_type this.return_type}}>> {
+  ): Promise<HttpResult<{{#unless (is_stream this.return_type)}}{{map_cidl_type this.return_type}}{{else}}Response{{/unless}}>> {
     const baseUrl = new URL("{{../../domain}}/{{../name}}/{{this.name}}");
 {{#unless (is_get_request this.http_verb)}}
     const payload: any = {};
@@ -105,7 +105,7 @@ export class {{this.name}} {
 {{/if}}
 {{/each}}
     fetchImpl: typeof fetch = fetch
-  ): Promise<HttpResult<{{#unless (is_stream this.return_type)}}{{map_cidl_type this.return_type}}{{else}}ReadableStream<{{map_cidl_type this.return_type}}>{{/unless}}>> {
+  ): Promise<HttpResult<{{#unless (is_stream this.return_type)}}{{map_cidl_type this.return_type}}{{else}}Response{{/unless}}>> {
 {{#unless this.is_static}}
     const id = [
   {{#if ../primary_key}}
@@ -328,7 +328,7 @@ export class HttpResult<T = unknown> {
           return instantiate(data, ctor);
         }
         case MediaType.Octet: {
-          return response.body;
+          return response;
         }
       }
     }

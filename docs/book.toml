@@ -1,0 +1,12 @@
+[book]
+title = "The Cloesce Compiler"
+authors = ["Ben Schreiber"]
+language = "en"
+
+[preprocessor.langtabs]
+command = "mdbook-langtabs"
+
+[output.html]
+git-repository-url = "https://github.com/bens-schreiber/cloesce"
+additional-css = ["langtabs.css"]
+additional-js = ["langtabs.js"]
