@@ -14,8 +14,6 @@
     - [Model Methods](./ch2-5-Model-methods.md)
     - [Cloesce ORM](./ch2-6-cloesce-orm.md)
 - [Services](./ch3-0-services.md)
-    - [Service Basics](./ch3-1-basic-service.md)
 - [Middleware](./ch4-0-middleware.md)
-    - [Middleware Basics](./ch4-1-middleware-basics.md)
 - [Testing](./ch5-0-testing.md)
 - [Compiler Reference](./ch6-0-compiler-reference.md)
