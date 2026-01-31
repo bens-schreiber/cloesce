@@ -1,6 +1,0 @@
-[package]
-name = "cloesce-docs"
-version = "0.1.0"
-edition = "2021"
-
-# This is a placeholder Cargo.toml for CI caching purposes only.
