@@ -345,3 +345,4 @@ src/ts/package-lock.json
 
 # ----------- MDBOOK VVV  ----------- 
 book
+!docs/langtabs.js

@@ -5,6 +5,7 @@ language = "en"
 
 [preprocessor.langtabs]
 command = "mdbook-langtabs"
+optional = true
 
 [output.html]
 git-repository-url = "https://github.com/bens-schreiber/cloesce"

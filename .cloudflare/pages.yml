@@ -5,7 +5,7 @@ build:
 
   command: |
     curl -L -o mdbook-v0.5.2-x86_64-unknown-linux-gnu.tar.gz https://github.com/rust-lang/mdBook/releases/download/v0.5.2/mdbook-v0.5.2-x86_64-unknown-linux-gnu.tar.gz
-    tar -xzf mdbook-v0.5.2-x86_64-unknown-linux-gnu.tar.gz
-    ./mdbook build
+    && tar -xzf mdbook-v0.5.2-x86_64-unknown-linux-gnu.tar.gz
+    && ./mdbook build
     
   output_dir: book
