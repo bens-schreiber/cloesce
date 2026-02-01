@@ -282,7 +282,7 @@ export class HttpResult<T = unknown> {
           return instantiate(data, ctor);
         }
         case MediaType.Octet: {
-          return response.body;
+          return response;
         }
       }
     }
