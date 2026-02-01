@@ -2,7 +2,7 @@
 
 In the previous section, we discussed how to define Navigation Properties in our Models to represent relationships between entities. 
 
-However, if you try to fetch a Model instance that has Navigation Properties, you will notice that they populated by default (either empty arrays or undefined). This is where Include Trees come into play.
+However, if you try to fetch a Model instance that has Navigation Properties, you will notice that they are not populated by default (they will be either empty arrays or undefined). This is where Include Trees come into play.
 
 ## What are Include Trees?
 

@@ -39,7 +39,7 @@ The `Person` Model has a foreign key property `dogId`, which references the prim
 
 ## Navigation Properties
 
-Inspired by [Entity Framework relationship navigation's](https://learn.microsoft.com/en-us/ef/core/Modeling/relationships/navigations), Cloesce allows you to effortlessly define One to One, One to Many and Many to Many relationships between your Models using Navigation Properties. All navigation properties are D1 backed Models themselves, or arrays of D1 backed Models.
+Inspired by [Entity Framework relationship navigations](https://learn.microsoft.com/en-us/ef/core/Modeling/relationships/navigations), Cloesce allows you to effortlessly define One to One, One to Many and Many to Many relationships between your Models using Navigation Properties. All navigation properties are D1 backed Models themselves, or arrays of D1 backed Models.
 
 Let's revisit our `Person` and `Dog` Models and add navigation properties to them:
 
