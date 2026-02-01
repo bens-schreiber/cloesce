@@ -69,7 +69,7 @@ jobs:
       - name: Check & Build & Test Frontend TS
         working-directory: src/ts
         run: |
-          npm ci
+          npm install
           npm run format -- --check
           npm run typecheck
           npm run build

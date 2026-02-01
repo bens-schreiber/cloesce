@@ -1,0 +1,16 @@
+{
+  "entryPoints": ["src/**/*"],
+  "out": "typedocs",
+  "name": "Cloesce",
+  "exclude": [
+    "src/extractor/**/*",
+    "src/global.d.ts",
+    "src/cli.ts",
+    "src/common.ts",
+    "src/router/crud.ts",
+    "src/router/validator.ts",
+    "src/router/wasm.ts"
+  ],
+  "includeVersion": true,
+  "excludeInternal": true
+}

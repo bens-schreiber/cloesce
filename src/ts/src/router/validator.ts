@@ -12,6 +12,7 @@ import { KValue } from "../ui/backend.js";
 // TODO: Create a "cleaned" object only with the values checked, discarding any extra.
 
 /**
+ * @internal
  * Runtime type validation, asserting that the structure of a value follows the
  * correlated CidlType.
  *

@@ -5,7 +5,7 @@ import { u8ToB64 } from "../common.js";
  * cloesce/backend
  */
 export { CloesceApp, DependencyContainer } from "../router/router.js";
-export type { MiddlewareFn, ResultMiddlewareFn } from "../router/router.js";
+export type { MiddlewareFn } from "../router/router.js";
 export type { CrudKind } from "../ast.js";
 export { Orm } from "../router/orm.js";
 export { R2ObjectBody } from "@cloudflare/workers-types";
@@ -42,6 +42,8 @@ export class KValue<V> {
  * @param headers All headers that the result is to be sent with or was received with
  * @param data JSON data yielded from a request, undefined if the request was not `ok`.
  * @param message An error text set if the request was not `ok`.
+ *
+ * @template T The type of `data` returned on success.
  *
  * @remarks If `status` is 204 `data` will always be undefined.
  *
@@ -134,14 +136,7 @@ type DeepPartialInner<T> = T extends (infer U)[]
     : T | (null extends T ? null : never);
 
 /**
- * Recursively makes all properties of a type optional — including nested objects and arrays.
- *
- * Similar to TypeScript's built-in `Partial<T>`, but applies the transformation deeply across
- * all nested structures. Useful for defining "patch" or "update" objects where only a subset
- * of properties may be provided.
- *
- * **Apart of the Cloesce method grammar**, meaning the type can be apart of method parameters
- * or return types and the generated workers and client API will act accordingly.
+ * Recursively makes all properties of a type optional, including nested objects and arrays.
  *
  * @template T
  * The target type to make deeply partial.
@@ -178,20 +173,52 @@ type DeepPartialInner<T> = T extends (infer U)[]
  */
 export type DeepPartial<T> = DeepPartialInner<T> & { __brand?: "Partial" };
 
+/**
+ * @internal
+ */
 export type KeysOfType<T, U> = {
   [K in keyof T]: T[K] extends U ? (K extends string ? K : never) : never;
 }[keyof T];
 
+/**
+ * Marks a class as a Cloesce Model.
+ *
+ * A stub decorator used by Cloesce to identify model classes.
+ *
+ * @param _kinds The CRUD kinds supported by this model.
+ */
 export const Model =
   (_kinds: CrudKind[] = []): ClassDecorator =>
   () => {};
 
+/**
+ * Marks a class as a Cloesce Service.
+ *
+ * A stub decorator used by Cloesce to identify service classes.
+ *
+ * @remarks
+ * On initialization, Services will call the `init` method if it exists.
+ * `init` can be async, but can accept only ＠Inject parameters.
+ * `init` must return either void or a HttpResult.
+ *
+ * Example:
+ * ```ts
+ * ＠Service
+ * export class MyService {
+ *   injectedProperty: SomeDependency;
+ *
+ *   async init(＠Inject env: WranglerEnv) {
+ *    // perform async setup here
+ *   }
+ * }
+ * ```
+ */
 export const Service: ClassDecorator = () => {};
 
 /**
  * Declares a Wrangler environment definition.
  *
- * A `@WranglerEnv` class describes environment bindings
+ * A `@WranglerEnv` decorated class describes environment bindings
  * available to your Cloudflare Worker at runtime.
  *
  * The environment instance is automatically injected into
@@ -206,7 +233,7 @@ export const Service: ClassDecorator = () => {};
  * }
  *
  * // in a method...
- * foo(＠Inject env: WranglerEnv) {...}
+ * foo(＠Inject env: Env) {...}
  * ```
  */
 export const WranglerEnv: ClassDecorator = () => {};
@@ -216,27 +243,54 @@ export const WranglerEnv: ClassDecorator = () => {};
  *
  * Every `@D1` class must define exactly one primary key.
  *
- * Cannot be null.
+ * A primary key property cannot be nullable.
  *
  * Example:
  * ```ts
  * ＠D1
  * export class User {
- *   ＠PrimaryKey id: number;
+ *   ＠PrimaryKey
+ *   id: number;
+ *
  *   name: string;
  * }
  * ```
  */
 export const PrimaryKey: PropertyDecorator = () => {};
 
+/**
+ * Marks a property as a key parameter for KV or R2 models.
+ *
+ * A stub decorator used by Cloesce to identify key properties.
+ *
+ * Must decorate a string property.
+ */
 export const KeyParam: PropertyDecorator = () => {};
 
+/**
+ * Marks a property as a Cloudflare KV binding.
+ *
+ * @param _keyFormat A key format string for the KV binding. Uses string interpolation syntax, e.g. `users/${userId}/settings`
+ * @param _namespaceBinding The name of the KV namespace binding in the Wrangler environment.
+ *
+ * @remarks
+ * This is a stub decorator used by Cloesce to identify KV bindings.
+ * It does not have any runtime behavior.
+ */
 export const KV =
-  (_keyFormat?: string, _namespaceBinding?: string): PropertyDecorator =>
+  (_keyFormat: string, _namespaceBinding: string): PropertyDecorator =>
   () => {};
 
+/**
+ * Marks a property as a Cloudflare R2 binding.
+ *
+ * A stub decorator used by Cloesce to identify R2 bindings.
+ *
+ * @param _keyFormat A key format string for the R2 binding. Uses string interpolation syntax, e.g. `uploads/${userId}/file.txt`
+ * @param _bucketBinding The name of the R2 bucket binding in the Wrangler environment.
+ */
 export const R2 =
-  (_keyFormat?: string, _bucketBinding?: string): PropertyDecorator =>
+  (_keyFormat: string, _bucketBinding: string): PropertyDecorator =>
   () => {};
 
 /**
@@ -269,18 +323,43 @@ export const PATCH: MethodDecorator = () => {};
  */
 export const DELETE: MethodDecorator = () => {};
 
+/**
+ * Marks a property as a one-to-many navigation property.
+ *
+ * A stub decorator used by Cloesce to identify one-to-many relationships.
+ *
+ * @param _selector A selector function that returns the foreign key property on the related model, e.g. `model => model.ownerId`
+ *
+ * @template T The type of the model to which the navigation property relates.
+ */
 export function OneToMany<T>(
   _selector: (model: T) => T[keyof T],
 ): PropertyDecorator {
   return () => {};
 }
 
+/**
+ * Marks a property as a one-to-one navigation property.
+ *
+ * A stub decorator used by Cloesce to identify one-to-one relationships.
+ *
+ * @param _selector A selector function that returns the foreign key property on this model, e.g. `model => model.profileId`
+ *
+ * @template T The type of the model containing the navigation property.
+ */
 export function OneToOne<T>(
   _selector: (model: T) => T[keyof T],
 ): PropertyDecorator {
   return () => {};
 }
 
+/**
+ * Marks a property as a foreign key to another model.
+ *
+ * A stub decorator used by Cloesce to identify foreign key properties.
+ *
+ * @param _Model The related model class or its name as a string.
+ */
 export const ForeignKey =
   <T>(_Model: T | string): PropertyDecorator =>
   () => {};
@@ -310,11 +389,13 @@ type Primitive = string | number | boolean | bigint | symbol | null | undefined;
  * A recursive type describing which related models to include
  * when querying a `＠D1` model.
  *
+ * @template T The model type for which to define the include tree.
+ *
  * An `IncludeTree<T>` mirrors the shape of the model class,
  * where each navigation property can be replaced with another
  * `IncludeTree` describing nested joins.
  *
- * - Scalar properties (string, number, etc.) are excluded automatically.
+ * - Scalar properties (string, number, etc.) are included automatically.
  * - Navigation properties (e.g. `dogs: Dog[]`, `owner: Person`) may appear
  *   as keys with empty objects `{}` or nested trees.
  *
@@ -345,6 +426,8 @@ export type IncludeTree<T> = (T extends Primitive
  * or `"none"` when no data source (no joins) should be applied.
  *
  * All instantiated model methods implicitly have a Data Source param `__dataSource`.
+ *
+ * @template T The model type for which to define the data source.
  *
  * Example:
  * ```ts
@@ -389,7 +472,7 @@ export type DataSourceOf<T extends object> = (
  */
 export type Integer = number & { __brand?: "Integer" };
 
-/**  Hack to detect R2Object at runtime */
+/**  @internal Hack to detect R2Object at runtime */
 function isR2Object(x: unknown): boolean {
   if (typeof x !== "object" || x === null) return false;
   const o = x as any;

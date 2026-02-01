@@ -3,6 +3,8 @@ import { NO_DATA_SOURCE } from "../ast.js";
 import { RuntimeContainer } from "./router.js";
 
 /**
+ * @internal
+ *
  * Wraps an object in a Proxy that will intercept non-overriden CRUD methods,
  * calling a default implementation.
  */

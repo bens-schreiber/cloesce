@@ -5,6 +5,7 @@ import { Either } from "../common.js";
 import * as mod from "../../dist/orm.wasm";
 
 /**
+ * @internal
  * Cloesce WASM ABI
  */
 export interface OrmWasmExports {
@@ -43,6 +44,7 @@ export interface OrmWasmExports {
   ): boolean;
 }
 
+/** @internal */
 export class WasmResource {
   private constructor(
     private wasm: OrmWasmExports,
@@ -70,6 +72,7 @@ export class WasmResource {
   }
 }
 
+/** @internal */
 export async function loadOrmWasm(ast: CloesceAst): Promise<OrmWasmExports> {
   // Load WASM
   let exports: OrmWasmExports;
@@ -115,6 +118,7 @@ export async function loadOrmWasm(ast: CloesceAst): Promise<OrmWasmExports> {
 }
 
 /**
+ * @internal
  * Invokes a WASM ORM function with the provided arguments, handling memory
  * allocation and deallocation.
  *
