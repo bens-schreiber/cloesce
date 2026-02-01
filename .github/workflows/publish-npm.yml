@@ -1,0 +1,44 @@
+name: Publish from GitHub Release
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          registry-url: https://registry.npmjs.org/
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+          targets: wasm32-unknown-unknown, wasm32-wasip1
+        
+      - name: Install npm dependencies
+        working-directory: src/ts
+        run: npm install
+
+      - name: make build
+        working-directory: ${{ github.workspace }}
+        run: make build
+
+      - name: Set version from tag
+        working-directory: src/ts
+        run: |
+          VERSION=${GITHUB_REF_NAME#v}
+          npm version $VERSION --no-git-tag-version
+
+      - name: Publish
+        working-directory: src/ts
+        run: npm publish
