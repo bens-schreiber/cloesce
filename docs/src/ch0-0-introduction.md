@@ -1,11 +1,11 @@
 # Introduction
 
-> *Alpha Note*: Cloesce is under active development, expanding its feature set as it pushes towards full
-> Cloudflare support, across any language. In this alpha, breaking changes can occur between releases.
+> *Alpha Note*: Cloesce is under active development, expanding its feature set as it pushes towards [full
+> Cloudflare support, across any language](./ch6-1-future-vision.md). In this alpha, breaking changes can occur between releases.
 
-*The Cloesce Compiler* enables a data-first approach to building full-stack applications on Cloudflare. Developers define their data Models and relationships once, in a high level language, and Cloesce deterministically generates the required cloud infrastructure, backend services, and client code, ensuring consistency and correctness across the entire stack.
+*The Cloesce Compiler* is a tool that enables a data first paradigm to building full stack applications with Cloudflare. Define "Models" in a high level language from which Cloesce deterministically generates and validates the required cloud infrastructure, database schemas, backend services and client code, ensuring consistency and correctness across the entire stack.
 
-Inspired by modern ORMs like [Entity Framework](https://learn.microsoft.com/en-us/ef/), web frameworks that utilize Dependency Injection such as [NestJS](https://nestjs.com/) and [ASP.NET](https://dotnet.microsoft.com/en-us/apps/aspnet),  interface definition and API contract tools like [Swagger Codegen](https://swagger.io/tools/swagger-codegen/) and [gRPC](https://grpc.io/), and many Infrastructure as Code frameworks, Cloesce brings these concepts together into a single deterministic compilation step.
+Inspired by ORMs like [Entity Framework](https://learn.microsoft.com/en-us/ef/), web frameworks that utilize Dependency Injection such as [NestJS](https://nestjs.com/) and [ASP.NET](https://dotnet.microsoft.com/en-us/apps/aspnet), interface definition and API contract tools like [Swagger Codegen](https://swagger.io/tools/swagger-codegen/) and [gRPC](https://grpc.io/), as well as Infrastructure as Code tools, Cloesce brings these concepts and much more together into a single compilation step.
 
 <!-- langtabs-start -->
 ```typescript
@@ -41,7 +41,7 @@ class User {
 
 ## Contributing
 
-Cloesce is a work in progress. We welcome contributions at all levels, from documentation improvements to new features, bug fixes, and suggestions. Join our [Discord](https://discord.gg/saVTbcGHwF) to discuss ideas, report issues, or get help getting started. [Create an issue](https://github.com/bens-schreiber/cloesce/issues/new) on GitHub if you find a bug or have a feature request.
+Contributions are welcome at all levels. Join our [Discord](https://discord.gg/saVTbcGHwF) to discuss ideas, report issues, or get help getting started. [Create an issue](https://github.com/bens-schreiber/cloesce/issues/new) on GitHub if you find a bug or have a feature request.
 
 ## Coalesce
 

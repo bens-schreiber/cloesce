@@ -1,8 +1,10 @@
 # Cloesce ORM
 
-> *Note*: The ORM is subject to change as new features are added.
+> *Alpha Note*: The ORM is subject to change as new features are added.
 
-During the hydration step of the Cloesce runtime, all of a Models data is fetched from it's various defined sources (D1, KV, R2) and combined into a single object instance. This unified object can then be used seamlessly within your application code. Luckily for developers, Cloesce doesn't keep this functionality a secret — it is made available through the Cloesce ORM.
+During the hydration step of the Cloesce runtime, all of a Models data is fetched from it's various defined sources (D1, KV, R2) and combined into a single object instance. This unified object can then be used seamlessly within your application code.
+
+Luckily, Cloesce doesn't keep this functionality to itself, it is made available through the `Orm` class in the `cloesce/backend` package.
 
 ## Getting and Listing Models
 
@@ -26,15 +28,58 @@ const users = await orm.list(User, User.withFriends);
 // => User[]
 ```
 
-Note that the `get` method requires the primary key of the Model to be passed in, along with any key parameters needed to construct KV or R2 keys. The `list` method simply takes an optional Include Tree to specify which navigation properties to include. This means that the `list` method cannot be used with Models that require key parameters for KV or R2 properties.
+Note that the `get` method requires the primary key of the Model to be passed in, along with any key parameters needed to construct KV or R2 keys. 
+
+The `list` method simply takes an optional Include Tree to specify which navigation properties to include. This means that the `list` method cannot be used with Models that require key parameters for KV or R2 properties (try using prefix queries instead).
 
 ### Select, Map and Hydrate
 
-Typically, when using D1, you require more advanced filtering capabilities. Unlike other ORMs, Cloesce admits defeat early and does not attempt to create its own query language-- SQL is king. Instead, it exposes two primitives: `select` and `map`.
+Typically, when using a relational database, you require more advanced filtering capabilities. Instead of creating a DSL for querying models (such as [LINQ](https://learn.microsoft.com/en-us/dotnet/csharp/linq/)) or advanced libraries like [Drizzle](https://orm.drizzle.team), Cloesce takes a stance that when you need to do a SQL query-- write it in SQL.
 
-The `select` method generates the appropriate SQL query to fetch the desired data from D1, generating the necessary joins for navigation properties based on the provided Include Tree. An example output of the `select` method proves it is more powerful than it may first seem.
+However, the logic of `LEFT JOIN`ing related tables based on navigation properties can be tedious and error prone. Additionally, some way to turn the flat result set of a SQL query into JSON objects, and some way to turn those JSON objects into fully fledged Model instances with KV and R2 properties populated is needed.
 
-Assume we are given a Model `Boss` who has many `Person`, and each `Person` has many `Dog` and many `Cat`. Given an Include Tree that specifies we want to include `persons`, `persons.dogs`, and `persons.cats`, the generated SQL would look like this:
+The `select` method generates the appropriate SQL query to fetch the desired data from D1, generating joins for navigation properties based on the provided Include Tree. It also aliases the selected columns to match the object graph structure, which is useful for filtering.
+
+Let's create a simple set of Models to demonstrate this:
+
+```typescript
+@Model()
+export class Boss {
+    id: Integer;
+    persons: Person[];
+
+    static readonly withAll: IncludeTree<Boss> = {
+        persons: {
+            dogs: {},
+            cats: {}
+        }
+    };
+}
+
+@Model()
+export class Person {
+    id: Integer;
+    bossId: Integer;
+    dogs: Dog[];
+    cats: Cat[];
+}
+
+@Model()
+export class Dog {
+    id: Integer;
+    personId: Integer;
+    Person: Person | undefined;
+}
+
+@Model()
+export class Cat {
+    id: Integer;
+    personId: Integer;
+    Person: Person | undefined;
+}
+```
+
+Using the `select` ORM method with the `Boss.withAll` Include Tree will generate the following SQL:
 
 ```sql
 SELECT 
@@ -54,7 +99,7 @@ LEFT JOIN "Cat" AS "Cat_3"
     ON "Person_1"."id" = "Cat_3"."personId"
 ```
 
-`select` will generate SQL aliased as if it were a normal object graph, allowing for queries like this to work:
+Utilizing the aliased results in a CTE expression allows for easy filtering based on navigation properties:
 
 ```typescript
 const selectSql = Orm.select(User, {
@@ -71,7 +116,7 @@ const query = `
         [persons.cat.id] = 10
     AND
         [persons.id] = 15
-`
+`;
 ```
 
 This SQL can be executed on a D1 instance, and the results passed to the `map` method to convert the flat result set into JSON objects:
@@ -94,7 +139,7 @@ const hydratedBosses = await orm.hydrate(Boss, {
 // => Boss[]
 ```
 
-> *Note*: `Orm.map` requires the input results to be in the exact format generated by `Orm.select`. Mixing and matching with other SQL queries may fail.
+> *Note*: `Orm.map` requires the input results to be in the exact aliased format generated by `Orm.select`. Mixing and matching with other SQL queries may fail.
 
 
 ## Saving a Model

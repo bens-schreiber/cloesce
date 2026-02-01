@@ -2,9 +2,11 @@
 
 After creating your project with `create-cloesce`, several example files are included to help you get started. Below is an overview of these files and their purposes.
 
-## Example Wrangler Env
+## Wrangler Environment
 
-In `src/data/main.ts`, a basic WranglerEnv has been set up to define your Cloudflare Workers environment. You can modify this file to add your own environment variables, KV namespaces, R2 buckets, and Durable Object bindings.
+Cloesce uses a class decorated with `@WranglerEnv` to define the [Cloudflare Workers environment](https://developers.cloudflare.com/workers/configuration/environment-variables/) for your application.
+
+In `src/data/main.ts`, a basic WranglerEnv has been set up to define your Cloudflare Workers environment. You can modify this file to add your own environment variables, KV namespaces, R2 buckets, and D1 database bindings.
 
 ```typescript
 @WranglerEnv
@@ -16,6 +18,8 @@ export class Env {
 ```
 
 The above implementation of `Env` defines a Wrangler environment with a D1 database binding named `db`, an R2 bucket named `bucket`, and a string environment variable named `myVariable`. In the build step, Cloesce will generate a matching `wrangler.toml` file based on this definition.
+
+Read more about the Wrangler Environment in the [Wrangler Environment](./ch2-7-wrangler-environment.md) chapter.
 
 ## Custom Main Function
 
@@ -32,7 +36,7 @@ export default async function main(
 
 Just like a standard Cloudflare Worker, this function receives a `Request`, `Env` and `ExecutionContext` object. Additionally, it receives a `CloesceApp` instance that you can use to handle routing and Model operations.
 
-> *TIP*: It is not always necessary to define a custom main function. If you do not need custom logic before Cloesce handles the request, you can omit main entirely and a default implementation will be used.
+Read more about custom main functions in the [Middleware](./ch4-0-middleware.md) chapter.
 
 ## Example Models
 
@@ -106,3 +110,4 @@ The `WeatherReport` Model consists of:
 - A `One to Many` relationship with `Weather`
 - An `IncludeTree` `withWeatherEntries`
 
+Read more about Models in the [Models](./ch2-0-Models.md) chapter.

@@ -1,17 +1,15 @@
 # Installation
-The simplest way to get a Cloesce project up and running is to use the `create-cloesce` template. This template sets up a basic Cloesce project structure with all the necessary dependencies and configurations, basic example Models, and unit tests to get you started quickly. The template includes a sample HTML frontend with Vite which should be replaced with your frontend of choice.
+
+> *Alpha Note*: Cloesce supports only TypeScript to TypeScript compilation as of Alpha v0.1.0. Support for additional languages will be added in future releases.
+
+The simplest way to get a Cloesce project up and running is to use the `create-cloesce` template. This template sets up a basic Cloesce project structure with all the necessary dependencies and configurations, example Models, and unit tests to help get you started quickly. The template includes a sample HTML frontend with Vite which should be replaced with your frontend of choice.
 
 ## Prerequisites
 
-> *Note*: Cloesce supports only TypeScript to TypeScript compilation as of Alpha v0.1.0. Support for additional languages will be added in future releases.
+1. Sign up for a [Cloudflare account](https://dash.cloudflare.com/sign-up/workers-and-pages)
+2. Install [Node.js](https://nodejs.org/) (version `16.17.0` or later)
 
-Cloesce depends solely on Wrangler, Cloudflare's CLI tool. Make sure you have [Wrangler installed on your machine](https://developers.cloudflare.com/workers/wrangler/install-and-update/). You can install it via npm:
-
-```bash
-$ npm i -D wrangler@latest
-```
-
-## Using create-cloesce
+## create-cloesce
 
 To create a new Cloesce project using the `create-cloesce` template, run the following command in your terminal:
 
@@ -25,7 +23,7 @@ After running this command, navigate into your new project directory:
 $ cd my-cloesce-app
 ```
 
-A simple project structure is set up for you, including example Models and unit tests:
+A simple project structure is set up for you:
 ```
 ├── src/
 │   ├── data/           # Example Cloesce Models

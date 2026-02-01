@@ -1,6 +1,9 @@
 # Testing
 
-A main feature of Cloesce is the ability to easily test your Models and Services in isolation, without ever needing to mock a request or spin up a server. Unit tests that utilize Cloesce must only:
+Cloesce Models and Services all live as their own isolated units with no inherent connection to an incoming Worker request, making them easy to unit test.
+
+To write tests for Cloesce that utilize any ORM features, ensure you have:
+
 - Have ran `npx cloesce compile` to generate the necessary files
 - Run migrations for the Models being tested
 - Invoke `CloesceApp.init` to initialize the Cloesce runtime
@@ -16,9 +19,13 @@ import { cidl, constructorRegistry } from "@generated/workers";
 beforeAll(() => CloesceApp.init(cidl as any, constructorRegistry));
 ```
 
-Cloesce needs only the CIDL and constructor registry to function in tests.
+Cloesce needs only the CIDL (generated interface definition) and Constructor Registry (linked Model, Service and Plain Old Object exports) to function be used in tests.
 
-A basic miniflare setup is shown in the template project which can be installed with
+Since Models rely on Cloudflare Workers bindings (D1, KV, R2, etc), you will need to mock these bindings in your test environment. The best choice for this is [Miniflare](https://developers.cloudflare.com/workers/testing/miniflare/), which provides an in memory implementation of Cloudflare Workers runtime and bindings.
+
+
+A basic Miniflare setup is shown in the template project which can be installed with:
+
 ```bash
 $ npx create-cloesce my-cloesce-app
 ```

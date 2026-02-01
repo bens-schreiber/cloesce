@@ -23,7 +23,12 @@
 		{
 			"name": "examples",
 			"path": "examples"
-		}
+		},
 	],
-	"settings": {}
+	"settings": {
+		"cSpell.words": [
+			"Cloesce",
+			"Codegen"
+		]
+	}
 }
