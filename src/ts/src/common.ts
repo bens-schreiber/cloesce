@@ -1,4 +1,5 @@
 /**
+ * @internal
  * Denotes that some error occured internally in Cloesce that should not happen.
  */
 export class InternalError extends Error {
@@ -8,6 +9,7 @@ export class InternalError extends Error {
   }
 }
 
+/** @internal */
 export class Either<L, R> {
   private constructor(
     private readonly inner: { ok: true; right: R } | { ok: false; left: L },
@@ -63,6 +65,7 @@ export class Either<L, R> {
   }
 }
 
+/** @internal */
 export function b64ToU8(b64: string): Uint8Array {
   // Prefer Buffer in Node.js environments
   if (typeof Buffer !== "undefined") {
@@ -79,6 +82,7 @@ export function b64ToU8(b64: string): Uint8Array {
   return u8;
 }
 
+/** @internal */
 export function u8ToB64(u8: Uint8Array): string {
   // Prefer Buffer in Node.js environments
   if (typeof Buffer !== "undefined") {

@@ -85,7 +85,38 @@ export class Orm {
     return JSON.parse(mapQueryRes.unwrap()) as T[];
   }
 
-  // Given a model, generates a sequence of joins to select it with its includes.
+  /**
+   * Generates a SELECT query string for a given Model,
+   * retrieving the model and its relations aliased as JSON.
+   *
+   * @param ctor - Constructor of the model to select
+   * @param args - Arguments specifying which relations/fields to select
+   * @returns The generated SELECT query string
+   *
+   * @example
+   * ```ts
+   * Orm.select(Boss, Boss.withAll);
+   *
+   * // Example result:
+   * const result = `
+   * SELECT
+   *   "Boss"."id" AS "id",
+   *   "Person_1"."id" AS "persons.id",
+   *   "Person_1"."bossId" AS "persons.bossId",
+   *   "Dog_2"."id" AS "persons.dogs.id",
+   *   "Dog_2"."personId" AS "persons.dogs.personId",
+   *   "Cat_3"."id" AS "persons.cats.id",
+   *   "Cat_3"."personId" AS "persons.cats.personId"
+   * FROM "Boss"
+   * LEFT JOIN "Person" AS "Person_1"
+   *   ON "Boss"."id" = "Person_1"."bossId"
+   * LEFT JOIN "Dog" AS "Dog_2"
+   *   ON "Person_1"."id" = "Dog_2"."personId"
+   * LEFT JOIN "Cat" AS "Cat_3"
+   *   ON "Person_1"."id" = "Cat_3"."personId"
+   * `;
+   * ```
+   */
   static select<T extends object>(
     ctor: new () => T,
     args: {
@@ -121,6 +152,13 @@ export class Orm {
     return selectQueryRes.unwrap();
   }
 
+  /**
+   * Given a base object representing a Model, hydrates its D1, R2 and KV properties.
+   * Fetches all KV and R2 data concurrently.
+   * @param ctor Constructor of the model to hydrate
+   * @param args Arguments for hydration
+   * @returns The hydrated model instance
+   */
   async hydrate<T extends object>(
     ctor: new () => T,
     args: {
@@ -342,6 +380,22 @@ export class Orm {
     }
   }
 
+  /**
+   * Given a new Model object, performs an upsert operation for D1 and KV.
+   *
+   * Concurrently performs all D1 and KV operations.
+   *
+   * Some KV results depend on a successful D1 upsert to resolve their keys,
+   * and will be uploaded only after the D1 upsert completes.
+   *
+   * If a Model is missing a primary key, and that primary key is of Integer type,
+   * it will be auto-incremented by D1. Else, upsert will fail if the primary key is missing.
+   *
+   * @param ctor Constructor of the model to upsert
+   * @param newModel The new model object to upsert
+   * @param includeTree Include tree specifying which navigation properties to include
+   * @returns The upserted model instance, or `null` if upsert failed
+   */
   async upsert<T extends object>(
     ctor: new () => T,
     newModel: DeepPartial<T>,
@@ -527,6 +581,13 @@ export class Orm {
     });
   }
 
+  /**
+   * Lists all instances of a given Model from D1.
+   *
+   * @param ctor Constructor of the model to list
+   * @param includeTree Include tree specifying which navigation properties to include
+   * @returns Array of listed model instances
+   */
   async list<T extends object>(
     ctor: new () => T,
     includeTree: IncludeTree<T> | null = null,

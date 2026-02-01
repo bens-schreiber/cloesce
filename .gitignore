@@ -340,4 +340,10 @@ tmp/
 # ----------- CLOESCE VVV  ----------- 
 .generated
 tmp.*
-examples/package-lock.json
+examples/*/package-lock.json
+src/ts/package-lock.json
+
+# ----------- MDBOOK VVV  ----------- 
+book
+docs/langtabs.js
+docs/langtabs.css

@@ -151,7 +151,7 @@ export class BlobHaver {
   async yieldStream(
     __datasource: "none" = "none",
     fetchImpl: typeof fetch = fetch
-  ): Promise<HttpResult<ReadableStream<Uint8Array>>> {
+  ): Promise<HttpResult<Response>> {
     const id = [
       encodeURIComponent(String(this.id)),
     ].join("/");
@@ -313,7 +313,7 @@ export class HttpResult<T = unknown> {
           return instantiate(data, ctor);
         }
         case MediaType.Octet: {
-          return response.body;
+          return response;
         }
       }
     }

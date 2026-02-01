@@ -69,7 +69,7 @@ jobs:
       - name: Check & Build & Test Frontend TS
         working-directory: src/ts
         run: |
-          npm ci
+          npm install
           npm run format -- --check
           npm run typecheck
           npm run build
@@ -84,7 +84,7 @@ jobs:
 
       # --- Integration Tests ---
       - name: Regression Tests
-        working-directory: tests/runner
+        working-directory: tests/regression
         run: cargo run --bin regression -- --check
 
       # --- E2E Tests ---

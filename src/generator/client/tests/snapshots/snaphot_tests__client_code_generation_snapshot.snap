@@ -27,7 +27,7 @@ export class PooWithComposition {
 export class BasicService {
   static async downloadData(
     fetchImpl: typeof fetch = fetch
-  ): Promise<HttpResult<Uint8Array>> {
+  ): Promise<HttpResult<Response>> {
     const baseUrl = new URL("http://example.com/api/BasicService/downloadData");
 
 
@@ -525,7 +525,7 @@ export class HttpResult<T = unknown> {
           return instantiate(data, ctor);
         }
         case MediaType.Octet: {
-          return response.body;
+          return response;
         }
       }
     }

@@ -1,0 +1,29 @@
+{
+  "name": "cloesce-proj",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "build": "cloesce compile && wrangler build",
+    "migrate:cloesce": "cloesce migrate",
+    "migrate:wrangler": "wrangler d1 migrations apply db",
+    "start:dev": "wrangler dev --port 5000",
+    "start:web": "vite",
+    "test": "vitest"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "cloesce": "^0.0.5-unstable.27",
+    "wrangler": "^4.61.1"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20260130.0",
+    "miniflare": "^4.20260128.0",
+    "typescript": "^5.9.3",
+    "vite-tsconfig-paths": "^6.0.5",
+    "vitest": "^4.0.18"
+  }
+}

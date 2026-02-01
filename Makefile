@@ -10,7 +10,7 @@ test:
 	cd src/ts && npm run test && \
 	cd ../orm && cargo test && \
 	cd ../generator && cargo test && \
-	cd ../../tests/runner && cargo run --bin regression && \
+	cd ../../tests/regression && cargo run --bin regression && \
 	cd ../e2e && npm run test
 
 
@@ -21,7 +21,7 @@ format:
 	cd ../orm && cargo fmt --all && \
 	cd ../generator && cargo fmt --all && \
 	cd ../../tests/e2e && npm run format:fix && \
-	cd ../runner && cargo fmt --all
+	cd ../regression && cargo fmt --all
 
 .PHONY: all
 all: format build test

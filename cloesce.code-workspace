@@ -18,12 +18,17 @@
 		},
 		{
 			"name": "regression",
-			"path": "tests/runner"
+			"path": "tests/regression"
 		},
 		{
 			"name": "examples",
 			"path": "examples"
-		}
+		},
 	],
-	"settings": {}
+	"settings": {
+		"cSpell.words": [
+			"Cloesce",
+			"Codegen"
+		]
+	}
 }

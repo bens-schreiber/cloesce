@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cloesce Project</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: system-ui, sans-serif;
+            background: #f5f5f5;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        h1 {
+            background: linear-gradient(135deg, #1e3a8a, #1e40af);
+            color: white;
+            padding: 24px;
+            font-size: 24px;
+        }
+
+        .sections-wrapper {
+            padding: 20px;
+        }
+
+        .section {
+            border: 1px solid #e5e7eb;
+            margin-bottom: 16px;
+            border-radius: 6px;
+            overflow: hidden;
+        }
+
+        h2 {
+            color: #1f2937;
+            font-size: 14px;
+            padding: 12px 16px;
+            background: #f9fafb;
+            border-left: 4px solid #3b82f6;
+            display: flex;
+            align-items: center;
+        }
+
+        .section-content {
+            padding: 20px;
+            background: white;
+        }
+
+        .form-group {
+            margin-bottom: 16px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 6px;
+            color: #374151;
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        input,
+        textarea {
+            width: 100%;
+            padding: 8px 10px;
+            border: 1px solid #d1d5db;
+            border-radius: 4px;
+            font-size: 13px;
+        }
+
+        button {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        .output {
+            margin-top: 16px;
+            padding: 12px;
+            background: #1f2937;
+            border-radius: 4px;
+            min-height: 50px;
+            font-family: monospace;
+            font-size: 12px;
+            color: #e5e7eb;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        .success {
+            color: #10b981;
+            font-weight: 600;
+        }
+
+        .error {
+            color: #ef4444;
+            font-weight: 600;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>⛅ Cloesce Project - Weather Report Manager</h1>
+        <div class="sections-wrapper">
+            <div class="section">
+                <h2>List All Reports</h2>
+                <div class="section-content">
+                    <button onclick="listReports()">Get All Reports</button>
+                    <div id="list-output" class="output"></div>
+                </div>
+            </div>
+            <div class="section">
+                <h2>Create/Update Report</h2>
+                <div class="section-content">
+                    <div class="form-group">
+                        <label>Title:</label>
+                        <input type="text" id="save-title" placeholder="e.g., Weekly Weather Summary">
+                    </div>
+                    <div class="form-group">
+                        <label>Description:</label>
+                        <textarea id="save-desc" rows="3" placeholder="e.g., Weather report for the week"></textarea>
+                    </div>
+                    <button onclick="saveReport()">Save Report</button>
+                    <div id="save-output" class="output"></div>
+                </div>
+            </div>
+            <div class="section">
+                <h2>Add Weather Entry to Report</h2>
+                <div class="section-content">
+                    <div class="form-group">
+                        <label>Report ID:</label>
+                        <input type="number" id="entry-report-id" placeholder="Enter report ID" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Location:</label>
+                        <input type="text" id="entry-location" placeholder="e.g., Seattle, WA">
+                    </div>
+                    <div class="form-group">
+                        <label>Temperature (°F):</label>
+                        <input type="number" id="entry-temp" placeholder="e.g., 72">
+                    </div>
+                    <div class="form-group">
+                        <label>Condition:</label>
+                        <input type="text" id="entry-condition" placeholder="e.g., Sunny, Cloudy, Rainy">
+                    </div>
+                    <div class="form-group">
+                        <label>Date/Time:</label>
+                        <input type="datetime-local" id="entry-datetime">
+                    </div>
+                    <button onclick="addWeatherEntry()">Add Weather Entry</button>
+                    <div id="entry-output" class="output"></div>
+                </div>
+            </div>
+            <div class="section">
+                <h2>Upload Photo to Weather Entry</h2>
+                <div class="section-content">
+                    <div class="form-group">
+                        <label>Weather Entry ID:</label>
+                        <input type="number" id="upload-id" placeholder="Enter weather entry ID">
+                    </div>
+                    <div class="form-group">
+                        <label>Photo File:</label>
+                        <input type="file" id="upload-file" accept="image/*">
+                    </div>
+                    <button onclick="uploadPhoto()">Upload Photo</button>
+                    <div id="upload-output" class="output"></div>
+                </div>
+            </div>
+            <div class="section">
+                <h2>Download Photo from Weather Entry</h2>
+                <div class="section-content">
+                    <div class="form-group">
+                        <label>Weather Entry ID:</label>
+                        <input type="number" id="download-id" placeholder="Enter weather entry ID">
+                    </div>
+                    <button onclick="downloadPhoto()">Download Photo</button>
+                    <div id="download-output" class="output"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script type="module" src="index.ts"></script>
+</body>
+
+</html>
