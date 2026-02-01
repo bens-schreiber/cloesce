@@ -19,7 +19,8 @@ jobs:
           node-version: '20'
 
       - name: Install TypeDoc
-        run: npm install typedoc --no-save
+        working-directory: src/ts
+        run: npm install
 
       - name: Build TypeDoc
         working-directory: src/ts
