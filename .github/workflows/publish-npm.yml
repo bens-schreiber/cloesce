@@ -1,46 +1,43 @@
-name: Publish Frontend to NPM
-on: [workflow_dispatch]
+name: Publish from GitHub Release
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  id-token: write
+  contents: read
+
 jobs:
-  deploy:
+  publish:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      deployments: write
-    name: Build mdBook and Deploy to Cloudflare Pages
+
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      
-      - name: Setup Rust
-        uses: actions-rust-lang/setup-rust-toolchain@v1
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
         with:
-          cache: false
-      
-      - name: Cache mdBook binaries
-        uses: actions/cache@v4
-        id: cache-mdbook
+          components: rustfmt, clippy
+          targets: wasm32-unknown-unknown, wasm32-wasip1
+
+      - uses: actions/setup-node@v4
         with:
-          path: |
-            ~/.cargo/bin/mdbook
-            ~/.cargo/bin/mdbook-langtabs
-          key: ${{ runner.os }}-mdbook-bins
-      
-      - name: Install mdBook and plugins
-        if: steps.cache-mdbook.outputs.cache-hit != 'true'
+          node-version: '24'
+          registry-url: https://registry.npmjs.org/
+
+      - name: npm install
+        working-directory: src/ts
+        run: npm install
+
+      - name: make build
+        run: make build
+
+      - name: Set version from tag
+        working-directory: src/ts
         run: |
-          cargo install mdbook --locked
-          cargo install mdbook-langtabs --locked
-      
-      - name: Build mdBook
-        working-directory: docs
-        run: |
-          mdbook-langtabs install
-          mdbook build
-      
-      - name: Deploy to Cloudflare Pages
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages deploy docs/book --project-name=cloesce
-          gitHubToken: ${{ secrets.GITHUB_TOKEN }}
+          VERSION=${GITHUB_REF_NAME#v}
+          npm version $VERSION --no-git-tag-version
+
+      - name: Publish to npm
+        working-directory: src/ts
+        run: npm publish
