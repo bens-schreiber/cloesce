@@ -9,14 +9,10 @@ jobs:
       deployments: write
     name: Build TypeDoc and Deploy to Cloudflare Pages
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
           node-version: '20'
-          cache: 'npm'
 
       - name: Install TypeDoc
         run: npm install typedoc --no-save
@@ -30,5 +26,5 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages deploy build --project-name=cloesce-ts
+          command: pages deploy src/ts/build --project-name=cloesce-ts
           gitHubToken: ${{ secrets.GITHUB_TOKEN }}
