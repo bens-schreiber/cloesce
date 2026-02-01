@@ -38,6 +38,12 @@ After being passed the `pre.cidl.json` file from the Frontend, the Generator per
 
 After semantic analysis is complete, the Generator produces the final `cidl.json` file which is then used to generate code for the worker runtime and client code generation. The generator will augment the CIDL with additional information like hashes for migrations and CRUD API endpoints for Models and Services.
 
+To make the Generator easily available to the frontend, it is written entirely in Rust and compiled to WebAssembly. This allows frontend languages to easily call into the Generator without needing to write language specific bindings. In the future, we may explore compiling native binaries for better performance, but WASM reduces the complexity of distributing multiple binaries for different platforms.
+
 ## Migrations Engine
 
-After a successful compilation, the Migrations Engine can be used to generate database migrations based on changes in the Model definitions, utilizing the hashes the Generator added to the CIDL. The Migrations Engine is responsible for creating valid SQL migrations that Wrangler can then apply to the D1 database.
+After a successful compilation, the Migrations Engine is used to generate database migrations from changes in the Model definitions, utilizing the Merkle-Tree hashes the Generator added to the CIDL.
+
+The engine can sometimes encounter problems it does not know the solution to, such as when a Model is renamed. In these cases, the engine will prompt the user with options on how to proceed (such as generating a rename migration or creating a new Model). This interactive process ensures that the generated migrations align with the user's intent.
+
+The Migrations Engine outputs SQLite files intended to be applied to D1 databases using the Wrangler CLI. It is written entirely in Rust and comes with the Generator as a single WebAssembly module for easy distribution.
