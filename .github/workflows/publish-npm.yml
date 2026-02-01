@@ -1,4 +1,4 @@
-name: Publish to NPM
+name: Publish Frontend to NPM
 on: [workflow_dispatch]
 jobs:
   deploy:
