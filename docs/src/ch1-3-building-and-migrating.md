@@ -1,7 +1,7 @@
 # Building and Migrating
 
-Building a Cloesce project typically consists of three main steps:
-1. Compiling via Cloesce
+Building a Cloesce project generally consists of three steps:
+1. Compilation
 2. Running database migrations
 3. Building your frontend code.
 

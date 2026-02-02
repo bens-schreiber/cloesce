@@ -1,15 +1,21 @@
-# KV and R2 Models
+# KV and R2 Properties
 
-In addition to D1 backed models, Cloesce also supports Models backed by [Cloudflare KV](https://developers.cloudflare.com/kv/) and [Cloudflare R2](https://developers.cloudflare.com/r2/). This allows developers to leverage the strengths of these storage solutions alongside D1 databases.
+D1 is a powerful relational database solution, but sometimes developers need to work with other types of storage for specific use cases. Cloesce supports integrating [Cloudflare KV](https://developers.cloudflare.com/kv/) and [Cloudflare R2](https://developers.cloudflare.com/r2/) storage directly into your Models, allowing you to leverage these storage solutions alongside D1 databases.
 
 ## Defining a Model with KV
 
 [Cloudflare KV](https://developers.cloudflare.com/kv/) is a globally distributed key-value storage system. Along with a key and value, KV entries can also have associated metadata.
 
-Cloesce respects the design choice of a KV storage. No relationships, Navigation Properties, or migrations are supported for a Model that is purely KV backed. When fetching data inside of a KV property it is not validated either, only hinted at.
+Cloesce respects the design constraints of KV storage. For models backed purely by KV or R2, the following are not supported:
+
+- Relationships  
+- Navigation properties  
+- Migrations  
+
 
 ```typescript
 import { Model, KV, KValue, KeyParam, IncludeTree } from "cloesce/backend";
+
 @Model()
 export class Settings {
     @KeyParam
@@ -27,6 +33,7 @@ export class Settings {
     };
 }
 ```
+
 The above Model uses only KV attributes. The `@KeyParam` decorator indicates that the `settingsId` property is used to construct the KV key for the `data` property, using string interpolation. The `@KV` decorator specifies the key pattern and the KV namespace to use.
 
 The `data` property is of type `KValue<unknown>`, which represents a value stored in KV. You can replace `unknown` with any serializable type, but Cloesce will not validate or instantiate the data when fetching it.
@@ -39,18 +46,19 @@ The `allSettings` property demonstrates how Cloesce can fetch via prefix from KV
 
 > *Note*: `unknown` is a special type to Cloesce designating that no validation should be performed on the data, but it is still stored and retrieved as JSON.
 
-> *Alpha Note*: KV Models do not yet support cache control directives. This feature is planned for a future release.
+> *Alpha Note*: KV Models do not yet support cache control directives and expiration times. This feature is planned for a future release.
 
 ## Defining a Model with R2
 
-[Cloudflare R2](https://developers.cloudflare.com/r2/) is an object storage solution similar to Amazon S3. It allows you to store and retrieve large binary objects.
+[Cloudflare R2](https://developers.cloudflare.com/r2/) is an object storage solution similar to [Amazon S3](https://aws.amazon.com/pm/serv-s3/). It allows you to store and retrieve large binary objects.
 
 Just like in KV Models, Cloesce does not support relationships, Navigation Properties, or migrations for purely R2 backed models. 
 
-Since R2 is used for storing large objects, the actual data of an R2 object is not fetched automatically when accessing an R2 property to avoid hitting [Worker memory limits](https://developers.cloudflare.com/workers/platform/limits/). Instead, only the metadata of the [R2 object](https://developers.cloudflare.com/r2/api/workers/workers-api-reference/#r2object-definition) is retrieved. To fetch the full object data, you can use Model Methods as described in the chapter [Model Methods](./ch2-5-Model-methods.md).
+Since R2 is used for storing large objects, the actual data of an R2 object is not fetched automatically when accessing an R2 property to avoid hitting [Worker memory limits](https://developers.cloudflare.com/workers/platform/limits/). Instead, only the metadata of the [`R2Object`](https://developers.cloudflare.com/r2/api/workers/workers-api-reference/#r2object-definition) is retrieved. To fetch the full object data, you can use Model Methods as described in the chapter [Model Methods](./ch2-5-Model-methods.md).
 
 ```typescript
 import { Model, R2, R2Object, KeyParam, IncludeTree } from "cloesce/backend";
+
 @Model()
 export class MediaFile {
     @KeyParam

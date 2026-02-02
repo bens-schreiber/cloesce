@@ -3,9 +3,17 @@
 > *Alpha Note*: Cloesce is under active development, expanding its feature set as it pushes towards [full
 > Cloudflare support, across any language](./ch6-1-future-vision.md). In this alpha, breaking changes can occur between releases.
 
-*The Cloesce Compiler* is a tool that enables a data first paradigm to building full stack applications with Cloudflare. Define "Models" in a high level language from which Cloesce deterministically generates and validates the required cloud infrastructure, database schemas, backend services and client code, ensuring consistency and correctness across the entire stack.
+*The Cloesce Compiler* converts object definitions into a full stack Cloudflare application.
 
-Inspired by ORMs like [Entity Framework](https://learn.microsoft.com/en-us/ef/), web frameworks that utilize Dependency Injection such as [NestJS](https://nestjs.com/) and [ASP.NET](https://dotnet.microsoft.com/en-us/apps/aspnet), interface definition and API contract tools like [Swagger Codegen](https://swagger.io/tools/swagger-codegen/) and [gRPC](https://grpc.io/), as well as Infrastructure as Code tools, Cloesce brings these concepts and much more together into a single compilation step.
+Inspired by 
+- [Entity Framework](https://learn.microsoft.com/en-us/ef/)
+- [NestJS](https://nestjs.com/)
+- [ASP.NET](https://dotnet.microsoft.com/en-us/apps/aspnet)
+- [Swagger Codegen](https://swagger.io/tools/swagger-codegen/) 
+- [gRPC](https://grpc.io/)
+- and Infrastructure as Code (IaC)
+
+Cloesce is not just a ORM, Migrations Engine, Web Framework, Runtime Validation Library, IaC tool, or API Generator. It is **all of these things and more**, wrapped in a clean paradigm that makes building Cloudflare applications a breeze.
 
 <!-- langtabs-start -->
 ```typescript
@@ -13,8 +21,6 @@ Inspired by ORMs like [Entity Framework](https://learn.microsoft.com/en-us/ef/),
 class User {
     id: Integer;
     name: String;
-
-    @OneToMany<Post>(p => p.userId)
     posts: Post[];
 
     @KV("user/settings/{id}", namespace)
@@ -25,7 +31,7 @@ class User {
 
     @POST
     async hello(): User {
-        // Everything is hydrated here! Magic!
+        // D1, KV and R2 all hydrated here!
         return this;
     }
 }
@@ -37,6 +43,8 @@ class User {
 // Coming in a later release!
 ```
 <!-- langtabs-end -->
+
+*How simple can full stack development get?*
 
 
 ## Contributing

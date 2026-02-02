@@ -1,10 +1,10 @@
-# A basic D1 Model
+# Basic D1 Backed Model
 
-In this section, we will create a simple Cloesce Model backed by a Cloudflare [D1 database](https://developers.cloudflare.com/d1/). This Model will represent a `User` entity with basic properties such as `id` and `name`. 
+In this section we will explore the basic properties of a D1 backed Model in Cloesce.
 
-We will also explore how to define the Model, its properties, and how to use the generated CRUD methods.
+> [Cloudflare D1]((https://developers.cloudflare.com/d1/)) is a serverless SQL database built on SQLite for Workers.
 
-## Defining the User Model
+## Defining a Model
 
 Compilation in Cloesce is composed of three phases: Extraction, Analysis and Code Generation. 
 
@@ -29,11 +29,13 @@ The above code defines a Model "User" with several properties:
 | `id` | Integer property decorated with `@PrimaryKey`, indicating it is the model’s primary key. |
 | `name` | String property representing the user’s name; stored as a regular column in the D1 database. |
 
+> Models do not have constructors as they should not be manually instantiated. Instead, use the [ORM functions](./ch2-6-cloesce-orm.md) to create, retrieve and update Model instances. For tests, consider using [`Object.assign()`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/assign) to create instances of Models with specific property values.
+
 > *TIP*: Using the `@PrimaryKey` decorator is optional if your primary key property is named `id` or `<className>Id` (in any casing, ie snake case, camel case, etc). The compiler will automatically treat a property named `id` as the primary key.
 
 ## Supported D1 Column Types
 
-Cloesce supports a variety of column types for D1 Models. Here are some of the most commonly used types:
+Cloesce supports a variety of column types for D1 Models. These are the supported TypeScript types and their corresponding SQLite types:
 
 | TypeScript Type | SQLite Type | Notes |
 |-----------------|-------------|-------|
@@ -44,7 +46,7 @@ Cloesce supports a variety of column types for D1 Models. Here are some of the m
 | `number` | `REAL` | Represents a floating-point number |
 | `Uint8Array` | `BLOB` | Represents binary data |
 
-All of these types by themselves are `NOT NULL` by default. To make a property nullable, you can use a union with `null` e.g., `property: string | null;`. `undefined` is reserved for navigation properties.
+All of these types by themselves are `NOT NULL` by default. To make a property nullable, you can use a union with `null` e.g., `property: string | null;`. `undefined` is reserved for [Navigation Properties](./ch2-2-navigation-properties.md) and cannot be used to indicate nullability.
 
 Notably, an `Integer` primary key is automatically set to `AUTOINCREMENT` in D1, so you don't need to manually assign values to it when creating new records (useful for the [ORM functions](./ch2-6-cloesce-orm.md)).
 

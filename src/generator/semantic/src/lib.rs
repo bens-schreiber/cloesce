@@ -12,17 +12,13 @@ pub struct SemanticAnalysis;
 impl SemanticAnalysis {
     /// Analyzes the grammar of the AST, yielding a [GeneratorErrorKind] on failure.
     ///
-    /// Sorts models topologically in SQL insertion order.
-    ///
-    /// Sorts services and plain old objects in constructor order.
-    ///
-    /// Determines the MediaType of all [ApiMethod]'s.
-    ///
-    /// Returns a set of all objects that have blobs (be it a direct attribute or composition)
+    /// Sorts models topologically in SQL insertion order, and
+    /// sorts services + plain old objects in constructor order.
     ///
     /// Returns a [GeneratorErrorKind] on failure.
     pub fn analyze(ast: &mut CloesceAst, spec: &WranglerSpec) -> Result<()> {
-        // Wrangler must be validated first so that the env can be used in later validations
+        // Wrangler must be validated first so that the env can be
+        // used in subsequent calls
         Self::wrangler(ast, spec)?;
 
         Self::models(ast)?;
@@ -596,6 +592,10 @@ impl SemanticAnalysis {
     }
 }
 
+/// Extracts braced variables from a format string.
+/// e.g, "users/{userId}/posts/{postId}" => ["userId", "postId"].
+///
+/// Returns a [GeneratorErrorKind] if the format string is invalid.
 fn extract_braced(s: &str) -> Result<Vec<String>> {
     let mut out = Vec::new();
     let mut current = None;
@@ -625,6 +625,10 @@ fn extract_braced(s: &str) -> Result<Vec<String>> {
     Ok(out)
 }
 
+/// Ensures the given [NamedTypedValue] can be mapped to a valid
+/// SQLite type.
+///
+/// Returns a [GeneratorErrorKind] on failure.
 fn ensure_valid_sql_type(model: &Model, value: &NamedTypedValue) -> Result<()> {
     let inner = match &value.cidl_type {
         CidlType::Nullable(inner) if matches!(inner.as_ref(), CidlType::Void) => {
@@ -661,6 +665,9 @@ fn is_valid_data_source_ref(ast: &CloesceAst, o: &String) -> bool {
     ast.models.contains_key(o)
 }
 
+/// Validates an [ApiMethod]'s grammar.
+///
+/// Returns a [GeneratorErrorKind] on failure.
 fn validate_methods(
     namespace: &str,
     method_name: &str,
@@ -845,6 +852,10 @@ fn kahns<'a>(
     Ok(rank)
 }
 
+/// Ensures that a reference within an include tree exists within the given model.
+///
+/// Returns the referenced model name if the reference is a navigation property,
+/// or None if the reference is a KV or R2 object.
 fn valid_include_tree_reference(model: &Model, var_name: String) -> Result<Option<&str>> {
     if let Some(nav) = model
         .navigation_properties

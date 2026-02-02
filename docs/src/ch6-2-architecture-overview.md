@@ -24,6 +24,8 @@ Beyond extraction, the Frontend layer also includes the runtime environment for 
 
 The runtime consists of two components: the Router and the ORM. The Router is currently written entirely in TypeScript, while the ORM compiles to WebAssembly from Rust.
 
+> Depending on the context, the CIDL may be referred to as the "Abstract Syntax Tree", the "Cloesce Interface Definition Language", or during the runtime just "metadata" when a particular node is being referenced. All of these labels are accurate-- it's a versatile structure!
+
 #### Router
 
 The Cloesce Router is responsible for handling incoming HTTP requests, matching them to an API endpoint defined in the CIDL, validating request parameters and body, hydrating data from the ORM and dispatching to a user defined method on a Model or Service. Along the way, the Router calls middleware functions defined in the CIDL. Although each middleware function can produce undefined behavior, each state in the Router is well defined and can produce only a corresponding failure state or success state. This makes reasoning about the Router's behavior straightforward.
