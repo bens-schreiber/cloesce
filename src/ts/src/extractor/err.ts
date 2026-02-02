@@ -7,11 +7,8 @@ export enum ExtractorErrorCode {
   InvalidPropertyModifier,
   InvalidApiMethodModifier,
   InvalidSelectorSyntax,
-  InvalidOneToOneSelector,
   InvalidNavigationProperty,
   TooManyWranglerEnvs,
-  MissingFile,
-  InvalidServiceProperty,
   InvalidTypescriptSyntax,
   MissingKValue,
   MissingR2ObjectBody,
@@ -60,15 +57,6 @@ const errorInfoMap: Record<
     description: "Too many wrangler environments defined in the project",
     suggestion: "Consolidate or remove unused @WranglerEnv's",
   },
-  [ExtractorErrorCode.MissingFile]: {
-    description: "A specified input file could not be found",
-    suggestion: "Verify the input file path is correct",
-  },
-  [ExtractorErrorCode.InvalidServiceProperty]: {
-    description:
-      "Services must contain only dependency injected instances as attributes.",
-    suggestion: "Remove the attribute.",
-  },
   [ExtractorErrorCode.InvalidTypescriptSyntax]: {
     description: "The TypeScript syntax is invalid.",
     suggestion: "Fix the TypeScript syntax errors.",
@@ -85,12 +73,6 @@ const errorInfoMap: Record<
     description: "The selector syntax is invalid.",
     suggestion:
       "Selectors should be of the form `N<T>(m => m.property)` where T is a model type and N is OneToOne or OneToMany.",
-  },
-  [ExtractorErrorCode.InvalidOneToOneSelector]: {
-    description:
-      "OneToOne selectors must select a model constructor or name string.",
-    suggestion:
-      "Ensure the selector is of the form `OneToOne<T>(...)` where T is a model type or a string representing the model name.",
   },
   [ExtractorErrorCode.InvalidNavigationProperty]: {
     description:

@@ -1,12 +1,12 @@
 # Navigation Properties
 
-In the previous section, we created a basic D1 Model with scalar properties. However, relational databases like Cloudflare D1 typically more complex relationships between tables. 
+In the previous section, we built a basic D1 model with scalar properties. However, relational databases like Cloudflare D1 often involve more complex relationships between tables.
 
 In this section, we will explore *Navigation Properties* which allow us to define relationships between different Models.
 
 ## Foreign Keys
 
-Before diving into navigation properties, it's essential to understand foreign keys. Foreign keys are scalar properties that reference the primary key of another Model, establishing a relationship between two Models.
+Before diving into Navigation Properties, it's essential to understand their source: foreign keys. Foreign keys are scalar properties that reference the Primary Key of another Model, establishing a relationship between two Models.
 
 Foreign keys directly translate to SQLite `FOREIGN KEY` constraints in the underlying D1 database.
 
@@ -28,8 +28,6 @@ export class Person {
     dogId: Integer;
 }
 ```
-
-In the above code, we defined a `Dog` Model and a `Person` Model. 
 
 The `Person` Model has a foreign key property `dogId`, which references the primary key of the `Dog` Model. This establishes a relationship where each person can be associated with one dog.
 
@@ -86,10 +84,11 @@ export class Person {
 }
 ```
 
-Cloesce will automatically infer the relationship based on the property names (`dogId` and `dog`).
+Cloesce will automatically infer the relationship based on the property names in a similiar fashion to primary key inference. (`dog` matches `dogId` or `dog_id` in any casing).
 
 ## One to Many
-To define a One to Many relationship, we can use the `@OneToMany` decorator. Let's modify our Models to allow a Person to have multiple Dogs:
+
+Let's modify our Models to allow a Person to have multiple Dogs:
 
 ```typescript
 import { Model, Integer, ForeignKey, OneToMany } from "cloesce/backend";
@@ -138,7 +137,7 @@ export class Person {
 
 ## Many To Many
 
-Many to Many relationships have an intermediate junction table that holds foreign keys to both related Models. Let's define a Many to Many relationship between `Student` and `Course` Models:
+Many to Many relationships have an intermediate junction table that holds foreign keys to both related Models.
 
 ```typescript
 import { Model, Integer } from "cloesce/backend";

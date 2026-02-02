@@ -255,7 +255,8 @@ async function extract(
 
   const fileCount = project.getSourceFiles().length;
   if (fileCount === 0) {
-    new ExtractorError(ExtractorErrorCode.MissingFile);
+    console.warn("No .cloesce.ts files found in the specified paths.");
+    process.exit(1);
   }
   debug(`Found ${fileCount} .cloesce.ts files`);
 

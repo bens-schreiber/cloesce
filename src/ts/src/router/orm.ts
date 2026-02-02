@@ -188,64 +188,6 @@ export class Orm {
 
     return instance;
 
-    async function hydrateKVList(
-      namespace: KVNamespace,
-      key: string,
-      kv: any,
-      current: any,
-    ) {
-      const res = await namespace.list({ prefix: key });
-
-      if (kv.value.cidl_type === "Stream") {
-        current[kv.value.name] = await Promise.all(
-          res.keys.map(async (k: any) => {
-            const stream = await namespace.get(k.name, { type: "stream" });
-            return Object.assign(new KValue(), {
-              key: k.name,
-              raw: stream,
-              metadata: null,
-            });
-          }),
-        );
-      } else {
-        current[kv.value.name] = await Promise.all(
-          res.keys.map(async (k: any) => {
-            const kvRes = await namespace.getWithMetadata(k.name, {
-              type: "json",
-            });
-            return Object.assign(new KValue(), {
-              key: k.name,
-              raw: kvRes.value,
-              metadata: kvRes.metadata,
-            });
-          }),
-        );
-      }
-    }
-
-    async function hydrateKVSingle(
-      namespace: KVNamespace,
-      key: string,
-      kv: any,
-      current: any,
-    ) {
-      if (kv.value.cidl_type === "Stream") {
-        const res = await namespace.get(key, { type: "stream" });
-        current[kv.value.name] = Object.assign(new KValue(), {
-          key,
-          raw: res,
-          metadata: null,
-        });
-      } else {
-        const res = await namespace.getWithMetadata(key, { type: "json" });
-        current[kv.value.name] = Object.assign(new KValue(), {
-          key,
-          raw: res.value,
-          metadata: res.metadata,
-        });
-      }
-    }
-
     function recurse(
       current: any,
       meta: AstModel,
@@ -378,6 +320,64 @@ export class Orm {
         }
       }
     }
+
+    async function hydrateKVList(
+      namespace: KVNamespace,
+      key: string,
+      kv: any,
+      current: any,
+    ) {
+      const res = await namespace.list({ prefix: key });
+
+      if (kv.value.cidl_type === "Stream") {
+        current[kv.value.name] = await Promise.all(
+          res.keys.map(async (k: any) => {
+            const stream = await namespace.get(k.name, { type: "stream" });
+            return Object.assign(new KValue(), {
+              key: k.name,
+              raw: stream,
+              metadata: null,
+            });
+          }),
+        );
+      } else {
+        current[kv.value.name] = await Promise.all(
+          res.keys.map(async (k: any) => {
+            const kvRes = await namespace.getWithMetadata(k.name, {
+              type: "json",
+            });
+            return Object.assign(new KValue(), {
+              key: k.name,
+              raw: kvRes.value,
+              metadata: kvRes.metadata,
+            });
+          }),
+        );
+      }
+    }
+
+    async function hydrateKVSingle(
+      namespace: KVNamespace,
+      key: string,
+      kv: any,
+      current: any,
+    ) {
+      if (kv.value.cidl_type === "Stream") {
+        const res = await namespace.get(key, { type: "stream" });
+        current[kv.value.name] = Object.assign(new KValue(), {
+          key,
+          raw: res,
+          metadata: null,
+        });
+      } else {
+        const res = await namespace.getWithMetadata(key, { type: "json" });
+        current[kv.value.name] = Object.assign(new KValue(), {
+          key,
+          raw: res.value,
+          metadata: res.metadata,
+        });
+      }
+    }
   }
 
   /**
@@ -469,7 +469,6 @@ export class Orm {
     // Concurrently execute SQL with KV uploads.
     const [batchRes] = await Promise.all([
       queries.length > 0 ? this.db.batch(queries) : Promise.resolve([]),
-
       ...kvUploadPromises,
     ]);
 

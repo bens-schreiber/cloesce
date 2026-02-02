@@ -6,6 +6,10 @@ Services are another core concept that allow you to encapsulate business logic a
 
 Instead, Services are used to group complex related functionality together and can be injected into other parts of your application using Cloesce's dependency injection system.
 
+
+> *TIP*: A clean design pattern for Cloesce is to use Services to encapsulate significant business logic and have Models act as
+> thin wrappers around data storage and retrieval. This separation of concerns can lead to more maintainable and testable code.
+
 ## Hello World Service
 
 Let's create a simple Service that returns a "Hello, World!" message.

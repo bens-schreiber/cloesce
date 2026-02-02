@@ -1,12 +1,14 @@
 # Exploring the Template
 
-After creating your project with `create-cloesce`, several example files are included to help you get started. Below is an overview of these files and their purposes.
+After creating your project with `create-cloesce`, several example files are included to help you get started. Below is an overview of those files and their purpose.
 
 ## Wrangler Environment
 
-Cloesce uses a class decorated with `@WranglerEnv` to define the [Cloudflare Workers environment](https://developers.cloudflare.com/workers/configuration/environment-variables/) for your application.
+All Cloudflare Workers define a [a set of bindings](https://developers.cloudflare.com/workers/configuration/environment-variables/) that provision resources such as [D1 databases](https://developers.cloudflare.com/d1/), [R2 buckets](https://developers.cloudflare.com/r2/), [KV namespaces](https://developers.cloudflare.com/kv/concepts/kv-namespaces/), and miscellaneous environment variables.
 
-In `src/data/main.ts`, a basic WranglerEnv has been set up to define your Cloudflare Workers environment. You can modify this file to add your own environment variables, KV namespaces, R2 buckets, and D1 database bindings.
+Cloesce uses a class decorated with `@WranglerEnv` to define the Wrangler Environment for your application, tailoring to the resources you need.
+
+In `src/data/main.ts`, a basic Wrangler Environment has been defined.
 
 ```typescript
 @WranglerEnv
@@ -17,13 +19,17 @@ export class Env {
 }
 ```
 
-The above implementation of `Env` defines a Wrangler environment with a D1 database binding named `db`, an R2 bucket named `bucket`, and a string environment variable named `myVariable`. In the build step, Cloesce will generate a matching `wrangler.toml` file based on this definition.
+The above implementation of `Env` defines a Wrangler environment with a D1 database binding named `db`, an R2 bucket named `bucket`, and a string environment variable named `myVariable`. 
+
+A typical Cloudflare Worker defines these bindings in a `wrangler.toml` file, but Cloesce generates this file for you during compilation based on the `@WranglerEnv` class.
 
 Read more about the Wrangler Environment in the [Wrangler Environment](./ch2-7-wrangler-environment.md) chapter.
 
 ## Custom Main Function
 
-A custom `main` function which acts as the worker entry point is defined in `src/data/main.ts`.
+Cloudflare Workers are serverless functions that run at Cloudflare’s edge and respond to HTTP requests. Each Worker defines an entry point function through which all requests are routed.
+
+Cloesce allows this same functionality through a custom `main` definition (seen in  `src/data/main.ts`)
 
 ```typescript
 export default async function main(
@@ -34,11 +40,19 @@ export default async function main(
 ): Promise<Response> {...}
 ```
 
-Just like a standard Cloudflare Worker, this function receives a `Request`, `Env` and `ExecutionContext` object. Additionally, it receives a `CloesceApp` instance that you can use to handle routing and Model operations.
+<!-- Just like a standard Cloudflare Worker, this function receives a `Request`, `Env` and `ExecutionContext` object. Additionally, it receives a `CloesceApp` instance that you can use to handle routing and Model operations. -->
+
+Just like the standard Workers entrypoint, this function receives the inbound `Request`, the Wrangler Environment defined by the decorated `@WranglerEnv` class, and an `ExecutionContext` for managing background tasks.
+
+Additionally, it receives a `CloesceApp` instance that you can use to handle routing and Model operations.
 
 Read more about custom main functions in the [Middleware](./ch4-0-middleware.md) chapter.
 
 ## Example Models
+
+Models are the core building blocks of a Cloesce application. They define exactly how your data is structured, what relationships exist between different data entities, and what API endpoints will be generated to interact with that data.
+
+Unlike other ORMs, Cloesce Models are not limited to just relational data stored in a SQL database. Models can also include data stored in R2 buckets, KV namespaces, or inject external services.
 
 In `src/data/Models.ts` you will find two example Models, `Weather` and `WeatherReport`.
 
@@ -95,19 +109,31 @@ export class WeatherReport {
 </details>
 
 The `Weather` Model conists of:
-- A primary key `id`
-- A `One to One` relationship with `WeatherReport`
-- Four scalar columns: `dateTime`, `temperature`, `condition`
-- A `R2` object `photo` which uses the key format `weather/photo/{id}`
-- An `IncludeTree` `withPhoto`
-- Two API endpoints `uploadPhoto` and `downloadPhoto`
+
+| Feature | Type / Description | Source / Layer |
+|---------|-----------------|----------------|
+| `id` | Primary Key | D1 |
+| `weatherReport` | One-to-One relationship | D1 |
+| `dateTime` | Scalar column | D1 |
+| `temperature` | Scalar column | D1 |
+| `condition` | Scalar column | D1 |
+| `photo` | R2 object, key format `weather/photo/{id}` | R2 |
+| `withPhoto` | IncludeTree | Cloesce |
+| `uploadPhoto` | API endpoint | Workers |
+| `downloadPhoto` | API endpoint | Workers |
+
 
 
 The `WeatherReport` Model consists of:
-- Three generated CRUD operations: `GET`, `SAVE`, `LIST`
-- A primary key `id`
-- Two scalar columns: `title`, `summary`
-- A `One to Many` relationship with `Weather`
-- An `IncludeTree` `withWeatherEntries`
+| Feature | Type / Description | Source / Layer |
+|---------|-----------------|----------------|
+| `id` | Primary Key | D1 |
+| `title` | Scalar column | D1 |
+| `summary` | Scalar column | D1 |
+| `weatherEntries` | One-to-Many relationship with `Weather` | D1 |
+| `withWeatherEntries` | IncludeTree | Cloesce |
+| `GET` | Generated CRUD operation | Workers |
+| `SAVE` | Generated CRUD operation | Workers |
+| `LIST` | Generated CRUD operation | Workers |
 
-Read more about Models in the [Models](./ch2-0-Models.md) chapter.
+Read more about how models work in the [Models](./ch2-0-models.md) chapter.

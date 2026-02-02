@@ -14,6 +14,7 @@ Methods must be decorated with a HTTP Verb such as `@GET`, `@POST`, etc. to be e
 
 ```typescript
 import { Model, Integer, HttpResult } from "cloesce/backend";
+
 @Model()
 export class User {
     id: Integer;
