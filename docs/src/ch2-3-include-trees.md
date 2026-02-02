@@ -1,6 +1,6 @@
 # Include Trees
 
-If you try to fetch a Model instance that has Navigation Properties, KV or R2 attributes you will notice that they are not populated by default (either empty arrays or undefined). This is intentional, and solved by Include Trees.
+If you try to fetch a Model instance that has Navigation Properties or KV and R2 attributes, you will notice that they are not populated by default (they will be either empty arrays or undefined). This is intentional and is handled by Include Trees.
 
 ## What are Include Trees?
 
