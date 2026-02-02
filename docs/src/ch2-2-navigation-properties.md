@@ -1,8 +1,8 @@
-# Navigation Properties and Include Trees
+# Navigation Properties
 
 In the previous section, we created a basic D1 Model with scalar properties. However, relational databases like Cloudflare D1 typically more complex relationships between tables. 
 
-In this section, we will explore *Navigation Properties* and *Include Trees*, which allow us to define and hydrate relationships between different Models.
+In this section, we will explore *Navigation Properties* which allow us to define relationships between different Models.
 
 ## Foreign Keys
 
