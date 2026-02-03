@@ -23,12 +23,13 @@ impl WorkersGenerator {
 
         /// Tries to compute the relative path between two paths. If not possible, returns an empty err.
         fn rel_path(target: &Path, base: &Path) -> String {
-            // Replace with a `.js` extension
-            // TODO: handle other languages
-            let target_no_ext = target.with_extension("js");
-
             // Normalize Windows backslashes
-            let norm_target = PathBuf::from(target_no_ext.to_string_lossy().replace('\\', "/"));
+            let norm_target = PathBuf::from(
+                target
+                    .with_extension("js")
+                    .to_string_lossy()
+                    .replace('\\', "/"),
+            );
             let norm_base = PathBuf::from(base.to_string_lossy().replace('\\', "/"));
 
             // Try computing relative path

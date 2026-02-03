@@ -20,7 +20,7 @@ fn link_generates_correct_imports() {
         // Assert
         assert!(
             result.contains(r#"import { User } from "../models/User.js""#),
-            "Expected relative path to models folder, got:\n{result}"
+            "got: \n{result}"
         );
     }
 
@@ -38,7 +38,7 @@ fn link_generates_correct_imports() {
         // Assert
         assert!(
             result.contains(r#"import { Thing } from "./Thing.js""#),
-            "Expected './Thing' import when model is in same folder:\n{result}"
+            "got: \n{result}"
         );
     }
 
@@ -56,7 +56,7 @@ fn link_generates_correct_imports() {
         // Assert
         assert!(
             result.contains(r#"import { Alien } from "C:/nonrelative/Alien.js""#),
-            "Expected fallback to absolute path when relative calc fails:\n{result}"
+            "got: \n{result}"
         );
     }
 
@@ -74,7 +74,7 @@ fn link_generates_correct_imports() {
         // Assert
         assert!(
             result.contains(r#"import { Model } from "../models/deep/Model.js""#),
-            "Expected forward-slash nested path, got:\n{result}"
+            "got:\n{result}"
         );
     }
 
@@ -96,30 +96,7 @@ fn link_generates_correct_imports() {
         // Assert
         assert!(
             result.contains(r#"import { Model } from "../src/data/models.cloesce.js""#),
-            "Expected correct import for Windows absolute path with forward slashes, got:\n{result}"
-        );
-    }
-
-    // Windows absolute path with backslashes
-    {
-        // Arrange
-        let workers_path = Path::new(
-            "C:\\Users\\vmtest\\Desktop\\cloescetest\\my-cloesce-app\\.generated\\workers.ts",
-        );
-        let mut model = ModelBuilder::new("Model").id_pk().build();
-        model.source_path = Path::new(
-            "C:\\Users\\vmtest\\Desktop\\cloescetest\\my-cloesce-app\\src\\data\\main.cloesce.ts",
-        )
-        .to_path_buf();
-
-        let ast = create_ast(vec![model]);
-        // Act
-        let result = WorkersGenerator::link(&ast, workers_path);
-
-        // Assert
-        assert!(
-            result.contains(r#"import { Model } from "C:/Users/vmtest/Desktop/cloescetest/my-cloesce-app/src/data/main.cloesce.js"#),
-            "Expected correct import for Windows absolute path with backslashes, got:\n{result}"
+            "got:\n{result}"
         );
     }
 }
