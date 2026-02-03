@@ -14,7 +14,7 @@
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "type": "commonjs",
+  "type": "module",
   "dependencies": {
     "cloesce": "^0.0.5-unstable.27",
     "wrangler": "^4.61.1"
