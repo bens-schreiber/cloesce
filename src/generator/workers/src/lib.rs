@@ -9,32 +9,46 @@ impl WorkersGenerator {
     ///
     /// Public for tests
     pub fn link(ast: &CloesceAst, workers_path: &Path) -> String {
-        let workers_dir = workers_path
-            .parent()
-            .expect("workers_path has no parent; cannot compute relative imports");
+        let workers_dir = {
+            let mut p = workers_path.to_path_buf();
+            if !p.pop() {
+                panic!(
+                    "Failed to get workers directory from path: {}",
+                    workers_path.display()
+                );
+            }
+            p
+        };
 
         /// Tries to compute the relative path between two paths. If not possible, returns an empty err.
-        fn rel_path(path: &Path, workers_dir: &Path) -> std::result::Result<String, ()> {
-            // Remove the extension (e.g., .ts/.tsx/.js)
-            let no_ext = path.with_extension("");
+        fn rel_path(target: &Path, base: &Path) -> String {
+            // Normalize Windows backslashes
+            let norm_target = PathBuf::from(
+                target
+                    .with_extension("js")
+                    .to_string_lossy()
+                    .replace('\\', "/"),
+            );
+            let norm_base = PathBuf::from(base.to_string_lossy().replace('\\', "/"));
 
-            // Compute the relative path from the workers file directory
-            let rel = pathdiff::diff_paths(&no_ext, workers_dir).ok_or(())?;
+            // Try computing relative path
+            if let Some(rel) = pathdiff::diff_paths(&norm_target, &norm_base) {
+                let mut s = rel.to_string_lossy().replace('\\', "/");
 
-            // Stringify + normalize to forward slashes
-            let mut rel_str = rel.to_string_lossy().replace('\\', "/");
+                // Same directory
+                if s.is_empty() {
+                    return "./".to_string();
+                }
 
-            // Ensure we have a leading './' when not starting with '../' or '/'
-            if !rel_str.starts_with(['.', '/']) {
-                rel_str = format!("./{}", rel_str);
+                if !s.starts_with('/') && !s.contains(':') && !s.starts_with('.') {
+                    s = format!("./{}", s);
+                }
+
+                return s;
             }
 
-            // If we collapsed to empty (it can happen if model sits exactly at from_dir/index)
-            if rel_str.is_empty() || rel_str == "." {
-                rel_str = "./".to_string();
-            }
-
-            Ok(rel_str)
+            // FALLBACK: absolute path (normalized)
+            norm_target.to_string_lossy().to_string()
         }
 
         /// Generates import statements for a collection of source items
@@ -47,8 +61,7 @@ impl WorkersGenerator {
                 .into_iter()
                 .map(|item| {
                     let (name, path) = f(item);
-                    let path = rel_path(&path, workers_dir)
-                        .unwrap_or_else(|_| path.to_string_lossy().to_string());
+                    let path = rel_path(&path, workers_dir);
                     format!("import {{ {} }} from \"{}\";", name, path)
                 })
                 .collect::<Vec<_>>()
@@ -57,8 +70,7 @@ impl WorkersGenerator {
 
         let main_import = match &ast.main_source {
             Some(p) => {
-                let path = rel_path(p, workers_dir)
-                    .unwrap_or_else(|_| p.clone().to_string_lossy().to_string());
+                let path = rel_path(p, &workers_dir);
                 format!("import main from \"{path}\"")
             }
             None => String::default(),
@@ -66,21 +78,20 @@ impl WorkersGenerator {
 
         let env_import = match &ast.wrangler_env {
             Some(env) => {
-                let path = rel_path(&env.source_path, workers_dir)
-                    .unwrap_or_else(|_| env.source_path.to_string_lossy().to_string());
+                let path = rel_path(&env.source_path, &workers_dir);
                 format!("import {{ {} }} from \"{}\";", env.name, path)
             }
             None => String::default(),
         };
 
         [
-            imports(&ast.models, workers_dir, |(name, model)| {
+            imports(&ast.models, &workers_dir, |(name, model)| {
                 (name.clone(), model.source_path.clone())
             }),
-            imports(&ast.poos, workers_dir, |(name, poo)| {
+            imports(&ast.poos, &workers_dir, |(name, poo)| {
                 (name.clone(), poo.source_path.clone())
             }),
-            imports(&ast.services, workers_dir, |(name, service)| {
+            imports(&ast.services, &workers_dir, |(name, service)| {
                 (name.clone(), service.source_path.clone())
             }),
             env_import,

@@ -1,12 +1,12 @@
 // GENERATED CODE. DO NOT MODIFY.
 import { CloesceApp } from "cloesce/backend";
 import cidl from "./cidl.json";
-import { PooAcceptYield } from "./seed__poo.cloesce.ts";
-import { PooA } from "./seed__poo.cloesce.ts";
-import { PooB } from "./seed__poo.cloesce.ts";
-import { PooC } from "./seed__poo.cloesce.ts";
+import { PooAcceptYield } from "./seed__poo.cloesce.js";
+import { PooA } from "./seed__poo.cloesce.js";
+import { PooB } from "./seed__poo.cloesce.js";
+import { PooC } from "./seed__poo.cloesce.js";
 
-import { Env } from "./seed__poo.cloesce.ts";
+import { Env } from "./seed__poo.cloesce.js";
 
 const constructorRegistry: Record<string, new () => any> = {
 	PooAcceptYield: PooAcceptYield,

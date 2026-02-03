@@ -1,10 +1,10 @@
 // GENERATED CODE. DO NOT MODIFY.
 import { CloesceApp } from "cloesce/backend";
 import cidl from "./cidl.json";
-import { Weather } from "./seed__bools_dates_ints.cloesce.ts";
+import { Weather } from "./seed__bools_dates_ints.cloesce.js";
 
 
-import { Env } from "./seed__bools_dates_ints.cloesce.ts";
+import { Env } from "./seed__bools_dates_ints.cloesce.js";
 
 const constructorRegistry: Record<string, new () => any> = {
 	Weather: Weather,

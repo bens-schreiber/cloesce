@@ -10,9 +10,8 @@ test:
 	cd src/ts && npm run test && \
 	cd ../orm && cargo test && \
 	cd ../generator && cargo test && \
-	cd ../../tests/regression && cargo run --bin regression && \
+	cd ../../tests/regression && cargo run --bin regression -- --check && \
 	cd ../e2e && npm run test
-
 
 .PHONY: format
 format:

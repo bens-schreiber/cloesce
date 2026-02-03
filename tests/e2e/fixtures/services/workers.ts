@@ -3,10 +3,10 @@ import { CloesceApp } from "cloesce/backend";
 import cidl from "./cidl.json";
 
 
-import { FooService } from "./seed__app.cloesce.ts";
-import { BarService } from "./seed__app.cloesce.ts";
+import { FooService } from "./seed__app.cloesce.js";
+import { BarService } from "./seed__app.cloesce.js";
 
-import main from "./seed__app.cloesce.ts"
+import main from "./seed__app.cloesce.js"
 const constructorRegistry: Record<string, new () => any> = {
 	FooService: FooService,
 	BarService: BarService

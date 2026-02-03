@@ -1,11 +1,11 @@
 // GENERATED CODE. DO NOT MODIFY.
 import { CloesceApp } from "cloesce/backend";
 import cidl from "./cidl.json";
-import { D1BackedModel } from "./seed__r2.cloesce.ts";
-import { PureR2Model } from "./seed__r2.cloesce.ts";
+import { D1BackedModel } from "./seed__r2.cloesce.js";
+import { PureR2Model } from "./seed__r2.cloesce.js";
 
 
-import { Env } from "./seed__r2.cloesce.ts";
+import { Env } from "./seed__r2.cloesce.js";
 
 const constructorRegistry: Record<string, new () => any> = {
 	D1BackedModel: D1BackedModel,

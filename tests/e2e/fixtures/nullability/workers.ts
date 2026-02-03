@@ -1,10 +1,10 @@
 // GENERATED CODE. DO NOT MODIFY.
 import { CloesceApp } from "cloesce/backend";
 import cidl from "./cidl.json";
-import { NullabilityChecks } from "./seed__nullability.cloesce.ts";
+import { NullabilityChecks } from "./seed__nullability.cloesce.js";
 
 
-import { Env } from "./seed__nullability.cloesce.ts";
+import { Env } from "./seed__nullability.cloesce.js";
 
 const constructorRegistry: Record<string, new () => any> = {
 	NullabilityChecks: NullabilityChecks,
