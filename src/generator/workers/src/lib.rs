@@ -1,4 +1,3 @@
-use core::panic;
 use std::path::{Path, PathBuf};
 
 use ast::{ApiMethod, CidlType, CloesceAst, CrudKind, HttpVerb, MediaType, NamedTypedValue};
