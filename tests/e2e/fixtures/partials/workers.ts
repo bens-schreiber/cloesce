@@ -1,10 +1,10 @@
 // GENERATED CODE. DO NOT MODIFY.
 import { CloesceApp } from "cloesce/backend";
 import cidl from "./cidl.json";
-import { Dog } from "./seed__partials.cloesce.ts";
+import { Dog } from "./seed__partials.cloesce.js";
 
 
-import { Env } from "./seed__partials.cloesce.ts";
+import { Env } from "./seed__partials.cloesce.js";
 
 const constructorRegistry: Record<string, new () => any> = {
 	Dog: Dog,

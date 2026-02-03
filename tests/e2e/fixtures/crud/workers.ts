@@ -1,12 +1,12 @@
 // GENERATED CODE. DO NOT MODIFY.
 import { CloesceApp } from "cloesce/backend";
 import cidl from "./cidl.json";
-import { CrudHaver } from "./seed__crud.cloesce.ts";
-import { Parent } from "./seed__crud.cloesce.ts";
-import { Child } from "./seed__crud.cloesce.ts";
+import { CrudHaver } from "./seed__crud.cloesce.js";
+import { Parent } from "./seed__crud.cloesce.js";
+import { Child } from "./seed__crud.cloesce.js";
 
 
-import { Env } from "./seed__crud.cloesce.ts";
+import { Env } from "./seed__crud.cloesce.js";
 
 const constructorRegistry: Record<string, new () => any> = {
 	CrudHaver: CrudHaver,

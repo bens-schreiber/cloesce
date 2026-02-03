@@ -1,15 +1,15 @@
 // GENERATED CODE. DO NOT MODIFY.
 import { CloesceApp } from "cloesce/backend";
 import cidl from "./cidl.json";
-import { B } from "./seed__foreign_keys.cloesce.ts";
-import { Course } from "./seed__foreign_keys.cloesce.ts";
-import { Person } from "./seed__foreign_keys.cloesce.ts";
-import { Student } from "./seed__foreign_keys.cloesce.ts";
-import { A } from "./seed__foreign_keys.cloesce.ts";
-import { Dog } from "./seed__foreign_keys.cloesce.ts";
+import { B } from "./seed__foreign_keys.cloesce.js";
+import { Course } from "./seed__foreign_keys.cloesce.js";
+import { Person } from "./seed__foreign_keys.cloesce.js";
+import { Student } from "./seed__foreign_keys.cloesce.js";
+import { A } from "./seed__foreign_keys.cloesce.js";
+import { Dog } from "./seed__foreign_keys.cloesce.js";
 
 
-import { Env } from "./seed__foreign_keys.cloesce.ts";
+import { Env } from "./seed__foreign_keys.cloesce.js";
 
 const constructorRegistry: Record<string, new () => any> = {
 	B: B,

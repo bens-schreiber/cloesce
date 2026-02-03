@@ -1,10 +1,10 @@
 // GENERATED CODE. DO NOT MODIFY.
 import { CloesceApp } from "cloesce/backend";
 import cidl from "./cidl.json";
-import { BlobHaver } from "./seed__blobs.cloesce.ts";
+import { BlobHaver } from "./seed__blobs.cloesce.js";
 
-import { BlobService } from "./seed__blobs.cloesce.ts";
-import { Env } from "./seed__blobs.cloesce.ts";
+import { BlobService } from "./seed__blobs.cloesce.js";
+import { Env } from "./seed__blobs.cloesce.js";
 
 const constructorRegistry: Record<string, new () => any> = {
 	BlobHaver: BlobHaver,

@@ -5,62 +5,123 @@ use generator_test::{ModelBuilder, create_ast};
 use workers::WorkersGenerator;
 
 #[test]
-fn link_generates_relative_import_for_model() {
-    // Arrange
-    let workers_path = Path::new("/project/workers/index.ts");
+fn link_generates_correct_imports() {
+    // Generates relative import for model
+    {
+        // Arrange
+        let workers_path = Path::new("/project/workers/index.ts");
+        let mut user = ModelBuilder::new("User").id_pk().build();
+        user.source_path = Path::new("/project/models/User.ts").to_path_buf();
+        let ast = create_ast(vec![user]);
 
-    let mut user = ModelBuilder::new("User").id_pk().build();
-    user.source_path = Path::new("/project/models/User.ts").to_path_buf();
+        // Act
+        let result = WorkersGenerator::link(&ast, workers_path);
 
-    let ast = create_ast(vec![user]);
+        // Assert
+        assert!(
+            result.contains(r#"import { User } from "../models/User.js""#),
+            "Expected relative path to models folder, got:\n{result}"
+        );
+    }
 
-    // Act
-    let result = WorkersGenerator::link(&ast, workers_path);
+    // Adds dot slash when model in same directory
+    {
+        // Arrange
+        let workers_path = Path::new("/project/workers/index.ts");
+        let mut thing = ModelBuilder::new("Thing").id_pk().build();
+        thing.source_path = Path::new("/project/workers/Thing.ts").to_path_buf();
+        let ast = create_ast(vec![thing]);
 
-    assert!(
-        result.contains(r#"import { User } from "../models/User""#),
-        "Expected relative path to models folder, got:\n{result}"
-    );
-}
+        // Act
+        let result = WorkersGenerator::link(&ast, workers_path);
 
-#[test]
-fn link_adds_dot_slash_when_model_in_same_directory() {
-    // Arrange
-    let workers_path = Path::new("/project/workers/index.ts");
+        // Assert
+        assert!(
+            result.contains(r#"import { Thing } from "./Thing.js""#),
+            "Expected './Thing' import when model is in same folder:\n{result}"
+        );
+    }
 
-    let mut thing = ModelBuilder::new("Thing").id_pk().build();
-    thing.source_path = Path::new("/project/workers/Thing.ts").to_path_buf();
+    // Falls back to absolute path when relative not possible
+    {
+        // Arrange
+        let workers_path = Path::new("/project/workers/index.ts");
+        let mut alien = ModelBuilder::new("Alien").id_pk().build();
+        alien.source_path = Path::new("C:\\nonrelative\\Alien.ts").to_path_buf();
+        let ast = create_ast(vec![alien]);
 
-    let ast = create_ast(vec![thing]);
+        // Act
+        let result = WorkersGenerator::link(&ast, workers_path);
 
-    // Act
-    let result = WorkersGenerator::link(&ast, workers_path);
+        // Assert
+        assert!(
+            result.contains(r#"import { Alien } from "C:/nonrelative/Alien.js""#),
+            "Expected fallback to absolute path when relative calc fails:\n{result}"
+        );
+    }
 
-    // Assert
-    assert!(
-        result.contains(r#"import { Thing } from "./Thing""#),
-        "Expected './Thing' import when model is in same folder:\n{result}"
-    );
-}
+    // Handles nested paths with forward slashes
+    {
+        // Arrange
+        let workers_path = Path::new("project/src/workers/index.ts");
+        let mut model = ModelBuilder::new("Model").id_pk().build();
+        model.source_path = Path::new("project/src/models/deep/Model.ts").to_path_buf();
+        let ast = create_ast(vec![model]);
 
-#[test]
-fn link_falls_back_to_absolute_path_when_relative_not_possible() {
-    // Arrange
-    let workers_path = Path::new("/project/workers/index.ts");
+        // Act
+        let result = WorkersGenerator::link(&ast, workers_path);
 
-    let mut alien = ModelBuilder::new("Alien").id_pk().build();
-    alien.source_path = Path::new("C:\\nonrelative\\Alien.ts").to_path_buf();
+        // Assert
+        assert!(
+            result.contains(r#"import { Model } from "../models/deep/Model.js""#),
+            "Expected forward-slash nested path, got:\n{result}"
+        );
+    }
 
-    let ast = create_ast(vec![alien]);
+    // Windows absolute path with forward slashes
+    {
+        // Arrange
+        let workers_path =
+            Path::new("C:/Users/vmtest/Desktop/cloescetest/my-cloesce-app/.generated/workers.ts");
+        let mut model = ModelBuilder::new("Model").id_pk().build();
+        model.source_path = Path::new(
+            "C:/Users/vmtest/Desktop/cloescetest/my-cloesce-app/src/data/models.cloesce.ts",
+        )
+        .to_path_buf();
+        let ast = create_ast(vec![model]);
 
-    // Act
-    let result = WorkersGenerator::link(&ast, workers_path);
+        // Act
+        let result = WorkersGenerator::link(&ast, workers_path);
 
-    // Assert
-    assert!(
-        result.contains(r#"import { Alien } from "C:\nonrelative\Alien.ts""#),
-        "Expected fallback to absolute path when relative calc fails:\n{result}"
-    );
+        // Assert
+        assert!(
+            result.contains(r#"import { Model } from "../src/data/models.cloesce.js""#),
+            "Expected correct import for Windows absolute path with forward slashes, got:\n{result}"
+        );
+    }
+
+    // Windows absolute path with backslashes
+    {
+        // Arrange
+        let workers_path = Path::new(
+            "C:\\Users\\vmtest\\Desktop\\cloescetest\\my-cloesce-app\\.generated\\workers.ts",
+        );
+        let mut model = ModelBuilder::new("Model").id_pk().build();
+        model.source_path = Path::new(
+            "C:\\Users\\vmtest\\Desktop\\cloescetest\\my-cloesce-app\\src\\data\\main.cloesce.ts",
+        )
+        .to_path_buf();
+
+        let ast = create_ast(vec![model]);
+        // Act
+        let result = WorkersGenerator::link(&ast, workers_path);
+
+        // Assert
+        assert!(
+            result.contains(r#"import { Model } from "C:/Users/vmtest/Desktop/cloescetest/my-cloesce-app/src/data/main.cloesce.js"#),
+            "Expected correct import for Windows absolute path with backslashes, got:\n{result}"
+        );
+    }
 }
 
 #[test]
