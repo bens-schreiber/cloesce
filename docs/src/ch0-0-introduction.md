@@ -53,4 +53,4 @@ Contributions are welcome at all levels. Join our [Discord](https://discord.gg/s
 
 ## Coalesce
 
-Check out [Coalesce](https://coalesce.intellitect.com), an accelerated web app framework for Vue.js and Entity Framework by [IntelliTect](https://intellitect.com). Cloesce takes much of its inspiration from Coalesce (Cloesce = Cloudflare + Coalesce).
+Check out [Coalesce](https://coalesce.intellitect.com), an accelerated web app framework for Vue.js and Entity Framework by [IntelliTect](https://intellitect.com). Many core concepts of Cloesce come directly from Coalesce (Cloesce = Cloudflare + Coalesce).

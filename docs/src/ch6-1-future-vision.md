@@ -24,6 +24,6 @@ Cloesce should be the best way to develop with Cloudflare. To achieve this, deve
 
 ## Designed for AI Integration
 
-With Cloesce, you write less code. Significantly less. Furthermore, the code you do write is at a high level of abstraction, focusing on only data models and business logic. This design makes Cloesce an ideal candidate for AI assisted development. Not only would creating a project require a fraction of the tokens, but the high level nature of the code means that AI can more easily understand the intent and structure of the application.
+With Cloesce, you write less code. Significantly less. Furthermore, the code you do write is at a high level of abstraction, focusing on only data Models and business logic. This design makes Cloesce an ideal candidate for AI assisted development. Not only would creating a project require a fraction of the tokens, but the high level nature of the code means that AI can more easily understand the intent and structure of the application.
 
 By its stable release, simply asking an AI agent to "Create Twitter with Cloesce" should yield a complete, functional application ready to deploy to Cloudflare Worker in a record low token count.

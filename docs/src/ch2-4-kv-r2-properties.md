@@ -6,7 +6,7 @@ D1 is a powerful relational database solution, but sometimes developers need to 
 
 [Cloudflare KV](https://developers.cloudflare.com/kv/) is a globally distributed key-value storage system. Along with a key and value, KV entries can also have associated metadata.
 
-Cloesce respects the design constraints of KV storage. For models backed purely by KV or R2, the following are not supported:
+Cloesce respects the design constraints of KV storage. For Models backed purely by KV or R2, the following are not supported:
 
 - Relationships  
 - Navigation properties  
@@ -52,7 +52,7 @@ The `allSettings` property demonstrates how Cloesce can fetch via prefix from KV
 
 [Cloudflare R2](https://developers.cloudflare.com/r2/) is an object storage solution similar to [Amazon S3](https://aws.amazon.com/pm/serv-s3/). It allows you to store and retrieve large binary objects.
 
-Just like in KV Models, Cloesce does not support relationships, Navigation Properties, or migrations for purely R2 backed models. 
+Just like in KV Models, Cloesce does not support relationships, Navigation Properties, or migrations for purely R2 backed Models. 
 
 Since R2 is used for storing large objects, the actual data of an R2 object is not fetched automatically when accessing an R2 property to avoid hitting [Worker memory limits](https://developers.cloudflare.com/workers/platform/limits/). Instead, only the metadata of the [`R2Object`](https://developers.cloudflare.com/r2/api/workers/workers-api-reference/#r2object-definition) is retrieved. To fetch the full object data, you can use Model Methods as described in the chapter [Model Methods](./ch2-5-Model-methods.md).
 
