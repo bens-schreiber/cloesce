@@ -27,7 +27,7 @@ With your application built and your database migrated, you're ready to deploy y
    Run the compile command to generate the necessary files for deployment:
 
    ```bash
-   $ npx cloesce compile
+   npx cloesce compile
    ```
 
 4. **Deploy using Wrangler**
@@ -35,7 +35,7 @@ With your application built and your database migrated, you're ready to deploy y
    Publish your application to Cloudflare Workers:
 
    ```bash
-   $ npx wrangler deploy
+   npx wrangler deploy
    ```
 
 5. **Deploy your frontend**
@@ -43,7 +43,7 @@ With your application built and your database migrated, you're ready to deploy y
    If you have a frontend application (e.g., built with Vite), build and deploy it to your preferred hosting service. For example, with [Cloudflare Pages](https://pages.cloudflare.com)
 
    ```bash
-   $ npx wrangler pages deploy ./dist
+   npx wrangler pages deploy ./dist
    ```
 
 

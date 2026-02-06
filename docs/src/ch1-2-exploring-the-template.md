@@ -136,4 +136,4 @@ The `WeatherReport` Model consists of:
 | `SAVE` | Generated CRUD operation | Workers |
 | `LIST` | Generated CRUD operation | Workers |
 
-Read more about how models work in the [Models](./ch2-0-models.md) chapter.
+Read more about how Models work in the [Models](./ch2-0-models.md) chapter.

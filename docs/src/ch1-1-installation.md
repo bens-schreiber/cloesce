@@ -11,21 +11,23 @@ This template sets up a basic Cloesce project structure with all the necessary d
 1. Sign up for a [Cloudflare account](https://dash.cloudflare.com/sign-up/workers-and-pages)
 2. Install [Node.js](https://nodejs.org/) (version `16.17.0` or later)
 
+> *Note*: An account is only necessary if you plan to deploy your Cloesce application. Local development and testing can be done without an account.
+
 ## create-cloesce
 
 To create a new Cloesce project using the `create-cloesce` template, run the following command in your terminal:
 
 ```bash
-$ npx create-cloesce my-cloesce-app
+npx create-cloesce my-cloesce-app
 ```
 
 After running this command, navigate into your new project directory:
 
 ```bash
-$ cd my-cloesce-app
+cd my-cloesce-app
 ```
 
-A simple project structure is set up for you:
+A simple project structure is set up for you.
 ```
 ├── src/
 │   ├── data/           # Example Cloesce Models

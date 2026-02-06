@@ -1,6 +1,6 @@
 # Navigation Properties
 
-In the previous section, we built a basic D1 model with scalar properties. However, relational databases like Cloudflare D1 often involve more complex relationships between tables.
+In the previous section, we built a basic D1 backed Model with scalar properties. However, relational databases like Cloudflare D1 often involve more complex relationships between tables.
 
 In this section, we will explore *Navigation Properties* which allow us to define relationships between different Models.
 
@@ -167,4 +167,4 @@ CREATE TABLE IF NOT EXISTS "CourseStudent" (
 );
 ```
 
-> *Note*: The left column lists the model name that comes first alphabetically; the right column lists the one that comes after.
+> *Note*: The left column lists the Model name that comes first alphabetically; the right column lists the one that comes after.

@@ -27,5 +27,5 @@ Since Models rely on Cloudflare Workers bindings (D1, KV, R2, etc), you will nee
 A basic Miniflare setup is shown in the template project which can be installed with:
 
 ```bash
-$ npx create-cloesce my-cloesce-app
+npx create-cloesce my-cloesce-app
 ```
