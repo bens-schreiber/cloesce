@@ -4,23 +4,23 @@ We can break down the Cloesce architecture into three components, each with thei
 
 ## Frontend
 
-The Frontend layer of Cloesce encompasses all components responsible for interfacing with the user’s project and extracting high level language into the Cloesce Interface Definition Language (CIDL). It serves as the both the entrypoint for compilation and the runtime environment for generated code.
+The Frontend layer of Cloesce encompasses all components responsible for interfacing with the user’s project and extracting high level language into the Cloesce Interface Definition Language (CIDL). It serves as both the entrypoint for compilation and the runtime environment for generated code.
 
 ### IDL Extraction
 
-A key design choice when building Cloesce was to not force users to write their Models in a separate IDL or DSL as seen in tools like gRPC and Prisma. 
+A key design choice when building Cloesce was not to force users to write their Models in a separate IDL or DSL as seen in tools like gRPC and Prisma. 
 
 Instead, we opted to have the Cloesce compiler utilize the source languages AST to extract Model definitions directly from the user's source code. This allows users to define their Models using familiar syntax and semantics, while still benefiting from the powerful features of Cloesce. Of course, this means we must write an extractor for each supported frontend language. Currently, the only supported language is TypeScript.
 
-The Extractor portion of the compiler is responsible for scanning the user's source files (marked with `.cloesce.<lang>`) and identifying Model definitions through stub preprocessor directives. Extraction does not perform any semantic analysis, it simply extracts the Model definitions and their properties into an intermediate representation (the CIDL).
+The Extractor portion of the compiler is responsible for scanning the user's source files (marked with `.cloesce.<lang>`) and identifying Model definitions through stub preprocessor directives. Extraction does not perform any semantic analysis; it simply extracts the Model definitions and their properties into an intermediate representation (the CIDL).
 
 The CIDL describes a full stack project. Every Model definition, Service, API endpoint and Wrangler binding is stored in the CIDL. Currently, this representation is serialized as JSON, but in the future we may explore other formats such as Protocol Buffers or FlatBuffers for better performance and extensibility.
 
-At the end of CIDL Extraction, a `cidl.pre.json` file is produced to semantically validated by the Generator.
+At the end of CIDL Extraction, a `cidl.pre.json` file is produced to be semantically validated by the Generator.
 
 ### Runtime
 
-Beyond extraction, the Frontend layer also includes the runtime environment for workers. Originally, we considered generating entirely standalone code for the Workers, but a shift to instead interpret the CIDL at runtime as if it was the program text allowed us to greatly reduce the amount of generated code, add tests and improve maintainability. Each supported frontend language has its own runtime implementation that can interpret the CIDL using simple state machine logic. Moving as much of the runtime logic into WebAssembly as possible helps portability to other languages in the future.
+Beyond extraction, the Frontend layer also includes the runtime environment for workers. Originally, we considered generating entirely standalone code for the Workers, but shifting to interpret the CIDL at runtime allowed us to greatly reduce the amount of generated code, add tests and improve maintainability. Each supported frontend language has its own runtime implementation that can interpret the CIDL using simple state machine logic. Moving as much of the runtime logic into WebAssembly as possible helps portability to other languages in the future.
 
 The runtime consists of two components: the Router and the ORM. The Router is currently written entirely in TypeScript, while the ORM compiles to WebAssembly from Rust.
 

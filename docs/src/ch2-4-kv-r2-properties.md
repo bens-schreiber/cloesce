@@ -6,7 +6,7 @@ D1 is a powerful relational database solution, but sometimes developers need to 
 
 [Cloudflare KV](https://developers.cloudflare.com/kv/) is a globally distributed key-value storage system. Along with a key and value, KV entries can also have associated metadata.
 
-Cloesce respects the design constraints of KV storage. For models backed purely by KV or R2, the following are not supported:
+Cloesce respects the design constraints of KV storage. For Models backed purely by KV or R2, the following are not supported:
 
 - Relationships  
 - Navigation properties  
@@ -38,13 +38,13 @@ The above Model uses only KV attributes. The `@KeyParam` decorator indicates tha
 
 The `data` property is of type `KValue<unknown>`, which represents a value stored in KV. You can replace `unknown` with any serializable type, but Cloesce will not validate or instantiate the data when fetching it.
 
-The `allSettings` property demonstrates how Cloesce can fetch via prefix from KV. This property will retrieve all KV entries with keys starting with `settings/` and return them as an array of `KValue<unknown>`.
+The `allSettings` property demonstrates how Cloesce can fetch by prefix from KV. This property will retrieve all KV entries with keys starting with `settings/` and return them as an array of `KValue<unknown>`.
 
 [Include Trees](./ch2-3-include-trees.md) can be used with KV Models as well to specify which properties to include when fetching data. By default, no properties are included unless specified in an Include Tree.
 
 > *Note*: KV properties on a Model consider a missing key as a valid state, and will not return 404 errors. Instead, the value inside of the `KValue` will be set to `null`.
 
-> *Note*: `unknown` is a special type to Cloesce designating that no validation should be performed on the data, but it is still stored and retrieved as JSON.
+> *Note*: `unknown` is a special type to Cloesce, designating that no validation should be performed on the data, but it is still stored and retrieved as JSON.
 
 > *Alpha Note*: KV Models do not yet support cache control directives and expiration times. This feature is planned for a future release.
 
@@ -52,7 +52,7 @@ The `allSettings` property demonstrates how Cloesce can fetch via prefix from KV
 
 [Cloudflare R2](https://developers.cloudflare.com/r2/) is an object storage solution similar to [Amazon S3](https://aws.amazon.com/pm/serv-s3/). It allows you to store and retrieve large binary objects.
 
-Just like in KV Models, Cloesce does not support relationships, Navigation Properties, or migrations for purely R2 backed models. 
+Just like in KV Models, Cloesce does not support relationships, Navigation Properties, or migrations for purely R2 backed Models. 
 
 Since R2 is used for storing large objects, the actual data of an R2 object is not fetched automatically when accessing an R2 property to avoid hitting [Worker memory limits](https://developers.cloudflare.com/workers/platform/limits/). Instead, only the metadata of the [`R2Object`](https://developers.cloudflare.com/r2/api/workers/workers-api-reference/#r2object-definition) is retrieved. To fetch the full object data, you can use Model Methods as described in the chapter [Model Methods](./ch2-5-Model-methods.md).
 
@@ -83,7 +83,7 @@ The `file` property is of type `R2Object`, which represents an object stored in 
 
 ## Mixing Data Together
 
-Cloesce allows you to combine D1, KV and R2 properties into a single Model. This provides flexibility in how you structure your data and choose the appropriate storage mechanism for each property.
+Cloesce allows you to combine D1, KV, and R2 properties into a single Model. This provides flexibility in how you structure your data and choose the appropriate storage mechanism for each property.
 
 ```typescript
 import { Model, Integer, KV, KValue, R2, R2Object, KeyParam, IncludeTree } from "cloesce/backend";
@@ -127,4 +127,4 @@ Mixing these storage mechanisms introduces some caveats. Whenever D1 is used in 
 
 However, if a primary key exists and the KV and R2 entries do not, Cloesce considers this a valid state and will place `null` or `undefined` in those properties respectively.
 
-Further, using `KeyParam`s in a Model with D1 limits the capabilities of the ORM, discussed [later in this chapter](./ch2-6-cloesce-orm.md). It is recommended to avoid using `KeyParam`s in Models that also use D1 Navigation Properties.
+Furthermore, using `KeyParam`s in a Model with D1 limits the capabilities of the ORM, discussed [later in this chapter](./ch2-6-cloesce-orm.md). It is recommended to avoid using `KeyParam`s in Models that also use D1 Navigation Properties.

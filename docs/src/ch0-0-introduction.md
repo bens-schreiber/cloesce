@@ -1,7 +1,7 @@
 # Introduction
 
-> *Alpha Note*: Cloesce is under active development, expanding its feature set as it pushes towards [full
-> Cloudflare support, across any language](./ch6-1-future-vision.md). In this alpha, breaking changes can occur between releases.
+> *Alpha Note*: Cloesce is under active development, expanding its feature set as it pushes toward [full
+> Cloudflare support across any language](./ch6-1-future-vision.md). In this alpha, breaking changes can occur between releases.
 
 *The Cloesce Compiler* converts object definitions into a full stack Cloudflare application.
 
@@ -13,7 +13,7 @@ Inspired by
 - [gRPC](https://grpc.io/)
 - and Infrastructure as Code (IaC)
 
-Cloesce is not just a ORM, Migrations Engine, Web Framework, Runtime Validation Library, IaC tool, or API Generator. It is **all of these things and more**, wrapped in a clean paradigm that makes building Cloudflare applications a breeze.
+Cloesce is not just an ORM, migration engine, web framework, runtime validation library, IaC tool, or API Generator. It is **all of these things and more**, wrapped in a clean paradigm that makes building Cloudflare applications a breeze.
 
 <!-- langtabs-start -->
 ```typescript
@@ -31,7 +31,7 @@ class User {
 
     @POST
     async hello(): User {
-        // D1, KV and R2 all hydrated here!
+        // D1, KV, and R2 all hydrated here!
         return this;
     }
 }
@@ -44,7 +44,7 @@ class User {
 ```
 <!-- langtabs-end -->
 
-*How simple can full stack development get?*
+*How easy can full stack development get?*
 
 
 ## Contributing
@@ -53,4 +53,4 @@ Contributions are welcome at all levels. Join our [Discord](https://discord.gg/s
 
 ## Coalesce
 
-Check out [Coalesce](https://coalesce.intellitect.com), an accelerated web app framework for Vue.js and Entity Framework by [IntelliTect](https://intellitect.com). Cloesce takes much of its inspiration from Coalesce (Cloesce = Cloudflare + Coalesce).
+Check out [Coalesce](https://coalesce.intellitect.com), an accelerated web app framework for Vue.js and Entity Framework by [IntelliTect](https://intellitect.com). Many core concepts of Cloesce come directly from Coalesce (Cloesce = Cloudflare + Coalesce).
