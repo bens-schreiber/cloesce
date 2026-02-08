@@ -1,10 +1,10 @@
 # Include Trees
 
-If you try to fetch a Model instance that has Navigation Properties or KV and R2 attributes, you will notice that they are not populated by default (they will be either empty arrays or undefined). This is intentional and is handled by Include Trees.
+If you try to fetch a Model instance that has Navigation Properties or KV and R2 attributes, you will notice that they are not populated by default (they will be either empty arrays or `undefined`). This is intentional and is handled by Include Trees.
 
 ## What are Include Trees?
 
-Include Trees are Cloesce's response to the overfetching and recursive relationship challenges when modeling a relational database with object-oriented paradigms.
+Include Trees are Cloesce's response to the overfetching and recursive relationship challenges when modeling relational databases with object-oriented paradigms.
 
 For example, in the Model definition below, how should Cloesce know how deep to go when fetching a Person and their associated Dog?
 
@@ -29,7 +29,7 @@ export class Person {
 // => { id: 1, dogs: [ { id: 1, owner: { id: 1, dogs: [ ... ] } } ] } ad infinitum
 ```
 
-If we were to follow this structure naively, fetching a `Person` would lead to fetching their `Dog`, which would lead to fetching the same `Person` again, and so on, infinitely.
+If we were to follow this structure naively, fetching a `Person` would lead to fetching their `Dog`, which would lead to fetching the same `Person` again, and so on, resulting in an infinite loop of data retrieval.
 
 Include Trees allow developers to explicitly state which related Navigation Properties should be included in the query results, preventing overfetching. If a Navigation Property is not included in the Include Tree, it will remain `undefined` (for singular relationships) or an empty array (for collections).
 
@@ -74,6 +74,6 @@ In this example, we defined a static property `withDogs` on the `Person` Model t
 
 During Cloesce's extraction phase, the compiler recognizes the `IncludeTree` type and processes the structure accordingly. 
 
-Client code generation will then have the option to use this Include Tree when querying for `Person` instances. See the [Cloesce ORM](./ch2-6-cloesce-orm.md) chapter and [Model Methods](./ch2-5-Model-methods.md) for more details on how to use Include Trees in queries.
+Client code generation will then have the option to use this Include Tree when querying for `Person` instances. See the [Cloesce ORM chapter](./ch2-6-cloesce-orm.md) and [Model Methods](./ch2-5-Model-methods.md) for more details on how to use Include Trees in queries.
 
 > Include Trees are not limited to only D1 backed Models; they can be used with KV and R2 as well.

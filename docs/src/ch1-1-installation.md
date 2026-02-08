@@ -4,7 +4,7 @@
 
 The simplest way to get a Cloesce project up and running is to use the `create-cloesce` template. 
 
-This template sets up a basic Cloesce project structure with all the necessary dependencies and configurations, example Models, and example tests to help get you started quickly. The template includes a sample HTML frontend with Vite which should be replaced with your frontend of choice.
+This template sets up a basic Cloesce project structure with all the necessary dependencies, configurations, example Models, and example tests to help get you started quickly. The template includes a sample HTML frontend with Vite which should be replaced with your frontend of choice.
 
 ## Prerequisites
 
@@ -27,12 +27,12 @@ After running this command, navigate into your new project directory:
 cd my-cloesce-app
 ```
 
-A simple project structure is set up for you.
+A simple project structure is created for you.
 ```
 ├── src/
 │   ├── data/           # Example Cloesce Models
 │   └── web/            # Frontend web assets
-├── tests/              # Unit tests for example Models
+├── test/               # Unit tests for example Models
 ├── migrations/         # Database migration files
 ├── cloesce.config.json # Cloesce compiler configuration
 └── package.json        # Project dependencies and scripts

@@ -4,9 +4,9 @@ After creating your project with `create-cloesce`, several example files are inc
 
 ## Wrangler Environment
 
-All Cloudflare Workers define a [a set of bindings](https://developers.cloudflare.com/workers/configuration/environment-variables/) that provision resources such as [D1 databases](https://developers.cloudflare.com/d1/), [R2 buckets](https://developers.cloudflare.com/r2/), [KV namespaces](https://developers.cloudflare.com/kv/concepts/kv-namespaces/), and miscellaneous environment variables.
+All Cloudflare Workers define [a set of bindings](https://developers.cloudflare.com/workers/configuration/environment-variables/) that provision resources such as [D1 databases](https://developers.cloudflare.com/d1/), [R2 buckets](https://developers.cloudflare.com/r2/), [KV namespaces](https://developers.cloudflare.com/kv/concepts/kv-namespaces/), and miscellaneous environment variables.
 
-Cloesce uses a class decorated with `@WranglerEnv` to define the Wrangler Environment for your application, tailoring to the resources you need.
+Cloesce uses a class decorated with `@WranglerEnv` to define the Wrangler Environment for your application, tailored to the resources you need.
 
 In `src/data/main.ts`, a basic Wrangler Environment has been defined.
 
@@ -29,7 +29,7 @@ Read more about the Wrangler Environment in the [Wrangler Environment](./ch2-7-w
 
 Cloudflare Workers are serverless functions that run at Cloudflare’s edge and respond to HTTP requests. Each Worker defines an entry point function through which all requests are routed.
 
-Cloesce allows this same functionality through a custom `main` definition (seen in  `src/data/main.ts`)
+Cloesce allows this same functionality through a custom `main` definition (seen in `src/data/main.ts`)
 
 ```typescript
 export default async function main(
@@ -39,8 +39,6 @@ export default async function main(
     ctx: ExecutionContext
 ): Promise<Response> {...}
 ```
-
-<!-- Just like a standard Cloudflare Worker, this function receives a `Request`, `Env` and `ExecutionContext` object. Additionally, it receives a `CloesceApp` instance that you can use to handle routing and Model operations. -->
 
 Just like the standard Workers entrypoint, this function receives the inbound `Request`, the Wrangler Environment defined by the decorated `@WranglerEnv` class, and an `ExecutionContext` for managing background tasks.
 
@@ -108,7 +106,7 @@ export class WeatherReport {
 ```
 </details>
 
-The `Weather` Model conists of:
+The `Weather` Model consists of:
 
 | Feature | Type / Description | Source / Layer |
 |---------|-----------------|----------------|

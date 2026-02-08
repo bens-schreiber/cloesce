@@ -2,13 +2,13 @@
 
 > *Alpha Note*: The ORM is subject to change as new features are added.
 
-During the hydration step of the Cloesce runtime, all of a Models data is fetched from it's various defined sources (D1, KV, R2) and combined into a single object instance. This unified object can then be used seamlessly within your application code.
+During the hydration step of the Cloesce runtime, all of a Model's data is fetched from its various defined sources (D1, KV, R2) and combined into a single object instance. This unified object can then be used seamlessly within your application code.
 
-Luckily, Cloesce doesn't keep this functionality to itself, it is made available through the `Orm` class in the `cloesce/backend` package.
+Luckily, Cloesce doesn't keep this functionality to itself; it is made available through the `Orm` class in the `cloesce/backend` package.
 
 ## Getting and Listing Models
 
-Cloesce provides two basic methods to select a Model from D1, KV and R2:
+Cloesce provides two basic methods to select a Model from D1, KV, and R2:
 
 ```typescript
 import { Orm } from "cloesce/backend";
@@ -34,7 +34,7 @@ The `list` method simply takes an optional Include Tree to specify which navigat
 
 ### Select, Map and Hydrate
 
-Typically, when using a relational database, you require more advanced filtering capabilities. Instead of creating a DSL for querying models (such as [LINQ](https://learn.microsoft.com/en-us/dotnet/csharp/linq/)) or advanced libraries like [Drizzle](https://orm.drizzle.team), Cloesce takes a stance that when you need to do a SQL query-- write it in SQL.
+Typically, when using a relational database, you require more advanced filtering capabilities. Instead of creating a DSL for querying Models (such as [LINQ](https://learn.microsoft.com/en-us/dotnet/csharp/linq/)) or advanced libraries like [Drizzle](https://orm.drizzle.team), Cloesce takes a stance that when you need to do a SQL query-- write it in SQL directly.
 
 However, the logic of `LEFT JOIN`ing related tables based on navigation properties can be tedious and error prone. Additionally, some way to turn the flat result set of a SQL query into JSON objects, and some way to turn those JSON objects into fully fledged Model instances with KV and R2 properties populated is needed.
 
@@ -99,7 +99,7 @@ LEFT JOIN "Cat" AS "Cat_3"
     ON "Person_1"."id" = "Cat_3"."personId"
 ```
 
-Utilizing the aliased results in a CTE expression allows for easy filtering based on navigation properties:
+Utilizing the aliased results in a CTE allows for easy filtering based on navigation properties:
 
 ```typescript
 const selectSql = Orm.select(User, {
@@ -113,7 +113,7 @@ const query = `
     SELECT * FROM BossCte WHERE
         [persons.dogs.id] = 5
     AND
-        [persons.cat.id] = 10
+        [persons.cats.id] = 10
     AND
         [persons.id] = 15
 `;
@@ -155,7 +155,7 @@ const result = await orm.upsert(User, {
     name: "New User",
     friends: [
         {
-            // Again assume Friend.id is an integer
+            // Again, assume Friend.id is an integer
             name: "Friend 1"
         },
         {

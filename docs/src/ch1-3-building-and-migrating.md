@@ -3,7 +3,7 @@
 Building a Cloesce project generally consists of three steps:
 1. Compilation
 2. Running database migrations
-3. Building your frontend code.
+3. Building your frontend code
 
 ## Compiling
 
@@ -15,10 +15,10 @@ npx cloesce compile
 
 This command looks for a `cloesce.config.json` file in your project root, which contains configuration settings for the Cloesce compiler. If the file is not found, or settings are omitted, default values will be used.
 
-After compilation, a `.generated` folder is created in your project root. This should __not__ be committed to source control, as it is regenerated on each build. The folder contains:
-- `cidl.json`
+After compilation, a `.generated` folder is created in your project root. This should **not** be committed to source control, as it is regenerated on each build. The folder contains:
+- `cidl.json`:
     
-    The Cloesce Interface Definition Language file, representing your data Models and their relationships. This file is used internally by Cloesce for generating client code, migrations, and running the Cloudflare Worker.
+    The Cloesce Interface Definition Language file, representing your data Models and their relationships. This file is used internally by Cloesce for generating client code, migrations, and running the Cloudflare Worker runtime.
 
 - `client.ts`: 
     
@@ -48,7 +48,7 @@ npx wrangler d1 migrations apply <database-binding-name>
 
 ## Running
 
-After compiling and applying migrations, you can build and run your Cloudflare Worker locally using Wrangler:
+After compiling and applying migrations, you can build and run your application locally using Wrangler:
 
 ```bash
 npx wrangler dev --port <port-number>
