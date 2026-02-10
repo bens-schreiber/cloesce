@@ -232,6 +232,10 @@ export class Orm {
             const arr: number[] = current[col.value.name];
             current[col.value.name] = new Uint8Array(arr);
           }
+          case "Boolean": {
+            current[col.value.name] = Boolean(current[col.value.name]);
+            break;
+          }
           default: {
             break;
           }

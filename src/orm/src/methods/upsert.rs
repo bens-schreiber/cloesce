@@ -621,17 +621,11 @@ fn validate_json_to_cidl(
     }
 
     match cidl_type.root_type() {
-        CidlType::Integer | CidlType::Boolean => {
-            ensure!(
-                matches!(value, Value::Number(_)),
-                OrmErrorKind::TypeMismatch,
-                "{}.{}",
-                model_name,
-                attr_name
-            );
-
-            Ok(Expr::val(value.as_i64().unwrap()).into())
-        }
+        CidlType::Integer | CidlType::Boolean => match value {
+            Value::Number(n) if n.is_i64() => Ok(Expr::val(n.as_i64().unwrap()).into()),
+            Value::Bool(b) => Ok(Expr::val(if *b { 1 } else { 0 }).into()),
+            _ => fail!(OrmErrorKind::TypeMismatch, "{}.{}", model_name, attr_name),
+        },
         CidlType::Real => {
             ensure!(
                 matches!(value, Value::Number(_)),
@@ -866,13 +860,15 @@ mod test {
             .col("color", CidlType::Text, None)
             .col("age", CidlType::Integer, None)
             .col("address", CidlType::nullable(CidlType::Text), None)
+            .col("is_tired", CidlType::Boolean, None)
             .build();
 
         let new_model = json!({
             "id": 1,
             "color": "brown",
             "age": 7,
-            "address": null
+            "address": null,
+            "is_tired": true
         });
 
         let mut meta = HashMap::new();
@@ -889,15 +885,20 @@ mod test {
         let stmt1 = &res[0];
         expected_str!(
             stmt1.query,
-            r#"INSERT INTO "Horse" ("color", "age", "address", "id") VALUES (?, ?, null, ?)"#
+            r#"INSERT INTO "Horse" ("color", "age", "address",  "is_tired", "id") VALUES (?, ?, null, ?, ?)"#
         );
         expected_str!(
             stmt1.query,
-            r#"ON CONFLICT ("id") DO UPDATE SET "color" = "excluded"."color", "age" = "excluded"."age", "address" = "excluded"."address""#
+            r#"ON CONFLICT ("id") DO UPDATE SET "color" = "excluded"."color", "age" = "excluded"."age", "address" = "excluded"."address", "is_tired" = "excluded"."is_tired"#
         );
         assert_eq!(
             *stmt1.values,
-            vec![Value::from("brown"), Value::from(7i64), Value::from(1i64)]
+            vec![
+                Value::from("brown"),
+                Value::from(7i64),
+                Value::from(1i64),
+                Value::from(1i64)
+            ]
         );
 
         let stmt2 = &res[1];
@@ -921,6 +922,7 @@ mod test {
         assert_eq!(row.try_get::<String, _>("color").unwrap(), "brown");
         assert_eq!(row.try_get::<i64, _>("age").unwrap(), 7);
         assert_eq!(row.try_get::<Option<String>, _>("address").unwrap(), None);
+        assert!(row.try_get::<bool, _>("is_tired").unwrap());
     }
 
     #[sqlx::test]
