@@ -621,11 +621,28 @@ fn validate_json_to_cidl(
     }
 
     match cidl_type.root_type() {
-        CidlType::Integer | CidlType::Boolean => match value {
-            Value::Number(n) if n.is_i64() => Ok(Expr::val(n.as_i64().unwrap()).into()),
-            Value::Bool(b) => Ok(Expr::val(if *b { 1 } else { 0 }).into()),
-            _ => fail!(OrmErrorKind::TypeMismatch, "{}.{}", model_name, attr_name),
-        },
+        CidlType::Integer => {
+            ensure!(
+                matches!(value, Value::Number(n) if n.is_i64()),
+                OrmErrorKind::TypeMismatch,
+                "{}.{}",
+                model_name,
+                attr_name
+            );
+
+            Ok(Expr::val(value.as_i64().unwrap()).into())
+        }
+        CidlType::Boolean => {
+            ensure!(
+                matches!(value, Value::Bool(_)),
+                OrmErrorKind::TypeMismatch,
+                "{}.{}",
+                model_name,
+                attr_name
+            );
+
+            Ok(Expr::val(if value.as_bool().unwrap() { 1 } else { 0 }).into())
+        }
         CidlType::Real => {
             ensure!(
                 matches!(value, Value::Number(_)),
