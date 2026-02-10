@@ -37,42 +37,245 @@ impl WranglerGenerator {
     }
 
     pub fn generate(&mut self, spec: WranglerSpec, mut wrangler_file: File) {
+        if let Some(name) = &spec.name {
+            self.insert("name".into(), name.clone());
+        }
+
+        if let Some(date) = &spec.compatibility_date {
+            self.insert("compatibility_date".into(), date.clone());
+        }
+
+        if let Some(main) = &spec.main {
+            self.insert("main".into(), main.clone());
+        }
+
         match self {
             WranglerGenerator::Json(val) => {
-                if let Some(name) = &spec.name {
-                    val["name"] = serde_json::to_value(name).expect("JSON to serialize");
-                }
-                if let Some(date) = &spec.compatibility_date {
-                    val["compatibility_date"] =
-                        serde_json::to_value(date).expect("JSON to serialize");
-                }
-                if let Some(main) = &spec.main {
-                    val["main"] = serde_json::to_value(main).expect("JSON to serialize");
-                }
+                let root = if let JsonValue::Object(map) = val {
+                    map
+                } else {
+                    panic!("Expected JSON root to be an object");
+                };
 
                 if !spec.d1_databases.is_empty() {
-                    let existing = if let Some(arr) =
-                        val.get_mut("d1_databases").and_then(|v| v.as_array_mut())
-                    {
-                        arr
+                    let arr = root
+                        .entry("d1_databases".to_string())
+                        .or_insert_with(|| JsonValue::Array(vec![]))
+                        .as_array_mut()
+                        .expect("d1_databases must be an array");
+
+                    for db in &spec.d1_databases {
+                        let binding = db.binding.as_deref();
+
+                        if let Some(JsonValue::Object(existing)) = arr
+                            .iter_mut()
+                            .find(|e| e.get("binding").and_then(|b| b.as_str()) == binding)
+                        {
+                            if let Some(id) = &db.database_id {
+                                existing.insert(
+                                    "database_id".into(),
+                                    serde_json::to_value(id).expect("JSON to serialize"),
+                                );
+                            }
+                            if let Some(name) = &db.database_name {
+                                existing.insert(
+                                    "database_name".into(),
+                                    serde_json::to_value(name).expect("JSON to serialize"),
+                                );
+                            }
+                        } else {
+                            arr.push(serde_json::to_value(db).unwrap());
+                        }
+                    }
+                }
+
+                if !spec.kv_namespaces.is_empty() {
+                    let arr = root
+                        .entry("kv_namespaces".to_string())
+                        .or_insert_with(|| JsonValue::Array(vec![]))
+                        .as_array_mut()
+                        .expect("kv_namespaces must be an array");
+
+                    for ns in &spec.kv_namespaces {
+                        let binding = ns.binding.as_deref();
+
+                        if let Some(JsonValue::Object(existing)) = arr
+                            .iter_mut()
+                            .find(|e| e.get("binding").and_then(|b| b.as_str()) == binding)
+                        {
+                            if let Some(id) = &ns.id {
+                                existing.insert(
+                                    "id".into(),
+                                    serde_json::to_value(id).expect("JSON to serialize"),
+                                );
+                            }
+                        } else {
+                            arr.push(serde_json::to_value(ns).unwrap());
+                        }
+                    }
+                }
+
+                if !spec.r2_buckets.is_empty() {
+                    let arr = root
+                        .entry("r2_buckets".to_string())
+                        .or_insert_with(|| JsonValue::Array(vec![]))
+                        .as_array_mut()
+                        .expect("r2_buckets must be an array");
+
+                    for bucket in &spec.r2_buckets {
+                        let binding = bucket.binding.as_deref();
+
+                        if let Some(JsonValue::Object(existing)) = arr
+                            .iter_mut()
+                            .find(|e| e.get("binding").and_then(|b| b.as_str()) == binding)
+                        {
+                            if let Some(name) = &bucket.bucket_name {
+                                existing.insert(
+                                    "bucket_name".into(),
+                                    serde_json::to_value(name).expect("JSON to serialize"),
+                                );
+                            }
+                        } else {
+                            arr.push(serde_json::to_value(bucket).unwrap());
+                        }
+                    }
+                }
+
+                if !spec.vars.is_empty() {
+                    root.insert(
+                        "vars".into(),
+                        serde_json::to_value(&spec.vars).expect("JSON to serialize"),
+                    );
+                }
+            }
+            WranglerGenerator::Toml(val) => {
+                let root = if let TomlValue::Table(map) = val {
+                    map
+                } else {
+                    panic!("Expected TOML root to be a table");
+                };
+
+                if !spec.d1_databases.is_empty() {
+                    let arr = root
+                        .entry("d1_databases")
+                        .or_insert_with(|| TomlValue::Array(vec![]))
+                        .as_array_mut()
+                        .expect("d1_databases must be an array");
+
+                    for db in &spec.d1_databases {
+                        let binding = db.binding.as_deref();
+
+                        if let Some(TomlValue::Table(existing)) = arr
+                            .iter_mut()
+                            .find(|e| e.get("binding").and_then(|b| b.as_str()) == binding)
+                        {
+                            if let Some(id) = &db.database_id {
+                                existing.insert(
+                                    "database_id".to_string(),
+                                    TomlValue::String(id.clone()),
+                                );
+                            }
+                            if let Some(name) = &db.database_name {
+                                existing.insert(
+                                    "database_name".to_string(),
+                                    TomlValue::String(name.clone()),
+                                );
+                            }
+                        } else {
+                            arr.push(TomlValue::try_from(db).unwrap());
+                        }
+                    }
+                }
+
+                if !spec.kv_namespaces.is_empty() {
+                    let arr = root
+                        .entry("kv_namespaces")
+                        .or_insert_with(|| TomlValue::Array(vec![]))
+                        .as_array_mut()
+                        .expect("kv_namespaces must be an array");
+
+                    for ns in &spec.kv_namespaces {
+                        let binding = ns.binding.as_deref();
+
+                        if let Some(TomlValue::Table(existing)) = arr
+                            .iter_mut()
+                            .find(|e| e.get("binding").and_then(|b| b.as_str()) == binding)
+                        {
+                            if let Some(id) = &ns.id {
+                                existing.insert("id".to_string(), TomlValue::String(id.clone()));
+                            }
+                        } else {
+                            arr.push(TomlValue::try_from(ns).unwrap());
+                        }
+                    }
+                }
+
+                if !spec.r2_buckets.is_empty() {
+                    let arr = root
+                        .entry("r2_buckets")
+                        .or_insert_with(|| TomlValue::Array(vec![]))
+                        .as_array_mut()
+                        .expect("r2_buckets must be an array");
+
+                    for bucket in &spec.r2_buckets {
+                        let binding = bucket.binding.as_deref();
+
+                        if let Some(TomlValue::Table(existing)) = arr
+                            .iter_mut()
+                            .find(|e| e.get("binding").and_then(|b| b.as_str()) == binding)
+                        {
+                            if let Some(name) = &bucket.bucket_name {
+                                existing.insert(
+                                    "bucket_name".to_string(),
+                                    TomlValue::String(name.clone()),
+                                );
+                            }
+                        } else {
+                            arr.push(TomlValue::try_from(bucket).unwrap());
+                        }
+                    }
+                }
+
+                if !spec.vars.is_empty() {
+                    root.insert(
+                        "vars".into(),
+                        TomlValue::try_from(&spec.vars).expect("TOML to serialize"),
+                    );
+                }
+            }
+        }
+
+        if !spec.d1_databases.is_empty() {
+            match self {
+                WranglerGenerator::Json(value) => {
+                    let existing = if let JsonValue::Object(map) = value {
+                        map.entry("d1_databases".to_string())
+                            .or_insert_with(|| JsonValue::Array(vec![]))
+                            .as_array_mut()
+                            .expect("d1_databases must be an array")
                     } else {
-                        val["d1_databases"] = JsonValue::Array(vec![]);
-                        val["d1_databases"].as_array_mut().unwrap()
+                        panic!("Expected JSON root to be an object");
                     };
 
                     for db in &spec.d1_databases {
                         let binding = db.binding.as_deref();
 
-                        if let Some(existing_db) = existing
+                        if let Some(JsonValue::Object(existing)) = existing
                             .iter_mut()
                             .find(|e| e.get("binding").and_then(|b| b.as_str()) == binding)
                         {
                             // Only overwrite known fields
                             if let Some(id) = &db.database_id {
-                                existing_db["database_id"] = id.clone().into();
+                                existing.insert(
+                                    "database_id".into(),
+                                    serde_json::to_value(id).expect("JSON to serialize"),
+                                );
                             }
                             if let Some(name) = &db.database_name {
-                                existing_db["database_name"] = name.clone().into();
+                                existing.insert(
+                                    "database_name".into(),
+                                    serde_json::to_value(name).expect("JSON to serialize"),
+                                );
                             }
                         } else {
                             // Insert new entry
@@ -80,84 +283,39 @@ impl WranglerGenerator {
                         }
                     }
                 }
-
-                if !spec.kv_namespaces.is_empty() {
-                    val["kv_namespaces"] =
-                        serde_json::to_value(&spec.kv_namespaces).expect("JSON to serialize");
-                }
-
-                if !spec.r2_buckets.is_empty() {
-                    val["r2_buckets"] =
-                        serde_json::to_value(&spec.kv_namespaces).expect("JSON to serialize");
-                }
-
-                if !spec.vars.is_empty() {
-                    val["vars"] = serde_json::to_value(&spec.vars).expect("JSON to serialize");
-                }
-            }
-            WranglerGenerator::Toml(val) => {
-                if let toml::Value::Table(table) = val {
-                    if let Some(name) = &spec.name {
-                        table.insert("name".to_string(), toml::Value::String(name.clone()));
-                    }
-                    if let Some(date) = &spec.compatibility_date {
-                        table.insert(
-                            "compatibility_date".to_string(),
-                            toml::Value::String(date.clone()),
-                        );
-                    }
-                    if let Some(main) = &spec.main {
-                        table.insert("main".to_string(), toml::Value::String(main.clone()));
-                    }
-
-                    if !spec.d1_databases.is_empty() {
-                        let arr = table
-                            .entry("d1_databases")
-                            .or_insert_with(|| toml::Value::Array(vec![]))
+                WranglerGenerator::Toml(value) => {
+                    let existing = if let TomlValue::Table(map) = value {
+                        map.entry("d1_databases".to_string())
+                            .or_insert_with(|| TomlValue::Array(vec![]))
                             .as_array_mut()
-                            .expect("d1_databases must be an array");
+                            .expect("d1_databases must be an array")
+                    } else {
+                        panic!("Expected TOML root to be a table");
+                    };
 
-                        for db in &spec.d1_databases {
-                            let binding = db.binding.as_deref();
+                    for db in &spec.d1_databases {
+                        let binding = db.binding.as_deref();
 
-                            if let Some(existing) = arr
-                                .iter_mut()
-                                .find(|e| e.get("binding").and_then(|b| b.as_str()) == binding)
-                            {
-                                if let Some(id) = &db.database_id {
-                                    existing["database_id"] = toml::Value::String(id.clone());
-                                }
-                                if let Some(name) = &db.database_name {
-                                    existing["database_name"] = toml::Value::String(name.clone());
-                                }
-                            } else {
-                                arr.push(toml::Value::try_from(db).unwrap());
+                        if let Some(TomlValue::Table(existing)) = existing
+                            .iter_mut()
+                            .find(|e| e.get("binding").and_then(|b| b.as_str()) == binding)
+                        {
+                            // Only overwrite known fields
+                            if let Some(id) = &db.database_id {
+                                existing
+                                    .insert("database_id".into(), TomlValue::String(id.clone()));
                             }
+                            if let Some(name) = &db.database_name {
+                                existing.insert(
+                                    "database_name".into(),
+                                    TomlValue::String(name.clone()),
+                                );
+                            }
+                        } else {
+                            // Insert new entry
+                            existing.push(TomlValue::try_from(db).unwrap());
                         }
                     }
-
-                    if !spec.kv_namespaces.is_empty() {
-                        table.insert(
-                            "kv_namespaces".to_string(),
-                            toml::Value::try_from(&spec.kv_namespaces).expect("TOML to serialize"),
-                        );
-                    }
-
-                    if !spec.r2_buckets.is_empty() {
-                        table.insert(
-                            "r2_buckets".to_string(),
-                            toml::Value::try_from(&spec.r2_buckets).expect("TOML to serialize"),
-                        );
-                    }
-
-                    if !spec.vars.is_empty() {
-                        table.insert(
-                            "vars".to_string(),
-                            toml::Value::try_from(&spec.vars).expect("TOML to serialize"),
-                        );
-                    }
-                } else {
-                    panic!("Expected TOML root to be a table");
                 }
             }
         }
@@ -182,6 +340,23 @@ impl WranglerGenerator {
             }
             WranglerGenerator::Toml(val) => {
                 WranglerSpec::deserialize(val.clone()).expect("Failed to deserialize wrangler.toml")
+            }
+        }
+    }
+
+    pub fn insert(&mut self, key: String, value: impl Into<JsonValue> + Into<TomlValue>) {
+        match self {
+            WranglerGenerator::Json(val) => {
+                let JsonValue::Object(map) = val else {
+                    panic!("Expected JSON root to be an object");
+                };
+                map.insert(key, value.into());
+            }
+            WranglerGenerator::Toml(val) => {
+                let TomlValue::Table(table) = val else {
+                    panic!("Expected TOML root to be a table");
+                };
+                table.insert(key, value.into());
             }
         }
     }
