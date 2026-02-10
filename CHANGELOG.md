@@ -1,3 +1,14 @@
+# [0.1.2] - 2026-2-3
+
+### Added
+
+### Changed
+
+### Fixed
+
+- boolean data types in the `upsert` expected integers
+- boolean data types after `hydrate` should be booleans, not integers
+
 # [0.1.1] - 2026-2-3
 
 ### Added
