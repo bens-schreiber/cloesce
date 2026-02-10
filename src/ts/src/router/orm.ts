@@ -231,6 +231,7 @@ export class Orm {
           case "Blob": {
             const arr: number[] = current[col.value.name];
             current[col.value.name] = new Uint8Array(arr);
+            break;
           }
           case "Boolean": {
             current[col.value.name] = Boolean(current[col.value.name]);
