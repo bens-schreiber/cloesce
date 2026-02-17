@@ -20,10 +20,12 @@ export type CidlType =
   | "Boolean"
   | "Stream"
   | "JsonValue"
+  | "R2Object"
   | { DataSource: string }
   | { Inject: string }
   | { Object: string }
   | { Partial: string }
+  | { KvObject: CidlType }
   | { Nullable: CidlType }
   | { Array: CidlType }
   | { HttpResult: CidlType };
