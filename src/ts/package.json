@@ -33,6 +33,10 @@
     "./backend": {
       "types": "./dist/ui/backend.d.ts",
       "import": "./dist/ui/backend.js"
+    },
+    "./vite": {
+      "types": "./dist/vite.d.ts",
+      "import": "./dist/vite.js"
     }
   },
   "bin": {
@@ -42,6 +46,9 @@
     "*": {
       "backend": [
         "dist/ui/backend.d.ts"
+      ],
+      "vite": [
+        "dist/vite.d.ts"
       ]
     }
   },
