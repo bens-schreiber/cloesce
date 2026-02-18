@@ -14,6 +14,13 @@ export interface CloescePluginOptions {
      */
     include?: string[];
     /**
+     * File path patterns that prevent recompilation when matched.
+     * Useful to exclude generated output directories from triggering a watch loop.
+     * Matching is performed as a simple substring check on the full file path.
+     * @default [".generated"]
+     */
+    exclude?: string[];
+    /**
      * Additional directories outside Vite's root to watch for changes.
      * Useful when your .cloesce.ts files live outside the Vite root.
      * @default ["src/data"]
@@ -37,6 +44,7 @@ export interface CloescePluginOptions {
  */
 export function cloesce(options: CloescePluginOptions = {}): Plugin {
     const include = options.include ?? [];
+    const exclude = options.exclude ?? [".generated"];
     const watchDirs = options.watchDirs ?? ["src/data"];
     let isCompiling = false;
 
@@ -53,20 +61,19 @@ export function cloesce(options: CloescePluginOptions = {}): Plugin {
             if (include.length > 0 && !include.some((pattern) => file.includes(pattern))) {
                 return;
             }
+            if (exclude.some((pattern) => file.includes(pattern))) {
+                return;
+            }
             if (isCompiling) {
                 return;
             }
             isCompiling = true;
             server.config.logger.info("[cloesce] Compiling...", { timestamp: true });
             try {
-                const { stdout, stderr } = await execAsync("npx cloesce compile");
-                if (stdout) server.config.logger.info(stdout);
-                if (stderr) server.config.logger.warn(stderr);
-                server.config.logger.info("[cloesce] Compile completed", { timestamp: true });
+                await execAsync("npx cloesce compile");
+                server.config.logger.info("[cloesce] Compiled", { timestamp: true });
             } catch (error: any) {
-                server.config.logger.error(`[cloesce] Compile failed: ${error.message}`);
-                if (error.stdout) server.config.logger.error(error.stdout);
-                if (error.stderr) server.config.logger.error(error.stderr);
+                server.config.logger.error(`[cloesce] Error: ${error.message}`, { timestamp: true });
             } finally {
                 isCompiling = false;
             }
@@ -77,16 +84,12 @@ export function cloesce(options: CloescePluginOptions = {}): Plugin {
                 return;
             }
             isCompiling = true;
-            this.warn("[cloesce] Running initial compile...");
+            this.warn("[cloesce] Compiling...");
             try {
-                const { stdout, stderr } = await execAsync("npx cloesce compile");
-                if (stdout) this.warn(stdout);
-                if (stderr) this.warn(stderr);
-                this.warn("[cloesce] Initial compile completed");
+                await execAsync("npx cloesce compile");
+                this.warn("[cloesce] Compiled");
             } catch (error: any) {
-                this.warn(`[cloesce] Initial compile failed: ${error.message}`);
-                if (error.stdout) this.warn(error.stdout);
-                if (error.stderr) this.warn(error.stderr);
+                this.warn(`[cloesce] Error: ${error.message}`);
             } finally {
                 isCompiling = false;
             }

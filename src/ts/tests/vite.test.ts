@@ -72,6 +72,24 @@ describe("cloesce vite plugin", () => {
             expect(mockExecImpl).toHaveBeenCalledOnce();
         });
 
+        test("skips file matching default exclude pattern (.generated)", async () => {
+            const plugin = cloesce();
+            await (plugin as any).hotUpdate({ file: "/project/.generated/client.ts", server: makeServer() });
+            expect(mockExecImpl).not.toHaveBeenCalled();
+        });
+
+        test("skips file matching custom exclude pattern", async () => {
+            const plugin = cloesce({ exclude: ["/dist/"] });
+            await (plugin as any).hotUpdate({ file: "/project/dist/output.ts", server: makeServer() });
+            expect(mockExecImpl).not.toHaveBeenCalled();
+        });
+
+        test("exclude takes priority over include", async () => {
+            const plugin = cloesce({ include: ["/src/data/"], exclude: ["/src/data/.generated/"] });
+            await (plugin as any).hotUpdate({ file: "/src/data/.generated/client.ts", server: makeServer() });
+            expect(mockExecImpl).not.toHaveBeenCalled();
+        });
+
         test("prevents concurrent compilations", async () => {
             let resolveFirst!: () => void;
             mockExecImpl.mockImplementation((_cmd: string, cb: Function) => {
@@ -112,6 +130,7 @@ describe("cloesce vite plugin", () => {
 
             expect(server.config.logger.error).toHaveBeenCalledWith(
                 expect.stringContaining("compile error"),
+                expect.anything(),
             );
         });
     });
