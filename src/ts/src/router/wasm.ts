@@ -42,6 +42,13 @@ export interface OrmWasmExports {
     include_tree_ptr: number,
     include_tree_len: number,
   ): boolean;
+
+  validate_type(
+    cidl_type_ptr: number,
+    cidl_type_len: number,
+    value_ptr: number,
+    value_len: number,
+  ): boolean;
 }
 
 /** @internal */
@@ -50,7 +57,7 @@ export class WasmResource {
     private wasm: OrmWasmExports,
     public ptr: number,
     public len: number,
-  ) {}
+  ) { }
 
   free() {
     this.wasm.dealloc(this.ptr, this.len);

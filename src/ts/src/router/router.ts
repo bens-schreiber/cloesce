@@ -1,4 +1,4 @@
-import { OrmWasmExports, loadOrmWasm } from "./wasm.js";
+import { OrmWasmExports, WasmResource, loadOrmWasm, invokeOrmWasm } from "./wasm.js";
 import { proxyCrud } from "./crud.js";
 import { IncludeTree } from "../ui/backend.js";
 import {
@@ -10,7 +10,6 @@ import {
   MediaType,
   CrudKind,
 } from "../ast.js";
-import { RuntimeValidator } from "./validator.js";
 import { Either, InternalError } from "../common.js";
 import { Orm, KeysOfType, HttpResult } from "../ui/backend.js";
 
@@ -54,7 +53,7 @@ export class RuntimeContainer {
     public readonly ast: CloesceAst,
     public readonly constructorRegistry: ConstructorRegistry,
     public readonly wasm: OrmWasmExports,
-  ) {}
+  ) { }
 
   static async init(ast: CloesceAst, constructorRegistry: ConstructorRegistry) {
     if (this.instance) return;
@@ -187,6 +186,7 @@ export class CloesceApp {
     request: Request,
     env: any,
     ast: CloesceAst,
+    wasm: OrmWasmExports,
     ctorReg: ConstructorRegistry,
     di: DependencyContainer,
   ): Promise<HttpResult<unknown>> {
@@ -242,7 +242,7 @@ export class CloesceApp {
     }
 
     // Request validation
-    const validation = await validateRequest(request, ast, ctorReg, route);
+    const validation = await validateRequest(request, wasm, route);
     if (validation.isLeft()) {
       return validation.value;
     }
@@ -279,7 +279,7 @@ export class CloesceApp {
    * @returns A Response object representing the result of the request.
    */
   public async run(request: Request, env: any): Promise<Response> {
-    const { ast, constructorRegistry: ctorReg } = RuntimeContainer.get();
+    const { ast, constructorRegistry: ctorReg, wasm } = RuntimeContainer.get();
 
     // DI will always contain the WranglerEnv and Request.
     const di = new DependencyContainer();
@@ -290,7 +290,7 @@ export class CloesceApp {
     di.set(Request, request);
 
     try {
-      const httpResult = await this.router(request, env, ast, ctorReg, di);
+      const httpResult = await this.router(request, env, ast, wasm, ctorReg, di);
 
       // Log any 500 errors
       if (httpResult.status === 500) {
@@ -431,8 +431,7 @@ function matchRoute(
  */
 async function validateRequest(
   request: Request,
-  ast: CloesceAst,
-  ctorReg: ConstructorRegistry,
+  wasm: OrmWasmExports,
   route: MatchedRoute,
 ): Promise<
   Either<HttpResult, { params: RequestParamMap; dataSource: string | null }>
@@ -464,10 +463,10 @@ async function validateRequest(
     (p) => !(typeof p.cidl_type === "object" && "Inject" in p.cidl_type),
   );
 
-  const url = new URL(request.url);
-  let params: RequestParamMap = Object.fromEntries(url.searchParams.entries());
 
   // Extract all method parameters from the body
+  const url = new URL(request.url);
+  let params: RequestParamMap = Object.fromEntries(url.searchParams.entries());
   if (route.method.http_verb !== "GET") {
     try {
       switch (route.method.parameters_media) {
@@ -502,17 +501,21 @@ async function validateRequest(
   // Validate all parameters type. Octet streams need no validation.
   if (route.method.parameters_media !== MediaType.Octet) {
     for (const p of requiredParams) {
-      const res = RuntimeValidator.validate(
-        params[p.name],
-        p.cidl_type,
-        ast,
-        ctorReg,
+      const validateRes = invokeOrmWasm(
+        wasm.validate_type,
+        [
+          WasmResource.fromString(JSON.stringify(p.cidl_type), wasm),
+          WasmResource.fromString(JSON.stringify(params[p.name]), wasm),
+        ],
+        wasm
       );
-      if (res.isLeft()) {
+
+      if (validateRes.isLeft()) {
         return invalidRequest(RouterError.RequestBodyInvalidParameter);
       }
 
-      params[p.name] = res.unwrap();
+      // TODO: instantiate types lazily
+      // params[p.name] = res.unwrap();
     }
   }
 

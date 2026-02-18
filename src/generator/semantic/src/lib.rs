@@ -737,18 +737,25 @@ fn validate_methods(
             continue;
         }
 
-        if cidl_type_contains!(&param.cidl_type, CidlType::KvObject(_)) {
-            // TODO: remove this
-            if method.http_verb == HttpVerb::GET {
-                fail!(
-                    GeneratorErrorKind::NotYetSupported,
-                    "GET Requests currently do not support R2Object parameters {}.{}.{}",
-                    namespace,
-                    method.name,
-                    param.name
-                )
-            }
-        }
+        ensure!(
+            !cidl_type_contains!(&param.cidl_type, CidlType::HttpResult(_)),
+            GeneratorErrorKind::NotYetSupported,
+            "Requests currently do not support HttpResult parameters {}.{}.{}",
+            namespace,
+            method.name,
+            param.name
+        );
+
+        // todo: remove this limitation
+        ensure!(
+            method.http_verb != HttpVerb::GET
+                && !cidl_type_contains!(&param.cidl_type, CidlType::KvObject(_)),
+            GeneratorErrorKind::NotYetSupported,
+            "GET Requests currently do not support KV Object parameters {}.{}.{}",
+            namespace,
+            method.name,
+            param.name
+        );
 
         let root_type = param.cidl_type.root_type();
 

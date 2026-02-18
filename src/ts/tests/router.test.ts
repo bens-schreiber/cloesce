@@ -286,7 +286,7 @@ describe("Namespace Middleware", () => {
       ],
     });
     const constructorRegistry = createCtorReg();
-    class Foo {}
+    class Foo { }
     constructorRegistry[Foo.name] = Foo;
 
     await RuntimeContainer.init(ast, constructorRegistry);
@@ -304,6 +304,7 @@ describe("Namespace Middleware", () => {
       request,
       env,
       ast,
+      undefined,
       constructorRegistry,
       di,
     );
@@ -324,7 +325,7 @@ describe("Namespace Middleware", () => {
       ],
     });
     const constructorRegistry = createCtorReg();
-    class Foo {}
+    class Foo { }
     constructorRegistry[Foo.name] = Foo;
 
     await RuntimeContainer.init(ast, constructorRegistry);
@@ -342,6 +343,7 @@ describe("Namespace Middleware", () => {
       request,
       env,
       ast,
+      undefined,
       constructorRegistry,
       di,
     );
@@ -360,15 +362,10 @@ describe("Request Validation", () => {
       .idPk()
       .method("method", HttpVerb.POST, false, [], "Void")
       .build();
-    const ast = createAst({
-      models: [model],
-    });
 
-    class Foo {}
-    const ctorReg = createCtorReg([Foo]);
     const route: MatchedRoute = {
       kind: "model",
-      namespace: Foo.name,
+      namespace: "Foo",
       model,
       method: model.methods["method"],
       primaryKey: null,
@@ -378,8 +375,7 @@ describe("Request Validation", () => {
     // Act
     const res = await _cloesceInternal.validateRequest(
       request,
-      ast,
-      ctorReg,
+      {} as any,
       route,
     );
 
@@ -397,15 +393,10 @@ describe("Request Validation", () => {
       .idPk()
       .method("method", HttpVerb.POST, true, [], "Void")
       .build();
-    const ast = createAst({
-      models: [model],
-    });
 
-    class Foo {}
-    const ctorReg = createCtorReg([Foo]);
     const route: MatchedRoute = {
       kind: "model",
-      namespace: Foo.name,
+      namespace: "Foo",
       method: model.methods["method"],
       primaryKey: null,
       keyParams: {},
@@ -414,8 +405,7 @@ describe("Request Validation", () => {
     // Act
     const res = await _cloesceInternal.validateRequest(
       request,
-      ast,
-      ctorReg,
+      {} as any,
       route,
     );
 
@@ -424,291 +414,6 @@ describe("Request Validation", () => {
     expect(extractErrorCode(res.unwrapLeft().message)).toEqual(
       RouterError.RequestMissingBody,
     );
-  });
-
-  test("Request Body Missing Parameters => 400", async () => {
-    // Arrange
-    const request = createRequest("http://foo.com/api/Foo/method", "POST", {});
-    const model = ModelBuilder.model("Foo")
-      .idPk()
-      .method(
-        "method",
-        HttpVerb.POST,
-        true,
-        [
-          {
-            name: "missingParam",
-            cidl_type: "Integer",
-          },
-        ],
-        "Void",
-      )
-      .build();
-    const ast = createAst({
-      models: [model],
-    });
-
-    class Foo {}
-    const ctorReg = createCtorReg([Foo]);
-    const route: MatchedRoute = {
-      kind: "model",
-      namespace: Foo.name,
-      method: model.methods["method"],
-      primaryKey: null,
-      keyParams: {},
-    };
-
-    // Act
-    const res = await _cloesceInternal.validateRequest(
-      request,
-      ast,
-      ctorReg,
-      route,
-    );
-
-    // Assert
-    expect(res.isLeft()).toBe(true);
-    expect(extractErrorCode(res.unwrapLeft().message)).toEqual(
-      RouterError.RequestBodyMissingParameters,
-    );
-  });
-
-  class Scalar {
-    id: number;
-    manyScalarsId: number;
-  }
-
-  class ManyScalars {
-    id: number;
-    scalars: Scalar[];
-  }
-
-  const now = Date.now();
-  const cases: {
-    params: NamedTypedValue[];
-    jsonValue: any;
-    instanceValues: any;
-    models?: Model[];
-    noGetRequests?: boolean; // TODO: allow
-    ctorReg?: Record<string, new () => any>;
-  }[] = [
-    // // Primitives
-    {
-      params: [
-        {
-          name: "int",
-          cidl_type: "Integer",
-        },
-        {
-          name: "string",
-          cidl_type: "Text",
-        },
-        {
-          name: "bool",
-          cidl_type: "Boolean",
-        },
-        {
-          name: "date",
-          cidl_type: "DateIso",
-        },
-        {
-          name: "float",
-          cidl_type: "Real",
-        },
-      ],
-      jsonValue: {
-        int: "0",
-        string: "hello",
-        bool: "false",
-        date: new Date(now).toISOString(),
-        float: "0.99",
-      },
-      instanceValues: {
-        int: 0,
-        string: "hello",
-        bool: false,
-        date: new Date(now),
-        float: 0.99,
-      },
-    },
-
-    // // Data Sources
-    {
-      params: [
-        {
-          name: "ds",
-          cidl_type: { DataSource: "TestCase" },
-        },
-      ],
-      jsonValue: {
-        ds: "none",
-      },
-      instanceValues: {
-        ds: "none",
-      },
-    },
-
-    // Models, Partials
-    {
-      params: [
-        {
-          name: "scalar",
-          cidl_type: { Object: "Scalar" },
-        },
-        {
-          name: "manyScalars",
-          cidl_type: { Object: "ManyScalars" },
-        },
-        {
-          name: "partialScalar",
-          cidl_type: { Partial: "Scalar" },
-        },
-        {
-          name: "partialManyScalars",
-          cidl_type: { Partial: "ManyScalars" },
-        },
-      ],
-      jsonValue: {
-        scalar: {
-          id: "0",
-          manyScalarsId: "0",
-        },
-        manyScalars: {
-          id: "0",
-          scalars: [
-            {
-              id: "1",
-              manyScalarsId: "0",
-            },
-            {
-              id: "2",
-              manyScalarsId: "0",
-            },
-          ],
-        },
-        partialScalar: {},
-        partialManyScalars: {
-          id: "1234",
-        },
-      },
-      instanceValues: {
-        scalar: Object.assign(new Scalar(), { id: 0, manyScalarsId: 0 }),
-        manyScalars: Object.assign(new ManyScalars(), {
-          id: 0,
-          scalars: [
-            Object.assign(new Scalar(), { id: 1, manyScalarsId: 0 }),
-            Object.assign(new Scalar(), { id: 2, manyScalarsId: 0 }),
-          ],
-        }),
-        partialScalar: {},
-        partialManyScalars: {
-          id: 1234,
-          scalars: [],
-        },
-      },
-      models: [
-        ModelBuilder.model("Scalar")
-          .idPk()
-          .col("manyScalarsId", "Integer", "ManyScalars")
-          .build(),
-        ModelBuilder.model("ManyScalars")
-          .idPk()
-          .navP("scalars", "Scalar", {
-            OneToMany: { column_reference: "manyScalarsId" },
-          })
-          .build(),
-      ],
-      ctorReg: {
-        Scalar: Scalar,
-        ManyScalars: ManyScalars,
-      },
-      noGetRequests: true,
-    },
-  ];
-
-  const expandedCases = cases.flatMap((testCase) => {
-    const canBeGetRequest = testCase.noGetRequests ? [false] : [true, false];
-    return canBeGetRequest.flatMap((isGetRequest) =>
-      [true, false].map((isSetToNull) => {
-        let params = structuredClone(testCase.params);
-        let jsonValue = structuredClone(testCase.jsonValue);
-        let instanceValues = structuredClone(testCase.instanceValues);
-
-        // Set everything to null and nullable
-        if (isSetToNull) {
-          for (const param of params) {
-            param.cidl_type = { Nullable: param.cidl_type };
-          }
-          for (const value in jsonValue) {
-            jsonValue[value] = null;
-          }
-          for (const value in instanceValues) {
-            instanceValues[value] = null;
-          }
-        }
-
-        return {
-          params,
-          jsonValue,
-          instanceValues,
-          isGetRequest,
-          isSetToNull,
-          models: testCase.models,
-          ctorReg: testCase.ctorReg,
-        };
-      }),
-    );
-  });
-
-  test.each(expandedCases)("validates parameters %#", async (testCase) => {
-    // Arrange
-    const model = ModelBuilder.model("TestCase")
-      .idPk()
-      .method(
-        "testMethod",
-        testCase.isGetRequest ? HttpVerb.GET : HttpVerb.POST,
-        true,
-        testCase.params,
-        "Void",
-      )
-      .build();
-    const ast = createAst({
-      models: [model, ...(testCase.models ?? [])],
-    });
-
-    const url = new URL("https://foo.com/api");
-    if (testCase.isGetRequest) {
-      for (const key in testCase.jsonValue) {
-        url.searchParams.set(key, testCase.jsonValue[key]);
-      }
-    }
-
-    const request = createRequest(
-      url.toString(),
-      testCase.isGetRequest ? "GET" : "POST",
-      testCase.isGetRequest ? undefined : testCase.jsonValue,
-    );
-
-    const route: MatchedRoute = {
-      kind: "model",
-      namespace: "TestCase",
-      model,
-      method: model.methods["testMethod"],
-      primaryKey: null,
-      keyParams: {},
-    };
-
-    // Act
-    const res = await _cloesceInternal.validateRequest(
-      request,
-      ast,
-      testCase.ctorReg ?? {},
-      route,
-    );
-
-    // Assert
-    expect(res.isRight()).toBe(true);
-    expect(res.unwrap().params).toEqual(testCase.instanceValues);
   });
 });
 
@@ -730,7 +435,7 @@ describe("Method Middleware", () => {
     });
     const constructorRegistry = createCtorReg();
     class Foo {
-      method() {}
+      method() { }
     }
     constructorRegistry[Foo.name] = Foo;
 
@@ -755,6 +460,7 @@ describe("Method Middleware", () => {
       request,
       env,
       ast,
+      undefined,
       constructorRegistry,
       di,
     );

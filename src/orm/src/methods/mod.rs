@@ -1,6 +1,7 @@
 pub mod map;
 pub mod select;
 pub mod upsert;
+pub mod validate;
 
 use std::fmt::Display;
 
