@@ -1,5 +1,6 @@
 import { exec } from "child_process";
 import { promisify } from "util";
+import type { Plugin, ViteDevServer } from "vite";
 
 const execAsync = promisify(exec);
 
@@ -7,6 +8,8 @@ export interface CloescePluginOptions {
     /**
      * File path patterns that trigger recompilation.
      * Defaults to all files (empty array = match all).
+     * Matching is performed as a simple substring check on the full file path.
+     * For example, `["/data/"]` would also match `/metadata/file.ts`.
      * @default []
      */
     include?: string[];
@@ -32,8 +35,7 @@ export interface CloescePluginOptions {
  * });
  * ```
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function cloesce(options: CloescePluginOptions = {}): any {
+export function cloesce(options: CloescePluginOptions = {}): Plugin {
     const include = options.include ?? [];
     const watchDirs = options.watchDirs ?? ["src/data"];
     let isCompiling = false;
@@ -41,13 +43,13 @@ export function cloesce(options: CloescePluginOptions = {}): any {
     return {
         name: "cloesce-compile",
 
-        configureServer(server: any) {
+        configureServer(server: ViteDevServer) {
             for (const dir of watchDirs) {
                 server.watcher.add(dir);
             }
         },
 
-        async hotUpdate({ file, server }: { file: string; server: any }) {
+        async hotUpdate({ file, server }: { file: string; server: ViteDevServer }) {
             if (include.length > 0 && !include.some((pattern) => file.includes(pattern))) {
                 return;
             }
@@ -71,16 +73,22 @@ export function cloesce(options: CloescePluginOptions = {}): any {
         },
 
         async buildStart() {
-            console.log("[cloesce] Running initial compile...");
+            if (isCompiling) {
+                return;
+            }
+            isCompiling = true;
+            this.warn("[cloesce] Running initial compile...");
             try {
                 const { stdout, stderr } = await execAsync("npx cloesce compile");
-                if (stdout) console.log(stdout);
-                if (stderr) console.warn(stderr);
-                console.log("[cloesce] Initial compile completed");
+                if (stdout) this.warn(stdout);
+                if (stderr) this.warn(stderr);
+                this.warn("[cloesce] Initial compile completed");
             } catch (error: any) {
-                console.error(`[cloesce] Initial compile failed: ${error.message}`);
-                if (error.stdout) console.error(error.stdout);
-                if (error.stderr) console.error(error.stderr);
+                this.warn(`[cloesce] Initial compile failed: ${error.message}`);
+                if (error.stdout) this.warn(error.stdout);
+                if (error.stderr) this.warn(error.stderr);
+            } finally {
+                isCompiling = false;
             }
         },
     };

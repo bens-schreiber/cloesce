@@ -29,13 +29,25 @@ plugins: [cloesce({ include: ["/src/data/"] })]
 
 Only files whose paths contain one of the provided strings will trigger compilation. An empty array (the default) matches all files.
 
+> **Note:** Matching is a simple substring check on the full file path. For example, `["/data/"]` would also match `/metadata/file.ts`.
+
+### `watchDirs`
+
+By default, the plugin watches `src/data` for changes. If your `.cloesce.ts` files live outside Vite's root, add those directories here so Vite's watcher picks them up:
+
+```ts
+plugins: [cloesce({ watchDirs: ["../shared/data", "src/data"] })]
+```
+
+An empty array disables the extra watchers entirely.
+
 ## Behaviour
 
 - **On server start** — runs `npx cloesce compile` once before the browser loads anything.
 - **On file change** — runs `npx cloesce compile` each time Vite detects a save. If a compile is already in progress it is skipped to avoid overlapping runs.
-- **On error** — compile errors are logged to the Vite dev server output and the server keeps running.
+- **On error** — compile errors are logged and the server keeps running.
 
-Output is logged through Vite's built-in logger:
+Output during file changes is logged through Vite's built-in logger. Output during the initial build-start compile is logged through Rollup's plugin warning channel (`this.warn`):
 
 ```
 [cloesce] Compiling...
