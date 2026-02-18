@@ -98,15 +98,15 @@ export class CidlExtractor {
           switch (decoratorName) {
             case ClassDecoratorKind.Model: {
               if (!classDecl.isExported()) return notExportedErr;
-                const prev = modelDecls.get(className);
-                if (prev) {
-                  return err(ExtractorErrorCode.DuplicateModel, (e) => {
-                    e.context = className;
-                    e.snippet = `${prev[0].getSourceFile().getFilePath()}:${prev[0].getStartLineNumber()} and ${classDecl.getSourceFile().getFilePath()}:${classDecl.getStartLineNumber()}`;
-                  });
-                }
-                modelDecls.set(className, [classDecl, decorator]);
-                break;
+              const prev = modelDecls.get(className);
+              if (prev) {
+                return err(ExtractorErrorCode.DuplicateModel, (e) => {
+                  e.context = className;
+                  e.snippet = `${prev[0].getSourceFile().getFilePath()}:${prev[0].getStartLineNumber()} and ${classDecl.getSourceFile().getFilePath()}:${classDecl.getStartLineNumber()}`;
+                });
+              }
+              modelDecls.set(className, [classDecl, decorator]);
+              break;
             }
 
             case ClassDecoratorKind.Service: {
@@ -116,7 +116,7 @@ export class CidlExtractor {
                 return err(ExtractorErrorCode.DuplicateService, (e) => {
                   e.context = className;
                   e.snippet = `${prev.getSourceFile().getFilePath()}:${prev.getStartLineNumber()} and ${classDecl.getSourceFile().getFilePath()}:${classDecl.getStartLineNumber()}`;
-                }); 
+                });
               }
               serviceDecls.set(className, classDecl);
               break;
