@@ -525,7 +525,7 @@ describe("Model", () => {
     );
   });
 
-  test("Extracts KV, R2", () => {
+  test("Extracts KV, R2 attributes", () => {
     // Arrange
     const project = cloesceProject();
     project.createSourceFile(
@@ -590,6 +590,50 @@ describe("Model", () => {
         .r2Object("files/Foo", "bucket", "allFiles", true)
         .build(),
     );
+  });
+
+  test("Extracts KV and R2 in method parameters", () => {
+    // Arrange
+    const project = cloesceProject();
+    const sourceFile = project.createSourceFile(
+      "test.ts",
+      `
+      import { KValue, Integer, R2ObjectBody } from "./src/ui/backend";
+
+      @Model()
+      export class Foo {
+        id: number;
+
+        @POST
+        async method(
+          value: KValue<unknown> | null,
+          fileMeta: R2ObjectBody,
+        ) {}
+      }
+      `,
+    );
+
+    // Act
+    const res = CidlExtractor.extract("Foo", project);
+
+    // Assert
+    expect(res.isRight()).toBe(true);
+    const cidl = res.unwrap();
+    expect(cidl.models["Foo"]).toBeDefined();
+
+    const fooModel = cidl.models["Foo"];
+    expect(fooModel.methods["method"]).toBeDefined();
+    const method = fooModel.methods["method"];
+    expect(method.parameters).toEqual([
+      {
+        name: "value",
+        cidl_type: { Nullable: { KvObject: "JsonValue" } },
+      },
+      {
+        name: "fileMeta",
+        cidl_type: "R2Object",
+      },
+    ]);
   });
 });
 

@@ -1,10 +1,249 @@
-import { describe, test, expect, afterEach, beforeAll, vi } from "vitest";
+import { describe, test, expect, afterEach } from "vitest";
 import { Miniflare } from "miniflare";
 import { ModelBuilder, createAst } from "./builder";
 import { KValue, Orm } from "../src/ui/backend.js";
 import { _cloesceInternal } from "../src/router/router.js";
-
 import { R2ObjectBody } from "@cloudflare/workers-types";
+import { hydrateType } from "../src/router/orm";
+import { CloesceAst } from "../src/ast";
+
+function createHydrateArgs() {
+  return {
+    ast: { models: {}, poos: {} } as CloesceAst,
+    ctorReg: {},
+    includeTree: null,
+    keyParams: {},
+    env: {},
+    promises: [],
+  };
+}
+
+describe("hydrateType Tests", () => {
+  afterEach(() => {
+    _cloesceInternal.RuntimeContainer.dispose();
+  });
+
+  describe("Primitive type hydration", () => {
+    test("returns null as-is", () => {
+      const result = hydrateType(null, "Text", createHydrateArgs());
+      expect(result).toBeNull();
+    });
+
+    test("returns undefined as-is", () => {
+      const result = hydrateType(undefined, "Text", createHydrateArgs());
+      expect(result).toBeUndefined();
+    });
+
+    test("hydrates DateIso strings into Date instances", () => {
+      const iso = "2024-01-15T12:00:00.000Z";
+      const result = hydrateType(iso, "DateIso", createHydrateArgs());
+      expect(result).toBeInstanceOf(Date);
+      expect(result.toISOString()).toBe(iso);
+    });
+
+    test("hydrates Blob number arrays into Uint8Array", () => {
+      const arr = [72, 101, 108, 108, 111];
+      const result = hydrateType(arr, "Blob", createHydrateArgs());
+      expect(result).toBeInstanceOf(Uint8Array);
+      expect(Array.from(result)).toEqual(arr);
+    });
+
+    test("hydrates Boolean truthy values", () => {
+      expect(hydrateType(1, "Boolean", createHydrateArgs())).toBe(true);
+      expect(hydrateType(0, "Boolean", createHydrateArgs())).toBe(false);
+      expect(hydrateType("true", "Boolean", createHydrateArgs())).toBe(true);
+      expect(hydrateType("", "Boolean", createHydrateArgs())).toBe(false);
+    });
+
+    test("passes through unknown primitive types unchanged", () => {
+      expect(hydrateType("hello", "Text", createHydrateArgs())).toBe("hello");
+      expect(hydrateType(42, "Integer", createHydrateArgs())).toBe(42);
+    });
+  });
+
+  describe("Array type hydration", () => {
+    test("hydrates each element of an array", () => {
+      const isos = ["2024-01-01T00:00:00.000Z", "2024-06-15T12:00:00.000Z"];
+      const result = hydrateType(
+        isos,
+        { Array: "DateIso" },
+        createHydrateArgs(),
+      );
+      expect(result).toBeUndefined();
+      expect(isos[0]).toBeInstanceOf(Date);
+      expect(isos[1]).toBeInstanceOf(Date);
+    });
+
+    test("returns empty array when value is not an array", () => {
+      const result = hydrateType(
+        "not-an-array",
+        { Array: "Text" },
+        createHydrateArgs(),
+      );
+      expect(result).toEqual([]);
+    });
+  });
+
+  describe("Model column hydration", () => {
+    test("hydrates typed columns within a model instance", async () => {
+      // Arrange
+      const modelMeta = ModelBuilder.model("TypedColModel")
+        .idPk()
+        .col("createdAt", "DateIso")
+        .col("data", "Blob")
+        .build();
+
+      class TypedColModel {
+        id: number;
+        createdAt: Date;
+        data: Uint8Array;
+      }
+
+      const ast = createAst({ models: [modelMeta] });
+      const ctorReg = { TypedColModel };
+
+      // Act
+      const result = hydrateType(
+        { id: 1, createdAt: "2024-03-10T08:00:00.000Z", data: [1, 2, 3] },
+        { Object: TypedColModel.name },
+        {
+          ...createHydrateArgs(),
+          ast,
+          ctorReg,
+        },
+      );
+
+      // Assert
+      expect(result).toBeInstanceOf(TypedColModel);
+      expect(result.createdAt).toBeInstanceOf(Date);
+      expect(result.createdAt.toISOString()).toBe("2024-03-10T08:00:00.000Z");
+      expect(result.data).toBeInstanceOf(Uint8Array);
+      expect(Array.from(result.data)).toEqual([1, 2, 3]);
+    });
+
+    test("skips column hydration when column value is undefined", async () => {
+      // Arrange
+      const modelMeta = ModelBuilder.model("SparseModel")
+        .idPk()
+        .col("createdAt", "DateIso")
+        .build();
+
+      class SparseModel {
+        id: number;
+        createdAt: Date;
+      }
+
+      const ast = createAst({ models: [modelMeta] });
+      const ctorReg = { SparseModel };
+
+      // Act
+      const result = hydrateType(
+        { id: 1, createdAt: undefined },
+        { Object: SparseModel.name },
+        {
+          ...createHydrateArgs(),
+          ast,
+          ctorReg,
+        },
+      );
+
+      // Assert
+      expect(result).toBeInstanceOf(SparseModel);
+      expect(result.createdAt).toBeUndefined();
+    });
+  });
+
+  describe("Navigation property include tree behavior", () => {
+    test("nav property is left unhydrated when omitted from include tree", async () => {
+      // Arrange
+      const childMeta = ModelBuilder.model("ChildModel").idPk().build();
+      class ChildModel {
+        id: number;
+      }
+
+      const parentMeta = ModelBuilder.model("ParentModel")
+        .idPk()
+        .col("fk", "Integer", "ChildModel")
+        .navP("child", "ChildModel", { OneToOne: { column_reference: "fk" } })
+        .build();
+      class ParentModel {
+        id: number;
+        fk: number;
+        child: ChildModel;
+      }
+
+      const ast = createAst({ models: [parentMeta, childMeta] });
+      const ctorReg = { ParentModel, ChildModel };
+
+      // Act
+      const result = hydrateType(
+        { id: 1, fk: 2, child: { id: 2 } },
+        { Object: ParentModel.name },
+        {
+          ...createHydrateArgs(),
+          ast,
+          ctorReg,
+          includeTree: {}, // empty include tree, so nav props should not be hydrated
+        },
+      );
+
+      // Assert
+      expect(result).toBeInstanceOf(ParentModel);
+      expect(result.child).not.toBeInstanceOf(ChildModel);
+    });
+
+    test("OneToMany nav property hydrates array of instances", async () => {
+      // Arrange
+      const tagMeta = ModelBuilder.model("TagModel")
+        .idPk()
+        .col("postId", "Integer", "PostModel")
+        .build();
+      class TagModel {
+        id: number;
+        postId: number;
+      }
+
+      const postMeta = ModelBuilder.model("PostModel")
+        .idPk()
+        .navP("tags", "TagModel", {
+          OneToMany: { column_reference: "postId" },
+        })
+        .build();
+      class PostModel {
+        id: number;
+        tags: TagModel[];
+      }
+
+      const ast = createAst({ models: [postMeta, tagMeta] });
+      const ctorReg = { PostModel, TagModel };
+      const obj = {
+        id: 1,
+        tags: [
+          { id: 10, postId: 1 },
+          { id: 11, postId: 1 },
+        ],
+      };
+
+      // Act
+      const result = hydrateType(
+        obj,
+        { Object: PostModel.name },
+        {
+          ...createHydrateArgs(),
+          ast,
+          ctorReg,
+          includeTree: { tags: {} }, // include 'tags' nav prop for hydration
+        },
+      );
+
+      // Assert
+      expect(result).toBeInstanceOf(PostModel);
+      expect(result.tags).toHaveLength(2);
+      expect(result.tags[0]).toBeInstanceOf(TagModel);
+      expect(result.tags[1]).toBeInstanceOf(TagModel);
+    });
+  });
+});
 
 describe("ORM Hydrate Tests", () => {
   afterEach(() => {
@@ -243,26 +482,22 @@ describe("ORM Hydrate Tests", () => {
 
     {
       // Act
-      const fullIncludeTree: TestModel = await instance.hydrate(
-        TestModel,
-
-        {
-          base,
-          keyParams: {
-            configId: configId,
-            imageId: imageId,
-          },
-          includeTree: {
-            config: {},
-            configStream: {},
-            configList: {},
-            emptyConfig: {},
-            image: {},
-            imageList: {},
-            emptyImage: {},
-          },
+      const fullIncludeTree: TestModel = await instance.hydrate(TestModel, {
+        base,
+        keyParams: {
+          configId: configId,
+          imageId: imageId,
         },
-      );
+        includeTree: {
+          config: {},
+          configStream: {},
+          configList: {},
+          emptyConfig: {},
+          image: {},
+          imageList: {},
+          emptyImage: {},
+        },
+      });
 
       // Assert
       expect(fullIncludeTree).toBeInstanceOf(TestModel);

@@ -38,7 +38,6 @@ export class NullabilityChecks {
     );
   }
   async httpResultTypes(
-    a: number | null | null,
     __datasource: "none" = "none",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<NullabilityChecks[] | null | null>> {
@@ -50,7 +49,6 @@ export class NullabilityChecks {
     );
     const payload: any = {};
 
-    payload["a"] = a;
     baseUrl.searchParams.append("__datasource", String(__datasource));
 
     const res = await fetchImpl(baseUrl, {

@@ -1,6 +1,7 @@
 pub mod map;
 pub mod select;
 pub mod upsert;
+pub mod validate;
 
 use std::fmt::Display;
 
@@ -88,11 +89,11 @@ pub type Result<T> = std::result::Result<T, OrmError>;
 use sqlx::sqlite::SqliteRow;
 
 #[cfg(test)]
-use crate::ModelMeta;
+use crate::CloesceAst;
 
 #[cfg(test)]
 pub async fn test_sql(
-    mut models: ModelMeta,
+    mut ast: CloesceAst,
     stmts: Vec<(String, Vec<serde_json::Value>)>,
     db: sqlx::SqlitePool,
 ) -> std::result::Result<Vec<Vec<SqliteRow>>, sqlx::Error> {
@@ -101,10 +102,9 @@ pub async fn test_sql(
     // Generate and run schema migration
     let migration_ast = {
         use ast::{CloesceAst, MigrationsAst, MigrationsModel};
-        use generator_test::{create_ast, create_spec};
+        use generator_test::create_spec;
         use semantic::SemanticAnalysis;
 
-        let mut ast = create_ast(models.drain().map(|(_, m)| m).collect::<Vec<_>>());
         let spec = create_spec(&ast);
         SemanticAnalysis::analyze(&mut ast, &spec).unwrap();
 

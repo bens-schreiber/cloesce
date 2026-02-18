@@ -12,7 +12,7 @@ export interface OrmWasmExports {
   memory: WebAssembly.Memory;
   get_return_len(): number;
   get_return_ptr(): number;
-  set_meta_ptr(ptr: number, len: number): number;
+  set_ast_ptr(ptr: number, len: number): number;
   alloc(len: number): number;
   dealloc(ptr: number, len: number): void;
 
@@ -41,6 +41,13 @@ export interface OrmWasmExports {
     d1_result_len: number,
     include_tree_ptr: number,
     include_tree_len: number,
+  ): boolean;
+
+  validate_type(
+    cidl_type_ptr: number,
+    cidl_type_len: number,
+    value_ptr: number,
+    value_len: number,
   ): boolean;
 }
 
@@ -80,7 +87,7 @@ export async function loadOrmWasm(ast: CloesceAst): Promise<OrmWasmExports> {
     mod.memory &&
     mod.alloc &&
     mod.dealloc &&
-    mod.set_meta_ptr &&
+    mod.set_ast_ptr &&
     mod.get_return_ptr &&
     mod.get_return_len
   ) {
@@ -95,13 +102,10 @@ export async function loadOrmWasm(ast: CloesceAst): Promise<OrmWasmExports> {
     ).exports;
   }
 
-  const modelMeta = WasmResource.fromString(
-    JSON.stringify(ast.models),
-    exports,
-  );
+  const astJson = WasmResource.fromString(JSON.stringify(ast), exports);
 
-  if (exports.set_meta_ptr(modelMeta.ptr, modelMeta.len) != 0) {
-    modelMeta.free();
+  if (exports.set_ast_ptr(astJson.ptr, astJson.len) != 0) {
+    astJson.free();
     const resPtr = exports.get_return_ptr();
     const resLen = exports.get_return_len();
     const errorMsg = new TextDecoder().decode(

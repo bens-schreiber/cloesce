@@ -1,20 +1,21 @@
 use std::collections::HashMap;
 
-use ast::{CidlType, Model, NamedTypedValue, NavigationProperty, NavigationPropertyKind, fail};
-use base64::Engine;
-use base64::prelude::BASE64_STANDARD;
+use ast::{
+    CidlType, CloesceAst, Model, NamedTypedValue, NavigationProperty, NavigationPropertyKind, fail,
+};
+
 use sea_query::{Alias, OnConflict, SimpleExpr, SqliteQueryBuilder, SubQueryStatement};
 use sea_query::{Expr, Query};
 use serde::Serialize;
 use serde_json::Map;
 use serde_json::Value;
 
-use crate::ModelMeta;
+use crate::IncludeTreeJson;
 use crate::methods::select::SelectModel;
 use crate::methods::{OrmErrorKind, alias};
-use crate::{IncludeTreeJson, ensure};
 
 use super::Result;
+use super::validate::validate_cidl_type;
 
 #[derive(Serialize)]
 pub struct SqlStatement {
@@ -47,7 +48,7 @@ pub struct UpsertResult {
 }
 
 pub struct UpsertModel<'a> {
-    meta: &'a ModelMeta,
+    ast: &'a CloesceAst,
     context: HashMap<String, Option<Value>>,
     sql_acc: Vec<SqlStatement>,
     kv_upload_acc: Vec<KvUpload>,
@@ -65,14 +66,14 @@ impl<'a> UpsertModel<'a> {
     /// Returns a string of SQL statements, or a descriptive error string.
     pub fn query(
         model_name: &'a str,
-        meta: &'a ModelMeta,
+        ast: &'a CloesceAst,
         new_model: Map<String, Value>,
         include_tree: Option<IncludeTreeJson>,
     ) -> Result<UpsertResult> {
         let include_tree = include_tree.unwrap_or_default();
 
         let mut generator = Self {
-            meta,
+            ast,
             context: HashMap::default(),
             sql_acc: Vec::default(),
             kv_upload_acc: Vec::default(),
@@ -87,10 +88,10 @@ impl<'a> UpsertModel<'a> {
         )?;
 
         // unwrap: root model is guaranteed to exist if we've gotten this far
-        let model = meta.get(model_name).unwrap();
+        let model = ast.models.get(model_name).unwrap();
         if let Some(pk_col) = &model.primary_key {
             // Final select to return the upserted model
-            let select_query = SelectModel::query(model_name, None, Some(include_tree), meta)?
+            let select_query = SelectModel::query(model_name, None, Some(include_tree), ast)?
                 .trim_start_matches("SELECT ")
                 .to_string();
 
@@ -103,11 +104,10 @@ impl<'a> UpsertModel<'a> {
                             .context
                             .get(&format!("{}.{}", model.name, pk_col.name))
                         {
-                            Some(Some(value)) => validate_json_to_cidl(
-                                value,
-                                &model.primary_key.as_ref().unwrap().cidl_type,
-                                model_name,
-                                &pk_col.name,
+                            Some(Some(value)) => validate_and_transform(
+                                model.primary_key.as_ref().unwrap().cidl_type.clone(),
+                                value.clone(),
+                                ast,
                             )?,
                             _ => SqlUpsertBuilder::value_from_ctx(&format!(
                                 "{}.{}",
@@ -141,7 +141,7 @@ impl<'a> UpsertModel<'a> {
         include_tree: &IncludeTreeJson,
         path: String,
     ) -> Result<()> {
-        let model = match self.meta.get(model_name) {
+        let model = match self.ast.models.get(model_name) {
             Some(m) => m,
             None => fail!(OrmErrorKind::UnknownModel, "{}", model_name),
         };
@@ -198,6 +198,7 @@ impl<'a> UpsertModel<'a> {
             model_name,
             model.columns.len(),
             model.primary_key.as_ref().unwrap(),
+            self.ast,
         );
 
         // Primary key
@@ -250,7 +251,8 @@ impl<'a> UpsertModel<'a> {
             )?;
 
             let nav_model_pk = self
-                .meta
+                .ast
+                .models
                 .get(&nav.model_reference)
                 .expect("nav model to exist")
                 .primary_key
@@ -268,7 +270,14 @@ impl<'a> UpsertModel<'a> {
                 format!(
                     "{}.{}",
                     path.rsplit_once('.').map(|(h, _)| h).unwrap_or(&path),
-                    self.meta.get(p).unwrap().primary_key.as_ref().unwrap().name
+                    self.ast
+                        .models
+                        .get(p)
+                        .unwrap()
+                        .primary_key
+                        .as_ref()
+                        .unwrap()
+                        .name
                 )
             });
 
@@ -373,7 +382,7 @@ impl<'a> UpsertModel<'a> {
         unique_id: &str,
         model: &Model,
     ) -> Result<()> {
-        let nav_meta = self.meta.get(&nav.model_reference).unwrap();
+        let nav_meta = self.ast.models.get(&nav.model_reference).unwrap();
         let nav_pk = nav_meta.primary_key.as_ref().unwrap();
         let model_pk = model.primary_key.as_ref().unwrap();
 
@@ -381,13 +390,11 @@ impl<'a> UpsertModel<'a> {
         let mut pairs = [
             (
                 nav.model_reference.as_str(),
-                format!("{}.{}", nav.model_reference, nav_pk.name),
                 &nav_pk.cidl_type,
                 format!("{path}.{}.{}", nav.var_name, nav_pk.name),
             ),
             (
                 model.name.as_str(),
-                format!("{}.{}", model.name, model_pk.name),
                 &model_pk.cidl_type,
                 format!("{path}.{}", model_pk.name),
             ),
@@ -396,9 +403,9 @@ impl<'a> UpsertModel<'a> {
 
         // Collect column/value pairs from context
         let mut entries = Vec::new();
-        for (i, (_, var_name, cidl_type, path_key)) in pairs.iter().enumerate() {
+        for (i, (_, cidl_type, path_key)) in pairs.iter().enumerate() {
             let value = match self.context.get(path_key).cloned().flatten() {
-                Some(v) => validate_json_to_cidl(&v, cidl_type, unique_id, var_name)?,
+                Some(v) => validate_and_transform(cidl_type.to_owned().clone(), v, self.ast)?,
                 None => SqlUpsertBuilder::value_from_ctx(path_key),
             };
 
@@ -487,6 +494,7 @@ struct SqlUpsertBuilder<'a> {
     cols: Vec<Alias>,
     vals: Vec<SimpleExpr>,
     pk_ntv: &'a NamedTypedValue,
+    ast: &'a CloesceAst,
 }
 
 impl<'a> SqlUpsertBuilder<'a> {
@@ -494,6 +502,7 @@ impl<'a> SqlUpsertBuilder<'a> {
         model_name: &'a str,
         scalar_len: usize,
         pk_ntv: &'a NamedTypedValue,
+        ast: &'a CloesceAst,
     ) -> SqlUpsertBuilder<'a> {
         Self {
             scalar_len,
@@ -501,6 +510,7 @@ impl<'a> SqlUpsertBuilder<'a> {
             pk_ntv,
             cols: Vec::default(),
             vals: Vec::default(),
+            ast,
         }
     }
 
@@ -511,7 +521,7 @@ impl<'a> SqlUpsertBuilder<'a> {
     /// Returns an error if the value does not match the meta type.
     fn push_val(&mut self, var_name: &str, value: Value, cidl_type: &CidlType) -> Result<()> {
         self.cols.push(alias(var_name));
-        let val = validate_json_to_cidl(&value, cidl_type, self.model_name, var_name)?;
+        let val = validate_and_transform(cidl_type.clone(), value, self.ast)?;
         self.vals.push(val);
         Ok(())
     }
@@ -552,14 +562,7 @@ impl<'a> SqlUpsertBuilder<'a> {
     fn build(self, pk_val: &Option<Value>) -> Result<SqlStatement> {
         let pk_expr = pk_val
             .as_ref()
-            .map(|v| {
-                validate_json_to_cidl(
-                    v,
-                    &self.pk_ntv.cidl_type,
-                    self.model_name,
-                    &self.pk_ntv.name,
-                )
-            })
+            .map(|v| validate_and_transform(self.pk_ntv.cidl_type.clone(), v.clone(), self.ast))
             .transpose()?;
 
         // Attributes are missing, but there is a PK. This must be an update query.
@@ -605,99 +608,6 @@ impl<'a> SqlUpsertBuilder<'a> {
         }
 
         Ok(build_sqlite(insert))
-    }
-}
-
-/// Validates that a JSON input follows the CIDL type, returning
-/// a SeaQuery [SimpleExpr] value
-fn validate_json_to_cidl(
-    value: &Value,
-    cidl_type: &CidlType,
-    model_name: &str,
-    attr_name: &str,
-) -> Result<SimpleExpr> {
-    if matches!(cidl_type, CidlType::Nullable(_)) && value.is_null() {
-        return Ok(SimpleExpr::Custom("null".into()));
-    }
-
-    match cidl_type.root_type() {
-        CidlType::Integer => {
-            ensure!(
-                matches!(value, Value::Number(n) if n.is_i64()),
-                OrmErrorKind::TypeMismatch,
-                "{}.{}",
-                model_name,
-                attr_name
-            );
-
-            Ok(Expr::val(value.as_i64().unwrap()).into())
-        }
-        CidlType::Boolean => {
-            ensure!(
-                matches!(value, Value::Bool(_)),
-                OrmErrorKind::TypeMismatch,
-                "{}.{}",
-                model_name,
-                attr_name
-            );
-
-            Ok(Expr::val(if value.as_bool().unwrap() { 1 } else { 0 }).into())
-        }
-        CidlType::Real => {
-            ensure!(
-                matches!(value, Value::Number(_)),
-                OrmErrorKind::TypeMismatch,
-                "{}.{}",
-                model_name,
-                attr_name
-            );
-
-            Ok(Expr::val(value.as_f64().unwrap()).into())
-        }
-        CidlType::Text | CidlType::DateIso => {
-            ensure!(
-                matches!(value, Value::String(_)),
-                OrmErrorKind::TypeMismatch,
-                "{}.{}",
-                model_name,
-                attr_name
-            );
-
-            Ok(Expr::val(value.as_str().unwrap()).into())
-        }
-        CidlType::Blob => match value {
-            // Base64 string
-            Value::String(b64) => {
-                let bytes = match BASE64_STANDARD.decode(b64) {
-                    Ok(b) => b,
-                    Err(_) => fail!(OrmErrorKind::TypeMismatch, "{}.{}", model_name, attr_name),
-                };
-
-                Ok(bytes_to_sqlite(&bytes))
-            }
-
-            // Byte array
-            Value::Array(inner) => {
-                let mut bytes = Vec::with_capacity(inner.len());
-                for v in inner {
-                    let n = match v.as_u64() {
-                        Some(n) => n,
-                        None => fail!(OrmErrorKind::TypeMismatch, "{}.{}", model_name, attr_name),
-                    };
-
-                    if n > 255 {
-                        fail!(OrmErrorKind::TypeMismatch, "{}.{}", model_name, attr_name);
-                    }
-                    bytes.push(n as u8);
-                }
-
-                Ok(bytes_to_sqlite(&bytes))
-            }
-            _ => fail!(OrmErrorKind::TypeMismatch, "{}.{}", model_name, attr_name),
-        },
-        _ => {
-            unreachable!("Invalid CIDL");
-        }
     }
 }
 
@@ -761,16 +671,6 @@ fn key_format_interpolation(
     Ok((key, placeholders_remain))
 }
 
-/// Convert a byte array to a sqlite hex string suitable
-/// for [CidlType::Blob] columns
-fn bytes_to_sqlite(bytes: &[u8]) -> SimpleExpr {
-    let hex = bytes
-        .iter()
-        .map(|b| format!("{:02X}", b))
-        .collect::<String>();
-    SimpleExpr::Custom(format!("X'{}'", hex))
-}
-
 /// Convert a SeaQuery value to a serde_json value
 fn sea_query_to_serde(v: sea_query::Value) -> serde_json::Value {
     match v {
@@ -797,12 +697,48 @@ fn build_sqlite<T: sea_query::QueryStatementWriter>(qb: T) -> SqlStatement {
     }
 }
 
+fn validate_and_transform(
+    cidl_type: CidlType,
+    value: Value,
+    ast: &CloesceAst,
+) -> Result<SimpleExpr> {
+    let res = validate_cidl_type(cidl_type, Some(value), ast, false);
+    let value = match res {
+        Ok(Some(v)) => v,
+        Ok(None) => fail!(
+            OrmErrorKind::MissingAttribute,
+            "An attribute is missing a value"
+        ),
+        Err(e) => fail!(
+            OrmErrorKind::TypeMismatch,
+            "Value does not match expected type: {:?}",
+            e
+        ),
+    };
+
+    Ok(match value {
+        Value::Null => SimpleExpr::Custom("null".into()),
+        Value::Bool(b) => Expr::val(if b { 1 } else { 0 }).into(),
+        Value::Number(n) if n.is_i64() => Expr::val(n.as_i64().unwrap()).into(),
+        Value::Number(n) if n.is_f64() => Expr::val(n.as_f64().unwrap()).into(),
+        Value::String(s) => Expr::val(s).into(),
+
+        // Must be a u8 array, so convert to hex string for SQLite
+        Value::Array(arr) => {
+            let hex = arr
+                .iter()
+                .map(|b| format!("{:02X}", b.as_i64().unwrap()))
+                .collect::<String>();
+            SimpleExpr::Custom(format!("X'{}'", hex))
+        }
+        _ => unreachable!("validate_cidl_type should have caught this"),
+    })
+}
+
 #[cfg(test)]
 mod test {
-    use std::collections::HashMap;
-
     use ast::{CidlType, NavigationPropertyKind};
-    use generator_test::{ModelBuilder, expected_str};
+    use generator_test::{ModelBuilder, create_ast, expected_str};
     use serde_json::{Value, json};
     use sqlx::{Row, SqlitePool};
 
@@ -872,7 +808,7 @@ mod test {
     #[sqlx::test]
     async fn upsert_scalar_model(db: SqlitePool) {
         // Arrange
-        let ast_model = ModelBuilder::new("Horse")
+        let model = ModelBuilder::new("Horse")
             .id_pk()
             .col("color", CidlType::Text, None)
             .col("age", CidlType::Integer, None)
@@ -888,11 +824,10 @@ mod test {
             "is_tired": true
         });
 
-        let mut meta = HashMap::new();
-        meta.insert(ast_model.name.clone(), ast_model);
+        let ast = create_ast(vec![model]);
 
         // Act
-        let res = UpsertModel::query("Horse", &meta, new_model.as_object().unwrap().clone(), None)
+        let res = UpsertModel::query("Horse", &ast, new_model.as_object().unwrap().clone(), None)
             .unwrap()
             .sql;
 
@@ -927,7 +862,7 @@ mod test {
         assert_eq!(stmt3.values.len(), 0);
 
         let results = test_sql(
-            meta,
+            ast,
             res.into_iter().map(|r| (r.query, r.values)).collect(),
             db,
         )
@@ -945,7 +880,7 @@ mod test {
     #[sqlx::test]
     async fn update_scalar_model(db: SqlitePool) {
         // Arrange
-        let ast_model = ModelBuilder::new("Horse")
+        let model = ModelBuilder::new("Horse")
             .id_pk()
             .col("color", CidlType::Text, None)
             .col("age", CidlType::Integer, None)
@@ -958,11 +893,10 @@ mod test {
             "address": null
         });
 
-        let mut meta = HashMap::new();
-        meta.insert(ast_model.name.clone(), ast_model);
+        let ast = create_ast(vec![model]);
 
         // Act
-        let res = UpsertModel::query("Horse", &meta, new_model.as_object().unwrap().clone(), None)
+        let res = UpsertModel::query("Horse", &ast, new_model.as_object().unwrap().clone(), None)
             .unwrap()
             .sql;
 
@@ -981,7 +915,7 @@ mod test {
         assert_eq!(*stmt2.values, vec![Value::from(1i64)]);
 
         test_sql(
-            meta,
+            ast,
             res.into_iter().map(|r| (r.query, r.values)).collect(),
             db,
         )
@@ -992,14 +926,13 @@ mod test {
     #[sqlx::test]
     async fn upsert_blob_b64(db: SqlitePool) {
         // Arrange
-        let ast_model = ModelBuilder::new("Picture")
+        let model = ModelBuilder::new("Picture")
             .id_pk()
             .col("metadata", CidlType::Text, None)
             .col("blob", CidlType::Blob, None)
             .build();
 
-        let mut meta = HashMap::new();
-        meta.insert(ast_model.name.clone(), ast_model);
+        let ast = create_ast(vec![model]);
 
         let new_model = json!({
             "id": 1,
@@ -1010,7 +943,7 @@ mod test {
         // Act
         let res = UpsertModel::query(
             "Picture",
-            &meta,
+            &ast,
             new_model.as_object().unwrap().clone(),
             None,
         )
@@ -1032,7 +965,7 @@ mod test {
         assert_eq!(*stmt2.values, vec![Value::from(1i64)]);
 
         let results = test_sql(
-            meta,
+            ast,
             res.into_iter().map(|r| (r.query, r.values)).collect(),
             db,
         )
@@ -1049,14 +982,13 @@ mod test {
     #[sqlx::test]
     async fn upsert_blob_u8_arr(db: SqlitePool) {
         // Arrange
-        let ast_model = ModelBuilder::new("Picture")
+        let model = ModelBuilder::new("Picture")
             .id_pk()
             .col("metadata", CidlType::Text, None)
             .col("blob", CidlType::Blob, None)
             .build();
 
-        let mut meta = HashMap::new();
-        meta.insert(ast_model.name.clone(), ast_model);
+        let ast = create_ast(vec![model]);
 
         let new_model = json!({
             "id": 1,
@@ -1071,7 +1003,7 @@ mod test {
         // Act
         let res = UpsertModel::query(
             "Picture",
-            &meta,
+            &ast,
             new_model.as_object().unwrap().clone(),
             None,
         )
@@ -1093,7 +1025,7 @@ mod test {
         assert_eq!(*stmt2.values, vec![Value::from(1i64)]);
 
         test_sql(
-            meta,
+            ast,
             res.into_iter().map(|r| (r.query, r.values)).collect(),
             db,
         )
@@ -1104,7 +1036,7 @@ mod test {
     #[sqlx::test]
     async fn one_to_one(db: SqlitePool) {
         // Arrange
-        let ast_person = ModelBuilder::new("Person")
+        let person = ModelBuilder::new("Person")
             .id_pk()
             .col("horseId", CidlType::Integer, Some("Horse".into()))
             .nav_p(
@@ -1115,7 +1047,7 @@ mod test {
                 },
             )
             .build();
-        let ast_horse = ModelBuilder::new("Horse").id_pk().build();
+        let horse = ModelBuilder::new("Horse").id_pk().build();
 
         let new_model = json!({
             "id": 1,
@@ -1129,14 +1061,12 @@ mod test {
             "horse": {}
         });
 
-        let mut meta = HashMap::new();
-        meta.insert(ast_horse.name.clone(), ast_horse);
-        meta.insert(ast_person.name.clone(), ast_person);
+        let ast = create_ast(vec![person, horse]);
 
         // Act
         let res = UpsertModel::query(
             "Person",
-            &meta,
+            &ast,
             new_model.as_object().unwrap().clone(),
             Some(include_tree.as_object().unwrap().clone()),
         )
@@ -1160,7 +1090,7 @@ mod test {
         assert_eq!(*stmt3.values, vec![1]);
 
         let results = test_sql(
-            meta,
+            ast,
             res.into_iter().map(|r| (r.query, r.values)).collect(),
             db,
         )
@@ -1176,7 +1106,7 @@ mod test {
     #[sqlx::test]
     async fn one_to_many(db: SqlitePool) {
         // Arrange
-        let ast_person = ModelBuilder::new("Person")
+        let person = ModelBuilder::new("Person")
             .id_pk()
             .nav_p(
                 "horses",
@@ -1186,7 +1116,7 @@ mod test {
                 },
             )
             .build();
-        let ast_horse = ModelBuilder::new("Horse")
+        let horse = ModelBuilder::new("Horse")
             .id_pk()
             .col("personId", CidlType::Integer, Some("Person".into()))
             .build();
@@ -1213,14 +1143,12 @@ mod test {
             "horses": {}
         });
 
-        let mut meta = HashMap::new();
-        meta.insert(ast_horse.name.clone(), ast_horse);
-        meta.insert(ast_person.name.clone(), ast_person);
+        let ast = create_ast(vec![person, horse]);
 
         // Act
         let res = UpsertModel::query(
             "Person",
-            &meta,
+            &ast,
             new_model.as_object().unwrap().clone(),
             Some(include_tree.as_object().unwrap().clone()),
         )
@@ -1260,7 +1188,7 @@ mod test {
         assert_eq!(*stmt5.values, vec![1]);
 
         let results = test_sql(
-            meta,
+            ast,
             res.into_iter().map(|r| (r.query, r.values)).collect(),
             db,
         )
@@ -1275,11 +1203,11 @@ mod test {
     #[sqlx::test]
     async fn many_to_many(db: SqlitePool) {
         // Arrange
-        let ast_person = ModelBuilder::new("Person")
+        let person = ModelBuilder::new("Person")
             .id_pk()
             .nav_p("horses", "Horse", NavigationPropertyKind::ManyToMany)
             .build();
-        let ast_horse = ModelBuilder::new("Horse")
+        let horse = ModelBuilder::new("Horse")
             .nav_p("persons", "Person", NavigationPropertyKind::ManyToMany)
             .id_pk()
             .build();
@@ -1300,14 +1228,12 @@ mod test {
             "horses": {}
         });
 
-        let mut meta = HashMap::new();
-        meta.insert(ast_horse.name.clone(), ast_horse);
-        meta.insert(ast_person.name.clone(), ast_person);
+        let ast = create_ast(vec![person, horse]);
 
         // Act
         let res = UpsertModel::query(
             "Person",
-            &meta,
+            &ast,
             new_model.as_object().unwrap().clone(),
             Some(include_tree.as_object().unwrap().clone()),
         )
@@ -1348,7 +1274,7 @@ mod test {
         assert_eq!(*stmt6.values, vec![1]);
 
         let results = test_sql(
-            meta,
+            ast,
             res.into_iter().map(|r| (r.query, r.values)).collect(),
             db,
         )
@@ -1363,7 +1289,7 @@ mod test {
     #[sqlx::test]
     async fn topological_ordering_is_correct(db: SqlitePool) {
         // Arrange
-        let ast_person = ModelBuilder::new("Person")
+        let person = ModelBuilder::new("Person")
             .id_pk()
             .col("horseId", CidlType::Integer, Some("Horse".into()))
             .nav_p(
@@ -1375,7 +1301,7 @@ mod test {
             )
             .build();
 
-        let ast_horse = ModelBuilder::new("Horse")
+        let horse = ModelBuilder::new("Horse")
             .id_pk()
             .nav_p(
                 "awards",
@@ -1386,16 +1312,13 @@ mod test {
             )
             .build();
 
-        let ast_award = ModelBuilder::new("Award")
+        let award = ModelBuilder::new("Award")
             .id_pk()
             .col("horseId", CidlType::Integer, Some("Horse".into()))
             .col("title", CidlType::Text, None)
             .build();
 
-        let mut meta = std::collections::HashMap::new();
-        meta.insert(ast_person.name.clone(), ast_person);
-        meta.insert(ast_horse.name.clone(), ast_horse);
-        meta.insert(ast_award.name.clone(), ast_award);
+        let ast = create_ast(vec![person, horse, award]);
 
         let new_model = json!({
             "id": 1,
@@ -1419,7 +1342,7 @@ mod test {
         // Act
         let res = UpsertModel::query(
             "Person",
-            &meta,
+            &ast,
             new_model.as_object().unwrap().clone(),
             Some(include_tree.as_object().unwrap().clone()),
         )
@@ -1459,7 +1382,7 @@ mod test {
         );
 
         test_sql(
-            meta,
+            ast,
             res.into_iter().map(|r| (r.query, r.values)).collect(),
             db,
         )
@@ -1471,15 +1394,14 @@ mod test {
     async fn insert_missing_pk_autogenerates(db: SqlitePool) {
         // Arrange
         let person = ModelBuilder::new("Person").id_pk().build();
-        let mut meta = std::collections::HashMap::new();
-        meta.insert(person.name.clone(), person);
+        let ast = create_ast(vec![person]);
 
         let new_person = json!({});
 
         // Act
         let res = UpsertModel::query(
             "Person",
-            &meta,
+            &ast,
             new_person.as_object().unwrap().clone(),
             None,
         )
@@ -1508,7 +1430,7 @@ mod test {
         assert_eq!(*stmt3.values, vec!["Person.id"]);
 
         let results = test_sql(
-            meta,
+            ast,
             res.into_iter().map(|r| (r.query, r.values)).collect(),
             db,
         )
@@ -1535,9 +1457,7 @@ mod test {
 
         let horse = ModelBuilder::new("Horse").id_pk().build();
 
-        let mut meta = std::collections::HashMap::new();
-        meta.insert(person.name.clone(), person);
-        meta.insert(horse.name.clone(), horse);
+        let ast = create_ast(vec![person, horse]);
 
         let new_person = json!({
             "horse": {
@@ -1552,7 +1472,7 @@ mod test {
         // Act
         let res = UpsertModel::query(
             "Person",
-            &meta,
+            &ast,
             new_person.as_object().unwrap().clone(),
             Some(include_tree.as_object().unwrap().clone()),
         )
@@ -1595,7 +1515,7 @@ mod test {
         assert_eq!(*stmt5.values, vec!["Person.id"]);
 
         let results = test_sql(
-            meta,
+            ast,
             res.into_iter().map(|r| (r.query, r.values)).collect(),
             db,
         )
@@ -1626,9 +1546,7 @@ mod test {
             .col("personId", CidlType::Integer, Some("Person".into()))
             .build();
 
-        let mut meta = std::collections::HashMap::new();
-        meta.insert(person.name.clone(), person);
-        meta.insert(horse.name.clone(), horse);
+        let ast = create_ast(vec![person, horse]);
 
         let new_person = json!({
             "horses": [
@@ -1646,7 +1564,7 @@ mod test {
         // Act
         let res = UpsertModel::query(
             "Person",
-            &meta,
+            &ast,
             new_person.as_object().unwrap().clone(),
             Some(include_tree.as_object().unwrap().clone()),
         )
@@ -1687,7 +1605,7 @@ mod test {
         assert_eq!(*stmt5.values, vec!["Person.id"]);
 
         let results = test_sql(
-            meta,
+            ast,
             res.into_iter().map(|r| (r.query, r.values)).collect(),
             db,
         )
@@ -1713,9 +1631,7 @@ mod test {
             .id_pk()
             .build();
 
-        let mut meta = std::collections::HashMap::new();
-        meta.insert(person.name.clone(), person);
-        meta.insert(horse.name.clone(), horse);
+        let ast = create_ast(vec![person, horse]);
 
         // new_person has no pk, horses array has no pks
         let new_person = json!({
@@ -1732,7 +1648,7 @@ mod test {
         // Act
         let res = UpsertModel::query(
             "Person",
-            &meta,
+            &ast,
             new_person.as_object().unwrap().clone(),
             Some(include_tree.as_object().unwrap().clone()),
         )
@@ -1796,7 +1712,7 @@ mod test {
         assert_eq!(*stmt9.values, vec!["Person.id"]);
 
         let results = test_sql(
-            meta,
+            ast,
             res.into_iter().map(|r| (r.query, r.values)).collect(),
             db,
         )
@@ -1811,7 +1727,7 @@ mod test {
     #[sqlx::test]
     async fn kv_objects(db: SqlitePool) {
         // Arrange
-        let person_model = ModelBuilder::new("Person")
+        let person = ModelBuilder::new("Person")
             .id_pk()
             .col("name", CidlType::Text, None)
             .col("horseId", CidlType::Integer, Some("Horse".into()))
@@ -1832,7 +1748,7 @@ mod test {
             )
             .build();
 
-        let horse_model = ModelBuilder::new("Horse")
+        let horse = ModelBuilder::new("Horse")
             .id_pk()
             .nav_p(
                 "awards",
@@ -1851,7 +1767,7 @@ mod test {
             )
             .build();
 
-        let award_model = ModelBuilder::new("Award")
+        let award = ModelBuilder::new("Award")
             .id_pk()
             .col("horseId", CidlType::Integer, Some("Horse".into()))
             .col("title", CidlType::Text, None)
@@ -1865,10 +1781,7 @@ mod test {
             )
             .build();
 
-        let mut meta = HashMap::new();
-        meta.insert(person_model.name.clone(), person_model);
-        meta.insert(horse_model.name.clone(), horse_model);
-        meta.insert(award_model.name.clone(), award_model);
+        let ast = create_ast(vec![person, horse, award]);
 
         let new_model = json!({
             "id": 100,
@@ -1914,7 +1827,7 @@ mod test {
         // Act
         let result = UpsertModel::query(
             "Person",
-            &meta,
+            &ast,
             new_model.as_object().unwrap().clone(),
             Some(include_tree.as_object().unwrap().clone()),
         )
@@ -1957,7 +1870,7 @@ mod test {
         );
 
         test_sql(
-            meta,
+            ast,
             result
                 .sql
                 .into_iter()
@@ -1978,8 +1891,7 @@ mod test {
             .kv_object("config/{key}", "CONFIG_KV", "data", false, CidlType::Text)
             .build();
 
-        let mut meta = HashMap::new();
-        meta.insert(model.name.clone(), model);
+        let ast = create_ast(vec![model]);
         let new_model = json!({
             "key": "site-settings",
             "data": {
@@ -1989,13 +1901,9 @@ mod test {
         });
 
         // Act
-        let result = UpsertModel::query(
-            "Config",
-            &meta,
-            new_model.as_object().unwrap().clone(),
-            None,
-        )
-        .unwrap();
+        let result =
+            UpsertModel::query("Config", &ast, new_model.as_object().unwrap().clone(), None)
+                .unwrap();
 
         // Assert
         assert_eq!(

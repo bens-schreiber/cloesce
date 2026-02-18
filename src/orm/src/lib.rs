@@ -1,19 +1,19 @@
 #![allow(clippy::missing_safety_doc)]
 mod methods;
 
-use ast::Model;
+use ast::CidlType;
+use ast::CloesceAst;
 
 use methods::map::map_sql;
 use methods::select::SelectModel;
 use methods::upsert::UpsertModel;
+use methods::validate::validate_cidl_type;
 
 use serde_json::Map;
 use std::cell::RefCell;
-use std::collections::HashMap;
 use std::slice;
 use std::str;
 
-type ModelMeta = HashMap<String, Model>;
 type IncludeTreeJson = Map<String, serde_json::Value>;
 type D1Result = Vec<Map<String, serde_json::Value>>;
 
@@ -35,16 +35,16 @@ pub unsafe extern "C" fn dealloc(ptr: *mut u8, cap: usize) {
 }
 
 thread_local! {
-    /// Cloesce meta data, intended to be imported once at WASM initializaton
-    pub static META: RefCell<ModelMeta> = RefCell::new(HashMap::new());
+    /// intended to be imported once at WASM initializaton
+    pub static AST: RefCell<CloesceAst> = RefCell::new(CloesceAst::default());
 }
 
-/// Sets the [META] global variable, returning 0 on success.
+/// Sets the [AST] global variable, returning 0 on success.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn set_meta_ptr(ptr: *mut u8, cap: usize) -> i32 {
+pub unsafe extern "C" fn set_ast_ptr(ptr: *mut u8, cap: usize) -> i32 {
     let slice = unsafe { std::slice::from_raw_parts(ptr, cap) };
 
-    let parsed: ModelMeta = match serde_json::from_slice(slice) {
+    let parsed: CloesceAst = match serde_json::from_slice(slice) {
         Ok(val) => val,
         Err(e) => {
             yield_error(e);
@@ -52,8 +52,8 @@ pub unsafe extern "C" fn set_meta_ptr(ptr: *mut u8, cap: usize) -> i32 {
         }
     };
 
-    META.with(|meta| {
-        *meta.borrow_mut() = parsed;
+    AST.with(|ast| {
+        *ast.borrow_mut() = parsed;
     });
 
     0
@@ -76,7 +76,7 @@ pub extern "C" fn get_return_ptr() -> *const u8 {
 
 /// Creates a series of insert, update and upsert statements, finally selecting the model.
 ///
-/// Requires a previous call to [set_meta_ptr].
+/// Requires a previous call to [set_ast_ptr].
 ///
 /// Panics on any error.
 ///
@@ -120,7 +120,7 @@ pub unsafe extern "C" fn upsert_model(
     };
 
     let res =
-        META.with(|meta| UpsertModel::query(model_name, &meta.borrow(), new_model, include_tree));
+        AST.with(|ast| UpsertModel::query(model_name, &ast.borrow(), new_model, include_tree));
     match res {
         Ok(res) => {
             let bytes = serde_json::to_string(&res).unwrap().into_bytes();
@@ -136,7 +136,7 @@ pub unsafe extern "C" fn upsert_model(
 
 /// Creates a series of joins to select a model.
 ///
-/// Requires a previous call to [set_meta_ptr].
+/// Requires a previous call to [set_ast_ptr].
 ///
 /// Panics on any error.
 ///
@@ -171,7 +171,7 @@ pub unsafe extern "C" fn select_model(
         }
     };
 
-    let res = META.with(|meta| SelectModel::query(model_name, from, include_tree, &meta.borrow()));
+    let res = AST.with(|ast| SelectModel::query(model_name, from, include_tree, &ast.borrow()));
     match res {
         Ok(res) => {
             let bytes = res.into_bytes();
@@ -187,7 +187,7 @@ pub unsafe extern "C" fn select_model(
 
 /// Maps D1 results to a Cloesce model structure.
 ///
-/// Requires a previous call to [set_meta_ptr].
+/// Requires a previous call to [set_ast_ptr].
 ///
 /// Panics on any error.
 ///
@@ -230,7 +230,7 @@ pub unsafe extern "C" fn map(
         }
     };
 
-    let res = META.with(|meta| map_sql(model_name, d1_results, include_tree, &meta.borrow()));
+    let res = AST.with(|ast| map_sql(model_name, d1_results, include_tree, &ast.borrow()));
     match res {
         Ok(res) => {
             let bytes = serde_json::to_string(&res).unwrap().into_bytes();
@@ -239,6 +239,57 @@ pub unsafe extern "C" fn map(
         }
         Err(e) => {
             yield_error(e);
+            1
+        }
+    }
+}
+
+/// Validates a value against a CidlType.
+///
+/// Requires a previous call to [set_ast_ptr].
+///
+/// Panics on any error.
+///
+/// Returns 0 on pass 1 on fail. Stores result in [RETURN_PTR].
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn validate_type(
+    // Cidl Type
+    cidl_type_ptr: *const u8,
+    cidl_type_len: usize,
+
+    // Value
+    value_ptr: *const u8,
+    value_len: usize,
+) -> i32 {
+    let cidl_type_raw =
+        unsafe { str::from_utf8(slice::from_raw_parts(cidl_type_ptr, cidl_type_len)).unwrap() };
+    let value_raw = unsafe { str::from_utf8(slice::from_raw_parts(value_ptr, value_len)).unwrap() };
+
+    let value = match serde_json::from_str::<Option<serde_json::Value>>(value_raw) {
+        Ok(res) => res,
+        Err(e) => {
+            yield_error(e);
+            return 1;
+        }
+    };
+
+    let cidl_type = match serde_json::from_str::<CidlType>(cidl_type_raw) {
+        Ok(res) => res,
+        Err(e) => {
+            yield_error(e);
+            return 1;
+        }
+    };
+
+    let res = AST.with(|ast| validate_cidl_type(cidl_type, value, &ast.borrow(), false));
+    match res {
+        Ok(value) => {
+            let bytes = serde_json::to_string(&value).unwrap().into_bytes();
+            yield_result(bytes);
+            0
+        }
+        Err(e) => {
+            yield_error(serde_json::to_string(&e).unwrap());
             1
         }
     }

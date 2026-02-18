@@ -119,6 +119,16 @@ fn test_client_code_generation_snapshot() {
                 }],
                 CidlType::Integer,
             )
+            .method(
+                "hasKvParamAndRes",
+                HttpVerb::POST,
+                false,
+                vec![NamedTypedValue {
+                    name: "input".into(),
+                    cidl_type: CidlType::KvObject(Box::new(CidlType::Text)),
+                }],
+                CidlType::KvObject(Box::new(CidlType::Text)),
+            )
             .build(),
         // R2
         ModelBuilder::new("ModelWithR2")
@@ -126,6 +136,16 @@ fn test_client_code_generation_snapshot() {
             .key_param("r2Id")
             .r2_object("r2/{id}/{r2Id}", "r2_namespace", "fileData", false)
             .r2_object("r2", "r2_namespace", "manyFileDatas", true)
+            .method(
+                "hasR2ParamAndRes",
+                HttpVerb::POST,
+                false,
+                vec![NamedTypedValue {
+                    name: "input".into(),
+                    cidl_type: CidlType::R2Object,
+                }],
+                CidlType::R2Object,
+            )
             .build(),
         // Hybrid (D1, KV, R2)
         ModelBuilder::new("ToyotaPrius")
