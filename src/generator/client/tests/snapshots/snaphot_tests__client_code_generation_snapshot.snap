@@ -261,6 +261,36 @@ export class ModelWithKv {
   manyValues: KValue<unknown>[];
   streamValue: KValue<void>;
 
+  async hasKvParamAndRes(
+    input: KValue<string>,
+    __datasource: "none" = "none",
+    fetchImpl: typeof fetch = fetch
+  ): Promise<HttpResult<KValue<string>>> {
+    const id = [
+      encodeURIComponent(String(this.id1)),
+      encodeURIComponent(String(this.id2)),
+    ].join("/");
+    const baseUrl = new URL(
+      `http://example.com/api/ModelWithKv/${id}/hasKvParamAndRes`
+    );
+    const payload: any = {};
+
+    payload["input"] = input;
+    baseUrl.searchParams.append("__datasource", String(__datasource));
+
+    const res = await fetchImpl(baseUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: requestBody(MediaType.Json, payload),
+    });
+
+    return await HttpResult.fromResponse(
+      res,
+      MediaType.Json,
+      undefined,
+      false
+    );
+  }
   async instanceMethod(
     input: string,
     __datasource: "none" = "none",
@@ -327,6 +357,36 @@ export class ModelWithR2 {
   fileData: R2Object;
   manyFileDatas: R2Object[];
 
+  async hasR2ParamAndRes(
+    input: R2Object,
+    __datasource: "none" = "none",
+    fetchImpl: typeof fetch = fetch
+  ): Promise<HttpResult<R2Object>> {
+    const id = [
+      encodeURIComponent(String(this.id)),
+      encodeURIComponent(String(this.r2Id)),
+    ].join("/");
+    const baseUrl = new URL(
+      `http://example.com/api/ModelWithR2/${id}/hasR2ParamAndRes`
+    );
+    const payload: any = {};
+
+    payload["input"] = input;
+    baseUrl.searchParams.append("__datasource", String(__datasource));
+
+    const res = await fetchImpl(baseUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: requestBody(MediaType.Json, payload),
+    });
+
+    return await HttpResult.fromResponse(
+      res,
+      MediaType.Json,
+      undefined,
+      false
+    );
+  }
 
   static fromJson(data: any): ModelWithR2 {
     const res = Object.assign(new ModelWithR2(), data);

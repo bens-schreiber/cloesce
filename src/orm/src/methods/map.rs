@@ -1,3 +1,4 @@
+use ast::CloesceAst;
 use ast::Model;
 use ast::NavigationPropertyKind;
 use ast::fail;
@@ -7,7 +8,6 @@ use serde_json::Value;
 
 use crate::D1Result;
 use crate::IncludeTreeJson;
-use crate::ModelMeta;
 use crate::methods::OrmErrorKind;
 
 use super::Result;
@@ -16,9 +16,9 @@ pub fn map_sql(
     model_name: &str,
     rows: D1Result,
     include_tree: Option<IncludeTreeJson>,
-    meta: &ModelMeta,
+    ast: &CloesceAst,
 ) -> Result<Vec<Value>> {
-    let model = match meta.get(model_name) {
+    let model = match ast.models.get(model_name) {
         Some(m) => m,
         None => fail!(OrmErrorKind::UnknownModel, "{}", model_name),
     };
@@ -77,7 +77,7 @@ pub fn map_sql(
         };
 
         if let Value::Object(model_json) = model_json {
-            process_navigation_properties(model_json, model, "", tree, row, meta)?;
+            process_navigation_properties(model_json, model, "", tree, row, ast)?;
         }
     }
 
@@ -90,7 +90,7 @@ fn process_navigation_properties(
     prefix: &str,
     include_tree: &IncludeTreeJson,
     row: &Map<String, Value>,
-    meta: &ModelMeta,
+    ast: &CloesceAst,
 ) -> Result<()> {
     for nav_prop in &model.navigation_properties {
         // Skip any property not in the tree.
@@ -98,7 +98,7 @@ fn process_navigation_properties(
             continue;
         }
 
-        let nested_model = match meta.get(&nav_prop.model_reference) {
+        let nested_model = match ast.models.get(&nav_prop.model_reference) {
             Some(m) => m,
             None => fail!(OrmErrorKind::UnknownModel, "{}", nav_prop.model_reference),
         };
@@ -157,7 +157,7 @@ fn process_navigation_properties(
                 prefix.as_str(),
                 nested_include_tree,
                 row,
-                meta,
+                ast,
             )?;
         }
 
@@ -185,15 +185,11 @@ fn process_navigation_properties(
 mod tests {
     use ast::{CidlType, NavigationPropertyKind};
     use base64::{Engine, prelude::BASE64_STANDARD};
-    use generator_test::ModelBuilder;
+    use generator_test::{ModelBuilder, create_ast};
     use serde_json::{Map, Value, json};
     use sqlx::{Column, Row, SqlitePool, TypeInfo, sqlite::SqliteRow};
-    use std::collections::HashMap;
 
-    use crate::{
-        ModelMeta,
-        methods::{map::map_sql, test_sql, upsert::UpsertModel},
-    };
+    use crate::methods::{map::map_sql, test_sql, upsert::UpsertModel};
 
     pub fn rows_to_json(rows: &[SqliteRow]) -> Vec<Map<String, Value>> {
         rows.iter()
@@ -256,12 +252,12 @@ mod tests {
             .col("nickname", CidlType::nullable(CidlType::Text), None)
             .build();
 
-        let meta = HashMap::from([("Horse".to_string(), horse), ("Rider".to_string(), rider)]);
+        let ast = create_ast(vec![horse, rider]);
 
         let rows: Vec<Map<String, Value>> = vec![];
 
         // Act
-        let result = map_sql("Horse", rows, None, &meta).unwrap();
+        let result = map_sql("Horse", rows, None, &ast).unwrap();
 
         // Assert
         assert_eq!(result.len(), 0);
@@ -275,7 +271,7 @@ mod tests {
             .col("name", CidlType::nullable(CidlType::Text), None)
             .build();
 
-        let meta = HashMap::from([("Horse".to_string(), horse)]);
+        let ast = create_ast(vec![horse]);
 
         let row = vec![
             ("id".to_string(), json!("1")),
@@ -285,7 +281,7 @@ mod tests {
         .collect::<Map<String, Value>>();
 
         // Act
-        let result = map_sql("Horse", vec![row], None, &meta).unwrap();
+        let result = map_sql("Horse", vec![row], None, &ast).unwrap();
         let horse = result.first().unwrap().as_object().unwrap();
 
         // Assert
@@ -296,8 +292,9 @@ mod tests {
     #[sqlx::test]
     async fn one_to_one(db: SqlitePool) {
         // Arrange
-        let meta = || {
-            vec![
+        let ast = || {
+            // hack: function to avoid lifetime issues
+            create_ast(vec![
                 ModelBuilder::new("Horse")
                     .id_pk()
                     .col("name", CidlType::nullable(CidlType::Text), None)
@@ -314,10 +311,7 @@ mod tests {
                     .id_pk()
                     .col("nickname", CidlType::nullable(CidlType::Text), None)
                     .build(),
-            ]
-            .into_iter()
-            .map(|m| (m.name.clone(), m))
-            .collect::<ModelMeta>()
+            ])
         };
 
         let new_model = json!({
@@ -336,14 +330,14 @@ mod tests {
 
         let upsert_res = UpsertModel::query(
             "Horse",
-            &meta(),
+            &ast(),
             new_model.as_object().unwrap().clone(),
             Some(include_tree.as_object().unwrap().clone()),
         )
         .expect("upsert to succeed");
 
         let results = test_sql(
-            meta(),
+            ast(),
             upsert_res
                 .sql
                 .into_iter()
@@ -361,7 +355,7 @@ mod tests {
             "Horse",
             select_rows,
             Some(include_tree.as_object().unwrap().clone()),
-            &meta(),
+            &ast(),
         )
         .expect("map_sql to succeed");
 
@@ -371,8 +365,8 @@ mod tests {
     #[sqlx::test]
     async fn one_to_many(db: SqlitePool) {
         // Arrange
-        let meta = || {
-            vec![
+        let ast = || {
+            create_ast(vec![
                 ModelBuilder::new("Horse")
                     .id_pk()
                     .col("name", CidlType::nullable(CidlType::Text), None)
@@ -389,10 +383,7 @@ mod tests {
                     .col("nickname", CidlType::nullable(CidlType::Text), None)
                     .col("horse_id", CidlType::Integer, Some("Horse".into()))
                     .build(),
-            ]
-            .into_iter()
-            .map(|m| (m.name.clone(), m))
-            .collect::<ModelMeta>()
+            ])
         };
 
         let new_model = json!({
@@ -418,14 +409,14 @@ mod tests {
 
         let upsert_stmts = UpsertModel::query(
             "Horse",
-            &meta(),
+            &ast(),
             new_model.as_object().unwrap().clone(),
             Some(include_tree.as_object().unwrap().clone()),
         )
         .expect("upsert to succeed");
 
         let results = test_sql(
-            meta(),
+            ast(),
             upsert_stmts
                 .sql
                 .into_iter()
@@ -443,7 +434,7 @@ mod tests {
             "Horse",
             select_rows,
             Some(include_tree.as_object().unwrap().clone()),
-            &meta(),
+            &ast(),
         )
         .expect("map_sql to succeed");
 
@@ -454,7 +445,7 @@ mod tests {
     async fn many_to_many(db: SqlitePool) {
         // Arrange
         let meta = || {
-            vec![
+            create_ast(vec![
                 ModelBuilder::new("Student")
                     .id_pk()
                     .col("name", CidlType::nullable(CidlType::Text), None)
@@ -465,10 +456,7 @@ mod tests {
                     .col("title", CidlType::nullable(CidlType::Text), None)
                     .nav_p("students", "Student", NavigationPropertyKind::ManyToMany)
                     .build(),
-            ]
-            .into_iter()
-            .map(|m| (m.name.clone(), m))
-            .collect::<ModelMeta>()
+            ])
         };
 
         let new_model = json!({

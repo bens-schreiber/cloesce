@@ -3,7 +3,7 @@ use std::collections::{BTreeMap, HashMap, VecDeque};
 use ast::err::{GeneratorErrorKind, Result};
 use ast::{
     ApiMethod, CidlType, CloesceAst, CrudKind, HttpVerb, Model, NamedTypedValue,
-    NavigationPropertyKind, WranglerSpec, ensure, fail,
+    NavigationPropertyKind, WranglerSpec, cidl_type_contains, ensure, fail,
 };
 
 type AdjacencyList<'a> = BTreeMap<&'a str, Vec<&'a str>>;
@@ -737,6 +737,26 @@ fn validate_methods(
             continue;
         }
 
+        ensure!(
+            !cidl_type_contains!(&param.cidl_type, CidlType::HttpResult(_)),
+            GeneratorErrorKind::NotYetSupported,
+            "Requests currently do not support HttpResult parameters {}.{}.{}",
+            namespace,
+            method.name,
+            param.name
+        );
+
+        // todo: remove this limitation
+        ensure!(
+            method.http_verb != HttpVerb::GET
+                || !cidl_type_contains!(&param.cidl_type, CidlType::KvObject(_)),
+            GeneratorErrorKind::NotYetSupported,
+            "GET Requests currently do not support KV Object parameters {}.{}.{}",
+            namespace,
+            method.name,
+            param.name
+        );
+
         let root_type = param.cidl_type.root_type();
 
         match root_type {
@@ -764,6 +784,18 @@ fn validate_methods(
                     fail!(
                         GeneratorErrorKind::NotYetSupported,
                         "GET Requests currently do not support object parameters {}.{}.{}",
+                        namespace,
+                        method.name,
+                        param.name
+                    )
+                }
+            }
+            CidlType::R2Object => {
+                // TODO: remove this
+                if method.http_verb == HttpVerb::GET {
+                    fail!(
+                        GeneratorErrorKind::NotYetSupported,
+                        "GET Requests currently do not support R2Object parameters {}.{}.{}",
                         namespace,
                         method.name,
                         param.name

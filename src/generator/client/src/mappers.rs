@@ -44,6 +44,11 @@ impl ClientLanguageTypeMapper for TypeScriptMapper {
                 format!("{} = \"none\"", format_ds.join(" |")) // default to none
             }
             CidlType::Stream => "Uint8Array".to_string(),
+            CidlType::KvObject(inner) => {
+                let inner_ts = self.cidl_type(inner, ast);
+                format!("KValue<{inner_ts}>")
+            }
+            CidlType::R2Object => "R2Object".to_string(),
             _ => panic!("Invalid type {:?}", ty),
         }
     }

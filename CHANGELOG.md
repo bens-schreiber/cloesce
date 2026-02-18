@@ -1,3 +1,14 @@
+# [0.2.0] - Unreleased
+### Added
+- Truncate extraneous fields during runtime validation
+- Runtime validation for `DateISO` type
+
+### Changed
+- KV and R2 objects added to the grammar (any method can accept or return these objects)
+- Moved runtime validation to WASM
+
+### Fixed
+
 # [0.1.3] - 2026-2-12
 
 ### Added

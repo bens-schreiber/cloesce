@@ -1,8 +1,8 @@
 {
-  "hash": 15129335377925298214,
+  "hash": 18128276575427666134,
   "models": {
     "NullabilityChecks": {
-      "hash": 1864818088460337102,
+      "hash": 5219882525693133573,
       "name": "NullabilityChecks",
       "primary_key": {
         "name": "id",
@@ -18,7 +18,7 @@
           "foreign_key_reference": null
         },
         {
-          "hash": 12569259787924476539,
+          "hash": 1586271874859688922,
           "value": {
             "name": "nullableString",
             "cidl_type": {

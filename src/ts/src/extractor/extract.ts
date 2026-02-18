@@ -463,25 +463,24 @@ export class CidlExtractor {
             });
           }
 
-          // Ensure that the prop type is KValue<T>
-          const [ty, _] = unwrapNullable(prop.getType());
-          const isArray = ty.isArray();
-          const elementType = isArray ? ty.getArrayElementTypeOrThrow() : ty;
-          const symbolName = elementType.getSymbol()?.getName();
-          if (symbolName !== "KValue") {
+          // Ensure that the prop type is a KvObject
+          const isArray = typeof cidl_type === "object" && "Array" in cidl_type;
+          const unwrapped = isArray ? (cidl_type as any).Array : cidl_type;
+          if (!("KvObject" in unwrapped)) {
             return err(ExtractorErrorCode.MissingKValue, (e) => {
               e.snippet = prop.getText();
               e.context = prop.getName();
             });
           }
+          const inner = unwrapped.KvObject;
 
-          if (model_reference) {
+          if (typeof inner === "object" && "Object" in inner) {
             if (
-              !this.extractedPoos.has(model_reference) &&
-              !this.modelDecls.has(model_reference)
+              !this.extractedPoos.has(inner.Object) &&
+              !this.modelDecls.has(inner.Object)
             ) {
               const res = this.poo(
-                classDecl.getSourceFile().getClassOrThrow(model_reference),
+                classDecl.getSourceFile().getClassOrThrow(inner.Object),
                 classDecl.getSourceFile(),
               );
 
@@ -497,7 +496,7 @@ export class CidlExtractor {
             namespace_binding,
             value: {
               name: prop.getName(),
-              cidl_type: isArray ? (cidl_type as any).Array : cidl_type,
+              cidl_type: inner,
             },
             list_prefix: isArray,
           });
@@ -514,12 +513,10 @@ export class CidlExtractor {
             });
           }
 
-          // Type must be R2ObjectBody
-          const [ty, _] = unwrapNullable(prop.getType());
-          const isArray = ty.isArray();
-          const elementType = isArray ? ty.getArrayElementTypeOrThrow() : ty;
-          const symbolName = elementType.getSymbol()?.getName();
-          if (symbolName !== "R2ObjectBody") {
+          // Type must be R2Object
+          const isArray = typeof cidl_type === "object" && "Array" in cidl_type;
+          const unwrapped = isArray ? (cidl_type as any).Array : cidl_type;
+          if (unwrapped !== "R2Object") {
             return err(ExtractorErrorCode.MissingR2ObjectBody, (e) => {
               e.snippet = prop.getText();
               e.context = prop.getName();
@@ -903,6 +900,7 @@ export class CidlExtractor {
     Boolean: "Boolean",
     Date: "DateIso",
     Uint8Array: "Blob",
+    R2ObjectBody: "R2Object",
   };
 
   // public for tests
@@ -1023,11 +1021,11 @@ export class CidlExtractor {
       return Either.right(wrapNullable("Stream", nullable));
     }
 
-    if (
-      symbolName === Promise.name ||
-      aliasName === "IncludeTree" ||
-      symbolName === "KValue"
-    ) {
+    if (symbolName === "KValue") {
+      return wrapGeneric(genericTy, nullable, (inner) => ({ KvObject: inner }));
+    }
+
+    if (symbolName === Promise.name || aliasName === "IncludeTree") {
       return wrapGeneric(genericTy, nullable, (inner) => inner);
     }
 

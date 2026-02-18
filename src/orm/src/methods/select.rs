@@ -1,18 +1,18 @@
-use ast::{Model, NavigationPropertyKind, fail};
+use ast::{CloesceAst, Model, NavigationPropertyKind, fail};
 use sea_query::{
     Expr, IntoCondition, IntoIden, Query, SelectStatement, SqliteQueryBuilder, TableRef,
 };
 use serde_json::Value;
 
 use crate::{
-    IncludeTreeJson, ModelMeta,
+    IncludeTreeJson,
     methods::{OrmErrorKind, alias},
 };
 
 use super::Result;
 
 pub struct SelectModel<'a> {
-    meta: &'a ModelMeta,
+    ast: &'a CloesceAst,
     path: Vec<String>,
     gensym_c: usize,
     query: SelectStatement,
@@ -23,9 +23,9 @@ impl<'a> SelectModel<'a> {
         model_name: &str,
         from: Option<String>,
         include_tree: Option<IncludeTreeJson>,
-        meta: &'a ModelMeta,
+        ast: &'a CloesceAst,
     ) -> Result<String> {
-        let model = match meta.get(model_name) {
+        let model = match ast.models.get(model_name) {
             Some(m) => m,
             None => fail!(OrmErrorKind::UnknownModel, "{}", model_name),
         };
@@ -49,7 +49,7 @@ impl<'a> SelectModel<'a> {
         }
 
         let mut sm = Self {
-            meta,
+            ast,
             path: vec![],
             gensym_c: 0,
             query,
@@ -119,7 +119,7 @@ impl<'a> SelectModel<'a> {
                 continue;
             };
 
-            let child = self.meta.get(&nav.model_reference).unwrap();
+            let child = self.ast.models.get(&nav.model_reference).unwrap();
             let child_alias = self.gensym(&child.name);
             let mut child_m2m_alias = None;
 
@@ -204,14 +204,11 @@ fn left_join_as(
 #[cfg(test)]
 mod test {
     use ast::{CidlType, NavigationPropertyKind};
-    use generator_test::{ModelBuilder, expected_str};
+    use generator_test::{ModelBuilder, create_ast, expected_str};
     use serde_json::json;
     use sqlx::{Row, SqlitePool};
 
-    use crate::{
-        ModelMeta,
-        methods::{select::SelectModel, test_sql},
-    };
+    use crate::methods::{select::SelectModel, test_sql};
 
     #[sqlx::test]
     async fn scalar_model(db: SqlitePool) {
@@ -221,10 +218,7 @@ mod test {
             .col("name", CidlType::Text, None)
             .build();
 
-        let meta = vec![ast_model]
-            .into_iter()
-            .map(|m| (m.name.clone(), m))
-            .collect();
+        let ast = create_ast(vec![ast_model]);
 
         let insert_query = r#"
             INSERT INTO Person (id, name) VALUES (1, 'Alice'), (2, 'Bob');
@@ -233,7 +227,7 @@ mod test {
 
         // Act
         let select_stmt =
-            SelectModel::query("Person", None, None, &meta).expect("SelectModel::query to work");
+            SelectModel::query("Person", None, None, &ast).expect("SelectModel::query to work");
 
         // Assert
         expected_str!(
@@ -241,13 +235,9 @@ mod test {
             r#"SELECT "Person"."id" AS "id", "Person"."name" AS "name" FROM "Person""#
         );
 
-        let results = test_sql(
-            meta,
-            vec![(insert_query, vec![]), (select_stmt, vec![])],
-            db,
-        )
-        .await
-        .expect("SQL to execute");
+        let results = test_sql(ast, vec![(insert_query, vec![]), (select_stmt, vec![])], db)
+            .await
+            .expect("SQL to execute");
 
         let value = &results[1][0];
         assert_eq!(value.try_get::<u32, _>("id").unwrap(), 1);
@@ -257,7 +247,7 @@ mod test {
     #[sqlx::test]
     async fn one_to_one(db: SqlitePool) {
         // Arrange
-        let meta: ModelMeta = vec![
+        let ast = create_ast(vec![
             ModelBuilder::new("Person")
                 .id_pk()
                 .col("dogId", CidlType::Integer, Some("Dog".into()))
@@ -270,10 +260,7 @@ mod test {
                 )
                 .build(),
             ModelBuilder::new("Dog").id_pk().build(),
-        ]
-        .into_iter()
-        .map(|m| (m.name.clone(), m))
-        .collect();
+        ]);
 
         let include_tree = json!({
             "dog": {}
@@ -290,7 +277,7 @@ mod test {
             "Person",
             None,
             Some(include_tree.as_object().unwrap().clone()),
-            &meta,
+            &ast,
         )
         .expect("SelectModel::query to work");
 
@@ -300,13 +287,9 @@ mod test {
             r#"SELECT "Person"."id" AS "id", "Person"."dogId" AS "dogId", "Dog_1"."id" AS "dog.id" FROM "Person" LEFT JOIN "Dog" AS "Dog_1" ON "Person"."dogId" = "Dog_1"."id""#
         );
 
-        let results = test_sql(
-            meta,
-            vec![(insert_query, vec![]), (select_stmt, vec![])],
-            db,
-        )
-        .await
-        .expect("SQL to execute");
+        let results = test_sql(ast, vec![(insert_query, vec![]), (select_stmt, vec![])], db)
+            .await
+            .expect("SQL to execute");
 
         let value = &results[1][0];
         assert_eq!(value.try_get::<u32, _>("id").unwrap(), 1);
@@ -315,7 +298,7 @@ mod test {
 
     #[sqlx::test]
     fn one_to_many(db: SqlitePool) {
-        let meta: ModelMeta = vec![
+        let ast = create_ast(vec![
             ModelBuilder::new("Dog")
                 .id_pk()
                 .col("personId", CidlType::Integer, Some("Person".into()))
@@ -352,10 +335,7 @@ mod test {
                     },
                 )
                 .build(),
-        ]
-        .into_iter()
-        .map(|m| (m.name.clone(), m))
-        .collect();
+        ]);
 
         let include_tree = json!({
             "persons": {
@@ -377,7 +357,7 @@ mod test {
             "Boss",
             None,
             Some(include_tree.as_object().unwrap().clone()),
-            &meta,
+            &ast,
         )
         .expect("list models to work");
 
@@ -400,7 +380,7 @@ mod test {
         "#
         );
 
-        let results = test_sql(meta, vec![(insert_query, vec![]), (sql, vec![])], db)
+        let results = test_sql(ast, vec![(insert_query, vec![]), (sql, vec![])], db)
             .await
             .expect("SQL to execute");
 
@@ -417,7 +397,7 @@ mod test {
     #[sqlx::test]
     async fn many_to_many(db: SqlitePool) {
         // Arrange
-        let meta: ModelMeta = vec![
+        let ast = create_ast(vec![
             ModelBuilder::new("Student")
                 .id_pk()
                 .nav_p(
@@ -434,10 +414,7 @@ mod test {
                     NavigationPropertyKind::ManyToMany,
                 )
                 .build(),
-        ]
-        .into_iter()
-        .map(|m| (m.name.clone(), m))
-        .collect();
+        ]);
 
         let include_tree = json!({
             "courses": {}
@@ -455,7 +432,7 @@ mod test {
             "Student",
             None,
             Some(include_tree.as_object().unwrap().clone()),
-            &meta,
+            &ast,
         )
         .expect("SelectModel::query to work");
 
@@ -465,13 +442,9 @@ mod test {
             r#"SELECT "Student"."id" AS "id", "CourseStudent_2"."left" AS "courses.id" FROM "Student" LEFT JOIN "CourseStudent" AS "CourseStudent_2" ON "Student"."id" = "CourseStudent_2"."right" LEFT JOIN "Course" AS "Course_1" ON "CourseStudent_2"."left" = "Course_1"."id""#
         );
 
-        let results = test_sql(
-            meta,
-            vec![(insert_query, vec![]), (select_stmt, vec![])],
-            db,
-        )
-        .await
-        .expect("SQL to execute");
+        let results = test_sql(ast, vec![(insert_query, vec![]), (select_stmt, vec![])], db)
+            .await
+            .expect("SQL to execute");
 
         let value = &results[1][0];
         assert_eq!(value.try_get::<u32, _>("id").unwrap(), 1);
@@ -507,11 +480,7 @@ mod test {
             )
             .build();
 
-        let meta: ModelMeta = vec![horse_model, match_model]
-            .into_iter()
-            .map(|m| (m.name.clone(), m))
-            .collect();
-
+        let ast = create_ast(vec![horse_model, match_model]);
         let include_tree = json!({
             "matches": {
                 "horse2": {}
@@ -528,7 +497,7 @@ mod test {
             "Horse",
             None,
             Some(include_tree.as_object().unwrap().clone()),
-            &meta,
+            &ast,
         )
         .expect("list models to work");
 
@@ -538,7 +507,7 @@ mod test {
             r#"SELECT "Horse"."id" AS "id", "Horse"."name" AS "name", "Horse"."bio" AS "bio", "Match_1"."id" AS "matches.id", "Match_1"."horseId1" AS "matches.horseId1", "Match_1"."horseId2" AS "matches.horseId2", "Horse_2"."id" AS "matches.horse2.id", "Horse_2"."name" AS "matches.horse2.name", "Horse_2"."bio" AS "matches.horse2.bio" FROM "Horse" LEFT JOIN "Match" AS "Match_1" ON "Horse"."id" = "Match_1"."horseId1" LEFT JOIN "Horse" AS "Horse_2" ON "Match_1"."horseId2" = "Horse_2"."id""#
         );
 
-        let results = test_sql(meta, vec![(insert_query, vec![]), (sql, vec![])], db)
+        let results = test_sql(ast, vec![(insert_query, vec![]), (sql, vec![])], db)
             .await
             .expect("SQL to execute");
 
@@ -556,10 +525,7 @@ mod test {
             .col("name", CidlType::Text, None)
             .build();
 
-        let meta = vec![ast_model]
-            .into_iter()
-            .map(|m| (m.name.clone(), m))
-            .collect();
+        let ast = create_ast(vec![ast_model]);
 
         let insert_query = r#"
             INSERT INTO Person (id, name) VALUES (1, 'Alice'), (2, 'Bob');
@@ -568,7 +534,7 @@ mod test {
 
         // Act
         let custom_from = "SELECT * FROM Person WHERE name = 'Alice'".to_string();
-        let select_stmt = SelectModel::query("Person", Some(custom_from), None, &meta)
+        let select_stmt = SelectModel::query("Person", Some(custom_from), None, &ast)
             .expect("SelectModel::query to work");
 
         // Assert
@@ -577,13 +543,9 @@ mod test {
             r#"SELECT "Person"."id" AS "id", "Person"."name" AS "name" FROM (SELECT * FROM Person WHERE name = 'Alice') AS "Person""#
         );
 
-        let results = test_sql(
-            meta,
-            vec![(insert_query, vec![]), (select_stmt, vec![])],
-            db,
-        )
-        .await
-        .expect("SQL to execute");
+        let results = test_sql(ast, vec![(insert_query, vec![]), (select_stmt, vec![])], db)
+            .await
+            .expect("SQL to execute");
 
         let value = &results[1][0];
         assert_eq!(value.try_get::<u32, _>("id").unwrap(), 1);

@@ -65,6 +65,9 @@ pub enum CidlType {
     /// Any valid JSON value
     JsonValue,
 
+    /// A Cloudflare R2 object (HEAD object response)
+    R2Object,
+
     /// A dependency injected instance, containing a type name.
     Inject(String),
 
@@ -88,6 +91,9 @@ pub enum CidlType {
     /// A wrapper denoting the type within can be null.
     /// If the inner value is void, represents just null.
     Nullable(Box<CidlType>),
+
+    /// A Cloudflare Workers KV object (GET value response)
+    KvObject(Box<CidlType>),
 }
 
 impl CidlType {
@@ -96,6 +102,7 @@ impl CidlType {
             CidlType::Array(inner) => inner.root_type(),
             CidlType::HttpResult(inner) => inner.root_type(),
             CidlType::Nullable(inner) => inner.root_type(),
+            CidlType::KvObject(inner) => inner.root_type(),
             t => t,
         }
     }
@@ -352,7 +359,7 @@ pub struct WranglerEnv {
 }
 
 #[serde_as]
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Default)]
 pub struct CloesceAst {
     #[serde(default)]
     pub hash: u64,
