@@ -286,7 +286,7 @@ describe("Namespace Middleware", () => {
       ],
     });
     const constructorRegistry = createCtorReg();
-    class Foo { }
+    class Foo {}
     constructorRegistry[Foo.name] = Foo;
 
     await RuntimeContainer.init(ast, constructorRegistry);
@@ -325,7 +325,7 @@ describe("Namespace Middleware", () => {
       ],
     });
     const constructorRegistry = createCtorReg();
-    class Foo { }
+    class Foo {}
     constructorRegistry[Foo.name] = Foo;
 
     await RuntimeContainer.init(ast, constructorRegistry);
@@ -372,10 +372,18 @@ describe("Request Validation", () => {
       keyParams: {},
     };
 
+    const wasmMock = {} as any;
+    const astMock = {} as any;
+    const envMock = {} as any;
+    const ctorRegMock = {} as any;
+
     // Act
     const res = await _cloesceInternal.validateRequest(
       request,
-      {} as any,
+      wasmMock,
+      astMock,
+      envMock,
+      ctorRegMock,
       route,
     );
 
@@ -402,10 +410,18 @@ describe("Request Validation", () => {
       keyParams: {},
     };
 
+    const wasmMock = {} as any;
+    const astMock = {} as any;
+    const envMock = {} as any;
+    const ctorRegMock = {} as any;
+
     // Act
     const res = await _cloesceInternal.validateRequest(
       request,
-      {} as any,
+      wasmMock,
+      astMock,
+      envMock,
+      ctorRegMock,
       route,
     );
 
@@ -435,7 +451,7 @@ describe("Method Middleware", () => {
     });
     const constructorRegistry = createCtorReg();
     class Foo {
-      method() { }
+      method() {}
     }
     constructorRegistry[Foo.name] = Foo;
 

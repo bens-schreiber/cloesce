@@ -31,7 +31,7 @@ export class NullabilityChecks {
   }
 
   @POST
-  injectableTypes(@Inject env: Env | null) {}
+  injectableTypes(@Inject env: Env | null) { }
 
   @POST
   arrayTypes(
@@ -42,9 +42,7 @@ export class NullabilityChecks {
   }
 
   @POST
-  httpResultTypes(
-    a: HttpResult<Integer | null> | null,
-  ): HttpResult<NullabilityChecks[] | null> | null {
+  httpResultTypes(): HttpResult<NullabilityChecks[] | null> | null {
     return null;
   }
 }

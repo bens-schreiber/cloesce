@@ -1,4 +1,9 @@
-import { OrmWasmExports, WasmResource, loadOrmWasm, invokeOrmWasm } from "./wasm.js";
+import {
+  OrmWasmExports,
+  WasmResource,
+  loadOrmWasm,
+  invokeOrmWasm,
+} from "./wasm.js";
 import { proxyCrud } from "./crud.js";
 import { IncludeTree } from "../ui/backend.js";
 import {
@@ -12,6 +17,7 @@ import {
 } from "../ast.js";
 import { Either, InternalError } from "../common.js";
 import { Orm, KeysOfType, HttpResult } from "../ui/backend.js";
+import { hydrateType } from "./orm.js";
 
 export type DependencyKey<T> = Function | (new () => T) | { name: string };
 
@@ -53,7 +59,7 @@ export class RuntimeContainer {
     public readonly ast: CloesceAst,
     public readonly constructorRegistry: ConstructorRegistry,
     public readonly wasm: OrmWasmExports,
-  ) { }
+  ) {}
 
   static async init(ast: CloesceAst, constructorRegistry: ConstructorRegistry) {
     if (this.instance) return;
@@ -242,7 +248,14 @@ export class CloesceApp {
     }
 
     // Request validation
-    const validation = await validateRequest(request, wasm, route);
+    const validation = await validateRequest(
+      request,
+      wasm,
+      ast,
+      env,
+      ctorReg,
+      route,
+    );
     if (validation.isLeft()) {
       return validation.value;
     }
@@ -290,7 +303,14 @@ export class CloesceApp {
     di.set(Request, request);
 
     try {
-      const httpResult = await this.router(request, env, ast, wasm, ctorReg, di);
+      const httpResult = await this.router(
+        request,
+        env,
+        ast,
+        wasm,
+        ctorReg,
+        di,
+      );
 
       // Log any 500 errors
       if (httpResult.status === 500) {
@@ -432,6 +452,9 @@ function matchRoute(
 async function validateRequest(
   request: Request,
   wasm: OrmWasmExports,
+  ast: CloesceAst,
+  env: any,
+  ctorReg: ConstructorRegistry,
   route: MatchedRoute,
 ): Promise<
   Either<HttpResult, { params: RequestParamMap; dataSource: string | null }>
@@ -462,7 +485,6 @@ async function validateRequest(
   const requiredParams = route.method.parameters.filter(
     (p) => !(typeof p.cidl_type === "object" && "Inject" in p.cidl_type),
   );
-
 
   // Extract all method parameters from the body
   const url = new URL(request.url);
@@ -507,15 +529,28 @@ async function validateRequest(
           WasmResource.fromString(JSON.stringify(p.cidl_type), wasm),
           WasmResource.fromString(JSON.stringify(params[p.name]), wasm),
         ],
-        wasm
+        wasm,
       );
 
       if (validateRes.isLeft()) {
         return invalidRequest(RouterError.RequestBodyInvalidParameter);
       }
 
-      // TODO: instantiate types lazily
-      // params[p.name] = res.unwrap();
+      const hydrateRes = hydrateType(
+        JSON.parse(validateRes.unwrap()),
+        p.cidl_type,
+        {
+          ast,
+          ctorReg,
+          includeTree: null,
+          keyParams: {},
+          env,
+          promises: [],
+        },
+      );
+      if (hydrateRes) {
+        params[p.name] = hydrateRes;
+      }
     }
   }
 

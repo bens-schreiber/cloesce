@@ -5,9 +5,14 @@ import type {
   D1Result,
 } from "@cloudflare/workers-types";
 
-import { RuntimeContainer } from "../router/router.js";
+import { ConstructorRegistry, RuntimeContainer } from "../router/router.js";
 import { WasmResource, invokeOrmWasm } from "../router/wasm.js";
-import { Model as AstModel } from "../ast.js";
+import {
+  Model as AstModel,
+  CidlType,
+  CloesceAst,
+  getNavigationPropertyCidlType,
+} from "../ast.js";
 import { InternalError, u8ToB64 } from "../common.js";
 import { IncludeTree, DeepPartial, KValue } from "../ui/backend.js";
 
@@ -172,217 +177,28 @@ export class Orm {
     },
   ): Promise<T> {
     const { ast, constructorRegistry } = RuntimeContainer.get();
-    const model = ast.models[ctor.name];
-    if (!model) {
+    if (!ast.models[ctor.name]) {
       return args.base ?? ({} as T);
     }
+
+    const modelCidlType: CidlType = {
+      Object: ctor.name,
+    };
+
     const env: any = this.env;
 
-    const instance: T = Object.assign(
-      new constructorRegistry[model.name](),
-      args.base,
-    );
     const promises: Promise<void>[] = [];
-    recurse(instance, model, args.includeTree ?? {});
+    const hydrated = hydrateType(args.base ?? {}, modelCidlType, {
+      ast,
+      ctorReg: constructorRegistry,
+      includeTree: args.includeTree ?? {},
+      keyParams: args.keyParams ?? {},
+      env,
+      promises,
+    });
+
     await Promise.all(promises);
-
-    return instance;
-
-    function recurse(
-      current: any,
-      meta: AstModel,
-      includeTree: IncludeTree<any>,
-    ) {
-      // Hydrate navigation properties
-      for (const navProp of meta.navigation_properties) {
-        const nestedTree = includeTree[navProp.var_name];
-        if (!nestedTree) continue;
-
-        const nestedMeta = ast.models[navProp.model_reference];
-        const value = current[navProp.var_name];
-
-        if (Array.isArray(value)) {
-          const ctor = constructorRegistry[nestedMeta.name];
-          current[navProp.var_name] = value.map((child) => {
-            const instance = Object.assign(new ctor(), child);
-            recurse(instance, nestedMeta, nestedTree);
-            return instance;
-          });
-        } else if (value) {
-          current[navProp.var_name] = Object.assign(
-            new constructorRegistry[nestedMeta.name](),
-            value,
-          );
-          recurse(current[navProp.var_name], nestedMeta, nestedTree);
-        }
-      }
-
-      // Hydrate columns
-      for (const col of meta.columns) {
-        if (current[col.value.name] === undefined) {
-          continue;
-        }
-
-        switch (col.value.cidl_type) {
-          case "DateIso": {
-            current[col.value.name] = new Date(current[col.value.name]);
-            break;
-          }
-          case "Blob": {
-            const arr: number[] = current[col.value.name];
-            current[col.value.name] = new Uint8Array(arr);
-            break;
-          }
-          case "Boolean": {
-            current[col.value.name] = Boolean(current[col.value.name]);
-            break;
-          }
-          default: {
-            break;
-          }
-        }
-      }
-
-      // Hydrate key params
-      if (args.keyParams) {
-        for (const keyParam of meta.key_params) {
-          current[keyParam] = args.keyParams[keyParam];
-        }
-      }
-
-      // Hydrate KV objects
-      for (const kv of meta.kv_objects) {
-        // Include check
-        if (includeTree[kv.value.name] === undefined) {
-          if (kv.list_prefix) {
-            current[kv.value.name] = [];
-          }
-          continue;
-        }
-
-        const key = resolveKey(kv.format, current, args.keyParams ?? {});
-        if (!key) {
-          if (kv.list_prefix) {
-            current[kv.value.name] = [];
-          }
-
-          // All key params must be resolvable.
-          // Fail silently by skipping hydration.
-          continue;
-        }
-
-        const namespace: KVNamespace = env[kv.namespace_binding];
-
-        if (kv.list_prefix) {
-          promises.push(hydrateKVList(namespace, key, kv, current));
-        } else {
-          promises.push(hydrateKVSingle(namespace, key, kv, current));
-        }
-      }
-
-      // Hydrate R2 objects
-      for (const r2 of meta.r2_objects) {
-        if (includeTree[r2.var_name] === undefined) {
-          if (r2.list_prefix) {
-            current[r2.var_name] = [];
-          }
-          continue;
-        }
-
-        const key = resolveKey(r2.format, current, args.keyParams ?? {});
-        if (!key) {
-          if (r2.list_prefix) {
-            current[r2.var_name] = [];
-          }
-
-          // All key params must be resolvable.
-          // Fail silently by skipping hydration.
-          continue;
-        }
-
-        const bucket: R2Bucket = env[r2.bucket_binding];
-
-        if (r2.list_prefix) {
-          promises.push(
-            (async () => {
-              const list = await bucket.list({ prefix: key });
-
-              current[r2.var_name] = await Promise.all(
-                list.objects.map(async (obj) => {
-                  const fullObj = await bucket.get(obj.key);
-                  return fullObj;
-                }),
-              );
-            })(),
-          );
-        } else {
-          promises.push(
-            (async () => {
-              const obj = await bucket.get(key);
-              current[r2.var_name] = obj;
-            })(),
-          );
-        }
-      }
-    }
-
-    async function hydrateKVList(
-      namespace: KVNamespace,
-      key: string,
-      kv: any,
-      current: any,
-    ) {
-      const res = await namespace.list({ prefix: key });
-
-      if (kv.value.cidl_type === "Stream") {
-        current[kv.value.name] = await Promise.all(
-          res.keys.map(async (k: any) => {
-            const stream = await namespace.get(k.name, { type: "stream" });
-            return Object.assign(new KValue(), {
-              key: k.name,
-              raw: stream,
-              metadata: null,
-            });
-          }),
-        );
-      } else {
-        current[kv.value.name] = await Promise.all(
-          res.keys.map(async (k: any) => {
-            const kvRes = await namespace.getWithMetadata(k.name, {
-              type: "json",
-            });
-            return Object.assign(new KValue(), {
-              key: k.name,
-              raw: kvRes.value,
-              metadata: kvRes.metadata,
-            });
-          }),
-        );
-      }
-    }
-
-    async function hydrateKVSingle(
-      namespace: KVNamespace,
-      key: string,
-      kv: any,
-      current: any,
-    ) {
-      if (kv.value.cidl_type === "Stream") {
-        const res = await namespace.get(key, { type: "stream" });
-        current[kv.value.name] = Object.assign(new KValue(), {
-          key,
-          raw: res,
-          metadata: null,
-        });
-      } else {
-        const res = await namespace.getWithMetadata(key, { type: "json" });
-        current[kv.value.name] = Object.assign(new KValue(), {
-          key,
-          raw: res.value,
-          metadata: res.metadata,
-        });
-      }
-    }
+    return hydrated;
   }
 
   /**
@@ -714,4 +530,266 @@ function resolveKey(
   } catch {
     return null;
   }
+}
+
+/**
+ * @internal
+ *
+ * Hydrates a pure JSON value to a JS object based on it's CIDL type.
+ *
+ * @param value The value to hydrate.
+ * @param cidlType The CIDL type of the value.
+ * @param includeTree The include tree specifying which navigation properties to include.
+ *  If null, includes all navigation properties, but does not hydrate KV and R2 properties.
+ *
+ * @returns The hydrated value if a transformation was necessary, or undefined if the value was mutated in place.
+ */
+export function hydrateType(
+  value: any,
+  cidlType: CidlType,
+  args: {
+    ast: CloesceAst;
+    ctorReg: ConstructorRegistry;
+    includeTree: IncludeTree<any> | null;
+    keyParams: Record<string, string>;
+    env: any;
+    promises: Promise<void>[];
+  },
+): any | undefined {
+  if (value === null || value === undefined) {
+    return value;
+  }
+
+  // Unwrap nullable types
+  if (typeof cidlType === "object" && "Nullable" in cidlType) {
+    cidlType = cidlType.Nullable;
+  }
+
+  if (typeof cidlType !== "object") {
+    switch (cidlType) {
+      case "DateIso": {
+        return new Date(value);
+      }
+      case "Blob": {
+        const arr: number[] = value;
+        return new Uint8Array(arr);
+      }
+      case "Boolean": {
+        return Boolean(value);
+      }
+      default: {
+        return value;
+      }
+    }
+  }
+
+  if ("Array" in cidlType) {
+    if (!Array.isArray(value)) {
+      return [];
+    }
+
+    for (let i = 0; i < value.length; i++) {
+      value[i] = hydrateType(value[i], cidlType.Array, args);
+    }
+
+    return;
+  }
+
+  const objectName =
+    "Object" in cidlType
+      ? cidlType.Object
+      : "Partial" in cidlType
+        ? cidlType.Partial
+        : null;
+  if (objectName === null) {
+    // Unsupported or unnecessary hydration.
+    return value;
+  }
+
+  const modelMeta = args.ast.models[objectName];
+  const pooMeta = args.ast.poos[objectName];
+  const ctor = args.ctorReg[objectName];
+
+  const instance = Object.assign(new ctor(), value);
+  if (modelMeta) {
+    // Hydrate columns
+    for (const col of modelMeta.columns) {
+      if (instance[col.value.name] === undefined) {
+        continue;
+      }
+
+      const res = hydrateType(
+        instance[col.value.name],
+        col.value.cidl_type,
+        args,
+      );
+      if (res) {
+        instance[col.value.name] = res;
+      }
+    }
+
+    // Recursively hydrate navigation properties
+    for (const navProp of modelMeta.navigation_properties) {
+      const tree = args.includeTree ? args.includeTree[navProp.var_name] : null;
+      if (tree === undefined) continue;
+
+      const res = hydrateType(
+        instance[navProp.var_name],
+        getNavigationPropertyCidlType(navProp),
+        {
+          ...args,
+          includeTree: tree,
+        },
+      );
+      if (res) {
+        instance[navProp.var_name] = res;
+      }
+    }
+
+    // Hydrate key params
+    for (const keyParam of modelMeta.key_params) {
+      instance[keyParam] = args.keyParams[keyParam] ?? instance[keyParam];
+    }
+
+    // Hydrate KV objects
+    for (const kv of modelMeta.kv_objects) {
+      const key = resolveKey(kv.format, instance, args.keyParams);
+      if (
+        (args.includeTree && args.includeTree[kv.value.name] === undefined) ||
+        !key
+      ) {
+        if (kv.list_prefix) {
+          instance[kv.value.name] = [];
+        }
+
+        // Do not hydrate KV properties if they are not included in the include tree.
+        // All keys must be resolved to perform hydration.
+        continue;
+      }
+
+      const namespace: KVNamespace = args.env[kv.namespace_binding]!;
+      if (kv.list_prefix) {
+        args.promises.push(hydrateKVList(namespace, key, kv, instance));
+      } else {
+        args.promises.push(hydrateKVSingle(namespace, key, kv, instance));
+      }
+    }
+
+    // Hydrate R2 objects
+    for (const r2 of modelMeta.r2_objects) {
+      const key = resolveKey(r2.format, instance, args.keyParams);
+      if (
+        (args.includeTree && args.includeTree[r2.var_name] === undefined) ||
+        !key
+      ) {
+        if (r2.list_prefix) {
+          instance[r2.var_name] = [];
+        }
+
+        // Do not hydrate R2 properties if they are not included in the include tree.
+        // All keys must be resolved to perform hydration.
+        continue;
+      }
+
+      const bucket: R2Bucket = args.env[r2.bucket_binding]!;
+      if (r2.list_prefix) {
+        args.promises.push(
+          (async () => {
+            const list = await bucket.list({ prefix: key });
+
+            instance[r2.var_name] = await Promise.all(
+              list.objects.map(async (obj) => {
+                const fullObj = await bucket.get(obj.key);
+                return fullObj;
+              }),
+            );
+          })(),
+        );
+        continue;
+      }
+
+      args.promises.push(
+        (async () => {
+          const obj = await bucket.get(key);
+          instance[r2.var_name] = obj;
+        })(),
+      );
+    }
+
+    return instance;
+  }
+
+  if (pooMeta) {
+    for (const attr of pooMeta.attributes) {
+      if (instance[attr.name] === undefined) {
+        continue;
+      }
+
+      const res = hydrateType(instance[attr.name], attr.cidl_type, args);
+      if (res) {
+        instance[attr.name] = res;
+      }
+    }
+  }
+}
+
+async function hydrateKVList(
+  namespace: KVNamespace,
+  key: string,
+  kv: any,
+  current: any,
+) {
+  const res = await namespace.list({ prefix: key });
+
+  if (kv.value.cidl_type === "Stream") {
+    current[kv.value.name] = await Promise.all(
+      res.keys.map(async (k: any) => {
+        const stream = await namespace.get(k.name, { type: "stream" });
+        return Object.assign(new KValue(), {
+          key: k.name,
+          raw: stream,
+          metadata: null,
+        });
+      }),
+    );
+    return;
+  }
+
+  current[kv.value.name] = await Promise.all(
+    res.keys.map(async (k: any) => {
+      const kvRes = await namespace.getWithMetadata(k.name, {
+        type: "json",
+      });
+      return Object.assign(new KValue(), {
+        key: k.name,
+        raw: kvRes.value,
+        metadata: kvRes.metadata,
+      });
+    }),
+  );
+}
+
+async function hydrateKVSingle(
+  namespace: KVNamespace,
+  key: string,
+  kv: any,
+  current: any,
+) {
+  if (kv.value.cidl_type === "Stream") {
+    const res = await namespace.get(key, { type: "stream" });
+    current[kv.value.name] = Object.assign(new KValue(), {
+      key,
+      raw: res,
+      metadata: null,
+    });
+
+    return;
+  }
+
+  const res = await namespace.getWithMetadata(key, { type: "json" });
+  current[kv.value.name] = Object.assign(new KValue(), {
+    key,
+    raw: res.value,
+    metadata: res.metadata,
+  });
 }

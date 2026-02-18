@@ -749,7 +749,7 @@ fn validate_methods(
         // todo: remove this limitation
         ensure!(
             method.http_verb != HttpVerb::GET
-                && !cidl_type_contains!(&param.cidl_type, CidlType::KvObject(_)),
+                || !cidl_type_contains!(&param.cidl_type, CidlType::KvObject(_)),
             GeneratorErrorKind::NotYetSupported,
             "GET Requests currently do not support KV Object parameters {}.{}.{}",
             namespace,

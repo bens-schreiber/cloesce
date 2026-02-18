@@ -358,7 +358,7 @@ pub struct WranglerEnv {
 }
 
 #[serde_as]
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Default)]
 pub struct CloesceAst {
     #[serde(default)]
     pub hash: u64,
