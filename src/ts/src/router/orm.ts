@@ -593,7 +593,9 @@ export function hydrateType(
       value[i] = hydrateType(value[i], cidlType.Array, args);
     }
 
-    return;
+    // Arrays are hydrated in place since they are mutable,
+    // so we return undefined to signal that no replacement is necessary.
+    return undefined;
   }
 
   const objectName =

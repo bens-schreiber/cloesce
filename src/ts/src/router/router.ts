@@ -536,21 +536,17 @@ async function validateRequest(
         return invalidRequest(RouterError.RequestBodyInvalidParameter);
       }
 
-      const hydrateRes = hydrateType(
-        JSON.parse(validateRes.unwrap()),
-        p.cidl_type,
-        {
-          ast,
-          ctorReg,
-          includeTree: null,
-          keyParams: {},
-          env,
-          promises: [],
-        },
-      );
-      if (hydrateRes) {
-        params[p.name] = hydrateRes;
-      }
+      const validatedRaw = JSON.parse(validateRes.unwrap());
+      const hydrated = hydrateType(validatedRaw, p.cidl_type, {
+        ast,
+        ctorReg,
+        includeTree: null,
+        keyParams: {},
+        env,
+        promises: [],
+      });
+
+      params[p.name] = hydrated ?? validatedRaw;
     }
   }
 

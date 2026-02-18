@@ -180,7 +180,7 @@ pub fn validate_cidl_type(
             if !partial && !matches!(key, Some(Value::String(_))) {
                 return Err(ValidatorErrorKind::InvalidKvObject);
             }
-            new_obj.insert("key".to_string(), key.unwrap_or(Value::Null).clone());
+            new_obj.insert("key".to_string(), key.unwrap_or(Value::Null));
 
             // Metadata must be an object or null if it exists
             if let Some(metadata) = metadata.to_owned()

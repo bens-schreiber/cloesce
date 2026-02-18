@@ -102,6 +102,7 @@ impl CidlType {
             CidlType::Array(inner) => inner.root_type(),
             CidlType::HttpResult(inner) => inner.root_type(),
             CidlType::Nullable(inner) => inner.root_type(),
+            CidlType::KvObject(inner) => inner.root_type(),
             t => t,
         }
     }
