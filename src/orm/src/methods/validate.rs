@@ -197,7 +197,7 @@ pub fn validate_cidl_type(
                 new_obj.insert("raw".to_string(), raw);
             }
 
-            return Ok(Some(Value::Object(new_obj)));
+            Ok(Some(Value::Object(new_obj)))
         }
 
         CidlType::Object(name) | CidlType::Partial(name) => {
@@ -293,7 +293,7 @@ pub fn validate_cidl_type(
                 }
             }
 
-            return Ok(Some(Value::Object(new_obj)));
+            Ok(Some(Value::Object(new_obj)))
         }
 
         CidlType::Array(cidl_type) => {
@@ -307,7 +307,7 @@ pub fn validate_cidl_type(
                     new_arr.push(res);
                 }
             }
-            return Ok(Some(Value::Array(new_arr)));
+            Ok(Some(Value::Array(new_arr)))
         }
 
         _ => unimplemented!(),
@@ -412,7 +412,7 @@ mod tests {
         // Floats return error
         {
             let ast = create_ast(vec![]);
-            let result = validate_cidl_type(CidlType::Integer, Some(json!(3.14)), &ast, false);
+            let result = validate_cidl_type(CidlType::Integer, Some(json!(3.01)), &ast, false);
             assert!(matches!(result, Err(ValidatorErrorKind::NonI64)));
         }
 
@@ -429,8 +429,8 @@ mod tests {
         // Float passes
         {
             let ast = create_ast(vec![]);
-            let result = validate_cidl_type(CidlType::Real, Some(json!(3.14)), &ast, false);
-            assert_eq!(result.unwrap(), Some(json!(3.14)));
+            let result = validate_cidl_type(CidlType::Real, Some(json!(3.01)), &ast, false);
+            assert_eq!(result.unwrap(), Some(json!(3.01)));
         }
 
         // Integer passes
