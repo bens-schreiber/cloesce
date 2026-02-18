@@ -731,6 +731,8 @@ export function hydrateType(
         instance[attr.name] = res;
       }
     }
+
+    return instance;
   }
 }
 

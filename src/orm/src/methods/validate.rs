@@ -122,7 +122,7 @@ pub fn validate_cidl_type(
                 .ok_or(ValidatorErrorKind::NonBase64),
 
             Value::Array(arr) => {
-                // everythign must be u8 (0-255)
+                // everything must be u8 (0-255)
                 if arr.iter().all(|v| v.is_u64() && v.as_u64().unwrap() <= 255) {
                     Ok(Some(value))
                 } else {
