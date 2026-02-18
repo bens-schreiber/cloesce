@@ -13,6 +13,8 @@ export enum ExtractorErrorCode {
   MissingKValue,
   MissingR2ObjectBody,
   InvalidServiceInitializer,
+  DuplicateModel,
+  DuplicateService,
 }
 
 const errorInfoMap: Record<
@@ -83,6 +85,16 @@ const errorInfoMap: Record<
     description:
       "Service initializers must be instance methods that accept only injected dependencies as parameters and return HttpResult<void> | undefined",
     suggestion: "Update the initializer to match the expected signature.",
+  },
+  [ExtractorErrorCode.DuplicateModel]: {
+    description:
+      "Multiple models with the same name found. Model names must be unique within a project.",
+    suggestion: "Update the model to be unique.",
+  },
+  [ExtractorErrorCode.DuplicateService]: {
+    description:
+      "Multiple services with the same name found. Service names must be unique within a project.",
+    suggestion: "Update the service to be unique.",
   },
 };
 
