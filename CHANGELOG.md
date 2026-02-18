@@ -9,6 +9,17 @@
 
 ### Fixed
 
+# [0.1.3] - 2026-2-12
+
+### Added
+
+### Changed
+
+### Fixed
+
+- A single missing value from the wrangler `d1_databases` would crash the generator
+- `wrangler` tests were not being ran in CI/CD because of misnamed test folder
+
 # [0.1.2] - 2026-2-3
 
 ### Added

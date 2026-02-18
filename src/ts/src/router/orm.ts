@@ -403,6 +403,7 @@ export class Orm {
 
   /**
    * Lists all instances of a given Model from D1.
+   * A model without a primary key cannot be listed, and this method will return an empty array in that case.
    *
    * @param ctor Constructor of the model to list
    * @param includeTree Include tree specifying which navigation properties to include
