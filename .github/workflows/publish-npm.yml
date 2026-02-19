@@ -25,12 +25,8 @@ jobs:
           node-version: '24'
           registry-url: https://registry.npmjs.org/
 
-      - name: npm install
-        working-directory: src/ts
-        run: npm install
-
-      - name: make build
-        run: make build
+      - name: Build
+        run: make build-src
 
       - name: Set version from tag
         working-directory: src/ts

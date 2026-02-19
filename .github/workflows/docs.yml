@@ -30,13 +30,15 @@ jobs:
         run: |
           cargo install mdbook --locked
           cargo install mdbook-langtabs --locked
+
+      - name: Install Pandoc
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pandoc
       
       - name: Build mdBook
-        working-directory: docs
-        run: |
-          mdbook-langtabs install
-          mdbook build
-      
+        run: make build-docs
+
       - name: Deploy to Cloudflare Pages
         uses: cloudflare/wrangler-action@v3
         with:
