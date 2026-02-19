@@ -18,11 +18,11 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Set version from tag
+      - name: Set version from latest NPM
         working-directory: src/ts
         run: |
-          VERSION=${GITHUB_REF_NAME#v}
-          npm version $VERSION --no-git-tag-version
+          LATEST=$(npm view $(node -p "require('./package.json').name") version)
+          npm version $LATEST --no-git-tag-version
 
       - name: Build Typedoc
         run: |
