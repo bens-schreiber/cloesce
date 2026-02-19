@@ -8,6 +8,7 @@
     - [Exploring the Template](./ch1-2-exploring-the-template.md)
     - [Building and Migrating](./ch1-3-building-and-migrating.md)
     - [Deploying](./ch1-4-deploying.md)
+    - [Vite Plugin](./ch1-5-vite-plugin.md)
 - [Models](./ch2-0-models.md)
     - [Basic D1 Backed Model](./ch2-1-d1-backed-model.md)
     - [D1 Navigation Properties](./ch2-2-navigation-properties.md)
