@@ -13,7 +13,7 @@ In your project directory, run the following command to compile your Cloesce Mod
 npx cloesce compile
 ```
 
-This command looks for a `cloesce.config.json` file in your project root, which contains configuration settings for the Cloesce compiler. If the file is not found, or settings are omitted, default values will be used.
+This command looks for a `cloesce.config.json` file in your project root, which contains configuration settings for Cloesce. If the file is not found, or settings are omitted, default values will be used.
 
 After compilation, a `.generated` folder is created in your project root. This should **not** be committed to source control, as it is regenerated on each build. The folder contains:
 - `cidl.json`:

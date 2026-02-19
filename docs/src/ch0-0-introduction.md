@@ -3,7 +3,7 @@
 > *Alpha Note*: Cloesce is under active development, expanding its feature set as it pushes toward [full
 > Cloudflare support across any language](./ch6-1-future-vision.md). In this alpha, breaking changes can occur between releases.
 
-*The Cloesce Compiler* converts class definitions into a full stack Cloudflare application.
+*Cloesce* converts class definitions into a full stack Cloudflare application.
 
 Inspired by 
 - [Entity Framework](https://learn.microsoft.com/en-us/ef/)

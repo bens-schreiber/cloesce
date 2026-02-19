@@ -10,9 +10,9 @@ The Frontend layer of Cloesce encompasses all components responsible for interfa
 
 A key design choice when building Cloesce was not to force users to write their Models in a separate IDL or DSL as seen in tools like gRPC and Prisma. 
 
-Instead, we opted to have the Cloesce compiler utilize the source languages AST to extract Model definitions directly from the user's source code. This allows users to define their Models using familiar syntax and semantics, while still benefiting from the powerful features of Cloesce. Of course, this means we must write an extractor for each supported frontend language. Currently, the only supported language is TypeScript.
+Instead, we opted to have Cloesce utilize the source languages AST to extract Model definitions directly from the user's source code. This allows users to define their Models using familiar syntax and semantics, while still benefiting from the powerful features of Cloesce. Of course, this means we must write an extractor for each supported frontend language. Currently, the only supported language is TypeScript.
 
-The Extractor portion of the compiler is responsible for scanning the user's source files (marked with `.cloesce.<lang>`) and identifying Model definitions through stub preprocessor directives. Extraction does not perform any semantic analysis; it simply extracts the Model definitions and their properties into an intermediate representation (the CIDL).
+The Extractor portion of Cloesce is responsible for scanning the user's source files (marked with `.cloesce.<lang>`) and identifying Model definitions through stub preprocessor directives. Extraction does not perform any semantic analysis; it simply extracts the Model definitions and their properties into an intermediate representation (the CIDL).
 
 The CIDL describes a full stack project. Every Model definition, Service, API endpoint and Wrangler binding is stored in the CIDL. Currently, this representation is serialized as JSON, but in the future we may explore other formats such as Protocol Buffers or FlatBuffers for better performance and extensibility.
 
