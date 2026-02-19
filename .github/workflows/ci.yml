@@ -57,11 +57,11 @@ jobs:
           key: npm-cache-${{ hashFiles('**/package-lock.json') }}
 
       # --- Build ---
-      - name: Build Rust code
+      - name: Build source code
         run: make build-src
       
       # --- Format and Lint ---
-      - name: Check Rust code formatting
+      - name: Check code formatting
         run: make format-check
 
 

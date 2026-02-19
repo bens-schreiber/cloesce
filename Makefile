@@ -12,7 +12,7 @@ format:
 format-check:
 	echo "CLOESCE: Checking Rust and TypeScript code formatting..."
 
-	cargo fmt --manifest-path src/orm/Cargo.toml -- --check 
+	cargo fmt --manifest-path src/orm/Cargo.toml -- --check
 	cargo clippy --manifest-path src/orm/Cargo.toml --all-targets --all-features -- -D warnings
 	
 	cargo fmt --all --manifest-path src/generator/Cargo.toml -- --check
