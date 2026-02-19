@@ -1,7 +1,7 @@
 # Summary
 
 [Introduction](./ch0-0-introduction.md)
-[TypeDoc](./ch0-1-typedoc.md)
+[LLMs and TypeDoc](./ch0-1-typedoc.md)
 
 - [Getting Started](./ch1-0-getting-started.md)
     - [Installation](./ch1-1-installation.md)

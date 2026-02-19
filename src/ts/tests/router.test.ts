@@ -1,12 +1,11 @@
 import { describe, test, expect, vi, afterEach } from "vitest";
 import {
-  DependencyKey,
   MatchedRoute,
   RouterError,
   RuntimeContainer,
   _cloesceInternal,
 } from "../src/router/router";
-import { HttpVerb, MediaType, Model, NamedTypedValue } from "../src/ast";
+import { HttpVerb, MediaType } from "../src/ast";
 import { CloesceApp, HttpResult, DependencyContainer } from "../src/ui/backend";
 import { ModelBuilder, ServiceBuilder, createAst } from "./builder";
 
@@ -39,13 +38,6 @@ function mockWranglerEnv() {
 
 function createDi() {
   return new DependencyContainer();
-}
-
-function mockD1() {
-  return {
-    prepare: vi.fn(),
-    exec: vi.fn(),
-  } as any;
 }
 
 function extractErrorCode(str) {
@@ -465,7 +457,6 @@ describe("Method Middleware", () => {
     );
 
     const di = createDi();
-    const d1 = mockD1();
 
     app.onMethod(Foo, "method", async () => {
       return HttpResult.fail(500, "oogly boogly");

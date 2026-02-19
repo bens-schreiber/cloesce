@@ -59,7 +59,7 @@ describe("BlobHaver", () => {
     const res = await blobHaver.yieldStream();
     expect(res.ok, withRes("GET should be OK", res)).toBe(true);
 
-    const got = new Uint8Array(await res.data?.arrayBuffer()!);
+    const got = new Uint8Array(await res.data!.arrayBuffer());
     const expected = [1, 2, 3, 4];
     expect(
       expected.length === got.length && expected.every((v, i) => v === got[i]),
