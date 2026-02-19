@@ -7,6 +7,7 @@ on:
       - "**/*.md"
       - "docs/**"
       - "examples/**"
+
   pull_request:
     branches: ["main", "release/*"]
     paths-ignore:
@@ -22,6 +23,7 @@ jobs:
   ci:
     name: Check & Build & Test
     runs-on: ubuntu-latest
+
     defaults:
       run:
         shell: bash
@@ -34,7 +36,7 @@ jobs:
         with:
           components: rustfmt, clippy
           targets: wasm32-unknown-unknown, wasm32-wasip1
-      
+
       - uses: actions/cache@v3
         with:
           path: |
@@ -43,25 +45,6 @@ jobs:
             src/orm/target
             src/generator/target
           key: cargo-${{ hashFiles('**/Cargo.lock') }}
-
-      # --- ORM ---
-      - name: Check & Build & Test ORM
-        working-directory: src/orm
-        run: |
-          cargo fmt -- --check
-          cargo clippy --all-targets --all-features -- -D warnings
-          cargo build --target wasm32-unknown-unknown --release
-          cargo test
-
-      # --- Generator ---
-      - name: Check & Build & Test Generator
-        working-directory: src/generator
-        run: |
-          cargo fmt -- --check
-          cargo clippy --all-targets --all-features -- -D warnings
-          cargo build --release
-          cargo build --target wasm32-wasip1 --release
-          cargo test
 
       # --- Node Setup ---
       - uses: actions/setup-node@v4
@@ -73,30 +56,14 @@ jobs:
           path: ~/.npm
           key: npm-cache-${{ hashFiles('**/package-lock.json') }}
 
-      # --- Frontend TS ---    
-      - name: Check & Build & Test Frontend TS
-        working-directory: src/ts
-        run: |
-          npm install
-          npm run format -- --check
-          npm run typecheck
-          npm run build
-          npm test
+      # --- Build ---
+      - name: Build source code
+        run: make build-src
+      
+      # --- Format and Lint ---
+      - name: Check code formatting
+        run: make format-check
 
-      # --- Build E2E Tests ---
-      - name: Build E2E
-        working-directory: tests/e2e
-        run: |
-          npm install
-          npm run format -- --check
-
-      # --- Integration Tests ---
-      - name: Regression Tests
-        working-directory: tests/regression
-        run: cargo run --bin regression -- --check
-
-      # --- E2E Tests ---
-      - name: Check & Test E2E
-        working-directory: tests/e2e
-        run: |
-          npm test
+      # --- Test ---
+      - name: Run all tests
+        run: make test

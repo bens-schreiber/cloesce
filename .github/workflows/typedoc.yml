@@ -18,13 +18,16 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Install TypeDoc
+      - name: Set version from tag
         working-directory: src/ts
-        run: npm install
+        run: |
+          VERSION=${GITHUB_REF_NAME#v}
+          npm version $VERSION --no-git-tag-version
 
-      - name: Build TypeDoc
-        working-directory: src/ts
-        run: npx typedoc --out build
+      - name: Build Typedoc
+        run: |
+          npm install --prefix src/ts
+          make build-typedoc
 
       - name: Deploy to Cloudflare Pages
         uses: cloudflare/wrangler-action@v3

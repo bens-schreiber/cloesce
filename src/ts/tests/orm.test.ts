@@ -1,4 +1,4 @@
-import { describe, test, expect, afterEach, beforeAll, vi } from "vitest";
+import { describe, test, expect, afterEach } from "vitest";
 import { Miniflare } from "miniflare";
 import { ModelBuilder, createAst } from "./builder";
 import { KValue, Orm } from "../src/ui/backend.js";
