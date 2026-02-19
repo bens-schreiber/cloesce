@@ -18,18 +18,21 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Install TypeDoc
+      - name: Set version from latest NPM
         working-directory: src/ts
-        run: npm install
+        run: |
+          LATEST=$(npm view $(node -p "require('./package.json').name") version)
+          npm version $LATEST --no-git-tag-version
 
-      - name: Build TypeDoc
-        working-directory: src/ts
-        run: npx typedoc --out build
+      - name: Build Typedoc
+        run: |
+          npm install --prefix src/ts
+          make build-typedoc
 
       - name: Deploy to Cloudflare Pages
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages deploy src/ts/build --project-name=cloesce-ts
+          command: pages deploy src/ts/build --project-name=cloesce-ts --branch=main
           gitHubToken: ${{ secrets.GITHUB_TOKEN }}

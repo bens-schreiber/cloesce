@@ -39,7 +39,7 @@ async fn main() {
     // Build generator
     tracing::info!("Building generator...");
     let cmd = Command::new("cargo")
-        .current_dir("../../src/generator")
+        .current_dir("src/generator")
         .args(["build", "--release"])
         .status();
     match cmd {

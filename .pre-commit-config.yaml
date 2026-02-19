@@ -7,68 +7,9 @@
 repos:
   - repo: local
     hooks:
-      - id: rust-fmt-orm
-        name: Rust fmt check (ORM)
+      - id: format-check
+        name: format check
+        entry: make format-check
         language: system
-        entry: bash -c "cd src/orm && cargo fmt -- --check"
-        pass_filenames: false
         always_run: true
-        files: ""
 
-      - id: rust-clippy-orm
-        name: Rust clippy check (ORM)
-        language: system
-        entry: bash -c "cd src/orm && cargo clippy --all-targets --all-features -- -D warnings"
-        pass_filenames: false
-        always_run: true
-        files: ""
-
-      - id: rust-fmt-generator
-        name: Rust fmt check (Generator)
-        language: system
-        entry: bash -c "cd src/generator && cargo fmt -- --check"
-        pass_filenames: false
-        always_run: true
-        files: ""
-
-      - id: rust-clippy-generator
-        name: Rust clippy check (Generator)
-        language: system
-        entry: bash -c "cd src/generator && cargo clippy --all-targets --all-features -- -D warnings"
-        pass_filenames: false
-        always_run: true
-        files: ""
-
-  - repo: local
-    hooks:
-      - id: ts-format-frontend
-        name: TS format check (frontend)
-        language: system
-        entry: bash -c "cd src/ts && npm run format -- --check"
-        pass_filenames: false
-        always_run: true
-        files: ""
-
-      - id: oxlint-frontend
-        name: TS oxlint check (frontend)
-        language: system
-        entry: bash -c "cd src/ts && npx oxlint ."
-        pass_filenames: false
-        always_run: true
-        files: ""
-
-      - id: ts-format-e2e
-        name: TS format check (e2e)
-        language: system
-        entry: bash -c "cd tests/e2e && npm run format -- --check"
-        pass_filenames: false
-        always_run: true
-        files: ""
-
-      - id: oxlint-e2e
-        name: TS oxlint check (frontend)
-        language: system
-        entry: bash -c "cd tests/e2e && npx oxlint ."
-        pass_filenames: false
-        always_run: true
-        files: ""

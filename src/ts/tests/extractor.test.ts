@@ -595,7 +595,7 @@ describe("Model", () => {
   test("Extracts KV and R2 in method parameters", () => {
     // Arrange
     const project = cloesceProject();
-    const sourceFile = project.createSourceFile(
+    project.createSourceFile(
       "test.ts",
       `
       import { KValue, Integer, R2ObjectBody } from "./src/ui/backend";
