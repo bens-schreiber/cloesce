@@ -64,7 +64,6 @@ jobs:
       - name: Check code formatting
         run: make format-check
 
-
       # --- Test ---
       - name: Run all tests
         run: make test

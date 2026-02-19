@@ -1,6 +1,6 @@
 .PHONY: format
 format:
-	echo "CLOESCE: Formatting Rust and TypeScript code..."
+	@echo "CLOESCE: Formatting Rust and TypeScript code..."
 
 	npm run format:fix --prefix src/ts
 	cargo fmt --all --manifest-path src/orm/Cargo.toml
@@ -10,9 +10,9 @@ format:
 
 .PHONY: format-check
 format-check:
-	echo "CLOESCE: Checking Rust and TypeScript code formatting..."
+	@echo "CLOESCE: Checking Rust and TypeScript code formatting..."
 
-	cargo fmt --manifest-path src/orm/Cargo.toml -- --check
+	cargo fmt --all --manifest-path src/orm/Cargo.toml -- --check 
 	cargo clippy --manifest-path src/orm/Cargo.toml --all-targets --all-features -- -D warnings
 	
 	cargo fmt --all --manifest-path src/generator/Cargo.toml -- --check
@@ -26,7 +26,7 @@ format-check:
 
 .PHONY: build-src
 build-src:
-	echo "CLOESCE: Building Rust and TypeScript code..."
+	@echo "CLOESCE: Building Rust and TypeScript code..."
 
 	cargo build --target wasm32-unknown-unknown --release --manifest-path src/orm/Cargo.toml
 	cargo build --target wasm32-wasip1 --release --manifest-path src/generator/Cargo.toml
@@ -38,7 +38,7 @@ build-src:
 
 .PHONY: test
 test:
-	echo "CLOESCE: Running tests for Rust and TypeScript code..."
+	@echo "CLOESCE: Running tests for Rust and TypeScript code..."
 
 	cargo test --manifest-path src/orm/Cargo.toml
 	cargo test --manifest-path src/generator/Cargo.toml
@@ -50,7 +50,7 @@ test:
 # https://pandoc.org/installing.html
 .PHONY: build-docs
 build-docs:
-	echo "CLOESCE: Building documentation for Rust and TypeScript code..."
+	@echo "CLOESCE: Building documentation for Rust and TypeScript code..."
 
 	cd docs && mdbook-langtabs install
 	cd docs && mdbook build
@@ -59,9 +59,8 @@ build-docs:
 
 .PHONY: build-typedoc
 build-typedoc:
-	echo "CLOESCE: Building TypeScript documentation using TypeDoc..."
-
-	npm install --prefix src/ts
+	@echo "CLOESCE: Building TypeScript documentation using TypeDoc..."
+	
 	cd ./src/ts && npx typedoc --out build
 
 .PHONY: all

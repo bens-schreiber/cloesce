@@ -25,7 +25,9 @@ jobs:
           npm version $VERSION --no-git-tag-version
 
       - name: Build Typedoc
-        run: make build-typedoc
+        run: |
+          npm install --prefix src/ts
+          make build-typedoc
 
       - name: Deploy to Cloudflare Pages
         uses: cloudflare/wrangler-action@v3
