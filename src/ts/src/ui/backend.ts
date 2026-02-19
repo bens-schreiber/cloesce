@@ -455,7 +455,7 @@ export type DataSourceOf<T extends object> = (
  * SQL column should be created as an `INTEGER`.
  *
  * While all numbers are valid JavaScript types, annotating a
- * field with `Integer` communicates to the Cloesce compiler
+ * field with `Integer` communicates to Cloesce
  * that this property represents an integer column in SQLite.
  *
  * Example:

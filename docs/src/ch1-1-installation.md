@@ -34,6 +34,6 @@ A simple project structure is created for you.
 │   └── web/            # Frontend web assets
 ├── test/               # Unit tests for example Models
 ├── migrations/         # Database migration files
-├── cloesce.config.json # Cloesce compiler configuration
+├── cloesce.config.json # Cloesce configuration
 └── package.json        # Project dependencies and scripts
 ```

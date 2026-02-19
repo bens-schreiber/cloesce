@@ -1,6 +1,6 @@
 # Proposal Template
 
-Below is a template for writing a proposal for changes to the Cloesce Compiler. Any significant **feature** or **change** should be proposed using this template to ensure a thorough discussion and evaluation process. **A bug fix does not require a proposal**. The exact format need not be strictly followed, but all relevant sections should be addressed to provide a comprehensive understanding of the proposal.
+Below is a template for writing a proposal for changes to Cloesce. Any significant **feature** or **change** should be proposed using this template to ensure a thorough discussion and evaluation process. **A bug fix does not require a proposal**. The exact format need not be strictly followed, but all relevant sections should be addressed to provide a comprehensive understanding of the proposal.
 
 # Proposal: <Short Descriptive Title>
 

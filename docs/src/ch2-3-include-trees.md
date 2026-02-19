@@ -72,8 +72,6 @@ export class Person {
 
 In this example, we defined a static property `withDogs` on the `Person` Model that represents an Include Tree. This tree specifies that when fetching a `Person`, we want to include their `dogs`, but we do not want to include the `owner` property of each `Dog`.
 
-During Cloesce's extraction phase, the compiler recognizes the `IncludeTree` type and processes the structure accordingly. 
-
 Client code generation will then have the option to use this Include Tree when querying for `Person` instances. See the [Cloesce ORM chapter](./ch2-6-cloesce-orm.md) and [Model Methods](./ch2-5-Model-methods.md) for more details on how to use Include Trees in queries.
 
 > Include Trees are not limited to only D1 backed Models; they can be used with KV and R2 as well.

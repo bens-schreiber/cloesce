@@ -8,7 +8,7 @@ In this section, we will explore the basic properties of a D1 backed Model in Cl
 
 Compilation in Cloesce consists of three phases: Extraction, Analysis, and Code Generation. 
 
-During Extraction, the compiler scans your source files (designated with `*.cloesce.ts`) for Model definitions. Models are defined using the `@Model()` decorator. 
+During Extraction, Cloesce scans your source files (designated with `*.cloesce.ts`) for Model definitions. Models are defined using the `@Model()` decorator. 
 
 ```typescript
 import { Model, Integer, PrimaryKey } from "cloesce/backend";
@@ -31,7 +31,7 @@ The above code defines a Model "User" with several properties:
 
 > Models do not have constructors as they should not be manually instantiated. Instead, use the [ORM functions](./ch2-6-cloesce-orm.md) to create, retrieve, and update Model instances. For tests, consider using [`Object.assign()`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/assign) to create instances of Models with specific property values.
 
-> *TIP*: Using the `@PrimaryKey` decorator is optional if your primary key property is named `id` or `<className>Id` (in any casing, i.e., snake case, camel case, etc). The compiler will automatically treat a property named `id` as the primary key.
+> *TIP*: Using the `@PrimaryKey` decorator is optional if your primary key property is named `id` or `<className>Id` (in any casing, i.e., snake case, camel case, etc). Cloesce will automatically treat a property named `id` as the primary key.
 
 ## Supported D1 Column Types
 

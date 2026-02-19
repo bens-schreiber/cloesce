@@ -498,7 +498,7 @@ async function validateRequest(
           break;
         }
         case MediaType.Octet: {
-          // Octet streams are verified by the Cloesce compiler to have
+          // Octet streams are verified by Cloesce to have
           // one Stream type
           const streamParam = requiredParams.find(
             (p) => typeof p.cidl_type === "string" && p.cidl_type === "Stream",
