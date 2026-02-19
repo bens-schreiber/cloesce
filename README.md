@@ -1,19 +1,26 @@
 # cloesce (alpha, v0.1.0)
 
-> *Alpha Note*: Cloesce is under active development, expanding its feature set as it pushes towards [full
-> Cloudflare support, across any language](./ch6-1-future-vision.md). In this alpha, breaking changes can occur between releases.
+> *Alpha Note*: Cloesce is under active development, expanding its feature set as it pushes toward [full
+> Cloudflare support across any language](https://cloesce.pages.dev/ch6-1-future-vision). In this alpha, breaking changes can occur between releases.
 
-*The Cloesce Compiler* is a tool that enables a data first paradigm to building full stack applications with Cloudflare. Define "Models" in a high level language from which Cloesce deterministically generates and validates the required cloud infrastructure, database schemas, backend services and client code, ensuring consistency and correctness across the entire stack.
+*The Cloesce Compiler* converts class definitions into a full stack Cloudflare application.
 
-Inspired by ORMs like [Entity Framework](https://learn.microsoft.com/en-us/ef/), web frameworks that utilize Dependency Injection such as [NestJS](https://nestjs.com/) and [ASP.NET](https://dotnet.microsoft.com/en-us/apps/aspnet), interface definition and API contract tools like [Swagger Codegen](https://swagger.io/tools/swagger-codegen/) and [gRPC](https://grpc.io/), as well as Infrastructure as Code tools, Cloesce brings these concepts and much more together into a single compilation step.
+Inspired by 
+- [Entity Framework](https://learn.microsoft.com/en-us/ef/)
+- [NestJS](https://nestjs.com/)
+- [ASP.NET](https://dotnet.microsoft.com/en-us/apps/aspnet)
+- [Swagger Codegen](https://swagger.io/tools/swagger-codegen/) 
+- [gRPC](https://grpc.io/)
+- and Infrastructure as Code (IaC)
 
+Cloesce is not just an ORM, migration engine, web framework, runtime validation library, IaC tool, or API Generator. It is **all of these things and more**, wrapped in a clean paradigm that makes building Cloudflare applications a breeze.
+
+<!-- langtabs-start -->
 ```typescript
 @Model(["GET", "SAVE", "LIST"])
 class User {
     id: Integer;
     name: String;
-
-    @OneToMany<Post>(p => p.userId)
     posts: Post[];
 
     @KV("user/settings/{id}", namespace)
@@ -24,7 +31,7 @@ class User {
 
     @POST
     async hello(): User {
-        // Everything is hydrated here! Magic!
+        // D1, KV, and R2 all hydrated here!
         return this;
     }
 }
@@ -33,6 +40,11 @@ class User {
 ## Documentation
 
 See the [Cloesce Compiler Docs](https://cloesce.pages.dev) for more information on getting started, language features, architecture, and roadmap.
+
+Utilize an LLM to interact with the docs in a conversational way:
+```
+curl https://cloesce.pages.dev/llms-full.txt -o llms-full.txt
+```
 
 See the [Typescript API Reference](https://cloesce-ts.pages.dev) for the generated client library documentation.
 
@@ -44,37 +56,6 @@ Contributions are welcome at all levels. Join our [Discord](https://discord.gg/s
 
 Check out [Coalesce](https://coalesce.intellitect.com), an accelerated web app framework for Vue.js and Entity Framework by [IntelliTect](https://intellitect.com). Cloesce takes much of its inspiration from Coalesce (Cloesce = Cloudflare + Coalesce).)
 
-# Building and Testing
+# Building, Formatting, Testing
 
-## Building
-- In `src/ts` run `npm i`
-- In the project root, run `make all` to format, build and run all tests.
-
-## Unit Tests
-
-- `src/ts` run `npm test`
-- `src/generator` run `cargo test`
-
-## Integration Tests
-
-- Regression tests: `cargo run --bin regression`
-
-Optionally, pass `--check` if new snapshots should not be created.
-
-To target a specific fixture, pass `--fixture folder_name`
-
-To update integration snapshots, run:
-
-- `cargo run --bin update`
-
-To delete any generated snapshots run:
-
-- `cargo run --bin update -- -d`
-
-## E2E
-
-- `tests/e2e` run `npm test`
-
-## Code Formatting
-
-- `cargo fmt`, `cargo clippy`, `npm run format:fix`
+All relevant commands can be found in the `Makefile` in the project root. Run `make all` to build, format and test all packages.
