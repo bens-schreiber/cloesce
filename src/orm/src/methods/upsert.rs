@@ -295,12 +295,12 @@ impl<'a> UpsertModel<'a> {
                             path_key,
                         )?;
                     }
-                    (None, _) if attr.value.cidl_type.is_nullable() => {
+                    (None, _) if pk_val.is_none() && attr.value.cidl_type.is_nullable() => {
                         // Default to null for both INSERT and UPSERT.
                         builder.push_val(&attr.value.name, &Value::Null, &attr.value.cidl_type)?;
                     }
                     (None, _) if pk_val.is_some() => {
-                        // This is an update with missing non-nullable attributes, which is allowed. Do nothing.
+                        // This is an update with missing non-nullable attribute. Do nothing.
                     }
                     _ => {
                         fail!(
@@ -1016,6 +1016,55 @@ mod test {
     }
 
     #[sqlx::test]
+    async fn update_with_undefined_nullable_col(db: SqlitePool) {
+        // Arrange
+        let model = ModelBuilder::new("User")
+            .id_pk()
+            .col("name", CidlType::Text, None)
+            .col("age", CidlType::Integer, None)
+            .col("nickname", CidlType::nullable(CidlType::Text), None)
+            .build();
+
+        let mut meta = HashMap::new();
+        meta.insert(model.name.clone(), model);
+
+        let new_model = json!({
+            "id": 1,
+            "name": "Bob",
+            "age": 30,
+            // nickname is nullable but is missing from the input
+        });
+
+        // Act
+        let res = UpsertModel::query("User", &meta, new_model.as_object().unwrap().clone(), None)
+            .unwrap()
+            .sql;
+
+        // Assert
+        let stmt1 = &res[0];
+        expected_str!(
+            stmt1.query,
+            r#"UPDATE "User" SET "name" = ?, "age" = ? WHERE "id" = ?"#
+        );
+        assert_eq!(
+            *stmt1.values,
+            vec![Value::from("Bob"), Value::from(30), Value::from(1i64)]
+        );
+
+        let stmt2 = &res[1];
+        expected_str!(stmt2.query, r#"WHERE "User"."id" = ?"#);
+        assert_eq!(*stmt2.values, vec![Value::from(1i64)]);
+
+        test_sql(
+            meta,
+            res.into_iter().map(|r| (r.query, r.values)).collect(),
+            db,
+        )
+        .await
+        .expect("Upsert to work");
+    }
+
+    #[sqlx::test]
     async fn upsert_blob_b64(db: SqlitePool) {
         // Arrange
         let ast_model = ModelBuilder::new("Picture")
@@ -1116,60 +1165,6 @@ mod test {
 
         let stmt2 = &res[1];
         expected_str!(stmt2.query, r#"WHERE "Picture"."id" = ?"#);
-        assert_eq!(*stmt2.values, vec![Value::from(1i64)]);
-
-        test_sql(
-            meta,
-            res.into_iter().map(|r| (r.query, r.values)).collect(),
-            db,
-        )
-        .await
-        .expect("Upsert to work");
-    }
-
-    #[sqlx::test]
-    async fn upsert_with_undefined_nullable_col(db: SqlitePool) {
-        // Arrange
-        let model = ModelBuilder::new("User")
-            .id_pk()
-            .col("name", CidlType::Text, None)
-            .col("age", CidlType::Integer, None)
-            .col("nickname", CidlType::nullable(CidlType::Text), None)
-            .build();
-
-        let mut meta = HashMap::new();
-        meta.insert(model.name.clone(), model);
-
-        let new_model = json!({
-            "id": 1,
-            "name": "Bob",
-            "age": 30,
-            // nickname is nullable but is missing from the input
-        });
-
-        // Act
-        let res = UpsertModel::query("User", &meta, new_model.as_object().unwrap().clone(), None)
-            .unwrap()
-            .sql;
-
-        // Assert
-        let stmt1 = &res[0];
-        expected_str!(
-            stmt1.query,
-            r#"INSERT INTO "User" ("name", "age", "nickname", "id") VALUES (?, ?, ?, ?) ON CONFLICT ("id") DO UPDATE SET "name" = "excluded"."name", "age" = "excluded"."age", "nickname" = "excluded"."nickname""#
-        );
-        assert_eq!(
-            *stmt1.values,
-            vec![
-                Value::from("Bob"),
-                Value::from(30),
-                Value::Null,
-                Value::from(1i64)
-            ]
-        );
-
-        let stmt2 = &res[1];
-        expected_str!(stmt2.query, r#"WHERE "User"."id" = ?"#);
         assert_eq!(*stmt2.values, vec![Value::from(1i64)]);
 
         test_sql(
