@@ -1,7 +1,5 @@
-import { Model, WranglerEnv, POST, IncludeTree } from "cloesce/backend";
+import { Model, WranglerEnv, POST, IncludeTree, Integer } from "cloesce/backend";
 import { D1Database } from "@cloudflare/workers-types";
-type Integer = number & { __kind: "Integer" };
-type IncludeTree<T> = { [K in keyof T] };
 
 @WranglerEnv
 export class Env {
