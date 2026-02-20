@@ -106,7 +106,7 @@ impl<'a> UpsertModel<'a> {
                         {
                             Some(Some(value)) => validate_and_transform(
                                 model.primary_key.as_ref().unwrap().cidl_type.clone(),
-                                value.clone(),
+                                value,
                                 ast,
                             )?,
                             _ => SqlUpsertBuilder::value_from_ctx(&format!(
@@ -292,7 +292,7 @@ impl<'a> UpsertModel<'a> {
                 ) {
                     (Some(value), _) => {
                         // A value was provided in `new_model`
-                        builder.push_val(&attr.value.name, value, &attr.value.cidl_type)?;
+                        builder.push_val(&attr.value.name, &value, &attr.value.cidl_type)?;
                     }
                     (None, Some(_)) if path_key.is_some() => {
                         let path_key = path_key.unwrap();
@@ -304,9 +304,12 @@ impl<'a> UpsertModel<'a> {
                             path_key,
                         )?;
                     }
-                    (None, None) if pk_val.is_some() => {
-                        // PK is provided, but an attribute is missing. Assume
-                        // this must be an update query.
+                    (None, _) if attr.value.cidl_type.is_nullable() => {
+                        // Default to null for both INSERT and UPSERT.
+                        builder.push_val(&attr.value.name, &Value::Null, &attr.value.cidl_type)?;
+                    }
+                    (None, _) if pk_val.is_some() => {
+                        // This is an update with missing non-nullable attributes, which is allowed. Do nothing.
                     }
                     _ => {
                         fail!(
@@ -404,7 +407,7 @@ impl<'a> UpsertModel<'a> {
         // Collect column/value pairs from context
         let mut entries = Vec::new();
         for (i, (_, cidl_type, path_key)) in pairs.iter().enumerate() {
-            let value = match self.context.get(path_key).cloned().flatten() {
+            let value = match self.context.get(path_key).and_then(|v| v.as_ref()) {
                 Some(v) => validate_and_transform(cidl_type.to_owned().clone(), v, self.ast)?,
                 None => SqlUpsertBuilder::value_from_ctx(path_key),
             };
@@ -516,10 +519,8 @@ impl<'a> SqlUpsertBuilder<'a> {
 
     /// Adds a column and value to the insert statement.
     ///
-    /// TODO: Copies the value
-    ///
     /// Returns an error if the value does not match the meta type.
-    fn push_val(&mut self, var_name: &str, value: Value, cidl_type: &CidlType) -> Result<()> {
+    fn push_val(&mut self, var_name: &str, value: &Value, cidl_type: &CidlType) -> Result<()> {
         self.cols.push(alias(var_name));
         let val = validate_and_transform(cidl_type.clone(), value, self.ast)?;
         self.vals.push(val);
@@ -540,7 +541,7 @@ impl<'a> SqlUpsertBuilder<'a> {
                 self.vals.push(Self::value_from_ctx(path));
             }
             Some(v) => {
-                self.push_val(var_name, v.clone(), cidl_type)?;
+                self.push_val(var_name, v, cidl_type)?;
             }
         }
         Ok(())
@@ -562,7 +563,7 @@ impl<'a> SqlUpsertBuilder<'a> {
     fn build(self, pk_val: &Option<Value>) -> Result<SqlStatement> {
         let pk_expr = pk_val
             .as_ref()
-            .map(|v| validate_and_transform(self.pk_ntv.cidl_type.clone(), v.clone(), self.ast))
+            .map(|v| validate_and_transform(self.pk_ntv.cidl_type.clone(), v, self.ast))
             .transpose()?;
 
         // Attributes are missing, but there is a PK. This must be an update query.
@@ -623,15 +624,17 @@ fn key_format_interpolation(
     new_model: &Map<String, Value>,
     meta: &Model,
 ) -> Result<(String, bool)> {
-    let mut key = key_format.to_string();
     let mut placeholders_remain = false;
 
-    for cap in key_format.match_indices('{') {
-        let end_brace = match key_format[cap.0..].find('}') {
-            Some(idx) => cap.0 + idx,
-            None => panic!("Unclosed brace in key format: {}", key_format),
+    let mut result = String::with_capacity(key_format.len());
+    let mut last_end = 0;
+    for (start, _) in key_format.match_indices('{') {
+        result.push_str(&key_format[last_end..start]);
+        let end = match key_format[start..].find('}') {
+            Some(idx) => start + idx,
+            None => unreachable!("Unclosed brace in key format: {}", key_format),
         };
-        let param_name = &key_format[cap.0 + 1..end_brace];
+        let param_name = &key_format[start + 1..end];
         let param_value = match new_model.get(param_name) {
             Some(v) => v,
             None => {
@@ -639,6 +642,8 @@ fn key_format_interpolation(
                     && pk.name == param_name
                 {
                     placeholders_remain = true;
+                    result.push_str(&format!("{{{}}}", param_name));
+                    last_end = end + 1;
                     continue;
                 }
 
@@ -665,10 +670,13 @@ fn key_format_interpolation(
             ),
         };
 
-        key = key.replace(&format!("{{{}}}", param_name), &replacement);
+        result.push_str(&replacement);
+        last_end = end + 1;
     }
 
-    Ok((key, placeholders_remain))
+    result.push_str(&key_format[last_end..]);
+
+    Ok((result, placeholders_remain))
 }
 
 /// Convert a SeaQuery value to a serde_json value
@@ -699,10 +707,10 @@ fn build_sqlite<T: sea_query::QueryStatementWriter>(qb: T) -> SqlStatement {
 
 fn validate_and_transform(
     cidl_type: CidlType,
-    value: Value,
+    value: &Value,
     ast: &CloesceAst,
 ) -> Result<SimpleExpr> {
-    let res = validate_cidl_type(cidl_type, Some(value), ast, false);
+    let res = validate_cidl_type(cidl_type.clone(), Some(value.clone()), ast, false);
     let value = match res {
         Ok(Some(v)) => v,
         Ok(None) => fail!(
@@ -717,7 +725,16 @@ fn validate_and_transform(
     };
 
     Ok(match value {
-        Value::Null => SimpleExpr::Custom("null".into()),
+        Value::Null => match cidl_type.root_type() {
+            CidlType::Integer => return Ok(Expr::val(None::<i64>).into()),
+            CidlType::Boolean => return Ok(Expr::val(None::<bool>).into()),
+            CidlType::Real => return Ok(Expr::val(None::<f64>).into()),
+            CidlType::Text | CidlType::DateIso => {
+                return Ok(Expr::val(None::<String>).into());
+            }
+            CidlType::Blob => return Ok(Expr::val(None::<Vec<u8>>).into()),
+            _ => unreachable!("Invalid CIDL"),
+        },
         Value::Bool(b) => Expr::val(if b { 1 } else { 0 }).into(),
         Value::Number(n) if n.is_i64() => Expr::val(n.as_i64().unwrap()).into(),
         Value::Number(n) if n.is_f64() => Expr::val(n.as_f64().unwrap()).into(),
@@ -837,7 +854,7 @@ mod test {
         let stmt1 = &res[0];
         expected_str!(
             stmt1.query,
-            r#"INSERT INTO "Horse" ("color", "age", "address",  "is_tired", "id") VALUES (?, ?, null, ?, ?)"#
+            r#"INSERT INTO "Horse" ("color", "age", "address",  "is_tired", "id") VALUES (?, ?, ?, ?, ?)"#
         );
         expected_str!(
             stmt1.query,
@@ -848,6 +865,7 @@ mod test {
             vec![
                 Value::from("brown"),
                 Value::from(7i64),
+                Value::from(None::<String>),
                 Value::from(1i64),
                 Value::from(1i64)
             ]
@@ -888,9 +906,12 @@ mod test {
             .build();
 
         let new_model = json!({
+            // pk exists
             "id": 1,
             "age": 7,
             "address": null
+
+            // color is missing, so this should be an update.
         });
 
         let ast = create_ast(vec![model]);
@@ -906,9 +927,16 @@ mod test {
         let stmt1 = &res[0];
         expected_str!(
             stmt1.query,
-            r#"UPDATE "Horse" SET "age" = ?, "address" = null WHERE "id" = ?"#
+            r#"UPDATE "Horse" SET "age" = ?, "address" = ? WHERE "id" = ?"#
         );
-        assert_eq!(*stmt1.values, vec![Value::from(7), Value::from(1)]);
+        assert_eq!(
+            *stmt1.values,
+            vec![
+                Value::from(7),
+                Value::from(None::<String>),
+                Value::from(1i64)
+            ]
+        );
 
         let stmt2 = &res[1];
         expected_str!(stmt2.query, r#"WHERE "Horse"."id" = ?"#);
@@ -1022,6 +1050,59 @@ mod test {
 
         let stmt2 = &res[1];
         expected_str!(stmt2.query, r#"WHERE "Picture"."id" = ?"#);
+        assert_eq!(*stmt2.values, vec![Value::from(1i64)]);
+
+        test_sql(
+            ast,
+            res.into_iter().map(|r| (r.query, r.values)).collect(),
+            db,
+        )
+        .await
+        .expect("Upsert to work");
+    }
+
+    #[sqlx::test]
+    async fn upsert_with_undefined_nullable_col(db: SqlitePool) {
+        // Arrange
+        let model = ModelBuilder::new("User")
+            .id_pk()
+            .col("name", CidlType::Text, None)
+            .col("age", CidlType::Integer, None)
+            .col("nickname", CidlType::nullable(CidlType::Text), None)
+            .build();
+
+        let ast = create_ast(vec![model]);
+
+        let new_model = json!({
+            "id": 1,
+            "name": "Bob",
+            "age": 30,
+            // nickname is nullable but is missing from the input
+        });
+
+        // Act
+        let res = UpsertModel::query("User", &ast, new_model.as_object().unwrap().clone(), None)
+            .unwrap()
+            .sql;
+
+        // Assert
+        let stmt1 = &res[0];
+        expected_str!(
+            stmt1.query,
+            r#"INSERT INTO "User" ("name", "age", "nickname", "id") VALUES (?, ?, ?, ?) ON CONFLICT ("id") DO UPDATE SET "name" = "excluded"."name", "age" = "excluded"."age", "nickname" = "excluded"."nickname""#
+        );
+        assert_eq!(
+            *stmt1.values,
+            vec![
+                Value::from("Bob"),
+                Value::from(30),
+                Value::Null,
+                Value::from(1i64)
+            ]
+        );
+
+        let stmt2 = &res[1];
+        expected_str!(stmt2.query, r#"WHERE "User"."id" = ?"#);
         assert_eq!(*stmt2.values, vec![Value::from(1i64)]);
 
         test_sql(
@@ -1439,6 +1520,85 @@ mod test {
 
         let row = &results[2][0];
         assert_eq!(row.try_get::<i64, _>("id").unwrap(), 1);
+    }
+
+    #[sqlx::test]
+    async fn insert_empty(db: SqlitePool) {
+        // Arrange
+        let model = ModelBuilder::new("User")
+            .id_pk()
+            .col("nickname", CidlType::nullable(CidlType::Text), None)
+            .build();
+
+        let ast = create_ast(vec![model]);
+
+        let new_model = json!({
+            // completely empty
+        });
+
+        // Act
+        let res =
+            UpsertModel::query("User", &ast, new_model.as_object().unwrap().clone(), None).unwrap();
+
+        // Assert
+        let stmt1 = &res.sql[0];
+        expected_str!(stmt1.query, r#"INSERT INTO "User" ("nickname") VALUES (?)"#);
+        assert_eq!(*stmt1.values, vec![Value::Null]);
+
+        test_sql(
+            ast,
+            res.sql.into_iter().map(|r| (r.query, r.values)).collect(),
+            db,
+        )
+        .await
+        .expect("Upsert to work");
+    }
+
+    #[sqlx::test]
+    async fn insert_with_undefined_nullable(db: SqlitePool) {
+        // Arrange
+        let model = ModelBuilder::new("User")
+            .id_pk()
+            .col("name", CidlType::Text, None)
+            .col("age", CidlType::Integer, None)
+            .col(
+                "bestFriend",
+                CidlType::nullable(CidlType::Integer),
+                Some("User".into()),
+            )
+            .build();
+
+        let new_model = json!({
+            "name": "Bob",
+            "age": 30,
+            // bestFriend is nullable but is missing from the input
+        });
+
+        let ast = create_ast(vec![model]);
+
+        // Act
+        let res = UpsertModel::query("User", &ast, new_model.as_object().unwrap().clone(), None)
+            .unwrap()
+            .sql;
+
+        // Assert
+        let stmt1 = &res[0];
+        expected_str!(
+            stmt1.query,
+            r#"INSERT INTO "User" ("name", "age", "bestFriend") VALUES (?, ?, ?)"#
+        );
+        assert_eq!(
+            *stmt1.values,
+            vec![Value::from("Bob"), Value::from(30), Value::Null]
+        );
+
+        test_sql(
+            ast,
+            res.into_iter().map(|r| (r.query, r.values)).collect(),
+            db,
+        )
+        .await
+        .expect("Upsert to work");
     }
 
     #[sqlx::test]
