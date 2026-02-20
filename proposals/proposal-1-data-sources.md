@@ -280,8 +280,8 @@ class User {
 
     static readonly includeAll: DataSource<User> = {
         includeTree: {
-            dogs: {},
-            cats: {}
+            dog: {},
+            posts: {}
         }
     }
 
