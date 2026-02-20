@@ -9,6 +9,16 @@
 
 ### Fixed
 
+# [0.1.5] - 2026-2-20
+
+### Added
+
+### Changed
+
+### Fixed
+
+- A bug where `upsert` would not properly replace an undefined value with `null` when the column is nullable.
+
 # [0.1.3] - 2026-2-12
 
 ### Added
