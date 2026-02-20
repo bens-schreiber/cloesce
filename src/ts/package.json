@@ -15,8 +15,7 @@
   },
   "dependencies": {
     "cmd-ts": "^0.14.1",
-    "ts-morph": "^22.0.0",
-    "wrangler": "^4.34.0"
+    "ts-morph": "^22.0.0"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20250906.0",

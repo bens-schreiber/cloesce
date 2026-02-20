@@ -8,6 +8,7 @@
 - Moved runtime validation to WASM
 
 ### Fixed
+- Optimized the ORM WASM binary size by 58% (657KB -> 383KB)
 
 # [0.1.5] - 2026-2-20
 
