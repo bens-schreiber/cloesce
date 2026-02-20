@@ -295,9 +295,12 @@ impl<'a> UpsertModel<'a> {
                             path_key,
                         )?;
                     }
+                    (None, None) if attr.value.cidl_type.is_nullable() => {
+                        // Nullable values are allowed to be missing and default to null.
+                        builder.push_val(&attr.value.name, Value::Null, &attr.value.cidl_type)?;
+                    }
                     (None, None) if pk_val.is_some() => {
-                        // PK is provided, but an attribute is missing. Assume
-                        // this must be an update query.
+                        // This is an update with missing attributes, which is allowed. Do nothing.
                     }
                     _ => {
                         fail!(
@@ -617,7 +620,14 @@ fn validate_json_to_cidl(
     attr_name: &str,
 ) -> Result<SimpleExpr> {
     if matches!(cidl_type, CidlType::Nullable(_)) && value.is_null() {
-        return Ok(SimpleExpr::Custom("null".into()));
+        match cidl_type.root_type() {
+            CidlType::Integer => return Ok(Expr::val(None::<i64>).into()),
+            CidlType::Boolean => return Ok(Expr::val(None::<bool>).into()),
+            CidlType::Real => return Ok(Expr::val(None::<f64>).into()),
+            CidlType::Text | CidlType::DateIso => return Ok(Expr::val(None::<String>).into()),
+            CidlType::Blob => return Ok(Expr::val(None::<Vec<u8>>).into()),
+            _ => unreachable!("Invalid CIDL"),
+        }
     }
 
     match cidl_type.root_type() {
@@ -902,7 +912,7 @@ mod test {
         let stmt1 = &res[0];
         expected_str!(
             stmt1.query,
-            r#"INSERT INTO "Horse" ("color", "age", "address",  "is_tired", "id") VALUES (?, ?, null, ?, ?)"#
+            r#"INSERT INTO "Horse" ("color", "age", "address",  "is_tired", "id") VALUES (?, ?, ?, ?, ?)"#
         );
         expected_str!(
             stmt1.query,
@@ -913,6 +923,7 @@ mod test {
             vec![
                 Value::from("brown"),
                 Value::from(7i64),
+                Value::from(None::<String>),
                 Value::from(1i64),
                 Value::from(1i64)
             ]
@@ -953,9 +964,12 @@ mod test {
             .build();
 
         let new_model = json!({
+            // pk exists
             "id": 1,
             "age": 7,
             "address": null
+
+            // color is missing, so this should be an update.
         });
 
         let mut meta = HashMap::new();
@@ -972,9 +986,16 @@ mod test {
         let stmt1 = &res[0];
         expected_str!(
             stmt1.query,
-            r#"UPDATE "Horse" SET "age" = ?, "address" = null WHERE "id" = ?"#
+            r#"UPDATE "Horse" SET "age" = ?, "address" = ? WHERE "id" = ?"#
         );
-        assert_eq!(*stmt1.values, vec![Value::from(7), Value::from(1)]);
+        assert_eq!(
+            *stmt1.values,
+            vec![
+                Value::from(7),
+                Value::from(None::<String>),
+                Value::from(1i64)
+            ]
+        );
 
         let stmt2 = &res[1];
         expected_str!(stmt2.query, r#"WHERE "Horse"."id" = ?"#);
@@ -1090,6 +1111,60 @@ mod test {
 
         let stmt2 = &res[1];
         expected_str!(stmt2.query, r#"WHERE "Picture"."id" = ?"#);
+        assert_eq!(*stmt2.values, vec![Value::from(1i64)]);
+
+        test_sql(
+            meta,
+            res.into_iter().map(|r| (r.query, r.values)).collect(),
+            db,
+        )
+        .await
+        .expect("Upsert to work");
+    }
+
+    #[sqlx::test]
+    async fn upsert_with_undefined_nullable_col(db: SqlitePool) {
+        // Arrange
+        let model = ModelBuilder::new("User")
+            .id_pk()
+            .col("name", CidlType::Text, None)
+            .col("age", CidlType::Integer, None)
+            .col("nickname", CidlType::nullable(CidlType::Text), None)
+            .build();
+
+        let mut meta = HashMap::new();
+        meta.insert(model.name.clone(), model);
+
+        let new_model = json!({
+            "id": 1,
+            "name": "Bob",
+            "age": 30,
+            // nickname is nullable but is missing from the input
+        });
+
+        // Act
+        let res = UpsertModel::query("User", &meta, new_model.as_object().unwrap().clone(), None)
+            .unwrap()
+            .sql;
+
+        // Assert
+        let stmt1 = &res[0];
+        expected_str!(
+            stmt1.query,
+            r#"INSERT INTO "User" ("name", "age", "nickname", "id") VALUES (?, ?, ?, ?) ON CONFLICT ("id") DO UPDATE SET "name" = "excluded"."name", "age" = "excluded"."age", "nickname" = "excluded"."nickname""#
+        );
+        assert_eq!(
+            *stmt1.values,
+            vec![
+                Value::from("Bob"),
+                Value::from(30),
+                Value::Null,
+                Value::from(1i64)
+            ]
+        );
+
+        let stmt2 = &res[1];
+        expected_str!(stmt2.query, r#"WHERE "User"."id" = ?"#);
         assert_eq!(*stmt2.values, vec![Value::from(1i64)]);
 
         test_sql(
@@ -1517,6 +1592,39 @@ mod test {
 
         let row = &results[2][0];
         assert_eq!(row.try_get::<i64, _>("id").unwrap(), 1);
+    }
+
+    #[sqlx::test]
+    async fn insert_with_empty_and_null(db: SqlitePool) {
+        // Arrange
+        let model = ModelBuilder::new("User")
+            .id_pk()
+            .col("nickname", CidlType::nullable(CidlType::Text), None)
+            .build();
+
+        let mut meta = HashMap::new();
+        meta.insert(model.name.clone(), model);
+
+        let new_model = json!({
+            // completely empty
+        });
+
+        // Act
+        let res = UpsertModel::query("User", &meta, new_model.as_object().unwrap().clone(), None)
+            .unwrap();
+
+        // Assert
+        let stmt1 = &res.sql[0];
+        expected_str!(stmt1.query, r#"INSERT INTO "User" ("nickname") VALUES (?)"#);
+        assert_eq!(*stmt1.values, vec![Value::Null]);
+
+        test_sql(
+            meta,
+            res.sql.into_iter().map(|r| (r.query, r.values)).collect(),
+            db,
+        )
+        .await
+        .expect("Upsert to work");
     }
 
     #[sqlx::test]
