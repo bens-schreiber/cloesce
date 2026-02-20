@@ -796,7 +796,9 @@ fn sea_query_to_serde(v: sea_query::Value) -> serde_json::Value {
         sea_query::Value::String(Some(s)) => Value::String(*s),
         sea_query::Value::String(None) => Value::Null,
         sea_query::Value::Float(Some(f)) => Value::from(f),
+        sea_query::Value::Float(None) => Value::Null,
         sea_query::Value::Double(Some(d)) => Value::from(d),
+        sea_query::Value::Double(None) => Value::Null,
         _ => unimplemented!("Value type not implemented in upsert serde conversion"),
     }
 }
