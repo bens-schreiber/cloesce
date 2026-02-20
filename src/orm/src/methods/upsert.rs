@@ -194,11 +194,7 @@ impl<'a> UpsertModel<'a> {
             return Ok(());
         };
 
-        let mut builder = SqlUpsertBuilder::new(
-            model_name,
-            model.columns.len(),
-            model.primary_key.as_ref().unwrap(),
-        );
+        let mut builder = SqlUpsertBuilder::new(model_name, model.primary_key.as_ref().unwrap());
 
         // Primary key
         let pk_val = match new_model.remove(&pk_meta.name) {
@@ -296,11 +292,14 @@ impl<'a> UpsertModel<'a> {
                         )?;
                     }
                     (None, _) if pk_val.is_none() && attr.value.cidl_type.is_nullable() => {
-                        // Default to null for both INSERT and UPSERT.
+                        // Default to null for INSERT (no PK provided).
                         builder.push_val(&attr.value.name, &Value::Null, &attr.value.cidl_type)?;
                     }
                     (None, _) if pk_val.is_some() => {
-                        // This is an update with missing non-nullable attribute. Do nothing.
+                        if !attr.value.cidl_type.is_nullable() {
+                            // A non-nullable column is missing and we have a PK. This forces an UPDATE.
+                            builder.flag_missing_non_nullable();
+                        }
                     }
                     _ => {
                         fail!(
@@ -486,24 +485,20 @@ impl VariablesTable {
 
 struct SqlUpsertBuilder<'a> {
     model_name: &'a str,
-    scalar_len: usize,
     cols: Vec<Alias>,
     vals: Vec<SimpleExpr>,
     pk_ntv: &'a NamedTypedValue,
+    has_missing_non_nullable: bool,
 }
 
 impl<'a> SqlUpsertBuilder<'a> {
-    fn new(
-        model_name: &'a str,
-        scalar_len: usize,
-        pk_ntv: &'a NamedTypedValue,
-    ) -> SqlUpsertBuilder<'a> {
+    fn new(model_name: &'a str, pk_ntv: &'a NamedTypedValue) -> SqlUpsertBuilder<'a> {
         Self {
-            scalar_len,
             model_name,
             pk_ntv,
             cols: Vec::default(),
             vals: Vec::default(),
+            has_missing_non_nullable: false,
         }
     }
 
@@ -537,6 +532,11 @@ impl<'a> SqlUpsertBuilder<'a> {
         Ok(())
     }
 
+    /// Force an UPDATE instead of an INSERT
+    fn flag_missing_non_nullable(&mut self) {
+        self.has_missing_non_nullable = true;
+    }
+
     fn value_from_ctx(path: &str) -> SimpleExpr {
         let subq = SubQueryStatement::SelectStatement(
             Query::select()
@@ -563,12 +563,10 @@ impl<'a> SqlUpsertBuilder<'a> {
             })
             .transpose()?;
 
-        // Attributes are missing, but there is a PK. This must be an update query.
-        if self.cols.len() < self.scalar_len {
-            let Some(pk_expr) = pk_expr else {
-                unreachable!("An attribute for an upsert is missing");
-            };
-
+        // If we have a PK and a non-nullable column is missing, this must be an UPDATE
+        if let Some(pk_expr) = pk_expr.clone()
+            && self.has_missing_non_nullable
+        {
             let mut update = Query::update();
             update
                 .table(alias(self.model_name))
@@ -578,13 +576,14 @@ impl<'a> SqlUpsertBuilder<'a> {
             return Ok(build_sqlite(update));
         }
 
+        // Build an INSERT
         let mut insert = {
             let mut insert = Query::insert();
             insert.into_table(alias(self.model_name));
 
             let mut cols = self.cols.clone();
             let mut vals = self.vals.clone();
-            if let Some(pk_expr) = pk_expr {
+            if let Some(pk_expr) = pk_expr.clone() {
                 cols.push(alias(&self.pk_ntv.name));
                 vals.push(pk_expr);
             }
@@ -596,7 +595,7 @@ impl<'a> SqlUpsertBuilder<'a> {
                 .to_owned()
         };
 
-        // Some id exists, and some column is being inserted, so this must be an upsert (either insert or update).
+        // If we have a PK and some attributes, enable conflict handling (UPSERT semantics)
         if pk_val.is_some() && !self.cols.is_empty() {
             insert.on_conflict(
                 OnConflict::column(alias(&self.pk_ntv.name))
@@ -1018,7 +1017,7 @@ mod test {
     }
 
     #[sqlx::test]
-    async fn update_with_undefined_nullable_col(db: SqlitePool) {
+    async fn upsert_with_undefined_nullable_col(db: SqlitePool) {
         // Arrange
         let model = ModelBuilder::new("User")
             .id_pk()
@@ -1034,6 +1033,7 @@ mod test {
             "id": 1,
             "name": "Bob",
             "age": 30,
+
             // nickname is nullable but is missing from the input
         });
 
@@ -1046,7 +1046,7 @@ mod test {
         let stmt1 = &res[0];
         expected_str!(
             stmt1.query,
-            r#"UPDATE "User" SET "name" = ?, "age" = ? WHERE "id" = ?"#
+            r#"INSERT INTO "User" ("name", "age", "id") VALUES (?, ?, ?) ON CONFLICT ("id") DO UPDATE SET "name" = "excluded"."name", "age" = "excluded"."age""#
         );
         assert_eq!(
             *stmt1.values,
