@@ -1,9 +1,9 @@
 # Proposal: Data Sources
 
 - **Author(s):** Ben Schreiber
-- **Status:** *Draft* | Review | Accepted | Rejected | Implemented
+- **Status:** Draft | Review | **Accepted** | Rejected | Implemented
 - **Created:** 2026-02-19
-- **Last Updated:** 2026-02-19
+- **Last Updated:** 2026-02-21
 
 ---
 
@@ -271,7 +271,7 @@ The client can now pass `User.includeAll` or `User.onlyNameAndPosts` into any Mo
 
 ### Using Data Sources in Model Methods
 
-By default, all instance methods of a Model will hydrate using the "default" Data Source. A method can specify a different Data Source by passing it explicitly to the HTTP verb decorator:
+By default, all instance methods of a Model will hydrate using the "default" Data Source. Static methods will not pass semantic analysis if they have a data source defined. A method can specify a different Data Source by passing it explicitly to the HTTP verb decorator:
 
 ```ts
 @Model()
