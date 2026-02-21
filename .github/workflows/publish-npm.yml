@@ -25,6 +25,11 @@ jobs:
           node-version: '24'
           registry-url: https://registry.npmjs.org/
 
+      - name: Install wasm-opt
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y binaryen
+
       - name: Build
         run: make build-src
 

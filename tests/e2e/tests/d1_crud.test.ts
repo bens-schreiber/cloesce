@@ -1,10 +1,10 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { startWrangler, stopWrangler, withRes } from "../src/setup";
-import { CrudHaver, Parent } from "../fixtures/crud/client";
+import { CrudHaver, Parent } from "../fixtures/d1_crud/client";
 
 beforeAll(async () => {
   // NOTE: e2e is called from proj root
-  await startWrangler("./fixtures/crud");
+  await startWrangler("./fixtures/d1_crud");
 }, 30_000);
 
 afterAll(async () => {
@@ -68,7 +68,7 @@ describe("Parent with children", () => {
   it("POST", async () => {
     const res = await Parent.SAVE(
       {
-        favoriteChildId: null,
+        // leaving out favoriteChildId, should infer as null
         children: [{}, {}, {}], // should be able to leave blank, creating 3 children
       },
       "withChildren",

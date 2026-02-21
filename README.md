@@ -58,4 +58,21 @@ Check out [Coalesce](https://coalesce.intellitect.com), an accelerated web app f
 
 # Building, Formatting, Testing
 
+## Prerequisites
+
+Before building, ensure you have the required dependencies installed:
+
+**Required:**
+- [Rust](https://rustup.rs/) (with `wasm32-unknown-unknown` and `wasm32-wasip1` targets)
+- [Node.js](https://nodejs.org/) and npm
+
+**Optional (but recommended):**
+- [binaryen](https://github.com/WebAssembly/binaryen) (for WASM optimization) - `brew install binaryen`
+- [pandoc](https://pandoc.org/) (for documentation) - `brew install pandoc`
+- [mdbook](https://rust-lang.github.io/mdBook/) (for documentation) - `cargo install mdbook`
+
+Run `make check-deps` to verify your setup.
+
+## Build Commands
+
 All relevant commands can be found in the `Makefile` in the project root. Run `make all` to build, format and test all packages.
