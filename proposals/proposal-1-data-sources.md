@@ -81,7 +81,7 @@ class User {
 
     @GET
     downloadObject(): HttpResult<ReadableStream> {
-        if (!this.photo) {
+        if (!this.object) {
             return HttpResult.fail(404, "Object not found");
         }
         return HttpResult.ok(200, this.object.body);
@@ -280,8 +280,8 @@ class User {
 
     static readonly includeAll: DataSource<User> = {
         includeTree: {
-            dogs: {},
-            cats: {}
+            dog: {},
+            posts: {}
         }
     }
 
