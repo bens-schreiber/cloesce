@@ -61,6 +61,20 @@ const cmds = subcommands({
         debugPhase = "npm cloesce";
 
         const outputDir = config.outPath ?? ".generated";
+
+        // Use temp paths for all WASM output files so wrangler never sees a
+        // partial write. wrangler.toml is read+written by the WASM, so we pre-copy
+        // it to the temp path before passing it. fs.renameSync is atomic on POSIX,
+        // preventing the "Missing entry-point" crash during hot update reloads.
+        const wranglerTmp = "wrangler.tmp.toml";
+        const workersTmp = path.join(outputDir, "workers.ts.tmp");
+        const clientTmp = path.join(outputDir, "client.ts.tmp");
+
+        // Pre-copy so the WASM can read the existing wrangler.toml content
+        if (fs.existsSync("wrangler.toml")) {
+          fs.copyFileSync("wrangler.toml", wranglerTmp);
+        }
+
         const generateConfig: WasmConfig = {
           name: "generate",
           wasmFile: "generator.wasm",
@@ -68,14 +82,19 @@ const cmds = subcommands({
             "generate",
             path.join(outputDir, "cidl.pre.json"),
             path.join(outputDir, "cidl.json"),
-            "wrangler.toml",
-            path.join(outputDir, "workers.ts"),
-            path.join(outputDir, "client.ts"),
+            wranglerTmp,
+            workersTmp,
+            clientTmp,
             config.workersUrl,
           ],
         };
 
         await generate(generateConfig);
+
+        // Atomically swap all temp files into place in one burst
+        fs.renameSync(wranglerTmp, "wrangler.toml"); // atomic on POSIX
+        fs.renameSync(workersTmp, path.join(outputDir, "workers.ts"));
+        fs.renameSync(clientTmp, path.join(outputDir, "client.ts"));
       },
     }),
     extract: command({
