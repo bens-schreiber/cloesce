@@ -683,6 +683,37 @@ fn validate_methods(
         method.name
     );
 
+    // Validate data source reference
+    if let Some(ds) = &method.data_source {
+        ensure!(
+            !method.is_static,
+            GeneratorErrorKind::InvalidDataSourceReference,
+            "{}.{} has a data source but is a static method.",
+            namespace,
+            method.name
+        );
+
+        let Some(model) = ast.models.get(namespace) else {
+            fail!(
+                GeneratorErrorKind::InvalidModelReference,
+                "{}.{} references a data source on an unknown model {}",
+                namespace,
+                method.name,
+                namespace
+            );
+        };
+
+        ensure!(
+            model.data_sources.contains_key(ds),
+            GeneratorErrorKind::UnknownDataSourceReference,
+            "{}.{} references an unknown data source {} on model {}",
+            namespace,
+            method.name,
+            ds,
+            namespace
+        );
+    }
+
     // Validate return type
     match &method.return_type.root_type() {
         CidlType::Object(o) | CidlType::Partial(o) => {
@@ -697,7 +728,7 @@ fn validate_methods(
 
         CidlType::DataSource(model_name) => ensure!(
             is_valid_data_source_ref(ast, model_name),
-            GeneratorErrorKind::InvalidModelReference,
+            GeneratorErrorKind::UnknownDataSourceReference,
             "{}.{}",
             namespace,
             method.name,

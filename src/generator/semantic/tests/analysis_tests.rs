@@ -7,7 +7,7 @@ use ast::{
     CidlType, HttpVerb, MigrationsAst, NamedTypedValue, NavigationPropertyKind, Service,
     ServiceAttribute, WranglerEnv, err::GeneratorErrorKind,
 };
-use generator_test::{ModelBuilder, create_ast, create_spec};
+use generator_test::{IncludeTreeBuilder, ModelBuilder, create_ast, create_spec};
 use semantic::SemanticAnalysis;
 use wrangler::WranglerGenerator;
 
@@ -327,6 +327,7 @@ fn instantiated_stream_method() {
                 },
             ],
             CidlType::Stream,
+            None,
         )
         .build();
 
@@ -354,6 +355,7 @@ fn static_stream_method() {
                 cidl_type: CidlType::Stream,
             }],
             CidlType::Stream,
+            None,
         )
         .build();
 
@@ -387,6 +389,7 @@ fn invalid_stream_method() {
                 },
             ],
             CidlType::Stream,
+            None,
         )
         .build();
 
@@ -716,6 +719,7 @@ fn http_result_stream_return_type() {
                 cidl_type: CidlType::DataSource("Dog".into()),
             }],
             CidlType::http(CidlType::Stream),
+            None,
         )
         .build();
 
@@ -727,4 +731,88 @@ fn http_result_stream_return_type() {
 
     // Assert
     res.unwrap();
+}
+
+#[test]
+fn data_source_valid_instance_method() {
+    // Arrange
+    let model = ModelBuilder::new("Dog")
+        .id_pk()
+        .data_source("dogs", IncludeTreeBuilder::default().build(), false)
+        .method(
+            "getDogs",
+            HttpVerb::GET,
+            false, // instance method
+            vec![],
+            CidlType::Object("Dog".into()),
+            Some("dogs".into()),
+        )
+        .build();
+
+    let mut ast = create_ast(vec![model]);
+    let spec = create_spec(&ast);
+
+    // Act
+    let result = SemanticAnalysis::analyze(&mut ast, &spec);
+
+    // Assert
+    result.expect("analysis to pass with valid data source");
+}
+
+#[test]
+fn data_source_on_static_method() {
+    // Arrange
+    let model = ModelBuilder::new("Dog")
+        .id_pk()
+        .data_source("dogs", IncludeTreeBuilder::default().build(), false)
+        .method(
+            "getDogs",
+            HttpVerb::GET,
+            true,
+            vec![],
+            CidlType::Object("Dog".into()),
+            Some("dogs".into()),
+        )
+        .build();
+
+    let mut ast = create_ast(vec![model]);
+    let spec = create_spec(&ast);
+
+    // Act
+    let err = SemanticAnalysis::analyze(&mut ast, &spec).unwrap_err();
+
+    // Assert
+    assert!(matches!(
+        err.kind,
+        GeneratorErrorKind::InvalidDataSourceReference
+    ));
+    assert!(err.context.contains("static method"));
+}
+
+#[test]
+fn data_source_unknown() {
+    // Arrange
+    let model = ModelBuilder::new("Dog")
+        .id_pk()
+        .method(
+            "getDogs",
+            HttpVerb::GET,
+            false,
+            vec![],
+            CidlType::Object("Dog".into()),
+            Some("nonexistent".into()), // This data source doesn't exist
+        )
+        .build();
+
+    let mut ast = create_ast(vec![model]);
+    let spec = create_spec(&ast);
+
+    // Act
+    let err = SemanticAnalysis::analyze(&mut ast, &spec).unwrap_err();
+
+    // Assert
+    assert!(matches!(
+        err.kind,
+        GeneratorErrorKind::UnknownDataSourceReference
+    ));
 }

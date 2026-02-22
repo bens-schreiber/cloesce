@@ -61,6 +61,8 @@ pub enum GeneratorErrorKind {
     InvalidNavigationPropertyReference,
     CyclicalDependency,
     UnknownIncludeTreeReference,
+    UnknownDataSourceReference,
+    InvalidDataSourceReference,
     ExtraneousManyToManyReferences,
     MissingManyToManyReference,
     MissingWranglerEnv,
@@ -180,6 +182,16 @@ impl GeneratorErrorKind {
             GeneratorErrorKind::UnsupportedCrudOperation => (
                 "The specified CRUD operation is not supported for this Model type.",
                 "Refer to the documentation for supported operations on this Model type.",
+                GeneratorPhase::ModelAnalysis,
+            ),
+            GeneratorErrorKind::UnknownDataSourceReference => (
+                "Found a reference to an unknown data source.",
+                "Ensure all data source references correspond to defined data sources.",
+                GeneratorPhase::ModelAnalysis,
+            ),
+            GeneratorErrorKind::InvalidDataSourceReference => (
+                "Found a reference to a data source that is invalid for the context.",
+                "TODO",
                 GeneratorPhase::ModelAnalysis,
             ),
 

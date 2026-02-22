@@ -1,6 +1,9 @@
 use std::path::{Path, PathBuf};
 
-use ast::{ApiMethod, CidlType, CloesceAst, CrudKind, HttpVerb, MediaType, NamedTypedValue};
+use ast::{
+    ApiMethod, CidlType, CloesceAst, CrudKind, DataSource, HttpVerb, IncludeTree, MediaType,
+    NamedTypedValue, NavigationPropertyKind,
+};
 
 // TODO: This is all hardcoded to TypeScript workers
 pub struct WorkersGenerator;
@@ -140,28 +143,11 @@ impl WorkersGenerator {
             };
         };
 
-        let set_datasource_param = |method: &mut ApiMethod, model_name: &str| {
-            if !method.is_static
-                && !method
-                    .parameters
-                    .iter()
-                    .any(|p| matches!(p.cidl_type, CidlType::DataSource(_)))
-            {
-                method.parameters.push(NamedTypedValue {
-                    name: "__datasource".into(),
-                    cidl_type: CidlType::DataSource(model_name.into()),
-                });
-            }
-        };
-
         for model in ast.models.values_mut() {
             for crud in &model.cruds {
                 let method = match crud {
                     CrudKind::GET => {
-                        let mut parameters = vec![NamedTypedValue {
-                            name: "__datasource".into(),
-                            cidl_type: CidlType::DataSource(model.name.clone()),
-                        }];
+                        let mut parameters = vec![];
 
                         for key in &model.key_params {
                             parameters.push(NamedTypedValue {
@@ -178,8 +164,10 @@ impl WorkersGenerator {
                             });
                         }
 
-                        // Data source should be last
-                        parameters.reverse();
+                        parameters.push(NamedTypedValue {
+                            name: "__datasource".into(),
+                            cidl_type: CidlType::DataSource(model.name.clone()),
+                        });
 
                         ApiMethod {
                             name: "GET".into(),
@@ -189,6 +177,7 @@ impl WorkersGenerator {
                             parameters,
                             parameters_media: MediaType::default(),
                             return_media: MediaType::default(),
+                            data_source: None,
                         }
                     }
                     CrudKind::LIST => ApiMethod {
@@ -204,6 +193,7 @@ impl WorkersGenerator {
                         }],
                         parameters_media: MediaType::default(),
                         return_media: MediaType::default(),
+                        data_source: None,
                     },
                     CrudKind::SAVE => ApiMethod {
                         name: "SAVE".into(),
@@ -222,6 +212,7 @@ impl WorkersGenerator {
                         ],
                         parameters_media: MediaType::default(),
                         return_media: MediaType::default(),
+                        data_source: None,
                     },
                 };
 
@@ -239,7 +230,6 @@ impl WorkersGenerator {
             }
 
             for method in model.methods.values_mut() {
-                set_datasource_param(method, &model.name);
                 set_media_types(method);
             }
         }
@@ -251,10 +241,77 @@ impl WorkersGenerator {
         }
     }
 
+    /// Generates a default [DataSource] for any model that doesn't have one.
+    /// Includes all KV, R2, 1:1, 1:N and M:N relationships by default.
+    /// Does not include relationships after a 1:N or M:N to avoid infinite trees.
+    ///
+    /// Public for tests
+    pub fn generate_default_data_sources(ast: &mut CloesceAst) {
+        let models_to_process = ast
+            .models
+            .iter()
+            .filter(|(_, model)| model.default_data_source().is_none())
+            .map(|(_, model)| model.name.clone())
+            .collect::<Vec<String>>();
+
+        for model_name in models_to_process {
+            let mut tree = IncludeTree::default();
+            dfs(ast, &model_name, &mut tree);
+
+            let data_source = DataSource {
+                name: "default".into(),
+                tree,
+                is_private: false,
+            };
+
+            ast.models
+                .get_mut(&model_name)
+                .unwrap()
+                .data_sources
+                .insert(data_source.name.clone(), data_source);
+        }
+
+        fn dfs(ast: &CloesceAst, current_model: &str, current_node: &mut IncludeTree) {
+            let model = ast.models.get(current_model).unwrap();
+            for nav in &model.navigation_properties {
+                match nav.kind {
+                    NavigationPropertyKind::OneToOne { .. } => {
+                        let mut new_node = IncludeTree::default();
+                        dfs(ast, &nav.model_reference, &mut new_node);
+                        current_node.0.insert(nav.var_name.clone(), new_node);
+                    }
+                    NavigationPropertyKind::OneToMany { .. } => {
+                        current_node
+                            .0
+                            .insert(nav.var_name.clone(), IncludeTree::default());
+                    }
+                    NavigationPropertyKind::ManyToMany => {
+                        current_node
+                            .0
+                            .insert(nav.var_name.clone(), IncludeTree::default());
+                    }
+                }
+            }
+
+            for kv in &model.kv_objects {
+                current_node
+                    .0
+                    .insert(kv.value.name.clone(), IncludeTree::default());
+            }
+
+            for r2 in &model.r2_objects {
+                current_node
+                    .0
+                    .insert(r2.var_name.clone(), IncludeTree::default());
+            }
+        }
+    }
+
     pub fn generate(ast: &mut CloesceAst, workers_path: &Path) -> String {
         let linked_sources = Self::link(ast, workers_path);
         let constructor_registry = Self::registry(ast);
 
+        Self::generate_default_data_sources(ast);
         Self::finalize_api_methods(ast);
 
         let fetch_impl = match &ast.main_source {

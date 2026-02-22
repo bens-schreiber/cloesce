@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use ast::{CidlType, CrudKind, HttpVerb, MediaType, NamedTypedValue};
+use ast::{CidlType, CrudKind, HttpVerb, MediaType, NamedTypedValue, NavigationPropertyKind};
 use generator_test::{ModelBuilder, create_ast};
 use workers::WorkersGenerator;
 
@@ -123,7 +123,6 @@ fn finalize_adds_crud_methods_to_model() {
 
 #[test]
 fn finalize_does_not_overwrite_existing_method() {
-    // Arrange
     let mut user = ModelBuilder::new("User")
         .id_pk()
         .method(
@@ -135,6 +134,7 @@ fn finalize_does_not_overwrite_existing_method() {
                 cidl_type: CidlType::Integer,
             }],
             CidlType::Void,
+            None,
         )
         .build();
     user.cruds.push(CrudKind::GET);
@@ -185,6 +185,7 @@ fn finalize_sets_octet_media_type() {
                     cidl_type: CidlType::Stream,
                 }],
                 CidlType::Stream,
+                None,
             )
             .build(),
     ]);
@@ -198,79 +199,6 @@ fn finalize_sets_octet_media_type() {
     assert!(matches!(method.return_media, MediaType::Octet));
     assert!(matches!(method.parameters_media, MediaType::Octet));
 }
-
-#[test]
-fn finalize_adds_datasource_parameter_to_instance_method() {
-    // Arrange
-    let mut ast = create_ast(vec![
-        ModelBuilder::new("User")
-            .id_pk()
-            // No datasource parameter initially
-            .method(
-                "instanceMethod",
-                HttpVerb::GET,
-                false,
-                vec![],
-                CidlType::Object("User".into()),
-            )
-            // Static, does not need datasource parameter
-            .method(
-                "staticMethod",
-                HttpVerb::GET,
-                true,
-                vec![],
-                CidlType::Object("User".into()),
-            )
-            // Has a datasource parameter already
-            .method(
-                "methodWithDatasource",
-                HttpVerb::GET,
-                false,
-                vec![NamedTypedValue {
-                    name: "datasource".into(),
-                    cidl_type: CidlType::DataSource("User".into()),
-                }],
-                CidlType::Object("User".into()),
-            )
-            .build(),
-    ]);
-
-    // Act
-    WorkersGenerator::finalize_api_methods(&mut ast);
-
-    // Assert
-    let mut user = ast.models.shift_remove("User").unwrap();
-    let instance_method = user.methods.remove("instanceMethod").unwrap();
-    let static_method = user.methods.remove("staticMethod").unwrap();
-    let method_with_datasource = user.methods.remove("methodWithDatasource").unwrap();
-
-    assert!(
-        instance_method
-            .parameters
-            .iter()
-            .any(|p| matches!(p.cidl_type, CidlType::DataSource(_))),
-        "Instance method should have a __datasource parameter"
-    );
-
-    assert!(
-        !static_method
-            .parameters
-            .iter()
-            .any(|p| matches!(p.cidl_type, CidlType::DataSource(_))),
-        "Static method should not have a __datasource parameter"
-    );
-
-    assert_eq!(
-        method_with_datasource
-            .parameters
-            .iter()
-            .filter(|p| matches!(p.cidl_type, CidlType::DataSource(_)))
-            .count(),
-        1,
-        "Method should not have duplicate __datasource parameters"
-    );
-}
-
 #[test]
 fn finalize_get_crud_adds_primary_key_for_d1_model() {
     // Arrange
@@ -352,5 +280,203 @@ fn finalize_get_crud_adds_key_params() {
     assert!(
         matches!(subcategory_param.unwrap().cidl_type, CidlType::Text),
         "Key params should be Text type"
+    );
+}
+
+#[test]
+fn generate_default_data_sources() {
+    // Arrange
+    let profile = ModelBuilder::new("Profile").id_pk().build();
+
+    let role = ModelBuilder::new("Role").id_pk().build();
+
+    let order = ModelBuilder::new("Order").id_pk().build();
+
+    let user = ModelBuilder::new("User")
+        .id_pk()
+        // 1:1 relationship to Profile
+        .nav_p(
+            "profile",
+            "Profile",
+            NavigationPropertyKind::OneToOne {
+                column_reference: "profileId".into(),
+            },
+        )
+        // 1:M relationship to Order
+        .nav_p(
+            "orders",
+            "Order",
+            NavigationPropertyKind::OneToMany {
+                column_reference: "userId".into(),
+            },
+        )
+        // M:M relationship to Role
+        .nav_p("roles", "Role", NavigationPropertyKind::ManyToMany)
+        // KV object for caching
+        .kv_object(
+            "json",
+            "kv_namespace",
+            "userCache",
+            false,
+            CidlType::Object("User".into()),
+        )
+        // R2 object for storage
+        .r2_object("binary", "r2_namespace", "userDocuments", false)
+        .build();
+
+    let mut ast = create_ast(vec![profile, role, order, user]);
+
+    // Act
+    WorkersGenerator::generate_default_data_sources(&mut ast);
+
+    // Assert
+    let user = ast.models.get("User").unwrap();
+    let default_ds = user
+        .default_data_source()
+        .expect("User should have default data source");
+    let tree = &default_ds.tree;
+
+    assert!(
+        tree.0.contains_key("profile"),
+        "Default data source should include 1:1 relationship 'profile'"
+    );
+
+    assert!(
+        tree.0.contains_key("orders"),
+        "Default data source should include 1:M relationship 'orders'"
+    );
+
+    assert!(
+        tree.0.contains_key("roles"),
+        "Default data source should include M:M relationship 'roles'"
+    );
+
+    assert!(
+        tree.0.contains_key("userCache"),
+        "Default data source should include KV object 'userCache'"
+    );
+
+    assert!(
+        tree.0.contains_key("userDocuments"),
+        "Default data source should include R2 object 'userDocuments'"
+    );
+
+    assert!(
+        !default_ds.is_private,
+        "Default data source should be public"
+    );
+
+    assert_eq!(
+        default_ds.name, "default",
+        "Data source should be named 'default'"
+    );
+}
+
+#[test]
+fn generate_default_data_sources_does_not_include_manys() {
+    // Arrange
+    let grade = ModelBuilder::new("Grade").id_pk().build();
+
+    let teacher = ModelBuilder::new("Teacher")
+        .id_pk()
+        .nav_p(
+            "students",
+            "Student",
+            NavigationPropertyKind::OneToMany {
+                column_reference: "teacherId".into(),
+            },
+        )
+        .build();
+
+    let student = ModelBuilder::new("Student")
+        .id_pk()
+        .nav_p("teachers", "Teacher", NavigationPropertyKind::ManyToMany)
+        .nav_p(
+            "grades",
+            "Grade",
+            NavigationPropertyKind::OneToMany {
+                column_reference: "studentId".into(),
+            },
+        )
+        .build();
+
+    let mut ast = create_ast(vec![grade, teacher, student]);
+
+    // Act
+    WorkersGenerator::generate_default_data_sources(&mut ast);
+
+    // Assert
+    let teacher = ast.models.get("Teacher").unwrap();
+    let default_ds = teacher
+        .default_data_source()
+        .expect("Teacher should have default data source");
+    let tree = &default_ds.tree;
+
+    assert!(
+        tree.0.contains_key("students"),
+        "Default data source for Teacher should include 'students' relationship"
+    );
+
+    let students_node = tree.0.get("students").unwrap();
+    assert!(
+        !students_node.0.contains_key("grades"),
+        "Default data source for Teacher should NOT include nested 'grades' under 'students'"
+    );
+}
+
+#[test]
+fn generate_default_data_sources_includes_multiple_one_to_ones() {
+    // Arrange
+    let toy = ModelBuilder::new("Toy").id_pk().build();
+    // dog has a toy
+    let dog = ModelBuilder::new("Dog")
+        .id_pk()
+        .nav_p(
+            "toy",
+            "Toy",
+            NavigationPropertyKind::OneToOne {
+                column_reference: "toyId".into(),
+            },
+        )
+        .build();
+
+    // owner has a dog
+    let owner = ModelBuilder::new("Owner")
+        .id_pk()
+        .nav_p(
+            "dog",
+            "Dog",
+            NavigationPropertyKind::OneToOne {
+                column_reference: "dogId".into(),
+            },
+        )
+        .build();
+
+    let mut ast = create_ast(vec![toy, dog, owner]);
+
+    // Act
+    WorkersGenerator::generate_default_data_sources(&mut ast);
+
+    // Assert
+    let owner = ast.models.get("Owner").unwrap();
+    let default_ds = owner
+        .default_data_source()
+        .expect("Owner should have default data source");
+    let tree = &default_ds.tree;
+    assert!(
+        tree.0.contains_key("dog"),
+        "Default data source for Owner should include 'dog' relationship"
+    );
+
+    let dog_node = tree.0.get("dog").unwrap();
+    assert!(
+        dog_node.0.contains_key("toy"),
+        "Default data source for Owner should include 'toy' relationship under 'dog'"
+    );
+
+    let toy_node = dog_node.0.get("toy").unwrap();
+    assert!(
+        toy_node.0.is_empty(),
+        "Default data source for Owner should NOT include any nested relationships under 'toy'"
     );
 }

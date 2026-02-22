@@ -42,11 +42,6 @@ pub fn create_spec(ast: &CloesceAst) -> WranglerSpec {
     spec
 }
 
-#[derive(Default)]
-pub struct IncludeTreeBuilder {
-    nodes: BTreeMap<String, IncludeTree>,
-}
-
 /// Compares two strings disregarding tabs, amount of spaces, and amount of newlines.
 /// Ensures that some expr is present in another expr.
 #[macro_export]
@@ -60,6 +55,11 @@ macro_rules! expected_str {
             $got
         );
     }};
+}
+
+#[derive(Default)]
+pub struct IncludeTreeBuilder {
+    nodes: BTreeMap<String, IncludeTree>,
 }
 
 impl IncludeTreeBuilder {
@@ -202,6 +202,7 @@ impl ModelBuilder {
         is_static: bool,
         parameters: Vec<NamedTypedValue>,
         return_type: CidlType,
+        data_source: Option<String>,
     ) -> Self {
         self.methods.insert(
             name.clone().into(),
@@ -213,17 +214,24 @@ impl ModelBuilder {
                 parameters,
                 return_media: MediaType::default(),
                 parameters_media: MediaType::default(),
+                data_source,
             },
         );
         self
     }
 
-    pub fn data_source(mut self, name: impl Into<String> + Clone, tree: IncludeTree) -> Self {
+    pub fn data_source(
+        mut self,
+        name: impl Into<String> + Clone,
+        tree: IncludeTree,
+        is_private: bool,
+    ) -> Self {
         self.data_sources.insert(
             name.clone().into(),
             DataSource {
                 name: name.into(),
                 tree,
+                is_private,
             },
         );
         self
