@@ -167,4 +167,5 @@ CREATE TABLE IF NOT EXISTS "CourseStudent" (
 );
 ```
 
-> *Note*: The left column lists the Model name that comes first alphabetically; the right column lists the one that comes after.
+> [!NOTE]
+> The left column lists the Model name that comes first alphabetically; the right column lists the one that comes after.
