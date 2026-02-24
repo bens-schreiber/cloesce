@@ -9,7 +9,8 @@ import { DataSourceContainer } from "../router/router.js";
 export { CloesceApp, DependencyContainer } from "../router/router.js";
 export type { MiddlewareFn } from "../router/router.js";
 export type { CrudKind } from "../ast.js";
-export { Orm, DataSource } from "../router/orm.js";
+export type { DataSource } from "../router/orm.js";
+export { Orm } from "../router/orm.js";
 export { R2ObjectBody } from "@cloudflare/workers-types";
 
 /**
@@ -357,10 +358,10 @@ export function Patch(dataSource?: DataSource<unknown>): MethodDecorator {
 }
 
 /**
- * Exposes a class method as an HTTP DEL endpoint.
+ * Exposes a class method as an HTTP DELETE endpoint.
  * The method will appear in both backend and generated client APIs.
  */
-export function Del(dataSource?: DataSource<unknown>): MethodDecorator {
+export function Delete(dataSource?: DataSource<unknown>): MethodDecorator {
   return function (target, propertyKey) {
     if (dataSource) {
       DataSourceContainer.set(

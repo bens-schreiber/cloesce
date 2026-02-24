@@ -65,7 +65,8 @@ export class Orm {
    * @returns The default data source for the model.
    */
   static defaultDataSource<T>(ctor: new () => T): DataSource<T> {
-    if ((ctor as any)["default"]) {
+    const defaultDs: DataSource<T> | undefined = (ctor as any)["default"];
+    if (defaultDs && defaultDs.includeTree) {
       return (ctor as any)["default"] as DataSource<T>;
     }
 

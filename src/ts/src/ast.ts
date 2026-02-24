@@ -41,7 +41,7 @@ export enum HttpVerb {
   Post = "Post",
   Put = "Put",
   Patch = "Patch",
-  Del = "Del",
+  Delete = "Delete",
 }
 
 /** @internal */

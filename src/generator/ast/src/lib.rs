@@ -133,7 +133,7 @@ pub enum HttpVerb {
     Post,
     Put,
     Patch,
-    Del,
+    Delete,
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash)]

@@ -103,7 +103,7 @@ describe("Match Route", () => {
       models: [
         ModelBuilder.model("Model")
           .idPk()
-          .method("method", HttpVerb.Del, false, [], "Void")
+          .method("method", HttpVerb.Delete, false, [], "Void")
           .build(),
       ],
     });

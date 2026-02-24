@@ -1394,35 +1394,39 @@ function dataSourceFromDecorator(
     });
   }
 
+  const dsWithEmptyTree = {
+    newDs: {
+      name: `${modelName}:${methodName}`,
+      tree: {},
+      is_private: true,
+    },
+    definedDs: null,
+  };
+
+  const invalidIncludeTree = err(
+    ExtractorErrorCode.InvalidDataSourceDefinition,
+    (e) => {
+      e.snippet = decoratorArg.getText();
+      e.context = `Invalid includeTree definition for data source on ${modelName}.${methodName}`;
+    },
+  );
+
   // Defined inline object literal
   if (MorphNode.isObjectLiteralExpression(decoratorArg)) {
     const includeTreeProp = decoratorArg.getProperty("includeTree");
     if (!includeTreeProp) {
       // Default to an empty tree if no includeTree is provided
-      return Either.right({
-        newDs: {
-          name: `${modelName}:${methodName}`,
-          tree: {},
-          is_private: true,
-        },
-        definedDs: null,
-      });
+      return Either.right(dsWithEmptyTree);
     }
 
     // Now let's parse the includeTree
     if (!MorphNode.isPropertyAssignment(includeTreeProp)) {
-      return err(ExtractorErrorCode.InvalidDataSourceDefinition, (e) => {
-        e.snippet = decoratorArg.getText();
-        e.context = `Invalid includeTree definition for data source on ${modelName}.${methodName}`;
-      });
+      return invalidIncludeTree;
     }
 
     const initializer = includeTreeProp.getInitializer();
     if (!initializer?.isKind(SyntaxKind.ObjectLiteralExpression)) {
-      return err(ExtractorErrorCode.InvalidDataSourceDefinition, (e) => {
-        e.snippet = decoratorArg.getText();
-        e.context = `Invalid includeTree definition for data source on ${modelName}.${methodName}`;
-      });
+      return invalidIncludeTree;
     }
 
     const includeTree = parseIncludeTree(
@@ -1463,21 +1467,11 @@ function dataSourceFromDecorator(
     const includeTreeProp = initializer.getProperty("includeTree");
     if (!includeTreeProp) {
       // Default to an empty tree if no includeTree is provided
-      return Either.right({
-        newDs: {
-          name: `${modelName}:${methodName}`,
-          tree: {},
-          is_private: true,
-        },
-        definedDs: null,
-      });
+      return Either.right(dsWithEmptyTree);
     }
 
     if (!MorphNode.isPropertyAssignment(includeTreeProp)) {
-      return err(ExtractorErrorCode.InvalidDataSourceDefinition, (e) => {
-        e.snippet = decoratorArg.getText();
-        e.context = `Invalid includeTree definition for data source ${decoratorArg.getText()} on ${modelName}.${methodName}`;
-      });
+      return invalidIncludeTree;
     }
 
     const includeTreeInitializer = includeTreeProp.getInitializer();
@@ -1485,10 +1479,7 @@ function dataSourceFromDecorator(
       !includeTreeInitializer ||
       !includeTreeInitializer.isKind(SyntaxKind.ObjectLiteralExpression)
     ) {
-      return err(ExtractorErrorCode.InvalidDataSourceDefinition, (e) => {
-        e.snippet = decoratorArg.getText();
-        e.context = `Invalid includeTree definition for data source ${decoratorArg.getText()} on ${modelName}.${methodName}`;
-      });
+      return invalidIncludeTree;
     }
 
     const includeTree = parseIncludeTree(
