@@ -129,11 +129,11 @@ impl CidlType {
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub enum HttpVerb {
-    GET,
-    POST,
-    PUT,
-    PATCH,
-    DELETE,
+    Get,
+    Post,
+    Put,
+    Patch,
+    Del,
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash)]

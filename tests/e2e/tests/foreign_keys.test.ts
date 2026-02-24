@@ -18,20 +18,6 @@ afterAll(async () => {
   await stopWrangler();
 });
 
-async function testRefresh<T>(
-  obj: T & { refresh: (dataSource: any) => Promise<any> },
-  dataSources: any[],
-  assertions: Record<string, (res: any) => void>,
-) {
-  for (const ds of dataSources) {
-    it(`refresh ${ds}`, async () => {
-      const res = await obj.refresh(ds);
-      expect(res.ok, withRes("Expected refresh to work", res)).toBe(true);
-      assertions[ds]?.(res.data);
-    });
-  }
-}
-
 describe("POST and refresh A", () => {
   const a = Object.assign(new A(), {
     id: 1,
@@ -61,10 +47,10 @@ describe("POST and refresh A", () => {
     expect(b.testMethod).toBeDefined();
   });
 
-  testRefresh(a, ["withB", "withoutB", "none"], {
-    withB: (data) => expect(data.b).toBeDefined(),
-    withoutB: (data) => expect(data.b).toBeUndefined(),
-    none: () => {},
+  it("withoutB returns A without B", async () => {
+    const res = await a.withoutB();
+    expect(res.data?.id).toBe(a.id);
+    expect(res.data?.b).toBeUndefined();
   });
 });
 
@@ -80,9 +66,10 @@ describe("POST and refresh Person", () => {
     expect(res.data!.dogs.length).toBe(1);
   });
 
-  testRefresh(person, ["withDogs", "none"], {
-    withDogs: (data) => expect(data.dogs.length).toBe(1),
-    none: (data) => expect(data.dogs.length).toBe(0),
+  it("withoutDogs returns Person without Dogs", async () => {
+    const res = await person.withoutDogs();
+    expect(res.data?.id).toBe(person.id);
+    expect(res.data?.dogs.length).toBe(0);
   });
 });
 
@@ -94,21 +81,15 @@ describe("POST and refresh Student", () => {
     const res = await Student.post(student);
     expect(res.ok, withRes("Expected POST to work", res)).toBe(true);
     expect(res.data!.courses.length).toBe(1);
+
+    // should have returned a student with courses, which should have students, which should have courses
+    expect(res.data!.courses[0].students.length).toBe(1);
+    expect(res.data!.courses[0].students[0].courses.length).toBe(1);
   });
 
-  testRefresh(
-    student,
-    ["withCoursesStudents", "withCoursesStudentsCourses", "none"],
-    {
-      withCoursesStudents: (data) => {
-        expect(data.courses.length).toBe(1);
-        expect(data.courses[0].students).not.toBeUndefined();
-      },
-      withCoursesStudentsCourses: (data) => {
-        expect(data.courses.length).toBe(1);
-        expect(data.courses[0].students[0].courses).not.toBeUndefined();
-      },
-      none: (data) => expect(data.courses.length).toBe(0),
-    },
-  );
+  it("none returns Student without Courses", async () => {
+    const res = await student.none();
+    expect(res.data?.id).toBe(student.id);
+    expect(res.data?.courses.length).toBe(0);
+  });
 });

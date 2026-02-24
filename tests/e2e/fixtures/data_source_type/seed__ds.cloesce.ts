@@ -1,10 +1,9 @@
 import {
   Model,
-  POST,
+  Post,
   WranglerEnv,
-  DataSourceOf,
+  DataSource,
   Integer,
-  IncludeTree,
 } from "cloesce/backend";
 import { D1Database } from "@cloudflare/workers-types";
 
@@ -22,24 +21,24 @@ export class NoDs {
 export class OneDs {
   id: Integer;
 
-  static readonly default: IncludeTree<OneDs> = {};
+  static readonly default: DataSource<OneDs> = {};
 }
 
 @Model()
 export class Foo {
   id: Integer;
 
-  static readonly baz: IncludeTree<Foo> = {};
+  static readonly baz: DataSource<Foo> = {};
 
-  @POST
+  @Post(Foo.baz)
   bar(
-    customDs: DataSourceOf<Foo>,
-    oneDs: DataSourceOf<OneDs>,
-    noDs: DataSourceOf<NoDs>,
+    customDs: DataSource<Foo>,
+    oneDs: DataSource<OneDs>,
+    noDs: DataSource<NoDs>,
     poo: Poo,
-  ) {}
+  ) { }
 }
 
 export class Poo {
-  ds: DataSourceOf<Foo>;
+  ds: DataSource<Foo>;
 }

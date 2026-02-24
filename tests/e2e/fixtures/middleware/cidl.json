@@ -26,7 +26,8 @@
         "SAVE": {
           "name": "SAVE",
           "is_static": true,
-          "http_verb": "POST",
+          "data_source": null,
+          "http_verb": "Post",
           "return_media": "Json",
           "return_type": {
             "HttpResult": {
@@ -52,7 +53,8 @@
         "blockedMethod": {
           "name": "blockedMethod",
           "is_static": true,
-          "http_verb": "GET",
+          "data_source": null,
+          "http_verb": "Get",
           "return_media": "Json",
           "return_type": "Void",
           "parameters_media": "Json",
@@ -61,7 +63,8 @@
         "getInjectedThing": {
           "name": "getInjectedThing",
           "is_static": true,
-          "http_verb": "GET",
+          "data_source": null,
+          "http_verb": "Get",
           "return_media": "Json",
           "return_type": {
             "Object": "InjectedThing"
@@ -77,7 +80,13 @@
           ]
         }
       },
-      "data_sources": {},
+      "data_sources": {
+        "default": {
+          "name": "default",
+          "tree": {},
+          "is_private": false
+        }
+      },
       "cruds": [
         "SAVE"
       ],

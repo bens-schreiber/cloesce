@@ -35,7 +35,7 @@ describe("Pure R2 Model", () => {
   });
 
   it("retrieves head", async () => {
-    const res = await PureR2Model.GET("test-id-1", "default");
+    const res = await PureR2Model.GET("test-id-1");
     expect(res.ok, withRes("GET should be OK", res)).toBe(true);
     expect(res.data).toBeDefined();
     expect(res.data?.id).toBe("test-id-1");
@@ -72,7 +72,7 @@ describe("D1 Backed Model", () => {
   });
 
   it("retrieves full model", async () => {
-    const res = await D1BackedModel.GET(model.id, model.keyParam, "default");
+    const res = await D1BackedModel.GET(model.id, model.keyParam);
     expect(res.ok, withRes("GET should be OK", res)).toBe(true);
     expect(res.data).toBeDefined();
     expect(res.data?.id).toBe(model.id);
@@ -81,7 +81,7 @@ describe("D1 Backed Model", () => {
   });
 
   it("lists models", async () => {
-    const res = await D1BackedModel.LIST("default");
+    const res = await D1BackedModel.LIST();
     expect(res.ok, withRes("LIST should be OK", res)).toBe(true);
     expect(res.data!.length).toBeGreaterThan(0);
 

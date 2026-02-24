@@ -55,7 +55,8 @@
         "GET": {
           "name": "GET",
           "is_static": true,
-          "http_verb": "GET",
+          "data_source": null,
+          "http_verb": "Get",
           "return_media": "Json",
           "return_type": {
             "HttpResult": {
@@ -83,7 +84,8 @@
         "LIST": {
           "name": "LIST",
           "is_static": true,
-          "http_verb": "GET",
+          "data_source": null,
+          "http_verb": "Get",
           "return_media": "Json",
           "return_type": {
             "HttpResult": {
@@ -105,7 +107,8 @@
         "SAVE": {
           "name": "SAVE",
           "is_static": true,
-          "http_verb": "POST",
+          "data_source": null,
+          "http_verb": "Post",
           "return_media": "Json",
           "return_type": {
             "HttpResult": {
@@ -131,7 +134,8 @@
         "uploadData": {
           "name": "uploadData",
           "is_static": false,
-          "http_verb": "PUT",
+          "data_source": null,
+          "http_verb": "Put",
           "return_media": "Json",
           "return_type": "Void",
           "parameters_media": "Octet",
@@ -145,12 +149,6 @@
             {
               "name": "stream",
               "cidl_type": "Stream"
-            },
-            {
-              "name": "__datasource",
-              "cidl_type": {
-                "DataSource": "D1BackedModel"
-              }
             }
           ]
         }
@@ -160,7 +158,8 @@
           "name": "default",
           "tree": {
             "r2Data": {}
-          }
+          },
+          "is_private": false
         }
       },
       "cruds": [
@@ -204,7 +203,8 @@
         "GET": {
           "name": "GET",
           "is_static": true,
-          "http_verb": "GET",
+          "data_source": null,
+          "http_verb": "Get",
           "return_media": "Json",
           "return_type": {
             "HttpResult": {
@@ -228,7 +228,8 @@
         "uploadData": {
           "name": "uploadData",
           "is_static": false,
-          "http_verb": "PUT",
+          "data_source": null,
+          "http_verb": "Put",
           "return_media": "Json",
           "return_type": "Void",
           "parameters_media": "Octet",
@@ -242,19 +243,14 @@
             {
               "name": "stream",
               "cidl_type": "Stream"
-            },
-            {
-              "name": "__datasource",
-              "cidl_type": {
-                "DataSource": "PureR2Model"
-              }
             }
           ]
         },
         "uploadOtherData": {
           "name": "uploadOtherData",
           "is_static": false,
-          "http_verb": "PUT",
+          "data_source": null,
+          "http_verb": "Put",
           "return_media": "Json",
           "return_type": "Void",
           "parameters_media": "Octet",
@@ -268,12 +264,6 @@
             {
               "name": "stream",
               "cidl_type": "Stream"
-            },
-            {
-              "name": "__datasource",
-              "cidl_type": {
-                "DataSource": "PureR2Model"
-              }
             }
           ]
         }
@@ -285,7 +275,8 @@
             "allData": {},
             "data": {},
             "otherData": {}
-          }
+          },
+          "is_private": false
         }
       },
       "cruds": [

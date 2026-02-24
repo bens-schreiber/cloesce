@@ -44,7 +44,7 @@
             "methods": {
                 "uploadData": {
                     "name": "uploadData",
-                    "http_verb": "PUT",
+                    "http_verb": "Put",
                     "is_static": false,
                     "return_media": "Json",
                     "return_type": "Void",
@@ -60,11 +60,12 @@
                             "name": "stream",
                             "cidl_type": "Stream"
                         }
-                    ]
+                    ],
+                    "data_source": null
                 },
                 "uploadOtherData": {
                     "name": "uploadOtherData",
-                    "http_verb": "PUT",
+                    "http_verb": "Put",
                     "is_static": false,
                     "return_media": "Json",
                     "return_type": "Void",
@@ -80,19 +81,11 @@
                             "name": "stream",
                             "cidl_type": "Stream"
                         }
-                    ]
+                    ],
+                    "data_source": null
                 }
             },
-            "data_sources": {
-                "default": {
-                    "name": "default",
-                    "tree": {
-                        "data": {},
-                        "otherData": {},
-                        "allData": {}
-                    }
-                }
-            },
+            "data_sources": {},
             "cruds": [
                 "GET"
             ],
@@ -136,7 +129,7 @@
             "methods": {
                 "uploadData": {
                     "name": "uploadData",
-                    "http_verb": "PUT",
+                    "http_verb": "Put",
                     "is_static": false,
                     "return_media": "Json",
                     "return_type": "Void",
@@ -152,17 +145,11 @@
                             "name": "stream",
                             "cidl_type": "Stream"
                         }
-                    ]
+                    ],
+                    "data_source": null
                 }
             },
-            "data_sources": {
-                "default": {
-                    "name": "default",
-                    "tree": {
-                        "r2Data": {}
-                    }
-                }
-            },
+            "data_sources": {},
             "cruds": [
                 "GET",
                 "LIST",

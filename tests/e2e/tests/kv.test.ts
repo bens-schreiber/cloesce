@@ -26,7 +26,7 @@ describe("PureKVModel", () => {
   });
 
   it("GET", async () => {
-    const res = await PureKVModel.GET(id, "default");
+    const res = await PureKVModel.GET(id);
     expect(res.ok, withRes("GET should be OK", res)).toBe(true);
     expect(res.data).toBeDefined();
     expect(res.data?.id).toBe(id);

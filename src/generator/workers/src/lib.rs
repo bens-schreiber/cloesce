@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
 use ast::{
@@ -149,18 +150,18 @@ impl WorkersGenerator {
                     CrudKind::GET => {
                         let mut parameters = vec![];
 
-                        for key in &model.key_params {
-                            parameters.push(NamedTypedValue {
-                                name: key.clone(),
-                                cidl_type: CidlType::Text,
-                            });
-                        }
-
                         if model.has_d1() {
                             let pk = model.primary_key.as_ref().expect("PK to exist");
                             parameters.push(NamedTypedValue {
                                 name: pk.name.clone(),
                                 cidl_type: pk.cidl_type.clone(),
+                            });
+                        }
+
+                        for key in &model.key_params {
+                            parameters.push(NamedTypedValue {
+                                name: key.clone(),
+                                cidl_type: CidlType::Text,
                             });
                         }
 
@@ -172,7 +173,7 @@ impl WorkersGenerator {
                         ApiMethod {
                             name: "GET".into(),
                             is_static: true,
-                            http_verb: HttpVerb::GET,
+                            http_verb: HttpVerb::Get,
                             return_type: CidlType::http(CidlType::Object(model.name.clone())),
                             parameters,
                             parameters_media: MediaType::default(),
@@ -183,7 +184,7 @@ impl WorkersGenerator {
                     CrudKind::LIST => ApiMethod {
                         name: "LIST".into(),
                         is_static: true,
-                        http_verb: HttpVerb::GET,
+                        http_verb: HttpVerb::Get,
                         return_type: CidlType::http(CidlType::array(CidlType::Object(
                             model.name.clone(),
                         ))),
@@ -198,7 +199,7 @@ impl WorkersGenerator {
                     CrudKind::SAVE => ApiMethod {
                         name: "SAVE".into(),
                         is_static: true,
-                        http_verb: HttpVerb::POST,
+                        http_verb: HttpVerb::Post,
                         return_type: CidlType::http(CidlType::Object(model.name.clone())),
                         parameters: vec![
                             NamedTypedValue {
@@ -256,7 +257,8 @@ impl WorkersGenerator {
 
         for model_name in models_to_process {
             let mut tree = IncludeTree::default();
-            dfs(ast, &model_name, &mut tree);
+            let mut visited = HashSet::new();
+            dfs(ast, &model_name, &mut tree, &mut visited);
 
             let data_source = DataSource {
                 name: "default".into(),
@@ -271,21 +273,40 @@ impl WorkersGenerator {
                 .insert(data_source.name.clone(), data_source);
         }
 
-        fn dfs(ast: &CloesceAst, current_model: &str, current_node: &mut IncludeTree) {
+        fn dfs(
+            ast: &CloesceAst,
+            current_model: &str,
+            current_node: &mut IncludeTree,
+            visited: &mut HashSet<String>,
+        ) {
+            if !visited.insert(current_model.to_string()) {
+                return;
+            }
+
             let model = ast.models.get(current_model).unwrap();
             for nav in &model.navigation_properties {
                 match nav.kind {
                     NavigationPropertyKind::OneToOne { .. } => {
+                        if nav.model_reference == current_model {
+                            // Self-referencing 1:1. Include but don't recurse.
+                            current_node
+                                .0
+                                .insert(nav.var_name.clone(), IncludeTree::default());
+                            continue;
+                        }
+
+                        if visited.contains(&nav.model_reference) {
+                            // Skip to avoid circular reference
+                            continue;
+                        }
+
                         let mut new_node = IncludeTree::default();
-                        dfs(ast, &nav.model_reference, &mut new_node);
+                        dfs(ast, &nav.model_reference, &mut new_node, visited);
                         current_node.0.insert(nav.var_name.clone(), new_node);
                     }
-                    NavigationPropertyKind::OneToMany { .. } => {
-                        current_node
-                            .0
-                            .insert(nav.var_name.clone(), IncludeTree::default());
-                    }
-                    NavigationPropertyKind::ManyToMany => {
+                    NavigationPropertyKind::OneToMany { .. }
+                    | NavigationPropertyKind::ManyToMany => {
+                        // Include the related model as a leaf, but don't recurse.
                         current_node
                             .0
                             .insert(nav.var_name.clone(), IncludeTree::default());
@@ -304,6 +325,8 @@ impl WorkersGenerator {
                     .0
                     .insert(r2.var_name.clone(), IncludeTree::default());
             }
+
+            visited.remove(current_model);
         }
     }
 

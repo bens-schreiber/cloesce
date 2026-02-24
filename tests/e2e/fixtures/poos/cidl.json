@@ -26,7 +26,8 @@
         "acceptPoos": {
           "name": "acceptPoos",
           "is_static": true,
-          "http_verb": "POST",
+          "data_source": null,
+          "http_verb": "Post",
           "return_media": "Json",
           "return_type": "Void",
           "parameters_media": "Json",
@@ -54,7 +55,8 @@
         "yieldPoo": {
           "name": "yieldPoo",
           "is_static": true,
-          "http_verb": "POST",
+          "data_source": null,
+          "http_verb": "Post",
           "return_media": "Json",
           "return_type": {
             "Object": "PooC"
@@ -63,7 +65,13 @@
           "parameters": []
         }
       },
-      "data_sources": {},
+      "data_sources": {
+        "default": {
+          "name": "default",
+          "tree": {},
+          "is_private": false
+        }
+      },
       "cruds": [],
       "source_path": "./seed__poo.cloesce.ts"
     }

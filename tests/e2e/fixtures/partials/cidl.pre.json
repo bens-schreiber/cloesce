@@ -38,7 +38,7 @@
             "methods": {
                 "post": {
                     "name": "post",
-                    "http_verb": "POST",
+                    "http_verb": "Post",
                     "is_static": true,
                     "return_media": "Json",
                     "return_type": {
@@ -58,18 +58,20 @@
                                 "Partial": "Dog"
                             }
                         }
-                    ]
+                    ],
+                    "data_source": null
                 },
                 "getPartialSelf": {
                     "name": "getPartialSelf",
-                    "http_verb": "GET",
+                    "http_verb": "Get",
                     "is_static": false,
                     "return_media": "Json",
                     "return_type": {
                         "Partial": "Dog"
                     },
                     "parameters_media": "Json",
-                    "parameters": []
+                    "parameters": [],
+                    "data_source": null
                 }
             },
             "data_sources": {},

@@ -101,7 +101,7 @@ fn test_client_code_generation_snapshot() {
             )
             .method(
                 "instanceMethod",
-                HttpVerb::POST,
+                HttpVerb::Post,
                 false,
                 vec![NamedTypedValue {
                     name: "input".into(),
@@ -112,7 +112,7 @@ fn test_client_code_generation_snapshot() {
             )
             .method(
                 "staticMethod",
-                HttpVerb::GET,
+                HttpVerb::Get,
                 true,
                 vec![NamedTypedValue {
                     name: "input".into(),
@@ -123,7 +123,7 @@ fn test_client_code_generation_snapshot() {
             )
             .method(
                 "hasKvParamAndRes",
-                HttpVerb::POST,
+                HttpVerb::Post,
                 false,
                 vec![NamedTypedValue {
                     name: "input".into(),
@@ -141,7 +141,7 @@ fn test_client_code_generation_snapshot() {
             .r2_object("r2", "r2_namespace", "manyFileDatas", true)
             .method(
                 "hasR2ParamAndRes",
-                HttpVerb::POST,
+                HttpVerb::Post,
                 false,
                 vec![NamedTypedValue {
                     name: "input".into(),
@@ -167,7 +167,7 @@ fn test_client_code_generation_snapshot() {
             .r2_object("{vehicleId}", "vehicle_photos", "photoData", false)
             .method(
                 "instanceMethod",
-                HttpVerb::POST,
+                HttpVerb::Post,
                 false,
                 vec![NamedTypedValue {
                     name: "input".into(),
@@ -211,7 +211,7 @@ fn test_client_code_generation_snapshot() {
             ApiMethod {
                 name: "staticMethod".into(),
                 is_static: true,
-                http_verb: HttpVerb::GET,
+                http_verb: HttpVerb::Get,
                 return_type: CidlType::http(CidlType::Text),
                 parameters_media: MediaType::default(),
                 parameters: vec![NamedTypedValue {
@@ -227,7 +227,7 @@ fn test_client_code_generation_snapshot() {
             ApiMethod {
                 name: "instanceMethod".into(),
                 is_static: false,
-                http_verb: HttpVerb::POST,
+                http_verb: HttpVerb::Post,
                 return_type: CidlType::http(CidlType::Integer),
                 parameters_media: MediaType::default(),
                 parameters: vec![NamedTypedValue {
@@ -245,7 +245,7 @@ fn test_client_code_generation_snapshot() {
             ApiMethod {
                 name: "uploadData".into(),
                 is_static: false,
-                http_verb: HttpVerb::POST,
+                http_verb: HttpVerb::Post,
                 return_type: CidlType::http(CidlType::Boolean),
                 parameters_media: ast::MediaType::Octet,
                 parameters: vec![NamedTypedValue {
@@ -263,7 +263,7 @@ fn test_client_code_generation_snapshot() {
             ApiMethod {
                 name: "downloadData".into(),
                 is_static: false,
-                http_verb: HttpVerb::GET,
+                http_verb: HttpVerb::Get,
                 return_type: CidlType::Stream,
                 parameters_media: MediaType::default(),
                 parameters: vec![],

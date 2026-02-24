@@ -94,9 +94,9 @@ describe("hydrateType Tests", () => {
         .build();
 
       class TypedColModel {
-        id: number;
-        createdAt: Date;
-        data: Uint8Array;
+        id!: number;
+        createdAt!: Date;
+        data!: Uint8Array;
       }
 
       const ast = createAst({ models: [modelMeta] });
@@ -129,8 +129,8 @@ describe("hydrateType Tests", () => {
         .build();
 
       class SparseModel {
-        id: number;
-        createdAt: Date;
+        id!: number;
+        createdAt!: Date;
       }
 
       const ast = createAst({ models: [modelMeta] });
@@ -158,7 +158,7 @@ describe("hydrateType Tests", () => {
       // Arrange
       const childMeta = ModelBuilder.model("ChildModel").idPk().build();
       class ChildModel {
-        id: number;
+        id!: number;
       }
 
       const parentMeta = ModelBuilder.model("ParentModel")
@@ -167,9 +167,9 @@ describe("hydrateType Tests", () => {
         .navP("child", "ChildModel", { OneToOne: { column_reference: "fk" } })
         .build();
       class ParentModel {
-        id: number;
-        fk: number;
-        child: ChildModel;
+        id!: number;
+        fk!: number;
+        child!: ChildModel;
       }
 
       const ast = createAst({ models: [parentMeta, childMeta] });
@@ -199,8 +199,8 @@ describe("hydrateType Tests", () => {
         .col("postId", "Integer", "PostModel")
         .build();
       class TagModel {
-        id: number;
-        postId: number;
+        id!: number;
+        postId!: number;
       }
 
       const postMeta = ModelBuilder.model("PostModel")
@@ -210,8 +210,8 @@ describe("hydrateType Tests", () => {
         })
         .build();
       class PostModel {
-        id: number;
-        tags: TagModel[];
+        id!: number;
+        tags!: TagModel[];
       }
 
       const ast = createAst({ models: [postMeta, tagMeta] });
@@ -257,8 +257,8 @@ describe("ORM Hydrate Tests", () => {
       .col("fk", "Integer", "Depth1Model")
       .build();
     class Depth2Model {
-      id: number;
-      fk: number;
+      id!: number;
+      fk!: number;
     }
 
     const depth1ModelMeta = ModelBuilder.model("Depth1Model")
@@ -269,9 +269,9 @@ describe("ORM Hydrate Tests", () => {
       })
       .build();
     class Depth1Model {
-      id: number;
-      name: string;
-      depth2: Depth2Model[];
+      id!: number;
+      name!: string;
+      depth2!: Depth2Model[];
     }
 
     const modelMeta = ModelBuilder.model("TestModel")
@@ -282,9 +282,9 @@ describe("ORM Hydrate Tests", () => {
       })
       .build();
     class TestModel {
-      id: number;
-      fk: number;
-      depth1: Depth1Model;
+      id!: number;
+      fk!: number;
+      depth1!: Depth1Model;
     }
 
     const base = {
@@ -330,7 +330,7 @@ describe("ORM Hydrate Tests", () => {
       // Act
       const depth1IncludeTree = await instance.hydrate(TestModel, {
         base,
-        includeTree: {
+        include: {
           depth1: {},
         },
       });
@@ -344,7 +344,7 @@ describe("ORM Hydrate Tests", () => {
       // Act
       const fullIncludeTree = await instance.hydrate(TestModel, {
         base,
-        includeTree: {
+        include: {
           depth1: {
             depth2: {},
           },
@@ -381,17 +381,17 @@ describe("ORM Hydrate Tests", () => {
       .build();
 
     class TestModel {
-      id: number;
-      configId: string;
-      config: KValue<unknown>;
-      configStream: KValue<ReadableStream>;
-      configList: KValue<unknown>[];
-      emptyConfig: KValue<unknown>;
+      id!: number;
+      configId!: string;
+      config!: KValue<unknown>;
+      configStream!: KValue<ReadableStream>;
+      configList!: KValue<unknown>[];
+      emptyConfig!: KValue<unknown>;
 
-      imageId: string;
-      image: R2ObjectBody;
-      imageList: R2ObjectBody[];
-      emptyImage: R2ObjectBody;
+      imageId!: string;
+      image!: R2ObjectBody;
+      imageList!: R2ObjectBody[];
+      emptyImage!: R2ObjectBody;
     }
 
     const configId = "some-config-id";
@@ -488,7 +488,7 @@ describe("ORM Hydrate Tests", () => {
           configId: configId,
           imageId: imageId,
         },
-        includeTree: {
+        include: {
           config: {},
           configStream: {},
           configList: {},

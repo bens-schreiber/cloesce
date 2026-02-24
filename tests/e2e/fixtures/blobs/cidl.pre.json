@@ -38,16 +38,17 @@
             "methods": {
                 "getBlob1": {
                     "name": "getBlob1",
-                    "http_verb": "GET",
+                    "http_verb": "Get",
                     "is_static": false,
                     "return_media": "Json",
                     "return_type": "Blob",
                     "parameters_media": "Json",
-                    "parameters": []
+                    "parameters": [],
+                    "data_source": null
                 },
                 "inputStream": {
                     "name": "inputStream",
-                    "http_verb": "POST",
+                    "http_verb": "Post",
                     "is_static": true,
                     "return_media": "Json",
                     "return_type": "Void",
@@ -57,16 +58,18 @@
                             "name": "stream",
                             "cidl_type": "Stream"
                         }
-                    ]
+                    ],
+                    "data_source": null
                 },
                 "yieldStream": {
                     "name": "yieldStream",
-                    "http_verb": "GET",
+                    "http_verb": "Get",
                     "is_static": false,
                     "return_media": "Json",
                     "return_type": "Stream",
                     "parameters_media": "Json",
-                    "parameters": []
+                    "parameters": [],
+                    "data_source": null
                 }
             },
             "data_sources": {},
@@ -86,7 +89,7 @@
             "methods": {
                 "incrementBlob": {
                     "name": "incrementBlob",
-                    "http_verb": "POST",
+                    "http_verb": "Post",
                     "is_static": false,
                     "return_media": "Json",
                     "return_type": "Blob",
@@ -96,7 +99,8 @@
                             "name": "blob",
                             "cidl_type": "Blob"
                         }
-                    ]
+                    ],
+                    "data_source": null
                 }
             },
             "source_path": "./seed__blobs.cloesce.ts",

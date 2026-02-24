@@ -314,7 +314,7 @@ fn instantiated_stream_method() {
         .id_pk()
         .method(
             "uploadPhoto",
-            HttpVerb::POST,
+            HttpVerb::Post,
             false,
             vec![
                 NamedTypedValue {
@@ -348,7 +348,7 @@ fn static_stream_method() {
         .id_pk()
         .method(
             "uploadPhoto",
-            HttpVerb::POST,
+            HttpVerb::Post,
             true,
             vec![NamedTypedValue {
                 name: "stream".into(),
@@ -376,7 +376,7 @@ fn invalid_stream_method() {
         .id_pk()
         .method(
             "uploadPhoto",
-            HttpVerb::POST,
+            HttpVerb::Post,
             true, // static is true, can only have 1 param
             vec![
                 NamedTypedValue {
@@ -712,7 +712,7 @@ fn http_result_stream_return_type() {
         .id_pk()
         .method(
             "downloadPhoto",
-            HttpVerb::GET,
+            HttpVerb::Get,
             true,
             vec![NamedTypedValue {
                 name: "ds".into(),
@@ -741,7 +741,7 @@ fn data_source_valid_instance_method() {
         .data_source("dogs", IncludeTreeBuilder::default().build(), false)
         .method(
             "getDogs",
-            HttpVerb::GET,
+            HttpVerb::Get,
             false, // instance method
             vec![],
             CidlType::Object("Dog".into()),
@@ -767,7 +767,7 @@ fn data_source_on_static_method() {
         .data_source("dogs", IncludeTreeBuilder::default().build(), false)
         .method(
             "getDogs",
-            HttpVerb::GET,
+            HttpVerb::Get,
             true,
             vec![],
             CidlType::Object("Dog".into()),
@@ -796,7 +796,7 @@ fn data_source_unknown() {
         .id_pk()
         .method(
             "getDogs",
-            HttpVerb::GET,
+            HttpVerb::Get,
             false,
             vec![],
             CidlType::Object("Dog".into()),

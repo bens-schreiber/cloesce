@@ -23,7 +23,7 @@
             "methods": {
                 "acceptPoos": {
                     "name": "acceptPoos",
-                    "http_verb": "POST",
+                    "http_verb": "Post",
                     "is_static": true,
                     "return_media": "Json",
                     "return_type": "Void",
@@ -47,18 +47,20 @@
                                 "Object": "PooC"
                             }
                         }
-                    ]
+                    ],
+                    "data_source": null
                 },
                 "yieldPoo": {
                     "name": "yieldPoo",
-                    "http_verb": "POST",
+                    "http_verb": "Post",
                     "is_static": true,
                     "return_media": "Json",
                     "return_type": {
                         "Object": "PooC"
                     },
                     "parameters_media": "Json",
-                    "parameters": []
+                    "parameters": [],
+                    "data_source": null
                 }
             },
             "data_sources": {},

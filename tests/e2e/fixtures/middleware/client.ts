@@ -14,7 +14,7 @@ export class Foo {
 
   static async SAVE(
     model: DeepPartial<Foo>,
-    __datasource: "none" = "none",
+    __datasource: "default" = "default",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Foo>> {
     const baseUrl = new URL(
@@ -26,7 +26,7 @@ export class Foo {
     baseUrl.searchParams.append("__datasource", String(__datasource));
 
     const res = await fetchImpl(baseUrl, {
-      method: "POST",
+      method: "Post",
       headers: { "Content-Type": "application/json" },
       body: requestBody(MediaType.Json, payload),
     });
@@ -47,7 +47,7 @@ export class Foo {
 
 
     const res = await fetchImpl(baseUrl, {
-      method: "GET",
+      method: "Get",
     });
 
     return await HttpResult.fromResponse(
@@ -66,7 +66,7 @@ export class Foo {
 
 
     const res = await fetchImpl(baseUrl, {
-      method: "GET",
+      method: "Get",
     });
 
     return await HttpResult.fromResponse(

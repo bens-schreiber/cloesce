@@ -1,6 +1,6 @@
 // GENERATED CODE. DO NOT MODIFY.
 export class Poo {
-  ds: "baz" |"none" = "none";
+  ds: "baz" | "default" = "default";
 
   static fromJson(data: any): Poo {
     const res = Object.assign(new Poo(), data);
@@ -13,9 +13,9 @@ export class Foo {
   id: number;
 
   async bar(
-    customDs: "baz" |"none" = "none",
-    oneDs: "default" |"none" = "none",
-    noDs: "none" = "none",
+    customDs: "baz" | "default" = "default",
+    oneDs: "default" = "default",
+    noDs: "default" = "default",
     poo: Poo,
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<void>> {
@@ -33,7 +33,7 @@ export class Foo {
     payload["poo"] = poo;
 
     const res = await fetchImpl(baseUrl, {
-      method: "POST",
+      method: "Post",
       headers: { "Content-Type": "application/json" },
       body: requestBody(MediaType.Json, payload),
     });

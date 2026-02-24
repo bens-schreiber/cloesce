@@ -17,7 +17,7 @@ function createRequest(url: string, method?: string, body?: any) {
 }
 
 function createCtorReg(ctors?: (new () => any)[]) {
-  const res = {};
+  const res: Record<string, new () => any> = {};
   if (ctors) {
     for (const ctor of ctors) {
       res[ctor.name] = ctor;
@@ -40,8 +40,8 @@ function createDi() {
   return new DependencyContainer();
 }
 
-function extractErrorCode(str) {
-  const match = str.match(/\(ErrorCode:\s*(\d+)\)/);
+function extractErrorCode(str: string | undefined): number | null {
+  const match = str?.match(/\(ErrorCode:\s*(\d+)\)/);
   return match ? Number(match[1]) : null;
 }
 
@@ -103,7 +103,7 @@ describe("Match Route", () => {
       models: [
         ModelBuilder.model("Model")
           .idPk()
-          .method("method", HttpVerb.DELETE, false, [], "Void")
+          .method("method", HttpVerb.Del, false, [], "Void")
           .build(),
       ],
     });
@@ -126,7 +126,7 @@ describe("Match Route", () => {
       models: [
         ModelBuilder.model("Model")
           .idPk()
-          .method("method", HttpVerb.POST, true, [], "Void")
+          .method("method", HttpVerb.Post, true, [], "Void")
           .build(),
       ],
     });
@@ -153,7 +153,7 @@ describe("Match Route", () => {
       models: [
         ModelBuilder.model("Model")
           .idPk()
-          .method("method", HttpVerb.POST, false, [], "Void")
+          .method("method", HttpVerb.Post, false, [], "Void")
           .build(),
       ],
     });
@@ -183,7 +183,7 @@ describe("Match Route", () => {
       models: [
         ModelBuilder.model("Model")
           .idPk()
-          .method("method", HttpVerb.POST, false, [], "Void")
+          .method("method", HttpVerb.Post, false, [], "Void")
           .keyParam("key1")
           .keyParam("key2")
           .build(),
@@ -214,7 +214,7 @@ describe("Match Route", () => {
     const ast = createAst({
       services: [
         ServiceBuilder.service("Service")
-          .method("method", HttpVerb.POST, true, [], "Void")
+          .method("method", HttpVerb.Post, true, [], "Void")
           .build(),
       ],
     });
@@ -240,7 +240,7 @@ describe("Match Route", () => {
     const ast = createAst({
       services: [
         ServiceBuilder.service("Service")
-          .method("method", HttpVerb.POST, false, [], "Void")
+          .method("method", HttpVerb.Post, false, [], "Void")
           .build(),
       ],
     });
@@ -273,7 +273,7 @@ describe("Namespace Middleware", () => {
       models: [
         ModelBuilder.model("Foo")
           .idPk()
-          .method("method", HttpVerb.POST, true, [], "Void")
+          .method("method", HttpVerb.Post, true, [], "Void")
           .build(),
       ],
     });
@@ -312,7 +312,7 @@ describe("Namespace Middleware", () => {
     const ast = createAst({
       services: [
         ServiceBuilder.service("Foo")
-          .method("method", HttpVerb.POST, true, [], "Void")
+          .method("method", HttpVerb.Post, true, [], "Void")
           .build(),
       ],
     });
@@ -352,7 +352,7 @@ describe("Request Validation", () => {
     const request = createRequest("http://foo.com/api/Foo/method", "POST", {});
     const model = ModelBuilder.model("Foo")
       .idPk()
-      .method("method", HttpVerb.POST, false, [], "Void")
+      .method("method", HttpVerb.Post, false, [], "Void")
       .build();
 
     const route: MatchedRoute = {
@@ -391,7 +391,7 @@ describe("Request Validation", () => {
     const request = createRequest("http://foo.com/api/Foo/method", "POST");
     const model = ModelBuilder.model("Foo")
       .idPk()
-      .method("method", HttpVerb.POST, true, [], "Void")
+      .method("method", HttpVerb.Post, true, [], "Void")
       .build();
 
     const route: MatchedRoute = {
@@ -437,7 +437,7 @@ describe("Method Middleware", () => {
       models: [
         ModelBuilder.model("Foo")
           .idPk()
-          .method("method", HttpVerb.POST, true, [], "Void")
+          .method("method", HttpVerb.Post, true, [], "Void")
           .build(),
       ],
     });
@@ -490,7 +490,7 @@ describe("Method Dispatch", () => {
     const di = createDi();
     const model = ModelBuilder.model("Foo")
       .idPk()
-      .method("testMethod", HttpVerb.GET, true, [], "Void")
+      .method("testMethod", HttpVerb.Get, true, [], "Void")
       .build();
 
     const route: MatchedRoute = {
@@ -521,7 +521,7 @@ describe("Method Dispatch", () => {
 
     const model = ModelBuilder.model("Foo")
       .idPk()
-      .method("testMethod", HttpVerb.GET, true, [], { HttpResult: "Void" })
+      .method("testMethod", HttpVerb.Get, true, [], { HttpResult: "Void" })
       .build();
 
     const route: MatchedRoute = {
@@ -552,7 +552,7 @@ describe("Method Dispatch", () => {
 
     const model = ModelBuilder.model("Foo")
       .idPk()
-      .method("testMethod", HttpVerb.GET, true, [], "Text")
+      .method("testMethod", HttpVerb.Get, true, [], "Text")
       .build();
 
     const route: MatchedRoute = {
@@ -576,7 +576,7 @@ describe("Method Dispatch", () => {
     // Arrange – Error object
     const model = ModelBuilder.model("Foo")
       .idPk()
-      .method("testMethod", HttpVerb.GET, true, [], "Text")
+      .method("testMethod", HttpVerb.Get, true, [], "Text")
       .build();
 
     const route: MatchedRoute = {

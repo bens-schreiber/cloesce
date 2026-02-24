@@ -6,6 +6,6 @@ import { DataSource } from "../../../src/ui/backend.ts";
 export class Foo {
   id: number;
 
-  // lacks `static readonly`
-  foo: DataSource<Foo> = {};
+  // lacks object initializer
+  static readonly foo: DataSource<Foo> = 1;
 }

@@ -1,53 +1,128 @@
 // GENERATED CODE. DO NOT MODIFY.
-export class PooA {
+
+
+export class Hamburger {
+  id: number;
   name: string;
-  major: string;
+  toppings: Topping[];
 
-  static fromJson(data: any): PooA {
-    const res = Object.assign(new PooA(), data);
-    return res;
+  static async LIST(
+    __datasource: "default" | "orderedBurgersWithLettuce" = "default",
+    fetchImpl: typeof fetch = fetch
+  ): Promise<HttpResult<Hamburger[]>> {
+    const baseUrl = new URL(
+      `http://localhost:5002/api/Hamburger/LIST`
+    );
+
+    baseUrl.searchParams.append("__datasource", String(__datasource));
+
+    const res = await fetchImpl(baseUrl, {
+      method: "Get",
+    });
+
+    return await HttpResult.fromResponse(
+      res,
+      MediaType.Json,
+      Hamburger,
+      true
+    );
   }
-}
-export class PooB {
-  color: string;
+  static async SAVE(
+    model: DeepPartial<Hamburger>,
+    __datasource: "default" | "orderedBurgersWithLettuce" = "default",
+    fetchImpl: typeof fetch = fetch
+  ): Promise<HttpResult<Hamburger>> {
+    const baseUrl = new URL(
+      `http://localhost:5002/api/Hamburger/SAVE`
+    );
+    const payload: any = {};
 
-  static fromJson(data: any): PooB {
-    const res = Object.assign(new PooB(), data);
-    return res;
+    payload["model"] = model;
+    baseUrl.searchParams.append("__datasource", String(__datasource));
+
+    const res = await fetchImpl(baseUrl, {
+      method: "Post",
+      headers: { "Content-Type": "application/json" },
+      body: requestBody(MediaType.Json, payload),
+    });
+
+    return await HttpResult.fromResponse(
+      res,
+      MediaType.Json,
+      Hamburger,
+      false
+    );
   }
-}
-export class PooC {
-  a: PooA;
-  b: PooB[];
+  async noLettuceToppings(
+    fetchImpl: typeof fetch = fetch
+  ): Promise<HttpResult<Topping[]>> {
+    const id = [
+      encodeURIComponent(String(this.id)),
+    ].join("/");
+    const baseUrl = new URL(
+      `http://localhost:5002/api/Hamburger/${id}/noLettuceToppings`
+    );
 
-  static fromJson(data: any): PooC {
-    const res = Object.assign(new PooC(), data);
-    res["a"] &&= PooA.fromJson(res.a);
-    for (let i = 0; i < res.b?.length; i++) {
-      res.b[i] = PooB.fromJson(res.b[i]);
+
+    const res = await fetchImpl(baseUrl, {
+      method: "Get",
+    });
+
+    return await HttpResult.fromResponse(
+      res,
+      MediaType.Json,
+      Topping,
+      true
+    );
+  }
+  async onlyBacon(
+    fetchImpl: typeof fetch = fetch
+  ): Promise<HttpResult<Topping[]>> {
+    const id = [
+      encodeURIComponent(String(this.id)),
+    ].join("/");
+    const baseUrl = new URL(
+      `http://localhost:5002/api/Hamburger/${id}/onlyBacon`
+    );
+
+
+    const res = await fetchImpl(baseUrl, {
+      method: "Get",
+    });
+
+    return await HttpResult.fromResponse(
+      res,
+      MediaType.Json,
+      Topping,
+      true
+    );
+  }
+
+  static fromJson(data: any): Hamburger {
+    const res = Object.assign(new Hamburger(), data);
+    for (let i = 0; i < res.toppings?.length; i++) {
+      res.toppings[i] = Topping.fromJson(res.toppings[i]);
     }
     return res;
   }
 }
-
-
-export class PooAcceptYield {
+export class Topping {
   id: number;
+  name: string;
+  hamburgers: Hamburger[];
 
-  static async acceptPoos(
-    a: PooA,
-    b: PooB,
-    c: PooC,
+  static async SAVE(
+    model: DeepPartial<Topping>,
+    __datasource: "default" = "default",
     fetchImpl: typeof fetch = fetch
-  ): Promise<HttpResult<void>> {
+  ): Promise<HttpResult<Topping>> {
     const baseUrl = new URL(
-      `http://localhost:5002/api/PooAcceptYield/acceptPoos`
+      `http://localhost:5002/api/Topping/SAVE`
     );
     const payload: any = {};
 
-    payload["a"] = a;
-    payload["b"] = b;
-    payload["c"] = c;
+    payload["model"] = model;
+    baseUrl.searchParams.append("__datasource", String(__datasource));
 
     const res = await fetchImpl(baseUrl, {
       method: "Post",
@@ -58,35 +133,16 @@ export class PooAcceptYield {
     return await HttpResult.fromResponse(
       res,
       MediaType.Json,
-      undefined,
-      false
-    );
-  }
-  static async yieldPoo(
-    fetchImpl: typeof fetch = fetch
-  ): Promise<HttpResult<PooC>> {
-    const baseUrl = new URL(
-      `http://localhost:5002/api/PooAcceptYield/yieldPoo`
-    );
-    const payload: any = {};
-
-
-    const res = await fetchImpl(baseUrl, {
-      method: "Post",
-      headers: { "Content-Type": "application/json" },
-      body: requestBody(MediaType.Json, payload),
-    });
-
-    return await HttpResult.fromResponse(
-      res,
-      MediaType.Json,
-      PooC,
+      Topping,
       false
     );
   }
 
-  static fromJson(data: any): PooAcceptYield {
-    const res = Object.assign(new PooAcceptYield(), data);
+  static fromJson(data: any): Topping {
+    const res = Object.assign(new Topping(), data);
+    for (let i = 0; i < res.hamburgers?.length; i++) {
+      res.hamburgers[i] = Hamburger.fromJson(res.hamburgers[i]);
+    }
     return res;
   }
 }

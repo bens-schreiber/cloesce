@@ -43,7 +43,8 @@
         "GET": {
           "name": "GET",
           "is_static": true,
-          "http_verb": "GET",
+          "data_source": null,
+          "http_verb": "Get",
           "return_media": "Json",
           "return_type": {
             "HttpResult": {
@@ -67,7 +68,8 @@
         "LIST": {
           "name": "LIST",
           "is_static": true,
-          "http_verb": "GET",
+          "data_source": null,
+          "http_verb": "Get",
           "return_media": "Json",
           "return_type": {
             "HttpResult": {
@@ -89,7 +91,8 @@
         "SAVE": {
           "name": "SAVE",
           "is_static": true,
-          "http_verb": "POST",
+          "data_source": null,
+          "http_verb": "Post",
           "return_media": "Json",
           "return_type": {
             "HttpResult": {
@@ -115,23 +118,18 @@
         "getBlob1": {
           "name": "getBlob1",
           "is_static": false,
-          "http_verb": "GET",
+          "data_source": null,
+          "http_verb": "Get",
           "return_media": "Json",
           "return_type": "Blob",
           "parameters_media": "Json",
-          "parameters": [
-            {
-              "name": "__datasource",
-              "cidl_type": {
-                "DataSource": "BlobHaver"
-              }
-            }
-          ]
+          "parameters": []
         },
         "inputStream": {
           "name": "inputStream",
           "is_static": true,
-          "http_verb": "POST",
+          "data_source": null,
+          "http_verb": "Post",
           "return_media": "Json",
           "return_type": "Void",
           "parameters_media": "Octet",
@@ -145,21 +143,21 @@
         "yieldStream": {
           "name": "yieldStream",
           "is_static": false,
-          "http_verb": "GET",
+          "data_source": null,
+          "http_verb": "Get",
           "return_media": "Octet",
           "return_type": "Stream",
           "parameters_media": "Json",
-          "parameters": [
-            {
-              "name": "__datasource",
-              "cidl_type": {
-                "DataSource": "BlobHaver"
-              }
-            }
-          ]
+          "parameters": []
         }
       },
-      "data_sources": {},
+      "data_sources": {
+        "default": {
+          "name": "default",
+          "tree": {},
+          "is_private": false
+        }
+      },
       "cruds": [
         "GET",
         "LIST",
@@ -177,7 +175,8 @@
         "incrementBlob": {
           "name": "incrementBlob",
           "is_static": false,
-          "http_verb": "POST",
+          "data_source": null,
+          "http_verb": "Post",
           "return_media": "Json",
           "return_type": "Blob",
           "parameters_media": "Json",

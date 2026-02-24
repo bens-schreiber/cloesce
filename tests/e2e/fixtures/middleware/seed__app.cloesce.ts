@@ -3,7 +3,7 @@ import {
   WranglerEnv,
   Model,
   Inject,
-  GET,
+  Get,
   HttpResult,
   Integer,
 } from "cloesce/backend";
@@ -22,10 +22,10 @@ export class Env {
 export class Foo {
   id: Integer;
 
-  @GET
-  static blockedMethod() {}
+  @Get()
+  static blockedMethod() { }
 
-  @GET
+  @Get()
   static getInjectedThing(@Inject thing: InjectedThing): InjectedThing {
     return thing;
   }

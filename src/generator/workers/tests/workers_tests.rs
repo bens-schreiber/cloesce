@@ -127,7 +127,7 @@ fn finalize_does_not_overwrite_existing_method() {
         .id_pk()
         .method(
             "get",
-            HttpVerb::POST,
+            HttpVerb::Post,
             true,
             vec![NamedTypedValue {
                 name: "id".into(),
@@ -148,7 +148,7 @@ fn finalize_does_not_overwrite_existing_method() {
     let user = ast.models.get("User").unwrap();
     let method = user.methods.get("get").unwrap();
 
-    assert_eq!(method.http_verb, HttpVerb::POST);
+    assert_eq!(method.http_verb, HttpVerb::Post);
     assert_eq!(method.parameters.len(), 1);
 }
 
@@ -178,7 +178,7 @@ fn finalize_sets_octet_media_type() {
             .id_pk()
             .method(
                 "acceptReturnOctet",
-                HttpVerb::POST,
+                HttpVerb::Post,
                 true,
                 vec![NamedTypedValue {
                     name: "stream".into(),
@@ -229,7 +229,7 @@ fn finalize_get_crud_adds_primary_key_for_d1_model() {
         "GET method should have primary key parameter for D1 model"
     );
 
-    assert_eq!(get_method.http_verb, HttpVerb::GET);
+    assert_eq!(get_method.http_verb, HttpVerb::Get);
     assert!(get_method.is_static);
 }
 
@@ -478,5 +478,66 @@ fn generate_default_data_sources_includes_multiple_one_to_ones() {
     assert!(
         toy_node.0.is_empty(),
         "Default data source for Owner should NOT include any nested relationships under 'toy'"
+    );
+}
+
+#[test]
+fn generate_default_data_sources_does_not_include_circular_references() {
+    // Arrange
+    let employee = ModelBuilder::new("Employee")
+        .id_pk()
+        .nav_p(
+            "manager",
+            "Employee",
+            NavigationPropertyKind::OneToOne {
+                column_reference: "managerId".into(),
+            },
+        )
+        .nav_p(
+            "employeeCard",
+            "EmployeeCard",
+            NavigationPropertyKind::OneToOne {
+                column_reference: "employeeCardId".into(),
+            },
+        )
+        .build();
+
+    let employee_card = ModelBuilder::new("EmployeeCard")
+        .id_pk()
+        .nav_p(
+            "employee",
+            "Employee",
+            NavigationPropertyKind::OneToOne {
+                column_reference: "employeeId".into(),
+            },
+        )
+        .build();
+
+    let mut ast = create_ast(vec![employee, employee_card]);
+
+    // Act
+    WorkersGenerator::generate_default_data_sources(&mut ast);
+
+    // Assert
+    let employee = ast.models.get("Employee").unwrap();
+    let default_ds = employee
+        .default_data_source()
+        .expect("Employee should have default data source");
+    let tree = &default_ds.tree;
+    let manager_node = tree.0.get("manager").unwrap();
+    assert!(
+        !manager_node.0.contains_key("manager"),
+        "Default data source for Employee should NOT include circular 'manager' relationship under 'manager'"
+    );
+
+    assert!(
+        tree.0.contains_key("employeeCard"),
+        "Default data source for Employee should include 'employeeCard' relationship"
+    );
+
+    let employee_card_node = tree.0.get("employeeCard").unwrap();
+    assert!(
+        !employee_card_node.0.contains_key("employee"),
+        "Default data source for Employee should NOT include circular 'employee' relationship under 'employeeCard'"
     );
 }

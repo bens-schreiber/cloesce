@@ -3,7 +3,7 @@
   "project_name": "runner",
   "wrangler_env": {
     "name": "Env",
-    "source_path": "./seed__crud.cloesce.ts",
+    "source_path": "./seed__d1_crud.cloesce.ts",
     "d1_binding": "db",
     "kv_bindings": [],
     "r2_bindings": [],
@@ -35,7 +35,8 @@
         "GET": {
           "name": "GET",
           "is_static": true,
-          "http_verb": "GET",
+          "data_source": null,
+          "http_verb": "Get",
           "return_media": "Json",
           "return_type": {
             "HttpResult": {
@@ -59,7 +60,8 @@
         "LIST": {
           "name": "LIST",
           "is_static": true,
-          "http_verb": "GET",
+          "data_source": null,
+          "http_verb": "Get",
           "return_media": "Json",
           "return_type": {
             "HttpResult": {
@@ -81,7 +83,8 @@
         "SAVE": {
           "name": "SAVE",
           "is_static": true,
-          "http_verb": "POST",
+          "data_source": null,
+          "http_verb": "Post",
           "return_media": "Json",
           "return_type": {
             "HttpResult": {
@@ -107,27 +110,27 @@
         "notCrud": {
           "name": "notCrud",
           "is_static": false,
-          "http_verb": "POST",
+          "data_source": null,
+          "http_verb": "Post",
           "return_media": "Json",
           "return_type": "Void",
           "parameters_media": "Json",
-          "parameters": [
-            {
-              "name": "__datasource",
-              "cidl_type": {
-                "DataSource": "CrudHaver"
-              }
-            }
-          ]
+          "parameters": []
         }
       },
-      "data_sources": {},
+      "data_sources": {
+        "default": {
+          "name": "default",
+          "tree": {},
+          "is_private": false
+        }
+      },
       "cruds": [
         "GET",
         "LIST",
         "SAVE"
       ],
-      "source_path": "./seed__crud.cloesce.ts"
+      "source_path": "./seed__d1_crud.cloesce.ts"
     },
     "Parent": {
       "hash": 17776526208155794011,
@@ -177,7 +180,8 @@
         "GET": {
           "name": "GET",
           "is_static": true,
-          "http_verb": "GET",
+          "data_source": null,
+          "http_verb": "Get",
           "return_media": "Json",
           "return_type": {
             "HttpResult": {
@@ -201,7 +205,8 @@
         "LIST": {
           "name": "LIST",
           "is_static": true,
-          "http_verb": "GET",
+          "data_source": null,
+          "http_verb": "Get",
           "return_media": "Json",
           "return_type": {
             "HttpResult": {
@@ -223,7 +228,8 @@
         "SAVE": {
           "name": "SAVE",
           "is_static": true,
-          "http_verb": "POST",
+          "data_source": null,
+          "http_verb": "Post",
           "return_media": "Json",
           "return_type": {
             "HttpResult": {
@@ -248,12 +254,21 @@
         }
       },
       "data_sources": {
+        "default": {
+          "name": "default",
+          "tree": {
+            "children": {},
+            "favoriteChild": {}
+          },
+          "is_private": false
+        },
         "withChildren": {
           "name": "withChildren",
           "tree": {
             "children": {},
             "favoriteChild": {}
-          }
+          },
+          "is_private": false
         }
       },
       "cruds": [
@@ -261,7 +276,7 @@
         "LIST",
         "SAVE"
       ],
-      "source_path": "./seed__crud.cloesce.ts"
+      "source_path": "./seed__d1_crud.cloesce.ts"
     },
     "Child": {
       "hash": 2823647866772793242,
@@ -296,9 +311,19 @@
       "kv_objects": [],
       "r2_objects": [],
       "methods": {},
-      "data_sources": {},
+      "data_sources": {
+        "default": {
+          "name": "default",
+          "tree": {
+            "parent": {
+              "children": {}
+            }
+          },
+          "is_private": false
+        }
+      },
       "cruds": [],
-      "source_path": "./seed__crud.cloesce.ts"
+      "source_path": "./seed__d1_crud.cloesce.ts"
     }
   },
   "services": {},

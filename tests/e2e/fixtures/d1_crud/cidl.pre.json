@@ -2,7 +2,7 @@
     "project_name": "runner",
     "wrangler_env": {
         "name": "Env",
-        "source_path": "./seed__crud.cloesce.ts",
+        "source_path": "./seed__d1_crud.cloesce.ts",
         "d1_binding": "db",
         "kv_bindings": [],
         "r2_bindings": [],
@@ -31,12 +31,13 @@
             "methods": {
                 "notCrud": {
                     "name": "notCrud",
-                    "http_verb": "POST",
+                    "http_verb": "Post",
                     "is_static": false,
                     "return_media": "Json",
                     "return_type": "Void",
                     "parameters_media": "Json",
-                    "parameters": []
+                    "parameters": [],
+                    "data_source": null
                 }
             },
             "data_sources": {},
@@ -45,7 +46,7 @@
                 "LIST",
                 "SAVE"
             ],
-            "source_path": "./seed__crud.cloesce.ts"
+            "source_path": "./seed__d1_crud.cloesce.ts"
         },
         "Parent": {
             "name": "Parent",
@@ -94,7 +95,8 @@
                     "tree": {
                         "favoriteChild": {},
                         "children": {}
-                    }
+                    },
+                    "is_private": false
                 }
             },
             "cruds": [
@@ -102,7 +104,7 @@
                 "LIST",
                 "SAVE"
             ],
-            "source_path": "./seed__crud.cloesce.ts"
+            "source_path": "./seed__d1_crud.cloesce.ts"
         },
         "Child": {
             "name": "Child",
@@ -136,7 +138,7 @@
             "methods": {},
             "data_sources": {},
             "cruds": [],
-            "source_path": "./seed__crud.cloesce.ts"
+            "source_path": "./seed__d1_crud.cloesce.ts"
         }
     },
     "poos": {},

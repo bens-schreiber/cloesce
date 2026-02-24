@@ -5,19 +5,17 @@ import {
   invokeOrmWasm,
 } from "./wasm.js";
 import { proxyCrud } from "./crud.js";
-import { IncludeTree } from "../ui/backend.js";
 import {
   CloesceAst,
   Model,
   ApiMethod,
-  NO_DATA_SOURCE,
   Service,
   MediaType,
   CrudKind,
 } from "../ast.js";
 import { Either, InternalError } from "../common.js";
 import { Orm, KeysOfType, HttpResult } from "../ui/backend.js";
-import { hydrateType } from "./orm.js";
+import { DataSource, hydrateType } from "./orm.js";
 
 export type DependencyKey<T> = Function | (new () => T) | { name: string };
 
@@ -39,6 +37,32 @@ export class DependencyContainer {
 
   has<T>(key: DependencyKey<T>): boolean {
     return this.container.has(key.name);
+  }
+}
+
+/**
+ * @internal
+ *
+ * A singleton registry of any Data Source referenced on a method
+ */
+export class DataSourceContainer {
+  private static container = new Map<string, DataSource<any>>();
+
+  private static key(modelName: string, methodName: string) {
+    return `${modelName}:${methodName}`;
+  }
+
+  static set(modelName: string, methodName: string, ds: DataSource<any>) {
+    this.container.set(this.key(modelName, methodName), ds);
+  }
+
+  static get(modelName: string, methodName: string): DataSource<any> {
+    const key = this.key(modelName, methodName);
+    return this.container.get(key)!;
+  }
+
+  static getWithKey(key: string): DataSource<any> | undefined {
+    return this.container.get(key);
   }
 }
 
@@ -102,7 +126,6 @@ export enum RouterError {
   RequestMissingBody,
   RequestBodyMissingParameters,
   RequestBodyInvalidParameter,
-  InstantiatedMethodMissingDataSource,
   InvalidDatabaseQuery,
   ModelNotFound,
   UncaughtException,
@@ -259,7 +282,7 @@ export class CloesceApp {
     if (validation.isLeft()) {
       return validation.value;
     }
-    const { params, dataSource } = validation.unwrap();
+    const params = validation.unwrap();
 
     // Method middleware
     for (const m of this.methodMiddleware
@@ -272,7 +295,7 @@ export class CloesceApp {
     }
 
     // Hydration
-    const hydrated = await hydrate(di, ctorReg, route, dataSource, env);
+    const hydrated = await hydrate(di, ctorReg, route, env);
 
     if (hydrated.isLeft()) {
       return hydrated.value;
@@ -398,7 +421,7 @@ function matchRoute(
     const method = model.methods[methodName];
     if (!method) return notFound(RouterError.UnknownRoute);
 
-    if (request.method !== method.http_verb) {
+    if (request.method.toLowerCase() !== method.http_verb.toLowerCase()) {
       return notFound(RouterError.UnmatchedHttpVerb);
     }
 
@@ -427,7 +450,7 @@ function matchRoute(
     const method = service.methods[methodName];
     if (!method || id.length > 0) return notFound(RouterError.UnknownRoute);
 
-    if (request.method !== method.http_verb) {
+    if (request.method.toLowerCase() !== method.http_verb.toLowerCase()) {
       return notFound(RouterError.UnmatchedHttpVerb);
     }
 
@@ -456,9 +479,7 @@ async function validateRequest(
   env: any,
   ctorReg: ConstructorRegistry,
   route: MatchedRoute,
-): Promise<
-  Either<HttpResult, { params: RequestParamMap; dataSource: string | null }>
-> {
+): Promise<Either<HttpResult, RequestParamMap>> {
   // Error state: any missing parameter, body, or malformed input will exit with 400.
   const invalidRequest = (c: RouterError) =>
     exit(400, c, "Invalid Request Body");
@@ -489,7 +510,7 @@ async function validateRequest(
   // Extract all method parameters from the body
   const url = new URL(request.url);
   let params: RequestParamMap = Object.fromEntries(url.searchParams.entries());
-  if (route.method.http_verb !== "GET") {
+  if (route.method.http_verb !== "Get") {
     try {
       switch (route.method.parameters_media) {
         case MediaType.Json: {
@@ -550,25 +571,7 @@ async function validateRequest(
     }
   }
 
-  // A data source is required for instantiated model methods
-  const dataSource = requiredParams
-    .filter(
-      (p) =>
-        typeof p.cidl_type === "object" &&
-        "DataSource" in p.cidl_type &&
-        p.cidl_type.DataSource === route.namespace,
-    )
-    .map((p) => params[p.name] as string)
-    .at(0);
-  if (
-    route.kind === "model" &&
-    !route.method.is_static &&
-    dataSource === undefined
-  ) {
-    return invalidRequest(RouterError.InstantiatedMethodMissingDataSource);
-  }
-
-  return Either.right({ params, dataSource: dataSource ?? null });
+  return Either.right(params);
 }
 
 /**
@@ -579,7 +582,6 @@ async function hydrate(
   di: DependencyContainer,
   ctorReg: ConstructorRegistry,
   route: MatchedRoute,
-  dataSource: string | null,
   env: any,
 ): Promise<Either<HttpResult, any>> {
   if (route.kind === "service") {
@@ -599,11 +601,7 @@ async function hydrate(
     return Either.right(proxyCrud(modelCtor, modelCtor, env));
   }
 
-  const includeTree: IncludeTree<any> | null =
-    dataSource === NO_DATA_SOURCE
-      ? null
-      : (ctorReg[model.name] as any)[dataSource!];
-
+  const dataSource = findDataSource(modelCtor, route.method.data_source);
   const orm = Orm.fromEnv(env);
 
   // Error state: If some outside force tweaked the database schema, the query may fail.
@@ -612,13 +610,13 @@ async function hydrate(
     exit(
       500,
       RouterError.InvalidDatabaseQuery,
-      `Error in hydration query, is the database out of sync with the backend?: ${e instanceof Error ? e.message : String(e)}`,
+      `Error in hydration query: ${e instanceof Error ? e.message : String(e)}`,
     );
 
   try {
     const result = await orm.get(modelCtor, {
       id: route.primaryKey,
-      includeTree,
+      include: dataSource,
       keyParams: route.keyParams,
     });
 
@@ -708,6 +706,30 @@ function findInjected(di: DependencyContainer, key: string): any | undefined {
     );
   }
   return injected;
+}
+
+/** @internal */
+export function findDataSource(
+  modelCtor: new () => any,
+  dsName: string | null,
+) {
+  if (dsName === null || dsName === "default") {
+    // Either the compiler generated default, or a user overriden default.
+    if ((modelCtor as any).default && (modelCtor as any).default.includeTree) {
+      return (modelCtor as any).default as DataSource<any>;
+    }
+
+    // No default was overriden. Use the compiler generated default.
+    return Orm.defaultDataSource(modelCtor);
+  }
+
+  if ((modelCtor as any)[dsName]) {
+    // Static data source defined on the model. Use it.
+    return (modelCtor as any)[dsName] as DataSource<any>;
+  }
+
+  // Must be an inline/private data source.
+  return DataSourceContainer.getWithKey(dsName);
 }
 
 /**

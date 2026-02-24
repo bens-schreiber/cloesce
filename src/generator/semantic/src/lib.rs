@@ -779,7 +779,7 @@ fn validate_methods(
 
         // todo: remove this limitation
         ensure!(
-            method.http_verb != HttpVerb::GET
+            method.http_verb != HttpVerb::Get
                 || !cidl_type_contains!(&param.cidl_type, CidlType::KvObject(_)),
             GeneratorErrorKind::NotYetSupported,
             "GET Requests currently do not support KV Object parameters {}.{}.{}",
@@ -811,7 +811,7 @@ fn validate_methods(
                 );
 
                 // TODO: remove this
-                if method.http_verb == HttpVerb::GET {
+                if method.http_verb == HttpVerb::Get {
                     fail!(
                         GeneratorErrorKind::NotYetSupported,
                         "GET Requests currently do not support object parameters {}.{}.{}",
@@ -823,7 +823,7 @@ fn validate_methods(
             }
             CidlType::R2Object => {
                 // TODO: remove this
-                if method.http_verb == HttpVerb::GET {
+                if method.http_verb == HttpVerb::Get {
                     fail!(
                         GeneratorErrorKind::NotYetSupported,
                         "GET Requests currently do not support R2Object parameters {}.{}.{}",

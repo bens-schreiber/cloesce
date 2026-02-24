@@ -11,7 +11,7 @@ export class D1BackedModel {
   static async GET(
     id: number,
     keyParam: string,
-    __datasource: "default" |"none" = "none",
+    __datasource: "default" = "default",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<D1BackedModel>> {
     const baseUrl = new URL(
@@ -23,7 +23,7 @@ export class D1BackedModel {
     baseUrl.searchParams.append("__datasource", String(__datasource));
 
     const res = await fetchImpl(baseUrl, {
-      method: "GET",
+      method: "Get",
     });
 
     return await HttpResult.fromResponse(
@@ -34,7 +34,7 @@ export class D1BackedModel {
     );
   }
   static async LIST(
-    __datasource: "default" |"none" = "none",
+    __datasource: "default" = "default",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<D1BackedModel[]>> {
     const baseUrl = new URL(
@@ -44,7 +44,7 @@ export class D1BackedModel {
     baseUrl.searchParams.append("__datasource", String(__datasource));
 
     const res = await fetchImpl(baseUrl, {
-      method: "GET",
+      method: "Get",
     });
 
     return await HttpResult.fromResponse(
@@ -56,7 +56,7 @@ export class D1BackedModel {
   }
   static async SAVE(
     model: DeepPartial<D1BackedModel>,
-    __datasource: "default" |"none" = "none",
+    __datasource: "default" = "default",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<D1BackedModel>> {
     const baseUrl = new URL(
@@ -68,7 +68,7 @@ export class D1BackedModel {
     baseUrl.searchParams.append("__datasource", String(__datasource));
 
     const res = await fetchImpl(baseUrl, {
-      method: "POST",
+      method: "Post",
       headers: { "Content-Type": "application/json" },
       body: requestBody(MediaType.Json, payload),
     });
@@ -94,7 +94,7 @@ export class PureKVModel {
 
   static async GET(
     id: string,
-    __datasource: "default" |"none" = "none",
+    __datasource: "default" = "default",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<PureKVModel>> {
     const baseUrl = new URL(
@@ -105,7 +105,7 @@ export class PureKVModel {
     baseUrl.searchParams.append("__datasource", String(__datasource));
 
     const res = await fetchImpl(baseUrl, {
-      method: "GET",
+      method: "Get",
     });
 
     return await HttpResult.fromResponse(
@@ -117,7 +117,7 @@ export class PureKVModel {
   }
   static async SAVE(
     model: DeepPartial<PureKVModel>,
-    __datasource: "default" |"none" = "none",
+    __datasource: "default" = "default",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<PureKVModel>> {
     const baseUrl = new URL(
@@ -129,7 +129,7 @@ export class PureKVModel {
     baseUrl.searchParams.append("__datasource", String(__datasource));
 
     const res = await fetchImpl(baseUrl, {
-      method: "POST",
+      method: "Post",
       headers: { "Content-Type": "application/json" },
       body: requestBody(MediaType.Json, payload),
     });

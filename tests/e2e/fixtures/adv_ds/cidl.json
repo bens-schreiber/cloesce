@@ -1,0 +1,232 @@
+{
+  "hash": 7972458822698731726,
+  "project_name": "runner",
+  "wrangler_env": {
+    "name": "Env",
+    "source_path": "./seed__adv_ds.cloesce.ts",
+    "d1_binding": "db",
+    "kv_bindings": [],
+    "r2_bindings": [],
+    "vars": {}
+  },
+  "models": {
+    "Hamburger": {
+      "hash": 17642057269789362886,
+      "name": "Hamburger",
+      "primary_key": {
+        "name": "id",
+        "cidl_type": "Integer"
+      },
+      "columns": [
+        {
+          "hash": 12056908550303509781,
+          "value": {
+            "name": "name",
+            "cidl_type": "Text"
+          },
+          "foreign_key_reference": null
+        }
+      ],
+      "navigation_properties": [
+        {
+          "hash": 6498092945051865391,
+          "var_name": "toppings",
+          "model_reference": "Topping",
+          "kind": "ManyToMany"
+        }
+      ],
+      "key_params": [],
+      "kv_objects": [],
+      "r2_objects": [],
+      "methods": {
+        "LIST": {
+          "name": "LIST",
+          "is_static": true,
+          "data_source": null,
+          "http_verb": "Get",
+          "return_media": "Json",
+          "return_type": {
+            "HttpResult": {
+              "Array": {
+                "Object": "Hamburger"
+              }
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "__datasource",
+              "cidl_type": {
+                "DataSource": "Hamburger"
+              }
+            }
+          ]
+        },
+        "SAVE": {
+          "name": "SAVE",
+          "is_static": true,
+          "data_source": null,
+          "http_verb": "Post",
+          "return_media": "Json",
+          "return_type": {
+            "HttpResult": {
+              "Object": "Hamburger"
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "model",
+              "cidl_type": {
+                "Partial": "Hamburger"
+              }
+            },
+            {
+              "name": "__datasource",
+              "cidl_type": {
+                "DataSource": "Hamburger"
+              }
+            }
+          ]
+        },
+        "noLettuceToppings": {
+          "name": "noLettuceToppings",
+          "is_static": false,
+          "data_source": "Hamburger:noLettuceToppings",
+          "http_verb": "Get",
+          "return_media": "Json",
+          "return_type": {
+            "Array": {
+              "Object": "Topping"
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": []
+        },
+        "onlyBacon": {
+          "name": "onlyBacon",
+          "is_static": false,
+          "data_source": "Hamburger:onlyBacon",
+          "http_verb": "Get",
+          "return_media": "Json",
+          "return_type": {
+            "Array": {
+              "Object": "Topping"
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": []
+        }
+      },
+      "data_sources": {
+        "Hamburger:noLettuceToppings": {
+          "name": "Hamburger:noLettuceToppings",
+          "tree": {
+            "toppings": {}
+          },
+          "is_private": true
+        },
+        "Hamburger:onlyBacon": {
+          "name": "Hamburger:onlyBacon",
+          "tree": {
+            "toppings": {}
+          },
+          "is_private": true
+        },
+        "default": {
+          "name": "default",
+          "tree": {
+            "toppings": {}
+          },
+          "is_private": false
+        },
+        "orderedBurgersWithLettuce": {
+          "name": "orderedBurgersWithLettuce",
+          "tree": {
+            "toppings": {}
+          },
+          "is_private": false
+        }
+      },
+      "cruds": [
+        "LIST",
+        "SAVE"
+      ],
+      "source_path": "./seed__adv_ds.cloesce.ts"
+    },
+    "Topping": {
+      "hash": 2395830274345848062,
+      "name": "Topping",
+      "primary_key": {
+        "name": "id",
+        "cidl_type": "Integer"
+      },
+      "columns": [
+        {
+          "hash": 12056908550303509781,
+          "value": {
+            "name": "name",
+            "cidl_type": "Text"
+          },
+          "foreign_key_reference": null
+        }
+      ],
+      "navigation_properties": [
+        {
+          "hash": 8945555950776796007,
+          "var_name": "hamburgers",
+          "model_reference": "Hamburger",
+          "kind": "ManyToMany"
+        }
+      ],
+      "key_params": [],
+      "kv_objects": [],
+      "r2_objects": [],
+      "methods": {
+        "SAVE": {
+          "name": "SAVE",
+          "is_static": true,
+          "data_source": null,
+          "http_verb": "Post",
+          "return_media": "Json",
+          "return_type": {
+            "HttpResult": {
+              "Object": "Topping"
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "model",
+              "cidl_type": {
+                "Partial": "Topping"
+              }
+            },
+            {
+              "name": "__datasource",
+              "cidl_type": {
+                "DataSource": "Topping"
+              }
+            }
+          ]
+        }
+      },
+      "data_sources": {
+        "default": {
+          "name": "default",
+          "tree": {
+            "hamburgers": {}
+          },
+          "is_private": false
+        }
+      },
+      "cruds": [
+        "SAVE"
+      ],
+      "source_path": "./seed__adv_ds.cloesce.ts"
+    }
+  },
+  "services": {},
+  "poos": {},
+  "main_source": null
+}

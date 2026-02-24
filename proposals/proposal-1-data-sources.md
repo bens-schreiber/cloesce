@@ -189,6 +189,7 @@ For example, given this Model:
 @Model()
 class Dog {
     // ...
+    user: User;
     toys: Toy[];
 }
 
@@ -198,6 +199,8 @@ class User {
     dog: Dog;
 
     posts: Post[];
+
+    user: User | null;
 
     @R2("{id}", bucket)
     object: R2ObjectBody | undefined;
@@ -217,6 +220,9 @@ const default: DataSource<User> = {
             }
         },
         posts: {
+            // No further relationships are included
+        },
+        user: {
             // No further relationships are included
         },
         object: {},

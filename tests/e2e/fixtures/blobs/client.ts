@@ -11,7 +11,7 @@ export class BlobService {
     payload["blob"] = blob;
 
     const res = await fetchImpl(baseUrl, {
-      method: "POST",
+      method: "Post",
       headers: { "Content-Type": "application/json" },
       body: requestBody(MediaType.Json, payload),
     });
@@ -32,7 +32,7 @@ export class BlobHaver {
 
   static async GET(
     id: number,
-    __datasource: "none" = "none",
+    __datasource: "default" = "default",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<BlobHaver>> {
     const baseUrl = new URL(
@@ -43,7 +43,7 @@ export class BlobHaver {
     baseUrl.searchParams.append("__datasource", String(__datasource));
 
     const res = await fetchImpl(baseUrl, {
-      method: "GET",
+      method: "Get",
     });
 
     return await HttpResult.fromResponse(
@@ -54,7 +54,7 @@ export class BlobHaver {
     );
   }
   static async LIST(
-    __datasource: "none" = "none",
+    __datasource: "default" = "default",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<BlobHaver[]>> {
     const baseUrl = new URL(
@@ -64,7 +64,7 @@ export class BlobHaver {
     baseUrl.searchParams.append("__datasource", String(__datasource));
 
     const res = await fetchImpl(baseUrl, {
-      method: "GET",
+      method: "Get",
     });
 
     return await HttpResult.fromResponse(
@@ -76,7 +76,7 @@ export class BlobHaver {
   }
   static async SAVE(
     model: DeepPartial<BlobHaver>,
-    __datasource: "none" = "none",
+    __datasource: "default" = "default",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<BlobHaver>> {
     const baseUrl = new URL(
@@ -88,7 +88,7 @@ export class BlobHaver {
     baseUrl.searchParams.append("__datasource", String(__datasource));
 
     const res = await fetchImpl(baseUrl, {
-      method: "POST",
+      method: "Post",
       headers: { "Content-Type": "application/json" },
       body: requestBody(MediaType.Json, payload),
     });
@@ -101,7 +101,6 @@ export class BlobHaver {
     );
   }
   async getBlob1(
-    __datasource: "none" = "none",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Uint8Array>> {
     const id = [
@@ -111,10 +110,9 @@ export class BlobHaver {
       `http://localhost:5002/api/BlobHaver/${id}/getBlob1`
     );
 
-    baseUrl.searchParams.append("__datasource", String(__datasource));
 
     const res = await fetchImpl(baseUrl, {
-      method: "GET",
+      method: "Get",
     });
 
     return await HttpResult.fromResponse(
@@ -136,7 +134,7 @@ export class BlobHaver {
     payload["stream"] = stream;
 
     const res = await fetchImpl(baseUrl, {
-      method: "POST",
+      method: "Post",
       headers: { "Content-Type": "application/octet-stream" },
       body: requestBody(MediaType.Octet, payload),
     });
@@ -149,7 +147,6 @@ export class BlobHaver {
     );
   }
   async yieldStream(
-    __datasource: "none" = "none",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Response>> {
     const id = [
@@ -159,10 +156,9 @@ export class BlobHaver {
       `http://localhost:5002/api/BlobHaver/${id}/yieldStream`
     );
 
-    baseUrl.searchParams.append("__datasource", String(__datasource));
 
     const res = await fetchImpl(baseUrl, {
-      method: "GET",
+      method: "Get",
     });
 
     return await HttpResult.fromResponse(

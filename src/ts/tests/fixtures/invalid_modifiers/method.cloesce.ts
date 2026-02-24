@@ -5,6 +5,6 @@
 export class Foo {
   id: number;
 
-  @POST
+  @Post()
   private method() {}
 }

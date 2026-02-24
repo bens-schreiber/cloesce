@@ -26,21 +26,21 @@
         "testMethod": {
           "name": "testMethod",
           "is_static": false,
-          "http_verb": "POST",
+          "data_source": null,
+          "http_verb": "Post",
           "return_media": "Json",
           "return_type": "Void",
           "parameters_media": "Json",
-          "parameters": [
-            {
-              "name": "__datasource",
-              "cidl_type": {
-                "DataSource": "B"
-              }
-            }
-          ]
+          "parameters": []
         }
       },
-      "data_sources": {},
+      "data_sources": {
+        "default": {
+          "name": "default",
+          "tree": {},
+          "is_private": false
+        }
+      },
       "cruds": [],
       "source_path": "./seed__foreign_keys.cloesce.ts"
     },
@@ -64,7 +64,15 @@
       "kv_objects": [],
       "r2_objects": [],
       "methods": {},
-      "data_sources": {},
+      "data_sources": {
+        "default": {
+          "name": "default",
+          "tree": {
+            "students": {}
+          },
+          "is_private": false
+        }
+      },
       "cruds": [],
       "source_path": "./seed__foreign_keys.cloesce.ts"
     },
@@ -95,7 +103,8 @@
         "post": {
           "name": "post",
           "is_static": true,
-          "http_verb": "POST",
+          "data_source": null,
+          "http_verb": "Post",
           "return_media": "Json",
           "return_type": {
             "Object": "Person"
@@ -116,28 +125,11 @@
             }
           ]
         },
-        "refresh": {
-          "name": "refresh",
-          "is_static": false,
-          "http_verb": "GET",
-          "return_media": "Json",
-          "return_type": {
-            "Object": "Person"
-          },
-          "parameters_media": "Json",
-          "parameters": [
-            {
-              "name": "__datasource",
-              "cidl_type": {
-                "DataSource": "Person"
-              }
-            }
-          ]
-        },
         "returnFatalIfParamsNotInstantiated": {
           "name": "returnFatalIfParamsNotInstantiated",
           "is_static": true,
-          "http_verb": "POST",
+          "data_source": null,
+          "http_verb": "Post",
           "return_media": "Json",
           "return_type": {
             "HttpResult": "Void"
@@ -151,14 +143,39 @@
               }
             }
           ]
+        },
+        "withoutDogs": {
+          "name": "withoutDogs",
+          "is_static": false,
+          "data_source": "Person:withoutDogs",
+          "http_verb": "Get",
+          "return_media": "Json",
+          "return_type": {
+            "Object": "Person"
+          },
+          "parameters_media": "Json",
+          "parameters": []
         }
       },
       "data_sources": {
+        "Person:withoutDogs": {
+          "name": "Person:withoutDogs",
+          "tree": {},
+          "is_private": true
+        },
+        "default": {
+          "name": "default",
+          "tree": {
+            "dogs": {}
+          },
+          "is_private": false
+        },
         "withDogs": {
           "name": "withDogs",
           "tree": {
             "dogs": {}
-          }
+          },
+          "is_private": false
         }
       },
       "cruds": [],
@@ -184,10 +201,23 @@
       "kv_objects": [],
       "r2_objects": [],
       "methods": {
+        "none": {
+          "name": "none",
+          "is_static": false,
+          "data_source": "Student:none",
+          "http_verb": "Get",
+          "return_media": "Json",
+          "return_type": {
+            "Object": "Student"
+          },
+          "parameters_media": "Json",
+          "parameters": []
+        },
         "post": {
           "name": "post",
           "is_static": true,
-          "http_verb": "POST",
+          "data_source": null,
+          "http_verb": "Post",
           "return_media": "Json",
           "return_type": {
             "Object": "Student"
@@ -207,34 +237,29 @@
               }
             }
           ]
-        },
-        "refresh": {
-          "name": "refresh",
-          "is_static": false,
-          "http_verb": "GET",
-          "return_media": "Json",
-          "return_type": {
-            "Object": "Student"
-          },
-          "parameters_media": "Json",
-          "parameters": [
-            {
-              "name": "__datasource",
-              "cidl_type": {
-                "DataSource": "Student"
-              }
-            }
-          ]
         }
       },
       "data_sources": {
+        "Student:none": {
+          "name": "Student:none",
+          "tree": {},
+          "is_private": true
+        },
+        "default": {
+          "name": "default",
+          "tree": {
+            "courses": {}
+          },
+          "is_private": false
+        },
         "withCoursesStudents": {
           "name": "withCoursesStudents",
           "tree": {
             "courses": {
               "students": {}
             }
-          }
+          },
+          "is_private": false
         },
         "withCoursesStudentsCourses": {
           "name": "withCoursesStudentsCourses",
@@ -244,7 +269,8 @@
                 "courses": {}
               }
             }
-          }
+          },
+          "is_private": false
         }
       },
       "cruds": [],
@@ -286,7 +312,8 @@
         "post": {
           "name": "post",
           "is_static": true,
-          "http_verb": "POST",
+          "data_source": null,
+          "http_verb": "Post",
           "return_media": "Json",
           "return_type": {
             "Object": "A"
@@ -307,28 +334,11 @@
             }
           ]
         },
-        "refresh": {
-          "name": "refresh",
-          "is_static": false,
-          "http_verb": "GET",
-          "return_media": "Json",
-          "return_type": {
-            "Object": "A"
-          },
-          "parameters_media": "Json",
-          "parameters": [
-            {
-              "name": "__datasource",
-              "cidl_type": {
-                "DataSource": "A"
-              }
-            }
-          ]
-        },
         "returnFatalIfParamsNotInstantiated": {
           "name": "returnFatalIfParamsNotInstantiated",
           "is_static": true,
-          "http_verb": "POST",
+          "data_source": null,
+          "http_verb": "Post",
           "return_media": "Json",
           "return_type": {
             "HttpResult": "Void"
@@ -342,18 +352,44 @@
               }
             }
           ]
+        },
+        "withoutB": {
+          "name": "withoutB",
+          "is_static": false,
+          "data_source": "A:withoutB",
+          "http_verb": "Get",
+          "return_media": "Json",
+          "return_type": {
+            "Object": "A"
+          },
+          "parameters_media": "Json",
+          "parameters": []
         }
       },
       "data_sources": {
+        "A:withoutB": {
+          "name": "A:withoutB",
+          "tree": {},
+          "is_private": true
+        },
+        "default": {
+          "name": "default",
+          "tree": {
+            "b": {}
+          },
+          "is_private": false
+        },
         "withB": {
           "name": "withB",
           "tree": {
             "b": {}
-          }
+          },
+          "is_private": false
         },
         "withoutB": {
           "name": "withoutB",
-          "tree": {}
+          "tree": {},
+          "is_private": false
         }
       },
       "cruds": [],
@@ -384,21 +420,21 @@
         "testMethod": {
           "name": "testMethod",
           "is_static": false,
-          "http_verb": "POST",
+          "data_source": null,
+          "http_verb": "Post",
           "return_media": "Json",
           "return_type": "Void",
           "parameters_media": "Json",
-          "parameters": [
-            {
-              "name": "__datasource",
-              "cidl_type": {
-                "DataSource": "Dog"
-              }
-            }
-          ]
+          "parameters": []
         }
       },
-      "data_sources": {},
+      "data_sources": {
+        "default": {
+          "name": "default",
+          "tree": {},
+          "is_private": false
+        }
+      },
       "cruds": [],
       "source_path": "./seed__foreign_keys.cloesce.ts"
     }
