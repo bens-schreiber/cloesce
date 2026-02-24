@@ -333,15 +333,6 @@
                 }
             },
             "data_sources": {
-                "withCoursesStudents": {
-                    "name": "withCoursesStudents",
-                    "tree": {
-                        "courses": {
-                            "students": {}
-                        }
-                    },
-                    "is_private": false
-                },
                 "withCoursesStudentsCourses": {
                     "name": "withCoursesStudentsCourses",
                     "tree": {

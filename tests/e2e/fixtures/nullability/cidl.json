@@ -45,7 +45,8 @@
         "arrayTypes": {
           "name": "arrayTypes",
           "is_static": false,
-          "http_verb": "POST",
+          "data_source": null,
+          "http_verb": "Post",
           "return_media": "Json",
           "return_type": {
             "Nullable": {
@@ -71,19 +72,14 @@
                   }
                 }
               }
-            },
-            {
-              "name": "__datasource",
-              "cidl_type": {
-                "DataSource": "NullabilityChecks"
-              }
             }
           ]
         },
         "httpResultTypes": {
           "name": "httpResultTypes",
           "is_static": false,
-          "http_verb": "POST",
+          "data_source": null,
+          "http_verb": "Post",
           "return_media": "Json",
           "return_type": {
             "Nullable": {
@@ -97,19 +93,13 @@
             }
           },
           "parameters_media": "Json",
-          "parameters": [
-            {
-              "name": "__datasource",
-              "cidl_type": {
-                "DataSource": "NullabilityChecks"
-              }
-            }
-          ]
+          "parameters": []
         },
         "injectableTypes": {
           "name": "injectableTypes",
           "is_static": false,
-          "http_verb": "POST",
+          "data_source": null,
+          "http_verb": "Post",
           "return_media": "Json",
           "return_type": "Void",
           "parameters_media": "Json",
@@ -121,19 +111,14 @@
                   "Inject": "Env"
                 }
               }
-            },
-            {
-              "name": "__datasource",
-              "cidl_type": {
-                "DataSource": "NullabilityChecks"
-              }
             }
           ]
         },
         "modelTypes": {
           "name": "modelTypes",
           "is_static": false,
-          "http_verb": "POST",
+          "data_source": null,
+          "http_verb": "Post",
           "return_media": "Json",
           "return_type": {
             "Nullable": {
@@ -149,19 +134,14 @@
                   "Object": "NullabilityChecks"
                 }
               }
-            },
-            {
-              "name": "__datasource",
-              "cidl_type": {
-                "DataSource": "NullabilityChecks"
-              }
             }
           ]
         },
         "primitiveTypes": {
           "name": "primitiveTypes",
           "is_static": false,
-          "http_verb": "POST",
+          "data_source": null,
+          "http_verb": "Post",
           "return_media": "Json",
           "return_type": {
             "Nullable": "Boolean"
@@ -179,17 +159,17 @@
               "cidl_type": {
                 "Nullable": "Text"
               }
-            },
-            {
-              "name": "__datasource",
-              "cidl_type": {
-                "DataSource": "NullabilityChecks"
-              }
             }
           ]
         }
       },
-      "data_sources": {},
+      "data_sources": {
+        "default": {
+          "name": "default",
+          "tree": {},
+          "is_private": false
+        }
+      },
       "cruds": [],
       "source_path": "./seed__nullability.cloesce.ts"
     }

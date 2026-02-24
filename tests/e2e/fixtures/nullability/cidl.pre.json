@@ -40,7 +40,7 @@
             "methods": {
                 "primitiveTypes": {
                     "name": "primitiveTypes",
-                    "http_verb": "POST",
+                    "http_verb": "Post",
                     "is_static": false,
                     "return_media": "Json",
                     "return_type": {
@@ -60,11 +60,12 @@
                                 "Nullable": "Text"
                             }
                         }
-                    ]
+                    ],
+                    "data_source": null
                 },
                 "modelTypes": {
                     "name": "modelTypes",
-                    "http_verb": "POST",
+                    "http_verb": "Post",
                     "is_static": false,
                     "return_media": "Json",
                     "return_type": {
@@ -82,11 +83,12 @@
                                 }
                             }
                         }
-                    ]
+                    ],
+                    "data_source": null
                 },
                 "injectableTypes": {
                     "name": "injectableTypes",
-                    "http_verb": "POST",
+                    "http_verb": "Post",
                     "is_static": false,
                     "return_media": "Json",
                     "return_type": "Void",
@@ -100,11 +102,12 @@
                                 }
                             }
                         }
-                    ]
+                    ],
+                    "data_source": null
                 },
                 "arrayTypes": {
                     "name": "arrayTypes",
-                    "http_verb": "POST",
+                    "http_verb": "Post",
                     "is_static": false,
                     "return_media": "Json",
                     "return_type": {
@@ -132,11 +135,12 @@
                                 }
                             }
                         }
-                    ]
+                    ],
+                    "data_source": null
                 },
                 "httpResultTypes": {
                     "name": "httpResultTypes",
-                    "http_verb": "POST",
+                    "http_verb": "Post",
                     "is_static": false,
                     "return_media": "Json",
                     "return_type": {
@@ -151,7 +155,8 @@
                         }
                     },
                     "parameters_media": "Json",
-                    "parameters": []
+                    "parameters": [],
+                    "data_source": null
                 }
             },
             "data_sources": {},
