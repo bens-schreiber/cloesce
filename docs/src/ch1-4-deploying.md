@@ -1,14 +1,14 @@
 # Deploying
 
-> *Alpha Note*: Deployment is not yet enhanced by Cloesce and has room for improvement.
+> [!IMPORTANT]
+> Workers URLs must have some path component (e.g., `https://my-app.workers.dev/api` has `/api`).
+
 
 With your application built and your database migrated, you're ready to deploy your Cloesce application to Cloudflare Workers. Deployment is done through the Wrangler CLI.
 
 1. **Modify `cloesce.config.json`**
    
    Ensure your `cloesce.config.json` file is correctly configured for production, including the production Worker URL.
-
-   > *Note*: Workers URLs must have some path component (e.g., `https://my-app.workers.dev/api` has `/api`).
 
 2. **Configure Wrangler bindings**
    

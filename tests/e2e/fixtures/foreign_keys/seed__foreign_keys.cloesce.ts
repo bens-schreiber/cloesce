@@ -1,14 +1,14 @@
 import {
   Model,
-  POST,
+  Post,
   WranglerEnv,
   ForeignKey,
-  GET,
+  Get,
   Orm,
   Inject,
   HttpResult,
   Integer,
-  IncludeTree,
+  DataSource,
 } from "cloesce/backend";
 import { D1Database } from "@cloudflare/workers-types";
 
@@ -22,8 +22,8 @@ export class Env {
 export class B {
   id: Integer;
 
-  @POST
-  testMethod() {}
+  @Post()
+  testMethod() { }
 }
 
 @Model()
@@ -33,30 +33,30 @@ export class A {
   bId: Integer;
   b: B | undefined;
 
-  static readonly withB: IncludeTree<A> = {
-    b: {},
+  static readonly withB: DataSource<A> = {
+    includeTree: {
+      b: {},
+    },
   };
 
-  static readonly withoutB: IncludeTree<A> = {};
+  static readonly withoutB: DataSource<A> = {
+    includeTree: {},
+  };
 
-  @POST
+  @Post()
   static async post(@Inject env: Env, a: A): Promise<A> {
     const orm = Orm.fromEnv(env);
     await orm.upsert(A, a, A.withB);
     return (await orm.get(A, {
       id: a.id,
-      includeTree: A.withB,
+      include: A.withB,
     }))!;
   }
 
-  @POST
+  @Post()
   static async returnFatalIfParamsNotInstantiated(
     a: A,
   ): Promise<HttpResult<void>> {
-    if (!a.refresh) {
-      return HttpResult.fail(500, "a.refresh was undefined");
-    }
-
     if (!a.b?.testMethod) {
       return HttpResult.fail(500, "a.b was undefined");
     }
@@ -64,8 +64,8 @@ export class A {
     return HttpResult.ok(200);
   }
 
-  @GET
-  refresh(): A {
+  @Get({ includeTree: {} })
+  async withoutB(): Promise<A> {
     return this;
   }
 }
@@ -79,24 +79,22 @@ export class Person {
 
   dogs: Dog[];
 
-  static readonly withDogs: IncludeTree<Person> = {
-    dogs: {},
+  static readonly withDogs: DataSource<Person> = {
+    includeTree: {
+      dogs: {},
+    },
   };
 
-  @POST
+  @Post()
   static async post(@Inject env: Env, person: Person): Promise<Person> {
     const orm = Orm.fromEnv(env);
     return (await orm.upsert(Person, person, Person.withDogs))!;
   }
 
-  @POST
+  @Post()
   static async returnFatalIfParamsNotInstantiated(
     person: Person,
   ): Promise<HttpResult<void>> {
-    if (person.refresh === undefined) {
-      return HttpResult.fail(500);
-    }
-
     if (person.dogs === undefined) {
       return HttpResult.fail(500);
     }
@@ -108,8 +106,8 @@ export class Person {
     return HttpResult.ok(200);
   }
 
-  @GET
-  refresh(): Person {
+  @Get({ includeTree: {} })
+  async withoutDogs(): Promise<Person> {
     return this;
   }
 }
@@ -121,8 +119,8 @@ export class Dog {
   @ForeignKey(Person)
   personId: Integer;
 
-  @POST
-  testMethod() {}
+  @Post()
+  testMethod() { }
 }
 //#endregion
 
@@ -132,22 +130,20 @@ export class Student {
   id: Integer;
   courses: Course[];
 
-  static readonly withCoursesStudents: IncludeTree<Student> = {
-    courses: { students: {} },
+  static readonly withCoursesStudentsCourses: DataSource<Student> = {
+    includeTree: {
+      courses: { students: { courses: {} } },
+    },
   };
 
-  static readonly withCoursesStudentsCourses: IncludeTree<Student> = {
-    courses: { students: { courses: {} } },
-  };
-
-  @POST
+  @Post()
   static async post(@Inject env: Env, student: Student): Promise<Student> {
     const orm = Orm.fromEnv(env);
-    return (await orm.upsert(Student, student, Student.withCoursesStudents))!;
+    return (await orm.upsert(Student, student, Student.withCoursesStudentsCourses))!;
   }
 
-  @GET
-  refresh(): Student {
+  @Get({ includeTree: {} })
+  async none(): Promise<Student> {
     return this;
   }
 }

@@ -1,8 +1,8 @@
 import { D1Database } from "@cloudflare/workers-types";
 import {
   Model,
-  POST,
-  GET,
+  Post,
+  Get,
   Inject,
   Orm,
   WranglerEnv,
@@ -22,13 +22,13 @@ export class Dog {
   name: string;
   age: Integer;
 
-  @POST
+  @Post()
   static async post(@Inject env: Env, dog: DeepPartial<Dog>): Promise<Dog> {
     const orm = Orm.fromEnv(env);
-    return (await orm.upsert(Dog, dog, null))!;
+    return (await orm.upsert(Dog, dog))!;
   }
 
-  @GET
+  @Get()
   getPartialSelf(): DeepPartial<Dog> {
     return {
       name: this.name,

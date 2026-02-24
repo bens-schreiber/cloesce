@@ -1,9 +1,9 @@
 import {
   Model,
   WranglerEnv,
-  GET,
+  Get,
   Service,
-  POST,
+  Post,
   Integer,
 } from "cloesce/backend";
 import { D1Database } from "@cloudflare/workers-types";
@@ -15,7 +15,7 @@ export class Env {
 
 @Service
 export class BlobService {
-  @POST
+  @Post()
   incrementBlob(blob: Uint8Array): Uint8Array {
     if (!(blob instanceof Uint8Array)) {
       throw new Error(
@@ -36,12 +36,12 @@ export class BlobHaver {
   blob1: Uint8Array;
   blob2: Uint8Array;
 
-  @GET
+  @Get()
   getBlob1(): Uint8Array {
     return this.blob1;
   }
 
-  @POST
+  @Post()
   static async inputStream(stream: ReadableStream) {
     if (!(stream instanceof ReadableStream)) {
       throw new Error("Did not receive a stream");
@@ -64,7 +64,7 @@ export class BlobHaver {
     }
   }
 
-  @GET
+  @Get()
   yieldStream(): ReadableStream {
     const blob1 = this.blob1;
     return new ReadableStream({

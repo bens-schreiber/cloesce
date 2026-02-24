@@ -57,6 +57,7 @@ abstract class ApiMethodBuilder {
     return_type: CidlType,
     return_media: MediaType = MediaType.Json,
     parameters_media: MediaType = MediaType.Json,
+    data_source: string | null = null,
   ): this {
     this.methods[name] = {
       name,
@@ -66,6 +67,7 @@ abstract class ApiMethodBuilder {
       return_type,
       return_media,
       parameters_media,
+      data_source,
     };
     return this;
   }
@@ -193,6 +195,7 @@ export class ModelBuilder {
     is_static: boolean,
     parameters: NamedTypedValue[],
     return_type: CidlType,
+    data_source: string | null = null,
   ): this {
     this.methods[name] = {
       name,
@@ -202,14 +205,16 @@ export class ModelBuilder {
       return_type,
       return_media: MediaType.Json,
       parameters_media: MediaType.Json,
+      data_source,
     };
     return this;
   }
 
-  dataSource(name: string, tree: any): this {
+  dataSource(name: string, tree: any, is_private: boolean = false): this {
     this.data_sources[name] = {
       name,
       tree,
+      is_private,
     };
     return this;
   }
@@ -260,6 +265,7 @@ export class ServiceBuilder extends ApiMethodBuilder {
       attributes: this.attributes,
       methods: this.methods,
       source_path: "",
+      initializer: null,
     };
   }
 }

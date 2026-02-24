@@ -101,13 +101,26 @@ impl Fixture {
         Self { fixture_id, path }
     }
 
+    fn get_project_root(&self) -> PathBuf {
+        self.path
+            .parent()
+            .and_then(|p| p.parent()) // fixtures
+            .and_then(|p| p.parent()) // e2e
+            .and_then(|p| p.parent()) // tests
+            .and_then(|p| p.parent()) // project root
+            .expect("Failed to calculate project root")
+            .to_path_buf()
+    }
+
     pub fn extract_cidl(&self) -> TestResult {
         let out = OutputFile::new(&self.path, "cidl.pre.json");
+        let project_root = self.get_project_root();
+        let e2e_dir = project_root.join("tests/e2e");
 
         tracing::info!("Extracting CIDL for fixture {}", self.fixture_id);
         let res = self.run_command(
             Command::new("node")
-                .current_dir("../e2e")
+                .current_dir(&e2e_dir)
                 .arg("../../src/ts/dist/cli.js")
                 .arg("extract")
                 .arg("--in")
@@ -128,6 +141,8 @@ impl Fixture {
     /// On all success, returns the cidl, otherwise returns the failed file.
     pub fn generate_all(&self, pre_cidl: &Path, workers_domain: &str) -> TestResult {
         let pre_cidl_canon = pre_cidl.canonicalize().unwrap();
+        let project_root = self.get_project_root();
+        let generator_dir = project_root.join("src/generator");
 
         let cidl_out = OutputFile::new(&self.path, "cidl.json");
         let wrangler_out = OutputFile::new(&self.path, "wrangler.toml");
@@ -144,7 +159,7 @@ impl Fixture {
                 .arg(workers_out.path())
                 .arg(client_out.path())
                 .arg(workers_domain)
-                .current_dir("../../src/generator"),
+                .current_dir(&generator_dir),
         );
 
         let mut has_diff = false;
@@ -185,6 +200,8 @@ impl Fixture {
         );
 
         let cidl_path = cidl.canonicalize().unwrap();
+        let project_root = self.get_project_root();
+        let generator_dir = project_root.join("src/generator");
 
         tracing::info!("Migrating CIDL for fixture {}", self.fixture_id);
         let res = self.run_command(
@@ -193,7 +210,7 @@ impl Fixture {
                 .arg(&cidl_path)
                 .arg(migrated_cidl.path())
                 .arg(migrated_sql.path())
-                .current_dir("../../src/generator"),
+                .current_dir(&generator_dir),
         );
 
         let cidl_res = match &res {

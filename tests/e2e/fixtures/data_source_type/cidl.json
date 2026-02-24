@@ -26,7 +26,8 @@
         "bar": {
           "name": "bar",
           "is_static": false,
-          "http_verb": "POST",
+          "data_source": "baz",
+          "http_verb": "Post",
           "return_media": "Json",
           "return_type": "Void",
           "parameters_media": "Json",
@@ -61,7 +62,13 @@
       "data_sources": {
         "baz": {
           "name": "baz",
-          "tree": {}
+          "tree": {},
+          "is_private": false
+        },
+        "default": {
+          "name": "default",
+          "tree": {},
+          "is_private": false
         }
       },
       "cruds": [],
@@ -80,7 +87,13 @@
       "kv_objects": [],
       "r2_objects": [],
       "methods": {},
-      "data_sources": {},
+      "data_sources": {
+        "default": {
+          "name": "default",
+          "tree": {},
+          "is_private": false
+        }
+      },
       "cruds": [],
       "source_path": "./seed__ds.cloesce.ts"
     },
@@ -100,7 +113,8 @@
       "data_sources": {
         "default": {
           "name": "default",
-          "tree": {}
+          "tree": {},
+          "is_private": false
         }
       },
       "cruds": [],

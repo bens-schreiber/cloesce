@@ -37,11 +37,11 @@ export function isNullableType(ty: CidlType): boolean {
 
 /** @internal */
 export enum HttpVerb {
-  GET = "GET",
-  POST = "POST",
-  PUT = "PUT",
-  PATCH = "PATCH",
-  DELETE = "DELETE",
+  Get = "Get",
+  Post = "Post",
+  Put = "Put",
+  Patch = "Patch",
+  Delete = "Delete",
 }
 
 /** @internal */
@@ -76,6 +76,7 @@ export function defaultMediaType(): MediaType {
 export interface ApiMethod {
   name: string;
   is_static: boolean;
+  data_source: string | null;
   http_verb: HttpVerb;
 
   return_media: MediaType;
@@ -166,12 +167,10 @@ export interface CidlIncludeTree {
 }
 
 /** @internal */
-export const NO_DATA_SOURCE = "none";
-
-/** @internal */
 export interface DataSource {
   name: string;
   tree: CidlIncludeTree;
+  is_private: boolean;
 }
 
 /** @internal */

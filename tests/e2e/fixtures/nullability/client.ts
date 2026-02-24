@@ -9,7 +9,6 @@ export class NullabilityChecks {
   async arrayTypes(
     a: number[] | null,
     b: NullabilityChecks[] | null,
-    __datasource: "none" = "none",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<string[] | null>> {
     const id = [
@@ -22,10 +21,9 @@ export class NullabilityChecks {
 
     payload["a"] = a;
     payload["b"] = b;
-    baseUrl.searchParams.append("__datasource", String(__datasource));
 
     const res = await fetchImpl(baseUrl, {
-      method: "POST",
+      method: "Post",
       headers: { "Content-Type": "application/json" },
       body: requestBody(MediaType.Json, payload),
     });
@@ -38,7 +36,6 @@ export class NullabilityChecks {
     );
   }
   async httpResultTypes(
-    __datasource: "none" = "none",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<NullabilityChecks[] | null | null>> {
     const id = [
@@ -49,10 +46,9 @@ export class NullabilityChecks {
     );
     const payload: any = {};
 
-    baseUrl.searchParams.append("__datasource", String(__datasource));
 
     const res = await fetchImpl(baseUrl, {
-      method: "POST",
+      method: "Post",
       headers: { "Content-Type": "application/json" },
       body: requestBody(MediaType.Json, payload),
     });
@@ -65,7 +61,6 @@ export class NullabilityChecks {
     );
   }
   async injectableTypes(
-    __datasource: "none" = "none",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<void>> {
     const id = [
@@ -76,10 +71,9 @@ export class NullabilityChecks {
     );
     const payload: any = {};
 
-    baseUrl.searchParams.append("__datasource", String(__datasource));
 
     const res = await fetchImpl(baseUrl, {
-      method: "POST",
+      method: "Post",
       headers: { "Content-Type": "application/json" },
       body: requestBody(MediaType.Json, payload),
     });
@@ -93,7 +87,6 @@ export class NullabilityChecks {
   }
   async modelTypes(
     a: NullabilityChecks | null,
-    __datasource: "none" = "none",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<NullabilityChecks | null>> {
     const id = [
@@ -105,10 +98,9 @@ export class NullabilityChecks {
     const payload: any = {};
 
     payload["a"] = a;
-    baseUrl.searchParams.append("__datasource", String(__datasource));
 
     const res = await fetchImpl(baseUrl, {
-      method: "POST",
+      method: "Post",
       headers: { "Content-Type": "application/json" },
       body: requestBody(MediaType.Json, payload),
     });
@@ -123,7 +115,6 @@ export class NullabilityChecks {
   async primitiveTypes(
     a: number | null,
     b: string | null,
-    __datasource: "none" = "none",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<boolean | null>> {
     const id = [
@@ -136,10 +127,9 @@ export class NullabilityChecks {
 
     payload["a"] = a;
     payload["b"] = b;
-    baseUrl.searchParams.append("__datasource", String(__datasource));
 
     const res = await fetchImpl(baseUrl, {
-      method: "POST",
+      method: "Post",
       headers: { "Content-Type": "application/json" },
       body: requestBody(MediaType.Json, payload),
     });

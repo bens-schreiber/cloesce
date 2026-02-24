@@ -6,6 +6,10 @@ Building a Cloesce project generally consists of three steps:
 3. Building your frontend code
 
 ## Compiling
+    
+> [!NOTE]
+> `wrangler.jsonc` is not fully supported in alpha v0.1.0. Please use `wrangler.toml` for now.
+
 
 In your project directory, run the following command to compile your Cloesce Models:
 
@@ -27,8 +31,6 @@ After compilation, a `.generated` folder is created in your project root. This s
 - `workers.ts`: 
     
     The generated Cloudflare Worker code with all linked dependencies (including your custom `main` function if defined). This file is the entry point for your Cloudflare Worker and is referenced in the generated `wrangler.toml`.
-    
-> *Alpha Note*: `wrangler.jsonc` is not fully supported. Please use `wrangler.toml` for now.
 
 ## Generating Migrations
 

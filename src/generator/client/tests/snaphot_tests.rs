@@ -1,11 +1,11 @@
 use std::{collections::BTreeMap, path::PathBuf};
 
 use ast::{
-    ApiMethod, CidlType, CrudKind, HttpVerb, MediaType, NamedTypedValue, PlainOldObject, Service,
-    ServiceAttribute,
+    ApiMethod, CidlType, CrudKind, HttpVerb, IncludeTree, MediaType, NamedTypedValue,
+    PlainOldObject, Service, ServiceAttribute,
 };
 use client::ClientGenerator;
-use generator_test::{ModelBuilder, create_ast, create_spec};
+use generator_test::{IncludeTreeBuilder, ModelBuilder, create_ast, create_spec};
 use semantic::SemanticAnalysis;
 use workers::WorkersGenerator;
 
@@ -101,33 +101,36 @@ fn test_client_code_generation_snapshot() {
             )
             .method(
                 "instanceMethod",
-                HttpVerb::POST,
+                HttpVerb::Post,
                 false,
                 vec![NamedTypedValue {
                     name: "input".into(),
                     cidl_type: CidlType::Text,
                 }],
                 CidlType::Text,
+                None,
             )
             .method(
                 "staticMethod",
-                HttpVerb::GET,
+                HttpVerb::Get,
                 true,
                 vec![NamedTypedValue {
                     name: "input".into(),
                     cidl_type: CidlType::Integer,
                 }],
                 CidlType::Integer,
+                None,
             )
             .method(
                 "hasKvParamAndRes",
-                HttpVerb::POST,
+                HttpVerb::Post,
                 false,
                 vec![NamedTypedValue {
                     name: "input".into(),
                     cidl_type: CidlType::KvObject(Box::new(CidlType::Text)),
                 }],
                 CidlType::KvObject(Box::new(CidlType::Text)),
+                None,
             )
             .build(),
         // R2
@@ -138,13 +141,14 @@ fn test_client_code_generation_snapshot() {
             .r2_object("r2", "r2_namespace", "manyFileDatas", true)
             .method(
                 "hasR2ParamAndRes",
-                HttpVerb::POST,
+                HttpVerb::Post,
                 false,
                 vec![NamedTypedValue {
                     name: "input".into(),
                     cidl_type: CidlType::R2Object,
                 }],
                 CidlType::R2Object,
+                None,
             )
             .build(),
         // Hybrid (D1, KV, R2)
@@ -163,14 +167,26 @@ fn test_client_code_generation_snapshot() {
             .r2_object("{vehicleId}", "vehicle_photos", "photoData", false)
             .method(
                 "instanceMethod",
-                HttpVerb::POST,
+                HttpVerb::Post,
                 false,
                 vec![NamedTypedValue {
                     name: "input".into(),
                     cidl_type: CidlType::Text,
                 }],
                 CidlType::Text,
+                None,
             )
+            .data_source(
+                "withKV",
+                IncludeTreeBuilder::default().add_node("metadata").build(),
+                false,
+            )
+            .data_source(
+                "withR2",
+                IncludeTreeBuilder::default().add_node("photoData").build(),
+                false,
+            )
+            .data_source("private", IncludeTree::default(), true)
             .build(),
     ]);
 
@@ -195,7 +211,7 @@ fn test_client_code_generation_snapshot() {
             ApiMethod {
                 name: "staticMethod".into(),
                 is_static: true,
-                http_verb: HttpVerb::GET,
+                http_verb: HttpVerb::Get,
                 return_type: CidlType::http(CidlType::Text),
                 parameters_media: MediaType::default(),
                 parameters: vec![NamedTypedValue {
@@ -203,6 +219,7 @@ fn test_client_code_generation_snapshot() {
                     cidl_type: CidlType::Text,
                 }],
                 return_media: MediaType::default(),
+                data_source: None,
             },
         );
         methods.insert(
@@ -210,7 +227,7 @@ fn test_client_code_generation_snapshot() {
             ApiMethod {
                 name: "instanceMethod".into(),
                 is_static: false,
-                http_verb: HttpVerb::POST,
+                http_verb: HttpVerb::Post,
                 return_type: CidlType::http(CidlType::Integer),
                 parameters_media: MediaType::default(),
                 parameters: vec![NamedTypedValue {
@@ -218,6 +235,7 @@ fn test_client_code_generation_snapshot() {
                     cidl_type: CidlType::Integer,
                 }],
                 return_media: MediaType::default(),
+                data_source: None,
             },
         );
 
@@ -227,7 +245,7 @@ fn test_client_code_generation_snapshot() {
             ApiMethod {
                 name: "uploadData".into(),
                 is_static: false,
-                http_verb: HttpVerb::POST,
+                http_verb: HttpVerb::Post,
                 return_type: CidlType::http(CidlType::Boolean),
                 parameters_media: ast::MediaType::Octet,
                 parameters: vec![NamedTypedValue {
@@ -235,6 +253,7 @@ fn test_client_code_generation_snapshot() {
                     cidl_type: CidlType::Stream,
                 }],
                 return_media: ast::MediaType::default(),
+                data_source: None,
             },
         );
 
@@ -244,11 +263,12 @@ fn test_client_code_generation_snapshot() {
             ApiMethod {
                 name: "downloadData".into(),
                 is_static: false,
-                http_verb: HttpVerb::GET,
+                http_verb: HttpVerb::Get,
                 return_type: CidlType::Stream,
                 parameters_media: MediaType::default(),
                 parameters: vec![],
                 return_media: ast::MediaType::Octet,
+                data_source: None,
             },
         );
 
@@ -308,6 +328,7 @@ fn test_client_code_generation_snapshot() {
 
     let spec = create_spec(&ast);
     SemanticAnalysis::analyze(&mut ast, &spec).expect("Semantic analysis to pass");
+    WorkersGenerator::generate_default_data_sources(&mut ast);
     WorkersGenerator::finalize_api_methods(&mut ast);
 
     let client_code = ClientGenerator::generate(&ast, "http://example.com/api".to_string());

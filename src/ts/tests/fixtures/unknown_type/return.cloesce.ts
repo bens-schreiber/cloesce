@@ -5,6 +5,6 @@
 export class Foo {
   id: number;
 
-  @POST
+  @Post()
   method(valid: number): Bar<number> {} // invalid return
 }

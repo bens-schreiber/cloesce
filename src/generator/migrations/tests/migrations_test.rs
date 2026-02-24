@@ -154,6 +154,7 @@ async fn migrate_models_one_to_one(db: SqlitePool) {
                     .data_source(
                         "default",
                         IncludeTreeBuilder::default().add_node("dog").build(),
+                        false,
                     )
                     .build(),
                 ModelBuilder::new("Dog").id_pk().build(),
@@ -233,6 +234,7 @@ async fn migrate_models_one_to_many(db: SqlitePool) {
                             .add_node("dogs")
                             .add_node("cats")
                             .build(),
+                        false,
                     )
                     .build(),
                 ModelBuilder::new("Boss")
@@ -249,6 +251,7 @@ async fn migrate_models_one_to_many(db: SqlitePool) {
                         IncludeTreeBuilder::default()
                             .add_with_children("persons", |b| b.add_node("dogs").add_node("cats"))
                             .build(),
+                        false,
                     )
                     .build(),
             ]);
@@ -320,6 +323,7 @@ async fn migrate_models_many_to_many(db: SqlitePool) {
                     .data_source(
                         "withCourses",
                         IncludeTreeBuilder::default().add_node("courses").build(),
+                        false,
                     )
                     .build(),
                 ModelBuilder::new("Course")
@@ -332,6 +336,7 @@ async fn migrate_models_many_to_many(db: SqlitePool) {
                     .data_source(
                         "withStudents",
                         IncludeTreeBuilder::default().add_node("students").build(),
+                        false,
                     )
                     .build(),
             ]);

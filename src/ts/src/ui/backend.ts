@@ -1,5 +1,7 @@
 import { CrudKind, MediaType } from "../ast.js";
 import { u8ToB64 } from "../common.js";
+import { DataSource } from "../router/orm.js";
+import { DataSourceContainer } from "../router/router.js";
 
 /**
  * cloesce/backend
@@ -7,6 +9,7 @@ import { u8ToB64 } from "../common.js";
 export { CloesceApp, DependencyContainer } from "../router/router.js";
 export type { MiddlewareFn } from "../router/router.js";
 export type { CrudKind } from "../ast.js";
+export type { DataSource } from "../router/orm.js";
 export { Orm } from "../router/orm.js";
 export { R2ObjectBody } from "@cloudflare/workers-types";
 
@@ -294,31 +297,81 @@ export const R2 =
  * Exposes a class method as an HTTP GET endpoint.
  * The method will appear in both backend and generated client APIs.
  */
-export const GET: MethodDecorator = () => {};
+export function Get(dataSource?: DataSource<unknown>): MethodDecorator {
+  return function (target, propertyKey) {
+    if (dataSource) {
+      DataSourceContainer.set(
+        target.constructor.name,
+        propertyKey.toString(),
+        dataSource,
+      );
+    }
+  };
+}
 
 /**
  * Exposes a class method as an HTTP POST endpoint.
  * The method will appear in both backend and generated client APIs.
  */
-export const POST: MethodDecorator = () => {};
+export function Post(dataSource?: DataSource<unknown>): MethodDecorator {
+  return function (target, propertyKey) {
+    if (dataSource) {
+      DataSourceContainer.set(
+        target.constructor.name,
+        propertyKey.toString(),
+        dataSource,
+      );
+    }
+  };
+}
 
 /**
  * Exposes a class method as an HTTP PUT endpoint.
  * The method will appear in both backend and generated client APIs.
  */
-export const PUT: MethodDecorator = () => {};
+export function Put(dataSource?: DataSource<unknown>): MethodDecorator {
+  return function (target, propertyKey) {
+    if (dataSource) {
+      DataSourceContainer.set(
+        target.constructor.name,
+        propertyKey.toString(),
+        dataSource,
+      );
+    }
+  };
+}
 
 /**
  * Exposes a class method as an HTTP PATCH endpoint.
  * The method will appear in both backend and generated client APIs.
  */
-export const PATCH: MethodDecorator = () => {};
+export function Patch(dataSource?: DataSource<unknown>): MethodDecorator {
+  return function (target, propertyKey) {
+    if (dataSource) {
+      DataSourceContainer.set(
+        target.constructor.name,
+        propertyKey.toString(),
+        dataSource,
+      );
+    }
+  };
+}
 
 /**
- * Exposes a class method as an HTTP DEL endpoint.
+ * Exposes a class method as an HTTP DELETE endpoint.
  * The method will appear in both backend and generated client APIs.
  */
-export const DELETE: MethodDecorator = () => {};
+export function Delete(dataSource?: DataSource<unknown>): MethodDecorator {
+  return function (target, propertyKey) {
+    if (dataSource) {
+      DataSourceContainer.set(
+        target.constructor.name,
+        propertyKey.toString(),
+        dataSource,
+      );
+    }
+  };
+}
 
 /**
  * Marks a property as a one-to-many navigation property.
@@ -372,7 +425,7 @@ export const ForeignKey =
  *
  * Example:
  * ```ts
- * ＠POST
+ * ＠Post
  * async neigh(＠Inject env: WranglerEnv) {
  *   return `i am ${this.name}`;
  * }
@@ -410,45 +463,13 @@ type Primitive = string | number | boolean | bigint | symbol | null | undefined;
  * }
  * ```
  */
-export type IncludeTree<T> = (T extends Primitive
+export type IncludeTree<T> = T extends Primitive
   ? never
   : {
       [K in keyof T]?: T[K] extends (infer U)[]
         ? IncludeTree<NonNullable<U>>
         : IncludeTree<NonNullable<T[K]>>;
-    }) & { __brand?: "IncludeTree" };
-
-/**
- * Represents the name of a `＠DataSource` available on a model type `T`,
- * or `"none"` when no data source (no joins) should be applied.
- *
- * All instantiated model methods implicitly have a Data Source param `__dataSource`.
- *
- * @template T The model type for which to define the data source.
- *
- * Example:
- * ```ts
- * ＠D1
- * export class Person {
- *   ＠PrimaryKey id: number;
- *
- *   ＠DataSource
- *   static readonly default: IncludeTree<Person> = { dogs: {} };
- *
- *   ＠POST
- *   foo(ds: DataSourceOf<Person>) {
- *    // Cloesce won't append an implicit data source param here since it's explicit
- *   }
- * }
- *
- * // on the API client:
- * async foo(ds: "default" | "none"): Promise<void> {...}
- * ```
- */
-export type DataSourceOf<T extends object> = (
-  | KeysOfType<T, IncludeTree<T>>
-  | "none"
-) & { __brand?: "DataSource" };
+    };
 
 /**
  * A branded `number` type indicating that the corresponding

@@ -4,6 +4,15 @@ D1 is a powerful relational database solution, but sometimes developers need to 
 
 ## Defining a Model with KV
 
+> [!IMPORTANT]
+> `unknown` is a special type to Cloesce, designating that no validation should be performed on the data, but it is still stored and retrieved as JSON.
+
+> [!IMPORTANT]
+> KV Models do not yet support cache control directives and expiration times. This feature is planned for a future release.
+
+> [!NOTE]
+> KV properties on a Model consider a missing key as a valid state, and will not return 404 errors. Instead, the value inside of the `KValue` will be set to `null`.
+
 [Cloudflare KV](https://developers.cloudflare.com/kv/) is a globally distributed key-value storage system. Along with a key and value, KV entries can also have associated metadata.
 
 Cloesce respects the design constraints of KV storage. For Models backed purely by KV or R2, the following are not supported:
@@ -42,13 +51,10 @@ The `allSettings` property demonstrates how Cloesce can fetch by prefix from KV.
 
 [Include Trees](./ch2-3-include-trees.md) can be used with KV Models as well to specify which properties to include when fetching data. By default, no properties are included unless specified in an Include Tree.
 
-> *Note*: KV properties on a Model consider a missing key as a valid state, and will not return 404 errors. Instead, the value inside of the `KValue` will be set to `null`.
-
-> *Note*: `unknown` is a special type to Cloesce, designating that no validation should be performed on the data, but it is still stored and retrieved as JSON.
-
-> *Alpha Note*: KV Models do not yet support cache control directives and expiration times. This feature is planned for a future release.
-
 ## Defining a Model with R2
+
+> [!NOTE]
+> R2 properties on a Model consider a missing object as a valid state, and will not return 404 errors. Instead, the property will be set to `undefined`.
 
 [Cloudflare R2](https://developers.cloudflare.com/r2/) is an object storage solution similar to [Amazon S3](https://aws.amazon.com/pm/serv-s3/). It allows you to store and retrieve large binary objects.
 
@@ -78,8 +84,6 @@ The `MediaFile` Model above is purely R2 backed. The `@KeyParam` decorator indic
 The `file` property is of type `R2Object`, which represents an object stored in R2. This type provides access to metadata about the object, such as its size and content type.
 
 [Include Trees](./ch2-3-include-trees.md) can also be used with R2 backed Models to specify which properties to include when fetching data.
-
-> *Note*: R2 properties on a Model consider a missing object as a valid state, and will not return 404 errors. Instead, the property will be set to `undefined`.
 
 ## Mixing Data Together
 

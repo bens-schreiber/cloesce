@@ -1,6 +1,6 @@
-import { IncludeTree, Orm, HttpResult } from "../ui/backend.js";
-import { NO_DATA_SOURCE } from "../ast.js";
-import { RuntimeContainer } from "./router.js";
+import { Orm, HttpResult } from "../ui/backend.js";
+import { DataSource } from "./orm.js";
+import { findDataSource, RuntimeContainer } from "./router.js";
 
 /**
  * @internal
@@ -38,14 +38,14 @@ export function proxyCrud(obj: any, ctor: any, env: any) {
 async function upsert(
   ctor: any,
   body: object,
-  dataSource: string,
+  dataSourceRef: string,
   env: any,
 ): Promise<HttpResult<unknown>> {
-  const includeTree = findIncludeTree(dataSource, ctor);
+  const dataSource = findDataSource(ctor, dataSourceRef);
   const orm = Orm.fromEnv(env);
 
   // Upsert
-  const result: any | null = await orm.upsert(ctor, body, includeTree);
+  const result: any | null = await orm.upsert(ctor, body, dataSource);
   return !result ? HttpResult.fail(404) : HttpResult.ok(200, result);
 }
 
@@ -60,7 +60,7 @@ async function _get(
   const getArgs: {
     id?: any;
     keyParams?: Record<string, any>;
-    includeTree?: IncludeTree<any> | null;
+    include?: DataSource<any>;
   } = {};
 
   let argIndex = 0;
@@ -79,7 +79,7 @@ async function _get(
   }
 
   // The last argument is always the data source.
-  getArgs.includeTree = findIncludeTree(args[argIndex], ctor);
+  getArgs.include = findDataSource(ctor, args[argIndex]);
 
   const orm = Orm.fromEnv(env);
   const result: any | null = await orm.get(ctor, getArgs);
@@ -88,20 +88,12 @@ async function _get(
 
 async function list(
   ctor: any,
-  dataSource: string,
+  dataSourceRef: string,
   env: any,
 ): Promise<HttpResult<unknown>> {
-  const includeTree = findIncludeTree(dataSource, ctor);
+  const dataSource = findDataSource(ctor, dataSourceRef);
   const orm = Orm.fromEnv(env);
 
-  const result: any[] = await orm.list(ctor, includeTree);
+  const result: any[] = await orm.list(ctor, dataSource);
   return HttpResult.ok(200, result);
-}
-
-function findIncludeTree(
-  dataSource: string,
-  ctor: new () => object,
-): IncludeTree<any> | null {
-  const normalizedDs = dataSource === NO_DATA_SOURCE ? null : dataSource;
-  return normalizedDs ? (ctor as any)[normalizedDs] : null;
 }

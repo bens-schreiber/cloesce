@@ -1,0 +1,132 @@
+{
+    "project_name": "runner",
+    "wrangler_env": {
+        "name": "Env",
+        "source_path": "./seed__adv_ds.cloesce.ts",
+        "d1_binding": "db",
+        "kv_bindings": [],
+        "r2_bindings": [],
+        "vars": {}
+    },
+    "models": {
+        "Topping": {
+            "name": "Topping",
+            "columns": [
+                {
+                    "foreign_key_reference": null,
+                    "value": {
+                        "name": "name",
+                        "cidl_type": "Text"
+                    }
+                }
+            ],
+            "primary_key": {
+                "name": "id",
+                "cidl_type": "Integer"
+            },
+            "navigation_properties": [
+                {
+                    "var_name": "hamburgers",
+                    "model_reference": "Hamburger",
+                    "kind": "ManyToMany"
+                }
+            ],
+            "key_params": [],
+            "kv_objects": [],
+            "r2_objects": [],
+            "methods": {},
+            "data_sources": {},
+            "cruds": [
+                "SAVE"
+            ],
+            "source_path": "./seed__adv_ds.cloesce.ts"
+        },
+        "Hamburger": {
+            "name": "Hamburger",
+            "columns": [
+                {
+                    "foreign_key_reference": null,
+                    "value": {
+                        "name": "name",
+                        "cidl_type": "Text"
+                    }
+                }
+            ],
+            "primary_key": {
+                "name": "id",
+                "cidl_type": "Integer"
+            },
+            "navigation_properties": [
+                {
+                    "var_name": "toppings",
+                    "model_reference": "Topping",
+                    "kind": "ManyToMany"
+                }
+            ],
+            "key_params": [],
+            "kv_objects": [],
+            "r2_objects": [],
+            "methods": {
+                "noLettuceToppings": {
+                    "name": "noLettuceToppings",
+                    "http_verb": "Get",
+                    "is_static": false,
+                    "return_media": "Json",
+                    "return_type": {
+                        "Array": {
+                            "Object": "Topping"
+                        }
+                    },
+                    "parameters_media": "Json",
+                    "parameters": [],
+                    "data_source": "Hamburger:noLettuceToppings"
+                },
+                "onlyBacon": {
+                    "name": "onlyBacon",
+                    "http_verb": "Get",
+                    "is_static": false,
+                    "return_media": "Json",
+                    "return_type": {
+                        "Array": {
+                            "Object": "Topping"
+                        }
+                    },
+                    "parameters_media": "Json",
+                    "parameters": [],
+                    "data_source": "Hamburger:onlyBacon"
+                }
+            },
+            "data_sources": {
+                "orderedBurgersWithLettuce": {
+                    "name": "orderedBurgersWithLettuce",
+                    "tree": {
+                        "toppings": {}
+                    },
+                    "is_private": false
+                },
+                "Hamburger:noLettuceToppings": {
+                    "name": "Hamburger:noLettuceToppings",
+                    "tree": {
+                        "toppings": {}
+                    },
+                    "is_private": true
+                },
+                "Hamburger:onlyBacon": {
+                    "name": "Hamburger:onlyBacon",
+                    "tree": {
+                        "toppings": {}
+                    },
+                    "is_private": true
+                }
+            },
+            "cruds": [
+                "LIST",
+                "SAVE"
+            ],
+            "source_path": "./seed__adv_ds.cloesce.ts"
+        }
+    },
+    "poos": {},
+    "services": {},
+    "main_source": null
+}

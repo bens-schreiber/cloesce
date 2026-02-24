@@ -32,7 +32,7 @@ export class BasicService {
 
 
     const res = await fetchImpl(baseUrl, {
-      method: "GET",
+      method: "Get",
     });
 
     return await HttpResult.fromResponse(
@@ -52,7 +52,7 @@ export class BasicService {
     payload["input"] = input;
 
     const res = await fetchImpl(baseUrl, {
-      method: "POST",
+      method: "Post",
       headers: { "Content-Type": "application/json" },
       body: requestBody(MediaType.Json, payload),
     });
@@ -73,7 +73,7 @@ export class BasicService {
     baseUrl.searchParams.append("input", String(input));
 
     const res = await fetchImpl(baseUrl, {
-      method: "GET",
+      method: "Get",
     });
 
     return await HttpResult.fromResponse(
@@ -93,7 +93,7 @@ export class BasicService {
     payload["data"] = data;
 
     const res = await fetchImpl(baseUrl, {
-      method: "POST",
+      method: "Post",
       headers: { "Content-Type": "application/octet-stream" },
       body: requestBody(MediaType.Octet, payload),
     });
@@ -180,7 +180,7 @@ export class ModelWithCruds {
 
   static async GET(
     id: number,
-    __datasource: "none" = "none",
+    __datasource: "default" = "default",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<ModelWithCruds>> {
     const baseUrl = new URL(
@@ -191,7 +191,7 @@ export class ModelWithCruds {
     baseUrl.searchParams.append("__datasource", String(__datasource));
 
     const res = await fetchImpl(baseUrl, {
-      method: "GET",
+      method: "Get",
     });
 
     return await HttpResult.fromResponse(
@@ -202,7 +202,7 @@ export class ModelWithCruds {
     );
   }
   static async LIST(
-    __datasource: "none" = "none",
+    __datasource: "default" = "default",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<ModelWithCruds[]>> {
     const baseUrl = new URL(
@@ -212,7 +212,7 @@ export class ModelWithCruds {
     baseUrl.searchParams.append("__datasource", String(__datasource));
 
     const res = await fetchImpl(baseUrl, {
-      method: "GET",
+      method: "Get",
     });
 
     return await HttpResult.fromResponse(
@@ -224,7 +224,7 @@ export class ModelWithCruds {
   }
   static async SAVE(
     model: DeepPartial<ModelWithCruds>,
-    __datasource: "none" = "none",
+    __datasource: "default" = "default",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<ModelWithCruds>> {
     const baseUrl = new URL(
@@ -236,7 +236,7 @@ export class ModelWithCruds {
     baseUrl.searchParams.append("__datasource", String(__datasource));
 
     const res = await fetchImpl(baseUrl, {
-      method: "POST",
+      method: "Post",
       headers: { "Content-Type": "application/json" },
       body: requestBody(MediaType.Json, payload),
     });
@@ -263,7 +263,6 @@ export class ModelWithKv {
 
   async hasKvParamAndRes(
     input: KValue<string>,
-    __datasource: "none" = "none",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<KValue<string>>> {
     const id = [
@@ -276,10 +275,9 @@ export class ModelWithKv {
     const payload: any = {};
 
     payload["input"] = input;
-    baseUrl.searchParams.append("__datasource", String(__datasource));
 
     const res = await fetchImpl(baseUrl, {
-      method: "POST",
+      method: "Post",
       headers: { "Content-Type": "application/json" },
       body: requestBody(MediaType.Json, payload),
     });
@@ -293,7 +291,6 @@ export class ModelWithKv {
   }
   async instanceMethod(
     input: string,
-    __datasource: "none" = "none",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<string>> {
     const id = [
@@ -306,10 +303,9 @@ export class ModelWithKv {
     const payload: any = {};
 
     payload["input"] = input;
-    baseUrl.searchParams.append("__datasource", String(__datasource));
 
     const res = await fetchImpl(baseUrl, {
-      method: "POST",
+      method: "Post",
       headers: { "Content-Type": "application/json" },
       body: requestBody(MediaType.Json, payload),
     });
@@ -332,7 +328,7 @@ export class ModelWithKv {
     baseUrl.searchParams.append("input", String(input));
 
     const res = await fetchImpl(baseUrl, {
-      method: "GET",
+      method: "Get",
     });
 
     return await HttpResult.fromResponse(
@@ -359,7 +355,6 @@ export class ModelWithR2 {
 
   async hasR2ParamAndRes(
     input: R2Object,
-    __datasource: "none" = "none",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<R2Object>> {
     const id = [
@@ -372,10 +367,9 @@ export class ModelWithR2 {
     const payload: any = {};
 
     payload["input"] = input;
-    baseUrl.searchParams.append("__datasource", String(__datasource));
 
     const res = await fetchImpl(baseUrl, {
-      method: "POST",
+      method: "Post",
       headers: { "Content-Type": "application/json" },
       body: requestBody(MediaType.Json, payload),
     });
@@ -416,7 +410,6 @@ export class ToyotaPrius {
 
   async instanceMethod(
     input: string,
-    __datasource: "none" = "none",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<string>> {
     const id = [
@@ -430,10 +423,9 @@ export class ToyotaPrius {
     const payload: any = {};
 
     payload["input"] = input;
-    baseUrl.searchParams.append("__datasource", String(__datasource));
 
     const res = await fetchImpl(baseUrl, {
-      method: "POST",
+      method: "Post",
       headers: { "Content-Type": "application/json" },
       body: requestBody(MediaType.Json, payload),
     });

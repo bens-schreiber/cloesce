@@ -1,7 +1,7 @@
 import { describe, test, expect } from "vitest";
 import { Project } from "ts-morph";
 import { CidlExtractor } from "../src/extractor/extract";
-import { CidlType, DataSource, Service } from "../src/ast";
+import { CidlType, Service } from "../src/ast";
 import { ModelBuilder } from "./builder";
 
 export function cloesceProject(): Project {
@@ -102,14 +102,14 @@ describe("CIDL Type", () => {
     const sourceFile = project.createSourceFile(
       "test.ts",
       `
-      import { DataSourceOf, DeepPartial, HttpResult } from "./src/ui/backend";
+      import { DataSource, DeepPartial, HttpResult } from "./src/ui/backend";
 
       class Bar {
         a: number;
       }
 
       class Foo {
-        ds: DataSourceOf<Bar>;
+        ds: DataSource<Bar>;
         partial: DeepPartial<Bar>;
         promise: Promise<Bar>;
         arr: Bar[];
@@ -202,19 +202,41 @@ describe("WranglerEnv", () => {
 });
 
 describe("Model", () => {
-  test("Finds Include Tree", () => {
+  test("Finds Data Sources", () => {
     // Arrange
     const project = cloesceProject();
     project.createSourceFile(
       "test.ts",
       `
-      import { IncludeTree } from "./src/ui/backend";
+      import { DataSource, GET } from "./src/ui/backend";
+
+      const ds: DataSource<Foo> = {};
+
       @Model()
       export class Foo {
-      @PrimaryKey
-      id: number;
-      
-      static readonly default: IncludeTree<Foo> = {};
+        id: number;
+
+        static readonly ds: DataSource<Foo> = {};
+
+        static readonly dsWithTree: DataSource<Foo> = { includeTree: { bar: {} } };
+
+        @Get(this.ds)
+        async thisStaticDs() {}
+
+        @Get(Foo.ds)
+        async fooStaticDs() {}
+
+        @Get({})
+        async inlineEmptyDs() {}
+
+        @Get({ includeTree: { bar: {} } })
+        async inlineDsWithTree() {}
+
+        @Get(ds)
+        async externalDs() {}
+
+        @Get()
+        async noDs() {}
       }
       `,
     );
@@ -226,12 +248,64 @@ describe("Model", () => {
     expect(res.isRight()).toBe(true);
     const cidl = res.unwrap();
     expect(cidl.models["Foo"]).toBeDefined();
+
     const fooModel = cidl.models["Foo"];
 
-    expect(fooModel.data_sources["default"]).toStrictEqual({
-      name: "default",
-      tree: {},
-    } as DataSource);
+    expect(fooModel.data_sources).toStrictEqual({
+      ds: {
+        name: "ds",
+        tree: {},
+        is_private: false,
+      },
+
+      dsWithTree: {
+        name: "dsWithTree",
+        tree: { bar: {} },
+        is_private: false,
+      },
+
+      "Foo:inlineEmptyDs": {
+        name: "Foo:inlineEmptyDs",
+        tree: {},
+        is_private: true,
+      },
+
+      "Foo:inlineDsWithTree": {
+        name: "Foo:inlineDsWithTree",
+        tree: { bar: {} },
+        is_private: true,
+      },
+
+      "Foo:externalDs": {
+        name: "Foo:externalDs",
+        tree: {},
+        is_private: true,
+      },
+    });
+
+    expect(fooModel.methods["thisStaticDs"]).toBeDefined();
+    expect(fooModel.methods["thisStaticDs"].data_source).toEqual("ds");
+
+    expect(fooModel.methods["fooStaticDs"]).toBeDefined();
+    expect(fooModel.methods["fooStaticDs"].data_source).toEqual("ds");
+
+    expect(fooModel.methods["inlineEmptyDs"]).toBeDefined();
+    expect(fooModel.methods["inlineEmptyDs"].data_source).toEqual(
+      "Foo:inlineEmptyDs",
+    );
+
+    expect(fooModel.methods["inlineDsWithTree"]).toBeDefined();
+    expect(fooModel.methods["inlineDsWithTree"].data_source).toEqual(
+      "Foo:inlineDsWithTree",
+    );
+
+    expect(fooModel.methods["externalDs"]).toBeDefined();
+    expect(fooModel.methods["externalDs"].data_source).toEqual(
+      "Foo:externalDs",
+    );
+
+    expect(fooModel.methods["noDs"]).toBeDefined();
+    expect(fooModel.methods["noDs"].data_source).toBeNull();
   });
 
   test("Infers primary key", () => {
@@ -604,7 +678,7 @@ describe("Model", () => {
       export class Foo {
         id: number;
 
-        @POST
+        @Post()
         async method(
           value: KValue<unknown> | null,
           fileMeta: R2ObjectBody,
@@ -661,7 +735,7 @@ describe("Plain Old Objects", () => {
           export class MyModel {
             id: number;
 
-            @POST
+            @Post()
             async method(foo: Foo, bar: Bar | null, baz: DeepPartial<Baz>): Promise<void> { }
           }
           `,
@@ -768,7 +842,7 @@ describe("Plain Old Objects", () => {
           export class Baz {
             id: number;
 
-            @POST
+            @Post()
             async method(): Promise<void> { }
           }
           `,

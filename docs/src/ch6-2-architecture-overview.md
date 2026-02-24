@@ -24,6 +24,7 @@ Beyond extraction, the Frontend layer also includes the runtime environment for 
 
 The runtime consists of two components: the Router and the ORM. The Router is currently written entirely in TypeScript, while the ORM compiles to WebAssembly from Rust.
 
+> [!TIP]
 > Depending on the context, the CIDL may be referred to as the "Abstract Syntax Tree", the "Cloesce Interface Definition Language", or during the runtime just "metadata" when a particular node is being referenced. All of these labels are accurate-- it's a versatile structure!
 
 #### Router

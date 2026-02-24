@@ -23,7 +23,18 @@ struct Cli {
 async fn main() {
     let cli = Cli::parse();
 
-    let pattern = format!("../e2e/fixtures/{}/seed__*", cli.fixture);
+    // Find project root (two levels up from tests/regression)
+    let manifest_dir = env!("CARGO_MANIFEST_DIR");
+    let project_root = std::path::Path::new(manifest_dir)
+        .parent()
+        .and_then(|p| p.parent())
+        .expect("Failed to find project root");
+
+    let pattern = format!(
+        "{}/tests/e2e/fixtures/{}/seed__*",
+        project_root.display(),
+        cli.fixture
+    );
 
     let fixtures = glob(&pattern)
         .expect("valid glob pattern")
@@ -38,8 +49,9 @@ async fn main() {
 
     // Build generator
     tracing::info!("Building generator...");
+    let generator_dir = project_root.join("src/generator");
     let cmd = Command::new("cargo")
-        .current_dir("src/generator")
+        .current_dir(&generator_dir)
         .args(["build", "--release"])
         .status();
     match cmd {

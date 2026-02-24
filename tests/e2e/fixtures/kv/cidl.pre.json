@@ -42,15 +42,7 @@
             ],
             "r2_objects": [],
             "methods": {},
-            "data_sources": {
-                "default": {
-                    "name": "default",
-                    "tree": {
-                        "data": {},
-                        "otherData": {}
-                    }
-                }
-            },
+            "data_sources": {},
             "cruds": [
                 "GET",
                 "SAVE"
@@ -96,14 +88,7 @@
             ],
             "r2_objects": [],
             "methods": {},
-            "data_sources": {
-                "default": {
-                    "name": "default",
-                    "tree": {
-                        "kvData": {}
-                    }
-                }
-            },
+            "data_sources": {},
             "cruds": [
                 "GET",
                 "LIST",

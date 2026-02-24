@@ -294,10 +294,8 @@ export class CidlExtractor {
 
       const cidl_type = typeRes.unwrap();
 
-      // Include Trees
-      const isIncludeTree =
-        getTypeText(prop.getType()) === `IncludeTree<${name}>`;
-      if (isIncludeTree) {
+      // Data Sources
+      if (typeof cidl_type === "object" && "DataSource" in cidl_type) {
         // Error: data sources must be static include trees
         if (!prop.isStatic()) {
           return err(ExtractorErrorCode.InvalidDataSourceDefinition, (e) => {
@@ -306,17 +304,46 @@ export class CidlExtractor {
           });
         }
 
-        const initializer = prop.getInitializer();
-        if (!initializer?.isKind(SyntaxKind.ObjectLiteralExpression)) {
-          return err(ExtractorErrorCode.InvalidDataSourceDefinition, (e) => {
+        // Error: expecting a DataSource object literal
+        const invalidDsErr = err(
+          ExtractorErrorCode.InvalidDataSourceDefinition,
+          (e) => {
             e.snippet = prop.getText();
             e.context = prop.getName();
-          });
+          },
+        );
+
+        const initializer = prop.getInitializer();
+        if (!initializer?.isKind(SyntaxKind.ObjectLiteralExpression)) {
+          return invalidDsErr;
+        }
+
+        const obj = initializer as ObjectLiteralExpression;
+        const includeTreeProp = obj.getProperty("includeTree");
+        let tree = {} as CidlIncludeTree;
+        if (includeTreeProp) {
+          if (!MorphNode.isPropertyAssignment(includeTreeProp)) {
+            return invalidDsErr;
+          }
+
+          const includeTreeInitializer = includeTreeProp.getInitializer();
+          if (
+            !includeTreeInitializer ||
+            !includeTreeInitializer.isKind(SyntaxKind.ObjectLiteralExpression)
+          ) {
+            return invalidDsErr;
+          }
+          tree = parseIncludeTree(
+            includeTreeInitializer as ObjectLiteralExpression,
+          );
         }
 
         data_sources[prop.getName()] = {
           name: prop.getName(),
-          tree: parseIncludeTree(initializer),
+          tree,
+
+          // Publicly exposed
+          is_private: false,
         };
         continue;
       }
@@ -520,18 +547,30 @@ export class CidlExtractor {
 
     // Process methods
     for (const m of classDecl.getMethods()) {
-      const httpVerb = m
+      const httpVerbDecorator = m
         .getDecorators()
-        .map(getDecoratorName)
-        .find((name) => Object.values(HttpVerb).includes(name as HttpVerb)) as
-        | HttpVerb
-        | undefined;
+        .find((d) =>
+          Object.values(HttpVerb).includes(getDecoratorName(d) as HttpVerb),
+        );
 
-      if (!httpVerb) {
+      if (!httpVerbDecorator) {
         continue;
       }
 
-      const result = this.method(m, httpVerb);
+      const httpVerb = getDecoratorName(httpVerbDecorator) as HttpVerb;
+
+      const res = dataSourceFromDecorator(name, m.getName(), httpVerbDecorator);
+      if (res.isLeft()) {
+        return res;
+      }
+      const { newDs, definedDs } = res.unwrap();
+      if (newDs) {
+        data_sources[newDs.name] = newDs;
+      }
+      const dataSourceReference =
+        newDs?.name ?? (definedDs ? data_sources[definedDs]?.name : null);
+
+      const result = this.method(m, httpVerb, dataSourceReference);
       if (result.isLeft()) {
         result.value.addContext((prev) => `${m.getName()} ${prev}`);
         return result;
@@ -598,7 +637,7 @@ export class CidlExtractor {
           });
         }
 
-        const apiMethodRes = this.method(m, HttpVerb.POST); // Verb doesn't matter here
+        const apiMethodRes = this.method(m, HttpVerb.Post); // Verb doesn't matter here
         if (apiMethodRes.isLeft()) {
           return apiMethodRes;
         }
@@ -667,7 +706,8 @@ export class CidlExtractor {
 
   private method(
     method: MethodDeclaration,
-    verb: HttpVerb,
+    httpVerb: HttpVerb,
+    dataSourceReference: string | null = null,
   ): Either<ExtractorError, ApiMethod> {
     // Error: invalid method scope, must be public
     if (method.getScope() != Scope.Public) {
@@ -742,12 +782,13 @@ export class CidlExtractor {
 
     return Either.right({
       name: method.getName(),
-      http_verb: verb,
+      http_verb: httpVerb,
       is_static: method.isStatic(),
       return_media: defaultMediaType(),
       return_type: typeRes.unwrap(),
       parameters_media: defaultMediaType(),
       parameters,
+      data_source: dataSourceReference,
     });
   }
 
@@ -949,14 +990,14 @@ export class CidlExtractor {
     const symbolName = unwrappedType.getSymbol()?.getName();
     const aliasName = unwrappedType.getAliasSymbol()?.getName();
 
-    if (aliasName === "DataSourceOf") {
+    if (symbolName === "DataSource") {
       const [_, genericTyNullable] = unwrapNullable(genericTy);
       const genericTyGenerics = [
         ...genericTy.getAliasTypeArguments(),
         ...genericTy.getTypeArguments(),
       ];
 
-      // Expect DataSourceOf to be of the exact form DataSource<Model>
+      // Expect DataSource to be of the exact form DataSource<Model>
       if (
         genericTyNullable ||
         genericTy.isUnion() ||
@@ -1329,6 +1370,135 @@ function getObjectName(t: CidlType): string | undefined {
   }
 
   return undefined;
+}
+
+function dataSourceFromDecorator(
+  modelName: string,
+  methodName: string,
+  decorator: Decorator,
+): Either<
+  ExtractorError,
+  { newDs: DataSource | null; definedDs: string | null }
+> {
+  const decoratorArg = decorator.getArguments()[0];
+  if (!decoratorArg) {
+    return Either.right({ newDs: null, definedDs: null });
+  }
+
+  // Reference to static property on the model
+  if (MorphNode.isPropertyAccessExpression(decoratorArg)) {
+    const propName = decoratorArg.getName();
+    return Either.right({
+      newDs: null,
+      definedDs: propName,
+    });
+  }
+
+  const dsWithEmptyTree = {
+    newDs: {
+      name: `${modelName}:${methodName}`,
+      tree: {},
+      is_private: true,
+    },
+    definedDs: null,
+  };
+
+  const invalidIncludeTree = err(
+    ExtractorErrorCode.InvalidDataSourceDefinition,
+    (e) => {
+      e.snippet = decoratorArg.getText();
+      e.context = `Invalid includeTree definition for data source on ${modelName}.${methodName}`;
+    },
+  );
+
+  // Defined inline object literal
+  if (MorphNode.isObjectLiteralExpression(decoratorArg)) {
+    const includeTreeProp = decoratorArg.getProperty("includeTree");
+    if (!includeTreeProp) {
+      // Default to an empty tree if no includeTree is provided
+      return Either.right(dsWithEmptyTree);
+    }
+
+    // Now let's parse the includeTree
+    if (!MorphNode.isPropertyAssignment(includeTreeProp)) {
+      return invalidIncludeTree;
+    }
+
+    const initializer = includeTreeProp.getInitializer();
+    if (!initializer?.isKind(SyntaxKind.ObjectLiteralExpression)) {
+      return invalidIncludeTree;
+    }
+
+    const includeTree = parseIncludeTree(
+      initializer as ObjectLiteralExpression,
+    );
+    return Either.right({
+      newDs: {
+        name: `${modelName}:${methodName}`,
+        tree: includeTree,
+        is_private: true,
+      },
+      definedDs: null,
+    });
+  }
+
+  // Defined in a constant outside the model
+  if (MorphNode.isIdentifier(decoratorArg)) {
+    const sourceFile = decoratorArg.getSourceFile();
+    const decl = sourceFile.getVariableDeclaration(decoratorArg.getText());
+    if (!decl) {
+      return err(ExtractorErrorCode.InvalidDataSourceDefinition, (e) => {
+        e.snippet = decoratorArg.getText();
+        e.context = `Data source ${decoratorArg.getText()} not found for ${modelName}.${methodName}`;
+      });
+    }
+
+    const initializer = decl.getInitializer();
+    if (
+      !initializer ||
+      !initializer.isKind(SyntaxKind.ObjectLiteralExpression)
+    ) {
+      return err(ExtractorErrorCode.InvalidDataSourceDefinition, (e) => {
+        e.snippet = decoratorArg.getText();
+        e.context = `Data source ${decoratorArg.getText()} must be an object literal for ${modelName}.${methodName}`;
+      });
+    }
+
+    const includeTreeProp = initializer.getProperty("includeTree");
+    if (!includeTreeProp) {
+      // Default to an empty tree if no includeTree is provided
+      return Either.right(dsWithEmptyTree);
+    }
+
+    if (!MorphNode.isPropertyAssignment(includeTreeProp)) {
+      return invalidIncludeTree;
+    }
+
+    const includeTreeInitializer = includeTreeProp.getInitializer();
+    if (
+      !includeTreeInitializer ||
+      !includeTreeInitializer.isKind(SyntaxKind.ObjectLiteralExpression)
+    ) {
+      return invalidIncludeTree;
+    }
+
+    const includeTree = parseIncludeTree(
+      includeTreeInitializer as ObjectLiteralExpression,
+    );
+    return Either.right({
+      newDs: {
+        name: `${modelName}:${methodName}`,
+        tree: includeTree,
+        is_private: true,
+      },
+      definedDs: decoratorArg.getText(),
+    });
+  }
+
+  return err(ExtractorErrorCode.InvalidDataSourceDefinition, (e) => {
+    e.snippet = decoratorArg.getText();
+    e.context = `Invalid data source definition for ${modelName}.${methodName}`;
+  });
 }
 
 function parseIncludeTree(

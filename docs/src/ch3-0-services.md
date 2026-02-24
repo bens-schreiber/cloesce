@@ -1,13 +1,17 @@
 # Services
 
+> [!TIP]
+> A clean design pattern for Cloesce is to use Services to encapsulate significant business logic and have Models act as
+> thin wrappers around data storage and retrieval. 
+>
+> This separation of concerns can lead to more maintainable and testable code.
+
 Models are not the only way to write API logic in Cloesce. 
 
 Services are another core concept that allows you to encapsulate business logic and share it across your application. Services are similar to Models in that they can define methods that can be called from your API routes, but they do not have any associated data storage or schema. 
 
 Instead, Services are used to group related, complex functionality together and can be injected into other parts of your application using Cloesce's dependency injection system.
 
-> *TIP*: A clean design pattern for Cloesce is to use Services to encapsulate significant business logic and have Models act as
-> thin wrappers around data storage and retrieval. This separation of concerns can lead to more maintainable and testable code.
 
 ## Hello World Service
 

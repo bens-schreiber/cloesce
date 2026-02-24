@@ -13,7 +13,6 @@ use rustc_hash::FxHasher;
 use serde::Deserialize;
 use serde::Serialize;
 use serde_json::Value;
-use serde_with::{MapPreventDuplicates, serde_as};
 
 #[macro_export]
 macro_rules! cidl_type_contains {
@@ -130,11 +129,11 @@ impl CidlType {
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub enum HttpVerb {
-    GET,
-    POST,
-    PUT,
-    PATCH,
-    DELETE,
+    Get,
+    Post,
+    Put,
+    Patch,
+    Delete,
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash)]
@@ -165,6 +164,7 @@ pub struct ApiMethod {
     /// If true, the method is static (instantiated on a class, not an instance).
     /// Static methods require no hydration or data source.
     pub is_static: bool,
+    pub data_source: Option<String>,
 
     pub http_verb: HttpVerb,
 
@@ -179,7 +179,7 @@ pub struct ApiMethod {
     pub parameters: Vec<NamedTypedValue>,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 pub struct IncludeTree(pub BTreeMap<String, IncludeTree>);
 
 /// A tree of model symbol names to include when hydrating a data source.
@@ -187,8 +187,10 @@ pub struct IncludeTree(pub BTreeMap<String, IncludeTree>);
 pub struct DataSource {
     /// The symbol name of the data source, e.g., "withUserDetails"
     pub name: String,
-
     pub tree: IncludeTree,
+
+    /// If true, the data source will not be generated on the client.
+    pub is_private: bool,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Hash)]
@@ -261,7 +263,6 @@ pub struct R2Object {
     pub list_prefix: bool,
 }
 
-#[serde_as]
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Model {
     #[serde(default)]
@@ -281,10 +282,8 @@ pub struct Model {
     pub r2_objects: Vec<R2Object>,
 
     /// API definitions.
-    #[serde_as(as = "MapPreventDuplicates<_, _>")]
     pub methods: BTreeMap<String, ApiMethod>,
 
-    #[serde_as(as = "MapPreventDuplicates<_, _>")]
     pub data_sources: BTreeMap<String, DataSource>,
 
     pub cruds: Vec<CrudKind>,
@@ -303,6 +302,11 @@ impl Model {
     pub fn has_r2(&self) -> bool {
         !self.r2_objects.is_empty()
     }
+
+    /// Returns the data source with the symbol name "default", if it exists.
+    pub fn default_data_source(&self) -> Option<&DataSource> {
+        self.data_sources.get("default")
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -314,7 +318,6 @@ pub struct ServiceAttribute {
     pub inject_reference: String,
 }
 
-#[serde_as]
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Service {
     /// The symbol that defines the service in the source code.
@@ -327,7 +330,6 @@ pub struct Service {
     pub initializer: Option<Vec<String>>,
 
     /// API definitions.
-    #[serde_as(as = "MapPreventDuplicates<_, _>")]
     pub methods: BTreeMap<String, ApiMethod>,
 
     pub source_path: PathBuf,
@@ -358,7 +360,6 @@ pub struct WranglerEnv {
     pub vars: HashMap<String, CidlType>,
 }
 
-#[serde_as]
 #[derive(Serialize, Deserialize, Default)]
 pub struct CloesceAst {
     #[serde(default)]
@@ -367,11 +368,8 @@ pub struct CloesceAst {
     pub project_name: String,
     pub wrangler_env: Option<WranglerEnv>,
 
-    // TODO: MapPreventDuplicates is not supported for IndexMap
     pub models: IndexMap<String, Model>,
     pub services: IndexMap<String, Service>,
-
-    #[serde_as(as = "MapPreventDuplicates<_, _>")]
     pub poos: BTreeMap<String, PlainOldObject>,
 
     pub main_source: Option<PathBuf>,

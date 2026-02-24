@@ -19,7 +19,7 @@ export class CrudHaver {
 
   static async GET(
     id: number,
-    __datasource: "none" = "none",
+    __datasource: "default" = "default",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<CrudHaver>> {
     const baseUrl = new URL(
@@ -30,7 +30,7 @@ export class CrudHaver {
     baseUrl.searchParams.append("__datasource", String(__datasource));
 
     const res = await fetchImpl(baseUrl, {
-      method: "GET",
+      method: "Get",
     });
 
     return await HttpResult.fromResponse(
@@ -41,7 +41,7 @@ export class CrudHaver {
     );
   }
   static async LIST(
-    __datasource: "none" = "none",
+    __datasource: "default" = "default",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<CrudHaver[]>> {
     const baseUrl = new URL(
@@ -51,7 +51,7 @@ export class CrudHaver {
     baseUrl.searchParams.append("__datasource", String(__datasource));
 
     const res = await fetchImpl(baseUrl, {
-      method: "GET",
+      method: "Get",
     });
 
     return await HttpResult.fromResponse(
@@ -63,7 +63,7 @@ export class CrudHaver {
   }
   static async SAVE(
     model: DeepPartial<CrudHaver>,
-    __datasource: "none" = "none",
+    __datasource: "default" = "default",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<CrudHaver>> {
     const baseUrl = new URL(
@@ -75,7 +75,7 @@ export class CrudHaver {
     baseUrl.searchParams.append("__datasource", String(__datasource));
 
     const res = await fetchImpl(baseUrl, {
-      method: "POST",
+      method: "Post",
       headers: { "Content-Type": "application/json" },
       body: requestBody(MediaType.Json, payload),
     });
@@ -88,7 +88,6 @@ export class CrudHaver {
     );
   }
   async notCrud(
-    __datasource: "none" = "none",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<void>> {
     const id = [
@@ -99,10 +98,9 @@ export class CrudHaver {
     );
     const payload: any = {};
 
-    baseUrl.searchParams.append("__datasource", String(__datasource));
 
     const res = await fetchImpl(baseUrl, {
-      method: "POST",
+      method: "Post",
       headers: { "Content-Type": "application/json" },
       body: requestBody(MediaType.Json, payload),
     });
@@ -128,7 +126,7 @@ export class Parent {
 
   static async GET(
     id: number,
-    __datasource: "withChildren" |"none" = "none",
+    __datasource: "default" | "withChildren" = "default",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Parent>> {
     const baseUrl = new URL(
@@ -139,7 +137,7 @@ export class Parent {
     baseUrl.searchParams.append("__datasource", String(__datasource));
 
     const res = await fetchImpl(baseUrl, {
-      method: "GET",
+      method: "Get",
     });
 
     return await HttpResult.fromResponse(
@@ -150,7 +148,7 @@ export class Parent {
     );
   }
   static async LIST(
-    __datasource: "withChildren" |"none" = "none",
+    __datasource: "default" | "withChildren" = "default",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Parent[]>> {
     const baseUrl = new URL(
@@ -160,7 +158,7 @@ export class Parent {
     baseUrl.searchParams.append("__datasource", String(__datasource));
 
     const res = await fetchImpl(baseUrl, {
-      method: "GET",
+      method: "Get",
     });
 
     return await HttpResult.fromResponse(
@@ -172,7 +170,7 @@ export class Parent {
   }
   static async SAVE(
     model: DeepPartial<Parent>,
-    __datasource: "withChildren" |"none" = "none",
+    __datasource: "default" | "withChildren" = "default",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Parent>> {
     const baseUrl = new URL(
@@ -184,7 +182,7 @@ export class Parent {
     baseUrl.searchParams.append("__datasource", String(__datasource));
 
     const res = await fetchImpl(baseUrl, {
-      method: "POST",
+      method: "Post",
       headers: { "Content-Type": "application/json" },
       body: requestBody(MediaType.Json, payload),
     });

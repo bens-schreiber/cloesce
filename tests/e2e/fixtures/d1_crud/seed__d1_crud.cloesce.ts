@@ -1,4 +1,4 @@
-import { Model, WranglerEnv, POST, IncludeTree, Integer } from "cloesce/backend";
+import { Model, WranglerEnv, Post, Integer, DataSource } from "cloesce/backend";
 import { D1Database } from "@cloudflare/workers-types";
 
 @WranglerEnv
@@ -11,8 +11,8 @@ export class CrudHaver {
   id: Integer;
   name: string;
 
-  @POST
-  async notCrud(): Promise<void> {}
+  @Post()
+  async notCrud(): Promise<void> { }
 }
 
 @Model(["SAVE", "GET", "LIST"])
@@ -24,9 +24,11 @@ export class Parent {
 
   children: Child[];
 
-  static readonly withChildren: IncludeTree<Parent> = {
-    favoriteChild: {},
-    children: {},
+  static readonly withChildren: DataSource<Parent> = {
+    includeTree: {
+      favoriteChild: {},
+      children: {},
+    },
   };
 }
 

@@ -1,0 +1,57 @@
+{
+  "hash": 7972458822698731726,
+  "models": {
+    "Hamburger": {
+      "hash": 17642057269789362886,
+      "name": "Hamburger",
+      "primary_key": {
+        "name": "id",
+        "cidl_type": "Integer"
+      },
+      "columns": [
+        {
+          "hash": 12056908550303509781,
+          "value": {
+            "name": "name",
+            "cidl_type": "Text"
+          },
+          "foreign_key_reference": null
+        }
+      ],
+      "navigation_properties": [
+        {
+          "hash": 6498092945051865391,
+          "var_name": "toppings",
+          "model_reference": "Topping",
+          "kind": "ManyToMany"
+        }
+      ]
+    },
+    "Topping": {
+      "hash": 2395830274345848062,
+      "name": "Topping",
+      "primary_key": {
+        "name": "id",
+        "cidl_type": "Integer"
+      },
+      "columns": [
+        {
+          "hash": 12056908550303509781,
+          "value": {
+            "name": "name",
+            "cidl_type": "Text"
+          },
+          "foreign_key_reference": null
+        }
+      ],
+      "navigation_properties": [
+        {
+          "hash": 8945555950776796007,
+          "var_name": "hamburgers",
+          "model_reference": "Hamburger",
+          "kind": "ManyToMany"
+        }
+      ]
+    }
+  }
+}

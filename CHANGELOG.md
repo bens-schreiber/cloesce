@@ -2,11 +2,13 @@
 ### Added
 - Truncate extraneous fields during runtime validation
 - Runtime validation for `DateISO` type
+- Private and inline data sources per method
 
 ### Changed
 - KV and R2 objects added to the grammar (any method can accept or return these objects)
 - Moved runtime validation to WASM
 - Optimized the ORM WASM binary size by 41% (657KB -> 383KB)
+- Refactored Data Sources as per `proposal-1-data-sources.md`
 
 ### Fixed
 

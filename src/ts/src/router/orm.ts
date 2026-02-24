@@ -16,6 +16,26 @@ import {
 import { InternalError, u8ToB64 } from "../common.js";
 import { IncludeTree, DeepPartial, KValue } from "../ui/backend.js";
 
+export interface DataSource<T> {
+  includeTree?: IncludeTree<T>;
+  select?: (joined: (from?: string) => string) => string;
+}
+
+type Include<T> = DataSource<T> | IncludeTree<T>;
+function isDataSource<T>(include: Include<T>): include is DataSource<T> {
+  return "includeTree" in include || "select" in include;
+}
+function getTreeFromInclude<T>(
+  include: Include<T> | null | undefined,
+): IncludeTree<T> {
+  if (!include) {
+    return {} as IncludeTree<T>;
+  }
+  return isDataSource(include)
+    ? ((include.includeTree as IncludeTree<T>) ?? ({} as IncludeTree<T>))
+    : include;
+}
+
 export class Orm {
   private constructor(private env: unknown) {}
 
@@ -33,6 +53,34 @@ export class Orm {
   private get db(): D1Database {
     const { ast } = RuntimeContainer.get();
     return (this.env as any)[ast.wrangler_env!.d1_binding!];
+  }
+
+  /**
+   * Given a model, retrieves the default data source for the model, which includes
+   * all KV, R2, 1:1, 1:M and M:M relationships.
+   *
+   * Does not include nested relationships of 1:M and M:M relationships to avoid excessively large data retrievals.
+   *
+   * @param ctor Constructor of the model to retrieve the default data source for
+   * @returns The default data source for the model.
+   */
+  static defaultDataSource<T>(ctor: new () => T): DataSource<T> {
+    const defaultDs: DataSource<T> | undefined = (ctor as any)["default"];
+    if (defaultDs && defaultDs.includeTree) {
+      return (ctor as any)["default"] as DataSource<T>;
+    }
+
+    const { ast } = RuntimeContainer.get();
+    const dataSourceMeta = ast.models[ctor.name]?.data_sources["default"];
+    if (!dataSourceMeta) {
+      throw new InternalError(
+        `No default data source found for model ${ctor.name}`,
+      );
+    }
+
+    return {
+      includeTree: dataSourceMeta.tree as IncludeTree<T>,
+    };
   }
 
   /**
@@ -59,24 +107,23 @@ export class Orm {
    *
    * @param ctor Constructor of the model to map to
    * @param d1Results Results from a D1 query
-   * @param includeTree Include tree specifying which navigation properties to include
+   * @param include Include Tree or DataSource specifying which navigation properties to include in the mapping.
    * @returns Array of mapped model instances
    */
   static map<T extends object>(
     ctor: new () => T,
     d1Results: D1Result,
-    includeTree: IncludeTree<T> | null = null,
+    include: Include<T> = {},
   ): T[] {
     const { wasm } = RuntimeContainer.get();
     const d1ResultsRes = WasmResource.fromString(
       JSON.stringify(d1Results.results),
       wasm,
     );
-    const includeTreeRes = WasmResource.fromString(
-      JSON.stringify(includeTree),
-      wasm,
-    );
 
+    const tree = getTreeFromInclude(include);
+
+    const includeTreeRes = WasmResource.fromString(JSON.stringify(tree), wasm);
     const mapQueryRes = invokeOrmWasm(
       wasm.map,
       [WasmResource.fromString(ctor.name, wasm), d1ResultsRes, includeTreeRes],
@@ -126,10 +173,10 @@ export class Orm {
     ctor: new () => T,
     args: {
       from?: string | null;
-      includeTree?: IncludeTree<T> | null;
+      include?: Include<T>;
     } = {
       from: null,
-      includeTree: null,
+      include: {},
     },
   ): string {
     const { wasm } = RuntimeContainer.get();
@@ -137,10 +184,17 @@ export class Orm {
       JSON.stringify(args.from ?? null),
       wasm,
     );
-    const includeTreeRes = WasmResource.fromString(
-      JSON.stringify(args.includeTree ?? null),
-      wasm,
-    );
+
+    const include = args.include ?? {};
+    const tree = getTreeFromInclude(include);
+    if (isDataSource(include) && include.select) {
+      // Override the default select generation with a custom one provided by the user.
+      return include.select((from) =>
+        Orm.select(ctor, { from, include: include.includeTree }),
+      );
+    }
+
+    const includeTreeRes = WasmResource.fromString(JSON.stringify(tree), wasm);
 
     const selectQueryRes = invokeOrmWasm(
       wasm.select_model,
@@ -169,11 +223,11 @@ export class Orm {
     args: {
       base?: any;
       keyParams?: Record<string, string>;
-      includeTree?: IncludeTree<T> | null;
+      include?: Include<T>;
     } = {
       base: {},
       keyParams: {},
-      includeTree: null,
+      include: {},
     },
   ): Promise<T> {
     const { ast, constructorRegistry } = RuntimeContainer.get();
@@ -186,12 +240,13 @@ export class Orm {
     };
 
     const env: any = this.env;
-
     const promises: Promise<void>[] = [];
+    const tree = getTreeFromInclude(args.include ?? {});
+
     const hydrated = hydrateType(args.base ?? {}, modelCidlType, {
       ast,
       ctorReg: constructorRegistry,
-      includeTree: args.includeTree ?? {},
+      includeTree: tree,
       keyParams: args.keyParams ?? {},
       env,
       promises,
@@ -214,17 +269,18 @@ export class Orm {
    *
    * @param ctor Constructor of the model to upsert
    * @param newModel The new model object to upsert
-   * @param includeTree Include tree specifying which navigation properties to include
+   * @param include Include tree specifying which navigation properties to include
    * @returns The upserted model instance, or `null` if upsert failed
    */
   async upsert<T extends object>(
     ctor: new () => T,
     newModel: DeepPartial<T>,
-    includeTree: IncludeTree<T> | null = null,
+    include: Include<T> = {},
   ): Promise<T | null> {
     const { wasm, ast } = RuntimeContainer.get();
     const meta = ast.models[ctor.name];
 
+    const includeTree = getTreeFromInclude(include);
     const upsertQueryRes = invokeOrmWasm(
       wasm.upsert_model,
       [
@@ -317,7 +373,7 @@ export class Orm {
 
     // Base needs to include all of the key params from newModel and its includes.
     const q: Array<{ model: any; meta: AstModel; tree: IncludeTree<any> }> = [
-      { model: base, meta, tree: includeTree ?? {} },
+      { model: base, meta, tree: includeTree },
     ]!;
     while (q.length > 0) {
       const {
@@ -397,7 +453,7 @@ export class Orm {
     // Hydrate and return the upserted model
     return await this.hydrate(ctor, {
       base: base,
-      includeTree,
+      include: includeTree,
     });
   }
 
@@ -406,12 +462,12 @@ export class Orm {
    * A model without a primary key cannot be listed, and this method will return an empty array in that case.
    *
    * @param ctor Constructor of the model to list
-   * @param includeTree Include tree specifying which navigation properties to include
+   * @param include Include tree specifying which navigation properties to include
    * @returns Array of listed model instances
    */
   async list<T extends object>(
     ctor: new () => T,
-    includeTree: IncludeTree<T> | null = null,
+    include: Include<T> = {},
   ): Promise<T[]> {
     const { ast } = RuntimeContainer.get();
     const model = ast.models[ctor.name];
@@ -425,7 +481,7 @@ export class Orm {
     }
 
     const query = Orm.select(ctor, {
-      includeTree,
+      include: include,
     });
     const rows = await this.db.prepare(query).all();
     if (rows.error) {
@@ -436,12 +492,12 @@ export class Orm {
     }
 
     // Map and hydrate
-    const results = Orm.map(ctor, rows, includeTree);
+    const results = Orm.map(ctor, rows, include);
     await Promise.all(
       results.map(async (modelJson, index) => {
         results[index] = await this.hydrate(ctor, {
           base: modelJson,
-          includeTree,
+          include: include,
         });
       }),
     );
@@ -463,11 +519,11 @@ export class Orm {
     args: {
       id?: any;
       keyParams?: Record<string, string>;
-      includeTree?: IncludeTree<T> | null;
+      include?: Include<T>;
     } = {
       id: undefined,
       keyParams: {},
-      includeTree: null,
+      include: {},
     },
   ): Promise<T | null> {
     const { ast } = RuntimeContainer.get();
@@ -480,15 +536,15 @@ export class Orm {
     if (model.primary_key === null) {
       return await this.hydrate(ctor, {
         keyParams: args.keyParams,
-        includeTree: args.includeTree ?? null,
+        include: args.include,
       });
     }
 
     // D1 retrieval
     const pkName = model.primary_key.name;
     const query = `
-      ${Orm.select(ctor, { includeTree: args.includeTree })}
-      WHERE  "${model.name}"."${pkName}" = ?
+      SELECT * FROM (${Orm.select(ctor, { include: args.include })}) as q
+      WHERE q."${pkName}" = ?
     `;
 
     const rows = await this.db.prepare(query).bind(args.id).run();
@@ -505,11 +561,11 @@ export class Orm {
     }
 
     // Map and hydrate
-    const results = Orm.map(ctor, rows, args.includeTree ?? null);
+    const results = Orm.map(ctor, rows, args.include ?? {});
     return await this.hydrate(ctor, {
       base: results.at(0),
       keyParams: args.keyParams,
-      includeTree: args.includeTree ?? null,
+      include: args.include ?? {},
     });
   }
 }

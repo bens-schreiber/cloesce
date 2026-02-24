@@ -1,10 +1,14 @@
 # Basic D1 Backed Model
 
-In this section, we will explore the basic properties of a D1 backed Model in Cloesce.
-
-> [Cloudflare D1]((https://developers.cloudflare.com/d1/)) is a serverless SQL database built on SQLite for Workers.
+In this section, we will explore the basic properties of a D1 backed Model in Cloesce. [Cloudflare D1]((https://developers.cloudflare.com/d1/)) is a serverless SQL database built on SQLite for Workers.
 
 ## Defining a Model
+
+> [!NOTE]
+> Models do not have constructors as they should not be manually instantiated. Instead, use the [ORM functions](./ch2-6-cloesce-orm.md) to create, retrieve, and update Model instances. For tests, consider using [`Object.assign()`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/assign) to create instances of Models with specific property values.
+
+> [!TIP]
+> Using the `@PrimaryKey` decorator is optional if your primary key property is named `id` or `<className>Id` (in any casing, i.e., snake case, camel case, etc). Cloesce will automatically treat a property named `id` as the primary key.
 
 Compilation in Cloesce consists of three phases: Extraction, Analysis, and Code Generation. 
 
@@ -29,10 +33,6 @@ The above code defines a Model "User" with several properties:
 | `id` | Integer property decorated with `@PrimaryKey`, indicating it is the Model’s primary key. |
 | `name` | String property representing the user’s name; stored as a regular column in the D1 database. |
 
-> Models do not have constructors as they should not be manually instantiated. Instead, use the [ORM functions](./ch2-6-cloesce-orm.md) to create, retrieve, and update Model instances. For tests, consider using [`Object.assign()`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/assign) to create instances of Models with specific property values.
-
-> *TIP*: Using the `@PrimaryKey` decorator is optional if your primary key property is named `id` or `<className>Id` (in any casing, i.e., snake case, camel case, etc). Cloesce will automatically treat a property named `id` as the primary key.
-
 ## Supported D1 Column Types
 
 Cloesce supports a variety of column types for D1 Models. These are the supported TypeScript types and their corresponding SQLite types:
@@ -52,6 +52,11 @@ Notably, an `Integer` primary key is automatically set to `AUTOINCREMENT` in D1,
 
 ## Migrating the Database
 
+> [!IMPORTANT]
+> Any change in a D1 backed Model definition (adding, removing, or modifying properties; renaming Models) requires a new migration to be created. 
+>
+> The migration command will generate a new migration file in the `migrations/` directory.
+
 The standard Cloesce compilation command does not perform database migrations. To create or update the D1 database schema based on your Model definitions, you need to run the migration command:
 
 ```bash
@@ -64,5 +69,3 @@ Finally, these generated migrations must be applied to the actual D1 database us
 ```bash
 npx wrangler d1 migrations apply <database-binding-name>
 ```
-
-> *TIP*: Any change in a D1 backed Model definition (adding, removing, or modifying properties; renaming Models) requires a new migration to be created. The migration command will generate a new migration file in the `migrations/` directory.

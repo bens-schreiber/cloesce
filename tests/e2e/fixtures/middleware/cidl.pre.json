@@ -23,16 +23,17 @@
             "methods": {
                 "blockedMethod": {
                     "name": "blockedMethod",
-                    "http_verb": "GET",
+                    "http_verb": "Get",
                     "is_static": true,
                     "return_media": "Json",
                     "return_type": "Void",
                     "parameters_media": "Json",
-                    "parameters": []
+                    "parameters": [],
+                    "data_source": null
                 },
                 "getInjectedThing": {
                     "name": "getInjectedThing",
-                    "http_verb": "GET",
+                    "http_verb": "Get",
                     "is_static": true,
                     "return_media": "Json",
                     "return_type": {
@@ -46,7 +47,8 @@
                                 "Inject": "InjectedThing"
                             }
                         }
-                    ]
+                    ],
+                    "data_source": null
                 }
             },
             "data_sources": {},

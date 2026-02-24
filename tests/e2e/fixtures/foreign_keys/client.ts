@@ -18,33 +18,9 @@ export class A {
     payload["a"] = a;
 
     const res = await fetchImpl(baseUrl, {
-      method: "POST",
+      method: "Post",
       headers: { "Content-Type": "application/json" },
       body: requestBody(MediaType.Json, payload),
-    });
-
-    return await HttpResult.fromResponse(
-      res,
-      MediaType.Json,
-      A,
-      false
-    );
-  }
-  async refresh(
-    __datasource: "withB" |"withoutB" |"none" = "none",
-    fetchImpl: typeof fetch = fetch
-  ): Promise<HttpResult<A>> {
-    const id = [
-      encodeURIComponent(String(this.id)),
-    ].join("/");
-    const baseUrl = new URL(
-      `http://localhost:5002/api/A/${id}/refresh`
-    );
-
-    baseUrl.searchParams.append("__datasource", String(__datasource));
-
-    const res = await fetchImpl(baseUrl, {
-      method: "GET",
     });
 
     return await HttpResult.fromResponse(
@@ -66,7 +42,7 @@ export class A {
     payload["a"] = a;
 
     const res = await fetchImpl(baseUrl, {
-      method: "POST",
+      method: "Post",
       headers: { "Content-Type": "application/json" },
       body: requestBody(MediaType.Json, payload),
     });
@@ -75,6 +51,28 @@ export class A {
       res,
       MediaType.Json,
       undefined,
+      false
+    );
+  }
+  async withoutB(
+    fetchImpl: typeof fetch = fetch
+  ): Promise<HttpResult<A>> {
+    const id = [
+      encodeURIComponent(String(this.id)),
+    ].join("/");
+    const baseUrl = new URL(
+      `http://localhost:5002/api/A/${id}/withoutB`
+    );
+
+
+    const res = await fetchImpl(baseUrl, {
+      method: "Get",
+    });
+
+    return await HttpResult.fromResponse(
+      res,
+      MediaType.Json,
+      A,
       false
     );
   }
@@ -89,7 +87,6 @@ export class B {
   id: number;
 
   async testMethod(
-    __datasource: "none" = "none",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<void>> {
     const id = [
@@ -100,10 +97,9 @@ export class B {
     );
     const payload: any = {};
 
-    baseUrl.searchParams.append("__datasource", String(__datasource));
 
     const res = await fetchImpl(baseUrl, {
-      method: "POST",
+      method: "Post",
       headers: { "Content-Type": "application/json" },
       body: requestBody(MediaType.Json, payload),
     });
@@ -139,7 +135,6 @@ export class Dog {
   personId: number;
 
   async testMethod(
-    __datasource: "none" = "none",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<void>> {
     const id = [
@@ -150,10 +145,9 @@ export class Dog {
     );
     const payload: any = {};
 
-    baseUrl.searchParams.append("__datasource", String(__datasource));
 
     const res = await fetchImpl(baseUrl, {
-      method: "POST",
+      method: "Post",
       headers: { "Content-Type": "application/json" },
       body: requestBody(MediaType.Json, payload),
     });
@@ -187,33 +181,9 @@ export class Person {
     payload["person"] = person;
 
     const res = await fetchImpl(baseUrl, {
-      method: "POST",
+      method: "Post",
       headers: { "Content-Type": "application/json" },
       body: requestBody(MediaType.Json, payload),
-    });
-
-    return await HttpResult.fromResponse(
-      res,
-      MediaType.Json,
-      Person,
-      false
-    );
-  }
-  async refresh(
-    __datasource: "withDogs" |"none" = "none",
-    fetchImpl: typeof fetch = fetch
-  ): Promise<HttpResult<Person>> {
-    const id = [
-      encodeURIComponent(String(this.id)),
-    ].join("/");
-    const baseUrl = new URL(
-      `http://localhost:5002/api/Person/${id}/refresh`
-    );
-
-    baseUrl.searchParams.append("__datasource", String(__datasource));
-
-    const res = await fetchImpl(baseUrl, {
-      method: "GET",
     });
 
     return await HttpResult.fromResponse(
@@ -235,7 +205,7 @@ export class Person {
     payload["person"] = person;
 
     const res = await fetchImpl(baseUrl, {
-      method: "POST",
+      method: "Post",
       headers: { "Content-Type": "application/json" },
       body: requestBody(MediaType.Json, payload),
     });
@@ -244,6 +214,28 @@ export class Person {
       res,
       MediaType.Json,
       undefined,
+      false
+    );
+  }
+  async withoutDogs(
+    fetchImpl: typeof fetch = fetch
+  ): Promise<HttpResult<Person>> {
+    const id = [
+      encodeURIComponent(String(this.id)),
+    ].join("/");
+    const baseUrl = new URL(
+      `http://localhost:5002/api/Person/${id}/withoutDogs`
+    );
+
+
+    const res = await fetchImpl(baseUrl, {
+      method: "Get",
+    });
+
+    return await HttpResult.fromResponse(
+      res,
+      MediaType.Json,
+      Person,
       false
     );
   }
@@ -260,6 +252,28 @@ export class Student {
   id: number;
   courses: Course[];
 
+  async none(
+    fetchImpl: typeof fetch = fetch
+  ): Promise<HttpResult<Student>> {
+    const id = [
+      encodeURIComponent(String(this.id)),
+    ].join("/");
+    const baseUrl = new URL(
+      `http://localhost:5002/api/Student/${id}/none`
+    );
+
+
+    const res = await fetchImpl(baseUrl, {
+      method: "Get",
+    });
+
+    return await HttpResult.fromResponse(
+      res,
+      MediaType.Json,
+      Student,
+      false
+    );
+  }
   static async post(
     student: Student,
     fetchImpl: typeof fetch = fetch
@@ -272,33 +286,9 @@ export class Student {
     payload["student"] = student;
 
     const res = await fetchImpl(baseUrl, {
-      method: "POST",
+      method: "Post",
       headers: { "Content-Type": "application/json" },
       body: requestBody(MediaType.Json, payload),
-    });
-
-    return await HttpResult.fromResponse(
-      res,
-      MediaType.Json,
-      Student,
-      false
-    );
-  }
-  async refresh(
-    __datasource: "withCoursesStudents" |"withCoursesStudentsCourses" |"none" = "none",
-    fetchImpl: typeof fetch = fetch
-  ): Promise<HttpResult<Student>> {
-    const id = [
-      encodeURIComponent(String(this.id)),
-    ].join("/");
-    const baseUrl = new URL(
-      `http://localhost:5002/api/Student/${id}/refresh`
-    );
-
-    baseUrl.searchParams.append("__datasource", String(__datasource));
-
-    const res = await fetchImpl(baseUrl, {
-      method: "GET",
     });
 
     return await HttpResult.fromResponse(

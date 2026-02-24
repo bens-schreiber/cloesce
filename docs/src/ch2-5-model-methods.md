@@ -6,6 +6,11 @@ In this section, we will explore how to define methods on Models that are expose
 
 ## Static and Instance Methods
 
+> [!WARNING]
+> GET methods in alpha v0.1.0 do not support complex types as parameters (such as other Models, arrays, etc). 
+> Only primitive types like `string`, `number`, `boolean` are supported. This limitation will be lifted in future releases.
+
+
 A Model class in Cloesce may have both static and instance methods.
 
 A static method simply exists on the same namespace as the Model class. An instance method exists on an actual instance of the Model.
@@ -46,10 +51,13 @@ After compilation via `npx cloesce compile`, the above Model will have two API e
 
 To query these endpoints, a full generated client that matches the exact structure defined in the Model is available after compilation in `.generated/client.ts`.
 
-> *Alpha Note*: GET methods currently do not support complex types as parameters (such as other Models, arrays, etc). 
-> Only primitive types like `string`, `number`, `boolean` are supported. This limitation will be lifted in future releases.
-
 ## CRUD Methods
+
+> [!IMPORTANT]
+> Delete is not yet supported as a generated CRUD method in alpha v0.1.0, but it is planned for a future release.
+
+> [!NOTE]
+> R2 does not support CRUD methods for streaming the object body, instead it only sends the metadata.
 
 When creating Models, you will find yourself writing the same CRUD (Create, Read, Update, Delete) boilerplate. To save this effort, Cloesce automatically generates standard CRUD methods if included in the Model decorator. These methods are exposed as API endpoints. Internally, they simply run the [Cloesce ORM](./ch2-6-cloesce-orm.md) operations available via the `Orm` class.
 
@@ -69,10 +77,6 @@ The above `User` Model will have the following API endpoints generated automatic
 - `GET /User/LIST?__dataSource=` List all `User` instances.
 
 All CRUD methods take an optional `IncludeTree` in the request to specify which navigation properties to include in the response. This defaults to no includes.
-
-> *Note*: R2 does not support CRUD methods for streaming the object body, instead it only sends the metadata.
-
-> *Alpha Note*: Delete is not yet supported as a generated CRUD method.
 
 ## Runtime Validation
 
@@ -100,6 +104,9 @@ There are many valid types for method parameters in Cloesce, such as:
 
 ## Plain Old Objects
 
+> [!NOTE]
+> Plain old objects can only consist of serializable properties supported by Cloesce. They must be exported so that they can be linked. They cannot contain streams.
+
 Cloesce supports the use of Plain Old Objects (POOs) as method parameters and return types. A POO is an object with properties that are of supported types. This allows developers to return or accept complex data structures without needing to define a full Model for them.
 
 ```typescript
@@ -124,7 +131,6 @@ export class User {
 }
 ```
 
-> *Note*: Plain old objects can only consist of serializable properties supported by Cloesce. They must be exported so that they can be linked. They cannot contain streams.
 
 ## HttpResult
 

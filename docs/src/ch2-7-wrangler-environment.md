@@ -1,6 +1,10 @@
 # Wrangler Environment
 
-> *Note*: Unlike some Infrastructure as Code tools for Cloudflare, Cloesce does not try to fully replace using a Wrangler configuration file. Account specific configuration settings such as binding IDs must still be managed manually.
+> [!WARNING]
+> Only one D1 database binding is supported in v0.1.0. Future releases will allow multiple D1 bindings.
+
+> [!NOTE]
+> Unlike some Infrastructure as Code tools for Cloudflare, Cloesce does not try to fully replace using a Wrangler configuration file. Account specific configuration settings such as binding IDs must still be managed manually.
 
 Cloesce will search your project for a class decorated with `@WranglerEnv` to define the [Cloudflare Workers environment](https://developers.cloudflare.com/workers/configuration/environment-variables/) tailored to your application. 
 
@@ -44,5 +48,3 @@ namespace_id = "replace_with_kv_namespace_id"
 [vars]
 someVariable = "default_string"
 ```
-
-> *Alpha Note*: Only one D1 database binding is currently supported. Future releases will allow multiple D1 bindings.

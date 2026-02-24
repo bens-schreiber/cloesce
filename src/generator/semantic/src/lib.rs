@@ -683,6 +683,37 @@ fn validate_methods(
         method.name
     );
 
+    // Validate data source reference
+    if let Some(ds) = &method.data_source {
+        ensure!(
+            !method.is_static,
+            GeneratorErrorKind::InvalidDataSourceReference,
+            "{}.{} has a data source but is a static method.",
+            namespace,
+            method.name
+        );
+
+        let Some(model) = ast.models.get(namespace) else {
+            fail!(
+                GeneratorErrorKind::InvalidModelReference,
+                "{}.{} references a data source on an unknown model {}",
+                namespace,
+                method.name,
+                namespace
+            );
+        };
+
+        ensure!(
+            model.data_sources.contains_key(ds),
+            GeneratorErrorKind::UnknownDataSourceReference,
+            "{}.{} references an unknown data source {} on model {}",
+            namespace,
+            method.name,
+            ds,
+            namespace
+        );
+    }
+
     // Validate return type
     match &method.return_type.root_type() {
         CidlType::Object(o) | CidlType::Partial(o) => {
@@ -697,7 +728,7 @@ fn validate_methods(
 
         CidlType::DataSource(model_name) => ensure!(
             is_valid_data_source_ref(ast, model_name),
-            GeneratorErrorKind::InvalidModelReference,
+            GeneratorErrorKind::UnknownDataSourceReference,
             "{}.{}",
             namespace,
             method.name,
@@ -748,7 +779,7 @@ fn validate_methods(
 
         // todo: remove this limitation
         ensure!(
-            method.http_verb != HttpVerb::GET
+            method.http_verb != HttpVerb::Get
                 || !cidl_type_contains!(&param.cidl_type, CidlType::KvObject(_)),
             GeneratorErrorKind::NotYetSupported,
             "GET Requests currently do not support KV Object parameters {}.{}.{}",
@@ -780,7 +811,7 @@ fn validate_methods(
                 );
 
                 // TODO: remove this
-                if method.http_verb == HttpVerb::GET {
+                if method.http_verb == HttpVerb::Get {
                     fail!(
                         GeneratorErrorKind::NotYetSupported,
                         "GET Requests currently do not support object parameters {}.{}.{}",
@@ -792,7 +823,7 @@ fn validate_methods(
             }
             CidlType::R2Object => {
                 // TODO: remove this
-                if method.http_verb == HttpVerb::GET {
+                if method.http_verb == HttpVerb::Get {
                     fail!(
                         GeneratorErrorKind::NotYetSupported,
                         "GET Requests currently do not support R2Object parameters {}.{}.{}",

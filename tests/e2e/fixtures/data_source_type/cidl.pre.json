@@ -40,7 +40,8 @@
             "data_sources": {
                 "default": {
                     "name": "default",
-                    "tree": {}
+                    "tree": {},
+                    "is_private": false
                 }
             },
             "cruds": [],
@@ -60,7 +61,7 @@
             "methods": {
                 "bar": {
                     "name": "bar",
-                    "http_verb": "POST",
+                    "http_verb": "Post",
                     "is_static": false,
                     "return_media": "Json",
                     "return_type": "Void",
@@ -90,13 +91,15 @@
                                 "Object": "Poo"
                             }
                         }
-                    ]
+                    ],
+                    "data_source": "baz"
                 }
             },
             "data_sources": {
                 "baz": {
                     "name": "baz",
-                    "tree": {}
+                    "tree": {},
+                    "is_private": false
                 }
             },
             "cruds": [],
