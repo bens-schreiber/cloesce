@@ -2,21 +2,20 @@
 
 - **Author(s):** Ben Schreiber
 - **Status:** **Draft** | Review | Accepted | Rejected | Implemented
-- **Created:** 2026-02-19
-- **Last Updated:** 2026-02-21
+- **Created:** 2026-02-26
+- **Last Updated:** 2026-02-26
 
 ---
 
 ## Summary
 
-Pagination is the act of splitting a large set of data yielded from a query into smaller chunks that can be retrieved incrementally. Cloesce Models, which are backed by D1, KV, and R2 can yield large data sets that are currently naively returned in their entirety. This proposal outlines a pagination system for Cloesce Models that would allow both the developer and clients to retrieve data in smaller chunks.
+Pagination is the act of splitting a large query result set into smaller chunks that can be retrieved incrementally. Cloesce Models, which are backed by D1, KV, and R2, can yield large data sets that are currently returned in their entirety. This proposal outlines a pagination system for Cloesce Models that would allow both developers and clients to retrieve data in smaller chunks.
 
 ---
 
 ## Motivation
 
-D1, KV, and R2 all have methods of pagination that allow retrieving data incrementally in smaller chunks. Currently, when `orm.list` is called with some Model, it retrieves every D1 row and KV/R2 value via a prefix list. We expose no way for a developer to paginate this data, meaning you must implement your own list method with both custom SQL and hydration logic. This is a non trivial amount of work, and it would be ideal for Cloesce to handle this for developers.
-
+D1, KV, and R2 all support incremental retrieval of data in smaller chunks. Currently, when `orm.list` is called with a Model, it retrieves every D1 row and every KV/R2 value via a prefix list. There is no way for a developer to paginate this data, meaning custom list methods must be implemented with both raw SQL and hydration logic. This is a non-trivial amount of work, and it would be ideal for Cloesce to handle this for developers.
 
 ---
 
@@ -24,13 +23,14 @@ D1, KV, and R2 all have methods of pagination that allow retrieving data increme
 
 ### Goals
 
-- Allow pagination of D1 results from both the ORM and the client generated `LIST` method.
-- Allow pagination of KV and R2 results from both the ORM and the client generated `LIST` method.
+- Allow pagination of D1 results from both the ORM and the client-generated `LIST` method.
+- Allow pagination of KV and R2 results from both the ORM and the client-generated `LIST` method.
 
 ### Non-Goals
-- Implementing cursor based pagination for KV and R2 in Cloesce. We will simply expose the cursor and associated metadata to developers, who can then query for the next page of results themselves.
-- Nested pagination of relationships, (e.g., paginating the `posts` relationship on a `User` model). Developers can implement this themselves with custom methods on their models.
-- Validation of SQL in Data Sources (a static analyzer is likely a future Proposal)
+
+- Implementing cursor-based pagination for KV and R2 within Cloesce. We will simply expose the cursor and associated metadata to developers, who can then query for the next page of results themselves.
+- Nested pagination of relationships (e.g., paginating the `posts` relationship on a `User` model). Developers can implement this themselves with custom methods on their models.
+- Validation of SQL in Data Sources (a static analyzer is likely coming in the future).
 
 ---
 
@@ -38,67 +38,68 @@ D1, KV, and R2 all have methods of pagination that allow retrieving data increme
 
 ### KV and R2
 
-Both KV and R2 have cursor based pagination. After a list query is performed, the response includes a "cursor" (a string) that can be used to retrieve the next page of results. 
+Both KV and R2 support cursor-based pagination. After a list query is performed, the response includes a cursor (an opaque string) that can be used to retrieve the next page of results.
 
-Cloesce is going to assume something bold here: you always want the maximum amount of results on the first page. That means, we will use the default page size for both KV and R2, which is 1000 results.
+Cloesce will make one opinionated assumption here: you always want the maximum number of results on the first page. We will therefore use the default page size for both KV and R2, which is 1,000 results.
 
-In the current implementation, indicating that a field is a list of KV or R2 objects is done by writing `field: KValue<unknown>[]` or `field: R2ObjectBody[]` in the model definition. In order to support pagination, we will instead introduce a new type called `Paginated`, which will be added to the Cloesce grammar.
+In the current implementation, a field containing a list of KV or R2 objects is declared as `field: KValue<unknown>[]` or `field: R2ObjectBody[]` in the model definition. To support pagination, we will introduce a new `Paginated` type to the Cloesce grammar:
 
 ```ts
-// On both the backend and client
+// Shared between backend and client
 interface Paginated<T> {
     results: T[];
     cursor: string | null;
-    complete: boolean; // true if cursor is null or if KV says so
+    complete: boolean; // true if cursor is null, or if KV indicates list_complete
 }
 ```
 
-In a model definition, you would write `field: Paginated<KValue<unknown>>` or `field: Paginated<R2ObjectBody>` to indicate that this field is paginated.
+In a model definition, you would write `field: Paginated<KValue<unknown>>` or `field: Paginated<R2ObjectBody>` to indicate that a field is paginated. Cloesce will hydrate this type when a query is made, populating `results` with the first page, `cursor` with the token for the next page, and `complete` with whether all results have been retrieved. This type will also be surfaced to the client for use in custom methods.
 
-This `Paginated` type would be hydrated by Cloesce when a query is made, and it would include the first page of results, the cursor for the next page, and a boolean indicating whether there are more results to retrieve. Additionally, it would be sent to the client, who may need to use it to retrieve more results in some custom method.
-
-This grammar would replace the current array syntax, which is a breaking change.
+This grammar replaces the current array syntax, which is a breaking change.
 
 > [!NOTE]
-> Sharing a cursor to the client is not particuarly dangerous, as the cursor is just an opaque string that the client can use to retrieve the next page of results (if some method even exposed the capacity to do so).
+> Sharing a cursor with the client is not particularly dangerous — it is an opaque string that can only be used to retrieve the next page of results, and only if a method exists that exposes that capability.
 
 ### D1
 
-D1 is less trivial to paginate results for, as it is a relational database that does not have pagination as a primitive concept.
+Paginating D1 results is less straightforward, as it is a relational database without a native pagination primitive.
 
-In SQL, pagination can be done in two ways:
-1. Using `LIMIT` and `OFFSET` (e.g., `SELECT * FROM table LIMIT 10 OFFSET 20` to get the 3rd page of results with a page size of 10)
-2. Using a "seek method" with a unique, sequential column (e.g., `SELECT * FROM table WHERE id > last_seen_id ORDER BY id LIMIT 10`)
+SQL pagination can be implemented in two ways:
 
-By default, Cloesce will use the seek method for the primary key of a Model, as it is more efficient and leads to more consistent results (especially if new records are being added to the database).
+1. **`LIMIT` / `OFFSET`** — e.g., `SELECT * FROM table LIMIT 10 OFFSET 20` to retrieve the third page with a page size of 10.
+2. **Seek method** — e.g., `SELECT * FROM table WHERE id > last_seen_id ORDER BY id LIMIT 10`, which filters from the last seen primary key.
 
+By default, Cloesce will use the seek method on the primary key of a Model. It is more efficient than `OFFSET` and produces more consistent results, particularly when new records are being inserted concurrently.
 
-#### Without a custom SQL `select` statement
+#### Without a Custom SQL `select` Statement
 
-Default pagination queries will always follow the exact same format:
+Default pagination queries will always follow this format:
+
 ```sql
-SELECT * FROM <all D1 relationships of the IncludeTree> WHERE <ModelName>.<primaryKey> > ? ORDER BY <ModelName>.<primaryKey> LIMIT ?
+SELECT * FROM <all D1 relationships of the IncludeTree>
+WHERE <ModelName>.<primaryKey> > ?
+ORDER BY <ModelName>.<primaryKey>
+LIMIT ?
 ```
 
-The two parameters would be the last id from the previous page, and the page size. It's important that we:
-- Order by a unique column (always the primary key) to ensure consistent pagination results
-- Filter by the last id from the previous page to ensure we are getting the next page of
-results (better than using OFFSET, which can lead to inconsistent results if there are new records being added to the database)
-- Limit by the page size to ensure we are only getting a specific number of results per page
+The two bound parameters are the last seen primary key from the previous page and the page size. Ordering by a unique column and filtering from the last seen key ensures stable, consistent pagination regardless of concurrent inserts — unlike `OFFSET`, which can skip or repeat rows as new records are added.
 
-#### Problems with a Custom SQL `select` statement
+#### Problems with a Custom SQL `select` Statement
 
-The current `select` statement in a Data Source is a raw SQL string used for both GET and LIST queries. It's integration into Cloesce is naive, especially in light of pagination. For example, assume we have some custom `select` statement like this:
+The current `select` field in a Data Source accepts a raw SQL string used for both GET and LIST queries. Its integration with pagination is problematic. For example, given a custom statement like:
+
 ```sql
 SELECT * FROM User ORDER BY User.name WHERE User.name > "greg"
 ```
 
-The current implementation will treat a custom `select` as a subquery, wrapping queries like this (for a GET):
+The current implementation wraps it as a subquery:
+
 ```sql
 SELECT * FROM (SELECT * FROM User ORDER BY User.name WHERE User.name > "greg") WHERE User.id = ?
 ```
 
-It would then follow that a pagination query would look like this:
+A pagination query would then look like:
+
 ```sql
 SELECT * FROM (
     SELECT * FROM User ORDER BY User.name WHERE User.name > "greg"
@@ -106,11 +107,11 @@ SELECT * FROM (
 WHERE q.id > ? ORDER BY q.id LIMIT ?
 ```
 
-This approach is inefficient, as it requires the database to execute the entire custom query and then filter and sort the results in memory. This is not ideal, especially for large data sets.
+This is inefficient — the database must execute the entire inner query before the outer query can filter and sort the results. This approach does not scale well for large data sets.
 
-#### Solution: `get` and `list` methods on Data Sources
+#### Solution: `get` and `list` Methods on Data Sources
 
-Instead of a single `select` statement, we can allow developers to define two seperate SQL statements: one for `get` and one for `list`. Then, instead of trying to mark up the SQL, we can assume the developer has taken pagination into account when writing their `list` statement. For example:
+Instead of a single `select` string, developers can define separate `get` and `list` methods on a Data Source. This allows the developer to write a pagination-aware `list` query without Cloesce needing to manipulate it:
 
 ```ts
 const customDs: DataSource<User> = {
@@ -124,36 +125,34 @@ const customDs: DataSource<User> = {
     list: (joined) => `
         WITH joined AS (${joined()})
         SELECT * FROM joined WHERE id > ? ORDER BY id LIMIT ?
-     `
+    `
 }
 ```
 
-Here, `customDs` defines a `get` method for retrieving a single user by id, and a `list` method for retrieving a paginated list of users.
-
-Both methods take a `joined` parameter (the SQL string that joins all relationships in the defined `includeTree`). Further, the `get` method takes a binded parameter for the id, and the `list` method takes binded parameters for the last id and page size.
-
----
+Both methods receive a `joined` parameter — a function that returns the SQL joining all relationships defined in `includeTree`. The `get` method binds a single `id` parameter, while the `list` method binds the last seen `id` and the page size, in that order.
 
 > [!NOTE]
 > A `Paginated` type is not necessary for D1, as only the root level of a query can be paginated.
 
-### Implementation
+---
 
-### KV and R2 
+## Implementation
 
-For KV and R2, we would need to update the Cloesce grammar to include the `Paginated` type, and then update the hydration logic to populate the `results`, `cursor`, and `complete` fields when a query is made. We would also need to update the client generated `LIST` method to return a `Paginated` type instead of an array.
+### KV and R2
 
-The `Paginated` interface would then need to be added to both the backend, and client TypeScript (via the handlebars template).
+The Cloesce grammar will be updated to include the `Paginated` type. The hydration logic will be updated to populate `results`, `cursor`, and `complete` when a list query is made. The client-generated `LIST` method will be updated to return `Paginated<T>` instead of `T[]`. The `Paginated` interface will be added to both the backend runtime and the client TypeScript output via the Handlebars template.
 
 ### D1
 
-The ORM will have to be updated to accept a last seen id and page size parameter for list queries. The last seen id can be nullable, utilizing the Model metadata to fill in a sensible default value (e.g., 0 for integers). The page size can default to some value (e.g., 1000), and can be overridden by the client.
+The ORM will be updated to accept an optional `lastSeen` parameter and a `limit` parameter for list queries. When `lastSeen` is not provided, the ORM will use Model metadata to supply a sensible default (e.g., `0` for integer primary keys). `limit` will default to `1000` but can be overridden by the caller.
 
-Within the ORM implementation, we would default to the defined functions in the Data Source. If not defined, a default `get` and `list` function would be used, with the `list` function following the pagination format outlined above.
+Within the ORM, the `get` and `list` functions defined on a Data Source take precedence. If neither is defined, the ORM falls back to the default seek-method query described above.
 
-### LIST Crud Method
+Parameter bindings are applied in the order `lastSeen`, `limit`, `offset`. This is safe because SQL grammar enforces a fixed clause order — `WHERE` always precedes `LIMIT`, which always precedes `OFFSET` — so bound parameters will always appear in this sequence regardless of how the query is written.
 
-If a Model has some D1 table associated with it, then the generated `LIST` method would need to be updated to accept optional pagination parameters.
+### LIST CRUD Method
+
+If a Model has a D1 table associated with it, the generated `LIST` method will be updated to accept optional pagination parameters (`lastSeen`, `limit`, and `offset`).
 
 ---
 
@@ -177,7 +176,7 @@ class User {
 
     @KV("settings/{id}", namespace)
     settings: Paginated<KValue<unknown>>;
-    
+
     @R2("files/{id}", bucket)
     files: Paginated<R2ObjectBody>;
 
@@ -210,16 +209,11 @@ const usersById = await orm.list(User, {
     limit: 1000,
 });
 
-// ex: iterate through KV using a cursor
+// Iterating through KV results beyond the first page using the cursor
 const someUser = usersByName[0];
 let result = await env.namespace.list({ cursor: someUser.settings.cursor });
 while (!result.list_complete) {
-  // process result.keys
-  result = await env.namespace.list({ cursor: result.cursor });
+    // process result.keys
+    result = await env.namespace.list({ cursor: result.cursor });
 }
 ```
-
-> [!NOTE]
-> The implementation will apply parameter bindings in the order: `lastSeen`, `limit`, `offset`. This is safe because a SQL query will always follow this order, due to the grammar of SQL (`WHERE` comes before `LIMIT`, which comes before `OFFSET`).
-
-
