@@ -1,7 +1,7 @@
 # Proposal: Pagination
 
 - **Author(s):** Ben Schreiber
-- **Status:** **Draft** | Review | Accepted | Rejected | Implemented
+- **Status:** Draft | **Review** | Accepted | Rejected | Implemented
 - **Created:** 2026-02-26
 - **Last Updated:** 2026-02-26
 
@@ -62,16 +62,18 @@ This grammar replaces the current array syntax, which is a breaking change.
 
 ### D1
 
-Paginating D1 results is less straightforward, as it is a relational database without a native pagination primitive.
-
-SQL pagination can be implemented in two ways:
+Paginating D1 results is less straightforward, because it lacks a native pagination primitive like a `cursor`. SQL pagination can be implemented in two ways:
 
 1. **`LIMIT` / `OFFSET`** — e.g., `SELECT * FROM table LIMIT 10 OFFSET 20` to retrieve the third page with a page size of 10.
 2. **Seek method** — e.g., `SELECT * FROM table WHERE id > last_seen_id ORDER BY id LIMIT 10`, which filters from the last seen primary key.
 
-By default, Cloesce will use the seek method on the primary key of a Model. It is more efficient than `OFFSET` and produces more consistent results, particularly when new records are being inserted concurrently.
+The `LIMIT` / `OFFSET` method can lead to inconsistent results if the rows are being concurrently inserted or deleted, because the offset is applied after the result set is generated. However, it the best way to implement pagination when ordering by a non-unique column (e.g., `ORDER BY name`), because the seek method requires a unique, sequential column to filter from.
 
-#### Without a Custom SQL `select` Statement
+The seek method is more performant and consistent for large data sets, because it can take advantage of indexes and doesn't require the database to count or skip rows. It requires a unique, sequential column (usually the primary key) to filter from.
+
+For Cloesces purposes, we will support both methods. By default, the ORM will use the seek method with the primary key for pagination. Custom data sources can be used to implement pagination with `LIMIT` / `OFFSET` if the developer wants to paginate by a non-unique column or use a different pagination strategy.
+
+#### Default Pagination with the Seek Method
 
 Default pagination queries will always follow this format:
 
@@ -82,54 +84,44 @@ ORDER BY <ModelName>.<primaryKey>
 LIMIT ?
 ```
 
-The two bound parameters are the last seen primary key from the previous page and the page size. Ordering by a unique column and filtering from the last seen key ensures stable, consistent pagination regardless of concurrent inserts — unlike `OFFSET`, which can skip or repeat rows as new records are added.
+The two bound parameters are the last seen primary key from the previous page and the page size. Ordering by a unique column and filtering from the last seen key ensures stable, consistent pagination regardless of concurrent inserts.
 
-#### Problems with a Custom SQL `select` Statement
-
-The current `select` field in a Data Source accepts a raw SQL string used for both GET and LIST queries. Its integration with pagination is problematic. For example, given a custom statement like:
-
-```sql
-SELECT * FROM User ORDER BY User.name WHERE User.name > "greg"
-```
-
-The current implementation wraps it as a subquery:
-
-```sql
-SELECT * FROM (SELECT * FROM User ORDER BY User.name WHERE User.name > "greg") WHERE User.id = ?
-```
-
-A pagination query would then look like:
-
-```sql
-SELECT * FROM (
-    SELECT * FROM User ORDER BY User.name WHERE User.name > "greg"
-) as q
-WHERE q.id > ? ORDER BY q.id LIMIT ?
-```
-
-This is inefficient — the database must execute the entire inner query before the outer query can filter and sort the results. This approach does not scale well for large data sets.
-
-#### Solution: `get` and `list` Methods on Data Sources
+#### `get` and `list` Methods on Data Sources
 
 Instead of a single `select` string, developers can define separate `get` and `list` methods on a Data Source. This allows the developer to write a pagination-aware `list` query without Cloesce needing to manipulate it:
 
 ```ts
+interface DataSource<T> {
+    includeTree?: IncludeTree;
+    get?: (joined: () => string) => string;
+    list?: (joined: () => string) => string;
+    listParams?: ("lastSeen" | "limit" | "offset")[]
+}
+
 const customDs: DataSource<User> = {
     includeTree: {
         posts: {}
     },
+
+    // NOTE: This is equivalent to the default `get` implementation
     get: (joined) => `
         WITH joined AS (${joined()})
         SELECT * FROM joined WHERE id = ?
     `,
+
+    // NOTE: This is equivalent to the default `list` implementation
     list: (joined) => `
         WITH joined AS (${joined()})
         SELECT * FROM joined WHERE id > ? ORDER BY id LIMIT ?
-    `
+    `,
+    listParams: ["lastSeen", "limit"]
 }
 ```
 
-Both methods receive a `joined` parameter — a function that returns the SQL joining all relationships defined in `includeTree`. The `get` method binds a single `id` parameter, while the `list` method binds the last seen `id` and the page size, in that order.
+Note that we also need to specify the parameter names in `listParams` so that Cloesce can bind them correctly. If `listParams` is not provided, Cloesce will assume the parameters are `lastSeen` and `limit` in that order.
+
+`get` is assumed to accept a single parameter for the primary key.
+
 
 > [!NOTE]
 > A `Paginated` type is not necessary for D1, as only the root level of a query can be paginated.
@@ -144,16 +136,24 @@ The Cloesce grammar will be updated to include the `Paginated` type. The hydrati
 
 ### D1
 
-The ORM will be updated to accept an optional `lastSeen` parameter and a `limit` parameter for list queries. When `lastSeen` is not provided, the ORM will use Model metadata to supply a sensible default (e.g., `0` for integer primary keys). `limit` will default to `1000` but can be overridden by the caller.
+The ORM `list` method will be updated to accept an arguments struct:
+```ts
+interface ListArgs {
+    lastSeen?: unknown; // type depends on the primary key type
+    limit?: number;
+    offset?: number;
+}
+```
 
-Within the ORM, the `get` and `list` functions defined on a Data Source take precedence. If neither is defined, the ORM falls back to the default seek-method query described above.
+When `list` is called, e.g., `orm.list(User)`, the ORM will check if the `User` model has a custom `list` method on its Data Source. If it does not, it will assume we are using the default seek method for pagination, using the `lastSeen` and `limit` parameters from `ListArgs` (with defaults if they are not provided) to bind the query parameters. 
 
-Parameter bindings are applied in the order `lastSeen`, `limit`, `offset`. This is safe because SQL grammar enforces a fixed clause order — `WHERE` always precedes `LIMIT`, which always precedes `OFFSET` — so bound parameters will always appear in this sequence regardless of how the query is written.
+If a custom `list` method is defined, the ORM will bind parameters from the names specified in `listParams` (or `lastSeen` and `limit` by default) to the query in the order they are defined. If a parameter is not provided by the caller, the ORM will use a default value (`0` for `lastSeen`, `1000` for `limit`, and `0` for `offset`) if the parameter is expected by the query.
 
 ### LIST CRUD Method
 
-If a Model has a D1 table associated with it, the generated `LIST` method will be updated to accept optional pagination parameters (`lastSeen`, `limit`, and `offset`).
+All `LIST` methods generated for the client will be updated to accept their Data Sources `listParams` as arguments, or just `lastSeen` and `limit` if not defined. The client will be responsible for managing pagination for KV and R2 fields using the cursor provided in the response.
 
+Note that this CRUD method will not validate input other than ensuring the parameters are of the correct type (e.g., `number` for `limit`). If a developer wanted to limit pagination size or enforce that `lastSeen` is provided, they would need to implement a custom method on their model that performs those checks and then calls `orm.list` with the appropriate parameters.
 ---
 
 ## Example
@@ -188,10 +188,14 @@ class User {
             WITH joined AS (${joined()})
             SELECT * FROM joined WHERE id = ?
         `,
+
+        // NOTE: If the parameters appeared many times in the query, we could use positional
+        // parameters (e.g., $1, $2), which uses the order of parameters in listParams to bind them correctly.
         list: (joined) => `
             WITH joined AS (${joined()})
             SELECT * FROM joined ORDER BY name LIMIT ? OFFSET ?
-        `
+        `,
+        listParams: ["offset", "limit"]
     }
 }
 ```
