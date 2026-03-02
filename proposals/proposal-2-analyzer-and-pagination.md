@@ -67,7 +67,7 @@ Paginating D1 results is less straightforward, because it lacks a native paginat
 1. **`LIMIT` / `OFFSET`** — e.g., `SELECT * FROM table LIMIT 10 OFFSET 20` to retrieve the third page with a page size of 10.
 2. **Seek method** — e.g., `SELECT * FROM table WHERE id > last_seen_id ORDER BY id LIMIT 10`, which filters from the last seen primary key.
 
-The `LIMIT` / `OFFSET` method can lead to inconsistent results if the rows are being concurrently inserted or deleted, because the offset is applied after the result set is generated. However, it the best way to implement pagination when ordering by a non-unique column (e.g., `ORDER BY name`), because the seek method requires a unique, sequential column to filter from.
+The `LIMIT` / `OFFSET` method can lead to inconsistent results if the rows are being concurrently inserted or deleted, because the offset is applied after the result set is generated. However, it is the best way to implement pagination when ordering by a non-unique column (e.g., `ORDER BY name`), because the seek method requires a unique, sequential column to filter from.
 
 The seek method is more performant and consistent for large data sets, because it can take advantage of indexes and doesn't require the database to count or skip rows. It requires a unique, sequential column (usually the primary key) to filter from.
 
