@@ -195,7 +195,7 @@ class User {
             WITH joined AS (${joined()})
             SELECT * FROM joined ORDER BY name LIMIT ? OFFSET ?
         `,
-        listParams: ["offset", "limit"]
+        listParams: ["limit", "offset"]
     }
 }
 ```
