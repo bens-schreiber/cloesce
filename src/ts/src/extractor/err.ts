@@ -62,12 +62,16 @@ const errorInfoMap: Record<
     suggestion: "Fix the TypeScript syntax errors.",
   },
   [ExtractorErrorCode.MissingKValue]: {
-    description: "All KV decorated fields must be of type KValue<T>",
-    suggestion: "Change the field type to KValue<T>.",
+    description:
+      "KV decorated fields must be KValue<T> for single keys, or Paginated<KValue<T>> for list prefixes",
+    suggestion:
+      "Use KValue<T> for single values, or Paginated<KValue<T>> for list prefixes.",
   },
   [ExtractorErrorCode.MissingR2ObjectBody]: {
-    description: "All R2 decorated fields must be of type R2ObjectBody.",
-    suggestion: "Change the field type to R2ObjectBody.",
+    description:
+      "R2 decorated fields must be R2ObjectBody for single keys, or Paginated<R2ObjectBody> for list prefixes.",
+    suggestion:
+      "Use R2ObjectBody for single values, or Paginated<R2ObjectBody> for list prefixes.",
   },
   [ExtractorErrorCode.InvalidSelectorSyntax]: {
     description: "The selector syntax is invalid.",

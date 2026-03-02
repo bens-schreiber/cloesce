@@ -118,7 +118,7 @@ export class PureR2Model {
   id: string;
   data: R2Object;
   otherData: R2Object;
-  allData: R2Object[];
+  allData: Paginated<R2Object>;
 
   static async GET(
     id: string,
@@ -218,6 +218,12 @@ export class KValue<V> {
   get value(): V | null {
     return this.raw as V | null;
   }
+}
+
+export interface Paginated<T> {
+  results: T[];
+  cursor: string | null;
+  complete: boolean;
 }
 
 export enum MediaType {

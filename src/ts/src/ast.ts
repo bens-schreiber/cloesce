@@ -26,6 +26,7 @@ export type CidlType =
   | { Object: string }
   | { Partial: string }
   | { KvObject: CidlType }
+  | { Paginated: CidlType }
   | { Nullable: CidlType }
   | { Array: CidlType }
   | { HttpResult: CidlType };

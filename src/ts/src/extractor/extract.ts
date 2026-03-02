@@ -474,9 +474,20 @@ export class CidlExtractor {
             });
           }
 
-          // Ensure that the prop type is a KvObject
-          const isArray = typeof cidl_type === "object" && "Array" in cidl_type;
-          const unwrapped = isArray ? (cidl_type as any).Array : cidl_type;
+          // Ensure that the prop type is a KvObject or Paginated<KvObject>
+          const isPaginated =
+            typeof cidl_type === "object" && "Paginated" in cidl_type;
+          const unwrapped = isPaginated
+            ? (cidl_type as { Paginated: CidlType }).Paginated
+            : cidl_type;
+
+          if (typeof unwrapped === "string") {
+            return err(ExtractorErrorCode.MissingKValue, (e) => {
+              e.snippet = prop.getText();
+              e.context = prop.getName();
+            });
+          }
+
           if (!("KvObject" in unwrapped)) {
             return err(ExtractorErrorCode.MissingKValue, (e) => {
               e.snippet = prop.getText();
@@ -509,7 +520,7 @@ export class CidlExtractor {
               name: prop.getName(),
               cidl_type: inner,
             },
-            list_prefix: isArray,
+            list_prefix: isPaginated,
           });
           break;
         }
@@ -524,9 +535,13 @@ export class CidlExtractor {
             });
           }
 
-          // Type must be R2Object
-          const isArray = typeof cidl_type === "object" && "Array" in cidl_type;
-          const unwrapped = isArray ? (cidl_type as any).Array : cidl_type;
+          // Type must be R2Object or Paginated<R2Object>
+          const isPaginated =
+            typeof cidl_type === "object" && "Paginated" in cidl_type;
+          const unwrapped = isPaginated
+            ? (cidl_type as { Paginated: CidlType }).Paginated
+            : cidl_type;
+
           if (unwrapped !== "R2Object") {
             return err(ExtractorErrorCode.MissingR2ObjectBody, (e) => {
               e.snippet = prop.getText();
@@ -538,7 +553,7 @@ export class CidlExtractor {
             format,
             bucket_binding,
             var_name: prop.getName(),
-            list_prefix: isArray,
+            list_prefix: isPaginated,
           });
           break;
         }
@@ -1050,6 +1065,12 @@ export class CidlExtractor {
       return wrapGeneric(genericTy, nullable, (inner) => ({ KvObject: inner }));
     }
 
+    if (symbolName === "Paginated") {
+      return wrapGeneric(genericTy, nullable, (inner) => ({
+        Paginated: inner,
+      }));
+    }
+
     if (symbolName === Promise.name || aliasName === "IncludeTree") {
       return wrapGeneric(genericTy, nullable, (inner) => inner);
     }
@@ -1354,6 +1375,10 @@ function getRootType(t: CidlType): CidlType {
 
   if ("HttpResult" in t) {
     return getRootType(t.HttpResult);
+  }
+
+  if ("Paginated" in t) {
+    return getRootType(t.Paginated);
   }
 
   return t;

@@ -37,6 +37,12 @@ export class KValue<V> {
   }
 }
 
+export interface Paginated<T> {
+  results: T[];
+  cursor: string | null;
+  complete: boolean;
+}
+
 /**
  * The result of a Workers endpoint.
  *

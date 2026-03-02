@@ -42,9 +42,9 @@ describe("Pure R2 Model", () => {
 
     expect(res.data?.data.key).toBe("path/to/data/test-id-1");
     expect(res.data?.otherData.key).toBe("path/to/other/test-id-1");
-    expect(res.data?.allData.length).toBe(2);
+    expect(res.data?.allData.results.length).toBe(2);
 
-    expect(res.data?.allData.map((obj) => obj.key).sort()).toEqual([
+    expect(res.data?.allData.results.map((obj) => obj.key).sort()).toEqual([
       "path/to/data/test-id-1",
       "path/to/other/test-id-1",
     ]);

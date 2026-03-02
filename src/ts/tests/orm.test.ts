@@ -1,7 +1,7 @@
 import { describe, test, expect, afterEach } from "vitest";
 import { Miniflare } from "miniflare";
 import { ModelBuilder, createAst } from "./builder";
-import { KValue, Orm } from "../src/ui/backend.js";
+import { KValue, Orm, Paginated } from "../src/ui/backend.js";
 import { _cloesceInternal } from "../src/router/router.js";
 import { R2ObjectBody } from "@cloudflare/workers-types";
 import { hydrateType } from "../src/router/orm";
@@ -385,12 +385,12 @@ describe("ORM Hydrate Tests", () => {
       configId!: string;
       config!: KValue<unknown>;
       configStream!: KValue<ReadableStream>;
-      configList!: KValue<unknown>[];
+      configList!: Paginated<KValue<unknown>>;
       emptyConfig!: KValue<unknown>;
 
       imageId!: string;
       image!: R2ObjectBody;
-      imageList!: R2ObjectBody[];
+      imageList!: Paginated<R2ObjectBody>;
       emptyImage!: R2ObjectBody;
     }
 
@@ -475,9 +475,17 @@ describe("ORM Hydrate Tests", () => {
       // Assert
       expect(noIncludeTree).toBeInstanceOf(TestModel);
       expect(noIncludeTree.config).toBeUndefined();
-      expect(noIncludeTree.configList).toEqual([]);
+      expect(noIncludeTree.configList).toEqual({
+        results: [],
+        cursor: null,
+        complete: true,
+      });
       expect(noIncludeTree.image).toBeUndefined();
-      expect(noIncludeTree.imageList).toEqual([]);
+      expect(noIncludeTree.imageList).toEqual({
+        results: [],
+        cursor: null,
+        complete: true,
+      });
     }
 
     {
@@ -506,8 +514,10 @@ describe("ORM Hydrate Tests", () => {
         raw: baseConfigKV.value,
         metadata: JSON.stringify(baseConfigKV.metadata),
       });
-      expect(fullIncludeTree.configList.length).toBe(2);
-      expect(fullIncludeTree.configList).toEqual(
+      expect(fullIncludeTree.configList.results.length).toBe(2);
+      expect(fullIncludeTree.configList.complete).toBe(true);
+      expect(fullIncludeTree.configList.cursor).toBeNull();
+      expect(fullIncludeTree.configList.results).toEqual(
         expect.arrayContaining([
           {
             key: baseConfigKV.key,
@@ -526,10 +536,12 @@ describe("ORM Hydrate Tests", () => {
 
       expect(fullIncludeTree.image).toBeDefined();
       expect(await fullIncludeTree.image.text()).toBe(baseImageObject.body);
-      expect(fullIncludeTree.imageList.length).toBe(2);
+      expect(fullIncludeTree.imageList.results.length).toBe(2);
+      expect(fullIncludeTree.imageList.complete).toBe(true);
+      expect(fullIncludeTree.imageList.cursor).toBeNull();
 
       const imageBodies: string[] = [];
-      for (const imgObj of fullIncludeTree.imageList) {
+      for (const imgObj of fullIncludeTree.imageList.results) {
         imageBodies.push(await imgObj.text());
       }
       expect(imageBodies).toEqual(
@@ -539,4 +551,74 @@ describe("ORM Hydrate Tests", () => {
       expect(fullIncludeTree.emptyImage).toBeNull();
     }
   });
+
+  test("KV cursor paginates correctly from hydrated Paginated result", async () => {
+    // Arrange
+    const modelMeta = ModelBuilder.model("CursorModel")
+      .idPk()
+      .kvObject("cursor-test", "namespace1", "configList", true, "JsonValue")
+      .build();
+
+    class CursorModel {
+      id!: number;
+      configList!: Paginated<KValue<unknown>>;
+    }
+
+    const mf = new Miniflare({
+      modules: true,
+      script: `
+            export default {
+              async fetch(request, env, ctx) {
+                return new Response("Hello Miniflare!");
+              }
+            }
+            `,
+      kvNamespaces: ["namespace1"],
+    });
+
+    const namespace1 = await mf.getKVNamespace("namespace1");
+    const total = 1005;
+    for (let i = 0; i < total; i++) {
+      await namespace1.put(
+        `cursor-test/${String(i).padStart(4, "0")}`,
+        JSON.stringify({ i }),
+      );
+    }
+
+    const ast = createAst({ models: [modelMeta] });
+    const ctorReg = {
+      CursorModel,
+    };
+
+    await _cloesceInternal.RuntimeContainer.init(ast, ctorReg);
+    const instance = Orm.fromEnv({ namespace1 });
+
+    // Act
+    const hydrated = await instance.hydrate(CursorModel, {
+      base: { id: 1 },
+      include: { configList: {} },
+    });
+
+    // Assert first page
+    expect(hydrated.configList.results.length).toBe(1000);
+    expect(hydrated.configList.complete).toBe(false);
+    expect(hydrated.configList.cursor).toBeTypeOf("string");
+
+    const firstPageKeys = new Set(
+      hydrated.configList.results.map((item) => item.key),
+    );
+
+    // Act on next page using hydrated cursor
+    const next = await namespace1.list({
+      prefix: "cursor-test",
+      cursor: hydrated.configList.cursor!,
+    });
+
+    // Assert cursor works for pagination
+    expect(next.keys.length).toBe(total - 1000);
+    expect(next.list_complete).toBe(true);
+    for (const key of next.keys) {
+      expect(firstPageKeys.has(key.name)).toBe(false);
+    }
+  }, 30000);
 });

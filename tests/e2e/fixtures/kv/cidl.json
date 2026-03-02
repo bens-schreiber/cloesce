@@ -1,5 +1,5 @@
 {
-  "hash": 864487073929629472,
+  "hash": 3330534804662703831,
   "project_name": "runner",
   "wrangler_env": {
     "name": "Env",
@@ -248,6 +248,91 @@
       "cruds": [
         "GET",
         "SAVE"
+      ],
+      "source_path": "./seed__kv.cloesce.ts"
+    },
+    "PaginatedKVModel": {
+      "hash": 14139697862985505255,
+      "name": "PaginatedKVModel",
+      "primary_key": null,
+      "columns": [],
+      "navigation_properties": [],
+      "key_params": [
+        "id"
+      ],
+      "kv_objects": [
+        {
+          "format": "paginated/items/",
+          "namespace_binding": "namespace",
+          "value": {
+            "name": "items",
+            "cidl_type": "JsonValue"
+          },
+          "list_prefix": true
+        }
+      ],
+      "r2_objects": [],
+      "methods": {
+        "GET": {
+          "name": "GET",
+          "is_static": true,
+          "data_source": null,
+          "http_verb": "Get",
+          "return_media": "Json",
+          "return_type": {
+            "HttpResult": {
+              "Object": "PaginatedKVModel"
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "id",
+              "cidl_type": "Text"
+            },
+            {
+              "name": "__datasource",
+              "cidl_type": {
+                "DataSource": "PaginatedKVModel"
+              }
+            }
+          ]
+        },
+        "acceptPaginated": {
+          "name": "acceptPaginated",
+          "is_static": true,
+          "data_source": null,
+          "http_verb": "Post",
+          "return_media": "Json",
+          "return_type": {
+            "Paginated": {
+              "KvObject": "JsonValue"
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "ps",
+              "cidl_type": {
+                "Paginated": {
+                  "KvObject": "JsonValue"
+                }
+              }
+            }
+          ]
+        }
+      },
+      "data_sources": {
+        "default": {
+          "name": "default",
+          "tree": {
+            "items": {}
+          },
+          "is_private": false
+        }
+      },
+      "cruds": [
+        "GET"
       ],
       "source_path": "./seed__kv.cloesce.ts"
     }

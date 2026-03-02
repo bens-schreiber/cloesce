@@ -1,5 +1,6 @@
 import type {
   R2Bucket,
+  R2ObjectBody,
   D1Database,
   KVNamespace,
   D1Result,
@@ -14,7 +15,7 @@ import {
   getNavigationPropertyCidlType,
 } from "../ast.js";
 import { InternalError, u8ToB64 } from "../common.js";
-import { IncludeTree, DeepPartial, KValue } from "../ui/backend.js";
+import { IncludeTree, DeepPartial, KValue, Paginated } from "../ui/backend.js";
 
 export interface DataSource<T> {
   includeTree?: IncludeTree<T>;
@@ -718,7 +719,11 @@ export function hydrateType(
         !key
       ) {
         if (kv.list_prefix) {
-          instance[kv.value.name] = [];
+          instance[kv.value.name] = {
+            results: [],
+            cursor: null,
+            complete: true,
+          } as Paginated<KValue<unknown>>;
         }
 
         // Do not hydrate KV properties if they are not included in the include tree.
@@ -742,7 +747,11 @@ export function hydrateType(
         !key
       ) {
         if (r2.list_prefix) {
-          instance[r2.var_name] = [];
+          instance[r2.var_name] = {
+            results: [],
+            cursor: null,
+            complete: true,
+          } as Paginated<R2ObjectBody>;
         }
 
         // Do not hydrate R2 properties if they are not included in the include tree.
@@ -756,12 +765,19 @@ export function hydrateType(
           (async () => {
             const list = await bucket.list({ prefix: key });
 
-            instance[r2.var_name] = await Promise.all(
+            const results = await Promise.all(
               list.objects.map(async (obj) => {
                 const fullObj = await bucket.get(obj.key);
                 return fullObj;
               }),
             );
+
+            const cursor = list.truncated ? (list.cursor ?? null) : null;
+            instance[r2.var_name] = {
+              results,
+              cursor,
+              complete: !cursor,
+            } as Paginated<R2ObjectBody>;
           })(),
         );
         continue;
@@ -801,9 +817,10 @@ async function hydrateKVList(
   current: any,
 ) {
   const res = await namespace.list({ prefix: key });
+  const cursor = !res.list_complete ? (res.cursor ?? null) : null;
 
   if (kv.value.cidl_type === "Stream") {
-    current[kv.value.name] = await Promise.all(
+    const results = await Promise.all(
       res.keys.map(async (k: any) => {
         const stream = await namespace.get(k.name, { type: "stream" });
         return Object.assign(new KValue(), {
@@ -813,10 +830,16 @@ async function hydrateKVList(
         });
       }),
     );
+
+    current[kv.value.name] = {
+      results,
+      cursor,
+      complete: res.list_complete || !cursor,
+    } as Paginated<KValue<ReadableStream>>;
     return;
   }
 
-  current[kv.value.name] = await Promise.all(
+  const results = await Promise.all(
     res.keys.map(async (k: any) => {
       const kvRes = await namespace.getWithMetadata(k.name, {
         type: "json",
@@ -828,6 +851,12 @@ async function hydrateKVList(
       });
     }),
   );
+
+  current[kv.value.name] = {
+    results,
+    cursor,
+    complete: res.list_complete || !cursor,
+  } as Paginated<KValue<unknown>>;
 }
 
 async function hydrateKVSingle(

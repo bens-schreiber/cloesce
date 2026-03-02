@@ -52,6 +52,10 @@ impl ClientLanguageTypeMapper for TypeScriptMapper {
                 let inner_ts = self.cidl_type(inner, ast);
                 format!("KValue<{inner_ts}>")
             }
+            CidlType::Paginated(inner) => {
+                let inner_ts = self.cidl_type(inner, ast);
+                format!("Paginated<{inner_ts}>")
+            }
             CidlType::R2Object => "R2Object".to_string(),
             _ => panic!("Invalid type {:?}", ty),
         }

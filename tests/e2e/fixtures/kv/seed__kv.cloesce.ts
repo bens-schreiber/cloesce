@@ -1,4 +1,4 @@
-import { KV, KValue, WranglerEnv, KeyParam, Model, DataSource, Integer } from "cloesce/backend";
+import { KV, KValue, Paginated, WranglerEnv, KeyParam, Model, DataSource, Integer, Post } from "cloesce/backend";
 import { D1Database, KVNamespace } from "@cloudflare/workers-types";
 
 @WranglerEnv
@@ -32,4 +32,18 @@ export class D1BackedModel {
 
   @KV("d1Backed/{id}/{keyParam}/{someColumn}/{someOtherColumn}", "namespace")
   kvData: KValue<unknown>;
+}
+
+@Model(["GET"])
+export class PaginatedKVModel {
+  @KeyParam
+  id: string;
+
+  @KV("paginated/items/", "namespace")
+  items: Paginated<KValue<unknown>>;
+
+  @Post()
+  static acceptPaginated(ps: Paginated<KValue<unknown>>): Paginated<KValue<unknown>> {
+    return ps;
+  }
 }

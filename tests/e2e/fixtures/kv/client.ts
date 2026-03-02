@@ -87,6 +87,64 @@ export class D1BackedModel {
     return res;
   }
 }
+export class PaginatedKVModel {
+  id: string;
+  items: Paginated<KValue<unknown>>;
+
+  static async GET(
+    id: string,
+    __datasource: "default" = "default",
+    fetchImpl: typeof fetch = fetch
+  ): Promise<HttpResult<PaginatedKVModel>> {
+    const baseUrl = new URL(
+      `http://localhost:5002/api/PaginatedKVModel/GET`
+    );
+
+    baseUrl.searchParams.append("id", String(id));
+    baseUrl.searchParams.append("__datasource", String(__datasource));
+
+    const res = await fetchImpl(baseUrl, {
+      method: "Get",
+    });
+
+    return await HttpResult.fromResponse(
+      res,
+      MediaType.Json,
+      PaginatedKVModel,
+      false
+    );
+  }
+  static async acceptPaginated(
+    ps: Paginated<KValue<unknown>>,
+    fetchImpl: typeof fetch = fetch
+  ): Promise<HttpResult<Paginated<KValue<unknown>>>> {
+    const baseUrl = new URL(
+      `http://localhost:5002/api/PaginatedKVModel/acceptPaginated`
+    );
+    const payload: any = {};
+
+    payload["ps"] = ps;
+
+    const res = await fetchImpl(baseUrl, {
+      method: "Post",
+      headers: { "Content-Type": "application/json" },
+      body: requestBody(MediaType.Json, payload),
+    });
+
+    return await HttpResult.fromResponse(
+      res,
+      MediaType.Json,
+      undefined,
+      false
+    );
+  }
+
+  static fromJson(data: any): PaginatedKVModel {
+    const res = Object.assign(new PaginatedKVModel(), data);
+    if (res.items) res.items = Object.assign(new KValue<unknown>(), res.items);
+    return res;
+  }
+}
 export class PureKVModel {
   id: string;
   data: KValue<unknown>;
@@ -164,6 +222,12 @@ export class KValue<V> {
   get value(): V | null {
     return this.raw as V | null;
   }
+}
+
+export interface Paginated<T> {
+  results: T[];
+  cursor: string | null;
+  complete: boolean;
 }
 
 export enum MediaType {
