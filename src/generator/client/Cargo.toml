@@ -12,4 +12,4 @@ serde_json = { workspace = true }
 generator-test = { path = "../generator-test" }
 semantic = { path = "../semantic" }
 workers = { path = "../workers" }
-insta = "1.45.1"
+insta = "1.46.3"
