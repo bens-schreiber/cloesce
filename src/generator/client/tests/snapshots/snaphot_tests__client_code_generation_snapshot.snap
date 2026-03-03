@@ -202,7 +202,7 @@ export class ModelWithCruds {
     );
   }
   static async LIST(
-    lastSeen: string | null,
+    lastSeen: number | null,
     limit: number | null,
     offset: number | null,
     __datasource: "default" = "default",

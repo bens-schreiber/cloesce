@@ -103,7 +103,10 @@
                         "toppings": {}
                     },
                     "is_private": false,
-                    "list_params": []
+                    "list_params": [
+                        "LastSeen",
+                        "Limit"
+                    ]
                 },
                 "Hamburger:noLettuceToppings": {
                     "name": "Hamburger:noLettuceToppings",
