@@ -12,19 +12,68 @@ import {
   Model as AstModel,
   CidlType,
   CloesceAst,
+  CrudListParam,
   getNavigationPropertyCidlType,
 } from "../ast.js";
 import { InternalError, u8ToB64 } from "../common.js";
 import { IncludeTree, DeepPartial, KValue, Paginated } from "../ui/backend.js";
 
+/**
+ * Defines a Data Source for a Model, which can include
+ * KV, R2, 1:1, 1:M and M:M relationships as specified by the include tree.
+ */
 export interface DataSource<T> {
+  /**
+   * The include tree specifying which relationships to include in the data source.
+   */
   includeTree?: IncludeTree<T>;
-  select?: (joined: (from?: string) => string) => string;
+
+  /**
+   * A custom function called when using `orm.get`. Defaults to:
+   *
+   * ```ts
+   * `${Orm.select(ctor, { include: includeTree })} WHERE ${pkName} = ?`
+   * ```
+   *
+   * A single parameter is always bound to the query when executed by D1, which is
+   * the value of the primary key of the model being retrieved. Reference it in the query using
+   * `?` or `?1`.
+   *
+   * @param joined A helper function to generate a SELECT query for the model with the same include tree as the data source.
+   * @return A SQL query string to retrieve a single instance of the model from D1.
+   */
+  get?: (joined: (from?: string) => string) => string;
+
+  /**
+   * A custom function called when using `orm.list`. Defaults to a seek pagination query:
+   * ```ts
+   * `${Orm.select(ctor, { include: includeTree })} WHERE ${pkName} > ? ORDER BY ${pkName} ASC LIMIT ?`
+   * ```
+   *
+   * Use `DataSource.listParams` to specify which parameters to bind when calling `orm.list`.
+   * If a custom implementation is given, no parameters are bound by default,
+   * and it's the responsibility of the user to specify and bind any parameters needed for the query.
+   *
+   *
+   * @param joined A helper function to generate a SELECT query for the model with the same include tree as the data source.
+   * @returns A SQL query string to retrieve multiple instances of the model from D1.
+   */
+  list?: (joined: (from?: string) => string) => string;
+
+  /**
+   * The parameters to bind when calling `DataSource.list`. Defaults to empty.
+   */
+  listParams?: CrudListParam[];
 }
 
 type Include<T> = DataSource<T> | IncludeTree<T>;
 function isDataSource<T>(include: Include<T>): include is DataSource<T> {
-  return "includeTree" in include || "select" in include;
+  return (
+    "includeTree" in include ||
+    "list" in include ||
+    "get" in include ||
+    "listParams" in include
+  );
 }
 function getTreeFromInclude<T>(
   include: Include<T> | null | undefined,
@@ -188,13 +237,6 @@ export class Orm {
 
     const include = args.include ?? {};
     const tree = getTreeFromInclude(include);
-    if (isDataSource(include) && include.select) {
-      // Override the default select generation with a custom one provided by the user.
-      return include.select((from) =>
-        Orm.select(ctor, { from, include: include.includeTree }),
-      );
-    }
-
     const includeTreeRes = WasmResource.fromString(JSON.stringify(tree), wasm);
 
     const selectQueryRes = invokeOrmWasm(
@@ -463,12 +505,17 @@ export class Orm {
    * A model without a primary key cannot be listed, and this method will return an empty array in that case.
    *
    * @param ctor Constructor of the model to list
-   * @param include Include tree specifying which navigation properties to include
+   * @param args Arguments for listing, such as the include tree and pagination parameters
    * @returns Array of listed model instances
    */
   async list<T extends object>(
     ctor: new () => T,
-    include: Include<T> = {},
+    args?: {
+      include?: Include<T>;
+      lastSeen?: unknown;
+      limit?: number;
+      offset?: number;
+    },
   ): Promise<T[]> {
     const { ast } = RuntimeContainer.get();
     const model = ast.models[ctor.name];
@@ -481,24 +528,74 @@ export class Orm {
       return [];
     }
 
-    const query = Orm.select(ctor, {
-      include: include,
-    });
-    const rows = await this.db.prepare(query).all();
-    if (rows.error) {
-      // An error in the query should not be possible unless the AST is invalid.
-      throw new InternalError(
-        `Failed to list models for ${ctor.name}: ${rows.error}`,
+    args ??= {};
+    args.include ??= {};
+    args.lastSeen ??= defaultLastSeen(model.primary_key.cidl_type);
+    args.limit ??= 1000;
+
+    let usedDefaultQuery = false;
+    let query: string;
+    if (isDataSource(args.include) && args.include.list) {
+      // Override the default list generation with a custom one provided by the user.
+      const includeDs = args.include as DataSource<T>;
+      query = args.include.list((from) =>
+        Orm.select(ctor, { from, include: includeDs.includeTree }),
       );
+    } else {
+      // Default list query with seek pagination
+      const pkName = model.primary_key.name;
+      query = `
+        ${Orm.select(ctor, { include: args.include })}
+        WHERE "${model.name}"."${pkName}" > ?
+        ORDER BY "${pkName}" ASC
+        LIMIT ?
+      `;
+      usedDefaultQuery = true;
+    }
+
+    const bindValues: any[] = [];
+    const listParams =
+      isDataSource(args.include) && args.include.listParams
+        ? args.include.listParams
+        : ["LastSeen", "Limit"];
+    for (const param of listParams) {
+      switch (param) {
+        case "LastSeen":
+          bindValues.push(args.lastSeen);
+          break;
+        case "Limit":
+          bindValues.push(args.limit);
+          break;
+        case "Offset":
+          bindValues.push(args.offset);
+          break;
+      }
+    }
+
+    const rows = await this.db
+      .prepare(query)
+      .bind(...bindValues)
+      .all();
+    if (rows.error) {
+      if (usedDefaultQuery) {
+        // An error in the default query should not be possible unless the AST is invalid.
+        throw new InternalError(
+          `Failed to list models for ${ctor.name} with default query: ${rows.error}`,
+        );
+      }
+
+      // TODO: We should have a better error handling strategy than just throwing generic errors, since
+      // an error in the query is entirely possible from invalid custom list functions.
+      throw new Error(`Failed to list models for ${ctor.name}: ${rows.error}`);
     }
 
     // Map and hydrate
-    const results = Orm.map(ctor, rows, include);
+    const results = Orm.map(ctor, rows, args.include ?? {});
     await Promise.all(
       results.map(async (modelJson, index) => {
         results[index] = await this.hydrate(ctor, {
           base: modelJson,
-          include: include,
+          include: args.include ?? {},
         });
       }),
     );
@@ -517,14 +614,10 @@ export class Orm {
    */
   async get<T extends object>(
     ctor: new () => T,
-    args: {
-      id?: any;
+    args?: {
+      primaryKey?: unknown;
       keyParams?: Record<string, string>;
       include?: Include<T>;
-    } = {
-      id: undefined,
-      keyParams: {},
-      include: {},
     },
   ): Promise<T | null> {
     const { ast } = RuntimeContainer.get();
@@ -532,6 +625,10 @@ export class Orm {
     if (!model) {
       return null;
     }
+
+    args ??= {};
+    args.include ??= {};
+    args.keyParams ??= {};
 
     // KV or R2 only
     if (model.primary_key === null) {
@@ -541,20 +638,42 @@ export class Orm {
       });
     }
 
-    // D1 retrieval
-    const pkName = model.primary_key.name;
-    const query = `
-      SELECT * FROM (${Orm.select(ctor, { include: args.include })}) as q
-      WHERE q."${pkName}" = ?
-    `;
-
-    const rows = await this.db.prepare(query).bind(args.id).run();
-
-    if (rows.error) {
-      // An error in the query should not be possible unless the AST is invalid.
-      throw new InternalError(
-        `Failed to retrieve model ${ctor.name} with ${pkName}=${args.id}: ${rows.error}`,
+    let usedDefaultQuery = false;
+    let query: string;
+    if (isDataSource(args.include) && args.include.get) {
+      // Override the default get generation with a custom one provided by the user.
+      const includeDs = args.include as DataSource<T>;
+      query = args.include.get((from) =>
+        Orm.select(ctor, { from, include: includeDs.includeTree }),
       );
+    } else {
+      // Default get query
+      const pkName = model.primary_key.name;
+      query = `
+        ${Orm.select(ctor, { include: args.include })}
+        WHERE "${model.name}"."${pkName}" = ?
+      `;
+      usedDefaultQuery = true;
+    }
+
+    const bindValue = args.primaryKey;
+    if (bindValue === undefined) {
+      throw new Error(
+        `Failed to retrieve model ${ctor.name}: primaryKey is undefined`,
+      );
+    }
+
+    const rows = await this.db.prepare(query).bind(bindValue).all();
+    if (rows.error) {
+      if (usedDefaultQuery) {
+        // An error in the default query should not be possible unless the AST is invalid.
+        throw new InternalError(
+          `Failed to retrieve model ${ctor.name} with default query: ${rows.error}`,
+        );
+      }
+
+      // TODO: Better error handling strategy for errors from custom get functions.
+      throw new Error(`Failed to retrieve model ${ctor.name}: ${rows.error}`);
     }
 
     if (rows.results.length < 1) {
@@ -564,11 +683,23 @@ export class Orm {
     // Map and hydrate
     const results = Orm.map(ctor, rows, args.include ?? {});
     return await this.hydrate(ctor, {
-      base: results.at(0),
+      base: results[0],
       keyParams: args.keyParams,
       include: args.include ?? {},
     });
   }
+}
+
+function defaultLastSeen(ty: CidlType): unknown {
+  if (ty === "DateIso") {
+    return new Date(0).toISOString();
+  }
+
+  if (ty === "Text") {
+    return "";
+  }
+
+  return 0;
 }
 
 /**

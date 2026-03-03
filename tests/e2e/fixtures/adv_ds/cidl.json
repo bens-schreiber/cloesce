@@ -55,6 +55,24 @@
           "parameters_media": "Json",
           "parameters": [
             {
+              "name": "lastSeen",
+              "cidl_type": {
+                "Nullable": "Integer"
+              }
+            },
+            {
+              "name": "limit",
+              "cidl_type": {
+                "Nullable": "Integer"
+              }
+            },
+            {
+              "name": "offset",
+              "cidl_type": {
+                "Nullable": "Integer"
+              }
+            },
+            {
               "name": "__datasource",
               "cidl_type": {
                 "DataSource": "Hamburger"
@@ -124,28 +142,35 @@
           "tree": {
             "toppings": {}
           },
-          "is_private": true
+          "is_private": true,
+          "list_params": []
         },
         "Hamburger:onlyBacon": {
           "name": "Hamburger:onlyBacon",
           "tree": {
             "toppings": {}
           },
-          "is_private": true
+          "is_private": true,
+          "list_params": []
         },
         "default": {
           "name": "default",
           "tree": {
             "toppings": {}
           },
-          "is_private": false
+          "is_private": false,
+          "list_params": [
+            "LastSeen",
+            "Limit"
+          ]
         },
         "orderedBurgersWithLettuce": {
           "name": "orderedBurgersWithLettuce",
           "tree": {
             "toppings": {}
           },
-          "is_private": false
+          "is_private": false,
+          "list_params": []
         }
       },
       "cruds": [
@@ -217,7 +242,11 @@
           "tree": {
             "hamburgers": {}
           },
-          "is_private": false
+          "is_private": false,
+          "list_params": [
+            "LastSeen",
+            "Limit"
+          ]
         }
       },
       "cruds": [

@@ -16,6 +16,7 @@ import {
   KeyValue,
   AstR2Object,
   CrudKind,
+  CrudListParam,
 } from "../src/ast";
 
 export function createAst(args?: {
@@ -210,11 +211,17 @@ export class ModelBuilder {
     return this;
   }
 
-  dataSource(name: string, tree: any, is_private: boolean = false): this {
+  dataSource(
+    name: string,
+    tree: any,
+    is_private: boolean = false,
+    list_params: CrudListParam[] = [],
+  ): this {
     this.data_sources[name] = {
       name,
       tree,
       is_private,
+      list_params,
     };
     return this;
   }

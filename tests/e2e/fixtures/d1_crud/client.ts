@@ -41,6 +41,9 @@ export class CrudHaver {
     );
   }
   static async LIST(
+    lastSeen: number | null,
+    limit: number | null,
+    offset: number | null,
     __datasource: "default" = "default",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<CrudHaver[]>> {
@@ -48,6 +51,9 @@ export class CrudHaver {
       `http://localhost:5002/api/CrudHaver/LIST`
     );
 
+    baseUrl.searchParams.append("lastSeen", String(lastSeen));
+    baseUrl.searchParams.append("limit", String(limit));
+    baseUrl.searchParams.append("offset", String(offset));
     baseUrl.searchParams.append("__datasource", String(__datasource));
 
     const res = await fetchImpl(baseUrl, {
@@ -148,6 +154,9 @@ export class Parent {
     );
   }
   static async LIST(
+    lastSeen: number | null,
+    limit: number | null,
+    offset: number | null,
     __datasource: "default" | "withChildren" = "default",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Parent[]>> {
@@ -155,6 +164,9 @@ export class Parent {
       `http://localhost:5002/api/Parent/LIST`
     );
 
+    baseUrl.searchParams.append("lastSeen", String(lastSeen));
+    baseUrl.searchParams.append("limit", String(limit));
+    baseUrl.searchParams.append("offset", String(offset));
     baseUrl.searchParams.append("__datasource", String(__datasource));
 
     const res = await fetchImpl(baseUrl, {

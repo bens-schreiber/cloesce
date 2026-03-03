@@ -232,6 +232,7 @@ impl ModelBuilder {
                 name: name.into(),
                 tree,
                 is_private,
+                list_params: Vec::new(),
             },
         );
         self

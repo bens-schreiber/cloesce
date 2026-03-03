@@ -81,7 +81,7 @@ describe("D1 Backed Model", () => {
   });
 
   it("lists models", async () => {
-    const res = await D1BackedModel.LIST();
+    const res = await D1BackedModel.LIST(null, null, null);
     expect(res.ok, withRes("LIST should be OK", res)).toBe(true);
     expect(res.data!.length).toBeGreaterThan(0);
 

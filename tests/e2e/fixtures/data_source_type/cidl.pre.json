@@ -41,7 +41,8 @@
                 "default": {
                     "name": "default",
                     "tree": {},
-                    "is_private": false
+                    "is_private": false,
+                    "list_params": []
                 }
             },
             "cruds": [],
@@ -99,7 +100,8 @@
                 "baz": {
                     "name": "baz",
                     "tree": {},
-                    "is_private": false
+                    "is_private": false,
+                    "list_params": []
                 }
             },
             "cruds": [],

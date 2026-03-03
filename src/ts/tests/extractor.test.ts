@@ -220,7 +220,10 @@ describe("Model", () => {
 
         static readonly ds: DataSource<Foo> = {};
 
-        static readonly dsWithTree: DataSource<Foo> = { includeTree: { bar: {} } };
+        static readonly dsWithTree: DataSource<Foo> = { 
+          includeTree: { bar: {} },
+          listParams: ["LastSeen", "Offset", "Limit"],
+        };
 
         @Get(this.ds)
         async thisStaticDs() {}
@@ -258,30 +261,35 @@ describe("Model", () => {
         name: "ds",
         tree: {},
         is_private: false,
+        list_params: [],
       },
 
       dsWithTree: {
         name: "dsWithTree",
         tree: { bar: {} },
         is_private: false,
+        list_params: ["LastSeen", "Offset", "Limit"],
       },
 
       "Foo:inlineEmptyDs": {
         name: "Foo:inlineEmptyDs",
         tree: {},
         is_private: true,
+        list_params: [],
       },
 
       "Foo:inlineDsWithTree": {
         name: "Foo:inlineDsWithTree",
         tree: { bar: {} },
         is_private: true,
+        list_params: [],
       },
 
       "Foo:externalDs": {
         name: "Foo:externalDs",
         tree: {},
         is_private: true,
+        list_params: [],
       },
     });
 

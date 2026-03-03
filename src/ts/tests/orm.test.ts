@@ -5,7 +5,7 @@ import { KValue, Orm, Paginated } from "../src/ui/backend.js";
 import { _cloesceInternal } from "../src/router/router.js";
 import { R2ObjectBody } from "@cloudflare/workers-types";
 import { hydrateType } from "../src/router/orm";
-import { CloesceAst } from "../src/ast";
+import { CloesceAst, CrudListParam } from "../src/ast";
 
 function createHydrateArgs() {
   return {
@@ -621,4 +621,314 @@ describe("ORM Hydrate Tests", () => {
       expect(firstPageKeys.has(key.name)).toBe(false);
     }
   }, 30000);
+});
+
+describe("ORM List Method with DataSource and listParams", () => {
+  afterEach(() => {
+    _cloesceInternal.RuntimeContainer.dispose();
+  });
+
+  test("List with default listParams (LastSeen, Limit)", async () => {
+    // Arrange
+    const modelMeta = ModelBuilder.model("Product")
+      .idPk()
+      .col("name", "Text")
+      .col("price", "Integer")
+      .build();
+
+    class Product {
+      id!: number;
+      name!: string;
+      price!: number;
+    }
+
+    const ast = createAst({ models: [modelMeta] });
+    const ctorReg = { Product };
+
+    await _cloesceInternal.RuntimeContainer.init(ast, ctorReg);
+
+    const mf = new Miniflare({
+      modules: true,
+      script: `
+        export default {
+          async fetch(request, env, ctx) {
+            return new Response("Hello Miniflare!");
+          }
+        }
+        `,
+      d1Databases: ["DB"],
+    });
+
+    const db = await mf.getD1Database("DB");
+
+    // Create table and insert test data
+    await db
+      .prepare(
+        `CREATE TABLE Product (id INTEGER PRIMARY KEY, name TEXT, price INTEGER)`,
+      )
+      .run();
+    await db
+      .prepare(
+        `INSERT INTO Product (id, name, price) VALUES
+         (1, 'Product 1', 100),
+         (2, 'Product 2', 200),
+         (3, 'Product 3', 300)`,
+      )
+      .run();
+
+    const env = { db };
+    const instance = Orm.fromEnv(env);
+
+    // Act
+    const products = await instance.list(Product, {
+      lastSeen: 0,
+      limit: 10,
+    });
+
+    // Assert
+    expect(products).toHaveLength(3);
+    expect(products[0]).toBeInstanceOf(Product);
+    expect(products[0].id).toBe(1);
+    expect(products[1].name).toBe("Product 2");
+    expect(products[2].price).toBe(300);
+  });
+
+  test("List with explicit custom query and pagination params", async () => {
+    // Arrange
+    const modelMeta = ModelBuilder.model("User")
+      .idPk()
+      .col("username", "Text")
+      .build();
+
+    class User {
+      id!: number;
+      username!: string;
+
+      static readonly custom = {
+        includeTree: {},
+        list: () =>
+          `SELECT "User"."id", "User"."username" FROM "User" ORDER BY "User"."id" LIMIT ? OFFSET ?`,
+        listParams: ["Limit", "Offset"] as CrudListParam[],
+      };
+    }
+
+    const ast = createAst({ models: [modelMeta] });
+    const ctorReg = { User };
+
+    await _cloesceInternal.RuntimeContainer.init(ast, ctorReg);
+
+    const mf = new Miniflare({
+      modules: true,
+      script: `
+        export default {
+          async fetch(request, env, ctx) {
+            return new Response("Hello Miniflare!");
+          }
+        }
+        `,
+      d1Databases: ["DB"],
+    });
+
+    const db = await mf.getD1Database("DB");
+
+    await db
+      .prepare(`CREATE TABLE User (id INTEGER PRIMARY KEY, username TEXT)`)
+      .run();
+    await db
+      .prepare(
+        `INSERT INTO User (id, username) VALUES
+         (1, 'alice'),
+         (2, 'bob'),
+         (3, 'charlie'),
+         (4, 'diana')`,
+      )
+      .run();
+
+    const env = { db };
+    const instance = Orm.fromEnv(env);
+
+    // Act
+    const users = await instance.list(User, {
+      include: User.custom,
+      limit: 2,
+      offset: 1,
+    });
+
+    // Assert
+    expect(users).toHaveLength(2);
+    expect(users[0]).toBeInstanceOf(User);
+    expect(users.map((u) => u.username)).toEqual(["bob", "charlie"]);
+  });
+
+  test("List supports custom DataSource methods with parameter binding", async () => {
+    // Arrange
+    const modelMeta = ModelBuilder.model("Record")
+      .idPk()
+      .col("data", "Text")
+      .build();
+
+    class Record {
+      id!: number;
+      data!: string;
+
+      static readonly custom = {
+        includeTree: {},
+        // Custom list with exact parameter binding
+        list: () =>
+          `SELECT "Record"."id", "Record"."data" FROM "Record" WHERE "Record"."id" > ? LIMIT ?`,
+        listParams: ["LastSeen", "Limit"] as CrudListParam[],
+      };
+    }
+
+    const ast = createAst({ models: [modelMeta] });
+    const ctorReg = { Record };
+
+    await _cloesceInternal.RuntimeContainer.init(ast, ctorReg);
+
+    const mf = new Miniflare({
+      modules: true,
+      script: `
+        export default {
+          async fetch(request, env, ctx) {
+            return new Response("Hello Miniflare!");
+          }
+        }
+        `,
+      d1Databases: ["DB"],
+    });
+
+    const db = await mf.getD1Database("DB");
+
+    await db
+      .prepare(`CREATE TABLE Record (id INTEGER PRIMARY KEY, data TEXT)`)
+      .run();
+    await db
+      .prepare(
+        `INSERT INTO Record (id, data) VALUES
+         (1, 'data1'),
+         (2, 'data2')`,
+      )
+      .run();
+
+    const env = { db };
+    const instance = Orm.fromEnv(env);
+
+    // Act
+    const records = await instance.list(Record, {
+      include: Record.custom,
+      lastSeen: 0,
+      limit: 5,
+    });
+
+    // Assert
+    expect(records).toHaveLength(2);
+    expect(records[0]).toBeInstanceOf(Record);
+    expect(records[0].id).toBe(1);
+    expect(records[1].id).toBe(2);
+  });
+
+  test("Get with primary key", async () => {
+    // Arrange
+    const modelMeta = ModelBuilder.model("Post")
+      .idPk()
+      .col("content", "Text")
+      .build();
+
+    class Post {
+      id!: number;
+      content!: string;
+    }
+
+    const ast = createAst({ models: [modelMeta] });
+    const ctorReg = { Post };
+
+    await _cloesceInternal.RuntimeContainer.init(ast, ctorReg);
+
+    const mf = new Miniflare({
+      modules: true,
+      script: `
+        export default {
+          async fetch(request, env, ctx) {
+            return new Response("Hello Miniflare!");
+          }
+        }
+        `,
+      d1Databases: ["DB"],
+    });
+
+    const db = await mf.getD1Database("DB");
+
+    // Create table and insert test data
+    await db
+      .prepare(`CREATE TABLE Post (id INTEGER PRIMARY KEY, content TEXT)`)
+      .run();
+    await db
+      .prepare(
+        `INSERT INTO Post (id, content) VALUES
+         (1, 'Hello World'),
+         (2, 'Second Post')`,
+      )
+      .run();
+
+    const env = { db };
+    const instance = Orm.fromEnv(env);
+
+    // Act
+    const post = await instance.get(Post, {
+      primaryKey: 1,
+    });
+
+    // Assert
+    expect(post).toBeInstanceOf(Post);
+    expect(post!.id).toBe(1);
+    expect(post!.content).toBe("Hello World");
+  });
+
+  test("Get returns null when not found", async () => {
+    // Arrange
+    const modelMeta = ModelBuilder.model("Comment")
+      .idPk()
+      .col("text", "Text")
+      .build();
+
+    class Comment {
+      id!: number;
+      text!: string;
+    }
+
+    const ast = createAst({ models: [modelMeta] });
+    const ctorReg = { Comment };
+
+    await _cloesceInternal.RuntimeContainer.init(ast, ctorReg);
+
+    const mf = new Miniflare({
+      modules: true,
+      script: `
+        export default {
+          async fetch(request, env, ctx) {
+            return new Response("Hello Miniflare!");
+          }
+        }
+        `,
+      d1Databases: ["DB"],
+    });
+
+    const db = await mf.getD1Database("DB");
+
+    // Create table but don't insert data for id=999
+    await db
+      .prepare(`CREATE TABLE Comment (id INTEGER PRIMARY KEY, text TEXT)`)
+      .run();
+
+    const env = { db };
+    const instance = Orm.fromEnv(env);
+
+    // Act
+    const comment = await instance.get(Comment, {
+      primaryKey: 999,
+    });
+
+    // Assert
+    expect(comment).toBeNull();
+  });
 });

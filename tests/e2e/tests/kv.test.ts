@@ -69,7 +69,7 @@ describe("D1BackedModel", () => {
 
   it("LIST", async () => {
     // D1BackedModel takes a key param and thus cannot list KV components
-    const res = await D1BackedModel.LIST("default");
+    const res = await D1BackedModel.LIST(null, null, null, "default");
 
     expect(res.ok, withRes("LIST should be OK", res)).toBe(true);
     expect(res.data!.length).toBeGreaterThan(0);

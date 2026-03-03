@@ -63,12 +63,17 @@
         "baz": {
           "name": "baz",
           "tree": {},
-          "is_private": false
+          "is_private": false,
+          "list_params": []
         },
         "default": {
           "name": "default",
           "tree": {},
-          "is_private": false
+          "is_private": false,
+          "list_params": [
+            "LastSeen",
+            "Limit"
+          ]
         }
       },
       "cruds": [],
@@ -91,7 +96,11 @@
         "default": {
           "name": "default",
           "tree": {},
-          "is_private": false
+          "is_private": false,
+          "list_params": [
+            "LastSeen",
+            "Limit"
+          ]
         }
       },
       "cruds": [],
@@ -114,7 +123,8 @@
         "default": {
           "name": "default",
           "tree": {},
-          "is_private": false
+          "is_private": false,
+          "list_params": []
         }
       },
       "cruds": [],

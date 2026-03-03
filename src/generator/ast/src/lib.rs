@@ -191,6 +191,13 @@ pub struct ApiMethod {
 #[derive(Serialize, Deserialize, Debug, Default)]
 pub struct IncludeTree(pub BTreeMap<String, IncludeTree>);
 
+#[derive(Serialize, Deserialize, Debug, Clone, Hash, PartialEq, Eq)]
+pub enum CrudListParam {
+    LastSeen,
+    Limit,
+    Offset,
+}
+
 /// A tree of model symbol names to include when hydrating a data source.
 #[derive(Serialize, Deserialize, Debug)]
 pub struct DataSource {
@@ -200,6 +207,9 @@ pub struct DataSource {
 
     /// If true, the data source will not be generated on the client.
     pub is_private: bool,
+
+    /// List pagination parameter names for the LIST method
+    pub list_params: Vec<CrudListParam>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Hash)]

@@ -102,21 +102,24 @@
                     "tree": {
                         "toppings": {}
                     },
-                    "is_private": false
+                    "is_private": false,
+                    "list_params": []
                 },
                 "Hamburger:noLettuceToppings": {
                     "name": "Hamburger:noLettuceToppings",
                     "tree": {
                         "toppings": {}
                     },
-                    "is_private": true
+                    "is_private": true,
+                    "list_params": []
                 },
                 "Hamburger:onlyBacon": {
                     "name": "Hamburger:onlyBacon",
                     "tree": {
                         "toppings": {}
                     },
-                    "is_private": true
+                    "is_private": true,
+                    "list_params": []
                 }
             },
             "cruds": [

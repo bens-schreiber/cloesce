@@ -96,7 +96,8 @@
                         "favoriteChild": {},
                         "children": {}
                     },
-                    "is_private": false
+                    "is_private": false,
+                    "list_params": []
                 }
             },
             "cruds": [

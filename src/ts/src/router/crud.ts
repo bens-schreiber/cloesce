@@ -23,7 +23,7 @@ export function proxyCrud(obj: any, ctor: any, env: any) {
       }
 
       if (method === "LIST") {
-        return (ds: string) => list(ctor, ds, env);
+        return (...args: any[]) => list(ctor, args, env);
       }
 
       if (method === "GET") {
@@ -58,7 +58,7 @@ async function _get(
   const model = ast.models[ctor.name];
 
   const getArgs: {
-    id?: any;
+    primaryKey?: any;
     keyParams?: Record<string, any>;
     include?: DataSource<any>;
   } = {};
@@ -66,7 +66,7 @@ async function _get(
   let argIndex = 0;
   if (model.primary_key) {
     // If there is a primary key, the first argument is the primary key.
-    getArgs.id = args[argIndex++];
+    getArgs.primaryKey = args[argIndex++];
   }
 
   if (model.key_params.length > 0) {
@@ -88,12 +88,22 @@ async function _get(
 
 async function list(
   ctor: any,
-  dataSourceRef: string,
+  args: any[],
   env: any,
 ): Promise<HttpResult<unknown>> {
+  const lastSeen = args[0];
+  const limit = args[1];
+  const offset = args[2];
+  const dataSourceRef = args[3];
+
   const dataSource = findDataSource(ctor, dataSourceRef);
   const orm = Orm.fromEnv(env);
 
-  const result: any[] = await orm.list(ctor, dataSource);
+  const result: any[] = await orm.list(ctor, {
+    include: dataSource,
+    lastSeen,
+    limit,
+    offset,
+  });
   return HttpResult.ok(200, result);
 }
