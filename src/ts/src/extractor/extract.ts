@@ -31,6 +31,7 @@ import {
   ServiceAttribute,
   KeyValue,
   AstR2Object,
+  CrudListParam,
 } from "../ast.js";
 import { TypeFormatFlags } from "typescript";
 import { ExtractorError, ExtractorErrorCode } from "./err.js";
@@ -339,7 +340,7 @@ export class CidlExtractor {
         }
 
         const listParamsProp = obj.getProperty("listParams");
-        let list_params: string[] = [];
+        let list_params: CrudListParam[] = [];
         if (listParamsProp) {
           const res = parseListParams(listParamsProp, prop.getName());
           if (res.isLeft()) {
@@ -354,7 +355,7 @@ export class CidlExtractor {
 
           // Publicly exposed
           is_private: false,
-          list_params: list_params as any,
+          list_params,
         };
         continue;
       }
@@ -1459,7 +1460,7 @@ function dataSourceFromDecorator(
     }
 
     const listParamsProp = decoratorArg.getProperty("listParams");
-    let list_params: string[] = [];
+    let list_params: CrudListParam[] = [];
     if (listParamsProp) {
       const res = parseListParams(listParamsProp, `${modelName}.${methodName}`);
       if (res.isLeft()) {
@@ -1473,7 +1474,7 @@ function dataSourceFromDecorator(
         name: `${modelName}:${methodName}`,
         tree: includeTree,
         is_private: true,
-        list_params: list_params as any,
+        list_params,
       },
       definedDs: null,
     });
@@ -1522,7 +1523,7 @@ function dataSourceFromDecorator(
     }
 
     const listParamsProp = initializer.getProperty("listParams");
-    let list_params: string[] = [];
+    let list_params: CrudListParam[] = [];
     if (listParamsProp) {
       const res = parseListParams(listParamsProp, decoratorArg.getText());
       if (res.isLeft()) {
@@ -1536,7 +1537,7 @@ function dataSourceFromDecorator(
         name: `${modelName}:${methodName}`,
         tree: includeTree,
         is_private: true,
-        list_params: list_params as any,
+        list_params,
       },
       definedDs: decoratorArg.getText(),
     });
@@ -1573,7 +1574,7 @@ function parseIncludeTree(
 function parseListParams(
   listParamsProp: any,
   contextName: string,
-): Either<ExtractorError, string[]> {
+): Either<ExtractorError, CrudListParam[]> {
   if (!MorphNode.isPropertyAssignment(listParamsProp)) {
     return err(ExtractorErrorCode.InvalidDataSourceDefinition, (e) => {
       e.snippet = listParamsProp.getText();
@@ -1590,8 +1591,8 @@ function parseListParams(
   }
 
   const elements = (initializer as any).getElements();
-  const listParams: string[] = [];
-  const paramMap: Record<string, string> = {
+  const listParams: CrudListParam[] = [];
+  const paramMap: Record<string, CrudListParam> = {
     lastseen: "LastSeen",
     limit: "Limit",
     offset: "Offset",
