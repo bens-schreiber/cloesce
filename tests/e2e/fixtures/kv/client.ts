@@ -147,7 +147,11 @@ export class PaginatedKVModel {
 
   static fromJson(data: any): PaginatedKVModel {
     const res = Object.assign(new PaginatedKVModel(), data);
-    if (res.items) res.items = Object.assign(new KValue<unknown>(), res.items);
+    if (res.items?.results) {
+      for (let i = 0; i < res.items.results.length; i++) {
+        res.items.results[i] = Object.assign(new KValue<unknown>(), res.items.results[i]);
+      }
+    }
     return res;
   }
 }

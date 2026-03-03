@@ -83,13 +83,6 @@ describe("D1BackedModel", () => {
 describe("PaginatedKVModel", () => {
   const id = "test-id";
 
-  it("setup: populate KV with paginated items", async () => {
-    // This would normally be done by the test setup, but we're doing it inline
-    // In a real scenario, the wrangler environment would have pre-populated the KV
-    // For now, this test just ensures the structure works
-    expect(true).toBe(true);
-  });
-
   it("GET with Paginated KV list returns paginated structure", async () => {
     const res = await PaginatedKVModel.GET(id);
     expect(res.ok, withRes("GET should be OK", res)).toBe(true);

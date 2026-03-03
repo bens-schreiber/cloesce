@@ -47,7 +47,7 @@ export interface DataSource<T> {
   /**
    * A custom function called when using `orm.list`. Defaults to a seek pagination query:
    * ```ts
-   * `${Orm.select(ctor, { include: includeTree })} WHERE ${pkName} > ? ORDER BY ${pkName} ASC LIMIT ?`
+   * `${Orm.select(ctor, { include: includeTree })}  WHERE "${model.name}"."${pkName}" > ? ORDER BY "${model.name}"."${pkName}" ASC LIMIT ?`
    * ```
    *
    * Use `DataSource.listParams` to specify which parameters to bind when calling `orm.list`.
@@ -547,17 +547,20 @@ export class Orm {
       query = `
         ${Orm.select(ctor, { include: args.include })}
         WHERE "${model.name}"."${pkName}" > ?
-        ORDER BY "${pkName}" ASC
+        ORDER BY "${model.name}"."${pkName}" ASC
         LIMIT ?
       `;
       usedDefaultQuery = true;
     }
 
+    let listParams: CrudListParam[];
+    if (isDataSource(args.include) && args.include.list) {
+      listParams = args.include.listParams ?? [];
+    } else {
+      listParams = ["LastSeen", "Limit"];
+    }
+
     const bindValues: any[] = [];
-    const listParams =
-      isDataSource(args.include) && args.include.listParams
-        ? args.include.listParams
-        : ["LastSeen", "Limit"];
     for (const param of listParams) {
       switch (param) {
         case "LastSeen":

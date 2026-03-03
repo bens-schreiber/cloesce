@@ -348,7 +348,11 @@ export class ModelWithKv {
   static fromJson(data: any): ModelWithKv {
     const res = Object.assign(new ModelWithKv(), data);
     if (res.someValue) res.someValue = Object.assign(new KValue<unknown>(), res.someValue);
-    if (res.manyValues) res.manyValues = Object.assign(new KValue<unknown>(), res.manyValues);
+    if (res.manyValues?.results) {
+      for (let i = 0; i < res.manyValues.results.length; i++) {
+        res.manyValues.results[i] = Object.assign(new KValue<unknown>(), res.manyValues.results[i]);
+      }
+    }
     
     return res;
   }
@@ -390,6 +394,11 @@ export class ModelWithR2 {
 
   static fromJson(data: any): ModelWithR2 {
     const res = Object.assign(new ModelWithR2(), data);
+    if (res.manyFileDatas?.results) {
+      for (let i = 0; i < res.manyFileDatas.results.length; i++) {
+        res.manyFileDatas.results[i] = Object.assign(new R2Object(), res.manyFileDatas.results[i]);
+      }
+    }
     return res;
   }
 }

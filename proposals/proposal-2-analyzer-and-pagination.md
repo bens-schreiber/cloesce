@@ -118,7 +118,7 @@ const customDs: DataSource<User> = {
 }
 ```
 
-Note that we also need to specify the parameter names in `listParams` so that Cloesce can bind them correctly. If `listParams` are not provided, an empty array is assumed and no bindings can be utilized.
+Note that we also need to specify the parameter names in `listParams` so that Cloesce can bind them correctly. If a `list` is provided and `listParams` are not provided, an empty array is assumed and no bindings can be utilized. If no `list` is provided, the default pagination query is used and `lastSeen` and `limit` are assumed as parameters.
 
 `get` is assumed to accept a single parameter for the primary key.
 

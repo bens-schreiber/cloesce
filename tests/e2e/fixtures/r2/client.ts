@@ -206,6 +206,11 @@ export class PureR2Model {
 
   static fromJson(data: any): PureR2Model {
     const res = Object.assign(new PureR2Model(), data);
+    if (res.allData?.results) {
+      for (let i = 0; i < res.allData.results.length; i++) {
+        res.allData.results[i] = Object.assign(new R2Object(), res.allData.results[i]);
+      }
+    }
     return res;
   }
 }
