@@ -34,6 +34,9 @@ export class D1BackedModel {
     );
   }
   static async LIST(
+    lastSeen: number | null,
+    limit: number | null,
+    offset: number | null,
     __datasource: "default" = "default",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<D1BackedModel[]>> {
@@ -41,6 +44,9 @@ export class D1BackedModel {
       `http://localhost:5002/api/D1BackedModel/LIST`
     );
 
+    baseUrl.searchParams.append("lastSeen", String(lastSeen));
+    baseUrl.searchParams.append("limit", String(limit));
+    baseUrl.searchParams.append("offset", String(offset));
     baseUrl.searchParams.append("__datasource", String(__datasource));
 
     const res = await fetchImpl(baseUrl, {
@@ -84,6 +90,68 @@ export class D1BackedModel {
   static fromJson(data: any): D1BackedModel {
     const res = Object.assign(new D1BackedModel(), data);
     if (res.kvData) res.kvData = Object.assign(new KValue<unknown>(), res.kvData);
+    return res;
+  }
+}
+export class PaginatedKVModel {
+  id: string;
+  items: Paginated<KValue<unknown>>;
+
+  static async GET(
+    id: string,
+    __datasource: "default" = "default",
+    fetchImpl: typeof fetch = fetch
+  ): Promise<HttpResult<PaginatedKVModel>> {
+    const baseUrl = new URL(
+      `http://localhost:5002/api/PaginatedKVModel/GET`
+    );
+
+    baseUrl.searchParams.append("id", String(id));
+    baseUrl.searchParams.append("__datasource", String(__datasource));
+
+    const res = await fetchImpl(baseUrl, {
+      method: "Get",
+    });
+
+    return await HttpResult.fromResponse(
+      res,
+      MediaType.Json,
+      PaginatedKVModel,
+      false
+    );
+  }
+  static async acceptPaginated(
+    ps: Paginated<KValue<unknown>>,
+    fetchImpl: typeof fetch = fetch
+  ): Promise<HttpResult<Paginated<KValue<unknown>>>> {
+    const baseUrl = new URL(
+      `http://localhost:5002/api/PaginatedKVModel/acceptPaginated`
+    );
+    const payload: any = {};
+
+    payload["ps"] = ps;
+
+    const res = await fetchImpl(baseUrl, {
+      method: "Post",
+      headers: { "Content-Type": "application/json" },
+      body: requestBody(MediaType.Json, payload),
+    });
+
+    return await HttpResult.fromResponse(
+      res,
+      MediaType.Json,
+      undefined,
+      false
+    );
+  }
+
+  static fromJson(data: any): PaginatedKVModel {
+    const res = Object.assign(new PaginatedKVModel(), data);
+    if (res.items?.results) {
+      for (let i = 0; i < res.items.results.length; i++) {
+        res.items.results[i] = Object.assign(new KValue<unknown>(), res.items.results[i]);
+      }
+    }
     return res;
   }
 }
@@ -164,6 +232,12 @@ export class KValue<V> {
   get value(): V | null {
     return this.raw as V | null;
   }
+}
+
+export interface Paginated<T> {
+  results: T[];
+  cursor: string | null;
+  complete: boolean;
 }
 
 export enum MediaType {

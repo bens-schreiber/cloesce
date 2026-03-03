@@ -91,10 +91,10 @@ export class {{this.name}} {
   {{this}}: string;
 {{/each}}
 {{#each this.kv_objects}}
-  {{value.name}}: {{#unless (is_stream value.cidl_type)}}KValue<{{map_cidl_type value.cidl_type}}>{{else}}KValue<void>{{/unless}}{{#if list_prefix }}[]{{/if}};
+  {{value.name}}: {{#if list_prefix}}Paginated<{{#unless (is_stream value.cidl_type)}}KValue<{{map_cidl_type value.cidl_type}}>{{else}}KValue<void>{{/unless}}>{{else}}{{#unless (is_stream value.cidl_type)}}KValue<{{map_cidl_type value.cidl_type}}>{{else}}KValue<void>{{/unless}}{{/if}};
 {{/each}}
 {{#each this.r2_objects}}
-  {{var_name}}: R2Object{{#if list_prefix}}[]{{/if}};
+  {{var_name}}: {{#if list_prefix}}Paginated<R2Object>{{else}}R2Object{{/if}};
 {{/each}}
 
 {{#each this.methods}}
@@ -175,7 +175,18 @@ export class {{this.name}} {
 {{/if}}
 {{/each}}
 {{#each this.kv_objects}}
-{{#if (has_array this.value.cidl_type)}}
+{{#if list_prefix}}
+    if (res.{{value.name}}?.results) {
+      for (let i = 0; i < res.{{value.name}}.results.length; i++) {
+{{#if (is_object this.value.cidl_type)}}
+        res.{{value.name}}.results[i] = Object.assign(new KValue<{{map_cidl_type this.value.cidl_type}}>(), res.{{value.name}}.results[i]);
+        if (res.{{value.name}}.results[i].raw) res.{{value.name}}.results[i].raw = {{get_object_name this.value.cidl_type}}.fromJson(res.{{value.name}}.results[i].raw);
+{{else}}
+        res.{{value.name}}.results[i] = Object.assign(new KValue<{{map_cidl_type this.value.cidl_type}}>(), res.{{value.name}}.results[i]);
+{{/if}}
+      }
+    }
+{{else if (has_array this.value.cidl_type)}}
     for (let i = 0; i < res.{{value.name}}.length; i++) {
 {{#if (is_object_array this.value.cidl_type)}}
       const obj = {{get_object_name this.value.cidl_type}}.fromJson(res.{{value.name}}[i]);
@@ -189,6 +200,15 @@ export class {{this.name}} {
 {{else}}
     {{#unless (is_stream this.value.cidl_type)}}if (res.{{value.name}}) res.{{value.name}} = Object.assign(new KValue<{{map_cidl_type this.value.cidl_type}}>(), res.{{value.name}});{{/unless}}
 {{/if}}
+{{/if}}
+{{/each}}
+{{#each this.r2_objects}}
+{{#if list_prefix}}
+    if (res.{{var_name}}?.results) {
+      for (let i = 0; i < res.{{var_name}}.results.length; i++) {
+        res.{{var_name}}.results[i] = Object.assign(new R2Object(), res.{{var_name}}.results[i]);
+      }
+    }
 {{/if}}
 {{/each}}
     return res;
@@ -210,6 +230,12 @@ export class KValue<V> {
   get value(): V | null {
     return this.raw as V | null;
   }
+}
+
+export interface Paginated<T> {
+  results: T[];
+  cursor: string | null;
+  complete: boolean;
 }
 
 export enum MediaType {

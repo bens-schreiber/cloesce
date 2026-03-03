@@ -129,17 +129,20 @@
                     "tree": {
                         "b": {}
                     },
-                    "is_private": false
+                    "is_private": false,
+                    "list_params": []
                 },
                 "withoutB": {
                     "name": "withoutB",
                     "tree": {},
-                    "is_private": false
+                    "is_private": false,
+                    "list_params": []
                 },
                 "A:withoutB": {
                     "name": "A:withoutB",
                     "tree": {},
-                    "is_private": true
+                    "is_private": true,
+                    "list_params": []
                 }
             },
             "cruds": [],
@@ -230,12 +233,14 @@
                     "tree": {
                         "dogs": {}
                     },
-                    "is_private": false
+                    "is_private": false,
+                    "list_params": []
                 },
                 "Person:withoutDogs": {
                     "name": "Person:withoutDogs",
                     "tree": {},
-                    "is_private": true
+                    "is_private": true,
+                    "list_params": []
                 }
             },
             "cruds": [],
@@ -342,12 +347,14 @@
                             }
                         }
                     },
-                    "is_private": false
+                    "is_private": false,
+                    "list_params": []
                 },
                 "Student:none": {
                     "name": "Student:none",
                     "tree": {},
-                    "is_private": true
+                    "is_private": true,
+                    "list_params": []
                 }
             },
             "cruds": [],

@@ -45,13 +45,18 @@ describe("Advanced Data Sources", () => {
   });
 
   it("LIST all hamburgers with default", async () => {
-    const res = await Hamburger.LIST();
+    const res = await Hamburger.LIST(null, null, null);
     expect(res.ok, withRes("LIST should be OK", res)).toBe(true);
     expect(res.data!.length).toBe(4);
   });
 
   it("LIST hamburgers with 'orderedBurgersWithLettuce' data source", async () => {
-    const res = await Hamburger.LIST("orderedBurgersWithLettuce");
+    const res = await Hamburger.LIST(
+      null,
+      null,
+      null,
+      "orderedBurgersWithLettuce",
+    );
     expect(res.ok, withRes("LIST should be OK", res)).toBe(true);
     expect(res.data!.length).toBe(2);
     expect(res.data![0].id).toBe(burgers[0].id);

@@ -488,7 +488,7 @@ impl SemanticAnalysis {
             }
 
             // Validate value type
-            match &kv.value.cidl_type {
+            match kv.value.cidl_type.root_type() {
                 CidlType::Object(o) | CidlType::Partial(o) => {
                     ensure!(
                         is_valid_object_ref(ast, o),

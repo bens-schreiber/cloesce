@@ -38,7 +38,11 @@
         "default": {
           "name": "default",
           "tree": {},
-          "is_private": false
+          "is_private": false,
+          "list_params": [
+            "LastSeen",
+            "Limit"
+          ]
         }
       },
       "cruds": [],
@@ -70,7 +74,11 @@
           "tree": {
             "students": {}
           },
-          "is_private": false
+          "is_private": false,
+          "list_params": [
+            "LastSeen",
+            "Limit"
+          ]
         }
       },
       "cruds": [],
@@ -161,21 +169,27 @@
         "Person:withoutDogs": {
           "name": "Person:withoutDogs",
           "tree": {},
-          "is_private": true
+          "is_private": true,
+          "list_params": []
         },
         "default": {
           "name": "default",
           "tree": {
             "dogs": {}
           },
-          "is_private": false
+          "is_private": false,
+          "list_params": [
+            "LastSeen",
+            "Limit"
+          ]
         },
         "withDogs": {
           "name": "withDogs",
           "tree": {
             "dogs": {}
           },
-          "is_private": false
+          "is_private": false,
+          "list_params": []
         }
       },
       "cruds": [],
@@ -243,14 +257,19 @@
         "Student:none": {
           "name": "Student:none",
           "tree": {},
-          "is_private": true
+          "is_private": true,
+          "list_params": []
         },
         "default": {
           "name": "default",
           "tree": {
             "courses": {}
           },
-          "is_private": false
+          "is_private": false,
+          "list_params": [
+            "LastSeen",
+            "Limit"
+          ]
         },
         "withCoursesStudentsCourses": {
           "name": "withCoursesStudentsCourses",
@@ -261,7 +280,8 @@
               }
             }
           },
-          "is_private": false
+          "is_private": false,
+          "list_params": []
         }
       },
       "cruds": [],
@@ -361,26 +381,33 @@
         "A:withoutB": {
           "name": "A:withoutB",
           "tree": {},
-          "is_private": true
+          "is_private": true,
+          "list_params": []
         },
         "default": {
           "name": "default",
           "tree": {
             "b": {}
           },
-          "is_private": false
+          "is_private": false,
+          "list_params": [
+            "LastSeen",
+            "Limit"
+          ]
         },
         "withB": {
           "name": "withB",
           "tree": {
             "b": {}
           },
-          "is_private": false
+          "is_private": false,
+          "list_params": []
         },
         "withoutB": {
           "name": "withoutB",
           "tree": {},
-          "is_private": false
+          "is_private": false,
+          "list_params": []
         }
       },
       "cruds": [],
@@ -423,7 +450,11 @@
         "default": {
           "name": "default",
           "tree": {},
-          "is_private": false
+          "is_private": false,
+          "list_params": [
+            "LastSeen",
+            "Limit"
+          ]
         }
       },
       "cruds": [],

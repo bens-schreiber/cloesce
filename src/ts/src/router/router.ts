@@ -615,7 +615,7 @@ async function hydrate(
 
   try {
     const result = await orm.get(modelCtor, {
-      id: route.primaryKey,
+      primaryKey: route.primaryKey,
       include: dataSource,
       keyParams: route.keyParams,
     });

@@ -2,8 +2,8 @@ use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
 use ast::{
-    ApiMethod, CidlType, CloesceAst, CrudKind, DataSource, HttpVerb, IncludeTree, MediaType,
-    NamedTypedValue, NavigationPropertyKind,
+    ApiMethod, CidlType, CloesceAst, CrudKind, CrudListParam, DataSource, HttpVerb, IncludeTree,
+    MediaType, NamedTypedValue, NavigationPropertyKind,
 };
 
 // TODO: This is all hardcoded to TypeScript workers
@@ -188,10 +188,30 @@ impl WorkersGenerator {
                         return_type: CidlType::http(CidlType::array(CidlType::Object(
                             model.name.clone(),
                         ))),
-                        parameters: vec![NamedTypedValue {
-                            name: "__datasource".into(),
-                            cidl_type: CidlType::DataSource(model.name.clone()),
-                        }],
+                        parameters: vec![
+                            NamedTypedValue {
+                                name: "lastSeen".into(),
+                                cidl_type: CidlType::nullable(
+                                    model
+                                        .primary_key
+                                        .as_ref()
+                                        .map(|pk| pk.cidl_type.clone())
+                                        .unwrap_or(CidlType::Integer),
+                                ),
+                            },
+                            NamedTypedValue {
+                                name: "limit".into(),
+                                cidl_type: CidlType::nullable(CidlType::Integer),
+                            },
+                            NamedTypedValue {
+                                name: "offset".into(),
+                                cidl_type: CidlType::nullable(CidlType::Integer),
+                            },
+                            NamedTypedValue {
+                                name: "__datasource".into(),
+                                cidl_type: CidlType::DataSource(model.name.clone()),
+                            },
+                        ],
                         parameters_media: MediaType::default(),
                         return_media: MediaType::default(),
                         data_source: None,
@@ -264,6 +284,7 @@ impl WorkersGenerator {
                 name: "default".into(),
                 tree,
                 is_private: false,
+                list_params: vec![CrudListParam::LastSeen, CrudListParam::Limit],
             };
 
             ast.models

@@ -54,6 +54,9 @@ export class BlobHaver {
     );
   }
   static async LIST(
+    lastSeen: number | null,
+    limit: number | null,
+    offset: number | null,
     __datasource: "default" = "default",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<BlobHaver[]>> {
@@ -61,6 +64,9 @@ export class BlobHaver {
       `http://localhost:5002/api/BlobHaver/LIST`
     );
 
+    baseUrl.searchParams.append("lastSeen", String(lastSeen));
+    baseUrl.searchParams.append("limit", String(limit));
+    baseUrl.searchParams.append("offset", String(offset));
     baseUrl.searchParams.append("__datasource", String(__datasource));
 
     const res = await fetchImpl(baseUrl, {
@@ -191,6 +197,12 @@ export class KValue<V> {
   get value(): V | null {
     return this.raw as V | null;
   }
+}
+
+export interface Paginated<T> {
+  results: T[];
+  cursor: string | null;
+  complete: boolean;
 }
 
 export enum MediaType {

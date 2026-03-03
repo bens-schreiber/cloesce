@@ -25,7 +25,8 @@ macro_rules! cidl_type_contains {
 
                 CidlType::Array(inner)
                 | CidlType::Nullable(inner)
-                | CidlType::HttpResult(inner) => {
+                | CidlType::HttpResult(inner)
+                | CidlType::Paginated(inner) => {
                     cur = inner;
                 }
 
@@ -91,6 +92,9 @@ pub enum CidlType {
     /// If the inner value is void, represents just null.
     Nullable(Box<CidlType>),
 
+    /// A paginated response containing list metadata and a page of results.
+    Paginated(Box<CidlType>),
+
     /// A Cloudflare Workers KV object (GET value response)
     KvObject(Box<CidlType>),
 }
@@ -102,6 +106,7 @@ impl CidlType {
             CidlType::HttpResult(inner) => inner.root_type(),
             CidlType::Nullable(inner) => inner.root_type(),
             CidlType::KvObject(inner) => inner.root_type(),
+            CidlType::Paginated(inner) => inner.root_type(),
             t => t,
         }
     }
@@ -124,6 +129,10 @@ impl CidlType {
 
     pub fn http(cidl_type: CidlType) -> CidlType {
         CidlType::HttpResult(Box::new(cidl_type))
+    }
+
+    pub fn paginated(cidl_type: CidlType) -> CidlType {
+        CidlType::Paginated(Box::new(cidl_type))
     }
 }
 
@@ -182,6 +191,13 @@ pub struct ApiMethod {
 #[derive(Serialize, Deserialize, Debug, Default)]
 pub struct IncludeTree(pub BTreeMap<String, IncludeTree>);
 
+#[derive(Serialize, Deserialize, Debug, Clone, Hash, PartialEq, Eq)]
+pub enum CrudListParam {
+    LastSeen,
+    Limit,
+    Offset,
+}
+
 /// A tree of model symbol names to include when hydrating a data source.
 #[derive(Serialize, Deserialize, Debug)]
 pub struct DataSource {
@@ -191,6 +207,9 @@ pub struct DataSource {
 
     /// If true, the data source will not be generated on the client.
     pub is_private: bool,
+
+    /// List pagination parameter names for the LIST method
+    pub list_params: Vec<CrudListParam>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Hash)]

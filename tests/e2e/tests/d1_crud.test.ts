@@ -54,7 +54,7 @@ describe("Basic", () => {
   });
 
   it("List 3 models", async () => {
-    const res = await CrudHaver.LIST();
+    const res = await CrudHaver.LIST(null, null, null);
     expect(res.ok, withRes("LIST should be OK", res)).toBe(true);
     expect(res.data!.length, withRes("Should be 4 results", res)).toBe(4); // including the one from the prev test
     models.forEach((m) =>
@@ -117,7 +117,7 @@ describe("Parent with children", () => {
   });
 
   it("LIST", async () => {
-    const res = await Parent.LIST("withChildren");
+    const res = await Parent.LIST(null, null, null, "withChildren");
     expect(res.ok, withRes("LIST should be OK", res)).toBe(true);
     expect(res.data!.length).toEqual(1);
     expect(res.data![0], withRes("Data should be equal", res)).toEqual(model);

@@ -97,6 +97,24 @@
           "parameters_media": "Json",
           "parameters": [
             {
+              "name": "lastSeen",
+              "cidl_type": {
+                "Nullable": "Integer"
+              }
+            },
+            {
+              "name": "limit",
+              "cidl_type": {
+                "Nullable": "Integer"
+              }
+            },
+            {
+              "name": "offset",
+              "cidl_type": {
+                "Nullable": "Integer"
+              }
+            },
+            {
               "name": "__datasource",
               "cidl_type": {
                 "DataSource": "D1BackedModel"
@@ -159,7 +177,11 @@
           "tree": {
             "r2Data": {}
           },
-          "is_private": false
+          "is_private": false,
+          "list_params": [
+            "LastSeen",
+            "Limit"
+          ]
         }
       },
       "cruds": [
@@ -276,7 +298,11 @@
             "data": {},
             "otherData": {}
           },
-          "is_private": false
+          "is_private": false,
+          "list_params": [
+            "LastSeen",
+            "Limit"
+          ]
         }
       },
       "cruds": [

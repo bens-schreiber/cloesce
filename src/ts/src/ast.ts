@@ -26,6 +26,7 @@ export type CidlType =
   | { Object: string }
   | { Partial: string }
   | { KvObject: CidlType }
+  | { Paginated: CidlType }
   | { Nullable: CidlType }
   | { Array: CidlType }
   | { HttpResult: CidlType };
@@ -166,11 +167,14 @@ export interface CidlIncludeTree {
   [key: string]: CidlIncludeTree;
 }
 
+export type CrudListParam = "LastSeen" | "Limit" | "Offset";
+
 /** @internal */
 export interface DataSource {
   name: string;
   tree: CidlIncludeTree;
   is_private: boolean;
+  list_params: CrudListParam[];
 }
 
 /** @internal */

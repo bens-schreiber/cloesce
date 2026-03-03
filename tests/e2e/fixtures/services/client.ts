@@ -73,6 +73,12 @@ export class KValue<V> {
   }
 }
 
+export interface Paginated<T> {
+  results: T[];
+  cursor: string | null;
+  complete: boolean;
+}
+
 export enum MediaType {
   Json = "Json",
   Octet = "Octet",

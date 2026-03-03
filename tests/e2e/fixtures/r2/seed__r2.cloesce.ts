@@ -1,5 +1,6 @@
 import {
   R2,
+  Paginated,
   WranglerEnv,
   KeyParam,
   Model,
@@ -34,7 +35,7 @@ export class PureR2Model {
   otherData: R2ObjectBody;
 
   @R2("path/", "bucket1")
-  allData: R2ObjectBody[];
+  allData: Paginated<R2ObjectBody>;
 
   @Put()
   async uploadData(@Inject env: Env, stream: ReadableStream) {

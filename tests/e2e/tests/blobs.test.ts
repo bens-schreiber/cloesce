@@ -50,7 +50,7 @@ describe("BlobHaver", () => {
   });
 
   it("LIST Blobs", async () => {
-    const res = await BlobHaver.LIST();
+    const res = await BlobHaver.LIST(null, null, null);
     expect(res.ok, withRes("GET should be OK", res)).toBe(true);
     expect(res.data).toStrictEqual([blobHaver]);
   });

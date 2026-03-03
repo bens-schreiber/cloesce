@@ -202,6 +202,9 @@ export class ModelWithCruds {
     );
   }
   static async LIST(
+    lastSeen: number | null,
+    limit: number | null,
+    offset: number | null,
     __datasource: "default" = "default",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<ModelWithCruds[]>> {
@@ -209,6 +212,9 @@ export class ModelWithCruds {
       `http://example.com/api/ModelWithCruds/LIST`
     );
 
+    baseUrl.searchParams.append("lastSeen", String(lastSeen));
+    baseUrl.searchParams.append("limit", String(limit));
+    baseUrl.searchParams.append("offset", String(offset));
     baseUrl.searchParams.append("__datasource", String(__datasource));
 
     const res = await fetchImpl(baseUrl, {
@@ -258,7 +264,7 @@ export class ModelWithKv {
   id1: string;
   id2: string;
   someValue: KValue<unknown>;
-  manyValues: KValue<unknown>[];
+  manyValues: Paginated<KValue<unknown>>;
   streamValue: KValue<void>;
 
   async hasKvParamAndRes(
@@ -342,7 +348,11 @@ export class ModelWithKv {
   static fromJson(data: any): ModelWithKv {
     const res = Object.assign(new ModelWithKv(), data);
     if (res.someValue) res.someValue = Object.assign(new KValue<unknown>(), res.someValue);
-    if (res.manyValues) res.manyValues = Object.assign(new KValue<unknown>(), res.manyValues);
+    if (res.manyValues?.results) {
+      for (let i = 0; i < res.manyValues.results.length; i++) {
+        res.manyValues.results[i] = Object.assign(new KValue<unknown>(), res.manyValues.results[i]);
+      }
+    }
     
     return res;
   }
@@ -351,7 +361,7 @@ export class ModelWithR2 {
   id: number;
   r2Id: string;
   fileData: R2Object;
-  manyFileDatas: R2Object[];
+  manyFileDatas: Paginated<R2Object>;
 
   async hasR2ParamAndRes(
     input: R2Object,
@@ -384,6 +394,11 @@ export class ModelWithR2 {
 
   static fromJson(data: any): ModelWithR2 {
     const res = Object.assign(new ModelWithR2(), data);
+    if (res.manyFileDatas?.results) {
+      for (let i = 0; i < res.manyFileDatas.results.length; i++) {
+        res.manyFileDatas.results[i] = Object.assign(new R2Object(), res.manyFileDatas.results[i]);
+      }
+    }
     return res;
   }
 }
@@ -459,6 +474,12 @@ export class KValue<V> {
   get value(): V | null {
     return this.raw as V | null;
   }
+}
+
+export interface Paginated<T> {
+  results: T[];
+  cursor: string | null;
+  complete: boolean;
 }
 
 export enum MediaType {

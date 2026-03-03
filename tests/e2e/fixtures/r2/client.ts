@@ -34,6 +34,9 @@ export class D1BackedModel {
     );
   }
   static async LIST(
+    lastSeen: number | null,
+    limit: number | null,
+    offset: number | null,
     __datasource: "default" = "default",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<D1BackedModel[]>> {
@@ -41,6 +44,9 @@ export class D1BackedModel {
       `http://localhost:5002/api/D1BackedModel/LIST`
     );
 
+    baseUrl.searchParams.append("lastSeen", String(lastSeen));
+    baseUrl.searchParams.append("limit", String(limit));
+    baseUrl.searchParams.append("offset", String(offset));
     baseUrl.searchParams.append("__datasource", String(__datasource));
 
     const res = await fetchImpl(baseUrl, {
@@ -118,7 +124,7 @@ export class PureR2Model {
   id: string;
   data: R2Object;
   otherData: R2Object;
-  allData: R2Object[];
+  allData: Paginated<R2Object>;
 
   static async GET(
     id: string,
@@ -200,6 +206,11 @@ export class PureR2Model {
 
   static fromJson(data: any): PureR2Model {
     const res = Object.assign(new PureR2Model(), data);
+    if (res.allData?.results) {
+      for (let i = 0; i < res.allData.results.length; i++) {
+        res.allData.results[i] = Object.assign(new R2Object(), res.allData.results[i]);
+      }
+    }
     return res;
   }
 }
@@ -218,6 +229,12 @@ export class KValue<V> {
   get value(): V | null {
     return this.raw as V | null;
   }
+}
+
+export interface Paginated<T> {
+  results: T[];
+  cursor: string | null;
+  complete: boolean;
 }
 
 export enum MediaType {

@@ -3,6 +3,8 @@
 - Truncate extraneous fields during runtime validation
 - Runtime validation for `DateISO` type
 - Private and inline data sources per method
+- Pagination support for KV, R2 and D1 via the `orm`
+- Pagination support for D1 via the `LIST` CRUD method
 
 ### Changed
 - KV and R2 objects added to the grammar (any method can accept or return these objects)

@@ -31,6 +31,7 @@ import {
   ServiceAttribute,
   KeyValue,
   AstR2Object,
+  CrudListParam,
 } from "../ast.js";
 import { TypeFormatFlags } from "typescript";
 import { ExtractorError, ExtractorErrorCode } from "./err.js";
@@ -338,12 +339,23 @@ export class CidlExtractor {
           );
         }
 
+        const listParamsProp = obj.getProperty("listParams");
+        let list_params: CrudListParam[] = [];
+        if (listParamsProp) {
+          const res = parseListParams(listParamsProp, prop.getName());
+          if (res.isLeft()) {
+            return res;
+          }
+          list_params = res.unwrap();
+        }
+
         data_sources[prop.getName()] = {
           name: prop.getName(),
           tree,
 
           // Publicly exposed
           is_private: false,
+          list_params,
         };
         continue;
       }
@@ -474,9 +486,20 @@ export class CidlExtractor {
             });
           }
 
-          // Ensure that the prop type is a KvObject
-          const isArray = typeof cidl_type === "object" && "Array" in cidl_type;
-          const unwrapped = isArray ? (cidl_type as any).Array : cidl_type;
+          // Ensure that the prop type is a KvObject or Paginated<KvObject>
+          const isPaginated =
+            typeof cidl_type === "object" && "Paginated" in cidl_type;
+          const unwrapped = isPaginated
+            ? (cidl_type as { Paginated: CidlType }).Paginated
+            : cidl_type;
+
+          if (typeof unwrapped === "string") {
+            return err(ExtractorErrorCode.MissingKValue, (e) => {
+              e.snippet = prop.getText();
+              e.context = prop.getName();
+            });
+          }
+
           if (!("KvObject" in unwrapped)) {
             return err(ExtractorErrorCode.MissingKValue, (e) => {
               e.snippet = prop.getText();
@@ -509,7 +532,7 @@ export class CidlExtractor {
               name: prop.getName(),
               cidl_type: inner,
             },
-            list_prefix: isArray,
+            list_prefix: isPaginated,
           });
           break;
         }
@@ -524,9 +547,13 @@ export class CidlExtractor {
             });
           }
 
-          // Type must be R2Object
-          const isArray = typeof cidl_type === "object" && "Array" in cidl_type;
-          const unwrapped = isArray ? (cidl_type as any).Array : cidl_type;
+          // Type must be R2Object or Paginated<R2Object>
+          const isPaginated =
+            typeof cidl_type === "object" && "Paginated" in cidl_type;
+          const unwrapped = isPaginated
+            ? (cidl_type as { Paginated: CidlType }).Paginated
+            : cidl_type;
+
           if (unwrapped !== "R2Object") {
             return err(ExtractorErrorCode.MissingR2ObjectBody, (e) => {
               e.snippet = prop.getText();
@@ -538,7 +565,7 @@ export class CidlExtractor {
             format,
             bucket_binding,
             var_name: prop.getName(),
-            list_prefix: isArray,
+            list_prefix: isPaginated,
           });
           break;
         }
@@ -1050,6 +1077,12 @@ export class CidlExtractor {
       return wrapGeneric(genericTy, nullable, (inner) => ({ KvObject: inner }));
     }
 
+    if (symbolName === "Paginated") {
+      return wrapGeneric(genericTy, nullable, (inner) => ({
+        Paginated: inner,
+      }));
+    }
+
     if (symbolName === Promise.name || aliasName === "IncludeTree") {
       return wrapGeneric(genericTy, nullable, (inner) => inner);
     }
@@ -1356,6 +1389,10 @@ function getRootType(t: CidlType): CidlType {
     return getRootType(t.HttpResult);
   }
 
+  if ("Paginated" in t) {
+    return getRootType(t.Paginated);
+  }
+
   return t;
 }
 
@@ -1382,7 +1419,10 @@ function dataSourceFromDecorator(
 > {
   const decoratorArg = decorator.getArguments()[0];
   if (!decoratorArg) {
-    return Either.right({ newDs: null, definedDs: null });
+    return Either.right({
+      newDs: null,
+      definedDs: null,
+    });
   }
 
   // Reference to static property on the model
@@ -1393,15 +1433,6 @@ function dataSourceFromDecorator(
       definedDs: propName,
     });
   }
-
-  const dsWithEmptyTree = {
-    newDs: {
-      name: `${modelName}:${methodName}`,
-      tree: {},
-      is_private: true,
-    },
-    definedDs: null,
-  };
 
   const invalidIncludeTree = err(
     ExtractorErrorCode.InvalidDataSourceDefinition,
@@ -1414,29 +1445,36 @@ function dataSourceFromDecorator(
   // Defined inline object literal
   if (MorphNode.isObjectLiteralExpression(decoratorArg)) {
     const includeTreeProp = decoratorArg.getProperty("includeTree");
-    if (!includeTreeProp) {
-      // Default to an empty tree if no includeTree is provided
-      return Either.right(dsWithEmptyTree);
+    let includeTree = {};
+    if (includeTreeProp) {
+      if (!MorphNode.isPropertyAssignment(includeTreeProp)) {
+        return invalidIncludeTree;
+      }
+
+      const initializer = includeTreeProp.getInitializer();
+      if (!initializer?.isKind(SyntaxKind.ObjectLiteralExpression)) {
+        return invalidIncludeTree;
+      }
+
+      includeTree = parseIncludeTree(initializer as ObjectLiteralExpression);
     }
 
-    // Now let's parse the includeTree
-    if (!MorphNode.isPropertyAssignment(includeTreeProp)) {
-      return invalidIncludeTree;
+    const listParamsProp = decoratorArg.getProperty("listParams");
+    let list_params: CrudListParam[] = [];
+    if (listParamsProp) {
+      const res = parseListParams(listParamsProp, `${modelName}.${methodName}`);
+      if (res.isLeft()) {
+        return res;
+      }
+      list_params = res.unwrap();
     }
 
-    const initializer = includeTreeProp.getInitializer();
-    if (!initializer?.isKind(SyntaxKind.ObjectLiteralExpression)) {
-      return invalidIncludeTree;
-    }
-
-    const includeTree = parseIncludeTree(
-      initializer as ObjectLiteralExpression,
-    );
     return Either.right({
       newDs: {
         name: `${modelName}:${methodName}`,
         tree: includeTree,
         is_private: true,
+        list_params,
       },
       definedDs: null,
     });
@@ -1465,31 +1503,41 @@ function dataSourceFromDecorator(
     }
 
     const includeTreeProp = initializer.getProperty("includeTree");
-    if (!includeTreeProp) {
-      // Default to an empty tree if no includeTree is provided
-      return Either.right(dsWithEmptyTree);
+    let includeTree = {};
+    if (includeTreeProp) {
+      if (!MorphNode.isPropertyAssignment(includeTreeProp)) {
+        return invalidIncludeTree;
+      }
+
+      const includeTreeInitializer = includeTreeProp.getInitializer();
+      if (
+        !includeTreeInitializer ||
+        !includeTreeInitializer.isKind(SyntaxKind.ObjectLiteralExpression)
+      ) {
+        return invalidIncludeTree;
+      }
+
+      includeTree = parseIncludeTree(
+        includeTreeInitializer as ObjectLiteralExpression,
+      );
     }
 
-    if (!MorphNode.isPropertyAssignment(includeTreeProp)) {
-      return invalidIncludeTree;
+    const listParamsProp = initializer.getProperty("listParams");
+    let list_params: CrudListParam[] = [];
+    if (listParamsProp) {
+      const res = parseListParams(listParamsProp, decoratorArg.getText());
+      if (res.isLeft()) {
+        return res;
+      }
+      list_params = res.unwrap();
     }
 
-    const includeTreeInitializer = includeTreeProp.getInitializer();
-    if (
-      !includeTreeInitializer ||
-      !includeTreeInitializer.isKind(SyntaxKind.ObjectLiteralExpression)
-    ) {
-      return invalidIncludeTree;
-    }
-
-    const includeTree = parseIncludeTree(
-      includeTreeInitializer as ObjectLiteralExpression,
-    );
     return Either.right({
       newDs: {
         name: `${modelName}:${methodName}`,
         tree: includeTree,
         is_private: true,
+        list_params,
       },
       definedDs: decoratorArg.getText(),
     });
@@ -1521,6 +1569,61 @@ function parseIncludeTree(
   });
 
   return result;
+}
+
+function parseListParams(
+  listParamsProp: any,
+  contextName: string,
+): Either<ExtractorError, CrudListParam[]> {
+  if (!MorphNode.isPropertyAssignment(listParamsProp)) {
+    return err(ExtractorErrorCode.InvalidDataSourceDefinition, (e) => {
+      e.snippet = listParamsProp.getText();
+      e.context = `listParams must be a property assignment for ${contextName}`;
+    });
+  }
+
+  const initializer = listParamsProp.getInitializer();
+  if (!initializer?.isKind(SyntaxKind.ArrayLiteralExpression)) {
+    return err(ExtractorErrorCode.InvalidDataSourceDefinition, (e) => {
+      e.snippet = listParamsProp.getText();
+      e.context = `listParams must be an array literal for ${contextName}`;
+    });
+  }
+
+  const elements = (initializer as any).getElements();
+  const listParams: CrudListParam[] = [];
+  const paramMap: Record<string, CrudListParam> = {
+    lastseen: "LastSeen",
+    limit: "Limit",
+    offset: "Offset",
+  };
+
+  for (const elem of elements) {
+    let paramValue = "";
+
+    if (elem.isKind(SyntaxKind.StringLiteral)) {
+      paramValue = elem.getLiteralValue();
+    } else if (elem.isKind(SyntaxKind.Identifier)) {
+      paramValue = elem.getText();
+    } else {
+      return err(ExtractorErrorCode.InvalidDataSourceDefinition, (e) => {
+        e.snippet = elem.getText();
+        e.context = `listParams array elements must be strings or identifiers for ${contextName}`;
+      });
+    }
+
+    const normalized = paramMap[paramValue.toLowerCase()];
+    if (!normalized) {
+      return err(ExtractorErrorCode.InvalidDataSourceDefinition, (e) => {
+        e.snippet = elem.getText();
+        e.context = `"${paramValue}" is not a valid list parameter. Valid values are: "lastSeen", "limit", "offset" for ${contextName}`;
+      });
+    }
+
+    listParams.push(normalized);
+  }
+
+  return Either.right(listParams);
 }
 
 function checkPropertyModifier(

@@ -73,6 +73,24 @@
           "parameters_media": "Json",
           "parameters": [
             {
+              "name": "lastSeen",
+              "cidl_type": {
+                "Nullable": "Integer"
+              }
+            },
+            {
+              "name": "limit",
+              "cidl_type": {
+                "Nullable": "Integer"
+              }
+            },
+            {
+              "name": "offset",
+              "cidl_type": {
+                "Nullable": "Integer"
+              }
+            },
+            {
               "name": "__datasource",
               "cidl_type": {
                 "DataSource": "CrudHaver"
@@ -122,7 +140,11 @@
         "default": {
           "name": "default",
           "tree": {},
-          "is_private": false
+          "is_private": false,
+          "list_params": [
+            "LastSeen",
+            "Limit"
+          ]
         }
       },
       "cruds": [
@@ -218,6 +240,24 @@
           "parameters_media": "Json",
           "parameters": [
             {
+              "name": "lastSeen",
+              "cidl_type": {
+                "Nullable": "Integer"
+              }
+            },
+            {
+              "name": "limit",
+              "cidl_type": {
+                "Nullable": "Integer"
+              }
+            },
+            {
+              "name": "offset",
+              "cidl_type": {
+                "Nullable": "Integer"
+              }
+            },
+            {
               "name": "__datasource",
               "cidl_type": {
                 "DataSource": "Parent"
@@ -260,7 +300,11 @@
             "children": {},
             "favoriteChild": {}
           },
-          "is_private": false
+          "is_private": false,
+          "list_params": [
+            "LastSeen",
+            "Limit"
+          ]
         },
         "withChildren": {
           "name": "withChildren",
@@ -268,7 +312,8 @@
             "children": {},
             "favoriteChild": {}
           },
-          "is_private": false
+          "is_private": false,
+          "list_params": []
         }
       },
       "cruds": [
@@ -319,7 +364,11 @@
               "children": {}
             }
           },
-          "is_private": false
+          "is_private": false,
+          "list_params": [
+            "LastSeen",
+            "Limit"
+          ]
         }
       },
       "cruds": [],

@@ -102,7 +102,7 @@ describe("CIDL Type", () => {
     const sourceFile = project.createSourceFile(
       "test.ts",
       `
-      import { DataSource, DeepPartial, HttpResult } from "./src/ui/backend";
+      import { DataSource, DeepPartial, HttpResult, KValue, Paginated } from "./src/ui/backend";
 
       class Bar {
         a: number;
@@ -114,6 +114,7 @@ describe("CIDL Type", () => {
         promise: Promise<Bar>;
         arr: Bar[];
         res: HttpResult<Bar>;
+        paginatedKv: Paginated<KValue<Bar>>;
       }
         `,
     );
@@ -137,6 +138,7 @@ describe("CIDL Type", () => {
       { Object: "Bar" },
       { Array: { Object: "Bar" } },
       { HttpResult: { Object: "Bar" } },
+      { Paginated: { KvObject: { Object: "Bar" } } },
     ] as CidlType[]);
   });
 });
@@ -218,7 +220,10 @@ describe("Model", () => {
 
         static readonly ds: DataSource<Foo> = {};
 
-        static readonly dsWithTree: DataSource<Foo> = { includeTree: { bar: {} } };
+        static readonly dsWithTree: DataSource<Foo> = { 
+          includeTree: { bar: {} },
+          listParams: ["LastSeen", "Offset", "Limit"],
+        };
 
         @Get(this.ds)
         async thisStaticDs() {}
@@ -256,30 +261,35 @@ describe("Model", () => {
         name: "ds",
         tree: {},
         is_private: false,
+        list_params: [],
       },
 
       dsWithTree: {
         name: "dsWithTree",
         tree: { bar: {} },
         is_private: false,
+        list_params: ["LastSeen", "Offset", "Limit"],
       },
 
       "Foo:inlineEmptyDs": {
         name: "Foo:inlineEmptyDs",
         tree: {},
         is_private: true,
+        list_params: [],
       },
 
       "Foo:inlineDsWithTree": {
         name: "Foo:inlineDsWithTree",
         tree: { bar: {} },
         is_private: true,
+        list_params: [],
       },
 
       "Foo:externalDs": {
         name: "Foo:externalDs",
         tree: {},
         is_private: true,
+        list_params: [],
       },
     });
 
@@ -605,7 +615,7 @@ describe("Model", () => {
     project.createSourceFile(
       "test.ts",
       `
-      import { KValue, Integer, R2ObjectBody } from "./src/ui/backend";
+      import { KValue, Integer, Paginated, R2ObjectBody } from "./src/ui/backend";
       @Model(["GET", "SAVE"])
       export class Foo {
         @PrimaryKey
@@ -622,13 +632,13 @@ describe("Model", () => {
         value: KValue<unknown> | undefined;
 
         @KV("value/Foo", "namespace")
-        allValues: KValue<unknown>[];
+        allValues: Paginated<KValue<unknown>>;
 
         @R2("files/Foo/{id}", "bucket")
         fileData: R2ObjectBody | undefined;
 
         @R2("files/Foo", "bucket")
-        allFiles: R2ObjectBody[] | undefined;
+        allFiles: Paginated<R2ObjectBody> | undefined;
       }
       `,
     );

@@ -48,7 +48,7 @@ export class A {
     const orm = Orm.fromEnv(env);
     await orm.upsert(A, a, A.withB);
     return (await orm.get(A, {
-      id: a.id,
+      primaryKey: a.id,
       include: A.withB,
     }))!;
   }

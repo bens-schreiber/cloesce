@@ -18,10 +18,12 @@ const onlyBaconDataSource: DataSource<Hamburger> = {
     includeTree: {
         toppings: {}
     },
-    select: (joined) => `
+    get: (joined) => `
         WITH cte AS (${joined()})
         SELECT * FROM CTE
         WHERE [toppings.name] = 'BACON'
+        AND id = ?
+        ORDER BY id
     `
 };
 
@@ -35,22 +37,27 @@ export class Hamburger {
         includeTree: {
             toppings: {}
         },
-        select: (joined) => `
+        list: (joined) => `
             WITH cte AS (${joined()})
             SELECT * FROM CTE
             WHERE [toppings.name] = 'LETTUCE'
+            AND id > ?
             ORDER BY id
-        `
+            LIMIT ?
+        `,
+        listParams: ["LastSeen", "Limit"]
     };
 
     @Get({
         includeTree: {
             toppings: {}
         },
-        select: (joined) => `
+        get: (joined) => `
             WITH cte AS (${joined()})
             SELECT * FROM CTE
             WHERE [toppings.name] != 'LETTUCE'
+            AND id = ?
+            ORDER BY id
         `
     })
     noLettuceToppings(): Topping[] {

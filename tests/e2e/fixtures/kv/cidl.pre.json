@@ -95,6 +95,57 @@
                 "SAVE"
             ],
             "source_path": "./seed__kv.cloesce.ts"
+        },
+        "PaginatedKVModel": {
+            "name": "PaginatedKVModel",
+            "columns": [],
+            "primary_key": null,
+            "navigation_properties": [],
+            "key_params": [
+                "id"
+            ],
+            "kv_objects": [
+                {
+                    "format": "paginated/items/",
+                    "namespace_binding": "namespace",
+                    "value": {
+                        "name": "items",
+                        "cidl_type": "JsonValue"
+                    },
+                    "list_prefix": true
+                }
+            ],
+            "r2_objects": [],
+            "methods": {
+                "acceptPaginated": {
+                    "name": "acceptPaginated",
+                    "http_verb": "Post",
+                    "is_static": true,
+                    "return_media": "Json",
+                    "return_type": {
+                        "Paginated": {
+                            "KvObject": "JsonValue"
+                        }
+                    },
+                    "parameters_media": "Json",
+                    "parameters": [
+                        {
+                            "name": "ps",
+                            "cidl_type": {
+                                "Paginated": {
+                                    "KvObject": "JsonValue"
+                                }
+                            }
+                        }
+                    ],
+                    "data_source": null
+                }
+            },
+            "data_sources": {},
+            "cruds": [
+                "GET"
+            ],
+            "source_path": "./seed__kv.cloesce.ts"
         }
     },
     "poos": {},

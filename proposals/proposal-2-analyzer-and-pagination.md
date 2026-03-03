@@ -1,7 +1,7 @@
 # Proposal: Pagination
 
 - **Author(s):** Ben Schreiber
-- **Status:** Draft | **Review** | Accepted | Rejected | Implemented
+- **Status:** Draft | Review | Accepted | Rejected | **Implemented**
 - **Created:** 2026-02-26
 - **Last Updated:** 2026-02-26
 
@@ -118,7 +118,7 @@ const customDs: DataSource<User> = {
 }
 ```
 
-Note that we also need to specify the parameter names in `listParams` so that Cloesce can bind them correctly. If `listParams` is not provided, Cloesce will assume the parameters are `lastSeen` and `limit` in that order.
+Note that we also need to specify the parameter names in `listParams` so that Cloesce can bind them correctly. If a `list` is provided and `listParams` are not provided, an empty array is assumed and no bindings can be utilized. If no `list` is provided, the default pagination query is used and `lastSeen` and `limit` are assumed as parameters.
 
 `get` is assumed to accept a single parameter for the primary key.
 
@@ -151,7 +151,7 @@ If a custom `list` method is defined, the ORM will bind parameters from the name
 
 ### LIST CRUD Method
 
-All `LIST` methods generated for the client will be updated to accept their Data Sources `listParams` as arguments, or just `lastSeen` and `limit` if not defined. The client will be responsible for managing pagination for KV and R2 fields using the cursor provided in the response.
+All `LIST` methods generated for the client will be updated to accept the same arguments struct as the ORM `list` method, allowing clients to also take advantage of pagination in their queries. 
 
 Note that this CRUD method will not validate input other than ensuring the parameters are of the correct type (e.g., `number` for `limit`). If a developer wanted to limit pagination size or enforce that `lastSeen` is provided, they would need to implement a custom method on their model that performs those checks and then calls `orm.list` with the appropriate parameters.
 ---
