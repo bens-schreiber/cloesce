@@ -37,7 +37,7 @@ jobs:
           components: rustfmt, clippy
           targets: wasm32-unknown-unknown, wasm32-wasip1
 
-      - uses: actions/cache@v3
+      - uses: actions/cache@v5
         with:
           path: |
             ~/.cargo/registry
@@ -51,7 +51,7 @@ jobs:
         with:
           node-version: 20
 
-      - uses: actions/cache@v3
+      - uses: actions/cache@v5
         with:
           path: ~/.npm
           key: npm-cache-${{ hashFiles('**/package-lock.json') }}
