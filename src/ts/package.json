@@ -14,7 +14,7 @@
     "copy-generator-wasm": "cp ../generator/target/wasm32-wasip1/release/cli.wasm ./dist/generator.wasm"
   },
   "dependencies": {
-    "cmd-ts": "^0.14.1",
+    "cmd-ts": "^0.15.0",
     "ts-morph": "^22.0.0"
   },
   "devDependencies": {
