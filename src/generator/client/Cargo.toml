@@ -5,7 +5,7 @@ edition = "2024"
 
 [dependencies]
 ast = { path = "../ast" }
-handlebars = "6.3.2"
+handlebars = "6.4.0"
 serde_json = { workspace = true }
 
 [dev-dependencies]
