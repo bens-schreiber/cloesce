@@ -87,7 +87,7 @@ Instead of creating an overbearing verbose syntax on top of a Model class, we wi
 
 ```ts
 // cloesce.config.ts
-import { defineConfig } from "cloesce";
+import { defineConfig, CloesceConfig, CloesceAst } from "cloesce";
 
 const config: CloesceConfig = defineConfig({
     srcPaths: [
@@ -97,7 +97,7 @@ const config: CloesceConfig = defineConfig({
     migrationsPath: "./migrations"
 });
 
-defineConfig.modelBuilder(Foo, (builder) => {
+config.modelBuilder(Foo, (builder) => {
     // 1. Define a primary key
     builder.primaryKey("id");
 
@@ -116,7 +116,7 @@ defineConfig.modelBuilder(Foo, (builder) => {
     // NOTE: KV and R2 to come in the future? May not be necessary.
 });
 
-defineConfig.rawAst(ast => {
+config.rawAst((ast: CloesceAst) => {
     // This function will be given the raw AST extracted from the source code and can modify it 
     // arbitrarily before it is passed to the generator.
     //
@@ -131,8 +131,8 @@ export default config;
 To define a unique constraint on some combination of columns, the `modelBuilder` function in `cloesce.config.ts` can be used to programmatically add unique constraints to the Model. This allows for a more flexible and powerful way to define constraints without cluttering the Model class with too many decorators.
 
 ```ts
-defineConfig.modelBuilder(ProfessorCourseRating, (builder) => {
-    builder.unique("courseId", "professorId");
+config.modelBuilder(ProfessorCourseRating, (builder) => {
+    builder.unique("professorId", "courseId");
     builder.unique("name");
 });
 ```
@@ -148,6 +148,7 @@ CREATE TABLE ProfessorCourseRating (
     FOREIGN KEY (professorId) REFERENCES Professor(id),
     FOREIGN KEY (courseId) REFERENCES Course(id),
     UNIQUE (professorId, courseId)
+);
 ```
 
 ### Composite Primary Keys
@@ -185,7 +186,7 @@ CREATE TABLE ProfessorCourseRating (
 Optionally, this could be expressed through the `modelBuilder` function in `cloesce.config.ts` instead of using decorators:
 
 ```ts
-defineConfig.modelBuilder(ProfessorCourseRating, (builder) => {
+config.modelBuilder(ProfessorCourseRating, (builder) => {
     builder.primaryKey("professorId", "courseId");
     builder.foreignKey("professorId").references(Professor, "id");
     builder.foreignKey("courseId").references(Course, "id");
@@ -208,7 +209,7 @@ class SomeModel {
 ```
 
 ```ts
-defineConfig.modelBuilder(SomeModel, (builder) => {
+config.modelBuilder(SomeModel, (builder) => {
     builder.foreignKey("professorId", "courseId")
         .references(ProfessorCourseRating, "professorId", "courseId");
 
@@ -276,7 +277,7 @@ class Student {
 ```
 
 ```ts
-defineConfig.modelBuilder(Student, (builder) => {
+config.modelBuilder(Student, (builder) => {
     builder.manyToMany("courses").references(Course, "id", "name");
 });
 ```
