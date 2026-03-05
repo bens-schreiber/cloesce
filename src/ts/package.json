@@ -15,6 +15,7 @@
   },
   "dependencies": {
     "cmd-ts": "^0.15.0",
+    "jiti": "^2.6.1",
     "ts-morph": "^22.0.0"
   },
   "devDependencies": {
@@ -32,6 +33,10 @@
     "./backend": {
       "types": "./dist/ui/backend.d.ts",
       "import": "./dist/ui/backend.js"
+    },
+    "./config": {
+      "types": "./dist/config.d.ts",
+      "import": "./dist/config.js"
     }
   },
   "bin": {
@@ -41,6 +46,9 @@
     "*": {
       "backend": [
         "dist/ui/backend.d.ts"
+      ],
+      "config": [
+        "dist/config.d.ts"
       ]
     }
   },

@@ -13,7 +13,7 @@ import {
   option,
   optional,
 } from "cmd-ts";
-import { Project } from "ts-morph";
+import { createJiti } from "jiti";
 import { CidlExtractor } from "./extractor/extract.js";
 import {
   ExtractorError,
@@ -21,10 +21,21 @@ import {
   getErrorInfo,
 } from "./extractor/err.js";
 import { CloesceAst } from "./ast.js";
+import {
+  CloesceConfig,
+  CloesceConfigOptions,
+  DefaultCloesceConfig,
+  setDefaultConfigs,
+} from "./config.js";
+import { Project } from "ts-morph";
 
 let debugPhase: "extractor" | "npm cloesce" = "npm cloesce";
 function debug(...args: any[]) {
-  console.log(`[${debugPhase}]: `, ...args);
+  console.log(`${timestamp()} [${debugPhase}]: `, ...args);
+}
+function debugBenchmark(...args: any[]) {
+  debug(...args);
+  return Date.now();
 }
 
 type WasmConfig = {
@@ -35,15 +46,6 @@ type WasmConfig = {
   env?: Record<string, string>;
 };
 
-type CloesceConfig = {
-  paths: string[];
-  projectName: string;
-  truncateSourcePaths: boolean;
-  outPath: string;
-  workersUrl: string;
-  migrationsPath: string;
-};
-
 const cmds = subcommands({
   name: "cloesce",
   cmds: {
@@ -52,15 +54,16 @@ const cmds = subcommands({
       description: "Run through the full compilation process.",
       args: {},
       handler: async () => {
-        const config = loadCloesceConfig(process.cwd());
-        if (!config) {
+        const rawConfig = await loadCloesceConfig(process.cwd());
+        if (!rawConfig) {
           process.exit(1);
         }
 
+        const config = setDefaultConfigs(rawConfig);
         await extract(config);
         debugPhase = "npm cloesce";
 
-        const outputDir = config.outPath ?? ".generated";
+        const outputDir = config.outPath;
         const generateConfig: WasmConfig = {
           name: "generate",
           wasmFile: "generator.wasm",
@@ -104,21 +107,17 @@ const cmds = subcommands({
         }),
       },
       handler: async (args) => {
-        const config: CloesceConfig = {
-          projectName: args.projectName!,
-          outPath: args.out!,
-          paths: [args.inp!],
-          truncateSourcePaths: false,
-          workersUrl: "",
-          migrationsPath: "",
+        const rawConfig: CloesceConfigOptions = {
+          projectName: args.projectName,
+          outPath: args.out,
+          srcPaths: [args.inp!],
+          truncateSourcePaths: args.truncateSourcePaths,
         };
 
-        await extract(config, {
-          truncateSourcePaths: args.truncateSourcePaths,
-        });
+        const config = setDefaultConfigs(rawConfig);
+        await extract(config);
       },
     }),
-
     migrate: command({
       name: "migrate",
       description: "Creates a database migration.",
@@ -131,11 +130,12 @@ const cmds = subcommands({
         }),
       },
       handler: async (args) => {
-        const config = loadCloesceConfig(process.cwd());
-        if (!config) {
+        const rawConfig = await loadCloesceConfig(process.cwd());
+        if (!rawConfig) {
           process.exit(1);
         }
 
+        const config = setDefaultConfigs(rawConfig);
         const cidlPath = path.join(config.outPath, "cidl.json");
         if (!fs.existsSync(cidlPath)) {
           console.error(
@@ -188,19 +188,18 @@ const cmds = subcommands({
 });
 
 async function extract(
-  config: CloesceConfig,
+  config: DefaultCloesceConfig,
   args: {
     truncateSourcePaths?: boolean;
   } = {},
 ) {
-  const startTime = Date.now();
   debugPhase = "extractor";
-  debug("Preparing extraction...");
+  const startTime = debugBenchmark("Preparing extraction...");
 
   const root = process.cwd();
   const projectRoot = process.cwd();
 
-  const searchPaths = config.paths ?? [root];
+  const searchPaths = config.srcPaths;
 
   const outPath = (() => {
     // If the out path is a directory, join it with "cidl.pre.json"
@@ -212,12 +211,12 @@ async function extract(
     }
 
     // If the out path is a file, use it directly
-    if (config.outPath && config.outPath.endsWith(".json")) {
+    if (config.outPath.endsWith(".json")) {
       return config.outPath;
     }
 
     // Default to .generated/cidl.pre.json
-    return path.join(config.outPath ?? ".generated", "cidl.pre.json");
+    return path.join(config.outPath, "cidl.pre.json");
   })();
 
   const truncate =
@@ -235,7 +234,7 @@ async function extract(
   });
 
   project.addSourceFilesAtPaths(
-    searchPaths.flatMap((p) => {
+    searchPaths.flatMap((p: string) => {
       const full = path.isAbsolute(p) ? p : path.resolve(root, p);
 
       if (!fs.existsSync(full)) {
@@ -261,8 +260,7 @@ async function extract(
   debug(`Found ${fileCount} .cloesce.ts files`);
 
   try {
-    const extractorStart = Date.now();
-    debug("Extracting CIDL...");
+    const extractorStart = debugBenchmark("Extracting CIDL...");
 
     const result = CidlExtractor.extract(cloesceProjectName, project);
     if (result.isLeft()) {
@@ -270,7 +268,7 @@ async function extract(
       process.exit(1);
     }
 
-    const ast: CloesceAst = result.unwrap();
+    let ast: CloesceAst = result.unwrap();
 
     if (truncate) {
       if (ast.wrangler_env) {
@@ -295,6 +293,11 @@ async function extract(
       }
     }
 
+    // Run all AST modifiers from the config on the extracted AST
+    for (const modifier of config.astModifiers) {
+      modifier(ast);
+    }
+
     const json = JSON.stringify(ast, null, 4);
     fs.mkdirSync(path.dirname(outPath), { recursive: true });
     fs.writeFileSync(outPath, json);
@@ -317,15 +320,13 @@ async function extract(
 }
 
 async function generate(config: WasmConfig) {
-  const debugStart = Date.now();
-  debug(`Starting generator`);
-
+  const debugStart = debugBenchmark(`Starting generator`);
   const root = process.cwd();
 
   // Look for wrangler.toml in the root directory
   const wranglerPath = path.join(root, "wrangler.toml");
   if (!fs.existsSync(wranglerPath)) {
-    debug("No wrangler.toml found, creating empty file.");
+    debug("No wrangler.toml found, creating empty config.");
     fs.writeFileSync(wranglerPath, "");
   }
   debug(`Using wrangler.toml at ${wranglerPath}`);
@@ -336,9 +337,7 @@ async function generate(config: WasmConfig) {
     preopens: { ".": root },
   });
 
-  const readWasmStart = Date.now();
-  debug(`Reading generator binary...`);
-
+  const readWasmStart = debugBenchmark(`Reading generator binary...`);
   const wasm = await readFile(new URL("./generator.wasm", import.meta.url));
   const mod = await WebAssembly.compile(new Uint8Array(wasm));
   let instance = await WebAssembly.instantiate(mod, {
@@ -358,61 +357,49 @@ async function generate(config: WasmConfig) {
   }
 }
 
-function loadCloesceConfig(root: string): CloesceConfig | undefined {
-  const configPath = path.join(root, "cloesce.config.json");
-  if (!fs.existsSync(configPath)) {
-    debug("No cloesce.config.json found");
-    return undefined;
+async function loadCloesceConfig(
+  root: string,
+): Promise<CloesceConfig | undefined> {
+  // Load cloesce.config.ts
+  const configTsPath = path.join(root, "cloesce.config.ts");
+  if (fs.existsSync(configTsPath)) {
+    try {
+      return await _loadCloesceConfig(configTsPath, root);
+    } catch (err) {
+      console.error(`Failed to load cloesce.config.ts: ${err}`);
+      throw err;
+    }
   }
 
-  try {
-    const config = JSON.parse(fs.readFileSync(configPath, "utf8"));
-    debug(`Loaded config from ${configPath}`);
+  debug("No cloesce.config.ts found");
+  return undefined;
 
-    if (!config.paths || !Array.isArray(config.paths)) {
-      debug("No paths specified in cloesce.config.json, defaulting to root");
-      config.paths = [root];
-    }
+  async function _loadCloesceConfig(
+    configTsPath: string,
+    root: string,
+  ): Promise<CloesceConfig> {
+    debug(`Attempting to load config from ${configTsPath}`);
 
-    if (!config.projectName) {
-      debug(
-        "No projectName specified in cloesce.config.json, reading from package.json",
+    const jitiLoader = createJiti(root, {
+      interopDefault: true,
+      moduleCache: false,
+    });
+
+    const configModule = (await jitiLoader.import(configTsPath)) as {
+      default?: any;
+    };
+    const configBuilder = configModule.default;
+
+    if (!configBuilder || typeof configBuilder.srcPaths === "undefined") {
+      throw new Error(
+        "cloesce.config.ts must export a config object via export default",
       );
-      config.projectName = readPackageJsonProjectName(root);
-    }
-
-    if (!config.outPath) {
-      debug(
-        "No outPath specified in cloesce.config.json, defaulting to .generated",
-      );
-      config.outPath = ".generated";
-    }
-
-    if (!config.workersUrl) {
-      debug(
-        "No workersUrl specified in cloesce.config.json, localhost:8787 will be used",
-      );
-      config.workersUrl = "http://localhost:8787";
-    }
-
-    if (!config.migrationsPath) {
-      debug(
-        "No migrationsPath specified in cloesce.config.json, defaulting to ./migrations",
-      );
-      config.migrationsPath = "./migrations";
-    }
-
-    if (typeof config.truncateSourcePaths !== "boolean") {
-      config.truncateSourcePaths = false;
     }
 
     debug(
-      `Cloesce Config: ${JSON.stringify({ ...config, truncateSourcePaths: undefined }, null, 4)}`,
+      `Cloesce Config: ${JSON.stringify({ srcPaths: configBuilder.srcPaths, projectName: configBuilder.projectName, outPath: configBuilder.outPath, workersUrl: configBuilder.workersUrl, migrationsPath: configBuilder.migrationsPath, truncateSourcePaths: configBuilder.truncateSourcePaths }, null, 2)}`,
     );
-    return config;
-  } catch (err) {
-    console.warn(`Failed to parse cloesce.config.json: ${err}`);
-    throw err;
+    return configBuilder;
   }
 }
 
