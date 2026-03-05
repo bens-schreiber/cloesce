@@ -81,7 +81,7 @@ The second approach is completely unsupported in Cloesce and requires a signific
 
 ### Cloesce Configuration (Fluent API)
 
-In many cases, it is difficult or unwieldy to express certain relationships and constraints through decorators on the Model class alone. These relationships do change the structure of the schema, but rather represent "SQL metadata".
+In many cases, it is difficult or unwieldy to express certain relationships and constraints through decorators on the Model class alone. These relationships do not change the set of tables or columns in the schema, but instead represent additional SQL metadata such as constraints.
 
 Instead of creating an overbearing verbose syntax on top of a Model class, we will introduce a new `cloesce.config.ts` file that can be used to programmatically modify the extracted AST before it is handed off to the generator. The Entity Framework-inspired Fluent API can define all things the current decorator syntax can, as well as the new features proposed in this document.
 
