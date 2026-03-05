@@ -321,16 +321,7 @@ A new property `unique_constraints` will be added to the Model AST, consisting o
 
 A single unique constraint can be added inline to the table definition, while multiple unique constraints will be added as separate `UNIQUE` clauses.
 
-The migrations engine must be capable of creating tables with unique constraints, as well as removing and adding a unique constraint. All of these will require a full table rebuild, as SQLite does not support adding or removing unique constraints through `ALTER TABLE`. To account for this, `unique_constraints` will be added to the Merkle hash calculation for the Model, so that any changes to unique constraints will trigger a full table rebuild.
-
-A Rust struct for the unique constraint definition may look like:
-
-```rust
-struct UniqueConstraint {
-    columns: Vec<Vec<String>>, // e.g., [["professorId", "courseId"], ["name"]]
-    hash: u64, // merkle hash
-}
-```
+The migrations engine must be capable of creating tables with unique constraints, as well as removing and adding a unique constraint. All of these will require a full table rebuild, as SQLite does not support adding or removing unique constraints through `ALTER TABLE`. A special `unique_ids` property can be added to the column definition to indicate which unique constraint(s) a column is part of, which will allow the migrations engine to determine which unique constraints need to be modified when a column is added, removed, or modified.
 
 Overall, this change is additive to the migrations engine portion of the generator.
 
@@ -356,6 +347,9 @@ pub struct D1Column {
     /// The ID of the composite key this column belongs to, if any.
     pub composite_key_id: Option<String>,
 
+    /// The ID of the unique constraint this column belongs to, if any.
+    pub unique_ids: Vec<String>,
+
     /// If the attribute is a primary key, this will be true.
     /// Otherwise, false.
     pub is_primary_key: bool,
@@ -369,6 +363,9 @@ impl Model {
 
     /// Returns a vector of composite keys, where each composite key is a vector of column indices.
     pub fn composite_keys(&self) -> Vec<Vec<usize>> { ... }
+
+    /// Returns a vector of unique constraints, where each unique constraint is a vector of column indices.
+    pub fn unique_constraints(&self) -> Vec<Vec<usize>> { ... }
 }
 ```
 
