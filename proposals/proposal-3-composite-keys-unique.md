@@ -9,7 +9,7 @@
 
 ## Summary
 
-This proposal aims to add support for composite keys and unique constraints in the D1 database schema. This will allow developers to define multiple columns as a primary key, as well as enforce uniqueness in any combination of columns.
+This proposal aims to add support for composite keys and unique constraints in the D1 database schema. This will allow developers to define multiple columns as a primary key, as well as enforce uniqueness on any combination of columns.
 
 ---
 
@@ -49,15 +49,16 @@ export class ProfessorCourseRating {
 }
 ```
 
-In this example, a Professor can have multiple ratings for different courses, but the combination of `professorId` and `courseId` should be unique to prevent duplicate ratings for the same course by the same professor. The course rating in this case isn't individual ratings from students, but rather an overall rating for the course by the professor, which is why it makes sense to enforce uniqueness on the combination of `professorId` and `courseId`.
+In this example, a Professor can have multiple ratings for different courses, but the combination of `professorId` and `courseId` should be unique to prevent duplicate ratings for the same course by the same professor. The course rating in this case is not an individual rating from students, but rather an overall rating for the course by the professor, which is why it makes sense to enforce uniqueness on the combination of `professorId` and `courseId`.
 
 Two approaches to modeling this are:
 1. **Using a surrogate primary key**: This is the current approach, where `id` is the primary key, and we would need to add a unique constraint on the combination of `professorId` and `courseId`.
 2. **Using a composite primary key**: This would allow us to define `professorId` and `courseId` together as the primary key, eliminating the need for a surrogate key and ensuring uniqueness by design.
 
-The first approach is do-able in Cloesce, by manually modifying the generated SQL schema to add a unique constraint (a method that shouldn't frown upon, as Cloesces generated SQL schema should be considered a starting point for further customization). However, it is not ideal as it requires manual intervention and is not supported by the D1 schema definition language.
+The first approach is doable in Cloesce by manually modifying the generated SQL schema to add a unique constraint (a method that should not be frowned upon, as Cloesce's generated SQL schema should be considered a starting point for further customization). However, it is not ideal as it requires manual intervention and is not supported by the D1 schema definition language.
 
-The second approach is completely unsupported in Cloesce, and requires a significant change to the way primary keys are defined and handled in the D1 schema.
+The second approach is completely unsupported in Cloesce and requires a significant change to the way primary keys are defined and handled in the D1 schema.
+
 ---
 
 ## Goals and Non-Goals
@@ -80,9 +81,9 @@ The second approach is completely unsupported in Cloesce, and requires a signifi
 
 ### Cloesce Configuration (Fluent API)
 
-In many cases, it is difficult or unwieldy to express certain relationships and constraints through decorators on the Model class alone. These relationships do change the structure of the schema, but rather "SQL metadata".
+In many cases, it is difficult or unwieldy to express certain relationships and constraints through decorators on the Model class alone. These relationships do change the structure of the schema, but rather represent "SQL metadata".
 
-Instead of creating an overbearing verbose syntax on top of a Model class, we will introduce a new `cloesce.config.ts` file that can be used to programatically modify the extracted AST before it is handed off to the generator. The Entity Framework inspired Fluent API can define all things the current decorator syntax can, as well as the new features proposed in this document.
+Instead of creating an overbearing verbose syntax on top of a Model class, we will introduce a new `cloesce.config.ts` file that can be used to programmatically modify the extracted AST before it is handed off to the generator. The Entity Framework-inspired Fluent API can define all things the current decorator syntax can, as well as the new features proposed in this document.
 
 ```ts
 // cloesce.config.ts
@@ -103,13 +104,13 @@ defineConfig.modelBuilder(Foo, (builder) => {
     // 2. Define a foreign key
     builder.foreignKey("barId").references(Bar, "id");
 
-    // 3. Define a one to one relationship
+    // 3. Define a one-to-one relationship
     builder.oneToOne("bar").references(Bar, "id");
 
-    // 4. Define a one to many relationship
+    // 4. Define a one-to-many relationship
     builder.oneToMany("bars").references(Bar, "fooId");
 
-    // 5. Define a many to many relationship
+    // 5. Define a many-to-many relationship
     builder.manyToMany("bars").references(Bar, "id");
 
     // NOTE: KV and R2 to come in the future? May not be necessary.
@@ -136,7 +137,7 @@ defineConfig.modelBuilder(ProfessorCourseRating, (builder) => {
 });
 ```
 
-This syntax defines a unique constraint for `(professorId, courseId)` and `(name)`, meaning that the combination of `professorId` and `courseId` must be unique, and the `name` must also be unique on its own.
+This syntax defines a unique constraint for `(professorId, courseId)` and `(name)`, meaning that the combination of `professorId` and `courseId` must be unique, and `name` must also be unique on its own.
 
 ```sql
 CREATE TABLE ProfessorCourseRating (
@@ -229,7 +230,7 @@ CREATE TABLE SomeModel (
 
 ### Many to Many with Composite Keys
 
-Cloesce supports many to many relationships through the use of join tables, such as:
+Cloesce supports many-to-many relationships through the use of join tables, such as:
 ```ts
 @Model()
 class Student {
@@ -250,8 +251,8 @@ class Course {
 // => Implicit join table with composite primary key (courseId, studentId)
 ```
 
-What if one of these models has a composite primary key? For example, if `Course` had a composite primary key of `(id, name)`, how would we define the many to many relationship between `Student` and `Course`?
-The `modelBuilder` function in `cloesce.config.ts` can be used to define the many to many relationship with composite keys:
+What if one of these models has a composite primary key? For example, if `Course` had a composite primary key of `(id, name)`, how would we define the many-to-many relationship between `Student` and `Course`?
+The `modelBuilder` function in `cloesce.config.ts` can be used to define the many-to-many relationship with composite keys:
 
 ```ts
 @Model()
@@ -320,7 +321,7 @@ A new property `unique_constraints` will be added to the Model AST, consisting o
 
 A single unique constraint can be added inline to the table definition, while multiple unique constraints will be added as separate `UNIQUE` clauses.
 
-The migrations engine must be capable of creating tables with unique constraints, as well as removing and adding a unique constraint. All of these will require a full table build, as SQLite does not support adding or removing unique constraints through `ALTER TABLE`. To account for this, `unique_constraints` will be added to the Merkle hash calculation for the Model, so that any changes to unique constraints will trigger a full table rebuild.
+The migrations engine must be capable of creating tables with unique constraints, as well as removing and adding a unique constraint. All of these will require a full table rebuild, as SQLite does not support adding or removing unique constraints through `ALTER TABLE`. To account for this, `unique_constraints` will be added to the Merkle hash calculation for the Model, so that any changes to unique constraints will trigger a full table rebuild.
 
 A Rust struct for the unique constraint definition may look like:
 
@@ -335,9 +336,9 @@ Overall, this change is additive to the migrations engine portion of the generat
 
 ### Composite Keys
 
-Primary keys are currently defined outside of the `columns` property of the Model AST, as a single `primary_key` property. Further, primary keys can also have foreign key references. The best way to support this move is going to be to move the indicator of a primary key to a boolean property on each column definition.
+Primary keys are currently defined outside of the `columns` property of the Model AST, as a single `primary_key` property. Furthermore, primary keys can also have foreign key references. The best way to support this change is to move the indicator of a primary key to a boolean property on each column definition.
 
-Additionally, a column may be apart of a composite key. A field `composite_key_id` can be added to the column definition, which will be an optional string. If it is `None`, then the column is not part of a composite key. If it is `Some(id)`, then the column is part of the composite key with the given id. The order of the columns in the composite key can be determined by the order of the columns in the Model definition.
+Additionally, a column may be part of a composite key. A field `composite_key_id` can be added to the column definition, which will be an optional string. If it is `None`, then the column is not part of a composite key. If it is `Some(id)`, then the column is part of the composite key with the given ID. The order of the columns in the composite key can be determined by the order of the columns in the Model definition.
 
 ```rust
 pub struct D1Column {
@@ -372,4 +373,3 @@ impl Model {
 ```
 
 This change will have significant repercussions throughout the entire codebase, as the concept of a primary key is currently deeply ingrained in the way Models are defined and handled.
-
