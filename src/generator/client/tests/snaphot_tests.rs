@@ -1,8 +1,8 @@
 use std::{collections::BTreeMap, path::PathBuf};
 
 use ast::{
-    ApiMethod, CidlType, CrudKind, HttpVerb, IncludeTree, MediaType, NamedTypedValue,
-    PlainOldObject, Service, ServiceAttribute,
+    ApiMethod, CidlType, CrudKind, ForeignKeyReference, HttpVerb, IncludeTree, MediaType,
+    NamedTypedValue, PlainOldObject, Service, ServiceAttribute,
 };
 use client::ClientGenerator;
 use generator_test::{IncludeTreeBuilder, ModelBuilder, create_ast, create_spec};
@@ -22,33 +22,60 @@ fn test_client_code_generation_snapshot() {
             .col(
                 "fk_to_model",
                 CidlType::Integer,
-                Some("OneToManyModel".into()),
+                Some(ForeignKeyReference {
+                    model_name: "OneToManyModel".into(),
+                    column_name: "id".into(),
+                }),
+                None,
             )
             .build(),
         // All valid SQL column types
         ModelBuilder::new("HasSqlColumnTypes")
             .id_pk()
-            .col("string", CidlType::Text, None)
-            .col("integer", CidlType::Integer, None)
-            .col("real", CidlType::Real, None)
-            .col("boolean", CidlType::Boolean, None)
-            .col("date", CidlType::DateIso, None)
-            .col("stringNull", CidlType::nullable(CidlType::Text), None)
-            .col("integerNull", CidlType::nullable(CidlType::Integer), None)
-            .col("realNull", CidlType::nullable(CidlType::Real), None)
-            .col("booleanNull", CidlType::nullable(CidlType::Boolean), None)
-            .col("dateNull", CidlType::nullable(CidlType::DateIso), None)
+            .col("string", CidlType::Text, None, None)
+            .col("integer", CidlType::Integer, None, None)
+            .col("real", CidlType::Real, None, None)
+            .col("boolean", CidlType::Boolean, None, None)
+            .col("date", CidlType::DateIso, None, None)
+            .col("stringNull", CidlType::nullable(CidlType::Text), None, None)
+            .col(
+                "integerNull",
+                CidlType::nullable(CidlType::Integer),
+                None,
+                None,
+            )
+            .col("realNull", CidlType::nullable(CidlType::Real), None, None)
+            .col(
+                "booleanNull",
+                CidlType::nullable(CidlType::Boolean),
+                None,
+                None,
+            )
+            .col(
+                "dateNull",
+                CidlType::nullable(CidlType::DateIso),
+                None,
+                None,
+            )
             .build(),
         // One to One Navigation Property
         ModelBuilder::new("HasOneToOne")
             .id_pk()
             // one to one
-            .col("basicModelId", CidlType::Integer, Some("BasicModel".into()))
+            .col(
+                "basicModelId",
+                CidlType::Integer,
+                Some(ForeignKeyReference {
+                    model_name: "BasicModel".into(),
+                    column_name: "id".into(),
+                }),
+                None,
+            )
             .nav_p(
                 "oneToOneNav",
                 "BasicModel",
                 ast::NavigationPropertyKind::OneToOne {
-                    column_reference: "basicModelId".into(),
+                    key_columns: vec!["id".into()],
                 },
             )
             .build(),
@@ -59,7 +86,7 @@ fn test_client_code_generation_snapshot() {
                 "oneToManyNav",
                 "BasicModel",
                 ast::NavigationPropertyKind::OneToMany {
-                    column_reference: "fk_to_model".into(),
+                    key_columns: vec!["fk_to_model".into()],
                 },
             )
             .build(),
@@ -78,6 +105,23 @@ fn test_client_code_generation_snapshot() {
                 "manyToManyNav",
                 "ManyToManyModelA",
                 ast::NavigationPropertyKind::ManyToMany,
+            )
+            .build(),
+        // Composite PK model
+        ModelBuilder::new("ModelWithCompositePk")
+            .pk("tenantId", CidlType::Text)
+            .pk("rowId", CidlType::Integer)
+            .col("name", CidlType::Text, None, None)
+            .method(
+                "instanceMethod",
+                HttpVerb::Post,
+                false,
+                vec![NamedTypedValue {
+                    name: "input".into(),
+                    cidl_type: CidlType::Text,
+                }],
+                CidlType::Text,
+                None,
             )
             .build(),
         // KV
@@ -154,7 +198,7 @@ fn test_client_code_generation_snapshot() {
         // Hybrid (D1, KV, R2)
         ModelBuilder::new("ToyotaPrius")
             .id_pk()
-            .col("modelYear", CidlType::Integer, None)
+            .col("modelYear", CidlType::Integer, None, None)
             .key_param("ownerId")
             .key_param("vehicleId")
             .kv_object(
@@ -190,11 +234,22 @@ fn test_client_code_generation_snapshot() {
             .build(),
     ]);
 
+    ast.models
+        .get_mut("HasOneToOne")
+        .unwrap()
+        .primary_key_columns
+        .first_mut()
+        .unwrap()
+        .foreign_key_reference = Some(ForeignKeyReference {
+        model_name: "BasicModel".into(),
+        column_name: "id".into(),
+    });
+
     // CRUD methods
     {
         let mut model_with_cruds = ModelBuilder::new("ModelWithCruds")
             .id_pk()
-            .col("name", CidlType::Text, None)
+            .col("name", CidlType::Text, None, None)
             .build();
         model_with_cruds.cruds.push(CrudKind::GET);
         model_with_cruds.cruds.push(CrudKind::SAVE);
