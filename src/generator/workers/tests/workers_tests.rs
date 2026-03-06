@@ -234,6 +234,48 @@ fn finalize_get_crud_adds_primary_key_for_d1_model() {
 }
 
 #[test]
+fn finalize_get_and_list_crud_adds_composite_primary_keys() {
+    // Arrange
+    let mut order_item = ModelBuilder::new("OrderItem")
+        .pk("orderId", CidlType::Integer)
+        .pk("productId", CidlType::Integer)
+        .build();
+    order_item.cruds.extend(vec![CrudKind::GET, CrudKind::LIST]);
+
+    let mut ast = create_ast(vec![order_item]);
+
+    // Act
+    WorkersGenerator::finalize_api_methods(&mut ast);
+
+    // Assert
+    let order_item = ast.models.get("OrderItem").unwrap();
+
+    let get_method = order_item.methods.get("GET").unwrap();
+    assert!(get_method.parameters.iter().any(|p| p.name == "orderId"));
+    assert!(get_method.parameters.iter().any(|p| p.name == "productId"));
+    assert!(
+        get_method
+            .parameters
+            .iter()
+            .any(|p| matches!(p.cidl_type, CidlType::DataSource(_)))
+    );
+
+    let list_method = order_item.methods.get("LIST").unwrap();
+    let last_seen_order = list_method
+        .parameters
+        .iter()
+        .find(|p| p.name == "lastSeen_orderId")
+        .unwrap();
+    let last_seen_product = list_method
+        .parameters
+        .iter()
+        .find(|p| p.name == "lastSeen_productId")
+        .unwrap();
+    assert!(last_seen_order.cidl_type.is_nullable());
+    assert!(last_seen_product.cidl_type.is_nullable());
+}
+
+#[test]
 fn finalize_get_crud_adds_key_params() {
     // Arrange
     let mut product = ModelBuilder::new("Product")
@@ -299,7 +341,7 @@ fn generate_default_data_sources() {
             "profile",
             "Profile",
             NavigationPropertyKind::OneToOne {
-                column_reference: "profileId".into(),
+                key_columns: vec!["profileId".to_string()],
             },
         )
         // 1:M relationship to Order
@@ -307,7 +349,7 @@ fn generate_default_data_sources() {
             "orders",
             "Order",
             NavigationPropertyKind::OneToMany {
-                column_reference: "userId".into(),
+                key_columns: vec!["userId".to_string()],
             },
         )
         // M:M relationship to Role
@@ -383,7 +425,7 @@ fn generate_default_data_sources_does_not_include_manys() {
             "students",
             "Student",
             NavigationPropertyKind::OneToMany {
-                column_reference: "teacherId".into(),
+                key_columns: vec!["teacherId".to_string()],
             },
         )
         .build();
@@ -395,7 +437,7 @@ fn generate_default_data_sources_does_not_include_manys() {
             "grades",
             "Grade",
             NavigationPropertyKind::OneToMany {
-                column_reference: "studentId".into(),
+                key_columns: vec!["studentId".to_string()],
             },
         )
         .build();
@@ -435,7 +477,7 @@ fn generate_default_data_sources_includes_multiple_one_to_ones() {
             "toy",
             "Toy",
             NavigationPropertyKind::OneToOne {
-                column_reference: "toyId".into(),
+                key_columns: vec!["toyId".to_string()],
             },
         )
         .build();
@@ -447,7 +489,7 @@ fn generate_default_data_sources_includes_multiple_one_to_ones() {
             "dog",
             "Dog",
             NavigationPropertyKind::OneToOne {
-                column_reference: "dogId".into(),
+                key_columns: vec!["dogId".to_string()],
             },
         )
         .build();
@@ -490,14 +532,14 @@ fn generate_default_data_sources_does_not_include_circular_references() {
             "manager",
             "Employee",
             NavigationPropertyKind::OneToOne {
-                column_reference: "managerId".into(),
+                key_columns: vec!["managerId".to_string()],
             },
         )
         .nav_p(
             "employeeCard",
             "EmployeeCard",
             NavigationPropertyKind::OneToOne {
-                column_reference: "employeeCardId".into(),
+                key_columns: vec!["employeeCardId".to_string()],
             },
         )
         .build();
@@ -508,7 +550,7 @@ fn generate_default_data_sources_does_not_include_circular_references() {
             "employee",
             "Employee",
             NavigationPropertyKind::OneToOne {
-                column_reference: "employeeId".into(),
+                key_columns: vec!["employeeId".to_string()],
             },
         )
         .build();
