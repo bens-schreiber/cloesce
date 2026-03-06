@@ -117,6 +117,8 @@ config
 export default config;
 ```
 
+With this new API, the `OneToOne` and `OneToMany` decorators can be removed, as they can be inferred through naming or defined through the Fluent API. `ForeignKey` and `PrimaryKey` will remain as they simple and look clean.
+
 ### Unique Constraints
 
 To define a unique constraint on some combination of columns, the `model` function in `cloesce.config.ts` can be used to programmatically add unique constraints to the Model. This allows for a more flexible and powerful way to define constraints without cluttering the Model class with too many decorators.

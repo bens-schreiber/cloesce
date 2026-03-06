@@ -65,7 +65,7 @@ export class HttpResult<T = unknown> {
     public data?: T,
     public message?: string,
     public mediaType?: MediaType,
-  ) {}
+  ) { }
 
   static ok<T>(status: number, data?: T, init?: HeadersInit): HttpResult<T> {
     const headers: Headers = new Headers(init);
@@ -141,8 +141,8 @@ export class HttpResult<T = unknown> {
 type DeepPartialInner<T> = T extends (infer U)[]
   ? DeepPartialInner<U>[]
   : T extends object
-    ? { [K in keyof T]?: DeepPartialInner<T[K]> }
-    : T | (null extends T ? null : never);
+  ? { [K in keyof T]?: DeepPartialInner<T[K]> }
+  : T | (null extends T ? null : never);
 
 /**
  * Recursively makes all properties of a type optional, including nested objects and arrays.
@@ -195,7 +195,7 @@ export type KeysOfType<T, U> = {
  */
 export const Model =
   (_kinds: CrudKind[] = []): ClassDecorator =>
-  () => {};
+    () => { };
 
 /**
  * Marks a class as a Cloesce Service.
@@ -219,7 +219,7 @@ export const Model =
  * }
  * ```
  */
-export const Service: ClassDecorator = () => {};
+export const Service: ClassDecorator = () => { };
 
 /**
  * Declares a Wrangler environment definition.
@@ -242,7 +242,7 @@ export const Service: ClassDecorator = () => {};
  * foo(＠Inject env: Env) {...}
  * ```
  */
-export const WranglerEnv: ClassDecorator = () => {};
+export const WranglerEnv: ClassDecorator = () => { };
 
 /**
  * Marks a property as the SQL primary key for a model.
@@ -262,7 +262,7 @@ export const WranglerEnv: ClassDecorator = () => {};
  * }
  * ```
  */
-export const PrimaryKey: PropertyDecorator = () => {};
+export const PrimaryKey: PropertyDecorator = () => { };
 
 /**
  * Marks a property as a key parameter for KV or R2 models.
@@ -271,7 +271,7 @@ export const PrimaryKey: PropertyDecorator = () => {};
  *
  * Must decorate a string property.
  */
-export const KeyParam: PropertyDecorator = () => {};
+export const KeyParam: PropertyDecorator = () => { };
 
 /**
  * Marks a property as a Cloudflare KV binding.
@@ -285,7 +285,7 @@ export const KeyParam: PropertyDecorator = () => {};
  */
 export const KV =
   (_keyFormat: string, _namespaceBinding: string): PropertyDecorator =>
-  () => {};
+    () => { };
 
 /**
  * Marks a property as a Cloudflare R2 binding.
@@ -297,7 +297,7 @@ export const KV =
  */
 export const R2 =
   (_keyFormat: string, _bucketBinding: string): PropertyDecorator =>
-  () => {};
+    () => { };
 
 /**
  * Exposes a class method as an HTTP GET endpoint.
@@ -380,36 +380,6 @@ export function Delete(dataSource?: DataSource<unknown>): MethodDecorator {
 }
 
 /**
- * Marks a property as a one-to-many navigation property.
- *
- * A stub decorator used by Cloesce to identify one-to-many relationships.
- *
- * @param _selector A selector function that returns the foreign key property on the related model, e.g. `model => model.ownerId`
- *
- * @template T The type of the model to which the navigation property relates.
- */
-export function OneToMany<T>(
-  _selector: (model: T) => T[keyof T],
-): PropertyDecorator {
-  return () => {};
-}
-
-/**
- * Marks a property as a one-to-one navigation property.
- *
- * A stub decorator used by Cloesce to identify one-to-one relationships.
- *
- * @param _selector A selector function that returns the foreign key property on this model, e.g. `model => model.profileId`
- *
- * @template T The type of the model containing the navigation property.
- */
-export function OneToOne<T>(
-  _selector: (model: T) => T[keyof T],
-): PropertyDecorator {
-  return () => {};
-}
-
-/**
  * Marks a property as a foreign key to another model.
  *
  * A stub decorator used by Cloesce to identify foreign key properties.
@@ -418,7 +388,7 @@ export function OneToOne<T>(
  */
 export const ForeignKey =
   <T>(_Model: T | string): PropertyDecorator =>
-  () => {};
+    () => { };
 
 /**
  * Marks a method parameter for dependency injection.
@@ -437,7 +407,7 @@ export const ForeignKey =
  * }
  * ```
  */
-export const Inject: ParameterDecorator = () => {};
+export const Inject: ParameterDecorator = () => { };
 
 type Primitive = string | number | boolean | bigint | symbol | null | undefined;
 
@@ -460,7 +430,7 @@ type Primitive = string | number | boolean | bigint | symbol | null | undefined;
  * ＠D1
  * export class Person {
  *   ＠PrimaryKey id: number;
- *   ＠OneToMany("personId") dogs: Dog[];
+ *   dogs: Dog[];
  *
  *   ＠DataSource
  *   static readonly default: IncludeTree<Person> = {
@@ -472,10 +442,10 @@ type Primitive = string | number | boolean | bigint | symbol | null | undefined;
 export type IncludeTree<T> = T extends Primitive
   ? never
   : {
-      [K in keyof T]?: T[K] extends (infer U)[]
-        ? IncludeTree<NonNullable<U>>
-        : IncludeTree<NonNullable<T[K]>>;
-    };
+    [K in keyof T]?: T[K] extends (infer U)[]
+    ? IncludeTree<NonNullable<U>>
+    : IncludeTree<NonNullable<T[K]>>;
+  };
 
 /**
  * A branded `number` type indicating that the corresponding

@@ -6,7 +6,6 @@ export enum ExtractorErrorCode {
   InvalidDataSourceDefinition,
   InvalidPropertyModifier,
   InvalidApiMethodModifier,
-  InvalidSelectorSyntax,
   InvalidNavigationProperty,
   TooManyWranglerEnvs,
   InvalidTypescriptSyntax,
@@ -73,11 +72,6 @@ const errorInfoMap: Record<
     suggestion:
       "Use R2ObjectBody for single values, or Paginated<R2ObjectBody> for list prefixes.",
   },
-  [ExtractorErrorCode.InvalidSelectorSyntax]: {
-    description: "The selector syntax is invalid.",
-    suggestion:
-      "Selectors should be of the form `N<T>(m => m.property)` where T is a model type and N is OneToOne or OneToMany.",
-  },
   [ExtractorErrorCode.InvalidNavigationProperty]: {
     description:
       "A navigation property must be of type T, T | undefined, or T[] where T is a model type.",
@@ -98,7 +92,7 @@ export class ExtractorError {
   context?: string;
   snippet?: string;
 
-  constructor(public code: ExtractorErrorCode) {}
+  constructor(public code: ExtractorErrorCode) { }
 
   addContext(fn: (val: string | undefined) => string | undefined) {
     this.context = fn(this.context ?? "");

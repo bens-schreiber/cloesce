@@ -13,7 +13,6 @@ export class Weather {
     weatherReportId: Integer;
 
     // Navigation property to weatherReportId
-    // Optionally, decorate with @OneToOne<Weather>(w => w.weatherReportId)
     weatherReport: WeatherReport | undefined;
 
     dateTime: Date;
@@ -53,9 +52,7 @@ export class WeatherReport {
     title: string;
     description: string;
 
-    // Cloesce assumes this is a foreign key to Weather.weatherReportId
-    // Optionally, or if multiple FKs exist, decorate with
-    // @OneToMany<Weather>(w => w.weatherReportId)
+    // Cloesce infers this relation via naming conventions
     weatherEntries: Weather[];
 
     // Hydrates the weatherEntries when the client calls "withWeatherEntries"
