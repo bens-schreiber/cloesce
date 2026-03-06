@@ -40,7 +40,7 @@ impl MigrationsGenerator {
                             .primary_key(),
                     )
                     .col(
-                        ColumnDef::new_with_type(alias("id"), sea_query::ColumnType::Integer)
+                        ColumnDef::new_with_type(alias("primary_key"), sea_query::ColumnType::Text)
                             .not_null(),
                     )
                     .to_owned(),

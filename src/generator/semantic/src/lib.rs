@@ -384,43 +384,26 @@ impl SemanticAnalysis {
                     cols[0].value.name
                 );
 
-                // Each column must be a foreign key to the same model.
-                let mut fk_model_name = None::<&str>;
+                // Each column must be a foreign key to some model with consistent nullability
+                let is_nullable = cols[0].value.cidl_type.is_nullable();
                 for col in cols {
-                    let Some(fk) = &col.foreign_key_reference else {
-                        fail!(
-                            GeneratorErrorKind::InvalidCompositeKey,
-                            "Composite key column {} is not a foreign key to another model",
-                            col.value.name
-                        );
-                    };
+                    ensure!(
+                        col.foreign_key_reference.is_some(),
+                        GeneratorErrorKind::InvalidCompositeKey,
+                        "Composite key column {} is not a foreign key to another model",
+                        col.value.name
+                    );
 
-                    if let Some(prev_model_name) = fk_model_name {
-                        if prev_model_name != fk.model_name.as_str() {
-                            fail!(
-                                GeneratorErrorKind::InvalidCompositeKey,
-                                "Composite key column {} references model {}, but other columns reference model {}",
-                                col.value.name,
-                                fk.model_name,
-                                prev_model_name
-                            );
-                        }
-                    } else {
-                        fk_model_name = Some(fk.model_name.as_str());
-                    }
+                    // All columns in a composite key must have the same nullability, otherwise
+                    // the composite key would not be able to enforce uniqueness
+                    ensure!(
+                        col.value.cidl_type.is_nullable() == is_nullable,
+                        GeneratorErrorKind::InvalidCompositeKey,
+                        "All columns in a composite key must have the same nullability {}.{}",
+                        model.name,
+                        col.value.name
+                    );
                 }
-
-                // Check that all columns in a composite key have consistent nullability
-                let nullabilities: HashSet<bool> = cols
-                    .iter()
-                    .map(|c| c.value.cidl_type.is_nullable())
-                    .collect();
-
-                ensure!(
-                    nullabilities.len() <= 1,
-                    GeneratorErrorKind::InvalidCompositeKey,
-                    "All columns in a composite key must have consistent nullability"
-                );
             }
 
             // Validate navigation props
@@ -460,8 +443,8 @@ impl SemanticAnalysis {
                         let mut referenced_nav_pks = HashSet::new();
                         for key_ref in key_columns {
                             let found = model
-                                .primary_key_columns
-                                .iter()
+                                .all_columns()
+                                .map(|(c, _)| c)
                                 .filter(|c| c.value.name == *key_ref)
                                 .find(|c| {
                                     c.foreign_key_reference
@@ -578,17 +561,17 @@ impl SemanticAnalysis {
                 }
             }
 
-            // Ensure all nav model PK columns are referenced exactly once
-            let nav_pk_names: HashSet<&str> = nav_model
+            // Ensure all current model PK columns are referenced exactly once
+            let model_pk_names: HashSet<&str> = model
                 .primary_key_columns
                 .iter()
                 .map(|c| c.value.name.as_str())
                 .collect();
 
             ensure!(
-                referenced_nav_pks == nav_pk_names,
+                referenced_nav_pks == model_pk_names,
                 GeneratorErrorKind::InvalidNavigationPropertyReference,
-                "{}.{} references {} but the key columns do not cover all primary key columns of the referenced model",
+                "{}.{} references {} but the key columns do not cover all primary key columns of this model",
                 model_name,
                 nav.var_name,
                 nav_model_reference

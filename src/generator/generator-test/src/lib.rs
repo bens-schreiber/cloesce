@@ -159,6 +159,25 @@ impl ModelBuilder {
         self
     }
 
+    pub fn foreign_pk(
+        mut self,
+        name: impl Into<String>,
+        cidl_type: CidlType,
+        foreign_key_reference: ForeignKeyReference,
+    ) -> Self {
+        self.primary_key_columns.push(D1Column {
+            value: NamedTypedValue {
+                name: name.into(),
+                cidl_type,
+            },
+            foreign_key_reference: Some(foreign_key_reference),
+            unique_ids: Vec::new(),
+            hash: 0,
+            composite_id: None,
+        });
+        self
+    }
+
     pub fn key_param(mut self, name: impl Into<String>) -> Self {
         self.key_params.push(name.into());
         self

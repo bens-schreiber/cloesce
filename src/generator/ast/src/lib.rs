@@ -354,6 +354,10 @@ impl Model {
         self.data_sources.get("default")
     }
 
+    pub fn has_composite_pk(&self) -> bool {
+        self.primary_key_columns.len() > 1
+    }
+
     /// Returns all columns, including primary key columns, as a single list.
     /// The boolean indicates whether the column is a primary key column.
     pub fn all_columns(&self) -> impl Iterator<Item = (&D1Column, bool)> {

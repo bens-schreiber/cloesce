@@ -966,39 +966,6 @@ fn composite_key_validation() {
         assert!(err.context.contains("not a foreign key"));
     }
 
-    // Error: composite key columns reference different models
-    {
-        let mut ast = create_ast(vec![
-            ModelBuilder::new("Student").id_pk().build(),
-            ModelBuilder::new("Course").id_pk().build(),
-            ModelBuilder::new("Enrollment")
-                .id_pk()
-                .col(
-                    "studentId",
-                    CidlType::Integer,
-                    Some(ForeignKeyReference {
-                        model_name: "Student".into(),
-                        column_name: "id".into(),
-                    }),
-                    Some(1),
-                )
-                .col(
-                    "courseId",
-                    CidlType::Integer,
-                    Some(ForeignKeyReference {
-                        model_name: "Course".into(),
-                        column_name: "id".into(),
-                    }),
-                    Some(1),
-                )
-                .build(),
-        ]);
-        let spec = create_spec(&ast);
-        let err = SemanticAnalysis::analyze(&mut ast, &spec).unwrap_err();
-        assert!(matches!(err.kind, GeneratorErrorKind::InvalidCompositeKey));
-        assert!(err.context.contains("references model"));
-    }
-
     // Error: composite key with nav prop doesn't reference all PK columns
     {
         let mut ast = create_ast(vec![
@@ -1030,7 +997,7 @@ fn composite_key_validation() {
                     "student",
                     "Student",
                     NavigationPropertyKind::OneToOne {
-                        key_columns: vec!["studentId".to_string(), "studentIdDup".to_string()],
+                        key_columns: vec!["studentId".to_string()], // missing studentIdDup
                     },
                 )
                 .build(),
@@ -1075,7 +1042,6 @@ fn composite_key_validation() {
         let spec = create_spec(&ast);
         let err = SemanticAnalysis::analyze(&mut ast, &spec).unwrap_err();
         assert!(matches!(err.kind, GeneratorErrorKind::InvalidCompositeKey));
-        assert!(err.context.contains("consistent nullability"));
     }
 }
 

@@ -22,32 +22,49 @@ pub fn map_sql(
         Some(m) => m,
         None => fail!(OrmErrorKind::UnknownModel, "{}", model_name),
     };
-    let Some(pk) = model.primary_key.as_ref() else {
+    if !model.has_d1() {
         fail!(
             OrmErrorKind::ModelMissingD1,
             "Model {} is not a D1 model",
             model_name
         )
-    };
+    }
 
-    let pk_name = &pk.name;
     let mut result_map = IndexMap::new();
 
     // Scan each row for the root model (`model_name`)'s primary key
     for row in rows.iter() {
-        let Some(pk_value) = row.get(pk_name).or_else(|| row.get(pk_name)) else {
-            // The root models primary key is not in the row, this row
-            // is not mappable.
+        // Build a composite key from all primary key columns
+        let mut pk_values = Vec::new();
+        let mut all_pks_present = true;
+        for pk_col in &model.primary_key_columns {
+            let pk_name = &pk_col.value.name;
+            if let Some(pk_value) = row.get(pk_name) {
+                pk_values.push((pk_name.clone(), pk_value.clone()));
+            } else {
+                // One or more primary key columns are missing
+                all_pks_present = false;
+                break;
+            }
+        }
+
+        if !all_pks_present {
+            // The root model's primary key is not fully present in the row
             continue;
-        };
+        }
+
+        // Create a composite key for the result map
+        let composite_key = Value::Array(pk_values.iter().map(|(_, v)| v.clone()).collect());
 
         // A particular primary key will only exist once. If that key does not yet
         // exist, put a new model into the result map.
-        let model_json = result_map.entry(pk_value.clone()).or_insert_with(|| {
+        let model_json = result_map.entry(composite_key).or_insert_with(|| {
             let mut m = serde_json::Map::new();
 
-            // Set primary key
-            m.insert(pk_name.clone(), pk_value.clone());
+            // Set primary key columns
+            for (pk_name, pk_value) in &pk_values {
+                m.insert(pk_name.clone(), pk_value.clone());
+            }
 
             // Set scalar columns
             for col in &model.columns {
@@ -104,22 +121,39 @@ fn process_navigation_properties(
         };
 
         // Nested properties always use their navigation path prefix (e.g. "cat.toy.id")
-        let nested_pk_name = &nested_model.primary_key.as_ref().unwrap().name;
-        let prefixed_key = if prefix.is_empty() {
-            format!("{}.{}", nav_prop.var_name, nested_pk_name)
-        } else {
-            format!("{}.{}.{}", prefix, nav_prop.var_name, nested_pk_name)
-        };
-        let Some(nested_pk_value) = row.get(&prefixed_key) else {
-            continue;
-        };
-        if nested_pk_value.is_null() {
+        // Check all primary key columns for the nested model
+        let mut nested_pk_values = Vec::new();
+        let mut all_nested_pks_present = true;
+
+        for pk_col in &nested_model.primary_key_columns {
+            let nested_pk_name = &pk_col.value.name;
+            let prefixed_key = if prefix.is_empty() {
+                format!("{}.{}", nav_prop.var_name, nested_pk_name)
+            } else {
+                format!("{}.{}.{}", prefix, nav_prop.var_name, nested_pk_name)
+            };
+
+            if let Some(nested_pk_value) = row.get(&prefixed_key) {
+                if nested_pk_value.is_null() {
+                    all_nested_pks_present = false;
+                    break;
+                }
+                nested_pk_values.push((nested_pk_name.clone(), nested_pk_value.clone()));
+            } else {
+                all_nested_pks_present = false;
+                break;
+            }
+        }
+
+        if !all_nested_pks_present {
             continue;
         }
 
         // Build nested JSON object
         let mut nested_model_json = serde_json::Map::new();
-        nested_model_json.insert(nested_pk_name.clone(), nested_pk_value.clone());
+        for (nested_pk_name, nested_pk_value) in &nested_pk_values {
+            nested_model_json.insert(nested_pk_name.clone(), nested_pk_value.clone());
+        }
 
         // Set nested scalar columns
         for col in &nested_model.columns {
@@ -165,9 +199,12 @@ fn process_navigation_properties(
             || matches!(nav_prop.kind, NavigationPropertyKind::ManyToMany)
         {
             if let Value::Array(arr) = model_json.get_mut(&nav_prop.var_name).unwrap() {
-                let already_exists = arr
-                    .iter()
-                    .any(|existing| existing.get(nested_pk_name) == Some(nested_pk_value));
+                // Check if this nested object already exists by comparing all primary key values
+                let already_exists = arr.iter().any(|existing| {
+                    nested_pk_values
+                        .iter()
+                        .all(|(pk_name, pk_value)| existing.get(pk_name) == Some(pk_value))
+                });
 
                 if !already_exists {
                     arr.push(Value::Object(nested_model_json));
@@ -183,7 +220,7 @@ fn process_navigation_properties(
 
 #[cfg(test)]
 mod tests {
-    use ast::{CidlType, NavigationPropertyKind};
+    use ast::{CidlType, ForeignKeyReference, NavigationPropertyKind};
     use base64::{Engine, prelude::BASE64_STANDARD};
     use generator_test::{ModelBuilder, create_ast};
     use serde_json::{Map, Value, json};
@@ -237,19 +274,19 @@ mod tests {
         // Arrange
         let horse = ModelBuilder::new("Horse")
             .id_pk()
-            .col("name", CidlType::nullable(CidlType::Text), None)
+            .col("name", CidlType::nullable(CidlType::Text), None, None)
             .nav_p(
                 "riders",
                 "Rider",
                 NavigationPropertyKind::OneToMany {
-                    column_reference: "id".into(),
+                    key_columns: vec!["id".into()],
                 },
             )
             .build();
 
         let rider = ModelBuilder::new("Rider")
             .id_pk()
-            .col("nickname", CidlType::nullable(CidlType::Text), None)
+            .col("nickname", CidlType::nullable(CidlType::Text), None, None)
             .build();
 
         let ast = create_ast(vec![horse, rider]);
@@ -268,7 +305,7 @@ mod tests {
         // Arrange
         let horse = ModelBuilder::new("Horse")
             .id_pk()
-            .col("name", CidlType::nullable(CidlType::Text), None)
+            .col("name", CidlType::nullable(CidlType::Text), None, None)
             .build();
 
         let ast = create_ast(vec![horse]);
@@ -297,19 +334,27 @@ mod tests {
             create_ast(vec![
                 ModelBuilder::new("Horse")
                     .id_pk()
-                    .col("name", CidlType::nullable(CidlType::Text), None)
-                    .col("best_rider_id", CidlType::Integer, Some("Rider".into()))
+                    .col("name", CidlType::nullable(CidlType::Text), None, None)
+                    .col(
+                        "best_rider_id",
+                        CidlType::Integer,
+                        Some(ForeignKeyReference {
+                            model_name: "Rider".into(),
+                            column_name: "id".into(),
+                        }),
+                        None,
+                    )
                     .nav_p(
                         "best_rider",
                         "Rider",
                         NavigationPropertyKind::OneToOne {
-                            column_reference: "best_rider_id".into(),
+                            key_columns: vec!["best_rider_id".into()],
                         },
                     )
                     .build(),
                 ModelBuilder::new("Rider")
                     .id_pk()
-                    .col("nickname", CidlType::nullable(CidlType::Text), None)
+                    .col("nickname", CidlType::nullable(CidlType::Text), None, None)
                     .build(),
             ])
         };
@@ -369,19 +414,27 @@ mod tests {
             create_ast(vec![
                 ModelBuilder::new("Horse")
                     .id_pk()
-                    .col("name", CidlType::nullable(CidlType::Text), None)
+                    .col("name", CidlType::nullable(CidlType::Text), None, None)
                     .nav_p(
                         "riders",
                         "Rider",
                         NavigationPropertyKind::OneToMany {
-                            column_reference: "horse_id".into(),
+                            key_columns: vec!["horse_id".into()],
                         },
                     )
                     .build(),
                 ModelBuilder::new("Rider")
                     .id_pk()
-                    .col("nickname", CidlType::nullable(CidlType::Text), None)
-                    .col("horse_id", CidlType::Integer, Some("Horse".into()))
+                    .col("nickname", CidlType::nullable(CidlType::Text), None, None)
+                    .col(
+                        "horse_id",
+                        CidlType::Integer,
+                        Some(ForeignKeyReference {
+                            model_name: "Horse".into(),
+                            column_name: "id".into(),
+                        }),
+                        None,
+                    )
                     .build(),
             ])
         };
@@ -448,12 +501,12 @@ mod tests {
             create_ast(vec![
                 ModelBuilder::new("Student")
                     .id_pk()
-                    .col("name", CidlType::nullable(CidlType::Text), None)
+                    .col("name", CidlType::nullable(CidlType::Text), None, None)
                     .nav_p("courses", "Course", NavigationPropertyKind::ManyToMany)
                     .build(),
                 ModelBuilder::new("Course")
                     .id_pk()
-                    .col("title", CidlType::nullable(CidlType::Text), None)
+                    .col("title", CidlType::nullable(CidlType::Text), None, None)
                     .nav_p("students", "Student", NavigationPropertyKind::ManyToMany)
                     .build(),
             ])
@@ -512,5 +565,192 @@ mod tests {
         .expect("map_sql to succeed");
 
         assert_eq!(result, vec![new_model]);
+    }
+
+    #[sqlx::test]
+    async fn composite_primary_key(db: SqlitePool) {
+        // Arrange
+        let meta = || {
+            create_ast(vec![
+                ModelBuilder::new("Order")
+                    .id_pk()
+                    .col("order_date", CidlType::nullable(CidlType::Text), None, None)
+                    .nav_p(
+                        "items",
+                        "OrderItem",
+                        NavigationPropertyKind::OneToMany {
+                            key_columns: vec!["order_id".into()],
+                        },
+                    )
+                    .build(),
+                ModelBuilder::new("Product")
+                    .id_pk()
+                    .col("name", CidlType::nullable(CidlType::Text), None, None)
+                    .col("price", CidlType::Integer, None, None)
+                    .build(),
+                ModelBuilder::new("OrderItem")
+                    .foreign_pk(
+                        "order_id",
+                        CidlType::Integer,
+                        ForeignKeyReference {
+                            model_name: "Order".into(),
+                            column_name: "id".into(),
+                        },
+                    )
+                    .foreign_pk(
+                        "product_id",
+                        CidlType::Integer,
+                        ForeignKeyReference {
+                            model_name: "Product".into(),
+                            column_name: "id".into(),
+                        },
+                    )
+                    .col("quantity", CidlType::Integer, None, None)
+                    .nav_p(
+                        "order",
+                        "Order",
+                        NavigationPropertyKind::OneToOne {
+                            key_columns: vec!["order_id".into()],
+                        },
+                    )
+                    .nav_p(
+                        "product",
+                        "Product",
+                        NavigationPropertyKind::OneToOne {
+                            key_columns: vec!["product_id".into()],
+                        },
+                    )
+                    .build(),
+            ])
+        };
+
+        let new_model = json!({
+            "id": 1,
+            "order_date": "2026-03-06",
+            "items": [
+                {
+                    "order_id": 1,
+                    "product_id": 101,
+                    "quantity": 2,
+                    "product": {
+                        "id": 101,
+                        "name": "Widget",
+                        "price": 500
+                    }
+                },
+                {
+                    "order_id": 1,
+                    "product_id": 102,
+                    "quantity": 1,
+                    "product": {
+                        "id": 102,
+                        "name": "Gadget",
+                        "price": 750
+                    }
+                }
+            ]
+        });
+
+        let include_tree_upsert = json!({
+            "items": {
+                "product": {}
+            }
+        });
+
+        let include_tree_map = json!({
+            "items": {}
+        });
+
+        let upsert_stmts = UpsertModel::query(
+            "Order",
+            &meta(),
+            new_model.as_object().unwrap().clone(),
+            Some(include_tree_upsert.as_object().unwrap().clone()),
+        )
+        .expect("upsert to succeed");
+
+        let results = test_sql(
+            meta(),
+            upsert_stmts
+                .sql
+                .into_iter()
+                .map(|r| (r.query, r.values))
+                .collect(),
+            db,
+        )
+        .await
+        .expect("test_sql to succeed");
+
+        let select_rows = rows_to_json(results.get(results.len() - 2).unwrap());
+
+        // Act
+        let result = map_sql(
+            "Order",
+            select_rows,
+            Some(include_tree_map.as_object().unwrap().clone()),
+            &meta(),
+        )
+        .expect("map_sql to succeed");
+
+        // Assert - Should correctly map order with items that have composite PKs
+        assert_eq!(result.len(), 1);
+        let order = result.first().unwrap().as_object().unwrap();
+        assert_eq!(order.get("id"), Some(&json!(1)));
+        assert_eq!(order.get("order_date"), Some(&json!("2026-03-06")));
+
+        let items = order.get("items").unwrap().as_array().unwrap();
+        assert_eq!(items.len(), 2);
+
+        // Check first item has both composite PK values
+        let item1 = items[0].as_object().unwrap();
+        assert_eq!(item1.get("order_id"), Some(&json!(1)));
+        assert_eq!(item1.get("product_id"), Some(&json!(101)));
+        assert_eq!(item1.get("quantity"), Some(&json!(2)));
+
+        // Check second item
+        let item2 = items[1].as_object().unwrap();
+        assert_eq!(item2.get("order_id"), Some(&json!(1)));
+        assert_eq!(item2.get("product_id"), Some(&json!(102)));
+        assert_eq!(item2.get("quantity"), Some(&json!(1)));
+    }
+
+    #[test]
+    fn composite_primary_key_deduplication() {
+        // Test that models with composite PKs are correctly deduplicated
+        let ast = create_ast(vec![
+            ModelBuilder::new("OrderItem")
+                .pk("order_id", CidlType::Integer)
+                .pk("product_id", CidlType::Integer)
+                .col("quantity", CidlType::Integer, None, None)
+                .build(),
+        ]);
+
+        // Two rows with the same composite PK should result in one model
+        let rows = vec![
+            vec![
+                ("order_id".to_string(), json!(1)),
+                ("product_id".to_string(), json!(101)),
+                ("quantity".to_string(), json!(2)),
+            ]
+            .into_iter()
+            .collect::<Map<String, Value>>(),
+            vec![
+                ("order_id".to_string(), json!(1)),
+                ("product_id".to_string(), json!(101)),
+                ("quantity".to_string(), json!(2)),
+            ]
+            .into_iter()
+            .collect::<Map<String, Value>>(),
+        ];
+
+        // Act
+        let result = map_sql("OrderItem", rows, None, &ast).unwrap();
+
+        // Assert - Should only have one item despite two rows
+        assert_eq!(result.len(), 1);
+        let item = result.first().unwrap().as_object().unwrap();
+        assert_eq!(item.get("order_id"), Some(&json!(1)));
+        assert_eq!(item.get("product_id"), Some(&json!(101)));
+        assert_eq!(item.get("quantity"), Some(&json!(2)));
     }
 }
