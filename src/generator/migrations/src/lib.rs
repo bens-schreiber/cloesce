@@ -104,32 +104,61 @@ impl MigrateTables {
     /// of naive insert queries.
     fn create(
         sorted_models: Vec<&MigrationsModel>,
-        model_lookup: &IndexMap<String, MigrationsModel>,
         jcts: HashMap<String, (&MigrationsModel, &MigrationsModel)>,
     ) -> Vec<String> {
         let mut res = vec![];
 
         for model in sorted_models {
+            let is_composite_pk = model.primary_key_columns.len() > 1;
+            let mut unique_columns_by_id = BTreeMap::<u32, Vec<&str>>::new();
+            let mut fk_groups = HashMap::<String, Vec<&D1Column>>::new();
+
             let mut table = Table::create();
             table.table(alias(&model.name));
             table.if_not_exists();
 
-            let mut unique_columns_by_id = BTreeMap::<u32, Vec<&str>>::new();
-            for col in model.columns.iter() {
+            for (col, is_pk) in model.all_columns() {
+                // Set primary keys
+                if is_pk {
+                    let mut column = typed_column(&col.value.name, &col.value.cidl_type, false);
+                    if is_composite_pk {
+                        column.not_null();
+                    } else {
+                        column.primary_key();
+                    }
+
+                    table.col(column);
+                }
+
+                // Set unique indexes
                 for unique_id in col.unique_ids.iter() {
                     unique_columns_by_id
                         .entry(*unique_id)
                         .or_default()
                         .push(col.value.name.as_str());
                 }
+
+                // Gather foreign key groups
+                let Some(fk_ref) = &col.foreign_key_reference else {
+                    continue;
+                };
+
+                let group_key = if let Some(composite_id) = col.composite_id {
+                    format!("{}::{}", fk_ref.model_name, composite_id)
+                } else {
+                    format!("{}::{}", fk_ref.model_name, col.value.name)
+                };
+
+                fk_groups.entry(group_key).or_default().push(col);
             }
 
-            // Set Primary Key
-            {
-                let mut column =
-                    typed_column(&model.primary_key.name, &model.primary_key.cidl_type, false);
-                column.primary_key();
-                table.col(column);
+            // Composite primary key index
+            if is_composite_pk {
+                let mut pk = Index::create();
+                for pk_col in model.primary_key_columns.iter() {
+                    pk.col(alias(pk_col.value.name.as_str()));
+                }
+                table.primary_key(&mut pk);
             }
 
             // Columns
@@ -149,26 +178,36 @@ impl MigrateTables {
                     column.not_null();
                 }
 
-                // Set column foreign key
-                if let Some(fk_model_name) = &col.foreign_key_reference {
-                    // Unwrap: safe because `validate_models` and `validate_fks` halt
-                    // if the values are missing
-                    let pk_name = &model_lookup
-                        .get(fk_model_name.as_str())
-                        .unwrap()
-                        .primary_key
-                        .name;
+                table.col(column);
+            }
 
-                    table.foreign_key(
-                        ForeignKey::create()
-                            .from(alias(model.name.clone()), alias(col.value.name.as_str()))
-                            .to(alias(fk_model_name.clone()), alias(pk_name))
-                            .on_update(sea_query::ForeignKeyAction::Cascade)
-                            .on_delete(sea_query::ForeignKeyAction::Restrict),
+            // Foreign keys
+            for cols in fk_groups.values_mut() {
+                cols.sort_by_key(|c| c.value.name.as_str());
+
+                let fk_ref = cols
+                    .first()
+                    .and_then(|c| c.foreign_key_reference.as_ref())
+                    .expect("grouped foreign key to have at least one reference");
+
+                let mut fk = ForeignKey::create();
+                for col in cols.iter() {
+                    fk.from(alias(model.name.as_str()), alias(col.value.name.as_str()));
+                    fk.to(
+                        alias(fk_ref.model_name.as_str()),
+                        alias(
+                            col.foreign_key_reference
+                                .as_ref()
+                                .unwrap()
+                                .column_name
+                                .as_str(),
+                        ),
                     );
                 }
 
-                table.col(column);
+                fk.on_update(sea_query::ForeignKeyAction::Cascade)
+                    .on_delete(sea_query::ForeignKeyAction::Restrict);
+                table.foreign_key(&mut fk);
             }
 
             // Multi column unique indexes
@@ -194,32 +233,46 @@ impl MigrateTables {
                 (jct.1, jct.0)
             };
 
-            const LEFT_NAME: &str = "left";
-            let mut left_col = typed_column(LEFT_NAME, &left.primary_key.cidl_type, false);
+            let left_join_cols = join_columns_for_side(left, "left");
+            let right_join_cols = join_columns_for_side(right, "right");
 
-            const RIGHT_NAME: &str = "right";
-            let mut right_col = typed_column(RIGHT_NAME, &right.primary_key.cidl_type, false);
+            table.table(alias(&id)).if_not_exists();
 
-            table
-                .table(alias(&id))
-                .if_not_exists()
-                .col(left_col.not_null())
-                .col(right_col.not_null())
-                .primary_key(Index::create().col(alias(LEFT_NAME)).col(alias(RIGHT_NAME)))
-                .foreign_key(
-                    ForeignKey::create()
-                        .from(alias(&id), alias(LEFT_NAME))
-                        .to(alias(&left.name), alias(&left.primary_key.name))
-                        .on_update(sea_query::ForeignKeyAction::Cascade)
-                        .on_delete(sea_query::ForeignKeyAction::Restrict),
-                )
-                .foreign_key(
-                    ForeignKey::create()
-                        .from(alias(&id), alias(RIGHT_NAME))
-                        .to(alias(&right.name), alias(&right.primary_key.name))
-                        .on_update(sea_query::ForeignKeyAction::Cascade)
-                        .on_delete(sea_query::ForeignKeyAction::Restrict),
-                );
+            for (join_col_name, pk_col) in left_join_cols.iter().chain(right_join_cols.iter()) {
+                let mut col = typed_column(join_col_name.as_str(), &pk_col.value.cidl_type, false);
+                table.col(col.not_null());
+            }
+
+            let mut pk_index = Index::create();
+            for (join_col_name, _) in left_join_cols.iter().chain(right_join_cols.iter()) {
+                pk_index.col(alias(join_col_name.as_str()));
+            }
+            table.primary_key(&mut pk_index);
+
+            let mut left_fk = ForeignKey::create();
+            for (join_col_name, pk_col) in left_join_cols {
+                left_fk
+                    .from(alias(id.as_str()), alias(join_col_name.as_str()))
+                    .to(alias(left.name.as_str()), alias(pk_col.value.name.as_str()));
+            }
+            left_fk
+                .on_update(sea_query::ForeignKeyAction::Cascade)
+                .on_delete(sea_query::ForeignKeyAction::Restrict);
+            table.foreign_key(&mut left_fk);
+
+            let mut right_fk = ForeignKey::create();
+            for (join_col_name, pk_col) in right_join_cols {
+                right_fk
+                    .from(alias(id.as_str()), alias(join_col_name.as_str()))
+                    .to(
+                        alias(right.name.as_str()),
+                        alias(pk_col.value.name.as_str()),
+                    );
+            }
+            right_fk
+                .on_update(sea_query::ForeignKeyAction::Cascade)
+                .on_delete(sea_query::ForeignKeyAction::Restrict);
+            table.foreign_key(&mut right_fk);
 
             res.push(to_sqlite(table));
             tracing::info!(
@@ -270,9 +323,7 @@ impl MigrateTables {
 
                         // Mark the model as renamed, meaning other models do not
                         // need to rebuild if they reference this one.
-                        if model.primary_key.name == lm_model.primary_key.name
-                            && model.primary_key.cidl_type == lm_model.primary_key.cidl_type
-                        {
+                        if is_same_primary_key(model, lm_model) {
                             renamed.insert((&lm_model.name, &model.name));
                         }
                         tracing::info!("Renamed table \"{}\" to \"{}\"", lm_model.name, model.name);
@@ -331,7 +382,7 @@ impl MigrateTables {
                         let join = model_lookup.get(model_name).unwrap();
                         jcts.insert(m2m_table_name.clone(), (model, join));
 
-                        res.extend(Self::create(vec![], model_lookup, jcts));
+                        res.extend(Self::create(vec![], jcts));
                         tracing::warn!(
                             "Created a many to many table \"{}\" between models: \"{}\" \"{}\"",
                             m2m_table_name,
@@ -354,14 +405,18 @@ impl MigrateTables {
                         tracing::info!("Dropped a many to many table \"{}\"", m2m_table_name,);
                     }
                     AlterKind::RebuildTable => {
-                        let has_fk_col = model
-                            .columns
-                            .iter()
-                            .any(|a| a.foreign_key_reference.is_some())
-                            || lm_model
-                                .columns
-                                .iter()
-                                .any(|a| a.foreign_key_reference.is_some());
+                        let has_fk_col = {
+                            let m = model
+                                .all_columns()
+                                .any(|(a, _)| a.foreign_key_reference.is_some());
+
+                            let lm = lm_model
+                                .all_columns()
+                                .any(|(a, _)| a.foreign_key_reference.is_some());
+
+                            m || lm
+                        };
+
                         if has_fk_col {
                             res.push(PRAGMA_FK_OFF.into());
                         }
@@ -383,8 +438,7 @@ impl MigrateTables {
 
                         // Create the new model
                         {
-                            let create_stmts =
-                                Self::create(vec![model], model_lookup, HashMap::default());
+                            let create_stmts = Self::create(vec![model], HashMap::default());
                             for stmt in create_stmts {
                                 res.push(stmt);
                             }
@@ -393,20 +447,13 @@ impl MigrateTables {
                         // Copy the data from the old table
                         {
                             let lm_col_lookup = lm_model
-                                .columns
-                                .iter()
-                                .map(|a| (&a.value.name, &a.value))
-                                .chain(std::iter::once((
-                                    &lm_model.primary_key.name,
-                                    &lm_model.primary_key,
-                                )))
+                                .all_columns()
+                                .map(|(c, _)| (&c.value.name, &c.value))
                                 .collect::<HashMap<_, _>>();
 
                             let columns = model
-                                .columns
-                                .iter()
-                                .map(|a| &a.value)
-                                .chain(std::iter::once(&model.primary_key))
+                                .all_columns()
+                                .map(|(c, _)| &c.value)
                                 .collect::<Vec<_>>();
 
                             let insert = Query::insert()
@@ -537,9 +584,7 @@ impl MigrateTables {
                 alterations.push(AlterKind::RenameTable);
             }
 
-            if model.primary_key.cidl_type != lm_model.primary_key.cidl_type
-                || model.primary_key.name != lm_model.primary_key.name
-            {
+            if !is_same_primary_key(model, lm_model) {
                 return vec![AlterKind::RebuildTable];
             }
 
@@ -551,7 +596,10 @@ impl MigrateTables {
 
             for col in &model.columns {
                 let Some(lm_col) = lm_cols.remove(&col.value.name) else {
-                    if col.foreign_key_reference.is_some() || !col.unique_ids.is_empty() {
+                    if col.foreign_key_reference.is_some()
+                        || !col.unique_ids.is_empty()
+                        || col.composite_id.is_some()
+                    {
                         return vec![AlterKind::RebuildTable];
                     }
 
@@ -565,7 +613,8 @@ impl MigrateTables {
 
                 if let (Some(model_fk_ref), Some(lm_fk_ref)) =
                     (&col.foreign_key_reference, &lm_col.foreign_key_reference)
-                    && renamed.contains(&(lm_fk_ref, model_fk_ref))
+                    && renamed.contains(&(&lm_fk_ref.model_name, &model_fk_ref.model_name))
+                    && lm_fk_ref.column_name == model_fk_ref.column_name
                     && lm_col.value.cidl_type == col.value.cidl_type
                 {
                     // If the last migrated column and current column share the same foreign key reference,
@@ -575,7 +624,10 @@ impl MigrateTables {
                 }
 
                 // Changes on a foreign key column require a rebuild.
-                if lm_col.foreign_key_reference.is_some() || col.foreign_key_reference.is_some() {
+                if lm_col.foreign_key_reference.is_some()
+                    || col.foreign_key_reference.is_some()
+                    || lm_col.composite_id != col.composite_id
+                {
                     return vec![AlterKind::RebuildTable];
                 }
 
@@ -592,6 +644,7 @@ impl MigrateTables {
             for unvisited_lm_col in lm_cols.into_values() {
                 if unvisited_lm_col.foreign_key_reference.is_some()
                     || !unvisited_lm_col.unique_ids.is_empty()
+                    || unvisited_lm_col.composite_id.is_some()
                 {
                     return vec![AlterKind::RebuildTable];
                 }
@@ -765,10 +818,7 @@ impl MigrateTables {
         let mut res = String::new();
         for (title, stmts) in [
             ("Dropped Models", &Self::drop(drops)),
-            (
-                "New Models",
-                &Self::create(creates, &ast.models, create_jcts),
-            ),
+            ("New Models", &Self::create(creates, create_jcts)),
             ("Altered Models", &Self::alter(alters, &ast.models, intent)),
         ] {
             if stmts.is_empty() {
@@ -785,6 +835,43 @@ impl MigrateTables {
 
 fn alias(name: impl Into<String>) -> sea_query::Alias {
     sea_query::Alias::new(name)
+}
+
+fn is_same_primary_key(model: &MigrationsModel, lm_model: &MigrationsModel) -> bool {
+    if model.primary_key_columns.len() != lm_model.primary_key_columns.len() {
+        return false;
+    }
+
+    model
+        .primary_key_columns
+        .iter()
+        .zip(lm_model.primary_key_columns.iter())
+        .all(|(a, b)| {
+            a.value.name == b.value.name
+                && a.value.cidl_type == b.value.cidl_type
+                && a.foreign_key_reference
+                    .as_ref()
+                    .map(|a| (&a.model_name, &a.column_name))
+                    == b.foreign_key_reference
+                        .as_ref()
+                        .map(|b| (&b.model_name, &b.column_name))
+                && a.composite_id == b.composite_id
+        })
+}
+
+fn join_columns_for_side<'a>(
+    model: &'a MigrationsModel,
+    side: &'a str,
+) -> Vec<(String, &'a D1Column)> {
+    if model.primary_key_columns.len() == 1 {
+        return vec![(side.into(), &model.primary_key_columns[0])];
+    }
+
+    model
+        .primary_key_columns
+        .iter()
+        .map(|pk| (format!("{side}_{}", pk.value.name), pk))
+        .collect()
 }
 
 // TODO: User made default types

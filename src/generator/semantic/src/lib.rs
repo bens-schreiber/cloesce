@@ -285,7 +285,7 @@ impl SemanticAnalysis {
 
             // At least one PK must be defined
             ensure!(
-                model.primary_key_columns.len() > 0,
+                !model.primary_key_columns.is_empty(),
                 GeneratorErrorKind::MissingPrimaryKey,
                 "{} is a D1 backed model but is missing a primary key",
                 model.name
@@ -540,8 +540,8 @@ impl SemanticAnalysis {
             graph
                 .entry(model_name)
                 .or_default()
-                .push(&nav_model_reference);
-            *in_degree.entry(&nav_model_reference).or_insert(0) += 1;
+                .push(nav_model_reference);
+            *in_degree.entry(nav_model_reference).or_insert(0) += 1;
         }
 
         // Validate M:M

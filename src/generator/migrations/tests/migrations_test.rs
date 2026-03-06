@@ -1,6 +1,9 @@
 use std::collections::HashMap;
 
-use ast::{CidlType, CloesceAst, MigrationsAst, MigrationsModel, NavigationPropertyKind};
+use ast::{
+    CidlType, CloesceAst, ForeignKeyReference, MigrationsAst, MigrationsModel,
+    NavigationPropertyKind,
+};
 use generator_test::{IncludeTreeBuilder, ModelBuilder, create_ast, expected_str};
 use migrations::{MigrationsDilemma, MigrationsGenerator, MigrationsIntent};
 
@@ -37,7 +40,7 @@ fn as_migration(ast: CloesceAst) -> MigrationsAst {
             let m = MigrationsModel {
                 hash: model.hash,
                 name: model.name,
-                primary_key: model.primary_key.unwrap(),
+                primary_key_columns: model.primary_key_columns,
                 columns: model.columns,
                 navigation_properties: model.navigation_properties,
             };
@@ -48,6 +51,13 @@ fn as_migration(ast: CloesceAst) -> MigrationsAst {
     MigrationsAst {
         hash,
         models: migrations_models,
+    }
+}
+
+fn fk_ref(model_name: &str, column_name: &str) -> ForeignKeyReference {
+    ForeignKeyReference {
+        model_name: model_name.into(),
+        column_name: column_name.into(),
     }
 }
 
@@ -92,9 +102,9 @@ async fn migrate_models_scalars(db: SqlitePool) {
             let mut ast = create_ast(vec![
                 ModelBuilder::new("User")
                     .id_pk()
-                    .col("name", CidlType::nullable(CidlType::Text), None)
-                    .col("age", CidlType::Integer, None)
-                    .col("address", CidlType::Text, None)
+                    .col("name", CidlType::nullable(CidlType::Text), None, None)
+                    .col("age", CidlType::Integer, None, None)
+                    .col("address", CidlType::Text, None, None)
                     .build(),
             ]);
             ast.set_merkle_hash();
@@ -143,12 +153,12 @@ async fn migrate_models_one_to_one(db: SqlitePool) {
             let mut ast = create_ast(vec![
                 ModelBuilder::new("Person")
                     .id_pk()
-                    .col("dogId", CidlType::Integer, Some("Dog".into()))
+                    .col("dogId", CidlType::Integer, Some(fk_ref("Dog", "id")), None)
                     .nav_p(
                         "dog",
                         "Dog",
                         NavigationPropertyKind::OneToOne {
-                            column_reference: "dogId".into(),
+                            key_columns: vec!["dogId".into()],
                         },
                     )
                     .data_source(
@@ -205,10 +215,20 @@ async fn migrate_models_one_to_many(db: SqlitePool) {
             let mut ast = create_ast(vec![
                 ModelBuilder::new("Dog")
                     .id_pk()
-                    .col("personId", CidlType::Integer, Some("Person".into()))
+                    .col(
+                        "personId",
+                        CidlType::Integer,
+                        Some(fk_ref("Person", "id")),
+                        None,
+                    )
                     .build(),
                 ModelBuilder::new("Cat")
-                    .col("personId", CidlType::Integer, Some("Person".into()))
+                    .col(
+                        "personId",
+                        CidlType::Integer,
+                        Some(fk_ref("Person", "id")),
+                        None,
+                    )
                     .id_pk()
                     .build(),
                 ModelBuilder::new("Person")
@@ -217,17 +237,22 @@ async fn migrate_models_one_to_many(db: SqlitePool) {
                         "dogs",
                         "Dog",
                         NavigationPropertyKind::OneToMany {
-                            column_reference: "personId".into(),
+                            key_columns: vec!["personId".into()],
                         },
                     )
                     .nav_p(
                         "cats",
                         "Cat",
                         NavigationPropertyKind::OneToMany {
-                            column_reference: "personId".into(),
+                            key_columns: vec!["personId".into()],
                         },
                     )
-                    .col("bossId", CidlType::Integer, Some("Boss".into()))
+                    .col(
+                        "bossId",
+                        CidlType::Integer,
+                        Some(fk_ref("Boss", "id")),
+                        None,
+                    )
                     .data_source(
                         "default",
                         IncludeTreeBuilder::default()
@@ -243,7 +268,7 @@ async fn migrate_models_one_to_many(db: SqlitePool) {
                         "persons",
                         "Person",
                         NavigationPropertyKind::OneToMany {
-                            column_reference: "bossId".into(),
+                            key_columns: vec!["bossId".into()],
                         },
                     )
                     .data_source(
@@ -386,9 +411,9 @@ async fn migrate_with_rebuild(db: SqlitePool) {
         let ast = as_migration(create_ast(vec![
             ModelBuilder::new("User")
                 .id_pk()
-                .col("name", CidlType::nullable(CidlType::Text), None)
-                .col("age", CidlType::Integer, None)
-                .col("address", CidlType::Text, None)
+                .col("name", CidlType::nullable(CidlType::Text), None, None)
+                .col("age", CidlType::Integer, None, None)
+                .col("address", CidlType::Text, None, None)
                 .build(),
         ]));
 
@@ -407,9 +432,9 @@ async fn migrate_with_rebuild(db: SqlitePool) {
             let mut ast = create_ast(vec![
                 ModelBuilder::new("User")
                     .id_pk()
-                    .col("first_name", CidlType::nullable(CidlType::Text), None) // changed name
-                    .col("age", CidlType::Text, None) // changed type
-                    .col("favorite_color", CidlType::Text, None) // added column
+                    .col("first_name", CidlType::nullable(CidlType::Text), None, None) // changed name
+                    .col("age", CidlType::Text, None, None) // changed type
+                    .col("favorite_color", CidlType::Text, None, None) // added column
                     // dropped column "address"
                     .build(),
             ]);
@@ -455,12 +480,12 @@ ALTER TABLE "User" ADD COLUMN "age" text"#
             let mut ast = create_ast(vec![
                 ModelBuilder::new("User")
                     .id_pk()
-                    .col("first_name", CidlType::nullable(CidlType::Text), None)
-                    .col("age", CidlType::Text, None)
-                    .col("favorite_color", CidlType::Text, None)
+                    .col("first_name", CidlType::nullable(CidlType::Text), None, None)
+                    .col("age", CidlType::Text, None, None)
+                    .col("favorite_color", CidlType::Text, None, None)
                     .build(),
             ]);
-            ast.models[0].primary_key.as_mut().unwrap().cidl_type = CidlType::Text; // new PK type
+            ast.models[0].primary_key_columns[0].value.cidl_type = CidlType::Text; // new PK type
             ast.set_merkle_hash();
             as_migration(ast)
         };
@@ -495,13 +520,13 @@ ALTER TABLE "User" ADD COLUMN "age" text"#
                 ModelBuilder::new("Dog").id_pk().build(), // added Dog
                 ModelBuilder::new("User")
                     .id_pk()
-                    .col("first_name", CidlType::nullable(CidlType::Text), None)
-                    .col("age", CidlType::Text, None)
-                    .col("favorite_color", CidlType::Text, None)
-                    .col("dog_id", CidlType::Integer, Some("Dog".into())) // added Dog FK
+                    .col("first_name", CidlType::nullable(CidlType::Text), None, None)
+                    .col("age", CidlType::Text, None, None)
+                    .col("favorite_color", CidlType::Text, None, None)
+                    .col("dog_id", CidlType::Integer, Some(fk_ref("Dog", "id")), None) // added Dog FK
                     .build(),
             ]);
-            ast.models[1].primary_key.as_mut().unwrap().cidl_type = CidlType::Text;
+            ast.models[1].primary_key_columns[0].value.cidl_type = CidlType::Text;
             ast.set_merkle_hash();
             as_migration(ast)
         };
@@ -530,10 +555,10 @@ ALTER TABLE "User" ADD COLUMN "age" text"#
             let mut ast = create_ast(vec![
                 ModelBuilder::new("UniqueUser")
                     .id_pk()
-                    .col("email", CidlType::Text, None)
-                    .col("first_name", CidlType::Text, None)
-                    .col("last_name", CidlType::Text, None)
-                    .col("age", CidlType::Integer, None)
+                    .col("email", CidlType::Text, None, None)
+                    .col("first_name", CidlType::Text, None, None)
+                    .col("last_name", CidlType::Text, None, None)
+                    .col("age", CidlType::Integer, None, None)
                     .build(),
             ]);
 
@@ -580,10 +605,10 @@ ALTER TABLE "User" ADD COLUMN "age" text"#
                 let mut ast = create_ast(vec![
                     ModelBuilder::new("UniqueUser")
                         .id_pk()
-                        .col("email", CidlType::Text, None)
-                        .col("first_name", CidlType::Text, None)
-                        .col("last_name", CidlType::Text, None)
-                        .col("age", CidlType::Integer, None)
+                        .col("email", CidlType::Text, None, None)
+                        .col("first_name", CidlType::Text, None, None)
+                        .col("last_name", CidlType::Text, None, None)
+                        .col("age", CidlType::Integer, None, None)
                         .build(),
                 ]);
 
@@ -637,10 +662,10 @@ ALTER TABLE "User" ADD COLUMN "age" text"#
                 let mut ast = create_ast(vec![
                     ModelBuilder::new("UniqueUser")
                         .id_pk()
-                        .col("email", CidlType::Text, None)
-                        .col("first_name", CidlType::Text, None)
-                        .col("last_name", CidlType::Text, None)
-                        .col("age", CidlType::Integer, None)
+                        .col("email", CidlType::Text, None, None)
+                        .col("first_name", CidlType::Text, None, None)
+                        .col("last_name", CidlType::Text, None, None)
+                        .col("age", CidlType::Integer, None, None)
                         .build(),
                 ]);
 
@@ -689,13 +714,18 @@ async fn migrate_with_rename(db: SqlitePool) {
         let mut ast = create_ast(vec![
             ModelBuilder::new("User")
                 .id_pk()
-                .col("name", CidlType::nullable(CidlType::Text), None)
-                .col("age", CidlType::Integer, None)
-                .col("address", CidlType::Text, None)
+                .col("name", CidlType::nullable(CidlType::Text), None, None)
+                .col("age", CidlType::Integer, None, None)
+                .col("address", CidlType::Text, None, None)
                 .build(),
             ModelBuilder::new("UserSettings")
                 .id_pk()
-                .col("userId", CidlType::Integer, Some("User".into()))
+                .col(
+                    "userId",
+                    CidlType::Integer,
+                    Some(fk_ref("User", "id")),
+                    None,
+                )
                 .build(),
         ]);
         ast.set_merkle_hash();
@@ -713,13 +743,18 @@ async fn migrate_with_rename(db: SqlitePool) {
         let mut ast = create_ast(vec![
             ModelBuilder::new("AppUser")
                 .id_pk()
-                .col("name", CidlType::nullable(CidlType::Text), None)
-                .col("age", CidlType::Integer, None)
-                .col("address", CidlType::Text, None)
+                .col("name", CidlType::nullable(CidlType::Text), None, None)
+                .col("age", CidlType::Integer, None, None)
+                .col("address", CidlType::Text, None, None)
                 .build(),
             ModelBuilder::new("UserSettings")
                 .id_pk()
-                .col("userId", CidlType::Integer, Some("AppUser".into()))
+                .col(
+                    "userId",
+                    CidlType::Integer,
+                    Some(fk_ref("AppUser", "id")),
+                    None,
+                )
                 .build(),
         ]);
         ast.set_merkle_hash();
@@ -840,4 +875,97 @@ async fn migrate_alter_add_m2m(db: SqlitePool) {
         .expect("Create table queries to work");
 
     assert!(exists_in_db(&db, "CourseStudent").await)
+}
+
+#[sqlx::test]
+async fn migrate_models_composite_pk_and_fk(db: SqlitePool) {
+    let empty_ast = empty_migration();
+
+    let ast = {
+        let mut ast = create_ast(vec![
+            ModelBuilder::new("Parent")
+                .pk("orgId", CidlType::Integer)
+                .pk("userId", CidlType::Integer)
+                .col("name", CidlType::Text, None, None)
+                .build(),
+            ModelBuilder::new("Child")
+                .id_pk()
+                .col(
+                    "orgId",
+                    CidlType::Integer,
+                    Some(fk_ref("Parent", "orgId")),
+                    Some(1),
+                )
+                .col(
+                    "userId",
+                    CidlType::Integer,
+                    Some(fk_ref("Parent", "userId")),
+                    Some(1),
+                )
+                .build(),
+        ]);
+        ast.set_merkle_hash();
+        as_migration(ast)
+    };
+
+    let sql =
+        MigrationsGenerator::migrate(&ast, Some(&empty_ast), &MockMigrationsIntent::default());
+
+    expected_str!(sql, r#"CREATE TABLE IF NOT EXISTS "Parent""#);
+    expected_str!(sql, r#"PRIMARY KEY ("orgId", "userId")"#);
+    expected_str!(sql, r#"CREATE TABLE IF NOT EXISTS "Child""#);
+    expected_str!(
+        sql,
+        r#"FOREIGN KEY ("orgId", "userId") REFERENCES "Parent" ("orgId", "userId") ON DELETE RESTRICT ON UPDATE CASCADE"#
+    );
+
+    query(&db, &sql).await.expect("Create tables query to work");
+    assert!(exists_in_db(&db, "Parent").await);
+    assert!(exists_in_db(&db, "Child").await);
+}
+
+#[sqlx::test]
+async fn migrate_models_many_to_many_composite_pk(db: SqlitePool) {
+    let empty_ast = empty_migration();
+
+    let ast = {
+        let mut ast = create_ast(vec![
+            ModelBuilder::new("Student")
+                .pk("schoolId", CidlType::Integer)
+                .pk("studentId", CidlType::Integer)
+                .nav_p("courses", "Course", NavigationPropertyKind::ManyToMany)
+                .build(),
+            ModelBuilder::new("Course")
+                .pk("deptId", CidlType::Integer)
+                .pk("courseId", CidlType::Integer)
+                .nav_p("students", "Student", NavigationPropertyKind::ManyToMany)
+                .build(),
+        ]);
+        ast.set_merkle_hash();
+        as_migration(ast)
+    };
+
+    let sql =
+        MigrationsGenerator::migrate(&ast, Some(&empty_ast), &MockMigrationsIntent::default());
+
+    expected_str!(sql, r#"CREATE TABLE IF NOT EXISTS "CourseStudent""#);
+    expected_str!(sql, r#""left_deptId" integer NOT NULL"#);
+    expected_str!(sql, r#""left_courseId" integer NOT NULL"#);
+    expected_str!(sql, r#""right_schoolId" integer NOT NULL"#);
+    expected_str!(sql, r#""right_studentId" integer NOT NULL"#);
+    expected_str!(
+        sql,
+        r#"PRIMARY KEY ("left_deptId", "left_courseId", "right_schoolId", "right_studentId")"#
+    );
+    expected_str!(
+        sql,
+        r#"FOREIGN KEY ("left_deptId", "left_courseId") REFERENCES "Course" ("deptId", "courseId") ON DELETE RESTRICT ON UPDATE CASCADE"#
+    );
+    expected_str!(
+        sql,
+        r#"FOREIGN KEY ("right_schoolId", "right_studentId") REFERENCES "Student" ("schoolId", "studentId") ON DELETE RESTRICT ON UPDATE CASCADE"#
+    );
+
+    query(&db, &sql).await.expect("Create tables query to work");
+    assert!(exists_in_db(&db, "CourseStudent").await);
 }

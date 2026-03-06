@@ -491,6 +491,20 @@ impl CloesceAst {
             model_h.write(b"Model");
             model.name.hash(&mut model_h);
 
+            for pk_col in model.primary_key_columns.iter_mut() {
+                let pk_col_h = {
+                    let mut h = FxHasher::default();
+                    h.write(b"ModelPrimaryKeyColumn");
+                    pk_col.value.hash(&mut h);
+                    pk_col.foreign_key_reference.hash(&mut h);
+                    pk_col.unique_ids.hash(&mut h);
+                    h.finish()
+                };
+
+                pk_col.hash = pk_col_h;
+                model_h.write_u64(pk_col_h);
+            }
+
             for col in model.columns.iter_mut() {
                 let col_h = {
                     let mut h = FxHasher::default();
@@ -538,6 +552,15 @@ pub struct MigrationsModel {
     pub primary_key_columns: Vec<D1Column>,
     pub columns: Vec<D1Column>,
     pub navigation_properties: Vec<NavigationProperty>,
+}
+
+impl MigrationsModel {
+    pub fn all_columns(&self) -> impl Iterator<Item = (&D1Column, bool)> {
+        self.columns
+            .iter()
+            .map(|c| (c, false))
+            .chain(self.primary_key_columns.iter().map(|c| (c, true)))
+    }
 }
 
 /// A subset of [CloesceAst] suited for D1 migrations.
