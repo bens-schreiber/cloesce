@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, HashMap, VecDeque};
+use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
 
 use ast::err::{GeneratorErrorKind, Result};
 use ast::{
@@ -283,73 +283,159 @@ impl SemanticAnalysis {
                 continue;
             }
 
-            let Some(primary_key) = &model.primary_key else {
-                fail!(GeneratorErrorKind::MissingPrimaryKey, "{}", model.name);
-            };
+            // At least one PK must be defined
+            ensure!(
+                model.primary_key_columns.len() > 0,
+                GeneratorErrorKind::MissingPrimaryKey,
+                "{} is a D1 backed model but is missing a primary key",
+                model.name
+            );
 
             graph.entry(&model.name).or_default();
             in_degree.entry(&model.name).or_insert(0);
 
-            // Validate PK
-            ensure!(
-                !primary_key.cidl_type.is_nullable(),
-                GeneratorErrorKind::NullPrimaryKey,
-                "{}.{}",
-                model.name,
-                primary_key.name
-            );
-            ensure_valid_sql_type(model, primary_key)?;
-
             // Validate columns
-            for col in &model.columns {
+            let mut composite_id_to_columns = HashMap::new();
+            for (col, is_pk) in model.all_columns() {
                 ensure_valid_sql_type(model, &col.value)?;
 
-                if let Some(fk_model_name) = &col.foreign_key_reference {
-                    let Some(fk_model) = ast.models.get(fk_model_name.as_str()) else {
+                // Primary Key
+                if is_pk {
+                    ensure!(
+                        !col.value.cidl_type.is_nullable(),
+                        GeneratorErrorKind::NullPrimaryKey,
+                        "{}.{} is a primary key but is nullable",
+                        model.name,
+                        col.value.name
+                    );
+                }
+
+                if let Some(id) = col.composite_id {
+                    composite_id_to_columns
+                        .entry(id)
+                        .or_insert_with(Vec::new)
+                        .push(col);
+                }
+
+                if let Some(fk) = &col.foreign_key_reference {
+                    // Find the model the FK references
+                    let Some(fk_model) = ast.models.get(fk.model_name.as_str()) else {
                         fail!(
                             GeneratorErrorKind::InvalidModelReference,
                             "{}.{} => {}?",
                             model.name,
                             col.value.name,
-                            fk_model_name
+                            fk.model_name
                         );
                     };
 
-                    let Some(fk_model_pk) = fk_model.primary_key.as_ref() else {
+                    // Find the PK column reference the FK references
+                    let Some(fk_model_pk) = fk_model
+                        .primary_key_columns
+                        .iter()
+                        .find(|r| r.value.name == fk.column_name)
+                    else {
                         fail!(
                             GeneratorErrorKind::InvalidModelReference,
-                            "{}.{} => {} has no primary key?",
+                            "{}.{} => {} has no primary key column {}?",
                             model.name,
                             col.value.name,
-                            fk_model_name
+                            fk.model_name,
+                            fk.column_name
                         );
                     };
 
-                    // Validate the types are equal
+                    // Validate the types are equal (comparing root types to allow nullable FKs)
                     ensure!(
-                        *col.value.cidl_type.root_type() == fk_model_pk.cidl_type,
+                        col.value.cidl_type.root_type() == fk_model_pk.value.cidl_type.root_type(),
                         GeneratorErrorKind::MismatchedForeignKeyTypes,
                         "{}.{} ({:?}) != {}.{} ({:?})",
                         model.name,
                         col.value.name,
                         col.value.cidl_type,
-                        fk_model_name,
-                        fk_model_pk.name,
-                        fk_model_pk.cidl_type
+                        fk.model_name,
+                        fk_model_pk.value.name,
+                        fk_model_pk.value.cidl_type
                     );
 
                     model_attr_ref_to_fk_model
-                        .insert((&model.name, col.value.name.as_str()), fk_model_name);
+                        .insert((&model.name, col.value.name.as_str()), &fk.model_name);
 
                     // Nullable FK's do not constrain table creation order, and thus
                     // can be left out of the topo sort
                     if !col.value.cidl_type.is_nullable() {
                         // One To One: Person has a Dog ..(sql)=> Person has a fk to Dog
                         // Dog must come before Person
-                        graph.entry(fk_model_name).or_default().push(&model.name);
+                        graph.entry(&fk.model_name).or_default().push(&model.name);
                         in_degree.entry(&model.name).and_modify(|d| *d += 1);
                     }
                 }
+            }
+
+            // Validate composite keys
+            for cols in composite_id_to_columns.values() {
+                // Each composite id should map to at least two columns, otherwise
+                // it is an invalid composite key (just an FK)
+                ensure!(
+                    cols.len() > 1,
+                    GeneratorErrorKind::InvalidCompositeKey,
+                    "Composite keys must contain at least 2 columns {} => ({})",
+                    model.name,
+                    cols[0].value.name
+                );
+
+                // Each column must be a foreign key to the same model, and the number of
+                // unique columns referenced must match the number of primary key columns
+                // on the referenced model
+                let mut unique_fk_cols = HashSet::new();
+                let mut fk_model_name = None::<&str>;
+                for col in cols {
+                    let Some(fk) = &col.foreign_key_reference else {
+                        fail!(
+                            GeneratorErrorKind::InvalidCompositeKey,
+                            "Composite key column {} is not a foreign key to another model",
+                            col.value.name
+                        );
+                    };
+
+                    unique_fk_cols.insert(fk.column_name.clone());
+                    if let Some(prev_model_name) = fk_model_name {
+                        if prev_model_name != fk.model_name.as_str() {
+                            fail!(
+                                GeneratorErrorKind::InvalidCompositeKey,
+                                "Composite key column {} references model {}, but other columns reference model {}",
+                                col.value.name,
+                                fk.model_name,
+                                prev_model_name
+                            );
+                        }
+                    } else {
+                        fk_model_name = Some(fk.model_name.as_str());
+                    }
+                }
+
+                // Check that all columns in a composite key have consistent nullability
+                let nullabilities: HashSet<bool> = cols
+                    .iter()
+                    .map(|c| c.value.cidl_type.is_nullable())
+                    .collect();
+
+                ensure!(
+                    nullabilities.len() <= 1,
+                    GeneratorErrorKind::InvalidCompositeKey,
+                    "All columns in a composite key must have consistent nullability"
+                );
+
+                let fk_model = ast.models.get(fk_model_name.unwrap()).unwrap();
+                ensure!(
+                    unique_fk_cols.len() == fk_model.primary_key_columns.len(),
+                    GeneratorErrorKind::InvalidCompositeKey,
+                    "Composite key columns reference model {} but the number of unique foreign key columns ({}) does not match the number of primary key columns on the referenced model {} ({})",
+                    fk_model.name,
+                    unique_fk_cols.len(),
+                    fk_model.name,
+                    fk_model.primary_key_columns.len()
+                );
             }
 
             // Validate navigation props
@@ -363,28 +449,38 @@ impl SemanticAnalysis {
                 );
 
                 match &nav.kind {
-                    NavigationPropertyKind::OneToOne { column_reference } => {
-                        // Validate the nav prop's reference is consistent
-                        if let Some(&fk_model) =
-                            model_attr_ref_to_fk_model.get(&(&model.name, column_reference))
-                        {
+                    NavigationPropertyKind::OneToOne { key_columns } => {
+                        let nav_model = ast.models.get(nav.model_reference.as_str()).unwrap();
+                        ensure!(
+                            key_columns.len() == nav_model.primary_key_columns.len(),
+                            GeneratorErrorKind::InvalidNavigationPropertyReference,
+                            "{}.{} references {} but the number of key columns does not match the number of primary key columns on the model",
+                            model.name,
+                            nav.var_name,
+                            nav.model_reference
+                        );
+
+                        for key_ref in key_columns {
+                            let found = model
+                                .primary_key_columns
+                                .iter()
+                                .filter(|c| c.value.name == *key_ref)
+                                .find(|c| {
+                                    c.foreign_key_reference
+                                        .as_ref()
+                                        .map(|fk| fk.model_name.as_str())
+                                        == Some(nav.model_reference.as_str())
+                                });
+
                             ensure!(
-                                fk_model == nav.model_reference,
-                                GeneratorErrorKind::MismatchedNavigationPropertyTypes,
-                                "({}.{}) does not match type ({})",
-                                model.name,
-                                nav.var_name,
-                                fk_model
-                            );
-                        } else {
-                            fail!(
+                                found.is_some(),
                                 GeneratorErrorKind::InvalidNavigationPropertyReference,
                                 "{}.{} references {}.{} which does not exist or is not a foreign key to {}",
                                 model.name,
                                 nav.var_name,
                                 nav.model_reference,
-                                column_reference,
-                                model.name
+                                key_ref,
+                                nav.model_reference
                             );
                         }
                     }
@@ -400,42 +496,52 @@ impl SemanticAnalysis {
         }
 
         // Validate 1:M nav props
-        for (model_name, nav_model, nav) in unvalidated_navs {
-            let NavigationPropertyKind::OneToMany { column_reference } = &nav.kind else {
+        for (model_name, nav_model_reference, nav) in unvalidated_navs {
+            let NavigationPropertyKind::OneToMany { key_columns } = &nav.kind else {
                 continue;
             };
 
-            // Validate the nav props reference is consistent to an column
-            // on another model
-            let Some(&fk_model) = model_attr_ref_to_fk_model.get(&(nav_model, column_reference))
-            else {
-                fail!(
+            let model = ast.models.get(model_name).unwrap();
+            ensure!(
+                key_columns.len() == model.primary_key_columns.len(),
+                GeneratorErrorKind::InvalidNavigationPropertyReference,
+                "{}.{} references {} but the number of key columns does not match the number of primary key columns on this model",
+                model_name,
+                nav.var_name,
+                nav_model_reference
+            );
+
+            let nav_model = ast.models.get(nav_model_reference.as_str()).unwrap();
+            for key_ref in key_columns {
+                let found = nav_model
+                    .all_columns()
+                    .filter(|(c, _)| c.value.name == *key_ref)
+                    .find(|(c, _)| {
+                        c.foreign_key_reference
+                            .as_ref()
+                            .map(|fk| fk.model_name.as_str())
+                            == Some(model_name)
+                    });
+
+                ensure!(
+                    found.is_some(),
                     GeneratorErrorKind::InvalidNavigationPropertyReference,
                     "{}.{} references {}.{} which does not exist or is not a foreign key to {}",
                     model_name,
                     nav.var_name,
-                    nav_model,
-                    column_reference,
+                    nav_model_reference,
+                    key_ref,
                     model_name
                 );
-            };
-
-            // The types should reference one another
-            // ie, Person has many dogs, personId on dog should be an fk to Person
-            ensure!(
-                model_name == fk_model,
-                GeneratorErrorKind::MismatchedNavigationPropertyTypes,
-                "({}.{}) does not match type ({}.{})",
-                model_name,
-                nav.var_name,
-                nav_model,
-                column_reference,
-            );
+            }
 
             // One To Many: Person has many Dogs (sql)=> Dog has an fk to  Person
             // Person must come before Dog in topo order
-            graph.entry(model_name).or_default().push(nav_model);
-            *in_degree.entry(nav_model).or_insert(0) += 1;
+            graph
+                .entry(model_name)
+                .or_default()
+                .push(&nav_model_reference);
+            *in_degree.entry(&nav_model_reference).or_insert(0) += 1;
         }
 
         // Validate M:M
@@ -471,13 +577,8 @@ impl SemanticAnalysis {
 
             for var in vars {
                 ensure!(
-                    model.columns.iter().any(|col| col.value.name == var)
-                        || model.key_params.contains(&var)
-                        || model
-                            .primary_key
-                            .as_ref()
-                            .map(|pk| pk.name == var)
-                            .unwrap_or(false),
+                    model.all_columns().any(|(col, _)| col.value.name == var)
+                        || model.key_params.contains(&var),
                     GeneratorErrorKind::UnknownKeyReference,
                     "{}.{} => {} missing key param for variable {}",
                     model.name,
@@ -526,13 +627,8 @@ impl SemanticAnalysis {
 
             for var in vars {
                 ensure!(
-                    model.columns.iter().any(|col| col.value.name == var)
-                        || model.key_params.contains(&var)
-                        || model
-                            .primary_key
-                            .as_ref()
-                            .map(|pk| pk.name == var)
-                            .unwrap_or(false),
+                    model.all_columns().any(|(col, _)| col.value.name == var)
+                        || model.key_params.contains(&var),
                     GeneratorErrorKind::UnknownKeyReference,
                     "{}.{} => {} missing key param for variable {}",
                     model.name,

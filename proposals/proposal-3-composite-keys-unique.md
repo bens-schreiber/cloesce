@@ -183,8 +183,10 @@ Optionally, this could be expressed through the `model` function in `cloesce.con
 config.model(ProfessorCourseRating, (builder) => {
     builder
         .primaryKey("professorId", "courseId")
-        .foreignKey("professorId").references(Professor, "id")
-        .foreignKey("courseId").references(Course, "id");
+        .foreignKey("professorId")
+            .references(Professor, "id")
+        .foreignKey("courseId")
+            .references(Course, "id");
 });
 ```
 
@@ -207,9 +209,9 @@ class SomeModel {
 config.model(SomeModel, (builder) => {
     builder
         .foreignKey("professorId", "courseId")
-        .references(ProfessorCourseRating, "professorId", "courseId")
+            .references(ProfessorCourseRating, "professorId", "courseId")
         .oneToOne("professorCourseRating")
-        .references(ProfessorCourseRating, "professorId", "courseId");
+            .references(ProfessorCourseRating, "professorId", "courseId");
 });
 ```
 
@@ -273,7 +275,9 @@ class Student {
 
 ```ts
 config.model(Student, (builder) => {
-    builder.manyToMany("courses").references(Course, "id", "name");
+    builder
+        .manyToMany("courses")
+        .references(Course, "id", "name");
 });
 ```
 
@@ -321,9 +325,11 @@ The migrations engine must be capable of creating tables with unique constraints
 
 ### Composite Keys
 
-Primary keys are currently defined outside of the `columns` property of the Model AST, as a single `primary_key` property. Furthermore, primary keys can also have foreign key references. The best way to support this change is to move the indicator of a primary key to a boolean property on each column definition.
+Primary keys are currently defined outside of the `columns` property of the Model AST, as a single `primary_key` `NamedTypedValue`.
 
-Additionally, a column may be part of a composite key. A field `composite_key_id` can be added to the column definition, which will be an optional string. If it is `None`, then the column is not part of a composite key. If it is `Some(id)`, then the column is part of the composite key with the given ID. The order of the columns in the composite key can be determined by the order of the columns in the Model definition.
+With this proposal, there can be several columns that make a composite primary key, and primary keys can be foreign keys as well. The best way to support this change is to move the indicator of a primary key to a boolean property on each column definition.
+
+Additionally, a column may be part of a composite key. A field `composite_key_id` can be added to the column definition, which will be an optional id. If it is `None`, then the column is not part of a composite key. If it is `Some(id)`, then the column is part of the composite key with the given ID. The order of the columns in the composite key can be determined by the order of the columns in the Model definition.
 
 ```rust
 pub struct D1Column {
@@ -338,8 +344,8 @@ pub struct D1Column {
     /// Otherwise, None.
     pub foreign_key_reference: Option<String>,
 
-    /// The ID of the composite key this column belongs to, if any.
-    pub composite_key_id: Option<u32>,
+    /// The IDs of the composite keys this column belongs to, if any.
+    pub composite_ids: Vec<u32>,
 
     /// The ID of the unique constraint this column belongs to, if any.
     pub unique_ids: Vec<u32>,
@@ -364,3 +370,59 @@ impl Model {
 ```
 
 This change will have significant repercussions throughout the entire codebase, as the concept of a primary key is currently deeply ingrained in the way Models are defined and handled.
+
+
+
+# weird scenarios
+
+One to One with a single key on left side and composite key on right side:
+```ts
+@Model()
+class Person {
+    @PrimaryKey()
+    id: Integer;
+
+    a: Integer;
+    b: Integer;
+    c: DogSettings;
+}
+
+@Model()
+class DogSettings {
+    @PrimaryKey()
+    dogId: Integer;
+
+    @PrimaryKey()
+    settingsId: Integer;
+}
+```
+
+In this case we would have a `OneToOne { key_columns: ["a", "b"]}` stored on the `Person` models navigations properties.
+We have to validate that `DogSettings` has a composite primary key of which the `a`'s foreign key references one of the columns, and `b`'s foreign key references the other column.
+
+```ts
+@Model()
+class Person {
+    @PrimaryKey()
+    id: Integer;
+
+    @PrimaryKey()
+    name: String;
+
+    dogs: Dog[];
+}
+
+@Model()
+class Dog {
+    @PrimaryKey()
+    id: Integer;
+
+    
+    a: Integer;
+    b: Integer;
+    c: DogSettings;
+}
+```
+
+In this case, we would have a `OneToMany { key_columns: ["a", "b"] }` stored on the `Person` models navigation properties.
+We would validate that `Dog` has a composite foreign key of `a` and `b` that references the composite primary key of `Person` on `id` and `name`.

@@ -4,8 +4,8 @@ use std::{
 };
 
 use ast::{
-    CidlType, HttpVerb, MigrationsAst, NamedTypedValue, NavigationPropertyKind, Service,
-    ServiceAttribute, WranglerEnv, err::GeneratorErrorKind,
+    CidlType, D1Column, ForeignKeyReference, HttpVerb, MigrationsAst, NamedTypedValue,
+    NavigationPropertyKind, Service, ServiceAttribute, WranglerEnv, err::GeneratorErrorKind,
 };
 use generator_test::{IncludeTreeBuilder, ModelBuilder, create_ast, create_spec};
 use semantic::SemanticAnalysis;
@@ -35,9 +35,15 @@ fn cloesce_serializes_to_migrations() {
 fn null_primary_key_error() {
     // Arrange
     let mut model = ModelBuilder::new("Dog").build();
-    model.primary_key = Some(NamedTypedValue {
-        name: "id".into(),
-        cidl_type: CidlType::nullable(CidlType::Integer),
+    model.primary_key_columns.push(D1Column {
+        hash: 0,
+        value: NamedTypedValue {
+            name: "id".into(),
+            cidl_type: CidlType::nullable(CidlType::Integer),
+        },
+        foreign_key_reference: None,
+        unique_ids: Vec::new(),
+        composite_id: None,
     });
 
     let mut ast = create_ast(vec![model]);
@@ -56,7 +62,15 @@ fn mismatched_foreign_keys_error() {
     let mut ast = create_ast(vec![
         ModelBuilder::new("Person")
             .id_pk()
-            .col("dogId", CidlType::Text, Some("Dog".into()))
+            .col(
+                "dogId",
+                CidlType::Text,
+                Some(ForeignKeyReference {
+                    model_name: "Dog".into(),
+                    column_name: "id".into(),
+                }),
+                None,
+            )
             .build(),
         ModelBuilder::new("Dog").id_pk().build(),
     ]);
@@ -79,15 +93,39 @@ fn model_cycle_detection_error() {
         // A -> B -> C -> A
         ModelBuilder::new("A")
             .id_pk()
-            .col("bId", CidlType::Integer, Some("B".to_string()))
+            .col(
+                "bId",
+                CidlType::Integer,
+                Some(ForeignKeyReference {
+                    model_name: "B".into(),
+                    column_name: "id".into(),
+                }),
+                None,
+            )
             .build(),
         ModelBuilder::new("B")
             .id_pk()
-            .col("cId", CidlType::Integer, Some("C".to_string()))
+            .col(
+                "cId",
+                CidlType::Integer,
+                Some(ForeignKeyReference {
+                    model_name: "C".into(),
+                    column_name: "id".into(),
+                }),
+                None,
+            )
             .build(),
         ModelBuilder::new("C")
             .id_pk()
-            .col("aId", CidlType::Integer, Some("A".to_string()))
+            .col(
+                "aId",
+                CidlType::Integer,
+                Some(ForeignKeyReference {
+                    model_name: "A".into(),
+                    column_name: "id".into(),
+                }),
+                None,
+            )
             .build(),
     ]);
     let spec = create_spec(&ast);
@@ -156,18 +194,38 @@ fn model_attr_nullability_prevents_cycle_error() {
     let mut ast = create_ast(vec![
         ModelBuilder::new("A")
             .id_pk()
-            .col("bId", CidlType::Integer, Some("B".to_string()))
+            .col(
+                "bId",
+                CidlType::Integer,
+                Some(ForeignKeyReference {
+                    model_name: "B".into(),
+                    column_name: "id".into(),
+                }),
+                None,
+            )
             .build(),
         ModelBuilder::new("B")
             .id_pk()
-            .col("cId", CidlType::Integer, Some("C".to_string()))
+            .col(
+                "cId",
+                CidlType::Integer,
+                Some(ForeignKeyReference {
+                    model_name: "C".into(),
+                    column_name: "id".into(),
+                }),
+                None,
+            )
             .build(),
         ModelBuilder::new("C")
             .id_pk()
             .col(
                 "aId",
                 CidlType::nullable(CidlType::Integer),
-                Some("A".to_string()),
+                Some(ForeignKeyReference {
+                    model_name: "A".into(),
+                    column_name: "id".into(),
+                }),
+                None,
             )
             .build(),
     ]);
@@ -188,7 +246,7 @@ fn one_to_one_nav_property_unknown_attribute_reference_error() {
                 "dog",
                 "Dog",
                 NavigationPropertyKind::OneToOne {
-                    column_reference: "dogId".to_string(),
+                    key_columns: vec!["dogId".to_string()], // dogId doesn't exist on Person
                 },
             )
             .build(),
@@ -213,12 +271,20 @@ fn one_to_one_mismatched_fk_and_nav_type_error() {
         ModelBuilder::new("Cat").id_pk().build(),
         ModelBuilder::new("Person")
             .id_pk()
-            .col("dogId", CidlType::Integer, Some("Dog".into()))
+            .col(
+                "dogId",
+                CidlType::Integer,
+                Some(ForeignKeyReference {
+                    model_name: "Dog".into(),
+                    column_name: "id".into(),
+                }),
+                None,
+            )
             .nav_p(
                 "dog",
                 "Cat", // incorrect: says Cat but fk points to Dog
                 NavigationPropertyKind::OneToOne {
-                    column_reference: "dogId".to_string(),
+                    key_columns: vec!["dogId".to_string()],
                 },
             )
             .build(),
@@ -231,7 +297,7 @@ fn one_to_one_mismatched_fk_and_nav_type_error() {
     // Assert
     assert!(matches!(
         err.kind,
-        GeneratorErrorKind::MismatchedNavigationPropertyTypes
+        GeneratorErrorKind::InvalidNavigationPropertyReference
     ));
 }
 
@@ -247,7 +313,7 @@ fn one_to_many_unresolved_reference_error() {
                 "dogs",
                 "Dog",
                 NavigationPropertyKind::OneToMany {
-                    column_reference: "personId".into(),
+                    key_columns: vec!["personId".to_string()],
                 },
             )
             .build(),
@@ -515,7 +581,7 @@ fn kv_object_valid_key_format() {
     let mut ast = create_ast(vec![
         ModelBuilder::new("Settings")
             .id_pk()
-            .col("userId", CidlType::Integer, None)
+            .col("userId", CidlType::Integer, None, None)
             .key_param("tenant")
             .kv_object(
                 "settings/{tenant}/{userId}",
@@ -614,7 +680,7 @@ fn kv_object_with_column_in_format() {
     let mut ast = create_ast(vec![
         ModelBuilder::new("Session")
             .id_pk()
-            .col("token", CidlType::Text, None)
+            .col("token", CidlType::Text, None, None)
             .kv_object(
                 "session/{token}",
                 "my_kv",
@@ -815,4 +881,252 @@ fn data_source_unknown() {
         err.kind,
         GeneratorErrorKind::UnknownDataSourceReference
     ));
+}
+
+#[test]
+fn composite_key_validation() {
+    // Valid composite key: Enrollment has a composite key referencing Student(id, id2)
+    {
+        let mut ast = create_ast(vec![
+            ModelBuilder::new("Student")
+                .pk("id", CidlType::Integer)
+                .pk("id2", CidlType::Integer)
+                .build(),
+            ModelBuilder::new("Enrollment")
+                .id_pk()
+                .col(
+                    "studentId",
+                    CidlType::Integer,
+                    Some(ForeignKeyReference {
+                        model_name: "Student".into(),
+                        column_name: "id".into(),
+                    }),
+                    Some(1),
+                )
+                .col(
+                    "studentId2",
+                    CidlType::Integer,
+                    Some(ForeignKeyReference {
+                        model_name: "Student".into(),
+                        column_name: "id2".into(),
+                    }),
+                    Some(1),
+                )
+                .col("grade", CidlType::Text, None, None)
+                .build(),
+        ]);
+        let spec = create_spec(&ast);
+        SemanticAnalysis::analyze(&mut ast, &spec).expect("valid composite key should pass");
+    }
+
+    // Error: composite key with only 1 column
+    {
+        let mut ast = create_ast(vec![
+            ModelBuilder::new("Student").id_pk().build(),
+            ModelBuilder::new("Enrollment")
+                .id_pk()
+                .col(
+                    "studentId",
+                    CidlType::Integer,
+                    Some(ForeignKeyReference {
+                        model_name: "Student".into(),
+                        column_name: "id".into(),
+                    }),
+                    Some(1),
+                )
+                .build(),
+        ]);
+        let spec = create_spec(&ast);
+        let err = SemanticAnalysis::analyze(&mut ast, &spec).unwrap_err();
+        assert!(matches!(err.kind, GeneratorErrorKind::InvalidCompositeKey));
+        assert!(err.context.contains("at least 2 columns"));
+    }
+
+    // Error: composite key contains non-FK column
+    {
+        let mut ast = create_ast(vec![
+            ModelBuilder::new("Student").id_pk().build(),
+            ModelBuilder::new("Enrollment")
+                .id_pk()
+                .col(
+                    "studentId",
+                    CidlType::Integer,
+                    Some(ForeignKeyReference {
+                        model_name: "Student".into(),
+                        column_name: "id".into(),
+                    }),
+                    Some(1),
+                )
+                .col("grade", CidlType::Text, None, Some(1))
+                .build(),
+        ]);
+        let spec = create_spec(&ast);
+        let err = SemanticAnalysis::analyze(&mut ast, &spec).unwrap_err();
+        assert!(matches!(err.kind, GeneratorErrorKind::InvalidCompositeKey));
+        assert!(err.context.contains("not a foreign key"));
+    }
+
+    // Error: composite key columns reference different models
+    {
+        let mut ast = create_ast(vec![
+            ModelBuilder::new("Student").id_pk().build(),
+            ModelBuilder::new("Course").id_pk().build(),
+            ModelBuilder::new("Enrollment")
+                .id_pk()
+                .col(
+                    "studentId",
+                    CidlType::Integer,
+                    Some(ForeignKeyReference {
+                        model_name: "Student".into(),
+                        column_name: "id".into(),
+                    }),
+                    Some(1),
+                )
+                .col(
+                    "courseId",
+                    CidlType::Integer,
+                    Some(ForeignKeyReference {
+                        model_name: "Course".into(),
+                        column_name: "id".into(),
+                    }),
+                    Some(1),
+                )
+                .build(),
+        ]);
+        let spec = create_spec(&ast);
+        let err = SemanticAnalysis::analyze(&mut ast, &spec).unwrap_err();
+        assert!(matches!(err.kind, GeneratorErrorKind::InvalidCompositeKey));
+        assert!(err.context.contains("references model"));
+    }
+
+    // Error: composite key doesn't reference all PK columns
+    {
+        let mut ast = create_ast(vec![
+            ModelBuilder::new("Student")
+                .pk("id", CidlType::Integer)
+                .pk("id2", CidlType::Integer)
+                .build(),
+            ModelBuilder::new("Enrollment")
+                .id_pk()
+                .col(
+                    "studentId",
+                    CidlType::Integer,
+                    Some(ForeignKeyReference {
+                        model_name: "Student".into(),
+                        column_name: "id".into(),
+                    }),
+                    Some(1),
+                )
+                .col(
+                    "studentIdDup",
+                    CidlType::Integer,
+                    Some(ForeignKeyReference {
+                        model_name: "Student".into(),
+                        column_name: "id".into(),
+                    }),
+                    Some(1),
+                )
+                .build(),
+        ]);
+        let spec = create_spec(&ast);
+        let err = SemanticAnalysis::analyze(&mut ast, &spec).unwrap_err();
+        assert!(matches!(err.kind, GeneratorErrorKind::InvalidCompositeKey));
+        assert!(err.context.contains("does not match"));
+    }
+
+    // Error: composite key with mixed nullability
+    {
+        let mut ast = create_ast(vec![
+            ModelBuilder::new("Student")
+                .pk("id", CidlType::Integer)
+                .pk("id2", CidlType::Integer)
+                .build(),
+            ModelBuilder::new("Enrollment")
+                .id_pk()
+                .col(
+                    "studentId",
+                    CidlType::Integer, // Non-nullable
+                    Some(ForeignKeyReference {
+                        model_name: "Student".into(),
+                        column_name: "id".into(),
+                    }),
+                    Some(1),
+                )
+                .col(
+                    "studentId2",
+                    CidlType::nullable(CidlType::Integer), // Nullable
+                    Some(ForeignKeyReference {
+                        model_name: "Student".into(),
+                        column_name: "id2".into(),
+                    }),
+                    Some(1),
+                )
+                .build(),
+        ]);
+        let spec = create_spec(&ast);
+        let err = SemanticAnalysis::analyze(&mut ast, &spec).unwrap_err();
+        assert!(matches!(err.kind, GeneratorErrorKind::InvalidCompositeKey));
+        assert!(err.context.contains("consistent nullability"));
+    }
+}
+
+#[test]
+fn multiple_composite_keys_same_model() {
+    // Arrange
+    let mut ast = create_ast(vec![
+        ModelBuilder::new("User")
+            .pk("id", CidlType::Integer)
+            .pk("id2", CidlType::Integer)
+            .build(),
+        ModelBuilder::new("Group")
+            .pk("id", CidlType::Integer)
+            .pk("id2", CidlType::Integer)
+            .build(),
+        ModelBuilder::new("Permission")
+            .id_pk()
+            .col(
+                "userId",
+                CidlType::Integer,
+                Some(ForeignKeyReference {
+                    model_name: "User".into(),
+                    column_name: "id".into(),
+                }),
+                Some(1), // composite_id = 1
+            )
+            .col(
+                "userId2",
+                CidlType::Integer,
+                Some(ForeignKeyReference {
+                    model_name: "User".into(),
+                    column_name: "id2".into(),
+                }),
+                Some(1),
+            )
+            .col(
+                "groupId",
+                CidlType::Integer,
+                Some(ForeignKeyReference {
+                    model_name: "Group".into(),
+                    column_name: "id".into(),
+                }),
+                Some(2), // composite_id = 2 (different composite key)
+            )
+            .col(
+                "groupId2",
+                CidlType::Integer,
+                Some(ForeignKeyReference {
+                    model_name: "Group".into(),
+                    column_name: "id2".into(),
+                }),
+                Some(2),
+            )
+            .build(),
+    ]);
+    let spec = create_spec(&ast);
+
+    // Act
+    let result = SemanticAnalysis::analyze(&mut ast, &spec);
+
+    // Assert
+    result.expect("multiple composite keys should be valid");
 }

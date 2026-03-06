@@ -75,6 +75,8 @@ pub enum GeneratorErrorKind {
     InvalidKeyFormat,
     UnknownKeyReference,
     UnsupportedCrudOperation,
+    UnknownCompositeKeyReference,
+    InvalidCompositeKey,
 }
 
 impl GeneratorErrorKind {
@@ -192,6 +194,16 @@ impl GeneratorErrorKind {
             GeneratorErrorKind::InvalidDataSourceReference => (
                 "Found a reference to a data source that is invalid for the context.",
                 "TODO",
+                GeneratorPhase::ModelAnalysis,
+            ),
+            GeneratorErrorKind::UnknownCompositeKeyReference => (
+                "A Model has a composite key reference that cannot be resolved.",
+                "Ensure all composite key references in the key format correspond to defined columns in the Model.",
+                GeneratorPhase::ModelAnalysis,
+            ),
+            GeneratorErrorKind::InvalidCompositeKey => (
+                "A Model has a composite key that is invalid.",
+                "Ensure all composite key references in the key format correspond to valid combinations of columns in the Model.",
                 GeneratorPhase::ModelAnalysis,
             ),
 
