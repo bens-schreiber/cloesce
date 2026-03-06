@@ -999,7 +999,7 @@ fn composite_key_validation() {
         assert!(err.context.contains("references model"));
     }
 
-    // Error: composite key doesn't reference all PK columns
+    // Error: composite key with nav prop doesn't reference all PK columns
     {
         let mut ast = create_ast(vec![
             ModelBuilder::new("Student")
@@ -1022,16 +1022,25 @@ fn composite_key_validation() {
                     CidlType::Integer,
                     Some(ForeignKeyReference {
                         model_name: "Student".into(),
-                        column_name: "id".into(),
+                        column_name: "id2".into(),
                     }),
                     Some(1),
+                )
+                .nav_p(
+                    "student",
+                    "Student",
+                    NavigationPropertyKind::OneToOne {
+                        key_columns: vec!["studentId".to_string(), "studentIdDup".to_string()],
+                    },
                 )
                 .build(),
         ]);
         let spec = create_spec(&ast);
         let err = SemanticAnalysis::analyze(&mut ast, &spec).unwrap_err();
-        assert!(matches!(err.kind, GeneratorErrorKind::InvalidCompositeKey));
-        assert!(err.context.contains("does not match"));
+        assert!(matches!(
+            err.kind,
+            GeneratorErrorKind::InvalidNavigationPropertyReference
+        ));
     }
 
     // Error: composite key with mixed nullability

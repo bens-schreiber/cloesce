@@ -384,10 +384,7 @@ impl SemanticAnalysis {
                     cols[0].value.name
                 );
 
-                // Each column must be a foreign key to the same model, and the number of
-                // unique columns referenced must match the number of primary key columns
-                // on the referenced model
-                let mut unique_fk_cols = HashSet::new();
+                // Each column must be a foreign key to the same model.
                 let mut fk_model_name = None::<&str>;
                 for col in cols {
                     let Some(fk) = &col.foreign_key_reference else {
@@ -398,7 +395,6 @@ impl SemanticAnalysis {
                         );
                     };
 
-                    unique_fk_cols.insert(fk.column_name.clone());
                     if let Some(prev_model_name) = fk_model_name {
                         if prev_model_name != fk.model_name.as_str() {
                             fail!(
@@ -425,17 +421,6 @@ impl SemanticAnalysis {
                     GeneratorErrorKind::InvalidCompositeKey,
                     "All columns in a composite key must have consistent nullability"
                 );
-
-                let fk_model = ast.models.get(fk_model_name.unwrap()).unwrap();
-                ensure!(
-                    unique_fk_cols.len() == fk_model.primary_key_columns.len(),
-                    GeneratorErrorKind::InvalidCompositeKey,
-                    "Composite key columns reference model {} but the number of unique foreign key columns ({}) does not match the number of primary key columns on the referenced model {} ({})",
-                    fk_model.name,
-                    unique_fk_cols.len(),
-                    fk_model.name,
-                    fk_model.primary_key_columns.len()
-                );
             }
 
             // Validate navigation props
@@ -460,6 +445,19 @@ impl SemanticAnalysis {
                             nav.model_reference
                         );
 
+                        // Ensure no duplicate key columns
+                        let unique_key_cols: HashSet<&str> =
+                            key_columns.iter().map(|s| s.as_str()).collect();
+                        ensure!(
+                            unique_key_cols.len() == key_columns.len(),
+                            GeneratorErrorKind::InvalidNavigationPropertyReference,
+                            "{}.{} references {} but key columns contain duplicates",
+                            model.name,
+                            nav.var_name,
+                            nav.model_reference
+                        );
+
+                        let mut referenced_nav_pks = HashSet::new();
                         for key_ref in key_columns {
                             let found = model
                                 .primary_key_columns
@@ -472,17 +470,42 @@ impl SemanticAnalysis {
                                         == Some(nav.model_reference.as_str())
                                 });
 
-                            ensure!(
-                                found.is_some(),
-                                GeneratorErrorKind::InvalidNavigationPropertyReference,
-                                "{}.{} references {}.{} which does not exist or is not a foreign key to {}",
-                                model.name,
-                                nav.var_name,
-                                nav.model_reference,
-                                key_ref,
-                                nav.model_reference
+                            let Some(col) = found else {
+                                fail!(
+                                    GeneratorErrorKind::InvalidNavigationPropertyReference,
+                                    "{}.{} references {}.{} which does not exist or is not a foreign key to {}",
+                                    model.name,
+                                    nav.var_name,
+                                    nav.model_reference,
+                                    key_ref,
+                                    nav.model_reference
+                                );
+                            };
+
+                            referenced_nav_pks.insert(
+                                col.foreign_key_reference
+                                    .as_ref()
+                                    .unwrap()
+                                    .column_name
+                                    .as_str(),
                             );
                         }
+
+                        // Ensure all nav model PK columns are referenced exactly once
+                        let nav_pk_names: HashSet<&str> = nav_model
+                            .primary_key_columns
+                            .iter()
+                            .map(|c| c.value.name.as_str())
+                            .collect();
+
+                        ensure!(
+                            referenced_nav_pks == nav_pk_names,
+                            GeneratorErrorKind::InvalidNavigationPropertyReference,
+                            "{}.{} references {} but the key columns do not cover all primary key columns of the referenced model",
+                            model.name,
+                            nav.var_name,
+                            nav.model_reference
+                        );
                     }
                     NavigationPropertyKind::OneToMany { .. } => {
                         unvalidated_navs.push((&model.name, &nav.model_reference, nav));
@@ -511,6 +534,20 @@ impl SemanticAnalysis {
                 nav_model_reference
             );
 
+            // Ensure no duplicate key columns
+            let unique_key_cols: HashSet<&str> = key_columns.iter().map(|s| s.as_str()).collect();
+            ensure!(
+                unique_key_cols.len() == key_columns.len(),
+                GeneratorErrorKind::InvalidNavigationPropertyReference,
+                "{}.{} references {} but key columns contain duplicates",
+                model_name,
+                nav.var_name,
+                nav_model_reference
+            );
+
+            // Track which nav model PK columns are referenced
+            let mut referenced_nav_pks = HashSet::new();
+
             let nav_model = ast.models.get(nav_model_reference.as_str()).unwrap();
             for key_ref in key_columns {
                 let found = nav_model
@@ -523,17 +560,39 @@ impl SemanticAnalysis {
                             == Some(model_name)
                     });
 
-                ensure!(
-                    found.is_some(),
-                    GeneratorErrorKind::InvalidNavigationPropertyReference,
-                    "{}.{} references {}.{} which does not exist or is not a foreign key to {}",
-                    model_name,
-                    nav.var_name,
-                    nav_model_reference,
-                    key_ref,
-                    model_name
-                );
+                let Some((col, _)) = found else {
+                    fail!(
+                        GeneratorErrorKind::InvalidNavigationPropertyReference,
+                        "{}.{} references {}.{} which does not exist or is not a foreign key to {}",
+                        model_name,
+                        nav.var_name,
+                        nav_model_reference,
+                        key_ref,
+                        model_name
+                    );
+                };
+
+                // Track which nav PK column is being referenced
+                if let Some(fk) = &col.foreign_key_reference {
+                    referenced_nav_pks.insert(fk.column_name.as_str());
+                }
             }
+
+            // Ensure all nav model PK columns are referenced exactly once
+            let nav_pk_names: HashSet<&str> = nav_model
+                .primary_key_columns
+                .iter()
+                .map(|c| c.value.name.as_str())
+                .collect();
+
+            ensure!(
+                referenced_nav_pks == nav_pk_names,
+                GeneratorErrorKind::InvalidNavigationPropertyReference,
+                "{}.{} references {} but the key columns do not cover all primary key columns of the referenced model",
+                model_name,
+                nav.var_name,
+                nav_model_reference
+            );
 
             // One To Many: Person has many Dogs (sql)=> Dog has an fk to  Person
             // Person must come before Dog in topo order
