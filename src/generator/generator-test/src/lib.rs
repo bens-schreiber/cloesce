@@ -122,6 +122,7 @@ impl ModelBuilder {
                 cidl_type,
             },
             foreign_key_reference: foreign_key,
+            unique_ids: Vec::new(),
             hash: 0,
         });
         self

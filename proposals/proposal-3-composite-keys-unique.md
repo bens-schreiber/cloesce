@@ -311,13 +311,11 @@ Finally, the `rawAst` function will be called with the entire extracted AST with
 
 ### Unique Constraints
 
-A new property `unique_constraints` will be added to the Model AST, consisting of an array of unique constraint definitions. The generator will then translate these unique constraint definitions into the appropriate SQL syntax when generating the schema.
+Each `D1Column` in the AST will have a new `unique_ids` property, which will be a vector of integers representing the unique constraints that the column is part of. A column could be apart of multiple unique constraints, which is why this is a vector. Each unique constraint will have a unique ID, which will be generated when the unique constraint is defined in the `model` function in `cloesce.config.ts`.
 
-A single unique constraint can be added inline to the table definition, while multiple unique constraints will be added as separate `UNIQUE` clauses.
+A single unique constraint can be added inline to the table definition during migrations, while multiple unique constraints will be added as separate `UNIQUE` clauses.
 
-The migrations engine must be capable of creating tables with unique constraints, as well as removing and adding a unique constraint. All of these will require a full table rebuild, as SQLite does not support adding or removing unique constraints through `ALTER TABLE`. A special `unique_ids` property can be added to the column definition to indicate which unique constraint(s) a column is part of, which will allow the migrations engine to determine which unique constraints need to be modified when a column is added, removed, or modified.
-
-Overall, this change is additive to the migrations engine portion of the generator.
+The migrations engine must be capable of creating tables with unique constraints, as well as removing and adding a unique constraint. All of these will require a full table rebuild, as SQLite does not support adding or removing unique constraints through `ALTER TABLE`.
 
 ### Composite Keys
 
@@ -339,10 +337,10 @@ pub struct D1Column {
     pub foreign_key_reference: Option<String>,
 
     /// The ID of the composite key this column belongs to, if any.
-    pub composite_key_id: Option<String>,
+    pub composite_key_id: Option<u32>,
 
     /// The ID of the unique constraint this column belongs to, if any.
-    pub unique_ids: Vec<String>,
+    pub unique_ids: Vec<u32>,
 
     /// If the attribute is a primary key, this will be true.
     /// Otherwise, false.

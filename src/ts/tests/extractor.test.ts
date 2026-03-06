@@ -390,6 +390,7 @@ describe("Model", () => {
             cidl_type: "Real",
           },
           foreign_key_reference: "Foo",
+          unique_ids: [],
         },
       ]),
     );
@@ -462,6 +463,7 @@ describe("Model", () => {
             cidl_type: "Real",
           },
           foreign_key_reference: "Foo",
+          unique_ids: [],
         },
       ]),
     );
@@ -591,6 +593,7 @@ describe("Model", () => {
             cidl_type: "Real",
           },
           foreign_key_reference: "Foo",
+          unique_ids: [],
         },
       ]),
     );

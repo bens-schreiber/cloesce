@@ -522,6 +522,164 @@ ALTER TABLE "User" ADD COLUMN "age" text"#
         assert!(exists_in_db(&db, "User").await);
         assert!(exists_in_db(&db, "Dog").await);
     }
+
+    // Rebuild: Unique Constraints
+    {
+        let empty_ast = empty_migration();
+        let mut base_unique_ast = {
+            let mut ast = create_ast(vec![
+                ModelBuilder::new("UniqueUser")
+                    .id_pk()
+                    .col("email", CidlType::Text, None)
+                    .col("first_name", CidlType::Text, None)
+                    .col("last_name", CidlType::Text, None)
+                    .col("age", CidlType::Integer, None)
+                    .build(),
+            ]);
+
+            let user = ast.models.get_mut("UniqueUser").unwrap();
+            user.columns
+                .iter_mut()
+                .find(|c| c.value.name == "email")
+                .unwrap()
+                .unique_ids = vec![0];
+            user.columns
+                .iter_mut()
+                .find(|c| c.value.name == "first_name")
+                .unwrap()
+                .unique_ids = vec![1];
+            user.columns
+                .iter_mut()
+                .find(|c| c.value.name == "last_name")
+                .unwrap()
+                .unique_ids = vec![1];
+
+            ast.set_merkle_hash();
+            let migration = as_migration(ast);
+
+            let sql = MigrationsGenerator::migrate(
+                &migration,
+                Some(&empty_ast),
+                &MockMigrationsIntent::default(),
+            );
+
+            expected_str!(sql, r#""email" text UNIQUE NOT NULL"#);
+            expected_str!(sql, r#"UNIQUE ("first_name", "last_name")"#);
+
+            query(&db, &sql)
+                .await
+                .expect("Create table queries to work");
+            assert!(exists_in_db(&db, "UniqueUser").await);
+
+            migration
+        };
+
+        // Add a unique constraint => rebuild table
+        {
+            let with_age_unique_ast = {
+                let mut ast = create_ast(vec![
+                    ModelBuilder::new("UniqueUser")
+                        .id_pk()
+                        .col("email", CidlType::Text, None)
+                        .col("first_name", CidlType::Text, None)
+                        .col("last_name", CidlType::Text, None)
+                        .col("age", CidlType::Integer, None)
+                        .build(),
+                ]);
+
+                let user = ast.models.get_mut("UniqueUser").unwrap();
+                user.columns
+                    .iter_mut()
+                    .find(|c| c.value.name == "email")
+                    .unwrap()
+                    .unique_ids = vec![0];
+                user.columns
+                    .iter_mut()
+                    .find(|c| c.value.name == "first_name")
+                    .unwrap()
+                    .unique_ids = vec![1];
+                user.columns
+                    .iter_mut()
+                    .find(|c| c.value.name == "last_name")
+                    .unwrap()
+                    .unique_ids = vec![1];
+                user.columns
+                    .iter_mut()
+                    .find(|c| c.value.name == "age")
+                    .unwrap()
+                    .unique_ids = vec![2];
+
+                ast.set_merkle_hash();
+                as_migration(ast)
+            };
+
+            // Act
+            let sql = MigrationsGenerator::migrate(
+                &with_age_unique_ast,
+                Some(&base_unique_ast),
+                &MockMigrationsIntent::default(),
+            );
+
+            // Assert
+            expected_str!(sql, r#"ALTER TABLE "UniqueUser" RENAME TO "UniqueUser_"#);
+            expected_str!(sql, r#""age" integer UNIQUE NOT NULL"#);
+            expected_str!(sql, r#"DROP TABLE "UniqueUser_"#);
+
+            query(&db, &sql).await.expect("Rebuild query to work");
+            assert!(exists_in_db(&db, "UniqueUser").await);
+
+            base_unique_ast = with_age_unique_ast;
+        }
+
+        // Drop a unique constraint => rebuild table
+        {
+            let without_age_unique_ast = {
+                let mut ast = create_ast(vec![
+                    ModelBuilder::new("UniqueUser")
+                        .id_pk()
+                        .col("email", CidlType::Text, None)
+                        .col("first_name", CidlType::Text, None)
+                        .col("last_name", CidlType::Text, None)
+                        .col("age", CidlType::Integer, None)
+                        .build(),
+                ]);
+
+                let user = ast.models.get_mut("UniqueUser").unwrap();
+                user.columns
+                    .iter_mut()
+                    .find(|c| c.value.name == "email")
+                    .unwrap()
+                    .unique_ids = vec![0];
+                user.columns
+                    .iter_mut()
+                    .find(|c| c.value.name == "first_name")
+                    .unwrap()
+                    .unique_ids = vec![1];
+                user.columns
+                    .iter_mut()
+                    .find(|c| c.value.name == "last_name")
+                    .unwrap()
+                    .unique_ids = vec![1];
+
+                ast.set_merkle_hash();
+                as_migration(ast)
+            };
+
+            // Act
+            let sql = MigrationsGenerator::migrate(
+                &without_age_unique_ast,
+                Some(&base_unique_ast),
+                &MockMigrationsIntent::default(),
+            );
+
+            // Assert
+            expected_str!(sql, r#"ALTER TABLE "UniqueUser" RENAME TO "UniqueUser_"#);
+            expected_str!(sql, r#"DROP TABLE "UniqueUser_"#);
+
+            query(&db, &sql).await.expect("Rebuild query to work");
+            assert!(exists_in_db(&db, "UniqueUser").await);
+        }
+    }
 }
 
 #[sqlx::test]

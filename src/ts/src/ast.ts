@@ -55,6 +55,7 @@ export interface NamedTypedValue {
 export interface D1Column {
   value: NamedTypedValue;
   foreign_key_reference: string | null;
+  unique_ids: number[];
 }
 
 /** @internal */

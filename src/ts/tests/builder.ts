@@ -128,6 +128,7 @@ export class ModelBuilder {
     this.columns.push({
       value: { name, cidl_type },
       foreign_key_reference: foreign_key,
+      unique_ids: [],
     });
     return this;
   }

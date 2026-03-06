@@ -1,6 +1,6 @@
 mod fmt;
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 
 use ast::{
     CidlType, D1Column, MigrationsAst, MigrationsModel, NavigationProperty, NavigationPropertyKind,
@@ -114,6 +114,16 @@ impl MigrateTables {
             table.table(alias(&model.name));
             table.if_not_exists();
 
+            let mut unique_columns_by_id = BTreeMap::<u32, Vec<&str>>::new();
+            for col in model.columns.iter() {
+                for unique_id in col.unique_ids.iter() {
+                    unique_columns_by_id
+                        .entry(*unique_id)
+                        .or_default()
+                        .push(col.value.name.as_str());
+                }
+            }
+
             // Set Primary Key
             {
                 let mut column =
@@ -125,6 +135,15 @@ impl MigrateTables {
             // Columns
             for col in model.columns.iter() {
                 let mut column = typed_column(&col.value.name, &col.value.cidl_type, false);
+
+                let single_column_unique = col.unique_ids.iter().any(|id| {
+                    unique_columns_by_id
+                        .get(id)
+                        .is_some_and(|cols| cols.len() == 1 && cols[0] == col.value.name)
+                });
+                if single_column_unique {
+                    column.unique_key();
+                }
 
                 if !col.value.cidl_type.is_nullable() {
                     column.not_null();
@@ -150,6 +169,16 @@ impl MigrateTables {
                 }
 
                 table.col(column);
+            }
+
+            // Multi column unique indexes
+            for columns in unique_columns_by_id.values().filter(|cols| cols.len() > 1) {
+                let mut index = Index::create();
+                index.unique();
+                for column_name in columns {
+                    index.col(alias(*column_name));
+                }
+                table.index(&mut index);
             }
 
             res.push(to_sqlite(table));
@@ -522,7 +551,7 @@ impl MigrateTables {
 
             for col in &model.columns {
                 let Some(lm_col) = lm_cols.remove(&col.value.name) else {
-                    if col.foreign_key_reference.is_some() {
+                    if col.foreign_key_reference.is_some() || !col.unique_ids.is_empty() {
                         return vec![AlterKind::RebuildTable];
                     }
 
@@ -550,13 +579,20 @@ impl MigrateTables {
                     return vec![AlterKind::RebuildTable];
                 }
 
+                // Changes on unique constraints require a rebuild.
+                if lm_col.unique_ids != col.unique_ids {
+                    return vec![AlterKind::RebuildTable];
+                }
+
                 if lm_col.value.cidl_type != col.value.cidl_type {
                     alterations.push(AlterKind::AlterColumnType { col, lm_col });
                 }
             }
 
             for unvisited_lm_col in lm_cols.into_values() {
-                if unvisited_lm_col.foreign_key_reference.is_some() {
+                if unvisited_lm_col.foreign_key_reference.is_some()
+                    || !unvisited_lm_col.unique_ids.is_empty()
+                {
                     return vec![AlterKind::RebuildTable];
                 }
 

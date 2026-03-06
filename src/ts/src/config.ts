@@ -101,17 +101,23 @@ interface PrimaryKeyDefinition {
   column: string;
 }
 
+interface UniqueConstraintDefinition {
+  id: number;
+  columns: string[];
+}
+
 class ModelConfig {
   primaryKeys: PrimaryKeyDefinition[] = [];
   foreignKeys: ForeignKeyDefinition[] = [];
   relationships: RelationshipDefinition[] = [];
+  uniqueConstraints: UniqueConstraintDefinition[] = [];
 }
 
 export class ForeignKeyBuilder<T extends object> {
   constructor(
     private column: string,
     private modelConfig: ModelConfig,
-  ) {}
+  ) { }
 
   references<R extends object>(
     model: new () => R,
@@ -132,7 +138,7 @@ export class RelationshipBuilder<T extends object> {
     private propertyName: string,
     private kind: "OneToOne" | "OneToMany" | "ManyToMany",
     private modelConfig: ModelConfig,
-  ) {}
+  ) { }
 
   references<R extends object>(
     model: new () => R,
@@ -150,7 +156,7 @@ export class RelationshipBuilder<T extends object> {
 }
 
 export class ModelBuilder<T extends object = any> {
-  constructor(private modelConfig: ModelConfig = new ModelConfig()) {}
+  constructor(private modelConfig: ModelConfig = new ModelConfig()) { }
 
   primaryKey<K extends keyof T>(column: K): ModelBuilder<T> {
     this.modelConfig.primaryKeys.push({ column: String(column) });
@@ -183,6 +189,16 @@ export class ModelBuilder<T extends object = any> {
       "ManyToMany",
       this.modelConfig,
     );
+  }
+
+  unique<K extends keyof T>(...columns: K[]): ModelBuilder<T> {
+    const columnNames = columns.map((c) => String(c));
+    const id = this.modelConfig.uniqueConstraints.length;
+    this.modelConfig.uniqueConstraints.push({
+      id,
+      columns: columnNames,
+    });
+    return this;
   }
 }
 
@@ -226,23 +242,49 @@ export class CloesceConfigBuilder implements CloesceConfig {
         return;
       }
 
+      const columnsByName = new Map(
+        astModel.columns.map((column) => [column.value.name, column] as const),
+      );
+      const warnMissingColumn = (columnName: string) => {
+        console.warn(`Column ${columnName} not found in model ${modelName}`);
+      };
+
       // Apply primary keys
       for (const pk of modelConfig.primaryKeys) {
-        const column = astModel.columns.find((c) => c.value.name === pk.column);
-        if (column) {
-          astModel.primary_key = column.value;
+        const column = columnsByName.get(pk.column);
+        if (!column) {
+          warnMissingColumn(pk.column);
+          continue;
         }
+
+        astModel.primary_key = column.value;
       }
 
       // Apply foreign keys
       for (const fk of modelConfig.foreignKeys) {
-        const column = astModel.columns.find((c) => c.value.name === fk.column);
-        if (column) {
-          column.foreign_key_reference = fk.referencedModel;
+        const column = columnsByName.get(fk.column);
+        if (!column) {
+          warnMissingColumn(fk.column);
+          continue;
+        }
+
+        column.foreign_key_reference = fk.referencedModel;
+      }
+
+      // Apply unique constraints
+      for (const unique of modelConfig.uniqueConstraints) {
+        for (const columnName of unique.columns) {
+          const column = columnsByName.get(columnName);
+          if (!column) {
+            warnMissingColumn(columnName);
+            continue;
+          }
+
+          column.unique_ids.push(unique.id);
         }
       }
 
-      // Apply relationships (navigation properties)
+      // Apply navigation properties
       for (const rel of modelConfig.relationships) {
         let kind: NavigationPropertyKind;
         if (rel.kind === "OneToOne") {

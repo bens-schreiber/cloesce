@@ -62,7 +62,7 @@ export class CidlExtractor {
   private constructor(
     private modelDecls: Map<string, [ClassDeclaration, Decorator]>,
     private extractedPoos: Map<string, PlainOldObject> = new Map(),
-  ) {}
+  ) { }
 
   static extract(
     projectName: string,
@@ -376,6 +376,7 @@ export class CidlExtractor {
       if (decorators.length === 0) {
         columns.push({
           foreign_key_reference: null,
+          unique_ids: [],
           value: {
             name: prop.getName(),
             cidl_type,
@@ -400,6 +401,7 @@ export class CidlExtractor {
         case PropertyDecoratorKind.ForeignKey: {
           columns.push({
             foreign_key_reference: getDecoratorArgument(decorator, 0) ?? null,
+            unique_ids: [],
             value: {
               name: prop.getName(),
               cidl_type,

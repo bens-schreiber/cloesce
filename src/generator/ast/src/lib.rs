@@ -253,6 +253,9 @@ pub struct D1Column {
     /// If the attribute is a foreign key, the referenced model name.
     /// Otherwise, None.
     pub foreign_key_reference: Option<String>,
+
+    /// IDs of unique constraints that this column participates in.
+    pub unique_ids: Vec<u32>,
 }
 
 #[derive(Serialize, Deserialize, Hash, PartialEq, Eq, Debug)]
@@ -463,6 +466,7 @@ impl CloesceAst {
                     h.write(b"ModelColumn");
                     col.value.hash(&mut h);
                     col.foreign_key_reference.hash(&mut h);
+                    col.unique_ids.hash(&mut h);
                     h.finish()
                 };
 

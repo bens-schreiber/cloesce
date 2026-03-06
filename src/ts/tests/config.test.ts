@@ -184,4 +184,56 @@ describe("Config Builder", () => {
       "User",
     );
   });
+
+  test("applies unique constraints to columns", () => {
+    // Arrange
+    class ProfessorCourseRating {
+      id!: number;
+      professorId!: number;
+      courseId!: number;
+      name!: string;
+    }
+
+    const config = defineConfig({ srcPaths: ["./src"] });
+    const ast = createAst({
+      models: [
+        ModelBuilder.model("ProfessorCourseRating")
+          .idPk()
+          .col("id", "Integer")
+          .col("professorId", "Integer")
+          .col("courseId", "Integer")
+          .col("name", "Text")
+          .build(),
+      ],
+    });
+
+    config.model(ProfessorCourseRating, (builder) => {
+      builder
+        .unique("professorId", "courseId")
+        .unique("name");
+    });
+
+    // Act
+    const modifiers = config._getAstModifiers();
+    modifiers.forEach((mod) => mod(ast));
+
+    // Assert
+    const model = ast.models.ProfessorCourseRating;
+
+    const professorIdCol = model.columns.find((c) => c.value.name === "professorId");
+    expect(professorIdCol).toBeDefined();
+    expect(professorIdCol!.unique_ids).toEqual([0]);
+
+    const courseIdCol = model.columns.find((c) => c.value.name === "courseId");
+    expect(courseIdCol).toBeDefined();
+    expect(courseIdCol!.unique_ids).toEqual([0]);
+
+    const nameCol = model.columns.find((c) => c.value.name === "name");
+    expect(nameCol).toBeDefined();
+    expect(nameCol!.unique_ids).toEqual([1]);
+
+    const idCol = model.columns.find((c) => c.value.name === "id");
+    expect(idCol).toBeDefined();
+    expect(idCol!.unique_ids).toEqual([]);
+  });
 });
