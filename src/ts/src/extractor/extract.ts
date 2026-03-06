@@ -59,7 +59,7 @@ export class CidlExtractor {
   private constructor(
     private modelDecls: Map<string, [ClassDeclaration, Decorator]>,
     private extractedPoos: Map<string, PlainOldObject> = new Map(),
-  ) { }
+  ) {}
 
   static extract(
     projectName: string,
@@ -395,7 +395,9 @@ export class CidlExtractor {
         continue;
       }
 
-      const decoratorName = getDecoratorName(decorator) as PropertyDecoratorKind;
+      const decoratorName = getDecoratorName(
+        decorator,
+      ) as PropertyDecoratorKind;
 
       // Process decorator
       switch (decoratorName) {
@@ -1087,11 +1089,9 @@ export class CidlExtractor {
       return;
     }
 
-
     if (!normalizedPropName.endsWith("id")) {
       return;
     }
-
 
     const referencedNavName = prop
       .getName()
@@ -1114,7 +1114,9 @@ export class CidlExtractor {
     // One to One Foreign Key
     if (oneToOneProperties[0] !== undefined) {
       const oneToOneProperty = oneToOneProperties[0];
-      const navModelTypeRes = CidlExtractor.cidlType(oneToOneProperty.getType());
+      const navModelTypeRes = CidlExtractor.cidlType(
+        oneToOneProperty.getType(),
+      );
       if (navModelTypeRes.isLeft()) {
         navModelTypeRes.value.context = prop.getName();
         navModelTypeRes.value.snippet = prop.getText();
@@ -1135,7 +1137,11 @@ export class CidlExtractor {
 
     // One to Many Foreign Key
     if (objectName !== undefined) {
-      const relation = this.resolveArrayRelationship(prop, className, objectName);
+      const relation = this.resolveArrayRelationship(
+        prop,
+        className,
+        objectName,
+      );
       if (relation.kind === "one-to-many") {
         prop.addDecorator({
           name: PropertyDecoratorKind.ForeignKey,
@@ -1144,7 +1150,6 @@ export class CidlExtractor {
         return;
       }
     }
-
   }
 
   private inferNavigationProperty(
@@ -1160,7 +1165,11 @@ export class CidlExtractor {
 
     // Array-based Navigation Properties (One to Many or Many to Many)
     if (typeof cidlType !== "string" && "Array" in cidlType) {
-      const relation = this.resolveArrayRelationship(prop, className, objectName);
+      const relation = this.resolveArrayRelationship(
+        prop,
+        className,
+        objectName,
+      );
 
       if (relation.kind === "one-to-many" && relation.foreignKeyProp) {
         return {

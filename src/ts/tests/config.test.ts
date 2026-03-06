@@ -208,9 +208,7 @@ describe("Config Builder", () => {
     });
 
     config.model(ProfessorCourseRating, (builder) => {
-      builder
-        .unique("professorId", "courseId")
-        .unique("name");
+      builder.unique("professorId", "courseId").unique("name");
     });
 
     // Act
@@ -220,7 +218,9 @@ describe("Config Builder", () => {
     // Assert
     const model = ast.models.ProfessorCourseRating;
 
-    const professorIdCol = model.columns.find((c) => c.value.name === "professorId");
+    const professorIdCol = model.columns.find(
+      (c) => c.value.name === "professorId",
+    );
     expect(professorIdCol).toBeDefined();
     expect(professorIdCol!.unique_ids).toEqual([0]);
 

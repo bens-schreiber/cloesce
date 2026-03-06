@@ -117,7 +117,7 @@ export class ForeignKeyBuilder<T extends object> {
   constructor(
     private column: string,
     private modelConfig: ModelConfig,
-  ) { }
+  ) {}
 
   references<R extends object>(
     model: new () => R,
@@ -138,7 +138,7 @@ export class RelationshipBuilder<T extends object> {
     private propertyName: string,
     private kind: "OneToOne" | "OneToMany" | "ManyToMany",
     private modelConfig: ModelConfig,
-  ) { }
+  ) {}
 
   references<R extends object>(
     model: new () => R,
@@ -156,7 +156,7 @@ export class RelationshipBuilder<T extends object> {
 }
 
 export class ModelBuilder<T extends object = any> {
-  constructor(private modelConfig: ModelConfig = new ModelConfig()) { }
+  constructor(private modelConfig: ModelConfig = new ModelConfig()) {}
 
   primaryKey<K extends keyof T>(column: K): ModelBuilder<T> {
     this.modelConfig.primaryKeys.push({ column: String(column) });
