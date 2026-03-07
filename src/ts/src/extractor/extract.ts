@@ -32,10 +32,12 @@ import {
   KeyValue,
   AstR2Object,
   CrudListParam,
+  ForeignKeyReference,
 } from "../ast.js";
 import { TypeFormatFlags } from "typescript";
 import { ExtractorError, ExtractorErrorCode } from "./err.js";
 import { Either } from "../common.js";
+import { InferenceBuilder, normalizeName } from "./infer.js";
 
 enum PropertyDecoratorKind {
   PrimaryKey = "PrimaryKey",
@@ -56,6 +58,8 @@ enum ParameterDecoratorKind {
 }
 
 export class CidlExtractor {
+  private inferBuilder = new InferenceBuilder();
+
   private constructor(
     private modelDecls: Map<string, [ClassDeclaration, Decorator]>,
     private extractedPoos: Map<string, PlainOldObject> = new Map(),
@@ -144,6 +148,9 @@ export class CidlExtractor {
       const model = res.unwrap();
       models[model.name] = model;
     }
+
+    // Process inferences
+    extractor.inferBuilder.build(models);
 
     // Extract services
     const services: Record<string, Service> = {};
@@ -265,7 +272,7 @@ export class CidlExtractor {
     const data_sources: Record<string, DataSource> = {};
     const methods: Record<string, ApiMethod> = {};
     const cruds: Set<CrudKind> = new Set<CrudKind>();
-    let primary_key: NamedTypedValue | null = null;
+    const primary_key_columns: D1Column[] = [];
 
     // Extract crud methods
     const arg = decorator.getArguments()[0];
@@ -349,9 +356,7 @@ export class CidlExtractor {
         data_sources[prop.getName()] = {
           name: prop.getName(),
           tree,
-
-          // Publicly exposed
-          is_private: false,
+          is_private: false, // Publicly exposed
           list_params,
         };
         continue;
@@ -363,160 +368,235 @@ export class CidlExtractor {
         return checkModifierRes;
       }
 
-      // Infer metadata annotations
-      if (prop.getDecorators().length === 0) {
-        this.inferModelAttributeDecorator(prop, classDecl, cidl_type);
-      }
-
-      const decorator = prop
+      const decorators = prop
         .getDecorators()
-        .find((d) => isPropertyDecoratorKind(getDecoratorName(d)));
+        .filter((d) => isPropertyDecoratorKind(getDecoratorName(d)));
 
-      if (!decorator) {
-        const inferredNav = this.inferNavigationProperty(
-          prop,
-          classDecl,
-          cidl_type,
-        );
+      const getPropDecorator = (kind: PropertyDecoratorKind) =>
+        decorators.find((d) => getDecoratorName(d) === kind);
 
-        if (inferredNav) {
-          navigation_properties.push(inferredNav);
+      if (decorators.length === 0) {
+        // One to one inference candidates
+        if (typeof cidl_type === "object" && "Object" in cidl_type) {
+          const referencedModelName = cidl_type.Object;
+          const referencedModelDecl =
+            this.modelDecls.get(referencedModelName)?.[0];
+          if (referencedModelDecl) {
+            this.inferBuilder.addOneToOne({
+              modelName: name,
+              propertyName: prop.getName(),
+              referencedModelName,
+            });
+          }
           continue;
         }
 
-        columns.push({
+        // One to many and many to many inference candidates
+        if (
+          typeof cidl_type === "object" &&
+          "Array" in cidl_type &&
+          typeof cidl_type.Array === "object" &&
+          "Object" in cidl_type.Array
+        ) {
+          const referencedModelName = cidl_type.Array.Object;
+          const referencedModelDecl =
+            this.modelDecls.get(referencedModelName)?.[0];
+
+          // Could be either 1:M or M:M
+          if (referencedModelDecl) {
+            this.inferBuilder.addMany({
+              modelName: name,
+              propertyName: prop.getName(),
+              referencedModelName,
+            });
+          }
+          continue;
+        }
+
+        const column: D1Column = {
           foreign_key_reference: null,
           unique_ids: [],
+          composite_id: null,
           value: {
             name: prop.getName(),
             cidl_type,
           },
+        };
+
+        // Infer primary key based on column name
+        const normalizedColumnName = normalizeName(prop.getName());
+        const normalizedModelName = normalizeName(name);
+        if (
+          normalizedColumnName === "id" ||
+          normalizedColumnName === `${normalizedModelName}id`
+        ) {
+          primary_key_columns.push(column);
+        } else {
+          columns.push(column);
+        }
+        continue;
+      }
+
+      // KeyParam decorators
+      const keyParamDecorator = getPropDecorator(
+        PropertyDecoratorKind.KeyParam,
+      );
+      if (keyParamDecorator) {
+        key_params.push(prop.getName());
+        continue;
+      }
+
+      // KV decorators
+      const kvDecorator = getPropDecorator(PropertyDecoratorKind.KV);
+      if (kvDecorator) {
+        const format = getDecoratorArgument(kvDecorator, 0);
+        const namespace_binding = getDecoratorArgument(kvDecorator, 1);
+        if (!format || !namespace_binding) {
+          return err(ExtractorErrorCode.InvalidTypescriptSyntax, (e) => {
+            e.snippet = prop.getText();
+            e.context = prop.getName();
+          });
+        }
+
+        const isPaginated =
+          typeof cidl_type === "object" && "Paginated" in cidl_type;
+        const unwrapped = isPaginated
+          ? (cidl_type as { Paginated: CidlType }).Paginated
+          : cidl_type;
+
+        if (typeof unwrapped === "string") {
+          return err(ExtractorErrorCode.MissingKValue, (e) => {
+            e.snippet = prop.getText();
+            e.context = prop.getName();
+          });
+        }
+
+        if (!("KvObject" in unwrapped)) {
+          return err(ExtractorErrorCode.MissingKValue, (e) => {
+            e.snippet = prop.getText();
+            e.context = prop.getName();
+          });
+        }
+        const inner = unwrapped.KvObject;
+
+        if (typeof inner === "object" && "Object" in inner) {
+          if (
+            !this.extractedPoos.has(inner.Object) &&
+            !this.modelDecls.has(inner.Object)
+          ) {
+            const res = this.poo(
+              classDecl.getSourceFile().getClassOrThrow(inner.Object),
+              classDecl.getSourceFile(),
+            );
+
+            if (res.isLeft()) {
+              res.value.addContext((prev) => `${prop.getName()}.${prev}`);
+              return res;
+            }
+          }
+        }
+
+        kv_objects.push({
+          format,
+          namespace_binding,
+          value: {
+            name: prop.getName(),
+            cidl_type: inner,
+          },
+          list_prefix: isPaginated,
         });
         continue;
       }
 
-      const decoratorName = getDecoratorName(
-        decorator,
-      ) as PropertyDecoratorKind;
-
-      // Process decorator
-      switch (decoratorName) {
-        case PropertyDecoratorKind.PrimaryKey: {
-          primary_key = {
-            name: prop.getName(),
-            cidl_type,
-          };
-          break;
-        }
-        case PropertyDecoratorKind.ForeignKey: {
-          columns.push({
-            foreign_key_reference: getDecoratorArgument(decorator, 0) ?? null,
-            unique_ids: [],
-            value: {
-              name: prop.getName(),
-              cidl_type,
-            },
+      // R2 decorators
+      const r2Decorator = getPropDecorator(PropertyDecoratorKind.R2);
+      if (r2Decorator) {
+        const format = getDecoratorArgument(r2Decorator, 0);
+        const bucket_binding = getDecoratorArgument(r2Decorator, 1);
+        if (!format || !bucket_binding) {
+          return err(ExtractorErrorCode.InvalidTypescriptSyntax, (e) => {
+            e.snippet = prop.getText();
+            e.context = prop.getName();
           });
-          break;
         }
-        case PropertyDecoratorKind.KeyParam: {
-          key_params.push(prop.getName());
-          break;
-        }
-        case PropertyDecoratorKind.KV: {
-          // Format and namespace binding are required
-          const format = getDecoratorArgument(decorator, 0);
-          const namespace_binding = getDecoratorArgument(decorator, 1);
-          if (!format || !namespace_binding) {
-            return err(ExtractorErrorCode.InvalidTypescriptSyntax, (e) => {
-              e.snippet = prop.getText();
-              e.context = prop.getName();
-            });
-          }
 
-          // Ensure that the prop type is a KvObject or Paginated<KvObject>
-          const isPaginated =
-            typeof cidl_type === "object" && "Paginated" in cidl_type;
-          const unwrapped = isPaginated
-            ? (cidl_type as { Paginated: CidlType }).Paginated
-            : cidl_type;
+        const isPaginated =
+          typeof cidl_type === "object" && "Paginated" in cidl_type;
+        const unwrapped = isPaginated
+          ? (cidl_type as { Paginated: CidlType }).Paginated
+          : cidl_type;
 
-          if (typeof unwrapped === "string") {
-            return err(ExtractorErrorCode.MissingKValue, (e) => {
-              e.snippet = prop.getText();
-              e.context = prop.getName();
-            });
-          }
-
-          if (!("KvObject" in unwrapped)) {
-            return err(ExtractorErrorCode.MissingKValue, (e) => {
-              e.snippet = prop.getText();
-              e.context = prop.getName();
-            });
-          }
-          const inner = unwrapped.KvObject;
-
-          if (typeof inner === "object" && "Object" in inner) {
-            if (
-              !this.extractedPoos.has(inner.Object) &&
-              !this.modelDecls.has(inner.Object)
-            ) {
-              const res = this.poo(
-                classDecl.getSourceFile().getClassOrThrow(inner.Object),
-                classDecl.getSourceFile(),
-              );
-
-              if (res.isLeft()) {
-                res.value.addContext((prev) => `${prop.getName()}.${prev}`);
-                return res;
-              }
-            }
-          }
-
-          kv_objects.push({
-            format,
-            namespace_binding,
-            value: {
-              name: prop.getName(),
-              cidl_type: inner,
-            },
-            list_prefix: isPaginated,
+        if (unwrapped !== "R2Object") {
+          return err(ExtractorErrorCode.MissingR2ObjectBody, (e) => {
+            e.snippet = prop.getText();
+            e.context = prop.getName();
           });
-          break;
         }
-        case PropertyDecoratorKind.R2: {
-          // Format and bucket binding are required
-          const format = getDecoratorArgument(decorator, 0);
-          const bucket_binding = getDecoratorArgument(decorator, 1);
-          if (!format || !bucket_binding) {
-            return err(ExtractorErrorCode.InvalidTypescriptSyntax, (e) => {
-              e.snippet = prop.getText();
-              e.context = prop.getName();
-            });
-          }
 
-          // Type must be R2Object or Paginated<R2Object>
-          const isPaginated =
-            typeof cidl_type === "object" && "Paginated" in cidl_type;
-          const unwrapped = isPaginated
-            ? (cidl_type as { Paginated: CidlType }).Paginated
-            : cidl_type;
+        r2_objects.push({
+          format,
+          bucket_binding,
+          var_name: prop.getName(),
+          list_prefix: isPaginated,
+        });
+        continue;
+      }
 
-          if (unwrapped !== "R2Object") {
-            return err(ExtractorErrorCode.MissingR2ObjectBody, (e) => {
-              e.snippet = prop.getText();
-              e.context = prop.getName();
-            });
-          }
-
-          r2_objects.push({
-            format,
-            bucket_binding,
-            var_name: prop.getName(),
-            list_prefix: isPaginated,
-          });
-          break;
+      // FK decorators
+      const foreignKeyDecorator = getPropDecorator(
+        PropertyDecoratorKind.ForeignKey,
+      );
+      let foreign_key_reference: ForeignKeyReference | null = null;
+      if (foreignKeyDecorator) {
+        const selectorModelNameRes = getSelectorModelName(foreignKeyDecorator);
+        if (selectorModelNameRes.isLeft()) {
+          selectorModelNameRes.value.context = prop.getName();
+          selectorModelNameRes.value.snippet = prop.getText();
+          return selectorModelNameRes;
         }
+
+        const selectorPropertyNameRes =
+          getSelectorPropertyName(foreignKeyDecorator);
+        if (selectorPropertyNameRes.isLeft()) {
+          selectorPropertyNameRes.value.context = prop.getName();
+          selectorPropertyNameRes.value.snippet = prop.getText();
+          return selectorPropertyNameRes;
+        }
+
+        foreign_key_reference = {
+          model_name: selectorModelNameRes.unwrap(),
+          column_name: selectorPropertyNameRes.unwrap(),
+        };
+      }
+
+      const column: D1Column = {
+        foreign_key_reference,
+        unique_ids: [],
+        composite_id: null,
+        value: {
+          name: prop.getName(),
+          cidl_type,
+        },
+      };
+
+      const primaryKeyDecorator = getPropDecorator(
+        PropertyDecoratorKind.PrimaryKey,
+      );
+      if (primaryKeyDecorator) {
+        primary_key_columns.push(column);
+        continue;
+      }
+
+      // Infer primary key based on column name
+      const normalizedColumnName = normalizeName(prop.getName());
+      const normalizedModelName = normalizeName(name);
+      if (
+        normalizedColumnName === "id" ||
+        normalizedColumnName === `${normalizedModelName}id`
+      ) {
+        primary_key_columns.push(column);
+      } else {
+        columns.push(column);
       }
     }
 
@@ -556,7 +636,7 @@ export class CidlExtractor {
     return Either.right({
       name,
       columns,
-      primary_key,
+      primary_key_columns,
       navigation_properties,
       key_params,
       kv_objects,
@@ -1064,238 +1144,6 @@ export class CidlExtractor {
       return res.map((inner) => wrapNullable(wrapper(inner), isNullable));
     }
   }
-
-  /**
-   * Mutates the property declaration to add inferred metadata annotations.
-   */
-  private inferModelAttributeDecorator(
-    prop: PropertyDeclaration,
-    classDecl: ClassDeclaration,
-    cidlType: CidlType,
-  ): Either<ExtractorError, void> | void {
-    const className = classDecl.getName()!;
-    const objectName = getObjectName(cidlType);
-    const normalizedPropName = normalizeName(prop.getName());
-
-    // Primary Key
-    if (
-      normalizedPropName === "id" ||
-      normalizedPropName === `${className.toLowerCase()}id`
-    ) {
-      prop.addDecorator({
-        name: PropertyDecoratorKind.PrimaryKey,
-        arguments: [],
-      });
-      return;
-    }
-
-    if (!normalizedPropName.endsWith("id")) {
-      return;
-    }
-
-    const referencedNavName = prop
-      .getName()
-      .slice(
-        0,
-        prop.getName().length - (normalizedPropName.endsWith("_id") ? 3 : 2),
-      );
-    const oneToOneProperties = classDecl
-      .getProperties()
-      .filter((p) => p.getName() === referencedNavName);
-
-    if (oneToOneProperties.length > 1) {
-      console.warn(`
-          Cannot infer ForeignKey relationship due to ambiguity, model ${className}, property ${prop.getName()}
-          could match ${oneToOneProperties.map((p) => p.getName()).join(", ")}
-          `);
-      return;
-    }
-
-    // One to One Foreign Key
-    if (oneToOneProperties[0] !== undefined) {
-      const oneToOneProperty = oneToOneProperties[0];
-      const navModelTypeRes = CidlExtractor.cidlType(
-        oneToOneProperty.getType(),
-      );
-      if (navModelTypeRes.isLeft()) {
-        navModelTypeRes.value.context = prop.getName();
-        navModelTypeRes.value.snippet = prop.getText();
-        return navModelTypeRes;
-      }
-
-      const navModelType = navModelTypeRes.unwrap();
-      const oneToOneModelName = getObjectName(navModelType);
-
-      if (oneToOneModelName) {
-        prop.addDecorator({
-          name: PropertyDecoratorKind.ForeignKey,
-          arguments: [oneToOneModelName],
-        });
-        return;
-      }
-    }
-
-    // One to Many Foreign Key
-    if (objectName !== undefined) {
-      const relation = this.resolveArrayRelationship(
-        prop,
-        className,
-        objectName,
-      );
-      if (relation.kind === "one-to-many") {
-        prop.addDecorator({
-          name: PropertyDecoratorKind.ForeignKey,
-          arguments: [objectName],
-        });
-        return;
-      }
-    }
-  }
-
-  private inferNavigationProperty(
-    prop: PropertyDeclaration,
-    classDecl: ClassDeclaration,
-    cidlType: CidlType,
-  ): NavigationProperty | null {
-    const className = classDecl.getName()!;
-    const objectName = getObjectName(cidlType);
-    if (objectName === undefined) {
-      return null;
-    }
-
-    // Array-based Navigation Properties (One to Many or Many to Many)
-    if (typeof cidlType !== "string" && "Array" in cidlType) {
-      const relation = this.resolveArrayRelationship(
-        prop,
-        className,
-        objectName,
-      );
-
-      if (relation.kind === "one-to-many" && relation.foreignKeyProp) {
-        return {
-          var_name: prop.getName(),
-          model_reference: objectName,
-          kind: {
-            OneToMany: {
-              column_reference: relation.foreignKeyProp.getName(),
-            },
-          },
-        };
-      }
-
-      if (relation.kind === "many-to-many") {
-        return {
-          var_name: prop.getName(),
-          model_reference: objectName,
-          kind: "ManyToMany",
-        };
-      }
-
-      return null;
-    }
-
-    const normalizedPropIdName = `${normalizeName(prop.getName())}id`;
-    const foreignKeyProps = classDecl.getProperties().filter((classProp) => {
-      const norm = normalizeName(classProp.getName());
-      return norm === normalizedPropIdName;
-    });
-    if (foreignKeyProps.length > 1) {
-      console.warn(`
-        Cannot infer OneToOne relationship due to ambiguity, model ${className}, property ${prop.getName()}
-        could match ${foreignKeyProps.map((p) => p.getName()).join(", ")}
-        `);
-      return null;
-    }
-
-    const foreignKey = foreignKeyProps.at(0);
-    if (!foreignKey) {
-      return null;
-    }
-
-    // One To One Navigation Property
-    return {
-      var_name: prop.getName(),
-      model_reference: objectName,
-      kind: {
-        OneToOne: {
-          column_reference: foreignKey.getName(),
-        },
-      },
-    };
-  }
-
-  private resolveArrayRelationship(
-    prop: PropertyDeclaration,
-    className: string,
-    referencedModelName: string,
-  ): {
-    kind: "one-to-many" | "many-to-many" | null;
-    foreignKeyProp?: PropertyDeclaration;
-  } {
-    const referencedModelDecl = this.modelDecls.get(referencedModelName)?.[0];
-    const normalizedModelIdName = `${normalizeName(className)}id`;
-
-    const foreignKeyProps: PropertyDeclaration[] = [];
-    const manyToManyProps: PropertyDeclaration[] = [];
-
-    for (const referencedProp of referencedModelDecl?.getProperties() ?? []) {
-      const tyRes = CidlExtractor.cidlType(referencedProp.getType());
-      if (tyRes.isLeft()) {
-        continue;
-      }
-
-      const ty = tyRes.unwrap();
-      const navObjectName = getObjectName(ty);
-      const normalizedPropName = normalizeName(referencedProp.getName());
-
-      if (
-        typeof ty !== "string" &&
-        "Array" in ty &&
-        navObjectName === className
-      ) {
-        manyToManyProps.push(referencedProp);
-      } else if (normalizedPropName === normalizedModelIdName) {
-        foreignKeyProps.push(referencedProp);
-      }
-    }
-
-    if (foreignKeyProps.length > 1) {
-      console.warn(`
-        Cannot infer OneToMany relationship due to ambiguity, model ${className}, property ${prop.getName()}
-        could match ${foreignKeyProps.map((p) => p.getName()).join(", ")}
-        `);
-      return { kind: null };
-    }
-
-    if (manyToManyProps.length > 1) {
-      console.warn(`
-        Cannot infer ManyToMany relationship due to ambiguity, model ${className}, property ${prop.getName()}
-        could match ${manyToManyProps.map((p) => p.getName()).join(", ")}
-        `);
-      return { kind: null };
-    }
-
-    const hasForeignKeyProp = foreignKeyProps.at(0);
-    const hasManyToManyProp = manyToManyProps.at(0);
-
-    if (hasForeignKeyProp && hasManyToManyProp) {
-      console.warn(`
-        Cannot infer relationship due to ambiguity, model ${className}, property ${prop.getName()}
-        could be OneToMany or ManyToMany
-        `);
-      return { kind: null };
-    }
-
-    if (hasForeignKeyProp) {
-      return { kind: "one-to-many", foreignKeyProp: hasForeignKeyProp };
-    }
-
-    if (hasManyToManyProp) {
-      return { kind: "many-to-many" };
-    }
-
-    return { kind: null };
-  }
 }
 
 function err(
@@ -1328,6 +1176,42 @@ function getDecoratorArgument(
   }
 
   return arg.getLiteralValue();
+}
+
+function getSelectorModelName(
+  decorator: Decorator,
+): Either<ExtractorError, string> {
+  const call = decorator.getCallExpression();
+  const selectorType = call?.getTypeArguments()[0];
+
+  if (!selectorType) {
+    return err(ExtractorErrorCode.InvalidSelectorSyntax);
+  }
+
+  return Either.right(
+    selectorType
+      .getText()
+      .replace(/^typeof\s+/, "")
+      .trim(),
+  );
+}
+
+function getSelectorPropertyName(
+  decorator: Decorator,
+): Either<ExtractorError, string> {
+  const call = decorator.getCallExpression();
+  const selector = call?.getArguments()[0];
+
+  if (!selector?.isKind(SyntaxKind.ArrowFunction)) {
+    return err(ExtractorErrorCode.InvalidSelectorSyntax);
+  }
+
+  const body = selector.getBody();
+  if (!body.isKind(SyntaxKind.PropertyAccessExpression)) {
+    return err(ExtractorErrorCode.InvalidSelectorSyntax);
+  }
+
+  return Either.right(body.getName());
 }
 
 function isPropertyDecoratorKind(name: string): name is PropertyDecoratorKind {
@@ -1599,10 +1483,6 @@ function checkPropertyModifier(
     });
   }
   return Either.right(null);
-}
-
-function normalizeName(name: string): string {
-  return name.toLowerCase().replace(/_/g, "");
 }
 
 /**

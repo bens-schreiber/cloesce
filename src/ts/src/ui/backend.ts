@@ -384,10 +384,10 @@ export function Delete(dataSource?: DataSource<unknown>): MethodDecorator {
  *
  * A stub decorator used by Cloesce to identify foreign key properties.
  *
- * @param _Model The related model class or its name as a string.
+ * @param _selector Selector for the referenced model key, e.g. @ForeignKey<User>(u => u.id).
  */
 export const ForeignKey =
-  <T>(_Model: T | string): PropertyDecorator =>
+  <T>(_selector: (model: T) => unknown): PropertyDecorator =>
   () => {};
 
 /**

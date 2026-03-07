@@ -3,6 +3,7 @@ export enum ExtractorErrorCode {
   InvalidMain,
   UnknownType,
   MultipleGenericType,
+  InvalidSelectorSyntax,
   InvalidDataSourceDefinition,
   InvalidPropertyModifier,
   InvalidApiMethodModifier,
@@ -35,6 +36,12 @@ const errorInfoMap: Record<
     description: "Cloesce does not yet support types with multiple generics",
     suggestion:
       "Simplify your type to use only a single generic parameter, ie Foo<T>",
+  },
+  [ExtractorErrorCode.InvalidSelectorSyntax]: {
+    description:
+      "Selector syntax is invalid. Expected @ForeignKey<Model>(x => x.property).",
+    suggestion:
+      "Use a typed selector in the decorator, e.g. @ForeignKey<User>(u => u.id).",
   },
   [ExtractorErrorCode.InvalidDataSourceDefinition]: {
     description:

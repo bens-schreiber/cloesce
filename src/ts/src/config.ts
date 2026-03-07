@@ -4,6 +4,13 @@ import {
   NavigationPropertyKind,
 } from "./ast.js";
 
+let nextCompositeId = 0;
+function compositeIdGen(): number {
+  const id = nextCompositeId;
+  nextCompositeId += 1;
+  return id;
+}
+
 export interface CloesceConfigOptions {
   /**
    * Source paths containing .cloesce.ts files
@@ -85,20 +92,21 @@ export function setDefaultConfigs(
 }
 
 interface ForeignKeyDefinition {
-  column: string;
+  columns: string[];
   referencedModel: string;
-  referencedColumn: string;
+  referencedColumns: string[];
+  compositeId: number | null;
 }
 
 interface RelationshipDefinition {
   propertyName: string;
   kind: "OneToOne" | "OneToMany" | "ManyToMany";
   referencedModel: string;
-  referencedColumn: string;
+  referencedColumns: string[];
 }
 
 interface PrimaryKeyDefinition {
-  column: string;
+  columns: string[];
 }
 
 interface UniqueConstraintDefinition {
@@ -115,19 +123,29 @@ class ModelConfig {
 
 export class ForeignKeyBuilder<T extends object> {
   constructor(
-    private column: string,
+    private columns: string[],
     private modelConfig: ModelConfig,
   ) {}
 
   references<R extends object>(
     model: new () => R,
-    referenceColumn: keyof R,
+    ...referenceColumns: (keyof R)[]
   ): ModelBuilder<T> {
+    if (this.columns.length !== referenceColumns.length) {
+      throw new Error(
+        `Foreign key definition mismatch: ${this.columns.length} local column(s) but ${referenceColumns.length} referenced column(s).`,
+      );
+    }
+
+    const localColumns = [...this.columns];
+    const referencedColumns = referenceColumns.map((col) => String(col));
+
     const modelName = model.name;
     this.modelConfig.foreignKeys.push({
-      column: this.column,
+      columns: localColumns,
       referencedModel: modelName,
-      referencedColumn: String(referenceColumn),
+      referencedColumns,
+      compositeId: localColumns.length > 1 ? compositeIdGen() : null,
     });
     return new ModelBuilder<T>(this.modelConfig);
   }
@@ -142,14 +160,14 @@ export class RelationshipBuilder<T extends object> {
 
   references<R extends object>(
     model: new () => R,
-    referenceColumn: keyof R,
+    ...referenceColumns: (keyof R)[]
   ): ModelBuilder<T> {
     const modelName = model.name;
     this.modelConfig.relationships.push({
       propertyName: this.propertyName,
       kind: this.kind,
       referencedModel: modelName,
-      referencedColumn: String(referenceColumn),
+      referencedColumns: referenceColumns.map((col) => String(col)),
     });
     return new ModelBuilder<T>(this.modelConfig);
   }
@@ -158,13 +176,26 @@ export class RelationshipBuilder<T extends object> {
 export class ModelBuilder<T extends object = any> {
   constructor(private modelConfig: ModelConfig = new ModelConfig()) {}
 
-  primaryKey<K extends keyof T>(column: K): ModelBuilder<T> {
-    this.modelConfig.primaryKeys.push({ column: String(column) });
+  primaryKey<K extends keyof T>(...columns: K[]): ModelBuilder<T> {
+    if (columns.length === 0) {
+      throw new Error("primaryKey requires at least one column");
+    }
+
+    this.modelConfig.primaryKeys.push({
+      columns: columns.map((col) => String(col)),
+    });
     return this;
   }
 
-  foreignKey<K extends keyof T>(column: K): ForeignKeyBuilder<T> {
-    return new ForeignKeyBuilder<T>(String(column), this.modelConfig);
+  foreignKey<K extends keyof T>(...columns: K[]): ForeignKeyBuilder<T> {
+    if (columns.length === 0) {
+      throw new Error("foreignKey requires at least one column");
+    }
+
+    return new ForeignKeyBuilder<T>(
+      columns.map((col) => String(col)),
+      this.modelConfig,
+    );
   }
 
   oneToOne<K extends keyof T>(propertyName: K): RelationshipBuilder<T> {
@@ -242,33 +273,62 @@ export class CloesceConfigBuilder implements CloesceConfig {
         return;
       }
 
+      const allColumns = [...astModel.columns, ...astModel.primary_key_columns];
       const columnsByName = new Map(
-        astModel.columns.map((column) => [column.value.name, column] as const),
+        allColumns.map((column) => [column.value.name, column] as const),
       );
       const warnMissingColumn = (columnName: string) => {
         console.warn(`Column ${columnName} not found in model ${modelName}`);
       };
 
       // Apply primary keys
-      for (const pk of modelConfig.primaryKeys) {
-        const column = columnsByName.get(pk.column);
-        if (!column) {
-          warnMissingColumn(pk.column);
-          continue;
+      if (modelConfig.primaryKeys.length > 0) {
+        const nextPrimaryKeyColumns = [];
+        const primaryKeyNames = new Set<string>();
+
+        for (const pk of modelConfig.primaryKeys) {
+          for (const pkColumnName of pk.columns) {
+            const column = columnsByName.get(pkColumnName);
+            if (!column) {
+              warnMissingColumn(pkColumnName);
+              continue;
+            }
+
+            if (primaryKeyNames.has(pkColumnName)) {
+              continue;
+            }
+
+            primaryKeyNames.add(pkColumnName);
+            column.composite_id = null;
+            nextPrimaryKeyColumns.push(column);
+          }
         }
 
-        astModel.primary_key = column.value;
+        astModel.primary_key_columns = nextPrimaryKeyColumns;
+        astModel.columns = allColumns.filter(
+          (column) => !primaryKeyNames.has(column.value.name),
+        );
       }
 
       // Apply foreign keys
       for (const fk of modelConfig.foreignKeys) {
-        const column = columnsByName.get(fk.column);
-        if (!column) {
-          warnMissingColumn(fk.column);
-          continue;
-        }
+        for (let i = 0; i < fk.columns.length; i += 1) {
+          const columnName = fk.columns[i];
+          const referencedColumnName = fk.referencedColumns[i];
 
-        column.foreign_key_reference = fk.referencedModel;
+          const column = columnsByName.get(columnName);
+          if (!column) {
+            warnMissingColumn(columnName);
+            continue;
+          }
+
+          column.foreign_key_reference = {
+            model_name: fk.referencedModel,
+            column_name: referencedColumnName,
+          };
+
+          column.composite_id = fk.compositeId;
+        }
       }
 
       // Apply unique constraints
@@ -288,9 +348,9 @@ export class CloesceConfigBuilder implements CloesceConfig {
       for (const rel of modelConfig.relationships) {
         let kind: NavigationPropertyKind;
         if (rel.kind === "OneToOne") {
-          kind = { OneToOne: { column_reference: rel.referencedColumn } };
+          kind = { OneToOne: { key_columns: rel.referencedColumns } };
         } else if (rel.kind === "OneToMany") {
-          kind = { OneToMany: { column_reference: rel.referencedColumn } };
+          kind = { OneToMany: { key_columns: rel.referencedColumns } };
         } else {
           kind = "ManyToMany";
         }
