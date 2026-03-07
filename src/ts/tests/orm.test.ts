@@ -163,8 +163,11 @@ describe("hydrateType Tests", () => {
 
       const parentMeta = ModelBuilder.model("ParentModel")
         .idPk()
-        .col("fk", "Integer", "ChildModel")
-        .navP("child", "ChildModel", { OneToOne: { column_reference: "fk" } })
+        .col("fk", "Integer", {
+          column_name: "id",
+          model_name: "ChildModel",
+        })
+        .navP("child", "ChildModel", { OneToOne: { key_columns: ["fk"] } })
         .build();
       class ParentModel {
         id!: number;
@@ -196,7 +199,10 @@ describe("hydrateType Tests", () => {
       // Arrange
       const tagMeta = ModelBuilder.model("TagModel")
         .idPk()
-        .col("postId", "Integer", "PostModel")
+        .col("postId", "Integer", {
+          column_name: "id",
+          model_name: "PostModel",
+        })
         .build();
       class TagModel {
         id!: number;
@@ -206,7 +212,7 @@ describe("hydrateType Tests", () => {
       const postMeta = ModelBuilder.model("PostModel")
         .idPk()
         .navP("tags", "TagModel", {
-          OneToMany: { column_reference: "postId" },
+          OneToMany: { key_columns: ["postId"] },
         })
         .build();
       class PostModel {
@@ -254,7 +260,10 @@ describe("ORM Hydrate Tests", () => {
     // // Arrange
     const depth2ModelMeta = ModelBuilder.model("Depth2Model")
       .idPk()
-      .col("fk", "Integer", "Depth1Model")
+      .col("fk", "Integer", {
+        column_name: "id",
+        model_name: "Depth1Model",
+      })
       .build();
     class Depth2Model {
       id!: number;
@@ -265,7 +274,7 @@ describe("ORM Hydrate Tests", () => {
       .idPk()
       .col("name", "Text")
       .navP("depth2", "Depth2Model", {
-        OneToMany: { column_reference: "fk" },
+        OneToMany: { key_columns: ["fk"] },
       })
       .build();
     class Depth1Model {
@@ -276,9 +285,12 @@ describe("ORM Hydrate Tests", () => {
 
     const modelMeta = ModelBuilder.model("TestModel")
       .idPk()
-      .col("fk", "Integer", "Depth1Model")
+      .col("fk", "Integer", {
+        column_name: "id",
+        model_name: "Depth1Model",
+      })
       .navP("depth1", "Depth1Model", {
-        OneToOne: { column_reference: "fk" },
+        OneToOne: { key_columns: ["fk"] },
       })
       .build();
     class TestModel {
@@ -681,7 +693,7 @@ describe("ORM List Method with DataSource and listParams", () => {
 
     // Act
     const products = await instance.list(Product, {
-      lastSeen: 0,
+      lastSeen: { id: 0 },
       limit: 10,
     });
 
@@ -816,7 +828,7 @@ describe("ORM List Method with DataSource and listParams", () => {
     // Act
     const records = await instance.list(Record, {
       include: Record.custom,
-      lastSeen: 0,
+      lastSeen: { id: 0 },
       limit: 5,
     });
 
@@ -875,7 +887,7 @@ describe("ORM List Method with DataSource and listParams", () => {
 
     // Act
     const post = await instance.get(Post, {
-      primaryKey: 1,
+      primaryKey: { id: 1 },
     });
 
     // Assert
@@ -925,10 +937,136 @@ describe("ORM List Method with DataSource and listParams", () => {
 
     // Act
     const comment = await instance.get(Comment, {
-      primaryKey: 999,
+      primaryKey: { id: 999 },
     });
 
     // Assert
     expect(comment).toBeNull();
+  });
+
+  test("List with composite primary key", async () => {
+    // Arrange
+    const modelMeta = ModelBuilder.model("Enrollment")
+      .pk("courseId", "Text")
+      .pk("studentId", "Integer")
+      .col("status", "Text")
+      .build();
+
+    class Enrollment {
+      courseId!: string;
+      studentId!: number;
+      status!: string;
+    }
+
+    const ast = createAst({ models: [modelMeta] });
+    const ctorReg = { Enrollment };
+
+    await _cloesceInternal.RuntimeContainer.init(ast, ctorReg);
+
+    const mf = new Miniflare({
+      modules: true,
+      script: `
+        export default {
+          async fetch(request, env, ctx) {
+            return new Response("Hello Miniflare!");
+          }
+        }
+        `,
+      d1Databases: ["DB"],
+    });
+
+    const db = await mf.getD1Database("DB");
+
+    await db
+      .prepare(
+        `CREATE TABLE Enrollment (courseId TEXT, studentId INTEGER, status TEXT, PRIMARY KEY (courseId, studentId))`,
+      )
+      .run();
+    await db
+      .prepare(
+        `INSERT INTO Enrollment (courseId, studentId, status) VALUES
+         ('course-a', 1, 'active'),
+         ('course-a', 2, 'active'),
+         ('course-b', 1, 'inactive')`,
+      )
+      .run();
+
+    const env = { db };
+    const instance = Orm.fromEnv(env);
+
+    // Act
+    const rows = await instance.list(Enrollment, {
+      lastSeen: { courseId: "course-a", studentId: 1 },
+      limit: 10,
+    });
+
+    // Assert
+    expect(rows).toHaveLength(2);
+    expect(rows[0]).toBeInstanceOf(Enrollment);
+    expect(rows[0].courseId).toBe("course-a");
+    expect(rows[0].studentId).toBe(2);
+    expect(rows[1].courseId).toBe("course-b");
+    expect(rows[1].studentId).toBe(1);
+  });
+
+  test("Get with composite primary key", async () => {
+    // Arrange
+    const modelMeta = ModelBuilder.model("Membership")
+      .pk("orgId", "Text")
+      .pk("userId", "Integer")
+      .col("role", "Text")
+      .build();
+
+    class Membership {
+      orgId!: string;
+      userId!: number;
+      role!: string;
+    }
+
+    const ast = createAst({ models: [modelMeta] });
+    const ctorReg = { Membership };
+
+    await _cloesceInternal.RuntimeContainer.init(ast, ctorReg);
+
+    const mf = new Miniflare({
+      modules: true,
+      script: `
+        export default {
+          async fetch(request, env, ctx) {
+            return new Response("Hello Miniflare!");
+          }
+        }
+        `,
+      d1Databases: ["DB"],
+    });
+
+    const db = await mf.getD1Database("DB");
+
+    await db
+      .prepare(
+        `CREATE TABLE Membership (orgId TEXT, userId INTEGER, role TEXT, PRIMARY KEY (orgId, userId))`,
+      )
+      .run();
+    await db
+      .prepare(
+        `INSERT INTO Membership (orgId, userId, role) VALUES
+         ('acme', 1, 'owner'),
+         ('acme', 2, 'member')`,
+      )
+      .run();
+
+    const env = { db };
+    const instance = Orm.fromEnv(env);
+
+    // Act
+    const membership = await instance.get(Membership, {
+      primaryKey: { orgId: "acme", userId: 2 },
+    });
+
+    // Assert
+    expect(membership).toBeInstanceOf(Membership);
+    expect(membership!.orgId).toBe("acme");
+    expect(membership!.userId).toBe(2);
+    expect(membership!.role).toBe("member");
   });
 });

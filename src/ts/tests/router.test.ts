@@ -137,7 +137,7 @@ describe("Match Route", () => {
     // Assert
     expect(res.isRight()).toBe(true);
     expect(res.unwrap()).toEqual({
-      primaryKey: null,
+      primaryKeyValues: {},
       keyParams: {},
       method: ast.models["Model"].methods["method"],
       model: ast.models["Model"],
@@ -164,7 +164,7 @@ describe("Match Route", () => {
     // Assert
     expect(res.isRight()).toBe(true);
     expect(res.unwrap()).toEqual({
-      primaryKey: "0",
+      primaryKeyValues: { id: "0" },
       keyParams: {},
       model: ast.models["Model"],
       method: ast.models["Model"].methods["method"],
@@ -196,7 +196,74 @@ describe("Match Route", () => {
     // Assert
     expect(res.isRight()).toBe(true);
     expect(res.unwrap()).toEqual({
-      primaryKey: "0",
+      primaryKeyValues: { id: "0" },
+      keyParams: {
+        key1: "value1",
+        key2: "value2",
+      },
+      model: ast.models["Model"],
+      method: ast.models["Model"].methods["method"],
+      namespace: "Model",
+      kind: "model",
+    });
+  });
+
+  test("Matches instantiated method with composite primary key", () => {
+    // Arrange
+    const request = createRequest(
+      "http://foo.com/api/Model/acme/user123/method",
+      "POST",
+    );
+    const ast = createAst({
+      models: [
+        ModelBuilder.model("Model")
+          .pk("orgId", "Text")
+          .pk("userId", "Text")
+          .method("method", HttpVerb.Post, false, [], "Void")
+          .build(),
+      ],
+    });
+
+    // Act
+    const res = _cloesceInternal.matchRoute(request, ast, "api");
+
+    // Assert
+    expect(res.isRight()).toBe(true);
+    expect(res.unwrap()).toEqual({
+      primaryKeyValues: { orgId: "acme", userId: "user123" },
+      keyParams: {},
+      model: ast.models["Model"],
+      method: ast.models["Model"].methods["method"],
+      namespace: "Model",
+      kind: "model",
+    });
+  });
+
+  test("Matches instantiated method with composite primary key and key params", () => {
+    // Arrange
+    const request = createRequest(
+      "http://foo.com/api/Model/acme/user123/value1/value2/method",
+      "POST",
+    );
+    const ast = createAst({
+      models: [
+        ModelBuilder.model("Model")
+          .pk("orgId", "Text")
+          .pk("userId", "Text")
+          .method("method", HttpVerb.Post, false, [], "Void")
+          .keyParam("key1")
+          .keyParam("key2")
+          .build(),
+      ],
+    });
+
+    // Act
+    const res = _cloesceInternal.matchRoute(request, ast, "api");
+
+    // Assert
+    expect(res.isRight()).toBe(true);
+    expect(res.unwrap()).toEqual({
+      primaryKeyValues: { orgId: "acme", userId: "user123" },
       keyParams: {
         key1: "value1",
         key2: "value2",
@@ -225,7 +292,7 @@ describe("Match Route", () => {
     // Assert
     expect(res.isRight()).toBe(true);
     expect(res.unwrap()).toEqual({
-      primaryKey: null,
+      primaryKeyValues: {},
       keyParams: {},
       method: ast.services["Service"].methods["method"],
       service: ast.services["Service"],
@@ -251,7 +318,7 @@ describe("Match Route", () => {
     // Assert
     expect(res.isRight()).toBe(true);
     expect(res.unwrap()).toEqual({
-      primaryKey: null,
+      primaryKeyValues: {},
       keyParams: {},
       method: ast.services["Service"].methods["method"],
       service: ast.services["Service"],
@@ -360,7 +427,7 @@ describe("Request Validation", () => {
       namespace: "Foo",
       model,
       method: model.methods["method"],
-      primaryKey: null,
+      primaryKeyValues: {},
       keyParams: {},
     };
 
@@ -398,7 +465,7 @@ describe("Request Validation", () => {
       kind: "model",
       namespace: "Foo",
       method: model.methods["method"],
-      primaryKey: null,
+      primaryKeyValues: {},
       keyParams: {},
     };
 
@@ -497,7 +564,7 @@ describe("Method Dispatch", () => {
       kind: "model",
       namespace: "Foo",
       method: model.methods["testMethod"],
-      primaryKey: null,
+      primaryKeyValues: {},
       keyParams: {},
     };
 
@@ -528,7 +595,7 @@ describe("Method Dispatch", () => {
       kind: "model",
       namespace: "Foo",
       method: model.methods["testMethod"],
-      primaryKey: null,
+      primaryKeyValues: {},
       keyParams: {},
     };
 
@@ -559,7 +626,7 @@ describe("Method Dispatch", () => {
       kind: "model",
       namespace: "Foo",
       method: model.methods["testMethod"],
-      primaryKey: null,
+      primaryKeyValues: {},
       keyParams: {},
     };
 
@@ -583,7 +650,7 @@ describe("Method Dispatch", () => {
       kind: "model",
       namespace: "Foo",
       method: model.methods["testMethod"],
-      primaryKey: null,
+      primaryKeyValues: {},
       keyParams: {},
     };
 

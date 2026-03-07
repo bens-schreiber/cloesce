@@ -13,6 +13,7 @@ import {
   CidlType,
   CloesceAst,
   CrudListParam,
+  D1Column,
   getNavigationPropertyCidlType,
 } from "../ast.js";
 import { InternalError, u8ToB64 } from "../common.js";
@@ -32,12 +33,11 @@ export interface DataSource<T> {
    * A custom function called when using `orm.get`. Defaults to:
    *
    * ```ts
-   * `${Orm.select(ctor, { include: includeTree })} WHERE ${pkName} = ?`
+   * `${Orm.select(ctor, { include: includeTree })} WHERE ${pkName1} = ? AND ${pkName2} = ? ...`
    * ```
    *
-   * A single parameter is always bound to the query when executed by D1, which is
-   * the value of the primary key of the model being retrieved. Reference it in the query using
-   * `?` or `?1`.
+   * Parameters for each primary key column are always bound to the query when executed by D1,
+   * in primary key column order. Reference them in the query using `?`, `?1`, `?2`, etc.
    *
    * @param joined A helper function to generate a SELECT query for the model with the same include tree as the data source.
    * @return A SQL query string to retrieve a single instance of the model from D1.
@@ -47,7 +47,7 @@ export interface DataSource<T> {
   /**
    * A custom function called when using `orm.list`. Defaults to a seek pagination query:
    * ```ts
-   * `${Orm.select(ctor, { include: includeTree })}  WHERE "${model.name}"."${pkName}" > ? ORDER BY "${model.name}"."${pkName}" ASC LIMIT ?`
+   * `${Orm.select(ctor, { include: includeTree })} WHERE ("${model.name}"."${pk1}", ...) > (?, ...) ORDER BY "${model.name}"."${pk1}" ASC, ... LIMIT ?`
    * ```
    *
    * Use `DataSource.listParams` to specify which parameters to bind when calling `orm.list`.
@@ -512,7 +512,7 @@ export class Orm {
     ctor: new () => T,
     args?: {
       include?: Include<T>;
-      lastSeen?: unknown;
+      lastSeen?: Partial<T>;
       limit?: number;
       offset?: number;
     },
@@ -523,15 +523,22 @@ export class Orm {
       return [];
     }
 
-    if (model.primary_key === null) {
+    if (model.primary_key_columns.length < 1) {
       // Listing is not supported for models without primary keys (i.e., KV or R2 only).
       return [];
     }
 
     args ??= {};
     args.include ??= {};
-    args.lastSeen ??= defaultLastSeen(model.primary_key.cidl_type);
+    args.lastSeen ??= defaultPrimaryKey<T>(model.primary_key_columns);
     args.limit ??= 1000;
+
+    const lastSeenValues = getPrimaryKeyValues(
+      ctor.name,
+      model.primary_key_columns,
+      args.lastSeen,
+      "lastSeen",
+    );
 
     let usedDefaultQuery = false;
     let query: string;
@@ -543,11 +550,17 @@ export class Orm {
       );
     } else {
       // Default list query with seek pagination
-      const pkName = model.primary_key.name;
+      const tupleCols = model.primary_key_columns
+        .map((col) => `"${model.name}"."${col.value.name}"`)
+        .join(", ");
+      const tupleParams = model.primary_key_columns.map(() => "?").join(", ");
+      const orderBy = model.primary_key_columns
+        .map((col) => `"${model.name}"."${col.value.name}" ASC`)
+        .join(", ");
       query = `
         ${Orm.select(ctor, { include: args.include })}
-        WHERE "${model.name}"."${pkName}" > ?
-        ORDER BY "${model.name}"."${pkName}" ASC
+        WHERE (${tupleCols}) > (${tupleParams})
+        ORDER BY ${orderBy}
         LIMIT ?
       `;
       usedDefaultQuery = true;
@@ -564,7 +577,7 @@ export class Orm {
     for (const param of listParams) {
       switch (param) {
         case "LastSeen":
-          bindValues.push(args.lastSeen);
+          bindValues.push(...lastSeenValues);
           break;
         case "Limit":
           bindValues.push(args.limit);
@@ -608,8 +621,8 @@ export class Orm {
 
   /**
    * Fetches a model by its primary key ID or key parameters.
-   * * If the model does not have a primary key, key parameters must be provided.
-   * * If the model has a primary key, the ID must be provided.
+   * - If the model does not have a primary key, key parameters must be provided.
+   * - If the model has primary key columns, `primaryKey` must provide each key column.
    *
    * @param ctor Constructor of the model to retrieve
    * @param args Arguments for retrieval
@@ -618,7 +631,7 @@ export class Orm {
   async get<T extends object>(
     ctor: new () => T,
     args?: {
-      primaryKey?: unknown;
+      primaryKey?: Partial<T>;
       keyParams?: Record<string, string>;
       include?: Include<T>;
     },
@@ -634,12 +647,19 @@ export class Orm {
     args.keyParams ??= {};
 
     // KV or R2 only
-    if (model.primary_key === null) {
+    if (model.primary_key_columns.length < 1) {
       return await this.hydrate(ctor, {
         keyParams: args.keyParams,
         include: args.include,
       });
     }
+
+    const primaryKeyValues = getPrimaryKeyValues(
+      ctor.name,
+      model.primary_key_columns,
+      args.primaryKey,
+      "primaryKey",
+    );
 
     let usedDefaultQuery = false;
     let query: string;
@@ -651,22 +671,20 @@ export class Orm {
       );
     } else {
       // Default get query
-      const pkName = model.primary_key.name;
+      const whereClause = model.primary_key_columns
+        .map((col) => `"${model.name}"."${col.value.name}" = ?`)
+        .join(" AND ");
       query = `
         ${Orm.select(ctor, { include: args.include })}
-        WHERE "${model.name}"."${pkName}" = ?
+        WHERE ${whereClause}
       `;
       usedDefaultQuery = true;
     }
 
-    const bindValue = args.primaryKey;
-    if (bindValue === undefined) {
-      throw new Error(
-        `Failed to retrieve model ${ctor.name}: primaryKey is undefined`,
-      );
-    }
-
-    const rows = await this.db.prepare(query).bind(bindValue).all();
+    const rows = await this.db
+      .prepare(query)
+      .bind(...primaryKeyValues)
+      .all();
     if (rows.error) {
       if (usedDefaultQuery) {
         // An error in the default query should not be possible unless the AST is invalid.
@@ -693,16 +711,63 @@ export class Orm {
   }
 }
 
-function defaultLastSeen(ty: CidlType): unknown {
-  if (ty === "DateIso") {
-    return new Date(0).toISOString();
+/**
+ * @returns An array of primary key values in the order of the model's primary key columns, extracted from `keyPartial`.
+ */
+function getPrimaryKeyValues(
+  modelName: string,
+  primaryKeyColumns: D1Column[],
+  keyPartial: unknown,
+  argName: "primaryKey" | "lastSeen",
+): unknown[] {
+  if (!keyPartial || typeof keyPartial !== "object") {
+    throw new Error(
+      `Failed to process ${argName} for model ${modelName}: expected an object containing all primary key columns`,
+    );
   }
 
-  if (ty === "Text") {
-    return "";
+  const keys = keyPartial as Record<string, unknown>;
+  const missing = primaryKeyColumns
+    .filter(
+      (col) =>
+        keys[col.value.name] === undefined || keys[col.value.name] === null,
+    )
+    .map((col) => col.value.name);
+
+  if (missing.length > 0) {
+    throw new Error(
+      `Failed to process ${argName} for model ${modelName}: missing primary key columns [${missing.join(", ")}]`,
+    );
   }
 
-  return 0;
+  return primaryKeyColumns.map((col) => keys[col.value.name]);
+}
+
+/**
+ * @returns An object containing default values for each primary key column.
+ */
+function defaultPrimaryKey<T extends object>(
+  primaryKeyColumns: AstModel["primary_key_columns"],
+): Partial<T> {
+  const defaults: Partial<T> = {};
+  for (const col of primaryKeyColumns) {
+    (defaults as Record<string, unknown>)[col.value.name] = defaultLastSeen(
+      col.value.cidl_type,
+    );
+  }
+  return defaults;
+
+  function defaultLastSeen(ty: CidlType): unknown {
+    if (ty === "DateIso") {
+      return new Date(0).toISOString();
+    }
+
+    if (ty === "Text") {
+      return "";
+    }
+
+    return 0;
+  }
 }
 
 /**
