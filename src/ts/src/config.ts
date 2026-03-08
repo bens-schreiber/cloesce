@@ -250,6 +250,10 @@ export class ModelBuilder<T extends object = any> {
   }
 
   unique<K extends keyof T>(...columns: K[]): ModelBuilder<T> {
+    if (columns.length === 0) {
+      return this;
+    }
+
     const columnNames = columns.map((c) => String(c));
     const id = this.modelConfig.uniqueConstraints.length;
     this.modelConfig.uniqueConstraints.push({
