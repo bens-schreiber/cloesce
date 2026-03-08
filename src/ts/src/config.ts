@@ -76,21 +76,6 @@ export function defineConfig(config: CloesceConfigOptions): CloesceConfig {
 /** @internal */
 export type DefaultCloesceConfig = Required<CloesceConfigOptions>;
 
-/** @internal */
-export function setDefaultConfigs(
-  config: CloesceConfigOptions,
-): DefaultCloesceConfig {
-  return {
-    srcPaths: config.srcPaths,
-    projectName: config.projectName ?? "cloesce-project",
-    outPath: config.outPath ?? ".generated",
-    workersUrl: config.workersUrl ?? "http://localhost:8787",
-    migrationsPath: config.migrationsPath ?? "./migrations",
-    truncateSourcePaths: config.truncateSourcePaths ?? false,
-    astModifiers: config.astModifiers ?? [],
-  };
-}
-
 interface ForeignKeyDefinition {
   columns: string[];
   referencedModel: string;
@@ -265,23 +250,31 @@ export class ModelBuilder<T extends object = any> {
 }
 
 /** @internal */
-export class CloesceConfigBuilder implements CloesceConfig {
+export class CloesceConfigBuilder implements Required<CloesceConfig> {
   public srcPaths: string[];
-  public projectName?: string;
-  public outPath?: string;
-  public workersUrl?: string;
-  public migrationsPath?: string;
-  public truncateSourcePaths?: boolean;
+  public projectName: string;
+  public outPath: string;
+  public workersUrl: string;
+  public migrationsPath: string;
+  public truncateSourcePaths: boolean;
   public astModifiers: Array<(ast: CloesceAst) => void>;
 
   constructor(config: CloesceConfigOptions) {
-    this.srcPaths = config.srcPaths;
-    this.projectName = config.projectName;
-    this.outPath = config.outPath;
-    this.workersUrl = config.workersUrl;
-    this.migrationsPath = config.migrationsPath;
-    this.truncateSourcePaths = config.truncateSourcePaths;
-    this.astModifiers = config.astModifiers ?? [];
+    const defaultedConfig = CloesceConfigBuilder.withDefaults(config);
+    this.srcPaths = defaultedConfig.srcPaths;
+    this.projectName = defaultedConfig.projectName;
+    this.outPath = defaultedConfig.outPath;
+    this.workersUrl = defaultedConfig.workersUrl;
+    this.migrationsPath = defaultedConfig.migrationsPath;
+    this.truncateSourcePaths = defaultedConfig.truncateSourcePaths;
+    this.astModifiers = defaultedConfig.astModifiers;
+  }
+
+  static fromDefault(): CloesceConfigBuilder {
+    return new CloesceConfigBuilder({
+      srcPaths: [],
+      projectName: "cloesce-project",
+    });
   }
 
   /**
@@ -421,5 +414,19 @@ export class CloesceConfigBuilder implements CloesceConfig {
    */
   _getAstModifiers(): Array<(ast: CloesceAst) => void> {
     return this.astModifiers;
+  }
+
+  private static withDefaults(
+    config: CloesceConfigOptions,
+  ): DefaultCloesceConfig {
+    return {
+      srcPaths: config.srcPaths,
+      projectName: config.projectName ?? "cloesce-project",
+      outPath: config.outPath ?? ".generated",
+      workersUrl: config.workersUrl ?? "http://localhost:8787",
+      migrationsPath: config.migrationsPath ?? "./migrations",
+      truncateSourcePaths: config.truncateSourcePaths ?? false,
+      astModifiers: config.astModifiers ?? [],
+    };
   }
 }

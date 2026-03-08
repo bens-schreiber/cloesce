@@ -1,4 +1,5 @@
 import { defineConfig } from "cloesce/config";
+import { Weather } from "./src/data/models.cloesce";
 
 const config = defineConfig({
     srcPaths: ["./src/data"],
@@ -6,5 +7,8 @@ const config = defineConfig({
     migrationsPath: "./migrations",
 });
 
+config.model(Weather, builder => {
+    builder.unique("dateTime", "location");
+});
 
 export default config;

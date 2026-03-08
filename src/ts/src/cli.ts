@@ -21,12 +21,7 @@ import {
   getErrorInfo,
 } from "./extractor/err.js";
 import { CloesceAst } from "./ast.js";
-import {
-  CloesceConfig,
-  CloesceConfigOptions,
-  DefaultCloesceConfig,
-  setDefaultConfigs,
-} from "./config.js";
+import { CloesceConfigBuilder, DefaultCloesceConfig } from "./config.js";
 import { Project } from "ts-morph";
 
 let debugPhase: "extractor" | "npm cloesce" = "npm cloesce";
@@ -54,12 +49,8 @@ const cmds = subcommands({
       description: "Run through the full compilation process.",
       args: {},
       handler: async () => {
-        const rawConfig = await loadCloesceConfig(process.cwd());
-        if (!rawConfig) {
-          process.exit(1);
-        }
+        const config = await loadCloesceConfig(process.cwd());
 
-        const config = setDefaultConfigs(rawConfig);
         await extract(config);
         debugPhase = "npm cloesce";
 
@@ -107,14 +98,13 @@ const cmds = subcommands({
         }),
       },
       handler: async (args) => {
-        const rawConfig: CloesceConfigOptions = {
+        const config = new CloesceConfigBuilder({
           projectName: args.projectName,
           outPath: args.out,
           srcPaths: [args.inp!],
           truncateSourcePaths: args.truncateSourcePaths,
-        };
+        });
 
-        const config = setDefaultConfigs(rawConfig);
         await extract(config);
       },
     }),
@@ -130,12 +120,8 @@ const cmds = subcommands({
         }),
       },
       handler: async (args) => {
-        const rawConfig = await loadCloesceConfig(process.cwd());
-        if (!rawConfig) {
-          process.exit(1);
-        }
+        const config = await loadCloesceConfig(process.cwd());
 
-        const config = setDefaultConfigs(rawConfig);
         const cidlPath = path.join(config.outPath, "cidl.json");
         if (!fs.existsSync(cidlPath)) {
           console.error(
@@ -357,27 +343,26 @@ async function generate(config: WasmConfig) {
   }
 }
 
-async function loadCloesceConfig(
-  root: string,
-): Promise<CloesceConfig | undefined> {
+async function loadCloesceConfig(root: string): Promise<DefaultCloesceConfig> {
   // Load cloesce.config.ts
   const configTsPath = path.join(root, "cloesce.config.ts");
   if (fs.existsSync(configTsPath)) {
     try {
       return await _loadCloesceConfig(configTsPath, root);
     } catch (err) {
-      console.error(`Failed to load cloesce.config.ts: ${err}`);
-      throw err;
+      console.warn(`Failed to load cloesce.config.ts: ${err}`);
     }
   }
 
-  debug("No cloesce.config.ts found");
-  return undefined;
+  debug(
+    "Using default config since no cloesce.config.ts was found or failed to load.",
+  );
+  return CloesceConfigBuilder.fromDefault();
 
   async function _loadCloesceConfig(
     configTsPath: string,
     root: string,
-  ): Promise<CloesceConfig> {
+  ): Promise<DefaultCloesceConfig> {
     debug(`Attempting to load config from ${configTsPath}`);
 
     const jitiLoader = createJiti(root, {
