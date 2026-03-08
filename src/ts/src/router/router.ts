@@ -436,9 +436,7 @@ function matchRoute(
     }
 
     const keyParams = Object.fromEntries(
-      id
-        .slice(numPrimaryKeys)
-        .map((v, i) => [model.key_params[i], decodeURIComponent(v)]),
+      id.slice(numPrimaryKeys).map((v, i) => [model.key_params[i], v]),
     );
 
     return Either.right({
