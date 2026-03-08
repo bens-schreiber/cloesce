@@ -174,6 +174,45 @@ export class ManyToManyModelB {
     return res;
   }
 }
+export class ModelWithCompositePk {
+  tenantId: string;
+  rowId: number;
+  name: string;
+
+  async instanceMethod(
+    input: string,
+    fetchImpl: typeof fetch = fetch
+  ): Promise<HttpResult<string>> {
+    const id = [
+    encodeURIComponent(String(this.tenantId)),
+    encodeURIComponent(String(this.rowId)),
+    ].join("/");
+    const baseUrl = new URL(
+      `http://example.com/api/ModelWithCompositePk/${id}/instanceMethod`
+    );
+    const payload: any = {};
+
+    payload["input"] = input;
+
+    const res = await fetchImpl(baseUrl, {
+      method: "Post",
+      headers: { "Content-Type": "application/json" },
+      body: requestBody(MediaType.Json, payload),
+    });
+
+    return await HttpResult.fromResponse(
+      res,
+      MediaType.Json,
+      undefined,
+      false
+    );
+  }
+
+  static fromJson(data: any): ModelWithCompositePk {
+    const res = Object.assign(new ModelWithCompositePk(), data);
+    return res;
+  }
+}
 export class ModelWithCruds {
   id: number;
   name: string;
@@ -202,7 +241,7 @@ export class ModelWithCruds {
     );
   }
   static async LIST(
-    lastSeen: number | null,
+    lastSeen_id: number | null,
     limit: number | null,
     offset: number | null,
     __datasource: "default" = "default",
@@ -212,7 +251,7 @@ export class ModelWithCruds {
       `http://example.com/api/ModelWithCruds/LIST`
     );
 
-    baseUrl.searchParams.append("lastSeen", String(lastSeen));
+    baseUrl.searchParams.append("lastSeen_id", String(lastSeen_id));
     baseUrl.searchParams.append("limit", String(limit));
     baseUrl.searchParams.append("offset", String(offset));
     baseUrl.searchParams.append("__datasource", String(__datasource));
@@ -368,7 +407,7 @@ export class ModelWithR2 {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<R2Object>> {
     const id = [
-      encodeURIComponent(String(this.id)),
+    encodeURIComponent(String(this.id)),
       encodeURIComponent(String(this.r2Id)),
     ].join("/");
     const baseUrl = new URL(
@@ -428,7 +467,7 @@ export class ToyotaPrius {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<string>> {
     const id = [
-      encodeURIComponent(String(this.id)),
+    encodeURIComponent(String(this.id)),
       encodeURIComponent(String(this.ownerId)),
       encodeURIComponent(String(this.vehicleId)),
     ].join("/");

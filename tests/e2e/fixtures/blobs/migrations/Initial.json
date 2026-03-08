@@ -1,29 +1,41 @@
 {
-  "hash": 9596228406543438623,
+  "hash": 13117940673344338035,
   "models": {
     "BlobHaver": {
-      "hash": 16516887753193349306,
+      "hash": 14402369111485430200,
       "name": "BlobHaver",
-      "primary_key": {
-        "name": "id",
-        "cidl_type": "Integer"
-      },
+      "primary_key_columns": [
+        {
+          "hash": 6397878138472974760,
+          "value": {
+            "name": "id",
+            "cidl_type": "Integer"
+          },
+          "foreign_key_reference": null,
+          "unique_ids": [],
+          "composite_id": null
+        }
+      ],
       "columns": [
         {
-          "hash": 9896464982256051644,
+          "hash": 17404811013903783014,
           "value": {
             "name": "blob1",
             "cidl_type": "Blob"
           },
-          "foreign_key_reference": null
+          "foreign_key_reference": null,
+          "unique_ids": [],
+          "composite_id": null
         },
         {
-          "hash": 7638662076542231806,
+          "hash": 14390429867474788070,
           "value": {
             "name": "blob2",
             "cidl_type": "Blob"
           },
-          "foreign_key_reference": null
+          "foreign_key_reference": null,
+          "unique_ids": [],
+          "composite_id": null
         }
       ],
       "navigation_properties": []

@@ -14,16 +14,25 @@
             "columns": [
                 {
                     "foreign_key_reference": null,
+                    "unique_ids": [],
+                    "composite_id": null,
                     "value": {
                         "name": "name",
                         "cidl_type": "Text"
                     }
                 }
             ],
-            "primary_key": {
-                "name": "id",
-                "cidl_type": "Integer"
-            },
+            "primary_key_columns": [
+                {
+                    "foreign_key_reference": null,
+                    "unique_ids": [],
+                    "composite_id": null,
+                    "value": {
+                        "name": "id",
+                        "cidl_type": "Integer"
+                    }
+                }
+            ],
             "navigation_properties": [
                 {
                     "var_name": "hamburgers",
@@ -46,16 +55,25 @@
             "columns": [
                 {
                     "foreign_key_reference": null,
+                    "unique_ids": [],
+                    "composite_id": null,
                     "value": {
                         "name": "name",
                         "cidl_type": "Text"
                     }
                 }
             ],
-            "primary_key": {
-                "name": "id",
-                "cidl_type": "Integer"
-            },
+            "primary_key_columns": [
+                {
+                    "foreign_key_reference": null,
+                    "unique_ids": [],
+                    "composite_id": null,
+                    "value": {
+                        "name": "id",
+                        "cidl_type": "Integer"
+                    }
+                }
+            ],
             "navigation_properties": [
                 {
                     "var_name": "toppings",

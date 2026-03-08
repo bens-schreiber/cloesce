@@ -1,31 +1,43 @@
 {
-  "hash": 18128276575427666134,
+  "hash": 18399852764960491253,
   "models": {
     "NullabilityChecks": {
-      "hash": 5219882525693133573,
+      "hash": 7244151530438892229,
       "name": "NullabilityChecks",
-      "primary_key": {
-        "name": "id",
-        "cidl_type": "Integer"
-      },
+      "primary_key_columns": [
+        {
+          "hash": 6397878138472974760,
+          "value": {
+            "name": "id",
+            "cidl_type": "Integer"
+          },
+          "foreign_key_reference": null,
+          "unique_ids": [],
+          "composite_id": null
+        }
+      ],
       "columns": [
         {
-          "hash": 11669773114930894259,
+          "hash": 17451028643436199502,
           "value": {
             "name": "notNullableString",
             "cidl_type": "Text"
           },
-          "foreign_key_reference": null
+          "foreign_key_reference": null,
+          "unique_ids": [],
+          "composite_id": null
         },
         {
-          "hash": 1586271874859688922,
+          "hash": 2709437981156923332,
           "value": {
             "name": "nullableString",
             "cidl_type": {
               "Nullable": "Text"
             }
           },
-          "foreign_key_reference": null
+          "foreign_key_reference": null,
+          "unique_ids": [],
+          "composite_id": null
         }
       ],
       "navigation_properties": []

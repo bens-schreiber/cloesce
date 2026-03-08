@@ -6,9 +6,9 @@ use std::{
 use indexmap::IndexMap;
 
 use ast::{
-    ApiMethod, CidlType, CloesceAst, D1Column, DataSource, HttpVerb, IncludeTree, KeyValue,
-    MediaType, Model, NamedTypedValue, NavigationProperty, NavigationPropertyKind, R2Object,
-    WranglerEnv, WranglerSpec,
+    ApiMethod, CidlType, CloesceAst, D1Column, DataSource, ForeignKeyReference, HttpVerb,
+    IncludeTree, KeyValue, MediaType, Model, NamedTypedValue, NavigationProperty,
+    NavigationPropertyKind, R2Object, WranglerEnv, WranglerSpec,
 };
 use wrangler::WranglerDefault;
 
@@ -85,7 +85,7 @@ impl IncludeTreeBuilder {
 
 pub struct ModelBuilder {
     name: String,
-    primary_key: Option<NamedTypedValue>,
+    primary_key_columns: Vec<D1Column>,
     columns: Vec<D1Column>,
     navigation_properties: Vec<NavigationProperty>,
     key_params: Vec<String>,
@@ -99,7 +99,7 @@ impl ModelBuilder {
     pub fn new(name: impl Into<String>) -> Self {
         Self {
             name: name.into(),
-            primary_key: None,
+            primary_key_columns: Vec::new(),
             columns: Vec::new(),
             navigation_properties: Vec::new(),
             key_params: Vec::new(),
@@ -114,15 +114,18 @@ impl ModelBuilder {
         mut self,
         name: impl Into<String>,
         cidl_type: CidlType,
-        foreign_key: Option<String>,
+        foreign_key_reference: Option<ForeignKeyReference>,
+        composite_id: Option<u32>,
     ) -> Self {
         self.columns.push(D1Column {
             value: NamedTypedValue {
                 name: name.into(),
                 cidl_type,
             },
-            foreign_key_reference: foreign_key,
+            foreign_key_reference,
+            unique_ids: Vec::new(),
             hash: 0,
+            composite_id,
         });
         self
     }
@@ -143,9 +146,34 @@ impl ModelBuilder {
     }
 
     pub fn pk(mut self, name: impl Into<String>, cidl_type: CidlType) -> Self {
-        self.primary_key = Some(NamedTypedValue {
-            name: name.into(),
-            cidl_type,
+        self.primary_key_columns.push(D1Column {
+            value: NamedTypedValue {
+                name: name.into(),
+                cidl_type,
+            },
+            foreign_key_reference: None,
+            unique_ids: Vec::new(),
+            hash: 0,
+            composite_id: None,
+        });
+        self
+    }
+
+    pub fn foreign_pk(
+        mut self,
+        name: impl Into<String>,
+        cidl_type: CidlType,
+        foreign_key_reference: ForeignKeyReference,
+    ) -> Self {
+        self.primary_key_columns.push(D1Column {
+            value: NamedTypedValue {
+                name: name.into(),
+                cidl_type,
+            },
+            foreign_key_reference: Some(foreign_key_reference),
+            unique_ids: Vec::new(),
+            hash: 0,
+            composite_id: None,
         });
         self
     }
@@ -241,7 +269,7 @@ impl ModelBuilder {
     pub fn build(self) -> Model {
         Model {
             name: self.name,
-            primary_key: self.primary_key,
+            primary_key_columns: self.primary_key_columns,
             columns: self.columns,
             navigation_properties: self.navigation_properties,
             key_params: self.key_params,

@@ -376,7 +376,7 @@ export type MatchedRoute = {
   kind: "model" | "service";
   namespace: string;
   method: ApiMethod;
-  primaryKey: string | null;
+  primaryKeyValues: Record<string, string>;
   keyParams: Record<string, string>;
   model?: Model;
   service?: Service;
@@ -425,14 +425,18 @@ function matchRoute(
       return notFound(RouterError.UnmatchedHttpVerb);
     }
 
-    const hasPrimaryKey = model.primary_key !== null;
-    const offset = hasPrimaryKey ? 1 : 0;
-    const primaryKey = hasPrimaryKey ? (id.at(0) ?? null) : null;
+    const numPrimaryKeys = model.primary_key_columns.length;
+    const primaryKeyValues: Record<string, string> = {};
+
+    for (let i = 0; i < numPrimaryKeys; i++) {
+      const pkCol = model.primary_key_columns[i];
+      if (i < id.length) {
+        primaryKeyValues[pkCol.value.name] = id[i];
+      }
+    }
 
     const keyParams = Object.fromEntries(
-      id
-        .slice(offset)
-        .map((v, i) => [model.key_params[i], decodeURIComponent(v)]),
+      id.slice(numPrimaryKeys).map((v, i) => [model.key_params[i], v]),
     );
 
     return Either.right({
@@ -440,7 +444,7 @@ function matchRoute(
       namespace,
       method,
       model,
-      primaryKey,
+      primaryKeyValues,
       keyParams,
     });
   }
@@ -459,7 +463,7 @@ function matchRoute(
       namespace,
       method,
       service,
-      primaryKey: null,
+      primaryKeyValues: {},
       keyParams: {},
     });
   }
@@ -487,8 +491,12 @@ async function validateRequest(
   // Validate instantiated model ids
   if (route.kind === "model" && !route.method.is_static) {
     const model = route.model!;
-    if (model.primary_key !== null && route.primaryKey === null) {
-      return invalidRequest(RouterError.InstantiatedMethodMissingPrimaryKey);
+
+    // Validate all primary key columns are present
+    for (const pkCol of model.primary_key_columns) {
+      if (!(pkCol.value.name in route.primaryKeyValues)) {
+        return invalidRequest(RouterError.InstantiatedMethodMissingPrimaryKey);
+      }
     }
 
     if (model.key_params.length !== Object.keys(route.keyParams).length) {
@@ -566,8 +574,8 @@ async function validateRequest(
         env,
         promises: [],
       });
-
-      params[p.name] = hydrated ?? validatedRaw;
+      const validatedParam = hydrated ?? validatedRaw;
+      params[p.name] = validatedParam;
     }
   }
 
@@ -615,7 +623,7 @@ async function hydrate(
 
   try {
     const result = await orm.get(modelCtor, {
-      primaryKey: route.primaryKey,
+      primaryKey: route.primaryKeyValues,
       include: dataSource,
       keyParams: route.keyParams,
     });
@@ -623,10 +631,11 @@ async function hydrate(
     // Result will only be null if the instance does not exist
     // for a D1 query.
     if (result === null) {
+      const pkValues = Object.values(route.primaryKeyValues).join(", ");
       return exit(
         404,
         RouterError.ModelNotFound,
-        `Model instance of type ${model.name} with primary key ${route.primaryKey} not found`,
+        `Model instance of type ${model.name} with primary key (${pkValues}) not found`,
       );
     }
 

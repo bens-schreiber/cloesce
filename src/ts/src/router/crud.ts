@@ -45,7 +45,13 @@ async function upsert(
   const orm = Orm.fromEnv(env);
 
   // Upsert
-  const result: any | null = await orm.upsert(ctor, body, dataSource);
+  let result: unknown | null = null;
+  try {
+    result = await orm.upsert(ctor, body, dataSource);
+  } catch {
+    return HttpResult.fail(400);
+  }
+
   return !result ? HttpResult.fail(404) : HttpResult.ok(200, result);
 }
 
@@ -64,9 +70,12 @@ async function _get(
   } = {};
 
   let argIndex = 0;
-  if (model.primary_key) {
-    // If there is a primary key, the first argument is the primary key.
-    getArgs.primaryKey = args[argIndex++];
+  if (model.primary_key_columns.length > 0) {
+    // Primary key arguments are ordered by the compiler.
+    getArgs.primaryKey = {};
+    for (const pkCol of model.primary_key_columns) {
+      getArgs.primaryKey[pkCol.value.name] = args[argIndex++];
+    }
   }
 
   if (model.key_params.length > 0) {
@@ -91,10 +100,27 @@ async function list(
   args: any[],
   env: any,
 ): Promise<HttpResult<unknown>> {
-  const lastSeen = args[0];
-  const limit = args[1];
-  const offset = args[2];
-  const dataSourceRef = args[3];
+  const { ast } = RuntimeContainer.get();
+  const model = ast.models[ctor.name];
+
+  let argIndex = 0;
+  const lastSeenValues = model.primary_key_columns.map(() => args[argIndex++]);
+  const limit = args[argIndex++];
+  const offset = args[argIndex++];
+  const dataSourceRef = args[argIndex];
+
+  // Last seen can only be used if all primary key values are present.
+  // Fail gracefully by ignoring lastSeen if some values are missing.
+  const lastSeen =
+    lastSeenValues.length == model.primary_key_columns.length &&
+    !lastSeenValues.some((v) => v == null)
+      ? Object.fromEntries(
+          model.primary_key_columns.map((col, i) => [
+            col.value.name,
+            lastSeenValues[i],
+          ]),
+        )
+      : undefined;
 
   const dataSource = findDataSource(ctor, dataSourceRef);
   const orm = Orm.fromEnv(env);

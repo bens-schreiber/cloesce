@@ -78,9 +78,9 @@ export class {{this.name}} {
 
 {{#each models}}
 export class {{this.name}} {
-{{#if this.primary_key}}
-  {{this.primary_key.name}}: {{map_cidl_type this.primary_key.cidl_type}};
-{{/if}}
+{{#each this.primary_key_columns}}
+  {{value.name}}: {{map_cidl_type value.cidl_type}};
+{{/each}}
 {{#each this.columns}}
   {{value.name}}: {{map_cidl_type value.cidl_type}};
 {{/each}}
@@ -108,9 +108,9 @@ export class {{this.name}} {
   ): Promise<HttpResult<{{#unless (is_stream this.return_type)}}{{map_cidl_type this.return_type}}{{else}}Response{{/unless}}>> {
 {{#unless this.is_static}}
     const id = [
-  {{#if ../primary_key}}
-      encodeURIComponent(String(this.{{../primary_key.name}})),
-  {{/if}}
+  {{#each ../primary_key_columns}}
+    encodeURIComponent(String(this.{{value.name}})),
+  {{/each}}
   {{#each ../key_params}}
       encodeURIComponent(String(this.{{this}})),
   {{/each}}

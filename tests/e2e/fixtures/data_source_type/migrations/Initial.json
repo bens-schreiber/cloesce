@@ -1,33 +1,57 @@
 {
-  "hash": 12833156802553350511,
+  "hash": 15400383832348768155,
   "models": {
     "Foo": {
-      "hash": 2291516488856648612,
+      "hash": 5230020806445609534,
       "name": "Foo",
-      "primary_key": {
-        "name": "id",
-        "cidl_type": "Integer"
-      },
+      "primary_key_columns": [
+        {
+          "hash": 6397878138472974760,
+          "value": {
+            "name": "id",
+            "cidl_type": "Integer"
+          },
+          "foreign_key_reference": null,
+          "unique_ids": [],
+          "composite_id": null
+        }
+      ],
       "columns": [],
       "navigation_properties": []
     },
     "NoDs": {
-      "hash": 11605062406260251798,
+      "hash": 17279481028985126790,
       "name": "NoDs",
-      "primary_key": {
-        "name": "id",
-        "cidl_type": "Integer"
-      },
+      "primary_key_columns": [
+        {
+          "hash": 6397878138472974760,
+          "value": {
+            "name": "id",
+            "cidl_type": "Integer"
+          },
+          "foreign_key_reference": null,
+          "unique_ids": [],
+          "composite_id": null
+        }
+      ],
       "columns": [],
       "navigation_properties": []
     },
     "OneDs": {
-      "hash": 665029414846726266,
+      "hash": 13768284310604316528,
       "name": "OneDs",
-      "primary_key": {
-        "name": "id",
-        "cidl_type": "Integer"
-      },
+      "primary_key_columns": [
+        {
+          "hash": 6397878138472974760,
+          "value": {
+            "name": "id",
+            "cidl_type": "Integer"
+          },
+          "foreign_key_reference": null,
+          "unique_ids": [],
+          "composite_id": null
+        }
+      ],
       "columns": [],
       "navigation_properties": []
     }

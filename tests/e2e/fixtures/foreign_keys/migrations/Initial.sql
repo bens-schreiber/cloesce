@@ -28,4 +28,7 @@ CREATE TABLE IF NOT EXISTS "CourseStudent" (
 );
 
 --- Cloesce Temporary Table
-CREATE TABLE IF NOT EXISTS "_cloesce_tmp" ("path" text PRIMARY KEY, "id" integer NOT NULL);
+CREATE TABLE IF NOT EXISTS "_cloesce_tmp" (
+  "path" text PRIMARY KEY,
+  "primary_key" text NOT NULL
+);

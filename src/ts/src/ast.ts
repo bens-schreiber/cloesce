@@ -52,9 +52,17 @@ export interface NamedTypedValue {
 }
 
 /** @internal */
+export interface ForeignKeyReference {
+  model_name: string;
+  column_name: string;
+}
+
+/** @internal */
 export interface D1Column {
   value: NamedTypedValue;
-  foreign_key_reference: string | null;
+  foreign_key_reference: ForeignKeyReference | null;
+  unique_ids: number[];
+  composite_id: number | null;
 }
 
 /** @internal */
@@ -89,8 +97,8 @@ export interface ApiMethod {
 
 /** @internal */
 export type NavigationPropertyKind =
-  | { OneToOne: { column_reference: string } }
-  | { OneToMany: { column_reference: string } }
+  | { OneToOne: { key_columns: string[] } }
+  | { OneToMany: { key_columns: string[] } }
   | "ManyToMany";
 
 /** @internal */
@@ -128,7 +136,7 @@ export interface AstR2Object {
 /** @internal */
 export interface Model {
   name: string;
-  primary_key: NamedTypedValue | null;
+  primary_key_columns: D1Column[];
   columns: D1Column[];
   navigation_properties: NavigationProperty[];
   key_params: string[];

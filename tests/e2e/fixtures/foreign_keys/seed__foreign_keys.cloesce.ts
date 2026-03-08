@@ -48,7 +48,9 @@ export class A {
     const orm = Orm.fromEnv(env);
     await orm.upsert(A, a, A.withB);
     return (await orm.get(A, {
-      primaryKey: a.id,
+      primaryKey: {
+        id: a.id,
+      },
       include: A.withB,
     }))!;
   }
@@ -116,7 +118,7 @@ export class Person {
 export class Dog {
   id: Integer;
 
-  @ForeignKey(Person)
+  @ForeignKey<Person>(p => p.id)
   personId: Integer;
 
   @Post()

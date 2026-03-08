@@ -102,7 +102,8 @@ export class IncludeTreeBuilder {
 
 export class ModelBuilder {
   private name: string;
-  private primary_key: NamedTypedValue | null = null;
+  private primary_key_names: string[] = [];
+  private primary_key_types: Record<string, CidlType> = {};
   private columns: D1Column[] = [];
   private navigation_properties: NavigationProperty[] = [];
   private key_params: string[] = [];
@@ -123,11 +124,13 @@ export class ModelBuilder {
   col(
     name: string,
     cidl_type: CidlType,
-    foreign_key: string | null = null,
+    foreign_key: { model_name: string; column_name: string } | null = null,
   ): this {
     this.columns.push({
       value: { name, cidl_type },
       foreign_key_reference: foreign_key,
+      unique_ids: [],
+      composite_id: null,
     });
     return this;
   }
@@ -146,7 +149,10 @@ export class ModelBuilder {
   }
 
   pk(name: string, cidl_type: CidlType): this {
-    this.primary_key = { name, cidl_type };
+    if (!this.primary_key_names.includes(name)) {
+      this.primary_key_names.push(name);
+    }
+    this.primary_key_types[name] = cidl_type;
     return this;
   }
 
@@ -232,10 +238,31 @@ export class ModelBuilder {
   }
 
   build(): Model {
+    const mutableColumns = [...this.columns];
+    const primary_key_columns: D1Column[] = [];
+
+    for (const pkName of this.primary_key_names) {
+      const idx = mutableColumns.findIndex((col) => col.value.name === pkName);
+      if (idx >= 0) {
+        primary_key_columns.push(mutableColumns[idx]);
+        mutableColumns.splice(idx, 1);
+      } else {
+        primary_key_columns.push({
+          value: {
+            name: pkName,
+            cidl_type: this.primary_key_types[pkName] ?? "Integer",
+          },
+          foreign_key_reference: null,
+          unique_ids: [],
+          composite_id: null,
+        });
+      }
+    }
+
     return {
       name: this.name,
-      primary_key: this.primary_key,
-      columns: this.columns,
+      primary_key_columns,
+      columns: mutableColumns,
       navigation_properties: this.navigation_properties,
       key_params: this.key_params,
       kv_objects: this.kv_objects,

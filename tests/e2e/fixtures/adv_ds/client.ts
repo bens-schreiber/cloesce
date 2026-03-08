@@ -7,7 +7,7 @@ export class Hamburger {
   toppings: Topping[];
 
   static async LIST(
-    lastSeen: number | null,
+    lastSeen_id: number | null,
     limit: number | null,
     offset: number | null,
     __datasource: "default" | "orderedBurgersWithLettuce" = "default",
@@ -17,7 +17,7 @@ export class Hamburger {
       `http://localhost:5002/api/Hamburger/LIST`
     );
 
-    baseUrl.searchParams.append("lastSeen", String(lastSeen));
+    baseUrl.searchParams.append("lastSeen_id", String(lastSeen_id));
     baseUrl.searchParams.append("limit", String(limit));
     baseUrl.searchParams.append("offset", String(offset));
     baseUrl.searchParams.append("__datasource", String(__datasource));
@@ -63,7 +63,7 @@ export class Hamburger {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Topping[]>> {
     const id = [
-      encodeURIComponent(String(this.id)),
+    encodeURIComponent(String(this.id)),
     ].join("/");
     const baseUrl = new URL(
       `http://localhost:5002/api/Hamburger/${id}/noLettuceToppings`
@@ -85,7 +85,7 @@ export class Hamburger {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Topping[]>> {
     const id = [
-      encodeURIComponent(String(this.id)),
+    encodeURIComponent(String(this.id)),
     ].join("/");
     const baseUrl = new URL(
       `http://localhost:5002/api/Hamburger/${id}/onlyBacon`

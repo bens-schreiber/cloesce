@@ -212,10 +212,23 @@ pub struct DataSource {
     pub list_params: Vec<CrudListParam>,
 }
 
+/// A D1 Navigation property, representing a relationship to another model
+/// through a foreign key or composite foreign key.
 #[derive(Serialize, Deserialize, Debug, Clone, Hash)]
 pub enum NavigationPropertyKind {
-    OneToOne { column_reference: String },
-    OneToMany { column_reference: String },
+    OneToOne {
+        /// The columns on the current model that reference the other model's primary key.
+        /// Multiple columns indicate a composite foreign key.
+        key_columns: Vec<String>,
+    },
+    OneToMany {
+        /// The columns on the other model that reference the current model's primary key.
+        /// Multiple columns indicate a composite foreign key.
+        key_columns: Vec<String>,
+    },
+
+    /// A many to many relationship expressed through a join table,
+    /// consisting of the two models primary keys (be they composite or not).
     ManyToMany,
 }
 
@@ -241,6 +254,12 @@ impl NavigationProperty {
     }
 }
 
+#[derive(Serialize, Deserialize, Debug, Hash)]
+pub struct ForeignKeyReference {
+    pub model_name: String,
+    pub column_name: String,
+}
+
 #[derive(Serialize, Deserialize, Debug)]
 pub struct D1Column {
     #[serde(default)]
@@ -250,9 +269,19 @@ pub struct D1Column {
     /// Represents both the column name and type.
     pub value: NamedTypedValue,
 
-    /// If the attribute is a foreign key, the referenced model name.
-    /// Otherwise, None.
-    pub foreign_key_reference: Option<String>,
+    /// If the attribute is a foreign key, the referenced model and column.
+    pub foreign_key_reference: Option<ForeignKeyReference>,
+
+    /// IDs of unique constraints that this column participates in.
+    pub unique_ids: Vec<u32>,
+
+    /// An ID indicating which composite key this column belongs to, if any.
+    /// Columns with the same composite_id belong to the same composite key.
+    ///
+    /// A primary key, will not fill this slot as a composite key as it's already identified as
+    /// a key by being in the primary_key_columns list. Thus, a column that makes up
+    /// a primary key can be apart of a composite foreign key.
+    pub composite_id: Option<u32>,
 }
 
 #[derive(Serialize, Deserialize, Hash, PartialEq, Eq, Debug)]
@@ -290,9 +319,7 @@ pub struct Model {
     /// The symbol that defines the model in the source code.
     pub name: String,
 
-    /// Primary key column of the model.
-    // TODO: Composite primary keys
-    pub primary_key: Option<NamedTypedValue>,
+    pub primary_key_columns: Vec<D1Column>,
     pub columns: Vec<D1Column>,
     pub navigation_properties: Vec<NavigationProperty>,
 
@@ -311,7 +338,7 @@ pub struct Model {
 
 impl Model {
     pub fn has_d1(&self) -> bool {
-        !self.columns.is_empty() || self.primary_key.is_some()
+        !self.columns.is_empty() || !self.primary_key_columns.is_empty()
     }
 
     pub fn has_kv(&self) -> bool {
@@ -325,6 +352,19 @@ impl Model {
     /// Returns the data source with the symbol name "default", if it exists.
     pub fn default_data_source(&self) -> Option<&DataSource> {
         self.data_sources.get("default")
+    }
+
+    pub fn has_composite_pk(&self) -> bool {
+        self.primary_key_columns.len() > 1
+    }
+
+    /// Returns all columns, including primary key columns, as a single list.
+    /// The boolean indicates whether the column is a primary key column.
+    pub fn all_columns(&self) -> impl Iterator<Item = (&D1Column, bool)> {
+        self.columns
+            .iter()
+            .map(|c| (c, false))
+            .chain(self.primary_key_columns.iter().map(|c| (c, true)))
     }
 }
 
@@ -418,15 +458,14 @@ impl CloesceAst {
         let migrations_models: IndexMap<String, MigrationsModel> = models
             .into_iter()
             .filter_map(|(name, model)| {
-                let Some(pk) = model.primary_key else {
-                    // Skip non-D1 models
+                if !model.has_d1() {
                     return None;
-                };
+                }
 
                 let m = MigrationsModel {
                     hash: model.hash,
                     name: model.name,
-                    primary_key: pk,
+                    primary_key_columns: model.primary_key_columns,
                     columns: model.columns,
                     navigation_properties: model.navigation_properties,
                 };
@@ -454,8 +493,21 @@ impl CloesceAst {
         for model in self.models.values_mut() {
             let mut model_h = FxHasher::default();
             model_h.write(b"Model");
-            model.primary_key.hash(&mut model_h);
             model.name.hash(&mut model_h);
+
+            for pk_col in model.primary_key_columns.iter_mut() {
+                let pk_col_h = {
+                    let mut h = FxHasher::default();
+                    h.write(b"ModelPrimaryKeyColumn");
+                    pk_col.value.hash(&mut h);
+                    pk_col.foreign_key_reference.hash(&mut h);
+                    pk_col.unique_ids.hash(&mut h);
+                    h.finish()
+                };
+
+                pk_col.hash = pk_col_h;
+                model_h.write_u64(pk_col_h);
+            }
 
             for col in model.columns.iter_mut() {
                 let col_h = {
@@ -463,6 +515,7 @@ impl CloesceAst {
                     h.write(b"ModelColumn");
                     col.value.hash(&mut h);
                     col.foreign_key_reference.hash(&mut h);
+                    col.unique_ids.hash(&mut h);
                     h.finish()
                 };
 
@@ -500,9 +553,18 @@ impl CloesceAst {
 pub struct MigrationsModel {
     pub hash: u64,
     pub name: String,
-    pub primary_key: NamedTypedValue,
+    pub primary_key_columns: Vec<D1Column>,
     pub columns: Vec<D1Column>,
     pub navigation_properties: Vec<NavigationProperty>,
+}
+
+impl MigrationsModel {
+    pub fn all_columns(&self) -> impl Iterator<Item = (&D1Column, bool)> {
+        self.columns
+            .iter()
+            .map(|c| (c, false))
+            .chain(self.primary_key_columns.iter().map(|c| (c, true)))
+    }
 }
 
 /// A subset of [CloesceAst] suited for D1 migrations.
@@ -512,7 +574,7 @@ pub struct MigrationsModel {
 pub struct MigrationsAst {
     pub hash: u64,
 
-    #[serde(deserialize_with = "skip_if_null_primary_key")]
+    #[serde(deserialize_with = "skip_if_not_d1")]
     pub models: IndexMap<String, MigrationsModel>,
 }
 
@@ -573,7 +635,7 @@ pub struct WranglerSpec {
     pub vars: HashMap<String, Value>,
 }
 
-fn skip_if_null_primary_key<'de, D>(
+fn skip_if_not_d1<'de, D>(
     deserializer: D,
 ) -> std::result::Result<IndexMap<String, MigrationsModel>, D::Error>
 where
@@ -583,7 +645,7 @@ where
     struct Temp {
         hash: u64,
         name: String,
-        primary_key: Option<NamedTypedValue>,
+        primary_key_columns: Vec<D1Column>,
         columns: Vec<D1Column>,
         navigation_properties: Vec<NavigationProperty>,
     }
@@ -593,17 +655,15 @@ where
     Ok(temps
         .into_iter()
         .filter_map(|(key, t)| {
-            t.primary_key.map(|pk| {
-                (
-                    key,
-                    MigrationsModel {
-                        hash: t.hash,
-                        name: t.name,
-                        primary_key: pk,
-                        columns: t.columns,
-                        navigation_properties: t.navigation_properties,
-                    },
-                )
+            (!t.columns.is_empty() || !t.primary_key_columns.is_empty()).then_some({
+                let m = MigrationsModel {
+                    hash: t.hash,
+                    name: t.name,
+                    primary_key_columns: t.primary_key_columns,
+                    columns: t.columns,
+                    navigation_properties: t.navigation_properties,
+                };
+                (key, m)
             })
         })
         .collect())

@@ -41,7 +41,7 @@ export class CrudHaver {
     );
   }
   static async LIST(
-    lastSeen: number | null,
+    lastSeen_id: number | null,
     limit: number | null,
     offset: number | null,
     __datasource: "default" = "default",
@@ -51,7 +51,7 @@ export class CrudHaver {
       `http://localhost:5002/api/CrudHaver/LIST`
     );
 
-    baseUrl.searchParams.append("lastSeen", String(lastSeen));
+    baseUrl.searchParams.append("lastSeen_id", String(lastSeen_id));
     baseUrl.searchParams.append("limit", String(limit));
     baseUrl.searchParams.append("offset", String(offset));
     baseUrl.searchParams.append("__datasource", String(__datasource));
@@ -97,7 +97,7 @@ export class CrudHaver {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<void>> {
     const id = [
-      encodeURIComponent(String(this.id)),
+    encodeURIComponent(String(this.id)),
     ].join("/");
     const baseUrl = new URL(
       `http://localhost:5002/api/CrudHaver/${id}/notCrud`
@@ -154,7 +154,7 @@ export class Parent {
     );
   }
   static async LIST(
-    lastSeen: number | null,
+    lastSeen_id: number | null,
     limit: number | null,
     offset: number | null,
     __datasource: "default" | "withChildren" = "default",
@@ -164,7 +164,7 @@ export class Parent {
       `http://localhost:5002/api/Parent/LIST`
     );
 
-    baseUrl.searchParams.append("lastSeen", String(lastSeen));
+    baseUrl.searchParams.append("lastSeen_id", String(lastSeen_id));
     baseUrl.searchParams.append("limit", String(limit));
     baseUrl.searchParams.append("offset", String(offset));
     baseUrl.searchParams.append("__datasource", String(__datasource));

@@ -12,7 +12,7 @@ export class NullabilityChecks {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<string[] | null>> {
     const id = [
-      encodeURIComponent(String(this.id)),
+    encodeURIComponent(String(this.id)),
     ].join("/");
     const baseUrl = new URL(
       `http://localhost:5002/api/NullabilityChecks/${id}/arrayTypes`
@@ -39,7 +39,7 @@ export class NullabilityChecks {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<NullabilityChecks[] | null | null>> {
     const id = [
-      encodeURIComponent(String(this.id)),
+    encodeURIComponent(String(this.id)),
     ].join("/");
     const baseUrl = new URL(
       `http://localhost:5002/api/NullabilityChecks/${id}/httpResultTypes`
@@ -64,7 +64,7 @@ export class NullabilityChecks {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<void>> {
     const id = [
-      encodeURIComponent(String(this.id)),
+    encodeURIComponent(String(this.id)),
     ].join("/");
     const baseUrl = new URL(
       `http://localhost:5002/api/NullabilityChecks/${id}/injectableTypes`
@@ -90,7 +90,7 @@ export class NullabilityChecks {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<NullabilityChecks | null>> {
     const id = [
-      encodeURIComponent(String(this.id)),
+    encodeURIComponent(String(this.id)),
     ].join("/");
     const baseUrl = new URL(
       `http://localhost:5002/api/NullabilityChecks/${id}/modelTypes`
@@ -118,7 +118,7 @@ export class NullabilityChecks {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<boolean | null>> {
     const id = [
-      encodeURIComponent(String(this.id)),
+    encodeURIComponent(String(this.id)),
     ].join("/");
     const baseUrl = new URL(
       `http://localhost:5002/api/NullabilityChecks/${id}/primitiveTypes`

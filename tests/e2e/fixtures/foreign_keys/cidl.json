@@ -1,5 +1,5 @@
 {
-  "hash": 12969325067576523993,
+  "hash": 780864939651386308,
   "project_name": "runner",
   "wrangler_env": {
     "name": "Env",
@@ -11,12 +11,20 @@
   },
   "models": {
     "B": {
-      "hash": 4631908692780450632,
+      "hash": 16609847665501086491,
       "name": "B",
-      "primary_key": {
-        "name": "id",
-        "cidl_type": "Integer"
-      },
+      "primary_key_columns": [
+        {
+          "hash": 6397878138472974760,
+          "value": {
+            "name": "id",
+            "cidl_type": "Integer"
+          },
+          "foreign_key_reference": null,
+          "unique_ids": [],
+          "composite_id": null
+        }
+      ],
       "columns": [],
       "navigation_properties": [],
       "key_params": [],
@@ -49,12 +57,20 @@
       "source_path": "./seed__foreign_keys.cloesce.ts"
     },
     "Course": {
-      "hash": 13717697900918874344,
+      "hash": 9450233988358908293,
       "name": "Course",
-      "primary_key": {
-        "name": "id",
-        "cidl_type": "Integer"
-      },
+      "primary_key_columns": [
+        {
+          "hash": 6397878138472974760,
+          "value": {
+            "name": "id",
+            "cidl_type": "Integer"
+          },
+          "foreign_key_reference": null,
+          "unique_ids": [],
+          "composite_id": null
+        }
+      ],
       "columns": [],
       "navigation_properties": [
         {
@@ -85,21 +101,31 @@
       "source_path": "./seed__foreign_keys.cloesce.ts"
     },
     "Person": {
-      "hash": 3115193583229976533,
+      "hash": 13201153341712694137,
       "name": "Person",
-      "primary_key": {
-        "name": "id",
-        "cidl_type": "Integer"
-      },
+      "primary_key_columns": [
+        {
+          "hash": 6397878138472974760,
+          "value": {
+            "name": "id",
+            "cidl_type": "Integer"
+          },
+          "foreign_key_reference": null,
+          "unique_ids": [],
+          "composite_id": null
+        }
+      ],
       "columns": [],
       "navigation_properties": [
         {
-          "hash": 14619809136778017828,
+          "hash": 4536776707783073402,
           "var_name": "dogs",
           "model_reference": "Dog",
           "kind": {
             "OneToMany": {
-              "column_reference": "personId"
+              "key_columns": [
+                "personId"
+              ]
             }
           }
         }
@@ -196,12 +222,20 @@
       "source_path": "./seed__foreign_keys.cloesce.ts"
     },
     "Student": {
-      "hash": 14637071863453399234,
+      "hash": 3704788498538301800,
       "name": "Student",
-      "primary_key": {
-        "name": "id",
-        "cidl_type": "Integer"
-      },
+      "primary_key_columns": [
+        {
+          "hash": 6397878138472974760,
+          "value": {
+            "name": "id",
+            "cidl_type": "Integer"
+          },
+          "foreign_key_reference": null,
+          "unique_ids": [],
+          "composite_id": null
+        }
+      ],
       "columns": [],
       "navigation_properties": [
         {
@@ -288,30 +322,45 @@
       "source_path": "./seed__foreign_keys.cloesce.ts"
     },
     "A": {
-      "hash": 466023394421909929,
+      "hash": 7057660159775044926,
       "name": "A",
-      "primary_key": {
-        "name": "id",
-        "cidl_type": "Integer"
-      },
+      "primary_key_columns": [
+        {
+          "hash": 6397878138472974760,
+          "value": {
+            "name": "id",
+            "cidl_type": "Integer"
+          },
+          "foreign_key_reference": null,
+          "unique_ids": [],
+          "composite_id": null
+        }
+      ],
       "columns": [
         {
-          "hash": 7233387911336606235,
+          "hash": 5114472031400271057,
           "value": {
             "name": "bId",
             "cidl_type": "Integer"
           },
-          "foreign_key_reference": "B"
+          "foreign_key_reference": {
+            "model_name": "B",
+            "column_name": "id"
+          },
+          "unique_ids": [],
+          "composite_id": null
         }
       ],
       "navigation_properties": [
         {
-          "hash": 13359034780033624503,
+          "hash": 9331351263167380859,
           "var_name": "b",
           "model_reference": "B",
           "kind": {
             "OneToOne": {
-              "column_reference": "bId"
+              "key_columns": [
+                "bId"
+              ]
             }
           }
         }
@@ -414,20 +463,33 @@
       "source_path": "./seed__foreign_keys.cloesce.ts"
     },
     "Dog": {
-      "hash": 7734451209746023667,
+      "hash": 12126547480545635937,
       "name": "Dog",
-      "primary_key": {
-        "name": "id",
-        "cidl_type": "Integer"
-      },
+      "primary_key_columns": [
+        {
+          "hash": 6397878138472974760,
+          "value": {
+            "name": "id",
+            "cidl_type": "Integer"
+          },
+          "foreign_key_reference": null,
+          "unique_ids": [],
+          "composite_id": null
+        }
+      ],
       "columns": [
         {
-          "hash": 14257879906577322840,
+          "hash": 16174990813136957012,
           "value": {
             "name": "personId",
             "cidl_type": "Integer"
           },
-          "foreign_key_reference": "Person"
+          "foreign_key_reference": {
+            "model_name": "Person",
+            "column_name": "id"
+          },
+          "unique_ids": [],
+          "composite_id": null
         }
       ],
       "navigation_properties": [],

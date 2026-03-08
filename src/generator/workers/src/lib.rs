@@ -150,11 +150,10 @@ impl WorkersGenerator {
                     CrudKind::GET => {
                         let mut parameters = vec![];
 
-                        if model.has_d1() {
-                            let pk = model.primary_key.as_ref().expect("PK to exist");
+                        for pk in &model.primary_key_columns {
                             parameters.push(NamedTypedValue {
-                                name: pk.name.clone(),
-                                cidl_type: pk.cidl_type.clone(),
+                                name: pk.value.name.clone(),
+                                cidl_type: pk.value.cidl_type.clone(),
                             });
                         }
 
@@ -181,41 +180,44 @@ impl WorkersGenerator {
                             data_source: None,
                         }
                     }
-                    CrudKind::LIST => ApiMethod {
-                        name: "LIST".into(),
-                        is_static: true,
-                        http_verb: HttpVerb::Get,
-                        return_type: CidlType::http(CidlType::array(CidlType::Object(
-                            model.name.clone(),
-                        ))),
-                        parameters: vec![
-                            NamedTypedValue {
-                                name: "lastSeen".into(),
-                                cidl_type: CidlType::nullable(
-                                    model
-                                        .primary_key
-                                        .as_ref()
-                                        .map(|pk| pk.cidl_type.clone())
-                                        .unwrap_or(CidlType::Integer),
-                                ),
-                            },
-                            NamedTypedValue {
-                                name: "limit".into(),
-                                cidl_type: CidlType::nullable(CidlType::Integer),
-                            },
-                            NamedTypedValue {
-                                name: "offset".into(),
-                                cidl_type: CidlType::nullable(CidlType::Integer),
-                            },
-                            NamedTypedValue {
-                                name: "__datasource".into(),
-                                cidl_type: CidlType::DataSource(model.name.clone()),
-                            },
-                        ],
-                        parameters_media: MediaType::default(),
-                        return_media: MediaType::default(),
-                        data_source: None,
-                    },
+                    CrudKind::LIST => {
+                        let parameters = model
+                            .primary_key_columns
+                            .iter()
+                            .map(|pk| NamedTypedValue {
+                                // TODO: some nice naming config
+                                name: format!("lastSeen_{}", pk.value.name),
+                                cidl_type: CidlType::nullable(pk.value.cidl_type.clone()),
+                            })
+                            .chain(vec![
+                                NamedTypedValue {
+                                    name: "limit".into(),
+                                    cidl_type: CidlType::nullable(CidlType::Integer),
+                                },
+                                NamedTypedValue {
+                                    name: "offset".into(),
+                                    cidl_type: CidlType::nullable(CidlType::Integer),
+                                },
+                                NamedTypedValue {
+                                    name: "__datasource".into(),
+                                    cidl_type: CidlType::DataSource(model.name.clone()),
+                                },
+                            ])
+                            .collect();
+
+                        ApiMethod {
+                            name: "LIST".into(),
+                            is_static: true,
+                            http_verb: HttpVerb::Get,
+                            return_type: CidlType::http(CidlType::array(CidlType::Object(
+                                model.name.clone(),
+                            ))),
+                            parameters,
+                            parameters_media: MediaType::default(),
+                            return_media: MediaType::default(),
+                            data_source: None,
+                        }
+                    }
                     CrudKind::SAVE => ApiMethod {
                         name: "SAVE".into(),
                         is_static: true,

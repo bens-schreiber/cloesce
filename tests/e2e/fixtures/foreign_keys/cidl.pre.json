@@ -12,10 +12,17 @@
         "B": {
             "name": "B",
             "columns": [],
-            "primary_key": {
-                "name": "id",
-                "cidl_type": "Integer"
-            },
+            "primary_key_columns": [
+                {
+                    "foreign_key_reference": null,
+                    "unique_ids": [],
+                    "composite_id": null,
+                    "value": {
+                        "name": "id",
+                        "cidl_type": "Integer"
+                    }
+                }
+            ],
             "navigation_properties": [],
             "key_params": [],
             "kv_objects": [],
@@ -40,24 +47,38 @@
             "name": "A",
             "columns": [
                 {
-                    "foreign_key_reference": "B",
+                    "foreign_key_reference": {
+                        "model_name": "B",
+                        "column_name": "id"
+                    },
+                    "unique_ids": [],
+                    "composite_id": null,
                     "value": {
                         "name": "bId",
                         "cidl_type": "Integer"
                     }
                 }
             ],
-            "primary_key": {
-                "name": "id",
-                "cidl_type": "Integer"
-            },
+            "primary_key_columns": [
+                {
+                    "foreign_key_reference": null,
+                    "unique_ids": [],
+                    "composite_id": null,
+                    "value": {
+                        "name": "id",
+                        "cidl_type": "Integer"
+                    }
+                }
+            ],
             "navigation_properties": [
                 {
                     "var_name": "b",
                     "model_reference": "B",
                     "kind": {
                         "OneToOne": {
-                            "column_reference": "bId"
+                            "key_columns": [
+                                "bId"
+                            ]
                         }
                     }
                 }
@@ -151,17 +172,26 @@
         "Person": {
             "name": "Person",
             "columns": [],
-            "primary_key": {
-                "name": "id",
-                "cidl_type": "Integer"
-            },
+            "primary_key_columns": [
+                {
+                    "foreign_key_reference": null,
+                    "unique_ids": [],
+                    "composite_id": null,
+                    "value": {
+                        "name": "id",
+                        "cidl_type": "Integer"
+                    }
+                }
+            ],
             "navigation_properties": [
                 {
                     "var_name": "dogs",
                     "model_reference": "Dog",
                     "kind": {
                         "OneToMany": {
-                            "column_reference": "personId"
+                            "key_columns": [
+                                "personId"
+                            ]
                         }
                     }
                 }
@@ -250,17 +280,29 @@
             "name": "Dog",
             "columns": [
                 {
-                    "foreign_key_reference": "Person",
+                    "foreign_key_reference": {
+                        "model_name": "Person",
+                        "column_name": "id"
+                    },
+                    "unique_ids": [],
+                    "composite_id": null,
                     "value": {
                         "name": "personId",
                         "cidl_type": "Integer"
                     }
                 }
             ],
-            "primary_key": {
-                "name": "id",
-                "cidl_type": "Integer"
-            },
+            "primary_key_columns": [
+                {
+                    "foreign_key_reference": null,
+                    "unique_ids": [],
+                    "composite_id": null,
+                    "value": {
+                        "name": "id",
+                        "cidl_type": "Integer"
+                    }
+                }
+            ],
             "navigation_properties": [],
             "key_params": [],
             "kv_objects": [],
@@ -284,10 +326,17 @@
         "Student": {
             "name": "Student",
             "columns": [],
-            "primary_key": {
-                "name": "id",
-                "cidl_type": "Integer"
-            },
+            "primary_key_columns": [
+                {
+                    "foreign_key_reference": null,
+                    "unique_ids": [],
+                    "composite_id": null,
+                    "value": {
+                        "name": "id",
+                        "cidl_type": "Integer"
+                    }
+                }
+            ],
             "navigation_properties": [
                 {
                     "var_name": "courses",
@@ -363,10 +412,17 @@
         "Course": {
             "name": "Course",
             "columns": [],
-            "primary_key": {
-                "name": "id",
-                "cidl_type": "Integer"
-            },
+            "primary_key_columns": [
+                {
+                    "foreign_key_reference": null,
+                    "unique_ids": [],
+                    "composite_id": null,
+                    "value": {
+                        "name": "id",
+                        "cidl_type": "Integer"
+                    }
+                }
+            ],
             "navigation_properties": [
                 {
                     "var_name": "students",

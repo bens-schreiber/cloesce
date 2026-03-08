@@ -223,15 +223,6 @@ pub fn validate_cidl_type(
             let model = ast.models.get(&name).unwrap();
             let obj = value.as_object_mut().ok_or(ValidatorErrorKind::NonObject)?;
 
-            if let Some(pk) = &model.primary_key {
-                let pk_value = obj.remove(&pk.name);
-                let res = validate_cidl_type(pk.cidl_type.clone(), pk_value, ast, is_partial)?;
-
-                if let Some(res) = res {
-                    new_obj.insert(pk.name.clone(), res);
-                }
-            }
-
             for key_param in &model.key_params {
                 let key_param_value = obj.remove(key_param);
                 let res = validate_cidl_type(CidlType::Text, key_param_value, ast, is_partial)?;
@@ -241,7 +232,7 @@ pub fn validate_cidl_type(
                 }
             }
 
-            for col in &model.columns {
+            for (col, _) in model.all_columns() {
                 let col_value = obj.remove(&col.value.name);
                 let res =
                     validate_cidl_type(col.value.cidl_type.clone(), col_value, ast, is_partial)?;
@@ -746,7 +737,7 @@ mod tests {
             // Arrange
             let horse = ModelBuilder::new("Horse")
                 .id_pk()
-                .col("name", CidlType::Text, None)
+                .col("name", CidlType::Text, None, None)
                 .build();
 
             let ast = generator_test::create_ast(vec![horse]);
@@ -800,20 +791,20 @@ mod tests {
             // Arrange
             let horse = ModelBuilder::new("Horse")
                 .id_pk()
-                .col("name", CidlType::Text, None)
+                .col("name", CidlType::Text, None, None)
                 .key_param("color")
                 .nav_p(
                     "riders",
                     "Rider",
                     NavigationPropertyKind::OneToMany {
-                        column_reference: "horse_id".into(),
+                        key_columns: vec!["horse_id".into()],
                     },
                 )
                 .build();
 
             let rider = ModelBuilder::new("Rider")
                 .id_pk()
-                .col("nickname", CidlType::Text, None)
+                .col("nickname", CidlType::Text, None, None)
                 .build();
 
             let ast = generator_test::create_ast(vec![horse, rider]);
@@ -843,7 +834,7 @@ mod tests {
             // Arrange
             let horse = ModelBuilder::new("Horse")
                 .id_pk()
-                .col("name", CidlType::Text, None)
+                .col("name", CidlType::Text, None, None)
                 .build();
 
             let ast = generator_test::create_ast(vec![horse]);

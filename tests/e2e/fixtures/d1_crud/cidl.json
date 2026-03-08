@@ -1,5 +1,5 @@
 {
-  "hash": 17196289896829317507,
+  "hash": 16878878349901575591,
   "project_name": "runner",
   "wrangler_env": {
     "name": "Env",
@@ -11,20 +11,30 @@
   },
   "models": {
     "CrudHaver": {
-      "hash": 16497283824177894047,
+      "hash": 13881397974626497053,
       "name": "CrudHaver",
-      "primary_key": {
-        "name": "id",
-        "cidl_type": "Integer"
-      },
+      "primary_key_columns": [
+        {
+          "hash": 6397878138472974760,
+          "value": {
+            "name": "id",
+            "cidl_type": "Integer"
+          },
+          "foreign_key_reference": null,
+          "unique_ids": [],
+          "composite_id": null
+        }
+      ],
       "columns": [
         {
-          "hash": 12056908550303509781,
+          "hash": 6788679640762437622,
           "value": {
             "name": "name",
             "cidl_type": "Text"
           },
-          "foreign_key_reference": null
+          "foreign_key_reference": null,
+          "unique_ids": [],
+          "composite_id": null
         }
       ],
       "navigation_properties": [],
@@ -73,7 +83,7 @@
           "parameters_media": "Json",
           "parameters": [
             {
-              "name": "lastSeen",
+              "name": "lastSeen_id",
               "cidl_type": {
                 "Nullable": "Integer"
               }
@@ -155,42 +165,59 @@
       "source_path": "./seed__d1_crud.cloesce.ts"
     },
     "Parent": {
-      "hash": 17776526208155794011,
+      "hash": 11455382279994136169,
       "name": "Parent",
-      "primary_key": {
-        "name": "id",
-        "cidl_type": "Integer"
-      },
+      "primary_key_columns": [
+        {
+          "hash": 6397878138472974760,
+          "value": {
+            "name": "id",
+            "cidl_type": "Integer"
+          },
+          "foreign_key_reference": null,
+          "unique_ids": [],
+          "composite_id": null
+        }
+      ],
       "columns": [
         {
-          "hash": 14127617476666259199,
+          "hash": 13382405950980379557,
           "value": {
             "name": "favoriteChildId",
             "cidl_type": {
               "Nullable": "Integer"
             }
           },
-          "foreign_key_reference": "Child"
+          "foreign_key_reference": {
+            "model_name": "Child",
+            "column_name": "id"
+          },
+          "unique_ids": [],
+          "composite_id": null
         }
       ],
       "navigation_properties": [
         {
-          "hash": 10900103892837471402,
+          "hash": 15239595953847103790,
           "var_name": "favoriteChild",
           "model_reference": "Child",
           "kind": {
             "OneToOne": {
-              "column_reference": "favoriteChildId"
+              "key_columns": [
+                "favoriteChildId"
+              ]
             }
           }
         },
         {
-          "hash": 15999549826759912293,
+          "hash": 9311210626431925322,
           "var_name": "children",
           "model_reference": "Child",
           "kind": {
             "OneToMany": {
-              "column_reference": "parentId"
+              "key_columns": [
+                "parentId"
+              ]
             }
           }
         }
@@ -240,7 +267,7 @@
           "parameters_media": "Json",
           "parameters": [
             {
-              "name": "lastSeen",
+              "name": "lastSeen_id",
               "cidl_type": {
                 "Nullable": "Integer"
               }
@@ -324,30 +351,45 @@
       "source_path": "./seed__d1_crud.cloesce.ts"
     },
     "Child": {
-      "hash": 2823647866772793242,
+      "hash": 4957102660187136393,
       "name": "Child",
-      "primary_key": {
-        "name": "id",
-        "cidl_type": "Integer"
-      },
+      "primary_key_columns": [
+        {
+          "hash": 6397878138472974760,
+          "value": {
+            "name": "id",
+            "cidl_type": "Integer"
+          },
+          "foreign_key_reference": null,
+          "unique_ids": [],
+          "composite_id": null
+        }
+      ],
       "columns": [
         {
-          "hash": 17200147533970366456,
+          "hash": 5546773060400918129,
           "value": {
             "name": "parentId",
             "cidl_type": "Integer"
           },
-          "foreign_key_reference": "Parent"
+          "foreign_key_reference": {
+            "model_name": "Parent",
+            "column_name": "id"
+          },
+          "unique_ids": [],
+          "composite_id": null
         }
       ],
       "navigation_properties": [
         {
-          "hash": 112683149846054066,
+          "hash": 3878402554849143311,
           "var_name": "parent",
           "model_reference": "Parent",
           "kind": {
             "OneToOne": {
-              "column_reference": "parentId"
+              "key_columns": [
+                "parentId"
+              ]
             }
           }
         }

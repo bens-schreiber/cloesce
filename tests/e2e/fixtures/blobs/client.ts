@@ -54,7 +54,7 @@ export class BlobHaver {
     );
   }
   static async LIST(
-    lastSeen: number | null,
+    lastSeen_id: number | null,
     limit: number | null,
     offset: number | null,
     __datasource: "default" = "default",
@@ -64,7 +64,7 @@ export class BlobHaver {
       `http://localhost:5002/api/BlobHaver/LIST`
     );
 
-    baseUrl.searchParams.append("lastSeen", String(lastSeen));
+    baseUrl.searchParams.append("lastSeen_id", String(lastSeen_id));
     baseUrl.searchParams.append("limit", String(limit));
     baseUrl.searchParams.append("offset", String(offset));
     baseUrl.searchParams.append("__datasource", String(__datasource));
@@ -110,7 +110,7 @@ export class BlobHaver {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Uint8Array>> {
     const id = [
-      encodeURIComponent(String(this.id)),
+    encodeURIComponent(String(this.id)),
     ].join("/");
     const baseUrl = new URL(
       `http://localhost:5002/api/BlobHaver/${id}/getBlob1`
@@ -156,7 +156,7 @@ export class BlobHaver {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Response>> {
     const id = [
-      encodeURIComponent(String(this.id)),
+    encodeURIComponent(String(this.id)),
     ].join("/");
     const baseUrl = new URL(
       `http://localhost:5002/api/BlobHaver/${id}/yieldStream`

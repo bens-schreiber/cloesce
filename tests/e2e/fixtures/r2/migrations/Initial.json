@@ -1,29 +1,41 @@
 {
-  "hash": 9234581653163423090,
+  "hash": 17168092024083253758,
   "models": {
     "D1BackedModel": {
-      "hash": 15131870847274583393,
+      "hash": 9299503543144665556,
       "name": "D1BackedModel",
-      "primary_key": {
-        "name": "id",
-        "cidl_type": "Integer"
-      },
+      "primary_key_columns": [
+        {
+          "hash": 6397878138472974760,
+          "value": {
+            "name": "id",
+            "cidl_type": "Integer"
+          },
+          "foreign_key_reference": null,
+          "unique_ids": [],
+          "composite_id": null
+        }
+      ],
       "columns": [
         {
-          "hash": 1999042468264969055,
+          "hash": 4638766536825732897,
           "value": {
             "name": "someColumn",
             "cidl_type": "Real"
           },
-          "foreign_key_reference": null
+          "foreign_key_reference": null,
+          "unique_ids": [],
+          "composite_id": null
         },
         {
-          "hash": 5739512274815634865,
+          "hash": 16794226563886906789,
           "value": {
             "name": "someOtherColumn",
             "cidl_type": "Text"
           },
-          "foreign_key_reference": null
+          "foreign_key_reference": null,
+          "unique_ids": [],
+          "composite_id": null
         }
       ],
       "navigation_properties": []

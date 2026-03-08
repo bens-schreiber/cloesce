@@ -1,5 +1,5 @@
 {
-  "hash": 11513542542314523995,
+  "hash": 5690044930238860381,
   "project_name": "runner",
   "wrangler_env": {
     "name": "Env",
@@ -11,28 +11,40 @@
   },
   "models": {
     "Weather": {
-      "hash": 13832862406689110475,
+      "hash": 10996866313912508781,
       "name": "Weather",
-      "primary_key": {
-        "name": "id",
-        "cidl_type": "Integer"
-      },
+      "primary_key_columns": [
+        {
+          "hash": 6397878138472974760,
+          "value": {
+            "name": "id",
+            "cidl_type": "Integer"
+          },
+          "foreign_key_reference": null,
+          "unique_ids": [],
+          "composite_id": null
+        }
+      ],
       "columns": [
         {
-          "hash": 4668177013190768849,
+          "hash": 7419779783954734969,
           "value": {
             "name": "date",
             "cidl_type": "DateIso"
           },
-          "foreign_key_reference": null
+          "foreign_key_reference": null,
+          "unique_ids": [],
+          "composite_id": null
         },
         {
-          "hash": 14600652857753235127,
+          "hash": 5134907052289059425,
           "value": {
             "name": "isRaining",
             "cidl_type": "Boolean"
           },
-          "foreign_key_reference": null
+          "foreign_key_reference": null,
+          "unique_ids": [],
+          "composite_id": null
         }
       ],
       "navigation_properties": [],

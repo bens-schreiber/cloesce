@@ -34,7 +34,7 @@ export class D1BackedModel {
     );
   }
   static async LIST(
-    lastSeen: number | null,
+    lastSeen_id: number | null,
     limit: number | null,
     offset: number | null,
     __datasource: "default" = "default",
@@ -44,7 +44,7 @@ export class D1BackedModel {
       `http://localhost:5002/api/D1BackedModel/LIST`
     );
 
-    baseUrl.searchParams.append("lastSeen", String(lastSeen));
+    baseUrl.searchParams.append("lastSeen_id", String(lastSeen_id));
     baseUrl.searchParams.append("limit", String(limit));
     baseUrl.searchParams.append("offset", String(offset));
     baseUrl.searchParams.append("__datasource", String(__datasource));

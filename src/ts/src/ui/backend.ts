@@ -380,44 +380,14 @@ export function Delete(dataSource?: DataSource<unknown>): MethodDecorator {
 }
 
 /**
- * Marks a property as a one-to-many navigation property.
- *
- * A stub decorator used by Cloesce to identify one-to-many relationships.
- *
- * @param _selector A selector function that returns the foreign key property on the related model, e.g. `model => model.ownerId`
- *
- * @template T The type of the model to which the navigation property relates.
- */
-export function OneToMany<T>(
-  _selector: (model: T) => T[keyof T],
-): PropertyDecorator {
-  return () => {};
-}
-
-/**
- * Marks a property as a one-to-one navigation property.
- *
- * A stub decorator used by Cloesce to identify one-to-one relationships.
- *
- * @param _selector A selector function that returns the foreign key property on this model, e.g. `model => model.profileId`
- *
- * @template T The type of the model containing the navigation property.
- */
-export function OneToOne<T>(
-  _selector: (model: T) => T[keyof T],
-): PropertyDecorator {
-  return () => {};
-}
-
-/**
  * Marks a property as a foreign key to another model.
  *
  * A stub decorator used by Cloesce to identify foreign key properties.
  *
- * @param _Model The related model class or its name as a string.
+ * @param _selector Selector for the referenced model key, e.g. @ForeignKey<User>(u => u.id).
  */
 export const ForeignKey =
-  <T>(_Model: T | string): PropertyDecorator =>
+  <T>(_selector: (model: T) => unknown): PropertyDecorator =>
   () => {};
 
 /**
@@ -460,7 +430,7 @@ type Primitive = string | number | boolean | bigint | symbol | null | undefined;
  * ＠D1
  * export class Person {
  *   ＠PrimaryKey id: number;
- *   ＠OneToMany("personId") dogs: Dog[];
+ *   dogs: Dog[];
  *
  *   ＠DataSource
  *   static readonly default: IncludeTree<Person> = {
