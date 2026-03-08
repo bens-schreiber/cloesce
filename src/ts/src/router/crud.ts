@@ -109,8 +109,11 @@ async function list(
   const offset = args[argIndex++];
   const dataSourceRef = args[argIndex];
 
+  // Last seen can only be used if all primary key values are present.
+  // Fail gracefully by ignoring lastSeen if some values are missing.
   const lastSeen =
-    lastSeenValues.length > 0 && !lastSeenValues.every((v) => v == null)
+    lastSeenValues.length == model.primary_key_columns.length &&
+    !lastSeenValues.some((v) => v == null)
       ? Object.fromEntries(
           model.primary_key_columns.map((col, i) => [
             col.value.name,
