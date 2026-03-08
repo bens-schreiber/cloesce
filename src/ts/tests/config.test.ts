@@ -104,7 +104,7 @@ describe("Config Builder", () => {
           .foreignKey("authorId")
           .references(User, "id")
           .oneToOne("author")
-          .references(User, "id")
+          .references(User, "authorId")
           .oneToMany("comments")
           .references(Comment, "postId")
           .manyToMany("tags")
@@ -116,7 +116,7 @@ describe("Config Builder", () => {
           .foreignKey("postId")
           .references(Post, "id")
           .oneToOne("post")
-          .references(Post, "id");
+          .references(Post, "postId");
       })
       .model(Department, (builder) => {
         builder
@@ -181,7 +181,7 @@ describe("Config Builder", () => {
     expect(ast.models.Post.navigation_properties).toContainEqual({
       var_name: "author",
       model_reference: "User",
-      kind: { OneToOne: { key_columns: ["id"] } },
+      kind: { OneToOne: { key_columns: ["authorId"] } },
     });
     expect(ast.models.Post.navigation_properties).toContainEqual({
       var_name: "comments",
@@ -212,7 +212,7 @@ describe("Config Builder", () => {
     expect(ast.models.Comment.navigation_properties[0]).toEqual({
       var_name: "post",
       model_reference: "Post",
-      kind: { OneToOne: { key_columns: ["id"] } },
+      kind: { OneToOne: { key_columns: ["postId"] } },
     });
 
     expect(ast.models.Department.primary_key_columns).toHaveLength(2);
@@ -281,7 +281,7 @@ describe("Config Builder", () => {
     });
 
     config.model(Post, (builder) => {
-      builder.oneToOne("author").references(User, "id");
+      builder.oneToOne("author").references(User, "authorId");
     });
 
     // Act
@@ -345,5 +345,35 @@ describe("Config Builder", () => {
     const idCol = model.primary_key_columns.find((c) => c.value.name === "id");
     expect(idCol).toBeDefined();
     expect(idCol!.unique_ids).toEqual([]);
+  });
+
+  test("OneToOne navigation should emit local FK columns, not referenced model columns", () => {
+    // Arrange
+    const config = defineConfig({ srcPaths: ["./src"] });
+    const ast = testAst();
+
+    config.model(Post, (builder) => {
+      builder
+        .foreignKey("authorId")
+        .references(User, "id")
+        .oneToOne("author")
+        .references(User, "authorId");
+    });
+
+    // Act
+    const modifiers = config._getAstModifiers();
+    modifiers.forEach((mod) => mod(ast));
+
+    // Assert
+    const authorNav = ast.models.Post.navigation_properties.find(
+      (np) => np.var_name === "author",
+    );
+
+    expect(authorNav).toBeDefined();
+    expect(authorNav).toEqual({
+      var_name: "author",
+      model_reference: "User",
+      kind: { OneToOne: { key_columns: ["authorId"] } },
+    });
   });
 });

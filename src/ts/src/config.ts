@@ -98,12 +98,19 @@ interface ForeignKeyDefinition {
   compositeId: number | null;
 }
 
-interface RelationshipDefinition {
-  propertyName: string;
-  kind: "OneToOne" | "OneToMany" | "ManyToMany";
-  referencedModel: string;
-  referencedColumns: string[];
-}
+type RelationshipDefinition =
+  | {
+      propertyName: string;
+      kind: "OneToOne";
+      referencedModel: string;
+      keyColumns: string[];
+    }
+  | {
+      propertyName: string;
+      kind: "OneToMany" | "ManyToMany";
+      referencedModel: string;
+      referencedColumns: string[];
+    };
 
 interface PrimaryKeyDefinition {
   columns: string[];
@@ -154,7 +161,7 @@ export class ForeignKeyBuilder<T extends object> {
 export class RelationshipBuilder<T extends object> {
   constructor(
     private propertyName: string,
-    private kind: "OneToOne" | "OneToMany" | "ManyToMany",
+    private kind: "OneToMany" | "ManyToMany",
     private modelConfig: ModelConfig,
   ) {}
 
@@ -168,6 +175,27 @@ export class RelationshipBuilder<T extends object> {
       kind: this.kind,
       referencedModel: modelName,
       referencedColumns: referenceColumns.map((col) => String(col)),
+    });
+    return new ModelBuilder<T>(this.modelConfig);
+  }
+}
+
+export class OneToOneRelationshipBuilder<T extends object> {
+  constructor(
+    private propertyName: string,
+    private modelConfig: ModelConfig,
+  ) {}
+
+  references<R extends object>(
+    model: new () => R,
+    ...keyColumns: (keyof T)[]
+  ): ModelBuilder<T> {
+    const modelName = model.name;
+    this.modelConfig.relationships.push({
+      propertyName: this.propertyName,
+      kind: "OneToOne",
+      referencedModel: modelName,
+      keyColumns: keyColumns.map((col) => String(col)),
     });
     return new ModelBuilder<T>(this.modelConfig);
   }
@@ -198,10 +226,9 @@ export class ModelBuilder<T extends object = any> {
     );
   }
 
-  oneToOne<K extends keyof T>(propertyName: K): RelationshipBuilder<T> {
-    return new RelationshipBuilder<T>(
+  oneToOne<K extends keyof T>(propertyName: K): OneToOneRelationshipBuilder<T> {
+    return new OneToOneRelationshipBuilder<T>(
       String(propertyName),
-      "OneToOne",
       this.modelConfig,
     );
   }
@@ -348,7 +375,7 @@ export class CloesceConfigBuilder implements CloesceConfig {
       for (const rel of modelConfig.relationships) {
         let kind: NavigationPropertyKind;
         if (rel.kind === "OneToOne") {
-          kind = { OneToOne: { key_columns: rel.referencedColumns } };
+          kind = { OneToOne: { key_columns: rel.keyColumns } };
         } else if (rel.kind === "OneToMany") {
           kind = { OneToMany: { key_columns: rel.referencedColumns } };
         } else {
