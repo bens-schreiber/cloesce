@@ -326,7 +326,7 @@ The migrations engine must be capable of creating tables with unique constraints
 
 Primary keys are currently defined outside of the `columns` property of the Model AST, as a single `primary_key` with type `NamedTypedValue`.
 
-With this proposal, there can be several columns that make a composite primary key, and primary keys can be foreign keys as well. Additionally, a column may be part of a composite key. A field `composite_key_id` can be added to the column definition, which will be an optional id. If it is `None`, then the column is not part of a composite key. If it is `Some(id)`, then the column is part of the composite key with the given ID. The order of the columns in the composite key can be determined by the order of the columns in the Model definition.
+With this proposal, there can be several columns that make a composite primary key, and primary keys can be foreign keys as well. Additionally, a column may be part of a composite key. A field `composite_id` can be added to the column definition, which will be an optional id. If it is `None`, then the column is not part of a composite key. If it is `Some(id)`, then the column is part of the composite key with the given ID. The order of the columns in the composite key can be determined by the order of the columns in the Model definition.
 
 ```rust
 struct ForeignKeyReference {
@@ -348,8 +348,9 @@ pub struct D1Column {
     /// Otherwise, None.
     pub foreign_key_reference: Option<ForeignKeyReference>,
 
-    /// The IDs of the composite keys this column belongs to, if any.
-    pub composite_ids: Vec<u32>,
+    /// The ID of the composite key this column belongs to, if any. 
+    /// Columns with the same composite_id belong to the same composite key.
+    pub composite_id: Option<u32>,
 
     /// The ID of the unique constraint this column belongs to, if any.
     pub unique_ids: Vec<u32>,
