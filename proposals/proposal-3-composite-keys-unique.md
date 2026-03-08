@@ -117,7 +117,7 @@ config
 export default config;
 ```
 
-With this new API, the `OneToOne` and `OneToMany` decorators can be removed, as they can be inferred through naming or defined through the Fluent API. `ForeignKey` and `PrimaryKey` will remain as they simple and look clean.
+With this new API, the `OneToOne` and `OneToMany` decorators can be removed, as they can be inferred through naming or defined through the Fluent API. `ForeignKey` and `PrimaryKey` will remain.
 
 ### Unique Constraints
 
@@ -153,11 +153,11 @@ A primary key may be made up of multiple columns. Those columns together may be 
 @Model()
 export class ProfessorCourseRating {
     @PrimaryKey()
-    @ForeignKey(Professor)
+    @ForeignKey<Professor>(p => p.id)
     professorId: Integer;
 
     @PrimaryKey()
-    @ForeignKey(Course)
+    @ForeignKey<Course>(c => c.id)
     courseId: Integer;
 
     name: String;
@@ -199,18 +199,18 @@ If a Model can have a composite primary key, it stands to reason that we should 
 class SomeModel {
     id: Integer;
 
-    professorId: Integer;
-    courseId: Integer;
-    professorCourseRating: ProfessorCourseRating;
+    pcrProfessorId: Integer;
+    pcrCourseId: Integer;
+    pcr: ProfessorCourseRating;
 }
 ```
 
 ```ts
 config.model(SomeModel, (builder) => {
     builder
-        .foreignKey("professorId", "courseId")
+        .foreignKey("pcrProfessorId", "pcrCourseId")
             .references(ProfessorCourseRating, "professorId", "courseId")
-        .oneToOne("professorCourseRating")
+        .oneToOne("pcr")
             .references(ProfessorCourseRating, "professorId", "courseId");
 });
 ```
@@ -304,7 +304,6 @@ CREATE TABLE CourseStudent (
 );
 ```
 
-
 ## Implementation
 
 ### Cloesce Configuration (Fluent API)
@@ -325,15 +324,20 @@ The migrations engine must be capable of creating tables with unique constraints
 
 ### Composite Keys
 
-Primary keys are currently defined outside of the `columns` property of the Model AST, as a single `primary_key` `NamedTypedValue`.
+Primary keys are currently defined outside of the `columns` property of the Model AST, as a single `primary_key` with type `NamedTypedValue`.
 
-With this proposal, there can be several columns that make a composite primary key, and primary keys can be foreign keys as well. The best way to support this change is to move the indicator of a primary key to a boolean property on each column definition.
-
-Additionally, a column may be part of a composite key. A field `composite_key_id` can be added to the column definition, which will be an optional id. If it is `None`, then the column is not part of a composite key. If it is `Some(id)`, then the column is part of the composite key with the given ID. The order of the columns in the composite key can be determined by the order of the columns in the Model definition.
+With this proposal, there can be several columns that make a composite primary key, and primary keys can be foreign keys as well. Additionally, a column may be part of a composite key. A field `composite_key_id` can be added to the column definition, which will be an optional id. If it is `None`, then the column is not part of a composite key. If it is `Some(id)`, then the column is part of the composite key with the given ID. The order of the columns in the composite key can be determined by the order of the columns in the Model definition.
 
 ```rust
+struct ForeignKeyReference {
+    /// The name of the referenced model.
+    model_name: String,
+
+    /// The name of the referenced column in the referenced model.
+    column_name: String,
+}
+
 pub struct D1Column {
-    #[serde(default)]
     pub hash: u64,
 
     /// Symbol name and Cloesce type of the attribute.
@@ -342,87 +346,81 @@ pub struct D1Column {
 
     /// If the attribute is a foreign key, the referenced model name.
     /// Otherwise, None.
-    pub foreign_key_reference: Option<String>,
+    pub foreign_key_reference: Option<ForeignKeyReference>,
 
     /// The IDs of the composite keys this column belongs to, if any.
     pub composite_ids: Vec<u32>,
 
     /// The ID of the unique constraint this column belongs to, if any.
     pub unique_ids: Vec<u32>,
-
-    /// If the attribute is a primary key, this will be true.
-    /// Otherwise, false.
-    pub is_primary_key: bool,
 }
 
-// ...
-impl Model {
-
-    /// Returns the indices of the columns that are part of the primary key.
-    pub fn primary_key(&self) -> Vec<usize> { ... } 
-
-    /// Returns a vector of composite keys, where each composite key is a vector of column indices.
-    pub fn composite_keys(&self) -> Vec<Vec<usize>> { ... }
-
-    /// Returns a vector of unique constraints, where each unique constraint is a vector of column indices.
-    pub fn unique_constraints(&self) -> Vec<Vec<usize>> { ... }
+pub struct Model {
+    // ...
+    primary_key_columns: Vec<D1Column>,
+    columns: Vec<D1Column>,
+     // ...
 }
 ```
 
 This change will have significant repercussions throughout the entire codebase, as the concept of a primary key is currently deeply ingrained in the way Models are defined and handled.
 
 
+## Example
 
-# weird scenarios
-
-One to One with a single key on left side and composite key on right side:
-```ts
-@Model()
-class Person {
-    @PrimaryKey()
-    id: Integer;
-
-    a: Integer;
-    b: Integer;
-    c: DogSettings;
-}
-
-@Model()
-class DogSettings {
-    @PrimaryKey()
-    dogId: Integer;
-
-    @PrimaryKey()
-    settingsId: Integer;
-}
-```
-
-In this case we would have a `OneToOne { key_columns: ["a", "b"]}` stored on the `Person` models navigations properties.
-We have to validate that `DogSettings` has a composite primary key of which the `a`'s foreign key references one of the columns, and `b`'s foreign key references the other column.
+A manual implementation of a Many to Many relationship, where `Student` has a composite primary key of `(id, name)`, and `Course` has a primary key of `id`. The join table `StudentCourse` has a composite primary key of `(studentId, studentName, courseId)`, which also serves as a composite foreign key to both `Student` and `Course`.
 
 ```ts
-@Model()
-class Person {
-    @PrimaryKey()
-    id: Integer;
 
-    @PrimaryKey()
-    name: String;
+@Model(["GET", "LIST", "SAVE"])
+export class Student {
+    @PrimaryKey
+    id: number;
 
-    dogs: Dog[];
+    @PrimaryKey
+    name: string;
+
+    favoriteColor: string;
+    courses: StudentCourse[];
+
+    static readonly coursesOrderedDesc: DataSource<Student> = {
+        includeTree: {
+            courses: {}
+        },
+        list: (joined) => `
+            WITH students AS (${joined()})
+            SELECT * FROM students
+            WHERE id > ?1
+                AND name > ?2
+            ORDER BY id DESC, name DESC
+            LIMIT ?3
+        `,
+        listParams: ["LastSeen", "Limit"]
+    }
 }
 
-@Model()
-class Dog {
-    @PrimaryKey()
-    id: Integer;
+@Model(["GET", "LIST", "SAVE"])
+export class Course {
+    id: number;
+    title: string;
 
-    
-    a: Integer;
-    b: Integer;
-    c: DogSettings;
+    students: StudentCourse[];
+}
+
+@Model(["GET", "LIST", "SAVE"])
+export class StudentCourse {
+    @PrimaryKey
+    @ForeignKey<Student>(s => s.id)
+    studentId: number;
+
+    @PrimaryKey
+    @ForeignKey<Student>(s => s.name)
+    studentName: string;
+    student: Student;
+
+    @PrimaryKey
+    @ForeignKey<Course>(c => c.id)
+    courseId: number;
+    course: Course;
 }
 ```
-
-In this case, we would have a `OneToMany { key_columns: ["a", "b"] }` stored on the `Person` models navigation properties.
-We would validate that `Dog` has a composite foreign key of `a` and `b` that references the composite primary key of `Person` on `id` and `name`.
