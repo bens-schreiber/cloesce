@@ -14,16 +14,25 @@
             "columns": [
                 {
                     "foreign_key_reference": null,
+                    "unique_ids": [],
+                    "composite_id": null,
                     "value": {
                         "name": "name",
                         "cidl_type": "Text"
                     }
                 }
             ],
-            "primary_key": {
-                "name": "id",
-                "cidl_type": "Integer"
-            },
+            "primary_key_columns": [
+                {
+                    "foreign_key_reference": null,
+                    "unique_ids": [],
+                    "composite_id": null,
+                    "value": {
+                        "name": "id",
+                        "cidl_type": "Integer"
+                    }
+                }
+            ],
             "navigation_properties": [],
             "key_params": [],
             "kv_objects": [],
@@ -52,7 +61,12 @@
             "name": "Parent",
             "columns": [
                 {
-                    "foreign_key_reference": "Child",
+                    "foreign_key_reference": {
+                        "model_name": "Child",
+                        "column_name": "id"
+                    },
+                    "unique_ids": [],
+                    "composite_id": null,
                     "value": {
                         "name": "favoriteChildId",
                         "cidl_type": {
@@ -61,17 +75,26 @@
                     }
                 }
             ],
-            "primary_key": {
-                "name": "id",
-                "cidl_type": "Integer"
-            },
+            "primary_key_columns": [
+                {
+                    "foreign_key_reference": null,
+                    "unique_ids": [],
+                    "composite_id": null,
+                    "value": {
+                        "name": "id",
+                        "cidl_type": "Integer"
+                    }
+                }
+            ],
             "navigation_properties": [
                 {
                     "var_name": "favoriteChild",
                     "model_reference": "Child",
                     "kind": {
                         "OneToOne": {
-                            "column_reference": "favoriteChildId"
+                            "key_columns": [
+                                "favoriteChildId"
+                            ]
                         }
                     }
                 },
@@ -80,7 +103,9 @@
                     "model_reference": "Child",
                     "kind": {
                         "OneToMany": {
-                            "column_reference": "parentId"
+                            "key_columns": [
+                                "parentId"
+                            ]
                         }
                     }
                 }
@@ -111,24 +136,38 @@
             "name": "Child",
             "columns": [
                 {
-                    "foreign_key_reference": "Parent",
+                    "foreign_key_reference": {
+                        "model_name": "Parent",
+                        "column_name": "id"
+                    },
+                    "unique_ids": [],
+                    "composite_id": null,
                     "value": {
                         "name": "parentId",
                         "cidl_type": "Integer"
                     }
                 }
             ],
-            "primary_key": {
-                "name": "id",
-                "cidl_type": "Integer"
-            },
+            "primary_key_columns": [
+                {
+                    "foreign_key_reference": null,
+                    "unique_ids": [],
+                    "composite_id": null,
+                    "value": {
+                        "name": "id",
+                        "cidl_type": "Integer"
+                    }
+                }
+            ],
             "navigation_properties": [
                 {
                     "var_name": "parent",
                     "model_reference": "Parent",
                     "kind": {
                         "OneToOne": {
-                            "column_reference": "parentId"
+                            "key_columns": [
+                                "parentId"
+                            ]
                         }
                     }
                 }

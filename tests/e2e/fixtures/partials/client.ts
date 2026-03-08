@@ -10,7 +10,7 @@ export class Dog {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<DeepPartial<Dog>>> {
     const id = [
-      encodeURIComponent(String(this.id)),
+    encodeURIComponent(String(this.id)),
     ].join("/");
     const baseUrl = new URL(
       `http://localhost:5002/api/Dog/${id}/getPartialSelf`

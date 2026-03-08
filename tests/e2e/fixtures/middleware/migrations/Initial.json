@@ -1,13 +1,21 @@
 {
-  "hash": 14803987991985266137,
+  "hash": 7645577656428666096,
   "models": {
     "Foo": {
-      "hash": 2291516488856648612,
+      "hash": 5230020806445609534,
       "name": "Foo",
-      "primary_key": {
-        "name": "id",
-        "cidl_type": "Integer"
-      },
+      "primary_key_columns": [
+        {
+          "hash": 6397878138472974760,
+          "value": {
+            "name": "id",
+            "cidl_type": "Integer"
+          },
+          "foreign_key_reference": null,
+          "unique_ids": [],
+          "composite_id": null
+        }
+      ],
       "columns": [],
       "navigation_properties": []
     }

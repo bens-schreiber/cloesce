@@ -315,6 +315,7 @@ export class Orm {
    * @param include Include tree specifying which navigation properties to include
    * @returns The upserted model instance, or `null` if upsert failed
    */
+  // TODO: Better ORM error handling strategies
   async upsert<T extends object>(
     ctor: new () => T,
     newModel: DeepPartial<T>,
@@ -342,7 +343,7 @@ export class Orm {
       wasm,
     );
     if (upsertQueryRes.isLeft()) {
-      throw new InternalError(`Upsert failed: ${upsertQueryRes.value}`);
+      throw new Error(`Upsert failed: ${upsertQueryRes.value}`);
     }
 
     const res = JSON.parse(upsertQueryRes.unwrap()) as {

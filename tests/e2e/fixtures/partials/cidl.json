@@ -1,5 +1,5 @@
 {
-  "hash": 13770848679796492454,
+  "hash": 15975022831843139571,
   "project_name": "runner",
   "wrangler_env": {
     "name": "Env",
@@ -11,28 +11,40 @@
   },
   "models": {
     "Dog": {
-      "hash": 10054987048785466557,
+      "hash": 4174928235648912644,
       "name": "Dog",
-      "primary_key": {
-        "name": "id",
-        "cidl_type": "Integer"
-      },
+      "primary_key_columns": [
+        {
+          "hash": 6397878138472974760,
+          "value": {
+            "name": "id",
+            "cidl_type": "Integer"
+          },
+          "foreign_key_reference": null,
+          "unique_ids": [],
+          "composite_id": null
+        }
+      ],
       "columns": [
         {
-          "hash": 12056908550303509781,
+          "hash": 6788679640762437622,
           "value": {
             "name": "name",
             "cidl_type": "Text"
           },
-          "foreign_key_reference": null
+          "foreign_key_reference": null,
+          "unique_ids": [],
+          "composite_id": null
         },
         {
-          "hash": 9647859276092761937,
+          "hash": 1725963293637091470,
           "value": {
             "name": "age",
             "cidl_type": "Integer"
           },
-          "foreign_key_reference": null
+          "foreign_key_reference": null,
+          "unique_ids": [],
+          "composite_id": null
         }
       ],
       "navigation_properties": [],

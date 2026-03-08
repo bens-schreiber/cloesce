@@ -576,8 +576,8 @@ async function validateRequest(
         env,
         promises: [],
       });
-
-      params[p.name] = hydrated ?? validatedRaw;
+      const validatedParam = hydrated ?? validatedRaw;
+      params[p.name] = validatedParam;
     }
   }
 

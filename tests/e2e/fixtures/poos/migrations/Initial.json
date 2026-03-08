@@ -1,13 +1,21 @@
 {
-  "hash": 14722648820501403073,
+  "hash": 9540641249058581934,
   "models": {
     "PooAcceptYield": {
-      "hash": 12256789407706551234,
+      "hash": 2437790181907432280,
       "name": "PooAcceptYield",
-      "primary_key": {
-        "name": "id",
-        "cidl_type": "Integer"
-      },
+      "primary_key_columns": [
+        {
+          "hash": 6397878138472974760,
+          "value": {
+            "name": "id",
+            "cidl_type": "Integer"
+          },
+          "foreign_key_reference": null,
+          "unique_ids": [],
+          "composite_id": null
+        }
+      ],
       "columns": [],
       "navigation_properties": []
     }

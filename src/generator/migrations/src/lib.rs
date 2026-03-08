@@ -105,13 +105,14 @@ impl MigrateTables {
     fn create(
         sorted_models: Vec<&MigrationsModel>,
         jcts: HashMap<String, (&MigrationsModel, &MigrationsModel)>,
+        model_lookup: &IndexMap<String, MigrationsModel>,
     ) -> Vec<String> {
         let mut res = vec![];
 
         for model in sorted_models {
             let is_composite_pk = model.primary_key_columns.len() > 1;
             let mut unique_columns_by_id = BTreeMap::<u32, Vec<&str>>::new();
-            let mut fk_groups = HashMap::<String, Vec<&D1Column>>::new();
+            let mut fk_groups = BTreeMap::<String, Vec<&D1Column>>::new();
 
             let mut table = Table::create();
             table.table(alias(&model.name));
@@ -143,8 +144,15 @@ impl MigrateTables {
                     continue;
                 };
 
+                let ref_model_has_composite_pk = model_lookup
+                    .get(fk_ref.model_name.as_str())
+                    .map(|m| m.primary_key_columns.len() > 1)
+                    .unwrap_or(false);
+
                 let group_key = if let Some(composite_id) = col.composite_id {
                     format!("{}::{}", fk_ref.model_name, composite_id)
+                } else if ref_model_has_composite_pk {
+                    format!("{}::composite", fk_ref.model_name)
                 } else {
                     format!("{}::{}", fk_ref.model_name, col.value.name)
                 };
@@ -379,10 +387,10 @@ impl MigrateTables {
 
                         let mut jcts = HashMap::new();
 
-                        let join = model_lookup.get(model_name).unwrap();
+                        let join = model_lookup.get(model_name.as_str()).unwrap();
                         jcts.insert(m2m_table_name.clone(), (model, join));
 
-                        res.extend(Self::create(vec![], jcts));
+                        res.extend(Self::create(vec![], jcts, model_lookup));
                         tracing::warn!(
                             "Created a many to many table \"{}\" between models: \"{}\" \"{}\"",
                             m2m_table_name,
@@ -438,7 +446,8 @@ impl MigrateTables {
 
                         // Create the new model
                         {
-                            let create_stmts = Self::create(vec![model], HashMap::default());
+                            let create_stmts =
+                                Self::create(vec![model], HashMap::default(), model_lookup);
                             for stmt in create_stmts {
                                 res.push(stmt);
                             }
@@ -818,7 +827,10 @@ impl MigrateTables {
         let mut res = String::new();
         for (title, stmts) in [
             ("Dropped Models", &Self::drop(drops)),
-            ("New Models", &Self::create(creates, create_jcts)),
+            (
+                "New Models",
+                &Self::create(creates, create_jcts, &ast.models),
+            ),
             ("Altered Models", &Self::alter(alters, &ast.models, intent)),
         ] {
             if stmts.is_empty() {

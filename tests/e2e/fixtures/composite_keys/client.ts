@@ -1,25 +1,21 @@
 // GENERATED CODE. DO NOT MODIFY.
 
 
-export class D1BackedModel {
+export class Course {
   id: number;
-  someColumn: number;
-  someOtherColumn: string;
-  keyParam: string;
-  kvData: KValue<unknown>;
+  title: string;
+  students: StudentCourse[];
 
   static async GET(
     id: number,
-    keyParam: string,
     __datasource: "default" = "default",
     fetchImpl: typeof fetch = fetch
-  ): Promise<HttpResult<D1BackedModel>> {
+  ): Promise<HttpResult<Course>> {
     const baseUrl = new URL(
-      `http://localhost:5002/api/D1BackedModel/GET`
+      `http://localhost:5002/api/Course/GET`
     );
 
     baseUrl.searchParams.append("id", String(id));
-    baseUrl.searchParams.append("keyParam", String(keyParam));
     baseUrl.searchParams.append("__datasource", String(__datasource));
 
     const res = await fetchImpl(baseUrl, {
@@ -29,7 +25,7 @@ export class D1BackedModel {
     return await HttpResult.fromResponse(
       res,
       MediaType.Json,
-      D1BackedModel,
+      Course,
       false
     );
   }
@@ -39,9 +35,9 @@ export class D1BackedModel {
     offset: number | null,
     __datasource: "default" = "default",
     fetchImpl: typeof fetch = fetch
-  ): Promise<HttpResult<D1BackedModel[]>> {
+  ): Promise<HttpResult<Course[]>> {
     const baseUrl = new URL(
-      `http://localhost:5002/api/D1BackedModel/LIST`
+      `http://localhost:5002/api/Course/LIST`
     );
 
     baseUrl.searchParams.append("lastSeen_id", String(lastSeen_id));
@@ -56,17 +52,17 @@ export class D1BackedModel {
     return await HttpResult.fromResponse(
       res,
       MediaType.Json,
-      D1BackedModel,
+      Course,
       true
     );
   }
   static async SAVE(
-    model: DeepPartial<D1BackedModel>,
+    model: DeepPartial<Course>,
     __datasource: "default" = "default",
     fetchImpl: typeof fetch = fetch
-  ): Promise<HttpResult<D1BackedModel>> {
+  ): Promise<HttpResult<Course>> {
     const baseUrl = new URL(
-      `http://localhost:5002/api/D1BackedModel/SAVE`
+      `http://localhost:5002/api/Course/SAVE`
     );
     const payload: any = {};
 
@@ -82,94 +78,37 @@ export class D1BackedModel {
     return await HttpResult.fromResponse(
       res,
       MediaType.Json,
-      D1BackedModel,
+      Course,
       false
     );
   }
 
-  static fromJson(data: any): D1BackedModel {
-    const res = Object.assign(new D1BackedModel(), data);
-    if (res.kvData) res.kvData = Object.assign(new KValue<unknown>(), res.kvData);
-    return res;
-  }
-}
-export class PaginatedKVModel {
-  id: string;
-  items: Paginated<KValue<unknown>>;
-
-  static async GET(
-    id: string,
-    __datasource: "default" = "default",
-    fetchImpl: typeof fetch = fetch
-  ): Promise<HttpResult<PaginatedKVModel>> {
-    const baseUrl = new URL(
-      `http://localhost:5002/api/PaginatedKVModel/GET`
-    );
-
-    baseUrl.searchParams.append("id", String(id));
-    baseUrl.searchParams.append("__datasource", String(__datasource));
-
-    const res = await fetchImpl(baseUrl, {
-      method: "Get",
-    });
-
-    return await HttpResult.fromResponse(
-      res,
-      MediaType.Json,
-      PaginatedKVModel,
-      false
-    );
-  }
-  static async acceptPaginated(
-    ps: Paginated<KValue<unknown>>,
-    fetchImpl: typeof fetch = fetch
-  ): Promise<HttpResult<Paginated<KValue<unknown>>>> {
-    const baseUrl = new URL(
-      `http://localhost:5002/api/PaginatedKVModel/acceptPaginated`
-    );
-    const payload: any = {};
-
-    payload["ps"] = ps;
-
-    const res = await fetchImpl(baseUrl, {
-      method: "Post",
-      headers: { "Content-Type": "application/json" },
-      body: requestBody(MediaType.Json, payload),
-    });
-
-    return await HttpResult.fromResponse(
-      res,
-      MediaType.Json,
-      undefined,
-      false
-    );
-  }
-
-  static fromJson(data: any): PaginatedKVModel {
-    const res = Object.assign(new PaginatedKVModel(), data);
-    if (res.items?.results) {
-      for (let i = 0; i < res.items.results.length; i++) {
-        res.items.results[i] = Object.assign(new KValue<unknown>(), res.items.results[i]);
-      }
+  static fromJson(data: any): Course {
+    const res = Object.assign(new Course(), data);
+    for (let i = 0; i < res.students?.length; i++) {
+      res.students[i] = StudentCourse.fromJson(res.students[i]);
     }
     return res;
   }
 }
-export class PureKVModel {
-  id: string;
-  data: KValue<unknown>;
-  otherData: KValue<string>;
+export class Student {
+  id: number;
+  name: string;
+  favoriteColor: string;
+  courses: StudentCourse[];
 
   static async GET(
-    id: string,
-    __datasource: "default" = "default",
+    id: number,
+    name: string,
+    __datasource: "coursesOrderedDesc" | "default" = "default",
     fetchImpl: typeof fetch = fetch
-  ): Promise<HttpResult<PureKVModel>> {
+  ): Promise<HttpResult<Student>> {
     const baseUrl = new URL(
-      `http://localhost:5002/api/PureKVModel/GET`
+      `http://localhost:5002/api/Student/GET`
     );
 
     baseUrl.searchParams.append("id", String(id));
+    baseUrl.searchParams.append("name", String(name));
     baseUrl.searchParams.append("__datasource", String(__datasource));
 
     const res = await fetchImpl(baseUrl, {
@@ -179,17 +118,46 @@ export class PureKVModel {
     return await HttpResult.fromResponse(
       res,
       MediaType.Json,
-      PureKVModel,
+      Student,
       false
     );
   }
-  static async SAVE(
-    model: DeepPartial<PureKVModel>,
-    __datasource: "default" = "default",
+  static async LIST(
+    lastSeen_id: number | null,
+    lastSeen_name: string | null,
+    limit: number | null,
+    offset: number | null,
+    __datasource: "coursesOrderedDesc" | "default" = "default",
     fetchImpl: typeof fetch = fetch
-  ): Promise<HttpResult<PureKVModel>> {
+  ): Promise<HttpResult<Student[]>> {
     const baseUrl = new URL(
-      `http://localhost:5002/api/PureKVModel/SAVE`
+      `http://localhost:5002/api/Student/LIST`
+    );
+
+    baseUrl.searchParams.append("lastSeen_id", String(lastSeen_id));
+    baseUrl.searchParams.append("lastSeen_name", String(lastSeen_name));
+    baseUrl.searchParams.append("limit", String(limit));
+    baseUrl.searchParams.append("offset", String(offset));
+    baseUrl.searchParams.append("__datasource", String(__datasource));
+
+    const res = await fetchImpl(baseUrl, {
+      method: "Get",
+    });
+
+    return await HttpResult.fromResponse(
+      res,
+      MediaType.Json,
+      Student,
+      true
+    );
+  }
+  static async SAVE(
+    model: DeepPartial<Student>,
+    __datasource: "coursesOrderedDesc" | "default" = "default",
+    fetchImpl: typeof fetch = fetch
+  ): Promise<HttpResult<Student>> {
+    const baseUrl = new URL(
+      `http://localhost:5002/api/Student/SAVE`
     );
     const payload: any = {};
 
@@ -205,15 +173,115 @@ export class PureKVModel {
     return await HttpResult.fromResponse(
       res,
       MediaType.Json,
-      PureKVModel,
+      Student,
       false
     );
   }
 
-  static fromJson(data: any): PureKVModel {
-    const res = Object.assign(new PureKVModel(), data);
-    if (res.data) res.data = Object.assign(new KValue<unknown>(), res.data);
-    if (res.otherData) res.otherData = Object.assign(new KValue<string>(), res.otherData);
+  static fromJson(data: any): Student {
+    const res = Object.assign(new Student(), data);
+    for (let i = 0; i < res.courses?.length; i++) {
+      res.courses[i] = StudentCourse.fromJson(res.courses[i]);
+    }
+    return res;
+  }
+}
+export class StudentCourse {
+  studentId: number;
+  studentName: string;
+  courseId: number;
+  student: Student | undefined;
+  course: Course | undefined;
+
+  static async GET(
+    studentId: number,
+    studentName: string,
+    courseId: number,
+    __datasource: "default" | "withStudentCourse" = "default",
+    fetchImpl: typeof fetch = fetch
+  ): Promise<HttpResult<StudentCourse>> {
+    const baseUrl = new URL(
+      `http://localhost:5002/api/StudentCourse/GET`
+    );
+
+    baseUrl.searchParams.append("studentId", String(studentId));
+    baseUrl.searchParams.append("studentName", String(studentName));
+    baseUrl.searchParams.append("courseId", String(courseId));
+    baseUrl.searchParams.append("__datasource", String(__datasource));
+
+    const res = await fetchImpl(baseUrl, {
+      method: "Get",
+    });
+
+    return await HttpResult.fromResponse(
+      res,
+      MediaType.Json,
+      StudentCourse,
+      false
+    );
+  }
+  static async LIST(
+    lastSeen_studentId: number | null,
+    lastSeen_studentName: string | null,
+    lastSeen_courseId: number | null,
+    limit: number | null,
+    offset: number | null,
+    __datasource: "default" | "withStudentCourse" = "default",
+    fetchImpl: typeof fetch = fetch
+  ): Promise<HttpResult<StudentCourse[]>> {
+    const baseUrl = new URL(
+      `http://localhost:5002/api/StudentCourse/LIST`
+    );
+
+    baseUrl.searchParams.append("lastSeen_studentId", String(lastSeen_studentId));
+    baseUrl.searchParams.append("lastSeen_studentName", String(lastSeen_studentName));
+    baseUrl.searchParams.append("lastSeen_courseId", String(lastSeen_courseId));
+    baseUrl.searchParams.append("limit", String(limit));
+    baseUrl.searchParams.append("offset", String(offset));
+    baseUrl.searchParams.append("__datasource", String(__datasource));
+
+    const res = await fetchImpl(baseUrl, {
+      method: "Get",
+    });
+
+    return await HttpResult.fromResponse(
+      res,
+      MediaType.Json,
+      StudentCourse,
+      true
+    );
+  }
+  static async SAVE(
+    model: DeepPartial<StudentCourse>,
+    __datasource: "default" | "withStudentCourse" = "default",
+    fetchImpl: typeof fetch = fetch
+  ): Promise<HttpResult<StudentCourse>> {
+    const baseUrl = new URL(
+      `http://localhost:5002/api/StudentCourse/SAVE`
+    );
+    const payload: any = {};
+
+    payload["model"] = model;
+    baseUrl.searchParams.append("__datasource", String(__datasource));
+
+    const res = await fetchImpl(baseUrl, {
+      method: "Post",
+      headers: { "Content-Type": "application/json" },
+      body: requestBody(MediaType.Json, payload),
+    });
+
+    return await HttpResult.fromResponse(
+      res,
+      MediaType.Json,
+      StudentCourse,
+      false
+    );
+  }
+
+  static fromJson(data: any): StudentCourse {
+    const res = Object.assign(new StudentCourse(), data);
+    res["student"] &&= Student.fromJson(res.student);
+    res["course"] &&= Course.fromJson(res.course);
     return res;
   }
 }

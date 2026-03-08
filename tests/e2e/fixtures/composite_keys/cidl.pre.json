@@ -1,0 +1,234 @@
+{
+    "project_name": "runner",
+    "wrangler_env": {
+        "name": "Env",
+        "source_path": "./seed__composite.cloesce.ts",
+        "d1_binding": "db",
+        "kv_bindings": [],
+        "r2_bindings": [],
+        "vars": {}
+    },
+    "models": {
+        "Student": {
+            "name": "Student",
+            "columns": [
+                {
+                    "foreign_key_reference": null,
+                    "unique_ids": [],
+                    "composite_id": null,
+                    "value": {
+                        "name": "favoriteColor",
+                        "cidl_type": "Text"
+                    }
+                }
+            ],
+            "primary_key_columns": [
+                {
+                    "foreign_key_reference": null,
+                    "unique_ids": [],
+                    "composite_id": null,
+                    "value": {
+                        "name": "id",
+                        "cidl_type": "Real"
+                    }
+                },
+                {
+                    "foreign_key_reference": null,
+                    "unique_ids": [],
+                    "composite_id": null,
+                    "value": {
+                        "name": "name",
+                        "cidl_type": "Text"
+                    }
+                }
+            ],
+            "navigation_properties": [
+                {
+                    "var_name": "courses",
+                    "model_reference": "StudentCourse",
+                    "kind": {
+                        "OneToMany": {
+                            "key_columns": [
+                                "studentId",
+                                "studentName"
+                            ]
+                        }
+                    }
+                }
+            ],
+            "key_params": [],
+            "kv_objects": [],
+            "r2_objects": [],
+            "methods": {},
+            "data_sources": {
+                "coursesOrderedDesc": {
+                    "name": "coursesOrderedDesc",
+                    "tree": {
+                        "courses": {}
+                    },
+                    "is_private": false,
+                    "list_params": [
+                        "LastSeen",
+                        "Limit"
+                    ]
+                }
+            },
+            "cruds": [
+                "GET",
+                "LIST",
+                "SAVE"
+            ],
+            "source_path": "./seed__composite.cloesce.ts"
+        },
+        "Course": {
+            "name": "Course",
+            "columns": [
+                {
+                    "foreign_key_reference": null,
+                    "unique_ids": [],
+                    "composite_id": null,
+                    "value": {
+                        "name": "title",
+                        "cidl_type": "Text"
+                    }
+                }
+            ],
+            "primary_key_columns": [
+                {
+                    "foreign_key_reference": null,
+                    "unique_ids": [],
+                    "composite_id": null,
+                    "value": {
+                        "name": "id",
+                        "cidl_type": "Real"
+                    }
+                }
+            ],
+            "navigation_properties": [
+                {
+                    "var_name": "students",
+                    "model_reference": "StudentCourse",
+                    "kind": {
+                        "OneToMany": {
+                            "key_columns": [
+                                "courseId"
+                            ]
+                        }
+                    }
+                }
+            ],
+            "key_params": [],
+            "kv_objects": [],
+            "r2_objects": [],
+            "methods": {},
+            "data_sources": {},
+            "cruds": [
+                "GET",
+                "LIST",
+                "SAVE"
+            ],
+            "source_path": "./seed__composite.cloesce.ts"
+        },
+        "StudentCourse": {
+            "name": "StudentCourse",
+            "columns": [],
+            "primary_key_columns": [
+                {
+                    "foreign_key_reference": {
+                        "model_name": "Student",
+                        "column_name": "id"
+                    },
+                    "unique_ids": [],
+                    "composite_id": null,
+                    "value": {
+                        "name": "studentId",
+                        "cidl_type": "Real"
+                    }
+                },
+                {
+                    "foreign_key_reference": {
+                        "model_name": "Student",
+                        "column_name": "name"
+                    },
+                    "unique_ids": [],
+                    "composite_id": null,
+                    "value": {
+                        "name": "studentName",
+                        "cidl_type": "Text"
+                    }
+                },
+                {
+                    "foreign_key_reference": {
+                        "model_name": "Course",
+                        "column_name": "id"
+                    },
+                    "unique_ids": [],
+                    "composite_id": null,
+                    "value": {
+                        "name": "courseId",
+                        "cidl_type": "Real"
+                    }
+                }
+            ],
+            "navigation_properties": [
+                {
+                    "var_name": "student",
+                    "model_reference": "Student",
+                    "kind": {
+                        "OneToOne": {
+                            "key_columns": [
+                                "studentId",
+                                "studentName"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "var_name": "course",
+                    "model_reference": "Course",
+                    "kind": {
+                        "OneToOne": {
+                            "key_columns": [
+                                "courseId"
+                            ]
+                        }
+                    }
+                }
+            ],
+            "key_params": [],
+            "kv_objects": [],
+            "r2_objects": [],
+            "methods": {},
+            "data_sources": {
+                "default": {
+                    "name": "default",
+                    "tree": {},
+                    "is_private": false,
+                    "list_params": []
+                },
+                "withStudentCourse": {
+                    "name": "withStudentCourse",
+                    "tree": {
+                        "student": {
+                            "courses": {}
+                        },
+                        "course": {
+                            "students": {}
+                        }
+                    },
+                    "is_private": false,
+                    "list_params": []
+                }
+            },
+            "cruds": [
+                "GET",
+                "LIST",
+                "SAVE"
+            ],
+            "source_path": "./seed__composite.cloesce.ts"
+        }
+    },
+    "poos": {},
+    "services": {},
+    "main_source": null
+}

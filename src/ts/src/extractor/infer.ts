@@ -1,4 +1,3 @@
-import { ClassDeclaration } from "ts-morph";
 import { Model, D1Column } from "../ast";
 
 /**
@@ -223,6 +222,9 @@ export class InferenceBuilder {
       }
     }
 
+    // Track processed many-to-many relationships to avoid duplicates
+    const processedManyToMany = new Set<string>();
+
     for (const inference of this.many) {
       const { modelName, propertyName, referencedModelName } = inference;
       const model = models[modelName];
@@ -249,6 +251,15 @@ export class InferenceBuilder {
 
       // Must be a many to many if there is one back reference
       if (backReferences.length === 1) {
+        // Create a normalized key for this M:M relationship (alphabetically ordered)
+        const m2mKey = [modelName, referencedModelName].sort().join("-");
+
+        // Skip if we've already processed this M:M relationship from the other side
+        if (processedManyToMany.has(m2mKey)) {
+          continue;
+        }
+        processedManyToMany.add(m2mKey);
+
         model.navigation_properties.push({
           var_name: propertyName,
           model_reference: referencedModelName,

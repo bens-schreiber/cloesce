@@ -15,7 +15,7 @@
         "PureKVModel": {
             "name": "PureKVModel",
             "columns": [],
-            "primary_key": null,
+            "primary_key_columns": [],
             "navigation_properties": [],
             "key_params": [
                 "id"
@@ -54,6 +54,8 @@
             "columns": [
                 {
                     "foreign_key_reference": null,
+                    "unique_ids": [],
+                    "composite_id": null,
                     "value": {
                         "name": "someColumn",
                         "cidl_type": "Real"
@@ -61,16 +63,25 @@
                 },
                 {
                     "foreign_key_reference": null,
+                    "unique_ids": [],
+                    "composite_id": null,
                     "value": {
                         "name": "someOtherColumn",
                         "cidl_type": "Text"
                     }
                 }
             ],
-            "primary_key": {
-                "name": "id",
-                "cidl_type": "Integer"
-            },
+            "primary_key_columns": [
+                {
+                    "foreign_key_reference": null,
+                    "unique_ids": [],
+                    "composite_id": null,
+                    "value": {
+                        "name": "id",
+                        "cidl_type": "Integer"
+                    }
+                }
+            ],
             "navigation_properties": [],
             "key_params": [
                 "keyParam"
@@ -99,7 +110,7 @@
         "PaginatedKVModel": {
             "name": "PaginatedKVModel",
             "columns": [],
-            "primary_key": null,
+            "primary_key_columns": [],
             "navigation_properties": [],
             "key_params": [
                 "id"

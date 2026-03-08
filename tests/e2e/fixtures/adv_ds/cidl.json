@@ -1,5 +1,5 @@
 {
-  "hash": 7972458822698731726,
+  "hash": 502872254450640108,
   "project_name": "runner",
   "wrangler_env": {
     "name": "Env",
@@ -11,20 +11,30 @@
   },
   "models": {
     "Hamburger": {
-      "hash": 17642057269789362886,
+      "hash": 12943904946861829134,
       "name": "Hamburger",
-      "primary_key": {
-        "name": "id",
-        "cidl_type": "Integer"
-      },
+      "primary_key_columns": [
+        {
+          "hash": 6397878138472974760,
+          "value": {
+            "name": "id",
+            "cidl_type": "Integer"
+          },
+          "foreign_key_reference": null,
+          "unique_ids": [],
+          "composite_id": null
+        }
+      ],
       "columns": [
         {
-          "hash": 12056908550303509781,
+          "hash": 6788679640762437622,
           "value": {
             "name": "name",
             "cidl_type": "Text"
           },
-          "foreign_key_reference": null
+          "foreign_key_reference": null,
+          "unique_ids": [],
+          "composite_id": null
         }
       ],
       "navigation_properties": [
@@ -55,7 +65,7 @@
           "parameters_media": "Json",
           "parameters": [
             {
-              "name": "lastSeen",
+              "name": "lastSeen_id",
               "cidl_type": {
                 "Nullable": "Integer"
               }
@@ -183,20 +193,30 @@
       "source_path": "./seed__adv_ds.cloesce.ts"
     },
     "Topping": {
-      "hash": 2395830274345848062,
+      "hash": 8564955201679083497,
       "name": "Topping",
-      "primary_key": {
-        "name": "id",
-        "cidl_type": "Integer"
-      },
+      "primary_key_columns": [
+        {
+          "hash": 6397878138472974760,
+          "value": {
+            "name": "id",
+            "cidl_type": "Integer"
+          },
+          "foreign_key_reference": null,
+          "unique_ids": [],
+          "composite_id": null
+        }
+      ],
       "columns": [
         {
-          "hash": 12056908550303509781,
+          "hash": 6788679640762437622,
           "value": {
             "name": "name",
             "cidl_type": "Text"
           },
-          "foreign_key_reference": null
+          "foreign_key_reference": null,
+          "unique_ids": [],
+          "composite_id": null
         }
       ],
       "navigation_properties": [
