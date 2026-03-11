@@ -183,32 +183,6 @@ export class PureKVModel {
       false
     );
   }
-  static async SAVE(
-    model: DeepPartial<PureKVModel>,
-    __datasource: "default" = "default",
-    fetchImpl: typeof fetch = fetch
-  ): Promise<HttpResult<PureKVModel>> {
-    const baseUrl = new URL(
-      `http://localhost:5002/api/PureKVModel/SAVE`
-    );
-    const payload: any = {};
-
-    payload["model"] = model;
-    baseUrl.searchParams.append("__datasource", String(__datasource));
-
-    const res = await fetchImpl(baseUrl, {
-      method: "Post",
-      headers: { "Content-Type": "application/json" },
-      body: requestBody(MediaType.Json, payload),
-    });
-
-    return await HttpResult.fromResponse(
-      res,
-      MediaType.Json,
-      PureKVModel,
-      false
-    );
-  }
 
   static fromJson(data: any): PureKVModel {
     const res = Object.assign(new PureKVModel(), data);

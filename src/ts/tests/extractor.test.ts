@@ -1,23 +1,11 @@
 import { describe, test, expect } from "vitest";
-import { Project } from "ts-morph";
 import { CidlExtractor } from "../src/extractor/extract";
 import { CidlType, Model, Service } from "../src/ast";
-import { ModelBuilder } from "./builder";
+import { cloesceProject, ModelBuilder } from "./builder";
 import {
   InferenceBuilder,
   InferenceBuilderError,
 } from "../src/extractor/infer";
-
-export function cloesceProject(): Project {
-  const project = new Project({
-    compilerOptions: {
-      strict: true,
-    },
-  });
-
-  project.addSourceFileAtPath("./src/ui/backend.ts");
-  return project;
-}
 
 describe("CIDL Type", () => {
   test("Primitives", () => {
@@ -218,7 +206,7 @@ describe("Model", () => {
 
       const ds: DataSource<Foo> = {};
 
-      @Model()
+      @Model("my_d1")
       export class Foo {
         id: number;
 
@@ -259,6 +247,7 @@ describe("Model", () => {
     expect(cidl.models["Foo"]).toBeDefined();
 
     const fooModel = cidl.models["Foo"];
+    expect(fooModel.d1_binding).toEqual("my_d1");
 
     expect(fooModel.data_sources).toStrictEqual({
       ds: {
@@ -719,7 +708,8 @@ describe("Model", () => {
       "test.ts",
       `
       import { KValue, Integer, Paginated, R2ObjectBody } from "./src/ui/backend";
-      @Model(["GET", "SAVE"])
+      @Crud("GET", "SAVE")
+      @Model("db")
       export class Foo {
         @PrimaryKey
         id: Integer;
@@ -758,6 +748,7 @@ describe("Model", () => {
     fooModel.source_path = "";
     expect(fooModel).toEqual(
       ModelBuilder.model("Foo")
+        .d1("db")
         .idPk()
         .crud("GET")
         .crud("SAVE")

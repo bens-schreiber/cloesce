@@ -3,7 +3,9 @@
     "wrangler_env": {
         "name": "Env",
         "source_path": "./seed__r2.cloesce.ts",
-        "d1_binding": "db",
+        "d1_bindings": [
+            "db"
+        ],
         "kv_bindings": [],
         "r2_bindings": [
             "bucket1",
@@ -14,6 +16,7 @@
     "models": {
         "PureR2Model": {
             "name": "PureR2Model",
+            "d1_binding": null,
             "columns": [],
             "primary_key_columns": [],
             "navigation_properties": [],
@@ -93,6 +96,7 @@
         },
         "D1BackedModel": {
             "name": "D1BackedModel",
+            "d1_binding": "db",
             "columns": [
                 {
                     "foreign_key_reference": null,

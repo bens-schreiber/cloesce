@@ -25,7 +25,7 @@ fn generates_default_wrangler_value() {
     ast.wrangler_env = Some(WranglerEnv {
         name: "Env".into(),
         source_path: "source.ts".into(),
-        d1_binding: Some("db".into()),
+        d1_bindings: vec!["db".into()],
         vars: [
             ("API_KEY".into(), CidlType::Text),
             ("TIMEOUT".into(), CidlType::Integer),
@@ -71,7 +71,7 @@ fn generates_default_d1_wrangler_values() {
     ast.wrangler_env = Some(WranglerEnv {
         name: "Env".into(),
         source_path: "source.ts".into(),
-        d1_binding: Some("db".into()),
+        d1_bindings: vec!["db".into()],
         vars: HashMap::new(),
         kv_bindings: vec![],
         r2_bindings: vec![],
@@ -110,7 +110,6 @@ fn generates_default_d1_wrangler_values() {
 fn generates_default_kv_wrangler_values() {
     // Arrange
     let mut ast = create_ast(vec![
-        // ModelBuilder::new("MyKV", "MyKV", CidlType::JsonValue).build(),
         ModelBuilder::new("MyKV")
             .kv_object("obj", "my_kv", "kvObj", false, CidlType::JsonValue)
             .build(),
@@ -118,7 +117,7 @@ fn generates_default_kv_wrangler_values() {
     ast.wrangler_env = Some(WranglerEnv {
         name: "Env".into(),
         source_path: "source.ts".into(),
-        d1_binding: None,
+        d1_bindings: vec![],
         vars: HashMap::new(),
         kv_bindings: vec!["my_kv".into()],
         r2_bindings: vec![],
@@ -144,7 +143,7 @@ fn generates_default_kv_wrangler_values() {
         assert_eq!(spec.kv_namespaces[0].binding.as_ref().unwrap(), "my_kv");
         assert_eq!(
             spec.kv_namespaces[0].id.as_ref().unwrap(),
-            "replace_with_kv_id"
+            "replace_with_my_kv_id"
         );
     }
 }
@@ -161,7 +160,7 @@ fn handles_d1_database_with_missing_values() {
     ast.wrangler_env = Some(WranglerEnv {
         name: "Env".into(),
         source_path: "source.ts".into(),
-        d1_binding: Some("db".into()),
+        d1_bindings: vec!["db".into()],
         vars: HashMap::new(),
         kv_bindings: vec![],
         r2_bindings: vec![],

@@ -1,18 +1,21 @@
 {
-  "hash": 11201987911354005058,
+  "hash": 7355829690118109237,
   "project_name": "runner",
   "wrangler_env": {
     "name": "Env",
     "source_path": "./seed__composite.cloesce.ts",
-    "d1_binding": "db",
+    "d1_bindings": [
+      "db"
+    ],
     "kv_bindings": [],
     "r2_bindings": [],
     "vars": {}
   },
   "models": {
     "Course": {
-      "hash": 18078407113291938113,
+      "hash": 16850187473558712992,
       "name": "Course",
+      "d1_binding": "db",
       "primary_key_columns": [
         {
           "hash": 5506969935928112087,
@@ -170,8 +173,9 @@
       "source_path": "./seed__composite.cloesce.ts"
     },
     "Student": {
-      "hash": 7094665033765862834,
+      "hash": 4576532940261906487,
       "name": "Student",
+      "d1_binding": "db",
       "primary_key_columns": [
         {
           "hash": 5506969935928112087,
@@ -361,8 +365,9 @@
       "source_path": "./seed__composite.cloesce.ts"
     },
     "StudentCourse": {
-      "hash": 7150643363848612315,
+      "hash": 3369799349848110955,
       "name": "StudentCourse",
+      "d1_binding": "db",
       "primary_key_columns": [
         {
           "hash": 17177798493862312650,

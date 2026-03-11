@@ -26,9 +26,9 @@ pub fn create_ast(models: Vec<Model>) -> CloesceAst {
         wrangler_env: Some(WranglerEnv {
             name: "TestEnv".to_string(),
             source_path: PathBuf::default(),
-            d1_binding: Some("TEST_DB".to_string()),
-            r2_bindings: vec!["r2_namespace".to_string()],
-            kv_bindings: vec!["kv_namespace".to_string()],
+            d1_bindings: vec!["d1".to_string()],
+            r2_bindings: vec!["r2".to_string()],
+            kv_bindings: vec!["kv".to_string()],
             vars: HashMap::new(),
         }),
         main_source: None,
@@ -85,6 +85,7 @@ impl IncludeTreeBuilder {
 
 pub struct ModelBuilder {
     name: String,
+    d1_binding: Option<String>,
     primary_key_columns: Vec<D1Column>,
     columns: Vec<D1Column>,
     navigation_properties: Vec<NavigationProperty>,
@@ -99,6 +100,7 @@ impl ModelBuilder {
     pub fn new(name: impl Into<String>) -> Self {
         Self {
             name: name.into(),
+            d1_binding: None,
             primary_key_columns: Vec::new(),
             columns: Vec::new(),
             navigation_properties: Vec::new(),
@@ -266,9 +268,20 @@ impl ModelBuilder {
         self
     }
 
+    pub fn db(mut self, name: impl Into<String>) -> Self {
+        self.d1_binding = Some(name.into());
+        self
+    }
+
+    pub fn default_db(mut self) -> Self {
+        self.d1_binding = Some("d1".into());
+        self
+    }
+
     pub fn build(self) -> Model {
         Model {
             name: self.name,
+            d1_binding: self.d1_binding,
             primary_key_columns: self.primary_key_columns,
             columns: self.columns,
             navigation_properties: self.navigation_properties,

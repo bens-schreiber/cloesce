@@ -1,12 +1,13 @@
 import { D1Database } from "@cloudflare/workers-types";
-import { Integer, Model, WranglerEnv, Get, DataSource } from "cloesce/backend";
+import { Integer, Model, WranglerEnv, Get, DataSource, Crud } from "cloesce/backend";
 
 @WranglerEnv
 export class Env {
     db: D1Database;
 }
 
-@Model(["SAVE"])
+@Crud("SAVE")
+@Model("db")
 export class Topping {
     id: Integer;
     name: string;
@@ -27,7 +28,8 @@ const onlyBaconDataSource: DataSource<Hamburger> = {
     `
 };
 
-@Model(["SAVE", "LIST"])
+@Crud("SAVE", "LIST")
+@Model("db")
 export class Hamburger {
     id: Integer;
     name: string;

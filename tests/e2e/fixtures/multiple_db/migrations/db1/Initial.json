@@ -1,9 +1,10 @@
 {
-  "hash": 15975022831843139571,
+  "hash": 5303730850516668862,
   "models": {
-    "Dog": {
-      "hash": 4174928235648912644,
-      "name": "Dog",
+    "DB1Model": {
+      "hash": 7341731061861978357,
+      "name": "DB1Model",
+      "d1_binding": "db1",
       "primary_key_columns": [
         {
           "hash": 6397878138472974760,
@@ -18,20 +19,10 @@
       ],
       "columns": [
         {
-          "hash": 6788679640762437622,
+          "hash": 3747858334280870224,
           "value": {
-            "name": "name",
+            "name": "someColumn",
             "cidl_type": "Text"
-          },
-          "foreign_key_reference": null,
-          "unique_ids": [],
-          "composite_id": null
-        },
-        {
-          "hash": 1725963293637091470,
-          "value": {
-            "name": "age",
-            "cidl_type": "Integer"
           },
           "foreign_key_reference": null,
           "unique_ids": [],

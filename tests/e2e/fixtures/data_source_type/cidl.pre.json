@@ -3,7 +3,9 @@
     "wrangler_env": {
         "name": "Env",
         "source_path": "./seed__ds.cloesce.ts",
-        "d1_binding": "db",
+        "d1_bindings": [
+            "db"
+        ],
         "kv_bindings": [],
         "r2_bindings": [],
         "vars": {}
@@ -11,6 +13,7 @@
     "models": {
         "NoDs": {
             "name": "NoDs",
+            "d1_binding": "db",
             "columns": [],
             "primary_key_columns": [
                 {
@@ -34,6 +37,7 @@
         },
         "OneDs": {
             "name": "OneDs",
+            "d1_binding": "db",
             "columns": [],
             "primary_key_columns": [
                 {
@@ -64,6 +68,7 @@
         },
         "Foo": {
             "name": "Foo",
+            "d1_binding": "db",
             "columns": [],
             "primary_key_columns": [
                 {

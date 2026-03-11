@@ -18,7 +18,7 @@ export class Env {
 }
 
 //#region OneToOne
-@Model()
+@Model("db")
 export class B {
   id: Integer;
 
@@ -26,7 +26,7 @@ export class B {
   testMethod() { }
 }
 
-@Model()
+@Model("db")
 export class A {
   id: Integer;
 
@@ -75,7 +75,7 @@ export class A {
 //#endregion
 
 //#region OneToMany
-@Model()
+@Model("db")
 export class Person {
   id: Integer;
 
@@ -114,7 +114,7 @@ export class Person {
   }
 }
 
-@Model()
+@Model("db")
 export class Dog {
   id: Integer;
 
@@ -127,7 +127,7 @@ export class Dog {
 //#endregion
 
 //#region ManyToMany
-@Model()
+@Model("db")
 export class Student {
   id: Integer;
   courses: Course[];
@@ -150,7 +150,7 @@ export class Student {
   }
 }
 
-@Model()
+@Model("db")
 export class Course {
   id: Integer;
   students: Student[];

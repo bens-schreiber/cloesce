@@ -1,12 +1,13 @@
 import { D1Database } from "@cloudflare/workers-types";
-import { DataSource, ForeignKey, Model, PrimaryKey, WranglerEnv } from "cloesce/backend";
+import { Crud, DataSource, ForeignKey, Model, PrimaryKey, WranglerEnv } from "cloesce/backend";
 
 @WranglerEnv
 export class Env {
     db: D1Database;
 }
 
-@Model(["GET", "LIST", "SAVE"])
+@Crud("GET", "LIST", "SAVE")
+@Model("db")
 export class Student {
     @PrimaryKey
     id: number;
@@ -33,7 +34,8 @@ export class Student {
     }
 }
 
-@Model(["GET", "LIST", "SAVE"])
+@Crud("GET", "LIST", "SAVE")
+@Model("db")
 export class Course {
     id: number;
     title: string;
@@ -41,7 +43,8 @@ export class Course {
     students: StudentCourse[];
 }
 
-@Model(["GET", "LIST", "SAVE"])
+@Crud("GET", "LIST", "SAVE")
+@Model("db")
 export class StudentCourse {
     @PrimaryKey
     @ForeignKey<Student>(s => s.id)

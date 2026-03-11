@@ -1,9 +1,10 @@
 {
-  "hash": 16878878349901575591,
+  "hash": 14708433785641074325,
   "models": {
     "CrudHaver": {
-      "hash": 13881397974626497053,
+      "hash": 3221090397089686579,
       "name": "CrudHaver",
+      "d1_binding": "db",
       "primary_key_columns": [
         {
           "hash": 6397878138472974760,
@@ -31,8 +32,9 @@
       "navigation_properties": []
     },
     "Parent": {
-      "hash": 11455382279994136169,
+      "hash": 1680874102925403923,
       "name": "Parent",
+      "d1_binding": "db",
       "primary_key_columns": [
         {
           "hash": 6397878138472974760,
@@ -90,8 +92,9 @@
       ]
     },
     "Child": {
-      "hash": 4957102660187136393,
+      "hash": 968287334711745682,
       "name": "Child",
+      "d1_binding": "db",
       "primary_key_columns": [
         {
           "hash": 6397878138472974760,

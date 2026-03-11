@@ -40,50 +40,26 @@ impl SemanticAnalysis {
             ),
         };
 
-        let (has_d1, has_r2, has_kv) = ast
-            .models
-            .iter()
-            .fold((false, false, false), |(d1, r2, kv), (_, m)| {
-                (d1 || m.has_d1(), r2 || m.has_r2(), kv || m.has_kv())
-            });
-
         for var in env.vars.keys() {
             ensure!(
                 spec.vars.contains_key(var),
-                GeneratorErrorKind::MissingWranglerVariable,
+                GeneratorErrorKind::InconsistentWranglerBinding,
                 "A variable is defined in the WranglerEnv but not in the Wrangler config ({})",
                 var
             )
         }
 
-        // If D1 models are defined, ensure a D1 database binding exists
-        ensure!(
-            !spec.d1_databases.is_empty() || !has_d1,
-            GeneratorErrorKind::MissingWranglerD1Binding,
-            "No D1 database binding is defined, but D1 models are defined in the WranglerEnv ({})",
-            env.source_path.display()
-        );
-
-        // TODO: multiple databases
-        if let Some(db) = spec.d1_databases.first() {
+        for db in &env.d1_bindings {
             ensure!(
-                env.d1_binding == db.binding,
+                spec.d1_databases
+                    .iter()
+                    .any(|d| d.binding.as_ref().is_some_and(|b| b == db)),
                 GeneratorErrorKind::InconsistentWranglerBinding,
-                "The Wrangler configs D1 binding does not match the WranglerEnv binding ({}.{:?} != {} in {})",
-                env.name,
-                env.d1_binding,
-                db.binding.as_ref().unwrap(),
+                "A Wrangler config D1 binding was missing or did not match the WranglerEnv binding ({} {})",
+                db,
                 env.source_path.display()
-            );
+            )
         }
-
-        // If KV models are defined, ensure a KV namespace binding exists
-        ensure!(
-            !spec.kv_namespaces.is_empty() || !has_kv,
-            GeneratorErrorKind::MissingWranglerKVNamespace,
-            "No KV namespace binding is defined, but KV models are defined in the WranglerEnv ({})",
-            env.source_path.display()
-        );
 
         for kv in &env.kv_bindings {
             ensure!(
@@ -96,14 +72,6 @@ impl SemanticAnalysis {
                 env.source_path.display()
             )
         }
-
-        // If R2 models are defined, ensure an R2 bucket binding exists
-        ensure!(
-            !spec.r2_buckets.is_empty() || !has_r2,
-            GeneratorErrorKind::MissingWranglerKVNamespace,
-            "No R2 bucket binding is defined, but R2 models are defined in the WranglerEnv ({})",
-            env.source_path.display()
-        );
 
         Ok(())
     }
@@ -283,6 +251,21 @@ impl SemanticAnalysis {
                 continue;
             }
 
+            // Database binding must be defined in the WranglerEnv
+            ensure!(
+                model.d1_binding.as_ref().is_some_and(|b| {
+                    ast.wrangler_env
+                        .as_ref()
+                        .unwrap()
+                        .d1_bindings
+                        .iter()
+                        .any(|db| db == b)
+                }),
+                GeneratorErrorKind::InconsistentWranglerBinding,
+                "{} is a D1 backed model but its database binding was missing or did not match any bindings in the WranglerEnv",
+                model.name,
+            );
+
             // At least one PK must be defined
             ensure!(
                 !model.primary_key_columns.is_empty(),
@@ -328,6 +311,18 @@ impl SemanticAnalysis {
                             fk.model_name
                         );
                     };
+
+                    // Ensure both models belong to the same database
+                    ensure!(
+                        model.d1_binding == fk_model.d1_binding,
+                        GeneratorErrorKind::InvalidModelReference,
+                        "{}.{} references {}, but they belong to different databases ({:?} != {:?})",
+                        model.name,
+                        col.value.name,
+                        fk.model_name,
+                        model.d1_binding,
+                        fk_model.d1_binding
+                    );
 
                     // Find the PK column reference the FK references
                     let Some(fk_model_pk) = fk_model
@@ -416,9 +411,22 @@ impl SemanticAnalysis {
                     nav.model_reference
                 );
 
+                // Ensure both models belong to the same database
+                let nav_model = ast.models.get(nav.model_reference.as_str()).unwrap();
+                ensure!(
+                    model.d1_binding == nav_model.d1_binding,
+                    GeneratorErrorKind::InvalidModelReference,
+                    "{}.{} references {}, but they belong to different databases ({:?} != {:?})",
+                    model.name,
+                    nav.var_name,
+                    nav.model_reference,
+                    model.d1_binding,
+                    nav_model.d1_binding
+                );
+
                 match &nav.kind {
                     NavigationPropertyKind::OneToOne { key_columns } => {
-                        let nav_model = ast.models.get(nav.model_reference.as_str()).unwrap();
+                        // nav_model is already retrieved and validated above
                         ensure!(
                             key_columns.len() == nav_model.primary_key_columns.len(),
                             GeneratorErrorKind::InvalidNavigationPropertyReference,
@@ -607,6 +615,19 @@ impl SemanticAnalysis {
                     "Many To Many Table {unique_id} {joined}",
                 );
             }
+
+            // Ensure both models in many-to-many relationship belong to the same database
+            let model1 = ast.models.get(jcts[0].as_str()).unwrap();
+            let model2 = ast.models.get(jcts[1].as_str()).unwrap();
+            ensure!(
+                model1.d1_binding == model2.d1_binding,
+                GeneratorErrorKind::InvalidModelReference,
+                "Many-to-many relationship between {} and {} requires both models to belong to the same database ({:?} != {:?})",
+                jcts[0],
+                jcts[1],
+                model1.d1_binding,
+                model2.d1_binding
+            );
         }
 
         kahns(graph, in_degree, d1_models.len())
@@ -615,6 +636,21 @@ impl SemanticAnalysis {
     fn kv_r2_models(ast: &CloesceAst, model: &Model) -> Result<()> {
         // Validate KV key format
         for kv in &model.kv_objects {
+            // Namespace must exist
+            ensure!(
+                ast.wrangler_env
+                    .as_ref()
+                    .unwrap()
+                    .kv_bindings
+                    .iter()
+                    .any(|ns| ns == &kv.namespace_binding),
+                GeneratorErrorKind::InconsistentWranglerBinding,
+                "{}.{} => {}? No matching KV namespace binding found in WranglerEnv",
+                model.name,
+                kv.value.name,
+                kv.namespace_binding
+            );
+
             let vars = extract_braced(&kv.format)?;
 
             for var in vars {
@@ -665,6 +701,21 @@ impl SemanticAnalysis {
 
         // Validate R2 Key format
         for r2 in &model.r2_objects {
+            // Bucket binding must exist
+            ensure!(
+                ast.wrangler_env
+                    .as_ref()
+                    .unwrap()
+                    .r2_bindings
+                    .iter()
+                    .any(|b| b == &r2.bucket_binding),
+                GeneratorErrorKind::InconsistentWranglerBinding,
+                "{}.{} => {}? No matching R2 bucket binding found in WranglerEnv",
+                model.name,
+                r2.var_name,
+                r2.bucket_binding
+            );
+
             let vars = extract_braced(&r2.format)?;
 
             for var in vars {

@@ -1,3 +1,4 @@
+import { Project } from "ts-morph";
 import {
   Model,
   CloesceAst,
@@ -18,6 +19,17 @@ import {
   CrudKind,
   CrudListParam,
 } from "../src/ast";
+
+export function cloesceProject(): Project {
+  const project = new Project({
+    compilerOptions: {
+      strict: true,
+    },
+  });
+
+  project.addSourceFileAtPath("./src/ui/backend.ts");
+  return project;
+}
 
 export function createAst(args?: {
   models?: Model[];
@@ -102,6 +114,7 @@ export class IncludeTreeBuilder {
 
 export class ModelBuilder {
   private name: string;
+  private d1_binding: string | null = null;
   private primary_key_names: string[] = [];
   private primary_key_types: Record<string, CidlType> = {};
   private columns: D1Column[] = [];
@@ -119,6 +132,11 @@ export class ModelBuilder {
 
   static model(name: string): ModelBuilder {
     return new ModelBuilder(name);
+  }
+
+  d1(binding: string): this {
+    this.d1_binding = binding;
+    return this;
   }
 
   col(
@@ -261,6 +279,7 @@ export class ModelBuilder {
 
     return {
       name: this.name,
+      d1_binding: this.d1_binding,
       primary_key_columns,
       columns: mutableColumns,
       navigation_properties: this.navigation_properties,

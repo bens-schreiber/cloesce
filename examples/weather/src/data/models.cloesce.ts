@@ -1,8 +1,8 @@
-import { Get, Post, HttpResult, Integer, Model, R2, Inject } from "cloesce/backend";
+import { Get, Post, HttpResult, Integer, Model, R2, Inject, Crud } from "cloesce/backend";
 import { R2ObjectBody, ReadableStream } from "@cloudflare/workers-types";
 import { Env } from "./main.cloesce";
 
-@Model()
+@Model("db")
 export class Weather {
     // Cloesce interprets this is a primary key.
     // Optionally, decorate with @PrimaryKey
@@ -38,7 +38,8 @@ export class Weather {
     }
 }
 
-@Model(["GET", "LIST", "SAVE"])
+@Crud("GET", "LIST", "SAVE")
+@Model("db")
 export class WeatherReport {
     // Cloesce assumes this is a primary key.
     // Optionally, decorate with @PrimaryKey

@@ -118,6 +118,7 @@ pub async fn test_sql(
                     MigrationsModel {
                         hash: model.hash,
                         name: model.name,
+                        d1_binding: None, // Not used in test
                         primary_key_columns: model.primary_key_columns,
                         columns: model.columns,
                         navigation_properties: model.navigation_properties,

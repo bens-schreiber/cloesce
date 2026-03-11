@@ -40,6 +40,7 @@ fn as_migration(ast: CloesceAst) -> MigrationsAst {
             let m = MigrationsModel {
                 hash: model.hash,
                 name: model.name,
+                d1_binding: Some("db".into()),
                 primary_key_columns: model.primary_key_columns,
                 columns: model.columns,
                 navigation_properties: model.navigation_properties,

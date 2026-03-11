@@ -191,10 +191,22 @@ export type KeysOfType<T, U> = {
  *
  * A stub decorator used by Cloesce to identify model classes.
  *
- * @param _kinds The CRUD kinds supported by this model.
+ * @param _d1Binding The optional D1 database binding name for this model.
  */
 export const Model =
-  (_kinds: CrudKind[] = []): ClassDecorator =>
+  (_d1Binding: string | null = null): ClassDecorator =>
+  () => {};
+
+/**
+ * Defines CRUD operations for a Cloesce Model.
+ *
+ * A stub decorator used by Cloesce to specify which CRUD operations
+ * are available for a model.
+ *
+ * @param kinds The CRUD kinds supported by this model.
+ */
+export const Crud =
+  (...kinds: CrudKind[]): ClassDecorator =>
   () => {};
 
 /**

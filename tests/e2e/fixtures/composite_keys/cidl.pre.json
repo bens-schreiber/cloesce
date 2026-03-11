@@ -3,7 +3,9 @@
     "wrangler_env": {
         "name": "Env",
         "source_path": "./seed__composite.cloesce.ts",
-        "d1_binding": "db",
+        "d1_bindings": [
+            "db"
+        ],
         "kv_bindings": [],
         "r2_bindings": [],
         "vars": {}
@@ -11,6 +13,7 @@
     "models": {
         "Student": {
             "name": "Student",
+            "d1_binding": "db",
             "columns": [
                 {
                     "foreign_key_reference": null,
@@ -82,6 +85,7 @@
         },
         "Course": {
             "name": "Course",
+            "d1_binding": "db",
             "columns": [
                 {
                     "foreign_key_reference": null,
@@ -131,6 +135,7 @@
         },
         "StudentCourse": {
             "name": "StudentCourse",
+            "d1_binding": "db",
             "columns": [],
             "primary_key_columns": [
                 {

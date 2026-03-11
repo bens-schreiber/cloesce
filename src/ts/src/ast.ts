@@ -136,6 +136,7 @@ export interface AstR2Object {
 /** @internal */
 export interface Model {
   name: string;
+  d1_binding: string | null;
   primary_key_columns: D1Column[];
   columns: D1Column[];
   navigation_properties: NavigationProperty[];
@@ -189,7 +190,7 @@ export interface DataSource {
 export interface WranglerEnv {
   name: string;
   source_path: string;
-  d1_binding?: string; // TODO: multiple D1 bindings
+  d1_bindings: string[];
   kv_bindings: string[];
   r2_bindings: string[];
   vars: Record<string, CidlType>;

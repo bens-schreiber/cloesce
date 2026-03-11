@@ -5,6 +5,7 @@ import {
   Service,
   Post,
   Integer,
+  Crud,
 } from "cloesce/backend";
 import { D1Database } from "@cloudflare/workers-types";
 
@@ -29,7 +30,8 @@ export class BlobService {
   }
 }
 
-@Model(["SAVE", "GET", "LIST"])
+@Crud("SAVE", "GET", "LIST")
+@Model("db")
 export class BlobHaver {
   id: Integer;
 

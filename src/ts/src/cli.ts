@@ -112,6 +112,11 @@ const cmds = subcommands({
       name: "migrate",
       description: "Creates a database migration.",
       args: {
+        binding: positional({
+          type: string,
+          displayName: "binding",
+          description: "The name of the D1 binding to generate a migration for",
+        }),
         name: positional({ type: string, displayName: "name" }),
         debug: flag({
           long: "debug",
@@ -134,31 +139,16 @@ const cmds = subcommands({
           fs.mkdirSync(config.migrationsPath);
         }
 
-        const migrationPrefix = path.join(
-          config.migrationsPath,
-          `${timestamp()}_${args.name}`,
-        );
+        let timestampU64 = BigInt(Math.floor(Date.now() / 1000));
         let wasmArgs = [
           "migrations",
           cidlPath,
-          `${migrationPrefix}.json`,
-          `${migrationPrefix}.sql`,
+          args.binding,
+          args.name,
+          timestampU64.toString(),
+          "wrangler.toml",
+          ".",
         ];
-
-        // Add last migration if exists
-        {
-          const files = fs.readdirSync(config.migrationsPath);
-          const jsonFiles = files.filter((f) => f.endsWith(".json"));
-
-          // Sort descending by filename
-          jsonFiles.sort((a, b) =>
-            b.localeCompare(a, undefined, { numeric: true }),
-          );
-
-          if (jsonFiles.length > 0) {
-            wasmArgs.push(path.join(config.migrationsPath, jsonFiles[0]));
-          }
-        }
 
         const migrateConfig: WasmConfig = {
           name: "migrations",

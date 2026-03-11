@@ -49,6 +49,7 @@ enum PropertyDecoratorKind {
 
 enum ClassDecoratorKind {
   Model = "Model",
+  Crud = "Crud",
   WranglerEnv = "WranglerEnv",
   Service = "Service",
 }
@@ -70,6 +71,7 @@ export class CidlExtractor {
     project: Project,
   ): Either<ExtractorError, CloesceAst> {
     const modelDecls: Map<string, [ClassDeclaration, Decorator]> = new Map();
+    const crudDecls: Map<string, Decorator> = new Map();
     const serviceDecls: Map<string, ClassDeclaration> = new Map();
     const wranglerEnvs: WranglerEnv[] = [];
     let main_source: string | null = null;
@@ -99,6 +101,11 @@ export class CidlExtractor {
             case ClassDecoratorKind.Model: {
               if (!classDecl.isExported()) return notExportedErr;
               modelDecls.set(classDecl.getName()!, [classDecl, decorator]);
+              break;
+            }
+
+            case ClassDecoratorKind.Crud: {
+              crudDecls.set(classDecl.getName()!, decorator);
               break;
             }
 
@@ -134,11 +141,13 @@ export class CidlExtractor {
 
     // Extract models
     const models: Record<string, Model> = {};
-    for (const [_, [classDecl, decorator]] of modelDecls) {
+    for (const [modelName, [classDecl, decorator]] of modelDecls) {
+      const crudDecorator = crudDecls.get(modelName);
       const res = extractor.model(
         classDecl,
         classDecl.getSourceFile(),
         decorator,
+        crudDecorator,
       );
       if (res.isLeft()) {
         res.value.addContext((prev) => `${classDecl.getName()}.${prev}`);
@@ -262,6 +271,7 @@ export class CidlExtractor {
     classDecl: ClassDeclaration,
     sourceFile: SourceFile,
     decorator: Decorator,
+    crudDecorator?: Decorator,
   ): Either<ExtractorError, Model> {
     const name = classDecl.getName()!;
     const columns: D1Column[] = [];
@@ -273,16 +283,22 @@ export class CidlExtractor {
     const methods: Record<string, ApiMethod> = {};
     const cruds: Set<CrudKind> = new Set<CrudKind>();
     const primary_key_columns: D1Column[] = [];
+    let d1_binding: string | null = null;
 
-    // Extract crud methods
-    const arg = decorator.getArguments()[0];
-    if (arg && MorphNode.isArrayLiteralExpression(arg)) {
-      for (const a of arg.getElements()) {
-        cruds.add(
-          (MorphNode.isStringLiteral(a)
-            ? a.getLiteralValue()
-            : a.getText()) as CrudKind,
-        );
+    // Extract d1_binding from @Model decorator
+    const bindingArg = decorator.getArguments()[0];
+    if (bindingArg && MorphNode.isStringLiteral(bindingArg)) {
+      d1_binding = bindingArg.getLiteralValue();
+    }
+
+    // Extract crud methods from @Crud decorator (rest parameters)
+    if (crudDecorator) {
+      for (const arg of crudDecorator.getArguments()) {
+        if (MorphNode.isStringLiteral(arg)) {
+          cruds.add(arg.getLiteralValue() as CrudKind);
+        } else {
+          cruds.add(arg.getText() as CrudKind);
+        }
       }
     }
 
@@ -635,6 +651,7 @@ export class CidlExtractor {
 
     return Either.right({
       name,
+      d1_binding,
       columns,
       primary_key_columns,
       navigation_properties,
@@ -923,7 +940,7 @@ export class CidlExtractor {
     sourceFile: SourceFile,
   ): Either<ExtractorError, WranglerEnv> {
     const vars: Record<string, CidlType> = {};
-    let d1_binding: string | undefined = undefined;
+    const d1_bindings: string[] = [];
     const kv_bindings: string[] = [];
     const r2_bindings: string[] = [];
 
@@ -934,9 +951,8 @@ export class CidlExtractor {
         return checkModifierRes;
       }
 
-      // TODO: Support multiple D1 bindings
       if (getTypeText(prop.getType()) === "D1Database") {
-        d1_binding = prop.getName();
+        d1_bindings.push(prop.getName());
         continue;
       }
 
@@ -963,7 +979,7 @@ export class CidlExtractor {
     return Either.right({
       name: classDecl.getName()!,
       source_path: sourceFile.getFilePath().toString(),
-      d1_binding,
+      d1_bindings,
       kv_bindings,
       r2_bindings,
       vars,

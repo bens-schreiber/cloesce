@@ -3,7 +3,9 @@
     "wrangler_env": {
         "name": "Env",
         "source_path": "./seed__kv.cloesce.ts",
-        "d1_binding": "db",
+        "d1_bindings": [
+            "db"
+        ],
         "kv_bindings": [
             "namespace",
             "otherNamespace"
@@ -14,6 +16,7 @@
     "models": {
         "PureKVModel": {
             "name": "PureKVModel",
+            "d1_binding": null,
             "columns": [],
             "primary_key_columns": [],
             "navigation_properties": [],
@@ -44,13 +47,13 @@
             "methods": {},
             "data_sources": {},
             "cruds": [
-                "GET",
-                "SAVE"
+                "GET"
             ],
             "source_path": "./seed__kv.cloesce.ts"
         },
         "D1BackedModel": {
             "name": "D1BackedModel",
+            "d1_binding": "db",
             "columns": [
                 {
                     "foreign_key_reference": null,
@@ -109,6 +112,7 @@
         },
         "PaginatedKVModel": {
             "name": "PaginatedKVModel",
+            "d1_binding": null,
             "columns": [],
             "primary_key_columns": [],
             "navigation_properties": [],

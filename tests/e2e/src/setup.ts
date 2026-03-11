@@ -14,11 +14,15 @@ export async function startWrangler(
   await fs.rm(`${fixturesPath}/dist`, { recursive: true, force: true });
 
   if (withMigrations) {
-    await runCmd(
-      "Applying D1 migrations",
-      "echo y | npx wrangler d1 migrations apply db",
-      { cwd: fixturesPath },
-    );
+    const d1Bindings = await getD1Bindings(fixturesPath);
+
+    for (const binding of d1Bindings) {
+      await runCmd(
+        `Applying D1 migrations (${binding})`,
+        `echo y | npx wrangler d1 migrations apply ${binding}`,
+        { cwd: fixturesPath },
+      );
+    }
   }
 
   await runCmd(
@@ -77,6 +81,12 @@ export async function stopWrangler() {
 
 export function withRes(message: string, res: any): string {
   return `${message}\n\n${JSON.stringify(res)}`;
+}
+
+async function getD1Bindings(fixturesPath: string): Promise<string[]> {
+  const cidlRaw = await fs.readFile(`${fixturesPath}/cidl.json`, "utf8");
+  const cidl = JSON.parse(cidlRaw);
+  return cidl.wrangler_env?.d1_bindings ?? [];
 }
 
 async function runCmd(label: string, cmd: string, opts: { cwd?: string } = {}) {

@@ -15,7 +15,7 @@ export class Env {
   db: D1Database;
 }
 
-@Model()
+@Model("db")
 export class Dog {
   id: Integer;
 

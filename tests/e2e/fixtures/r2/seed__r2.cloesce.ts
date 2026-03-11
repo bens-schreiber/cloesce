@@ -8,6 +8,7 @@ import {
   DataSource,
   Inject,
   Put,
+  Crud,
 } from "cloesce/backend";
 import {
   D1Database,
@@ -23,7 +24,8 @@ export class Env {
   bucket2: R2Bucket;
 }
 
-@Model(["GET"])
+@Crud("GET")
+@Model()
 export class PureR2Model {
   @KeyParam
   id: string;
@@ -48,7 +50,8 @@ export class PureR2Model {
   }
 }
 
-@Model(["GET", "SAVE", "LIST"])
+@Crud("GET", "SAVE", "LIST")
+@Model("db")
 export class D1BackedModel {
   id: Integer;
 

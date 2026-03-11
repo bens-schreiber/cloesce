@@ -319,6 +319,7 @@ pub struct Model {
     /// The symbol that defines the model in the source code.
     pub name: String,
 
+    pub d1_binding: Option<String>,
     pub primary_key_columns: Vec<D1Column>,
     pub columns: Vec<D1Column>,
     pub navigation_properties: Vec<NavigationProperty>,
@@ -338,7 +339,7 @@ pub struct Model {
 
 impl Model {
     pub fn has_d1(&self) -> bool {
-        !self.columns.is_empty() || !self.primary_key_columns.is_empty()
+        self.d1_binding.is_some()
     }
 
     pub fn has_kv(&self) -> bool {
@@ -410,10 +411,7 @@ pub struct WranglerEnv {
     /// Class name of the Wrangler environment.
     pub name: String,
     pub source_path: PathBuf,
-
-    // TODO: Many database bindings
-    pub d1_binding: Option<String>,
-
+    pub d1_bindings: Vec<String>,
     pub kv_bindings: Vec<String>,
     pub r2_bindings: Vec<String>,
     pub vars: HashMap<String, CidlType>,
@@ -465,6 +463,7 @@ impl CloesceAst {
                 let m = MigrationsModel {
                     hash: model.hash,
                     name: model.name,
+                    d1_binding: model.d1_binding,
                     primary_key_columns: model.primary_key_columns,
                     columns: model.columns,
                     navigation_properties: model.navigation_properties,
@@ -494,6 +493,7 @@ impl CloesceAst {
             let mut model_h = FxHasher::default();
             model_h.write(b"Model");
             model.name.hash(&mut model_h);
+            model.d1_binding.hash(&mut model_h);
 
             for pk_col in model.primary_key_columns.iter_mut() {
                 let pk_col_h = {
@@ -553,6 +553,10 @@ impl CloesceAst {
 pub struct MigrationsModel {
     pub hash: u64,
     pub name: String,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub d1_binding: Option<String>,
+
     pub primary_key_columns: Vec<D1Column>,
     pub columns: Vec<D1Column>,
     pub navigation_properties: Vec<NavigationProperty>,
@@ -602,6 +606,7 @@ pub struct D1Database {
     pub binding: Option<String>,
     pub database_name: Option<String>,
     pub database_id: Option<String>,
+    pub migrations_dir: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
@@ -645,6 +650,7 @@ where
     struct Temp {
         hash: u64,
         name: String,
+        d1_binding: Option<String>,
         primary_key_columns: Vec<D1Column>,
         columns: Vec<D1Column>,
         navigation_properties: Vec<NavigationProperty>,
@@ -659,6 +665,7 @@ where
                 let m = MigrationsModel {
                     hash: t.hash,
                     name: t.name,
+                    d1_binding: t.d1_binding,
                     primary_key_columns: t.primary_key_columns,
                     columns: t.columns,
                     navigation_properties: t.navigation_properties,

@@ -99,10 +99,8 @@ export class Orm {
     return new Orm(env);
   }
 
-  // TODO: support multiple D1 bindings
-  private get db(): D1Database {
-    const { ast } = RuntimeContainer.get();
-    return (this.env as any)[ast.wrangler_env!.d1_binding!];
+  private getDb(binding: string): D1Database {
+    return (this.env as any)[binding] as D1Database;
   }
 
   /**
@@ -323,6 +321,7 @@ export class Orm {
   ): Promise<T | null> {
     const { wasm, ast } = RuntimeContainer.get();
     const meta = ast.models[ctor.name];
+    const d1Binding = meta.d1_binding ? this.getDb(meta.d1_binding) : null;
 
     const includeTree = getTreeFromInclude(include);
     const upsertQueryRes = invokeOrmWasm(
@@ -384,12 +383,12 @@ export class Orm {
     );
 
     const queries = res.sql.map((s) =>
-      this.db.prepare(s.query).bind(...s.values),
+      d1Binding!.prepare(s.query).bind(...s.values),
     );
 
     // Concurrently execute SQL with KV uploads.
     const [batchRes] = await Promise.all([
-      queries.length > 0 ? this.db.batch(queries) : Promise.resolve([]),
+      queries.length > 0 ? d1Binding!.batch(queries) : Promise.resolve([]),
       ...kvUploadPromises,
     ]);
 
@@ -524,8 +523,8 @@ export class Orm {
       return [];
     }
 
-    if (model.primary_key_columns.length < 1) {
-      // Listing is not supported for models without primary keys (i.e., KV or R2 only).
+    if (!model.d1_binding) {
+      // Listing is not supported for non-D1 models
       return [];
     }
 
@@ -589,7 +588,8 @@ export class Orm {
       }
     }
 
-    const rows = await this.db
+    const d1Binding = this.getDb(model.d1_binding);
+    const rows = await d1Binding
       .prepare(query)
       .bind(...bindValues)
       .all();
@@ -648,7 +648,7 @@ export class Orm {
     args.keyParams ??= {};
 
     // KV or R2 only
-    if (model.primary_key_columns.length < 1) {
+    if (!model.d1_binding) {
       return await this.hydrate(ctor, {
         keyParams: args.keyParams,
         include: args.include,
@@ -682,7 +682,8 @@ export class Orm {
       usedDefaultQuery = true;
     }
 
-    const rows = await this.db
+    const d1Binding = this.getDb(model.d1_binding);
+    const rows = await d1Binding
       .prepare(query)
       .bind(...primaryKeyValues)
       .all();
