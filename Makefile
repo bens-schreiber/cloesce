@@ -115,4 +115,4 @@ clean:
 	@echo "✅ Build artifacts removed!"
 
 .PHONY: all
-all: check-deps format  build-src format-check build-docs build-typedoc test
+all: check-deps format build-src format-check build-docs build-typedoc test

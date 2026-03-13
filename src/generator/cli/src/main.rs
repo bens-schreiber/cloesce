@@ -305,8 +305,12 @@ fn generate_migrations(
         } else {
             entries
                 .iter()
-                .filter(|p| p.extension().and_then(|e| e.to_str()) == Some("json"))
-                .next_back()
+                .rfind(|p| {
+                    p.extension()
+                        .and_then(|e| e.to_str())
+                        .map(|ext| ext.eq_ignore_ascii_case("json"))
+                        .unwrap_or(false)
+                })
                 .cloned()
         };
 
