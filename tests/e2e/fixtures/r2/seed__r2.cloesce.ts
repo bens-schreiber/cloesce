@@ -5,9 +5,9 @@ import {
   KeyParam,
   Model,
   Integer,
-  DataSource,
   Inject,
   Put,
+  Crud,
 } from "cloesce/backend";
 import {
   D1Database,
@@ -23,7 +23,8 @@ export class Env {
   bucket2: R2Bucket;
 }
 
-@Model(["GET"])
+@Crud("GET")
+@Model()
 export class PureR2Model {
   @KeyParam
   id: string;
@@ -31,7 +32,7 @@ export class PureR2Model {
   @R2("path/to/data/{id}", "bucket1")
   data: R2ObjectBody;
 
-  @R2("path/to/other/{id}", "bucket2")
+  @R2("path/to/other/{id}", "bucket1")
   otherData: R2ObjectBody;
 
   @R2("path/", "bucket1")
@@ -44,11 +45,12 @@ export class PureR2Model {
 
   @Put()
   async uploadOtherData(@Inject env: Env, stream: ReadableStream) {
-    await env.bucket2.put(`path/to/other/${this.id}`, stream);
+    await env.bucket1.put(`path/to/other/${this.id}`, stream);
   }
 }
 
-@Model(["GET", "SAVE", "LIST"])
+@Crud("GET", "SAVE", "LIST")
+@Model("db")
 export class D1BackedModel {
   id: Integer;
 

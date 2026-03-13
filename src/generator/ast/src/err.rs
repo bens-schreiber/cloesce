@@ -5,6 +5,7 @@ pub enum GeneratorPhase {
     External,
     ModelAnalysis,
     WranglerAnalysis,
+    Migrations,
 }
 
 #[derive(Debug)]
@@ -66,9 +67,6 @@ pub enum GeneratorErrorKind {
     ExtraneousManyToManyReferences,
     MissingManyToManyReference,
     MissingWranglerEnv,
-    MissingWranglerVariable,
-    MissingWranglerD1Binding,
-    MissingWranglerKVNamespace,
     InconsistentWranglerBinding,
     InvalidStream,
     InvalidModelReference,
@@ -77,12 +75,12 @@ pub enum GeneratorErrorKind {
     UnsupportedCrudOperation,
     UnknownCompositeKeyReference,
     InvalidCompositeKey,
+    UnknownBinding,
 }
 
 impl GeneratorErrorKind {
     pub fn to_error(self) -> GeneratorError {
         let (description, suggestion, phase) = match self {
-            /* ---- MODELS ---- */
             GeneratorErrorKind::NullSqlType => (
                 "Model attributes cannot be literally null",
                 "Remove 'null' from your Model definition.",
@@ -206,8 +204,6 @@ impl GeneratorErrorKind {
                 "Ensure all composite key references in the key format correspond to valid combinations of columns in the Model.",
                 GeneratorPhase::ModelAnalysis,
             ),
-
-            /* ---- WRANGLER ---- */
             GeneratorErrorKind::InconsistentWranglerBinding => (
                 "Wrangler config definitions must be consistent with the WranglerEnv definition",
                 "Change your WranglerEnv's bindings to match the Wrangler file",
@@ -218,24 +214,12 @@ impl GeneratorErrorKind {
                 "Add a WranglerEnv definition to your backend code.",
                 GeneratorPhase::WranglerAnalysis,
             ),
-            GeneratorErrorKind::MissingWranglerVariable => (
-                "A Wrangler config variable binding is required to define a variable in the WranglerEnv",
-                "Add the variable binding to your Wrangler configuration.",
-                GeneratorPhase::WranglerAnalysis,
-            ),
-            GeneratorErrorKind::MissingWranglerD1Binding => (
-                "A Wrangler config D1 database binding is required to define a D1 Model.",
-                "Add the D1 database binding to your Wrangler configuration.",
-                GeneratorPhase::WranglerAnalysis,
-            ),
-            GeneratorErrorKind::MissingWranglerKVNamespace => (
-                "A Wrangler config KV namespace binding is required to define a KV Model.",
-                "Add the KV namespace binding to your Wrangler configuration.",
-                GeneratorPhase::WranglerAnalysis,
-            ),
-
-            /* ---- EXTERNAL ---- */
             GeneratorErrorKind::InvalidInputFile => ("", "", GeneratorPhase::External),
+            GeneratorErrorKind::UnknownBinding => (
+                "Migration references an unknown D1 binding.",
+                "Ensure all binding references correspond to defined bindings.",
+                GeneratorPhase::Migrations,
+            ),
         };
 
         GeneratorError::new(self, phase, description.into(), suggestion.into())

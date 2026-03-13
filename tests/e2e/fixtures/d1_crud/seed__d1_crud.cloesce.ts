@@ -1,4 +1,4 @@
-import { Model, WranglerEnv, Post, Integer, DataSource } from "cloesce/backend";
+import { Model, WranglerEnv, Post, Integer, DataSource, Crud } from "cloesce/backend";
 import { D1Database } from "@cloudflare/workers-types";
 
 @WranglerEnv
@@ -6,7 +6,8 @@ export class Env {
   db: D1Database;
 }
 
-@Model(["SAVE", "GET", "LIST"])
+@Crud("SAVE", "GET", "LIST")
+@Model("db")
 export class CrudHaver {
   id: Integer;
   name: string;
@@ -15,7 +16,8 @@ export class CrudHaver {
   async notCrud(): Promise<void> { }
 }
 
-@Model(["SAVE", "GET", "LIST"])
+@Crud("SAVE", "GET", "LIST")
+@Model("db")
 export class Parent {
   id: Integer;
 
@@ -32,7 +34,7 @@ export class Parent {
   };
 }
 
-@Model()
+@Model("db")
 export class Child {
   id: Integer;
   parentId: Integer;

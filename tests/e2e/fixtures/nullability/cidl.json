@@ -1,18 +1,21 @@
 {
-  "hash": 18399852764960491253,
+  "hash": 17765369616828601231,
   "project_name": "runner",
   "wrangler_env": {
     "name": "Env",
     "source_path": "./seed__nullability.cloesce.ts",
-    "d1_binding": "db",
+    "d1_bindings": [
+      "db"
+    ],
     "kv_bindings": [],
     "r2_bindings": [],
     "vars": {}
   },
   "models": {
     "NullabilityChecks": {
-      "hash": 7244151530438892229,
+      "hash": 7819174499920087688,
       "name": "NullabilityChecks",
+      "d1_binding": "db",
       "primary_key_columns": [
         {
           "hash": 6397878138472974760,

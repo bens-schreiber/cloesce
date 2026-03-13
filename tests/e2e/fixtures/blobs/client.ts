@@ -5,7 +5,7 @@ export class BlobService {
     blob: Uint8Array,
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Uint8Array>> {
-    const baseUrl = new URL("http://localhost:5002/api/BlobService/incrementBlob");
+    const baseUrl = new URL("http://localhost:5668/api/BlobService/incrementBlob");
     const payload: any = {};
 
     payload["blob"] = blob;
@@ -36,7 +36,7 @@ export class BlobHaver {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<BlobHaver>> {
     const baseUrl = new URL(
-      `http://localhost:5002/api/BlobHaver/GET`
+      `http://localhost:5668/api/BlobHaver/GET`
     );
 
     baseUrl.searchParams.append("id", String(id));
@@ -61,7 +61,7 @@ export class BlobHaver {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<BlobHaver[]>> {
     const baseUrl = new URL(
-      `http://localhost:5002/api/BlobHaver/LIST`
+      `http://localhost:5668/api/BlobHaver/LIST`
     );
 
     baseUrl.searchParams.append("lastSeen_id", String(lastSeen_id));
@@ -86,7 +86,7 @@ export class BlobHaver {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<BlobHaver>> {
     const baseUrl = new URL(
-      `http://localhost:5002/api/BlobHaver/SAVE`
+      `http://localhost:5668/api/BlobHaver/SAVE`
     );
     const payload: any = {};
 
@@ -113,7 +113,7 @@ export class BlobHaver {
     encodeURIComponent(String(this.id)),
     ].join("/");
     const baseUrl = new URL(
-      `http://localhost:5002/api/BlobHaver/${id}/getBlob1`
+      `http://localhost:5668/api/BlobHaver/${id}/getBlob1`
     );
 
 
@@ -133,7 +133,7 @@ export class BlobHaver {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<void>> {
     const baseUrl = new URL(
-      `http://localhost:5002/api/BlobHaver/inputStream`
+      `http://localhost:5668/api/BlobHaver/inputStream`
     );
     const payload: any = {};
 
@@ -159,7 +159,7 @@ export class BlobHaver {
     encodeURIComponent(String(this.id)),
     ].join("/");
     const baseUrl = new URL(
-      `http://localhost:5002/api/BlobHaver/${id}/yieldStream`
+      `http://localhost:5668/api/BlobHaver/${id}/yieldStream`
     );
 
 

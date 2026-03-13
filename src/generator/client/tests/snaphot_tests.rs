@@ -18,6 +18,7 @@ use workers::WorkersGenerator;
 fn test_client_code_generation_snapshot() {
     let mut ast = create_ast(vec![
         ModelBuilder::new("BasicModel")
+            .default_db()
             .id_pk()
             .col(
                 "fk_to_model",
@@ -31,6 +32,7 @@ fn test_client_code_generation_snapshot() {
             .build(),
         // All valid SQL column types
         ModelBuilder::new("HasSqlColumnTypes")
+            .default_db()
             .id_pk()
             .col("string", CidlType::Text, None, None)
             .col("integer", CidlType::Integer, None, None)
@@ -60,6 +62,7 @@ fn test_client_code_generation_snapshot() {
             .build(),
         // One to One Navigation Property
         ModelBuilder::new("HasOneToOne")
+            .default_db()
             .id_pk()
             // one to one
             .col(
@@ -81,6 +84,7 @@ fn test_client_code_generation_snapshot() {
             .build(),
         // One to Many Navigation Property
         ModelBuilder::new("OneToManyModel")
+            .default_db()
             .id_pk()
             .nav_p(
                 "oneToManyNav",
@@ -92,6 +96,7 @@ fn test_client_code_generation_snapshot() {
             .build(),
         // Many to Many
         ModelBuilder::new("ManyToManyModelA")
+            .default_db()
             .id_pk()
             .nav_p(
                 "manyToManyNav",
@@ -100,6 +105,7 @@ fn test_client_code_generation_snapshot() {
             )
             .build(),
         ModelBuilder::new("ManyToManyModelB")
+            .default_db()
             .id_pk()
             .nav_p(
                 "manyToManyNav",
@@ -109,6 +115,7 @@ fn test_client_code_generation_snapshot() {
             .build(),
         // Composite PK model
         ModelBuilder::new("ModelWithCompositePk")
+            .default_db()
             .pk("tenantId", CidlType::Text)
             .pk("rowId", CidlType::Integer)
             .col("name", CidlType::Text, None, None)
@@ -128,21 +135,9 @@ fn test_client_code_generation_snapshot() {
         ModelBuilder::new("ModelWithKv")
             .key_param("id1")
             .key_param("id2")
-            .kv_object(
-                "{id1}",
-                "kv_namespace",
-                "someValue",
-                false,
-                CidlType::JsonValue,
-            )
-            .kv_object("", "kv_namespace", "manyValues", true, CidlType::JsonValue)
-            .kv_object(
-                "constant",
-                "kv_namespace",
-                "streamValue",
-                false,
-                CidlType::Stream,
-            )
+            .kv_object("{id1}", "kv", "someValue", false, CidlType::JsonValue)
+            .kv_object("", "kv", "manyValues", true, CidlType::JsonValue)
+            .kv_object("constant", "kv", "streamValue", false, CidlType::Stream)
             .method(
                 "instanceMethod",
                 HttpVerb::Post,
@@ -179,10 +174,11 @@ fn test_client_code_generation_snapshot() {
             .build(),
         // R2
         ModelBuilder::new("ModelWithR2")
+            .default_db()
             .id_pk()
             .key_param("r2Id")
-            .r2_object("r2/{id}/{r2Id}", "r2_namespace", "fileData", false)
-            .r2_object("r2", "r2_namespace", "manyFileDatas", true)
+            .r2_object("r2/{id}/{r2Id}", "r2", "fileData", false)
+            .r2_object("r2", "r2", "manyFileDatas", true)
             .method(
                 "hasR2ParamAndRes",
                 HttpVerb::Post,
@@ -197,18 +193,19 @@ fn test_client_code_generation_snapshot() {
             .build(),
         // Hybrid (D1, KV, R2)
         ModelBuilder::new("ToyotaPrius")
+            .default_db()
             .id_pk()
             .col("modelYear", CidlType::Integer, None, None)
             .key_param("ownerId")
             .key_param("vehicleId")
             .kv_object(
                 "{ownerId}/{modelYear}",
-                "owner_metadata",
+                "kv",
                 "metadata",
                 false,
                 CidlType::JsonValue,
             )
-            .r2_object("{vehicleId}", "vehicle_photos", "photoData", false)
+            .r2_object("{vehicleId}", "r2", "photoData", false)
             .method(
                 "instanceMethod",
                 HttpVerb::Post,
@@ -248,6 +245,7 @@ fn test_client_code_generation_snapshot() {
     // CRUD methods
     {
         let mut model_with_cruds = ModelBuilder::new("ModelWithCruds")
+            .default_db()
             .id_pk()
             .col("name", CidlType::Text, None, None)
             .build();

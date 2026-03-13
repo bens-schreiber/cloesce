@@ -1,4 +1,4 @@
-import { KV, KValue, Paginated, WranglerEnv, KeyParam, Model, DataSource, Integer, Post } from "cloesce/backend";
+import { KV, KValue, Paginated, WranglerEnv, KeyParam, Model, DataSource, Integer, Post, Crud } from "cloesce/backend";
 import { D1Database, KVNamespace } from "@cloudflare/workers-types";
 
 @WranglerEnv
@@ -8,7 +8,8 @@ export class Env {
   otherNamespace: KVNamespace;
 }
 
-@Model(["GET", "SAVE"])
+@Crud("GET", "SAVE")
+@Model()
 export class PureKVModel {
   @KeyParam
   id: string;
@@ -20,7 +21,8 @@ export class PureKVModel {
   otherData: KValue<string>;
 }
 
-@Model(["GET", "SAVE", "LIST"])
+@Crud("GET", "SAVE", "LIST")
+@Model("db")
 export class D1BackedModel {
   id: Integer;
 
@@ -34,7 +36,8 @@ export class D1BackedModel {
   kvData: KValue<unknown>;
 }
 
-@Model(["GET"])
+@Crud("GET")
+@Model()
 export class PaginatedKVModel {
   @KeyParam
   id: string;

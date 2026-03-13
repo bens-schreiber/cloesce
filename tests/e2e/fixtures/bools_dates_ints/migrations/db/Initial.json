@@ -1,9 +1,10 @@
 {
-  "hash": 13117940673344338035,
+  "hash": 14113549040013838164,
   "models": {
-    "BlobHaver": {
-      "hash": 14402369111485430200,
-      "name": "BlobHaver",
+    "Weather": {
+      "hash": 10306382131681195126,
+      "name": "Weather",
+      "d1_binding": "db",
       "primary_key_columns": [
         {
           "hash": 6397878138472974760,
@@ -18,20 +19,20 @@
       ],
       "columns": [
         {
-          "hash": 17404811013903783014,
+          "hash": 7419779783954734969,
           "value": {
-            "name": "blob1",
-            "cidl_type": "Blob"
+            "name": "date",
+            "cidl_type": "DateIso"
           },
           "foreign_key_reference": null,
           "unique_ids": [],
           "composite_id": null
         },
         {
-          "hash": 14390429867474788070,
+          "hash": 5134907052289059425,
           "value": {
-            "name": "blob2",
-            "cidl_type": "Blob"
+            "name": "isRaining",
+            "cidl_type": "Boolean"
           },
           "foreign_key_reference": null,
           "unique_ids": [],

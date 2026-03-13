@@ -1,18 +1,21 @@
 {
-  "hash": 15400383832348768155,
+  "hash": 4118850450692199408,
   "project_name": "runner",
   "wrangler_env": {
     "name": "Env",
     "source_path": "./seed__ds.cloesce.ts",
-    "d1_binding": "db",
+    "d1_bindings": [
+      "db"
+    ],
     "kv_bindings": [],
     "r2_bindings": [],
     "vars": {}
   },
   "models": {
     "Foo": {
-      "hash": 5230020806445609534,
+      "hash": 9350576688796676214,
       "name": "Foo",
+      "d1_binding": "db",
       "primary_key_columns": [
         {
           "hash": 6397878138472974760,
@@ -88,8 +91,9 @@
       "source_path": "./seed__ds.cloesce.ts"
     },
     "NoDs": {
-      "hash": 17279481028985126790,
+      "hash": 1047721130316512114,
       "name": "NoDs",
+      "d1_binding": "db",
       "primary_key_columns": [
         {
           "hash": 6397878138472974760,
@@ -123,8 +127,9 @@
       "source_path": "./seed__ds.cloesce.ts"
     },
     "OneDs": {
-      "hash": 13768284310604316528,
+      "hash": 7029550209668726983,
       "name": "OneDs",
+      "d1_binding": "db",
       "primary_key_columns": [
         {
           "hash": 6397878138472974760,

@@ -1,10 +1,12 @@
 {
-  "hash": 8885713398587814937,
+  "hash": 11127522741759014364,
   "project_name": "runner",
   "wrangler_env": {
     "name": "Env",
     "source_path": "./seed__kv.cloesce.ts",
-    "d1_binding": "db",
+    "d1_bindings": [
+      "db"
+    ],
     "kv_bindings": [
       "namespace",
       "otherNamespace"
@@ -14,8 +16,9 @@
   },
   "models": {
     "D1BackedModel": {
-      "hash": 9299503543144665556,
+      "hash": 6703974713046051109,
       "name": "D1BackedModel",
+      "d1_binding": "db",
       "primary_key_columns": [
         {
           "hash": 6397878138472974760,
@@ -186,8 +189,9 @@
       "source_path": "./seed__kv.cloesce.ts"
     },
     "PureKVModel": {
-      "hash": 17429923880492602280,
+      "hash": 5491520551375615806,
       "name": "PureKVModel",
+      "d1_binding": null,
       "primary_key_columns": [],
       "columns": [],
       "navigation_properties": [],
@@ -290,8 +294,9 @@
       "source_path": "./seed__kv.cloesce.ts"
     },
     "PaginatedKVModel": {
-      "hash": 14919198216055227446,
+      "hash": 13757542679648203632,
       "name": "PaginatedKVModel",
+      "d1_binding": null,
       "primary_key_columns": [],
       "columns": [],
       "navigation_properties": [],

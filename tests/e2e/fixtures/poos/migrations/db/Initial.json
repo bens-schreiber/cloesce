@@ -1,9 +1,10 @@
 {
-  "hash": 9540641249058581934,
+  "hash": 17820378546947952927,
   "models": {
     "PooAcceptYield": {
-      "hash": 2437790181907432280,
+      "hash": 8862362961581783171,
       "name": "PooAcceptYield",
+      "d1_binding": "db",
       "primary_key_columns": [
         {
           "hash": 6397878138472974760,

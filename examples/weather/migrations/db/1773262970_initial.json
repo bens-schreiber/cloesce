@@ -1,9 +1,10 @@
 {
-  "hash": 3578175031,
+  "hash": 1396661610,
   "models": {
     "WeatherReport": {
-      "hash": 1972420924,
+      "hash": 2033966860,
       "name": "WeatherReport",
+      "d1_binding": "db",
       "primary_key_columns": [
         {
           "hash": 3808173647,
@@ -54,8 +55,9 @@
       ]
     },
     "Weather": {
-      "hash": 1156483465,
+      "hash": 731488034,
       "name": "Weather",
+      "d1_binding": "db",
       "primary_key_columns": [
         {
           "hash": 3808173647,

@@ -11,7 +11,7 @@ export class A {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<A>> {
     const baseUrl = new URL(
-      `http://localhost:5002/api/A/post`
+      `http://localhost:5499/api/A/post`
     );
     const payload: any = {};
 
@@ -35,7 +35,7 @@ export class A {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<void>> {
     const baseUrl = new URL(
-      `http://localhost:5002/api/A/returnFatalIfParamsNotInstantiated`
+      `http://localhost:5499/api/A/returnFatalIfParamsNotInstantiated`
     );
     const payload: any = {};
 
@@ -61,7 +61,7 @@ export class A {
     encodeURIComponent(String(this.id)),
     ].join("/");
     const baseUrl = new URL(
-      `http://localhost:5002/api/A/${id}/withoutB`
+      `http://localhost:5499/api/A/${id}/withoutB`
     );
 
 
@@ -93,7 +93,7 @@ export class B {
     encodeURIComponent(String(this.id)),
     ].join("/");
     const baseUrl = new URL(
-      `http://localhost:5002/api/B/${id}/testMethod`
+      `http://localhost:5499/api/B/${id}/testMethod`
     );
     const payload: any = {};
 
@@ -141,7 +141,7 @@ export class Dog {
     encodeURIComponent(String(this.id)),
     ].join("/");
     const baseUrl = new URL(
-      `http://localhost:5002/api/Dog/${id}/testMethod`
+      `http://localhost:5499/api/Dog/${id}/testMethod`
     );
     const payload: any = {};
 
@@ -174,7 +174,7 @@ export class Person {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Person>> {
     const baseUrl = new URL(
-      `http://localhost:5002/api/Person/post`
+      `http://localhost:5499/api/Person/post`
     );
     const payload: any = {};
 
@@ -198,7 +198,7 @@ export class Person {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<void>> {
     const baseUrl = new URL(
-      `http://localhost:5002/api/Person/returnFatalIfParamsNotInstantiated`
+      `http://localhost:5499/api/Person/returnFatalIfParamsNotInstantiated`
     );
     const payload: any = {};
 
@@ -224,7 +224,7 @@ export class Person {
     encodeURIComponent(String(this.id)),
     ].join("/");
     const baseUrl = new URL(
-      `http://localhost:5002/api/Person/${id}/withoutDogs`
+      `http://localhost:5499/api/Person/${id}/withoutDogs`
     );
 
 
@@ -259,7 +259,7 @@ export class Student {
     encodeURIComponent(String(this.id)),
     ].join("/");
     const baseUrl = new URL(
-      `http://localhost:5002/api/Student/${id}/none`
+      `http://localhost:5499/api/Student/${id}/none`
     );
 
 
@@ -279,7 +279,7 @@ export class Student {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Student>> {
     const baseUrl = new URL(
-      `http://localhost:5002/api/Student/post`
+      `http://localhost:5499/api/Student/post`
     );
     const payload: any = {};
 

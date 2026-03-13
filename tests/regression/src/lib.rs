@@ -9,7 +9,7 @@ use similar::TextDiff;
 // Compares unified file diffs, creating a `.new` snapshot file if a diff is found
 ///
 /// Returns if a `.new` file created
-fn diff_file(out: OutputFile, new_contents: String) -> TestOutput {
+fn diff_file(out: OutputFile, new_contents: String) -> (bool, PathBuf) {
     let name = out.base_name.clone();
 
     let new_path = out.path.with_file_name(format!("snap___{}", name));
@@ -58,16 +58,16 @@ struct OutputFile {
 }
 
 impl OutputFile {
-    fn new(fixture_path: &Path, base_name: &str) -> Self {
-        if let Some(parent) = fixture_path.parent()
-            && !parent.exists()
-        {
-            fs::create_dir_all(parent).unwrap();
+    fn new(dir: &Path, base_name: &str) -> Self {
+        if !dir.exists() {
+            fs::create_dir_all(dir).unwrap();
         }
 
-        let path = fixture_path.with_file_name(format!("out.{base_name}"));
+        let path = dir.join(format!("out.{base_name}"));
+        if !path.exists() {
+            std::fs::File::create(&path).expect("file to have been created");
+        }
 
-        std::fs::File::create(&path).unwrap();
         Self {
             path,
             base_name: base_name.to_string(),
@@ -82,12 +82,18 @@ impl OutputFile {
 
 impl Drop for OutputFile {
     fn drop(&mut self) {
+        if self
+            .path
+            .file_name()
+            .and_then(|name| name.to_str())
+            .is_some_and(|name| !name.starts_with("out."))
+        {
+            return;
+        }
+
         let _ = fs::remove_file(&self.path);
     }
 }
-
-type TestOutput = (bool, PathBuf);
-type TestResult = Result<TestOutput, String>;
 
 pub struct Fixture {
     /// The path of a fixture entry point, ie a seed source file
@@ -112,8 +118,8 @@ impl Fixture {
             .to_path_buf()
     }
 
-    pub fn extract_cidl(&self) -> TestResult {
-        let out = OutputFile::new(&self.path, "cidl.pre.json");
+    pub fn extract_cidl(&self) -> Result<(bool, PathBuf), String> {
+        let out = OutputFile::new(self.path.parent().unwrap(), "cidl.pre.json");
         let project_root = self.get_project_root();
         let e2e_dir = project_root.join("tests/e2e");
 
@@ -138,16 +144,21 @@ impl Fixture {
         }
     }
 
-    /// On all success, returns the cidl, otherwise returns the failed file.
-    pub fn generate_all(&self, pre_cidl: &Path, workers_domain: &str) -> TestResult {
+    /// On all success, returns the cidl and wrangler config, otherwise returns the failed file.
+    pub fn generate_all(
+        &self,
+        pre_cidl: &Path,
+        workers_domain: &str,
+    ) -> Result<(bool, PathBuf, PathBuf), String> {
         let pre_cidl_canon = pre_cidl.canonicalize().unwrap();
         let project_root = self.get_project_root();
         let generator_dir = project_root.join("src/generator");
 
-        let cidl_out = OutputFile::new(&self.path, "cidl.json");
-        let wrangler_out = OutputFile::new(&self.path, "wrangler.toml");
-        let workers_out = OutputFile::new(&self.path, "workers.ts");
-        let client_out = OutputFile::new(&self.path, "client.ts");
+        let fixture_dir = self.path.parent().unwrap();
+        let cidl_out = OutputFile::new(fixture_dir, "cidl.json");
+        let wrangler_out = OutputFile::new(fixture_dir, "wrangler.toml");
+        let workers_out = OutputFile::new(fixture_dir, "workers.ts");
+        let client_out = OutputFile::new(fixture_dir, "client.ts");
 
         tracing::info!("Generating outputs for fixture {}", self.fixture_id);
         let cmd = self.run_command(
@@ -159,6 +170,7 @@ impl Fixture {
                 .arg(workers_out.path())
                 .arg(client_out.path())
                 .arg(workers_domain)
+                .arg("migrations")
                 .current_dir(&generator_dir),
         );
 
@@ -176,7 +188,19 @@ impl Fixture {
             }
         };
 
-        for out in [wrangler_out, workers_out, client_out] {
+        let wrangler_path = {
+            match cmd {
+                Ok(_) => {
+                    let (diff, path) = self.read_out_and_diff(wrangler_out);
+                    has_diff |= diff;
+
+                    path
+                }
+                Err(err) => return Err(err),
+            }
+        };
+
+        for out in [workers_out, client_out] {
             match cmd {
                 Ok(_) => {
                     let (diff, _) = self.read_out_and_diff(out);
@@ -186,57 +210,97 @@ impl Fixture {
             }
         }
 
-        Ok((has_diff, cidl_path))
+        Ok((has_diff, cidl_path, wrangler_path))
     }
 
-    pub fn migrate(&self, cidl: &Path) -> (TestResult, TestResult) {
-        let migrated_cidl = OutputFile::new(
-            &self.path.parent().unwrap().join("migrations/Initial.json"),
-            "Initial.json",
-        );
-        let migrated_sql = OutputFile::new(
-            &self.path.parent().unwrap().join("migrations/Initial.sql"),
-            "Initial.sql",
-        );
-
+    pub fn migrate(&self, cidl: &Path, wrangler_path: &Path) -> Result<(bool, bool), String> {
+        let fixture_root = self.path.parent().expect("fixture root to exist");
         let cidl_path = cidl.canonicalize().unwrap();
-        let project_root = self.get_project_root();
-        let generator_dir = project_root.join("src/generator");
+        let generator_dir = {
+            let project_root = self.get_project_root();
+            project_root.join("src/generator")
+        };
 
         tracing::info!("Migrating CIDL for fixture {}", self.fixture_id);
         let res = self.run_command(
             Command::new("./target/release/cli")
                 .arg("migrations")
                 .arg(&cidl_path)
-                .arg(migrated_cidl.path())
-                .arg(migrated_sql.path())
+                .arg("--fixed")
+                .arg("--all")
+                .arg("out.Initial")
+                .arg(&wrangler_path)
+                .arg(fixture_root)
                 .current_dir(&generator_dir),
         );
 
-        let cidl_res = match &res {
-            Ok(_) => Ok(self.read_out_and_diff(migrated_cidl)),
-            Err(err) => Err(err.clone()),
+        let res = match res {
+            Ok(res) => res,
+            Err(err) => return Err(err.clone()),
         };
 
-        let sql_res = match res {
-            Ok(_) => Ok(self.read_out_and_diff(migrated_sql)),
-            Err(err) => Err(err),
-        };
+        let mut bindings = Vec::<String>::new();
+        for line in res.lines() {
+            if let Some(start_idx) = line.find("Finished migration for binding '") {
+                let rest = &line[start_idx + "Finished migration for binding '".len()..];
+                if let Some(end_idx) = rest.find("'.") {
+                    let binding = rest[..end_idx].to_string();
+                    if !bindings.contains(&binding) {
+                        bindings.push(binding);
+                    }
+                }
+            }
+        }
 
-        (cidl_res, sql_res)
+        if bindings.is_empty() {
+            tracing::info!(
+                "No migrations were run for fixture {}, skipping diffing",
+                self.fixture_id
+            );
+            return Ok((false, false));
+        }
+
+        let mut sql_changed = false;
+        let mut cidl_changed = false;
+        for binding in bindings {
+            let fixture_path = fixture_root.join(format!("migrations/{binding}"));
+            let cidl_out = OutputFile::new(&fixture_path, "Initial.json");
+            let sql_out = OutputFile::new(&fixture_path, "Initial.sql");
+
+            sql_changed |= self.read_out_and_diff(sql_out).0;
+            cidl_changed |= self.read_out_and_diff(cidl_out).0;
+        }
+
+        Ok((sql_changed, cidl_changed))
     }
 
     /// Returns the error given by the command on failure
-    fn run_command(&self, command: &mut Command) -> Result<(), String> {
+    fn run_command(&self, command: &mut Command) -> Result<String, String> {
         let output = command.output().expect("Failed to execute command");
+        let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+        let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+
         if !output.status.success() {
-            return Err(String::from_utf8_lossy(&output.stderr).to_string());
+            let msg = if !stderr.trim().is_empty() {
+                stderr
+            } else {
+                stdout
+            };
+            return Err(msg);
         }
 
-        Ok(())
+        if stdout.trim().is_empty() {
+            return Ok(stderr);
+        }
+
+        if stderr.trim().is_empty() {
+            return Ok(stdout);
+        }
+
+        Ok(format!("{stdout}\n{stderr}"))
     }
 
-    fn read_out_and_diff(&self, out: OutputFile) -> TestOutput {
+    fn read_out_and_diff(&self, out: OutputFile) -> (bool, PathBuf) {
         let contents = fs::read(&out.path).expect("temp file to be readable");
         diff_file(out, String::from_utf8_lossy(&contents).to_string())
     }

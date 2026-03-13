@@ -23,7 +23,7 @@ export class CrudHaver {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<CrudHaver>> {
     const baseUrl = new URL(
-      `http://localhost:5002/api/CrudHaver/GET`
+      `http://localhost:5740/api/CrudHaver/GET`
     );
 
     baseUrl.searchParams.append("id", String(id));
@@ -48,7 +48,7 @@ export class CrudHaver {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<CrudHaver[]>> {
     const baseUrl = new URL(
-      `http://localhost:5002/api/CrudHaver/LIST`
+      `http://localhost:5740/api/CrudHaver/LIST`
     );
 
     baseUrl.searchParams.append("lastSeen_id", String(lastSeen_id));
@@ -73,7 +73,7 @@ export class CrudHaver {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<CrudHaver>> {
     const baseUrl = new URL(
-      `http://localhost:5002/api/CrudHaver/SAVE`
+      `http://localhost:5740/api/CrudHaver/SAVE`
     );
     const payload: any = {};
 
@@ -100,7 +100,7 @@ export class CrudHaver {
     encodeURIComponent(String(this.id)),
     ].join("/");
     const baseUrl = new URL(
-      `http://localhost:5002/api/CrudHaver/${id}/notCrud`
+      `http://localhost:5740/api/CrudHaver/${id}/notCrud`
     );
     const payload: any = {};
 
@@ -136,7 +136,7 @@ export class Parent {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Parent>> {
     const baseUrl = new URL(
-      `http://localhost:5002/api/Parent/GET`
+      `http://localhost:5740/api/Parent/GET`
     );
 
     baseUrl.searchParams.append("id", String(id));
@@ -161,7 +161,7 @@ export class Parent {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Parent[]>> {
     const baseUrl = new URL(
-      `http://localhost:5002/api/Parent/LIST`
+      `http://localhost:5740/api/Parent/LIST`
     );
 
     baseUrl.searchParams.append("lastSeen_id", String(lastSeen_id));
@@ -186,7 +186,7 @@ export class Parent {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Parent>> {
     const baseUrl = new URL(
-      `http://localhost:5002/api/Parent/SAVE`
+      `http://localhost:5740/api/Parent/SAVE`
     );
     const payload: any = {};
 

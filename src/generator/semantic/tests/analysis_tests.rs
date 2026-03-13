@@ -15,8 +15,8 @@ use wrangler::WranglerGenerator;
 fn cloesce_serializes_to_migrations() {
     // Arrange
     let mut ast = create_ast(vec![
-        ModelBuilder::new("Dog").id_pk().build(),
-        ModelBuilder::new("Person").id_pk().build(),
+        ModelBuilder::new("Dog").default_db().id_pk().build(),
+        ModelBuilder::new("Person").default_db().id_pk().build(),
     ]);
     ast.set_merkle_hash();
 
@@ -34,7 +34,7 @@ fn cloesce_serializes_to_migrations() {
 #[test]
 fn null_primary_key_error() {
     // Arrange
-    let mut model = ModelBuilder::new("Dog").build();
+    let mut model = ModelBuilder::new("Dog").default_db().build();
     model.primary_key_columns.push(D1Column {
         hash: 0,
         value: NamedTypedValue {
@@ -61,6 +61,7 @@ fn mismatched_foreign_keys_error() {
     // Arrange
     let mut ast = create_ast(vec![
         ModelBuilder::new("Person")
+            .default_db()
             .id_pk()
             .col(
                 "dogId",
@@ -72,7 +73,7 @@ fn mismatched_foreign_keys_error() {
                 None,
             )
             .build(),
-        ModelBuilder::new("Dog").id_pk().build(),
+        ModelBuilder::new("Dog").default_db().id_pk().build(),
     ]);
     let spec = create_spec(&ast);
 
@@ -92,6 +93,7 @@ fn model_cycle_detection_error() {
     let mut ast = create_ast(vec![
         // A -> B -> C -> A
         ModelBuilder::new("A")
+            .default_db()
             .id_pk()
             .col(
                 "bId",
@@ -104,6 +106,7 @@ fn model_cycle_detection_error() {
             )
             .build(),
         ModelBuilder::new("B")
+            .default_db()
             .id_pk()
             .col(
                 "cId",
@@ -116,6 +119,7 @@ fn model_cycle_detection_error() {
             )
             .build(),
         ModelBuilder::new("C")
+            .default_db()
             .id_pk()
             .col(
                 "aId",
@@ -193,6 +197,7 @@ fn model_attr_nullability_prevents_cycle_error() {
     // A -> B -> C -> Nullable<A>
     let mut ast = create_ast(vec![
         ModelBuilder::new("A")
+            .default_db()
             .id_pk()
             .col(
                 "bId",
@@ -205,6 +210,7 @@ fn model_attr_nullability_prevents_cycle_error() {
             )
             .build(),
         ModelBuilder::new("B")
+            .default_db()
             .id_pk()
             .col(
                 "cId",
@@ -217,6 +223,7 @@ fn model_attr_nullability_prevents_cycle_error() {
             )
             .build(),
         ModelBuilder::new("C")
+            .default_db()
             .id_pk()
             .col(
                 "aId",
@@ -239,8 +246,9 @@ fn model_attr_nullability_prevents_cycle_error() {
 fn one_to_one_nav_property_unknown_attribute_reference_error() {
     // Arrange
     let mut ast = create_ast(vec![
-        ModelBuilder::new("Dog").id_pk().build(),
+        ModelBuilder::new("Dog").default_db().id_pk().build(),
         ModelBuilder::new("Person")
+            .default_db()
             .id_pk()
             .nav_p(
                 "dog",
@@ -267,9 +275,10 @@ fn one_to_one_nav_property_unknown_attribute_reference_error() {
 fn one_to_one_mismatched_fk_and_nav_type_error() {
     // Arrange: attribute dogId references Dog, but nav prop type is Cat -> mismatch
     let mut ast = create_ast(vec![
-        ModelBuilder::new("Dog").id_pk().build(),
-        ModelBuilder::new("Cat").id_pk().build(),
+        ModelBuilder::new("Dog").default_db().id_pk().build(),
+        ModelBuilder::new("Cat").default_db().id_pk().build(),
         ModelBuilder::new("Person")
+            .default_db()
             .id_pk()
             .col(
                 "dogId",
@@ -306,8 +315,9 @@ fn one_to_many_unresolved_reference_error() {
     // Arrange:
     // Person declares OneToMany to Dog referencing Dog.personId, but Dog has no personId FK attr.
     let mut ast = create_ast(vec![
-        ModelBuilder::new("Dog").id_pk().build(), // no personId attribute
+        ModelBuilder::new("Dog").default_db().id_pk().build(), // no personId attribute
         ModelBuilder::new("Person")
+            .default_db()
             .id_pk()
             .nav_p(
                 "dogs",
@@ -335,11 +345,12 @@ fn junction_table_builder_errors() {
     {
         let mut ast = create_ast(vec![
             ModelBuilder::new("Student")
+                .default_db()
                 .id_pk()
                 .nav_p("courses", "Course", NavigationPropertyKind::ManyToMany)
                 .build(),
             // Course exists, but doesn't declare the reciprocal nav property
-            ModelBuilder::new("Course").id_pk().build(),
+            ModelBuilder::new("Course").default_db().id_pk().build(),
         ]);
         let spec = create_spec(&ast);
 
@@ -354,11 +365,13 @@ fn junction_table_builder_errors() {
     {
         let mut ast = create_ast(vec![
             ModelBuilder::new("A")
+                .default_db()
                 .id_pk()
                 .nav_p("bs", "B", NavigationPropertyKind::ManyToMany)
                 .nav_p("bs2", "B", NavigationPropertyKind::ManyToMany)
                 .build(),
             ModelBuilder::new("B")
+                .default_db()
                 .id_pk()
                 .nav_p("as", "A", NavigationPropertyKind::ManyToMany)
                 .build(),
@@ -377,6 +390,7 @@ fn junction_table_builder_errors() {
 fn instantiated_stream_method() {
     // Arrange
     let model = ModelBuilder::new("Dog")
+        .default_db()
         .id_pk()
         .method(
             "uploadPhoto",
@@ -411,6 +425,7 @@ fn instantiated_stream_method() {
 fn static_stream_method() {
     // Arrange
     let model = ModelBuilder::new("Dog")
+        .default_db()
         .id_pk()
         .method(
             "uploadPhoto",
@@ -439,6 +454,7 @@ fn static_stream_method() {
 fn invalid_stream_method() {
     // Arrange
     let model = ModelBuilder::new("Dog")
+        .default_db()
         .id_pk()
         .method(
             "uploadPhoto",
@@ -475,11 +491,11 @@ fn invalid_stream_method() {
 #[test]
 fn missing_variable_in_wrangler() {
     // Arrange
-    let mut ast = create_ast(vec![ModelBuilder::new("User").id_pk().build()]);
+    let mut ast = create_ast(vec![ModelBuilder::new("User").db("my_d1").id_pk().build()]);
     ast.wrangler_env = Some(WranglerEnv {
         name: "Env".into(),
         source_path: "source.ts".into(),
-        d1_binding: None,
+        d1_bindings: vec!["my_d1".into()],
         kv_bindings: vec![],
         r2_bindings: vec![],
         vars: [
@@ -500,7 +516,10 @@ fn missing_variable_in_wrangler() {
         let res = SemanticAnalysis::analyze(&mut ast, &spec).unwrap_err().kind;
 
         // Assert
-        assert!(matches!(res, GeneratorErrorKind::MissingWranglerVariable));
+        assert!(matches!(
+            res,
+            GeneratorErrorKind::InconsistentWranglerBinding
+        ));
     }
 }
 
@@ -527,7 +546,7 @@ fn missing_env_in_ast() {
 #[test]
 fn missing_d1_binding_in_wrangler() {
     // Arrange
-    let mut ast = create_ast(vec![ModelBuilder::new("User").id_pk().build()]);
+    let mut ast = create_ast(vec![ModelBuilder::new("User").default_db().id_pk().build()]);
 
     let specs = vec![
         WranglerGenerator::Toml(toml::from_str("").unwrap()).as_spec(),
@@ -539,7 +558,10 @@ fn missing_d1_binding_in_wrangler() {
         let res = SemanticAnalysis::analyze(&mut ast, &spec).unwrap_err().kind;
 
         // Assert
-        assert!(matches!(res, GeneratorErrorKind::MissingWranglerD1Binding));
+        assert!(matches!(
+            res,
+            GeneratorErrorKind::InconsistentWranglerBinding
+        ));
     }
 }
 
@@ -570,7 +592,7 @@ fn missing_kv_bindings_in_wrangler() {
         // Assert
         assert!(matches!(
             res,
-            GeneratorErrorKind::MissingWranglerKVNamespace
+            GeneratorErrorKind::InconsistentWranglerBinding
         ));
     }
 }
@@ -580,6 +602,7 @@ fn kv_object_valid_key_format() {
     // Arrange
     let mut ast = create_ast(vec![
         ModelBuilder::new("Settings")
+            .db("my_d1")
             .id_pk()
             .col("userId", CidlType::Integer, None, None)
             .key_param("tenant")
@@ -595,7 +618,7 @@ fn kv_object_valid_key_format() {
     ast.wrangler_env = Some(WranglerEnv {
         name: "Env".into(),
         source_path: "source.ts".into(),
-        d1_binding: Some("my_d1".into()),
+        d1_bindings: vec!["my_d1".into()],
         kv_bindings: vec!["my_kv".into()],
         r2_bindings: vec![],
         vars: HashMap::new(),
@@ -615,6 +638,7 @@ fn kv_object_missing_key_param_error() {
     // Arrange
     let mut ast = create_ast(vec![
         ModelBuilder::new("Settings")
+            .db("my_d1")
             .id_pk()
             .kv_object(
                 "settings/{tenant}/{userId}",
@@ -628,7 +652,7 @@ fn kv_object_missing_key_param_error() {
     ast.wrangler_env = Some(WranglerEnv {
         name: "Env".into(),
         source_path: "source.ts".into(),
-        d1_binding: Some("my_d1".into()),
+        d1_bindings: vec!["my_d1".into()],
         kv_bindings: vec!["my_kv".into()],
         r2_bindings: vec![],
         vars: HashMap::new(),
@@ -647,6 +671,7 @@ fn kv_object_with_primary_key_in_format() {
     // Arrange
     let mut ast = create_ast(vec![
         ModelBuilder::new("User")
+            .db("my_d1")
             .id_pk()
             .kv_object(
                 "user/{id}/preferences",
@@ -660,7 +685,7 @@ fn kv_object_with_primary_key_in_format() {
     ast.wrangler_env = Some(WranglerEnv {
         name: "Env".into(),
         source_path: "source.ts".into(),
-        d1_binding: Some("my_d1".into()),
+        d1_bindings: vec!["my_d1".into()],
         kv_bindings: vec!["my_kv".into()],
         r2_bindings: vec![],
         vars: HashMap::new(),
@@ -693,7 +718,7 @@ fn kv_object_with_column_in_format() {
     ast.wrangler_env = Some(WranglerEnv {
         name: "Env".into(),
         source_path: "source.ts".into(),
-        d1_binding: Some("my_d1".into()),
+        d1_bindings: vec!["my_d1".into()],
         kv_bindings: vec!["my_kv".into()],
         r2_bindings: vec![],
         vars: HashMap::new(),
@@ -712,6 +737,7 @@ fn kv_object_invalid_nested_braces_error() {
     // Arrange
     let mut ast = create_ast(vec![
         ModelBuilder::new("Settings")
+            .db("my_d1")
             .id_pk()
             .kv_object(
                 "settings/{{nested}}",
@@ -725,7 +751,7 @@ fn kv_object_invalid_nested_braces_error() {
     ast.wrangler_env = Some(WranglerEnv {
         name: "Env".into(),
         source_path: "source.ts".into(),
-        d1_binding: Some("my_d1".into()),
+        d1_bindings: vec!["my_d1".into()],
         kv_bindings: vec!["my_kv".into()],
         r2_bindings: vec![],
         vars: HashMap::new(),
@@ -744,6 +770,7 @@ fn kv_object_unclosed_brace_error() {
     // Arrange
     let mut ast = create_ast(vec![
         ModelBuilder::new("Settings")
+            .db("my_d1")
             .id_pk()
             .kv_object(
                 "settings/{unclosed",
@@ -757,7 +784,7 @@ fn kv_object_unclosed_brace_error() {
     ast.wrangler_env = Some(WranglerEnv {
         name: "Env".into(),
         source_path: "source.ts".into(),
-        d1_binding: Some("my_d1".into()),
+        d1_bindings: vec!["my_d1".into()],
         kv_bindings: vec!["my_kv".into()],
         r2_bindings: vec![],
         vars: HashMap::new(),
@@ -889,10 +916,12 @@ fn composite_key_validation() {
     {
         let mut ast = create_ast(vec![
             ModelBuilder::new("Student")
+                .default_db()
                 .pk("id", CidlType::Integer)
                 .pk("id2", CidlType::Integer)
                 .build(),
             ModelBuilder::new("Enrollment")
+                .default_db()
                 .id_pk()
                 .col(
                     "studentId",
@@ -922,8 +951,9 @@ fn composite_key_validation() {
     // Error: composite key with only 1 column
     {
         let mut ast = create_ast(vec![
-            ModelBuilder::new("Student").id_pk().build(),
+            ModelBuilder::new("Student").default_db().id_pk().build(),
             ModelBuilder::new("Enrollment")
+                .default_db()
                 .id_pk()
                 .col(
                     "studentId",
@@ -945,8 +975,9 @@ fn composite_key_validation() {
     // Error: composite key contains non-FK column
     {
         let mut ast = create_ast(vec![
-            ModelBuilder::new("Student").id_pk().build(),
+            ModelBuilder::new("Student").default_db().id_pk().build(),
             ModelBuilder::new("Enrollment")
+                .default_db()
                 .id_pk()
                 .col(
                     "studentId",
@@ -970,10 +1001,12 @@ fn composite_key_validation() {
     {
         let mut ast = create_ast(vec![
             ModelBuilder::new("Student")
+                .default_db()
                 .pk("id", CidlType::Integer)
                 .pk("id2", CidlType::Integer)
                 .build(),
             ModelBuilder::new("Enrollment")
+                .default_db()
                 .id_pk()
                 .col(
                     "studentId",
@@ -1014,10 +1047,12 @@ fn composite_key_validation() {
     {
         let mut ast = create_ast(vec![
             ModelBuilder::new("Student")
+                .default_db()
                 .pk("id", CidlType::Integer)
                 .pk("id2", CidlType::Integer)
                 .build(),
             ModelBuilder::new("Enrollment")
+                .default_db()
                 .id_pk()
                 .col(
                     "studentId",
@@ -1050,14 +1085,17 @@ fn multiple_composite_keys_same_model() {
     // Arrange
     let mut ast = create_ast(vec![
         ModelBuilder::new("User")
+            .default_db()
             .pk("id", CidlType::Integer)
             .pk("id2", CidlType::Integer)
             .build(),
         ModelBuilder::new("Group")
+            .default_db()
             .pk("id", CidlType::Integer)
             .pk("id2", CidlType::Integer)
             .build(),
         ModelBuilder::new("Permission")
+            .default_db()
             .id_pk()
             .col(
                 "userId",

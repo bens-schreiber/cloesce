@@ -1,9 +1,10 @@
 {
-  "hash": 11201987911354005058,
+  "hash": 7355829690118109237,
   "models": {
     "Course": {
-      "hash": 18078407113291938113,
+      "hash": 16850187473558712992,
       "name": "Course",
+      "d1_binding": "db",
       "primary_key_columns": [
         {
           "hash": 5506969935928112087,
@@ -44,8 +45,9 @@
       ]
     },
     "Student": {
-      "hash": 7094665033765862834,
+      "hash": 4576532940261906487,
       "name": "Student",
+      "d1_binding": "db",
       "primary_key_columns": [
         {
           "hash": 5506969935928112087,
@@ -97,8 +99,9 @@
       ]
     },
     "StudentCourse": {
-      "hash": 7150643363848612315,
+      "hash": 3369799349848110955,
       "name": "StudentCourse",
+      "d1_binding": "db",
       "primary_key_columns": [
         {
           "hash": 17177798493862312650,

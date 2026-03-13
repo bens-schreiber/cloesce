@@ -249,6 +249,7 @@ mod test {
     async fn scalar_model(db: SqlitePool) {
         // Arrange
         let ast_model = ModelBuilder::new("Person")
+            .default_db()
             .id_pk()
             .col("name", CidlType::Text, None, None)
             .build();
@@ -284,6 +285,7 @@ mod test {
         // Arrange
         let ast = create_ast(vec![
             ModelBuilder::new("Person")
+                .default_db()
                 .id_pk()
                 .col(
                     "dogId",
@@ -302,7 +304,7 @@ mod test {
                     },
                 )
                 .build(),
-            ModelBuilder::new("Dog").id_pk().build(),
+            ModelBuilder::new("Dog").default_db().id_pk().build(),
         ]);
 
         let include_tree = json!({
@@ -343,6 +345,7 @@ mod test {
     fn one_to_many(db: SqlitePool) {
         let ast = create_ast(vec![
             ModelBuilder::new("Dog")
+                .default_db()
                 .id_pk()
                 .col(
                     "personId",
@@ -355,6 +358,7 @@ mod test {
                 )
                 .build(),
             ModelBuilder::new("Cat")
+                .default_db()
                 .col(
                     "personId",
                     CidlType::Integer,
@@ -367,6 +371,7 @@ mod test {
                 .id_pk()
                 .build(),
             ModelBuilder::new("Person")
+                .default_db()
                 .id_pk()
                 .nav_p(
                     "dogs",
@@ -393,6 +398,7 @@ mod test {
                 )
                 .build(),
             ModelBuilder::new("Boss")
+                .default_db()
                 .id_pk()
                 .nav_p(
                     "persons",
@@ -466,6 +472,7 @@ mod test {
         // Arrange
         let ast = create_ast(vec![
             ModelBuilder::new("Student")
+                .default_db()
                 .id_pk()
                 .nav_p(
                     "courses",
@@ -474,6 +481,7 @@ mod test {
                 )
                 .build(),
             ModelBuilder::new("Course")
+                .default_db()
                 .id_pk()
                 .nav_p(
                     "students",
@@ -523,11 +531,13 @@ mod test {
         // Arrange
         let ast = create_ast(vec![
             ModelBuilder::new("Student")
+                .default_db()
                 .pk("school_id", CidlType::Integer)
                 .pk("student_number", CidlType::Integer)
                 .col("name", CidlType::Text, None, None)
                 .build(),
             ModelBuilder::new("Enrollment")
+                .default_db()
                 .id_pk()
                 .col(
                     "school_id",
@@ -605,6 +615,7 @@ mod test {
         // Arrange
         let ast = create_ast(vec![
             ModelBuilder::new("Order")
+                .default_db()
                 .pk("region_id", CidlType::Integer)
                 .pk("order_number", CidlType::Integer)
                 .col("customer", CidlType::Text, None, None)
@@ -617,6 +628,7 @@ mod test {
                 )
                 .build(),
             ModelBuilder::new("OrderItem")
+                .default_db()
                 .id_pk()
                 .col(
                     "region_id",
@@ -699,12 +711,14 @@ mod test {
         // Arrange
         let ast = create_ast(vec![
             ModelBuilder::new("Teacher")
+                .default_db()
                 .pk("school_id", CidlType::Integer)
                 .pk("employee_id", CidlType::Integer)
                 .col("name", CidlType::Text, None, None)
                 .nav_p("courses", "Course", NavigationPropertyKind::ManyToMany)
                 .build(),
             ModelBuilder::new("Course")
+                .default_db()
                 .pk("department_id", CidlType::Integer)
                 .pk("course_code", CidlType::Integer)
                 .col("title", CidlType::Text, None, None)
@@ -762,6 +776,7 @@ mod test {
     async fn gensym_stops_ambigious_table(db: SqlitePool) {
         // Arrange
         let horse_model = ModelBuilder::new("Horse")
+            .default_db()
             .id_pk()
             .col("name", CidlType::Text, None, None)
             .col("bio", CidlType::nullable(CidlType::Text), None, None)
@@ -775,6 +790,7 @@ mod test {
             .build();
 
         let match_model = ModelBuilder::new("Match")
+            .default_db()
             .id_pk()
             .col(
                 "horseId1",
@@ -844,6 +860,7 @@ mod test {
     fn custom_from(db: SqlitePool) {
         // Arrange
         let ast_model = ModelBuilder::new("Person")
+            .default_db()
             .id_pk()
             .col("name", CidlType::Text, None, None)
             .build();

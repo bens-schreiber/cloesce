@@ -23,7 +23,7 @@ export class Foo {
     encodeURIComponent(String(this.id)),
     ].join("/");
     const baseUrl = new URL(
-      `http://localhost:5002/api/Foo/${id}/bar`
+      `http://localhost:5520/api/Foo/${id}/bar`
     );
     const payload: any = {};
 

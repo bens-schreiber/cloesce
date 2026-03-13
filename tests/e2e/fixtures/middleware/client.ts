@@ -18,7 +18,7 @@ export class Foo {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Foo>> {
     const baseUrl = new URL(
-      `http://localhost:5002/api/Foo/SAVE`
+      `http://localhost:5977/api/Foo/SAVE`
     );
     const payload: any = {};
 
@@ -42,7 +42,7 @@ export class Foo {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<void>> {
     const baseUrl = new URL(
-      `http://localhost:5002/api/Foo/blockedMethod`
+      `http://localhost:5977/api/Foo/blockedMethod`
     );
 
 
@@ -61,7 +61,7 @@ export class Foo {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<InjectedThing>> {
     const baseUrl = new URL(
-      `http://localhost:5002/api/Foo/getInjectedThing`
+      `http://localhost:5977/api/Foo/getInjectedThing`
     );
 
 

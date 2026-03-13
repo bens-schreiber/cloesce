@@ -12,7 +12,7 @@ export class Weather {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Weather>> {
     const baseUrl = new URL(
-      `http://localhost:5002/api/Weather/GET`
+      `http://localhost:5066/api/Weather/GET`
     );
 
     baseUrl.searchParams.append("id", String(id));
@@ -35,7 +35,7 @@ export class Weather {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Weather>> {
     const baseUrl = new URL(
-      `http://localhost:5002/api/Weather/SAVE`
+      `http://localhost:5066/api/Weather/SAVE`
     );
     const payload: any = {};
 

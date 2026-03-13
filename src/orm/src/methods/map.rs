@@ -273,6 +273,7 @@ mod tests {
     fn no_records_returns_empty() {
         // Arrange
         let horse = ModelBuilder::new("Horse")
+            .default_db()
             .id_pk()
             .col("name", CidlType::nullable(CidlType::Text), None, None)
             .nav_p(
@@ -285,6 +286,7 @@ mod tests {
             .build();
 
         let rider = ModelBuilder::new("Rider")
+            .default_db()
             .id_pk()
             .col("nickname", CidlType::nullable(CidlType::Text), None, None)
             .build();
@@ -304,6 +306,7 @@ mod tests {
     fn flat() {
         // Arrange
         let horse = ModelBuilder::new("Horse")
+            .default_db()
             .id_pk()
             .col("name", CidlType::nullable(CidlType::Text), None, None)
             .build();
@@ -333,6 +336,7 @@ mod tests {
             // hack: function to avoid lifetime issues
             create_ast(vec![
                 ModelBuilder::new("Horse")
+                    .default_db()
                     .id_pk()
                     .col("name", CidlType::nullable(CidlType::Text), None, None)
                     .col(
@@ -353,6 +357,7 @@ mod tests {
                     )
                     .build(),
                 ModelBuilder::new("Rider")
+                    .default_db()
                     .id_pk()
                     .col("nickname", CidlType::nullable(CidlType::Text), None, None)
                     .build(),
@@ -413,6 +418,7 @@ mod tests {
         let ast = || {
             create_ast(vec![
                 ModelBuilder::new("Horse")
+                    .default_db()
                     .id_pk()
                     .col("name", CidlType::nullable(CidlType::Text), None, None)
                     .nav_p(
@@ -424,6 +430,7 @@ mod tests {
                     )
                     .build(),
                 ModelBuilder::new("Rider")
+                    .default_db()
                     .id_pk()
                     .col("nickname", CidlType::nullable(CidlType::Text), None, None)
                     .col(
@@ -500,11 +507,13 @@ mod tests {
         let meta = || {
             create_ast(vec![
                 ModelBuilder::new("Student")
+                    .default_db()
                     .id_pk()
                     .col("name", CidlType::nullable(CidlType::Text), None, None)
                     .nav_p("courses", "Course", NavigationPropertyKind::ManyToMany)
                     .build(),
                 ModelBuilder::new("Course")
+                    .default_db()
                     .id_pk()
                     .col("title", CidlType::nullable(CidlType::Text), None, None)
                     .nav_p("students", "Student", NavigationPropertyKind::ManyToMany)
@@ -573,6 +582,7 @@ mod tests {
         let meta = || {
             create_ast(vec![
                 ModelBuilder::new("Order")
+                    .default_db()
                     .id_pk()
                     .col("order_date", CidlType::nullable(CidlType::Text), None, None)
                     .nav_p(
@@ -584,11 +594,13 @@ mod tests {
                     )
                     .build(),
                 ModelBuilder::new("Product")
+                    .default_db()
                     .id_pk()
                     .col("name", CidlType::nullable(CidlType::Text), None, None)
                     .col("price", CidlType::Integer, None, None)
                     .build(),
                 ModelBuilder::new("OrderItem")
+                    .default_db()
                     .foreign_pk(
                         "order_id",
                         CidlType::Integer,
@@ -719,6 +731,7 @@ mod tests {
         // Test that models with composite PKs are correctly deduplicated
         let ast = create_ast(vec![
             ModelBuilder::new("OrderItem")
+                .default_db()
                 .pk("order_id", CidlType::Integer)
                 .pk("product_id", CidlType::Integer)
                 .col("quantity", CidlType::Integer, None, None)

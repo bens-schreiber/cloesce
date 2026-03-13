@@ -3,7 +3,9 @@
     "wrangler_env": {
         "name": "Env",
         "source_path": "./seed__d1_crud.cloesce.ts",
-        "d1_binding": "db",
+        "d1_bindings": [
+            "db"
+        ],
         "kv_bindings": [],
         "r2_bindings": [],
         "vars": {}
@@ -11,6 +13,7 @@
     "models": {
         "CrudHaver": {
             "name": "CrudHaver",
+            "d1_binding": "db",
             "columns": [
                 {
                     "foreign_key_reference": null,
@@ -59,6 +62,7 @@
         },
         "Parent": {
             "name": "Parent",
+            "d1_binding": "db",
             "columns": [
                 {
                     "foreign_key_reference": {
@@ -134,6 +138,7 @@
         },
         "Child": {
             "name": "Child",
+            "d1_binding": "db",
             "columns": [
                 {
                     "foreign_key_reference": {

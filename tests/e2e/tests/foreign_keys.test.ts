@@ -1,4 +1,4 @@
-import { startWrangler, stopWrangler, withRes } from "../src/setup.js";
+import { startWrangler, withRes } from "../src/setup.js";
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import {
   A,
@@ -8,10 +8,15 @@ import {
   Course,
   B,
 } from "../fixtures/foreign_keys/client";
+import config from "../fixtures/foreign_keys/cloesce.config";
 
+let stopWrangler: () => Promise<void>;
 beforeAll(async () => {
   // NOTE: e2e is called from proj root
-  await startWrangler("./fixtures/foreign_keys");
+  stopWrangler = await startWrangler(
+    "./fixtures/foreign_keys",
+    config.workersUrl!,
+  );
 }, 30_000);
 
 afterAll(async () => {

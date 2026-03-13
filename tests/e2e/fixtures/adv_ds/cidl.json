@@ -1,18 +1,21 @@
 {
-  "hash": 502872254450640108,
+  "hash": 12269881830252270504,
   "project_name": "runner",
   "wrangler_env": {
     "name": "Env",
     "source_path": "./seed__adv_ds.cloesce.ts",
-    "d1_binding": "db",
+    "d1_bindings": [
+      "db"
+    ],
     "kv_bindings": [],
     "r2_bindings": [],
     "vars": {}
   },
   "models": {
     "Hamburger": {
-      "hash": 12943904946861829134,
+      "hash": 16378746804444100937,
       "name": "Hamburger",
+      "d1_binding": "db",
       "primary_key_columns": [
         {
           "hash": 6397878138472974760,
@@ -193,8 +196,9 @@
       "source_path": "./seed__adv_ds.cloesce.ts"
     },
     "Topping": {
-      "hash": 8564955201679083497,
+      "hash": 14407311656640296225,
       "name": "Topping",
+      "d1_binding": "db",
       "primary_key_columns": [
         {
           "hash": 6397878138472974760,

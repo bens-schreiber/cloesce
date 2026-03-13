@@ -13,7 +13,7 @@ export class Env {
   db: D1Database;
 }
 
-@Model()
+@Model("db")
 export class NullabilityChecks {
   id: Integer;
 

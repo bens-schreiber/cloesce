@@ -1,18 +1,21 @@
 {
-  "hash": 13117940673344338035,
+  "hash": 4055048839320829329,
   "project_name": "runner",
   "wrangler_env": {
     "name": "Env",
     "source_path": "./seed__blobs.cloesce.ts",
-    "d1_binding": "db",
+    "d1_bindings": [
+      "db"
+    ],
     "kv_bindings": [],
     "r2_bindings": [],
     "vars": {}
   },
   "models": {
     "BlobHaver": {
-      "hash": 14402369111485430200,
+      "hash": 560041510452854967,
       "name": "BlobHaver",
+      "d1_binding": "db",
       "primary_key_columns": [
         {
           "hash": 6397878138472974760,

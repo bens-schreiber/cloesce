@@ -1,10 +1,12 @@
 {
-  "hash": 17168092024083253758,
+  "hash": 11218240258977183070,
   "project_name": "runner",
   "wrangler_env": {
     "name": "Env",
     "source_path": "./seed__r2.cloesce.ts",
-    "d1_binding": "db",
+    "d1_bindings": [
+      "db"
+    ],
     "kv_bindings": [],
     "r2_bindings": [
       "bucket1",
@@ -14,8 +16,9 @@
   },
   "models": {
     "D1BackedModel": {
-      "hash": 9299503543144665556,
+      "hash": 6703974713046051109,
       "name": "D1BackedModel",
+      "d1_binding": "db",
       "primary_key_columns": [
         {
           "hash": 6397878138472974760,
@@ -204,8 +207,9 @@
       "source_path": "./seed__r2.cloesce.ts"
     },
     "PureR2Model": {
-      "hash": 4603769887942882489,
+      "hash": 1708237429327031561,
       "name": "PureR2Model",
+      "d1_binding": null,
       "primary_key_columns": [],
       "columns": [],
       "navigation_properties": [],
@@ -223,7 +227,7 @@
         {
           "format": "path/to/other/{id}",
           "var_name": "otherData",
-          "bucket_binding": "bucket2",
+          "bucket_binding": "bucket1",
           "list_prefix": false
         },
         {

@@ -12,19 +12,19 @@ export class Env {
   db: D1Database;
 }
 
-@Model()
+@Model("db")
 export class NoDs {
   id: Integer;
 }
 
-@Model()
+@Model("db")
 export class OneDs {
   id: Integer;
 
   static readonly default: DataSource<OneDs> = {};
 }
 
-@Model()
+@Model("db")
 export class Foo {
   id: Integer;
 

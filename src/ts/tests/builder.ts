@@ -1,3 +1,4 @@
+import { Project } from "ts-morph";
 import {
   Model,
   CloesceAst,
@@ -19,6 +20,17 @@ import {
   CrudListParam,
 } from "../src/ast";
 
+export function cloesceProject(): Project {
+  const project = new Project({
+    compilerOptions: {
+      strict: true,
+    },
+  });
+
+  project.addSourceFileAtPath("./src/ui/backend.ts");
+  return project;
+}
+
 export function createAst(args?: {
   models?: Model[];
   services?: Service[];
@@ -38,7 +50,7 @@ export function createAst(args?: {
     wrangler_env: {
       name: "Env",
       source_path: "source.ts",
-      d1_binding: "db",
+      d1_bindings: ["d1"],
       kv_bindings: [],
       r2_bindings: [],
       vars: {},
@@ -102,6 +114,7 @@ export class IncludeTreeBuilder {
 
 export class ModelBuilder {
   private name: string;
+  private d1_binding: string | null = null;
   private primary_key_names: string[] = [];
   private primary_key_types: Record<string, CidlType> = {};
   private columns: D1Column[] = [];
@@ -119,6 +132,16 @@ export class ModelBuilder {
 
   static model(name: string): ModelBuilder {
     return new ModelBuilder(name);
+  }
+
+  d1(binding: string): this {
+    this.d1_binding = binding;
+    return this;
+  }
+
+  defaultDb(): this {
+    this.d1_binding = "d1";
+    return this;
   }
 
   col(
@@ -261,6 +284,7 @@ export class ModelBuilder {
 
     return {
       name: this.name,
+      d1_binding: this.d1_binding,
       primary_key_columns,
       columns: mutableColumns,
       navigation_properties: this.navigation_properties,

@@ -14,7 +14,7 @@ export class Hamburger {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Hamburger[]>> {
     const baseUrl = new URL(
-      `http://localhost:5002/api/Hamburger/LIST`
+      `http://localhost:5672/api/Hamburger/LIST`
     );
 
     baseUrl.searchParams.append("lastSeen_id", String(lastSeen_id));
@@ -39,7 +39,7 @@ export class Hamburger {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Hamburger>> {
     const baseUrl = new URL(
-      `http://localhost:5002/api/Hamburger/SAVE`
+      `http://localhost:5672/api/Hamburger/SAVE`
     );
     const payload: any = {};
 
@@ -66,7 +66,7 @@ export class Hamburger {
     encodeURIComponent(String(this.id)),
     ].join("/");
     const baseUrl = new URL(
-      `http://localhost:5002/api/Hamburger/${id}/noLettuceToppings`
+      `http://localhost:5672/api/Hamburger/${id}/noLettuceToppings`
     );
 
 
@@ -88,7 +88,7 @@ export class Hamburger {
     encodeURIComponent(String(this.id)),
     ].join("/");
     const baseUrl = new URL(
-      `http://localhost:5002/api/Hamburger/${id}/onlyBacon`
+      `http://localhost:5672/api/Hamburger/${id}/onlyBacon`
     );
 
 
@@ -123,7 +123,7 @@ export class Topping {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Topping>> {
     const baseUrl = new URL(
-      `http://localhost:5002/api/Topping/SAVE`
+      `http://localhost:5672/api/Topping/SAVE`
     );
     const payload: any = {};
 

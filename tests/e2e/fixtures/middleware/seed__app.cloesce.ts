@@ -6,6 +6,7 @@ import {
   Get,
   HttpResult,
   Integer,
+  Crud,
 } from "cloesce/backend";
 import { D1Database, ExecutionContext } from "@cloudflare/workers-types";
 
@@ -18,7 +19,8 @@ export class Env {
   db: D1Database;
 }
 
-@Model(["SAVE"])
+@Crud("SAVE")
+@Model("db")
 export class Foo {
   id: Integer;
 

@@ -1,23 +1,11 @@
 import { describe, test, expect } from "vitest";
-import { Project } from "ts-morph";
 import { CidlExtractor } from "../src/extractor/extract";
 import { CidlType, Model, Service } from "../src/ast";
-import { ModelBuilder } from "./builder";
+import { cloesceProject, ModelBuilder } from "./builder";
 import {
   InferenceBuilder,
   InferenceBuilderError,
 } from "../src/extractor/infer";
-
-export function cloesceProject(): Project {
-  const project = new Project({
-    compilerOptions: {
-      strict: true,
-    },
-  });
-
-  project.addSourceFileAtPath("./src/ui/backend.ts");
-  return project;
-}
 
 describe("CIDL Type", () => {
   test("Primitives", () => {
@@ -169,7 +157,7 @@ describe("Main", () => {
 });
 
 describe("WranglerEnv", () => {
-  test("Finds D1 Database", () => {
+  test("Finds bindings", () => {
     // Arrange
     const project = cloesceProject();
     const sourceFile = project.createSourceFile(
@@ -179,6 +167,7 @@ describe("WranglerEnv", () => {
         @WranglerEnv
         class Env {
           db: D1Database;
+          db2: D1Database;
           kv1: KVNamespace;
           kv2: KVNamespace;
           var1: string;
@@ -195,7 +184,7 @@ describe("WranglerEnv", () => {
     expect(res.isRight()).toBe(true);
     expect(res.unwrap()).toEqual({
       name: "Env",
-      d1_binding: "db",
+      d1_bindings: ["db", "db2"],
       kv_bindings: ["kv1", "kv2"],
       r2_bindings: [],
       vars: {
@@ -218,7 +207,7 @@ describe("Model", () => {
 
       const ds: DataSource<Foo> = {};
 
-      @Model()
+      @Model("my_d1")
       export class Foo {
         id: number;
 
@@ -259,6 +248,7 @@ describe("Model", () => {
     expect(cidl.models["Foo"]).toBeDefined();
 
     const fooModel = cidl.models["Foo"];
+    expect(fooModel.d1_binding).toEqual("my_d1");
 
     expect(fooModel.data_sources).toStrictEqual({
       ds: {
@@ -719,7 +709,8 @@ describe("Model", () => {
       "test.ts",
       `
       import { KValue, Integer, Paginated, R2ObjectBody } from "./src/ui/backend";
-      @Model(["GET", "SAVE"])
+      @Crud("GET", "SAVE")
+      @Model("db")
       export class Foo {
         @PrimaryKey
         id: Integer;
@@ -758,6 +749,7 @@ describe("Model", () => {
     fooModel.source_path = "";
     expect(fooModel).toEqual(
       ModelBuilder.model("Foo")
+        .d1("db")
         .idPk()
         .crud("GET")
         .crud("SAVE")

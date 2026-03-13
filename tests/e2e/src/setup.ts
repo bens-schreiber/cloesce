@@ -2,21 +2,87 @@ import { ChildProcess, execSync, spawn } from "child_process";
 import fs from "fs/promises";
 import kill from "tree-kill";
 
-const PORT = 5002;
-const DEBUG_PORT = 9230;
-let wranglerProcess: ChildProcess;
+// const DEBUG_PORT = 9230;
 
-export async function startWrangler(
+class ConsoleBuffer {
+  private logs: string[] = [];
+  private readonly original = {
+    log: console.log.bind(console),
+    error: console.error.bind(console),
+    warn: console.warn.bind(console),
+  };
+
+  constructor(private readonly prefix: string) {
+    console.log = (...args) => this.capture("log", ...args);
+    console.error = (...args) => this.capture("err", ...args);
+    console.warn = (...args) => this.capture("warn", ...args);
+  }
+
+  capture(tag: string, ...args: any[]) {
+    const msg = args
+      .map((a) => (typeof a === "string" ? a : JSON.stringify(a)))
+      .join(" ");
+    for (const line of msg.split("\n")) {
+      if (line.trim()) this.logs.push(`[${this.prefix}|${tag}] ${line}`);
+    }
+  }
+
+  flush() {
+    const { log, error, warn } = this.original;
+    console.log = log;
+    console.error = error;
+    console.warn = warn;
+    if (this.logs.length > 0) {
+      log(`\n--- [${this.prefix}] ---`);
+      for (const line of this.logs) {
+        log(line);
+      }
+      log(`--- [${this.prefix}] end ---\n`);
+    }
+  }
+}
+
+export function withRes(message: string, res: any): string {
+  return `${message}\n\n${JSON.stringify(res)}`;
+}
+
+export async function startWrangler(fixturesPath: string, workersUrl: string) {
+  const prefix = fixturesPath.split("/").filter(Boolean).pop() ?? fixturesPath;
+  const buffer = new ConsoleBuffer(prefix);
+
+  let wranglerProcess: ChildProcess | null = null;
+  try {
+    wranglerProcess = await _startWrangler(fixturesPath, workersUrl, buffer);
+  } catch (err) {
+    if (wranglerProcess) kill(wranglerProcess.pid!, "SIGTERM");
+    buffer.capture("err", err instanceof Error ? err.message : String(err));
+    buffer.flush();
+    throw err;
+  }
+
+  return async () => {
+    await new Promise<void>((resolve, reject) => {
+      kill(wranglerProcess!.pid!, "SIGTERM", (err) =>
+        err ? reject(err) : resolve(),
+      );
+    });
+    buffer.flush();
+  };
+}
+
+async function _startWrangler(
   fixturesPath: string,
-  withMigrations: boolean = true,
-) {
+  workersUrl: string,
+  buffer: ConsoleBuffer,
+): Promise<ChildProcess> {
   await fs.rm(`${fixturesPath}/.wrangler`, { recursive: true, force: true });
   await fs.rm(`${fixturesPath}/dist`, { recursive: true, force: true });
 
-  if (withMigrations) {
+  const d1Bindings = await getD1Bindings(fixturesPath);
+  for (const binding of d1Bindings) {
     await runCmd(
-      "Applying D1 migrations",
-      "echo y | npx wrangler d1 migrations apply db",
+      `Applying D1 migrations (${binding})`,
+      `echo y | npx wrangler d1 migrations apply ${binding}`,
       { cwd: fixturesPath },
     );
   }
@@ -29,63 +95,53 @@ export async function startWrangler(
     },
   );
 
-  wranglerProcess = spawn(
+  const port = portFromUrl(workersUrl);
+  const wranglerProcess = spawn(
     "npx",
     [
       "wrangler",
       "dev",
       "--port",
-      String(PORT),
+      String(port),
+      "--inspector-port",
+      "0", // String(DEBUG_PORT),
       "--config",
       "wrangler.toml",
-      "--inspector-port",
-      String(DEBUG_PORT),
     ],
-    {
-      cwd: fixturesPath,
-      stdio: "inherit",
-    },
+    { cwd: fixturesPath, stdio: "pipe" },
   );
 
-  wranglerProcess.stdout?.on("data", (data) => {
-    console.log(`[wrangler stdout]: ${data}`);
-  });
-
-  wranglerProcess.stderr?.on("data", (data) => {
-    console.error(`[wrangler stderr]: ${data}`);
-  });
-
-  wranglerProcess.on("exit", (code) => {
-    console.log(`⚠️ Wrangler process exited with code ${code}`);
-  });
+  wranglerProcess.stdout?.on("data", (data) =>
+    buffer.capture("wrangler", data.toString()),
+  );
+  wranglerProcess.stderr?.on("data", (data) =>
+    buffer.capture("wrangler", data.toString()),
+  );
+  wranglerProcess.on("exit", (code) =>
+    buffer.capture("wrangler", `⚠️ Wrangler process exited with code ${code}`),
+  );
 
   await new Promise((resolve) => setTimeout(resolve, 5000));
   console.log("Wrangler server ready ✅\n");
+
+  return wranglerProcess;
 }
 
-/**
- * Kills the running wrangler process via `kill-tree`
- */
-export async function stopWrangler() {
-  await new Promise<void>((resolve, reject) => {
-    kill(wranglerProcess.pid!, "SIGTERM", (err) => {
-      if (err) reject(err);
-      else resolve();
-    });
-  });
-}
-
-export function withRes(message: string, res: any): string {
-  return `${message}\n\n${JSON.stringify(res)}`;
+async function getD1Bindings(fixturesPath: string): Promise<string[]> {
+  const cidlRaw = await fs.readFile(`${fixturesPath}/cidl.json`, "utf8");
+  const cidl = JSON.parse(cidlRaw);
+  return cidl.wrangler_env?.d1_bindings ?? [];
 }
 
 async function runCmd(label: string, cmd: string, opts: { cwd?: string } = {}) {
-  try {
-    console.log(`${label}...`);
-    execSync(cmd, { stdio: "inherit", ...opts });
-    console.log("Ok ✅\n");
-  } catch (err) {
-    console.error(`${label} failed:`, err);
-    await stopWrangler();
-  }
+  console.log(`${label}...`);
+  const out = execSync(cmd, { encoding: "utf8", stdio: "pipe", ...opts });
+  if (out?.trim()) console.log(out.trim());
+  console.log("Ok ✅\n");
+}
+
+function portFromUrl(url: string): number {
+  const match = url.match(/:(\d+)/);
+  if (!match) throw new Error(`Invalid workersUrl: ${url}`);
+  return parseInt(match[1], 10);
 }

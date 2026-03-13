@@ -1,9 +1,10 @@
 {
-  "hash": 8885713398587814937,
+  "hash": 11127522741759014364,
   "models": {
     "D1BackedModel": {
-      "hash": 9299503543144665556,
+      "hash": 6703974713046051109,
       "name": "D1BackedModel",
+      "d1_binding": "db",
       "primary_key_columns": [
         {
           "hash": 6397878138472974760,

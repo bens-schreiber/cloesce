@@ -1,18 +1,21 @@
 {
-  "hash": 7645577656428666096,
+  "hash": 6083998897186386139,
   "project_name": "runner",
   "wrangler_env": {
     "name": "Env",
     "source_path": "./seed__app.cloesce.ts",
-    "d1_binding": "db",
+    "d1_bindings": [
+      "db"
+    ],
     "kv_bindings": [],
     "r2_bindings": [],
     "vars": {}
   },
   "models": {
     "Foo": {
-      "hash": 5230020806445609534,
+      "hash": 9350576688796676214,
       "name": "Foo",
+      "d1_binding": "db",
       "primary_key_columns": [
         {
           "hash": 6397878138472974760,

@@ -24,7 +24,7 @@ fn main() -> io::Result<()> {
     for fixture in fixtures {
         let patterns = vec![
             format!("{}/snap___*", fixture.display()),
-            format!("{}/migrations/snap___*", fixture.display()),
+            format!("{}/migrations/*/snap___*", fixture.display()),
         ];
 
         for pat in patterns {

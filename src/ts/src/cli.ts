@@ -66,6 +66,7 @@ const cmds = subcommands({
             path.join(outputDir, "workers.ts"),
             path.join(outputDir, "client.ts"),
             config.workersUrl,
+            config.migrationsPath,
           ],
         };
 
@@ -112,7 +113,18 @@ const cmds = subcommands({
       name: "migrate",
       description: "Creates a database migration.",
       args: {
-        name: positional({ type: string, displayName: "name" }),
+        // When --all is used, only one positional is provided and it lands here (as the name).
+        // When --all is not used, this is the D1 binding name and `name` is the migration name.
+        binding: positional({
+          type: optional(string),
+          displayName: "binding",
+          description: "The name of the D1 binding to generate a migration for",
+        }),
+        name: positional({ type: optional(string), displayName: "name" }),
+        all: flag({
+          long: "all",
+          description: "Generate migrations for all D1 bindings",
+        }),
         debug: flag({
           long: "debug",
           short: "d",
@@ -120,6 +132,35 @@ const cmds = subcommands({
         }),
       },
       handler: async (args) => {
+        let bindingArgs: string[];
+        let migrationName: string;
+
+        if (args.all) {
+          if (!args.binding) {
+            console.error(
+              "Error: Must provide a migration name. Usage: cloesce migrate --all NAME",
+            );
+            process.exit(1);
+          }
+          if (args.name !== undefined) {
+            console.error(
+              "Error: Unexpected argument. Usage: cloesce migrate --all NAME",
+            );
+            process.exit(1);
+          }
+          migrationName = args.binding;
+          bindingArgs = ["--all"];
+        } else {
+          if (!args.binding || !args.name) {
+            console.error(
+              "Error: Must provide both a binding and a migration name. Usage: cloesce migrate BINDING NAME",
+            );
+            process.exit(1);
+          }
+          migrationName = args.name;
+          bindingArgs = ["--binding", args.binding];
+        }
+
         const config = await loadCloesceConfig(process.cwd());
 
         const cidlPath = path.join(config.outPath, "cidl.json");
@@ -134,31 +175,14 @@ const cmds = subcommands({
           fs.mkdirSync(config.migrationsPath);
         }
 
-        const migrationPrefix = path.join(
-          config.migrationsPath,
-          `${timestamp()}_${args.name}`,
-        );
         let wasmArgs = [
           "migrations",
           cidlPath,
-          `${migrationPrefix}.json`,
-          `${migrationPrefix}.sql`,
+          ...bindingArgs,
+          migrationName,
+          "wrangler.toml",
+          ".",
         ];
-
-        // Add last migration if exists
-        {
-          const files = fs.readdirSync(config.migrationsPath);
-          const jsonFiles = files.filter((f) => f.endsWith(".json"));
-
-          // Sort descending by filename
-          jsonFiles.sort((a, b) =>
-            b.localeCompare(a, undefined, { numeric: true }),
-          );
-
-          if (jsonFiles.length > 0) {
-            wasmArgs.push(path.join(config.migrationsPath, jsonFiles[0]));
-          }
-        }
 
         const migrateConfig: WasmConfig = {
           name: "migrations",
