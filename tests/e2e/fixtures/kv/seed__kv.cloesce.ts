@@ -8,7 +8,7 @@ export class Env {
   otherNamespace: KVNamespace;
 }
 
-@Crud("GET")
+@Crud("GET", "SAVE")
 @Model()
 export class PureKVModel {
   @KeyParam

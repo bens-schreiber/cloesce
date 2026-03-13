@@ -1,14 +1,19 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { startWrangler, stopWrangler, withRes } from "../src/setup";
+import { startWrangler, withRes } from "../src/setup";
 import {
   Student,
   Course,
   StudentCourse,
 } from "../fixtures/composite_keys/client";
+import config from "../fixtures/composite_keys/cloesce.config";
 
+let stopWrangler: () => Promise<void>;
 beforeAll(async () => {
   // NOTE: e2e is called from proj root
-  await startWrangler("./fixtures/composite_keys");
+  stopWrangler = await startWrangler(
+    "./fixtures/composite_keys",
+    config.workersUrl!,
+  );
 }, 30_000);
 
 afterAll(async () => {

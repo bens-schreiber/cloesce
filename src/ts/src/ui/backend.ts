@@ -203,10 +203,10 @@ export const Model =
  * A stub decorator used by Cloesce to specify which CRUD operations
  * are available for a model.
  *
- * @param kinds The CRUD kinds supported by this model.
+ * @param _kinds The CRUD kinds supported by this model.
  */
 export const Crud =
-  (...kinds: CrudKind[]): ClassDecorator =>
+  (..._kinds: CrudKind[]): ClassDecorator =>
   () => {};
 
 /**

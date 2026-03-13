@@ -11,7 +11,7 @@ export class DB1Model {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<DB1Model>> {
     const baseUrl = new URL(
-      `http://localhost:5002/api/DB1Model/GET`
+      `http://localhost:5306/api/DB1Model/GET`
     );
 
     baseUrl.searchParams.append("id", String(id));
@@ -36,7 +36,7 @@ export class DB1Model {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<DB1Model[]>> {
     const baseUrl = new URL(
-      `http://localhost:5002/api/DB1Model/LIST`
+      `http://localhost:5306/api/DB1Model/LIST`
     );
 
     baseUrl.searchParams.append("lastSeen_id", String(lastSeen_id));
@@ -61,7 +61,7 @@ export class DB1Model {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<DB1Model>> {
     const baseUrl = new URL(
-      `http://localhost:5002/api/DB1Model/SAVE`
+      `http://localhost:5306/api/DB1Model/SAVE`
     );
     const payload: any = {};
 
@@ -97,7 +97,7 @@ export class DB2Model {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<DB2Model>> {
     const baseUrl = new URL(
-      `http://localhost:5002/api/DB2Model/GET`
+      `http://localhost:5306/api/DB2Model/GET`
     );
 
     baseUrl.searchParams.append("id", String(id));
@@ -122,7 +122,7 @@ export class DB2Model {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<DB2Model[]>> {
     const baseUrl = new URL(
-      `http://localhost:5002/api/DB2Model/LIST`
+      `http://localhost:5306/api/DB2Model/LIST`
     );
 
     baseUrl.searchParams.append("lastSeen_id", String(lastSeen_id));
@@ -147,7 +147,7 @@ export class DB2Model {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<DB2Model>> {
     const baseUrl = new URL(
-      `http://localhost:5002/api/DB2Model/SAVE`
+      `http://localhost:5306/api/DB2Model/SAVE`
     );
     const payload: any = {};
 

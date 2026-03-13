@@ -1,10 +1,12 @@
-import { startWrangler, stopWrangler, withRes } from "../src/setup.js";
+import { startWrangler, withRes } from "../src/setup.js";
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { PooAcceptYield } from "../fixtures/poos/client";
+import config from "../fixtures/poos/cloesce.config";
 
+let stopWrangler: () => Promise<void>;
 beforeAll(async () => {
   // NOTE: e2e is called from proj root
-  await startWrangler("./fixtures/poos");
+  stopWrangler = await startWrangler("./fixtures/poos", config.workersUrl!);
 }, 30_000);
 
 afterAll(async () => {

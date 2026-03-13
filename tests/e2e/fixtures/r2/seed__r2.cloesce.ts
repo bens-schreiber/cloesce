@@ -5,7 +5,6 @@ import {
   KeyParam,
   Model,
   Integer,
-  DataSource,
   Inject,
   Put,
   Crud,
@@ -33,7 +32,7 @@ export class PureR2Model {
   @R2("path/to/data/{id}", "bucket1")
   data: R2ObjectBody;
 
-  @R2("path/to/other/{id}", "bucket2")
+  @R2("path/to/other/{id}", "bucket1")
   otherData: R2ObjectBody;
 
   @R2("path/", "bucket1")
@@ -46,7 +45,7 @@ export class PureR2Model {
 
   @Put()
   async uploadOtherData(@Inject env: Env, stream: ReadableStream) {
-    await env.bucket2.put(`path/to/other/${this.id}`, stream);
+    await env.bucket1.put(`path/to/other/${this.id}`, stream);
   }
 }
 

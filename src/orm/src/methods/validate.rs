@@ -694,7 +694,7 @@ mod tests {
         // Unknown data source
         {
             // Arrange
-            let horse = ModelBuilder::new("Horse").id_pk().build();
+            let horse = ModelBuilder::new("Horse").default_db().id_pk().build();
 
             let ast = generator_test::create_ast(vec![horse]);
 
@@ -713,7 +713,7 @@ mod tests {
         // "none" is valid data source
         {
             // Arrange
-            let horse = ModelBuilder::new("Horse").id_pk().build();
+            let horse = ModelBuilder::new("Horse").default_db().id_pk().build();
 
             let ast = generator_test::create_ast(vec![horse]);
 
@@ -736,6 +736,7 @@ mod tests {
         {
             // Arrange
             let horse = ModelBuilder::new("Horse")
+                .default_db()
                 .id_pk()
                 .col("name", CidlType::Text, None, None)
                 .build();
@@ -763,6 +764,7 @@ mod tests {
         {
             // Arrange
             let horse = ModelBuilder::new("Horse")
+                .default_db()
                 .id_pk()
                 .key_param("nickname")
                 .build();
@@ -790,6 +792,7 @@ mod tests {
         {
             // Arrange
             let horse = ModelBuilder::new("Horse")
+                .default_db()
                 .id_pk()
                 .col("name", CidlType::Text, None, None)
                 .key_param("color")
@@ -803,6 +806,7 @@ mod tests {
                 .build();
 
             let rider = ModelBuilder::new("Rider")
+                .default_db()
                 .id_pk()
                 .col("nickname", CidlType::Text, None, None)
                 .build();
@@ -833,6 +837,7 @@ mod tests {
         {
             // Arrange
             let horse = ModelBuilder::new("Horse")
+                .default_db()
                 .id_pk()
                 .col("name", CidlType::Text, None, None)
                 .build();

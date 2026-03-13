@@ -13,7 +13,7 @@ export class Dog {
     encodeURIComponent(String(this.id)),
     ].join("/");
     const baseUrl = new URL(
-      `http://localhost:5002/api/Dog/${id}/getPartialSelf`
+      `http://localhost:5006/api/Dog/${id}/getPartialSelf`
     );
 
 
@@ -33,7 +33,7 @@ export class Dog {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Dog>> {
     const baseUrl = new URL(
-      `http://localhost:5002/api/Dog/post`
+      `http://localhost:5006/api/Dog/post`
     );
     const payload: any = {};
 

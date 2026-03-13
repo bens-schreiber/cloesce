@@ -10,8 +10,8 @@ migrations_dir = "migrations/db"
 
 [[r2_buckets]]
 binding = "bucket1"
-bucket_name = "replace_with_bucket1_name"
+bucket_name = "replace-with-bucket1-name"
 
 [[r2_buckets]]
 binding = "bucket2"
-bucket_name = "replace_with_bucket2_name"
+bucket_name = "replace-with-bucket2-name"

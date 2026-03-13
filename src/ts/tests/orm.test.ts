@@ -643,6 +643,7 @@ describe("ORM List Method with DataSource and listParams", () => {
   test("List with default listParams (LastSeen, Limit)", async () => {
     // Arrange
     const modelMeta = ModelBuilder.model("Product")
+      .defaultDb()
       .idPk()
       .col("name", "Text")
       .col("price", "Integer")
@@ -668,18 +669,18 @@ describe("ORM List Method with DataSource and listParams", () => {
           }
         }
         `,
-      d1Databases: ["DB"],
+      d1Databases: ["d1"],
     });
 
-    const db = await mf.getD1Database("DB");
+    const d1 = await mf.getD1Database("d1");
 
     // Create table and insert test data
-    await db
+    await d1
       .prepare(
         `CREATE TABLE Product (id INTEGER PRIMARY KEY, name TEXT, price INTEGER)`,
       )
       .run();
-    await db
+    await d1
       .prepare(
         `INSERT INTO Product (id, name, price) VALUES
          (1, 'Product 1', 100),
@@ -688,7 +689,7 @@ describe("ORM List Method with DataSource and listParams", () => {
       )
       .run();
 
-    const env = { db };
+    const env = { d1 };
     const instance = Orm.fromEnv(env);
 
     // Act
@@ -708,6 +709,7 @@ describe("ORM List Method with DataSource and listParams", () => {
   test("List with explicit custom query and pagination params", async () => {
     // Arrange
     const modelMeta = ModelBuilder.model("User")
+      .defaultDb()
       .idPk()
       .col("username", "Text")
       .build();
@@ -738,15 +740,15 @@ describe("ORM List Method with DataSource and listParams", () => {
           }
         }
         `,
-      d1Databases: ["DB"],
+      d1Databases: ["d1"],
     });
 
-    const db = await mf.getD1Database("DB");
+    const d1 = await mf.getD1Database("d1");
 
-    await db
+    await d1
       .prepare(`CREATE TABLE User (id INTEGER PRIMARY KEY, username TEXT)`)
       .run();
-    await db
+    await d1
       .prepare(
         `INSERT INTO User (id, username) VALUES
          (1, 'alice'),
@@ -756,7 +758,7 @@ describe("ORM List Method with DataSource and listParams", () => {
       )
       .run();
 
-    const env = { db };
+    const env = { d1 };
     const instance = Orm.fromEnv(env);
 
     // Act
@@ -775,6 +777,7 @@ describe("ORM List Method with DataSource and listParams", () => {
   test("List supports custom DataSource methods with parameter binding", async () => {
     // Arrange
     const modelMeta = ModelBuilder.model("Record")
+      .defaultDb()
       .idPk()
       .col("data", "Text")
       .build();
@@ -806,15 +809,15 @@ describe("ORM List Method with DataSource and listParams", () => {
           }
         }
         `,
-      d1Databases: ["DB"],
+      d1Databases: ["d1"],
     });
 
-    const db = await mf.getD1Database("DB");
+    const d1 = await mf.getD1Database("d1");
 
-    await db
+    await d1
       .prepare(`CREATE TABLE Record (id INTEGER PRIMARY KEY, data TEXT)`)
       .run();
-    await db
+    await d1
       .prepare(
         `INSERT INTO Record (id, data) VALUES
          (1, 'data1'),
@@ -822,7 +825,7 @@ describe("ORM List Method with DataSource and listParams", () => {
       )
       .run();
 
-    const env = { db };
+    const env = { d1 };
     const instance = Orm.fromEnv(env);
 
     // Act
@@ -842,6 +845,7 @@ describe("ORM List Method with DataSource and listParams", () => {
   test("Get with primary key", async () => {
     // Arrange
     const modelMeta = ModelBuilder.model("Post")
+      .defaultDb()
       .idPk()
       .col("content", "Text")
       .build();
@@ -865,16 +869,16 @@ describe("ORM List Method with DataSource and listParams", () => {
           }
         }
         `,
-      d1Databases: ["DB"],
+      d1Databases: ["d1"],
     });
 
-    const db = await mf.getD1Database("DB");
+    const d1 = await mf.getD1Database("d1");
 
     // Create table and insert test data
-    await db
+    await d1
       .prepare(`CREATE TABLE Post (id INTEGER PRIMARY KEY, content TEXT)`)
       .run();
-    await db
+    await d1
       .prepare(
         `INSERT INTO Post (id, content) VALUES
          (1, 'Hello World'),
@@ -882,7 +886,7 @@ describe("ORM List Method with DataSource and listParams", () => {
       )
       .run();
 
-    const env = { db };
+    const env = { d1 };
     const instance = Orm.fromEnv(env);
 
     // Act
@@ -899,6 +903,7 @@ describe("ORM List Method with DataSource and listParams", () => {
   test("Get returns null when not found", async () => {
     // Arrange
     const modelMeta = ModelBuilder.model("Comment")
+      .defaultDb()
       .idPk()
       .col("text", "Text")
       .build();
@@ -922,17 +927,17 @@ describe("ORM List Method with DataSource and listParams", () => {
           }
         }
         `,
-      d1Databases: ["DB"],
+      d1Databases: ["d1"],
     });
 
-    const db = await mf.getD1Database("DB");
+    const d1 = await mf.getD1Database("d1");
 
     // Create table but don't insert data for id=999
-    await db
+    await d1
       .prepare(`CREATE TABLE Comment (id INTEGER PRIMARY KEY, text TEXT)`)
       .run();
 
-    const env = { db };
+    const env = { d1 };
     const instance = Orm.fromEnv(env);
 
     // Act
@@ -947,6 +952,7 @@ describe("ORM List Method with DataSource and listParams", () => {
   test("List with composite primary key", async () => {
     // Arrange
     const modelMeta = ModelBuilder.model("Enrollment")
+      .defaultDb()
       .pk("courseId", "Text")
       .pk("studentId", "Integer")
       .col("status", "Text")
@@ -972,17 +978,17 @@ describe("ORM List Method with DataSource and listParams", () => {
           }
         }
         `,
-      d1Databases: ["DB"],
+      d1Databases: ["d1"],
     });
 
-    const db = await mf.getD1Database("DB");
+    const d1 = await mf.getD1Database("d1");
 
-    await db
+    await d1
       .prepare(
         `CREATE TABLE Enrollment (courseId TEXT, studentId INTEGER, status TEXT, PRIMARY KEY (courseId, studentId))`,
       )
       .run();
-    await db
+    await d1
       .prepare(
         `INSERT INTO Enrollment (courseId, studentId, status) VALUES
          ('course-a', 1, 'active'),
@@ -991,7 +997,7 @@ describe("ORM List Method with DataSource and listParams", () => {
       )
       .run();
 
-    const env = { db };
+    const env = { d1 };
     const instance = Orm.fromEnv(env);
 
     // Act
@@ -1012,6 +1018,7 @@ describe("ORM List Method with DataSource and listParams", () => {
   test("Get with composite primary key", async () => {
     // Arrange
     const modelMeta = ModelBuilder.model("Membership")
+      .defaultDb()
       .pk("orgId", "Text")
       .pk("userId", "Integer")
       .col("role", "Text")
@@ -1037,17 +1044,17 @@ describe("ORM List Method with DataSource and listParams", () => {
           }
         }
         `,
-      d1Databases: ["DB"],
+      d1Databases: ["d1"],
     });
 
-    const db = await mf.getD1Database("DB");
+    const d1 = await mf.getD1Database("d1");
 
-    await db
+    await d1
       .prepare(
         `CREATE TABLE Membership (orgId TEXT, userId INTEGER, role TEXT, PRIMARY KEY (orgId, userId))`,
       )
       .run();
-    await db
+    await d1
       .prepare(
         `INSERT INTO Membership (orgId, userId, role) VALUES
          ('acme', 1, 'owner'),
@@ -1055,7 +1062,7 @@ describe("ORM List Method with DataSource and listParams", () => {
       )
       .run();
 
-    const env = { db };
+    const env = { d1 };
     const instance = Orm.fromEnv(env);
 
     // Act

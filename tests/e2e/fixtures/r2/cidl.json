@@ -227,7 +227,7 @@
         {
           "format": "path/to/other/{id}",
           "var_name": "otherData",
-          "bucket_binding": "bucket2",
+          "bucket_binding": "bucket1",
           "list_prefix": false
         },
         {

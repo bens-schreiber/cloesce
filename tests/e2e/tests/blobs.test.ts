@@ -1,10 +1,12 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { startWrangler, stopWrangler, withRes } from "../src/setup";
+import { startWrangler, withRes } from "../src/setup";
 import { BlobHaver, BlobService } from "../fixtures/blobs/client";
+import config from "../fixtures/blobs/cloesce.config";
 
+let stopWrangler: () => Promise<void>;
 beforeAll(async () => {
   // NOTE: e2e is called from proj root
-  await startWrangler("./fixtures/blobs");
+  stopWrangler = await startWrangler("./fixtures/blobs", config.workersUrl!);
 }, 30_000);
 
 afterAll(async () => {

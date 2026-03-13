@@ -239,7 +239,7 @@ fn generate_migrations(
     wrangler_path: &Path,
     root_path: &Path,
 ) -> Result<()> {
-    let wrangler = WranglerGenerator::from_path(&wrangler_path);
+    let wrangler = WranglerGenerator::from_path(wrangler_path);
     let spec = wrangler.as_spec();
 
     if spec.d1_databases.is_empty() {
@@ -304,12 +304,12 @@ fn generate_migrations(
             entries
                 .iter()
                 .filter(|p| p.extension().and_then(|e| e.to_str()) == Some("json"))
-                .last()
+                .next_back()
                 .cloned()
         };
 
         let file_stem = if fixed {
-            format!("{name}")
+            name.to_string()
         } else {
             let timestamp = std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
@@ -336,7 +336,7 @@ fn generate_migrations(
             .transpose()?;
 
         // Migrate only the models with the specified D1 binding
-        let mut ast = ast::MigrationsAst::from_json(&cidl_path)?;
+        let mut ast = ast::MigrationsAst::from_json(cidl_path)?;
         ast.models
             .retain(|_, m| m.d1_binding == Some(current_binding.to_string()));
 

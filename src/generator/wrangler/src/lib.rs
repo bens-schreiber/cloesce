@@ -399,7 +399,7 @@ impl WranglerDefault {
                 match r2 {
                     Some(bucket) => {
                         if bucket.bucket_name.is_none() {
-                            bucket.bucket_name = Some(format!("replace_with_{}_name", r2_binding));
+                            bucket.bucket_name = Some(format!("replace-with-{}-name", r2_binding));
                             tracing::warn!(
                                 "R2 Bucket with binding {} is missing a bucket name. See https://developers.cloudflare.com/r2/get-started/",
                                 r2_binding
@@ -409,7 +409,7 @@ impl WranglerDefault {
                     None => {
                         spec.r2_buckets.push(ast::R2Bucket {
                             binding: Some(r2_binding.clone()),
-                            bucket_name: Some(format!("replace_with_{}_name", r2_binding)),
+                            bucket_name: Some(format!("replace-with-{}-name", r2_binding)),
                         });
 
                         tracing::warn!(

@@ -15,7 +15,7 @@ export class D1BackedModel {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<D1BackedModel>> {
     const baseUrl = new URL(
-      `http://localhost:5002/api/D1BackedModel/GET`
+      `http://localhost:5758/api/D1BackedModel/GET`
     );
 
     baseUrl.searchParams.append("id", String(id));
@@ -41,7 +41,7 @@ export class D1BackedModel {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<D1BackedModel[]>> {
     const baseUrl = new URL(
-      `http://localhost:5002/api/D1BackedModel/LIST`
+      `http://localhost:5758/api/D1BackedModel/LIST`
     );
 
     baseUrl.searchParams.append("lastSeen_id", String(lastSeen_id));
@@ -66,7 +66,7 @@ export class D1BackedModel {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<D1BackedModel>> {
     const baseUrl = new URL(
-      `http://localhost:5002/api/D1BackedModel/SAVE`
+      `http://localhost:5758/api/D1BackedModel/SAVE`
     );
     const payload: any = {};
 
@@ -103,7 +103,7 @@ export class PaginatedKVModel {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<PaginatedKVModel>> {
     const baseUrl = new URL(
-      `http://localhost:5002/api/PaginatedKVModel/GET`
+      `http://localhost:5758/api/PaginatedKVModel/GET`
     );
 
     baseUrl.searchParams.append("id", String(id));
@@ -125,7 +125,7 @@ export class PaginatedKVModel {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Paginated<KValue<unknown>>>> {
     const baseUrl = new URL(
-      `http://localhost:5002/api/PaginatedKVModel/acceptPaginated`
+      `http://localhost:5758/api/PaginatedKVModel/acceptPaginated`
     );
     const payload: any = {};
 
@@ -166,7 +166,7 @@ export class PureKVModel {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<PureKVModel>> {
     const baseUrl = new URL(
-      `http://localhost:5002/api/PureKVModel/GET`
+      `http://localhost:5758/api/PureKVModel/GET`
     );
 
     baseUrl.searchParams.append("id", String(id));
@@ -174,6 +174,32 @@ export class PureKVModel {
 
     const res = await fetchImpl(baseUrl, {
       method: "Get",
+    });
+
+    return await HttpResult.fromResponse(
+      res,
+      MediaType.Json,
+      PureKVModel,
+      false
+    );
+  }
+  static async SAVE(
+    model: DeepPartial<PureKVModel>,
+    __datasource: "default" = "default",
+    fetchImpl: typeof fetch = fetch
+  ): Promise<HttpResult<PureKVModel>> {
+    const baseUrl = new URL(
+      `http://localhost:5758/api/PureKVModel/SAVE`
+    );
+    const payload: any = {};
+
+    payload["model"] = model;
+    baseUrl.searchParams.append("__datasource", String(__datasource));
+
+    const res = await fetchImpl(baseUrl, {
+      method: "Post",
+      headers: { "Content-Type": "application/json" },
+      body: requestBody(MediaType.Json, payload),
     });
 
     return await HttpResult.fromResponse(

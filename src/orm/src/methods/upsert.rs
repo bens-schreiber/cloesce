@@ -872,6 +872,8 @@ fn validate_and_transform(
 
 #[cfg(test)]
 mod test {
+    use std::{collections::HashMap, path::PathBuf};
+
     use ast::{CidlType, ForeignKeyReference, NavigationPropertyKind};
     use generator_test::{ModelBuilder, create_ast, expected_str};
     use serde_json::{Value, json};
@@ -898,7 +900,7 @@ mod test {
             let res = key_format_interpolation(
                 key_format,
                 new_model.as_object().unwrap(),
-                &ModelBuilder::new("User").id_pk().build(),
+                &ModelBuilder::new("User").default_db().id_pk().build(),
             );
 
             // Assert
@@ -908,7 +910,7 @@ mod test {
         // Returns placeholder on missing PK
         {
             // Arrange
-            let model = ModelBuilder::new("User").id_pk().build();
+            let model = ModelBuilder::new("User").default_db().id_pk().build();
             let key_format = "User/{id}/";
             let new_model = json!({});
 
@@ -922,7 +924,7 @@ mod test {
         // Returns OrmError on missing required param
         {
             // Arrange
-            let model = ModelBuilder::new("User").id_pk().build();
+            let model = ModelBuilder::new("User").default_db().id_pk().build();
             let key_format = "User/{id}/{foo}/";
             let new_model = json!({
                 "id": 1
@@ -944,6 +946,7 @@ mod test {
     async fn upsert_scalar_model(db: SqlitePool) {
         // Arrange
         let model = ModelBuilder::new("Horse")
+            .default_db()
             .id_pk()
             .col("color", CidlType::Text, None, None)
             .col("age", CidlType::Integer, None, None)
@@ -1017,6 +1020,7 @@ mod test {
     async fn update_scalar_model(db: SqlitePool) {
         // Arrange
         let model = ModelBuilder::new("Horse")
+            .default_db()
             .id_pk()
             .col("color", CidlType::Text, None, None)
             .col("age", CidlType::Integer, None, None)
@@ -1073,6 +1077,7 @@ mod test {
     async fn upsert_with_undefined_nullable_col(db: SqlitePool) {
         // Arrange
         let model = ModelBuilder::new("User")
+            .default_db()
             .id_pk()
             .col("name", CidlType::Text, None, None)
             .col("age", CidlType::Integer, None, None)
@@ -1122,6 +1127,7 @@ mod test {
     async fn upsert_blob_b64(db: SqlitePool) {
         // Arrange
         let model = ModelBuilder::new("Picture")
+            .default_db()
             .id_pk()
             .col("metadata", CidlType::Text, None, None)
             .col("blob", CidlType::Blob, None, None)
@@ -1178,6 +1184,7 @@ mod test {
     async fn upsert_blob_u8_arr(db: SqlitePool) {
         // Arrange
         let model = ModelBuilder::new("Picture")
+            .default_db()
             .id_pk()
             .col("metadata", CidlType::Text, None, None)
             .col("blob", CidlType::Blob, None, None)
@@ -1232,6 +1239,7 @@ mod test {
     async fn one_to_one(db: SqlitePool) {
         // Arrange
         let person = ModelBuilder::new("Person")
+            .default_db()
             .id_pk()
             .col(
                 "horseId",
@@ -1250,7 +1258,7 @@ mod test {
                 },
             )
             .build();
-        let horse = ModelBuilder::new("Horse").id_pk().build();
+        let horse = ModelBuilder::new("Horse").default_db().id_pk().build();
 
         let new_model = json!({
             "id": 1,
@@ -1310,6 +1318,7 @@ mod test {
     async fn one_to_many(db: SqlitePool) {
         // Arrange
         let person = ModelBuilder::new("Person")
+            .default_db()
             .id_pk()
             .nav_p(
                 "horses",
@@ -1320,6 +1329,7 @@ mod test {
             )
             .build();
         let horse = ModelBuilder::new("Horse")
+            .default_db()
             .id_pk()
             .col(
                 "personId",
@@ -1415,10 +1425,12 @@ mod test {
     async fn many_to_many(db: SqlitePool) {
         // Arrange
         let person = ModelBuilder::new("Person")
+            .default_db()
             .id_pk()
             .nav_p("horses", "Horse", NavigationPropertyKind::ManyToMany)
             .build();
         let horse = ModelBuilder::new("Horse")
+            .default_db()
             .nav_p("persons", "Person", NavigationPropertyKind::ManyToMany)
             .id_pk()
             .build();
@@ -1501,6 +1513,7 @@ mod test {
     async fn topological_ordering_is_correct(db: SqlitePool) {
         // Arrange
         let person = ModelBuilder::new("Person")
+            .default_db()
             .id_pk()
             .col(
                 "horseId",
@@ -1521,6 +1534,7 @@ mod test {
             .build();
 
         let horse = ModelBuilder::new("Horse")
+            .default_db()
             .id_pk()
             .nav_p(
                 "awards",
@@ -1532,6 +1546,7 @@ mod test {
             .build();
 
         let award = ModelBuilder::new("Award")
+            .default_db()
             .id_pk()
             .col(
                 "horseId",
@@ -1620,7 +1635,7 @@ mod test {
     #[sqlx::test]
     async fn insert_missing_pk_autogenerates(db: SqlitePool) {
         // Arrange
-        let person = ModelBuilder::new("Person").id_pk().build();
+        let person = ModelBuilder::new("Person").default_db().id_pk().build();
         let ast = create_ast(vec![person]);
 
         let new_person = json!({});
@@ -1671,6 +1686,7 @@ mod test {
     async fn insert_empty(db: SqlitePool) {
         // Arrange
         let model = ModelBuilder::new("User")
+            .default_db()
             .id_pk()
             .col("nickname", CidlType::nullable(CidlType::Text), None, None)
             .build();
@@ -1703,6 +1719,7 @@ mod test {
     async fn insert_with_undefined_nullable(db: SqlitePool) {
         // Arrange
         let model = ModelBuilder::new("User")
+            .default_db()
             .id_pk()
             .col("name", CidlType::Text, None, None)
             .col("age", CidlType::Integer, None, None)
@@ -1753,6 +1770,7 @@ mod test {
     #[sqlx::test]
     async fn insert_missing_one_to_one_fk_autogenerates(db: SqlitePool) {
         let person = ModelBuilder::new("Person")
+            .default_db()
             .id_pk()
             .col(
                 "horseId",
@@ -1772,7 +1790,7 @@ mod test {
             )
             .build();
 
-        let horse = ModelBuilder::new("Horse").id_pk().build();
+        let horse = ModelBuilder::new("Horse").default_db().id_pk().build();
 
         let ast = create_ast(vec![person, horse]);
 
@@ -1846,6 +1864,7 @@ mod test {
     async fn insert_missing_one_to_many_fk_autogenerates(db: SqlitePool) {
         // Arrange
         let person = ModelBuilder::new("Person")
+            .default_db()
             .id_pk()
             .nav_p(
                 "horses",
@@ -1857,6 +1876,7 @@ mod test {
             .build();
 
         let horse = ModelBuilder::new("Horse")
+            .default_db()
             .id_pk()
             .col(
                 "personId",
@@ -1943,11 +1963,13 @@ mod test {
     async fn insert_missing_many_to_many_pk_fk_autogenerates(db: SqlitePool) {
         // Arrange
         let person = ModelBuilder::new("Person")
+            .default_db()
             .id_pk()
             .nav_p("horses", "Horse", NavigationPropertyKind::ManyToMany)
             .build();
 
         let horse = ModelBuilder::new("Horse")
+            .default_db()
             .nav_p("persons", "Person", NavigationPropertyKind::ManyToMany)
             .id_pk()
             .build();
@@ -2046,6 +2068,7 @@ mod test {
     async fn composite_primary_key_upsert(db: SqlitePool) {
         // Arrange
         let order_item = ModelBuilder::new("OrderItem")
+            .default_db()
             .pk("order_id", CidlType::Integer)
             .pk("product_id", CidlType::Integer) // => composite PK of (order_id, product_id)
             .col("quantity", CidlType::Integer, None, None)
@@ -2104,12 +2127,14 @@ mod test {
     async fn composite_fk_one_to_one(db: SqlitePool) {
         // Arrange
         let student = ModelBuilder::new("Student")
+            .default_db()
             .pk("school_id", CidlType::Integer)
             .pk("student_number", CidlType::Integer) // => composite PK of (school_id, student_number)
             .col("name", CidlType::Text, None, None)
             .build();
 
         let enrollment = ModelBuilder::new("Enrollment")
+            .default_db()
             .id_pk()
             .col(
                 "school_id",
@@ -2200,6 +2225,7 @@ mod test {
     #[sqlx::test]
     async fn composite_fk_one_to_many(db: SqlitePool) {
         let order = ModelBuilder::new("Order")
+            .default_db()
             .pk("region_id", CidlType::Integer)
             .pk("order_number", CidlType::Integer) // => composite PK of (region_id, order_number)
             .col("customer", CidlType::Text, None, None)
@@ -2213,6 +2239,7 @@ mod test {
             .build();
 
         let order_item = ModelBuilder::new("OrderItem")
+            .default_db()
             .id_pk()
             .col(
                 "region_id",
@@ -2300,6 +2327,7 @@ mod test {
     async fn composite_pk_many_to_many(db: SqlitePool) {
         // Arrange
         let teacher = ModelBuilder::new("Teacher")
+            .default_db()
             .pk("school_id", CidlType::Integer)
             .pk("employee_id", CidlType::Integer) // => composite PK of (school_id, employee_id)
             .col("name", CidlType::Text, None, None)
@@ -2307,6 +2335,7 @@ mod test {
             .build();
 
         let course = ModelBuilder::new("Course")
+            .default_db()
             .pk("department_id", CidlType::Integer)
             .pk("course_code", CidlType::Integer)
             .col("title", CidlType::Text, None, None)
@@ -2381,6 +2410,7 @@ mod test {
     fn composite_key_cannot_autoincrement() {
         // Arrange
         let order_item = ModelBuilder::new("OrderItem")
+            .default_db()
             .pk("order_id", CidlType::Integer)
             .pk("product_id", CidlType::Integer)
             .col("quantity", CidlType::Integer, None, None)
@@ -2419,6 +2449,7 @@ mod test {
     fn composite_key_with_partial_keys_fails() {
         // Arrange
         let order_item = ModelBuilder::new("OrderItem")
+            .default_db()
             .pk("order_id", CidlType::Integer)
             .pk("product_id", CidlType::Integer)
             .col("quantity", CidlType::Integer, None, None)
@@ -2454,6 +2485,7 @@ mod test {
     async fn kv_objects(db: SqlitePool) {
         // Arrange
         let person = ModelBuilder::new("Person")
+            .db("d1")
             .id_pk()
             .col("name", CidlType::Text, None, None)
             .col(
@@ -2483,6 +2515,7 @@ mod test {
             .build();
 
         let horse = ModelBuilder::new("Horse")
+            .db("d1")
             .id_pk()
             .nav_p(
                 "awards",
@@ -2502,6 +2535,7 @@ mod test {
             .build();
 
         let award = ModelBuilder::new("Award")
+            .db("d1")
             .id_pk()
             .col(
                 "horseId",
@@ -2523,7 +2557,19 @@ mod test {
             )
             .build();
 
-        let ast = create_ast(vec![person, horse, award]);
+        let mut ast = create_ast(vec![person, horse, award]);
+        ast.wrangler_env = Some(ast::WranglerEnv {
+            name: "test".to_string(),
+            source_path: PathBuf::default(),
+            d1_bindings: vec!["d1".to_string()],
+            kv_bindings: vec![
+                "PERSON_KV".to_string(),
+                "HORSE_KV".to_string(),
+                "AWARD_KV".to_string(),
+            ],
+            r2_bindings: vec![],
+            vars: HashMap::default(),
+        });
 
         let new_model = json!({
             "id": 100,

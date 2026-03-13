@@ -1,8 +1,13 @@
-use std::process::Command;
+use std::{
+    collections::hash_map::DefaultHasher,
+    hash::{Hash, Hasher},
+    process::Command,
+};
 
 use clap::Parser;
 use futures::future::join_all;
 use glob::glob;
+
 use regression::Fixture;
 
 #[derive(Parser)]
@@ -10,9 +15,6 @@ use regression::Fixture;
 struct Cli {
     #[arg(short = 'c', long = "check", global = true)]
     check: bool,
-
-    #[arg(long, default_value = "http://localhost:5002/api")]
-    domain: String,
 
     #[arg(long, default_value = "*", global = true)]
     fixture: String,
@@ -67,8 +69,7 @@ async fn main() {
 
     let mut tasks = Vec::with_capacity(fixtures.len());
     for fixture in fixtures {
-        let domain = cli.domain.clone();
-
+        let domain = create_cloesce_config(&fixture);
         tasks.push(tokio::task::spawn_blocking(move || {
             run_integration_test(fixture, &domain).unwrap_or(true)
         }));
@@ -138,4 +139,36 @@ fn run_integration_test(fixture: Fixture, domain: &str) -> Result<bool, bool> {
     );
 
     Ok(pre_cidl_changed | generated_changed | migrated_cidl_changed | migrated_sql_changed)
+}
+
+fn create_cloesce_config(fixture: &Fixture) -> String {
+    let mut hasher = DefaultHasher::new();
+    fixture.fixture_id.hash(&mut hasher);
+    let port_seed = hasher.finish() % 1000;
+
+    let domain = format!("http://localhost:{}/api", 5000 + port_seed);
+    let config_source = format!(
+        r#"import {{ defineConfig }} from "cloesce/config";
+export default defineConfig({{
+    srcPaths: ["./"],
+    workersUrl: "{}",
+}});
+            "#,
+        domain
+    );
+
+    // Write the config to cloesce.config.ts in the fixture directory
+    let config_path = fixture
+        .path
+        .parent()
+        .expect("fixture parent to exist")
+        .join("cloesce.config.ts");
+    std::fs::write(&config_path, config_source).unwrap_or_else(|err| {
+        panic!(
+            "Failed to write config for fixture {}: {}",
+            fixture.fixture_id, err
+        )
+    });
+
+    domain
 }

@@ -47,7 +47,8 @@
             "methods": {},
             "data_sources": {},
             "cruds": [
-                "GET"
+                "GET",
+                "SAVE"
             ],
             "source_path": "./seed__kv.cloesce.ts"
         },

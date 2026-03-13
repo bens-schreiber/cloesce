@@ -50,7 +50,7 @@ export function createAst(args?: {
     wrangler_env: {
       name: "Env",
       source_path: "source.ts",
-      d1_binding: "db",
+      d1_bindings: ["d1"],
       kv_bindings: [],
       r2_bindings: [],
       vars: {},
@@ -136,6 +136,11 @@ export class ModelBuilder {
 
   d1(binding: string): this {
     this.d1_binding = binding;
+    return this;
+  }
+
+  defaultDb(): this {
+    this.d1_binding = "d1";
     return this;
   }
 

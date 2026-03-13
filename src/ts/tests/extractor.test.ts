@@ -157,7 +157,7 @@ describe("Main", () => {
 });
 
 describe("WranglerEnv", () => {
-  test("Finds D1 Database", () => {
+  test("Finds bindings", () => {
     // Arrange
     const project = cloesceProject();
     const sourceFile = project.createSourceFile(
@@ -167,6 +167,7 @@ describe("WranglerEnv", () => {
         @WranglerEnv
         class Env {
           db: D1Database;
+          db2: D1Database;
           kv1: KVNamespace;
           kv2: KVNamespace;
           var1: string;
@@ -183,7 +184,7 @@ describe("WranglerEnv", () => {
     expect(res.isRight()).toBe(true);
     expect(res.unwrap()).toEqual({
       name: "Env",
-      d1_binding: "db",
+      d1_bindings: ["db", "db2"],
       kv_bindings: ["kv1", "kv2"],
       r2_bindings: [],
       vars: {
