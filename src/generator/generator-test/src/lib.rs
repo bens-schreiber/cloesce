@@ -38,7 +38,7 @@ pub fn create_ast(models: Vec<Model>) -> CloesceAst {
 
 pub fn create_spec(ast: &CloesceAst) -> WranglerSpec {
     let mut spec = WranglerSpec::default();
-    WranglerDefault::set_defaults(&mut spec, ast);
+    WranglerDefault::set_defaults(&mut spec, ast, "migrations");
     spec
 }
 

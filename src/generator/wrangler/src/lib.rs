@@ -83,6 +83,13 @@ impl WranglerGenerator {
                                     serde_json::to_value(name).expect("JSON to serialize"),
                                 );
                             }
+                            if let Some(migrations_dir) = &db.migrations_dir {
+                                existing.insert(
+                                    "migrations_dir".into(),
+                                    serde_json::to_value(migrations_dir)
+                                        .expect("JSON to serialize"),
+                                );
+                            }
                         } else {
                             arr.push(serde_json::to_value(db).unwrap());
                         }
@@ -179,6 +186,12 @@ impl WranglerGenerator {
                                 existing.insert(
                                     "database_name".to_string(),
                                     TomlValue::String(name.clone()),
+                                );
+                            }
+                            if let Some(migrations_dir) = &db.migrations_dir {
+                                existing.insert(
+                                    "migrations_dir".to_string(),
+                                    TomlValue::String(migrations_dir.clone()),
                                 );
                             }
                         } else {
@@ -291,7 +304,16 @@ pub struct WranglerDefault;
 impl WranglerDefault {
     /// Ensures that all required values exist or places a default
     /// for them
-    pub fn set_defaults(spec: &mut WranglerSpec, ast: &CloesceAst) {
+    pub fn set_defaults(spec: &mut WranglerSpec, ast: &CloesceAst, default_migrations_path: &str) {
+        let default_migrations_path = default_migrations_path
+            .trim_end_matches('/')
+            .trim_end_matches('\\');
+        let default_migrations_path = if default_migrations_path.is_empty() {
+            "migrations"
+        } else {
+            default_migrations_path
+        };
+
         // Generate default worker entry point values
         spec.name = Some(spec.name.clone().unwrap_or_else(|| {
             tracing::warn!("Set a default worker name \"cloesce\"");
@@ -334,12 +356,11 @@ impl WranglerDefault {
                             );
                         }
                         if db.migrations_dir.is_none() {
-                            db.migrations_dir = Some(format!(
-                                "migrations/{}",
-                                db.binding.as_ref().unwrap().clone()
-                            ));
+                            db.migrations_dir = Some(format!("{}/{}", default_migrations_path, d1));
                             tracing::warn!(
-                                "D1 Database with binding {} is missing a migrations_dir. Using binding name as default. See https://developers.cloudflare.com/d1/get-started/",
+                                "D1 Database with binding {} is missing a migrations_dir. Defaulting to {}/{}",
+                                d1,
+                                default_migrations_path,
                                 d1
                             );
                         }
@@ -349,7 +370,7 @@ impl WranglerDefault {
                             binding: Some(d1.clone()),
                             database_name: Some(format!("replace_with_{}_name", d1)),
                             database_id: Some(format!("replace_with_{}_id", d1)),
-                            migrations_dir: Some(format!("migrations/{}", d1)),
+                            migrations_dir: Some(format!("{}/{}", default_migrations_path, d1)),
                         });
 
                         tracing::warn!(

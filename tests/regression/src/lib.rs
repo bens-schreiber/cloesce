@@ -170,6 +170,7 @@ impl Fixture {
                 .arg(workers_out.path())
                 .arg(client_out.path())
                 .arg(workers_domain)
+                .arg("migrations")
                 .current_dir(&generator_dir),
         );
 

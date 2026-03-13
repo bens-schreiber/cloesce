@@ -33,6 +33,7 @@ enum Commands {
         workers_path: PathBuf,
         client_path: PathBuf,
         workers_domain: String,
+        default_migrations_path: String,
     },
     Migrations {
         cidl_path: PathBuf,
@@ -121,6 +122,7 @@ fn run_cli() -> Result<()> {
             workers_path,
             client_path,
             workers_domain,
+            default_migrations_path,
         } => {
             // Parsing
             let wrangler = WranglerGenerator::from_path(&wrangler_path);
@@ -128,7 +130,7 @@ fn run_cli() -> Result<()> {
             let mut ast = CloesceAst::from_json(&pre_cidl_path)?;
 
             // Analysis
-            WranglerDefault::set_defaults(&mut spec, &ast);
+            WranglerDefault::set_defaults(&mut spec, &ast, &default_migrations_path);
             SemanticAnalysis::analyze(&mut ast, &spec)?;
 
             // Code Generation
