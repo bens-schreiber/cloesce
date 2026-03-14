@@ -4,6 +4,8 @@ import {
   NavigationPropertyKind,
 } from "./ast.js";
 
+export type WranglerConfigFormat = "toml" | "jsonc";
+
 let nextCompositeId = 0;
 function compositeIdGen(): number {
   const id = nextCompositeId;
@@ -36,6 +38,11 @@ export interface CloesceConfigOptions {
    * Path to migrations directory (default: ./migrations)
    */
   migrationsPath?: string;
+
+  /**
+   * Wrangler config format used by compile/migrate (default: toml)
+   */
+  wranglerConfigFormat?: WranglerConfigFormat;
 
   /**
    * Whether to truncate source paths to just the filename
@@ -256,6 +263,7 @@ export class CloesceConfigBuilder implements Required<CloesceConfig> {
   public outPath: string;
   public workersUrl: string;
   public migrationsPath: string;
+  public wranglerConfigFormat: WranglerConfigFormat;
   public truncateSourcePaths: boolean;
   public astModifiers: Array<(ast: CloesceAst) => void>;
 
@@ -266,6 +274,7 @@ export class CloesceConfigBuilder implements Required<CloesceConfig> {
     this.outPath = defaultedConfig.outPath;
     this.workersUrl = defaultedConfig.workersUrl;
     this.migrationsPath = defaultedConfig.migrationsPath;
+    this.wranglerConfigFormat = defaultedConfig.wranglerConfigFormat;
     this.truncateSourcePaths = defaultedConfig.truncateSourcePaths;
     this.astModifiers = defaultedConfig.astModifiers;
   }
@@ -425,6 +434,7 @@ export class CloesceConfigBuilder implements Required<CloesceConfig> {
       outPath: config.outPath ?? ".generated",
       workersUrl: config.workersUrl ?? "http://localhost:8787",
       migrationsPath: config.migrationsPath ?? "./migrations",
+      wranglerConfigFormat: config.wranglerConfigFormat ?? "toml",
       truncateSourcePaths: config.truncateSourcePaths ?? false,
       astModifiers: config.astModifiers ?? [],
     };

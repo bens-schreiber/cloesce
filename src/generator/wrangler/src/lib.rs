@@ -23,13 +23,14 @@ impl WranglerGenerator {
             .expect("Missing or invalid extension");
 
         match extension {
-            "json" => {
-                let val: JsonValue =
-                    serde_json::from_str(contents.as_str()).expect("JSON to be opened");
+            "json" | "jsonc" => {
+                let val: JsonValue = serde_json::from_str(contents.as_str())
+                    .unwrap_or(JsonValue::Object(serde_json::Map::new()));
                 WranglerGenerator::Json(val)
             }
             "toml" => {
-                let val: TomlValue = toml::from_str(&contents).expect("Toml to be opened");
+                let val: TomlValue =
+                    toml::from_str(&contents).unwrap_or(TomlValue::Table(toml::Table::new()));
                 WranglerGenerator::Toml(val)
             }
             other => panic!("Unsupported wrangler file extension: {other}"),
