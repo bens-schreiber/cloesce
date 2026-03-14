@@ -1,0 +1,22 @@
+{
+  "compatibility_date": "2025-10-02",
+  "d1_databases": [
+    {
+      "binding": "db",
+      "database_id": "replace_with_db_id",
+      "database_name": "replace_with_db_name",
+      "migrations_dir": "./customDir/db"
+    }
+  ],
+  "main": "workers.ts",
+  "name": "cloesce",
+  "r2_buckets": [
+    {
+      "binding": "bucket",
+      "bucket_name": "replace-with-bucket-name"
+    }
+  ],
+  "vars": {
+    "myVariable": "default_string"
+  }
+}
