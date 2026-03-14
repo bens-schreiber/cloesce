@@ -384,7 +384,7 @@ fn test_client_code_generation_snapshot() {
     WorkersGenerator::generate_default_data_sources(&mut ast);
     WorkersGenerator::finalize_api_methods(&mut ast);
 
-    let client_code = ClientGenerator::generate(&ast, "http://example.com/api".to_string());
+    let client_code = ClientGenerator::generate(&ast, "http://example.com/path/to/api");
 
     insta::assert_snapshot!("client_code_generation_snapshot", client_code);
 }

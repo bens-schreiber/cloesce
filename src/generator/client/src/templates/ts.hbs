@@ -38,7 +38,7 @@ export class {{this.name}} {
 {{/each}}
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<{{#unless (is_stream this.return_type)}}{{map_cidl_type this.return_type}}{{else}}Response{{/unless}}>> {
-    const baseUrl = new URL("{{../../domain}}/{{../name}}/{{this.name}}");
+    const baseUrl = new URL("{{../../worker_url}}/{{../name}}/{{this.name}}");
 {{#unless (is_get_request this.http_verb)}}
     const payload: any = {};
 {{/unless}}
@@ -117,7 +117,7 @@ export class {{this.name}} {
     ].join("/");
 {{/unless}}
     const baseUrl = new URL(
-      `{{../../domain}}/{{../name}}/{{#unless this.is_static}}${id}/{{/unless}}{{this.name}}`
+      `{{../../worker_url}}/{{../name}}/{{#unless this.is_static}}${id}/{{/unless}}{{this.name}}`
     );
 {{#unless (is_get_request this.http_verb)}}
     const payload: any = {};

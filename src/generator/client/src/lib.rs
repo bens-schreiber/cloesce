@@ -49,7 +49,7 @@ const TEMPLATE_STRING: &str = "client_api";
 
 pub struct ClientGenerator;
 impl ClientGenerator {
-    pub fn generate(ast: &CloesceAst, domain: String) -> String {
+    pub fn generate(ast: &CloesceAst, worker_url: &str) -> String {
         // TODO: Hardcoded TypeScript for now
         let template = TYPESCRIPT_TEMPLATE;
         let mapper = Arc::new(TypeScriptMapper);
@@ -62,9 +62,12 @@ impl ClientGenerator {
 
         let mut context = serde_json::to_value(ast).unwrap();
 
-        // Manually set the "domain" field in the context
+        // Manually set the "worker_url" field in the context
         if let serde_json::Value::Object(ref mut map) = context {
-            map.insert("domain".to_string(), serde_json::Value::String(domain));
+            map.insert(
+                "worker_url".to_string(),
+                serde_json::Value::String(worker_url.to_string()),
+            );
         }
 
         handlebars.render(TEMPLATE_STRING, &context).unwrap()

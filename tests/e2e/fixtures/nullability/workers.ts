@@ -12,7 +12,7 @@ const constructorRegistry: Record<string, new () => any> = {
 };
 
 async function fetch(request: Request, env: any, ctx: any): Promise<Response> {
-    const app = await CloesceApp.init(cidl as any, constructorRegistry);
+    const app = await CloesceApp.init(cidl as any, constructorRegistry, "http://localhost:5206/api");
     return await app.run(request, env);
 }
 
