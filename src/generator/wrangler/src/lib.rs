@@ -24,7 +24,8 @@ impl WranglerGenerator {
 
         match extension {
             "json" | "jsonc" => {
-                let val: JsonValue = serde_json::from_str(contents.as_str())
+                let contents_no_comments = json_comments::StripComments::new(contents.as_bytes());
+                let val: JsonValue = serde_json::from_reader(contents_no_comments)
                     .unwrap_or(JsonValue::Object(serde_json::Map::new()));
                 WranglerGenerator::Json(val)
             }
