@@ -146,6 +146,7 @@ export class CloesceApp {
    * Initializes the Cloesce runtime with the given CIDL AST and constructor registry.
    * @param ast the generated Cloesce IDL AST
    * @param ctorReg the generated constructor registry
+   * @param workerUrl the URL of the worker script used by the runtime
    * @returns A CloesceApp instance
    */
   public static async init(
@@ -394,8 +395,9 @@ export type MatchedRoute = {
 };
 
 /**
- * Matches a request to an ApiInvocation
- * @param apiRoute The route from the domain to the actual API, ie https://foo.com/route/to/api => route/to/api/
+ * Matches a request to an ApiInvocation.
+ * @param workerUrl The full URL of the worker/API endpoint, e.g. http://localhost:5977/api;
+ *   its path portion is treated as the prefix to strip from incoming request URLs.
  * @returns 404 or a matched route.
  */
 function matchRoute(
