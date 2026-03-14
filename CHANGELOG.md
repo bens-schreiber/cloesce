@@ -5,6 +5,7 @@
 - Private and inline data sources per method
 - Pagination support for KV, R2 and D1 via the `orm`
 - Pagination support for D1 via the `LIST` CRUD method
+- Support for `jsonc` Wrangler config files
 
 ### Changed
 - KV and R2 objects added to the grammar (any method can accept or return these objects)

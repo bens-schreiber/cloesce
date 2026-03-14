@@ -21,7 +21,11 @@ import {
   getErrorInfo,
 } from "./extractor/err.js";
 import { CloesceAst } from "./ast.js";
-import { CloesceConfigBuilder, DefaultCloesceConfig } from "./config.js";
+import {
+  CloesceConfigBuilder,
+  DefaultCloesceConfig,
+  WranglerConfigFormat,
+} from "./config.js";
 import { Project } from "ts-morph";
 
 let debugPhase: "extractor" | "npm cloesce" = "npm cloesce";
@@ -38,8 +42,13 @@ type WasmConfig = {
   description?: string;
   wasmFile: string;
   args: string[];
+  wranglerConfigPath: string;
   env?: Record<string, string>;
 };
+
+function wranglerConfigPathFor(format: WranglerConfigFormat): string {
+  return format === "jsonc" ? "wrangler.jsonc" : "wrangler.toml";
+}
 
 const cmds = subcommands({
   name: "cloesce",
@@ -50,6 +59,9 @@ const cmds = subcommands({
       args: {},
       handler: async () => {
         const config = await loadCloesceConfig(process.cwd());
+        const wranglerConfigPath = wranglerConfigPathFor(
+          config.wranglerConfigFormat,
+        );
 
         await extract(config);
         debugPhase = "npm cloesce";
@@ -62,12 +74,13 @@ const cmds = subcommands({
             "generate",
             path.join(outputDir, "cidl.pre.json"),
             path.join(outputDir, "cidl.json"),
-            "wrangler.toml",
+            wranglerConfigPath,
             path.join(outputDir, "workers.ts"),
             path.join(outputDir, "client.ts"),
             config.workersUrl,
             config.migrationsPath,
           ],
+          wranglerConfigPath,
         };
 
         await generate(generateConfig);
@@ -162,6 +175,9 @@ const cmds = subcommands({
         }
 
         const config = await loadCloesceConfig(process.cwd());
+        const wranglerConfigPath = wranglerConfigPathFor(
+          config.wranglerConfigFormat,
+        );
 
         const cidlPath = path.join(config.outPath, "cidl.json");
         if (!fs.existsSync(cidlPath)) {
@@ -180,7 +196,7 @@ const cmds = subcommands({
           cidlPath,
           ...bindingArgs,
           migrationName,
-          "wrangler.toml",
+          wranglerConfigPath,
           ".",
         ];
 
@@ -188,6 +204,7 @@ const cmds = subcommands({
           name: "migrations",
           wasmFile: "generator.wasm",
           args: wasmArgs,
+          wranglerConfigPath,
         };
 
         // Runs a generator command. Exits the process on failure.
@@ -333,13 +350,14 @@ async function generate(config: WasmConfig) {
   const debugStart = debugBenchmark(`Starting generator`);
   const root = process.cwd();
 
-  // Look for wrangler.toml in the root directory
-  const wranglerPath = path.join(root, "wrangler.toml");
+  const wranglerPath = path.join(root, config.wranglerConfigPath);
   if (!fs.existsSync(wranglerPath)) {
-    debug("No wrangler.toml found, creating empty config.");
+    debug(
+      `No ${config.wranglerConfigPath} found, creating empty config at ${wranglerPath}.`,
+    );
     fs.writeFileSync(wranglerPath, "");
   }
-  debug(`Using wrangler.toml at ${wranglerPath}`);
+  debug(`Using ${config.wranglerConfigPath} at ${wranglerPath}`);
   const wasi = new WASI({
     version: "preview1",
     args: ["generate", ...config.args],
@@ -406,7 +424,7 @@ async function loadCloesceConfig(root: string): Promise<DefaultCloesceConfig> {
     }
 
     debug(
-      `Cloesce Config: ${JSON.stringify({ srcPaths: configBuilder.srcPaths, projectName: configBuilder.projectName, outPath: configBuilder.outPath, workersUrl: configBuilder.workersUrl, migrationsPath: configBuilder.migrationsPath, truncateSourcePaths: configBuilder.truncateSourcePaths }, null, 2)}`,
+      `Cloesce Config: ${JSON.stringify({ srcPaths: configBuilder.srcPaths, projectName: configBuilder.projectName, outPath: configBuilder.outPath, workersUrl: configBuilder.workersUrl, migrationsPath: configBuilder.migrationsPath, wranglerConfigFormat: configBuilder.wranglerConfigFormat, truncateSourcePaths: configBuilder.truncateSourcePaths }, null, 2)}`,
     );
     return configBuilder;
   }
