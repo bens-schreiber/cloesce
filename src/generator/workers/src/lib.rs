@@ -353,7 +353,7 @@ impl WorkersGenerator {
         }
     }
 
-    pub fn generate(ast: &mut CloesceAst, workers_path: &Path) -> String {
+    pub fn generate(ast: &mut CloesceAst, workers_path: &Path, worker_url: &str) -> String {
         let linked_sources = Self::link(ast, workers_path);
         let constructor_registry = Self::registry(ast);
 
@@ -373,7 +373,7 @@ import cidl from "./cidl.json";
 {constructor_registry}
 
 async function fetch(request: Request, env: any, ctx: any): Promise<Response> {{
-    const app = await CloesceApp.init(cidl as any, constructorRegistry);
+    const app = await CloesceApp.init(cidl as any, constructorRegistry, "{worker_url}");
     {fetch_impl}
 }}
 

@@ -32,7 +32,7 @@ enum Commands {
         wrangler_path: PathBuf,
         workers_path: PathBuf,
         client_path: PathBuf,
-        workers_domain: String,
+        worker_url: String,
         default_migrations_path: String,
     },
     Migrations {
@@ -121,7 +121,7 @@ fn run_cli() -> Result<()> {
             wrangler_path,
             workers_path,
             client_path,
-            workers_domain,
+            worker_url,
             default_migrations_path,
         } => {
             // Parsing
@@ -135,8 +135,8 @@ fn run_cli() -> Result<()> {
 
             // Code Generation
             generate_wrangler(&wrangler_path, wrangler, spec)?;
-            generate_workers(&mut ast, &workers_path)?;
-            generate_client(&ast, &client_path, &workers_domain)?;
+            generate_workers(&mut ast, &workers_path, &worker_url)?;
+            generate_client(&ast, &client_path, &worker_url)?;
 
             ast.set_merkle_hash();
             write_cidl(ast, &cidl_path)?;
@@ -382,18 +382,18 @@ fn generate_wrangler(
     Ok(())
 }
 
-fn generate_workers(ast: &mut CloesceAst, workers_path: &Path) -> Result<()> {
+fn generate_workers(ast: &mut CloesceAst, workers_path: &Path, worker_url: &str) -> Result<()> {
     let mut file = open_file_or_create(workers_path)?;
 
-    let workers = WorkersGenerator::generate(ast, workers_path);
+    let workers = WorkersGenerator::generate(ast, workers_path, worker_url);
     file.write_all(workers.as_bytes())
         .expect("Could not write to file");
     Ok(())
 }
 
-fn generate_client(ast: &CloesceAst, client_path: &Path, domain: &str) -> Result<()> {
+fn generate_client(ast: &CloesceAst, client_path: &Path, worker_url: &str) -> Result<()> {
     let mut file = open_file_or_create(client_path)?;
-    file.write_all(ClientGenerator::generate(ast, domain.to_string()).as_bytes())
+    file.write_all(ClientGenerator::generate(ast, worker_url).as_bytes())
         .expect("Could not write to file");
     Ok(())
 }
