@@ -84,7 +84,7 @@ export class RuntimeContainer {
     public readonly constructorRegistry: ConstructorRegistry,
     public readonly wasm: OrmWasmExports,
     public readonly workerUrl: string,
-  ) {}
+  ) { }
 
   static async init(
     ast: CloesceAst,
@@ -325,7 +325,7 @@ export class CloesceApp {
    * @returns A Response object representing the result of the request.
    */
   public async run(request: Request, env: any): Promise<Response> {
-    const { ast, constructorRegistry: ctorReg, wasm } = RuntimeContainer.get();
+    const { ast, constructorRegistry: ctorReg, wasm, workerUrl } = RuntimeContainer.get();
 
     // DI will always contain the WranglerEnv and Request.
     const di = new DependencyContainer();
@@ -343,6 +343,7 @@ export class CloesceApp {
         wasm,
         ctorReg,
         di,
+        workerUrl
       );
 
       // Log any 500 errors
