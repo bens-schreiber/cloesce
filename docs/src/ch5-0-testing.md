@@ -16,7 +16,7 @@ import { cidl, constructorRegistry } from "@generated/workers";
 // It takes the generated Cloesce Interface Definition Language (CIDL)
 // and the generated constructor registry. Both may be imported from
 // "@generated/workers" as shown above.
-beforeAll(() => CloesceApp.init(cidl as any, constructorRegistry));
+beforeAll(() => CloesceApp.init(cidl as any, constructorRegistry, "https://localhost:8787"));
 ```
 
 Cloesce needs only the CIDL (generated interface definition) and Constructor Registry (linked Model, Service and Plain Old Object exports) to be used in tests. This means you can write tests for your Models and Services without needing to run a full Cloudflare Worker environment.

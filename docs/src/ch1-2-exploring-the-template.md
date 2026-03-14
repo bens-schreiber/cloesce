@@ -21,7 +21,7 @@ export class Env {
 
 The above implementation of `Env` defines a Wrangler environment with a D1 database binding named `db`, an R2 bucket named `bucket`, and a string environment variable named `myVariable`. 
 
-A typical Cloudflare Worker defines these bindings in a `wrangler.toml` file, but Cloesce generates this file for you during compilation based on the `@WranglerEnv` class.
+A typical Cloudflare Worker defines these bindings in a `wrangler.jsonc` file, but Cloesce generates this file for you during compilation based on the `@WranglerEnv` class.
 
 Read more about the Wrangler Environment in the [Wrangler Environment](./ch2-7-wrangler-environment.md) chapter.
 
@@ -73,15 +73,11 @@ export class Weather {
     @R2("weather/photo/{id}", "bucket")
     photo: R2ObjectBody | undefined;
 
-    static readonly withPhoto: IncludeTree<Weather> = {
-        photo: {}
-    }
+    @Post()
+    async uploadPhoto(@Inject env: Env, stream: ReadableStream) { ... }
 
-    @POST
-    async uploadPhoto(@Inject env: Env, stream: ReadableStream) {... }
-
-    @GET
-    downloadPhoto() {... }
+    @Get()
+    downloadPhoto() { ... }
 }
 ```
 </details>
@@ -98,10 +94,6 @@ export class WeatherReport {
     description: string;
 
     weatherEntries: Weather[];
-
-    static readonly withWeatherEntries: IncludeTree<WeatherReport> = {
-        weatherEntries: {}
-    }
 }
 ```
 </details>
@@ -116,7 +108,6 @@ The `Weather` Model consists of:
 | `temperature` | Scalar column | D1 |
 | `condition` | Scalar column | D1 |
 | `photo` | R2 object, key format `weather/photo/{id}` | R2 |
-| `withPhoto` | IncludeTree | Cloesce |
 | `uploadPhoto` | API endpoint | Workers |
 | `downloadPhoto` | API endpoint | Workers |
 
@@ -129,7 +120,6 @@ The `WeatherReport` Model consists of:
 | `title` | Scalar column | D1 |
 | `summary` | Scalar column | D1 |
 | `weatherEntries` | One-to-Many relationship with `Weather` | D1 |
-| `withWeatherEntries` | IncludeTree | Cloesce |
 | `GET` | Generated CRUD operation | Workers |
 | `SAVE` | Generated CRUD operation | Workers |
 | `LIST` | Generated CRUD operation | Workers |
