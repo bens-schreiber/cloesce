@@ -146,6 +146,7 @@ export class CloesceApp {
    * Initializes the Cloesce runtime with the given CIDL AST and constructor registry.
    * @param ast the generated Cloesce IDL AST
    * @param ctorReg the generated constructor registry
+   * @param workerUrl the URL of the worker script used by the runtime
    * @returns A CloesceApp instance
    */
   public static async init(
