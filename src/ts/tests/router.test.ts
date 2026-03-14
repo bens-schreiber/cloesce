@@ -45,6 +45,8 @@ function extractErrorCode(str: string | undefined): number | null {
   return match ? Number(match[1]) : null;
 }
 
+const api = "http://foo.com/api";
+
 describe("Match Route", () => {
   test("Unknown Prefix => 404", () => {
     // Arrange
@@ -52,7 +54,7 @@ describe("Match Route", () => {
     const ast = createAst();
 
     // Act
-    const res = _cloesceInternal.matchRoute(request, ast, "api");
+    const res = _cloesceInternal.matchRoute(request, ast, api);
 
     // Assert
     expect(res.isLeft()).toBe(true);
@@ -68,7 +70,7 @@ describe("Match Route", () => {
     const ast = createAst();
 
     // Act
-    const res = _cloesceInternal.matchRoute(request, ast, "api");
+    const res = _cloesceInternal.matchRoute(request, ast, api);
 
     // Assert
     expect(res.isLeft()).toBe(true);
@@ -86,7 +88,7 @@ describe("Match Route", () => {
     });
 
     // Act
-    const res = _cloesceInternal.matchRoute(request, ast, "api");
+    const res = _cloesceInternal.matchRoute(request, ast, api);
 
     // Assert
     expect(res.isLeft()).toBe(true);
@@ -109,7 +111,7 @@ describe("Match Route", () => {
     });
 
     // Act
-    const res = _cloesceInternal.matchRoute(request, ast, "api");
+    const res = _cloesceInternal.matchRoute(request, ast, api);
 
     // Assert
     expect(res.isLeft()).toBe(true);
@@ -132,7 +134,7 @@ describe("Match Route", () => {
     });
 
     // Act
-    const res = _cloesceInternal.matchRoute(request, ast, "api");
+    const res = _cloesceInternal.matchRoute(request, ast, api);
 
     // Assert
     expect(res.isRight()).toBe(true);
@@ -159,7 +161,7 @@ describe("Match Route", () => {
     });
 
     // Act
-    const res = _cloesceInternal.matchRoute(request, ast, "api");
+    const res = _cloesceInternal.matchRoute(request, ast, api);
 
     // Assert
     expect(res.isRight()).toBe(true);
@@ -191,7 +193,7 @@ describe("Match Route", () => {
     });
 
     // Act
-    const res = _cloesceInternal.matchRoute(request, ast, "api");
+    const res = _cloesceInternal.matchRoute(request, ast, api);
 
     // Assert
     expect(res.isRight()).toBe(true);
@@ -225,7 +227,7 @@ describe("Match Route", () => {
     });
 
     // Act
-    const res = _cloesceInternal.matchRoute(request, ast, "api");
+    const res = _cloesceInternal.matchRoute(request, ast, api);
 
     // Assert
     expect(res.isRight()).toBe(true);
@@ -258,7 +260,7 @@ describe("Match Route", () => {
     });
 
     // Act
-    const res = _cloesceInternal.matchRoute(request, ast, "api");
+    const res = _cloesceInternal.matchRoute(request, ast, api);
 
     // Assert
     expect(res.isRight()).toBe(true);
@@ -287,7 +289,7 @@ describe("Match Route", () => {
     });
 
     // Act
-    const res = _cloesceInternal.matchRoute(request, ast, "api");
+    const res = _cloesceInternal.matchRoute(request, ast, api);
 
     // Assert
     expect(res.isRight()).toBe(true);
@@ -313,7 +315,7 @@ describe("Match Route", () => {
     });
 
     // Act
-    const res = _cloesceInternal.matchRoute(request, ast, "api");
+    const res = _cloesceInternal.matchRoute(request, ast, api);
 
     // Assert
     expect(res.isRight()).toBe(true);
@@ -348,7 +350,7 @@ describe("Namespace Middleware", () => {
     class Foo {}
     constructorRegistry[Foo.name] = Foo;
 
-    await RuntimeContainer.init(ast, constructorRegistry);
+    await RuntimeContainer.init(ast, constructorRegistry, api);
     const app = new CloesceApp();
 
     const request = createRequest("http://foo.com/api/Foo/method", "POST");
@@ -366,6 +368,7 @@ describe("Namespace Middleware", () => {
       undefined,
       constructorRegistry,
       di,
+      api,
     );
 
     // Assert
@@ -387,7 +390,7 @@ describe("Namespace Middleware", () => {
     class Foo {}
     constructorRegistry[Foo.name] = Foo;
 
-    await RuntimeContainer.init(ast, constructorRegistry);
+    await RuntimeContainer.init(ast, constructorRegistry, api);
     const app = new CloesceApp();
 
     const request = createRequest("http://foo.com/api/Foo/method", "POST");
@@ -405,6 +408,7 @@ describe("Namespace Middleware", () => {
       undefined,
       constructorRegistry,
       di,
+      api,
     );
 
     // Assert
@@ -514,7 +518,7 @@ describe("Method Middleware", () => {
     }
     constructorRegistry[Foo.name] = Foo;
 
-    await RuntimeContainer.init(ast, constructorRegistry);
+    await RuntimeContainer.init(ast, constructorRegistry, api);
     const app = new CloesceApp();
 
     const request = createRequest(
@@ -537,6 +541,7 @@ describe("Method Middleware", () => {
       undefined,
       constructorRegistry,
       di,
+      api,
     );
 
     // Assert

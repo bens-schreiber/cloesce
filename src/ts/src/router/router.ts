@@ -83,12 +83,22 @@ export class RuntimeContainer {
     public readonly ast: CloesceAst,
     public readonly constructorRegistry: ConstructorRegistry,
     public readonly wasm: OrmWasmExports,
+    public readonly workerUrl: string,
   ) {}
 
-  static async init(ast: CloesceAst, constructorRegistry: ConstructorRegistry) {
+  static async init(
+    ast: CloesceAst,
+    constructorRegistry: ConstructorRegistry,
+    workerUrl: string,
+  ) {
     if (this.instance) return;
     const wasmAbi = await loadOrmWasm(ast);
-    this.instance = new RuntimeContainer(ast, constructorRegistry, wasmAbi);
+    this.instance = new RuntimeContainer(
+      ast,
+      constructorRegistry,
+      wasmAbi,
+      workerUrl,
+    );
   }
 
   static get(): RuntimeContainer {
@@ -132,19 +142,19 @@ export enum RouterError {
 }
 
 export class CloesceApp {
-  public routePrefix: string = "api";
-
   /**
    * Initializes the Cloesce runtime with the given CIDL AST and constructor registry.
    * @param ast the generated Cloesce IDL AST
    * @param ctorReg the generated constructor registry
+   * @param workerUrl the URL of the worker script used by the runtime
    * @returns A CloesceApp instance
    */
   public static async init(
     ast: CloesceAst,
     ctorReg: ConstructorRegistry,
+    workerUrl: string,
   ): Promise<CloesceApp> {
-    await RuntimeContainer.init(ast, ctorReg);
+    await RuntimeContainer.init(ast, ctorReg, workerUrl);
     return new CloesceApp();
   }
 
@@ -218,9 +228,10 @@ export class CloesceApp {
     wasm: OrmWasmExports,
     ctorReg: ConstructorRegistry,
     di: DependencyContainer,
+    workerUrl: string,
   ): Promise<HttpResult<unknown>> {
     // Route match
-    const routeRes = matchRoute(request, ast, this.routePrefix);
+    const routeRes = matchRoute(request, ast, workerUrl);
     if (routeRes.isLeft()) {
       return routeRes.value;
     }
@@ -315,7 +326,12 @@ export class CloesceApp {
    * @returns A Response object representing the result of the request.
    */
   public async run(request: Request, env: any): Promise<Response> {
-    const { ast, constructorRegistry: ctorReg, wasm } = RuntimeContainer.get();
+    const {
+      ast,
+      constructorRegistry: ctorReg,
+      wasm,
+      workerUrl,
+    } = RuntimeContainer.get();
 
     // DI will always contain the WranglerEnv and Request.
     const di = new DependencyContainer();
@@ -333,6 +349,7 @@ export class CloesceApp {
         wasm,
         ctorReg,
         di,
+        workerUrl,
       );
 
       // Log any 500 errors
@@ -383,18 +400,19 @@ export type MatchedRoute = {
 };
 
 /**
- * Matches a request to an ApiInvocation
- * @param apiRoute The route from the domain to the actual API, ie https://foo.com/route/to/api => route/to/api/
+ * Matches a request to an ApiInvocation.
+ * @param workerUrl The full URL of the worker/API endpoint, e.g. http://localhost:5977/api;
+ *   its path portion is treated as the prefix to strip from incoming request URLs.
  * @returns 404 or a matched route.
  */
 function matchRoute(
   request: Request,
   ast: CloesceAst,
-  routePrefix: string,
+  workerUrl: string,
 ): Either<HttpResult, MatchedRoute> {
   const url = new URL(request.url);
   const parts = url.pathname.split("/").filter(Boolean);
-  const prefix = routePrefix.split("/").filter(Boolean);
+  const prefix = new URL(workerUrl).pathname.split("/").filter(Boolean);
 
   // Error state: We expect an exact request format, and expect that the model
   // and are apart of the CIDL

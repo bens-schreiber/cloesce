@@ -28,7 +28,7 @@ export class BasicService {
   static async downloadData(
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Response>> {
-    const baseUrl = new URL("http://example.com/api/BasicService/downloadData");
+    const baseUrl = new URL("http://example.com/path/to/api/BasicService/downloadData");
 
 
     const res = await fetchImpl(baseUrl, {
@@ -46,7 +46,7 @@ export class BasicService {
     input: number,
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<number>> {
-    const baseUrl = new URL("http://example.com/api/BasicService/instanceMethod");
+    const baseUrl = new URL("http://example.com/path/to/api/BasicService/instanceMethod");
     const payload: any = {};
 
     payload["input"] = input;
@@ -68,7 +68,7 @@ export class BasicService {
     input: string,
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<string>> {
-    const baseUrl = new URL("http://example.com/api/BasicService/staticMethod");
+    const baseUrl = new URL("http://example.com/path/to/api/BasicService/staticMethod");
 
     baseUrl.searchParams.append("input", String(input));
 
@@ -87,7 +87,7 @@ export class BasicService {
     data: Uint8Array,
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<boolean>> {
-    const baseUrl = new URL("http://example.com/api/BasicService/uploadData");
+    const baseUrl = new URL("http://example.com/path/to/api/BasicService/uploadData");
     const payload: any = {};
 
     payload["data"] = data;
@@ -188,7 +188,7 @@ export class ModelWithCompositePk {
     encodeURIComponent(String(this.rowId)),
     ].join("/");
     const baseUrl = new URL(
-      `http://example.com/api/ModelWithCompositePk/${id}/instanceMethod`
+      `http://example.com/path/to/api/ModelWithCompositePk/${id}/instanceMethod`
     );
     const payload: any = {};
 
@@ -223,7 +223,7 @@ export class ModelWithCruds {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<ModelWithCruds>> {
     const baseUrl = new URL(
-      `http://example.com/api/ModelWithCruds/GET`
+      `http://example.com/path/to/api/ModelWithCruds/GET`
     );
 
     baseUrl.searchParams.append("id", String(id));
@@ -248,7 +248,7 @@ export class ModelWithCruds {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<ModelWithCruds[]>> {
     const baseUrl = new URL(
-      `http://example.com/api/ModelWithCruds/LIST`
+      `http://example.com/path/to/api/ModelWithCruds/LIST`
     );
 
     baseUrl.searchParams.append("lastSeen_id", String(lastSeen_id));
@@ -273,7 +273,7 @@ export class ModelWithCruds {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<ModelWithCruds>> {
     const baseUrl = new URL(
-      `http://example.com/api/ModelWithCruds/SAVE`
+      `http://example.com/path/to/api/ModelWithCruds/SAVE`
     );
     const payload: any = {};
 
@@ -315,7 +315,7 @@ export class ModelWithKv {
       encodeURIComponent(String(this.id2)),
     ].join("/");
     const baseUrl = new URL(
-      `http://example.com/api/ModelWithKv/${id}/hasKvParamAndRes`
+      `http://example.com/path/to/api/ModelWithKv/${id}/hasKvParamAndRes`
     );
     const payload: any = {};
 
@@ -343,7 +343,7 @@ export class ModelWithKv {
       encodeURIComponent(String(this.id2)),
     ].join("/");
     const baseUrl = new URL(
-      `http://example.com/api/ModelWithKv/${id}/instanceMethod`
+      `http://example.com/path/to/api/ModelWithKv/${id}/instanceMethod`
     );
     const payload: any = {};
 
@@ -367,7 +367,7 @@ export class ModelWithKv {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<number>> {
     const baseUrl = new URL(
-      `http://example.com/api/ModelWithKv/staticMethod`
+      `http://example.com/path/to/api/ModelWithKv/staticMethod`
     );
 
     baseUrl.searchParams.append("input", String(input));
@@ -411,7 +411,7 @@ export class ModelWithR2 {
       encodeURIComponent(String(this.r2Id)),
     ].join("/");
     const baseUrl = new URL(
-      `http://example.com/api/ModelWithR2/${id}/hasR2ParamAndRes`
+      `http://example.com/path/to/api/ModelWithR2/${id}/hasR2ParamAndRes`
     );
     const payload: any = {};
 
@@ -472,7 +472,7 @@ export class ToyotaPrius {
       encodeURIComponent(String(this.vehicleId)),
     ].join("/");
     const baseUrl = new URL(
-      `http://example.com/api/ToyotaPrius/${id}/instanceMethod`
+      `http://example.com/path/to/api/ToyotaPrius/${id}/instanceMethod`
     );
     const payload: any = {};
 
