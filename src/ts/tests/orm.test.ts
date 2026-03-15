@@ -18,6 +18,8 @@ function createHydrateArgs() {
   };
 }
 
+const api = "http://test.com";
+
 describe("hydrateType Tests", () => {
   afterEach(() => {
     _cloesceInternal.RuntimeContainer.dispose();
@@ -322,7 +324,7 @@ describe("ORM Hydrate Tests", () => {
       Depth2Model: Depth2Model,
     };
 
-    await _cloesceInternal.RuntimeContainer.init(ast, ctorReg);
+    await _cloesceInternal.RuntimeContainer.init(ast, ctorReg, api);
 
     const env = {};
     const instance = Orm.fromEnv(env);
@@ -465,7 +467,7 @@ describe("ORM Hydrate Tests", () => {
       TestModel: TestModel,
     };
 
-    await _cloesceInternal.RuntimeContainer.init(ast, ctorReg);
+    await _cloesceInternal.RuntimeContainer.init(ast, ctorReg, api);
 
     const env = {
       namespace1: namespace1,
@@ -598,11 +600,12 @@ describe("ORM Hydrate Tests", () => {
     }
 
     const ast = createAst({ models: [modelMeta] });
+
     const ctorReg = {
       CursorModel,
     };
 
-    await _cloesceInternal.RuntimeContainer.init(ast, ctorReg);
+    await _cloesceInternal.RuntimeContainer.init(ast, ctorReg, api);
     const instance = Orm.fromEnv({ namespace1 });
 
     // Act
@@ -635,7 +638,7 @@ describe("ORM Hydrate Tests", () => {
   }, 30000);
 });
 
-describe("ORM List Method with DataSource and listParams", () => {
+describe("List, Get, Upsert", () => {
   afterEach(() => {
     _cloesceInternal.RuntimeContainer.dispose();
   });
@@ -658,7 +661,7 @@ describe("ORM List Method with DataSource and listParams", () => {
     const ast = createAst({ models: [modelMeta] });
     const ctorReg = { Product };
 
-    await _cloesceInternal.RuntimeContainer.init(ast, ctorReg);
+    await _cloesceInternal.RuntimeContainer.init(ast, ctorReg, api);
 
     const mf = new Miniflare({
       modules: true,
@@ -729,7 +732,7 @@ describe("ORM List Method with DataSource and listParams", () => {
     const ast = createAst({ models: [modelMeta] });
     const ctorReg = { User };
 
-    await _cloesceInternal.RuntimeContainer.init(ast, ctorReg);
+    await _cloesceInternal.RuntimeContainer.init(ast, ctorReg, api);
 
     const mf = new Miniflare({
       modules: true,
@@ -798,7 +801,7 @@ describe("ORM List Method with DataSource and listParams", () => {
     const ast = createAst({ models: [modelMeta] });
     const ctorReg = { Record };
 
-    await _cloesceInternal.RuntimeContainer.init(ast, ctorReg);
+    await _cloesceInternal.RuntimeContainer.init(ast, ctorReg, api);
 
     const mf = new Miniflare({
       modules: true,
@@ -858,7 +861,7 @@ describe("ORM List Method with DataSource and listParams", () => {
     const ast = createAst({ models: [modelMeta] });
     const ctorReg = { Post };
 
-    await _cloesceInternal.RuntimeContainer.init(ast, ctorReg);
+    await _cloesceInternal.RuntimeContainer.init(ast, ctorReg, api);
 
     const mf = new Miniflare({
       modules: true,
@@ -916,7 +919,7 @@ describe("ORM List Method with DataSource and listParams", () => {
     const ast = createAst({ models: [modelMeta] });
     const ctorReg = { Comment };
 
-    await _cloesceInternal.RuntimeContainer.init(ast, ctorReg);
+    await _cloesceInternal.RuntimeContainer.init(ast, ctorReg, api);
 
     const mf = new Miniflare({
       modules: true,
@@ -967,7 +970,7 @@ describe("ORM List Method with DataSource and listParams", () => {
     const ast = createAst({ models: [modelMeta] });
     const ctorReg = { Enrollment };
 
-    await _cloesceInternal.RuntimeContainer.init(ast, ctorReg);
+    await _cloesceInternal.RuntimeContainer.init(ast, ctorReg, api);
 
     const mf = new Miniflare({
       modules: true,
@@ -1033,7 +1036,7 @@ describe("ORM List Method with DataSource and listParams", () => {
     const ast = createAst({ models: [modelMeta] });
     const ctorReg = { Membership };
 
-    await _cloesceInternal.RuntimeContainer.init(ast, ctorReg);
+    await _cloesceInternal.RuntimeContainer.init(ast, ctorReg, api);
 
     const mf = new Miniflare({
       modules: true,
@@ -1075,5 +1078,112 @@ describe("ORM List Method with DataSource and listParams", () => {
     expect(membership!.orgId).toBe("acme");
     expect(membership!.userId).toBe(2);
     expect(membership!.role).toBe("member");
+  });
+
+  test("List, Get, Upsert default DataSource when not specified", async () => {
+    // Arrange
+    const dependencyModel = ModelBuilder.model("DependentModel")
+      .defaultDb()
+      .idPk()
+      .col("value", "Text")
+      .build();
+
+    class DependentModel {
+      id!: number;
+      value!: string;
+    }
+
+    const modelMeta = ModelBuilder.model("DefaultDSModel")
+      .defaultDb()
+      .idPk()
+      .col("dependencyId", "Integer", {
+        column_name: "id",
+        model_name: "DependentModel",
+      })
+      .navP("dependency", "DependentModel", {
+        OneToOne: { key_columns: ["dependencyId"] },
+      })
+      .build();
+
+    class DefaultDSModel {
+      id!: number;
+      dependencyId!: number;
+      dependency!: DependentModel;
+    }
+
+    const ast = createAst({ models: [modelMeta, dependencyModel] });
+
+    ast.models["DefaultDSModel"].data_sources["default"] = {
+      name: "default",
+      is_private: false,
+      tree: {
+        dependency: {},
+      },
+      list_params: ["LastSeen", "Limit"],
+    };
+
+    const ctorReg = { DefaultDSModel, DependentModel };
+
+    await _cloesceInternal.RuntimeContainer.init(ast, ctorReg, api);
+
+    const mf = new Miniflare({
+      modules: true,
+      script: `
+        export default {
+          async fetch(request, env, ctx) {
+            return new Response("Hello Miniflare!");
+          }
+        }
+        `,
+      d1Databases: ["d1"],
+    });
+
+    const d1 = await mf.getD1Database("d1");
+
+    // Create tables and insert test data
+    await d1
+      .prepare(
+        `
+      CREATE TABLE IF NOT EXISTS "_cloesce_tmp" (
+      "path" text PRIMARY KEY,
+      "primary_key" text NOT NULL
+    );`,
+      )
+      .run();
+
+    await d1
+      .prepare(
+        `CREATE TABLE DependentModel (id INTEGER PRIMARY KEY, value TEXT)`,
+      )
+      .run();
+    await d1
+      .prepare(
+        `CREATE TABLE DefaultDSModel (id INTEGER PRIMARY KEY, dependencyId INTEGER)`,
+      )
+      .run();
+
+    const env = { d1 };
+    const instance = Orm.fromEnv(env);
+
+    // Act
+    const upsertResult = await instance.upsert(DefaultDSModel, {
+      id: 2,
+      dependencyId: 1,
+      dependency: { id: 1, value: "Dependency Value" },
+    });
+    const listResult = await instance.list(DefaultDSModel);
+    const getResult = await instance.get(DefaultDSModel, {
+      primaryKey: { id: 2 },
+    });
+
+    // Assert
+    expect(upsertResult).toBeInstanceOf(DefaultDSModel);
+    expect(upsertResult!.dependency).toBeInstanceOf(DependentModel);
+    expect(upsertResult!.dependency.value).toBe("Dependency Value");
+    expect(listResult).toHaveLength(1);
+    expect(listResult[0]).toBeInstanceOf(DefaultDSModel);
+    expect(listResult[0].dependency).toBeInstanceOf(DependentModel);
+    expect(getResult).toBeInstanceOf(DefaultDSModel);
+    expect(getResult!.dependency).toBeInstanceOf(DependentModel);
   });
 });
