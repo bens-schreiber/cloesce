@@ -77,7 +77,7 @@ config.model(Person, builder => {
     // Property "dogId" is a foreign key referencing the model Dog,
     // using Dog's primary key "id"
     .foreignKey("dogId")
-        .references("id", Dog)
+        .references(Dog, "id")
     
     // Property "dog" is one to one referencing the model Dog,
     // using the foreign key "dogId"
