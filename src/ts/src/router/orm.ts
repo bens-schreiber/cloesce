@@ -162,7 +162,10 @@ export class Orm {
    *
    * @param ctor Constructor of the model to map to
    * @param d1Results Results from a D1 query
+   *
    * @param include Include Tree or DataSource specifying which navigation properties to include in the mapping.
+   * If undefined, uses the default data source's include tree.
+   *
    * @returns Array of mapped model instances
    */
   static map<T extends object>(
@@ -194,6 +197,8 @@ export class Orm {
   /**
    * Generates a SELECT query string for a given Model,
    * retrieving the model and its relations aliased as JSON.
+   *
+   * If `args.include` is not provided, uses the default data source's include tree for the model.
    *
    * @param ctor - Constructor of the model to select
    * @param args - Arguments specifying which relations/fields to select
@@ -258,6 +263,9 @@ export class Orm {
   /**
    * Given a base object representing a Model, hydrates its D1, R2 and KV properties.
    * Fetches all KV and R2 data concurrently.
+   *
+   * If `args.include` is not provided, uses the default data source's include tree for the model to determine which properties to hydrate.
+   *
    * @param ctor Constructor of the model to hydrate
    * @param args Arguments for hydration
    * @returns The hydrated model instance
@@ -308,6 +316,9 @@ export class Orm {
    *
    * If a Model is missing a primary key, and that primary key is of Integer type,
    * it will be auto-incremented by D1. Else, upsert will fail if the primary key is missing.
+   *
+   * If `args.include` is not provided, uses the default data source's include tree for the
+   * model to determine which properties to upsert.
    *
    * @param ctor Constructor of the model to upsert
    * @param newModel The new model object to upsert
@@ -505,6 +516,9 @@ export class Orm {
    * Lists all instances of a given Model from D1.
    * A model without a primary key cannot be listed, and this method will return an empty array in that case.
    *
+   * If `args.include` is not provided, uses the default data source's include tree for the
+   * model to determine which properties to include in the listing.
+   *
    * @param ctor Constructor of the model to list
    * @param args Arguments for listing, such as the include tree and pagination parameters
    * @returns Array of listed model instances
@@ -625,6 +639,8 @@ export class Orm {
    * Fetches a model by its primary key ID or key parameters.
    * - If the model does not have a primary key, key parameters must be provided.
    * - If the model has primary key columns, `primaryKey` must provide each key column.
+   * - If `args.include` is not provided, uses the default data source's include tree for
+   * the model to determine which properties to include in the retrieval.
    *
    * @param ctor Constructor of the model to retrieve
    * @param args Arguments for retrieval
