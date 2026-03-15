@@ -17,7 +17,8 @@ Cloesce is not just an ORM, migration engine, web framework, runtime validation 
 
 <!-- langtabs-start -->
 ```typescript
-@Model(["GET", "SAVE", "LIST"])
+@Crud("GET", "SAVE", "LIST")
+@Model("db")
 class User {
     id: Integer;
     name: String;
@@ -29,8 +30,8 @@ class User {
     @R2("user/avatars/{id}.png", bucket)
     avatar: R2Object;
 
-    @POST
-    async hello(): User {
+    @Post()
+    hello(): User {
         // D1, KV, and R2 all hydrated here!
         return this;
     }
