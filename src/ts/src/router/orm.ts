@@ -76,14 +76,22 @@ function isDataSource<T>(include: Include<T>): include is DataSource<T> {
   );
 }
 function getTreeFromInclude<T>(
+  ctor: new () => T,
   include: Include<T> | null | undefined,
 ): IncludeTree<T> {
   if (!include) {
-    return {} as IncludeTree<T>;
+    return Orm.defaultDataSource(ctor).includeTree!;
   }
-  return isDataSource(include)
-    ? ((include.includeTree as IncludeTree<T>) ?? ({} as IncludeTree<T>))
-    : include;
+
+  if (isDataSource(include)) {
+    return (
+      (include.includeTree as IncludeTree<T> | undefined) ??
+      Orm.defaultDataSource(ctor).includeTree ??
+      ({} as IncludeTree<T>)
+    );
+  }
+
+  return include;
 }
 
 export class Orm {
@@ -169,7 +177,7 @@ export class Orm {
       wasm,
     );
 
-    const tree = getTreeFromInclude(include);
+    const tree = getTreeFromInclude(ctor, include);
 
     const includeTreeRes = WasmResource.fromString(JSON.stringify(tree), wasm);
     const mapQueryRes = invokeOrmWasm(
@@ -234,7 +242,7 @@ export class Orm {
     );
 
     const include = args.include ?? {};
-    const tree = getTreeFromInclude(include);
+    const tree = getTreeFromInclude(ctor, include);
     const includeTreeRes = WasmResource.fromString(JSON.stringify(tree), wasm);
 
     const selectQueryRes = invokeOrmWasm(
@@ -282,7 +290,7 @@ export class Orm {
 
     const env: any = this.env;
     const promises: Promise<void>[] = [];
-    const tree = getTreeFromInclude(args.include ?? {});
+    const tree = getTreeFromInclude(ctor, args.include ?? {});
 
     const hydrated = hydrateType(args.base ?? {}, modelCidlType, {
       ast,
@@ -323,7 +331,7 @@ export class Orm {
     const meta = ast.models[ctor.name];
     const d1Binding = meta.d1_binding ? this.getDb(meta.d1_binding) : null;
 
-    const includeTree = getTreeFromInclude(include);
+    const includeTree = getTreeFromInclude(ctor, include);
     const upsertQueryRes = invokeOrmWasm(
       wasm.upsert_model,
       [
@@ -545,8 +553,9 @@ export class Orm {
     if (isDataSource(args.include) && args.include.list) {
       // Override the default list generation with a custom one provided by the user.
       const includeDs = args.include as DataSource<T>;
+      const includeTree = getTreeFromInclude(ctor, includeDs);
       query = args.include.list((from) =>
-        Orm.select(ctor, { from, include: includeDs.includeTree }),
+        Orm.select(ctor, { from, include: includeTree }),
       );
     } else {
       // Default list query with seek pagination
@@ -667,8 +676,9 @@ export class Orm {
     if (isDataSource(args.include) && args.include.get) {
       // Override the default get generation with a custom one provided by the user.
       const includeDs = args.include as DataSource<T>;
+      const includeTree = getTreeFromInclude(ctor, includeDs);
       query = args.include.get((from) =>
-        Orm.select(ctor, { from, include: includeDs.includeTree }),
+        Orm.select(ctor, { from, include: includeTree }),
       );
     } else {
       // Default get query
