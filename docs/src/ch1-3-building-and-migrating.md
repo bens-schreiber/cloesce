@@ -39,7 +39,7 @@ npx cloesce migrate <d1-binding> <migration-name>
 npx cloesce migrate --all <migration-name>
 ```
 
-This command compares your current Cloesce Models against the last applied migration and generates a new migration file in the `migrations/ <d1-binding>` folder with the specified `<migration-name>`. The migration file contains SQL statements to update your D1 database schema to match your Models.
+This command compares your current Cloesce Models against the last applied migration and generates a new migration file in the `migrations/<d1-binding>` folder with the specified `<migration-name>`. The migration file contains SQL statements to update your D1 database schema to match your Models.
 
 You must apply the generated migrations to your D1 database using the Wrangler CLI:
 
