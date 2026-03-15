@@ -64,7 +64,7 @@ build-src:
 	
 	@if command -v wasm-opt >/dev/null 2>&1; then \
 		echo "CLOESCE: Optimizing WASM with wasm-opt..."; \
-		wasm-opt -Oz --enable-bulk-memory --strip-debug --strip-producers \
+		wasm-opt -Oz --enable-bulk-memory --enable-sign-ext --strip-debug --strip-producers \
 			$(ORM_DIR)/target/$(WASM_TARGET)/release/orm.wasm \
 			-o $(ORM_DIR)/target/$(WASM_TARGET)/release/orm.wasm; \
 	else \
