@@ -27,7 +27,7 @@ export interface DataSource<T> {
   /**
    * The include tree specifying which relationships to include in the data source.
    */
-  includeTree?: IncludeTree<T>;
+  includeTree: IncludeTree<T>;
 
   /**
    * A custom function called when using `orm.get`. Defaults to:
@@ -86,7 +86,7 @@ function treeFromInclude<T>(
   include: Include<T> | null | undefined,
 ): IncludeTree<T> {
   if (!include) {
-    return Orm.defaultDataSource<T>(ctor).includeTree!;
+    return Orm.defaultDataSource<T>(ctor).includeTree;
   }
   return isDataSource(include)
     ? ((include.includeTree as IncludeTree<T>) ?? ({} as IncludeTree<T>))
@@ -627,7 +627,7 @@ export class Orm {
       results.map(async (modelJson, index) => {
         results[index] = await this.hydrate(ctor, {
           base: modelJson,
-          include: args.include ?? {},
+          include: args.include,
         });
       }),
     );

@@ -44,7 +44,7 @@ export function createAst(args?: {
 
   // NOTE: these won't always be empty in real usage
   for (const model of Object.values(modelsMap)) {
-    model.data_sources["default"] = {
+    model.data_sources["default"] ??= {
       name: "default",
       is_private: false,
       tree: {},
