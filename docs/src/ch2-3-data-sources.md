@@ -140,7 +140,7 @@ const customDs: DataSource<User> = {
     // Array of parameters available for the list method. Also defines
     // the order of those parameters. `lastSeen` can be multiple primary keys 
     // for composite key models, defined in the same order as the primary keys.
-    listParams: ["lastSeen", "limit"] 
+    listParams: ["LastSeen", "Limit"] 
 }
 
 @Model("db")
