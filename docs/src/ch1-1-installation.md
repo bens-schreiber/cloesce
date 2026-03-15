@@ -1,7 +1,7 @@
 # Installation
 
 > [!NOTE]
-> Cloesce supports only TypeScript to TypeScript compilation as of Alpha v0.1.0. Support for additional languages will be added in future releases.
+> Cloesce supports only TypeScript to TypeScript compilation as of Alpha v0.2.0. Support for additional languages will be added in future releases.
 
 The simplest way to get a Cloesce project up and running is to use the `create-cloesce` template. 
 
@@ -34,6 +34,6 @@ A simple project structure is created for you.
 │   └── web/            # Frontend web assets
 ├── test/               # Unit tests for example Models
 ├── migrations/         # Database migration files
-├── cloesce.config.json # Cloesce configuration
+├── cloesce.config.ts # Cloesce configuration
 └── package.json        # Project dependencies and scripts
 ```

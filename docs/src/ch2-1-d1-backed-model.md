@@ -3,7 +3,6 @@
 In this section, we will explore the basic properties of a D1 backed Model in Cloesce. [Cloudflare D1]((https://developers.cloudflare.com/d1/)) is a serverless SQL database built on SQLite for Workers.
 
 ## Defining a Model
-
 > [!NOTE]
 > Models do not have constructors as they should not be manually instantiated. Instead, use the [ORM functions](./ch2-6-cloesce-orm.md) to create, retrieve, and update Model instances. For tests, consider using [`Object.assign()`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/assign) to create instances of Models with specific property values.
 
@@ -17,7 +16,7 @@ During Extraction, Cloesce scans your source files (designated with `*.cloesce.t
 ```typescript
 import { Model, Integer, PrimaryKey } from "cloesce/backend";
 
-@Model()
+@Model("db")
 export class User {
     @PrimaryKey
     id: Integer;
@@ -26,7 +25,7 @@ export class User {
 }
 ```
 
-The above code defines a Model "User" with several properties:
+The above code defines a Model "User" stored in the D1 database `db`, with several properties:
 | Property | Description |
 |--------|-------------|
 | `User` | Cloesce infers from the class attributes that this Model is backed by a D1 table `User` |
@@ -50,6 +49,30 @@ All of these types by themselves are `NOT NULL` by default. To make a property n
 
 Notably, an `Integer` primary key is automatically set to `AUTOINCREMENT` in D1, so you don't need to manually assign values to it when creating new records (useful for the [ORM functions](./ch2-6-cloesce-orm.md)).
 
+## Fluent API
+
+Some column configurations cannot be cleanly expressed through TypeScript decorators alone. For these cases, Cloesce provides a Fluent API that can called in `cloesce.config.ts` to further customize the D1 schema. For example, to make a column unique:
+
+```ts
+import { defineConfig } from "cloesce/config";
+import { Weather } from "./src/data/models.cloesce";
+
+const config = defineConfig({
+    // ...
+});
+
+config.model(Weather, builder => {
+    builder.unique("dateTime", "location");
+});
+```
+
+Additionally, Cloesce exposes a method to modify the AST after extraction:
+```ts
+config.rawAst((ast) => {
+    // modify the raw AST here
+});
+```
+
 ## Migrating the Database
 
 > [!IMPORTANT]
@@ -61,11 +84,11 @@ The standard Cloesce compilation command does not perform database migrations. T
 
 ```bash
 npx cloesce compile # load the latest Model definitions
-npx cloesce migrate <migration name>
+npx cloesce migrate <d1-binding> <migration name>
 ```
 
 Finally, these generated migrations must be applied to the actual D1 database using the Wrangler CLI:
 
 ```bash
-npx wrangler d1 migrations apply <database-binding-name>
+npx wrangler d1 migrations apply <d1-binding>
 ```

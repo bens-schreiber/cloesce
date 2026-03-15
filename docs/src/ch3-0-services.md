@@ -18,7 +18,7 @@ Instead, Services are used to group related, complex functionality together and 
 Let's create a simple Service that returns a "Hello, World!" message.
 
 ```typescript
-import { Service, GET, HttpResult } from 'cloesce/backend';
+import { Service, Get, HttpResult } from 'cloesce/backend';
 
 @Service
 export class HelloWorldService {
@@ -27,7 +27,7 @@ export class HelloWorldService {
         // Optional initialization logic can go here
     }
 
-    @GET
+    @Get()
     hello(): string {
         return "Hello, World!";
     }
@@ -44,7 +44,7 @@ To share dependencies across your Cloesce application methods, Cloesce utilizes 
 
 You can access these dependencies by decorating your method parameters with the `@Inject` decorator on any Cloesce Model or Service method:
 ```typescript
-import { Service, GET, WranglerEnv } from 'cloesce/backend';
+import { Service, Get, WranglerEnv } from 'cloesce/backend';
 
 @WranglerEnv
 class Env {
@@ -53,7 +53,7 @@ class Env {
 
 @Service
 export class HelloWorldService {
-    @GET
+    @Get()
     async hello(@Inject env: Env, @Inject request: Request): Promise<string> {
         console.log("Request URL:", request.url);
         const res = await env.d1.prepare("SELECT 'Hello, World!' AS message").first<{ message: string }>();
@@ -76,7 +76,7 @@ export class HelloWorldService {
         this.foo = "bar";
     }
 
-    @GET
+    @Get()
     async hello(): Promise<string> {
         console.log("Request URL:", this.request.url);
         const res = await this.env.d1.prepare("SELECT 'Hello, World!' AS message").first<{ message: string }>();
@@ -101,7 +101,7 @@ export class GreetingService {
 export class HelloWorldService {
     greetingService: GreetingService;
 
-    @GET
+    @Get()
     hello(name: string): string {
         return this.greetingService.greet(name);
     }

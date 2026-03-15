@@ -11,7 +11,7 @@
 - [Models](./ch2-0-models.md)
     - [Basic D1 Backed Model](./ch2-1-d1-backed-model.md)
     - [D1 Navigation Properties](./ch2-2-navigation-properties.md)
-    - [Include Trees](./ch2-3-include-trees.md)
+    - [Data Sources](./ch2-3-data-sources.md)
     - [KV and R2 Properties](./ch2-4-kv-r2-properties.md)
     - [Model Methods](./ch2-5-model-methods.md)
     - [Cloesce ORM](./ch2-6-cloesce-orm.md)

@@ -9,7 +9,6 @@
  */
 export type CrudKind = "SAVE" | "GET" | "LIST";
 
-/** @internal */
 export type CidlType =
   | "Void"
   | "Integer"
@@ -36,7 +35,6 @@ export function isNullableType(ty: CidlType): boolean {
   return typeof ty === "object" && ty !== null && "Nullable" in ty;
 }
 
-/** @internal */
 export enum HttpVerb {
   Get = "Get",
   Post = "Post",
@@ -45,19 +43,16 @@ export enum HttpVerb {
   Delete = "Delete",
 }
 
-/** @internal */
 export interface NamedTypedValue {
   name: string;
   cidl_type: CidlType;
 }
 
-/** @internal */
 export interface ForeignKeyReference {
   model_name: string;
   column_name: string;
 }
 
-/** @internal */
 export interface D1Column {
   value: NamedTypedValue;
   foreign_key_reference: ForeignKeyReference | null;
@@ -65,7 +60,6 @@ export interface D1Column {
   composite_id: number | null;
 }
 
-/** @internal */
 export enum MediaType {
   Json = "Json",
   Octet = "Octet",
@@ -81,7 +75,6 @@ export function defaultMediaType(): MediaType {
   return MediaType.Json;
 }
 
-/** @internal */
 export interface ApiMethod {
   name: string;
   is_static: boolean;
@@ -95,13 +88,11 @@ export interface ApiMethod {
   parameters: NamedTypedValue[];
 }
 
-/** @internal */
 export type NavigationPropertyKind =
   | { OneToOne: { key_columns: string[] } }
   | { OneToMany: { key_columns: string[] } }
   | "ManyToMany";
 
-/** @internal */
 export interface NavigationProperty {
   var_name: string;
   model_reference: string;
@@ -117,7 +108,6 @@ export function getNavigationPropertyCidlType(
     : { Array: { Object: nav.model_reference } };
 }
 
-/** @internal */
 export interface KeyValue {
   format: string;
   namespace_binding: string;
@@ -125,7 +115,6 @@ export interface KeyValue {
   list_prefix: boolean;
 }
 
-/** @internal */
 export interface AstR2Object {
   format: string;
   bucket_binding: string;
@@ -133,7 +122,6 @@ export interface AstR2Object {
   list_prefix: boolean;
 }
 
-/** @internal */
 export interface Model {
   name: string;
   d1_binding: string | null;
@@ -149,20 +137,17 @@ export interface Model {
   source_path: string;
 }
 
-/** @internal */
 export interface PlainOldObject {
   name: string;
   attributes: NamedTypedValue[];
   source_path: string;
 }
 
-/** @internal */
 export interface ServiceAttribute {
   var_name: string;
   inject_reference: string;
 }
 
-/** @internal */
 export interface Service {
   name: string;
   attributes: ServiceAttribute[];
@@ -171,14 +156,12 @@ export interface Service {
   initializer: string[] | null;
 }
 
-/** @internal */
 export interface CidlIncludeTree {
   [key: string]: CidlIncludeTree;
 }
 
 export type CrudListParam = "LastSeen" | "Limit" | "Offset";
 
-/** @internal */
 export interface DataSource {
   name: string;
   tree: CidlIncludeTree;
@@ -186,7 +169,6 @@ export interface DataSource {
   list_params: CrudListParam[];
 }
 
-/** @internal */
 export interface WranglerEnv {
   name: string;
   source_path: string;
@@ -196,7 +178,6 @@ export interface WranglerEnv {
   vars: Record<string, CidlType>;
 }
 
-/** @internal */
 export interface CloesceAst {
   project_name: string;
   wrangler_env?: WranglerEnv;
