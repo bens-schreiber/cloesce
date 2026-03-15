@@ -1,3 +1,12 @@
+# [0.2.2] - 2026-3-14
+### Added
+
+### Changed
+- If unspecified in ORM functions, Data Sources will default to what is defined
+in the default data source.
+
+### Fixed
+
 # [0.2.0] - 2026-03-14
 ### Added
 - Pagination support for KV, R2 and D1 via the `orm`
