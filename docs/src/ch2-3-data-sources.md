@@ -33,7 +33,7 @@ export class Person {
 
 If we were to follow this structure naively, fetching a `Person` would lead to fetching their `Dog`, which would lead to fetching the same `Person` again, and so on, resulting in an infinite loop of data retrieval.
 
-Include Trees allow developers to explicitly state which related Navigation Properties should be included in the query results, preventing overfetching. If a Navigation Property is not included in the Include Tree, it will remain `undefined` (for singular relationships) or an empty array (for collections).
+Data Sources, through their `includeTree` configuration, allow developers to explicitly state which related Navigation Properties should be included in the query results, preventing overfetching. If a Navigation Property is not included in the `includeTree`, it will remain `undefined` (for singular relationships) or an empty array (for collections).
 
 A common convention to follow when writing singular Navigation Properties is to define them as `Type | undefined`, indicating that they may not be populated unless explicitly included.
 
