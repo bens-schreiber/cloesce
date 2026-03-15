@@ -48,7 +48,7 @@ Inspired by [Entity Framework relationship navigations](https://learn.microsoft.
 Let's revisit our `Person` and `Dog` Models and add navigation properties to them:
 
 ```typescript
-import { Model, Integer, ForeignKey, OneToOne } from "cloesce/backend";
+import { Model, Integer } from "cloesce/backend";
 
 @Model("db")
 export class Dog {
