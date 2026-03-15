@@ -9,7 +9,7 @@ In this section, we will explore *Navigation Properties* which allow us to defin
 > [!NOTE]
 > A Model can only have a foreign key to another Model if it is:
 > 1. D1 backed
-> 2. Apart of the same database as the Model it references (lifted in future releases!)
+> 2. Part of the same database as the Model it references (lifted in future releases!)
 
 Before diving into Navigation Properties, it's essential to understand their source: foreign keys. Foreign keys are scalar properties that reference the Primary Key of another Model, establishing a relationship between two Models.
 
