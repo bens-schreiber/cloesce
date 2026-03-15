@@ -22,7 +22,7 @@ Cloesce respects the design constraints of KV storage. For Models backed purely 
 - Migrations  
 
 ```typescript
-import { Model, KV, KValue, KeyParam, IncludeTree } from "cloesce/backend";
+import { Model, KV, KValue, KeyParam } from "cloesce/backend";
 
 @Model() // no database specified
 export class Settings {

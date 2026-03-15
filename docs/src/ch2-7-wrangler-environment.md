@@ -64,3 +64,4 @@ This will compile to the following `wrangler.jsonc` file:
         "someVariable": "default_string"
     }
 }
+```

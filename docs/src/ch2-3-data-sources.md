@@ -52,7 +52,7 @@ For example, in the `Person` and `Dog` Models above, the default Data Source for
 }
 ```
 
-The defalt Data Source for `Dog` would be:
+The default Data Source for `Dog` would be:
 ```typescript
 {
     includeTree: {

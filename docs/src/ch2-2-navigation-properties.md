@@ -96,7 +96,7 @@ This property allows us to access the associated `Dog` instance directly from a 
 Let's modify our Models to allow a Person to have multiple Dogs:
 
 ```typescript
-import { Model, Integer, ForeignKey, OneToMany } from "cloesce/backend";
+import { Model, Integer } from "cloesce/backend";
 
 @Model("db")
 export class Dog {

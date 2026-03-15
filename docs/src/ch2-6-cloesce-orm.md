@@ -81,7 +81,7 @@ The default query is `WHERE (primaryKey) > (lastSeen) ORDER BY primaryKey LIMIT 
 KV and R2 list fields are declared with `Paginated<T>`:
 
 ```typescript
-@Model()
+@Model("db")
 class User {
     id: Integer;
 
