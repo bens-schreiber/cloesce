@@ -63,7 +63,7 @@ To query these endpoints, a full generated client that matches the exact structu
 When creating Models, you will find yourself writing the same CRUD (Create, Read, Update, Delete) boilerplate. To save this effort, Cloesce automatically generates standard CRUD methods if included in the Model decorator. These methods are exposed as API endpoints. Internally, they simply run the [Cloesce ORM](./ch2-6-cloesce-orm.md) operations available via the `Orm` class.
 
 ```typescript
-import { Model, Integer } from "cloesce/backend";
+import { Model, Integer, Crud } from "cloesce/backend";
 
 @Crud("GET", "SAVE", "LIST")
 @Model("db")
