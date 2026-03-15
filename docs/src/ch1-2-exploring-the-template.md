@@ -58,7 +58,7 @@ In `src/data/Models.ts` you will find two example Models, `Weather` and `Weather
     <summary>Weather Code Snippet</summary>
 
 ```typescript
-@Model()
+@Model("db")
 export class Weather {
     id: Integer;
 
@@ -86,7 +86,8 @@ export class Weather {
     <summary>WeatherReport Code Snippet</summary>
 
 ```typescript
-@Model(["GET", "LIST", "SAVE"])
+@Crud("GET", "LIST", "SAVE")
+@Model("db")
 export class WeatherReport {
     id: Integer;
 

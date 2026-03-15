@@ -90,5 +90,5 @@ npx cloesce migrate <d1-binding> <migration name>
 Finally, these generated migrations must be applied to the actual D1 database using the Wrangler CLI:
 
 ```bash
-npx wrangler d1 migrations apply <database-binding-name>
+npx wrangler d1 migrations apply <d1-binding>
 ```
