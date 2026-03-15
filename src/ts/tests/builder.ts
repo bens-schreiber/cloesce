@@ -42,6 +42,16 @@ export function createAst(args?: {
     args?.services?.map((s) => [s.name, s]) ?? [],
   );
 
+  // NOTE: these won't always be empty in real usage
+  for (const model of Object.values(modelsMap)) {
+    model.data_sources["default"] = {
+      name: "default",
+      is_private: false,
+      tree: {},
+      list_params: [],
+    };
+  }
+
   return {
     project_name: "test",
     models: modelsMap,

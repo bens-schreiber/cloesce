@@ -75,23 +75,22 @@ function isDataSource<T>(include: Include<T>): include is DataSource<T> {
     "listParams" in include
   );
 }
-function getTreeFromInclude<T>(
+
+/**
+ * @returns The include tree from the given `include` argument.
+ * If `include` is a `DataSource`, returns its `includeTree` property.
+ * If `include` is null or undefined, returns the default data source's include tree for the model.
+ */
+function treeFromInclude<T>(
   ctor: new () => T,
   include: Include<T> | null | undefined,
 ): IncludeTree<T> {
   if (!include) {
-    return Orm.defaultDataSource(ctor).includeTree!;
+    return Orm.defaultDataSource<T>(ctor).includeTree!;
   }
-
-  if (isDataSource(include)) {
-    return (
-      (include.includeTree as IncludeTree<T> | undefined) ??
-      Orm.defaultDataSource(ctor).includeTree ??
-      ({} as IncludeTree<T>)
-    );
-  }
-
-  return include;
+  return isDataSource(include)
+    ? ((include.includeTree as IncludeTree<T>) ?? ({} as IncludeTree<T>))
+    : include;
 }
 
 export class Orm {
@@ -169,7 +168,7 @@ export class Orm {
   static map<T extends object>(
     ctor: new () => T,
     d1Results: D1Result,
-    include: Include<T> = {},
+    include?: Include<T>,
   ): T[] {
     const { wasm } = RuntimeContainer.get();
     const d1ResultsRes = WasmResource.fromString(
@@ -177,8 +176,7 @@ export class Orm {
       wasm,
     );
 
-    const tree = getTreeFromInclude(ctor, include);
-
+    const tree = treeFromInclude(ctor, include);
     const includeTreeRes = WasmResource.fromString(JSON.stringify(tree), wasm);
     const mapQueryRes = invokeOrmWasm(
       wasm.map,
@@ -232,7 +230,6 @@ export class Orm {
       include?: Include<T>;
     } = {
       from: null,
-      include: {},
     },
   ): string {
     const { wasm } = RuntimeContainer.get();
@@ -241,10 +238,8 @@ export class Orm {
       wasm,
     );
 
-    const include = args.include ?? {};
-    const tree = getTreeFromInclude(ctor, include);
+    const tree = treeFromInclude(ctor, args.include);
     const includeTreeRes = WasmResource.fromString(JSON.stringify(tree), wasm);
-
     const selectQueryRes = invokeOrmWasm(
       wasm.select_model,
       [WasmResource.fromString(ctor.name, wasm), fromRes, includeTreeRes],
@@ -276,7 +271,6 @@ export class Orm {
     } = {
       base: {},
       keyParams: {},
-      include: {},
     },
   ): Promise<T> {
     const { ast, constructorRegistry } = RuntimeContainer.get();
@@ -287,10 +281,9 @@ export class Orm {
     const modelCidlType: CidlType = {
       Object: ctor.name,
     };
-
     const env: any = this.env;
     const promises: Promise<void>[] = [];
-    const tree = getTreeFromInclude(ctor, args.include ?? {});
+    const tree = treeFromInclude(ctor, args.include);
 
     const hydrated = hydrateType(args.base ?? {}, modelCidlType, {
       ast,
@@ -325,13 +318,13 @@ export class Orm {
   async upsert<T extends object>(
     ctor: new () => T,
     newModel: DeepPartial<T>,
-    include: Include<T> = {},
+    include?: Include<T>,
   ): Promise<T | null> {
     const { wasm, ast } = RuntimeContainer.get();
     const meta = ast.models[ctor.name];
     const d1Binding = meta.d1_binding ? this.getDb(meta.d1_binding) : null;
 
-    const includeTree = getTreeFromInclude(ctor, include);
+    const tree = treeFromInclude(ctor, include);
     const upsertQueryRes = invokeOrmWasm(
       wasm.upsert_model,
       [
@@ -345,7 +338,7 @@ export class Orm {
           ),
           wasm,
         ),
-        WasmResource.fromString(JSON.stringify(includeTree), wasm),
+        WasmResource.fromString(JSON.stringify(tree), wasm),
       ],
       wasm,
     );
@@ -419,12 +412,12 @@ export class Orm {
         }
       }
 
-      base = Orm.map(ctor, batchRes[selectIndex!], includeTree)[0];
+      base = Orm.map(ctor, batchRes[selectIndex!], tree)[0];
     }
 
     // Base needs to include all of the key params from newModel and its includes.
     const q: Array<{ model: any; meta: AstModel; tree: IncludeTree<any> }> = [
-      { model: base, meta, tree: includeTree },
+      { model: base, meta, tree },
     ]!;
     while (q.length > 0) {
       const {
@@ -504,7 +497,7 @@ export class Orm {
     // Hydrate and return the upserted model
     return await this.hydrate(ctor, {
       base: base,
-      include: includeTree,
+      include: tree,
     });
   }
 
@@ -537,7 +530,7 @@ export class Orm {
     }
 
     args ??= {};
-    args.include ??= {};
+    args.include ??= treeFromInclude(ctor, args.include);
     args.lastSeen ??= defaultPrimaryKey<T>(model.primary_key_columns);
     args.limit ??= 1000;
 
@@ -553,9 +546,8 @@ export class Orm {
     if (isDataSource(args.include) && args.include.list) {
       // Override the default list generation with a custom one provided by the user.
       const includeDs = args.include as DataSource<T>;
-      const includeTree = getTreeFromInclude(ctor, includeDs);
       query = args.include.list((from) =>
-        Orm.select(ctor, { from, include: includeTree }),
+        Orm.select(ctor, { from, include: includeDs.includeTree }),
       );
     } else {
       // Default list query with seek pagination
@@ -653,7 +645,7 @@ export class Orm {
     }
 
     args ??= {};
-    args.include ??= {};
+    args.include ??= treeFromInclude(ctor, args.include);
     args.keyParams ??= {};
 
     // KV or R2 only
@@ -676,9 +668,8 @@ export class Orm {
     if (isDataSource(args.include) && args.include.get) {
       // Override the default get generation with a custom one provided by the user.
       const includeDs = args.include as DataSource<T>;
-      const includeTree = getTreeFromInclude(ctor, includeDs);
       query = args.include.get((from) =>
-        Orm.select(ctor, { from, include: includeTree }),
+        Orm.select(ctor, { from, include: includeDs.includeTree }),
       );
     } else {
       // Default get query
