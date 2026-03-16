@@ -2,7 +2,8 @@ use chumsky::prelude::*;
 
 use crate::{Extra, SymbolTable, sqlite_column_types};
 use ast::{
-    Binding, CidlType, Field, ForeignKey, Model, NavigationProperty, NavigationPropertyKind, Symbol,
+    Binding, CidlType, D1NavigationProperty, D1NavigationPropertyKind, Field, ForeignKey,
+    KvNavigationProperty, Model, R2NavigationProperty, Symbol,
 };
 use lexer::Token;
 
@@ -25,10 +26,23 @@ enum PendingNavigationKind {
 struct PendingField {
     name: String,
     cidl_type: CidlType,
+    kv_navigation: Option<PendingKvNavigation>,
+    r2_navigation: Option<PendingR2Navigation>,
+}
+
+struct PendingKvNavigation {
+    namespace_binding: String,
+    format: String,
+}
+
+struct PendingR2Navigation {
+    bucket_binding: String,
+    format: String,
 }
 
 enum ModelEntry {
     Primary(Vec<String>),
+    Unique(Vec<String>),
     Foreign(PendingForeignKey),
     Nav(PendingNavigation),
     Field(PendingField),
@@ -36,10 +50,13 @@ enum ModelEntry {
 
 /// Parses a model block of the form:
 /// ```cloesce
-/// [optional_d1_binding]
+/// @d1(optional_d1_binding)
 /// model ModelName {
 ///     // floating primary key tag
 ///     [primary col1, col2, ...]
+///
+///     // floating unique constraint tag
+///     [unique col1, col2, ...]
 ///
 ///     col1: sqlite_type
 ///     col2: sqlite_type
@@ -62,14 +79,16 @@ enum ModelEntry {
 /// }
 /// ```
 pub fn model_block<'t>() -> impl Parser<'t, &'t [Token], Model, Extra<'t>> {
-    // Binding tag on the model declaration
-    let model_level_binding = just(Token::LBracket)
+    // Anchored D1 binding tag on the model declaration: @d1(binding_name)
+    let model_level_binding = just(Token::At)
+        .ignore_then(just(Token::D1))
+        .ignore_then(just(Token::LParen))
         .ignore_then(select! { Token::Ident(name) => name })
-        .then_ignore(just(Token::RBracket))
+        .then_ignore(just(Token::RParen))
         .or_not();
 
     // [primary col1, col2, ...]
-    let primary_decorator = just(Token::LBracket)
+    let primary_tag = just(Token::LBracket)
         .ignore_then(just(Token::Ident("primary".into())))
         .ignore_then(
             select! { Token::Ident(name) => name }
@@ -80,9 +99,21 @@ pub fn model_block<'t>() -> impl Parser<'t, &'t [Token], Model, Extra<'t>> {
         .then_ignore(just(Token::RBracket))
         .map(ModelEntry::Primary);
 
+    // [unique col1, col2, ...]
+    let unique_tag = just(Token::LBracket)
+        .ignore_then(just(Token::Ident("unique".into())))
+        .ignore_then(
+            select! { Token::Ident(name) => name }
+                .separated_by(just(Token::Comma))
+                .at_least(1)
+                .collect::<Vec<_>>(),
+        )
+        .then_ignore(just(Token::RBracket))
+        .map(ModelEntry::Unique);
+
     // [foreign col -> Other::col]
     // [foreign (col1, col2) -> (Other::col1, Other::col2)]
-    let foreign_decorator = {
+    let foreign_tag = {
         // OtherModel::col
         let foreign_target_column_ref = select! { Token::Ident(model_name) => model_name }
             .then_ignore(just(Token::DoubleColon))
@@ -128,7 +159,7 @@ pub fn model_block<'t>() -> impl Parser<'t, &'t [Token], Model, Extra<'t>> {
     // [nav col -> Other::col]
     // [nav col -> (Other::col1, Other::col2)]
     // [nav col <> Other::otherNav]
-    let nav_decorator = {
+    let nav_tag = {
         // ModelName::col
         let nav_key_ref = select! { Token::Ident(model_name) => model_name }
             .then_ignore(just(Token::DoubleColon))
@@ -198,17 +229,65 @@ pub fn model_block<'t>() -> impl Parser<'t, &'t [Token], Model, Extra<'t>> {
 
     let model_field_type = choice((sqlite_column_types(), object_type));
 
+    // @kv(binding_name, "prefix/{id}")
+    let kv_tag = just(Token::At)
+        .ignore_then(just(Token::Kv))
+        .ignore_then(just(Token::LParen))
+        .ignore_then(select! { Token::Ident(name) => name })
+        .then_ignore(just(Token::Comma))
+        .then(select! { Token::StringLit(value) => unquote_string_literal(value) })
+        .then_ignore(just(Token::RParen))
+        .map(|(namespace_binding, format)| PendingKvNavigation {
+            namespace_binding,
+            format,
+        });
+
+    // @r2(binding_name, "prefix/{id}")
+    let r2_tag = just(Token::At)
+        .ignore_then(just(Token::R2))
+        .ignore_then(just(Token::LParen))
+        .ignore_then(select! { Token::Ident(name) => name })
+        .then_ignore(just(Token::Comma))
+        .then(select! { Token::StringLit(value) => unquote_string_literal(value) })
+        .then_ignore(just(Token::RParen))
+        .map(|(bucket_binding, format)| PendingR2Navigation {
+            bucket_binding,
+            format,
+        });
+
+    // At most one @kv and one @r2 per field, in either order.
+    let anchored_field_tags = choice((
+        kv_tag
+            .clone()
+            .then(r2_tag.clone().or_not())
+            .map(|(kv, r2)| (Some(kv), r2)),
+        r2_tag
+            .clone()
+            .then(kv_tag.clone().or_not())
+            .map(|(r2, kv)| (kv, Some(r2))),
+    ))
+    .or_not()
+    .map(|tags| tags.unwrap_or((None, None)));
+
     // sqlite types
-    let field = select! { Token::Ident(name) => name }
+    let field = anchored_field_tags
+        .then(select! { Token::Ident(name) => name })
         .then_ignore(just(Token::Colon))
         .then(model_field_type)
-        .map(|(name, cidl_type)| ModelEntry::Field(PendingField { name, cidl_type }));
+        .map(|(((kv_navigation, r2_navigation), name), cidl_type)| {
+            ModelEntry::Field(PendingField {
+                name,
+                cidl_type,
+                kv_navigation,
+                r2_navigation,
+            })
+        });
 
     model_level_binding
         .then_ignore(just(Token::Model))
         .then(select! { Token::Ident(name) => name })
         .then(
-            choice((primary_decorator, foreign_decorator, nav_decorator, field))
+            choice((primary_tag, unique_tag, foreign_tag, nav_tag, field))
                 .repeated()
                 .collect::<Vec<_>>()
                 .delimited_by(just(Token::LBrace), just(Token::RBrace)),
@@ -228,9 +307,12 @@ fn map_model(
     let model_symbol = symbol_table.intern_global(&model_name);
     let mut columns: Vec<Field> = Vec::new();
     let mut foreign_keys: Vec<ForeignKey> = Vec::new();
-    let mut navigation_properties: Vec<NavigationProperty> = Vec::new();
-    let mut pending_navigation_properties: Vec<PendingNavigation> = Vec::new();
+    let mut navigation_properties: Vec<D1NavigationProperty> = Vec::new();
+    let mut kv_navigation_properties: Vec<KvNavigationProperty> = Vec::new();
+    let mut r2_navigation_properties: Vec<R2NavigationProperty> = Vec::new();
+    let mut pending_d1_navigation_properties: Vec<PendingNavigation> = Vec::new();
     let mut primary_key_columns: Vec<Symbol> = Vec::new();
+    let mut unique_constraints: Vec<Vec<Symbol>> = Vec::new();
 
     for item in items {
         match item {
@@ -240,6 +322,14 @@ fn map_model(
                     .map(|col_name| symbol_table.intern_scoped(&model_name, &col_name));
 
                 primary_key_columns.extend(symbols);
+            }
+            ModelEntry::Unique(cols) => {
+                let symbols = cols
+                    .iter()
+                    .map(|col_name| symbol_table.intern_scoped(&model_name, col_name))
+                    .collect::<Vec<_>>();
+
+                unique_constraints.push(symbols);
             }
             ModelEntry::Foreign(foreign_key) => {
                 let columns = foreign_key
@@ -255,22 +345,49 @@ fn map_model(
                 foreign_keys.push(foreign_key);
             }
             ModelEntry::Nav(nav) => {
-                pending_navigation_properties.push(nav);
+                pending_d1_navigation_properties.push(nav);
             }
             ModelEntry::Field(field) => {
-                let field = Field {
-                    symbol: symbol_table.intern_scoped(&model_name, &field.name),
+                let field_symbol = symbol_table.intern_scoped(&model_name, &field.name);
+                let field_value = Field {
+                    symbol: field_symbol.clone(),
                     name: field.name,
                     cidl_type: field.cidl_type,
                 };
-                columns.push(field);
+
+                if let Some(kv_navigation) = field.kv_navigation {
+                    kv_navigation_properties.push(KvNavigationProperty {
+                        namespace_binding: symbol_table
+                            .intern_scoped(&model_name, &kv_navigation.namespace_binding),
+                        field: Field {
+                            symbol: field_symbol.clone(),
+                            name: field_value.name.clone(),
+                            cidl_type: field_value.cidl_type.clone(),
+                        },
+                        format: kv_navigation.format,
+                        list_prefix: false,
+                    });
+                }
+
+                if let Some(r2_navigation) = field.r2_navigation {
+                    r2_navigation_properties.push(R2NavigationProperty {
+                        name: field_value.name.clone(),
+                        symbol: field_symbol.clone(),
+                        format: r2_navigation.format,
+                        bucket_binding: symbol_table
+                            .intern_scoped(&model_name, &r2_navigation.bucket_binding),
+                        list_prefix: false,
+                    });
+                }
+
+                columns.push(field_value);
             }
         }
     }
 
-    for nav in pending_navigation_properties {
+    for nav in pending_d1_navigation_properties {
         let nav_kind = match nav.kind {
-            PendingNavigationKind::ManyToMany => NavigationPropertyKind::ManyToMany {
+            PendingNavigationKind::ManyToMany => D1NavigationPropertyKind::ManyToMany {
                 column: symbol_table.intern_scoped(&model_name, &nav.name),
             },
             PendingNavigationKind::OneOrManyByFieldType { key_columns } => {
@@ -281,18 +398,18 @@ fn map_model(
 
                 match columns.iter().find(|field| field.name == nav.name) {
                     Some(field) if matches!(&field.cidl_type, CidlType::Array(_)) => {
-                        NavigationPropertyKind::OneToMany {
+                        D1NavigationPropertyKind::OneToMany {
                             columns: key_columns,
                         }
                     }
-                    _ => NavigationPropertyKind::OneToOne {
+                    _ => D1NavigationPropertyKind::OneToOne {
                         columns: key_columns,
                     },
                 }
             }
         };
 
-        let nav_prop = NavigationProperty {
+        let nav_prop = D1NavigationProperty {
             hash: 0,
             field: symbol_table.intern_scoped(&model_name, &nav.name),
             to_model: symbol_table.intern_global(&nav.to_model),
@@ -313,10 +430,17 @@ fn map_model(
         columns,
         navigation_properties,
         foreign_keys,
-        unique_constraints: Vec::new(),
+        unique_constraints,
         key_params: Vec::<Symbol>::new(),
-        kv_objects: Vec::new(),
-        r2_objects: Vec::new(),
-        cruds: Vec::new(),
+        kv_navigation_properties,
+        r2_navigation_properties,
     }
+}
+
+fn unquote_string_literal(literal: String) -> String {
+    literal
+        .strip_prefix('"')
+        .and_then(|value| value.strip_suffix('"'))
+        .unwrap_or(&literal)
+        .to_owned()
 }

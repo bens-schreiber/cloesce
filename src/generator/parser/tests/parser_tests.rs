@@ -1,4 +1,4 @@
-use ast::{CidlType, CloesceAst, NavigationPropertyKind};
+use ast::{CidlType, CloesceAst, D1NavigationPropertyKind};
 use lexer::Lexer;
 use parser::CloesceParser;
 
@@ -105,7 +105,7 @@ fn env_block() {
 fn model_block_scalar() {
     let ast = lex_and_parse(
         r#"
-        [d1_a]
+        @d1(d1_a)
         model Person {
             // Composite PK id, age
             [primary id, age]
@@ -152,16 +152,103 @@ fn model_block_scalar() {
 }
 
 #[test]
+fn model_block_kv_r2_anchored_tags() {
+    let ast = lex_and_parse(
+        r#"
+        env {
+            cache_ns: kv
+            assets_bucket: r2
+        }
+
+        model Foo {
+            field: string
+
+            @kv(cache_ns, "my-interpolated-format{field}")
+            kv_value: anyTypeATAll
+
+            @r2(assets_bucket, "my_interpolated_format{field}")
+            obj: R2Object
+        }
+        "#,
+    );
+
+    let foo = ast
+        .models
+        .iter()
+        .find(|(_, m)| m.name == "Foo")
+        .expect("Foo model to be present")
+        .1;
+
+    assert_eq!(foo.kv_navigation_properties.len(), 1);
+    assert_eq!(foo.r2_navigation_properties.len(), 1);
+
+    let kv = &foo.kv_navigation_properties[0];
+    assert_eq!(kv.field.name, "kv_value");
+    assert_eq!(kv.format, "my-interpolated-format{field}");
+
+    let r2 = &foo.r2_navigation_properties[0];
+    assert_eq!(r2.name, "obj");
+    assert_eq!(r2.format, "my_interpolated_format{field}");
+}
+
+#[test]
+fn model_block_unique_constraints() {
+    let ast = lex_and_parse(
+        r#"
+        @d1(d1_a)
+        model Foo {
+            [primary id]
+            [unique a, b, c]
+            [unique email]
+
+            id: int
+            a: int
+            b: int
+            c: int
+            email: string
+        }
+        "#,
+    );
+
+    let foo = ast
+        .models
+        .iter()
+        .find(|(_, m)| m.name == "Foo")
+        .expect("Foo model to be present")
+        .1;
+
+    let unique_constraints = foo
+        .unique_constraints
+        .iter()
+        .map(|constraint| {
+            constraint
+                .iter()
+                .map(|symbol| {
+                    foo.columns
+                        .iter()
+                        .find(|field| field.symbol == *symbol)
+                        .expect("unique constraint symbol to resolve to a model column")
+                        .name
+                        .clone()
+                })
+                .collect::<Vec<_>>()
+        })
+        .collect::<Vec<_>>();
+
+    assert_eq!(unique_constraints, vec![vec!["a", "b", "c"], vec!["email"]]);
+}
+
+#[test]
 fn model_block_single_foreign_key() {
     let ast = lex_and_parse(
         r#"
-        [d1_a]
+        @d1(d1_a)
         model Person {
             [primary id]
             id: int
         }
 
-        [d1_a]
+        @d1(d1_a)
         model Dog {
             [primary id]
             [foreign userId -> Person::id]
@@ -208,14 +295,14 @@ fn model_block_single_foreign_key() {
 fn model_block_composite_foreign_key() {
     let _ast = lex_and_parse(
         r#"
-        [d1_a]
+        @d1(d1_a)
         model Parent {
             [primary orgId, userId]
             orgId: int
             userId: int
         }
 
-        [d1_a]
+        @d1(d1_a)
         model Child {
             [primary id]
             id: int
@@ -228,42 +315,19 @@ fn model_block_composite_foreign_key() {
         }
         "#,
     );
-
-    // let parent = get_model_by_name(&ast, "Parent");
-    // let child = get_model_by_name(&ast, "Child");
-
-    // let org_id_symbol = child
-    //     .columns
-    //     .iter()
-    //     .find(|c| c.name == "orgId")
-    //     .expect("orgId column to be present")
-    //     .symbol
-    //     .clone();
-    // let user_id_symbol = child
-    //     .columns
-    //     .iter()
-    //     .find(|c| c.name == "userId")
-    //     .expect("userId column to be present")
-    //     .symbol
-    //     .clone();
-
-    // assert_eq!(child.foreign_keys.len(), 1);
-    // let fk = &child.foreign_keys[0];
-    // assert_eq!(fk.to_model, parent.symbol);
-    // assert_eq!(fk.columns, vec![org_id_symbol, user_id_symbol]);
 }
 
 #[test]
 fn model_block_nav_one_to_one() {
     let ast = lex_and_parse(
         r#"
-        [d1_a]
+        @d1(d1_a)
         model Bar {
             [primary id]
             id: int
         }
 
-        [d1_a]
+        @d1(d1_a)
         model Foo {
             [primary id]
             id: int
@@ -295,7 +359,10 @@ fn model_block_nav_one_to_one() {
     assert_eq!(nav_props.len(), 1);
     let (nav, key_fields) = &nav_props[0];
     assert_eq!(nav.to_model, bar.symbol);
-    assert!(matches!(&nav.kind, NavigationPropertyKind::OneToOne { .. }));
+    assert!(matches!(
+        &nav.kind,
+        D1NavigationPropertyKind::OneToOne { .. }
+    ));
     assert_eq!(
         key_fields
             .iter()
@@ -309,7 +376,7 @@ fn model_block_nav_one_to_one() {
 fn model_block_nav_one_to_many() {
     let ast = lex_and_parse(
         r#"
-        [d1_a]
+        @d1(d1_a)
         model Foo {
             [primary id]
             id: int
@@ -318,7 +385,7 @@ fn model_block_nav_one_to_many() {
             bars: Array<Bar>
         }
 
-        [d1_a]
+        @d1(d1_a)
         model Bar {
             [primary id]
             id: int
@@ -350,7 +417,7 @@ fn model_block_nav_one_to_many() {
     assert_eq!(nav.to_model, bar.symbol);
     assert!(matches!(
         &nav.kind,
-        NavigationPropertyKind::OneToMany { .. }
+        D1NavigationPropertyKind::OneToMany { .. }
     ));
 }
 
@@ -358,7 +425,7 @@ fn model_block_nav_one_to_many() {
 fn model_block_nav_many_to_many() {
     let ast = lex_and_parse(
         r#"
-        [d1_a]
+        @d1(d1_a)
         model Student {
             [primary id]
             id: int
@@ -367,7 +434,7 @@ fn model_block_nav_many_to_many() {
             courses: Array<Course>
         }
 
-        [d1_a]
+        @d1(d1_a)
         model Course {
             [primary id]
             id: int
@@ -398,7 +465,7 @@ fn model_block_nav_many_to_many() {
     assert_eq!(student_nav.to_model, course.symbol);
     assert!(matches!(
         &student_nav.kind,
-        NavigationPropertyKind::ManyToMany { .. }
+        D1NavigationPropertyKind::ManyToMany { .. }
     ));
 
     let course_nav_props: Vec<_> = course.navigation_properties().collect();
@@ -407,6 +474,6 @@ fn model_block_nav_many_to_many() {
     assert_eq!(course_nav.to_model, student.symbol);
     assert!(matches!(
         &course_nav.kind,
-        NavigationPropertyKind::ManyToMany { .. }
+        D1NavigationPropertyKind::ManyToMany { .. }
     ));
 }

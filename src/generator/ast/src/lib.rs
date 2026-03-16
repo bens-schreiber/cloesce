@@ -120,7 +120,6 @@ impl CidlType {
     pub fn paginated(cidl_type: CidlType) -> CidlType {
         CidlType::Paginated(Box::new(cidl_type))
     }
-    
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
@@ -205,7 +204,7 @@ pub struct DataSource {
 /// A D1 Navigation property, representing a relationship to another model
 /// through a foreign key or composite foreign key.
 #[derive(Serialize, Deserialize, Debug, Clone, Hash)]
-pub enum NavigationPropertyKind {
+pub enum D1NavigationPropertyKind {
     OneToOne {
         /// The columns on the current model that reference the other model's primary key.
         /// Multiple columns indicate a composite foreign key.
@@ -223,7 +222,7 @@ pub enum NavigationPropertyKind {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct NavigationProperty {
+pub struct D1NavigationProperty {
     pub hash: u64,
 
     /// The field on the current model that represents the relationship
@@ -233,7 +232,7 @@ pub struct NavigationProperty {
     pub to_model: Symbol,
 
     /// The kind of navigation property, which encodes the relationship and foreign key structure.
-    pub kind: NavigationPropertyKind,
+    pub kind: D1NavigationPropertyKind,
 }
 
 #[derive(Serialize, Deserialize, Debug, Hash)]
@@ -251,20 +250,21 @@ pub enum CrudKind {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct KeyValue {
-    pub format: String,
+pub struct KvNavigationProperty {
     pub namespace_binding: Symbol,
     pub field: Field,
+    pub format: String,
 
     /// If true, treat the key as a prefix for listing multiple keys.
     pub list_prefix: bool,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct R2Object {
+pub struct R2NavigationProperty {
+    pub name: String,
     pub symbol: Symbol,
     pub format: String,
-    pub name: String,
+
     pub bucket_binding: Symbol,
 
     /// If true, treat the key as a prefix for listing multiple keys.
@@ -285,17 +285,15 @@ pub struct Model {
     pub d1_binding: Option<Binding>,
     pub columns: Vec<Field>,
     pub primary_key_columns: Vec<Symbol>,
-    pub navigation_properties: Vec<NavigationProperty>,
+    pub navigation_properties: Vec<D1NavigationProperty>,
     pub foreign_keys: Vec<ForeignKey>,
 
     /// Each inner Vec represents a unique constraint, containing the column names that make up the constraint.
     pub unique_constraints: Vec<Vec<Symbol>>,
 
     pub key_params: Vec<Symbol>,
-    pub kv_objects: Vec<KeyValue>,
-    pub r2_objects: Vec<R2Object>,
-
-    pub cruds: Vec<CrudKind>,
+    pub kv_navigation_properties: Vec<KvNavigationProperty>,
+    pub r2_navigation_properties: Vec<R2NavigationProperty>,
 }
 
 impl Model {
@@ -304,11 +302,11 @@ impl Model {
     }
 
     pub fn has_kv(&self) -> bool {
-        !self.kv_objects.is_empty()
+        !self.kv_navigation_properties.is_empty()
     }
 
     pub fn has_r2(&self) -> bool {
-        !self.r2_objects.is_empty()
+        !self.r2_navigation_properties.is_empty()
     }
 
     pub fn has_composite_pk(&self) -> bool {
@@ -323,17 +321,17 @@ impl Model {
 
     pub fn navigation_properties(
         &self,
-    ) -> impl Iterator<Item = (&NavigationProperty, Vec<&Field>)> {
+    ) -> impl Iterator<Item = (&D1NavigationProperty, Vec<&Field>)> {
         self.navigation_properties.iter().map(|nav| {
             let key_fields = match &nav.kind {
-                NavigationPropertyKind::OneToOne { columns }
-                | NavigationPropertyKind::OneToMany { columns } => self
+                D1NavigationPropertyKind::OneToOne { columns }
+                | D1NavigationPropertyKind::OneToMany { columns } => self
                     .columns
                     .iter()
                     .filter(|col| columns.contains(&col.symbol))
                     .collect(),
 
-                NavigationPropertyKind::ManyToMany { column } => self
+                D1NavigationPropertyKind::ManyToMany { column } => self
                     .columns
                     .iter()
                     .filter(|col| &col.symbol == column)
@@ -365,7 +363,7 @@ pub struct Service {
     pub initializer: Option<Vec<String>>,
 
     /// API definitions.
-    pub methods: BTreeMap<String, ApiMethod>,
+    pub methods: BTreeMap<Symbol, ApiMethod>,
 
     pub source_path: PathBuf,
 }
@@ -399,9 +397,17 @@ pub struct CloesceAst {
     pub hash: u64,
     pub project_name: String,
     pub wrangler_env: Vec<WranglerEnv>,
+
+    /// Maps a model symbol to the model definition
     pub models: IndexMap<Symbol, Model>,
+
+    /// Maps a Model symbol to an API
     pub apis: IndexMap<Symbol, Api>,
+
+    /// Maps a Model symbol to all of its data sources
     pub sources: IndexMap<Symbol, Vec<DataSource>>,
+
+    /// Maps a service symbol to the service definition
     pub services: IndexMap<Symbol, Service>,
     pub poos: BTreeMap<Symbol, PlainOldObject>,
 }

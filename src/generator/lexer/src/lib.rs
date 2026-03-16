@@ -80,6 +80,8 @@ pub enum Token {
     Arrow,
     #[token("::")]
     DoubleColon,
+    #[token("@")]
+    At,
 
     // Literals
     #[regex(r#""[^"]*""#, |lex| lex.slice().to_string())]
@@ -159,13 +161,13 @@ mod tests {
     [primary id]
     id: int
 
-    [default "hello world"]
+    @default("hello world")
     name: string
 
-    [default 0]
+    @default(0)
     field: int
 
-    [default 3.14]
+    @default(3.14)
     field2: double
 
     // comment should be ignored
@@ -181,39 +183,39 @@ mod tests {
         assert_eq!(
             tokens,
             [
-                (Token::Model, 0..5,),
-                (Token::Ident("Foo".into()), 6..9,),
-                (Token::LBrace, 10..11,),
-                (Token::LBracket, 16..17,),
-                (Token::Ident("primary".into()), 17..24,),
-                (Token::Ident("id".into()), 25..27,),
-                (Token::RBracket, 27..28,),
-                (Token::Ident("id".into()), 33..35,),
-                (Token::Colon, 35..36,),
-                (Token::Ident("int".into()), 37..40,),
-                (Token::LBracket, 46..47,),
-                (Token::Ident("default".into()), 47..54,),
-                (Token::StringLit("\"hello world\"".into()), 55..68,),
-                (Token::RBracket, 68..69,),
-                (Token::Ident("name".into()), 74..78,),
-                (Token::Colon, 78..79,),
-                (Token::Ident("string".into()), 80..86,),
-                (Token::LBracket, 92..93,),
-                (Token::Ident("default".into()), 93..100,),
-                (Token::IntLit(0), 101..102,),
-                (Token::RBracket, 102..103,),
-                (Token::Ident("field".into()), 108..113,),
-                (Token::Colon, 113..114,),
-                (Token::Ident("int".into()), 115..118,),
-                (Token::LBracket, 124..125,),
-                (Token::Ident("default".into()), 125..132,),
-                (Token::DoubleLit(3.14), 133..137,),
-                (Token::RBracket, 137..138,),
-                (Token::Ident("field2".into()), 143..149,),
-                (Token::Colon, 149..150,),
-                (Token::Ident("double".into()), 151..157,),
-                (Token::RBrace, 192..193,),
+                (Token::Model, 0..5),
+                (Token::Ident("Foo".into()), 6..9),
+                (Token::LBrace, 10..11),
+                (Token::LBracket, 16..17),
+                (Token::Ident("primary".into()), 17..24),
+                (Token::Ident("id".into()), 25..27),
+                (Token::RBracket, 27..28),
+                (Token::Ident("id".into()), 33..35),
+                (Token::Colon, 35..36),
+                (Token::Ident("int".into()), 37..40),
+                (Token::LBracket, 46..47),
+                (Token::Ident("default".into()), 47..54),
+                (Token::StringLit("\"hello world\"".into()), 55..68),
+                (Token::RBracket, 68..69),
+                (Token::Ident("name".into()), 74..78),
+                (Token::Colon, 78..79),
+                (Token::Ident("string".into()), 80..86),
+                (Token::LBracket, 92..93),
+                (Token::Ident("default".into()), 93..100),
+                (Token::IntLit(0), 101..102),
+                (Token::RBracket, 102..103),
+                (Token::Ident("field".into()), 108..113),
+                (Token::Colon, 113..114),
+                (Token::Ident("int".into()), 115..118),
+                (Token::LBracket, 124..125),
+                (Token::Ident("default".into()), 125..132),
+                (Token::DoubleLit(3.14), 133..137),
+                (Token::RBracket, 137..138),
+                (Token::Ident("field2".into()), 143..149),
+                (Token::Colon, 149..150),
+                (Token::Ident("double".into()), 151..157),
+                (Token::RBrace, 192..193)
             ]
-        )
+        );
     }
 }
