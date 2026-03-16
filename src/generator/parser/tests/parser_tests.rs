@@ -1,4 +1,4 @@
-use ast::{CidlType, CloesceAst, D1NavigationPropertyKind};
+use ast::{CidlType, CloesceAst, CrudKind, D1NavigationPropertyKind, HttpVerb};
 use lexer::Lexer;
 use parser::CloesceParser;
 
@@ -527,4 +527,69 @@ fn model_block_nav_many_to_many() {
         &course_nav.kind,
         D1NavigationPropertyKind::ManyToMany { .. }
     ));
+}
+
+#[test]
+fn api_block_with_crud_and_methods() {
+    let ast = lex_and_parse(
+        r#"
+        model User {
+            [primary id]
+            id: int
+            name: string
+        }
+
+        @crud(get, save, list)
+        api User {
+            post someMethod(
+                @source(mySource)
+                self,
+                id: Option<int>
+            ) -> Result<double>
+
+            get anotherMethod() -> void
+        }
+        "#,
+    );
+
+    let (user_symbol, _) = ast
+        .models
+        .iter()
+        .find(|(_, model)| model.name == "User")
+        .expect("User model to be present");
+
+    let api = ast.apis.get(user_symbol).expect("User api to be present");
+
+    assert_eq!(
+        api.cruds,
+        vec![CrudKind::GET, CrudKind::SAVE, CrudKind::LIST]
+    );
+    assert_eq!(api.methods.len(), 2);
+
+    let some_method = api
+        .methods
+        .iter()
+        .find(|method| method.name == "someMethod")
+        .expect("someMethod to be present");
+    assert_eq!(some_method.http_verb, HttpVerb::Post);
+    assert!(!some_method.is_static);
+    assert!(some_method.data_source.is_some());
+    assert_eq!(some_method.parameters.len(), 1);
+    assert_eq!(some_method.parameters[0].name, "id");
+    assert_eq!(
+        some_method.parameters[0].cidl_type,
+        CidlType::nullable(CidlType::Integer)
+    );
+    assert_eq!(some_method.return_type, CidlType::http(CidlType::Double));
+
+    let another_method = api
+        .methods
+        .iter()
+        .find(|method| method.name == "anotherMethod")
+        .expect("anotherMethod to be present");
+    assert_eq!(another_method.http_verb, HttpVerb::Get);
+    assert!(another_method.is_static);
+    assert!(another_method.data_source.is_none());
+    assert_eq!(another_method.parameters.len(), 0);
+    assert_eq!(another_method.return_type, CidlType::Void);
 }

@@ -6,9 +6,10 @@ use std::sync::atomic::AtomicU64;
 use chumsky::extra::SimpleState;
 use chumsky::prelude::*;
 
-use ast::{Binding, CidlType, CloesceAst, Field, Model, Symbol, WranglerEnv};
+use ast::{Api, Binding, CidlType, CloesceAst, Field, Model, Symbol, WranglerEnv};
 use lexer::Token;
 
+mod api;
 mod model;
 
 const GLOBAL_SCOPE: &str = "global";
@@ -81,6 +82,7 @@ impl CloesceParser {
         choice((
             Self::env_block().map(Global::Env),
             model::model_block().map(Global::Model),
+            api::api_block().map(Global::Api),
         ))
         .repeated()
         .collect::<Vec<_>>()
@@ -93,6 +95,9 @@ impl CloesceParser {
                     }
                     Global::Model(model) => {
                         ast.models.insert(model.symbol.clone(), model);
+                    }
+                    Global::Api((model_symbol, api)) => {
+                        ast.apis.insert(model_symbol, api);
                     }
                 }
             }
@@ -191,7 +196,7 @@ impl CloesceParser {
     }
 }
 
-fn sqlite_column_types<'t>() -> impl Parser<'t, &'t [Token], CidlType, Extra<'t>> {
+fn sqlite_column_types<'t>() -> impl Parser<'t, &'t [Token], CidlType, Extra<'t>> + Clone {
     choice((
         just(Token::String).to(CidlType::String),
         just(Token::Int).to(CidlType::Integer),
@@ -204,4 +209,5 @@ fn sqlite_column_types<'t>() -> impl Parser<'t, &'t [Token], CidlType, Extra<'t>
 enum Global {
     Env(WranglerEnv),
     Model(Model),
+    Api((Symbol, Api)),
 }

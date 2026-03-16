@@ -228,7 +228,11 @@ pub fn model_block<'t>() -> impl Parser<'t, &'t [Token], Model, Extra<'t>> {
 
     let object_type = object_array_generic.or(object_name.map(CidlType::Object));
 
-    let model_field_type = choice((sqlite_column_types(), object_type));
+    let model_field_type = choice((
+        sqlite_column_types(),
+        just(Token::R2Object).map(|_| CidlType::R2Object),
+        object_type,
+    ));
 
     // @kv(binding_name, "prefix/{id}")
     let kv_tag = just(Token::At)

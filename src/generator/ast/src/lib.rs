@@ -163,7 +163,7 @@ pub struct ApiMethod {
     /// If true, the method is static (instantiated on a class, not an instance).
     /// Static methods require no hydration or data source.
     pub is_static: bool,
-    pub data_source: Option<String>,
+    pub data_source: Option<Symbol>,
 
     pub http_verb: HttpVerb,
 

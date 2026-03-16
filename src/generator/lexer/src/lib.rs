@@ -26,6 +26,12 @@ pub enum Token {
     Get,
     #[token("post")]
     Post,
+    #[token("put")]
+    Put,
+    #[token("patch")]
+    Patch,
+    #[token("delete")]
+    Delete,
     #[token("include")]
     Include,
     #[token("crud")]
@@ -52,6 +58,14 @@ pub enum Token {
     Json,
     #[token("bool")]
     Bool,
+    #[token("void")]
+    Void,
+    #[token("blob")]
+    Blob,
+    #[token("stream")]
+    Stream,
+    #[token("R2Object")]
+    R2Object,
 
     // Punctuation
     #[token("{")]
