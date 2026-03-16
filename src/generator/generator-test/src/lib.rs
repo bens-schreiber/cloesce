@@ -6,8 +6,8 @@ use std::{
 use indexmap::IndexMap;
 
 use ast::{
-    ApiMethod, CidlType, CloesceAst, D1Column, DataSource, ForeignKeyReference, HttpVerb,
-    IncludeTree, KeyValue, MediaType, Model, NamedTypedValue, NavigationProperty,
+    ApiMethod, CidlType, CloesceAst, D1Column, DataSource, ForeignKey, HttpVerb,
+    IncludeTree, KeyValue, MediaType, Model, Field, NavigationProperty,
     NavigationPropertyKind, R2Object, WranglerEnv, WranglerSpec,
 };
 use wrangler::WranglerDefault;
@@ -116,11 +116,11 @@ impl ModelBuilder {
         mut self,
         name: impl Into<String>,
         cidl_type: CidlType,
-        foreign_key_reference: Option<ForeignKeyReference>,
+        foreign_key_reference: Option<ForeignKey>,
         composite_id: Option<u32>,
     ) -> Self {
         self.columns.push(D1Column {
-            value: NamedTypedValue {
+            value: Field {
                 name: name.into(),
                 cidl_type,
             },
@@ -139,7 +139,7 @@ impl ModelBuilder {
         foreign_key: NavigationPropertyKind,
     ) -> Self {
         self.navigation_properties.push(NavigationProperty {
-            var_name: var_name.into(),
+            field_name: var_name.into(),
             model_reference: model_reference.into(),
             kind: foreign_key,
             hash: 0,
@@ -149,7 +149,7 @@ impl ModelBuilder {
 
     pub fn pk(mut self, name: impl Into<String>, cidl_type: CidlType) -> Self {
         self.primary_key_columns.push(D1Column {
-            value: NamedTypedValue {
+            value: Field {
                 name: name.into(),
                 cidl_type,
             },
@@ -165,10 +165,10 @@ impl ModelBuilder {
         mut self,
         name: impl Into<String>,
         cidl_type: CidlType,
-        foreign_key_reference: ForeignKeyReference,
+        foreign_key_reference: ForeignKey,
     ) -> Self {
         self.primary_key_columns.push(D1Column {
-            value: NamedTypedValue {
+            value: Field {
                 name: name.into(),
                 cidl_type,
             },
@@ -196,7 +196,7 @@ impl ModelBuilder {
         self.kv_objects.push(KeyValue {
             format: format.into(),
             namespace_binding: namespace_binding.into(),
-            value: NamedTypedValue {
+            value: Field {
                 name: name.into(),
                 cidl_type,
             },
@@ -230,7 +230,7 @@ impl ModelBuilder {
         name: impl Into<String> + Clone,
         http_verb: HttpVerb,
         is_static: bool,
-        parameters: Vec<NamedTypedValue>,
+        parameters: Vec<Field>,
         return_type: CidlType,
         data_source: Option<String>,
     ) -> Self {

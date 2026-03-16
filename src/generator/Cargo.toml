@@ -1,14 +1,16 @@
 [workspace]
 resolver = "3"
 members = [
-    "cli",
+    # "cli",
     "ast",
-    "migrations",
-    "workers",
-    "client",
-    "wrangler",
-    "semantic",
-    "generator-test",
+    # "migrations",
+    # "workers",
+    # "client",
+    # "wrangler",
+    # "semantic",
+    # "generator-test",
+    "lexer",
+    "parser",
 ]
 
 [workspace.dependencies]

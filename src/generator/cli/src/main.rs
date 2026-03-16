@@ -26,14 +26,13 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    Generate {
-        pre_cidl_path: PathBuf,
-        cidl_path: PathBuf,
+    Compile {
+        cloesce_out_path: PathBuf,
         wrangler_path: PathBuf,
-        workers_path: PathBuf,
-        client_path: PathBuf,
         worker_url: String,
-        default_migrations_path: String,
+
+        #[arg(required = true, num_args = 1.., value_name = "PATH")]
+        targets: Vec<PathBuf>,
     },
     Migrations {
         cidl_path: PathBuf,
@@ -114,32 +113,6 @@ fn run_cli() -> Result<()> {
                 &wrangler_path,
                 &root_path,
             )?;
-        }
-        Commands::Generate {
-            pre_cidl_path,
-            cidl_path,
-            wrangler_path,
-            workers_path,
-            client_path,
-            worker_url,
-            default_migrations_path,
-        } => {
-            // Parsing
-            let wrangler = WranglerGenerator::from_path(&wrangler_path);
-            let mut spec = wrangler.as_spec();
-            let mut ast = CloesceAst::from_json(&pre_cidl_path)?;
-
-            // Analysis
-            WranglerDefault::set_defaults(&mut spec, &ast, &default_migrations_path);
-            SemanticAnalysis::analyze(&mut ast, &spec)?;
-
-            // Code Generation
-            generate_wrangler(&wrangler_path, wrangler, spec)?;
-            generate_workers(&mut ast, &workers_path, &worker_url)?;
-            generate_client(&ast, &client_path, &worker_url)?;
-
-            ast.set_merkle_hash();
-            write_cidl(ast, &cidl_path)?;
         }
     }
 

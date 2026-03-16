@@ -1,0 +1,9 @@
+[package]
+name = "parser"
+version = "0.0.1"
+edition = "2024"
+
+[dependencies]
+ast = { path = "../ast" }
+lexer = { path = "../lexer" }
+chumsky = "0.12.0"

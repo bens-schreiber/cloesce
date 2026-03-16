@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use ast::{CidlType, CrudKind, HttpVerb, MediaType, NamedTypedValue, NavigationPropertyKind};
+use ast::{CidlType, CrudKind, HttpVerb, MediaType, Field, NavigationPropertyKind};
 use generator_test::{ModelBuilder, create_ast};
 use workers::WorkersGenerator;
 
@@ -129,7 +129,7 @@ fn finalize_does_not_overwrite_existing_method() {
             "get",
             HttpVerb::Post,
             true,
-            vec![NamedTypedValue {
+            vec![Field {
                 name: "id".into(),
                 cidl_type: CidlType::Integer,
             }],
@@ -180,7 +180,7 @@ fn finalize_sets_octet_media_type() {
                 "acceptReturnOctet",
                 HttpVerb::Post,
                 true,
-                vec![NamedTypedValue {
+                vec![Field {
                     name: "stream".into(),
                     cidl_type: CidlType::Stream,
                 }],

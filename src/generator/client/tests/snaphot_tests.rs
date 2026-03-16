@@ -1,8 +1,8 @@
 use std::{collections::BTreeMap, path::PathBuf};
 
 use ast::{
-    ApiMethod, CidlType, CrudKind, ForeignKeyReference, HttpVerb, IncludeTree, MediaType,
-    NamedTypedValue, PlainOldObject, Service, ServiceAttribute,
+    ApiMethod, CidlType, CrudKind, ForeignKey, HttpVerb, IncludeTree, MediaType,
+    Field, PlainOldObject, Service, ServiceAttribute,
 };
 use client::ClientGenerator;
 use generator_test::{IncludeTreeBuilder, ModelBuilder, create_ast, create_spec};
@@ -23,7 +23,7 @@ fn test_client_code_generation_snapshot() {
             .col(
                 "fk_to_model",
                 CidlType::Integer,
-                Some(ForeignKeyReference {
+                Some(ForeignKey {
                     model_name: "OneToManyModel".into(),
                     column_name: "id".into(),
                 }),
@@ -68,7 +68,7 @@ fn test_client_code_generation_snapshot() {
             .col(
                 "basicModelId",
                 CidlType::Integer,
-                Some(ForeignKeyReference {
+                Some(ForeignKey {
                     model_name: "BasicModel".into(),
                     column_name: "id".into(),
                 }),
@@ -123,7 +123,7 @@ fn test_client_code_generation_snapshot() {
                 "instanceMethod",
                 HttpVerb::Post,
                 false,
-                vec![NamedTypedValue {
+                vec![Field {
                     name: "input".into(),
                     cidl_type: CidlType::Text,
                 }],
@@ -142,7 +142,7 @@ fn test_client_code_generation_snapshot() {
                 "instanceMethod",
                 HttpVerb::Post,
                 false,
-                vec![NamedTypedValue {
+                vec![Field {
                     name: "input".into(),
                     cidl_type: CidlType::Text,
                 }],
@@ -153,7 +153,7 @@ fn test_client_code_generation_snapshot() {
                 "staticMethod",
                 HttpVerb::Get,
                 true,
-                vec![NamedTypedValue {
+                vec![Field {
                     name: "input".into(),
                     cidl_type: CidlType::Integer,
                 }],
@@ -164,7 +164,7 @@ fn test_client_code_generation_snapshot() {
                 "hasKvParamAndRes",
                 HttpVerb::Post,
                 false,
-                vec![NamedTypedValue {
+                vec![Field {
                     name: "input".into(),
                     cidl_type: CidlType::KvObject(Box::new(CidlType::Text)),
                 }],
@@ -183,7 +183,7 @@ fn test_client_code_generation_snapshot() {
                 "hasR2ParamAndRes",
                 HttpVerb::Post,
                 false,
-                vec![NamedTypedValue {
+                vec![Field {
                     name: "input".into(),
                     cidl_type: CidlType::R2Object,
                 }],
@@ -210,7 +210,7 @@ fn test_client_code_generation_snapshot() {
                 "instanceMethod",
                 HttpVerb::Post,
                 false,
-                vec![NamedTypedValue {
+                vec![Field {
                     name: "input".into(),
                     cidl_type: CidlType::Text,
                 }],
@@ -237,7 +237,7 @@ fn test_client_code_generation_snapshot() {
         .primary_key_columns
         .first_mut()
         .unwrap()
-        .foreign_key_reference = Some(ForeignKeyReference {
+        .foreign_key_reference = Some(ForeignKey {
         model_name: "BasicModel".into(),
         column_name: "id".into(),
     });
@@ -267,7 +267,7 @@ fn test_client_code_generation_snapshot() {
                 http_verb: HttpVerb::Get,
                 return_type: CidlType::http(CidlType::Text),
                 parameters_media: MediaType::default(),
-                parameters: vec![NamedTypedValue {
+                parameters: vec![Field {
                     name: "input".into(),
                     cidl_type: CidlType::Text,
                 }],
@@ -283,7 +283,7 @@ fn test_client_code_generation_snapshot() {
                 http_verb: HttpVerb::Post,
                 return_type: CidlType::http(CidlType::Integer),
                 parameters_media: MediaType::default(),
-                parameters: vec![NamedTypedValue {
+                parameters: vec![Field {
                     name: "input".into(),
                     cidl_type: CidlType::Integer,
                 }],
@@ -301,7 +301,7 @@ fn test_client_code_generation_snapshot() {
                 http_verb: HttpVerb::Post,
                 return_type: CidlType::http(CidlType::Boolean),
                 parameters_media: ast::MediaType::Octet,
-                parameters: vec![NamedTypedValue {
+                parameters: vec![Field {
                     name: "data".into(),
                     cidl_type: CidlType::Stream,
                 }],
@@ -347,11 +347,11 @@ fn test_client_code_generation_snapshot() {
             PlainOldObject {
                 name: "BasicPoo".into(),
                 attributes: vec![
-                    NamedTypedValue {
+                    Field {
                         name: "field1".into(),
                         cidl_type: CidlType::Text,
                     },
-                    NamedTypedValue {
+                    Field {
                         name: "field2".into(),
                         cidl_type: CidlType::Integer,
                     },
@@ -365,11 +365,11 @@ fn test_client_code_generation_snapshot() {
             PlainOldObject {
                 name: "PooWithComposition".into(),
                 attributes: vec![
-                    NamedTypedValue {
+                    Field {
                         name: "field1".into(),
                         cidl_type: CidlType::Object("BasicPoo".into()),
                     },
-                    NamedTypedValue {
+                    Field {
                         name: "field2".into(),
                         cidl_type: CidlType::Object("BasicModel".into()),
                     },

@@ -1,8 +1,7 @@
 use std::collections::HashMap;
 
 use ast::{
-    CidlType, CloesceAst, ForeignKeyReference, MigrationsAst, MigrationsModel,
-    NavigationPropertyKind,
+    CidlType, CloesceAst, ForeignKey, MigrationsAst, MigrationsModel, NavigationPropertyKind,
 };
 use generator_test::{IncludeTreeBuilder, ModelBuilder, create_ast, expected_str};
 use migrations::{MigrationsDilemma, MigrationsGenerator, MigrationsIntent};
@@ -55,8 +54,8 @@ fn as_migration(ast: CloesceAst) -> MigrationsAst {
     }
 }
 
-fn fk_ref(model_name: &str, column_name: &str) -> ForeignKeyReference {
-    ForeignKeyReference {
+fn fk_ref(model_name: &str, column_name: &str) -> ForeignKey {
+    ForeignKey {
         model_name: model_name.into(),
         column_name: column_name.into(),
     }

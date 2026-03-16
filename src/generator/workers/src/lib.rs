@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 
 use ast::{
     ApiMethod, CidlType, CloesceAst, CrudKind, CrudListParam, DataSource, HttpVerb, IncludeTree,
-    MediaType, NamedTypedValue, NavigationPropertyKind,
+    MediaType, Field, NavigationPropertyKind,
 };
 
 // TODO: This is all hardcoded to TypeScript workers
@@ -151,20 +151,20 @@ impl WorkersGenerator {
                         let mut parameters = vec![];
 
                         for pk in &model.primary_key_columns {
-                            parameters.push(NamedTypedValue {
+                            parameters.push(Field {
                                 name: pk.value.name.clone(),
                                 cidl_type: pk.value.cidl_type.clone(),
                             });
                         }
 
                         for key in &model.key_params {
-                            parameters.push(NamedTypedValue {
+                            parameters.push(Field {
                                 name: key.clone(),
                                 cidl_type: CidlType::Text,
                             });
                         }
 
-                        parameters.push(NamedTypedValue {
+                        parameters.push(Field {
                             name: "__datasource".into(),
                             cidl_type: CidlType::DataSource(model.name.clone()),
                         });
@@ -184,21 +184,21 @@ impl WorkersGenerator {
                         let parameters = model
                             .primary_key_columns
                             .iter()
-                            .map(|pk| NamedTypedValue {
+                            .map(|pk| Field {
                                 // TODO: some nice naming config
                                 name: format!("lastSeen_{}", pk.value.name),
                                 cidl_type: CidlType::nullable(pk.value.cidl_type.clone()),
                             })
                             .chain(vec![
-                                NamedTypedValue {
+                                Field {
                                     name: "limit".into(),
                                     cidl_type: CidlType::nullable(CidlType::Integer),
                                 },
-                                NamedTypedValue {
+                                Field {
                                     name: "offset".into(),
                                     cidl_type: CidlType::nullable(CidlType::Integer),
                                 },
-                                NamedTypedValue {
+                                Field {
                                     name: "__datasource".into(),
                                     cidl_type: CidlType::DataSource(model.name.clone()),
                                 },
@@ -224,11 +224,11 @@ impl WorkersGenerator {
                         http_verb: HttpVerb::Post,
                         return_type: CidlType::http(CidlType::Object(model.name.clone())),
                         parameters: vec![
-                            NamedTypedValue {
+                            Field {
                                 name: "model".into(),
                                 cidl_type: CidlType::Partial(model.name.clone()),
                             },
-                            NamedTypedValue {
+                            Field {
                                 name: "__datasource".into(),
                                 cidl_type: CidlType::DataSource(model.name.clone()),
                             },
@@ -314,7 +314,7 @@ impl WorkersGenerator {
                             // Self-referencing 1:1. Include but don't recurse.
                             current_node
                                 .0
-                                .insert(nav.var_name.clone(), IncludeTree::default());
+                                .insert(nav.field_name.clone(), IncludeTree::default());
                             continue;
                         }
 
@@ -325,14 +325,14 @@ impl WorkersGenerator {
 
                         let mut new_node = IncludeTree::default();
                         dfs(ast, &nav.model_reference, &mut new_node, visited);
-                        current_node.0.insert(nav.var_name.clone(), new_node);
+                        current_node.0.insert(nav.field_name.clone(), new_node);
                     }
                     NavigationPropertyKind::OneToMany { .. }
                     | NavigationPropertyKind::ManyToMany => {
                         // Include the related model as a leaf, but don't recurse.
                         current_node
                             .0
-                            .insert(nav.var_name.clone(), IncludeTree::default());
+                            .insert(nav.field_name.clone(), IncludeTree::default());
                     }
                 }
             }

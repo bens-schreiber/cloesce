@@ -4,7 +4,7 @@ use std::{
 };
 
 use ast::{
-    CidlType, D1Column, ForeignKeyReference, HttpVerb, MigrationsAst, NamedTypedValue,
+    CidlType, D1Column, ForeignKey, HttpVerb, MigrationsAst, Field,
     NavigationPropertyKind, Service, ServiceAttribute, WranglerEnv, err::GeneratorErrorKind,
 };
 use generator_test::{IncludeTreeBuilder, ModelBuilder, create_ast, create_spec};
@@ -37,7 +37,7 @@ fn null_primary_key_error() {
     let mut model = ModelBuilder::new("Dog").default_db().build();
     model.primary_key_columns.push(D1Column {
         hash: 0,
-        value: NamedTypedValue {
+        value: Field {
             name: "id".into(),
             cidl_type: CidlType::nullable(CidlType::Integer),
         },
@@ -66,7 +66,7 @@ fn mismatched_foreign_keys_error() {
             .col(
                 "dogId",
                 CidlType::Text,
-                Some(ForeignKeyReference {
+                Some(ForeignKey {
                     model_name: "Dog".into(),
                     column_name: "id".into(),
                 }),
@@ -98,7 +98,7 @@ fn model_cycle_detection_error() {
             .col(
                 "bId",
                 CidlType::Integer,
-                Some(ForeignKeyReference {
+                Some(ForeignKey {
                     model_name: "B".into(),
                     column_name: "id".into(),
                 }),
@@ -111,7 +111,7 @@ fn model_cycle_detection_error() {
             .col(
                 "cId",
                 CidlType::Integer,
-                Some(ForeignKeyReference {
+                Some(ForeignKey {
                     model_name: "C".into(),
                     column_name: "id".into(),
                 }),
@@ -124,7 +124,7 @@ fn model_cycle_detection_error() {
             .col(
                 "aId",
                 CidlType::Integer,
-                Some(ForeignKeyReference {
+                Some(ForeignKey {
                     model_name: "A".into(),
                     column_name: "id".into(),
                 }),
@@ -202,7 +202,7 @@ fn model_attr_nullability_prevents_cycle_error() {
             .col(
                 "bId",
                 CidlType::Integer,
-                Some(ForeignKeyReference {
+                Some(ForeignKey {
                     model_name: "B".into(),
                     column_name: "id".into(),
                 }),
@@ -215,7 +215,7 @@ fn model_attr_nullability_prevents_cycle_error() {
             .col(
                 "cId",
                 CidlType::Integer,
-                Some(ForeignKeyReference {
+                Some(ForeignKey {
                     model_name: "C".into(),
                     column_name: "id".into(),
                 }),
@@ -228,7 +228,7 @@ fn model_attr_nullability_prevents_cycle_error() {
             .col(
                 "aId",
                 CidlType::nullable(CidlType::Integer),
-                Some(ForeignKeyReference {
+                Some(ForeignKey {
                     model_name: "A".into(),
                     column_name: "id".into(),
                 }),
@@ -283,7 +283,7 @@ fn one_to_one_mismatched_fk_and_nav_type_error() {
             .col(
                 "dogId",
                 CidlType::Integer,
-                Some(ForeignKeyReference {
+                Some(ForeignKey {
                     model_name: "Dog".into(),
                     column_name: "id".into(),
                 }),
@@ -397,11 +397,11 @@ fn instantiated_stream_method() {
             HttpVerb::Post,
             false,
             vec![
-                NamedTypedValue {
+                Field {
                     name: "stream".into(),
                     cidl_type: CidlType::Stream,
                 },
-                NamedTypedValue {
+                Field {
                     name: "ds".into(),
                     cidl_type: CidlType::DataSource("Dog".into()),
                 },
@@ -431,7 +431,7 @@ fn static_stream_method() {
             "uploadPhoto",
             HttpVerb::Post,
             true,
-            vec![NamedTypedValue {
+            vec![Field {
                 name: "stream".into(),
                 cidl_type: CidlType::Stream,
             }],
@@ -461,11 +461,11 @@ fn invalid_stream_method() {
             HttpVerb::Post,
             true, // static is true, can only have 1 param
             vec![
-                NamedTypedValue {
+                Field {
                     name: "stream".into(),
                     cidl_type: CidlType::Stream,
                 },
-                NamedTypedValue {
+                Field {
                     name: "id".into(),
                     cidl_type: CidlType::Integer,
                 },
@@ -807,7 +807,7 @@ fn http_result_stream_return_type() {
             "downloadPhoto",
             HttpVerb::Get,
             true,
-            vec![NamedTypedValue {
+            vec![Field {
                 name: "ds".into(),
                 cidl_type: CidlType::DataSource("Dog".into()),
             }],
@@ -926,7 +926,7 @@ fn composite_key_validation() {
                 .col(
                     "studentId",
                     CidlType::Integer,
-                    Some(ForeignKeyReference {
+                    Some(ForeignKey {
                         model_name: "Student".into(),
                         column_name: "id".into(),
                     }),
@@ -935,7 +935,7 @@ fn composite_key_validation() {
                 .col(
                     "studentId2",
                     CidlType::Integer,
-                    Some(ForeignKeyReference {
+                    Some(ForeignKey {
                         model_name: "Student".into(),
                         column_name: "id2".into(),
                     }),
@@ -958,7 +958,7 @@ fn composite_key_validation() {
                 .col(
                     "studentId",
                     CidlType::Integer,
-                    Some(ForeignKeyReference {
+                    Some(ForeignKey {
                         model_name: "Student".into(),
                         column_name: "id".into(),
                     }),
@@ -982,7 +982,7 @@ fn composite_key_validation() {
                 .col(
                     "studentId",
                     CidlType::Integer,
-                    Some(ForeignKeyReference {
+                    Some(ForeignKey {
                         model_name: "Student".into(),
                         column_name: "id".into(),
                     }),
@@ -1011,7 +1011,7 @@ fn composite_key_validation() {
                 .col(
                     "studentId",
                     CidlType::Integer,
-                    Some(ForeignKeyReference {
+                    Some(ForeignKey {
                         model_name: "Student".into(),
                         column_name: "id".into(),
                     }),
@@ -1020,7 +1020,7 @@ fn composite_key_validation() {
                 .col(
                     "studentIdDup",
                     CidlType::Integer,
-                    Some(ForeignKeyReference {
+                    Some(ForeignKey {
                         model_name: "Student".into(),
                         column_name: "id2".into(),
                     }),
@@ -1057,7 +1057,7 @@ fn composite_key_validation() {
                 .col(
                     "studentId",
                     CidlType::Integer, // Non-nullable
-                    Some(ForeignKeyReference {
+                    Some(ForeignKey {
                         model_name: "Student".into(),
                         column_name: "id".into(),
                     }),
@@ -1066,7 +1066,7 @@ fn composite_key_validation() {
                 .col(
                     "studentId2",
                     CidlType::nullable(CidlType::Integer), // Nullable
-                    Some(ForeignKeyReference {
+                    Some(ForeignKey {
                         model_name: "Student".into(),
                         column_name: "id2".into(),
                     }),
@@ -1100,7 +1100,7 @@ fn multiple_composite_keys_same_model() {
             .col(
                 "userId",
                 CidlType::Integer,
-                Some(ForeignKeyReference {
+                Some(ForeignKey {
                     model_name: "User".into(),
                     column_name: "id".into(),
                 }),
@@ -1109,7 +1109,7 @@ fn multiple_composite_keys_same_model() {
             .col(
                 "userId2",
                 CidlType::Integer,
-                Some(ForeignKeyReference {
+                Some(ForeignKey {
                     model_name: "User".into(),
                     column_name: "id2".into(),
                 }),
@@ -1118,7 +1118,7 @@ fn multiple_composite_keys_same_model() {
             .col(
                 "groupId",
                 CidlType::Integer,
-                Some(ForeignKeyReference {
+                Some(ForeignKey {
                     model_name: "Group".into(),
                     column_name: "id".into(),
                 }),
@@ -1127,7 +1127,7 @@ fn multiple_composite_keys_same_model() {
             .col(
                 "groupId2",
                 CidlType::Integer,
-                Some(ForeignKeyReference {
+                Some(ForeignKey {
                     model_name: "Group".into(),
                     column_name: "id2".into(),
                 }),

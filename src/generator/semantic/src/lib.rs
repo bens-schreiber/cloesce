@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
 
 use ast::err::{GeneratorErrorKind, Result};
 use ast::{
-    ApiMethod, CidlType, CloesceAst, CrudKind, HttpVerb, Model, NamedTypedValue,
+    ApiMethod, CidlType, CloesceAst, CrudKind, HttpVerb, Model, Field,
     NavigationPropertyKind, WranglerSpec, cidl_type_contains, ensure, fail,
 };
 
@@ -418,7 +418,7 @@ impl SemanticAnalysis {
                     GeneratorErrorKind::InvalidModelReference,
                     "{}.{} references {}, but they belong to different databases ({:?} != {:?})",
                     model.name,
-                    nav.var_name,
+                    nav.field_name,
                     nav.model_reference,
                     model.d1_binding,
                     nav_model.d1_binding
@@ -432,7 +432,7 @@ impl SemanticAnalysis {
                             GeneratorErrorKind::InvalidNavigationPropertyReference,
                             "{}.{} references {} but the number of key columns does not match the number of primary key columns on the model",
                             model.name,
-                            nav.var_name,
+                            nav.field_name,
                             nav.model_reference
                         );
 
@@ -444,7 +444,7 @@ impl SemanticAnalysis {
                             GeneratorErrorKind::InvalidNavigationPropertyReference,
                             "{}.{} references {} but key columns contain duplicates",
                             model.name,
-                            nav.var_name,
+                            nav.field_name,
                             nav.model_reference
                         );
 
@@ -466,7 +466,7 @@ impl SemanticAnalysis {
                                     GeneratorErrorKind::InvalidNavigationPropertyReference,
                                     "{}.{} references {}.{} which does not exist or is not a foreign key to {}",
                                     model.name,
-                                    nav.var_name,
+                                    nav.field_name,
                                     nav.model_reference,
                                     key_ref,
                                     nav.model_reference
@@ -494,7 +494,7 @@ impl SemanticAnalysis {
                             GeneratorErrorKind::InvalidNavigationPropertyReference,
                             "{}.{} references {} but the key columns do not cover all primary key columns of the referenced model",
                             model.name,
-                            nav.var_name,
+                            nav.field_name,
                             nav.model_reference
                         );
                     }
@@ -521,7 +521,7 @@ impl SemanticAnalysis {
                 GeneratorErrorKind::InvalidNavigationPropertyReference,
                 "{}.{} references {} but the number of key columns does not match the number of primary key columns on this model",
                 model_name,
-                nav.var_name,
+                nav.field_name,
                 nav_model_reference
             );
 
@@ -532,7 +532,7 @@ impl SemanticAnalysis {
                 GeneratorErrorKind::InvalidNavigationPropertyReference,
                 "{}.{} references {} but key columns contain duplicates",
                 model_name,
-                nav.var_name,
+                nav.field_name,
                 nav_model_reference
             );
 
@@ -556,7 +556,7 @@ impl SemanticAnalysis {
                         GeneratorErrorKind::InvalidNavigationPropertyReference,
                         "{}.{} references {}.{} which does not exist or is not a foreign key to {}",
                         model_name,
-                        nav.var_name,
+                        nav.field_name,
                         nav_model_reference,
                         key_ref,
                         model_name
@@ -581,7 +581,7 @@ impl SemanticAnalysis {
                 GeneratorErrorKind::InvalidNavigationPropertyReference,
                 "{}.{} references {} but the key columns do not cover all primary key columns of this model",
                 model_name,
-                nav.var_name,
+                nav.field_name,
                 nav_model_reference
             );
 
@@ -818,7 +818,7 @@ fn extract_braced(s: &str) -> Result<Vec<String>> {
 /// SQLite type.
 ///
 /// Returns a [GeneratorErrorKind] on failure.
-fn ensure_valid_sql_type(model: &Model, value: &NamedTypedValue) -> Result<()> {
+fn ensure_valid_sql_type(model: &Model, value: &Field) -> Result<()> {
     let inner = match &value.cidl_type {
         CidlType::Nullable(inner) if matches!(inner.as_ref(), CidlType::Void) => {
             fail!(GeneratorErrorKind::NullSqlType)
@@ -1112,7 +1112,7 @@ fn valid_include_tree_reference(model: &Model, var_name: String) -> Result<Optio
     if let Some(nav) = model
         .navigation_properties
         .iter()
-        .find(|nav| nav.var_name == var_name)
+        .find(|nav| nav.field_name == var_name)
     {
         return Ok(Some(&nav.model_reference));
     }
