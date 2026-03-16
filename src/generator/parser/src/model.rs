@@ -12,8 +12,14 @@ struct PendingForeignKey {
 }
 
 struct PendingNavigation {
+    name: String,
     to_model: String,
-    key_columns: Vec<String>,
+    kind: PendingNavigationKind,
+}
+
+enum PendingNavigationKind {
+    OneOrManyByFieldType { key_columns: Vec<String> },
+    ManyToMany,
 }
 
 struct PendingField {
@@ -38,19 +44,19 @@ enum ModelEntry {
 ///     col1: sqlite_type
 ///     col2: sqlite_type
 ///
-///     col3: OtherModel
+///     otherModel: OtherModel
 ///
 ///     // floating foreign key tag
-///     [foreign col -> OtherModel::col]
+///     [foreign col1 -> OtherModel::col1]
 ///
 ///      // floating composite foreign key tag
 ///     [foreign (col1, col2) -> (OtherModel::col1, OtherModel::col2)]
 ///     
-///     // floating navigation tag
-///     [nav col3 -> OtherModel::col1]
+///     // navigation tag
+///     [nav otherModel -> OtherModel::col1]
 ///     
-///     // floating composite navigation tag
-///     [nav col3 -> (OtherModel::col1, OtherModel::col2)]
+///     // composite navigation tag
+///     [nav otherModel -> (OtherModel::col1, OtherModel::col2)]
 ///     
 ///     ...
 /// }
@@ -119,10 +125,11 @@ pub fn model_block<'t>() -> impl Parser<'t, &'t [Token], Model, Extra<'t>> {
             })
     };
 
-    // [nav myNav -> localKey]
-    // [nav myNav -> (Model::key1, key2)]
+    // [nav col -> Other::col]
+    // [nav col -> (Other::col1, Other::col2)]
+    // [nav col <> Other::otherNav]
     let nav_decorator = {
-        // ModelName::col (namespace required)
+        // ModelName::col
         let nav_key_ref = select! { Token::Ident(model_name) => model_name }
             .then_ignore(just(Token::DoubleColon))
             .then(select! { Token::Ident(column_name) => column_name });
@@ -131,18 +138,19 @@ pub fn model_block<'t>() -> impl Parser<'t, &'t [Token], Model, Extra<'t>> {
             .clone()
             .map(|key_ref| vec![key_ref])
             .or(nav_key_ref
+                .clone()
                 .separated_by(just(Token::Comma))
                 .at_least(1)
                 .collect::<Vec<_>>()
                 .delimited_by(just(Token::LParen), just(Token::RParen)));
 
-        just(Token::LBracket)
+        let nav_arrow = just(Token::LBracket)
             .ignore_then(just(Token::Ident("nav".into())))
             .ignore_then(select! { Token::Ident(name) => name })
             .then_ignore(just(Token::Arrow))
             .then(nav_key_ref_list)
             .then_ignore(just(Token::RBracket))
-            .map(|(_, to)| {
+            .map(|(name, to)| {
                 let to_model = to[0].0.clone();
                 let key_columns = to
                     .into_iter()
@@ -153,30 +161,44 @@ pub fn model_block<'t>() -> impl Parser<'t, &'t [Token], Model, Extra<'t>> {
                     .collect::<Vec<_>>();
 
                 ModelEntry::Nav(PendingNavigation {
+                    name,
                     to_model,
-                    key_columns,
+                    kind: PendingNavigationKind::OneOrManyByFieldType { key_columns },
                 })
-            })
+            });
+
+        let nav_many_to_many = just(Token::LBracket)
+            .ignore_then(just(Token::Ident("nav".into())))
+            .ignore_then(select! { Token::Ident(name) => name })
+            .then_ignore(just(Token::LAngle))
+            .then_ignore(just(Token::RAngle))
+            .then(nav_key_ref)
+            .then_ignore(just(Token::RBracket))
+            .map(|(name, (to_model, _to_navigation_name))| {
+                ModelEntry::Nav(PendingNavigation {
+                    name,
+                    to_model,
+                    kind: PendingNavigationKind::ManyToMany,
+                })
+            });
+
+        nav_arrow.or(nav_many_to_many)
     };
 
-    let object_type = select! { Token::Ident(name) => name }
-        .map(CidlType::Object)
-        .then(
-            just(Token::LBracket)
-                .ignore_then(just(Token::RBracket))
-                .or_not(),
-        )
-        .map(|(cidl_type, is_array)| {
-            if is_array.is_some() {
-                CidlType::array(cidl_type)
-            } else {
-                cidl_type
-            }
-        });
+    // otherModel: OtherModel
+    // otherModels: Array<OtherModel>
+    let object_name = select! { Token::Ident(name) => name };
+    let object_array_generic = just(Token::Ident("Array".into()))
+        .ignore_then(just(Token::LAngle))
+        .ignore_then(object_name.clone())
+        .then_ignore(just(Token::RAngle))
+        .map(|object_name| CidlType::array(CidlType::Object(object_name)));
+
+    let object_type = object_array_generic.or(object_name.map(CidlType::Object));
 
     let model_field_type = choice((sqlite_column_types(), object_type));
 
-    // col1: sqlite_type
+    // sqlite types
     let field = select! { Token::Ident(name) => name }
         .then_ignore(just(Token::Colon))
         .then(model_field_type)
@@ -207,6 +229,7 @@ fn map_model(
     let mut columns: Vec<Field> = Vec::new();
     let mut foreign_keys: Vec<ForeignKey> = Vec::new();
     let mut navigation_properties: Vec<NavigationProperty> = Vec::new();
+    let mut pending_navigation_properties: Vec<PendingNavigation> = Vec::new();
     let mut primary_key_columns: Vec<Symbol> = Vec::new();
 
     for item in items {
@@ -232,18 +255,7 @@ fn map_model(
                 foreign_keys.push(foreign_key);
             }
             ModelEntry::Nav(nav) => {
-                let columns = nav
-                    .key_columns
-                    .iter()
-                    .map(|col_name| symbol_table.intern_scoped(&model_name, col_name))
-                    .collect();
-                let nav_prop = NavigationProperty {
-                    hash: 0,
-                    to_model: symbol_table.intern_global(&nav.to_model),
-                    // Assuming 1:1 for now
-                    kind: NavigationPropertyKind::OneToOne { columns },
-                };
-                navigation_properties.push(nav_prop);
+                pending_navigation_properties.push(nav);
             }
             ModelEntry::Field(field) => {
                 let field = Field {
@@ -254,6 +266,39 @@ fn map_model(
                 columns.push(field);
             }
         }
+    }
+
+    for nav in pending_navigation_properties {
+        let nav_kind = match nav.kind {
+            PendingNavigationKind::ManyToMany => NavigationPropertyKind::ManyToMany {
+                column: symbol_table.intern_scoped(&model_name, &nav.name),
+            },
+            PendingNavigationKind::OneOrManyByFieldType { key_columns } => {
+                let key_columns = key_columns
+                    .iter()
+                    .map(|col_name| symbol_table.intern_scoped(&model_name, col_name))
+                    .collect::<Vec<_>>();
+
+                match columns.iter().find(|field| field.name == nav.name) {
+                    Some(field) if matches!(&field.cidl_type, CidlType::Array(_)) => {
+                        NavigationPropertyKind::OneToMany {
+                            columns: key_columns,
+                        }
+                    }
+                    _ => NavigationPropertyKind::OneToOne {
+                        columns: key_columns,
+                    },
+                }
+            }
+        };
+
+        let nav_prop = NavigationProperty {
+            hash: 0,
+            field: symbol_table.intern_scoped(&model_name, &nav.name),
+            to_model: symbol_table.intern_global(&nav.to_model),
+            kind: nav_kind,
+        };
+        navigation_properties.push(nav_prop);
     }
 
     Model {

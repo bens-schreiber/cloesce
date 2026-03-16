@@ -304,3 +304,109 @@ fn model_block_nav_one_to_one() {
         vec!["id"]
     );
 }
+
+#[test]
+fn model_block_nav_one_to_many() {
+    let ast = lex_and_parse(
+        r#"
+        [d1_a]
+        model Foo {
+            [primary id]
+            id: int
+
+            [nav bars -> Bar::fooId]
+            bars: Array<Bar>
+        }
+
+        [d1_a]
+        model Bar {
+            [primary id]
+            id: int
+
+            [foreign fooId -> Foo::id]
+            fooId: int
+        }
+        "#,
+    );
+
+    let bar = ast
+        .models
+        .iter()
+        .find(|(_, m)| m.name == "Bar")
+        .expect("Bar model to be present")
+        .1;
+
+    let foo = ast
+        .models
+        .iter()
+        .find(|(_, m)| m.name == "Foo")
+        .expect("Foo model to be present")
+        .1;
+
+    let nav_props: Vec<_> = foo.navigation_properties().collect();
+    assert_eq!(nav_props.len(), 1);
+
+    let (nav, _) = &nav_props[0];
+    assert_eq!(nav.to_model, bar.symbol);
+    assert!(matches!(
+        &nav.kind,
+        NavigationPropertyKind::OneToMany { .. }
+    ));
+}
+
+#[test]
+fn model_block_nav_many_to_many() {
+    let ast = lex_and_parse(
+        r#"
+        [d1_a]
+        model Student {
+            [primary id]
+            id: int
+
+            [nav courses <> Course::students]
+            courses: Array<Course>
+        }
+
+        [d1_a]
+        model Course {
+            [primary id]
+            id: int
+
+            [nav students <> Student::courses]
+            students: Array<Student>
+        }
+        "#,
+    );
+
+    let student = ast
+        .models
+        .iter()
+        .find(|(_, m)| m.name == "Student")
+        .expect("Student model to be present")
+        .1;
+
+    let course = ast
+        .models
+        .iter()
+        .find(|(_, m)| m.name == "Course")
+        .expect("Course model to be present")
+        .1;
+
+    let student_nav_props: Vec<_> = student.navigation_properties().collect();
+    assert_eq!(student_nav_props.len(), 1);
+    let (student_nav, _) = &student_nav_props[0];
+    assert_eq!(student_nav.to_model, course.symbol);
+    assert!(matches!(
+        &student_nav.kind,
+        NavigationPropertyKind::ManyToMany { .. }
+    ));
+
+    let course_nav_props: Vec<_> = course.navigation_properties().collect();
+    assert_eq!(course_nav_props.len(), 1);
+    let (course_nav, _) = &course_nav_props[0];
+    assert_eq!(course_nav.to_model, student.symbol);
+    assert!(matches!(
+        &course_nav.kind,
+        NavigationPropertyKind::ManyToMany { .. }
+    ));
+}

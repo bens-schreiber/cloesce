@@ -120,6 +120,7 @@ impl CidlType {
     pub fn paginated(cidl_type: CidlType) -> CidlType {
         CidlType::Paginated(Box::new(cidl_type))
     }
+    
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
@@ -224,7 +225,14 @@ pub enum NavigationPropertyKind {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct NavigationProperty {
     pub hash: u64,
+
+    /// The field on the current model that represents the relationship
+    pub field: Symbol,
+
+    /// The model that this this navigation property points to
     pub to_model: Symbol,
+
+    /// The kind of navigation property, which encodes the relationship and foreign key structure.
     pub kind: NavigationPropertyKind,
 }
 
