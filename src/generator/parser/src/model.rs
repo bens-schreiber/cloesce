@@ -26,6 +26,7 @@ enum PendingNavigationKind {
 struct PendingField {
     name: String,
     cidl_type: CidlType,
+    key_param: bool,
     kv_navigation: Option<PendingKvNavigation>,
     r2_navigation: Option<PendingR2Navigation>,
 }
@@ -255,33 +256,36 @@ pub fn model_block<'t>() -> impl Parser<'t, &'t [Token], Model, Extra<'t>> {
             format,
         });
 
-    // At most one @kv and one @r2 per field, in either order.
+    // @keyparam
+    let key_param_tag = just(Token::At)
+        .ignore_then(just(Token::Ident("keyparam".into())))
+        .to(());
+
+    // Anchors cannot stack: a field can have at most one of @keyparam, @kv, or @r2.
     let anchored_field_tags = choice((
-        kv_tag
-            .clone()
-            .then(r2_tag.clone().or_not())
-            .map(|(kv, r2)| (Some(kv), r2)),
-        r2_tag
-            .clone()
-            .then(kv_tag.clone().or_not())
-            .map(|(r2, kv)| (kv, Some(r2))),
+        key_param_tag.map(|_| (true, None, None)),
+        kv_tag.map(|kv| (false, Some(kv), None)),
+        r2_tag.map(|r2| (false, None, Some(r2))),
     ))
     .or_not()
-    .map(|tags| tags.unwrap_or((None, None)));
+    .map(|tags| tags.unwrap_or((false, None, None)));
 
     // sqlite types
     let field = anchored_field_tags
         .then(select! { Token::Ident(name) => name })
         .then_ignore(just(Token::Colon))
         .then(model_field_type)
-        .map(|(((kv_navigation, r2_navigation), name), cidl_type)| {
-            ModelEntry::Field(PendingField {
-                name,
-                cidl_type,
-                kv_navigation,
-                r2_navigation,
-            })
-        });
+        .map(
+            |(((key_param, kv_navigation, r2_navigation), name), cidl_type)| {
+                ModelEntry::Field(PendingField {
+                    name,
+                    cidl_type,
+                    key_param,
+                    kv_navigation,
+                    r2_navigation,
+                })
+            },
+        );
 
     model_level_binding
         .then_ignore(just(Token::Model))
@@ -313,6 +317,7 @@ fn map_model(
     let mut pending_d1_navigation_properties: Vec<PendingNavigation> = Vec::new();
     let mut primary_key_columns: Vec<Symbol> = Vec::new();
     let mut unique_constraints: Vec<Vec<Symbol>> = Vec::new();
+    let mut key_params: Vec<Symbol> = Vec::new();
 
     for item in items {
         match item {
@@ -354,6 +359,10 @@ fn map_model(
                     name: field.name,
                     cidl_type: field.cidl_type,
                 };
+
+                if field.key_param {
+                    key_params.push(field_symbol.clone());
+                }
 
                 if let Some(kv_navigation) = field.kv_navigation {
                     kv_navigation_properties.push(KvNavigationProperty {
@@ -431,7 +440,7 @@ fn map_model(
         navigation_properties,
         foreign_keys,
         unique_constraints,
-        key_params: Vec::<Symbol>::new(),
+        key_params,
         kv_navigation_properties,
         r2_navigation_properties,
     }

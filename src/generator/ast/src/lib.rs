@@ -319,6 +319,25 @@ impl Model {
             .filter(move |col| self.primary_key_columns.contains(&col.symbol))
     }
 
+    pub fn key_params(&self) -> impl Iterator<Item = &Field> {
+        self.columns
+            .iter()
+            .filter(move |col| self.key_params.contains(&col.symbol))
+    }
+
+    pub fn kv_objects(&self) -> impl Iterator<Item = &Field> {
+        self.kv_navigation_properties.iter().map(|kv| &kv.field)
+    }
+
+    pub fn r2_objects(&self) -> impl Iterator<Item = &Field> {
+        self.r2_navigation_properties.iter().filter_map(|r2| {
+            self.columns
+                .iter()
+                .find(|col| col.symbol == r2.symbol)
+                .or_else(|| self.columns.iter().find(|col| col.name == r2.name))
+        })
+    }
+
     pub fn navigation_properties(
         &self,
     ) -> impl Iterator<Item = (&D1NavigationProperty, Vec<&Field>)> {

@@ -163,7 +163,10 @@ fn model_block_kv_r2_anchored_tags() {
         model Foo {
             field: string
 
-            @kv(cache_ns, "my-interpolated-format{field}")
+            @keyparam
+            category: string
+
+            @kv(cache_ns, "my-interpolated-format{field}-{category}")
             kv_value: anyTypeATAll
 
             @r2(assets_bucket, "my_interpolated_format{field}")
@@ -179,12 +182,20 @@ fn model_block_kv_r2_anchored_tags() {
         .expect("Foo model to be present")
         .1;
 
-    assert_eq!(foo.kv_navigation_properties.len(), 1);
-    assert_eq!(foo.r2_navigation_properties.len(), 1);
+    assert_eq!(foo.kv_objects().count(), 1);
+    assert_eq!(foo.r2_objects().count(), 1);
+    assert_eq!(foo.key_params().count(), 1);
+
+    let key_param_names = foo
+        .key_params()
+        .map(|field| field.name.as_str())
+        .collect::<Vec<_>>();
+
+    assert_eq!(key_param_names, vec!["category"]);
 
     let kv = &foo.kv_navigation_properties[0];
     assert_eq!(kv.field.name, "kv_value");
-    assert_eq!(kv.format, "my-interpolated-format{field}");
+    assert_eq!(kv.format, "my-interpolated-format{field}-{category}");
 
     let r2 = &foo.r2_navigation_properties[0];
     assert_eq!(r2.name, "obj");
@@ -293,7 +304,7 @@ fn model_block_single_foreign_key() {
 
 #[test]
 fn model_block_composite_foreign_key() {
-    let _ast = lex_and_parse(
+    let ast = lex_and_parse(
         r#"
         @d1(d1_a)
         model Parent {
@@ -315,6 +326,46 @@ fn model_block_composite_foreign_key() {
         }
         "#,
     );
+
+    let parent = ast
+        .models
+        .iter()
+        .find(|(_, m)| m.name == "Parent")
+        .expect("Parent model to be present")
+        .1;
+
+    let child = ast
+        .models
+        .iter()
+        .find(|(_, m)| m.name == "Child")
+        .expect("Child model to be present")
+        .1;
+
+    assert_eq!(
+        child.d1_binding.as_ref().map(|b| b.name.as_str()),
+        Some("d1_a")
+    );
+
+    let org_id_symbol = child
+        .columns
+        .iter()
+        .find(|c| c.name == "orgId")
+        .expect("orgId column to be present")
+        .symbol
+        .clone();
+
+    let user_id_symbol = child
+        .columns
+        .iter()
+        .find(|c| c.name == "userId")
+        .expect("userId column to be present")
+        .symbol
+        .clone();
+
+    assert_eq!(child.foreign_keys.len(), 1);
+    let fk = &child.foreign_keys[0];
+    assert_eq!(fk.to_model, parent.symbol);
+    assert_eq!(fk.columns, vec![org_id_symbol, user_id_symbol]);
 }
 
 #[test]
