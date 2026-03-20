@@ -1,9 +1,9 @@
 use chumsky::prelude::*;
 
-use ast::{Api, ApiMethod, CidlType, CrudKind, Field, HttpVerb, MediaType, Symbol};
+use ast::{Api, ApiMethod, CidlType, CrudKind, Field, HttpVerb, MediaType};
 use lexer::Token;
 
-use crate::{Extra, SymbolTable, sqlite_column_types};
+use crate::{Extra, SymbolTable, cidl_type};
 
 struct PendingApiMethod {
     name: String,
@@ -17,7 +17,9 @@ enum PendingApiParam {
     Field { name: String, cidl_type: CidlType },
 }
 
-pub fn api_block<'t>() -> impl Parser<'t, &'t [Token], (Symbol, Api), Extra<'t>> {
+pub fn api_block<'t>() -> impl Parser<'t, &'t [Token], Api, Extra<'t>> {
+
+    // @crud(get, save, list)
     let crud_tag = just(Token::At)
         .ignore_then(just(Token::Crud))
         .ignore_then(just(Token::LParen))
@@ -31,6 +33,7 @@ pub fn api_block<'t>() -> impl Parser<'t, &'t [Token], (Symbol, Api), Extra<'t>>
         .or_not()
         .map(|cruds| cruds.unwrap_or_default());
 
+    // api <ModelName> { ... }
     crud_tag
         .then_ignore(just(Token::Api))
         .then(select! { Token::Ident(name) => name })
@@ -43,13 +46,19 @@ pub fn api_block<'t>() -> impl Parser<'t, &'t [Token], (Symbol, Api), Extra<'t>>
         .map_with(|((cruds, model_name), methods), e| {
             let symbol_table = e.state();
             let model_symbol = symbol_table.intern_global(&model_name);
+            let api_symbol = symbol_table.intern_scoped("api", &model_name);
 
             let methods = methods
                 .into_iter()
                 .map(|method| map_method(model_name.as_str(), method, symbol_table))
                 .collect();
 
-            (model_symbol, Api { cruds, methods })
+            Api {
+                symbol: api_symbol,
+                model_symbol,
+                cruds,
+                methods,
+            }
         })
 }
 
@@ -93,44 +102,6 @@ fn parameter<'t>() -> impl Parser<'t, &'t [Token], PendingApiParam, Extra<'t>> {
         .map(|(name, cidl_type)| PendingApiParam::Field { name, cidl_type });
 
     self_parameter.or(named_parameter)
-}
-
-fn cidl_type<'t>() -> impl Parser<'t, &'t [Token], CidlType, Extra<'t>> {
-    recursive(|cidl_type| {
-        let generic_wrapper = select! { Token::Ident(name) => name }
-            .then_ignore(just(Token::LAngle))
-            .then(cidl_type.clone())
-            .then_ignore(just(Token::RAngle))
-            .try_map(|(wrapper, inner), span| match wrapper.as_str() {
-                "Option" => Ok(CidlType::nullable(inner)),
-                "Result" => Ok(CidlType::http(inner)),
-                "Array" => Ok(CidlType::array(inner)),
-                "Paginated" => Ok(CidlType::paginated(inner)),
-                "KvObject" => Ok(CidlType::KvObject(Box::new(inner))),
-                "Partial" => match inner {
-                    CidlType::Object(name) => Ok(CidlType::Partial(name)),
-                    _ => Err(Rich::custom(span, "Partial<T> expects an object type")),
-                },
-                "DataSource" => match inner {
-                    CidlType::Object(name) => Ok(CidlType::DataSource(name)),
-                    _ => Err(Rich::custom(span, "DataSource<T> expects an object type")),
-                },
-                _ => Err(Rich::custom(span, "Unknown generic type wrapper")),
-            });
-
-        let primitive_keyword = choice((
-            sqlite_column_types(),
-            just(Token::Json).map(|_| CidlType::JsonValue),
-            just(Token::Void).map(|_| CidlType::Void),
-            just(Token::Blob).map(|_| CidlType::Blob),
-            just(Token::Stream).map(|_| CidlType::Stream),
-            just(Token::R2Object).map(|_| CidlType::R2Object),
-        ));
-
-        let object_type = select! { Token::Ident(name) => CidlType::Object(name) };
-
-        choice((generic_wrapper, primitive_keyword, object_type)).boxed()
-    })
 }
 
 fn http_verb<'t>() -> impl Parser<'t, &'t [Token], HttpVerb, Extra<'t>> {

@@ -6,7 +6,7 @@ use std::sync::atomic::AtomicU64;
 use chumsky::extra::SimpleState;
 use chumsky::prelude::*;
 
-use ast::{Api, Binding, CidlType, CloesceAst, Field, Model, Symbol, WranglerEnv};
+use ast::{Api, Binding, CidlType, CloesceAst, Field, Model, PlainOldObject, Symbol, WranglerEnv};
 use lexer::Token;
 
 mod api;
@@ -83,6 +83,7 @@ impl CloesceParser {
             Self::env_block().map(Global::Env),
             model::model_block().map(Global::Model),
             api::api_block().map(Global::Api),
+            Self::poo_block().map(Global::Poo),
         ))
         .repeated()
         .collect::<Vec<_>>()
@@ -96,8 +97,29 @@ impl CloesceParser {
                     Global::Model(model) => {
                         ast.models.insert(model.symbol.clone(), model);
                     }
-                    Global::Api((model_symbol, api)) => {
-                        ast.apis.insert(model_symbol, api);
+                    Global::Api(api) => {
+                        if let Some(existing) = ast.apis.get_mut(&api.symbol) {
+                            for crud in api.cruds {
+                                if !existing.cruds.contains(&crud) {
+                                    existing.cruds.push(crud);
+                                }
+                            }
+
+                            for method in api.methods {
+                                if !existing
+                                    .methods
+                                    .iter()
+                                    .any(|existing_method| existing_method.symbol == method.symbol)
+                                {
+                                    existing.methods.push(method);
+                                }
+                            }
+                        } else {
+                            ast.apis.insert(api.symbol.clone(), api);
+                        }
+                    }
+                    Global::Poo(poo) => {
+                        ast.poos.insert(poo.symbol.clone(), poo);
                     }
                 }
             }
@@ -105,20 +127,54 @@ impl CloesceParser {
         })
     }
 
-    /// Parses an environment block of the form:
+    /// Parses a POO (Plain Old Object) block of the form:
     /// ```cloesce
-    /// env {
-    ///     // Bindings (d1, r2, kv)
-    ///     my_d1_binding: d1,
-    ///     my_r2_binding: r2,
-    ///     my_kv_binding: kv,
-    ///
-    ///     // Variables (any non nested CIDL type)
-    ///     my_var: string,
-    ///     my_other_var: int,
-    ///     ...
+    /// poo MyObject {
+    ///     field1: string
+    ///     field2: MyOtherObject
+    ///     anotherField: Option<User>
     /// }
     /// ```
+    fn poo_block<'t>() -> impl Parser<'t, &'t [Token], PlainOldObject, Extra<'t>> {
+        let poo_field = select! { Token::Ident(name) => name }
+            .then_ignore(just(Token::Colon))
+            .then(cidl_type())
+            .map(|(name, cidl_type)| (name, cidl_type));
+
+        just(Token::Poo)
+            .ignore_then(select! { Token::Ident(name) => name })
+            .then(
+                poo_field
+                    .repeated()
+                    .collect::<Vec<_>>()
+                    .delimited_by(just(Token::LBrace), just(Token::RBrace)),
+            )
+            .map_with(|(poo_name, fields), e| {
+                let symbol_table = e.state();
+                let poo_symbol = symbol_table.intern_global(&poo_name);
+
+                let attributes = fields
+                    .into_iter()
+                    .map(|(field_name, cidl_type)| {
+                        let field_symbol = symbol_table.intern_scoped(&poo_name, &field_name);
+                        Field {
+                            symbol: field_symbol,
+                            name: field_name,
+                            cidl_type,
+                        }
+                    })
+                    .collect();
+
+                PlainOldObject {
+                    symbol: poo_symbol,
+                    name: poo_name,
+                    attributes,
+                    source_path: std::path::PathBuf::new(),
+                }
+            })
+    }
+
+    /// Parses an environment block of the form:
     fn env_block<'t>() -> impl Parser<'t, &'t [Token], WranglerEnv, Extra<'t>> {
         enum BindingKind {
             D1,
@@ -136,7 +192,7 @@ impl CloesceParser {
         // Environment variables can be a sqlite column type or a JSON value
         let env_var = choice((
             sqlite_column_types(),
-            just(Token::Json).map(|_| CidlType::JsonValue),
+            just(Token::Json).map(|_| CidlType::Json),
         ));
 
         let env_entry = select! { Token::Ident(name) => name }
@@ -206,8 +262,47 @@ fn sqlite_column_types<'t>() -> impl Parser<'t, &'t [Token], CidlType, Extra<'t>
     ))
 }
 
+pub fn cidl_type<'t>() -> impl Parser<'t, &'t [Token], CidlType, Extra<'t>> {
+    recursive(|cidl_type| {
+        let generic_wrapper = select! { Token::Ident(name) => name }
+            .then_ignore(just(Token::LAngle))
+            .then(cidl_type.clone())
+            .then_ignore(just(Token::RAngle))
+            .try_map(|(wrapper, inner), span| match wrapper.as_str() {
+                "Option" => Ok(CidlType::nullable(inner)),
+                "Result" => Ok(CidlType::http(inner)),
+                "Array" => Ok(CidlType::array(inner)),
+                "Paginated" => Ok(CidlType::paginated(inner)),
+                "KvObject" => Ok(CidlType::KvObject(Box::new(inner))),
+                "Partial" => match inner {
+                    CidlType::Object(name) => Ok(CidlType::Partial(name)),
+                    _ => Err(Rich::custom(span, "Partial<T> expects an object type")),
+                },
+                "DataSource" => match inner {
+                    CidlType::Object(name) => Ok(CidlType::DataSource(name)),
+                    _ => Err(Rich::custom(span, "DataSource<T> expects an object type")),
+                },
+                _ => Err(Rich::custom(span, "Unknown generic type wrapper")),
+            });
+
+        let primitive_keyword = choice((
+            sqlite_column_types(),
+            just(Token::Json).map(|_| CidlType::Json),
+            just(Token::Void).map(|_| CidlType::Void),
+            just(Token::Blob).map(|_| CidlType::Blob),
+            just(Token::Stream).map(|_| CidlType::Stream),
+            just(Token::R2Object).map(|_| CidlType::R2Object),
+        ));
+
+        let object_type = select! { Token::Ident(name) => CidlType::Object(name) };
+
+        choice((generic_wrapper, primitive_keyword, object_type)).boxed()
+    })
+}
+
 enum Global {
     Env(WranglerEnv),
     Model(Model),
-    Api((Symbol, Api)),
+    Api(Api),
+    Poo(PlainOldObject),
 }

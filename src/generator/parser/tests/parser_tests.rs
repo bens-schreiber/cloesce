@@ -89,7 +89,7 @@ fn env_block() {
             .find(|v| v.name == "payload")
             .expect("payload var to be present")
             .cidl_type,
-        CidlType::JsonValue
+        CidlType::Json
     );
     assert_eq!(
         env.vars
@@ -530,7 +530,7 @@ fn model_block_nav_many_to_many() {
 }
 
 #[test]
-fn api_block_with_crud_and_methods() {
+fn api_block() {
     let ast = lex_and_parse(
         r#"
         model User {
@@ -558,7 +558,16 @@ fn api_block_with_crud_and_methods() {
         .find(|(_, model)| model.name == "User")
         .expect("User model to be present");
 
-    let api = ast.apis.get(user_symbol).expect("User api to be present");
+    assert!(
+        ast.apis.get(user_symbol).is_none(),
+        "apis should be keyed by api::<model_name>, not by model symbol"
+    );
+
+    let api = ast
+        .apis
+        .values()
+        .find(|api| api.methods.iter().any(|method| method.name == "someMethod"))
+        .expect("User api to be present");
 
     assert_eq!(
         api.cruds,
@@ -592,4 +601,242 @@ fn api_block_with_crud_and_methods() {
     assert!(another_method.data_source.is_none());
     assert_eq!(another_method.parameters.len(), 0);
     assert_eq!(another_method.return_type, CidlType::Void);
+}
+
+#[test]
+fn api_block_merges_for_same_model() {
+    let ast = lex_and_parse(
+        r#"
+        model User {
+            [primary id]
+            id: int
+        }
+
+        @crud(get)
+        api User {
+            get getById(id: int) -> void
+        }
+
+        @crud(save, list)
+        api User {
+            post update(self) -> void
+        }
+        "#,
+    );
+
+    assert_eq!(ast.apis.len(), 1);
+
+    let api = ast.apis.values().next().expect("User api to be present");
+    assert_eq!(
+        api.cruds,
+        vec![CrudKind::GET, CrudKind::SAVE, CrudKind::LIST]
+    );
+    assert_eq!(api.methods.len(), 2);
+    assert!(api.methods.iter().any(|m| m.name == "getById"));
+    assert!(api.methods.iter().any(|m| m.name == "update"));
+}
+
+#[test]
+fn poo_block() {
+    let ast = lex_and_parse(
+        r#"
+        poo Address {
+            street: string
+            city: string
+            zipcode: Option<string>
+        }
+
+        poo User {
+            id: int
+            name: string
+            email: string
+            age: Option<int>
+            active: bool
+            balance: double
+            created: date
+            address: Address
+            tags: Array<string>
+            metadata: Option<json>
+            optional_items: Option<Array<Item>>
+            nullable_arrays: Array<Option<string>>
+        }
+
+        poo Container {
+            items: Array<Item>
+            nested: Array<Array<int>>
+        }
+        "#,
+    );
+
+    assert_eq!(ast.poos.len(), 3);
+
+    // Test Address POO
+    let address_poo = ast
+        .poos
+        .values()
+        .find(|p| p.name == "Address")
+        .expect("Address poo to be present");
+    assert_eq!(address_poo.attributes.len(), 3);
+    assert_ne!(address_poo.symbol.0, 0);
+
+    let zipcode = address_poo
+        .attributes
+        .iter()
+        .find(|f| f.name == "zipcode")
+        .expect("zipcode field to be present");
+    assert_eq!(zipcode.cidl_type, CidlType::nullable(CidlType::String));
+
+    // Test User POO - comprehensive type coverage
+    let user_poo = ast
+        .poos
+        .values()
+        .find(|p| p.name == "User")
+        .expect("User poo to be present");
+    assert_eq!(user_poo.attributes.len(), 12);
+    assert_ne!(user_poo.symbol.0, 0);
+
+    let field_names: Vec<&str> = user_poo.attributes.iter().map(|f| f.name.as_str()).collect();
+    assert_eq!(
+        field_names,
+        vec![
+            "id",
+            "name",
+            "email",
+            "age",
+            "active",
+            "balance",
+            "created",
+            "address",
+            "tags",
+            "metadata",
+            "optional_items",
+            "nullable_arrays"
+        ]
+    );
+
+    // Test primitive types
+    assert_eq!(
+        user_poo
+            .attributes
+            .iter()
+            .find(|f| f.name == "id")
+            .unwrap()
+            .cidl_type,
+        CidlType::Integer
+    );
+    assert_eq!(
+        user_poo
+            .attributes
+            .iter()
+            .find(|f| f.name == "name")
+            .unwrap()
+            .cidl_type,
+        CidlType::String
+    );
+    assert_eq!(
+        user_poo
+            .attributes
+            .iter()
+            .find(|f| f.name == "active")
+            .unwrap()
+            .cidl_type,
+        CidlType::Boolean
+    );
+    assert_eq!(
+        user_poo
+            .attributes
+            .iter()
+            .find(|f| f.name == "balance")
+            .unwrap()
+            .cidl_type,
+        CidlType::Double
+    );
+    assert_eq!(
+        user_poo
+            .attributes
+            .iter()
+            .find(|f| f.name == "created")
+            .unwrap()
+            .cidl_type,
+        CidlType::DateIso
+    );
+
+    // Test nullable types
+    assert_eq!(
+        user_poo
+            .attributes
+            .iter()
+            .find(|f| f.name == "age")
+            .unwrap()
+            .cidl_type,
+        CidlType::nullable(CidlType::Integer)
+    );
+    assert_eq!(
+        user_poo
+            .attributes
+            .iter()
+            .find(|f| f.name == "metadata")
+            .unwrap()
+            .cidl_type,
+        CidlType::nullable(CidlType::Json)
+    );
+
+    // Test object reference
+    assert_eq!(
+        user_poo
+            .attributes
+            .iter()
+            .find(|f| f.name == "address")
+            .unwrap()
+            .cidl_type,
+        CidlType::Object("Address".into())
+    );
+
+    // Test array types
+    assert_eq!(
+        user_poo
+            .attributes
+            .iter()
+            .find(|f| f.name == "tags")
+            .unwrap()
+            .cidl_type,
+        CidlType::array(CidlType::String)
+    );
+    assert_eq!(
+        user_poo
+            .attributes
+            .iter()
+            .find(|f| f.name == "optional_items")
+            .unwrap()
+            .cidl_type,
+        CidlType::nullable(CidlType::array(CidlType::Object("Item".into())))
+    );
+    assert_eq!(
+        user_poo
+            .attributes
+            .iter()
+            .find(|f| f.name == "nullable_arrays")
+            .unwrap()
+            .cidl_type,
+        CidlType::array(CidlType::nullable(CidlType::String))
+    );
+
+    // Test Container POO - nested arrays
+    let container_poo = ast
+        .poos
+        .values()
+        .find(|p| p.name == "Container")
+        .expect("Container poo to be present");
+    assert_eq!(container_poo.attributes.len(), 2);
+    assert_ne!(container_poo.symbol.0, 0);
+
+    assert_eq!(
+        container_poo
+            .attributes
+            .iter()
+            .find(|f| f.name == "nested")
+            .unwrap()
+            .cidl_type,
+        CidlType::array(CidlType::array(CidlType::Integer))
+    );
 }

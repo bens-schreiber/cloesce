@@ -49,7 +49,7 @@ pub enum CidlType {
     Stream,
 
     /// Any valid JSON value
-    JsonValue,
+    Json,
 
     /// A Cloudflare R2 object (HEAD object response)
     R2Object,
@@ -151,6 +151,8 @@ pub enum MediaType {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Api {
+    pub symbol: Symbol,
+    pub model_symbol: Symbol,
     pub cruds: Vec<CrudKind>,
     pub methods: Vec<ApiMethod>,
 }
@@ -390,6 +392,9 @@ pub struct Service {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct PlainOldObject {
     /// The symbol that defines the POO in the source code.
+    pub symbol: Symbol,
+
+    /// The name of the POO.
     pub name: String,
 
     /// Class fields of any serializable type.
@@ -420,7 +425,7 @@ pub struct CloesceAst {
     /// Maps a model symbol to the model definition
     pub models: IndexMap<Symbol, Model>,
 
-    /// Maps a Model symbol to an API
+    /// Maps an API block symbol (`api::<model_name>`) to an API
     pub apis: IndexMap<Symbol, Api>,
 
     /// Maps a Model symbol to all of its data sources

@@ -168,7 +168,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn all_regexes() {
+    fn regexes() {
         // Arrange
         let lexer = Lexer::default();
         let source = r#"model Foo {
