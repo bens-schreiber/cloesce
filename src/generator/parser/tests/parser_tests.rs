@@ -549,31 +549,41 @@ fn api_block() {
 
             get anotherMethod() -> void
         }
+
+        @crud(get)
+        api User {
+            get getById(id: int) -> void
+        }
+
+        @crud(save, list)
+        api User {
+            post update(self) -> void
+        }
         "#,
     );
 
+    // apis should be keyed by api::<model_name>, not by model symbol
     let (user_symbol, _) = ast
         .models
         .iter()
         .find(|(_, model)| model.name == "User")
         .expect("User model to be present");
+    assert!(ast.apis.get(user_symbol).is_none());
 
-    assert!(
-        ast.apis.get(user_symbol).is_none(),
-        "apis should be keyed by api::<model_name>, not by model symbol"
-    );
+    // multiple api blocks for the same model are merged into one
+    assert_eq!(ast.apis.len(), 1);
 
     let api = ast
         .apis
         .values()
-        .find(|api| api.methods.iter().any(|method| method.name == "someMethod"))
+        .next()
         .expect("User api to be present");
 
     assert_eq!(
         api.cruds,
         vec![CrudKind::GET, CrudKind::SAVE, CrudKind::LIST]
     );
-    assert_eq!(api.methods.len(), 2);
+    assert_eq!(api.methods.len(), 4);
 
     let some_method = api
         .methods
@@ -601,37 +611,7 @@ fn api_block() {
     assert!(another_method.data_source.is_none());
     assert_eq!(another_method.parameters.len(), 0);
     assert_eq!(another_method.return_type, CidlType::Void);
-}
 
-#[test]
-fn api_block_merges_for_same_model() {
-    let ast = lex_and_parse(
-        r#"
-        model User {
-            [primary id]
-            id: int
-        }
-
-        @crud(get)
-        api User {
-            get getById(id: int) -> void
-        }
-
-        @crud(save, list)
-        api User {
-            post update(self) -> void
-        }
-        "#,
-    );
-
-    assert_eq!(ast.apis.len(), 1);
-
-    let api = ast.apis.values().next().expect("User api to be present");
-    assert_eq!(
-        api.cruds,
-        vec![CrudKind::GET, CrudKind::SAVE, CrudKind::LIST]
-    );
-    assert_eq!(api.methods.len(), 2);
     assert!(api.methods.iter().any(|m| m.name == "getById"));
     assert!(api.methods.iter().any(|m| m.name == "update"));
 }
@@ -651,16 +631,23 @@ fn data_source_block() {
                 "SELECT * FROM users LIMIT ? OFFSET ?"
             }
         }
+
+        source MinimalSource for Post {
+            include { id, title }
+        }
         "#,
     );
 
-    assert_eq!(ast.sources.len(), 1);
+    assert_eq!(ast.sources.len(), 2);
 
-    let sources = ast.sources.values().next().expect("one source entry");
-    assert_eq!(sources.len(), 1);
+    let user_sources = ast
+        .sources
+        .values()
+        .find(|s| s[0].name == "UserSource")
+        .expect("UserSource entry");
+    assert_eq!(user_sources.len(), 1);
 
-    let source = &sources[0];
-    assert_eq!(source.name, "UserSource");
+    let source = &user_sources[0];
     assert!(!source.is_private);
 
     // include tree: { id, name, address { street, city } }
@@ -691,27 +678,20 @@ fn data_source_block() {
     assert_eq!(list.parameters[0].cidl_type, CidlType::Integer);
     assert_eq!(list.parameters[1].name, "limit");
     assert_eq!(list.parameters[1].cidl_type, CidlType::Integer);
-}
 
-#[test]
-fn data_source_block_optional_methods() {
-    let ast = lex_and_parse(
-        r#"
-        source MinimalSource for Post {
-            include { id, title }
-        }
-        "#,
-    );
+    // MinimalSource — optional sql methods absent
+    let minimal_sources = ast
+        .sources
+        .values()
+        .find(|s| s[0].name == "MinimalSource")
+        .expect("MinimalSource entry");
+    let minimal = &minimal_sources[0];
+    assert!(minimal.get.is_none());
+    assert!(minimal.list.is_none());
 
-    let sources = ast.sources.values().next().expect("one source entry");
-    let source = &sources[0];
-    assert_eq!(source.name, "MinimalSource");
-    assert!(source.get.is_none());
-    assert!(source.list.is_none());
-
-    let tree = &source.tree;
-    assert!(tree.0.contains_key("id"));
-    assert!(tree.0.contains_key("title"));
+    let minimal_tree = &minimal.tree;
+    assert!(minimal_tree.0.contains_key("id"));
+    assert!(minimal_tree.0.contains_key("title"));
 }
 
 #[test]
@@ -921,4 +901,23 @@ fn poo_block() {
             .cidl_type,
         CidlType::array(CidlType::array(CidlType::Integer))
     );
+}
+
+#[test]
+fn inject_block() {
+    let ast = lex_and_parse(
+        r#"
+        inject {
+            OpenApiService
+        }
+
+        inject {
+            YouTubeApi
+            SlackApi
+        }
+        "#,
+    );
+
+    assert_eq!(ast.injectables.len(), 3);
+    assert!(ast.injectables.iter().all(|s| s.0 != 0));
 }

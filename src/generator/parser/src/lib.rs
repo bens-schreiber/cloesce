@@ -86,6 +86,7 @@ impl CloesceParser {
             api::api_block().map(Global::Api),
             Self::poo_block().map(Global::Poo),
             data_source::data_source_block().map(Global::DataSource),
+            Self::inject_block().map(Global::Inject),
         ))
         .repeated()
         .collect::<Vec<_>>()
@@ -128,8 +129,11 @@ impl CloesceParser {
                             existing.push(ds);
                             continue;
                         }
-                        
+
                         ast.sources.insert(ds.symbol.clone(), vec![ds]);
+                    }
+                    Global::Inject(symbols) => {
+                        ast.injectables.extend(symbols);
                     }
                 }
             }
@@ -181,6 +185,31 @@ impl CloesceParser {
                     attributes,
                     source_path: std::path::PathBuf::new(),
                 }
+            })
+    }
+
+    /// Parses an inject block of the form:
+    /// ```cloesce
+    /// inject {
+    ///     OpenApiService
+    ///     YouTubeApi
+    /// }
+    /// ```
+    fn inject_block<'t>() -> impl Parser<'t, &'t [Token], Vec<Symbol>, Extra<'t>> {
+        just(Token::Inject)
+            .ignore_then(
+                select! { Token::Ident(name) => name }
+                    .repeated()
+                    .collect::<Vec<_>>()
+                    .delimited_by(just(Token::LBrace), just(Token::RBrace)),
+            )
+            .map_with(|names, e| {
+                let symbol_table: &mut SimpleState<SymbolTable> = e.state();
+                let mut symbols = Vec::new();
+                for name in names {
+                    symbols.push(symbol_table.intern_global(&name));
+                }
+                symbols
             })
     }
 
@@ -316,4 +345,5 @@ enum Global {
     Api(Api),
     Poo(PlainOldObject),
     DataSource(DataSource),
+    Inject(Vec<Symbol>),
 }

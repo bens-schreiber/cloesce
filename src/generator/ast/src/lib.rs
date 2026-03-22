@@ -2,6 +2,7 @@ pub mod err;
 
 use std::collections::BTreeMap;
 use std::collections::HashMap;
+use std::collections::HashSet;
 use std::hash::Hash;
 use std::path::PathBuf;
 
@@ -435,6 +436,9 @@ pub struct CloesceAst {
     /// Maps a service symbol to the service definition
     pub services: IndexMap<Symbol, Service>,
     pub poos: BTreeMap<Symbol, PlainOldObject>,
+
+    /// A set of symbols that are injected dependencies, defined outside of Cloesce.
+    pub injectables: HashSet<Symbol>,
 }
 
 impl CloesceAst {
