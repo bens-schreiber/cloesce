@@ -1,10 +1,12 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { startWrangler, stopWrangler, withRes } from "../src/setup";
+import { startWrangler, withRes } from "../src/setup";
 import { BlobHaver, BlobService } from "../fixtures/blobs/client";
+import config from "../fixtures/blobs/cloesce.config";
 
+let stopWrangler: () => Promise<void>;
 beforeAll(async () => {
   // NOTE: e2e is called from proj root
-  await startWrangler("./fixtures/blobs");
+  stopWrangler = await startWrangler("./fixtures/blobs", config.workersUrl!);
 }, 30_000);
 
 afterAll(async () => {
@@ -50,7 +52,7 @@ describe("BlobHaver", () => {
   });
 
   it("LIST Blobs", async () => {
-    const res = await BlobHaver.LIST();
+    const res = await BlobHaver.LIST(null, null, null);
     expect(res.ok, withRes("GET should be OK", res)).toBe(true);
     expect(res.data).toStrictEqual([blobHaver]);
   });
@@ -59,7 +61,7 @@ describe("BlobHaver", () => {
     const res = await blobHaver.yieldStream();
     expect(res.ok, withRes("GET should be OK", res)).toBe(true);
 
-    const got = new Uint8Array(await res.data?.arrayBuffer()!);
+    const got = new Uint8Array(await res.data!.arrayBuffer());
     const expected = [1, 2, 3, 4];
     expect(
       expected.length === got.length && expected.every((v, i) => v === got[i]),

@@ -1,14 +1,45 @@
 # Cloesce ORM
 
-> *Alpha Note*: The ORM is subject to change as new features are added.
+> [!CAUTION]
+> The ORM is subject to change as new features are added.
 
 During the hydration step of the Cloesce runtime, all of a Model's data is fetched from its various defined sources (D1, KV, R2) and combined into a single object instance. This unified object can then be used seamlessly within your application code.
 
-Luckily, Cloesce doesn't keep this functionality to itself; it is made available through the `Orm` class in the `cloesce/backend` package.
+This functionality is exposed through the `Orm` class in the `cloesce/backend` package.
+
+## Data Sources
+
+A `DataSource<T>` describes how a Model should be fetched and hydrated. It pairs an optional `IncludeTree` (which relationships to join) with optional custom SQL for `get` and `list` queries.
+
+```typescript
+interface DataSource<T> {
+    includeTree?: IncludeTree<T>;
+    get?: (joined: (from?: string) => string) => string;
+    list?: (joined: (from?: string) => string) => string;
+    listParams?: ("LastSeen" | "Limit" | "Offset")[];
+}
+```
+
+- `includeTree` — which relationships to include (KV, R2, 1:1, 1:M, M:M).
+- `get` — custom SQL for `orm.get`. Receives a helper that generates the joined SELECT. Primary key columns are always bound in order via `?`.
+- `list` — custom SQL for `orm.list`. Receives the same helper. Bind parameters are declared in `listParams`.
+- `listParams` — which parameters to bind when executing the custom `list` query. Defaults to empty.
+
+All ORM methods that accept an include accept either a `DataSource<T>` or a plain `IncludeTree<T>` interchangeably.
+
+### Default Data Source
+
+Cloesce generates a default `DataSource` for every Model at compile time. It includes all near relationships (KV, R2, 1:1) and the shallow side of 1:M and M:M relationships. This is used whenever no explicit Data Source is provided to an ORM method or instance method.
+
+You can access it at runtime with:
+
+```typescript
+const defaultDs = Orm.defaultDataSource(User);
+```
+
+Defining a `static readonly default` property on your Model that is a `DataSource<T>` with an `includeTree` overrides the compiler-generated default.
 
 ## Getting and Listing Models
-
-Cloesce provides two basic methods to select a Model from D1, KV, and R2:
 
 ```typescript
 import { Orm } from "cloesce/backend";
@@ -16,31 +47,67 @@ import { User } from "@data"
 
 const orm = Orm.fromEnv(env);
 const user = await orm.get(User, {
-    id: 1,
-    keyParams: {
-        myParam: "value"
-    },
-    includeTree: User.withFriends
+    primaryKey: { id: 1 },
+    keyParams: { myParam: "value" },
+    include: User.withFriends
 });
-// => User | undefined
+// => User | null
 
-const users = await orm.list(User, User.withFriends);
+const users = await orm.list(User, { include: User.withFriends });
 // => User[]
 ```
 
-Note that the `get` method requires the primary key of the Model to be passed in, along with any key parameters needed to construct KV or R2 keys. 
+`get` requires the primary key via `primaryKey`. For composite primary keys, supply all key columns: `primaryKey: { professorId: 1, courseId: 2 }`. Any `keyParams` needed to construct KV or R2 keys are passed alongside it. Returns `null` when no matching row is found.
 
-The `list` method simply takes an optional Include Tree to specify which navigation properties to include. This means that the `list` method cannot be used with Models that require key parameters for KV or R2 properties (try using prefix queries instead).
+`list` takes an optional args object and cannot be used with Models that require key parameters for KV or R2 properties. Use prefix queries for those instead.
 
-### Select, Map and Hydrate
+### Pagination
 
-Typically, when using a relational database, you require more advanced filtering capabilities. Instead of creating a DSL for querying Models (such as [LINQ](https://learn.microsoft.com/en-us/dotnet/csharp/linq/)) or advanced libraries like [Drizzle](https://orm.drizzle.team), Cloesce takes a stance that when you need to do a SQL query-- write it in SQL directly.
+`orm.list` uses seek-based pagination by default. Pass `lastSeen`, `limit`, and `offset` to page through results:
 
-However, the logic of `LEFT JOIN`ing related tables based on navigation properties can be tedious and error prone. Additionally, some way to turn the flat result set of a SQL query into JSON objects, and some way to turn those JSON objects into fully fledged Model instances with KV and R2 properties populated is needed.
+```typescript
+const page1 = await orm.list(User, { limit: 50 });
 
-The `select` method generates the appropriate SQL query to fetch the desired data from D1, generating joins for navigation properties based on the provided Include Tree. It also aliases the selected columns to match the object graph structure, which is useful for filtering.
+const page2 = await orm.list(User, {
+    lastSeen: { id: page1[page1.length - 1].id },
+    limit: 50
+});
+```
 
-Let's create a simple set of Models to demonstrate this:
+The default query is `WHERE (primaryKey) > (lastSeen) ORDER BY primaryKey LIMIT ?`, which stays consistent under concurrent inserts. For `LIMIT`/`OFFSET` pagination or custom ordering, provide a `list` function on a custom Data Source.
+
+### Paginated KV and R2 Fields
+
+KV and R2 list fields are declared with `Paginated<T>`:
+
+```typescript
+@Model("db")
+class User {
+    id: Integer;
+
+    @KV("settings/{id}", namespace)
+    settings: Paginated<KValue<unknown>>;
+
+    @R2("files/{id}", bucket)
+    files: Paginated<R2ObjectBody>;
+}
+```
+
+```typescript
+interface Paginated<T> {
+    results: T[];    // first page, up to 1,000 entries
+    cursor: string | null;
+    complete: boolean;
+}
+```
+
+To retrieve the next page, use the `cursor` from the previous result with a custom method on your Model.
+
+## Select, Map and Hydrate
+
+When you need filtering, ordering, or aggregation beyond what `get` and `list` provide, write the SQL directly. The ORM gives you three methods to bridge raw SQL results back to hydrated Model instances.
+
+`Orm.select` generates the appropriate `SELECT` with `LEFT JOIN`s and column aliases for a given Data Source. For example, given:
 
 ```typescript
 @Model()
@@ -48,38 +115,18 @@ export class Boss {
     id: Integer;
     persons: Person[];
 
-    static readonly withAll: IncludeTree<Boss> = {
-        persons: {
-            dogs: {},
-            cats: {}
+    static readonly withAll: DataSource<Boss> = {
+        includeTree: {
+            persons: {
+                dogs: {},
+                cats: {}
+            }
         }
     };
 }
-
-@Model()
-export class Person {
-    id: Integer;
-    bossId: Integer;
-    dogs: Dog[];
-    cats: Cat[];
-}
-
-@Model()
-export class Dog {
-    id: Integer;
-    personId: Integer;
-    Person: Person | undefined;
-}
-
-@Model()
-export class Cat {
-    id: Integer;
-    personId: Integer;
-    Person: Person | undefined;
-}
 ```
 
-Using the `select` ORM method with the `Boss.withAll` Include Tree will generate the following SQL:
+`Orm.select(Boss, { include: Boss.withAll })` produces:
 
 ```sql
 SELECT 
@@ -99,27 +146,30 @@ LEFT JOIN "Cat" AS "Cat_3"
     ON "Person_1"."id" = "Cat_3"."personId"
 ```
 
-Utilizing the aliased results in a CTE allows for easy filtering based on navigation properties:
+The aliased columns make it straightforward to filter on nested relationships via a CTE:
 
 ```typescript
-const selectSql = Orm.select(User, {
-    includeTree: Boss.withAll
-});
-
 const query = `
     WITH BossCte AS (
-        ${selectSql}
+        ${Orm.select(Boss, { include: Boss.withAll })}
     )
-    SELECT * FROM BossCte WHERE
-        [persons.dogs.id] = 5
-    AND
-        [persons.cats.id] = 10
-    AND
-        [persons.id] = 15
+    SELECT * FROM BossCte
+    WHERE [persons.dogs.id] = 5
+      AND [persons.cats.id] = 10
+      AND [persons.id] = 15
 `;
 ```
 
-This SQL can be executed on a D1 instance, and the results passed to the `map` method to convert the flat result set into JSON objects:
+An optional `from` string wraps a subquery as the base table:
+
+```typescript
+Orm.select(Boss, {
+    from: "SELECT * FROM Boss WHERE name = 'Alice'",
+    include: Boss.withAll
+});
+```
+
+Pass the D1 results to `Orm.map` to reconstruct the object graph:
 
 ```typescript
 const results = await d1.prepare(query).all();
@@ -127,43 +177,39 @@ const bosses = Orm.map(Boss, results, Boss.withAll);
 // => Boss[]
 ```
 
-Finally, the `hydrate` method can be used to take these JSON objects and convert them into fully fledged Model instances, with KV and R2 properties fetched and populated:
+Then `orm.hydrate` fetches any KV and R2 properties and returns fully populated Model instances:
 
 ```typescript
 const orm = Orm.fromEnv(env);
 const hydratedBosses = await orm.hydrate(Boss, {
     base: bosses,
     keyParams: {...},
-    includeTree: Boss.withAll
+    include: Boss.withAll
 });
 // => Boss[]
 ```
 
-> *Note*: `Orm.map` requires the input results to be in the exact aliased format generated by `Orm.select`. Mixing and matching with other SQL queries may fail.
+> [!NOTE]
+> `Orm.map` requires results in the exact aliased format produced by `Orm.select`. Mixing in results from other queries may fail.
 
 
 ## Saving a Model
 
-Cloesce combines posting and editing a Model into a single method `upsert`. Upsert is capable of creating or inserting complex object graphs including D1 and KV properties. R2 properties are not supported for upsert since they typically involve large binary data that is better handled separately.
+`orm.upsert` handles both creating and updating a Model, including nested D1 and KV relationships. R2 properties are not supported; large binary data is better handled separately.
 
 ```typescript
 import { Orm } from "cloesce/backend";
 import { User } from "@data"
+
 const orm = Orm.fromEnv(env);
 const result = await orm.upsert(User, {
-    // id: 1, Assume User.id is an integer, we can auto-increment it
+    // id: 1, omit to auto-increment
     name: "New User",
     friends: [
-        {
-            // Again, assume Friend.id is an integer
-            name: "Friend 1"
-        },
-        {
-            id: 1, // Existing Friend
-            name: "My Best Friend" // Update existing Friend name
-        },
+        { name: "Friend 1" },
+        { id: 1, name: "My Best Friend" } // update existing
     ]
 }, User.withFriends);
 ```
 
-Upsert would then return the newly created User instance, complete with assigned primary keys and any navigation properties specified in the Include Tree, along with the newly created Friends.
+The returned instance has all primary keys assigned and any navigation properties specified by the third argument (`DataSource<T>` or `IncludeTree<T>`) populated.

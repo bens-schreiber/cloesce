@@ -13,7 +13,7 @@ In your project directory, run the following command to compile your Cloesce Mod
 npx cloesce compile
 ```
 
-This command looks for a `cloesce.config.json` file in your project root, which contains configuration settings for the Cloesce compiler. If the file is not found, or settings are omitted, default values will be used.
+This command looks for a `cloesce.config.ts` file in your project root, which contains configuration settings for Cloesce. If the file is not found, or settings are omitted, default values will be used.
 
 After compilation, a `.generated` folder is created in your project root. This should **not** be committed to source control, as it is regenerated on each build. The folder contains:
 - `cidl.json`:
@@ -26,24 +26,25 @@ After compilation, a `.generated` folder is created in your project root. This s
 
 - `workers.ts`: 
     
-    The generated Cloudflare Worker code with all linked dependencies (including your custom `main` function if defined). This file is the entry point for your Cloudflare Worker and is referenced in the generated `wrangler.toml`.
-    
-> *Alpha Note*: `wrangler.jsonc` is not fully supported. Please use `wrangler.toml` for now.
+    The generated Cloudflare Worker code with all linked dependencies (including your custom `main` function if defined). This file is the entry point for your Cloudflare Worker and is referenced in the generated `wrangler.jsonc`.
 
 ## Generating Migrations
 
 To generate database migration files based on changes to your Cloesce Models, run the following command:
 
 ```bash
-npx cloesce migrate <migration-name>
+npx cloesce migrate <d1-binding> <migration-name>
+
+# Or to generate a migration for all D1 bindings:
+npx cloesce migrate --all <migration-name>
 ```
 
-This command compares your current Cloesce Models against the last applied migration and generates a new migration file in the `migrations/` folder with the specified `<migration-name>`. The migration file contains SQL statements to update your D1 database schema to match your Models.
+This command compares your current Cloesce Models against the last applied migration and generates a new migration file in the `migrations/<d1-binding>` folder with the specified `<migration-name>`. The migration file contains SQL statements to update your D1 database schema to match your Models.
 
 You must apply the generated migrations to your D1 database using the Wrangler CLI:
 
 ```bash
-npx wrangler d1 migrations apply <database-binding-name>
+npx wrangler d1 migrations apply <d1-binding-name>
 ```
 
 ## Running

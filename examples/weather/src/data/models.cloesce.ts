@@ -1,19 +1,18 @@
-import { GET, POST, HttpResult, IncludeTree, Integer, Model, R2, Inject } from "cloesce/backend";
+import { Get, Post, HttpResult, Integer, Model, R2, Inject, Crud } from "cloesce/backend";
 import { R2ObjectBody, ReadableStream } from "@cloudflare/workers-types";
 import { Env } from "./main.cloesce";
 
-@Model()
+@Model("db")
 export class Weather {
     // Cloesce interprets this is a primary key.
     // Optionally, decorate with @PrimaryKey
     id: Integer;
 
     // Foreign key to WeatherReport
-    // Optionally, decorate with @ForeignKey
+    // Optionally, decorate with @ForeignKey<WeatherReport>(x => x.weatherReportId)
     weatherReportId: Integer;
 
     // Navigation property to weatherReportId
-    // Optionally, decorate with @OneToOne<Weather>(w => w.weatherReportId)
     weatherReport: WeatherReport | undefined;
 
     dateTime: Date;
@@ -24,18 +23,13 @@ export class Weather {
     @R2("weather/photo/{id}", "bucket")
     photo: R2ObjectBody | undefined;
 
-    // Hydrates the photo when the client calls "withPhoto"
-    static readonly withPhoto: IncludeTree<Weather> = {
-        photo: {}
-    }
-
-    @POST
+    @Post()
     async uploadPhoto(@Inject env: Env, stream: ReadableStream): Promise<HttpResult<void>> {
         await env.bucket.put(`weather/photo/${this.id}`, stream);
         return HttpResult.ok(200);
     }
 
-    @GET
+    @Get({ includeTree: { photo: {} } })
     downloadPhoto(): HttpResult<ReadableStream> {
         if (!this.photo) {
             return HttpResult.fail(404, "Photo not found");
@@ -44,7 +38,8 @@ export class Weather {
     }
 }
 
-@Model(["GET", "LIST", "SAVE"])
+@Crud("GET", "LIST", "SAVE")
+@Model("db")
 export class WeatherReport {
     // Cloesce assumes this is a primary key.
     // Optionally, decorate with @PrimaryKey
@@ -53,13 +48,6 @@ export class WeatherReport {
     title: string;
     description: string;
 
-    // Cloesce assumes this is a foreign key to Weather.weatherReportId
-    // Optionally, or if multiple FKs exist, decorate with
-    // @OneToMany<Weather>(w => w.weatherReportId)
+    // Cloesce infers this relation via naming conventions
     weatherEntries: Weather[];
-
-    // Hydrates the weatherEntries when the client calls "withWeatherEntries"
-    static readonly withWeatherEntries: IncludeTree<WeatherReport> = {
-        weatherEntries: {}
-    }
 }

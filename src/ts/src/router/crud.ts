@@ -1,6 +1,6 @@
-import { IncludeTree, Orm, HttpResult } from "../ui/backend.js";
-import { NO_DATA_SOURCE } from "../ast.js";
-import { RuntimeContainer } from "./router.js";
+import { Orm, HttpResult } from "../ui/backend.js";
+import { DataSource } from "./orm.js";
+import { findDataSource, RuntimeContainer } from "./router.js";
 
 /**
  * @internal
@@ -23,7 +23,7 @@ export function proxyCrud(obj: any, ctor: any, env: any) {
       }
 
       if (method === "LIST") {
-        return (ds: string) => list(ctor, ds, env);
+        return (...args: any[]) => list(ctor, args, env);
       }
 
       if (method === "GET") {
@@ -38,14 +38,20 @@ export function proxyCrud(obj: any, ctor: any, env: any) {
 async function upsert(
   ctor: any,
   body: object,
-  dataSource: string,
+  dataSourceRef: string,
   env: any,
 ): Promise<HttpResult<unknown>> {
-  const includeTree = findIncludeTree(dataSource, ctor);
+  const dataSource = findDataSource(ctor, dataSourceRef);
   const orm = Orm.fromEnv(env);
 
   // Upsert
-  const result: any | null = await orm.upsert(ctor, body, includeTree);
+  let result: unknown | null = null;
+  try {
+    result = await orm.upsert(ctor, body, dataSource);
+  } catch {
+    return HttpResult.fail(400);
+  }
+
   return !result ? HttpResult.fail(404) : HttpResult.ok(200, result);
 }
 
@@ -58,15 +64,18 @@ async function _get(
   const model = ast.models[ctor.name];
 
   const getArgs: {
-    id?: any;
+    primaryKey?: any;
     keyParams?: Record<string, any>;
-    includeTree?: IncludeTree<any> | null;
+    include?: DataSource<any>;
   } = {};
 
   let argIndex = 0;
-  if (model.primary_key) {
-    // If there is a primary key, the first argument is the primary key.
-    getArgs.id = args[argIndex++];
+  if (model.primary_key_columns.length > 0) {
+    // Primary key arguments are ordered by the compiler.
+    getArgs.primaryKey = {};
+    for (const pkCol of model.primary_key_columns) {
+      getArgs.primaryKey[pkCol.value.name] = args[argIndex++];
+    }
   }
 
   if (model.key_params.length > 0) {
@@ -79,7 +88,7 @@ async function _get(
   }
 
   // The last argument is always the data source.
-  getArgs.includeTree = findIncludeTree(args[argIndex], ctor);
+  getArgs.include = findDataSource(ctor, args[argIndex]);
 
   const orm = Orm.fromEnv(env);
   const result: any | null = await orm.get(ctor, getArgs);
@@ -88,20 +97,39 @@ async function _get(
 
 async function list(
   ctor: any,
-  dataSource: string,
+  args: any[],
   env: any,
 ): Promise<HttpResult<unknown>> {
-  const includeTree = findIncludeTree(dataSource, ctor);
+  const { ast } = RuntimeContainer.get();
+  const model = ast.models[ctor.name];
+
+  let argIndex = 0;
+  const lastSeenValues = model.primary_key_columns.map(() => args[argIndex++]);
+  const limit = args[argIndex++];
+  const offset = args[argIndex++];
+  const dataSourceRef = args[argIndex];
+
+  // Last seen can only be used if all primary key values are present.
+  // Fail gracefully by ignoring lastSeen if some values are missing.
+  const lastSeen =
+    lastSeenValues.length == model.primary_key_columns.length &&
+    !lastSeenValues.some((v) => v == null)
+      ? Object.fromEntries(
+          model.primary_key_columns.map((col, i) => [
+            col.value.name,
+            lastSeenValues[i],
+          ]),
+        )
+      : undefined;
+
+  const dataSource = findDataSource(ctor, dataSourceRef);
   const orm = Orm.fromEnv(env);
 
-  const result: any[] = await orm.list(ctor, includeTree);
+  const result: any[] = await orm.list(ctor, {
+    include: dataSource,
+    lastSeen,
+    limit,
+    offset,
+  });
   return HttpResult.ok(200, result);
-}
-
-function findIncludeTree(
-  dataSource: string,
-  ctor: new () => object,
-): IncludeTree<any> | null {
-  const normalizedDs = dataSource === NO_DATA_SOURCE ? null : dataSource;
-  return normalizedDs ? (ctor as any)[normalizedDs] : null;
 }

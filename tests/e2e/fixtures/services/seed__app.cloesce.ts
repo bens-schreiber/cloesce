@@ -1,7 +1,7 @@
 import { ExecutionContext } from "@cloudflare/workers-types";
 import {
   Service,
-  GET,
+  Get,
   CloesceApp,
   Inject,
   HttpResult,
@@ -14,7 +14,7 @@ class InjectedThing {
 
 @Service
 export class FooService {
-  @GET
+  @Get()
   static staticMethod(@Inject thing: InjectedThing): string {
     if (!thing) {
       throw new Error("Injected thing is missing");
@@ -22,7 +22,7 @@ export class FooService {
     return "foo's static invocation";
   }
 
-  @GET
+  @Get()
   instantiatedMethod(@Inject thing: InjectedThing): string {
     if (!thing) {
       throw new Error("Injected thing is missing");
@@ -43,7 +43,7 @@ export class BarService {
     this.someCrap = "just some crap";
   }
 
-  @GET
+  @Get()
   useFoo(@Inject injectedThing: InjectedThing): string {
     if (!injectedThing) {
       throw new Error("Injected thing is missing");

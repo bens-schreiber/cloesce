@@ -41,7 +41,7 @@ export class PooAcceptYield {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<void>> {
     const baseUrl = new URL(
-      `http://localhost:5002/api/PooAcceptYield/acceptPoos`
+      `http://localhost:5695/api/PooAcceptYield/acceptPoos`
     );
     const payload: any = {};
 
@@ -50,7 +50,7 @@ export class PooAcceptYield {
     payload["c"] = c;
 
     const res = await fetchImpl(baseUrl, {
-      method: "POST",
+      method: "Post",
       headers: { "Content-Type": "application/json" },
       body: requestBody(MediaType.Json, payload),
     });
@@ -66,13 +66,13 @@ export class PooAcceptYield {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<PooC>> {
     const baseUrl = new URL(
-      `http://localhost:5002/api/PooAcceptYield/yieldPoo`
+      `http://localhost:5695/api/PooAcceptYield/yieldPoo`
     );
     const payload: any = {};
 
 
     const res = await fetchImpl(baseUrl, {
-      method: "POST",
+      method: "Post",
       headers: { "Content-Type": "application/json" },
       body: requestBody(MediaType.Json, payload),
     });
@@ -105,6 +105,12 @@ export class KValue<V> {
   get value(): V | null {
     return this.raw as V | null;
   }
+}
+
+export interface Paginated<T> {
+  results: T[];
+  cursor: string | null;
+  complete: boolean;
 }
 
 export enum MediaType {

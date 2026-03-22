@@ -1,0 +1,45 @@
+{
+  "hash": 4055048839320829329,
+  "models": {
+    "BlobHaver": {
+      "hash": 560041510452854967,
+      "name": "BlobHaver",
+      "d1_binding": "db",
+      "primary_key_columns": [
+        {
+          "hash": 6397878138472974760,
+          "value": {
+            "name": "id",
+            "cidl_type": "Integer"
+          },
+          "foreign_key_reference": null,
+          "unique_ids": [],
+          "composite_id": null
+        }
+      ],
+      "columns": [
+        {
+          "hash": 17404811013903783014,
+          "value": {
+            "name": "blob1",
+            "cidl_type": "Blob"
+          },
+          "foreign_key_reference": null,
+          "unique_ids": [],
+          "composite_id": null
+        },
+        {
+          "hash": 14390429867474788070,
+          "value": {
+            "name": "blob2",
+            "cidl_type": "Blob"
+          },
+          "foreign_key_reference": null,
+          "unique_ids": [],
+          "composite_id": null
+        }
+      ],
+      "navigation_properties": []
+    }
+  }
+}

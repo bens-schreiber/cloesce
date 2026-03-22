@@ -1,6 +1,10 @@
+use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
-use ast::{ApiMethod, CidlType, CloesceAst, CrudKind, HttpVerb, MediaType, NamedTypedValue};
+use ast::{
+    ApiMethod, CidlType, CloesceAst, CrudKind, CrudListParam, DataSource, HttpVerb, IncludeTree,
+    MediaType, NamedTypedValue, NavigationPropertyKind,
+};
 
 // TODO: This is all hardcoded to TypeScript workers
 pub struct WorkersGenerator;
@@ -140,28 +144,18 @@ impl WorkersGenerator {
             };
         };
 
-        let set_datasource_param = |method: &mut ApiMethod, model_name: &str| {
-            if !method.is_static
-                && !method
-                    .parameters
-                    .iter()
-                    .any(|p| matches!(p.cidl_type, CidlType::DataSource(_)))
-            {
-                method.parameters.push(NamedTypedValue {
-                    name: "__datasource".into(),
-                    cidl_type: CidlType::DataSource(model_name.into()),
-                });
-            }
-        };
-
         for model in ast.models.values_mut() {
             for crud in &model.cruds {
                 let method = match crud {
                     CrudKind::GET => {
-                        let mut parameters = vec![NamedTypedValue {
-                            name: "__datasource".into(),
-                            cidl_type: CidlType::DataSource(model.name.clone()),
-                        }];
+                        let mut parameters = vec![];
+
+                        for pk in &model.primary_key_columns {
+                            parameters.push(NamedTypedValue {
+                                name: pk.value.name.clone(),
+                                cidl_type: pk.value.cidl_type.clone(),
+                            });
+                        }
 
                         for key in &model.key_params {
                             parameters.push(NamedTypedValue {
@@ -170,45 +164,64 @@ impl WorkersGenerator {
                             });
                         }
 
-                        if model.has_d1() {
-                            let pk = model.primary_key.as_ref().expect("PK to exist");
-                            parameters.push(NamedTypedValue {
-                                name: pk.name.clone(),
-                                cidl_type: pk.cidl_type.clone(),
-                            });
-                        }
-
-                        // Data source should be last
-                        parameters.reverse();
+                        parameters.push(NamedTypedValue {
+                            name: "__datasource".into(),
+                            cidl_type: CidlType::DataSource(model.name.clone()),
+                        });
 
                         ApiMethod {
                             name: "GET".into(),
                             is_static: true,
-                            http_verb: HttpVerb::GET,
+                            http_verb: HttpVerb::Get,
                             return_type: CidlType::http(CidlType::Object(model.name.clone())),
                             parameters,
                             parameters_media: MediaType::default(),
                             return_media: MediaType::default(),
+                            data_source: None,
                         }
                     }
-                    CrudKind::LIST => ApiMethod {
-                        name: "LIST".into(),
-                        is_static: true,
-                        http_verb: HttpVerb::GET,
-                        return_type: CidlType::http(CidlType::array(CidlType::Object(
-                            model.name.clone(),
-                        ))),
-                        parameters: vec![NamedTypedValue {
-                            name: "__datasource".into(),
-                            cidl_type: CidlType::DataSource(model.name.clone()),
-                        }],
-                        parameters_media: MediaType::default(),
-                        return_media: MediaType::default(),
-                    },
+                    CrudKind::LIST => {
+                        let parameters = model
+                            .primary_key_columns
+                            .iter()
+                            .map(|pk| NamedTypedValue {
+                                // TODO: some nice naming config
+                                name: format!("lastSeen_{}", pk.value.name),
+                                cidl_type: CidlType::nullable(pk.value.cidl_type.clone()),
+                            })
+                            .chain(vec![
+                                NamedTypedValue {
+                                    name: "limit".into(),
+                                    cidl_type: CidlType::nullable(CidlType::Integer),
+                                },
+                                NamedTypedValue {
+                                    name: "offset".into(),
+                                    cidl_type: CidlType::nullable(CidlType::Integer),
+                                },
+                                NamedTypedValue {
+                                    name: "__datasource".into(),
+                                    cidl_type: CidlType::DataSource(model.name.clone()),
+                                },
+                            ])
+                            .collect();
+
+                        ApiMethod {
+                            name: "LIST".into(),
+                            is_static: true,
+                            http_verb: HttpVerb::Get,
+                            return_type: CidlType::http(CidlType::array(CidlType::Object(
+                                model.name.clone(),
+                            ))),
+                            parameters,
+                            parameters_media: MediaType::default(),
+                            return_media: MediaType::default(),
+                            data_source: None,
+                        }
+                    }
                     CrudKind::SAVE => ApiMethod {
                         name: "SAVE".into(),
                         is_static: true,
-                        http_verb: HttpVerb::POST,
+                        http_verb: HttpVerb::Post,
                         return_type: CidlType::http(CidlType::Object(model.name.clone())),
                         parameters: vec![
                             NamedTypedValue {
@@ -222,6 +235,7 @@ impl WorkersGenerator {
                         ],
                         parameters_media: MediaType::default(),
                         return_media: MediaType::default(),
+                        data_source: None,
                     },
                 };
 
@@ -239,7 +253,6 @@ impl WorkersGenerator {
             }
 
             for method in model.methods.values_mut() {
-                set_datasource_param(method, &model.name);
                 set_media_types(method);
             }
         }
@@ -251,10 +264,100 @@ impl WorkersGenerator {
         }
     }
 
-    pub fn generate(ast: &mut CloesceAst, workers_path: &Path) -> String {
+    /// Generates a default [DataSource] for any model that doesn't have one.
+    /// Includes all KV, R2, 1:1, 1:N and M:N relationships by default.
+    /// Does not include relationships after a 1:N or M:N to avoid infinite trees.
+    ///
+    /// Public for tests
+    pub fn generate_default_data_sources(ast: &mut CloesceAst) {
+        let models_to_process = ast
+            .models
+            .iter()
+            .filter(|(_, model)| model.default_data_source().is_none())
+            .map(|(_, model)| model.name.clone())
+            .collect::<Vec<String>>();
+
+        for model_name in models_to_process {
+            let mut tree = IncludeTree::default();
+            let mut visited = HashSet::new();
+            dfs(ast, &model_name, &mut tree, &mut visited);
+
+            let data_source = DataSource {
+                name: "default".into(),
+                tree,
+                is_private: false,
+                list_params: vec![CrudListParam::LastSeen, CrudListParam::Limit],
+            };
+
+            ast.models
+                .get_mut(&model_name)
+                .unwrap()
+                .data_sources
+                .insert(data_source.name.clone(), data_source);
+        }
+
+        fn dfs(
+            ast: &CloesceAst,
+            current_model: &str,
+            current_node: &mut IncludeTree,
+            visited: &mut HashSet<String>,
+        ) {
+            if !visited.insert(current_model.to_string()) {
+                return;
+            }
+
+            let model = ast.models.get(current_model).unwrap();
+            for nav in &model.navigation_properties {
+                match nav.kind {
+                    NavigationPropertyKind::OneToOne { .. } => {
+                        if nav.model_reference == current_model {
+                            // Self-referencing 1:1. Include but don't recurse.
+                            current_node
+                                .0
+                                .insert(nav.var_name.clone(), IncludeTree::default());
+                            continue;
+                        }
+
+                        if visited.contains(&nav.model_reference) {
+                            // Skip to avoid circular reference
+                            continue;
+                        }
+
+                        let mut new_node = IncludeTree::default();
+                        dfs(ast, &nav.model_reference, &mut new_node, visited);
+                        current_node.0.insert(nav.var_name.clone(), new_node);
+                    }
+                    NavigationPropertyKind::OneToMany { .. }
+                    | NavigationPropertyKind::ManyToMany => {
+                        // Include the related model as a leaf, but don't recurse.
+                        current_node
+                            .0
+                            .insert(nav.var_name.clone(), IncludeTree::default());
+                    }
+                }
+            }
+
+            for kv in &model.kv_objects {
+                current_node
+                    .0
+                    .insert(kv.value.name.clone(), IncludeTree::default());
+            }
+
+            for r2 in &model.r2_objects {
+                current_node
+                    .0
+                    .insert(r2.var_name.clone(), IncludeTree::default());
+            }
+
+            visited.remove(current_model);
+        }
+    }
+
+    pub fn generate(ast: &mut CloesceAst, workers_path: &Path, worker_url: &str) -> String {
         let linked_sources = Self::link(ast, workers_path);
         let constructor_registry = Self::registry(ast);
 
+        Self::generate_default_data_sources(ast);
         Self::finalize_api_methods(ast);
 
         let fetch_impl = match &ast.main_source {
@@ -270,7 +373,7 @@ import cidl from "./cidl.json";
 {constructor_registry}
 
 async function fetch(request: Request, env: any, ctx: any): Promise<Response> {{
-    const app = await CloesceApp.init(cidl as any, constructorRegistry);
+    const app = await CloesceApp.init(cidl as any, constructorRegistry, "{worker_url}");
     {fetch_impl}
 }}
 

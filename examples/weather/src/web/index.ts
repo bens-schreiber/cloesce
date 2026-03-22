@@ -21,7 +21,7 @@ const showResult = (outputId: string, result: any) => {
 };
 
 window.listReports = async () => {
-    const result = await WeatherReport.LIST("withWeatherEntries");
+    const result = await WeatherReport.LIST(null, null, null);
     showResult('list-output', result);
 };
 
@@ -46,7 +46,7 @@ window.addWeatherEntry = async () => {
         return;
     }
 
-    const getResult = await WeatherReport.GET(reportId, "withWeatherEntries");
+    const getResult = await WeatherReport.GET(reportId);
     if (!getResult.ok) {
         showResult('entry-output', getResult);
         return;
@@ -66,7 +66,7 @@ window.addWeatherEntry = async () => {
         title: report.title,
         description: report.description,
         weatherEntries: [...(report.weatherEntries || []), newEntry]
-    }, "withWeatherEntries");
+    });
 
     showResult('entry-output', result);
 };
@@ -90,7 +90,7 @@ window.uploadPhoto = async () => {
     const weather = new Weather();
     weather.id = id;
 
-    const result = await weather.uploadPhoto(new Uint8Array(buffer), "withPhoto");
+    const result = await weather.uploadPhoto(new Uint8Array(buffer));
     showResult('upload-output', result);
 };
 
@@ -104,7 +104,7 @@ window.downloadPhoto = async () => {
 
     const weather = new Weather();
     weather.id = id;
-    const result = await weather.downloadPhoto("withPhoto");
+    const result = await weather.downloadPhoto();
 
     if (result.ok && result.data) {
         const blob = await result.data.blob();

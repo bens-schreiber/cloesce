@@ -1,4 +1,4 @@
-import { Model, POST, WranglerEnv, Integer } from "cloesce/backend";
+import { Model, Post, WranglerEnv, Integer } from "cloesce/backend";
 import { D1Database } from "@cloudflare/workers-types";
 
 export class PooA {
@@ -20,14 +20,14 @@ export class Env {
   db: D1Database;
 }
 
-@Model()
+@Model("db")
 export class PooAcceptYield {
   id: Integer;
 
-  @POST
-  static acceptPoos(a: PooA, b: PooB, c: PooC) {}
+  @Post()
+  static acceptPoos(a: PooA, b: PooB, c: PooC) { }
 
-  @POST
+  @Post()
   static yieldPoo(): PooC {
     return {
       a: {

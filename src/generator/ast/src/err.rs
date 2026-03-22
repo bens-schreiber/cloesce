@@ -5,6 +5,7 @@ pub enum GeneratorPhase {
     External,
     ModelAnalysis,
     WranglerAnalysis,
+    Migrations,
 }
 
 #[derive(Debug)]
@@ -61,24 +62,25 @@ pub enum GeneratorErrorKind {
     InvalidNavigationPropertyReference,
     CyclicalDependency,
     UnknownIncludeTreeReference,
+    UnknownDataSourceReference,
+    InvalidDataSourceReference,
     ExtraneousManyToManyReferences,
     MissingManyToManyReference,
     MissingWranglerEnv,
-    MissingWranglerVariable,
-    MissingWranglerD1Binding,
-    MissingWranglerKVNamespace,
     InconsistentWranglerBinding,
     InvalidStream,
     InvalidModelReference,
     InvalidKeyFormat,
     UnknownKeyReference,
     UnsupportedCrudOperation,
+    UnknownCompositeKeyReference,
+    InvalidCompositeKey,
+    UnknownBinding,
 }
 
 impl GeneratorErrorKind {
     pub fn to_error(self) -> GeneratorError {
         let (description, suggestion, phase) = match self {
-            /* ---- MODELS ---- */
             GeneratorErrorKind::NullSqlType => (
                 "Model attributes cannot be literally null",
                 "Remove 'null' from your Model definition.",
@@ -182,8 +184,26 @@ impl GeneratorErrorKind {
                 "Refer to the documentation for supported operations on this Model type.",
                 GeneratorPhase::ModelAnalysis,
             ),
-
-            /* ---- WRANGLER ---- */
+            GeneratorErrorKind::UnknownDataSourceReference => (
+                "Found a reference to an unknown data source.",
+                "Ensure all data source references correspond to defined data sources.",
+                GeneratorPhase::ModelAnalysis,
+            ),
+            GeneratorErrorKind::InvalidDataSourceReference => (
+                "Found a reference to a data source that is invalid for the context.",
+                "TODO",
+                GeneratorPhase::ModelAnalysis,
+            ),
+            GeneratorErrorKind::UnknownCompositeKeyReference => (
+                "A Model has a composite key reference that cannot be resolved.",
+                "Ensure all composite key references in the key format correspond to defined columns in the Model.",
+                GeneratorPhase::ModelAnalysis,
+            ),
+            GeneratorErrorKind::InvalidCompositeKey => (
+                "A Model has a composite key that is invalid.",
+                "Ensure all composite key references in the key format correspond to valid combinations of columns in the Model.",
+                GeneratorPhase::ModelAnalysis,
+            ),
             GeneratorErrorKind::InconsistentWranglerBinding => (
                 "Wrangler config definitions must be consistent with the WranglerEnv definition",
                 "Change your WranglerEnv's bindings to match the Wrangler file",
@@ -194,24 +214,12 @@ impl GeneratorErrorKind {
                 "Add a WranglerEnv definition to your backend code.",
                 GeneratorPhase::WranglerAnalysis,
             ),
-            GeneratorErrorKind::MissingWranglerVariable => (
-                "A Wrangler config variable binding is required to define a variable in the WranglerEnv",
-                "Add the variable binding to your Wrangler configuration.",
-                GeneratorPhase::WranglerAnalysis,
-            ),
-            GeneratorErrorKind::MissingWranglerD1Binding => (
-                "A Wrangler config D1 database binding is required to define a D1 Model.",
-                "Add the D1 database binding to your Wrangler configuration.",
-                GeneratorPhase::WranglerAnalysis,
-            ),
-            GeneratorErrorKind::MissingWranglerKVNamespace => (
-                "A Wrangler config KV namespace binding is required to define a KV Model.",
-                "Add the KV namespace binding to your Wrangler configuration.",
-                GeneratorPhase::WranglerAnalysis,
-            ),
-
-            /* ---- EXTERNAL ---- */
             GeneratorErrorKind::InvalidInputFile => ("", "", GeneratorPhase::External),
+            GeneratorErrorKind::UnknownBinding => (
+                "Migration references an unknown D1 binding.",
+                "Ensure all binding references correspond to defined bindings.",
+                GeneratorPhase::Migrations,
+            ),
         };
 
         GeneratorError::new(self, phase, description.into(), suggestion.into())

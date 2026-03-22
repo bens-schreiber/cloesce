@@ -3,7 +3,9 @@
     "wrangler_env": {
         "name": "Env",
         "source_path": "./seed__ds.cloesce.ts",
-        "d1_binding": "db",
+        "d1_bindings": [
+            "db"
+        ],
         "kv_bindings": [],
         "r2_bindings": [],
         "vars": {}
@@ -11,11 +13,19 @@
     "models": {
         "NoDs": {
             "name": "NoDs",
+            "d1_binding": "db",
             "columns": [],
-            "primary_key": {
-                "name": "id",
-                "cidl_type": "Integer"
-            },
+            "primary_key_columns": [
+                {
+                    "foreign_key_reference": null,
+                    "unique_ids": [],
+                    "composite_id": null,
+                    "value": {
+                        "name": "id",
+                        "cidl_type": "Integer"
+                    }
+                }
+            ],
             "navigation_properties": [],
             "key_params": [],
             "kv_objects": [],
@@ -27,11 +37,19 @@
         },
         "OneDs": {
             "name": "OneDs",
+            "d1_binding": "db",
             "columns": [],
-            "primary_key": {
-                "name": "id",
-                "cidl_type": "Integer"
-            },
+            "primary_key_columns": [
+                {
+                    "foreign_key_reference": null,
+                    "unique_ids": [],
+                    "composite_id": null,
+                    "value": {
+                        "name": "id",
+                        "cidl_type": "Integer"
+                    }
+                }
+            ],
             "navigation_properties": [],
             "key_params": [],
             "kv_objects": [],
@@ -40,7 +58,9 @@
             "data_sources": {
                 "default": {
                     "name": "default",
-                    "tree": {}
+                    "tree": {},
+                    "is_private": false,
+                    "list_params": []
                 }
             },
             "cruds": [],
@@ -48,11 +68,19 @@
         },
         "Foo": {
             "name": "Foo",
+            "d1_binding": "db",
             "columns": [],
-            "primary_key": {
-                "name": "id",
-                "cidl_type": "Integer"
-            },
+            "primary_key_columns": [
+                {
+                    "foreign_key_reference": null,
+                    "unique_ids": [],
+                    "composite_id": null,
+                    "value": {
+                        "name": "id",
+                        "cidl_type": "Integer"
+                    }
+                }
+            ],
             "navigation_properties": [],
             "key_params": [],
             "kv_objects": [],
@@ -60,7 +88,7 @@
             "methods": {
                 "bar": {
                     "name": "bar",
-                    "http_verb": "POST",
+                    "http_verb": "Post",
                     "is_static": false,
                     "return_media": "Json",
                     "return_type": "Void",
@@ -90,13 +118,16 @@
                                 "Object": "Poo"
                             }
                         }
-                    ]
+                    ],
+                    "data_source": "baz"
                 }
             },
             "data_sources": {
                 "baz": {
                     "name": "baz",
-                    "tree": {}
+                    "tree": {},
+                    "is_private": false,
+                    "list_params": []
                 }
             },
             "cruds": [],

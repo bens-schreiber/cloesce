@@ -39,14 +39,22 @@ impl ClientLanguageTypeMapper for TypeScriptMapper {
                     .expect("Model to exist")
                     .data_sources;
 
-                let mut format_ds = ds.keys().map(|k| format!("\"{k}\"")).collect::<Vec<_>>();
-                format_ds.push("\"none\"".to_string());
-                format!("{} = \"none\"", format_ds.join(" |")) // default to none
+                let joined = ds
+                    .iter()
+                    .filter_map(|(k, v)| (!v.is_private).then_some(format!("\"{k}\"")))
+                    .collect::<Vec<_>>()
+                    .join(" | ");
+
+                format!("{joined} = \"default\"")
             }
             CidlType::Stream => "Uint8Array".to_string(),
             CidlType::KvObject(inner) => {
                 let inner_ts = self.cidl_type(inner, ast);
                 format!("KValue<{inner_ts}>")
+            }
+            CidlType::Paginated(inner) => {
+                let inner_ts = self.cidl_type(inner, ast);
+                format!("Paginated<{inner_ts}>")
             }
             CidlType::R2Object => "R2Object".to_string(),
             _ => panic!("Invalid type {:?}", ty),

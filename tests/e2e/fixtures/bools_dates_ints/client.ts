@@ -8,18 +8,18 @@ export class Weather {
 
   static async GET(
     id: number,
-    __datasource: "none" = "none",
+    __datasource: "default" = "default",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Weather>> {
     const baseUrl = new URL(
-      `http://localhost:5002/api/Weather/GET`
+      `http://localhost:5066/api/Weather/GET`
     );
 
     baseUrl.searchParams.append("id", String(id));
     baseUrl.searchParams.append("__datasource", String(__datasource));
 
     const res = await fetchImpl(baseUrl, {
-      method: "GET",
+      method: "Get",
     });
 
     return await HttpResult.fromResponse(
@@ -31,11 +31,11 @@ export class Weather {
   }
   static async SAVE(
     model: DeepPartial<Weather>,
-    __datasource: "none" = "none",
+    __datasource: "default" = "default",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Weather>> {
     const baseUrl = new URL(
-      `http://localhost:5002/api/Weather/SAVE`
+      `http://localhost:5066/api/Weather/SAVE`
     );
     const payload: any = {};
 
@@ -43,7 +43,7 @@ export class Weather {
     baseUrl.searchParams.append("__datasource", String(__datasource));
 
     const res = await fetchImpl(baseUrl, {
-      method: "POST",
+      method: "Post",
       headers: { "Content-Type": "application/json" },
       body: requestBody(MediaType.Json, payload),
     });
@@ -76,6 +76,12 @@ export class KValue<V> {
   get value(): V | null {
     return this.raw as V | null;
   }
+}
+
+export interface Paginated<T> {
+  results: T[];
+  cursor: string | null;
+  complete: boolean;
 }
 
 export enum MediaType {

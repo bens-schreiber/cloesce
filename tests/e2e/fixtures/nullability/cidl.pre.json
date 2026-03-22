@@ -3,7 +3,9 @@
     "wrangler_env": {
         "name": "Env",
         "source_path": "./seed__nullability.cloesce.ts",
-        "d1_binding": "db",
+        "d1_bindings": [
+            "db"
+        ],
         "kv_bindings": [],
         "r2_bindings": [],
         "vars": {}
@@ -11,9 +13,12 @@
     "models": {
         "NullabilityChecks": {
             "name": "NullabilityChecks",
+            "d1_binding": "db",
             "columns": [
                 {
                     "foreign_key_reference": null,
+                    "unique_ids": [],
+                    "composite_id": null,
                     "value": {
                         "name": "notNullableString",
                         "cidl_type": "Text"
@@ -21,6 +26,8 @@
                 },
                 {
                     "foreign_key_reference": null,
+                    "unique_ids": [],
+                    "composite_id": null,
                     "value": {
                         "name": "nullableString",
                         "cidl_type": {
@@ -29,10 +36,17 @@
                     }
                 }
             ],
-            "primary_key": {
-                "name": "id",
-                "cidl_type": "Integer"
-            },
+            "primary_key_columns": [
+                {
+                    "foreign_key_reference": null,
+                    "unique_ids": [],
+                    "composite_id": null,
+                    "value": {
+                        "name": "id",
+                        "cidl_type": "Integer"
+                    }
+                }
+            ],
             "navigation_properties": [],
             "key_params": [],
             "kv_objects": [],
@@ -40,7 +54,7 @@
             "methods": {
                 "primitiveTypes": {
                     "name": "primitiveTypes",
-                    "http_verb": "POST",
+                    "http_verb": "Post",
                     "is_static": false,
                     "return_media": "Json",
                     "return_type": {
@@ -60,11 +74,12 @@
                                 "Nullable": "Text"
                             }
                         }
-                    ]
+                    ],
+                    "data_source": null
                 },
                 "modelTypes": {
                     "name": "modelTypes",
-                    "http_verb": "POST",
+                    "http_verb": "Post",
                     "is_static": false,
                     "return_media": "Json",
                     "return_type": {
@@ -82,11 +97,12 @@
                                 }
                             }
                         }
-                    ]
+                    ],
+                    "data_source": null
                 },
                 "injectableTypes": {
                     "name": "injectableTypes",
-                    "http_verb": "POST",
+                    "http_verb": "Post",
                     "is_static": false,
                     "return_media": "Json",
                     "return_type": "Void",
@@ -100,11 +116,12 @@
                                 }
                             }
                         }
-                    ]
+                    ],
+                    "data_source": null
                 },
                 "arrayTypes": {
                     "name": "arrayTypes",
-                    "http_verb": "POST",
+                    "http_verb": "Post",
                     "is_static": false,
                     "return_media": "Json",
                     "return_type": {
@@ -132,11 +149,12 @@
                                 }
                             }
                         }
-                    ]
+                    ],
+                    "data_source": null
                 },
                 "httpResultTypes": {
                     "name": "httpResultTypes",
-                    "http_verb": "POST",
+                    "http_verb": "Post",
                     "is_static": false,
                     "return_media": "Json",
                     "return_type": {
@@ -151,7 +169,8 @@
                         }
                     },
                     "parameters_media": "Json",
-                    "parameters": []
+                    "parameters": [],
+                    "data_source": null
                 }
             },
             "data_sources": {},

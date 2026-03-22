@@ -1,10 +1,11 @@
 // @ts-nocheck
 // InvalidDataSourceDefinition
-import { IncludeTree } from "../../../src/ui/backend";
+import { DataSource } from "../../../src/ui/backend.ts";
 
 @Model()
 export class Foo {
   id: number;
 
-  bar: IncludeTree<Foo> = {}; // must be static
+  // lacks `static readonly`
+  foo: DataSource<Foo> = {};
 }

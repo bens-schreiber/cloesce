@@ -1,0 +1,79 @@
+{
+  "hash": 12269881830252270504,
+  "models": {
+    "Hamburger": {
+      "hash": 16378746804444100937,
+      "name": "Hamburger",
+      "d1_binding": "db",
+      "primary_key_columns": [
+        {
+          "hash": 6397878138472974760,
+          "value": {
+            "name": "id",
+            "cidl_type": "Integer"
+          },
+          "foreign_key_reference": null,
+          "unique_ids": [],
+          "composite_id": null
+        }
+      ],
+      "columns": [
+        {
+          "hash": 6788679640762437622,
+          "value": {
+            "name": "name",
+            "cidl_type": "Text"
+          },
+          "foreign_key_reference": null,
+          "unique_ids": [],
+          "composite_id": null
+        }
+      ],
+      "navigation_properties": [
+        {
+          "hash": 6498092945051865391,
+          "var_name": "toppings",
+          "model_reference": "Topping",
+          "kind": "ManyToMany"
+        }
+      ]
+    },
+    "Topping": {
+      "hash": 14407311656640296225,
+      "name": "Topping",
+      "d1_binding": "db",
+      "primary_key_columns": [
+        {
+          "hash": 6397878138472974760,
+          "value": {
+            "name": "id",
+            "cidl_type": "Integer"
+          },
+          "foreign_key_reference": null,
+          "unique_ids": [],
+          "composite_id": null
+        }
+      ],
+      "columns": [
+        {
+          "hash": 6788679640762437622,
+          "value": {
+            "name": "name",
+            "cidl_type": "Text"
+          },
+          "foreign_key_reference": null,
+          "unique_ids": [],
+          "composite_id": null
+        }
+      ],
+      "navigation_properties": [
+        {
+          "hash": 8945555950776796007,
+          "var_name": "hamburgers",
+          "model_reference": "Hamburger",
+          "kind": "ManyToMany"
+        }
+      ]
+    }
+  }
+}

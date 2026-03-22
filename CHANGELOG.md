@@ -1,13 +1,42 @@
-# [0.2.0] - Unreleased
+# [0.2.2] - 2026-3-14
 ### Added
-- Truncate extraneous fields during runtime validation
-- Runtime validation for `DateISO` type
 
 ### Changed
-- KV and R2 objects added to the grammar (any method can accept or return these objects)
-- Moved runtime validation to WASM
+- If unspecified in ORM functions, Data Sources will default to what is defined
+in the default data source.
 
 ### Fixed
+
+# [0.2.0] - 2026-03-14
+### Added
+- Pagination support for KV, R2 and D1 via the `orm`
+- Pagination support for D1 via the `LIST` CRUD method
+- Support for `jsonc` Wrangler config files
+- Support for composite keys (foreign and primary)
+- New fluent API for extended Model definitions
+- Support for multiple D1 databases in a single project
+- Truncate extraneous fields during runtime validation
+- Runtime validation for `DateISO` type
+- Private and inline data sources per method
+- KV and R2 objects added to the grammar (any method can accept or return these objects)
+
+### Changed
+- Moved runtime validation to WASM
+- Optimized the ORM WASM binary size by 41% (657KB -> 383KB)
+- Refactored Data Sources as per `proposal-1-data-sources.md`
+- Removed `@OneToOne` and `@OneToMany` decorators
+
+### Fixed
+
+# [0.1.5] - 2026-2-20
+
+### Added
+
+### Changed
+
+### Fixed
+
+- A bug where `upsert` would not properly replace an undefined value with `null` when the column is nullable.
 
 # [0.1.3] - 2026-2-12
 

@@ -47,6 +47,7 @@ pub enum OrmErrorKind {
     MissingAttribute,
     MissingKeyParameter,
     TypeMismatch,
+    CompositeKeyCannotAutoincrement,
 }
 
 impl OrmErrorKind {
@@ -117,7 +118,8 @@ pub async fn test_sql(
                     MigrationsModel {
                         hash: model.hash,
                         name: model.name,
-                        primary_key: model.primary_key.unwrap(),
+                        d1_binding: None, // Not used in test
+                        primary_key_columns: model.primary_key_columns,
                         columns: model.columns,
                         navigation_properties: model.navigation_properties,
                     },

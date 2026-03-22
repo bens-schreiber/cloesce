@@ -1,6 +1,6 @@
 // GENERATED CODE. DO NOT MODIFY.
 export class Poo {
-  ds: "baz" |"none" = "none";
+  ds: "baz" | "default" = "default";
 
   static fromJson(data: any): Poo {
     const res = Object.assign(new Poo(), data);
@@ -13,17 +13,17 @@ export class Foo {
   id: number;
 
   async bar(
-    customDs: "baz" |"none" = "none",
-    oneDs: "default" |"none" = "none",
-    noDs: "none" = "none",
+    customDs: "baz" | "default" = "default",
+    oneDs: "default" = "default",
+    noDs: "default" = "default",
     poo: Poo,
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<void>> {
     const id = [
-      encodeURIComponent(String(this.id)),
+    encodeURIComponent(String(this.id)),
     ].join("/");
     const baseUrl = new URL(
-      `http://localhost:5002/api/Foo/${id}/bar`
+      `http://localhost:5520/api/Foo/${id}/bar`
     );
     const payload: any = {};
 
@@ -33,7 +33,7 @@ export class Foo {
     payload["poo"] = poo;
 
     const res = await fetchImpl(baseUrl, {
-      method: "POST",
+      method: "Post",
       headers: { "Content-Type": "application/json" },
       body: requestBody(MediaType.Json, payload),
     });
@@ -84,6 +84,12 @@ export class KValue<V> {
   get value(): V | null {
     return this.raw as V | null;
   }
+}
+
+export interface Paginated<T> {
+  results: T[];
+  cursor: string | null;
+  complete: boolean;
 }
 
 export enum MediaType {

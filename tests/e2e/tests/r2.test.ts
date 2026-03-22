@@ -1,10 +1,12 @@
-import { startWrangler, stopWrangler, withRes } from "../src/setup.js";
+import { startWrangler, withRes } from "../src/setup.js";
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { PureR2Model, D1BackedModel } from "../fixtures/r2/client";
+import config from "../fixtures/r2/cloesce.config";
 
+let stopWrangler: () => Promise<void>;
 beforeAll(async () => {
   // NOTE: e2e is called from proj root
-  await startWrangler("./fixtures/r2");
+  stopWrangler = await startWrangler("./fixtures/r2", config.workersUrl!);
 }, 30_000);
 
 afterAll(async () => {
@@ -35,16 +37,16 @@ describe("Pure R2 Model", () => {
   });
 
   it("retrieves head", async () => {
-    const res = await PureR2Model.GET("test-id-1", "default");
+    const res = await PureR2Model.GET("test-id-1");
     expect(res.ok, withRes("GET should be OK", res)).toBe(true);
     expect(res.data).toBeDefined();
     expect(res.data?.id).toBe("test-id-1");
 
     expect(res.data?.data.key).toBe("path/to/data/test-id-1");
     expect(res.data?.otherData.key).toBe("path/to/other/test-id-1");
-    expect(res.data?.allData.length).toBe(2);
+    expect(res.data?.allData.results.length).toBe(2);
 
-    expect(res.data?.allData.map((obj) => obj.key).sort()).toEqual([
+    expect(res.data?.allData.results.map((obj) => obj.key).sort()).toEqual([
       "path/to/data/test-id-1",
       "path/to/other/test-id-1",
     ]);
@@ -72,7 +74,7 @@ describe("D1 Backed Model", () => {
   });
 
   it("retrieves full model", async () => {
-    const res = await D1BackedModel.GET(model.id, model.keyParam, "default");
+    const res = await D1BackedModel.GET(model.id, model.keyParam);
     expect(res.ok, withRes("GET should be OK", res)).toBe(true);
     expect(res.data).toBeDefined();
     expect(res.data?.id).toBe(model.id);
@@ -81,7 +83,7 @@ describe("D1 Backed Model", () => {
   });
 
   it("lists models", async () => {
-    const res = await D1BackedModel.LIST("default");
+    const res = await D1BackedModel.LIST(null, null, null);
     expect(res.ok, withRes("LIST should be OK", res)).toBe(true);
     expect(res.data!.length).toBeGreaterThan(0);
 

@@ -1,22 +1,33 @@
 {
-  "hash": 12833156802553350511,
+  "hash": 4118850450692199408,
   "project_name": "runner",
   "wrangler_env": {
     "name": "Env",
     "source_path": "./seed__ds.cloesce.ts",
-    "d1_binding": "db",
+    "d1_bindings": [
+      "db"
+    ],
     "kv_bindings": [],
     "r2_bindings": [],
     "vars": {}
   },
   "models": {
     "Foo": {
-      "hash": 2291516488856648612,
+      "hash": 9350576688796676214,
       "name": "Foo",
-      "primary_key": {
-        "name": "id",
-        "cidl_type": "Integer"
-      },
+      "d1_binding": "db",
+      "primary_key_columns": [
+        {
+          "hash": 6397878138472974760,
+          "value": {
+            "name": "id",
+            "cidl_type": "Integer"
+          },
+          "foreign_key_reference": null,
+          "unique_ids": [],
+          "composite_id": null
+        }
+      ],
       "columns": [],
       "navigation_properties": [],
       "key_params": [],
@@ -26,7 +37,8 @@
         "bar": {
           "name": "bar",
           "is_static": false,
-          "http_verb": "POST",
+          "data_source": "baz",
+          "http_verb": "Post",
           "return_media": "Json",
           "return_type": "Void",
           "parameters_media": "Json",
@@ -61,36 +73,39 @@
       "data_sources": {
         "baz": {
           "name": "baz",
-          "tree": {}
+          "tree": {},
+          "is_private": false,
+          "list_params": []
+        },
+        "default": {
+          "name": "default",
+          "tree": {},
+          "is_private": false,
+          "list_params": [
+            "LastSeen",
+            "Limit"
+          ]
         }
       },
       "cruds": [],
       "source_path": "./seed__ds.cloesce.ts"
     },
     "NoDs": {
-      "hash": 11605062406260251798,
+      "hash": 1047721130316512114,
       "name": "NoDs",
-      "primary_key": {
-        "name": "id",
-        "cidl_type": "Integer"
-      },
-      "columns": [],
-      "navigation_properties": [],
-      "key_params": [],
-      "kv_objects": [],
-      "r2_objects": [],
-      "methods": {},
-      "data_sources": {},
-      "cruds": [],
-      "source_path": "./seed__ds.cloesce.ts"
-    },
-    "OneDs": {
-      "hash": 665029414846726266,
-      "name": "OneDs",
-      "primary_key": {
-        "name": "id",
-        "cidl_type": "Integer"
-      },
+      "d1_binding": "db",
+      "primary_key_columns": [
+        {
+          "hash": 6397878138472974760,
+          "value": {
+            "name": "id",
+            "cidl_type": "Integer"
+          },
+          "foreign_key_reference": null,
+          "unique_ids": [],
+          "composite_id": null
+        }
+      ],
       "columns": [],
       "navigation_properties": [],
       "key_params": [],
@@ -100,7 +115,45 @@
       "data_sources": {
         "default": {
           "name": "default",
-          "tree": {}
+          "tree": {},
+          "is_private": false,
+          "list_params": [
+            "LastSeen",
+            "Limit"
+          ]
+        }
+      },
+      "cruds": [],
+      "source_path": "./seed__ds.cloesce.ts"
+    },
+    "OneDs": {
+      "hash": 7029550209668726983,
+      "name": "OneDs",
+      "d1_binding": "db",
+      "primary_key_columns": [
+        {
+          "hash": 6397878138472974760,
+          "value": {
+            "name": "id",
+            "cidl_type": "Integer"
+          },
+          "foreign_key_reference": null,
+          "unique_ids": [],
+          "composite_id": null
+        }
+      ],
+      "columns": [],
+      "navigation_properties": [],
+      "key_params": [],
+      "kv_objects": [],
+      "r2_objects": [],
+      "methods": {},
+      "data_sources": {
+        "default": {
+          "name": "default",
+          "tree": {},
+          "is_private": false,
+          "list_params": []
         }
       },
       "cruds": [],

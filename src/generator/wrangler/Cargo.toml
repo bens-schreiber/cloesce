@@ -9,6 +9,7 @@ tracing = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 toml = { workspace = true }
+json_comments = "0.2.2"
 
 [dev-dependencies]
 generator-test = { path = "../generator-test" }

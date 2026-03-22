@@ -1,20 +1,24 @@
 # Services
 
+> [!TIP]
+> A clean design pattern for Cloesce is to use Services to encapsulate significant business logic and have Models act as
+> thin wrappers around data storage and retrieval. 
+>
+> This separation of concerns can lead to more maintainable and testable code.
+
 Models are not the only way to write API logic in Cloesce. 
 
 Services are another core concept that allows you to encapsulate business logic and share it across your application. Services are similar to Models in that they can define methods that can be called from your API routes, but they do not have any associated data storage or schema. 
 
 Instead, Services are used to group related, complex functionality together and can be injected into other parts of your application using Cloesce's dependency injection system.
 
-> *TIP*: A clean design pattern for Cloesce is to use Services to encapsulate significant business logic and have Models act as
-> thin wrappers around data storage and retrieval. This separation of concerns can lead to more maintainable and testable code.
 
 ## Hello World Service
 
 Let's create a simple Service that returns a "Hello, World!" message.
 
 ```typescript
-import { Service, GET, HttpResult } from 'cloesce/backend';
+import { Service, Get, HttpResult } from 'cloesce/backend';
 
 @Service
 export class HelloWorldService {
@@ -23,7 +27,7 @@ export class HelloWorldService {
         // Optional initialization logic can go here
     }
 
-    @GET
+    @Get()
     hello(): string {
         return "Hello, World!";
     }
@@ -40,7 +44,7 @@ To share dependencies across your Cloesce application methods, Cloesce utilizes 
 
 You can access these dependencies by decorating your method parameters with the `@Inject` decorator on any Cloesce Model or Service method:
 ```typescript
-import { Service, GET, WranglerEnv } from 'cloesce/backend';
+import { Service, Get, WranglerEnv } from 'cloesce/backend';
 
 @WranglerEnv
 class Env {
@@ -49,7 +53,7 @@ class Env {
 
 @Service
 export class HelloWorldService {
-    @GET
+    @Get()
     async hello(@Inject env: Env, @Inject request: Request): Promise<string> {
         console.log("Request URL:", request.url);
         const res = await env.d1.prepare("SELECT 'Hello, World!' AS message").first<{ message: string }>();
@@ -72,7 +76,7 @@ export class HelloWorldService {
         this.foo = "bar";
     }
 
-    @GET
+    @Get()
     async hello(): Promise<string> {
         console.log("Request URL:", this.request.url);
         const res = await this.env.d1.prepare("SELECT 'Hello, World!' AS message").first<{ message: string }>();
@@ -97,7 +101,7 @@ export class GreetingService {
 export class HelloWorldService {
     greetingService: GreetingService;
 
-    @GET
+    @Get()
     hello(name: string): string {
         return this.greetingService.greet(name);
     }

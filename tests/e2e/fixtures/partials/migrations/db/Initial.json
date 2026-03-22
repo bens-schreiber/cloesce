@@ -1,0 +1,45 @@
+{
+  "hash": 5565231451096687504,
+  "models": {
+    "Dog": {
+      "hash": 16625692680497709233,
+      "name": "Dog",
+      "d1_binding": "db",
+      "primary_key_columns": [
+        {
+          "hash": 6397878138472974760,
+          "value": {
+            "name": "id",
+            "cidl_type": "Integer"
+          },
+          "foreign_key_reference": null,
+          "unique_ids": [],
+          "composite_id": null
+        }
+      ],
+      "columns": [
+        {
+          "hash": 6788679640762437622,
+          "value": {
+            "name": "name",
+            "cidl_type": "Text"
+          },
+          "foreign_key_reference": null,
+          "unique_ids": [],
+          "composite_id": null
+        },
+        {
+          "hash": 1725963293637091470,
+          "value": {
+            "name": "age",
+            "cidl_type": "Integer"
+          },
+          "foreign_key_reference": null,
+          "unique_ids": [],
+          "composite_id": null
+        }
+      ],
+      "navigation_properties": []
+    }
+  }
+}

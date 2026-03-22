@@ -1,12 +1,13 @@
 import {
   R2,
+  Paginated,
   WranglerEnv,
   KeyParam,
   Model,
-  PUT,
   Integer,
-  IncludeTree,
   Inject,
+  Put,
+  Crud,
 } from "cloesce/backend";
 import {
   D1Database,
@@ -22,7 +23,8 @@ export class Env {
   bucket2: R2Bucket;
 }
 
-@Model(["GET"])
+@Crud("GET")
+@Model()
 export class PureR2Model {
   @KeyParam
   id: string;
@@ -30,30 +32,25 @@ export class PureR2Model {
   @R2("path/to/data/{id}", "bucket1")
   data: R2ObjectBody;
 
-  @R2("path/to/other/{id}", "bucket2")
+  @R2("path/to/other/{id}", "bucket1")
   otherData: R2ObjectBody;
 
   @R2("path/", "bucket1")
-  allData: R2ObjectBody[];
+  allData: Paginated<R2ObjectBody>;
 
-  @PUT
+  @Put()
   async uploadData(@Inject env: Env, stream: ReadableStream) {
     await env.bucket1.put(`path/to/data/${this.id}`, stream);
   }
 
-  @PUT
+  @Put()
   async uploadOtherData(@Inject env: Env, stream: ReadableStream) {
-    await env.bucket2.put(`path/to/other/${this.id}`, stream);
+    await env.bucket1.put(`path/to/other/${this.id}`, stream);
   }
-
-  static readonly default: IncludeTree<PureR2Model> = {
-    data: {},
-    otherData: {},
-    allData: {},
-  };
 }
 
-@Model(["GET", "SAVE", "LIST"])
+@Crud("GET", "SAVE", "LIST")
+@Model("db")
 export class D1BackedModel {
   id: Integer;
 
@@ -66,15 +63,11 @@ export class D1BackedModel {
   @R2("d1Backed/{id}/{keyParam}/{someColumn}/{someOtherColumn}", "bucket1")
   r2Data: R2ObjectBody;
 
-  @PUT
+  @Put()
   async uploadData(@Inject env: Env, stream: ReadableStream) {
     await env.bucket1.put(
       `d1Backed/${this.id}/${this.keyParam}/${this.someColumn}/${this.someOtherColumn}`,
       stream,
     );
   }
-
-  static readonly default: IncludeTree<D1BackedModel> = {
-    r2Data: {},
-  };
 }

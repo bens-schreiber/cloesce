@@ -29,7 +29,7 @@ impl<'a> SelectModel<'a> {
             Some(m) => m,
             None => fail!(OrmErrorKind::UnknownModel, "{}", model_name),
         };
-        if model.primary_key.is_none() {
+        if model.primary_key_columns.is_empty() {
             fail!(
                 OrmErrorKind::ModelMissingD1,
                 "Model '{}' is not a D1 model.",
@@ -85,25 +85,33 @@ impl<'a> SelectModel<'a> {
             }
         };
 
-        let pk = &model.primary_key.as_ref().unwrap().name;
+        // Primary Key columns
+        for pk_col in &model.primary_key_columns {
+            let pk_name = &pk_col.value.name;
 
-        // Primary Key
-        {
             let col = if let Some(m2m_alias) = m2m_alias {
-                // M:M pk is "left" or "right", alphabetically sorted.
-                // Kind of a hack here but it works.
-                let col = if model.name.as_str() < m2m_alias.trim_end_matches("_") {
+                // For M:M tables with composite PKs:
+                // - single PK: use "left" or "right" (alphabetically sorted)
+                // - composite PK: use "left_<pk_name>" or "right_<pk_name>"
+                let base = if model.name.as_str() < m2m_alias.trim_end_matches("_") {
                     "left"
                 } else {
                     "right"
                 };
-                Expr::col((alias(m2m_alias), alias(col)))
+
+                let col_name = if model.primary_key_columns.len() == 1 {
+                    base.to_string()
+                } else {
+                    format!("{}_{}", base, pk_name)
+                };
+
+                Expr::col((alias(m2m_alias), alias(&col_name)))
             } else {
-                Expr::col((alias(&model_alias), alias(pk)))
+                Expr::col((alias(&model_alias), alias(pk_name)))
             };
 
-            self.query.expr_as(col, alias(join_path(pk)));
-        };
+            self.query.expr_as(col, alias(join_path(pk_name)));
+        }
 
         // Columns
         for col in &model.columns {
@@ -124,54 +132,81 @@ impl<'a> SelectModel<'a> {
             let mut child_m2m_alias = None;
 
             match &nav.kind {
-                NavigationPropertyKind::OneToOne { column_reference } => {
-                    let nav_model_pk = &child.primary_key.as_ref().unwrap().name;
-                    left_join_as(
-                        &mut self.query,
-                        &child.name,
-                        &child_alias,
-                        Expr::col((alias(&model_alias), alias(column_reference)))
-                            .equals((alias(&child_alias), alias(nav_model_pk))),
-                    );
+                NavigationPropertyKind::OneToOne { key_columns } => {
+                    // Build join condition for all key columns
+                    let mut condition = sea_query::Condition::all();
+
+                    for (key_col, pk_col) in
+                        key_columns.iter().zip(child.primary_key_columns.iter())
+                    {
+                        condition = condition.add(
+                            Expr::col((alias(&model_alias), alias(key_col)))
+                                .equals((alias(&child_alias), alias(&pk_col.value.name))),
+                        );
+                    }
+
+                    left_join_as(&mut self.query, &child.name, &child_alias, condition);
                 }
-                NavigationPropertyKind::OneToMany { column_reference } => {
-                    left_join_as(
-                        &mut self.query,
-                        &child.name,
-                        &child_alias,
-                        Expr::col((alias(&model_alias), alias(pk)))
-                            .equals((alias(&child_alias), alias(column_reference))),
-                    );
+                NavigationPropertyKind::OneToMany { key_columns } => {
+                    // Build join condition for all key columns
+                    let mut condition = sea_query::Condition::all();
+
+                    for (pk_col, key_col) in
+                        model.primary_key_columns.iter().zip(key_columns.iter())
+                    {
+                        condition = condition.add(
+                            Expr::col((alias(&model_alias), alias(&pk_col.value.name)))
+                                .equals((alias(&child_alias), alias(key_col))),
+                        );
+                    }
+
+                    left_join_as(&mut self.query, &child.name, &child_alias, condition);
                 }
                 NavigationPropertyKind::ManyToMany => {
-                    let nav_model_pk = &child.primary_key;
-                    let pk = &model.primary_key.as_ref().unwrap().name;
                     let m2m_table_name = nav.many_to_many_table_name(&model.name);
                     let m2m_alias = self.gensym(&m2m_table_name);
 
-                    let (a, b) = if model.name < nav.model_reference {
+                    let (side_a, side_b) = if model.name < nav.model_reference {
                         ("left", "right")
                     } else {
                         ("right", "left")
                     };
 
-                    left_join_as(
-                        &mut self.query,
-                        &m2m_table_name,
-                        &m2m_alias,
-                        Expr::col((alias(&model_alias), alias(pk)))
-                            .equals((alias(&m2m_alias), alias(a))),
-                    );
+                    // Join from current model to M:M table
+                    // Handle both single and composite primary keys
+                    let mut condition_a = sea_query::Condition::all();
+                    for pk_col in &model.primary_key_columns {
+                        let m2m_col = if model.primary_key_columns.len() == 1 {
+                            side_a.to_string()
+                        } else {
+                            format!("{}_{}", side_a, pk_col.value.name)
+                        };
 
-                    left_join_as(
-                        &mut self.query,
-                        &child.name,
-                        &child_alias,
-                        Expr::col((alias(&m2m_alias), alias(b))).equals((
-                            alias(&child_alias),
-                            alias(&nav_model_pk.as_ref().unwrap().name),
-                        )),
-                    );
+                        condition_a = condition_a.add(
+                            Expr::col((alias(&model_alias), alias(&pk_col.value.name)))
+                                .equals((alias(&m2m_alias), alias(&m2m_col))),
+                        );
+                    }
+
+                    left_join_as(&mut self.query, &m2m_table_name, &m2m_alias, condition_a);
+
+                    // Join from M:M table to child model
+                    // Handle both single and composite primary keys
+                    let mut condition_b = sea_query::Condition::all();
+                    for pk_col in &child.primary_key_columns {
+                        let m2m_col = if child.primary_key_columns.len() == 1 {
+                            side_b.to_string()
+                        } else {
+                            format!("{}_{}", side_b, pk_col.value.name)
+                        };
+
+                        condition_b = condition_b.add(
+                            Expr::col((alias(&m2m_alias), alias(&m2m_col)))
+                                .equals((alias(&child_alias), alias(&pk_col.value.name))),
+                        );
+                    }
+
+                    left_join_as(&mut self.query, &child.name, &child_alias, condition_b);
 
                     child_m2m_alias = Some(m2m_alias);
                 }
@@ -203,7 +238,7 @@ fn left_join_as(
 
 #[cfg(test)]
 mod test {
-    use ast::{CidlType, NavigationPropertyKind};
+    use ast::{CidlType, ForeignKeyReference, NavigationPropertyKind};
     use generator_test::{ModelBuilder, create_ast, expected_str};
     use serde_json::json;
     use sqlx::{Row, SqlitePool};
@@ -214,8 +249,9 @@ mod test {
     async fn scalar_model(db: SqlitePool) {
         // Arrange
         let ast_model = ModelBuilder::new("Person")
+            .default_db()
             .id_pk()
-            .col("name", CidlType::Text, None)
+            .col("name", CidlType::Text, None, None)
             .build();
 
         let ast = create_ast(vec![ast_model]);
@@ -249,17 +285,26 @@ mod test {
         // Arrange
         let ast = create_ast(vec![
             ModelBuilder::new("Person")
+                .default_db()
                 .id_pk()
-                .col("dogId", CidlType::Integer, Some("Dog".into()))
+                .col(
+                    "dogId",
+                    CidlType::Integer,
+                    Some(ForeignKeyReference {
+                        model_name: "Dog".into(),
+                        column_name: "id".into(),
+                    }),
+                    None,
+                )
                 .nav_p(
                     "dog",
                     "Dog",
                     NavigationPropertyKind::OneToOne {
-                        column_reference: "dogId".into(),
+                        key_columns: vec!["dogId".into()],
                     },
                 )
                 .build(),
-            ModelBuilder::new("Dog").id_pk().build(),
+            ModelBuilder::new("Dog").default_db().id_pk().build(),
         ]);
 
         let include_tree = json!({
@@ -300,38 +345,66 @@ mod test {
     fn one_to_many(db: SqlitePool) {
         let ast = create_ast(vec![
             ModelBuilder::new("Dog")
+                .default_db()
                 .id_pk()
-                .col("personId", CidlType::Integer, Some("Person".into()))
+                .col(
+                    "personId",
+                    CidlType::Integer,
+                    Some(ForeignKeyReference {
+                        model_name: "Person".into(),
+                        column_name: "id".into(),
+                    }),
+                    None,
+                )
                 .build(),
             ModelBuilder::new("Cat")
-                .col("personId", CidlType::Integer, Some("Person".into()))
+                .default_db()
+                .col(
+                    "personId",
+                    CidlType::Integer,
+                    Some(ForeignKeyReference {
+                        model_name: "Person".into(),
+                        column_name: "id".into(),
+                    }),
+                    None,
+                )
                 .id_pk()
                 .build(),
             ModelBuilder::new("Person")
+                .default_db()
                 .id_pk()
                 .nav_p(
                     "dogs",
                     "Dog",
                     NavigationPropertyKind::OneToMany {
-                        column_reference: "personId".into(),
+                        key_columns: vec!["personId".into()],
                     },
                 )
                 .nav_p(
                     "cats",
                     "Cat",
                     NavigationPropertyKind::OneToMany {
-                        column_reference: "personId".into(),
+                        key_columns: vec!["personId".into()],
                     },
                 )
-                .col("bossId", CidlType::Integer, Some("Boss".into()))
+                .col(
+                    "bossId",
+                    CidlType::Integer,
+                    Some(ForeignKeyReference {
+                        model_name: "Boss".into(),
+                        column_name: "id".into(),
+                    }),
+                    None,
+                )
                 .build(),
             ModelBuilder::new("Boss")
+                .default_db()
                 .id_pk()
                 .nav_p(
                     "persons",
                     "Person",
                     NavigationPropertyKind::OneToMany {
-                        column_reference: "bossId".into(),
+                        key_columns: vec!["bossId".into()],
                     },
                 )
                 .build(),
@@ -399,6 +472,7 @@ mod test {
         // Arrange
         let ast = create_ast(vec![
             ModelBuilder::new("Student")
+                .default_db()
                 .id_pk()
                 .nav_p(
                     "courses",
@@ -407,6 +481,7 @@ mod test {
                 )
                 .build(),
             ModelBuilder::new("Course")
+                .default_db()
                 .id_pk()
                 .nav_p(
                     "students",
@@ -452,30 +527,294 @@ mod test {
     }
 
     #[sqlx::test]
+    async fn composite_one_to_one(db: SqlitePool) {
+        // Arrange
+        let ast = create_ast(vec![
+            ModelBuilder::new("Student")
+                .default_db()
+                .pk("school_id", CidlType::Integer)
+                .pk("student_number", CidlType::Integer)
+                .col("name", CidlType::Text, None, None)
+                .build(),
+            ModelBuilder::new("Enrollment")
+                .default_db()
+                .id_pk()
+                .col(
+                    "school_id",
+                    CidlType::Integer,
+                    Some(ForeignKeyReference {
+                        model_name: "Student".into(),
+                        column_name: "school_id".into(),
+                    }),
+                    Some(0),
+                )
+                .col(
+                    "student_number",
+                    CidlType::Integer,
+                    Some(ForeignKeyReference {
+                        model_name: "Student".into(),
+                        column_name: "student_number".into(),
+                    }),
+                    Some(0),
+                )
+                .col("course", CidlType::Text, None, None)
+                .nav_p(
+                    "student",
+                    "Student",
+                    NavigationPropertyKind::OneToOne {
+                        key_columns: vec!["school_id".into(), "student_number".into()],
+                    },
+                )
+                .build(),
+        ]);
+
+        let include_tree = json!({
+            "student": {}
+        });
+
+        let insert_query = r#"
+            INSERT INTO Student (school_id, student_number, name) VALUES (10, 5001, 'Alice'), (10, 5002, 'Bob');
+            INSERT INTO Enrollment (id, school_id, student_number, course) VALUES (1, 10, 5001, 'Math 101'), (2, 10, 5002, 'Physics 101');
+        "#
+        .to_string();
+
+        // Act
+        let select_stmt = SelectModel::query(
+            "Enrollment",
+            None,
+            Some(include_tree.as_object().unwrap().clone()),
+            &ast,
+        )
+        .expect("SelectModel::query to work");
+
+        // Assert
+        expected_str!(
+            select_stmt,
+            r#"SELECT "Enrollment"."id" AS "id", "Enrollment"."school_id" AS "school_id", "Enrollment"."student_number" AS "student_number", "Enrollment"."course" AS "course", "Student_1"."school_id" AS "student.school_id", "Student_1"."student_number" AS "student.student_number", "Student_1"."name" AS "student.name" FROM "Enrollment" LEFT JOIN "Student" AS "Student_1" ON "Enrollment"."school_id" = "Student_1"."school_id" AND "Enrollment"."student_number" = "Student_1"."student_number""#
+        );
+
+        let results = test_sql(ast, vec![(insert_query, vec![]), (select_stmt, vec![])], db)
+            .await
+            .expect("SQL to execute");
+
+        let value = &results[1][0];
+        assert_eq!(value.try_get::<u32, _>("id").unwrap(), 1);
+        assert_eq!(value.try_get::<u32, _>("school_id").unwrap(), 10);
+        assert_eq!(value.try_get::<u32, _>("student_number").unwrap(), 5001);
+        assert_eq!(value.try_get::<String, _>("course").unwrap(), "Math 101");
+        assert_eq!(value.try_get::<u32, _>("student.school_id").unwrap(), 10);
+        assert_eq!(
+            value.try_get::<u32, _>("student.student_number").unwrap(),
+            5001
+        );
+        assert_eq!(value.try_get::<String, _>("student.name").unwrap(), "Alice");
+    }
+
+    #[sqlx::test]
+    async fn composite_one_to_many(db: SqlitePool) {
+        // Arrange
+        let ast = create_ast(vec![
+            ModelBuilder::new("Order")
+                .default_db()
+                .pk("region_id", CidlType::Integer)
+                .pk("order_number", CidlType::Integer)
+                .col("customer", CidlType::Text, None, None)
+                .nav_p(
+                    "items",
+                    "OrderItem",
+                    NavigationPropertyKind::OneToMany {
+                        key_columns: vec!["region_id".into(), "order_number".into()],
+                    },
+                )
+                .build(),
+            ModelBuilder::new("OrderItem")
+                .default_db()
+                .id_pk()
+                .col(
+                    "region_id",
+                    CidlType::Integer,
+                    Some(ForeignKeyReference {
+                        model_name: "Order".into(),
+                        column_name: "region_id".into(),
+                    }),
+                    Some(0),
+                )
+                .col(
+                    "order_number",
+                    CidlType::Integer,
+                    Some(ForeignKeyReference {
+                        model_name: "Order".into(),
+                        column_name: "order_number".into(),
+                    }),
+                    Some(0),
+                )
+                .col("product", CidlType::Text, None, None)
+                .build(),
+        ]);
+
+        let include_tree = json!({
+            "items": {}
+        });
+
+        let insert_query = r#"
+            INSERT INTO "Order" (region_id, order_number, customer) VALUES (1, 100, 'Bob');
+            INSERT INTO OrderItem (id, region_id, order_number, product) VALUES (1, 1, 100, 'Widget'), (2, 1, 100, 'Gadget');
+        "#
+        .to_string();
+
+        // Act
+        let select_stmt = SelectModel::query(
+            "Order",
+            None,
+            Some(include_tree.as_object().unwrap().clone()),
+            &ast,
+        )
+        .expect("SelectModel::query to work");
+
+        // Assert
+        expected_str!(
+            select_stmt,
+            r#"SELECT "Order"."region_id" AS "region_id", "Order"."order_number" AS "order_number", "Order"."customer" AS "customer", "OrderItem_1"."id" AS "items.id", "OrderItem_1"."region_id" AS "items.region_id", "OrderItem_1"."order_number" AS "items.order_number", "OrderItem_1"."product" AS "items.product" FROM "Order" LEFT JOIN "OrderItem" AS "OrderItem_1" ON "Order"."region_id" = "OrderItem_1"."region_id" AND "Order"."order_number" = "OrderItem_1"."order_number""#
+        );
+
+        let results = test_sql(ast, vec![(insert_query, vec![]), (select_stmt, vec![])], db)
+            .await
+            .expect("SQL to execute");
+
+        let value1 = &results[1][0];
+        assert_eq!(value1.try_get::<u32, _>("region_id").unwrap(), 1);
+        assert_eq!(value1.try_get::<u32, _>("order_number").unwrap(), 100);
+        assert_eq!(value1.try_get::<String, _>("customer").unwrap(), "Bob");
+        assert_eq!(value1.try_get::<u32, _>("items.id").unwrap(), 2);
+        assert_eq!(value1.try_get::<u32, _>("items.region_id").unwrap(), 1);
+        assert_eq!(value1.try_get::<u32, _>("items.order_number").unwrap(), 100);
+        assert_eq!(
+            value1.try_get::<String, _>("items.product").unwrap(),
+            "Gadget"
+        );
+
+        let value2 = &results[1][1];
+        assert_eq!(value2.try_get::<u32, _>("region_id").unwrap(), 1);
+        assert_eq!(value2.try_get::<u32, _>("order_number").unwrap(), 100);
+        assert_eq!(value2.try_get::<String, _>("customer").unwrap(), "Bob");
+        assert_eq!(value2.try_get::<u32, _>("items.id").unwrap(), 1);
+        assert_eq!(value2.try_get::<u32, _>("items.region_id").unwrap(), 1);
+        assert_eq!(value2.try_get::<u32, _>("items.order_number").unwrap(), 100);
+        assert_eq!(
+            value2.try_get::<String, _>("items.product").unwrap(),
+            "Widget"
+        );
+    }
+
+    #[sqlx::test]
+    async fn composite_many_to_many(db: SqlitePool) {
+        // Arrange
+        let ast = create_ast(vec![
+            ModelBuilder::new("Teacher")
+                .default_db()
+                .pk("school_id", CidlType::Integer)
+                .pk("employee_id", CidlType::Integer)
+                .col("name", CidlType::Text, None, None)
+                .nav_p("courses", "Course", NavigationPropertyKind::ManyToMany)
+                .build(),
+            ModelBuilder::new("Course")
+                .default_db()
+                .pk("department_id", CidlType::Integer)
+                .pk("course_code", CidlType::Integer)
+                .col("title", CidlType::Text, None, None)
+                .nav_p("teachers", "Teacher", NavigationPropertyKind::ManyToMany)
+                .build(),
+        ]);
+
+        let include_tree = json!({
+            "courses": {}
+        });
+
+        let insert_query = r#"
+            INSERT INTO Teacher (school_id, employee_id, name) VALUES (1, 123, 'Dr. Smith');
+            INSERT INTO Course (department_id, course_code, title) VALUES (10, 101, 'Intro to CS');
+            INSERT INTO CourseTeacher (left_department_id, left_course_code, right_school_id, right_employee_id)
+            VALUES (10, 101, 1, 123);
+        "#
+        .to_string();
+
+        // Act
+        let select_stmt = SelectModel::query(
+            "Teacher",
+            None,
+            Some(include_tree.as_object().unwrap().clone()),
+            &ast,
+        )
+        .expect("SelectModel::query to work");
+
+        // Assert
+        expected_str!(
+            select_stmt,
+            r#"SELECT "Teacher"."school_id" AS "school_id", "Teacher"."employee_id" AS "employee_id", "Teacher"."name" AS "name", "CourseTeacher_2"."left_department_id" AS "courses.department_id", "CourseTeacher_2"."left_course_code" AS "courses.course_code", "Course_1"."title" AS "courses.title" FROM "Teacher" LEFT JOIN "CourseTeacher" AS "CourseTeacher_2" ON "Teacher"."school_id" = "CourseTeacher_2"."right_school_id" AND "Teacher"."employee_id" = "CourseTeacher_2"."right_employee_id" LEFT JOIN "Course" AS "Course_1" ON "CourseTeacher_2"."left_department_id" = "Course_1"."department_id" AND "CourseTeacher_2"."left_course_code" = "Course_1"."course_code""#
+        );
+
+        let results = test_sql(ast, vec![(insert_query, vec![]), (select_stmt, vec![])], db)
+            .await
+            .expect("SQL to execute");
+
+        let value = &results[1][0];
+        assert_eq!(value.try_get::<u32, _>("school_id").unwrap(), 1);
+        assert_eq!(value.try_get::<u32, _>("employee_id").unwrap(), 123);
+        assert_eq!(value.try_get::<String, _>("name").unwrap(), "Dr. Smith");
+        assert_eq!(
+            value.try_get::<u32, _>("courses.department_id").unwrap(),
+            10
+        );
+        assert_eq!(value.try_get::<u32, _>("courses.course_code").unwrap(), 101);
+        assert_eq!(
+            value.try_get::<String, _>("courses.title").unwrap(),
+            "Intro to CS"
+        );
+    }
+
+    #[sqlx::test]
     async fn gensym_stops_ambigious_table(db: SqlitePool) {
         // Arrange
         let horse_model = ModelBuilder::new("Horse")
+            .default_db()
             .id_pk()
-            .col("name", CidlType::Text, None)
-            .col("bio", CidlType::nullable(CidlType::Text), None)
+            .col("name", CidlType::Text, None, None)
+            .col("bio", CidlType::nullable(CidlType::Text), None, None)
             .nav_p(
                 "matches",
                 "Match",
                 NavigationPropertyKind::OneToMany {
-                    column_reference: "horseId1".into(),
+                    key_columns: vec!["horseId1".into()],
                 },
             )
             .build();
 
         let match_model = ModelBuilder::new("Match")
+            .default_db()
             .id_pk()
-            .col("horseId1", CidlType::Integer, Some("Horse".into()))
-            .col("horseId2", CidlType::Integer, Some("Horse".into()))
+            .col(
+                "horseId1",
+                CidlType::Integer,
+                Some(ForeignKeyReference {
+                    model_name: "Horse".into(),
+                    column_name: "id".into(),
+                }),
+                None,
+            )
+            .col(
+                "horseId2",
+                CidlType::Integer,
+                Some(ForeignKeyReference {
+                    model_name: "Horse".into(),
+                    column_name: "id".into(),
+                }),
+                None,
+            )
             .nav_p(
                 "horse2",
                 "Horse",
                 NavigationPropertyKind::OneToOne {
-                    column_reference: "horseId2".into(),
+                    key_columns: vec!["horseId2".into()],
                 },
             )
             .build();
@@ -521,8 +860,9 @@ mod test {
     fn custom_from(db: SqlitePool) {
         // Arrange
         let ast_model = ModelBuilder::new("Person")
+            .default_db()
             .id_pk()
-            .col("name", CidlType::Text, None)
+            .col("name", CidlType::Text, None, None)
             .build();
 
         let ast = create_ast(vec![ast_model]);

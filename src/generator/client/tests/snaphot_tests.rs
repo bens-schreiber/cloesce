@@ -1,11 +1,11 @@
 use std::{collections::BTreeMap, path::PathBuf};
 
 use ast::{
-    ApiMethod, CidlType, CrudKind, HttpVerb, MediaType, NamedTypedValue, PlainOldObject, Service,
-    ServiceAttribute,
+    ApiMethod, CidlType, CrudKind, ForeignKeyReference, HttpVerb, IncludeTree, MediaType,
+    NamedTypedValue, PlainOldObject, Service, ServiceAttribute,
 };
 use client::ClientGenerator;
-use generator_test::{ModelBuilder, create_ast, create_spec};
+use generator_test::{IncludeTreeBuilder, ModelBuilder, create_ast, create_spec};
 use semantic::SemanticAnalysis;
 use workers::WorkersGenerator;
 
@@ -18,53 +18,85 @@ use workers::WorkersGenerator;
 fn test_client_code_generation_snapshot() {
     let mut ast = create_ast(vec![
         ModelBuilder::new("BasicModel")
+            .default_db()
             .id_pk()
             .col(
                 "fk_to_model",
                 CidlType::Integer,
-                Some("OneToManyModel".into()),
+                Some(ForeignKeyReference {
+                    model_name: "OneToManyModel".into(),
+                    column_name: "id".into(),
+                }),
+                None,
             )
             .build(),
         // All valid SQL column types
         ModelBuilder::new("HasSqlColumnTypes")
+            .default_db()
             .id_pk()
-            .col("string", CidlType::Text, None)
-            .col("integer", CidlType::Integer, None)
-            .col("real", CidlType::Real, None)
-            .col("boolean", CidlType::Boolean, None)
-            .col("date", CidlType::DateIso, None)
-            .col("stringNull", CidlType::nullable(CidlType::Text), None)
-            .col("integerNull", CidlType::nullable(CidlType::Integer), None)
-            .col("realNull", CidlType::nullable(CidlType::Real), None)
-            .col("booleanNull", CidlType::nullable(CidlType::Boolean), None)
-            .col("dateNull", CidlType::nullable(CidlType::DateIso), None)
+            .col("string", CidlType::Text, None, None)
+            .col("integer", CidlType::Integer, None, None)
+            .col("real", CidlType::Real, None, None)
+            .col("boolean", CidlType::Boolean, None, None)
+            .col("date", CidlType::DateIso, None, None)
+            .col("stringNull", CidlType::nullable(CidlType::Text), None, None)
+            .col(
+                "integerNull",
+                CidlType::nullable(CidlType::Integer),
+                None,
+                None,
+            )
+            .col("realNull", CidlType::nullable(CidlType::Real), None, None)
+            .col(
+                "booleanNull",
+                CidlType::nullable(CidlType::Boolean),
+                None,
+                None,
+            )
+            .col(
+                "dateNull",
+                CidlType::nullable(CidlType::DateIso),
+                None,
+                None,
+            )
             .build(),
         // One to One Navigation Property
         ModelBuilder::new("HasOneToOne")
+            .default_db()
             .id_pk()
             // one to one
-            .col("basicModelId", CidlType::Integer, Some("BasicModel".into()))
+            .col(
+                "basicModelId",
+                CidlType::Integer,
+                Some(ForeignKeyReference {
+                    model_name: "BasicModel".into(),
+                    column_name: "id".into(),
+                }),
+                None,
+            )
             .nav_p(
                 "oneToOneNav",
                 "BasicModel",
                 ast::NavigationPropertyKind::OneToOne {
-                    column_reference: "basicModelId".into(),
+                    key_columns: vec!["id".into()],
                 },
             )
             .build(),
         // One to Many Navigation Property
         ModelBuilder::new("OneToManyModel")
+            .default_db()
             .id_pk()
             .nav_p(
                 "oneToManyNav",
                 "BasicModel",
                 ast::NavigationPropertyKind::OneToMany {
-                    column_reference: "fk_to_model".into(),
+                    key_columns: vec!["fk_to_model".into()],
                 },
             )
             .build(),
         // Many to Many
         ModelBuilder::new("ManyToManyModelA")
+            .default_db()
             .id_pk()
             .nav_p(
                 "manyToManyNav",
@@ -73,6 +105,7 @@ fn test_client_code_generation_snapshot() {
             )
             .build(),
         ModelBuilder::new("ManyToManyModelB")
+            .default_db()
             .id_pk()
             .nav_p(
                 "manyToManyNav",
@@ -80,105 +113,141 @@ fn test_client_code_generation_snapshot() {
                 ast::NavigationPropertyKind::ManyToMany,
             )
             .build(),
-        // KV
-        ModelBuilder::new("ModelWithKv")
-            .key_param("id1")
-            .key_param("id2")
-            .kv_object(
-                "{id1}",
-                "kv_namespace",
-                "someValue",
-                false,
-                CidlType::JsonValue,
-            )
-            .kv_object("", "kv_namespace", "manyValues", true, CidlType::JsonValue)
-            .kv_object(
-                "constant",
-                "kv_namespace",
-                "streamValue",
-                false,
-                CidlType::Stream,
-            )
+        // Composite PK model
+        ModelBuilder::new("ModelWithCompositePk")
+            .default_db()
+            .pk("tenantId", CidlType::Text)
+            .pk("rowId", CidlType::Integer)
+            .col("name", CidlType::Text, None, None)
             .method(
                 "instanceMethod",
-                HttpVerb::POST,
+                HttpVerb::Post,
                 false,
                 vec![NamedTypedValue {
                     name: "input".into(),
                     cidl_type: CidlType::Text,
                 }],
                 CidlType::Text,
+                None,
+            )
+            .build(),
+        // KV
+        ModelBuilder::new("ModelWithKv")
+            .key_param("id1")
+            .key_param("id2")
+            .kv_object("{id1}", "kv", "someValue", false, CidlType::JsonValue)
+            .kv_object("", "kv", "manyValues", true, CidlType::JsonValue)
+            .kv_object("constant", "kv", "streamValue", false, CidlType::Stream)
+            .method(
+                "instanceMethod",
+                HttpVerb::Post,
+                false,
+                vec![NamedTypedValue {
+                    name: "input".into(),
+                    cidl_type: CidlType::Text,
+                }],
+                CidlType::Text,
+                None,
             )
             .method(
                 "staticMethod",
-                HttpVerb::GET,
+                HttpVerb::Get,
                 true,
                 vec![NamedTypedValue {
                     name: "input".into(),
                     cidl_type: CidlType::Integer,
                 }],
                 CidlType::Integer,
+                None,
             )
             .method(
                 "hasKvParamAndRes",
-                HttpVerb::POST,
+                HttpVerb::Post,
                 false,
                 vec![NamedTypedValue {
                     name: "input".into(),
                     cidl_type: CidlType::KvObject(Box::new(CidlType::Text)),
                 }],
                 CidlType::KvObject(Box::new(CidlType::Text)),
+                None,
             )
             .build(),
         // R2
         ModelBuilder::new("ModelWithR2")
+            .default_db()
             .id_pk()
             .key_param("r2Id")
-            .r2_object("r2/{id}/{r2Id}", "r2_namespace", "fileData", false)
-            .r2_object("r2", "r2_namespace", "manyFileDatas", true)
+            .r2_object("r2/{id}/{r2Id}", "r2", "fileData", false)
+            .r2_object("r2", "r2", "manyFileDatas", true)
             .method(
                 "hasR2ParamAndRes",
-                HttpVerb::POST,
+                HttpVerb::Post,
                 false,
                 vec![NamedTypedValue {
                     name: "input".into(),
                     cidl_type: CidlType::R2Object,
                 }],
                 CidlType::R2Object,
+                None,
             )
             .build(),
         // Hybrid (D1, KV, R2)
         ModelBuilder::new("ToyotaPrius")
+            .default_db()
             .id_pk()
-            .col("modelYear", CidlType::Integer, None)
+            .col("modelYear", CidlType::Integer, None, None)
             .key_param("ownerId")
             .key_param("vehicleId")
             .kv_object(
                 "{ownerId}/{modelYear}",
-                "owner_metadata",
+                "kv",
                 "metadata",
                 false,
                 CidlType::JsonValue,
             )
-            .r2_object("{vehicleId}", "vehicle_photos", "photoData", false)
+            .r2_object("{vehicleId}", "r2", "photoData", false)
             .method(
                 "instanceMethod",
-                HttpVerb::POST,
+                HttpVerb::Post,
                 false,
                 vec![NamedTypedValue {
                     name: "input".into(),
                     cidl_type: CidlType::Text,
                 }],
                 CidlType::Text,
+                None,
             )
+            .data_source(
+                "withKV",
+                IncludeTreeBuilder::default().add_node("metadata").build(),
+                false,
+            )
+            .data_source(
+                "withR2",
+                IncludeTreeBuilder::default().add_node("photoData").build(),
+                false,
+            )
+            .data_source("private", IncludeTree::default(), true)
             .build(),
     ]);
+
+    ast.models
+        .get_mut("HasOneToOne")
+        .unwrap()
+        .primary_key_columns
+        .first_mut()
+        .unwrap()
+        .foreign_key_reference = Some(ForeignKeyReference {
+        model_name: "BasicModel".into(),
+        column_name: "id".into(),
+    });
 
     // CRUD methods
     {
         let mut model_with_cruds = ModelBuilder::new("ModelWithCruds")
+            .default_db()
             .id_pk()
-            .col("name", CidlType::Text, None)
+            .col("name", CidlType::Text, None, None)
             .build();
         model_with_cruds.cruds.push(CrudKind::GET);
         model_with_cruds.cruds.push(CrudKind::SAVE);
@@ -195,7 +264,7 @@ fn test_client_code_generation_snapshot() {
             ApiMethod {
                 name: "staticMethod".into(),
                 is_static: true,
-                http_verb: HttpVerb::GET,
+                http_verb: HttpVerb::Get,
                 return_type: CidlType::http(CidlType::Text),
                 parameters_media: MediaType::default(),
                 parameters: vec![NamedTypedValue {
@@ -203,6 +272,7 @@ fn test_client_code_generation_snapshot() {
                     cidl_type: CidlType::Text,
                 }],
                 return_media: MediaType::default(),
+                data_source: None,
             },
         );
         methods.insert(
@@ -210,7 +280,7 @@ fn test_client_code_generation_snapshot() {
             ApiMethod {
                 name: "instanceMethod".into(),
                 is_static: false,
-                http_verb: HttpVerb::POST,
+                http_verb: HttpVerb::Post,
                 return_type: CidlType::http(CidlType::Integer),
                 parameters_media: MediaType::default(),
                 parameters: vec![NamedTypedValue {
@@ -218,6 +288,7 @@ fn test_client_code_generation_snapshot() {
                     cidl_type: CidlType::Integer,
                 }],
                 return_media: MediaType::default(),
+                data_source: None,
             },
         );
 
@@ -227,7 +298,7 @@ fn test_client_code_generation_snapshot() {
             ApiMethod {
                 name: "uploadData".into(),
                 is_static: false,
-                http_verb: HttpVerb::POST,
+                http_verb: HttpVerb::Post,
                 return_type: CidlType::http(CidlType::Boolean),
                 parameters_media: ast::MediaType::Octet,
                 parameters: vec![NamedTypedValue {
@@ -235,6 +306,7 @@ fn test_client_code_generation_snapshot() {
                     cidl_type: CidlType::Stream,
                 }],
                 return_media: ast::MediaType::default(),
+                data_source: None,
             },
         );
 
@@ -244,11 +316,12 @@ fn test_client_code_generation_snapshot() {
             ApiMethod {
                 name: "downloadData".into(),
                 is_static: false,
-                http_verb: HttpVerb::GET,
+                http_verb: HttpVerb::Get,
                 return_type: CidlType::Stream,
                 parameters_media: MediaType::default(),
                 parameters: vec![],
                 return_media: ast::MediaType::Octet,
+                data_source: None,
             },
         );
 
@@ -308,9 +381,10 @@ fn test_client_code_generation_snapshot() {
 
     let spec = create_spec(&ast);
     SemanticAnalysis::analyze(&mut ast, &spec).expect("Semantic analysis to pass");
+    WorkersGenerator::generate_default_data_sources(&mut ast);
     WorkersGenerator::finalize_api_methods(&mut ast);
 
-    let client_code = ClientGenerator::generate(&ast, "http://example.com/api".to_string());
+    let client_code = ClientGenerator::generate(&ast, "http://example.com/path/to/api");
 
     insta::assert_snapshot!("client_code_generation_snapshot", client_code);
 }

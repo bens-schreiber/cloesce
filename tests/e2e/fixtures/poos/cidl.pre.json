@@ -3,7 +3,9 @@
     "wrangler_env": {
         "name": "Env",
         "source_path": "./seed__poo.cloesce.ts",
-        "d1_binding": "db",
+        "d1_bindings": [
+            "db"
+        ],
         "kv_bindings": [],
         "r2_bindings": [],
         "vars": {}
@@ -11,11 +13,19 @@
     "models": {
         "PooAcceptYield": {
             "name": "PooAcceptYield",
+            "d1_binding": "db",
             "columns": [],
-            "primary_key": {
-                "name": "id",
-                "cidl_type": "Integer"
-            },
+            "primary_key_columns": [
+                {
+                    "foreign_key_reference": null,
+                    "unique_ids": [],
+                    "composite_id": null,
+                    "value": {
+                        "name": "id",
+                        "cidl_type": "Integer"
+                    }
+                }
+            ],
             "navigation_properties": [],
             "key_params": [],
             "kv_objects": [],
@@ -23,7 +33,7 @@
             "methods": {
                 "acceptPoos": {
                     "name": "acceptPoos",
-                    "http_verb": "POST",
+                    "http_verb": "Post",
                     "is_static": true,
                     "return_media": "Json",
                     "return_type": "Void",
@@ -47,18 +57,20 @@
                                 "Object": "PooC"
                             }
                         }
-                    ]
+                    ],
+                    "data_source": null
                 },
                 "yieldPoo": {
                     "name": "yieldPoo",
-                    "http_verb": "POST",
+                    "http_verb": "Post",
                     "is_static": true,
                     "return_media": "Json",
                     "return_type": {
                         "Object": "PooC"
                     },
                     "parameters_media": "Json",
-                    "parameters": []
+                    "parameters": [],
+                    "data_source": null
                 }
             },
             "data_sources": {},

@@ -1,10 +1,12 @@
 {
-  "hash": 864487073929629472,
+  "hash": 11127522741759014364,
   "project_name": "runner",
   "wrangler_env": {
     "name": "Env",
     "source_path": "./seed__kv.cloesce.ts",
-    "d1_binding": "db",
+    "d1_bindings": [
+      "db"
+    ],
     "kv_bindings": [
       "namespace",
       "otherNamespace"
@@ -14,28 +16,41 @@
   },
   "models": {
     "D1BackedModel": {
-      "hash": 15131870847274583393,
+      "hash": 6703974713046051109,
       "name": "D1BackedModel",
-      "primary_key": {
-        "name": "id",
-        "cidl_type": "Integer"
-      },
+      "d1_binding": "db",
+      "primary_key_columns": [
+        {
+          "hash": 6397878138472974760,
+          "value": {
+            "name": "id",
+            "cidl_type": "Integer"
+          },
+          "foreign_key_reference": null,
+          "unique_ids": [],
+          "composite_id": null
+        }
+      ],
       "columns": [
         {
-          "hash": 1999042468264969055,
+          "hash": 4638766536825732897,
           "value": {
             "name": "someColumn",
             "cidl_type": "Real"
           },
-          "foreign_key_reference": null
+          "foreign_key_reference": null,
+          "unique_ids": [],
+          "composite_id": null
         },
         {
-          "hash": 5739512274815634865,
+          "hash": 16794226563886906789,
           "value": {
             "name": "someOtherColumn",
             "cidl_type": "Text"
           },
-          "foreign_key_reference": null
+          "foreign_key_reference": null,
+          "unique_ids": [],
+          "composite_id": null
         }
       ],
       "navigation_properties": [],
@@ -58,7 +73,8 @@
         "GET": {
           "name": "GET",
           "is_static": true,
-          "http_verb": "GET",
+          "data_source": null,
+          "http_verb": "Get",
           "return_media": "Json",
           "return_type": {
             "HttpResult": {
@@ -86,7 +102,8 @@
         "LIST": {
           "name": "LIST",
           "is_static": true,
-          "http_verb": "GET",
+          "data_source": null,
+          "http_verb": "Get",
           "return_media": "Json",
           "return_type": {
             "HttpResult": {
@@ -98,6 +115,24 @@
           "parameters_media": "Json",
           "parameters": [
             {
+              "name": "lastSeen_id",
+              "cidl_type": {
+                "Nullable": "Integer"
+              }
+            },
+            {
+              "name": "limit",
+              "cidl_type": {
+                "Nullable": "Integer"
+              }
+            },
+            {
+              "name": "offset",
+              "cidl_type": {
+                "Nullable": "Integer"
+              }
+            },
+            {
               "name": "__datasource",
               "cidl_type": {
                 "DataSource": "D1BackedModel"
@@ -108,7 +143,8 @@
         "SAVE": {
           "name": "SAVE",
           "is_static": true,
-          "http_verb": "POST",
+          "data_source": null,
+          "http_verb": "Post",
           "return_media": "Json",
           "return_type": {
             "HttpResult": {
@@ -137,7 +173,12 @@
           "name": "default",
           "tree": {
             "kvData": {}
-          }
+          },
+          "is_private": false,
+          "list_params": [
+            "LastSeen",
+            "Limit"
+          ]
         }
       },
       "cruds": [
@@ -148,9 +189,10 @@
       "source_path": "./seed__kv.cloesce.ts"
     },
     "PureKVModel": {
-      "hash": 16650423527422880089,
+      "hash": 5491520551375615806,
       "name": "PureKVModel",
-      "primary_key": null,
+      "d1_binding": null,
+      "primary_key_columns": [],
       "columns": [],
       "navigation_properties": [],
       "key_params": [
@@ -181,7 +223,8 @@
         "GET": {
           "name": "GET",
           "is_static": true,
-          "http_verb": "GET",
+          "data_source": null,
+          "http_verb": "Get",
           "return_media": "Json",
           "return_type": {
             "HttpResult": {
@@ -205,7 +248,8 @@
         "SAVE": {
           "name": "SAVE",
           "is_static": true,
-          "http_verb": "POST",
+          "data_source": null,
+          "http_verb": "Post",
           "return_media": "Json",
           "return_type": {
             "HttpResult": {
@@ -235,12 +279,107 @@
           "tree": {
             "data": {},
             "otherData": {}
-          }
+          },
+          "is_private": false,
+          "list_params": [
+            "LastSeen",
+            "Limit"
+          ]
         }
       },
       "cruds": [
         "GET",
         "SAVE"
+      ],
+      "source_path": "./seed__kv.cloesce.ts"
+    },
+    "PaginatedKVModel": {
+      "hash": 13757542679648203632,
+      "name": "PaginatedKVModel",
+      "d1_binding": null,
+      "primary_key_columns": [],
+      "columns": [],
+      "navigation_properties": [],
+      "key_params": [
+        "id"
+      ],
+      "kv_objects": [
+        {
+          "format": "paginated/items/",
+          "namespace_binding": "namespace",
+          "value": {
+            "name": "items",
+            "cidl_type": "JsonValue"
+          },
+          "list_prefix": true
+        }
+      ],
+      "r2_objects": [],
+      "methods": {
+        "GET": {
+          "name": "GET",
+          "is_static": true,
+          "data_source": null,
+          "http_verb": "Get",
+          "return_media": "Json",
+          "return_type": {
+            "HttpResult": {
+              "Object": "PaginatedKVModel"
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "id",
+              "cidl_type": "Text"
+            },
+            {
+              "name": "__datasource",
+              "cidl_type": {
+                "DataSource": "PaginatedKVModel"
+              }
+            }
+          ]
+        },
+        "acceptPaginated": {
+          "name": "acceptPaginated",
+          "is_static": true,
+          "data_source": null,
+          "http_verb": "Post",
+          "return_media": "Json",
+          "return_type": {
+            "Paginated": {
+              "KvObject": "JsonValue"
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "ps",
+              "cidl_type": {
+                "Paginated": {
+                  "KvObject": "JsonValue"
+                }
+              }
+            }
+          ]
+        }
+      },
+      "data_sources": {
+        "default": {
+          "name": "default",
+          "tree": {
+            "items": {}
+          },
+          "is_private": false,
+          "list_params": [
+            "LastSeen",
+            "Limit"
+          ]
+        }
+      },
+      "cruds": [
+        "GET"
       ],
       "source_path": "./seed__kv.cloesce.ts"
     }

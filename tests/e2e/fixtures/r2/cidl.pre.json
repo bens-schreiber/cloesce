@@ -3,7 +3,9 @@
     "wrangler_env": {
         "name": "Env",
         "source_path": "./seed__r2.cloesce.ts",
-        "d1_binding": "db",
+        "d1_bindings": [
+            "db"
+        ],
         "kv_bindings": [],
         "r2_bindings": [
             "bucket1",
@@ -14,8 +16,9 @@
     "models": {
         "PureR2Model": {
             "name": "PureR2Model",
+            "d1_binding": null,
             "columns": [],
-            "primary_key": null,
+            "primary_key_columns": [],
             "navigation_properties": [],
             "key_params": [
                 "id"
@@ -30,7 +33,7 @@
                 },
                 {
                     "format": "path/to/other/{id}",
-                    "bucket_binding": "bucket2",
+                    "bucket_binding": "bucket1",
                     "var_name": "otherData",
                     "list_prefix": false
                 },
@@ -44,7 +47,7 @@
             "methods": {
                 "uploadData": {
                     "name": "uploadData",
-                    "http_verb": "PUT",
+                    "http_verb": "Put",
                     "is_static": false,
                     "return_media": "Json",
                     "return_type": "Void",
@@ -60,11 +63,12 @@
                             "name": "stream",
                             "cidl_type": "Stream"
                         }
-                    ]
+                    ],
+                    "data_source": null
                 },
                 "uploadOtherData": {
                     "name": "uploadOtherData",
-                    "http_verb": "PUT",
+                    "http_verb": "Put",
                     "is_static": false,
                     "return_media": "Json",
                     "return_type": "Void",
@@ -80,19 +84,11 @@
                             "name": "stream",
                             "cidl_type": "Stream"
                         }
-                    ]
+                    ],
+                    "data_source": null
                 }
             },
-            "data_sources": {
-                "default": {
-                    "name": "default",
-                    "tree": {
-                        "data": {},
-                        "otherData": {},
-                        "allData": {}
-                    }
-                }
-            },
+            "data_sources": {},
             "cruds": [
                 "GET"
             ],
@@ -100,9 +96,12 @@
         },
         "D1BackedModel": {
             "name": "D1BackedModel",
+            "d1_binding": "db",
             "columns": [
                 {
                     "foreign_key_reference": null,
+                    "unique_ids": [],
+                    "composite_id": null,
                     "value": {
                         "name": "someColumn",
                         "cidl_type": "Real"
@@ -110,16 +109,25 @@
                 },
                 {
                     "foreign_key_reference": null,
+                    "unique_ids": [],
+                    "composite_id": null,
                     "value": {
                         "name": "someOtherColumn",
                         "cidl_type": "Text"
                     }
                 }
             ],
-            "primary_key": {
-                "name": "id",
-                "cidl_type": "Integer"
-            },
+            "primary_key_columns": [
+                {
+                    "foreign_key_reference": null,
+                    "unique_ids": [],
+                    "composite_id": null,
+                    "value": {
+                        "name": "id",
+                        "cidl_type": "Integer"
+                    }
+                }
+            ],
             "navigation_properties": [],
             "key_params": [
                 "keyParam"
@@ -136,7 +144,7 @@
             "methods": {
                 "uploadData": {
                     "name": "uploadData",
-                    "http_verb": "PUT",
+                    "http_verb": "Put",
                     "is_static": false,
                     "return_media": "Json",
                     "return_type": "Void",
@@ -152,17 +160,11 @@
                             "name": "stream",
                             "cidl_type": "Stream"
                         }
-                    ]
+                    ],
+                    "data_source": null
                 }
             },
-            "data_sources": {
-                "default": {
-                    "name": "default",
-                    "tree": {
-                        "r2Data": {}
-                    }
-                }
-            },
+            "data_sources": {},
             "cruds": [
                 "GET",
                 "LIST",

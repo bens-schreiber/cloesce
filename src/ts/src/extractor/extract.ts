@@ -31,17 +31,17 @@ import {
   ServiceAttribute,
   KeyValue,
   AstR2Object,
+  CrudListParam,
+  ForeignKeyReference,
 } from "../ast.js";
 import { TypeFormatFlags } from "typescript";
 import { ExtractorError, ExtractorErrorCode } from "./err.js";
 import { Either } from "../common.js";
+import { InferenceBuilder, normalizeName } from "./infer.js";
 
 enum PropertyDecoratorKind {
   PrimaryKey = "PrimaryKey",
   ForeignKey = "ForeignKey",
-  OneToOne = "OneToOne",
-  OneToMany = "OneToMany",
-  ManyToMany = "ManyToMany",
   KeyParam = "KeyParam",
   KV = "KV",
   R2 = "R2",
@@ -49,6 +49,7 @@ enum PropertyDecoratorKind {
 
 enum ClassDecoratorKind {
   Model = "Model",
+  Crud = "Crud",
   WranglerEnv = "WranglerEnv",
   Service = "Service",
 }
@@ -58,6 +59,8 @@ enum ParameterDecoratorKind {
 }
 
 export class CidlExtractor {
+  private inferBuilder = new InferenceBuilder();
+
   private constructor(
     private modelDecls: Map<string, [ClassDeclaration, Decorator]>,
     private extractedPoos: Map<string, PlainOldObject> = new Map(),
@@ -68,6 +71,7 @@ export class CidlExtractor {
     project: Project,
   ): Either<ExtractorError, CloesceAst> {
     const modelDecls: Map<string, [ClassDeclaration, Decorator]> = new Map();
+    const crudDecls: Map<string, Decorator> = new Map();
     const serviceDecls: Map<string, ClassDeclaration> = new Map();
     const wranglerEnvs: WranglerEnv[] = [];
     let main_source: string | null = null;
@@ -106,6 +110,11 @@ export class CidlExtractor {
                 });
               }
               modelDecls.set(className, [classDecl, decorator]);
+              break;
+            }
+
+            case ClassDecoratorKind.Crud: {
+              crudDecls.set(classDecl.getName()!, decorator);
               break;
             }
 
@@ -148,11 +157,13 @@ export class CidlExtractor {
 
     // Extract models
     const models: Record<string, Model> = {};
-    for (const [_, [classDecl, decorator]] of modelDecls) {
+    for (const [modelName, [classDecl, decorator]] of modelDecls) {
+      const crudDecorator = crudDecls.get(modelName);
       const res = extractor.model(
         classDecl,
         classDecl.getSourceFile(),
         decorator,
+        crudDecorator,
       );
       if (res.isLeft()) {
         res.value.addContext((prev) => `${classDecl.getName()}.${prev}`);
@@ -162,6 +173,9 @@ export class CidlExtractor {
       const model = res.unwrap();
       models[model.name] = model;
     }
+
+    // Process inferences
+    extractor.inferBuilder.build(models);
 
     // Extract services
     const services: Record<string, Service> = {};
@@ -273,6 +287,7 @@ export class CidlExtractor {
     classDecl: ClassDeclaration,
     sourceFile: SourceFile,
     decorator: Decorator,
+    crudDecorator?: Decorator,
   ): Either<ExtractorError, Model> {
     const name = classDecl.getName()!;
     const columns: D1Column[] = [];
@@ -283,17 +298,23 @@ export class CidlExtractor {
     const data_sources: Record<string, DataSource> = {};
     const methods: Record<string, ApiMethod> = {};
     const cruds: Set<CrudKind> = new Set<CrudKind>();
-    let primary_key: NamedTypedValue | null = null;
+    const primary_key_columns: D1Column[] = [];
+    let d1_binding: string | null = null;
 
-    // Extract crud methods
-    const arg = decorator.getArguments()[0];
-    if (arg && MorphNode.isArrayLiteralExpression(arg)) {
-      for (const a of arg.getElements()) {
-        cruds.add(
-          (MorphNode.isStringLiteral(a)
-            ? a.getLiteralValue()
-            : a.getText()) as CrudKind,
-        );
+    // Extract d1_binding from @Model decorator
+    const bindingArg = decorator.getArguments()[0];
+    if (bindingArg && MorphNode.isStringLiteral(bindingArg)) {
+      d1_binding = bindingArg.getLiteralValue();
+    }
+
+    // Extract crud methods from @Crud decorator (rest parameters)
+    if (crudDecorator) {
+      for (const arg of crudDecorator.getArguments()) {
+        if (MorphNode.isStringLiteral(arg)) {
+          cruds.add(arg.getLiteralValue() as CrudKind);
+        } else {
+          cruds.add(arg.getText() as CrudKind);
+        }
       }
     }
 
@@ -310,10 +331,8 @@ export class CidlExtractor {
 
       const cidl_type = typeRes.unwrap();
 
-      // Include Trees
-      const isIncludeTree =
-        getTypeText(prop.getType()) === `IncludeTree<${name}>`;
-      if (isIncludeTree) {
+      // Data Sources
+      if (typeof cidl_type === "object" && "DataSource" in cidl_type) {
         // Error: data sources must be static include trees
         if (!prop.isStatic()) {
           return err(ExtractorErrorCode.InvalidDataSourceDefinition, (e) => {
@@ -322,17 +341,55 @@ export class CidlExtractor {
           });
         }
 
-        const initializer = prop.getInitializer();
-        if (!initializer?.isKind(SyntaxKind.ObjectLiteralExpression)) {
-          return err(ExtractorErrorCode.InvalidDataSourceDefinition, (e) => {
+        // Error: expecting a DataSource object literal
+        const invalidDsErr = err(
+          ExtractorErrorCode.InvalidDataSourceDefinition,
+          (e) => {
             e.snippet = prop.getText();
             e.context = prop.getName();
-          });
+          },
+        );
+
+        const initializer = prop.getInitializer();
+        if (!initializer?.isKind(SyntaxKind.ObjectLiteralExpression)) {
+          return invalidDsErr;
+        }
+
+        const obj = initializer as ObjectLiteralExpression;
+        const includeTreeProp = obj.getProperty("includeTree");
+        let tree = {} as CidlIncludeTree;
+        if (includeTreeProp) {
+          if (!MorphNode.isPropertyAssignment(includeTreeProp)) {
+            return invalidDsErr;
+          }
+
+          const includeTreeInitializer = includeTreeProp.getInitializer();
+          if (
+            !includeTreeInitializer ||
+            !includeTreeInitializer.isKind(SyntaxKind.ObjectLiteralExpression)
+          ) {
+            return invalidDsErr;
+          }
+          tree = parseIncludeTree(
+            includeTreeInitializer as ObjectLiteralExpression,
+          );
+        }
+
+        const listParamsProp = obj.getProperty("listParams");
+        let list_params: CrudListParam[] = [];
+        if (listParamsProp) {
+          const res = parseListParams(listParamsProp, prop.getName());
+          if (res.isLeft()) {
+            return res;
+          }
+          list_params = res.unwrap();
         }
 
         data_sources[prop.getName()] = {
           name: prop.getName(),
-          tree: parseIncludeTree(initializer),
+          tree,
+          is_private: false, // Publicly exposed
+          list_params,
         };
         continue;
       }
@@ -343,211 +400,264 @@ export class CidlExtractor {
         return checkModifierRes;
       }
 
-      // Infer decorator
-      if (prop.getDecorators().length === 0) {
-        this.inferModelDecorator(prop, classDecl, cidl_type);
-      }
-      const decorators = prop.getDecorators();
+      const decorators = prop
+        .getDecorators()
+        .filter((d) => isPropertyDecoratorKind(getDecoratorName(d)));
 
-      // Scalar column
+      const getPropDecorator = (kind: PropertyDecoratorKind) =>
+        decorators.find((d) => getDecoratorName(d) === kind);
+
       if (decorators.length === 0) {
-        columns.push({
+        // One to one inference candidates
+        if (typeof cidl_type === "object" && "Object" in cidl_type) {
+          const referencedModelName = cidl_type.Object;
+          const referencedModelDecl =
+            this.modelDecls.get(referencedModelName)?.[0];
+          if (referencedModelDecl) {
+            this.inferBuilder.addOneToOne({
+              modelName: name,
+              propertyName: prop.getName(),
+              referencedModelName,
+            });
+          }
+          continue;
+        }
+
+        // One to many and many to many inference candidates
+        if (
+          typeof cidl_type === "object" &&
+          "Array" in cidl_type &&
+          typeof cidl_type.Array === "object" &&
+          "Object" in cidl_type.Array
+        ) {
+          const referencedModelName = cidl_type.Array.Object;
+          const referencedModelDecl =
+            this.modelDecls.get(referencedModelName)?.[0];
+
+          // Could be either 1:M or M:M
+          if (referencedModelDecl) {
+            this.inferBuilder.addMany({
+              modelName: name,
+              propertyName: prop.getName(),
+              referencedModelName,
+            });
+          }
+          continue;
+        }
+
+        const column: D1Column = {
           foreign_key_reference: null,
+          unique_ids: [],
+          composite_id: null,
           value: {
             name: prop.getName(),
             cidl_type,
           },
+        };
+
+        // Infer primary key based on column name
+        const normalizedColumnName = normalizeName(prop.getName());
+        const normalizedModelName = normalizeName(name);
+        if (
+          normalizedColumnName === "id" ||
+          normalizedColumnName === `${normalizedModelName}id`
+        ) {
+          primary_key_columns.push(column);
+        } else {
+          columns.push(column);
+        }
+        continue;
+      }
+
+      // KeyParam decorators
+      const keyParamDecorator = getPropDecorator(
+        PropertyDecoratorKind.KeyParam,
+      );
+      if (keyParamDecorator) {
+        key_params.push(prop.getName());
+        continue;
+      }
+
+      // KV decorators
+      const kvDecorator = getPropDecorator(PropertyDecoratorKind.KV);
+      if (kvDecorator) {
+        const format = getDecoratorArgument(kvDecorator, 0);
+        const namespace_binding = getDecoratorArgument(kvDecorator, 1);
+        if (!format || !namespace_binding) {
+          return err(ExtractorErrorCode.InvalidTypescriptSyntax, (e) => {
+            e.snippet = prop.getText();
+            e.context = prop.getName();
+          });
+        }
+
+        const isPaginated =
+          typeof cidl_type === "object" && "Paginated" in cidl_type;
+        const unwrapped = isPaginated
+          ? (cidl_type as { Paginated: CidlType }).Paginated
+          : cidl_type;
+
+        if (typeof unwrapped === "string") {
+          return err(ExtractorErrorCode.MissingKValue, (e) => {
+            e.snippet = prop.getText();
+            e.context = prop.getName();
+          });
+        }
+
+        if (!("KvObject" in unwrapped)) {
+          return err(ExtractorErrorCode.MissingKValue, (e) => {
+            e.snippet = prop.getText();
+            e.context = prop.getName();
+          });
+        }
+        const inner = unwrapped.KvObject;
+
+        if (typeof inner === "object" && "Object" in inner) {
+          if (
+            !this.extractedPoos.has(inner.Object) &&
+            !this.modelDecls.has(inner.Object)
+          ) {
+            const res = this.poo(
+              classDecl.getSourceFile().getClassOrThrow(inner.Object),
+              classDecl.getSourceFile(),
+            );
+
+            if (res.isLeft()) {
+              res.value.addContext((prev) => `${prop.getName()}.${prev}`);
+              return res;
+            }
+          }
+        }
+
+        kv_objects.push({
+          format,
+          namespace_binding,
+          value: {
+            name: prop.getName(),
+            cidl_type: inner,
+          },
+          list_prefix: isPaginated,
         });
         continue;
       }
 
-      const decorator = decorators[0];
-      const decoratorName = getDecoratorName(decorator);
-      const model_reference = getObjectName(cidl_type);
-
-      // Process decorator
-      switch (decoratorName) {
-        case PropertyDecoratorKind.PrimaryKey: {
-          primary_key = {
-            name: prop.getName(),
-            cidl_type,
-          };
-          break;
-        }
-        case PropertyDecoratorKind.ForeignKey: {
-          columns.push({
-            foreign_key_reference: getDecoratorArgument(decorator, 0) ?? null,
-            value: {
-              name: prop.getName(),
-              cidl_type,
-            },
+      // R2 decorators
+      const r2Decorator = getPropDecorator(PropertyDecoratorKind.R2);
+      if (r2Decorator) {
+        const format = getDecoratorArgument(r2Decorator, 0);
+        const bucket_binding = getDecoratorArgument(r2Decorator, 1);
+        if (!format || !bucket_binding) {
+          return err(ExtractorErrorCode.InvalidTypescriptSyntax, (e) => {
+            e.snippet = prop.getText();
+            e.context = prop.getName();
           });
-          break;
         }
-        case PropertyDecoratorKind.OneToOne: {
-          const selector = getSelectorPropertyName(decorator);
-          if (selector.isLeft()) {
-            return err(ExtractorErrorCode.InvalidSelectorSyntax, (e) => {
-              e.snippet = prop.getText();
-              e.context = prop.getName();
-            });
-          }
 
-          // Error: navigation properties require a model reference
-          if (!model_reference) {
-            return err(ExtractorErrorCode.InvalidSelectorSyntax, (e) => {
-              e.snippet = prop.getText();
-              e.context = prop.getName();
-            });
-          }
+        const isPaginated =
+          typeof cidl_type === "object" && "Paginated" in cidl_type;
+        const unwrapped = isPaginated
+          ? (cidl_type as { Paginated: CidlType }).Paginated
+          : cidl_type;
 
-          navigation_properties.push({
-            var_name: prop.getName(),
-            model_reference,
-            kind: { OneToOne: { column_reference: selector.unwrap() } },
+        if (unwrapped !== "R2Object") {
+          return err(ExtractorErrorCode.MissingR2ObjectBody, (e) => {
+            e.snippet = prop.getText();
+            e.context = prop.getName();
           });
-          break;
         }
-        case PropertyDecoratorKind.OneToMany: {
-          const selector = getSelectorPropertyName(decorator);
-          if (selector.isLeft()) {
-            return err(ExtractorErrorCode.InvalidSelectorSyntax, (e) => {
-              e.snippet = prop.getText();
-              e.context = prop.getName();
-            });
-          }
 
-          // Error: navigation properties require a model reference
-          if (!model_reference) {
-            return err(ExtractorErrorCode.InvalidNavigationProperty, (e) => {
-              e.snippet = prop.getText();
-              e.context = prop.getName();
-            });
-          }
+        r2_objects.push({
+          format,
+          bucket_binding,
+          var_name: prop.getName(),
+          list_prefix: isPaginated,
+        });
+        continue;
+      }
 
-          navigation_properties.push({
-            var_name: prop.getName(),
-            model_reference,
-            kind: { OneToMany: { column_reference: selector.unwrap() } },
-          });
-          break;
+      // FK decorators
+      const foreignKeyDecorator = getPropDecorator(
+        PropertyDecoratorKind.ForeignKey,
+      );
+      let foreign_key_reference: ForeignKeyReference | null = null;
+      if (foreignKeyDecorator) {
+        const selectorModelNameRes = getSelectorModelName(foreignKeyDecorator);
+        if (selectorModelNameRes.isLeft()) {
+          selectorModelNameRes.value.context = prop.getName();
+          selectorModelNameRes.value.snippet = prop.getText();
+          return selectorModelNameRes;
         }
-        case PropertyDecoratorKind.ManyToMany: {
-          // Error: navigation properties require a model reference
-          if (!model_reference) {
-            return err(ExtractorErrorCode.InvalidNavigationProperty, (e) => {
-              e.snippet = prop.getText();
-              e.context = prop.getName();
-            });
-          }
 
-          navigation_properties.push({
-            var_name: prop.getName(),
-            model_reference,
-            kind: "ManyToMany",
-          });
-          break;
+        const selectorPropertyNameRes =
+          getSelectorPropertyName(foreignKeyDecorator);
+        if (selectorPropertyNameRes.isLeft()) {
+          selectorPropertyNameRes.value.context = prop.getName();
+          selectorPropertyNameRes.value.snippet = prop.getText();
+          return selectorPropertyNameRes;
         }
-        case PropertyDecoratorKind.KeyParam: {
-          key_params.push(prop.getName());
-          break;
-        }
-        case PropertyDecoratorKind.KV: {
-          // Format and namespace binding are required
-          const format = getDecoratorArgument(decorator, 0);
-          const namespace_binding = getDecoratorArgument(decorator, 1);
-          if (!format || !namespace_binding) {
-            return err(ExtractorErrorCode.InvalidTypescriptSyntax, (e) => {
-              e.snippet = prop.getText();
-              e.context = prop.getName();
-            });
-          }
 
-          // Ensure that the prop type is a KvObject
-          const isArray = typeof cidl_type === "object" && "Array" in cidl_type;
-          const unwrapped = isArray ? (cidl_type as any).Array : cidl_type;
-          if (!("KvObject" in unwrapped)) {
-            return err(ExtractorErrorCode.MissingKValue, (e) => {
-              e.snippet = prop.getText();
-              e.context = prop.getName();
-            });
-          }
-          const inner = unwrapped.KvObject;
+        foreign_key_reference = {
+          model_name: selectorModelNameRes.unwrap(),
+          column_name: selectorPropertyNameRes.unwrap(),
+        };
+      }
 
-          if (typeof inner === "object" && "Object" in inner) {
-            if (
-              !this.extractedPoos.has(inner.Object) &&
-              !this.modelDecls.has(inner.Object)
-            ) {
-              const res = this.poo(
-                classDecl.getSourceFile().getClassOrThrow(inner.Object),
-                classDecl.getSourceFile(),
-              );
+      const column: D1Column = {
+        foreign_key_reference,
+        unique_ids: [],
+        composite_id: null,
+        value: {
+          name: prop.getName(),
+          cidl_type,
+        },
+      };
 
-              if (res.isLeft()) {
-                res.value.addContext((prev) => `${prop.getName()}.${prev}`);
-                return res;
-              }
-            }
-          }
+      const primaryKeyDecorator = getPropDecorator(
+        PropertyDecoratorKind.PrimaryKey,
+      );
+      if (primaryKeyDecorator) {
+        primary_key_columns.push(column);
+        continue;
+      }
 
-          kv_objects.push({
-            format,
-            namespace_binding,
-            value: {
-              name: prop.getName(),
-              cidl_type: inner,
-            },
-            list_prefix: isArray,
-          });
-          break;
-        }
-        case PropertyDecoratorKind.R2: {
-          // Format and bucket binding are required
-          const format = getDecoratorArgument(decorator, 0);
-          const bucket_binding = getDecoratorArgument(decorator, 1);
-          if (!format || !bucket_binding) {
-            return err(ExtractorErrorCode.InvalidTypescriptSyntax, (e) => {
-              e.snippet = prop.getText();
-              e.context = prop.getName();
-            });
-          }
-
-          // Type must be R2Object
-          const isArray = typeof cidl_type === "object" && "Array" in cidl_type;
-          const unwrapped = isArray ? (cidl_type as any).Array : cidl_type;
-          if (unwrapped !== "R2Object") {
-            return err(ExtractorErrorCode.MissingR2ObjectBody, (e) => {
-              e.snippet = prop.getText();
-              e.context = prop.getName();
-            });
-          }
-
-          r2_objects.push({
-            format,
-            bucket_binding,
-            var_name: prop.getName(),
-            list_prefix: isArray,
-          });
-          break;
-        }
+      // Infer primary key based on column name
+      const normalizedColumnName = normalizeName(prop.getName());
+      const normalizedModelName = normalizeName(name);
+      if (
+        normalizedColumnName === "id" ||
+        normalizedColumnName === `${normalizedModelName}id`
+      ) {
+        primary_key_columns.push(column);
+      } else {
+        columns.push(column);
       }
     }
 
     // Process methods
     for (const m of classDecl.getMethods()) {
-      const httpVerb = m
+      const httpVerbDecorator = m
         .getDecorators()
-        .map(getDecoratorName)
-        .find((name) => Object.values(HttpVerb).includes(name as HttpVerb)) as
-        | HttpVerb
-        | undefined;
+        .find((d) =>
+          Object.values(HttpVerb).includes(getDecoratorName(d) as HttpVerb),
+        );
 
-      if (!httpVerb) {
+      if (!httpVerbDecorator) {
         continue;
       }
 
-      const result = this.method(m, httpVerb);
+      const httpVerb = getDecoratorName(httpVerbDecorator) as HttpVerb;
+
+      const res = dataSourceFromDecorator(name, m.getName(), httpVerbDecorator);
+      if (res.isLeft()) {
+        return res;
+      }
+      const { newDs, definedDs } = res.unwrap();
+      if (newDs) {
+        data_sources[newDs.name] = newDs;
+      }
+      const dataSourceReference =
+        newDs?.name ?? (definedDs ? data_sources[definedDs]?.name : null);
+
+      const result = this.method(m, httpVerb, dataSourceReference);
       if (result.isLeft()) {
         result.value.addContext((prev) => `${m.getName()} ${prev}`);
         return result;
@@ -557,8 +667,9 @@ export class CidlExtractor {
 
     return Either.right({
       name,
+      d1_binding,
       columns,
-      primary_key,
+      primary_key_columns,
       navigation_properties,
       key_params,
       kv_objects,
@@ -614,7 +725,7 @@ export class CidlExtractor {
           });
         }
 
-        const apiMethodRes = this.method(m, HttpVerb.POST); // Verb doesn't matter here
+        const apiMethodRes = this.method(m, HttpVerb.Post); // Verb doesn't matter here
         if (apiMethodRes.isLeft()) {
           return apiMethodRes;
         }
@@ -683,7 +794,8 @@ export class CidlExtractor {
 
   private method(
     method: MethodDeclaration,
-    verb: HttpVerb,
+    httpVerb: HttpVerb,
+    dataSourceReference: string | null = null,
   ): Either<ExtractorError, ApiMethod> {
     // Error: invalid method scope, must be public
     if (method.getScope() != Scope.Public) {
@@ -758,12 +870,13 @@ export class CidlExtractor {
 
     return Either.right({
       name: method.getName(),
-      http_verb: verb,
+      http_verb: httpVerb,
       is_static: method.isStatic(),
       return_media: defaultMediaType(),
       return_type: typeRes.unwrap(),
       parameters_media: defaultMediaType(),
       parameters,
+      data_source: dataSourceReference,
     });
   }
 
@@ -843,7 +956,7 @@ export class CidlExtractor {
     sourceFile: SourceFile,
   ): Either<ExtractorError, WranglerEnv> {
     const vars: Record<string, CidlType> = {};
-    let d1_binding: string | undefined = undefined;
+    const d1_bindings: string[] = [];
     const kv_bindings: string[] = [];
     const r2_bindings: string[] = [];
 
@@ -854,9 +967,8 @@ export class CidlExtractor {
         return checkModifierRes;
       }
 
-      // TODO: Support multiple D1 bindings
       if (getTypeText(prop.getType()) === "D1Database") {
-        d1_binding = prop.getName();
+        d1_bindings.push(prop.getName());
         continue;
       }
 
@@ -883,7 +995,7 @@ export class CidlExtractor {
     return Either.right({
       name: classDecl.getName()!,
       source_path: sourceFile.getFilePath().toString(),
-      d1_binding,
+      d1_bindings,
       kv_bindings,
       r2_bindings,
       vars,
@@ -965,14 +1077,14 @@ export class CidlExtractor {
     const symbolName = unwrappedType.getSymbol()?.getName();
     const aliasName = unwrappedType.getAliasSymbol()?.getName();
 
-    if (aliasName === "DataSourceOf") {
+    if (symbolName === "DataSource") {
       const [_, genericTyNullable] = unwrapNullable(genericTy);
       const genericTyGenerics = [
         ...genericTy.getAliasTypeArguments(),
         ...genericTy.getTypeArguments(),
       ];
 
-      // Expect DataSourceOf to be of the exact form DataSource<Model>
+      // Expect DataSource to be of the exact form DataSource<Model>
       if (
         genericTyNullable ||
         genericTy.isUnion() ||
@@ -1025,6 +1137,12 @@ export class CidlExtractor {
       return wrapGeneric(genericTy, nullable, (inner) => ({ KvObject: inner }));
     }
 
+    if (symbolName === "Paginated") {
+      return wrapGeneric(genericTy, nullable, (inner) => ({
+        Paginated: inner,
+      }));
+    }
+
     if (symbolName === Promise.name || aliasName === "IncludeTree") {
       return wrapGeneric(genericTy, nullable, (inner) => inner);
     }
@@ -1056,228 +1174,6 @@ export class CidlExtractor {
     ): Either<ExtractorError, CidlType> {
       const res = CidlExtractor.cidlType(t, inject);
       return res.map((inner) => wrapNullable(wrapper(inner), isNullable));
-    }
-  }
-
-  /**
-   * Mutates the property declaration to add inferred decorators based on naming conventions.
-   */
-  private inferModelDecorator(
-    prop: PropertyDeclaration,
-    classDecl: ClassDeclaration,
-    cidlType: CidlType,
-  ): Either<ExtractorError, void> | void {
-    const className = classDecl.getName()!;
-    const objectName = getObjectName(cidlType);
-    const normalizedPropName = normalizeName(prop.getName());
-
-    // Primary Key
-    if (
-      normalizedPropName === "id" ||
-      normalizedPropName === `${className.toLowerCase()}id`
-    ) {
-      // Add a primary key decorator
-      prop.addDecorator({
-        name: PropertyDecoratorKind.PrimaryKey,
-        arguments: [],
-      });
-      return;
-    }
-
-    // Foreign Key
-    if (normalizedPropName.endsWith("id")) {
-      const referencedNavName = prop
-        .getName()
-        .slice(
-          0,
-          prop.getName().length - (normalizedPropName.endsWith("_id") ? 3 : 2),
-        );
-
-      const oneToOneProperties = classDecl
-        .getProperties()
-        .filter((p) => p.getName() === referencedNavName);
-
-      if (oneToOneProperties.length > 1) {
-        console.warn(`
-          Cannot infer ForeignKey relationship due to ambiguity, model ${className}, property ${prop.getName()}
-          could match ${oneToOneProperties.map((p) => p.getName()).join(", ")}
-          `);
-        return;
-      }
-
-      // If a one to one property exists with the expected name, use that
-      if (oneToOneProperties[0] !== undefined) {
-        const oneToOneProperty = oneToOneProperties[0];
-
-        const navModelTypeRes = CidlExtractor.cidlType(
-          oneToOneProperty?.getType(),
-        );
-        if (navModelTypeRes.isLeft()) {
-          navModelTypeRes.value.context = prop.getName();
-          navModelTypeRes.value.snippet = prop.getText();
-          return navModelTypeRes;
-        }
-
-        const navModelType = navModelTypeRes.unwrap();
-        const objectName = getObjectName(navModelType);
-
-        if (objectName) {
-          // Add a foreign key decorator
-          prop.addDecorator({
-            name: PropertyDecoratorKind.ForeignKey,
-            arguments: [objectName],
-          });
-
-          return;
-        }
-      }
-
-      if (objectName !== undefined) {
-        const oneToManyClassDecl = this.modelDecls.get(objectName)?.[0];
-        const containsOneToManyProp = oneToManyClassDecl
-          ?.getProperties()
-          .filter((p) => {
-            const tyRes = CidlExtractor.cidlType(p.getType());
-            if (tyRes.isLeft()) {
-              return false;
-            }
-
-            const ty = tyRes.unwrap();
-            const navObjectName = getObjectName(ty);
-            if (navObjectName !== className) {
-              return false;
-            }
-
-            if (typeof ty === "string" || !("Array" in ty)) {
-              return false;
-            }
-
-            return true;
-          });
-
-        if (containsOneToManyProp) {
-          if (containsOneToManyProp.length > 1) {
-            console.warn(`
-              Cannot infer ForeignKey relationship due to ambiguity, model ${className}, property ${prop.getName()}
-              could match ${containsOneToManyProp.map((p) => p.getName()).join(", ")}
-              `);
-            return;
-          }
-
-          // Add a foreign key decorator
-          prop.addDecorator({
-            name: PropertyDecoratorKind.ForeignKey,
-            arguments: [objectName],
-          });
-          return;
-        }
-      }
-    }
-
-    // One to Many + Many to Many
-    if (
-      objectName !== undefined &&
-      typeof cidlType !== "string" &&
-      "Array" in cidlType
-    ) {
-      const referencedModelDecl = this.modelDecls.get(objectName)?.[0];
-      const normalizedModelIdName = `${normalizeName(className)}id`;
-
-      const foreignKeyProps: PropertyDeclaration[] = [];
-      const manyToManyProps: PropertyDeclaration[] = [];
-
-      for (const prop of referencedModelDecl?.getProperties() ?? []) {
-        const tyRes = CidlExtractor.cidlType(prop.getType());
-        if (tyRes.isLeft()) {
-          continue;
-        }
-
-        const ty = tyRes.unwrap();
-        const navObjectName = getObjectName(ty);
-        const normalizedPropName = normalizeName(prop.getName());
-
-        if (
-          typeof ty !== "string" &&
-          "Array" in ty &&
-          navObjectName === className
-        ) {
-          // Many to Many
-          manyToManyProps.push(prop);
-        } else if (normalizedPropName === normalizedModelIdName) {
-          // One to Many
-          foreignKeyProps.push(prop);
-        }
-      }
-
-      if (foreignKeyProps.length > 1) {
-        console.warn(`
-          Cannot infer OneToMany relationship due to ambiguity, model ${className}, property ${prop.getName()}
-          could match ${foreignKeyProps.map((p) => p.getName()).join(", ")}
-          `);
-        return;
-      }
-
-      if (manyToManyProps.length > 1) {
-        console.warn(`
-          Cannot infer ManyToMany relationship due to ambiguity, model ${className}, property ${prop.getName()}
-          could match ${manyToManyProps.map((p) => p.getName()).join(", ")}
-          `);
-        return;
-      }
-
-      const hasForeignKeyProp = foreignKeyProps.at(0);
-      const hasManyToManyProp = manyToManyProps.at(0);
-      if (hasForeignKeyProp && hasManyToManyProp) {
-        console.warn(`
-          Cannot infer relationship due to ambiguity, model ${className}, property ${prop.getName()}
-          could be OneToMany or ManyToMany
-          `);
-        return;
-      }
-
-      if (hasForeignKeyProp) {
-        // Add a one to many decorator
-        prop.addDecorator({
-          name: PropertyDecoratorKind.OneToMany,
-          arguments: [`(m: any) => m.${hasForeignKeyProp.getName()}`],
-        });
-        return;
-      }
-
-      if (hasManyToManyProp) {
-        // Add a many to many decorator
-        prop.addDecorator({
-          name: PropertyDecoratorKind.ManyToMany,
-          arguments: [],
-        });
-        return;
-      }
-    }
-
-    // One to One
-    if (objectName !== undefined) {
-      const normalizedPropIdName = `${normalizedPropName}id`;
-      const foreignKeyProps = classDecl.getProperties().filter((p) => {
-        const norm = normalizeName(p.getName());
-        return norm === normalizedPropIdName;
-      });
-
-      if (foreignKeyProps.length > 1) {
-        console.warn(`
-          Cannot infer OneToOne relationship due to ambiguity, model ${className}, property ${prop.getName()}
-          could match ${foreignKeyProps.map((p) => p.getName()).join(", ")}
-          `);
-      }
-
-      if (foreignKeyProps.at(0) !== undefined) {
-        const foreignKey = foreignKeyProps[0];
-        // Add a one to one decorator
-        prop.addDecorator({
-          name: PropertyDecoratorKind.OneToOne,
-          arguments: [`(_m: any) => m.${foreignKey.getName()}`],
-        });
-        return;
-      }
     }
   }
 }
@@ -1314,6 +1210,46 @@ function getDecoratorArgument(
   return arg.getLiteralValue();
 }
 
+function getSelectorModelName(
+  decorator: Decorator,
+): Either<ExtractorError, string> {
+  const call = decorator.getCallExpression();
+  const selectorType = call?.getTypeArguments()[0];
+
+  if (!selectorType) {
+    return err(ExtractorErrorCode.InvalidSelectorSyntax);
+  }
+
+  return Either.right(
+    selectorType
+      .getText()
+      .replace(/^typeof\s+/, "")
+      .trim(),
+  );
+}
+
+function getSelectorPropertyName(
+  decorator: Decorator,
+): Either<ExtractorError, string> {
+  const call = decorator.getCallExpression();
+  const selector = call?.getArguments()[0];
+
+  if (!selector?.isKind(SyntaxKind.ArrowFunction)) {
+    return err(ExtractorErrorCode.InvalidSelectorSyntax);
+  }
+
+  const body = selector.getBody();
+  if (!body.isKind(SyntaxKind.PropertyAccessExpression)) {
+    return err(ExtractorErrorCode.InvalidSelectorSyntax);
+  }
+
+  return Either.right(body.getName());
+}
+
+function isPropertyDecoratorKind(name: string): name is PropertyDecoratorKind {
+  return (Object.values(PropertyDecoratorKind) as string[]).includes(name);
+}
+
 function getRootType(t: CidlType): CidlType {
   if (typeof t === "string") {
     return t;
@@ -1331,6 +1267,10 @@ function getRootType(t: CidlType): CidlType {
     return getRootType(t.HttpResult);
   }
 
+  if ("Paginated" in t) {
+    return getRootType(t.Paginated);
+  }
+
   return t;
 }
 
@@ -1345,6 +1285,146 @@ function getObjectName(t: CidlType): string | undefined {
   }
 
   return undefined;
+}
+
+function dataSourceFromDecorator(
+  modelName: string,
+  methodName: string,
+  decorator: Decorator,
+): Either<
+  ExtractorError,
+  { newDs: DataSource | null; definedDs: string | null }
+> {
+  const decoratorArg = decorator.getArguments()[0];
+  if (!decoratorArg) {
+    return Either.right({
+      newDs: null,
+      definedDs: null,
+    });
+  }
+
+  // Reference to static property on the model
+  if (MorphNode.isPropertyAccessExpression(decoratorArg)) {
+    const propName = decoratorArg.getName();
+    return Either.right({
+      newDs: null,
+      definedDs: propName,
+    });
+  }
+
+  const invalidIncludeTree = err(
+    ExtractorErrorCode.InvalidDataSourceDefinition,
+    (e) => {
+      e.snippet = decoratorArg.getText();
+      e.context = `Invalid includeTree definition for data source on ${modelName}.${methodName}`;
+    },
+  );
+
+  // Defined inline object literal
+  if (MorphNode.isObjectLiteralExpression(decoratorArg)) {
+    const includeTreeProp = decoratorArg.getProperty("includeTree");
+    let includeTree = {};
+    if (includeTreeProp) {
+      if (!MorphNode.isPropertyAssignment(includeTreeProp)) {
+        return invalidIncludeTree;
+      }
+
+      const initializer = includeTreeProp.getInitializer();
+      if (!initializer?.isKind(SyntaxKind.ObjectLiteralExpression)) {
+        return invalidIncludeTree;
+      }
+
+      includeTree = parseIncludeTree(initializer as ObjectLiteralExpression);
+    }
+
+    const listParamsProp = decoratorArg.getProperty("listParams");
+    let list_params: CrudListParam[] = [];
+    if (listParamsProp) {
+      const res = parseListParams(listParamsProp, `${modelName}.${methodName}`);
+      if (res.isLeft()) {
+        return res;
+      }
+      list_params = res.unwrap();
+    }
+
+    return Either.right({
+      newDs: {
+        name: `${modelName}:${methodName}`,
+        tree: includeTree,
+        is_private: true,
+        list_params,
+      },
+      definedDs: null,
+    });
+  }
+
+  // Defined in a constant outside the model
+  if (MorphNode.isIdentifier(decoratorArg)) {
+    const sourceFile = decoratorArg.getSourceFile();
+    const decl = sourceFile.getVariableDeclaration(decoratorArg.getText());
+    if (!decl) {
+      return err(ExtractorErrorCode.InvalidDataSourceDefinition, (e) => {
+        e.snippet = decoratorArg.getText();
+        e.context = `Data source ${decoratorArg.getText()} not found for ${modelName}.${methodName}`;
+      });
+    }
+
+    const initializer = decl.getInitializer();
+    if (
+      !initializer ||
+      !initializer.isKind(SyntaxKind.ObjectLiteralExpression)
+    ) {
+      return err(ExtractorErrorCode.InvalidDataSourceDefinition, (e) => {
+        e.snippet = decoratorArg.getText();
+        e.context = `Data source ${decoratorArg.getText()} must be an object literal for ${modelName}.${methodName}`;
+      });
+    }
+
+    const includeTreeProp = initializer.getProperty("includeTree");
+    let includeTree = {};
+    if (includeTreeProp) {
+      if (!MorphNode.isPropertyAssignment(includeTreeProp)) {
+        return invalidIncludeTree;
+      }
+
+      const includeTreeInitializer = includeTreeProp.getInitializer();
+      if (
+        !includeTreeInitializer ||
+        !includeTreeInitializer.isKind(SyntaxKind.ObjectLiteralExpression)
+      ) {
+        return invalidIncludeTree;
+      }
+
+      includeTree = parseIncludeTree(
+        includeTreeInitializer as ObjectLiteralExpression,
+      );
+    }
+
+    const listParamsProp = initializer.getProperty("listParams");
+    let list_params: CrudListParam[] = [];
+    if (listParamsProp) {
+      const res = parseListParams(listParamsProp, decoratorArg.getText());
+      if (res.isLeft()) {
+        return res;
+      }
+      list_params = res.unwrap();
+    }
+
+    return Either.right({
+      newDs: {
+        name: `${modelName}:${methodName}`,
+        tree: includeTree,
+        is_private: true,
+        list_params,
+      },
+      definedDs: decoratorArg.getText(),
+    });
+  }
+
+  return err(ExtractorErrorCode.InvalidDataSourceDefinition, (e) => {
+    e.snippet = decoratorArg.getText();
+    e.context = `Invalid data source definition for ${modelName}.${methodName}`;
+  });
 }
 
 function parseIncludeTree(
@@ -1369,6 +1449,61 @@ function parseIncludeTree(
   return result;
 }
 
+function parseListParams(
+  listParamsProp: any,
+  contextName: string,
+): Either<ExtractorError, CrudListParam[]> {
+  if (!MorphNode.isPropertyAssignment(listParamsProp)) {
+    return err(ExtractorErrorCode.InvalidDataSourceDefinition, (e) => {
+      e.snippet = listParamsProp.getText();
+      e.context = `listParams must be a property assignment for ${contextName}`;
+    });
+  }
+
+  const initializer = listParamsProp.getInitializer();
+  if (!initializer?.isKind(SyntaxKind.ArrayLiteralExpression)) {
+    return err(ExtractorErrorCode.InvalidDataSourceDefinition, (e) => {
+      e.snippet = listParamsProp.getText();
+      e.context = `listParams must be an array literal for ${contextName}`;
+    });
+  }
+
+  const elements = (initializer as any).getElements();
+  const listParams: CrudListParam[] = [];
+  const paramMap: Record<string, CrudListParam> = {
+    lastseen: "LastSeen",
+    limit: "Limit",
+    offset: "Offset",
+  };
+
+  for (const elem of elements) {
+    let paramValue = "";
+
+    if (elem.isKind(SyntaxKind.StringLiteral)) {
+      paramValue = elem.getLiteralValue();
+    } else if (elem.isKind(SyntaxKind.Identifier)) {
+      paramValue = elem.getText();
+    } else {
+      return err(ExtractorErrorCode.InvalidDataSourceDefinition, (e) => {
+        e.snippet = elem.getText();
+        e.context = `listParams array elements must be strings or identifiers for ${contextName}`;
+      });
+    }
+
+    const normalized = paramMap[paramValue.toLowerCase()];
+    if (!normalized) {
+      return err(ExtractorErrorCode.InvalidDataSourceDefinition, (e) => {
+        e.snippet = elem.getText();
+        e.context = `"${paramValue}" is not a valid list parameter. Valid values are: "lastSeen", "limit", "offset" for ${contextName}`;
+      });
+    }
+
+    listParams.push(normalized);
+  }
+
+  return Either.right(listParams);
+}
+
 function checkPropertyModifier(
   prop: PropertyDeclaration,
 ): Either<ExtractorError, null> {
@@ -1380,28 +1515,6 @@ function checkPropertyModifier(
     });
   }
   return Either.right(null);
-}
-
-function normalizeName(name: string): string {
-  return name.toLowerCase().replace(/_/g, "");
-}
-
-function getSelectorPropertyName(
-  decorator: Decorator,
-): Either<ExtractorError, string> {
-  const call = decorator.getCallExpression();
-  const selector = call?.getArguments()[0];
-
-  if (!selector?.isKind(SyntaxKind.ArrowFunction)) {
-    return err(ExtractorErrorCode.InvalidSelectorSyntax);
-  }
-
-  const body = selector.getBody();
-  if (!body.isKind(SyntaxKind.PropertyAccessExpression)) {
-    return err(ExtractorErrorCode.InvalidSelectorSyntax);
-  }
-
-  return Either.right(body.getName());
 }
 
 /**

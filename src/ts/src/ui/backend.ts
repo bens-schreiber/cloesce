@@ -1,5 +1,7 @@
 import { CrudKind, MediaType } from "../ast.js";
 import { u8ToB64 } from "../common.js";
+import { DataSource } from "../router/orm.js";
+import { DataSourceContainer } from "../router/router.js";
 
 /**
  * cloesce/backend
@@ -7,6 +9,7 @@ import { u8ToB64 } from "../common.js";
 export { CloesceApp, DependencyContainer } from "../router/router.js";
 export type { MiddlewareFn } from "../router/router.js";
 export type { CrudKind } from "../ast.js";
+export type { DataSource } from "../router/orm.js";
 export { Orm } from "../router/orm.js";
 export { R2ObjectBody } from "@cloudflare/workers-types";
 
@@ -32,6 +35,12 @@ export class KValue<V> {
   get value(): V | null {
     return this.raw as V | null;
   }
+}
+
+export interface Paginated<T> {
+  results: T[];
+  cursor: string | null;
+  complete: boolean;
 }
 
 /**
@@ -182,10 +191,22 @@ export type KeysOfType<T, U> = {
  *
  * A stub decorator used by Cloesce to identify model classes.
  *
- * @param _kinds The CRUD kinds supported by this model.
+ * @param _d1Binding The optional D1 database binding name for this model.
  */
 export const Model =
-  (_kinds: CrudKind[] = []): ClassDecorator =>
+  (_d1Binding: string | null = null): ClassDecorator =>
+  () => {};
+
+/**
+ * Defines CRUD operations for a Cloesce Model.
+ *
+ * A stub decorator used by Cloesce to specify which CRUD operations
+ * are available for a model.
+ *
+ * @param _kinds The CRUD kinds supported by this model.
+ */
+export const Crud =
+  (..._kinds: CrudKind[]): ClassDecorator =>
   () => {};
 
 /**
@@ -294,60 +315,80 @@ export const R2 =
  * Exposes a class method as an HTTP GET endpoint.
  * The method will appear in both backend and generated client APIs.
  */
-export const GET: MethodDecorator = () => {};
+export function Get(dataSource?: DataSource<unknown>): MethodDecorator {
+  return function (target, propertyKey) {
+    if (dataSource) {
+      DataSourceContainer.set(
+        target.constructor.name,
+        propertyKey.toString(),
+        dataSource,
+      );
+    }
+  };
+}
 
 /**
  * Exposes a class method as an HTTP POST endpoint.
  * The method will appear in both backend and generated client APIs.
  */
-export const POST: MethodDecorator = () => {};
+export function Post(dataSource?: DataSource<unknown>): MethodDecorator {
+  return function (target, propertyKey) {
+    if (dataSource) {
+      DataSourceContainer.set(
+        target.constructor.name,
+        propertyKey.toString(),
+        dataSource,
+      );
+    }
+  };
+}
 
 /**
  * Exposes a class method as an HTTP PUT endpoint.
  * The method will appear in both backend and generated client APIs.
  */
-export const PUT: MethodDecorator = () => {};
+export function Put(dataSource?: DataSource<unknown>): MethodDecorator {
+  return function (target, propertyKey) {
+    if (dataSource) {
+      DataSourceContainer.set(
+        target.constructor.name,
+        propertyKey.toString(),
+        dataSource,
+      );
+    }
+  };
+}
 
 /**
  * Exposes a class method as an HTTP PATCH endpoint.
  * The method will appear in both backend and generated client APIs.
  */
-export const PATCH: MethodDecorator = () => {};
-
-/**
- * Exposes a class method as an HTTP DEL endpoint.
- * The method will appear in both backend and generated client APIs.
- */
-export const DELETE: MethodDecorator = () => {};
-
-/**
- * Marks a property as a one-to-many navigation property.
- *
- * A stub decorator used by Cloesce to identify one-to-many relationships.
- *
- * @param _selector A selector function that returns the foreign key property on the related model, e.g. `model => model.ownerId`
- *
- * @template T The type of the model to which the navigation property relates.
- */
-export function OneToMany<T>(
-  _selector: (model: T) => T[keyof T],
-): PropertyDecorator {
-  return () => {};
+export function Patch(dataSource?: DataSource<unknown>): MethodDecorator {
+  return function (target, propertyKey) {
+    if (dataSource) {
+      DataSourceContainer.set(
+        target.constructor.name,
+        propertyKey.toString(),
+        dataSource,
+      );
+    }
+  };
 }
 
 /**
- * Marks a property as a one-to-one navigation property.
- *
- * A stub decorator used by Cloesce to identify one-to-one relationships.
- *
- * @param _selector A selector function that returns the foreign key property on this model, e.g. `model => model.profileId`
- *
- * @template T The type of the model containing the navigation property.
+ * Exposes a class method as an HTTP DELETE endpoint.
+ * The method will appear in both backend and generated client APIs.
  */
-export function OneToOne<T>(
-  _selector: (model: T) => T[keyof T],
-): PropertyDecorator {
-  return () => {};
+export function Delete(dataSource?: DataSource<unknown>): MethodDecorator {
+  return function (target, propertyKey) {
+    if (dataSource) {
+      DataSourceContainer.set(
+        target.constructor.name,
+        propertyKey.toString(),
+        dataSource,
+      );
+    }
+  };
 }
 
 /**
@@ -355,10 +396,10 @@ export function OneToOne<T>(
  *
  * A stub decorator used by Cloesce to identify foreign key properties.
  *
- * @param _Model The related model class or its name as a string.
+ * @param _selector Selector for the referenced model key, e.g. @ForeignKey<User>(u => u.id).
  */
 export const ForeignKey =
-  <T>(_Model: T | string): PropertyDecorator =>
+  <T>(_selector: (model: T) => unknown): PropertyDecorator =>
   () => {};
 
 /**
@@ -372,7 +413,7 @@ export const ForeignKey =
  *
  * Example:
  * ```ts
- * ＠POST
+ * ＠Post
  * async neigh(＠Inject env: WranglerEnv) {
  *   return `i am ${this.name}`;
  * }
@@ -401,7 +442,7 @@ type Primitive = string | number | boolean | bigint | symbol | null | undefined;
  * ＠D1
  * export class Person {
  *   ＠PrimaryKey id: number;
- *   ＠OneToMany("personId") dogs: Dog[];
+ *   dogs: Dog[];
  *
  *   ＠DataSource
  *   static readonly default: IncludeTree<Person> = {
@@ -410,52 +451,20 @@ type Primitive = string | number | boolean | bigint | symbol | null | undefined;
  * }
  * ```
  */
-export type IncludeTree<T> = (T extends Primitive
+export type IncludeTree<T> = T extends Primitive
   ? never
   : {
       [K in keyof T]?: T[K] extends (infer U)[]
         ? IncludeTree<NonNullable<U>>
         : IncludeTree<NonNullable<T[K]>>;
-    }) & { __brand?: "IncludeTree" };
-
-/**
- * Represents the name of a `＠DataSource` available on a model type `T`,
- * or `"none"` when no data source (no joins) should be applied.
- *
- * All instantiated model methods implicitly have a Data Source param `__dataSource`.
- *
- * @template T The model type for which to define the data source.
- *
- * Example:
- * ```ts
- * ＠D1
- * export class Person {
- *   ＠PrimaryKey id: number;
- *
- *   ＠DataSource
- *   static readonly default: IncludeTree<Person> = { dogs: {} };
- *
- *   ＠POST
- *   foo(ds: DataSourceOf<Person>) {
- *    // Cloesce won't append an implicit data source param here since it's explicit
- *   }
- * }
- *
- * // on the API client:
- * async foo(ds: "default" | "none"): Promise<void> {...}
- * ```
- */
-export type DataSourceOf<T extends object> = (
-  | KeysOfType<T, IncludeTree<T>>
-  | "none"
-) & { __brand?: "DataSource" };
+    };
 
 /**
  * A branded `number` type indicating that the corresponding
  * SQL column should be created as an `INTEGER`.
  *
  * While all numbers are valid JavaScript types, annotating a
- * field with `Integer` communicates to the Cloesce compiler
+ * field with `Integer` communicates to Cloesce
  * that this property represents an integer column in SQLite.
  *
  * Example:

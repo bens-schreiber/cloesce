@@ -23,13 +23,15 @@ impl WranglerGenerator {
             .expect("Missing or invalid extension");
 
         match extension {
-            "json" => {
-                let val: JsonValue =
-                    serde_json::from_str(contents.as_str()).expect("JSON to be opened");
+            "json" | "jsonc" => {
+                let contents_no_comments = json_comments::StripComments::new(contents.as_bytes());
+                let val: JsonValue = serde_json::from_reader(contents_no_comments)
+                    .unwrap_or(JsonValue::Object(serde_json::Map::new()));
                 WranglerGenerator::Json(val)
             }
             "toml" => {
-                let val: TomlValue = toml::from_str(&contents).expect("Toml to be opened");
+                let val: TomlValue =
+                    toml::from_str(&contents).unwrap_or(TomlValue::Table(toml::Table::new()));
                 WranglerGenerator::Toml(val)
             }
             other => panic!("Unsupported wrangler file extension: {other}"),
@@ -81,6 +83,13 @@ impl WranglerGenerator {
                                 existing.insert(
                                     "database_name".into(),
                                     serde_json::to_value(name).expect("JSON to serialize"),
+                                );
+                            }
+                            if let Some(migrations_dir) = &db.migrations_dir {
+                                existing.insert(
+                                    "migrations_dir".into(),
+                                    serde_json::to_value(migrations_dir)
+                                        .expect("JSON to serialize"),
                                 );
                             }
                         } else {
@@ -179,6 +188,12 @@ impl WranglerGenerator {
                                 existing.insert(
                                     "database_name".to_string(),
                                     TomlValue::String(name.clone()),
+                                );
+                            }
+                            if let Some(migrations_dir) = &db.migrations_dir {
+                                existing.insert(
+                                    "migrations_dir".to_string(),
+                                    TomlValue::String(migrations_dir.clone()),
                                 );
                             }
                         } else {
@@ -291,7 +306,16 @@ pub struct WranglerDefault;
 impl WranglerDefault {
     /// Ensures that all required values exist or places a default
     /// for them
-    pub fn set_defaults(spec: &mut WranglerSpec, ast: &CloesceAst) {
+    pub fn set_defaults(spec: &mut WranglerSpec, ast: &CloesceAst, default_migrations_path: &str) {
+        let default_migrations_path = default_migrations_path
+            .trim_end_matches('/')
+            .trim_end_matches('\\');
+        let default_migrations_path = if default_migrations_path.is_empty() {
+            "migrations"
+        } else {
+            default_migrations_path
+        };
+
         // Generate default worker entry point values
         spec.name = Some(spec.name.clone().unwrap_or_else(|| {
             tracing::warn!("Set a default worker name \"cloesce\"");
@@ -311,40 +335,49 @@ impl WranglerDefault {
 
         // Ensure all bindings referenced in the WranglerEnv exist in the spec
         if let Some(env) = &ast.wrangler_env {
-            if let Some(db_binding) = &env.d1_binding {
+            for d1 in &env.d1_bindings {
                 let db = spec
                     .d1_databases
                     .iter_mut()
-                    .find(|db| db.binding.as_deref() == Some(db_binding));
+                    .find(|db| db.binding.as_deref() == Some(d1));
 
                 match db {
                     Some(db) => {
                         if db.database_id.is_none() {
-                            db.database_id = Some("replace_with_db_id".into());
+                            db.database_id = Some(format!("replace_with_{}_id", d1));
                             tracing::warn!(
                                 "D1 Database with binding {} is missing an id. See https://developers.cloudflare.com/d1/get-started/",
-                                db_binding
+                                d1
                             );
                         }
-
                         if db.database_name.is_none() {
-                            db.database_name = Some("replace_with_db_name".into());
+                            db.database_name = Some(format!("replace_with_{}_name", d1));
                             tracing::warn!(
                                 "D1 Database with binding {} is missing a name. See https://developers.cloudflare.com/d1/get-started/",
-                                db_binding
+                                d1
+                            );
+                        }
+                        if db.migrations_dir.is_none() {
+                            db.migrations_dir = Some(format!("{}/{}", default_migrations_path, d1));
+                            tracing::warn!(
+                                "D1 Database with binding {} is missing a migrations_dir. Defaulting to {}/{}",
+                                d1,
+                                default_migrations_path,
+                                d1
                             );
                         }
                     }
                     None => {
                         spec.d1_databases.push(D1Database {
-                            binding: Some(db_binding.clone()),
-                            database_name: Some("replace_with_db_name".into()),
-                            database_id: Some("replace_with_db_id".into()),
+                            binding: Some(d1.clone()),
+                            database_name: Some(format!("replace_with_{}_name", d1)),
+                            database_id: Some(format!("replace_with_{}_id", d1)),
+                            migrations_dir: Some(format!("{}/{}", default_migrations_path, d1)),
                         });
 
                         tracing::warn!(
                             "D1 Database with binding {} was missing, added a default. See https://developers.cloudflare.com/d1/get-started/",
-                            db_binding
+                            d1
                         );
                     }
                 }
@@ -359,7 +392,7 @@ impl WranglerDefault {
                 match kv {
                     Some(ns) => {
                         if ns.id.is_none() {
-                            ns.id = Some("replace_with_kv_id".into());
+                            ns.id = Some(format!("replace_with_{}_id", kv_binding));
                             tracing::warn!(
                                 "KV Namespace with binding {} is missing an id. See https://developers.cloudflare.com/workers/platform/storage/#namespaces",
                                 kv_binding
@@ -369,7 +402,7 @@ impl WranglerDefault {
                     None => {
                         spec.kv_namespaces.push(KVNamespace {
                             binding: Some(kv_binding.clone()),
-                            id: Some("replace_with_kv_id".into()),
+                            id: Some(format!("replace_with_{}_id", kv_binding)),
                         });
 
                         tracing::warn!(
@@ -389,7 +422,7 @@ impl WranglerDefault {
                 match r2 {
                     Some(bucket) => {
                         if bucket.bucket_name.is_none() {
-                            bucket.bucket_name = Some("replace-with-r2-bucket-name".into());
+                            bucket.bucket_name = Some(format!("replace-with-{}-name", r2_binding));
                             tracing::warn!(
                                 "R2 Bucket with binding {} is missing a bucket name. See https://developers.cloudflare.com/r2/get-started/",
                                 r2_binding
@@ -399,7 +432,7 @@ impl WranglerDefault {
                     None => {
                         spec.r2_buckets.push(ast::R2Bucket {
                             binding: Some(r2_binding.clone()),
-                            bucket_name: Some("replace-with-r2-bucket-name".into()),
+                            bucket_name: Some(format!("replace-with-{}-name", r2_binding)),
                         });
 
                         tracing::warn!(

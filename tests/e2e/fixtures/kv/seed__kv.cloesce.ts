@@ -1,10 +1,5 @@
-import { KV, KValue, WranglerEnv, KeyParam, Model } from "cloesce/backend";
-import { D1Database } from "@cloudflare/workers-types";
-
-class KValue<T> {}
-class KVNamespace {}
-type Integer = number & { __kind: "Integer" };
-type IncludeTree<T> = { [K in keyof T] };
+import { KV, KValue, Paginated, WranglerEnv, KeyParam, Model, DataSource, Integer, Post, Crud } from "cloesce/backend";
+import { D1Database, KVNamespace } from "@cloudflare/workers-types";
 
 @WranglerEnv
 export class Env {
@@ -13,7 +8,8 @@ export class Env {
   otherNamespace: KVNamespace;
 }
 
-@Model(["GET", "SAVE"])
+@Crud("GET", "SAVE")
+@Model()
 export class PureKVModel {
   @KeyParam
   id: string;
@@ -23,14 +19,10 @@ export class PureKVModel {
 
   @KV("path/to/other/{id}", "otherNamespace")
   otherData: KValue<string>;
-
-  static readonly default: IncludeTree<PureKVModel> = {
-    data: {},
-    otherData: {},
-  };
 }
 
-@Model(["GET", "SAVE", "LIST"])
+@Crud("GET", "SAVE", "LIST")
+@Model("db")
 export class D1BackedModel {
   id: Integer;
 
@@ -42,8 +34,19 @@ export class D1BackedModel {
 
   @KV("d1Backed/{id}/{keyParam}/{someColumn}/{someOtherColumn}", "namespace")
   kvData: KValue<unknown>;
+}
 
-  static readonly default: IncludeTree<D1BackedModel> = {
-    kvData: {},
-  };
+@Crud("GET")
+@Model()
+export class PaginatedKVModel {
+  @KeyParam
+  id: string;
+
+  @KV("paginated/items/", "namespace")
+  items: Paginated<KValue<unknown>>;
+
+  @Post()
+  static acceptPaginated(ps: Paginated<KValue<unknown>>): Paginated<KValue<unknown>> {
+    return ps;
+  }
 }

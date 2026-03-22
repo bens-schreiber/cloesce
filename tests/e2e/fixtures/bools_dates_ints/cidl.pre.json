@@ -3,7 +3,9 @@
     "wrangler_env": {
         "name": "Env",
         "source_path": "./seed__bools_dates_ints.cloesce.ts",
-        "d1_binding": "db",
+        "d1_bindings": [
+            "db"
+        ],
         "kv_bindings": [],
         "r2_bindings": [],
         "vars": {}
@@ -11,9 +13,12 @@
     "models": {
         "Weather": {
             "name": "Weather",
+            "d1_binding": "db",
             "columns": [
                 {
                     "foreign_key_reference": null,
+                    "unique_ids": [],
+                    "composite_id": null,
                     "value": {
                         "name": "date",
                         "cidl_type": "DateIso"
@@ -21,16 +26,25 @@
                 },
                 {
                     "foreign_key_reference": null,
+                    "unique_ids": [],
+                    "composite_id": null,
                     "value": {
                         "name": "isRaining",
                         "cidl_type": "Boolean"
                     }
                 }
             ],
-            "primary_key": {
-                "name": "id",
-                "cidl_type": "Integer"
-            },
+            "primary_key_columns": [
+                {
+                    "foreign_key_reference": null,
+                    "unique_ids": [],
+                    "composite_id": null,
+                    "value": {
+                        "name": "id",
+                        "cidl_type": "Integer"
+                    }
+                }
+            ],
             "navigation_properties": [],
             "key_params": [],
             "kv_objects": [],

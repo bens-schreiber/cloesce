@@ -6,11 +6,12 @@ name = "cloesce"
 binding = "db"
 database_id = "replace_with_db_id"
 database_name = "replace_with_db_name"
+migrations_dir = "migrations/db"
 
 [[r2_buckets]]
 binding = "bucket1"
-bucket_name = "replace-with-r2-bucket-name"
+bucket_name = "replace-with-bucket1-name"
 
 [[r2_buckets]]
 binding = "bucket2"
-bucket_name = "replace-with-r2-bucket-name"
+bucket_name = "replace-with-bucket2-name"

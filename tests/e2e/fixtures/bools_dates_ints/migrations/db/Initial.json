@@ -1,0 +1,45 @@
+{
+  "hash": 14113549040013838164,
+  "models": {
+    "Weather": {
+      "hash": 10306382131681195126,
+      "name": "Weather",
+      "d1_binding": "db",
+      "primary_key_columns": [
+        {
+          "hash": 6397878138472974760,
+          "value": {
+            "name": "id",
+            "cidl_type": "Integer"
+          },
+          "foreign_key_reference": null,
+          "unique_ids": [],
+          "composite_id": null
+        }
+      ],
+      "columns": [
+        {
+          "hash": 7419779783954734969,
+          "value": {
+            "name": "date",
+            "cidl_type": "DateIso"
+          },
+          "foreign_key_reference": null,
+          "unique_ids": [],
+          "composite_id": null
+        },
+        {
+          "hash": 5134907052289059425,
+          "value": {
+            "name": "isRaining",
+            "cidl_type": "Boolean"
+          },
+          "foreign_key_reference": null,
+          "unique_ids": [],
+          "composite_id": null
+        }
+      ],
+      "navigation_properties": []
+    }
+  }
+}

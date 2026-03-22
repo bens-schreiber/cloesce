@@ -5,13 +5,13 @@ export class BlobService {
     blob: Uint8Array,
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Uint8Array>> {
-    const baseUrl = new URL("http://localhost:5002/api/BlobService/incrementBlob");
+    const baseUrl = new URL("http://localhost:5668/api/BlobService/incrementBlob");
     const payload: any = {};
 
     payload["blob"] = blob;
 
     const res = await fetchImpl(baseUrl, {
-      method: "POST",
+      method: "Post",
       headers: { "Content-Type": "application/json" },
       body: requestBody(MediaType.Json, payload),
     });
@@ -32,18 +32,18 @@ export class BlobHaver {
 
   static async GET(
     id: number,
-    __datasource: "none" = "none",
+    __datasource: "default" = "default",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<BlobHaver>> {
     const baseUrl = new URL(
-      `http://localhost:5002/api/BlobHaver/GET`
+      `http://localhost:5668/api/BlobHaver/GET`
     );
 
     baseUrl.searchParams.append("id", String(id));
     baseUrl.searchParams.append("__datasource", String(__datasource));
 
     const res = await fetchImpl(baseUrl, {
-      method: "GET",
+      method: "Get",
     });
 
     return await HttpResult.fromResponse(
@@ -54,17 +54,23 @@ export class BlobHaver {
     );
   }
   static async LIST(
-    __datasource: "none" = "none",
+    lastSeen_id: number | null,
+    limit: number | null,
+    offset: number | null,
+    __datasource: "default" = "default",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<BlobHaver[]>> {
     const baseUrl = new URL(
-      `http://localhost:5002/api/BlobHaver/LIST`
+      `http://localhost:5668/api/BlobHaver/LIST`
     );
 
+    baseUrl.searchParams.append("lastSeen_id", String(lastSeen_id));
+    baseUrl.searchParams.append("limit", String(limit));
+    baseUrl.searchParams.append("offset", String(offset));
     baseUrl.searchParams.append("__datasource", String(__datasource));
 
     const res = await fetchImpl(baseUrl, {
-      method: "GET",
+      method: "Get",
     });
 
     return await HttpResult.fromResponse(
@@ -76,11 +82,11 @@ export class BlobHaver {
   }
   static async SAVE(
     model: DeepPartial<BlobHaver>,
-    __datasource: "none" = "none",
+    __datasource: "default" = "default",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<BlobHaver>> {
     const baseUrl = new URL(
-      `http://localhost:5002/api/BlobHaver/SAVE`
+      `http://localhost:5668/api/BlobHaver/SAVE`
     );
     const payload: any = {};
 
@@ -88,7 +94,7 @@ export class BlobHaver {
     baseUrl.searchParams.append("__datasource", String(__datasource));
 
     const res = await fetchImpl(baseUrl, {
-      method: "POST",
+      method: "Post",
       headers: { "Content-Type": "application/json" },
       body: requestBody(MediaType.Json, payload),
     });
@@ -101,20 +107,18 @@ export class BlobHaver {
     );
   }
   async getBlob1(
-    __datasource: "none" = "none",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Uint8Array>> {
     const id = [
-      encodeURIComponent(String(this.id)),
+    encodeURIComponent(String(this.id)),
     ].join("/");
     const baseUrl = new URL(
-      `http://localhost:5002/api/BlobHaver/${id}/getBlob1`
+      `http://localhost:5668/api/BlobHaver/${id}/getBlob1`
     );
 
-    baseUrl.searchParams.append("__datasource", String(__datasource));
 
     const res = await fetchImpl(baseUrl, {
-      method: "GET",
+      method: "Get",
     });
 
     return await HttpResult.fromResponse(
@@ -129,14 +133,14 @@ export class BlobHaver {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<void>> {
     const baseUrl = new URL(
-      `http://localhost:5002/api/BlobHaver/inputStream`
+      `http://localhost:5668/api/BlobHaver/inputStream`
     );
     const payload: any = {};
 
     payload["stream"] = stream;
 
     const res = await fetchImpl(baseUrl, {
-      method: "POST",
+      method: "Post",
       headers: { "Content-Type": "application/octet-stream" },
       body: requestBody(MediaType.Octet, payload),
     });
@@ -149,20 +153,18 @@ export class BlobHaver {
     );
   }
   async yieldStream(
-    __datasource: "none" = "none",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Response>> {
     const id = [
-      encodeURIComponent(String(this.id)),
+    encodeURIComponent(String(this.id)),
     ].join("/");
     const baseUrl = new URL(
-      `http://localhost:5002/api/BlobHaver/${id}/yieldStream`
+      `http://localhost:5668/api/BlobHaver/${id}/yieldStream`
     );
 
-    baseUrl.searchParams.append("__datasource", String(__datasource));
 
     const res = await fetchImpl(baseUrl, {
-      method: "GET",
+      method: "Get",
     });
 
     return await HttpResult.fromResponse(
@@ -195,6 +197,12 @@ export class KValue<V> {
   get value(): V | null {
     return this.raw as V | null;
   }
+}
+
+export interface Paginated<T> {
+  results: T[];
+  cursor: string | null;
+  complete: boolean;
 }
 
 export enum MediaType {

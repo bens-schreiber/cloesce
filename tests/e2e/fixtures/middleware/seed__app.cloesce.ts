@@ -3,9 +3,10 @@ import {
   WranglerEnv,
   Model,
   Inject,
-  GET,
+  Get,
   HttpResult,
   Integer,
+  Crud,
 } from "cloesce/backend";
 import { D1Database, ExecutionContext } from "@cloudflare/workers-types";
 
@@ -18,14 +19,15 @@ export class Env {
   db: D1Database;
 }
 
-@Model(["SAVE"])
+@Crud("SAVE")
+@Model("db")
 export class Foo {
   id: Integer;
 
-  @GET
-  static blockedMethod() {}
+  @Get()
+  static blockedMethod() { }
 
-  @GET
+  @Get()
   static getInjectedThing(@Inject thing: InjectedThing): InjectedThing {
     return thing;
   }

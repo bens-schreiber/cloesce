@@ -9,7 +9,6 @@
  */
 export type CrudKind = "SAVE" | "GET" | "LIST";
 
-/** @internal */
 export type CidlType =
   | "Void"
   | "Integer"
@@ -26,6 +25,7 @@ export type CidlType =
   | { Object: string }
   | { Partial: string }
   | { KvObject: CidlType }
+  | { Paginated: CidlType }
   | { Nullable: CidlType }
   | { Array: CidlType }
   | { HttpResult: CidlType };
@@ -35,28 +35,31 @@ export function isNullableType(ty: CidlType): boolean {
   return typeof ty === "object" && ty !== null && "Nullable" in ty;
 }
 
-/** @internal */
 export enum HttpVerb {
-  GET = "GET",
-  POST = "POST",
-  PUT = "PUT",
-  PATCH = "PATCH",
-  DELETE = "DELETE",
+  Get = "Get",
+  Post = "Post",
+  Put = "Put",
+  Patch = "Patch",
+  Delete = "Delete",
 }
 
-/** @internal */
 export interface NamedTypedValue {
   name: string;
   cidl_type: CidlType;
 }
 
-/** @internal */
-export interface D1Column {
-  value: NamedTypedValue;
-  foreign_key_reference: string | null;
+export interface ForeignKeyReference {
+  model_name: string;
+  column_name: string;
 }
 
-/** @internal */
+export interface D1Column {
+  value: NamedTypedValue;
+  foreign_key_reference: ForeignKeyReference | null;
+  unique_ids: number[];
+  composite_id: number | null;
+}
+
 export enum MediaType {
   Json = "Json",
   Octet = "Octet",
@@ -72,10 +75,10 @@ export function defaultMediaType(): MediaType {
   return MediaType.Json;
 }
 
-/** @internal */
 export interface ApiMethod {
   name: string;
   is_static: boolean;
+  data_source: string | null;
   http_verb: HttpVerb;
 
   return_media: MediaType;
@@ -85,13 +88,11 @@ export interface ApiMethod {
   parameters: NamedTypedValue[];
 }
 
-/** @internal */
 export type NavigationPropertyKind =
-  | { OneToOne: { column_reference: string } }
-  | { OneToMany: { column_reference: string } }
+  | { OneToOne: { key_columns: string[] } }
+  | { OneToMany: { key_columns: string[] } }
   | "ManyToMany";
 
-/** @internal */
 export interface NavigationProperty {
   var_name: string;
   model_reference: string;
@@ -107,7 +108,6 @@ export function getNavigationPropertyCidlType(
     : { Array: { Object: nav.model_reference } };
 }
 
-/** @internal */
 export interface KeyValue {
   format: string;
   namespace_binding: string;
@@ -115,7 +115,6 @@ export interface KeyValue {
   list_prefix: boolean;
 }
 
-/** @internal */
 export interface AstR2Object {
   format: string;
   bucket_binding: string;
@@ -123,10 +122,10 @@ export interface AstR2Object {
   list_prefix: boolean;
 }
 
-/** @internal */
 export interface Model {
   name: string;
-  primary_key: NamedTypedValue | null;
+  d1_binding: string | null;
+  primary_key_columns: D1Column[];
   columns: D1Column[];
   navigation_properties: NavigationProperty[];
   key_params: string[];
@@ -138,20 +137,17 @@ export interface Model {
   source_path: string;
 }
 
-/** @internal */
 export interface PlainOldObject {
   name: string;
   attributes: NamedTypedValue[];
   source_path: string;
 }
 
-/** @internal */
 export interface ServiceAttribute {
   var_name: string;
   inject_reference: string;
 }
 
-/** @internal */
 export interface Service {
   name: string;
   attributes: ServiceAttribute[];
@@ -160,31 +156,28 @@ export interface Service {
   initializer: string[] | null;
 }
 
-/** @internal */
 export interface CidlIncludeTree {
   [key: string]: CidlIncludeTree;
 }
 
-/** @internal */
-export const NO_DATA_SOURCE = "none";
+export type CrudListParam = "LastSeen" | "Limit" | "Offset";
 
-/** @internal */
 export interface DataSource {
   name: string;
   tree: CidlIncludeTree;
+  is_private: boolean;
+  list_params: CrudListParam[];
 }
 
-/** @internal */
 export interface WranglerEnv {
   name: string;
   source_path: string;
-  d1_binding?: string; // TODO: multiple D1 bindings
+  d1_bindings: string[];
   kv_bindings: string[];
   r2_bindings: string[];
   vars: Record<string, CidlType>;
 }
 
-/** @internal */
 export interface CloesceAst {
   project_name: string;
   wrangler_env?: WranglerEnv;

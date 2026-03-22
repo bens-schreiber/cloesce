@@ -8,4 +8,3 @@ rustc-hash = "2.1.1"
 indexmap = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
-serde_with = "3.14.1"

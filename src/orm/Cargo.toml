@@ -9,11 +9,11 @@ crate-type = ["cdylib"]
 [dependencies]
 ast = { path = "../generator/ast" }
 base64 = "0.22.1"
-indexmap = { version = "2.12.0" }
+indexmap = { version = "2.13.0" }
 sea-query = { version = "0.32.7", features = ["backend-sqlite"] }
 serde = "1.0.219"
-serde_json = "1.0.143"
-chrono = { version = "0.4.43", features = ["serde"], default-features = false }
+serde_json = "1.0.149"
+chrono = { version = "0.4.44", features = ["serde"], default-features = false }
 
 [dev-dependencies]
 sqlx = { version = "0.8", features = ["sqlite", "runtime-tokio"] }
@@ -27,4 +27,7 @@ debug = true
 
 [profile.release]
 opt-level = "z"
+lto = true
+codegen-units = 1
 panic = "abort"
+strip = true

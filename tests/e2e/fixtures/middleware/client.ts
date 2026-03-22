@@ -14,11 +14,11 @@ export class Foo {
 
   static async SAVE(
     model: DeepPartial<Foo>,
-    __datasource: "none" = "none",
+    __datasource: "default" = "default",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Foo>> {
     const baseUrl = new URL(
-      `http://localhost:5002/api/Foo/SAVE`
+      `http://localhost:5977/api/Foo/SAVE`
     );
     const payload: any = {};
 
@@ -26,7 +26,7 @@ export class Foo {
     baseUrl.searchParams.append("__datasource", String(__datasource));
 
     const res = await fetchImpl(baseUrl, {
-      method: "POST",
+      method: "Post",
       headers: { "Content-Type": "application/json" },
       body: requestBody(MediaType.Json, payload),
     });
@@ -42,12 +42,12 @@ export class Foo {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<void>> {
     const baseUrl = new URL(
-      `http://localhost:5002/api/Foo/blockedMethod`
+      `http://localhost:5977/api/Foo/blockedMethod`
     );
 
 
     const res = await fetchImpl(baseUrl, {
-      method: "GET",
+      method: "Get",
     });
 
     return await HttpResult.fromResponse(
@@ -61,12 +61,12 @@ export class Foo {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<InjectedThing>> {
     const baseUrl = new URL(
-      `http://localhost:5002/api/Foo/getInjectedThing`
+      `http://localhost:5977/api/Foo/getInjectedThing`
     );
 
 
     const res = await fetchImpl(baseUrl, {
-      method: "GET",
+      method: "Get",
     });
 
     return await HttpResult.fromResponse(
@@ -97,6 +97,12 @@ export class KValue<V> {
   get value(): V | null {
     return this.raw as V | null;
   }
+}
+
+export interface Paginated<T> {
+  results: T[];
+  cursor: string | null;
+  complete: boolean;
 }
 
 export enum MediaType {

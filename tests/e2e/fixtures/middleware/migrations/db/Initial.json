@@ -1,0 +1,24 @@
+{
+  "hash": 6083998897186386139,
+  "models": {
+    "Foo": {
+      "hash": 9350576688796676214,
+      "name": "Foo",
+      "d1_binding": "db",
+      "primary_key_columns": [
+        {
+          "hash": 6397878138472974760,
+          "value": {
+            "name": "id",
+            "cidl_type": "Integer"
+          },
+          "foreign_key_reference": null,
+          "unique_ids": [],
+          "composite_id": null
+        }
+      ],
+      "columns": [],
+      "navigation_properties": []
+    }
+  }
+}

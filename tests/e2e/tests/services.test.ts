@@ -1,10 +1,12 @@
-import { startWrangler, stopWrangler, withRes } from "../src/setup.js";
+import { startWrangler, withRes } from "../src/setup.js";
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { FooService, BarService } from "../fixtures/services/client";
+import config from "../fixtures/services/cloesce.config";
 
+let stopWrangler: () => Promise<void>;
 beforeAll(async () => {
   // NOTE: e2e is called from proj root
-  await startWrangler("./fixtures/services", false);
+  stopWrangler = await startWrangler("./fixtures/services", config.workersUrl!);
 }, 30_000);
 
 afterAll(async () => {

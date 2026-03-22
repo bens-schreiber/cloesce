@@ -1,9 +1,10 @@
 # Introduction
 
-> *Alpha Note*: Cloesce is under active development, expanding its feature set as it pushes toward [full
+> [!WARNING]
+> Cloesce is under active development, expanding its feature set as it pushes toward [full
 > Cloudflare support across any language](./ch6-1-future-vision.md). In this alpha, breaking changes can occur between releases.
 
-*The Cloesce Compiler* converts object definitions into a full stack Cloudflare application.
+*Cloesce* converts class definitions into a full stack Cloudflare application.
 
 Inspired by 
 - [Entity Framework](https://learn.microsoft.com/en-us/ef/)
@@ -17,7 +18,8 @@ Cloesce is not just an ORM, migration engine, web framework, runtime validation 
 
 <!-- langtabs-start -->
 ```typescript
-@Model(["GET", "SAVE", "LIST"])
+@Crud("GET", "SAVE", "LIST")
+@Model("db")
 class User {
     id: Integer;
     name: String;
@@ -29,9 +31,8 @@ class User {
     @R2("user/avatars/{id}.png", bucket)
     avatar: R2Object;
 
-    @POST
-    async hello(): User {
-        // D1, KV, and R2 all hydrated here!
+    @Post()
+    hello(): User {
         return this;
     }
 }

@@ -1,12 +1,11 @@
 import { describe, test, expect, vi, afterEach } from "vitest";
 import {
-  DependencyKey,
   MatchedRoute,
   RouterError,
   RuntimeContainer,
   _cloesceInternal,
 } from "../src/router/router";
-import { HttpVerb, MediaType, Model, NamedTypedValue } from "../src/ast";
+import { HttpVerb, MediaType } from "../src/ast";
 import { CloesceApp, HttpResult, DependencyContainer } from "../src/ui/backend";
 import { ModelBuilder, ServiceBuilder, createAst } from "./builder";
 
@@ -18,7 +17,7 @@ function createRequest(url: string, method?: string, body?: any) {
 }
 
 function createCtorReg(ctors?: (new () => any)[]) {
-  const res = {};
+  const res: Record<string, new () => any> = {};
   if (ctors) {
     for (const ctor of ctors) {
       res[ctor.name] = ctor;
@@ -41,17 +40,12 @@ function createDi() {
   return new DependencyContainer();
 }
 
-function mockD1() {
-  return {
-    prepare: vi.fn(),
-    exec: vi.fn(),
-  } as any;
-}
-
-function extractErrorCode(str) {
-  const match = str.match(/\(ErrorCode:\s*(\d+)\)/);
+function extractErrorCode(str: string | undefined): number | null {
+  const match = str?.match(/\(ErrorCode:\s*(\d+)\)/);
   return match ? Number(match[1]) : null;
 }
+
+const api = "http://foo.com/api";
 
 describe("Match Route", () => {
   test("Unknown Prefix => 404", () => {
@@ -60,7 +54,7 @@ describe("Match Route", () => {
     const ast = createAst();
 
     // Act
-    const res = _cloesceInternal.matchRoute(request, ast, "api");
+    const res = _cloesceInternal.matchRoute(request, ast, api);
 
     // Assert
     expect(res.isLeft()).toBe(true);
@@ -76,7 +70,7 @@ describe("Match Route", () => {
     const ast = createAst();
 
     // Act
-    const res = _cloesceInternal.matchRoute(request, ast, "api");
+    const res = _cloesceInternal.matchRoute(request, ast, api);
 
     // Assert
     expect(res.isLeft()).toBe(true);
@@ -94,7 +88,7 @@ describe("Match Route", () => {
     });
 
     // Act
-    const res = _cloesceInternal.matchRoute(request, ast, "api");
+    const res = _cloesceInternal.matchRoute(request, ast, api);
 
     // Assert
     expect(res.isLeft()).toBe(true);
@@ -111,13 +105,13 @@ describe("Match Route", () => {
       models: [
         ModelBuilder.model("Model")
           .idPk()
-          .method("method", HttpVerb.DELETE, false, [], "Void")
+          .method("method", HttpVerb.Delete, false, [], "Void")
           .build(),
       ],
     });
 
     // Act
-    const res = _cloesceInternal.matchRoute(request, ast, "api");
+    const res = _cloesceInternal.matchRoute(request, ast, api);
 
     // Assert
     expect(res.isLeft()).toBe(true);
@@ -134,18 +128,18 @@ describe("Match Route", () => {
       models: [
         ModelBuilder.model("Model")
           .idPk()
-          .method("method", HttpVerb.POST, true, [], "Void")
+          .method("method", HttpVerb.Post, true, [], "Void")
           .build(),
       ],
     });
 
     // Act
-    const res = _cloesceInternal.matchRoute(request, ast, "api");
+    const res = _cloesceInternal.matchRoute(request, ast, api);
 
     // Assert
     expect(res.isRight()).toBe(true);
     expect(res.unwrap()).toEqual({
-      primaryKey: null,
+      primaryKeyValues: {},
       keyParams: {},
       method: ast.models["Model"].methods["method"],
       model: ast.models["Model"],
@@ -161,18 +155,18 @@ describe("Match Route", () => {
       models: [
         ModelBuilder.model("Model")
           .idPk()
-          .method("method", HttpVerb.POST, false, [], "Void")
+          .method("method", HttpVerb.Post, false, [], "Void")
           .build(),
       ],
     });
 
     // Act
-    const res = _cloesceInternal.matchRoute(request, ast, "api");
+    const res = _cloesceInternal.matchRoute(request, ast, api);
 
     // Assert
     expect(res.isRight()).toBe(true);
     expect(res.unwrap()).toEqual({
-      primaryKey: "0",
+      primaryKeyValues: { id: "0" },
       keyParams: {},
       model: ast.models["Model"],
       method: ast.models["Model"].methods["method"],
@@ -191,7 +185,7 @@ describe("Match Route", () => {
       models: [
         ModelBuilder.model("Model")
           .idPk()
-          .method("method", HttpVerb.POST, false, [], "Void")
+          .method("method", HttpVerb.Post, false, [], "Void")
           .keyParam("key1")
           .keyParam("key2")
           .build(),
@@ -199,12 +193,79 @@ describe("Match Route", () => {
     });
 
     // Act
-    const res = _cloesceInternal.matchRoute(request, ast, "api");
+    const res = _cloesceInternal.matchRoute(request, ast, api);
 
     // Assert
     expect(res.isRight()).toBe(true);
     expect(res.unwrap()).toEqual({
-      primaryKey: "0",
+      primaryKeyValues: { id: "0" },
+      keyParams: {
+        key1: "value1",
+        key2: "value2",
+      },
+      model: ast.models["Model"],
+      method: ast.models["Model"].methods["method"],
+      namespace: "Model",
+      kind: "model",
+    });
+  });
+
+  test("Matches instantiated method with composite primary key", () => {
+    // Arrange
+    const request = createRequest(
+      "http://foo.com/api/Model/acme/user123/method",
+      "POST",
+    );
+    const ast = createAst({
+      models: [
+        ModelBuilder.model("Model")
+          .pk("orgId", "Text")
+          .pk("userId", "Text")
+          .method("method", HttpVerb.Post, false, [], "Void")
+          .build(),
+      ],
+    });
+
+    // Act
+    const res = _cloesceInternal.matchRoute(request, ast, api);
+
+    // Assert
+    expect(res.isRight()).toBe(true);
+    expect(res.unwrap()).toEqual({
+      primaryKeyValues: { orgId: "acme", userId: "user123" },
+      keyParams: {},
+      model: ast.models["Model"],
+      method: ast.models["Model"].methods["method"],
+      namespace: "Model",
+      kind: "model",
+    });
+  });
+
+  test("Matches instantiated method with composite primary key and key params", () => {
+    // Arrange
+    const request = createRequest(
+      "http://foo.com/api/Model/acme/user123/value1/value2/method",
+      "POST",
+    );
+    const ast = createAst({
+      models: [
+        ModelBuilder.model("Model")
+          .pk("orgId", "Text")
+          .pk("userId", "Text")
+          .method("method", HttpVerb.Post, false, [], "Void")
+          .keyParam("key1")
+          .keyParam("key2")
+          .build(),
+      ],
+    });
+
+    // Act
+    const res = _cloesceInternal.matchRoute(request, ast, api);
+
+    // Assert
+    expect(res.isRight()).toBe(true);
+    expect(res.unwrap()).toEqual({
+      primaryKeyValues: { orgId: "acme", userId: "user123" },
       keyParams: {
         key1: "value1",
         key2: "value2",
@@ -222,18 +283,18 @@ describe("Match Route", () => {
     const ast = createAst({
       services: [
         ServiceBuilder.service("Service")
-          .method("method", HttpVerb.POST, true, [], "Void")
+          .method("method", HttpVerb.Post, true, [], "Void")
           .build(),
       ],
     });
 
     // Act
-    const res = _cloesceInternal.matchRoute(request, ast, "api");
+    const res = _cloesceInternal.matchRoute(request, ast, api);
 
     // Assert
     expect(res.isRight()).toBe(true);
     expect(res.unwrap()).toEqual({
-      primaryKey: null,
+      primaryKeyValues: {},
       keyParams: {},
       method: ast.services["Service"].methods["method"],
       service: ast.services["Service"],
@@ -248,18 +309,18 @@ describe("Match Route", () => {
     const ast = createAst({
       services: [
         ServiceBuilder.service("Service")
-          .method("method", HttpVerb.POST, false, [], "Void")
+          .method("method", HttpVerb.Post, false, [], "Void")
           .build(),
       ],
     });
 
     // Act
-    const res = _cloesceInternal.matchRoute(request, ast, "api");
+    const res = _cloesceInternal.matchRoute(request, ast, api);
 
     // Assert
     expect(res.isRight()).toBe(true);
     expect(res.unwrap()).toEqual({
-      primaryKey: null,
+      primaryKeyValues: {},
       keyParams: {},
       method: ast.services["Service"].methods["method"],
       service: ast.services["Service"],
@@ -281,7 +342,7 @@ describe("Namespace Middleware", () => {
       models: [
         ModelBuilder.model("Foo")
           .idPk()
-          .method("method", HttpVerb.POST, true, [], "Void")
+          .method("method", HttpVerb.Post, true, [], "Void")
           .build(),
       ],
     });
@@ -289,7 +350,7 @@ describe("Namespace Middleware", () => {
     class Foo {}
     constructorRegistry[Foo.name] = Foo;
 
-    await RuntimeContainer.init(ast, constructorRegistry);
+    await RuntimeContainer.init(ast, constructorRegistry, api);
     const app = new CloesceApp();
 
     const request = createRequest("http://foo.com/api/Foo/method", "POST");
@@ -307,6 +368,7 @@ describe("Namespace Middleware", () => {
       undefined,
       constructorRegistry,
       di,
+      api,
     );
 
     // Assert
@@ -320,7 +382,7 @@ describe("Namespace Middleware", () => {
     const ast = createAst({
       services: [
         ServiceBuilder.service("Foo")
-          .method("method", HttpVerb.POST, true, [], "Void")
+          .method("method", HttpVerb.Post, true, [], "Void")
           .build(),
       ],
     });
@@ -328,7 +390,7 @@ describe("Namespace Middleware", () => {
     class Foo {}
     constructorRegistry[Foo.name] = Foo;
 
-    await RuntimeContainer.init(ast, constructorRegistry);
+    await RuntimeContainer.init(ast, constructorRegistry, api);
     const app = new CloesceApp();
 
     const request = createRequest("http://foo.com/api/Foo/method", "POST");
@@ -346,6 +408,7 @@ describe("Namespace Middleware", () => {
       undefined,
       constructorRegistry,
       di,
+      api,
     );
 
     // Assert
@@ -360,7 +423,7 @@ describe("Request Validation", () => {
     const request = createRequest("http://foo.com/api/Foo/method", "POST", {});
     const model = ModelBuilder.model("Foo")
       .idPk()
-      .method("method", HttpVerb.POST, false, [], "Void")
+      .method("method", HttpVerb.Post, false, [], "Void")
       .build();
 
     const route: MatchedRoute = {
@@ -368,7 +431,7 @@ describe("Request Validation", () => {
       namespace: "Foo",
       model,
       method: model.methods["method"],
-      primaryKey: null,
+      primaryKeyValues: {},
       keyParams: {},
     };
 
@@ -399,14 +462,14 @@ describe("Request Validation", () => {
     const request = createRequest("http://foo.com/api/Foo/method", "POST");
     const model = ModelBuilder.model("Foo")
       .idPk()
-      .method("method", HttpVerb.POST, true, [], "Void")
+      .method("method", HttpVerb.Post, true, [], "Void")
       .build();
 
     const route: MatchedRoute = {
       kind: "model",
       namespace: "Foo",
       method: model.methods["method"],
-      primaryKey: null,
+      primaryKeyValues: {},
       keyParams: {},
     };
 
@@ -445,7 +508,7 @@ describe("Method Middleware", () => {
       models: [
         ModelBuilder.model("Foo")
           .idPk()
-          .method("method", HttpVerb.POST, true, [], "Void")
+          .method("method", HttpVerb.Post, true, [], "Void")
           .build(),
       ],
     });
@@ -455,7 +518,7 @@ describe("Method Middleware", () => {
     }
     constructorRegistry[Foo.name] = Foo;
 
-    await RuntimeContainer.init(ast, constructorRegistry);
+    await RuntimeContainer.init(ast, constructorRegistry, api);
     const app = new CloesceApp();
 
     const request = createRequest(
@@ -465,7 +528,6 @@ describe("Method Middleware", () => {
     );
 
     const di = createDi();
-    const d1 = mockD1();
 
     app.onMethod(Foo, "method", async () => {
       return HttpResult.fail(500, "oogly boogly");
@@ -479,6 +541,7 @@ describe("Method Middleware", () => {
       undefined,
       constructorRegistry,
       di,
+      api,
     );
 
     // Assert
@@ -499,14 +562,14 @@ describe("Method Dispatch", () => {
     const di = createDi();
     const model = ModelBuilder.model("Foo")
       .idPk()
-      .method("testMethod", HttpVerb.GET, true, [], "Void")
+      .method("testMethod", HttpVerb.Get, true, [], "Void")
       .build();
 
     const route: MatchedRoute = {
       kind: "model",
       namespace: "Foo",
       method: model.methods["testMethod"],
-      primaryKey: null,
+      primaryKeyValues: {},
       keyParams: {},
     };
 
@@ -530,14 +593,14 @@ describe("Method Dispatch", () => {
 
     const model = ModelBuilder.model("Foo")
       .idPk()
-      .method("testMethod", HttpVerb.GET, true, [], { HttpResult: "Void" })
+      .method("testMethod", HttpVerb.Get, true, [], { HttpResult: "Void" })
       .build();
 
     const route: MatchedRoute = {
       kind: "model",
       namespace: "Foo",
       method: model.methods["testMethod"],
-      primaryKey: null,
+      primaryKeyValues: {},
       keyParams: {},
     };
 
@@ -561,14 +624,14 @@ describe("Method Dispatch", () => {
 
     const model = ModelBuilder.model("Foo")
       .idPk()
-      .method("testMethod", HttpVerb.GET, true, [], "Text")
+      .method("testMethod", HttpVerb.Get, true, [], "Text")
       .build();
 
     const route: MatchedRoute = {
       kind: "model",
       namespace: "Foo",
       method: model.methods["testMethod"],
-      primaryKey: null,
+      primaryKeyValues: {},
       keyParams: {},
     };
 
@@ -585,14 +648,14 @@ describe("Method Dispatch", () => {
     // Arrange – Error object
     const model = ModelBuilder.model("Foo")
       .idPk()
-      .method("testMethod", HttpVerb.GET, true, [], "Text")
+      .method("testMethod", HttpVerb.Get, true, [], "Text")
       .build();
 
     const route: MatchedRoute = {
       kind: "model",
       namespace: "Foo",
       method: model.methods["testMethod"],
-      primaryKey: null,
+      primaryKeyValues: {},
       keyParams: {},
     };
 

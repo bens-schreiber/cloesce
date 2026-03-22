@@ -3,7 +3,9 @@
     "wrangler_env": {
         "name": "Env",
         "source_path": "./seed__app.cloesce.ts",
-        "d1_binding": "db",
+        "d1_bindings": [
+            "db"
+        ],
         "kv_bindings": [],
         "r2_bindings": [],
         "vars": {}
@@ -11,11 +13,19 @@
     "models": {
         "Foo": {
             "name": "Foo",
+            "d1_binding": "db",
             "columns": [],
-            "primary_key": {
-                "name": "id",
-                "cidl_type": "Integer"
-            },
+            "primary_key_columns": [
+                {
+                    "foreign_key_reference": null,
+                    "unique_ids": [],
+                    "composite_id": null,
+                    "value": {
+                        "name": "id",
+                        "cidl_type": "Integer"
+                    }
+                }
+            ],
             "navigation_properties": [],
             "key_params": [],
             "kv_objects": [],
@@ -23,16 +33,17 @@
             "methods": {
                 "blockedMethod": {
                     "name": "blockedMethod",
-                    "http_verb": "GET",
+                    "http_verb": "Get",
                     "is_static": true,
                     "return_media": "Json",
                     "return_type": "Void",
                     "parameters_media": "Json",
-                    "parameters": []
+                    "parameters": [],
+                    "data_source": null
                 },
                 "getInjectedThing": {
                     "name": "getInjectedThing",
-                    "http_verb": "GET",
+                    "http_verb": "Get",
                     "is_static": true,
                     "return_media": "Json",
                     "return_type": {
@@ -46,7 +57,8 @@
                                 "Inject": "InjectedThing"
                             }
                         }
-                    ]
+                    ],
+                    "data_source": null
                 }
             },
             "data_sources": {},

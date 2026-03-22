@@ -4,10 +4,10 @@ use std::{
 };
 
 use ast::{
-    CidlType, HttpVerb, MigrationsAst, NamedTypedValue, NavigationPropertyKind, Service,
-    ServiceAttribute, WranglerEnv, err::GeneratorErrorKind,
+    CidlType, D1Column, ForeignKeyReference, HttpVerb, MigrationsAst, NamedTypedValue,
+    NavigationPropertyKind, Service, ServiceAttribute, WranglerEnv, err::GeneratorErrorKind,
 };
-use generator_test::{ModelBuilder, create_ast, create_spec};
+use generator_test::{IncludeTreeBuilder, ModelBuilder, create_ast, create_spec};
 use semantic::SemanticAnalysis;
 use wrangler::WranglerGenerator;
 
@@ -15,8 +15,8 @@ use wrangler::WranglerGenerator;
 fn cloesce_serializes_to_migrations() {
     // Arrange
     let mut ast = create_ast(vec![
-        ModelBuilder::new("Dog").id_pk().build(),
-        ModelBuilder::new("Person").id_pk().build(),
+        ModelBuilder::new("Dog").default_db().id_pk().build(),
+        ModelBuilder::new("Person").default_db().id_pk().build(),
     ]);
     ast.set_merkle_hash();
 
@@ -34,10 +34,16 @@ fn cloesce_serializes_to_migrations() {
 #[test]
 fn null_primary_key_error() {
     // Arrange
-    let mut model = ModelBuilder::new("Dog").build();
-    model.primary_key = Some(NamedTypedValue {
-        name: "id".into(),
-        cidl_type: CidlType::nullable(CidlType::Integer),
+    let mut model = ModelBuilder::new("Dog").default_db().build();
+    model.primary_key_columns.push(D1Column {
+        hash: 0,
+        value: NamedTypedValue {
+            name: "id".into(),
+            cidl_type: CidlType::nullable(CidlType::Integer),
+        },
+        foreign_key_reference: None,
+        unique_ids: Vec::new(),
+        composite_id: None,
     });
 
     let mut ast = create_ast(vec![model]);
@@ -55,10 +61,19 @@ fn mismatched_foreign_keys_error() {
     // Arrange
     let mut ast = create_ast(vec![
         ModelBuilder::new("Person")
+            .default_db()
             .id_pk()
-            .col("dogId", CidlType::Text, Some("Dog".into()))
+            .col(
+                "dogId",
+                CidlType::Text,
+                Some(ForeignKeyReference {
+                    model_name: "Dog".into(),
+                    column_name: "id".into(),
+                }),
+                None,
+            )
             .build(),
-        ModelBuilder::new("Dog").id_pk().build(),
+        ModelBuilder::new("Dog").default_db().id_pk().build(),
     ]);
     let spec = create_spec(&ast);
 
@@ -78,16 +93,43 @@ fn model_cycle_detection_error() {
     let mut ast = create_ast(vec![
         // A -> B -> C -> A
         ModelBuilder::new("A")
+            .default_db()
             .id_pk()
-            .col("bId", CidlType::Integer, Some("B".to_string()))
+            .col(
+                "bId",
+                CidlType::Integer,
+                Some(ForeignKeyReference {
+                    model_name: "B".into(),
+                    column_name: "id".into(),
+                }),
+                None,
+            )
             .build(),
         ModelBuilder::new("B")
+            .default_db()
             .id_pk()
-            .col("cId", CidlType::Integer, Some("C".to_string()))
+            .col(
+                "cId",
+                CidlType::Integer,
+                Some(ForeignKeyReference {
+                    model_name: "C".into(),
+                    column_name: "id".into(),
+                }),
+                None,
+            )
             .build(),
         ModelBuilder::new("C")
+            .default_db()
             .id_pk()
-            .col("aId", CidlType::Integer, Some("A".to_string()))
+            .col(
+                "aId",
+                CidlType::Integer,
+                Some(ForeignKeyReference {
+                    model_name: "A".into(),
+                    column_name: "id".into(),
+                }),
+                None,
+            )
             .build(),
     ]);
     let spec = create_spec(&ast);
@@ -155,19 +197,42 @@ fn model_attr_nullability_prevents_cycle_error() {
     // A -> B -> C -> Nullable<A>
     let mut ast = create_ast(vec![
         ModelBuilder::new("A")
+            .default_db()
             .id_pk()
-            .col("bId", CidlType::Integer, Some("B".to_string()))
+            .col(
+                "bId",
+                CidlType::Integer,
+                Some(ForeignKeyReference {
+                    model_name: "B".into(),
+                    column_name: "id".into(),
+                }),
+                None,
+            )
             .build(),
         ModelBuilder::new("B")
+            .default_db()
             .id_pk()
-            .col("cId", CidlType::Integer, Some("C".to_string()))
+            .col(
+                "cId",
+                CidlType::Integer,
+                Some(ForeignKeyReference {
+                    model_name: "C".into(),
+                    column_name: "id".into(),
+                }),
+                None,
+            )
             .build(),
         ModelBuilder::new("C")
+            .default_db()
             .id_pk()
             .col(
                 "aId",
                 CidlType::nullable(CidlType::Integer),
-                Some("A".to_string()),
+                Some(ForeignKeyReference {
+                    model_name: "A".into(),
+                    column_name: "id".into(),
+                }),
+                None,
             )
             .build(),
     ]);
@@ -181,14 +246,15 @@ fn model_attr_nullability_prevents_cycle_error() {
 fn one_to_one_nav_property_unknown_attribute_reference_error() {
     // Arrange
     let mut ast = create_ast(vec![
-        ModelBuilder::new("Dog").id_pk().build(),
+        ModelBuilder::new("Dog").default_db().id_pk().build(),
         ModelBuilder::new("Person")
+            .default_db()
             .id_pk()
             .nav_p(
                 "dog",
                 "Dog",
                 NavigationPropertyKind::OneToOne {
-                    column_reference: "dogId".to_string(),
+                    key_columns: vec!["dogId".to_string()], // dogId doesn't exist on Person
                 },
             )
             .build(),
@@ -209,16 +275,25 @@ fn one_to_one_nav_property_unknown_attribute_reference_error() {
 fn one_to_one_mismatched_fk_and_nav_type_error() {
     // Arrange: attribute dogId references Dog, but nav prop type is Cat -> mismatch
     let mut ast = create_ast(vec![
-        ModelBuilder::new("Dog").id_pk().build(),
-        ModelBuilder::new("Cat").id_pk().build(),
+        ModelBuilder::new("Dog").default_db().id_pk().build(),
+        ModelBuilder::new("Cat").default_db().id_pk().build(),
         ModelBuilder::new("Person")
+            .default_db()
             .id_pk()
-            .col("dogId", CidlType::Integer, Some("Dog".into()))
+            .col(
+                "dogId",
+                CidlType::Integer,
+                Some(ForeignKeyReference {
+                    model_name: "Dog".into(),
+                    column_name: "id".into(),
+                }),
+                None,
+            )
             .nav_p(
                 "dog",
                 "Cat", // incorrect: says Cat but fk points to Dog
                 NavigationPropertyKind::OneToOne {
-                    column_reference: "dogId".to_string(),
+                    key_columns: vec!["dogId".to_string()],
                 },
             )
             .build(),
@@ -231,7 +306,7 @@ fn one_to_one_mismatched_fk_and_nav_type_error() {
     // Assert
     assert!(matches!(
         err.kind,
-        GeneratorErrorKind::MismatchedNavigationPropertyTypes
+        GeneratorErrorKind::InvalidNavigationPropertyReference
     ));
 }
 
@@ -240,14 +315,15 @@ fn one_to_many_unresolved_reference_error() {
     // Arrange:
     // Person declares OneToMany to Dog referencing Dog.personId, but Dog has no personId FK attr.
     let mut ast = create_ast(vec![
-        ModelBuilder::new("Dog").id_pk().build(), // no personId attribute
+        ModelBuilder::new("Dog").default_db().id_pk().build(), // no personId attribute
         ModelBuilder::new("Person")
+            .default_db()
             .id_pk()
             .nav_p(
                 "dogs",
                 "Dog",
                 NavigationPropertyKind::OneToMany {
-                    column_reference: "personId".into(),
+                    key_columns: vec!["personId".to_string()],
                 },
             )
             .build(),
@@ -269,11 +345,12 @@ fn junction_table_builder_errors() {
     {
         let mut ast = create_ast(vec![
             ModelBuilder::new("Student")
+                .default_db()
                 .id_pk()
                 .nav_p("courses", "Course", NavigationPropertyKind::ManyToMany)
                 .build(),
             // Course exists, but doesn't declare the reciprocal nav property
-            ModelBuilder::new("Course").id_pk().build(),
+            ModelBuilder::new("Course").default_db().id_pk().build(),
         ]);
         let spec = create_spec(&ast);
 
@@ -288,11 +365,13 @@ fn junction_table_builder_errors() {
     {
         let mut ast = create_ast(vec![
             ModelBuilder::new("A")
+                .default_db()
                 .id_pk()
                 .nav_p("bs", "B", NavigationPropertyKind::ManyToMany)
                 .nav_p("bs2", "B", NavigationPropertyKind::ManyToMany)
                 .build(),
             ModelBuilder::new("B")
+                .default_db()
                 .id_pk()
                 .nav_p("as", "A", NavigationPropertyKind::ManyToMany)
                 .build(),
@@ -311,10 +390,11 @@ fn junction_table_builder_errors() {
 fn instantiated_stream_method() {
     // Arrange
     let model = ModelBuilder::new("Dog")
+        .default_db()
         .id_pk()
         .method(
             "uploadPhoto",
-            HttpVerb::POST,
+            HttpVerb::Post,
             false,
             vec![
                 NamedTypedValue {
@@ -327,6 +407,7 @@ fn instantiated_stream_method() {
                 },
             ],
             CidlType::Stream,
+            None,
         )
         .build();
 
@@ -344,16 +425,18 @@ fn instantiated_stream_method() {
 fn static_stream_method() {
     // Arrange
     let model = ModelBuilder::new("Dog")
+        .default_db()
         .id_pk()
         .method(
             "uploadPhoto",
-            HttpVerb::POST,
+            HttpVerb::Post,
             true,
             vec![NamedTypedValue {
                 name: "stream".into(),
                 cidl_type: CidlType::Stream,
             }],
             CidlType::Stream,
+            None,
         )
         .build();
 
@@ -371,10 +454,11 @@ fn static_stream_method() {
 fn invalid_stream_method() {
     // Arrange
     let model = ModelBuilder::new("Dog")
+        .default_db()
         .id_pk()
         .method(
             "uploadPhoto",
-            HttpVerb::POST,
+            HttpVerb::Post,
             true, // static is true, can only have 1 param
             vec![
                 NamedTypedValue {
@@ -387,6 +471,7 @@ fn invalid_stream_method() {
                 },
             ],
             CidlType::Stream,
+            None,
         )
         .build();
 
@@ -406,11 +491,11 @@ fn invalid_stream_method() {
 #[test]
 fn missing_variable_in_wrangler() {
     // Arrange
-    let mut ast = create_ast(vec![ModelBuilder::new("User").id_pk().build()]);
+    let mut ast = create_ast(vec![ModelBuilder::new("User").db("my_d1").id_pk().build()]);
     ast.wrangler_env = Some(WranglerEnv {
         name: "Env".into(),
         source_path: "source.ts".into(),
-        d1_binding: None,
+        d1_bindings: vec!["my_d1".into()],
         kv_bindings: vec![],
         r2_bindings: vec![],
         vars: [
@@ -431,7 +516,10 @@ fn missing_variable_in_wrangler() {
         let res = SemanticAnalysis::analyze(&mut ast, &spec).unwrap_err().kind;
 
         // Assert
-        assert!(matches!(res, GeneratorErrorKind::MissingWranglerVariable));
+        assert!(matches!(
+            res,
+            GeneratorErrorKind::InconsistentWranglerBinding
+        ));
     }
 }
 
@@ -458,7 +546,7 @@ fn missing_env_in_ast() {
 #[test]
 fn missing_d1_binding_in_wrangler() {
     // Arrange
-    let mut ast = create_ast(vec![ModelBuilder::new("User").id_pk().build()]);
+    let mut ast = create_ast(vec![ModelBuilder::new("User").default_db().id_pk().build()]);
 
     let specs = vec![
         WranglerGenerator::Toml(toml::from_str("").unwrap()).as_spec(),
@@ -470,7 +558,10 @@ fn missing_d1_binding_in_wrangler() {
         let res = SemanticAnalysis::analyze(&mut ast, &spec).unwrap_err().kind;
 
         // Assert
-        assert!(matches!(res, GeneratorErrorKind::MissingWranglerD1Binding));
+        assert!(matches!(
+            res,
+            GeneratorErrorKind::InconsistentWranglerBinding
+        ));
     }
 }
 
@@ -501,7 +592,7 @@ fn missing_kv_bindings_in_wrangler() {
         // Assert
         assert!(matches!(
             res,
-            GeneratorErrorKind::MissingWranglerKVNamespace
+            GeneratorErrorKind::InconsistentWranglerBinding
         ));
     }
 }
@@ -511,8 +602,9 @@ fn kv_object_valid_key_format() {
     // Arrange
     let mut ast = create_ast(vec![
         ModelBuilder::new("Settings")
+            .db("my_d1")
             .id_pk()
-            .col("userId", CidlType::Integer, None)
+            .col("userId", CidlType::Integer, None, None)
             .key_param("tenant")
             .kv_object(
                 "settings/{tenant}/{userId}",
@@ -526,7 +618,7 @@ fn kv_object_valid_key_format() {
     ast.wrangler_env = Some(WranglerEnv {
         name: "Env".into(),
         source_path: "source.ts".into(),
-        d1_binding: Some("my_d1".into()),
+        d1_bindings: vec!["my_d1".into()],
         kv_bindings: vec!["my_kv".into()],
         r2_bindings: vec![],
         vars: HashMap::new(),
@@ -546,6 +638,7 @@ fn kv_object_missing_key_param_error() {
     // Arrange
     let mut ast = create_ast(vec![
         ModelBuilder::new("Settings")
+            .db("my_d1")
             .id_pk()
             .kv_object(
                 "settings/{tenant}/{userId}",
@@ -559,7 +652,7 @@ fn kv_object_missing_key_param_error() {
     ast.wrangler_env = Some(WranglerEnv {
         name: "Env".into(),
         source_path: "source.ts".into(),
-        d1_binding: Some("my_d1".into()),
+        d1_bindings: vec!["my_d1".into()],
         kv_bindings: vec!["my_kv".into()],
         r2_bindings: vec![],
         vars: HashMap::new(),
@@ -578,6 +671,7 @@ fn kv_object_with_primary_key_in_format() {
     // Arrange
     let mut ast = create_ast(vec![
         ModelBuilder::new("User")
+            .db("my_d1")
             .id_pk()
             .kv_object(
                 "user/{id}/preferences",
@@ -591,7 +685,7 @@ fn kv_object_with_primary_key_in_format() {
     ast.wrangler_env = Some(WranglerEnv {
         name: "Env".into(),
         source_path: "source.ts".into(),
-        d1_binding: Some("my_d1".into()),
+        d1_bindings: vec!["my_d1".into()],
         kv_bindings: vec!["my_kv".into()],
         r2_bindings: vec![],
         vars: HashMap::new(),
@@ -611,7 +705,7 @@ fn kv_object_with_column_in_format() {
     let mut ast = create_ast(vec![
         ModelBuilder::new("Session")
             .id_pk()
-            .col("token", CidlType::Text, None)
+            .col("token", CidlType::Text, None, None)
             .kv_object(
                 "session/{token}",
                 "my_kv",
@@ -624,7 +718,7 @@ fn kv_object_with_column_in_format() {
     ast.wrangler_env = Some(WranglerEnv {
         name: "Env".into(),
         source_path: "source.ts".into(),
-        d1_binding: Some("my_d1".into()),
+        d1_bindings: vec!["my_d1".into()],
         kv_bindings: vec!["my_kv".into()],
         r2_bindings: vec![],
         vars: HashMap::new(),
@@ -643,6 +737,7 @@ fn kv_object_invalid_nested_braces_error() {
     // Arrange
     let mut ast = create_ast(vec![
         ModelBuilder::new("Settings")
+            .db("my_d1")
             .id_pk()
             .kv_object(
                 "settings/{{nested}}",
@@ -656,7 +751,7 @@ fn kv_object_invalid_nested_braces_error() {
     ast.wrangler_env = Some(WranglerEnv {
         name: "Env".into(),
         source_path: "source.ts".into(),
-        d1_binding: Some("my_d1".into()),
+        d1_bindings: vec!["my_d1".into()],
         kv_bindings: vec!["my_kv".into()],
         r2_bindings: vec![],
         vars: HashMap::new(),
@@ -675,6 +770,7 @@ fn kv_object_unclosed_brace_error() {
     // Arrange
     let mut ast = create_ast(vec![
         ModelBuilder::new("Settings")
+            .db("my_d1")
             .id_pk()
             .kv_object(
                 "settings/{unclosed",
@@ -688,7 +784,7 @@ fn kv_object_unclosed_brace_error() {
     ast.wrangler_env = Some(WranglerEnv {
         name: "Env".into(),
         source_path: "source.ts".into(),
-        d1_binding: Some("my_d1".into()),
+        d1_bindings: vec!["my_d1".into()],
         kv_bindings: vec!["my_kv".into()],
         r2_bindings: vec![],
         vars: HashMap::new(),
@@ -709,13 +805,14 @@ fn http_result_stream_return_type() {
         .id_pk()
         .method(
             "downloadPhoto",
-            HttpVerb::GET,
+            HttpVerb::Get,
             true,
             vec![NamedTypedValue {
                 name: "ds".into(),
                 cidl_type: CidlType::DataSource("Dog".into()),
             }],
             CidlType::http(CidlType::Stream),
+            None,
         )
         .build();
 
@@ -727,4 +824,322 @@ fn http_result_stream_return_type() {
 
     // Assert
     res.unwrap();
+}
+
+#[test]
+fn data_source_valid_instance_method() {
+    // Arrange
+    let model = ModelBuilder::new("Dog")
+        .id_pk()
+        .data_source("dogs", IncludeTreeBuilder::default().build(), false)
+        .method(
+            "getDogs",
+            HttpVerb::Get,
+            false, // instance method
+            vec![],
+            CidlType::Object("Dog".into()),
+            Some("dogs".into()),
+        )
+        .build();
+
+    let mut ast = create_ast(vec![model]);
+    let spec = create_spec(&ast);
+
+    // Act
+    let result = SemanticAnalysis::analyze(&mut ast, &spec);
+
+    // Assert
+    result.expect("analysis to pass with valid data source");
+}
+
+#[test]
+fn data_source_on_static_method() {
+    // Arrange
+    let model = ModelBuilder::new("Dog")
+        .id_pk()
+        .data_source("dogs", IncludeTreeBuilder::default().build(), false)
+        .method(
+            "getDogs",
+            HttpVerb::Get,
+            true,
+            vec![],
+            CidlType::Object("Dog".into()),
+            Some("dogs".into()),
+        )
+        .build();
+
+    let mut ast = create_ast(vec![model]);
+    let spec = create_spec(&ast);
+
+    // Act
+    let err = SemanticAnalysis::analyze(&mut ast, &spec).unwrap_err();
+
+    // Assert
+    assert!(matches!(
+        err.kind,
+        GeneratorErrorKind::InvalidDataSourceReference
+    ));
+    assert!(err.context.contains("static method"));
+}
+
+#[test]
+fn data_source_unknown() {
+    // Arrange
+    let model = ModelBuilder::new("Dog")
+        .id_pk()
+        .method(
+            "getDogs",
+            HttpVerb::Get,
+            false,
+            vec![],
+            CidlType::Object("Dog".into()),
+            Some("nonexistent".into()), // This data source doesn't exist
+        )
+        .build();
+
+    let mut ast = create_ast(vec![model]);
+    let spec = create_spec(&ast);
+
+    // Act
+    let err = SemanticAnalysis::analyze(&mut ast, &spec).unwrap_err();
+
+    // Assert
+    assert!(matches!(
+        err.kind,
+        GeneratorErrorKind::UnknownDataSourceReference
+    ));
+}
+
+#[test]
+fn composite_key_validation() {
+    // Valid composite key: Enrollment has a composite key referencing Student(id, id2)
+    {
+        let mut ast = create_ast(vec![
+            ModelBuilder::new("Student")
+                .default_db()
+                .pk("id", CidlType::Integer)
+                .pk("id2", CidlType::Integer)
+                .build(),
+            ModelBuilder::new("Enrollment")
+                .default_db()
+                .id_pk()
+                .col(
+                    "studentId",
+                    CidlType::Integer,
+                    Some(ForeignKeyReference {
+                        model_name: "Student".into(),
+                        column_name: "id".into(),
+                    }),
+                    Some(1),
+                )
+                .col(
+                    "studentId2",
+                    CidlType::Integer,
+                    Some(ForeignKeyReference {
+                        model_name: "Student".into(),
+                        column_name: "id2".into(),
+                    }),
+                    Some(1),
+                )
+                .col("grade", CidlType::Text, None, None)
+                .build(),
+        ]);
+        let spec = create_spec(&ast);
+        SemanticAnalysis::analyze(&mut ast, &spec).expect("valid composite key should pass");
+    }
+
+    // Error: composite key with only 1 column
+    {
+        let mut ast = create_ast(vec![
+            ModelBuilder::new("Student").default_db().id_pk().build(),
+            ModelBuilder::new("Enrollment")
+                .default_db()
+                .id_pk()
+                .col(
+                    "studentId",
+                    CidlType::Integer,
+                    Some(ForeignKeyReference {
+                        model_name: "Student".into(),
+                        column_name: "id".into(),
+                    }),
+                    Some(1),
+                )
+                .build(),
+        ]);
+        let spec = create_spec(&ast);
+        let err = SemanticAnalysis::analyze(&mut ast, &spec).unwrap_err();
+        assert!(matches!(err.kind, GeneratorErrorKind::InvalidCompositeKey));
+        assert!(err.context.contains("at least 2 columns"));
+    }
+
+    // Error: composite key contains non-FK column
+    {
+        let mut ast = create_ast(vec![
+            ModelBuilder::new("Student").default_db().id_pk().build(),
+            ModelBuilder::new("Enrollment")
+                .default_db()
+                .id_pk()
+                .col(
+                    "studentId",
+                    CidlType::Integer,
+                    Some(ForeignKeyReference {
+                        model_name: "Student".into(),
+                        column_name: "id".into(),
+                    }),
+                    Some(1),
+                )
+                .col("grade", CidlType::Text, None, Some(1))
+                .build(),
+        ]);
+        let spec = create_spec(&ast);
+        let err = SemanticAnalysis::analyze(&mut ast, &spec).unwrap_err();
+        assert!(matches!(err.kind, GeneratorErrorKind::InvalidCompositeKey));
+        assert!(err.context.contains("not a foreign key"));
+    }
+
+    // Error: composite key with nav prop doesn't reference all PK columns
+    {
+        let mut ast = create_ast(vec![
+            ModelBuilder::new("Student")
+                .default_db()
+                .pk("id", CidlType::Integer)
+                .pk("id2", CidlType::Integer)
+                .build(),
+            ModelBuilder::new("Enrollment")
+                .default_db()
+                .id_pk()
+                .col(
+                    "studentId",
+                    CidlType::Integer,
+                    Some(ForeignKeyReference {
+                        model_name: "Student".into(),
+                        column_name: "id".into(),
+                    }),
+                    Some(1),
+                )
+                .col(
+                    "studentIdDup",
+                    CidlType::Integer,
+                    Some(ForeignKeyReference {
+                        model_name: "Student".into(),
+                        column_name: "id2".into(),
+                    }),
+                    Some(1),
+                )
+                .nav_p(
+                    "student",
+                    "Student",
+                    NavigationPropertyKind::OneToOne {
+                        key_columns: vec!["studentId".to_string()], // missing studentIdDup
+                    },
+                )
+                .build(),
+        ]);
+        let spec = create_spec(&ast);
+        let err = SemanticAnalysis::analyze(&mut ast, &spec).unwrap_err();
+        assert!(matches!(
+            err.kind,
+            GeneratorErrorKind::InvalidNavigationPropertyReference
+        ));
+    }
+
+    // Error: composite key with mixed nullability
+    {
+        let mut ast = create_ast(vec![
+            ModelBuilder::new("Student")
+                .default_db()
+                .pk("id", CidlType::Integer)
+                .pk("id2", CidlType::Integer)
+                .build(),
+            ModelBuilder::new("Enrollment")
+                .default_db()
+                .id_pk()
+                .col(
+                    "studentId",
+                    CidlType::Integer, // Non-nullable
+                    Some(ForeignKeyReference {
+                        model_name: "Student".into(),
+                        column_name: "id".into(),
+                    }),
+                    Some(1),
+                )
+                .col(
+                    "studentId2",
+                    CidlType::nullable(CidlType::Integer), // Nullable
+                    Some(ForeignKeyReference {
+                        model_name: "Student".into(),
+                        column_name: "id2".into(),
+                    }),
+                    Some(1),
+                )
+                .build(),
+        ]);
+        let spec = create_spec(&ast);
+        let err = SemanticAnalysis::analyze(&mut ast, &spec).unwrap_err();
+        assert!(matches!(err.kind, GeneratorErrorKind::InvalidCompositeKey));
+    }
+}
+
+#[test]
+fn multiple_composite_keys_same_model() {
+    // Arrange
+    let mut ast = create_ast(vec![
+        ModelBuilder::new("User")
+            .default_db()
+            .pk("id", CidlType::Integer)
+            .pk("id2", CidlType::Integer)
+            .build(),
+        ModelBuilder::new("Group")
+            .default_db()
+            .pk("id", CidlType::Integer)
+            .pk("id2", CidlType::Integer)
+            .build(),
+        ModelBuilder::new("Permission")
+            .default_db()
+            .id_pk()
+            .col(
+                "userId",
+                CidlType::Integer,
+                Some(ForeignKeyReference {
+                    model_name: "User".into(),
+                    column_name: "id".into(),
+                }),
+                Some(1), // composite_id = 1
+            )
+            .col(
+                "userId2",
+                CidlType::Integer,
+                Some(ForeignKeyReference {
+                    model_name: "User".into(),
+                    column_name: "id2".into(),
+                }),
+                Some(1),
+            )
+            .col(
+                "groupId",
+                CidlType::Integer,
+                Some(ForeignKeyReference {
+                    model_name: "Group".into(),
+                    column_name: "id".into(),
+                }),
+                Some(2), // composite_id = 2 (different composite key)
+            )
+            .col(
+                "groupId2",
+                CidlType::Integer,
+                Some(ForeignKeyReference {
+                    model_name: "Group".into(),
+                    column_name: "id2".into(),
+                }),
+                Some(2),
+            )
+            .build(),
+    ]);
+    let spec = create_spec(&ast);
+
+    // Act
+    let result = SemanticAnalysis::analyze(&mut ast, &spec);
+
+    // Assert
+    result.expect("multiple composite keys should be valid");
 }

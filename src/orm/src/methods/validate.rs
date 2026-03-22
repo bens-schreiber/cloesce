@@ -223,15 +223,6 @@ pub fn validate_cidl_type(
             let model = ast.models.get(&name).unwrap();
             let obj = value.as_object_mut().ok_or(ValidatorErrorKind::NonObject)?;
 
-            if let Some(pk) = &model.primary_key {
-                let pk_value = obj.remove(&pk.name);
-                let res = validate_cidl_type(pk.cidl_type.clone(), pk_value, ast, is_partial)?;
-
-                if let Some(res) = res {
-                    new_obj.insert(pk.name.clone(), res);
-                }
-            }
-
             for key_param in &model.key_params {
                 let key_param_value = obj.remove(key_param);
                 let res = validate_cidl_type(CidlType::Text, key_param_value, ast, is_partial)?;
@@ -241,7 +232,7 @@ pub fn validate_cidl_type(
                 }
             }
 
-            for col in &model.columns {
+            for (col, _) in model.all_columns() {
                 let col_value = obj.remove(&col.value.name);
                 let res =
                     validate_cidl_type(col.value.cidl_type.clone(), col_value, ast, is_partial)?;
@@ -272,12 +263,16 @@ pub fn validate_cidl_type(
 
             for kv_obj_meta in &model.kv_objects {
                 let kv_obj_value = obj.remove(&kv_obj_meta.value.name);
-                let res = validate_cidl_type(
-                    CidlType::KvObject(Box::new(kv_obj_meta.value.cidl_type.clone())),
-                    kv_obj_value,
-                    ast,
-                    is_partial,
-                )?;
+
+                let cidl_type = if kv_obj_meta.list_prefix {
+                    CidlType::Paginated(Box::new(CidlType::KvObject(Box::new(
+                        kv_obj_meta.value.cidl_type.clone(),
+                    ))))
+                } else {
+                    CidlType::KvObject(Box::new(kv_obj_meta.value.cidl_type.clone()))
+                };
+
+                let res = validate_cidl_type(cidl_type, kv_obj_value, ast, is_partial)?;
 
                 if let Some(res) = res {
                     new_obj.insert(kv_obj_meta.value.name.clone(), res);
@@ -286,7 +281,14 @@ pub fn validate_cidl_type(
 
             for r2_obj_meta in &model.r2_objects {
                 let r2_obj_value = obj.remove(&r2_obj_meta.var_name);
-                let res = validate_cidl_type(CidlType::R2Object, r2_obj_value, ast, is_partial)?;
+
+                let cidl_type = if r2_obj_meta.list_prefix {
+                    CidlType::Paginated(Box::new(CidlType::R2Object))
+                } else {
+                    CidlType::R2Object
+                };
+
+                let res = validate_cidl_type(cidl_type, r2_obj_value, ast, is_partial)?;
 
                 if let Some(res) = res {
                     new_obj.insert(r2_obj_meta.var_name.clone(), res);
@@ -308,6 +310,39 @@ pub fn validate_cidl_type(
                 }
             }
             Ok(Some(Value::Array(new_arr)))
+        }
+
+        CidlType::Paginated(inner) => {
+            let obj = value.as_object_mut().ok_or(ValidatorErrorKind::NonObject)?;
+            let mut new_obj = serde_json::Map::<String, Value>::new();
+
+            // Validate results array
+            let results = obj.remove("results");
+            let results_value =
+                validate_cidl_type(CidlType::Array(inner), results, ast, is_partial)?;
+            if let Some(results_value) = results_value {
+                new_obj.insert("results".to_string(), results_value);
+            }
+
+            // Validate cursor (string | null)
+            let cursor = obj.remove("cursor");
+            if let Some(cursor_value) = cursor {
+                if !cursor_value.is_string() && !cursor_value.is_null() {
+                    return Err(ValidatorErrorKind::NonString);
+                }
+                new_obj.insert("cursor".to_string(), cursor_value);
+            } else {
+                new_obj.insert("cursor".to_string(), Value::Null);
+            }
+
+            // Validate complete (boolean)
+            let complete = obj.remove("complete");
+            let complete_value = validate_cidl_type(CidlType::Boolean, complete, ast, is_partial)?;
+            if let Some(complete_value) = complete_value {
+                new_obj.insert("complete".to_string(), complete_value);
+            }
+
+            Ok(Some(Value::Object(new_obj)))
         }
 
         _ => unimplemented!(),
@@ -659,7 +694,7 @@ mod tests {
         // Unknown data source
         {
             // Arrange
-            let horse = ModelBuilder::new("Horse").id_pk().build();
+            let horse = ModelBuilder::new("Horse").default_db().id_pk().build();
 
             let ast = generator_test::create_ast(vec![horse]);
 
@@ -678,7 +713,7 @@ mod tests {
         // "none" is valid data source
         {
             // Arrange
-            let horse = ModelBuilder::new("Horse").id_pk().build();
+            let horse = ModelBuilder::new("Horse").default_db().id_pk().build();
 
             let ast = generator_test::create_ast(vec![horse]);
 
@@ -701,8 +736,9 @@ mod tests {
         {
             // Arrange
             let horse = ModelBuilder::new("Horse")
+                .default_db()
                 .id_pk()
-                .col("name", CidlType::Text, None)
+                .col("name", CidlType::Text, None, None)
                 .build();
 
             let ast = generator_test::create_ast(vec![horse]);
@@ -728,6 +764,7 @@ mod tests {
         {
             // Arrange
             let horse = ModelBuilder::new("Horse")
+                .default_db()
                 .id_pk()
                 .key_param("nickname")
                 .build();
@@ -755,21 +792,23 @@ mod tests {
         {
             // Arrange
             let horse = ModelBuilder::new("Horse")
+                .default_db()
                 .id_pk()
-                .col("name", CidlType::Text, None)
+                .col("name", CidlType::Text, None, None)
                 .key_param("color")
                 .nav_p(
                     "riders",
                     "Rider",
                     NavigationPropertyKind::OneToMany {
-                        column_reference: "horse_id".into(),
+                        key_columns: vec!["horse_id".into()],
                     },
                 )
                 .build();
 
             let rider = ModelBuilder::new("Rider")
+                .default_db()
                 .id_pk()
-                .col("nickname", CidlType::Text, None)
+                .col("nickname", CidlType::Text, None, None)
                 .build();
 
             let ast = generator_test::create_ast(vec![horse, rider]);
@@ -798,8 +837,9 @@ mod tests {
         {
             // Arrange
             let horse = ModelBuilder::new("Horse")
+                .default_db()
                 .id_pk()
-                .col("name", CidlType::Text, None)
+                .col("name", CidlType::Text, None, None)
                 .build();
 
             let ast = generator_test::create_ast(vec![horse]);
@@ -839,6 +879,164 @@ mod tests {
 
             // Assert
             assert_eq!(result.unwrap(), Some(val));
+        }
+    }
+
+    #[test]
+    fn paginated() {
+        // Valid KV paginated result
+        {
+            let ast = create_ast(vec![]);
+
+            let value = json!({
+                "results": [
+                    {
+                        "key": "item1",
+                        "raw": { "data": "value1" },
+                        "metadata": null
+                    },
+                    {
+                        "key": "item2",
+                        "raw": { "data": "value2" },
+                        "metadata": { "custom": "field" }
+                    }
+                ],
+                "cursor": "next_page_cursor",
+                "complete": false
+            });
+
+            let result = validate_cidl_type(
+                CidlType::Paginated(Box::new(CidlType::KvObject(Box::new(CidlType::JsonValue)))),
+                Some(value.clone()),
+                &ast,
+                false,
+            );
+
+            assert!(result.is_ok());
+            let validated = result.unwrap().unwrap();
+            assert!(validated.get("results").is_some());
+            assert!(validated.get("results").unwrap().is_array());
+            assert_eq!(
+                validated.get("cursor").and_then(|v| v.as_str()),
+                Some("next_page_cursor")
+            );
+            assert_eq!(
+                validated.get("complete").and_then(|v| v.as_bool()),
+                Some(false)
+            );
+        }
+
+        // KV with null cursor
+        {
+            let ast = create_ast(vec![]);
+
+            let value = json!({
+                "results": [
+                    {
+                        "key": "item1",
+                        "raw": "string_value",
+                        "metadata": null
+                    }
+                ],
+                "cursor": null,
+                "complete": true
+            });
+
+            let result = validate_cidl_type(
+                CidlType::Paginated(Box::new(CidlType::KvObject(Box::new(CidlType::Text)))),
+                Some(value.clone()),
+                &ast,
+                false,
+            );
+
+            assert!(result.is_ok());
+            let validated = result.unwrap().unwrap();
+            assert!(validated.get("cursor").unwrap().is_null());
+            assert_eq!(
+                validated.get("complete").and_then(|v| v.as_bool()),
+                Some(true)
+            );
+        }
+
+        // Valid R2 paginated result
+        {
+            let ast = create_ast(vec![]);
+
+            let value = json!({
+                "results": [
+                    {
+                        "key": "file1.txt",
+                        "version": "v1",
+                        "size": 1024,
+                        "etag": "abc123",
+                        "http_etag": "\"abc123\"",
+                        "uploaded": "2024-01-01T00:00:00Z",
+                        "custom_metadata": { "author": "test" }
+                    }
+                ],
+                "cursor": "file_cursor",
+                "complete": false
+            });
+
+            let result = validate_cidl_type(
+                CidlType::Paginated(Box::new(CidlType::R2Object)),
+                Some(value),
+                &ast,
+                false,
+            );
+
+            assert!(result.is_ok());
+            let validated = result.unwrap().unwrap();
+            assert!(validated.get("results").unwrap().is_array());
+            assert_eq!(
+                validated.get("cursor").and_then(|v| v.as_str()),
+                Some("file_cursor")
+            );
+            assert_eq!(
+                validated.get("complete").and_then(|v| v.as_bool()),
+                Some(false)
+            );
+        }
+
+        // Missing cursor defaults to null
+        {
+            let ast = create_ast(vec![]);
+
+            let value = json!({
+                "results": [],
+                "complete": true
+            });
+
+            let result = validate_cidl_type(
+                CidlType::Paginated(Box::new(CidlType::KvObject(Box::new(CidlType::JsonValue)))),
+                Some(value),
+                &ast,
+                false,
+            );
+
+            assert!(result.is_ok());
+            let validated = result.unwrap().unwrap();
+            assert!(validated.get("cursor").unwrap().is_null());
+        }
+
+        // Invalid cursor type fails
+        {
+            let ast = create_ast(vec![]);
+
+            let value = json!({
+                "results": [],
+                "cursor": 123,
+                "complete": true
+            });
+
+            let result = validate_cidl_type(
+                CidlType::Paginated(Box::new(CidlType::R2Object)),
+                Some(value),
+                &ast,
+                false,
+            );
+
+            assert!(matches!(result, Err(ValidatorErrorKind::NonString)));
         }
     }
 }

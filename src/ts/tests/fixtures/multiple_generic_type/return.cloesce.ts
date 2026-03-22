@@ -9,6 +9,6 @@ class Bar<T, U> {
 export class Foo {
   id: number;
 
-  @POST
+  @Post()
   method(valid: number): Bar<number, number> {} // invalid return type
 }

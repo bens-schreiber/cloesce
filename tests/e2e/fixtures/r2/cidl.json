@@ -1,10 +1,12 @@
 {
-  "hash": 9234581653163423090,
+  "hash": 11218240258977183070,
   "project_name": "runner",
   "wrangler_env": {
     "name": "Env",
     "source_path": "./seed__r2.cloesce.ts",
-    "d1_binding": "db",
+    "d1_bindings": [
+      "db"
+    ],
     "kv_bindings": [],
     "r2_bindings": [
       "bucket1",
@@ -14,28 +16,41 @@
   },
   "models": {
     "D1BackedModel": {
-      "hash": 15131870847274583393,
+      "hash": 6703974713046051109,
       "name": "D1BackedModel",
-      "primary_key": {
-        "name": "id",
-        "cidl_type": "Integer"
-      },
+      "d1_binding": "db",
+      "primary_key_columns": [
+        {
+          "hash": 6397878138472974760,
+          "value": {
+            "name": "id",
+            "cidl_type": "Integer"
+          },
+          "foreign_key_reference": null,
+          "unique_ids": [],
+          "composite_id": null
+        }
+      ],
       "columns": [
         {
-          "hash": 1999042468264969055,
+          "hash": 4638766536825732897,
           "value": {
             "name": "someColumn",
             "cidl_type": "Real"
           },
-          "foreign_key_reference": null
+          "foreign_key_reference": null,
+          "unique_ids": [],
+          "composite_id": null
         },
         {
-          "hash": 5739512274815634865,
+          "hash": 16794226563886906789,
           "value": {
             "name": "someOtherColumn",
             "cidl_type": "Text"
           },
-          "foreign_key_reference": null
+          "foreign_key_reference": null,
+          "unique_ids": [],
+          "composite_id": null
         }
       ],
       "navigation_properties": [],
@@ -55,7 +70,8 @@
         "GET": {
           "name": "GET",
           "is_static": true,
-          "http_verb": "GET",
+          "data_source": null,
+          "http_verb": "Get",
           "return_media": "Json",
           "return_type": {
             "HttpResult": {
@@ -83,7 +99,8 @@
         "LIST": {
           "name": "LIST",
           "is_static": true,
-          "http_verb": "GET",
+          "data_source": null,
+          "http_verb": "Get",
           "return_media": "Json",
           "return_type": {
             "HttpResult": {
@@ -95,6 +112,24 @@
           "parameters_media": "Json",
           "parameters": [
             {
+              "name": "lastSeen_id",
+              "cidl_type": {
+                "Nullable": "Integer"
+              }
+            },
+            {
+              "name": "limit",
+              "cidl_type": {
+                "Nullable": "Integer"
+              }
+            },
+            {
+              "name": "offset",
+              "cidl_type": {
+                "Nullable": "Integer"
+              }
+            },
+            {
               "name": "__datasource",
               "cidl_type": {
                 "DataSource": "D1BackedModel"
@@ -105,7 +140,8 @@
         "SAVE": {
           "name": "SAVE",
           "is_static": true,
-          "http_verb": "POST",
+          "data_source": null,
+          "http_verb": "Post",
           "return_media": "Json",
           "return_type": {
             "HttpResult": {
@@ -131,7 +167,8 @@
         "uploadData": {
           "name": "uploadData",
           "is_static": false,
-          "http_verb": "PUT",
+          "data_source": null,
+          "http_verb": "Put",
           "return_media": "Json",
           "return_type": "Void",
           "parameters_media": "Octet",
@@ -145,12 +182,6 @@
             {
               "name": "stream",
               "cidl_type": "Stream"
-            },
-            {
-              "name": "__datasource",
-              "cidl_type": {
-                "DataSource": "D1BackedModel"
-              }
             }
           ]
         }
@@ -160,7 +191,12 @@
           "name": "default",
           "tree": {
             "r2Data": {}
-          }
+          },
+          "is_private": false,
+          "list_params": [
+            "LastSeen",
+            "Limit"
+          ]
         }
       },
       "cruds": [
@@ -171,9 +207,10 @@
       "source_path": "./seed__r2.cloesce.ts"
     },
     "PureR2Model": {
-      "hash": 3824269534873160298,
+      "hash": 1708237429327031561,
       "name": "PureR2Model",
-      "primary_key": null,
+      "d1_binding": null,
+      "primary_key_columns": [],
       "columns": [],
       "navigation_properties": [],
       "key_params": [
@@ -190,7 +227,7 @@
         {
           "format": "path/to/other/{id}",
           "var_name": "otherData",
-          "bucket_binding": "bucket2",
+          "bucket_binding": "bucket1",
           "list_prefix": false
         },
         {
@@ -204,7 +241,8 @@
         "GET": {
           "name": "GET",
           "is_static": true,
-          "http_verb": "GET",
+          "data_source": null,
+          "http_verb": "Get",
           "return_media": "Json",
           "return_type": {
             "HttpResult": {
@@ -228,7 +266,8 @@
         "uploadData": {
           "name": "uploadData",
           "is_static": false,
-          "http_verb": "PUT",
+          "data_source": null,
+          "http_verb": "Put",
           "return_media": "Json",
           "return_type": "Void",
           "parameters_media": "Octet",
@@ -242,19 +281,14 @@
             {
               "name": "stream",
               "cidl_type": "Stream"
-            },
-            {
-              "name": "__datasource",
-              "cidl_type": {
-                "DataSource": "PureR2Model"
-              }
             }
           ]
         },
         "uploadOtherData": {
           "name": "uploadOtherData",
           "is_static": false,
-          "http_verb": "PUT",
+          "data_source": null,
+          "http_verb": "Put",
           "return_media": "Json",
           "return_type": "Void",
           "parameters_media": "Octet",
@@ -268,12 +302,6 @@
             {
               "name": "stream",
               "cidl_type": "Stream"
-            },
-            {
-              "name": "__datasource",
-              "cidl_type": {
-                "DataSource": "PureR2Model"
-              }
             }
           ]
         }
@@ -285,7 +313,12 @@
             "allData": {},
             "data": {},
             "otherData": {}
-          }
+          },
+          "is_private": false,
+          "list_params": [
+            "LastSeen",
+            "Limit"
+          ]
         }
       },
       "cruds": [

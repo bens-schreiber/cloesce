@@ -1,10 +1,12 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { startWrangler, stopWrangler, withRes } from "../src/setup";
-import { CrudHaver, Parent } from "../fixtures/crud/client";
+import { startWrangler, withRes } from "../src/setup";
+import { CrudHaver, Parent } from "../fixtures/d1_crud/client";
+import config from "../fixtures/d1_crud/cloesce.config";
 
+let stopWrangler: () => Promise<void>;
 beforeAll(async () => {
   // NOTE: e2e is called from proj root
-  await startWrangler("./fixtures/crud");
+  stopWrangler = await startWrangler("./fixtures/d1_crud", config.workersUrl!);
 }, 30_000);
 
 afterAll(async () => {
@@ -54,7 +56,7 @@ describe("Basic", () => {
   });
 
   it("List 3 models", async () => {
-    const res = await CrudHaver.LIST();
+    const res = await CrudHaver.LIST(null, null, null);
     expect(res.ok, withRes("LIST should be OK", res)).toBe(true);
     expect(res.data!.length, withRes("Should be 4 results", res)).toBe(4); // including the one from the prev test
     models.forEach((m) =>
@@ -68,7 +70,7 @@ describe("Parent with children", () => {
   it("POST", async () => {
     const res = await Parent.SAVE(
       {
-        favoriteChildId: null,
+        // leaving out favoriteChildId, should infer as null
         children: [{}, {}, {}], // should be able to leave blank, creating 3 children
       },
       "withChildren",
@@ -117,7 +119,7 @@ describe("Parent with children", () => {
   });
 
   it("LIST", async () => {
-    const res = await Parent.LIST("withChildren");
+    const res = await Parent.LIST(null, null, null, "withChildren");
     expect(res.ok, withRes("LIST should be OK", res)).toBe(true);
     expect(res.data!.length).toEqual(1);
     expect(res.data![0], withRes("Data should be equal", res)).toEqual(model);

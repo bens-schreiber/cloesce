@@ -1,3 +1,4 @@
+import { Project } from "ts-morph";
 import {
   Model,
   CloesceAst,
@@ -16,7 +17,19 @@ import {
   KeyValue,
   AstR2Object,
   CrudKind,
+  CrudListParam,
 } from "../src/ast";
+
+export function cloesceProject(): Project {
+  const project = new Project({
+    compilerOptions: {
+      strict: true,
+    },
+  });
+
+  project.addSourceFileAtPath("./src/ui/backend.ts");
+  return project;
+}
 
 export function createAst(args?: {
   models?: Model[];
@@ -29,6 +42,16 @@ export function createAst(args?: {
     args?.services?.map((s) => [s.name, s]) ?? [],
   );
 
+  // NOTE: these won't always be empty in real usage
+  for (const model of Object.values(modelsMap)) {
+    model.data_sources["default"] ??= {
+      name: "default",
+      is_private: false,
+      tree: {},
+      list_params: [],
+    };
+  }
+
   return {
     project_name: "test",
     models: modelsMap,
@@ -37,7 +60,7 @@ export function createAst(args?: {
     wrangler_env: {
       name: "Env",
       source_path: "source.ts",
-      d1_binding: "db",
+      d1_bindings: ["d1"],
       kv_bindings: [],
       r2_bindings: [],
       vars: {},
@@ -57,6 +80,7 @@ abstract class ApiMethodBuilder {
     return_type: CidlType,
     return_media: MediaType = MediaType.Json,
     parameters_media: MediaType = MediaType.Json,
+    data_source: string | null = null,
   ): this {
     this.methods[name] = {
       name,
@@ -66,6 +90,7 @@ abstract class ApiMethodBuilder {
       return_type,
       return_media,
       parameters_media,
+      data_source,
     };
     return this;
   }
@@ -99,7 +124,9 @@ export class IncludeTreeBuilder {
 
 export class ModelBuilder {
   private name: string;
-  private primary_key: NamedTypedValue | null = null;
+  private d1_binding: string | null = null;
+  private primary_key_names: string[] = [];
+  private primary_key_types: Record<string, CidlType> = {};
   private columns: D1Column[] = [];
   private navigation_properties: NavigationProperty[] = [];
   private key_params: string[] = [];
@@ -117,14 +144,26 @@ export class ModelBuilder {
     return new ModelBuilder(name);
   }
 
+  d1(binding: string): this {
+    this.d1_binding = binding;
+    return this;
+  }
+
+  defaultDb(): this {
+    this.d1_binding = "d1";
+    return this;
+  }
+
   col(
     name: string,
     cidl_type: CidlType,
-    foreign_key: string | null = null,
+    foreign_key: { model_name: string; column_name: string } | null = null,
   ): this {
     this.columns.push({
       value: { name, cidl_type },
       foreign_key_reference: foreign_key,
+      unique_ids: [],
+      composite_id: null,
     });
     return this;
   }
@@ -143,7 +182,10 @@ export class ModelBuilder {
   }
 
   pk(name: string, cidl_type: CidlType): this {
-    this.primary_key = { name, cidl_type };
+    if (!this.primary_key_names.includes(name)) {
+      this.primary_key_names.push(name);
+    }
+    this.primary_key_types[name] = cidl_type;
     return this;
   }
 
@@ -193,6 +235,7 @@ export class ModelBuilder {
     is_static: boolean,
     parameters: NamedTypedValue[],
     return_type: CidlType,
+    data_source: string | null = null,
   ): this {
     this.methods[name] = {
       name,
@@ -202,14 +245,22 @@ export class ModelBuilder {
       return_type,
       return_media: MediaType.Json,
       parameters_media: MediaType.Json,
+      data_source,
     };
     return this;
   }
 
-  dataSource(name: string, tree: any): this {
+  dataSource(
+    name: string,
+    tree: any,
+    is_private: boolean = false,
+    list_params: CrudListParam[] = [],
+  ): this {
     this.data_sources[name] = {
       name,
       tree,
+      is_private,
+      list_params,
     };
     return this;
   }
@@ -220,10 +271,32 @@ export class ModelBuilder {
   }
 
   build(): Model {
+    const mutableColumns = [...this.columns];
+    const primary_key_columns: D1Column[] = [];
+
+    for (const pkName of this.primary_key_names) {
+      const idx = mutableColumns.findIndex((col) => col.value.name === pkName);
+      if (idx >= 0) {
+        primary_key_columns.push(mutableColumns[idx]);
+        mutableColumns.splice(idx, 1);
+      } else {
+        primary_key_columns.push({
+          value: {
+            name: pkName,
+            cidl_type: this.primary_key_types[pkName] ?? "Integer",
+          },
+          foreign_key_reference: null,
+          unique_ids: [],
+          composite_id: null,
+        });
+      }
+    }
+
     return {
       name: this.name,
-      primary_key: this.primary_key,
-      columns: this.columns,
+      d1_binding: this.d1_binding,
+      primary_key_columns,
+      columns: mutableColumns,
       navigation_properties: this.navigation_properties,
       key_params: this.key_params,
       kv_objects: this.kv_objects,
@@ -260,6 +333,7 @@ export class ServiceBuilder extends ApiMethodBuilder {
       attributes: this.attributes,
       methods: this.methods,
       source_path: "",
+      initializer: null,
     };
   }
 }

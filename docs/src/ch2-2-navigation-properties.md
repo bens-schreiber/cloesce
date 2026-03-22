@@ -6,6 +6,11 @@ In this section, we will explore *Navigation Properties* which allow us to defin
 
 ## Foreign Keys
 
+> [!NOTE]
+> A Model can only have a foreign key to another Model if it is:
+> 1. D1 backed
+> 2. Part of the same database as the Model it references (lifted in future releases!)
+
 Before diving into Navigation Properties, it's essential to understand their source: foreign keys. Foreign keys are scalar properties that reference the Primary Key of another Model, establishing a relationship between two Models.
 
 Foreign keys directly translate to SQLite `FOREIGN KEY` constraints in the underlying D1 database.
@@ -15,23 +20,24 @@ For example, let's say we want to create a relationship between `Person` and `Do
 ```typescript
 import { Model, Integer, ForeignKey } from "cloesce/backend";
 
-@Model()
+@Model("db")
 export class Dog {
     id: Integer;
 }
 
-@Model()
+@Model("db")
 export class Person {
     id: Integer;
 
-    @ForeignKey(Dog)
+    @ForeignKey<Dog>(d => d.id)
     dogId: Integer;
 }
 ```
 
 The `Person` Model has a foreign key property `dogId`, which references the primary key of the `Dog` Model. This establishes a relationship where each person can be associated with one dog.
 
-> *Note*: Cloesce does not allow circular foreign key relationships (and neither does SQLite!). 
+> [!NOTE]
+> Cloesce does not allow circular foreign key relationships (and neither does SQLite!). 
 >
 > If you need to model such a relationship, consider marking a foreign key as nullable and managing the relationship at the application level.
 
@@ -42,40 +48,14 @@ Inspired by [Entity Framework relationship navigations](https://learn.microsoft.
 Let's revisit our `Person` and `Dog` Models and add navigation properties to them:
 
 ```typescript
-import { Model, Integer, ForeignKey, OneToOne } from "cloesce/backend";
-
-@Model()
-export class Dog {
-    id: Integer;
-}
-
-@Model()
-export class Person {
-    id: Integer;
-
-    @ForeignKey(Dog)
-    dogId: Integer;
-
-    @OneToOne<Dog>(p => p.dogId)
-    dog: Dog | undefined;
-}
-```
-
-In this example, we added a navigation property `dog` to the `Person` Model using the `@OneToOne` decorator. 
-
-This property allows us to access the associated `Dog` instance directly from a `Person` instance. The type of the navigation property is `Dog | undefined`, indicating that it may or may not be populated (elaborated on in the [Include Trees](./ch2-3-include-trees.md) section).
-
-Just like in Entity Framework, omitting decorators is possible when specific naming conventions are followed. The above code can be reduced to:
-
-```typescript
 import { Model, Integer } from "cloesce/backend";
 
-@Model()
+@Model("db")
 export class Dog {
     id: Integer;
 }
 
-@Model()
+@Model("db")
 export class Person {
     id: Integer;
 
@@ -84,55 +64,67 @@ export class Person {
 }
 ```
 
-Cloesce will automatically infer the relationship based on the property names in a similar fashion to primary key inference. (`dog` matches `dogId` or `dog_id` in any casing).
+In this example, Cloesce infers that `dog` is a navigation property to `Dog`, with `dogId` as the foreign key. This allows us to access the associated `Dog` instance directly from a `Person` instance.
+
+Cloesce has a simple inference engine that finds navigation properties, then searches for a property in the Model with the name `<navPropName><primaryKeyName>` (in any casing) to use as the foreign key.
+
+This relationship can be explicitly expressed using the Fluent API in `cloesce.config.ts`:
+
+```typescript
+config.model(Person, builder => {
+    builder
+
+    // Property "dogId" is a foreign key referencing the model Dog,
+    // using Dog's primary key "id"
+    .foreignKey("dogId")
+        .references(Dog, "id")
+    
+    // Property "dog" is one to one referencing the model Dog,
+    // using the foreign key "dogId"
+    .oneToOne("dog")
+        .references(Dog, "dogId");
+});
+```
+
+<!-- In this example, we added a navigation property `dog` to the `Person` Model using the `@OneToOne` decorator. 
+
+This property allows us to access the associated `Dog` instance directly from a `Person` instance. The type of the navigation property is `Dog | undefined`, indicating that it may or may not be populated (elaborated on in the [Include Trees](./ch2-3-include-trees.md) section).
+ -->
 
 ## One to Many
 
 Let's modify our Models to allow a Person to have multiple Dogs:
 
 ```typescript
-import { Model, Integer, ForeignKey, OneToMany } from "cloesce/backend";
+import { Model, Integer } from "cloesce/backend";
 
-@Model()
+@Model("db")
 export class Dog {
     id: Integer;
 
-    @ForeignKey(Person)
     ownerId: Integer;
-
-    @OneToMany<Person>(d => d.ownerId)
     owner: Person | undefined;
 }
 
-@Model()
+@Model("db")
 export class Person {
     id: Integer;
-
-    @OneToMany<Dog>(d => d.ownerId)
     dogs: Dog[];
 }
 ```
 
 In this example, we added a foreign key `ownerId` to the `Dog` Model, referencing the `Person` Model. The `Person` Model now has a navigation property `dogs`, which is an array of `Dog` instances, representing all dogs owned by that person.
 
-We can omit decorators for `OneToMany` only if a single `ForeignKey` exists pointing from `Dog` to `Person`. Thus, the above code can be simplified to:
+Cloesce can infer this relationship by finding the first property in `Dog` that references `Person` as a foreign key, and using that as the basis for the one to many relationship. If many properties reference `Person`, it will need to be explicitly stated in the Fluent API:
 
 ```typescript
-import { Model, Integer } from "cloesce/backend";
-@Model()
-export class Dog {
-    id: Integer;
-
-    ownerId: Integer;
-    owner: Person | undefined;
-}
-
-@Model()
-export class Person {
-    id: Integer;
-
-    dogs: Dog[];
-}
+config.model(Person, builder => {
+    builder
+    .oneToMany("dogs")
+        .references(Dog, "ownerId");
+    .oneToMany("otherDogs")
+        .references(Dog, "otherOwnerId");
+});
 ```
 
 ## Many to Many
@@ -141,14 +133,15 @@ Many to Many relationships have an intermediate junction table that holds foreig
 
 ```typescript
 import { Model, Integer } from "cloesce/backend";
-@Model()
+
+@Model("db")
 export class Student {
     id: Integer;
 
     courses: Course[];
 }
 
-@Model()
+@Model("db")
 export class Course {
     id: Integer;
 
@@ -167,4 +160,70 @@ CREATE TABLE IF NOT EXISTS "CourseStudent" (
 );
 ```
 
-> *Note*: The left column lists the Model name that comes first alphabetically; the right column lists the one that comes after.
+> [!NOTE]
+> The left column lists the Model name that comes first alphabetically; the right column lists the one that comes after.
+
+## Composite Keys
+
+A Model can have a composite primary key by using the `@PrimaryKey` decorator on multiple properties. A primary key may also be a foreign key.
+
+```typescript
+import { Model, Integer, PrimaryKey } from "cloesce/backend";
+
+@Model("db")
+class Enrollment {
+    @PrimaryKey
+    @ForeignKey<Student>(s => s.id)
+    studentId: Integer;
+
+    @PrimaryKey
+    courseId: Integer;
+
+    student: Student | undefined;
+    course: Course | undefined;
+}
+
+@Model("db")
+class Student {
+    id: Integer;
+    enrollments: Enrollment[];
+}
+```
+
+Here, Cloesce is able to infer that Student has many Enrollments through `enrollments` because the Enrollment Model has a foreign key to Student.
+
+```typescript
+import { Model, Integer, PrimaryKey } from "cloesce/backend";
+
+@Model("db")
+class Person {
+    @PrimaryKey
+    firstName: string;
+
+    @PrimaryKey
+    lastName: string;
+
+    dog: Dog | undefined;
+}
+
+@Model("db")
+class Dog {
+    id: Integer;
+
+    ownerFirstName: string;
+    ownerLastName: string;
+    owner: Person | undefined;
+}
+```
+
+Because a navigation property `owner` is defined on `Dog`, Cloesce can infer that `ownerFirstName` and `ownerLastName` together form a composite foreign key to `Person`.
+
+Without a navigation property, Cloesce Models can only decorate a single foreign key, so the Fluent API must be used to explicitly define the composite foreign key:
+
+```typescript
+config.model(Dog, builder => {
+    builder
+        .foreignKey("ownerFirstName", "ownerLastName")
+        .references(Person, "firstName", "lastName");
+});
+```

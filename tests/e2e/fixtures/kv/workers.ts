@@ -3,6 +3,7 @@ import { CloesceApp } from "cloesce/backend";
 import cidl from "./cidl.json";
 import { D1BackedModel } from "./seed__kv.cloesce.js";
 import { PureKVModel } from "./seed__kv.cloesce.js";
+import { PaginatedKVModel } from "./seed__kv.cloesce.js";
 
 
 import { Env } from "./seed__kv.cloesce.js";
@@ -10,11 +11,12 @@ import { Env } from "./seed__kv.cloesce.js";
 const constructorRegistry: Record<string, new () => any> = {
 	D1BackedModel: D1BackedModel,
 	PureKVModel: PureKVModel,
+	PaginatedKVModel: PaginatedKVModel,
 	Env: Env
 };
 
 async function fetch(request: Request, env: any, ctx: any): Promise<Response> {
-    const app = await CloesceApp.init(cidl as any, constructorRegistry);
+    const app = await CloesceApp.init(cidl as any, constructorRegistry, "http://localhost:5758/api");
     return await app.run(request, env);
 }
 

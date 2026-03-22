@@ -1,0 +1,288 @@
+{
+  "hash": 12269881830252270504,
+  "project_name": "runner",
+  "wrangler_env": {
+    "name": "Env",
+    "source_path": "./seed__adv_ds.cloesce.ts",
+    "d1_bindings": [
+      "db"
+    ],
+    "kv_bindings": [],
+    "r2_bindings": [],
+    "vars": {}
+  },
+  "models": {
+    "Hamburger": {
+      "hash": 16378746804444100937,
+      "name": "Hamburger",
+      "d1_binding": "db",
+      "primary_key_columns": [
+        {
+          "hash": 6397878138472974760,
+          "value": {
+            "name": "id",
+            "cidl_type": "Integer"
+          },
+          "foreign_key_reference": null,
+          "unique_ids": [],
+          "composite_id": null
+        }
+      ],
+      "columns": [
+        {
+          "hash": 6788679640762437622,
+          "value": {
+            "name": "name",
+            "cidl_type": "Text"
+          },
+          "foreign_key_reference": null,
+          "unique_ids": [],
+          "composite_id": null
+        }
+      ],
+      "navigation_properties": [
+        {
+          "hash": 6498092945051865391,
+          "var_name": "toppings",
+          "model_reference": "Topping",
+          "kind": "ManyToMany"
+        }
+      ],
+      "key_params": [],
+      "kv_objects": [],
+      "r2_objects": [],
+      "methods": {
+        "LIST": {
+          "name": "LIST",
+          "is_static": true,
+          "data_source": null,
+          "http_verb": "Get",
+          "return_media": "Json",
+          "return_type": {
+            "HttpResult": {
+              "Array": {
+                "Object": "Hamburger"
+              }
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "lastSeen_id",
+              "cidl_type": {
+                "Nullable": "Integer"
+              }
+            },
+            {
+              "name": "limit",
+              "cidl_type": {
+                "Nullable": "Integer"
+              }
+            },
+            {
+              "name": "offset",
+              "cidl_type": {
+                "Nullable": "Integer"
+              }
+            },
+            {
+              "name": "__datasource",
+              "cidl_type": {
+                "DataSource": "Hamburger"
+              }
+            }
+          ]
+        },
+        "SAVE": {
+          "name": "SAVE",
+          "is_static": true,
+          "data_source": null,
+          "http_verb": "Post",
+          "return_media": "Json",
+          "return_type": {
+            "HttpResult": {
+              "Object": "Hamburger"
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "model",
+              "cidl_type": {
+                "Partial": "Hamburger"
+              }
+            },
+            {
+              "name": "__datasource",
+              "cidl_type": {
+                "DataSource": "Hamburger"
+              }
+            }
+          ]
+        },
+        "noLettuceToppings": {
+          "name": "noLettuceToppings",
+          "is_static": false,
+          "data_source": "Hamburger:noLettuceToppings",
+          "http_verb": "Get",
+          "return_media": "Json",
+          "return_type": {
+            "Array": {
+              "Object": "Topping"
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": []
+        },
+        "onlyBacon": {
+          "name": "onlyBacon",
+          "is_static": false,
+          "data_source": "Hamburger:onlyBacon",
+          "http_verb": "Get",
+          "return_media": "Json",
+          "return_type": {
+            "Array": {
+              "Object": "Topping"
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": []
+        }
+      },
+      "data_sources": {
+        "Hamburger:noLettuceToppings": {
+          "name": "Hamburger:noLettuceToppings",
+          "tree": {
+            "toppings": {}
+          },
+          "is_private": true,
+          "list_params": []
+        },
+        "Hamburger:onlyBacon": {
+          "name": "Hamburger:onlyBacon",
+          "tree": {
+            "toppings": {}
+          },
+          "is_private": true,
+          "list_params": []
+        },
+        "default": {
+          "name": "default",
+          "tree": {
+            "toppings": {}
+          },
+          "is_private": false,
+          "list_params": [
+            "LastSeen",
+            "Limit"
+          ]
+        },
+        "orderedBurgersWithLettuce": {
+          "name": "orderedBurgersWithLettuce",
+          "tree": {
+            "toppings": {}
+          },
+          "is_private": false,
+          "list_params": [
+            "LastSeen",
+            "Limit"
+          ]
+        }
+      },
+      "cruds": [
+        "LIST",
+        "SAVE"
+      ],
+      "source_path": "./seed__adv_ds.cloesce.ts"
+    },
+    "Topping": {
+      "hash": 14407311656640296225,
+      "name": "Topping",
+      "d1_binding": "db",
+      "primary_key_columns": [
+        {
+          "hash": 6397878138472974760,
+          "value": {
+            "name": "id",
+            "cidl_type": "Integer"
+          },
+          "foreign_key_reference": null,
+          "unique_ids": [],
+          "composite_id": null
+        }
+      ],
+      "columns": [
+        {
+          "hash": 6788679640762437622,
+          "value": {
+            "name": "name",
+            "cidl_type": "Text"
+          },
+          "foreign_key_reference": null,
+          "unique_ids": [],
+          "composite_id": null
+        }
+      ],
+      "navigation_properties": [
+        {
+          "hash": 8945555950776796007,
+          "var_name": "hamburgers",
+          "model_reference": "Hamburger",
+          "kind": "ManyToMany"
+        }
+      ],
+      "key_params": [],
+      "kv_objects": [],
+      "r2_objects": [],
+      "methods": {
+        "SAVE": {
+          "name": "SAVE",
+          "is_static": true,
+          "data_source": null,
+          "http_verb": "Post",
+          "return_media": "Json",
+          "return_type": {
+            "HttpResult": {
+              "Object": "Topping"
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "model",
+              "cidl_type": {
+                "Partial": "Topping"
+              }
+            },
+            {
+              "name": "__datasource",
+              "cidl_type": {
+                "DataSource": "Topping"
+              }
+            }
+          ]
+        }
+      },
+      "data_sources": {
+        "default": {
+          "name": "default",
+          "tree": {
+            "hamburgers": {}
+          },
+          "is_private": false,
+          "list_params": [
+            "LastSeen",
+            "Limit"
+          ]
+        }
+      },
+      "cruds": [
+        "SAVE"
+      ],
+      "source_path": "./seed__adv_ds.cloesce.ts"
+    }
+  },
+  "services": {},
+  "poos": {},
+  "main_source": null
+}

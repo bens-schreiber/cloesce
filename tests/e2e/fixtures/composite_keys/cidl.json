@@ -1,0 +1,590 @@
+{
+  "hash": 7355829690118109237,
+  "project_name": "runner",
+  "wrangler_env": {
+    "name": "Env",
+    "source_path": "./seed__composite.cloesce.ts",
+    "d1_bindings": [
+      "db"
+    ],
+    "kv_bindings": [],
+    "r2_bindings": [],
+    "vars": {}
+  },
+  "models": {
+    "Course": {
+      "hash": 16850187473558712992,
+      "name": "Course",
+      "d1_binding": "db",
+      "primary_key_columns": [
+        {
+          "hash": 5506969935928112087,
+          "value": {
+            "name": "id",
+            "cidl_type": "Real"
+          },
+          "foreign_key_reference": null,
+          "unique_ids": [],
+          "composite_id": null
+        }
+      ],
+      "columns": [
+        {
+          "hash": 16671312646982238929,
+          "value": {
+            "name": "title",
+            "cidl_type": "Text"
+          },
+          "foreign_key_reference": null,
+          "unique_ids": [],
+          "composite_id": null
+        }
+      ],
+      "navigation_properties": [
+        {
+          "hash": 4497791794299832312,
+          "var_name": "students",
+          "model_reference": "StudentCourse",
+          "kind": {
+            "OneToMany": {
+              "key_columns": [
+                "courseId"
+              ]
+            }
+          }
+        }
+      ],
+      "key_params": [],
+      "kv_objects": [],
+      "r2_objects": [],
+      "methods": {
+        "GET": {
+          "name": "GET",
+          "is_static": true,
+          "data_source": null,
+          "http_verb": "Get",
+          "return_media": "Json",
+          "return_type": {
+            "HttpResult": {
+              "Object": "Course"
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "id",
+              "cidl_type": "Real"
+            },
+            {
+              "name": "__datasource",
+              "cidl_type": {
+                "DataSource": "Course"
+              }
+            }
+          ]
+        },
+        "LIST": {
+          "name": "LIST",
+          "is_static": true,
+          "data_source": null,
+          "http_verb": "Get",
+          "return_media": "Json",
+          "return_type": {
+            "HttpResult": {
+              "Array": {
+                "Object": "Course"
+              }
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "lastSeen_id",
+              "cidl_type": {
+                "Nullable": "Real"
+              }
+            },
+            {
+              "name": "limit",
+              "cidl_type": {
+                "Nullable": "Integer"
+              }
+            },
+            {
+              "name": "offset",
+              "cidl_type": {
+                "Nullable": "Integer"
+              }
+            },
+            {
+              "name": "__datasource",
+              "cidl_type": {
+                "DataSource": "Course"
+              }
+            }
+          ]
+        },
+        "SAVE": {
+          "name": "SAVE",
+          "is_static": true,
+          "data_source": null,
+          "http_verb": "Post",
+          "return_media": "Json",
+          "return_type": {
+            "HttpResult": {
+              "Object": "Course"
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "model",
+              "cidl_type": {
+                "Partial": "Course"
+              }
+            },
+            {
+              "name": "__datasource",
+              "cidl_type": {
+                "DataSource": "Course"
+              }
+            }
+          ]
+        }
+      },
+      "data_sources": {
+        "default": {
+          "name": "default",
+          "tree": {
+            "students": {}
+          },
+          "is_private": false,
+          "list_params": [
+            "LastSeen",
+            "Limit"
+          ]
+        }
+      },
+      "cruds": [
+        "GET",
+        "LIST",
+        "SAVE"
+      ],
+      "source_path": "./seed__composite.cloesce.ts"
+    },
+    "Student": {
+      "hash": 4576532940261906487,
+      "name": "Student",
+      "d1_binding": "db",
+      "primary_key_columns": [
+        {
+          "hash": 5506969935928112087,
+          "value": {
+            "name": "id",
+            "cidl_type": "Real"
+          },
+          "foreign_key_reference": null,
+          "unique_ids": [],
+          "composite_id": null
+        },
+        {
+          "hash": 1120594035772014887,
+          "value": {
+            "name": "name",
+            "cidl_type": "Text"
+          },
+          "foreign_key_reference": null,
+          "unique_ids": [],
+          "composite_id": null
+        }
+      ],
+      "columns": [
+        {
+          "hash": 2861543403928163629,
+          "value": {
+            "name": "favoriteColor",
+            "cidl_type": "Text"
+          },
+          "foreign_key_reference": null,
+          "unique_ids": [],
+          "composite_id": null
+        }
+      ],
+      "navigation_properties": [
+        {
+          "hash": 5774797186201287617,
+          "var_name": "courses",
+          "model_reference": "StudentCourse",
+          "kind": {
+            "OneToMany": {
+              "key_columns": [
+                "studentId",
+                "studentName"
+              ]
+            }
+          }
+        }
+      ],
+      "key_params": [],
+      "kv_objects": [],
+      "r2_objects": [],
+      "methods": {
+        "GET": {
+          "name": "GET",
+          "is_static": true,
+          "data_source": null,
+          "http_verb": "Get",
+          "return_media": "Json",
+          "return_type": {
+            "HttpResult": {
+              "Object": "Student"
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "id",
+              "cidl_type": "Real"
+            },
+            {
+              "name": "name",
+              "cidl_type": "Text"
+            },
+            {
+              "name": "__datasource",
+              "cidl_type": {
+                "DataSource": "Student"
+              }
+            }
+          ]
+        },
+        "LIST": {
+          "name": "LIST",
+          "is_static": true,
+          "data_source": null,
+          "http_verb": "Get",
+          "return_media": "Json",
+          "return_type": {
+            "HttpResult": {
+              "Array": {
+                "Object": "Student"
+              }
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "lastSeen_id",
+              "cidl_type": {
+                "Nullable": "Real"
+              }
+            },
+            {
+              "name": "lastSeen_name",
+              "cidl_type": {
+                "Nullable": "Text"
+              }
+            },
+            {
+              "name": "limit",
+              "cidl_type": {
+                "Nullable": "Integer"
+              }
+            },
+            {
+              "name": "offset",
+              "cidl_type": {
+                "Nullable": "Integer"
+              }
+            },
+            {
+              "name": "__datasource",
+              "cidl_type": {
+                "DataSource": "Student"
+              }
+            }
+          ]
+        },
+        "SAVE": {
+          "name": "SAVE",
+          "is_static": true,
+          "data_source": null,
+          "http_verb": "Post",
+          "return_media": "Json",
+          "return_type": {
+            "HttpResult": {
+              "Object": "Student"
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "model",
+              "cidl_type": {
+                "Partial": "Student"
+              }
+            },
+            {
+              "name": "__datasource",
+              "cidl_type": {
+                "DataSource": "Student"
+              }
+            }
+          ]
+        }
+      },
+      "data_sources": {
+        "coursesOrderedDesc": {
+          "name": "coursesOrderedDesc",
+          "tree": {
+            "courses": {}
+          },
+          "is_private": false,
+          "list_params": [
+            "LastSeen",
+            "Limit"
+          ]
+        },
+        "default": {
+          "name": "default",
+          "tree": {
+            "courses": {}
+          },
+          "is_private": false,
+          "list_params": [
+            "LastSeen",
+            "Limit"
+          ]
+        }
+      },
+      "cruds": [
+        "GET",
+        "LIST",
+        "SAVE"
+      ],
+      "source_path": "./seed__composite.cloesce.ts"
+    },
+    "StudentCourse": {
+      "hash": 3369799349848110955,
+      "name": "StudentCourse",
+      "d1_binding": "db",
+      "primary_key_columns": [
+        {
+          "hash": 17177798493862312650,
+          "value": {
+            "name": "studentId",
+            "cidl_type": "Real"
+          },
+          "foreign_key_reference": {
+            "model_name": "Student",
+            "column_name": "id"
+          },
+          "unique_ids": [],
+          "composite_id": null
+        },
+        {
+          "hash": 8458339642054402947,
+          "value": {
+            "name": "studentName",
+            "cidl_type": "Text"
+          },
+          "foreign_key_reference": {
+            "model_name": "Student",
+            "column_name": "name"
+          },
+          "unique_ids": [],
+          "composite_id": null
+        },
+        {
+          "hash": 7270320578742903278,
+          "value": {
+            "name": "courseId",
+            "cidl_type": "Real"
+          },
+          "foreign_key_reference": {
+            "model_name": "Course",
+            "column_name": "id"
+          },
+          "unique_ids": [],
+          "composite_id": null
+        }
+      ],
+      "columns": [],
+      "navigation_properties": [
+        {
+          "hash": 12787935236774875380,
+          "var_name": "student",
+          "model_reference": "Student",
+          "kind": {
+            "OneToOne": {
+              "key_columns": [
+                "studentId",
+                "studentName"
+              ]
+            }
+          }
+        },
+        {
+          "hash": 213490876683007423,
+          "var_name": "course",
+          "model_reference": "Course",
+          "kind": {
+            "OneToOne": {
+              "key_columns": [
+                "courseId"
+              ]
+            }
+          }
+        }
+      ],
+      "key_params": [],
+      "kv_objects": [],
+      "r2_objects": [],
+      "methods": {
+        "GET": {
+          "name": "GET",
+          "is_static": true,
+          "data_source": null,
+          "http_verb": "Get",
+          "return_media": "Json",
+          "return_type": {
+            "HttpResult": {
+              "Object": "StudentCourse"
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "studentId",
+              "cidl_type": "Real"
+            },
+            {
+              "name": "studentName",
+              "cidl_type": "Text"
+            },
+            {
+              "name": "courseId",
+              "cidl_type": "Real"
+            },
+            {
+              "name": "__datasource",
+              "cidl_type": {
+                "DataSource": "StudentCourse"
+              }
+            }
+          ]
+        },
+        "LIST": {
+          "name": "LIST",
+          "is_static": true,
+          "data_source": null,
+          "http_verb": "Get",
+          "return_media": "Json",
+          "return_type": {
+            "HttpResult": {
+              "Array": {
+                "Object": "StudentCourse"
+              }
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "lastSeen_studentId",
+              "cidl_type": {
+                "Nullable": "Real"
+              }
+            },
+            {
+              "name": "lastSeen_studentName",
+              "cidl_type": {
+                "Nullable": "Text"
+              }
+            },
+            {
+              "name": "lastSeen_courseId",
+              "cidl_type": {
+                "Nullable": "Real"
+              }
+            },
+            {
+              "name": "limit",
+              "cidl_type": {
+                "Nullable": "Integer"
+              }
+            },
+            {
+              "name": "offset",
+              "cidl_type": {
+                "Nullable": "Integer"
+              }
+            },
+            {
+              "name": "__datasource",
+              "cidl_type": {
+                "DataSource": "StudentCourse"
+              }
+            }
+          ]
+        },
+        "SAVE": {
+          "name": "SAVE",
+          "is_static": true,
+          "data_source": null,
+          "http_verb": "Post",
+          "return_media": "Json",
+          "return_type": {
+            "HttpResult": {
+              "Object": "StudentCourse"
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "model",
+              "cidl_type": {
+                "Partial": "StudentCourse"
+              }
+            },
+            {
+              "name": "__datasource",
+              "cidl_type": {
+                "DataSource": "StudentCourse"
+              }
+            }
+          ]
+        }
+      },
+      "data_sources": {
+        "default": {
+          "name": "default",
+          "tree": {},
+          "is_private": false,
+          "list_params": []
+        },
+        "withStudentCourse": {
+          "name": "withStudentCourse",
+          "tree": {
+            "course": {
+              "students": {}
+            },
+            "student": {
+              "courses": {}
+            }
+          },
+          "is_private": false,
+          "list_params": []
+        }
+      },
+      "cruds": [
+        "GET",
+        "LIST",
+        "SAVE"
+      ],
+      "source_path": "./seed__composite.cloesce.ts"
+    }
+  },
+  "services": {},
+  "poos": {},
+  "main_source": null
+}

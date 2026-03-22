@@ -11,11 +11,11 @@ export class D1BackedModel {
   static async GET(
     id: number,
     keyParam: string,
-    __datasource: "default" |"none" = "none",
+    __datasource: "default" = "default",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<D1BackedModel>> {
     const baseUrl = new URL(
-      `http://localhost:5002/api/D1BackedModel/GET`
+      `http://localhost:5419/api/D1BackedModel/GET`
     );
 
     baseUrl.searchParams.append("id", String(id));
@@ -23,7 +23,7 @@ export class D1BackedModel {
     baseUrl.searchParams.append("__datasource", String(__datasource));
 
     const res = await fetchImpl(baseUrl, {
-      method: "GET",
+      method: "Get",
     });
 
     return await HttpResult.fromResponse(
@@ -34,17 +34,23 @@ export class D1BackedModel {
     );
   }
   static async LIST(
-    __datasource: "default" |"none" = "none",
+    lastSeen_id: number | null,
+    limit: number | null,
+    offset: number | null,
+    __datasource: "default" = "default",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<D1BackedModel[]>> {
     const baseUrl = new URL(
-      `http://localhost:5002/api/D1BackedModel/LIST`
+      `http://localhost:5419/api/D1BackedModel/LIST`
     );
 
+    baseUrl.searchParams.append("lastSeen_id", String(lastSeen_id));
+    baseUrl.searchParams.append("limit", String(limit));
+    baseUrl.searchParams.append("offset", String(offset));
     baseUrl.searchParams.append("__datasource", String(__datasource));
 
     const res = await fetchImpl(baseUrl, {
-      method: "GET",
+      method: "Get",
     });
 
     return await HttpResult.fromResponse(
@@ -56,11 +62,11 @@ export class D1BackedModel {
   }
   static async SAVE(
     model: DeepPartial<D1BackedModel>,
-    __datasource: "default" |"none" = "none",
+    __datasource: "default" = "default",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<D1BackedModel>> {
     const baseUrl = new URL(
-      `http://localhost:5002/api/D1BackedModel/SAVE`
+      `http://localhost:5419/api/D1BackedModel/SAVE`
     );
     const payload: any = {};
 
@@ -68,7 +74,7 @@ export class D1BackedModel {
     baseUrl.searchParams.append("__datasource", String(__datasource));
 
     const res = await fetchImpl(baseUrl, {
-      method: "POST",
+      method: "Post",
       headers: { "Content-Type": "application/json" },
       body: requestBody(MediaType.Json, payload),
     });
@@ -82,23 +88,21 @@ export class D1BackedModel {
   }
   async uploadData(
     stream: Uint8Array,
-    __datasource: "default" |"none" = "none",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<void>> {
     const id = [
-      encodeURIComponent(String(this.id)),
+    encodeURIComponent(String(this.id)),
       encodeURIComponent(String(this.keyParam)),
     ].join("/");
     const baseUrl = new URL(
-      `http://localhost:5002/api/D1BackedModel/${id}/uploadData`
+      `http://localhost:5419/api/D1BackedModel/${id}/uploadData`
     );
     const payload: any = {};
 
     payload["stream"] = stream;
-    baseUrl.searchParams.append("__datasource", String(__datasource));
 
     const res = await fetchImpl(baseUrl, {
-      method: "PUT",
+      method: "Put",
       headers: { "Content-Type": "application/octet-stream" },
       body: requestBody(MediaType.Octet, payload),
     });
@@ -120,22 +124,22 @@ export class PureR2Model {
   id: string;
   data: R2Object;
   otherData: R2Object;
-  allData: R2Object[];
+  allData: Paginated<R2Object>;
 
   static async GET(
     id: string,
-    __datasource: "default" |"none" = "none",
+    __datasource: "default" = "default",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<PureR2Model>> {
     const baseUrl = new URL(
-      `http://localhost:5002/api/PureR2Model/GET`
+      `http://localhost:5419/api/PureR2Model/GET`
     );
 
     baseUrl.searchParams.append("id", String(id));
     baseUrl.searchParams.append("__datasource", String(__datasource));
 
     const res = await fetchImpl(baseUrl, {
-      method: "GET",
+      method: "Get",
     });
 
     return await HttpResult.fromResponse(
@@ -147,22 +151,20 @@ export class PureR2Model {
   }
   async uploadData(
     stream: Uint8Array,
-    __datasource: "default" |"none" = "none",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<void>> {
     const id = [
       encodeURIComponent(String(this.id)),
     ].join("/");
     const baseUrl = new URL(
-      `http://localhost:5002/api/PureR2Model/${id}/uploadData`
+      `http://localhost:5419/api/PureR2Model/${id}/uploadData`
     );
     const payload: any = {};
 
     payload["stream"] = stream;
-    baseUrl.searchParams.append("__datasource", String(__datasource));
 
     const res = await fetchImpl(baseUrl, {
-      method: "PUT",
+      method: "Put",
       headers: { "Content-Type": "application/octet-stream" },
       body: requestBody(MediaType.Octet, payload),
     });
@@ -176,22 +178,20 @@ export class PureR2Model {
   }
   async uploadOtherData(
     stream: Uint8Array,
-    __datasource: "default" |"none" = "none",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<void>> {
     const id = [
       encodeURIComponent(String(this.id)),
     ].join("/");
     const baseUrl = new URL(
-      `http://localhost:5002/api/PureR2Model/${id}/uploadOtherData`
+      `http://localhost:5419/api/PureR2Model/${id}/uploadOtherData`
     );
     const payload: any = {};
 
     payload["stream"] = stream;
-    baseUrl.searchParams.append("__datasource", String(__datasource));
 
     const res = await fetchImpl(baseUrl, {
-      method: "PUT",
+      method: "Put",
       headers: { "Content-Type": "application/octet-stream" },
       body: requestBody(MediaType.Octet, payload),
     });
@@ -206,6 +206,11 @@ export class PureR2Model {
 
   static fromJson(data: any): PureR2Model {
     const res = Object.assign(new PureR2Model(), data);
+    if (res.allData?.results) {
+      for (let i = 0; i < res.allData.results.length; i++) {
+        res.allData.results[i] = Object.assign(new R2Object(), res.allData.results[i]);
+      }
+    }
     return res;
   }
 }
@@ -224,6 +229,12 @@ export class KValue<V> {
   get value(): V | null {
     return this.raw as V | null;
   }
+}
+
+export interface Paginated<T> {
+  results: T[];
+  cursor: string | null;
+  complete: boolean;
 }
 
 export enum MediaType {

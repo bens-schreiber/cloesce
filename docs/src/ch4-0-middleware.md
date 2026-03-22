@@ -6,6 +6,12 @@ It is important to note that the Cloesce client expects results to come exactly 
 
 ## Custom Main Entrypoint
 
+> [!TIP]
+> The Cloesce Router will never throw an unhandled exception. All errors are converted into `HttpResult` responses. 
+>
+> Therefore, there is no need to wrap `app.run` in a try/catch block. HTTP 500 errors are logged by default.
+
+
 The most basic form of middleware is a custom main entrypoint function, which will be called for every request to your Cloesce application.
 
 Cloesce will search your project for an exported `main` entrypoint. If none is found, a default main will be generated that simply initializes the Cloesce application. The main entrypoint allows you to intercept a request before it reaches the Cloesce Router, and handle the output of the Cloesce Router as you see fit.
@@ -46,11 +52,16 @@ export default async function main(
 }
 ```
 
-> *Note*: The Cloesce Router will never throw an unhandled exception. All errors are converted into `HttpResult` responses. Therefore, there is no need to wrap `app.run` in a try/catch block. HTTP 500 errors are logged by default.
-
 ## Middleware Hooks
 
->*Alpha Note*: Middleware hooks are likely to change significantly before a stable release.
+> [!WARNING]
+> Middleware hooks are likely to change significantly before a stable release.
+
+> [!WARNING]
+> Middleware can only inject classes into the DI container at this time. Injecting primitive values (strings, numbers, etc) is not yet supported, but support is planned for a future release.
+
+> [!TIP]
+> Many hooks can be registered. Hooks are called in the order they are registered, per hook.
 
 Middleware hooks can be registered to run at specific points in the Cloesce Router processing pipeline. The available middleware hooks are:
 
@@ -60,8 +71,6 @@ Middleware hooks can be registered to run at specific points in the Cloesce Rout
 | `onNamespace` | Called when a request hits a specific namespace (Model or Service). Occurs after service initialization but before request body validation. |
 | `onMethod`| Called when a request is about to invoke a specific method. Occurs after request body validation but before hydration and method execution. |
 
-
-> *Note*: Many hooks can be registered. Hooks are called in the order they are registered, per hook.
 
 Each hook has access to the dependency injection container for the current request, allowing you to modify it as needed.
 
@@ -74,21 +83,21 @@ export default async function main(
     request: Request,
     env: Env,
     app: CloesceApp,
-    _ctx: ExecutionContext): Promise<Response> {
-        app.onNamespace(Foo, (di) => {
-            di.set(InjectedThing, {
-                value: "hello world",
-            });
+    _ctx: ExecutionContext
+    ): Promise<Response> {
+        
+    app.onNamespace(Foo, (di) => {
+        di.set(InjectedThing, {
+            value: "hello world",
         });
+    });
 
-        app.onMethod(Foo, "blockedMethod", (_di) => {
-            return HttpResult.fail(401, "Blocked method");
-        });
+    app.onMethod(Foo, "blockedMethod", (_di) => {
+        return HttpResult.fail(401, "Blocked method");
+    });
 
-        return await app.run(request, env);
+    return await app.run(request, env);
 }
 ```
 
 Middleware is capable of short-circuiting the request processing by returning an `HttpResult` directly. This is useful for implementing features like authentication. Middleware can also modify the dependency injection container for the current request, allowing you to inject custom services or data.
-
-> *Alpha Note*: Middleware can only inject classes into the DI container at this time. Injecting primitive values (strings, numbers, etc) is not yet supported, but support is planned for a future release.

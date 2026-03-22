@@ -1,22 +1,33 @@
 {
-  "hash": 14803987991985266137,
+  "hash": 6083998897186386139,
   "project_name": "runner",
   "wrangler_env": {
     "name": "Env",
     "source_path": "./seed__app.cloesce.ts",
-    "d1_binding": "db",
+    "d1_bindings": [
+      "db"
+    ],
     "kv_bindings": [],
     "r2_bindings": [],
     "vars": {}
   },
   "models": {
     "Foo": {
-      "hash": 2291516488856648612,
+      "hash": 9350576688796676214,
       "name": "Foo",
-      "primary_key": {
-        "name": "id",
-        "cidl_type": "Integer"
-      },
+      "d1_binding": "db",
+      "primary_key_columns": [
+        {
+          "hash": 6397878138472974760,
+          "value": {
+            "name": "id",
+            "cidl_type": "Integer"
+          },
+          "foreign_key_reference": null,
+          "unique_ids": [],
+          "composite_id": null
+        }
+      ],
       "columns": [],
       "navigation_properties": [],
       "key_params": [],
@@ -26,7 +37,8 @@
         "SAVE": {
           "name": "SAVE",
           "is_static": true,
-          "http_verb": "POST",
+          "data_source": null,
+          "http_verb": "Post",
           "return_media": "Json",
           "return_type": {
             "HttpResult": {
@@ -52,7 +64,8 @@
         "blockedMethod": {
           "name": "blockedMethod",
           "is_static": true,
-          "http_verb": "GET",
+          "data_source": null,
+          "http_verb": "Get",
           "return_media": "Json",
           "return_type": "Void",
           "parameters_media": "Json",
@@ -61,7 +74,8 @@
         "getInjectedThing": {
           "name": "getInjectedThing",
           "is_static": true,
-          "http_verb": "GET",
+          "data_source": null,
+          "http_verb": "Get",
           "return_media": "Json",
           "return_type": {
             "Object": "InjectedThing"
@@ -77,7 +91,17 @@
           ]
         }
       },
-      "data_sources": {},
+      "data_sources": {
+        "default": {
+          "name": "default",
+          "tree": {},
+          "is_private": false,
+          "list_params": [
+            "LastSeen",
+            "Limit"
+          ]
+        }
+      },
       "cruds": [
         "SAVE"
       ],

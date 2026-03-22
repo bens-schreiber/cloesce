@@ -1,0 +1,192 @@
+{
+    "project_name": "runner",
+    "wrangler_env": {
+        "name": "Env",
+        "source_path": "./seed__d1_crud.cloesce.ts",
+        "d1_bindings": [
+            "db"
+        ],
+        "kv_bindings": [],
+        "r2_bindings": [],
+        "vars": {}
+    },
+    "models": {
+        "CrudHaver": {
+            "name": "CrudHaver",
+            "d1_binding": "db",
+            "columns": [
+                {
+                    "foreign_key_reference": null,
+                    "unique_ids": [],
+                    "composite_id": null,
+                    "value": {
+                        "name": "name",
+                        "cidl_type": "Text"
+                    }
+                }
+            ],
+            "primary_key_columns": [
+                {
+                    "foreign_key_reference": null,
+                    "unique_ids": [],
+                    "composite_id": null,
+                    "value": {
+                        "name": "id",
+                        "cidl_type": "Integer"
+                    }
+                }
+            ],
+            "navigation_properties": [],
+            "key_params": [],
+            "kv_objects": [],
+            "r2_objects": [],
+            "methods": {
+                "notCrud": {
+                    "name": "notCrud",
+                    "http_verb": "Post",
+                    "is_static": false,
+                    "return_media": "Json",
+                    "return_type": "Void",
+                    "parameters_media": "Json",
+                    "parameters": [],
+                    "data_source": null
+                }
+            },
+            "data_sources": {},
+            "cruds": [
+                "GET",
+                "LIST",
+                "SAVE"
+            ],
+            "source_path": "./seed__d1_crud.cloesce.ts"
+        },
+        "Parent": {
+            "name": "Parent",
+            "d1_binding": "db",
+            "columns": [
+                {
+                    "foreign_key_reference": {
+                        "model_name": "Child",
+                        "column_name": "id"
+                    },
+                    "unique_ids": [],
+                    "composite_id": null,
+                    "value": {
+                        "name": "favoriteChildId",
+                        "cidl_type": {
+                            "Nullable": "Integer"
+                        }
+                    }
+                }
+            ],
+            "primary_key_columns": [
+                {
+                    "foreign_key_reference": null,
+                    "unique_ids": [],
+                    "composite_id": null,
+                    "value": {
+                        "name": "id",
+                        "cidl_type": "Integer"
+                    }
+                }
+            ],
+            "navigation_properties": [
+                {
+                    "var_name": "favoriteChild",
+                    "model_reference": "Child",
+                    "kind": {
+                        "OneToOne": {
+                            "key_columns": [
+                                "favoriteChildId"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "var_name": "children",
+                    "model_reference": "Child",
+                    "kind": {
+                        "OneToMany": {
+                            "key_columns": [
+                                "parentId"
+                            ]
+                        }
+                    }
+                }
+            ],
+            "key_params": [],
+            "kv_objects": [],
+            "r2_objects": [],
+            "methods": {},
+            "data_sources": {
+                "withChildren": {
+                    "name": "withChildren",
+                    "tree": {
+                        "favoriteChild": {},
+                        "children": {}
+                    },
+                    "is_private": false,
+                    "list_params": []
+                }
+            },
+            "cruds": [
+                "GET",
+                "LIST",
+                "SAVE"
+            ],
+            "source_path": "./seed__d1_crud.cloesce.ts"
+        },
+        "Child": {
+            "name": "Child",
+            "d1_binding": "db",
+            "columns": [
+                {
+                    "foreign_key_reference": {
+                        "model_name": "Parent",
+                        "column_name": "id"
+                    },
+                    "unique_ids": [],
+                    "composite_id": null,
+                    "value": {
+                        "name": "parentId",
+                        "cidl_type": "Integer"
+                    }
+                }
+            ],
+            "primary_key_columns": [
+                {
+                    "foreign_key_reference": null,
+                    "unique_ids": [],
+                    "composite_id": null,
+                    "value": {
+                        "name": "id",
+                        "cidl_type": "Integer"
+                    }
+                }
+            ],
+            "navigation_properties": [
+                {
+                    "var_name": "parent",
+                    "model_reference": "Parent",
+                    "kind": {
+                        "OneToOne": {
+                            "key_columns": [
+                                "parentId"
+                            ]
+                        }
+                    }
+                }
+            ],
+            "key_params": [],
+            "kv_objects": [],
+            "r2_objects": [],
+            "methods": {},
+            "data_sources": {},
+            "cruds": [],
+            "source_path": "./seed__d1_crud.cloesce.ts"
+        }
+    },
+    "poos": {},
+    "services": {},
+    "main_source": null
+}

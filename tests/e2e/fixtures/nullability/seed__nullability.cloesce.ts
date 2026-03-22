@@ -1,6 +1,6 @@
 import {
   Model,
-  POST,
+  Post,
   WranglerEnv,
   Inject,
   Integer,
@@ -13,27 +13,27 @@ export class Env {
   db: D1Database;
 }
 
-@Model()
+@Model("db")
 export class NullabilityChecks {
   id: Integer;
 
   notNullableString: string;
   nullableString: string | null;
 
-  @POST
+  @Post()
   primitiveTypes(a: Integer | null, b: string | null): boolean | null {
     return null;
   }
 
-  @POST
+  @Post()
   modelTypes(a: NullabilityChecks | null): NullabilityChecks | null {
     return null;
   }
 
-  @POST
+  @Post()
   injectableTypes(@Inject env: Env | null) { }
 
-  @POST
+  @Post()
   arrayTypes(
     a: Integer[] | null,
     b: NullabilityChecks[] | null,
@@ -41,7 +41,7 @@ export class NullabilityChecks {
     return null;
   }
 
-  @POST
+  @Post()
   httpResultTypes(): HttpResult<NullabilityChecks[] | null> | null {
     return null;
   }

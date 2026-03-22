@@ -3,10 +3,10 @@ export enum ExtractorErrorCode {
   InvalidMain,
   UnknownType,
   MultipleGenericType,
+  InvalidSelectorSyntax,
   InvalidDataSourceDefinition,
   InvalidPropertyModifier,
   InvalidApiMethodModifier,
-  InvalidSelectorSyntax,
   InvalidNavigationProperty,
   TooManyWranglerEnvs,
   InvalidTypescriptSyntax,
@@ -39,6 +39,12 @@ const errorInfoMap: Record<
     suggestion:
       "Simplify your type to use only a single generic parameter, ie Foo<T>",
   },
+  [ExtractorErrorCode.InvalidSelectorSyntax]: {
+    description:
+      "Selector syntax is invalid. Expected @ForeignKey<Model>(x => x.property).",
+    suggestion:
+      "Use a typed selector in the decorator, e.g. @ForeignKey<User>(u => u.id).",
+  },
   [ExtractorErrorCode.InvalidDataSourceDefinition]: {
     description:
       "Data Sources must be explicitly typed as a static Include Tree",
@@ -64,17 +70,16 @@ const errorInfoMap: Record<
     suggestion: "Fix the TypeScript syntax errors.",
   },
   [ExtractorErrorCode.MissingKValue]: {
-    description: "All KV decorated fields must be of type KValue<T>",
-    suggestion: "Change the field type to KValue<T>.",
+    description:
+      "KV decorated fields must be KValue<T> for single keys, or Paginated<KValue<T>> for list prefixes",
+    suggestion:
+      "Use KValue<T> for single values, or Paginated<KValue<T>> for list prefixes.",
   },
   [ExtractorErrorCode.MissingR2ObjectBody]: {
-    description: "All R2 decorated fields must be of type R2ObjectBody.",
-    suggestion: "Change the field type to R2ObjectBody.",
-  },
-  [ExtractorErrorCode.InvalidSelectorSyntax]: {
-    description: "The selector syntax is invalid.",
+    description:
+      "R2 decorated fields must be R2ObjectBody for single keys, or Paginated<R2ObjectBody> for list prefixes.",
     suggestion:
-      "Selectors should be of the form `N<T>(m => m.property)` where T is a model type and N is OneToOne or OneToMany.",
+      "Use R2ObjectBody for single values, or Paginated<R2ObjectBody> for list prefixes.",
   },
   [ExtractorErrorCode.InvalidNavigationProperty]: {
     description:

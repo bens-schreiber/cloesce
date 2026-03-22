@@ -4,6 +4,15 @@ D1 is a powerful relational database solution, but sometimes developers need to 
 
 ## Defining a Model with KV
 
+> [!IMPORTANT]
+> `unknown` is a special type to Cloesce, designating that no validation should be performed on the data, but it is still stored and retrieved as JSON.
+
+> [!IMPORTANT]
+> KV Models do not yet support cache control directives and expiration times. This feature is planned for a future release.
+
+> [!NOTE]
+> KV properties on a Model consider a missing key as a valid state, and will not return 404 errors. Instead, the value inside of the `KValue` will be set to `null`.
+
 [Cloudflare KV](https://developers.cloudflare.com/kv/) is a globally distributed key-value storage system. Along with a key and value, KV entries can also have associated metadata.
 
 Cloesce respects the design constraints of KV storage. For Models backed purely by KV or R2, the following are not supported:
@@ -12,11 +21,10 @@ Cloesce respects the design constraints of KV storage. For Models backed purely 
 - Navigation properties  
 - Migrations  
 
-
 ```typescript
-import { Model, KV, KValue, KeyParam, IncludeTree } from "cloesce/backend";
+import { Model, KV, KValue, KeyParam } from "cloesce/backend";
 
-@Model()
+@Model() // no database specified
 export class Settings {
     @KeyParam
     settingsId: string;
@@ -26,11 +34,6 @@ export class Settings {
 
     @KV("settings/", "myNamespace")
     allSettings: KValue<unknown>[];
-
-    static readonly withAll: IncludeTree<Settings> = {
-        data: {},
-        allSettings: {}
-    };
 }
 ```
 
@@ -38,17 +41,12 @@ The above Model uses only KV attributes. The `@KeyParam` decorator indicates tha
 
 The `data` property is of type `KValue<unknown>`, which represents a value stored in KV. You can replace `unknown` with any serializable type, but Cloesce will not validate or instantiate the data when fetching it.
 
-The `allSettings` property demonstrates how Cloesce can fetch by prefix from KV. This property will retrieve all KV entries with keys starting with `settings/` and return them as an array of `KValue<unknown>`.
-
-[Include Trees](./ch2-3-include-trees.md) can be used with KV Models as well to specify which properties to include when fetching data. By default, no properties are included unless specified in an Include Tree.
-
-> *Note*: KV properties on a Model consider a missing key as a valid state, and will not return 404 errors. Instead, the value inside of the `KValue` will be set to `null`.
-
-> *Note*: `unknown` is a special type to Cloesce, designating that no validation should be performed on the data, but it is still stored and retrieved as JSON.
-
-> *Alpha Note*: KV Models do not yet support cache control directives and expiration times. This feature is planned for a future release.
+[Data Sources](./ch2-3-data-sources.md) can be used with KV Models as well to specify which properties to include when fetching data.
 
 ## Defining a Model with R2
+
+> [!NOTE]
+> R2 properties on a Model consider a missing object as a valid state, and will not return 404 errors. Instead, the property will be set to `undefined`.
 
 [Cloudflare R2](https://developers.cloudflare.com/r2/) is an object storage solution similar to [Amazon S3](https://aws.amazon.com/pm/serv-s3/). It allows you to store and retrieve large binary objects.
 
@@ -59,17 +57,13 @@ Since R2 is used for storing large objects, the actual data of an R2 object is n
 ```typescript
 import { Model, R2, R2Object, KeyParam, IncludeTree } from "cloesce/backend";
 
-@Model()
+@Model() // no database specified
 export class MediaFile {
     @KeyParam
     fileName: string;
 
     @R2("media/{fileName}.png", "myBucket")
     file: R2Object | undefined;
-
-    static readonly withFile: IncludeTree<MediaFile> = {
-        file: {}
-    };
 }
 ```
 
@@ -77,18 +71,16 @@ The `MediaFile` Model above is purely R2 backed. The `@KeyParam` decorator indic
 
 The `file` property is of type `R2Object`, which represents an object stored in R2. This type provides access to metadata about the object, such as its size and content type.
 
-[Include Trees](./ch2-3-include-trees.md) can also be used with R2 backed Models to specify which properties to include when fetching data.
-
-> *Note*: R2 properties on a Model consider a missing object as a valid state, and will not return 404 errors. Instead, the property will be set to `undefined`.
+[Data Sources](./ch2-3-data-sources.md) can also be used with R2 Models to specify which properties to include when fetching data.
 
 ## Mixing Data Together
 
 Cloesce allows you to combine D1, KV, and R2 properties into a single Model. This provides flexibility in how you structure your data and choose the appropriate storage mechanism for each property.
 
 ```typescript
-import { Model, Integer, KV, KValue, R2, R2Object, KeyParam, IncludeTree } from "cloesce/backend";
+import { Model, Integer, KV, KValue, R2, R2Object, KeyParam, DataSource } from "cloesce/backend";
 
-@Model()
+@Model("db")
 export class DataCentaur {
     id: Integer;
 
@@ -96,7 +88,7 @@ export class DataCentaur {
     photo: R2Object;
 }
 
-@Model()
+@Model("db")
 export class DataChimera {
     id: Integer;
     
@@ -110,14 +102,6 @@ export class DataChimera {
 
     @R2("media/{id}.png", "myBucket")
     mediaFile: R2Object | undefined;
-
-    static readonly withAll: IncludeTree<DataChimera> = {
-        dataCentaur: {
-            photo: {}
-        },
-        settings: {},
-        mediaFile: {},
-    };
 }
 ```
 

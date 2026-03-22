@@ -25,7 +25,7 @@ fn generates_default_wrangler_value() {
     ast.wrangler_env = Some(WranglerEnv {
         name: "Env".into(),
         source_path: "source.ts".into(),
-        d1_binding: Some("db".into()),
+        d1_bindings: vec!["db".into()],
         vars: [
             ("API_KEY".into(), CidlType::Text),
             ("TIMEOUT".into(), CidlType::Integer),
@@ -42,12 +42,12 @@ fn generates_default_wrangler_value() {
     let specs = vec![
         {
             let mut spec = WranglerGenerator::Toml(toml::from_str("").unwrap()).as_spec();
-            WranglerDefault::set_defaults(&mut spec, &ast);
+            WranglerDefault::set_defaults(&mut spec, &ast, "migrations");
             spec
         },
         {
             let mut spec = WranglerGenerator::Json(serde_json::from_str("{}").unwrap()).as_spec();
-            WranglerDefault::set_defaults(&mut spec, &ast);
+            WranglerDefault::set_defaults(&mut spec, &ast, "migrations");
             spec
         },
     ];
@@ -71,7 +71,7 @@ fn generates_default_d1_wrangler_values() {
     ast.wrangler_env = Some(WranglerEnv {
         name: "Env".into(),
         source_path: "source.ts".into(),
-        d1_binding: Some("db".into()),
+        d1_bindings: vec!["db".into()],
         vars: HashMap::new(),
         kv_bindings: vec![],
         r2_bindings: vec![],
@@ -81,12 +81,12 @@ fn generates_default_d1_wrangler_values() {
     let specs = vec![
         {
             let mut spec = WranglerGenerator::Toml(toml::from_str("").unwrap()).as_spec();
-            WranglerDefault::set_defaults(&mut spec, &ast);
+            WranglerDefault::set_defaults(&mut spec, &ast, "my-migrations");
             spec
         },
         {
             let mut spec = WranglerGenerator::Json(serde_json::from_str("{}").unwrap()).as_spec();
-            WranglerDefault::set_defaults(&mut spec, &ast);
+            WranglerDefault::set_defaults(&mut spec, &ast, "my-migrations");
             spec
         },
     ];
@@ -103,6 +103,10 @@ fn generates_default_d1_wrangler_values() {
             spec.d1_databases[0].database_id.as_ref().unwrap(),
             "replace_with_db_id"
         );
+        assert_eq!(
+            spec.d1_databases[0].migrations_dir.as_ref().unwrap(),
+            "my-migrations/db"
+        );
     }
 }
 
@@ -110,7 +114,6 @@ fn generates_default_d1_wrangler_values() {
 fn generates_default_kv_wrangler_values() {
     // Arrange
     let mut ast = create_ast(vec![
-        // ModelBuilder::new("MyKV", "MyKV", CidlType::JsonValue).build(),
         ModelBuilder::new("MyKV")
             .kv_object("obj", "my_kv", "kvObj", false, CidlType::JsonValue)
             .build(),
@@ -118,7 +121,7 @@ fn generates_default_kv_wrangler_values() {
     ast.wrangler_env = Some(WranglerEnv {
         name: "Env".into(),
         source_path: "source.ts".into(),
-        d1_binding: None,
+        d1_bindings: vec![],
         vars: HashMap::new(),
         kv_bindings: vec!["my_kv".into()],
         r2_bindings: vec![],
@@ -128,12 +131,12 @@ fn generates_default_kv_wrangler_values() {
     let specs = vec![
         {
             let mut spec = WranglerGenerator::Toml(toml::from_str("").unwrap()).as_spec();
-            WranglerDefault::set_defaults(&mut spec, &ast);
+            WranglerDefault::set_defaults(&mut spec, &ast, "migrations");
             spec
         },
         {
             let mut spec = WranglerGenerator::Json(serde_json::from_str("{}").unwrap()).as_spec();
-            WranglerDefault::set_defaults(&mut spec, &ast);
+            WranglerDefault::set_defaults(&mut spec, &ast, "migrations");
             spec
         },
     ];
@@ -144,7 +147,7 @@ fn generates_default_kv_wrangler_values() {
         assert_eq!(spec.kv_namespaces[0].binding.as_ref().unwrap(), "my_kv");
         assert_eq!(
             spec.kv_namespaces[0].id.as_ref().unwrap(),
-            "replace_with_kv_id"
+            "replace_with_my_kv_id"
         );
     }
 }
@@ -161,7 +164,7 @@ fn handles_d1_database_with_missing_values() {
     ast.wrangler_env = Some(WranglerEnv {
         name: "Env".into(),
         source_path: "source.ts".into(),
-        d1_binding: Some("db".into()),
+        d1_bindings: vec!["db".into()],
         vars: HashMap::new(),
         kv_bindings: vec![],
         r2_bindings: vec![],
@@ -170,7 +173,7 @@ fn handles_d1_database_with_missing_values() {
     // Act
     let mut spec =
         WranglerGenerator::Toml(toml::from_str(toml_with_incomplete_d1).unwrap()).as_spec();
-    WranglerDefault::set_defaults(&mut spec, &ast);
+    WranglerDefault::set_defaults(&mut spec, &ast, "default-migrations");
 
     // Assert
     assert_eq!(spec.d1_databases.len(), 1);
@@ -182,6 +185,10 @@ fn handles_d1_database_with_missing_values() {
     assert_eq!(
         spec.d1_databases[0].database_id.as_ref().unwrap(),
         "replace_with_db_id"
+    );
+    assert_eq!(
+        spec.d1_databases[0].migrations_dir.as_ref().unwrap(),
+        "default-migrations/db"
     );
 
     let temp_dir = std::env::temp_dir();

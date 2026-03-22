@@ -13,7 +13,6 @@ use rustc_hash::FxHasher;
 use serde::Deserialize;
 use serde::Serialize;
 use serde_json::Value;
-use serde_with::{MapPreventDuplicates, serde_as};
 
 #[macro_export]
 macro_rules! cidl_type_contains {
@@ -26,7 +25,8 @@ macro_rules! cidl_type_contains {
 
                 CidlType::Array(inner)
                 | CidlType::Nullable(inner)
-                | CidlType::HttpResult(inner) => {
+                | CidlType::HttpResult(inner)
+                | CidlType::Paginated(inner) => {
                     cur = inner;
                 }
 
@@ -92,6 +92,9 @@ pub enum CidlType {
     /// If the inner value is void, represents just null.
     Nullable(Box<CidlType>),
 
+    /// A paginated response containing list metadata and a page of results.
+    Paginated(Box<CidlType>),
+
     /// A Cloudflare Workers KV object (GET value response)
     KvObject(Box<CidlType>),
 }
@@ -103,6 +106,7 @@ impl CidlType {
             CidlType::HttpResult(inner) => inner.root_type(),
             CidlType::Nullable(inner) => inner.root_type(),
             CidlType::KvObject(inner) => inner.root_type(),
+            CidlType::Paginated(inner) => inner.root_type(),
             t => t,
         }
     }
@@ -126,15 +130,19 @@ impl CidlType {
     pub fn http(cidl_type: CidlType) -> CidlType {
         CidlType::HttpResult(Box::new(cidl_type))
     }
+
+    pub fn paginated(cidl_type: CidlType) -> CidlType {
+        CidlType::Paginated(Box::new(cidl_type))
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub enum HttpVerb {
-    GET,
-    POST,
-    PUT,
-    PATCH,
-    DELETE,
+    Get,
+    Post,
+    Put,
+    Patch,
+    Delete,
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash)]
@@ -165,6 +173,7 @@ pub struct ApiMethod {
     /// If true, the method is static (instantiated on a class, not an instance).
     /// Static methods require no hydration or data source.
     pub is_static: bool,
+    pub data_source: Option<String>,
 
     pub http_verb: HttpVerb,
 
@@ -179,22 +188,47 @@ pub struct ApiMethod {
     pub parameters: Vec<NamedTypedValue>,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 pub struct IncludeTree(pub BTreeMap<String, IncludeTree>);
+
+#[derive(Serialize, Deserialize, Debug, Clone, Hash, PartialEq, Eq)]
+pub enum CrudListParam {
+    LastSeen,
+    Limit,
+    Offset,
+}
 
 /// A tree of model symbol names to include when hydrating a data source.
 #[derive(Serialize, Deserialize, Debug)]
 pub struct DataSource {
     /// The symbol name of the data source, e.g., "withUserDetails"
     pub name: String,
-
     pub tree: IncludeTree,
+
+    /// If true, the data source will not be generated on the client.
+    pub is_private: bool,
+
+    /// List pagination parameter names for the LIST method
+    pub list_params: Vec<CrudListParam>,
 }
 
+/// A D1 Navigation property, representing a relationship to another model
+/// through a foreign key or composite foreign key.
 #[derive(Serialize, Deserialize, Debug, Clone, Hash)]
 pub enum NavigationPropertyKind {
-    OneToOne { column_reference: String },
-    OneToMany { column_reference: String },
+    OneToOne {
+        /// The columns on the current model that reference the other model's primary key.
+        /// Multiple columns indicate a composite foreign key.
+        key_columns: Vec<String>,
+    },
+    OneToMany {
+        /// The columns on the other model that reference the current model's primary key.
+        /// Multiple columns indicate a composite foreign key.
+        key_columns: Vec<String>,
+    },
+
+    /// A many to many relationship expressed through a join table,
+    /// consisting of the two models primary keys (be they composite or not).
     ManyToMany,
 }
 
@@ -220,6 +254,12 @@ impl NavigationProperty {
     }
 }
 
+#[derive(Serialize, Deserialize, Debug, Hash)]
+pub struct ForeignKeyReference {
+    pub model_name: String,
+    pub column_name: String,
+}
+
 #[derive(Serialize, Deserialize, Debug)]
 pub struct D1Column {
     #[serde(default)]
@@ -229,9 +269,19 @@ pub struct D1Column {
     /// Represents both the column name and type.
     pub value: NamedTypedValue,
 
-    /// If the attribute is a foreign key, the referenced model name.
-    /// Otherwise, None.
-    pub foreign_key_reference: Option<String>,
+    /// If the attribute is a foreign key, the referenced model and column.
+    pub foreign_key_reference: Option<ForeignKeyReference>,
+
+    /// IDs of unique constraints that this column participates in.
+    pub unique_ids: Vec<u32>,
+
+    /// An ID indicating which composite key this column belongs to, if any.
+    /// Columns with the same composite_id belong to the same composite key.
+    ///
+    /// A primary key, will not fill this slot as a composite key as it's already identified as
+    /// a key by being in the primary_key_columns list. Thus, a column that makes up
+    /// a primary key can be apart of a composite foreign key.
+    pub composite_id: Option<u32>,
 }
 
 #[derive(Serialize, Deserialize, Hash, PartialEq, Eq, Debug)]
@@ -261,7 +311,6 @@ pub struct R2Object {
     pub list_prefix: bool,
 }
 
-#[serde_as]
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Model {
     #[serde(default)]
@@ -270,9 +319,8 @@ pub struct Model {
     /// The symbol that defines the model in the source code.
     pub name: String,
 
-    /// Primary key column of the model.
-    // TODO: Composite primary keys
-    pub primary_key: Option<NamedTypedValue>,
+    pub d1_binding: Option<String>,
+    pub primary_key_columns: Vec<D1Column>,
     pub columns: Vec<D1Column>,
     pub navigation_properties: Vec<NavigationProperty>,
 
@@ -281,10 +329,8 @@ pub struct Model {
     pub r2_objects: Vec<R2Object>,
 
     /// API definitions.
-    #[serde_as(as = "MapPreventDuplicates<_, _>")]
     pub methods: BTreeMap<String, ApiMethod>,
 
-    #[serde_as(as = "MapPreventDuplicates<_, _>")]
     pub data_sources: BTreeMap<String, DataSource>,
 
     pub cruds: Vec<CrudKind>,
@@ -293,7 +339,7 @@ pub struct Model {
 
 impl Model {
     pub fn has_d1(&self) -> bool {
-        !self.columns.is_empty() || self.primary_key.is_some()
+        self.d1_binding.is_some()
     }
 
     pub fn has_kv(&self) -> bool {
@@ -302,6 +348,24 @@ impl Model {
 
     pub fn has_r2(&self) -> bool {
         !self.r2_objects.is_empty()
+    }
+
+    /// Returns the data source with the symbol name "default", if it exists.
+    pub fn default_data_source(&self) -> Option<&DataSource> {
+        self.data_sources.get("default")
+    }
+
+    pub fn has_composite_pk(&self) -> bool {
+        self.primary_key_columns.len() > 1
+    }
+
+    /// Returns all columns, including primary key columns, as a single list.
+    /// The boolean indicates whether the column is a primary key column.
+    pub fn all_columns(&self) -> impl Iterator<Item = (&D1Column, bool)> {
+        self.columns
+            .iter()
+            .map(|c| (c, false))
+            .chain(self.primary_key_columns.iter().map(|c| (c, true)))
     }
 }
 
@@ -314,7 +378,6 @@ pub struct ServiceAttribute {
     pub inject_reference: String,
 }
 
-#[serde_as]
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Service {
     /// The symbol that defines the service in the source code.
@@ -327,7 +390,6 @@ pub struct Service {
     pub initializer: Option<Vec<String>>,
 
     /// API definitions.
-    #[serde_as(as = "MapPreventDuplicates<_, _>")]
     pub methods: BTreeMap<String, ApiMethod>,
 
     pub source_path: PathBuf,
@@ -349,16 +411,12 @@ pub struct WranglerEnv {
     /// Class name of the Wrangler environment.
     pub name: String,
     pub source_path: PathBuf,
-
-    // TODO: Many database bindings
-    pub d1_binding: Option<String>,
-
+    pub d1_bindings: Vec<String>,
     pub kv_bindings: Vec<String>,
     pub r2_bindings: Vec<String>,
     pub vars: HashMap<String, CidlType>,
 }
 
-#[serde_as]
 #[derive(Serialize, Deserialize, Default)]
 pub struct CloesceAst {
     #[serde(default)]
@@ -367,11 +425,8 @@ pub struct CloesceAst {
     pub project_name: String,
     pub wrangler_env: Option<WranglerEnv>,
 
-    // TODO: MapPreventDuplicates is not supported for IndexMap
     pub models: IndexMap<String, Model>,
     pub services: IndexMap<String, Service>,
-
-    #[serde_as(as = "MapPreventDuplicates<_, _>")]
     pub poos: BTreeMap<String, PlainOldObject>,
 
     pub main_source: Option<PathBuf>,
@@ -401,15 +456,15 @@ impl CloesceAst {
         let migrations_models: IndexMap<String, MigrationsModel> = models
             .into_iter()
             .filter_map(|(name, model)| {
-                let Some(pk) = model.primary_key else {
-                    // Skip non-D1 models
+                if !model.has_d1() {
                     return None;
-                };
+                }
 
                 let m = MigrationsModel {
                     hash: model.hash,
                     name: model.name,
-                    primary_key: pk,
+                    d1_binding: model.d1_binding,
+                    primary_key_columns: model.primary_key_columns,
                     columns: model.columns,
                     navigation_properties: model.navigation_properties,
                 };
@@ -437,8 +492,22 @@ impl CloesceAst {
         for model in self.models.values_mut() {
             let mut model_h = FxHasher::default();
             model_h.write(b"Model");
-            model.primary_key.hash(&mut model_h);
             model.name.hash(&mut model_h);
+            model.d1_binding.hash(&mut model_h);
+
+            for pk_col in model.primary_key_columns.iter_mut() {
+                let pk_col_h = {
+                    let mut h = FxHasher::default();
+                    h.write(b"ModelPrimaryKeyColumn");
+                    pk_col.value.hash(&mut h);
+                    pk_col.foreign_key_reference.hash(&mut h);
+                    pk_col.unique_ids.hash(&mut h);
+                    h.finish()
+                };
+
+                pk_col.hash = pk_col_h;
+                model_h.write_u64(pk_col_h);
+            }
 
             for col in model.columns.iter_mut() {
                 let col_h = {
@@ -446,6 +515,7 @@ impl CloesceAst {
                     h.write(b"ModelColumn");
                     col.value.hash(&mut h);
                     col.foreign_key_reference.hash(&mut h);
+                    col.unique_ids.hash(&mut h);
                     h.finish()
                 };
 
@@ -483,9 +553,22 @@ impl CloesceAst {
 pub struct MigrationsModel {
     pub hash: u64,
     pub name: String,
-    pub primary_key: NamedTypedValue,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub d1_binding: Option<String>,
+
+    pub primary_key_columns: Vec<D1Column>,
     pub columns: Vec<D1Column>,
     pub navigation_properties: Vec<NavigationProperty>,
+}
+
+impl MigrationsModel {
+    pub fn all_columns(&self) -> impl Iterator<Item = (&D1Column, bool)> {
+        self.columns
+            .iter()
+            .map(|c| (c, false))
+            .chain(self.primary_key_columns.iter().map(|c| (c, true)))
+    }
 }
 
 /// A subset of [CloesceAst] suited for D1 migrations.
@@ -495,7 +578,7 @@ pub struct MigrationsModel {
 pub struct MigrationsAst {
     pub hash: u64,
 
-    #[serde(deserialize_with = "skip_if_null_primary_key")]
+    #[serde(deserialize_with = "skip_if_not_d1")]
     pub models: IndexMap<String, MigrationsModel>,
 }
 
@@ -523,6 +606,7 @@ pub struct D1Database {
     pub binding: Option<String>,
     pub database_name: Option<String>,
     pub database_id: Option<String>,
+    pub migrations_dir: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
@@ -556,7 +640,7 @@ pub struct WranglerSpec {
     pub vars: HashMap<String, Value>,
 }
 
-fn skip_if_null_primary_key<'de, D>(
+fn skip_if_not_d1<'de, D>(
     deserializer: D,
 ) -> std::result::Result<IndexMap<String, MigrationsModel>, D::Error>
 where
@@ -566,7 +650,8 @@ where
     struct Temp {
         hash: u64,
         name: String,
-        primary_key: Option<NamedTypedValue>,
+        d1_binding: Option<String>,
+        primary_key_columns: Vec<D1Column>,
         columns: Vec<D1Column>,
         navigation_properties: Vec<NavigationProperty>,
     }
@@ -576,17 +661,16 @@ where
     Ok(temps
         .into_iter()
         .filter_map(|(key, t)| {
-            t.primary_key.map(|pk| {
-                (
-                    key,
-                    MigrationsModel {
-                        hash: t.hash,
-                        name: t.name,
-                        primary_key: pk,
-                        columns: t.columns,
-                        navigation_properties: t.navigation_properties,
-                    },
-                )
+            (!t.columns.is_empty() || !t.primary_key_columns.is_empty()).then_some({
+                let m = MigrationsModel {
+                    hash: t.hash,
+                    name: t.name,
+                    d1_binding: t.d1_binding,
+                    primary_key_columns: t.primary_key_columns,
+                    columns: t.columns,
+                    navigation_properties: t.navigation_properties,
+                };
+                (key, m)
             })
         })
         .collect())
