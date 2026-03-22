@@ -921,3 +921,105 @@ fn inject_block() {
     assert_eq!(ast.injectables.len(), 3);
     assert!(ast.injectables.iter().all(|s| s.0 != 0));
 }
+
+#[test]
+fn service_block() {
+    let ast = lex_and_parse(
+        r#"
+        service MyAppService {
+            api1: OpenApiService
+            api2: YouTubeApi
+        }
+
+        service EmptyService {}
+
+        api MyAppService {
+            post createItem(
+                name: string,
+                count: int
+            ) -> Result<string>
+        }
+
+        api MyAppService {
+            get listItems(self) -> Array<string>
+        }
+        "#,
+    );
+
+    // Two services parsed
+    assert_eq!(ast.services.len(), 2);
+
+    let service = ast
+        .services
+        .values()
+        .find(|s| s.name == "MyAppService")
+        .expect("MyAppService service to be present");
+
+    // Symbol is non-zero
+    assert_ne!(service.symbol.0, 0);
+
+    // Two injected attributes
+    assert_eq!(service.attributes.len(), 2);
+
+    let api1 = service
+        .attributes
+        .iter()
+        .find(|a| a.var_name == "api1")
+        .expect("api1 attribute");
+    assert_eq!(api1.inject_reference, "OpenApiService");
+    assert_ne!(api1.symbol.0, 0);
+
+    let api2 = service
+        .attributes
+        .iter()
+        .find(|a| a.var_name == "api2")
+        .expect("api2 attribute");
+    assert_eq!(api2.inject_reference, "YouTubeApi");
+    assert_ne!(api2.symbol.0, 0);
+
+    // Attribute symbols are distinct
+    assert_ne!(api1.symbol, api2.symbol);
+
+    // Empty service
+    let empty = ast
+        .services
+        .values()
+        .find(|s| s.name == "EmptyService")
+        .expect("EmptyService to be present");
+    assert_eq!(empty.attributes.len(), 0);
+    assert_ne!(empty.symbol.0, 0);
+
+    // Service symbols are distinct
+    assert_ne!(service.symbol, empty.symbol);
+
+    // Two api blocks for MyAppService are merged into one Api entry
+    assert_eq!(ast.apis.len(), 1);
+    let api = ast
+        .apis
+        .values()
+        .find(|a| a.model_symbol == service.symbol)
+        .expect("Api for MyAppService to be present");
+
+    // Both api blocks merged: createItem + listItems
+    assert_eq!(api.methods.len(), 2);
+    assert!(api.methods.iter().any(|m| m.name == "createItem"));
+    assert!(api.methods.iter().any(|m| m.name == "listItems"));
+
+    let create = api
+        .methods
+        .iter()
+        .find(|m| m.name == "createItem")
+        .unwrap();
+    assert_eq!(create.http_verb, HttpVerb::Post);
+    assert!(create.is_static);
+    assert_eq!(create.parameters.len(), 2);
+    assert_eq!(
+        create.return_type,
+        CidlType::http(CidlType::String)
+    );
+
+    let list = api.methods.iter().find(|m| m.name == "listItems").unwrap();
+    assert_eq!(list.http_verb, HttpVerb::Get);
+    assert!(!list.is_static);
+    assert_eq!(list.return_type, CidlType::array(CidlType::String));
+}

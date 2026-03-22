@@ -367,6 +367,8 @@ impl Model {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ServiceAttribute {
+    pub symbol: Symbol,
+
     /// Symbol name of the class field.
     pub var_name: String,
 
@@ -376,7 +378,9 @@ pub struct ServiceAttribute {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Service {
-    /// The symbol that defines the service in the source code.
+    pub symbol: Symbol,
+
+    /// The name that defines the service in the source code.
     pub name: String,
 
     /// Class fields which are all injected dependencies.

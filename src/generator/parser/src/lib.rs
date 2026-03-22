@@ -6,12 +6,13 @@ use std::sync::atomic::AtomicU64;
 use chumsky::extra::SimpleState;
 use chumsky::prelude::*;
 
-use ast::{Api, Binding, CidlType, CloesceAst, DataSource, Field, Model, PlainOldObject, Symbol, WranglerEnv};
+use ast::{Api, Binding, CidlType, CloesceAst, DataSource, Field, Model, PlainOldObject, Service, Symbol, WranglerEnv};
 use lexer::Token;
 
 mod api;
-mod model;
 mod data_source;
+mod model;
+mod service;
 
 const GLOBAL_SCOPE: &str = "global";
 static GENSYM_SEED: AtomicU64 = AtomicU64::new(0);
@@ -84,6 +85,7 @@ impl CloesceParser {
             Self::env_block().map(Global::Env),
             model::model_block().map(Global::Model),
             api::api_block().map(Global::Api),
+            service::service_block().map(Global::Service),
             Self::poo_block().map(Global::Poo),
             data_source::data_source_block().map(Global::DataSource),
             Self::inject_block().map(Global::Inject),
@@ -131,6 +133,9 @@ impl CloesceParser {
                         }
 
                         ast.sources.insert(ds.symbol.clone(), vec![ds]);
+                    }
+                    Global::Service(service) => {
+                        ast.services.insert(service.symbol.clone(), service);
                     }
                     Global::Inject(symbols) => {
                         ast.injectables.extend(symbols);
@@ -343,6 +348,7 @@ enum Global {
     Env(WranglerEnv),
     Model(Model),
     Api(Api),
+    Service(Service),
     Poo(PlainOldObject),
     DataSource(DataSource),
     Inject(Vec<Symbol>),
