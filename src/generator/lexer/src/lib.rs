@@ -12,6 +12,10 @@ pub enum Token {
     Model,
     #[token("source")]
     Source,
+    #[token("for")]
+    For,
+    #[token("exposes")]
+    Exposes,
     #[token("service")]
     Service,
     #[token("inject")]

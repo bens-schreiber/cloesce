@@ -298,7 +298,7 @@ fn model_block_single_foreign_key() {
 
     assert_eq!(dog.foreign_keys.len(), 1);
     let fk = &dog.foreign_keys[0];
-    assert_eq!(fk.to_model, person.symbol);
+    assert_eq!(fk.adj_model, person.symbol);
     assert_eq!(fk.columns, vec![user_id_symbol]);
 }
 
@@ -364,7 +364,7 @@ fn model_block_composite_foreign_key() {
 
     assert_eq!(child.foreign_keys.len(), 1);
     let fk = &child.foreign_keys[0];
-    assert_eq!(fk.to_model, parent.symbol);
+    assert_eq!(fk.adj_model, parent.symbol);
     assert_eq!(fk.columns, vec![org_id_symbol, user_id_symbol]);
 }
 
@@ -409,7 +409,7 @@ fn model_block_nav_one_to_one() {
     let nav_props: Vec<_> = foo.navigation_properties().collect();
     assert_eq!(nav_props.len(), 1);
     let (nav, key_fields) = &nav_props[0];
-    assert_eq!(nav.to_model, bar.symbol);
+    assert_eq!(nav.adj_model, bar.symbol);
     assert!(matches!(
         &nav.kind,
         D1NavigationPropertyKind::OneToOne { .. }
@@ -465,7 +465,7 @@ fn model_block_nav_one_to_many() {
     assert_eq!(nav_props.len(), 1);
 
     let (nav, _) = &nav_props[0];
-    assert_eq!(nav.to_model, bar.symbol);
+    assert_eq!(nav.adj_model, bar.symbol);
     assert!(matches!(
         &nav.kind,
         D1NavigationPropertyKind::OneToMany { .. }
@@ -513,7 +513,7 @@ fn model_block_nav_many_to_many() {
     let student_nav_props: Vec<_> = student.navigation_properties().collect();
     assert_eq!(student_nav_props.len(), 1);
     let (student_nav, _) = &student_nav_props[0];
-    assert_eq!(student_nav.to_model, course.symbol);
+    assert_eq!(student_nav.adj_model, course.symbol);
     assert!(matches!(
         &student_nav.kind,
         D1NavigationPropertyKind::ManyToMany { .. }
@@ -522,7 +522,7 @@ fn model_block_nav_many_to_many() {
     let course_nav_props: Vec<_> = course.navigation_properties().collect();
     assert_eq!(course_nav_props.len(), 1);
     let (course_nav, _) = &course_nav_props[0];
-    assert_eq!(course_nav.to_model, student.symbol);
+    assert_eq!(course_nav.adj_model, student.symbol);
     assert!(matches!(
         &course_nav.kind,
         D1NavigationPropertyKind::ManyToMany { .. }

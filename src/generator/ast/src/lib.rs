@@ -183,24 +183,25 @@ pub struct ApiMethod {
 #[derive(Serialize, Deserialize, Debug, Default)]
 pub struct IncludeTree(pub BTreeMap<String, IncludeTree>);
 
-#[derive(Serialize, Deserialize, Debug, Clone, Hash, PartialEq, Eq)]
-pub enum CrudListParam {
-    LastSeen,
-    Limit,
-    Offset,
+#[derive(Serialize, Deserialize, Debug)]
+pub struct DataSourceMethod {
+    pub parameters: Vec<Field>,
+    pub raw_sql: String,
 }
 
 /// A tree of model symbol names to include when hydrating a data source.
 #[derive(Serialize, Deserialize, Debug)]
 pub struct DataSource {
+    pub symbol: Symbol,
+    pub model_symbol: Symbol,
     pub name: String,
     pub tree: IncludeTree,
 
     /// If true, the data source will not be generated on the client.
     pub is_private: bool,
 
-    /// List pagination parameter names for the LIST method
-    pub list_params: Vec<CrudListParam>,
+    pub list: Option<DataSourceMethod>,
+    pub get: Option<DataSourceMethod>,
 }
 
 /// A D1 Navigation property, representing a relationship to another model
@@ -231,7 +232,7 @@ pub struct D1NavigationProperty {
     pub field: Symbol,
 
     /// The model that this this navigation property points to
-    pub to_model: Symbol,
+    pub adj_model: Symbol,
 
     /// The kind of navigation property, which encodes the relationship and foreign key structure.
     pub kind: D1NavigationPropertyKind,
@@ -240,7 +241,7 @@ pub struct D1NavigationProperty {
 #[derive(Serialize, Deserialize, Debug, Hash)]
 pub struct ForeignKey {
     pub hash: u64,
-    pub to_model: Symbol,
+    pub adj_model: Symbol,
     pub columns: Vec<Symbol>,
 }
 

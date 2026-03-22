@@ -8,13 +8,13 @@ use ast::{
 use lexer::Token;
 
 struct PendingForeignKey {
-    to_model_name: String,
+    adj_model_name: String,
     columns: Vec<String>,
 }
 
 struct PendingNavigation {
     name: String,
-    to_model: String,
+    adj_model: String,
     kind: PendingNavigationKind,
 }
 
@@ -81,7 +81,7 @@ enum ModelEntry {
 /// ```
 pub fn model_block<'t>() -> impl Parser<'t, &'t [Token], Model, Extra<'t>> {
     // Anchored D1 binding tag on the model declaration: @d1(binding_name)
-    let model_level_binding = just(Token::At)
+    let d1_binding = just(Token::At)
         .ignore_then(just(Token::D1))
         .ignore_then(just(Token::LParen))
         .ignore_then(select! { Token::Ident(name) => name })
@@ -151,7 +151,7 @@ pub fn model_block<'t>() -> impl Parser<'t, &'t [Token], Model, Extra<'t>> {
             .map(|(from, to)| {
                 let to_model_name = to[0].0.clone();
                 ModelEntry::Foreign(PendingForeignKey {
-                    to_model_name,
+                    adj_model_name: to_model_name,
                     columns: from,
                 })
             })
@@ -194,7 +194,7 @@ pub fn model_block<'t>() -> impl Parser<'t, &'t [Token], Model, Extra<'t>> {
 
                 ModelEntry::Nav(PendingNavigation {
                     name,
-                    to_model,
+                    adj_model: to_model,
                     kind: PendingNavigationKind::OneOrManyByFieldType { key_columns },
                 })
             });
@@ -209,7 +209,7 @@ pub fn model_block<'t>() -> impl Parser<'t, &'t [Token], Model, Extra<'t>> {
             .map(|(name, (to_model, _to_navigation_name))| {
                 ModelEntry::Nav(PendingNavigation {
                     name,
-                    to_model,
+                    adj_model: to_model,
                     kind: PendingNavigationKind::ManyToMany,
                 })
             });
@@ -291,7 +291,7 @@ pub fn model_block<'t>() -> impl Parser<'t, &'t [Token], Model, Extra<'t>> {
             },
         );
 
-    model_level_binding
+    d1_binding
         .then_ignore(just(Token::Model))
         .then(select! { Token::Ident(name) => name })
         .then(
@@ -348,7 +348,7 @@ fn map_model(
                     .collect();
                 let foreign_key = ForeignKey {
                     hash: 0,
-                    to_model: symbol_table.intern_global(&foreign_key.to_model_name),
+                    adj_model: symbol_table.intern_global(&foreign_key.adj_model_name),
                     columns,
                 };
                 foreign_keys.push(foreign_key);
@@ -425,7 +425,7 @@ fn map_model(
         let nav_prop = D1NavigationProperty {
             hash: 0,
             field: symbol_table.intern_scoped(&model_name, &nav.name),
-            to_model: symbol_table.intern_global(&nav.to_model),
+            adj_model: symbol_table.intern_global(&nav.adj_model),
             kind: nav_kind,
         };
         navigation_properties.push(nav_prop);
