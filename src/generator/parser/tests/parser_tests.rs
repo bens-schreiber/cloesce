@@ -637,6 +637,84 @@ fn api_block_merges_for_same_model() {
 }
 
 #[test]
+fn data_source_block() {
+    let ast = lex_and_parse(
+        r#"
+        source UserSource for User {
+            include { id, name, address { street, city } }
+
+            sql get(id: int) {
+                "SELECT * FROM users WHERE id = ?"
+            }
+
+            sql list(offset: int, limit: int) {
+                "SELECT * FROM users LIMIT ? OFFSET ?"
+            }
+        }
+        "#,
+    );
+
+    assert_eq!(ast.sources.len(), 1);
+
+    let sources = ast.sources.values().next().expect("one source entry");
+    assert_eq!(sources.len(), 1);
+
+    let source = &sources[0];
+    assert_eq!(source.name, "UserSource");
+    assert!(!source.is_private);
+
+    // include tree: { id, name, address { street, city } }
+    let tree = &source.tree;
+    assert!(tree.0.contains_key("id"));
+    assert!(tree.0.contains_key("name"));
+    assert!(tree.0.contains_key("address"));
+
+    let address_subtree = &tree.0["address"];
+    assert!(address_subtree.0.contains_key("street"));
+    assert!(address_subtree.0.contains_key("city"));
+
+    let id_subtree = &tree.0["id"];
+    assert!(id_subtree.0.is_empty());
+
+    // get method
+    let get = source.get.as_ref().expect("get method to be present");
+    assert_eq!(get.raw_sql, "\"SELECT * FROM users WHERE id = ?\"");
+    assert_eq!(get.parameters.len(), 1);
+    assert_eq!(get.parameters[0].name, "id");
+    assert_eq!(get.parameters[0].cidl_type, CidlType::Integer);
+
+    // list method
+    let list = source.list.as_ref().expect("list method to be present");
+    assert_eq!(list.raw_sql, "\"SELECT * FROM users LIMIT ? OFFSET ?\"");
+    assert_eq!(list.parameters.len(), 2);
+    assert_eq!(list.parameters[0].name, "offset");
+    assert_eq!(list.parameters[0].cidl_type, CidlType::Integer);
+    assert_eq!(list.parameters[1].name, "limit");
+    assert_eq!(list.parameters[1].cidl_type, CidlType::Integer);
+}
+
+#[test]
+fn data_source_block_optional_methods() {
+    let ast = lex_and_parse(
+        r#"
+        source MinimalSource for Post {
+            include { id, title }
+        }
+        "#,
+    );
+
+    let sources = ast.sources.values().next().expect("one source entry");
+    let source = &sources[0];
+    assert_eq!(source.name, "MinimalSource");
+    assert!(source.get.is_none());
+    assert!(source.list.is_none());
+
+    let tree = &source.tree;
+    assert!(tree.0.contains_key("id"));
+    assert!(tree.0.contains_key("title"));
+}
+
+#[test]
 fn poo_block() {
     let ast = lex_and_parse(
         r#"
@@ -695,7 +773,11 @@ fn poo_block() {
     assert_eq!(user_poo.attributes.len(), 12);
     assert_ne!(user_poo.symbol.0, 0);
 
-    let field_names: Vec<&str> = user_poo.attributes.iter().map(|f| f.name.as_str()).collect();
+    let field_names: Vec<&str> = user_poo
+        .attributes
+        .iter()
+        .map(|f| f.name.as_str())
+        .collect();
     assert_eq!(
         field_names,
         vec![

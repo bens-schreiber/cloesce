@@ -85,6 +85,7 @@ impl CloesceParser {
             model::model_block().map(Global::Model),
             api::api_block().map(Global::Api),
             Self::poo_block().map(Global::Poo),
+            data_source::data_source_block().map(Global::DataSource),
         ))
         .repeated()
         .collect::<Vec<_>>()
