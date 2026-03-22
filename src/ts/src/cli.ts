@@ -50,6 +50,31 @@ function wranglerConfigPathFor(format: WranglerConfigFormat): string {
   return format === "jsonc" ? "wrangler.jsonc" : "wrangler.toml";
 }
 
+function toWasiPath(filePath: string, root: string): string {
+  const normalize = (value: string) => value.replace(/\\/g, "/");
+  const normalizedRoot = normalize(path.resolve(root));
+  const normalizedFile = normalize(path.resolve(root, filePath));
+
+  const rootKey =
+    process.platform === "win32"
+      ? normalizedRoot.toLowerCase()
+      : normalizedRoot;
+  const fileKey =
+    process.platform === "win32"
+      ? normalizedFile.toLowerCase()
+      : normalizedFile;
+
+  if (fileKey === rootKey) {
+    return ".";
+  }
+
+  if (fileKey.startsWith(`${rootKey}/`)) {
+    return normalizedFile.slice(normalizedRoot.length + 1);
+  }
+
+  return normalize(filePath);
+}
+
 const cmds = subcommands({
   name: "cloesce",
   cmds: {
@@ -58,6 +83,7 @@ const cmds = subcommands({
       description: "Run through the full compilation process.",
       args: {},
       handler: async () => {
+        const root = process.cwd();
         const config = await loadCloesceConfig(process.cwd());
         const wranglerConfigPath = wranglerConfigPathFor(
           config.wranglerConfigFormat,
@@ -72,11 +98,11 @@ const cmds = subcommands({
           wasmFile: "generator.wasm",
           args: [
             "generate",
-            path.join(outputDir, "cidl.pre.json"),
-            path.join(outputDir, "cidl.json"),
-            wranglerConfigPath,
-            path.join(outputDir, "workers.ts"),
-            path.join(outputDir, "client.ts"),
+            toWasiPath(path.join(outputDir, "cidl.pre.json"), root),
+            toWasiPath(path.join(outputDir, "cidl.json"), root),
+            toWasiPath(wranglerConfigPath, root),
+            toWasiPath(path.join(outputDir, "workers.ts"), root),
+            toWasiPath(path.join(outputDir, "client.ts"), root),
             config.workersUrl,
             config.migrationsPath,
           ],
@@ -145,6 +171,7 @@ const cmds = subcommands({
         }),
       },
       handler: async (args) => {
+        const root = process.cwd();
         let bindingArgs: string[];
         let migrationName: string;
 
@@ -193,11 +220,11 @@ const cmds = subcommands({
 
         let wasmArgs = [
           "migrations",
-          cidlPath,
+          toWasiPath(cidlPath, root),
           ...bindingArgs,
           migrationName,
-          wranglerConfigPath,
-          ".",
+          toWasiPath(wranglerConfigPath, root),
+          toWasiPath(".", root),
         ];
 
         const migrateConfig: WasmConfig = {
