@@ -1,10 +1,8 @@
 use chumsky::prelude::*;
 
 use ast::CidlType;
-use lexer::Token;
 
-use crate::Extra;
-use crate::parse_ast::{ServiceBlock, SpannedName, SpannedTypedName};
+use crate::{ServiceBlock, SpannedName, SpannedTypedName, lexer::Token, parser::Extra};
 
 /// Parses a block of the form:
 ///

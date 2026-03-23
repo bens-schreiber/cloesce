@@ -3,6 +3,9 @@ use std::collections::BTreeMap;
 use ast::{CidlType, CrudKind, HttpVerb};
 use chumsky::span::SimpleSpan;
 
+pub mod lexer;
+pub mod parser;
+
 /// A name that has been parsed but not yet resolved to a specific declaration.
 pub struct UnresolvedName(pub String);
 

@@ -1,9 +1,18 @@
-use chumsky::prelude::*;
+use std::ops::Range;
 
 use ast::CidlType;
-use lexer::Token;
+use chumsky::extra;
+use chumsky::prelude::*;
 
-use crate::Extra;
+use crate::SpannedName;
+use crate::SpannedTypedName;
+use crate::lexer::Token;
+use crate::{
+    ApiBlock, DataSourceBlock, ModelBlock, ParseAst, PlainOldObjectBlock, ServiceBlock,
+    UnresolvedName, WranglerEnvBlock,
+};
+
+pub(crate) type Extra<'t> = extra::Err<Rich<'t, Token>>;
 
 mod api;
 mod data_source;
@@ -11,13 +20,61 @@ mod env;
 mod model;
 mod service;
 
-pub use api::api_block;
-pub use data_source::data_source_block;
-pub use env::env_block;
-pub use model::model_block;
-pub use service::service_block;
+#[derive(Default)]
+pub struct CloesceParser;
 
-use crate::parse_ast::{PlainOldObjectBlock, SpannedName, SpannedTypedName, UnresolvedName};
+impl CloesceParser {
+    pub fn parse(
+        &self,
+        tokens: Vec<(Token, Range<usize>)>,
+    ) -> Result<ParseAst, Vec<Rich<'static, Token>>> {
+        let tokens = tokens.into_iter().map(|(t, _)| t).collect::<Vec<_>>();
+
+        self._parse()
+            .parse(&tokens)
+            .into_result()
+            .map_err(|errs| errs.into_iter().map(|e| e.into_owned()).collect())
+    }
+
+    fn _parse<'t>(&self) -> impl chumsky::Parser<'t, &'t [Token], ParseAst, Extra<'t>> {
+        choice((
+            env::env_block().map(Global::Env),
+            model::model_block().map(Global::Model),
+            api::api_block().map(Global::Api),
+            service::service_block().map(Global::Service),
+            poo_block().map(Global::Poo),
+            data_source::data_source_block().map(Global::DataSource),
+            inject_block().map(Global::Inject),
+        ))
+        .repeated()
+        .collect::<Vec<_>>()
+        .map(|items| {
+            let mut ast = ParseAst::default();
+            for item in items {
+                match item {
+                    Global::Env(env) => ast.wrangler_env.push(env),
+                    Global::Model(model) => ast.models.push(model),
+                    Global::Api(api) => ast.apis.push(api),
+                    Global::Service(service) => ast.services.push(service),
+                    Global::Poo(poo) => ast.poos.push(poo),
+                    Global::DataSource(ds) => ast.sources.push(ds),
+                    Global::Inject(symbols) => ast.injectables.extend(symbols),
+                }
+            }
+            ast
+        })
+    }
+}
+
+enum Global {
+    Env(WranglerEnvBlock),
+    Model(ModelBlock),
+    Api(ApiBlock),
+    Service(ServiceBlock),
+    Poo(PlainOldObjectBlock),
+    DataSource(DataSourceBlock),
+    Inject(Vec<UnresolvedName>),
+}
 
 /// Parses a block of the form:
 ///

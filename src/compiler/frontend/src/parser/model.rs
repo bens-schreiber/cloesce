@@ -1,13 +1,12 @@
 use chumsky::prelude::*;
 
 use ast::CidlType;
-use lexer::Token;
 
-use crate::Extra;
-use crate::blocks::sqlite_column_types;
-use crate::parse_ast::{
+use crate::{
     D1NavigationProperty, D1NavigationPropertyKind, ForeignKey, KvR2Field, ModelBlock, SpannedName,
     SpannedTypedName, UnresolvedName,
+    lexer::Token,
+    parser::{Extra, sqlite_column_types},
 };
 
 struct PendingForeignKey {
@@ -273,8 +272,10 @@ pub fn model_block<'t>() -> impl Parser<'t, &'t [Token], ModelBlock, Extra<'t>> 
     d1_binding
         .then_ignore(just(Token::Model))
         .then(
-            select! { Token::Ident(name) => name }
-                .map_with(|name, e| SpannedName { name, span: e.span() }),
+            select! { Token::Ident(name) => name }.map_with(|name, e| SpannedName {
+                name,
+                span: e.span(),
+            }),
         )
         .then(
             choice((primary_tag, unique_tag, foreign_tag, nav_tag, field))

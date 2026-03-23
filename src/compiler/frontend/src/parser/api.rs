@@ -1,11 +1,12 @@
 use chumsky::prelude::*;
 
 use ast::{CidlType, CrudKind, HttpVerb};
-use lexer::Token;
 
-use crate::Extra;
-use crate::blocks::cidl_type;
-use crate::parse_ast::{ApiBlock, ApiMethod, SpannedName, SpannedTypedName, UnresolvedName};
+use crate::{
+    ApiBlock, ApiMethod, SpannedName, SpannedTypedName, UnresolvedName,
+    lexer::Token,
+    parser::{Extra, cidl_type},
+};
 
 struct PendingApiMethod {
     span_name: SpannedName,
@@ -58,8 +59,10 @@ pub fn api_block<'t>() -> impl Parser<'t, &'t [Token], ApiBlock, Extra<'t>> {
     crud_tag
         .then_ignore(just(Token::Api))
         .then(
-            select! { Token::Ident(name) => name }
-                .map_with(|name, e| SpannedName { name, span: e.span() }),
+            select! { Token::Ident(name) => name }.map_with(|name, e| SpannedName {
+                name,
+                span: e.span(),
+            }),
         )
         .then(
             method()
@@ -83,8 +86,10 @@ fn method<'t>() -> impl Parser<'t, &'t [Token], PendingApiMethod, Extra<'t>> {
     // http_verb methodName(ident1: cidl_type, ...) -> cidl_type
     http_verb()
         .then(
-            select! { Token::Ident(name) => name }
-                .map_with(|name, e| SpannedName { name, span: e.span() }),
+            select! { Token::Ident(name) => name }.map_with(|name, e| SpannedName {
+                name,
+                span: e.span(),
+            }),
         )
         .then(
             parameter()

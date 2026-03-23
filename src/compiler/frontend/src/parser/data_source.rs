@@ -3,18 +3,17 @@ use std::collections::BTreeMap;
 use chumsky::prelude::*;
 
 use ast::CidlType;
-use lexer::Token;
 
-use crate::Extra;
-use crate::blocks::cidl_type;
-use crate::parse_ast::{
+use crate::{
     DataSourceBlock, DataSourceMethod, IncludeTree, SpannedTypedName, UnresolvedName,
+    lexer::Token,
+    parser::{Extra, cidl_type},
 };
 
 enum PendingSqlParam {
     Field {
         name: String,
-        name_span: chumsky::span::SimpleSpan,
+        span: SimpleSpan,
         cidl_type: CidlType,
     },
 }
@@ -81,7 +80,7 @@ pub fn data_source_block<'t>() -> impl Parser<'t, &'t [Token], DataSourceBlock, 
             .then(cidl_type())
             .map(|((name, name_span), cidl_type)| PendingSqlParam::Field {
                 name,
-                name_span,
+                span: name_span,
                 cidl_type,
             })
     };
@@ -152,7 +151,7 @@ fn map_data_source(
             .map(|p| match p {
                 PendingSqlParam::Field {
                     name,
-                    name_span,
+                    span: name_span,
                     cidl_type,
                 } => SpannedTypedName {
                     span: name_span,

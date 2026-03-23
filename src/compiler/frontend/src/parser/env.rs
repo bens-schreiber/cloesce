@@ -1,11 +1,12 @@
 use chumsky::prelude::*;
 
 use ast::CidlType;
-use lexer::Token;
 
-use crate::Extra;
-use crate::blocks::sqlite_column_types;
-use crate::parse_ast::{SpannedName, SpannedTypedName, WranglerEnvBlock};
+use crate::{
+    SpannedName, SpannedTypedName, WranglerEnvBlock,
+    lexer::Token,
+    parser::{Extra, sqlite_column_types},
+};
 
 enum BindingKind {
     D1,

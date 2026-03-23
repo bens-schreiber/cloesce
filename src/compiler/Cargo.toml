@@ -9,8 +9,7 @@ members = [
     # "wrangler",
     # "semantic",
     # "generator-test",
-    "lexer",
-    "parser",
+    "frontend",
 ]
 
 [workspace.dependencies]

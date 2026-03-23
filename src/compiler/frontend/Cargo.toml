@@ -1,7 +1,9 @@
 [package]
-name = "lexer"
+name = "frontend"
 version = "0.0.1"
 edition = "2024"
 
 [dependencies]
+ast = { path = "../ast" }
+chumsky = "0.12.0"
 logos = "0.16.1"

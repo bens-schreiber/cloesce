@@ -1,10 +1,8 @@
 use ast::{CidlType, CrudKind, HttpVerb};
-use lexer::Lexer;
-use parser::CloesceParser;
-use parser::parse_ast::{D1NavigationPropertyKind, ParseAst};
+use frontend::{D1NavigationPropertyKind, ParseAst, lexer::CloesceLexer, parser::CloesceParser};
 
 fn lex_and_parse(src: &str) -> ParseAst {
-    let tokens = Lexer::default().lex(src).expect("lex to succeed");
+    let tokens = CloesceLexer::default().lex(src).expect("lex to succeed");
     CloesceParser::default()
         .parse(tokens)
         .expect("parse to succeed")
