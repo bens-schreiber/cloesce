@@ -2,29 +2,46 @@ use std::collections::BTreeMap;
 
 use chumsky::prelude::*;
 
-use crate::{Extra, SymbolTable, cidl_type};
-use ast::{CidlType, DataSource, DataSourceMethod, Field, IncludeTree};
+use ast::CidlType;
 use lexer::Token;
 
+use crate::Extra;
+use crate::blocks::cidl_type;
+use crate::parse_ast::{
+    DataSourceBlock, DataSourceMethod, IncludeTree, SpannedTypedName, UnresolvedName,
+};
+
 enum PendingSqlParam {
-    Field { name: String, cidl_type: CidlType },
+    Field {
+        name: String,
+        name_span: chumsky::span::SimpleSpan,
+        cidl_type: CidlType,
+    },
 }
 
-/// Parses a data source block of the form
+/// Parses a block of the form:
+///
 /// ```cloesce
 /// source SourceName for ModelName {
-///     include { field1, field2, field3 { field4, ...} }
-///
-///     sql get(id: int) {
-///         "SELECT * FROM ..."
+///     include {
+///         ident1,
+///         ident2,
+///         ident3 {
+///             ident4, ...
+///         }
 ///     }
 ///
-///     sql list(id: int, offset: int, limit: int) {
-///         "SELECT * FROM ..."
+///     sql get(ident5: cidl_type, ...) {
+///         "..."
+///     }
+///
+///     sql list(ident7: cidl_type, ...) {
+///         "..."
 ///     }
 /// }
 /// ```
-pub fn data_source_block<'t>() -> impl Parser<'t, &'t [Token], DataSource, Extra<'t>> {
+pub fn data_source_block<'t>() -> impl Parser<'t, &'t [Token], DataSourceBlock, Extra<'t>> {
+    // ident | ident { ... }
     let include_entry = recursive(|entry| {
         select! { Token::Ident(name) => name }
             .then(
@@ -47,6 +64,7 @@ pub fn data_source_block<'t>() -> impl Parser<'t, &'t [Token], DataSource, Extra
             .boxed()
     });
 
+    // include { ... }
     let include_tree = just(Token::Include).ignore_then(
         include_entry
             .separated_by(just(Token::Comma))
@@ -55,17 +73,24 @@ pub fn data_source_block<'t>() -> impl Parser<'t, &'t [Token], DataSource, Extra
             .delimited_by(just(Token::LBrace), just(Token::RBrace)),
     );
 
+    // ident: cidl_type
     let named_parameter = || {
         select! { Token::Ident(name) => name }
+            .map_with(|name, e| (name, e.span()))
             .then_ignore(just(Token::Colon))
             .then(cidl_type())
-            .map(|(name, cidl_type)| PendingSqlParam::Field { name, cidl_type })
+            .map(|((name, name_span), cidl_type)| PendingSqlParam::Field {
+                name,
+                name_span,
+                cidl_type,
+            })
     };
 
-    // SQL body is a quoted string literal between braces.
+    // { "..." }
     let sql_block = select! { Token::StringLit(sql) => sql }
         .delimited_by(just(Token::LBrace), just(Token::RBrace));
 
+    // sql get(ident: cidl_type, ...) { "..." }
     let method_params = || {
         named_parameter()
             .separated_by(just(Token::Comma))
@@ -74,17 +99,19 @@ pub fn data_source_block<'t>() -> impl Parser<'t, &'t [Token], DataSource, Extra
             .delimited_by(just(Token::LParen), just(Token::RParen))
     };
 
-    // can have N parameters (no self param)
+    // sql get(...) { ... }
     let get_method = just(Token::Sql)
         .then_ignore(just(Token::Get))
         .ignore_then(method_params())
         .then(sql_block.clone());
 
+    // sql list(...) { ... }
     let list_method = just(Token::Sql)
         .then_ignore(just(Token::Ident("list".into())))
         .ignore_then(method_params())
         .then(sql_block);
 
+    // source SourceName for ModelName { ... }
     just(Token::Source)
         .ignore_then(select! { Token::Ident(name) => name })
         .then_ignore(just(Token::For))
@@ -97,71 +124,62 @@ pub fn data_source_block<'t>() -> impl Parser<'t, &'t [Token], DataSource, Extra
         )
         .map_with(
             |((name, model), ((include_entries, get_method), list_method)), e| {
-                let symbol_table = e.state();
-                map_source(
+                map_data_source(
                     name,
                     model,
                     include_entries,
                     get_method,
                     list_method,
-                    symbol_table,
+                    e.span(),
                 )
             },
         )
 }
 
-fn map_source(
+fn map_data_source(
     name: String,
     model: String,
     include_entries: Vec<(String, IncludeTree)>,
     get_method: Option<(Vec<PendingSqlParam>, String)>,
     list_method: Option<(Vec<PendingSqlParam>, String)>,
-    symbol_table: &mut SymbolTable,
-) -> DataSource {
-    let symbol = symbol_table.intern_global(&name);
-    let model_symbol = symbol_table.intern_global(&model);
+    span: SimpleSpan,
+) -> DataSourceBlock {
     let tree = IncludeTree(include_entries.into_iter().collect());
 
-    let get = get_method.map(|(params, raw_sql)| DataSourceMethod {
-        parameters: params
+    let map_params = |params: Vec<PendingSqlParam>| {
+        params
             .into_iter()
             .map(|p| match p {
                 PendingSqlParam::Field {
-                    name: field_name,
+                    name,
+                    name_span,
                     cidl_type,
-                } => Field {
-                    symbol: symbol_table.intern_scoped(&name, &field_name),
-                    name: field_name,
-                    cidl_type,
+                } => SpannedTypedName {
+                    span: name_span,
+                    name,
+                    ty: cidl_type,
                 },
             })
-            .collect(),
+            .collect::<Vec<_>>()
+    };
+
+    let get = get_method.map(|(params, raw_sql)| DataSourceMethod {
+        span,
+        parameters: map_params(params),
         raw_sql,
     });
 
     let list = list_method.map(|(params, raw_sql)| DataSourceMethod {
-        parameters: params
-            .into_iter()
-            .map(|p| match p {
-                PendingSqlParam::Field {
-                    name: field_name,
-                    cidl_type,
-                } => Field {
-                    symbol: symbol_table.intern_scoped(&name, &field_name),
-                    name: field_name,
-                    cidl_type,
-                },
-            })
-            .collect(),
+        span,
+        parameters: map_params(params),
         raw_sql,
     });
 
-    DataSource {
-        symbol,
-        model_symbol,
+    DataSourceBlock {
+        span,
         name,
+        model_name: UnresolvedName(model),
         tree,
-        is_private: false,
         get,
         list,
     }
