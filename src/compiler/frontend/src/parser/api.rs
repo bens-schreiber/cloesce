@@ -5,9 +5,9 @@ use chumsky::prelude::*;
 use ast::{CidlType, CrudKind, HttpVerb};
 
 use crate::{
-    ApiBlock, ApiMethod, SpannedTypedName, UnresolvedName,
+    ApiBlock, ApiBlockMethod, SpannedTypedName,
     lexer::Token,
-    parser::{Extra, cidl_type},
+    parser::{Extra, IdScope, It, cidl_type},
 };
 
 struct PendingApiMethod {
@@ -43,7 +43,7 @@ enum PendingApiParam {
 ///     ) -> cidl_type
 /// }
 /// ```
-pub fn api_block<'t>() -> impl Parser<'t, &'t [Token], ApiBlock, Extra<'t>> {
+pub fn api_block<'t>(st: It) -> impl Parser<'t, &'t [Token], ApiBlock, Extra<'t>> {
     // @crud(get | save | list, ...)
     let crud_tag = just(Token::At)
         .ignore_then(just(Token::Crud))
@@ -58,42 +58,62 @@ pub fn api_block<'t>() -> impl Parser<'t, &'t [Token], ApiBlock, Extra<'t>> {
         .or_not()
         .map(|cruds| cruds.unwrap_or_default());
 
+    let st_methods = st.clone();
+    let st_map = st.clone();
+
     // api ApiName for ModelName { ... }
     crud_tag
         .then_ignore(just(Token::Api))
         .then(select! { Token::Ident(name) => name })
+        .then_ignore(just(Token::For))
+        .then(select! { Token::Ident(name) => name })
         .then(
-            method()
+            method(st_methods)
                 .repeated()
                 .collect::<Vec<_>>()
                 .delimited_by(just(Token::LBrace), just(Token::RBrace)),
         )
-        .map_with(|((cruds, model_name), methods), e| {
-            let methods = methods.into_iter().map(map_method).collect();
+        .map_with(
+            move |(((cruds, api_name), model_name), pending_methods), e| {
+                let id = st_map
+                    .borrow_mut()
+                    .intern(api_name.clone(), IdScope::Global);
+                let model = st_map.borrow_mut().intern(model_name, IdScope::Global);
+                let api_scope = IdScope::Api(api_name.clone());
 
-            ApiBlock {
-                span: e.span(),
-                file: PathBuf::new(),
-                model: UnresolvedName(model_name),
-                cruds,
-                methods,
-            }
-        })
+                let methods = pending_methods
+                    .into_iter()
+                    .map(|m| map_method(m, &st_map, &api_scope))
+                    .collect();
+
+                ApiBlock {
+                    id,
+                    name: api_name,
+                    span: e.span(),
+                    file: PathBuf::new(),
+                    model,
+                    cruds,
+                    methods,
+                }
+            },
+        )
 }
 
-fn method<'t>() -> impl Parser<'t, &'t [Token], PendingApiMethod, Extra<'t>> {
+fn method<'t>(st: It) -> impl Parser<'t, &'t [Token], PendingApiMethod, Extra<'t>> {
+    let st_param = st.clone();
+
     // http_verb methodName(ident1: cidl_type, ...) -> cidl_type
     http_verb()
         .then(select! { Token::Ident(name) => name }.map_with(|name, e| (name, e.span())))
         .then(
-            parameter()
+            parameter(st_param)
                 .separated_by(just(Token::Comma))
                 .allow_trailing()
                 .collect::<Vec<_>>()
                 .delimited_by(just(Token::LParen), just(Token::RParen)),
         )
         .then_ignore(just(Token::Arrow))
-        .then(cidl_type())
+        .then(cidl_type(st))
         .map(
             |(((http_verb, (name, span)), parameters), return_type)| PendingApiMethod {
                 name,
@@ -105,7 +125,7 @@ fn method<'t>() -> impl Parser<'t, &'t [Token], PendingApiMethod, Extra<'t>> {
         )
 }
 
-fn parameter<'t>() -> impl Parser<'t, &'t [Token], PendingApiParam, Extra<'t>> {
+fn parameter<'t>(st: It) -> impl Parser<'t, &'t [Token], PendingApiParam, Extra<'t>> {
     // @source(DataSourceName) self
     let source_tag = just(Token::At)
         .ignore_then(just(Token::Source))
@@ -123,7 +143,7 @@ fn parameter<'t>() -> impl Parser<'t, &'t [Token], PendingApiParam, Extra<'t>> {
     let named_parameter = select! { Token::Ident(name) => name }
         .map_with(|name, e| (name, e.span()))
         .then_ignore(just(Token::Colon))
-        .then(cidl_type())
+        .then(cidl_type(st))
         .map(|((name, name_span), cidl_type)| PendingApiParam::Field {
             name,
             name_span,
@@ -153,7 +173,9 @@ fn crud_kind<'t>() -> impl Parser<'t, &'t [Token], CrudKind, Extra<'t>> {
     ))
 }
 
-fn map_method(method: PendingApiMethod) -> ApiMethod {
+fn map_method(method: PendingApiMethod, st: &It, api_scope: &IdScope) -> ApiBlockMethod {
+    let id = st.borrow_mut().intern(method.name, api_scope.clone());
+
     let mut is_static = true;
     let mut data_source = None;
     let mut parameters = Vec::new();
@@ -165,7 +187,8 @@ fn map_method(method: PendingApiMethod) -> ApiMethod {
             } => {
                 is_static = false;
                 if data_source.is_none() {
-                    data_source = explicit_source.map(UnresolvedName);
+                    data_source =
+                        explicit_source.map(|s| st.borrow_mut().intern(s, IdScope::Global));
                 }
             }
             PendingApiParam::Field {
@@ -173,7 +196,9 @@ fn map_method(method: PendingApiMethod) -> ApiMethod {
                 name_span,
                 cidl_type,
             } => {
+                let id = st.borrow_mut().intern(name.clone(), api_scope.clone());
                 parameters.push(SpannedTypedName {
+                    id,
                     span: name_span,
                     name,
                     cidl_type,
@@ -182,9 +207,9 @@ fn map_method(method: PendingApiMethod) -> ApiMethod {
         }
     }
 
-    ApiMethod {
+    ApiBlockMethod {
+        id,
         span: method.span,
-        name: method.name,
         is_static,
         data_source_name: data_source,
         http_verb: method.http_verb,

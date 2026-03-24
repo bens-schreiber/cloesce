@@ -3,15 +3,14 @@ use std::{collections::BTreeMap, path::PathBuf};
 use ast::{CidlType, CrudKind, HttpVerb};
 use chumsky::span::SimpleSpan;
 
+use crate::parser::ParseId;
+
 pub mod lexer;
 pub mod parser;
 
-/// A name that has been parsed but not yet resolved to a specific declaration.
-#[derive(PartialEq, Eq, Hash, Clone)]
-pub struct UnresolvedName(pub String);
-
 #[derive(Clone)]
 pub struct SpannedTypedName {
+    pub id: ParseId,
     pub span: SimpleSpan,
     pub name: String,
     pub cidl_type: CidlType,
@@ -19,69 +18,73 @@ pub struct SpannedTypedName {
 
 #[derive(Clone)]
 pub struct SpannedName {
+    pub id: ParseId,
     pub span: SimpleSpan,
     pub name: String,
 }
 
 pub struct ApiBlock {
+    pub id: ParseId,
+    pub name: String,
     pub span: SimpleSpan,
     pub file: PathBuf,
 
-    pub model: UnresolvedName,
+    pub model: ParseId,
     pub cruds: Vec<CrudKind>,
-    pub methods: Vec<ApiMethod>,
+    pub methods: Vec<ApiBlockMethod>,
 }
 
-pub struct ApiMethod {
+pub struct ApiBlockMethod {
+    pub id: ParseId,
     pub span: SimpleSpan,
-    pub name: String,
 
     pub is_static: bool,
     pub http_verb: HttpVerb,
-    pub data_source_name: Option<UnresolvedName>,
+    pub data_source_name: Option<ParseId>,
     pub return_type: CidlType,
     pub parameters: Vec<SpannedTypedName>,
 }
 
 pub struct IncludeTree(pub BTreeMap<String, IncludeTree>);
 
-pub struct DataSourceMethod {
+pub struct DataSourceBlockMethod {
     pub span: SimpleSpan,
     pub parameters: Vec<SpannedTypedName>,
     pub raw_sql: String,
 }
 
 pub struct DataSourceBlock {
+    pub id: ParseId,
     pub span: SimpleSpan,
     pub name: String,
     pub file: PathBuf,
 
-    pub model: UnresolvedName,
+    pub model: ParseId,
     pub tree: IncludeTree,
-    pub list: Option<DataSourceMethod>,
-    pub get: Option<DataSourceMethod>,
+    pub list: Option<DataSourceBlockMethod>,
+    pub get: Option<DataSourceBlockMethod>,
 }
 
-pub struct D1NavigationProperty {
+pub struct NavigationTag {
     /// The field on the current model that represents the relationship
-    pub field: UnresolvedName,
+    pub field: ParseId,
 
     /// The model that this this navigation property points to
-    pub adj_model: UnresolvedName,
+    pub adj_model: ParseId,
 
     /// All columns involved in the relationship
-    pub fields: Vec<UnresolvedName>,
+    pub fields: Vec<ParseId>,
 
     pub is_many_to_many: bool,
 }
 
-pub struct ForeignKey {
-    pub adj_model: UnresolvedName,
-    pub references: Vec<(UnresolvedName, UnresolvedName)>,
+pub struct ForeignKeyTag {
+    pub adj_model: ParseId,
+    pub references: Vec<(ParseId, ParseId)>, // (current model field, adjacent model field)
 }
 
-pub struct KvR2 {
-    pub field: UnresolvedName,
+pub struct KvR2Tag {
+    pub field: ParseId,
     pub span: SimpleSpan,
     pub cidl_type: CidlType,
 
@@ -89,28 +92,30 @@ pub struct KvR2 {
     pub format: String,
 
     /// The symbol of the environment variable binding the KV namespace
-    pub env_binding: UnresolvedName,
+    pub env_binding: ParseId,
 }
 
 pub struct ModelBlock {
+    pub id: ParseId,
     pub span: SimpleSpan,
     pub name: String,
     pub file: PathBuf,
 
     pub fields: Vec<SpannedTypedName>,
 
-    pub primary_keys: Vec<UnresolvedName>,
-    pub d1_binding: Option<UnresolvedName>,
-    pub key_fields: Vec<UnresolvedName>,
-    pub unique_constraints: Vec<Vec<UnresolvedName>>,
-    pub kvs: Vec<KvR2>,
-    pub r2s: Vec<KvR2>,
+    pub primary_keys: Vec<ParseId>,
+    pub d1_binding: Option<ParseId>,
+    pub key_fields: Vec<ParseId>,
+    pub unique_constraints: Vec<Vec<ParseId>>,
+    pub kvs: Vec<KvR2Tag>,
+    pub r2s: Vec<KvR2Tag>,
 
-    pub navigation_properties: Vec<D1NavigationProperty>,
-    pub foreign_keys: Vec<ForeignKey>,
+    pub navigation_properties: Vec<NavigationTag>,
+    pub foreign_keys: Vec<ForeignKeyTag>,
 }
 
 pub struct ServiceBlock {
+    pub id: ParseId,
     pub span: SimpleSpan,
     pub name: String,
     pub file: PathBuf,
@@ -119,6 +124,7 @@ pub struct ServiceBlock {
 }
 
 pub struct PlainOldObjectBlock {
+    pub id: ParseId,
     pub span: SimpleSpan,
     pub name: String,
     pub file: PathBuf,
@@ -127,6 +133,7 @@ pub struct PlainOldObjectBlock {
 }
 
 pub struct WranglerEnvBlock {
+    pub id: ParseId,
     pub span: SimpleSpan,
     pub file: PathBuf,
 
@@ -137,13 +144,14 @@ pub struct WranglerEnvBlock {
 }
 
 pub struct InjectBlock {
+    pub id: ParseId,
     pub span: SimpleSpan,
     pub file: PathBuf,
 
-    pub names: Vec<String>,
+    pub refs: Vec<ParseId>,
 }
 
-/// An IR representing the raw parsed structure of a Cloesce project
+/// An IR for the raw parsed structure of a Cloesce project
 #[derive(Default)]
 pub struct ParseAst {
     pub wrangler_envs: Vec<WranglerEnvBlock>,

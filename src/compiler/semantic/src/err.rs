@@ -51,6 +51,10 @@ pub enum CompilerErrorKind {
 
     /// A column in a D1 model can only participate in a single foreign key relationship
     ForeignKeyColumnAlreadyInForeignKey,
+
+    NavigationPropertyReferencesInvalidOrUnknownColumn,
+
+    NavigationPropertyReferencesSelf,
     // UnknownBinding,
     // MultipleWranglerEnvs,
     // NullSqlType,

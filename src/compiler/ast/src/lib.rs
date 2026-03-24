@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::collections::HashSet;
 use std::hash::Hash;
 use std::path::PathBuf;
+use std::usize;
 
 use serde::Deserialize;
 use serde::Serialize;
@@ -30,18 +31,18 @@ pub enum CidlType {
     R2Object,
 
     /// A dependency injected instance, containing a type name.
-    Inject(String),
+    Inject(SymbolRef),
 
     /// A model, or plain old object, containing the name of the class.
-    Object(String),
+    Object(SymbolRef),
 
     /// A part of a model or plain object, containing the name of the class.
     ///
     /// Only valid as a method argument.
-    Partial(String),
+    Partial(SymbolRef),
 
     /// A data source of some model
-    DataSource(String),
+    DataSource(SymbolRef),
 
     /// An array of any type
     Array(Box<CidlType>),
@@ -110,33 +111,90 @@ pub struct FileSpan {
     pub file: PathBuf,
 }
 
-#[derive(Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub struct Symbol {
-    pub id: usize,
-    pub name: String,
-    pub span: FileSpan,
-    pub cidl_type: CidlType,
+pub type SymbolRef = usize;
+
+#[derive(Clone)]
+pub enum WranglerEnvBindingKind {
+    D1,
+    KV,
+    R2,
 }
 
-impl Hash for Symbol {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.id.hash(state);
-    }
+#[derive(Clone)]
+pub enum SymbolKind {
+    ModelDecl,
+    WranglerEnvDecl,
+    WranglerEnvBinding {
+        kind: WranglerEnvBindingKind,
+    },
+    WranglerEnvVar {
+        cidl_type: CidlType,
+    },
+    ModelField {
+        parent: SymbolRef,
+        cidl_type: CidlType,
+    },
+}
+
+#[derive(Clone)]
+pub struct Symbol {
+    pub id: usize,
+
+    /// Empty for some symbols
+    pub name: String,
+
+    pub span: FileSpan,
+    pub kind: SymbolKind,
 }
 
 pub struct ForeignKey {
-    pub adj_model: Symbol,
-    pub columns: Vec<Symbol>,
+    pub adj_model: SymbolRef,
+    pub columns: Vec<SymbolRef>,
+}
+
+/// A D1 Navigation property, representing a relationship to another model
+/// through a foreign key or composite foreign key.
+pub enum NavigationPropertyKind {
+    OneToOne {
+        /// The columns on the current model that reference the other model's primary key.
+        /// Multiple columns indicate a composite foreign key.
+        columns: Vec<SymbolRef>,
+    },
+    OneToMany {
+        /// The columns on the other model that reference the current model's primary key.
+        /// Multiple columns indicate a composite foreign key.
+        columns: Vec<SymbolRef>,
+    },
+
+    /// A many to many relationship expressed through a join table,
+    /// consisting of the two models primary keys (be they composite or not).
+    ManyToMany,
+}
+
+pub struct D1NavigationProperty {
+    pub hash: u64,
+    pub field: SymbolRef,
+    pub adj_model: SymbolRef,
+    pub kind: NavigationPropertyKind,
+}
+
+impl D1NavigationProperty {
+    // pub fn many_to_many_table_name(&self, parent_model: &Symbol) -> String {
+    //     let mut names = [&parent_model.name, &self.adj_model.name];
+    //     names.sort();
+    //     format!("{}{}", names[0], names[1])
+    // }
 }
 
 pub struct Model {
     pub hash: u64,
-    pub symbol: Symbol,
+    pub symbol: SymbolRef,
 
-    pub d1_binding: Option<Symbol>,
-    pub columns: HashSet<Symbol>,
-    pub primary_key_columns: HashSet<Symbol>,
+    pub d1_binding: Option<SymbolRef>,
+    pub columns: HashSet<SymbolRef>,
+    pub primary_key_columns: HashSet<SymbolRef>,
     pub foreign_keys: Vec<ForeignKey>,
+    pub navigation_properties: Vec<D1NavigationProperty>,
 }
 
 #[derive(PartialEq, Debug, Clone, Copy)]
@@ -157,15 +215,16 @@ pub enum HttpVerb {
 
 #[derive(Default)]
 pub struct CloesceAst {
-    pub models: HashMap<Symbol, Model>,
+    pub models: HashMap<SymbolRef, Model>,
+    pub symbols: HashMap<SymbolRef, Symbol>,
 }
 
 pub struct WranglerEnv {
-    pub symbol: Symbol,
-    pub d1_bindings: HashSet<Symbol>,
-    pub kv_bindings: HashSet<Symbol>,
-    pub r2_bindings: HashSet<Symbol>,
-    pub vars: HashSet<Symbol>,
+    pub symbol: SymbolRef,
+    pub d1_bindings: HashSet<SymbolRef>,
+    pub kv_bindings: HashSet<SymbolRef>,
+    pub r2_bindings: HashSet<SymbolRef>,
+    pub vars: HashSet<SymbolRef>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]

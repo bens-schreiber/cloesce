@@ -5,20 +5,41 @@ use chumsky::prelude::*;
 use ast::CidlType;
 
 use crate::{
-    D1NavigationProperty, ForeignKey, KvR2, ModelBlock, SpannedTypedName, UnresolvedName,
+    ForeignKeyTag, KvR2Tag, ModelBlock, NavigationTag, SpannedTypedName,
     lexer::Token,
-    parser::{Extra, cidl_type},
+    parser::{Extra, IdScope, It, cidl_type},
 };
 
+struct PendingForeignKeyTag {
+    adj_model: String,
+    /// (source_field_name, target_field_name)
+    references: Vec<(String, String)>,
+}
+
+struct PendingNavTag {
+    field: String,
+    adj_model: String,
+    fields: Vec<String>,
+    is_many_to_many: bool,
+}
+
+struct PendingKvR2Tag {
+    field: String,
+    span: SimpleSpan,
+    cidl_type: CidlType,
+    format: String,
+    env_binding: String,
+}
+
 enum ModelField {
-    Primary(Vec<UnresolvedName>),
-    Unique(Vec<UnresolvedName>),
-    Foreign(ForeignKey),
-    Nav(D1NavigationProperty),
+    Primary(Vec<String>),
+    Unique(Vec<String>),
+    Foreign(PendingForeignKeyTag),
+    Nav(PendingNavTag),
     Field(SpannedTypedName),
-    KeyField(UnresolvedName),
-    KvField(KvR2),
-    R2Field(KvR2),
+    KeyField(String),
+    KvField(PendingKvR2Tag),
+    R2Field(PendingKvR2Tag),
 }
 
 /// Parses a block of the form:
@@ -37,7 +58,7 @@ enum ModelField {
 ///   [nav RelationName -> TargetModel::ident7, ident8, ...]
 /// }
 /// ```
-pub fn model_block<'t>() -> impl Parser<'t, &'t [Token], ModelBlock, Extra<'t>> {
+pub fn model_block<'t>(it: It) -> impl Parser<'t, &'t [Token], ModelBlock, Extra<'t>> {
     // @d1(binding)
     let d1_binding = just(Token::At)
         .ignore_then(just(Token::D1))
@@ -50,7 +71,7 @@ pub fn model_block<'t>() -> impl Parser<'t, &'t [Token], ModelBlock, Extra<'t>> 
     let primary_tag = just(Token::LBracket)
         .ignore_then(just(Token::Ident("primary".into())))
         .ignore_then(
-            select! { Token::Ident(name) => UnresolvedName(name) }
+            select! { Token::Ident(name) => name }
                 .separated_by(just(Token::Comma))
                 .at_least(1)
                 .collect::<Vec<_>>(),
@@ -62,7 +83,7 @@ pub fn model_block<'t>() -> impl Parser<'t, &'t [Token], ModelBlock, Extra<'t>> 
     let unique_tag = just(Token::LBracket)
         .ignore_then(just(Token::Ident("unique".into())))
         .ignore_then(
-            select! { Token::Ident(name) => UnresolvedName(name) }
+            select! { Token::Ident(name) => name }
                 .separated_by(just(Token::Comma))
                 .at_least(1)
                 .collect::<Vec<_>>(),
@@ -72,11 +93,11 @@ pub fn model_block<'t>() -> impl Parser<'t, &'t [Token], ModelBlock, Extra<'t>> 
 
     // [foreign ident1, ident2 -> TargetModel::ident3, ident4, ...]
     let foreign_tag = {
-        let target_field_ref = select! { Token::Ident(model_name) => UnresolvedName(model_name) }
+        let target_field_ref = select! { Token::Ident(model_name) => model_name }
             .then_ignore(just(Token::DoubleColon))
-            .then(select! { Token::Ident(field_name) => UnresolvedName(field_name) });
+            .then(select! { Token::Ident(field_name) => field_name });
 
-        let source_field_ref = select! { Token::Ident(name) => UnresolvedName(name) };
+        let source_field_ref = select! { Token::Ident(name) => name };
 
         let source_field_list = source_field_ref
             .clone()
@@ -103,15 +124,12 @@ pub fn model_block<'t>() -> impl Parser<'t, &'t [Token], ModelBlock, Extra<'t>> 
             .then(target_field_list)
             .then_ignore(just(Token::RBracket))
             .map(|(fields, target_refs)| {
-                // target_refs: Vec<(UnresolvedName, UnresolvedName)>
-                // fields: Vec<UnresolvedName>
-                // We expect the number of source fields and target_refs to match
                 let (adj_model, _) = target_refs.first().cloned().unwrap();
                 let references = fields
                     .into_iter()
                     .zip(target_refs.into_iter().map(|(_, f)| f))
                     .collect();
-                ModelField::Foreign(ForeignKey {
+                ModelField::Foreign(PendingForeignKeyTag {
                     adj_model,
                     references,
                 })
@@ -121,9 +139,9 @@ pub fn model_block<'t>() -> impl Parser<'t, &'t [Token], ModelBlock, Extra<'t>> 
     // [nav RelationName -> TargetModel::field1, field2, ...]
     // [nav RelationName <> TargetModel::field]
     let nav_tag = {
-        let nav_key_ref = select! { Token::Ident(model_name) => UnresolvedName(model_name) }
+        let nav_key_ref = select! { Token::Ident(model_name) => model_name }
             .then_ignore(just(Token::DoubleColon))
-            .then(select! { Token::Ident(field_name) => UnresolvedName(field_name) });
+            .then(select! { Token::Ident(field_name) => field_name });
 
         let nav_key_ref_list = nav_key_ref
             .clone()
@@ -137,14 +155,14 @@ pub fn model_block<'t>() -> impl Parser<'t, &'t [Token], ModelBlock, Extra<'t>> 
 
         let nav_arrow = just(Token::LBracket)
             .ignore_then(just(Token::Ident("nav".into())))
-            .ignore_then(select! { Token::Ident(name) => UnresolvedName(name) })
+            .ignore_then(select! { Token::Ident(name) => name })
             .then_ignore(just(Token::Arrow))
             .then(nav_key_ref_list)
             .then_ignore(just(Token::RBracket))
             .map(|(field, to)| {
-                let adj_model = UnresolvedName(to[0].0.0.clone());
+                let adj_model = to[0].0.clone();
                 let fields = to.into_iter().map(|(_, f)| f).collect::<Vec<_>>();
-                ModelField::Nav(D1NavigationProperty {
+                ModelField::Nav(PendingNavTag {
                     field,
                     adj_model,
                     fields,
@@ -154,13 +172,13 @@ pub fn model_block<'t>() -> impl Parser<'t, &'t [Token], ModelBlock, Extra<'t>> 
 
         let nav_many_to_many = just(Token::LBracket)
             .ignore_then(just(Token::Ident("nav".into())))
-            .ignore_then(select! { Token::Ident(name) => UnresolvedName(name) })
+            .ignore_then(select! { Token::Ident(name) => name })
             .then_ignore(just(Token::LAngle))
             .then_ignore(just(Token::RAngle))
             .then(nav_key_ref)
             .then_ignore(just(Token::RBracket))
             .map(|(field, (adj_model, f))| {
-                ModelField::Nav(D1NavigationProperty {
+                ModelField::Nav(PendingNavTag {
                     field,
                     adj_model,
                     fields: vec![f],
@@ -175,7 +193,7 @@ pub fn model_block<'t>() -> impl Parser<'t, &'t [Token], ModelBlock, Extra<'t>> 
     let kv_tag = just(Token::At)
         .ignore_then(just(Token::Kv))
         .ignore_then(just(Token::LParen))
-        .ignore_then(select! { Token::Ident(name) => UnresolvedName(name) })
+        .ignore_then(select! { Token::Ident(name) => name })
         .then_ignore(just(Token::Comma))
         .then(select! { Token::StringLit(value) => unquote_string_literal(value) })
         .then_ignore(just(Token::RParen));
@@ -184,7 +202,7 @@ pub fn model_block<'t>() -> impl Parser<'t, &'t [Token], ModelBlock, Extra<'t>> 
     let r2_tag = just(Token::At)
         .ignore_then(just(Token::R2))
         .ignore_then(just(Token::LParen))
-        .ignore_then(select! { Token::Ident(name) => UnresolvedName(name) })
+        .ignore_then(select! { Token::Ident(name) => name })
         .then_ignore(just(Token::Comma))
         .then(select! { Token::StringLit(value) => unquote_string_literal(value) })
         .then_ignore(just(Token::RParen));
@@ -192,7 +210,8 @@ pub fn model_block<'t>() -> impl Parser<'t, &'t [Token], ModelBlock, Extra<'t>> 
     // @keyparam
     let key_param_tag = just(Token::At).ignore_then(just(Token::Ident("keyparam".into())));
 
-    type Binding = (UnresolvedName, String);
+    let st_field = it.clone();
+    type Binding = (String, String);
     let field_tag = choice((
         key_param_tag.map(|_| (true, None::<Binding>, None::<Binding>)),
         kv_tag.map(|kv| (false, Some(kv), None)),
@@ -204,28 +223,29 @@ pub fn model_block<'t>() -> impl Parser<'t, &'t [Token], ModelBlock, Extra<'t>> 
     let field = field_tag
         .then(select! { Token::Ident(name) => name }.map_with(|name, e| (name, e.span())))
         .then_ignore(just(Token::Colon))
-        .then(cidl_type())
+        .then(cidl_type(st_field))
         .map(|(((key_param, kv, r2), (name, span)), cidl_type)| {
             if let Some((env_binding, format)) = kv {
-                ModelField::KvField(KvR2 {
-                    field: UnresolvedName(name),
+                ModelField::KvField(PendingKvR2Tag {
+                    field: name,
                     span,
                     cidl_type,
                     format,
                     env_binding,
                 })
             } else if let Some((env_binding, format)) = r2 {
-                ModelField::R2Field(KvR2 {
-                    field: UnresolvedName(name),
+                ModelField::R2Field(PendingKvR2Tag {
+                    field: name,
                     span,
                     cidl_type,
                     format,
                     env_binding,
                 })
             } else if key_param {
-                ModelField::KeyField(UnresolvedName(name))
+                ModelField::KeyField(name)
             } else {
                 ModelField::Field(SpannedTypedName {
+                    id: 0, // resolved in map_model
                     span,
                     name,
                     cidl_type,
@@ -242,42 +262,120 @@ pub fn model_block<'t>() -> impl Parser<'t, &'t [Token], ModelBlock, Extra<'t>> 
                 .collect::<Vec<_>>()
                 .delimited_by(just(Token::LBrace), just(Token::RBrace)),
         )
-        .map(|((d1_binding, (name, span)), items)| map_model(name, span, d1_binding, items))
+        .map(move |((d1_binding, (name, span)), items)| {
+            map_model(&it, name, span, d1_binding, items)
+        })
 }
 
 fn map_model(
+    it: &It,
     name: String,
     span: SimpleSpan,
     d1_binding: Option<String>,
     items: Vec<ModelField>,
 ) -> ModelBlock {
+    let model_scope = IdScope::Model(name.clone());
+    let id = it.borrow_mut().intern(name.clone(), IdScope::Global);
+    let d1_binding = d1_binding.map(|b| it.borrow_mut().intern(b, IdScope::Env));
+
     let mut fields: Vec<SpannedTypedName> = Vec::new();
-    let mut foreign_keys: Vec<ForeignKey> = Vec::new();
-    let mut navigation_properties: Vec<D1NavigationProperty> = Vec::new();
-    let mut primary_keys: Vec<UnresolvedName> = Vec::new();
-    let mut unique_constraints: Vec<Vec<UnresolvedName>> = Vec::new();
-    let mut key_fields: Vec<UnresolvedName> = Vec::new();
-    let mut kvs: Vec<KvR2> = Vec::new();
-    let mut r2s: Vec<KvR2> = Vec::new();
+    let mut foreign_keys: Vec<ForeignKeyTag> = Vec::new();
+    let mut navigation_properties: Vec<NavigationTag> = Vec::new();
+    let mut primary_keys = Vec::new();
+    let mut unique_constraints: Vec<Vec<_>> = Vec::new();
+    let mut key_fields = Vec::new();
+    let mut kvs: Vec<KvR2Tag> = Vec::new();
+    let mut r2s: Vec<KvR2Tag> = Vec::new();
 
     for item in items {
         match item {
-            ModelField::Primary(cols) => primary_keys.extend(cols),
-            ModelField::Unique(cols) => unique_constraints.push(cols),
-            ModelField::Foreign(fk) => foreign_keys.push(fk),
-            ModelField::Nav(nav) => navigation_properties.push(nav),
-            ModelField::Field(field) => fields.push(field),
-            ModelField::KeyField(name) => key_fields.push(name),
-            ModelField::KvField(kv) => kvs.push(kv),
-            ModelField::R2Field(r2) => r2s.push(r2),
+            ModelField::Primary(cols) => {
+                for col in cols {
+                    primary_keys.push(it.borrow_mut().intern(col, model_scope.clone()));
+                }
+            }
+            ModelField::Unique(cols) => {
+                let refs = cols
+                    .into_iter()
+                    .map(|c| it.borrow_mut().intern(c, model_scope.clone()))
+                    .collect();
+                unique_constraints.push(refs);
+            }
+            ModelField::Foreign(fk) => {
+                let adj_model = it
+                    .borrow_mut()
+                    .intern(fk.adj_model.clone(), IdScope::Global);
+                let adj_scope = IdScope::Model(fk.adj_model);
+                let references = fk
+                    .references
+                    .into_iter()
+                    .map(|(src, tgt)| {
+                        let src_ref = it.borrow_mut().intern(src, model_scope.clone());
+                        let tgt_ref = it.borrow_mut().intern(tgt, adj_scope.clone());
+                        (src_ref, tgt_ref)
+                    })
+                    .collect();
+                foreign_keys.push(ForeignKeyTag {
+                    adj_model,
+                    references,
+                });
+            }
+            ModelField::Nav(nav) => {
+                let field = it.borrow_mut().intern(nav.field, model_scope.clone());
+                let adj_model = it
+                    .borrow_mut()
+                    .intern(nav.adj_model.clone(), IdScope::Global);
+                let adj_scope = IdScope::Model(nav.adj_model);
+                let fields_refs = nav
+                    .fields
+                    .into_iter()
+                    .map(|f| it.borrow_mut().intern(f, adj_scope.clone()))
+                    .collect();
+                navigation_properties.push(NavigationTag {
+                    field,
+                    adj_model,
+                    fields: fields_refs,
+                    is_many_to_many: nav.is_many_to_many,
+                });
+            }
+            ModelField::Field(mut f) => {
+                f.id = it.borrow_mut().intern(f.name.clone(), model_scope.clone());
+                fields.push(f);
+            }
+            ModelField::KeyField(n) => {
+                key_fields.push(it.borrow_mut().intern(n, model_scope.clone()));
+            }
+            ModelField::KvField(kv) => {
+                let field = it.borrow_mut().intern(kv.field, model_scope.clone());
+                let env_binding = it.borrow_mut().intern(kv.env_binding, IdScope::Env);
+                kvs.push(KvR2Tag {
+                    field,
+                    span: kv.span,
+                    cidl_type: kv.cidl_type,
+                    format: kv.format,
+                    env_binding,
+                });
+            }
+            ModelField::R2Field(r2) => {
+                let field = it.borrow_mut().intern(r2.field, model_scope.clone());
+                let env_binding = it.borrow_mut().intern(r2.env_binding, IdScope::Env);
+                r2s.push(KvR2Tag {
+                    field,
+                    span: r2.span,
+                    cidl_type: r2.cidl_type,
+                    format: r2.format,
+                    env_binding,
+                });
+            }
         }
     }
 
     ModelBlock {
+        id,
         span,
         name,
-        file: PathBuf::new(), // TODO
-        d1_binding: d1_binding.map(UnresolvedName),
+        file: PathBuf::new(),
+        d1_binding,
         fields,
         primary_keys,
         key_fields,

@@ -1,197 +1,148 @@
-use ast::{CidlType, CloesceAst, FileSpan, ForeignKey, Model, Symbol, WranglerEnv, WranglerSpec};
+use ast::{
+    CidlType, CloesceAst, FileSpan, ForeignKey, Model, Symbol, SymbolKind, SymbolRef, WranglerEnv,
+    WranglerEnvBindingKind, WranglerSpec,
+};
 use frontend::{ModelBlock, ParseAst};
 
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::{
+    collections::{BTreeMap, HashMap, HashSet},
+    ops::Not,
+};
 
 use crate::err::{BatchResult, CompilerErrorKind, ErrorSink};
 
 pub mod err;
 
-#[derive(Clone)]
-enum SymbolScope {
-    Global,
-    Env,
-    Inject,
-    Model(String),
-    DataSource(String),
-    Service(String),
-    PlainOldObject(String),
-    // Api { namespace: String, method: String },
-}
-
-#[derive(Default)]
-struct SymbolTable {
-    table: HashMap<String, Symbol>,
+pub struct SymbolTable {
+    table: HashMap<SymbolRef, Symbol>,
 }
 
 impl SymbolTable {
-    fn _key(name: &str, scope: &SymbolScope) -> String {
-        match scope {
-            SymbolScope::Global => format!("global::{}", name),
-            SymbolScope::Env => format!("env::{}", name),
-            SymbolScope::Inject => format!("inject::{}", name),
-            SymbolScope::Model(model_name) => format!("{}::{}", model_name, name),
-            SymbolScope::Service(service_name) => format!("{}::{}", service_name, name),
-            SymbolScope::PlainOldObject(poo_name) => format!("{}::{}", poo_name, name),
-            SymbolScope::DataSource(model_name) => format!("{}::{}", model_name, name),
-        }
-    }
-
-    fn intern(
-        &mut self,
-        name: String,
-        scope: SymbolScope,
-        span: FileSpan,
-        cidl_type: Option<CidlType>,
-    ) -> Symbol {
-        if let Some(existing) = self.lookup(&name, scope.clone()) {
-            return existing.clone();
-        }
-
-        let symbol = Symbol {
-            id: self.table.len(),
-            name: name.clone(),
-            span,
-            cidl_type: cidl_type.unwrap_or_default(),
+    /// Converts all declared [ParseId]s into [Symbol]s, catching surface errors along the way
+    fn from_parse(parse: &ParseAst, sink: &mut ErrorSink) -> BatchResult<SymbolTable> {
+        let mut table = SymbolTable {
+            table: HashMap::new(),
         };
 
-        self.table.insert(Self::_key(&name, &scope), symbol.clone());
-        symbol
-    }
-
-    fn lookup(&self, name: &str, scope: SymbolScope) -> Option<&Symbol> {
-        let key = Self::_key(name, &scope);
-        self.table.get(&key)
-    }
-
-    /// Interns all global symbols
-    fn from_parse(parse: &ParseAst) -> SymbolTable {
-        let mut table = SymbolTable::default();
-
-        for model in &parse.models {
-            table.intern(
-                model.name.clone(),
-                SymbolScope::Global,
-                FileSpan {
-                    start: model.span.start,
-                    end: model.span.end,
-                    file: model.file.clone(),
-                },
-                None,
-            );
-        }
-
-        for service in &parse.services {
-            table.intern(
-                service.name.clone(),
-                SymbolScope::Global,
-                FileSpan {
-                    start: service.span.start,
-                    end: service.span.end,
-                    file: service.file.clone(),
-                },
-                None,
-            );
-        }
-
-        for poo in &parse.poos {
-            table.intern(
-                poo.name.clone(),
-                SymbolScope::Global,
-                FileSpan {
-                    start: poo.span.start,
-                    end: poo.span.end,
-                    file: poo.file.clone(),
-                },
-                None,
-            );
-        }
-
-        for ds in &parse.sources {
-            table.intern(
-                ds.name.clone(),
-                SymbolScope::DataSource(ds.model.0.clone()),
-                FileSpan {
-                    start: ds.span.start,
-                    end: ds.span.end,
-                    file: ds.file.clone(),
-                },
-                None,
-            );
-        }
-
-        // All fields under the WranglerEnv are global in scope under "env"
         for env in &parse.wrangler_envs {
-            for d1 in &env.d1_bindings {
-                table.intern(
-                    d1.name.clone(),
-                    SymbolScope::Env,
-                    FileSpan {
-                        start: d1.span.start,
-                        end: d1.span.end,
-                        file: env.file.clone(),
-                    },
-                    None,
-                );
+            let symbol = Symbol {
+                id: env.id,
+                name: String::default(),
+                span: FileSpan {
+                    start: env.span.start,
+                    end: env.span.end,
+                    file: env.file.clone(),
+                },
+                kind: SymbolKind::WranglerEnvDecl,
+            };
+
+            if let Some(existing) = table.table.insert(env.id, symbol) {
+                sink.push(CompilerErrorKind::DuplicateSymbol);
+                table.table.insert(env.id, existing);
             }
 
-            for kv in &env.kv_bindings {
-                table.intern(
-                    kv.name.clone(),
-                    SymbolScope::Env,
-                    FileSpan {
-                        start: kv.span.start,
-                        end: kv.span.end,
-                        file: env.file.clone(),
-                    },
-                    None,
+            let bindings = env
+                .d1_bindings
+                .iter()
+                .map(|b| (b, WranglerEnvBindingKind::D1))
+                .chain(
+                    env.kv_bindings
+                        .iter()
+                        .map(|b| (b, WranglerEnvBindingKind::KV)),
+                )
+                .chain(
+                    env.r2_bindings
+                        .iter()
+                        .map(|b| (b, WranglerEnvBindingKind::R2)),
                 );
-            }
 
-            for r2 in &env.r2_bindings {
-                table.intern(
-                    r2.name.clone(),
-                    SymbolScope::Env,
-                    FileSpan {
-                        start: r2.span.start,
-                        end: r2.span.end,
+            for binding in bindings {
+                let symbol = Symbol {
+                    id: binding.0.id,
+                    name: binding.0.name.clone(),
+                    span: FileSpan {
+                        start: binding.0.span.start,
+                        end: binding.0.span.end,
                         file: env.file.clone(),
                     },
-                    None,
-                );
+                    kind: SymbolKind::WranglerEnvBinding {
+                        kind: binding.1.clone(),
+                    },
+                };
+
+                if let Some(existing) = table.table.insert(binding.0.id, symbol) {
+                    sink.push(CompilerErrorKind::DuplicateSymbol);
+                    table.table.insert(binding.0.id, existing);
+                }
             }
 
             for var in &env.vars {
-                table.intern(
-                    var.name.clone(),
-                    SymbolScope::Env,
-                    FileSpan {
+                let symbol = Symbol {
+                    id: var.id,
+                    name: var.name.clone(),
+                    span: FileSpan {
                         start: var.span.start,
                         end: var.span.end,
                         file: env.file.clone(),
                     },
-                    None,
-                );
-            }
-        }
-
-        // All fields in an Inject block are global in scope under "inject"
-        for inject in &parse.injects {
-            for injectable in inject.names.iter() {
-                table.intern(
-                    injectable.clone(),
-                    SymbolScope::Inject,
-                    FileSpan {
-                        start: inject.span.start,
-                        end: inject.span.end,
-                        file: inject.file.clone(),
+                    kind: SymbolKind::WranglerEnvVar {
+                        cidl_type: var.cidl_type.clone(),
                     },
-                    None,
-                );
+                };
+
+                if let Some(existing) = table.table.insert(var.id, symbol) {
+                    sink.push(CompilerErrorKind::DuplicateSymbol);
+                    table.table.insert(var.id, existing);
+                }
             }
         }
 
-        table
+        for model in &parse.models {
+            let symbol = Symbol {
+                id: model.id,
+                name: model.name.clone(),
+                span: FileSpan {
+                    start: model.span.start,
+                    end: model.span.end,
+                    file: model.file.clone(),
+                },
+                kind: SymbolKind::ModelDecl,
+            };
+
+            if let Some(existing) = table.table.insert(model.id, symbol) {
+                sink.push(CompilerErrorKind::DuplicateSymbol);
+                table.table.insert(model.id, existing);
+            }
+
+            for field in &model.fields {
+                let symbol = Symbol {
+                    id: field.id,
+                    name: field.name.clone(),
+                    span: FileSpan {
+                        start: field.span.start,
+                        end: field.span.end,
+                        file: model.file.clone(),
+                    },
+                    kind: SymbolKind::ModelField {
+                        parent: model.id,
+                        cidl_type: field.cidl_type.clone(),
+                    },
+                };
+
+                if let Some(existing) = table.table.insert(field.id, symbol) {
+                    sink.push(CompilerErrorKind::DuplicateSymbol);
+                    table.table.insert(field.id, existing);
+                }
+            }
+        }
+
+        // TODO: rest
+
+        Ok(table)
+    }
+
+    fn lookup(&self, id: usize) -> Option<&Symbol> {
+        self.table.get(&id)
     }
 }
 
@@ -200,17 +151,18 @@ type AdjacencyList<'a> = BTreeMap<&'a str, Vec<&'a str>>;
 pub struct SemanticAnalysis;
 impl SemanticAnalysis {
     pub fn analyze(parse: ParseAst, spec: &WranglerSpec) -> BatchResult<()> {
-        let mut table = SymbolTable::from_parse(&parse);
         let mut sink = ErrorSink::new();
         let mut ast = CloesceAst::default();
 
+        let mut table = SymbolTable::from_parse(&parse, &mut sink)?;
+
         let wrangler_env = Self::wrangler(&parse, &mut table, spec, &mut sink)?;
 
-        let models = Self::models(&parse, &mut table, wrangler_env.as_ref(), &mut sink);
+        let models = Self::models(&parse, &mut table, &mut sink);
 
         sink.finish()?;
 
-        todo!()
+        Ok(())
     }
 
     /// Validates:
@@ -254,14 +206,7 @@ impl SemanticAnalysis {
                 CompilerErrorKind::WranglerBindingInconsistentWithSpec
             );
 
-            let symbol = table
-                .lookup(var.name.as_str(), SymbolScope::Env)
-                .expect("Global symbols to exist");
-            ensure_sink!(
-                vars.insert(symbol.clone()),
-                sink,
-                CompilerErrorKind::DuplicateSymbol
-            )
+            vars.insert(var.id);
         }
 
         for db in &parsed_env.d1_bindings {
@@ -273,14 +218,7 @@ impl SemanticAnalysis {
                 CompilerErrorKind::WranglerBindingInconsistentWithSpec
             );
 
-            let symbol = table
-                .lookup(db.name.as_str(), SymbolScope::Env)
-                .expect("Global symbols to exist");
-            ensure_sink!(
-                d1_bindings.insert(symbol.clone()),
-                sink,
-                CompilerErrorKind::DuplicateSymbol
-            )
+            d1_bindings.insert(db.id);
         }
 
         for kv in &parsed_env.kv_bindings {
@@ -292,14 +230,7 @@ impl SemanticAnalysis {
                 CompilerErrorKind::WranglerBindingInconsistentWithSpec
             );
 
-            let symbol = table
-                .lookup(kv.name.as_str(), SymbolScope::Env)
-                .expect("Global symbols to exist");
-            ensure_sink!(
-                kv_bindings.insert(symbol.clone()),
-                sink,
-                CompilerErrorKind::DuplicateSymbol
-            )
+            kv_bindings.insert(kv.id);
         }
 
         for r2 in &parsed_env.r2_bindings {
@@ -311,83 +242,34 @@ impl SemanticAnalysis {
                 CompilerErrorKind::WranglerBindingInconsistentWithSpec
             );
 
-            let symbol = table
-                .lookup(r2.name.as_str(), SymbolScope::Env)
-                .expect("Global symbols to exist");
-
-            ensure_sink!(
-                r2_bindings.insert(symbol.clone()),
-                sink,
-                CompilerErrorKind::DuplicateSymbol
-            )
+            r2_bindings.insert(r2.id);
         }
 
-        // No symbol can be bound to multiple Wrangler environment variable types (D1, KV or R2) because that would cause ambiguity in codegen
-        {
-            let intersect = [&d1_bindings, &kv_bindings, &r2_bindings]
-                .into_iter()
-                .fold(None, |acc: Option<HashSet<Symbol>>, set| match acc {
-                    None => Some(set.clone()),
-                    Some(a) => Some(a.intersection(set).cloned().collect::<HashSet<Symbol>>()),
-                })
-                .unwrap();
-
-            ensure_sink!(
-                intersect.is_empty(),
-                sink,
-                CompilerErrorKind::DuplicateSymbol
-            );
-        }
-
-        let env = {
-            let symbol = table.intern(
-                "$env".to_string(),
-                SymbolScope::Global,
-                FileSpan {
-                    start: parsed_env.span.start,
-                    end: parsed_env.span.end,
-                    file: parsed_env.file.clone(),
-                },
-                None,
-            );
-
-            WranglerEnv {
-                symbol,
-                d1_bindings: d1_bindings,
-                kv_bindings: kv_bindings,
-                r2_bindings: r2_bindings,
-                vars: vars,
-            }
-        };
-
-        Ok(Some(env))
+        Ok(Some(WranglerEnv {
+            symbol: parsed_env.id,
+            d1_bindings: d1_bindings,
+            kv_bindings: kv_bindings,
+            r2_bindings: r2_bindings,
+            vars: vars,
+        }))
     }
 
     fn models(
         parse: &ParseAst,
         table: &mut SymbolTable,
-        env: Option<&WranglerEnv>,
         sink: &mut ErrorSink,
-    ) -> BatchResult<HashMap<Symbol, Model>> {
+    ) -> BatchResult<HashMap<SymbolRef, Model>> {
         let mut models = HashMap::new();
-        let Some(env) = env else {
-            return Ok(models);
-        };
 
-        let mut d1_model_blocks = HashMap::<Symbol, &ModelBlock>::new();
+        let mut d1_model_blocks = HashMap::<SymbolRef, &ModelBlock>::new();
         for model in &parse.models {
-            let symbol = table
-                .lookup(model.name.as_str(), SymbolScope::Global)
-                .expect("Global symbols to exist")
-                .clone();
-
             if model.d1_binding.is_some()
                 || model.primary_keys.len() > 0
                 || model.fields.len() > 0
                 || model.navigation_properties.len() > 0
                 || model.foreign_keys.len() > 0
             {
-                d1_model_blocks.insert(symbol.clone(), model);
+                d1_model_blocks.insert(model.id, model);
             }
 
             if model.kvs.len() > 0 || model.r2s.len() > 0 {
@@ -396,7 +278,7 @@ impl SemanticAnalysis {
         }
 
         if !d1_model_blocks.is_empty() {
-            Self::d1_models(&mut models, d1_model_blocks, env, table, sink)?;
+            Self::d1_models(&mut models, d1_model_blocks, table, sink)?;
             // d1_models.sort_by_key(|m| rank.get(m.name.as_str()).unwrap_or(&usize::MAX));
         }
 
@@ -404,37 +286,42 @@ impl SemanticAnalysis {
     }
 
     fn d1_models(
-        models: &mut HashMap<Symbol, Model>,
-        d1_model_blocks: HashMap<Symbol, &ModelBlock>,
-        env: &WranglerEnv,
+        models: &mut HashMap<SymbolRef, Model>,
+        d1_model_blocks: HashMap<SymbolRef, &ModelBlock>,
         table: &mut SymbolTable,
         sink: &mut ErrorSink,
     ) -> BatchResult<()> {
         // Topo sort and cycle detection
-        let mut in_degree = BTreeMap::<Symbol, usize>::new();
-        let mut graph = BTreeMap::<Symbol, Vec<Symbol>>::new();
+        let mut in_degree = BTreeMap::<SymbolRef, usize>::new();
+        let mut graph = BTreeMap::<SymbolRef, Vec<SymbolRef>>::new();
 
         // Maps a field foreign key reference to the model it is referencing
         // Ie, Person.dogId => { (Person, dogId): "Dog" }
-        let mut model_field_to_adj_model = HashMap::<(Symbol, Symbol), Symbol>::new();
+        let mut model_field_to_adj_model = HashMap::<(SymbolRef, SymbolRef), SymbolRef>::new();
         // let mut unvalidated_navs = Vec::new();
 
         // Maps a m2m unique id to the models that reference the id
         // let mut m2m = HashMap::<String, Vec<&String>>::new();
 
-        for (model_sym, model_block) in &d1_model_blocks {
+        for model_block in d1_model_blocks.values() {
             let Some(d1_binding) = &model_block.d1_binding else {
                 sink.push(CompilerErrorKind::D1ModelMissingD1Binding);
                 continue;
             };
 
-            let Some(binding_symbol) = table.lookup(&d1_binding.0, SymbolScope::Env).cloned()
-            else {
+            let Some(binding_symbol) = table.lookup(*d1_binding) else {
                 sink.push(CompilerErrorKind::UnresolvedSymbol);
                 continue;
             };
 
-            if !env.d1_bindings.contains(&binding_symbol) {
+            if matches!(
+                binding_symbol.kind,
+                SymbolKind::WranglerEnvBinding {
+                    kind: WranglerEnvBindingKind::D1
+                }
+            )
+            .not()
+            {
                 sink.push(CompilerErrorKind::D1ModelInvalidD1Binding);
                 continue;
             }
@@ -445,34 +332,18 @@ impl SemanticAnalysis {
                 continue;
             }
 
-            // Validate columns
+            // Validate columns + intern all fields
             let mut columns = HashSet::new();
             let mut primary_key_columns = HashSet::new();
             for field in &model_block.fields {
                 if !is_valid_sql_type(&field.cidl_type) {
-                    sink.push(CompilerErrorKind::InvalidColumnType);
-
-                    // TODO: nav props, kv/r2 objects, key params
+                    // Type cannot be a SQL column
                     continue;
                 }
 
-                let symbol = table.intern(
-                    field.name.clone(),
-                    SymbolScope::Model(model_block.name.clone()),
-                    FileSpan {
-                        start: field.span.start,
-                        end: field.span.end,
-                        file: model_block.file.clone(),
-                    },
-                    Some(field.cidl_type.clone()),
-                );
+                columns.insert(field.id);
 
-                if !columns.insert(symbol.clone()) {
-                    sink.push(CompilerErrorKind::DuplicateSymbol);
-                    continue;
-                }
-
-                let is_pk = model_block.primary_keys.iter().any(|pk| pk.0 == field.name);
+                let is_pk = model_block.primary_keys.iter().any(|id| *id == field.id);
                 if is_pk {
                     ensure_sink!(
                         !field.cidl_type.is_nullable(),
@@ -480,33 +351,175 @@ impl SemanticAnalysis {
                         CompilerErrorKind::NullablePrimaryKey
                     );
 
-                    primary_key_columns.insert(symbol);
+                    primary_key_columns.insert(field.id);
                 }
             }
 
-            graph.entry(model_sym.clone()).or_default();
-            in_degree.entry(model_sym.clone()).or_insert(0);
+            graph.entry(model_block.id).or_default();
+            in_degree.entry(model_block.id).or_insert(0);
 
             // Validate foreign keys
             let mut foreign_keys = Vec::new();
-            let mut fk_columns_seen = HashSet::<Symbol>::new();
+            let mut fk_columns_seen = HashSet::<SymbolRef>::new();
             for fk in &model_block.foreign_keys {
-                let Some(adj_model_sym) =
-                    table.lookup(&fk.adj_model.0, SymbolScope::Global).cloned()
-                else {
+                if table.lookup(fk.adj_model).is_none() {
                     sink.push(CompilerErrorKind::UnresolvedSymbol);
                     continue;
                 };
 
-                if adj_model_sym == *model_sym {
+                let Some(adj_model) = d1_model_blocks.get(&fk.adj_model) else {
+                    sink.push(CompilerErrorKind::ForeignKeyReferencesNonD1Model);
+                    continue;
+                };
+
+                if fk.adj_model == model_block.id {
                     sink.push(CompilerErrorKind::ForeignKeyReferenceSelf);
                     continue;
                 }
 
-                let Some(adj_model) = d1_model_blocks.get(&adj_model_sym) else {
+                // Must belong to the same database
+                if model_block.d1_binding != adj_model.d1_binding {
+                    sink.push(CompilerErrorKind::ForeignKeyReferencesDifferentDatabase);
+                    continue;
+                }
+
+                let is_nullable = {
+                    let Some(first_field) = table.lookup(fk.references.first().unwrap().0) else {
+                        sink.push(CompilerErrorKind::ForeignKeyReferencesInvalidOrUnknownColumn);
+                        continue;
+                    };
+
+                    let SymbolKind::ModelField { parent, cidl_type } = &first_field.kind else {
+                        sink.push(CompilerErrorKind::ForeignKeyReferencesInvalidOrUnknownColumn);
+                        continue;
+                    };
+
+                    cidl_type.is_nullable()
+                };
+
+                let mut fk_columns = Vec::new();
+                for (field, adj_field) in &fk.references {
+                    let Some(field_symbol) = table.lookup(*field) else {
+                        sink.push(CompilerErrorKind::ForeignKeyReferencesInvalidOrUnknownColumn);
+                        continue;
+                    };
+
+                    let SymbolKind::ModelField { cidl_type, .. } = &field_symbol.kind else {
+                        sink.push(CompilerErrorKind::ForeignKeyReferencesInvalidOrUnknownColumn);
+                        continue;
+                    };
+
+                    if !fk_columns_seen.insert(field_symbol.id) {
+                        sink.push(CompilerErrorKind::ForeignKeyColumnAlreadyInForeignKey);
+                        continue;
+                    }
+
+                    fk_columns.push(field_symbol.id);
+
+                    let Some(adj_field) = adj_model.fields.iter().find(|f| f.id == *adj_field)
+                    else {
+                        sink.push(CompilerErrorKind::ForeignKeyReferencesInvalidOrUnknownColumn);
+                        continue;
+                    };
+
+                    // Nullability must be consistent between all FK columns
+                    if cidl_type.is_nullable() != is_nullable {
+                        sink.push(CompilerErrorKind::ForeignKeyInconsistentNullability);
+                        continue;
+                    }
+
+                    // All columns in a foreign key must be valid SQL types
+                    if !is_valid_sql_type(&cidl_type) {
+                        sink.push(CompilerErrorKind::InvalidColumnType);
+                        continue;
+                    }
+
+                    // Types must be equal (comparing root types to allow nullable FKs)
+                    if cidl_type.root_type() != adj_field.cidl_type.root_type() {
+                        sink.push(CompilerErrorKind::ForeignKeyReferencesIncompatibleColumnType);
+                        continue;
+                    }
+
+                    model_field_to_adj_model
+                        .insert((field_symbol.id, model_block.id), adj_model.id);
+
+                    if !cidl_type.is_nullable() {
+                        // One To One: Person has a Dog ..(sql)=> Person has a fk to Dog
+                        // Dog must come before Person
+                        graph.entry(fk.adj_model).or_default().push(model_block.id);
+                        *in_degree.entry(model_block.id).or_insert(0) += 1;
+                    }
+                }
+
+                foreign_keys.push(ForeignKey {
+                    adj_model: fk.adj_model,
+                    columns: fk_columns,
+                });
+            }
+
+            // Validate navigation properties
+            let mut navigation_properties = Vec::new();
+            for nav in &model_block.navigation_properties {
+                let Some(nav_field_sym) = table.lookup(nav.field) else {
+                    sink.push(CompilerErrorKind::UnresolvedSymbol);
+                    continue;
+                };
+
+                let SymbolKind::ModelField { parent, cidl_type } = &nav_field_sym.kind else {
+                    sink.push(
+                        CompilerErrorKind::NavigationPropertyReferencesInvalidOrUnknownColumn,
+                    );
+                    continue;
+                };
+
+                // A nav property must exist on this model
+                if model_block.id != *parent {
+                    sink.push(
+                        CompilerErrorKind::NavigationPropertyReferencesInvalidOrUnknownColumn,
+                    );
+                    continue;
+                }
+
+                let Some(adj_model_sym) = table.lookup(nav.adj_model) else {
+                    sink.push(CompilerErrorKind::UnresolvedSymbol);
+                    continue;
+                };
+
+                if adj_model_sym.id == model_block.id {
+                    sink.push(CompilerErrorKind::NavigationPropertyReferencesSelf);
+                    continue;
+                }
+
+                let Some(adj_model) = d1_model_blocks.get(&adj_model_sym.id) else {
                     sink.push(CompilerErrorKind::ForeignKeyReferencesNonD1Model);
                     continue;
                 };
+
+                let referenced_fields = nav
+                    .fields
+                    .iter()
+                    .filter_map(|f| {
+                        let Some(field_sym) = table.lookup(*f) else {
+                            sink.push(
+                                CompilerErrorKind::NavigationPropertyReferencesInvalidOrUnknownColumn,
+                            );
+                            return None;
+                        };
+
+                        if !columns.contains(&field_sym.id) {
+                            sink.push(
+                                CompilerErrorKind::NavigationPropertyReferencesInvalidOrUnknownColumn,
+                            );
+                            return None;
+                        }
+
+                        Some(field_sym)
+                    })
+                    .collect::<Vec<&Symbol>>();
+                if referenced_fields.len() != nav.fields.len() {
+                    // Some referenced fields were invalid, errors caught above
+                    continue;
+                }
 
                 // Ensure both models belong to the same database
                 if model_block.d1_binding != adj_model.d1_binding {
@@ -514,82 +527,30 @@ impl SemanticAnalysis {
                     continue;
                 }
 
-                let is_nullable = {
-                    let Some(first_field) = table.lookup(
-                        &fk.references.first().unwrap().0.0,
-                        SymbolScope::Model(model_block.name.clone()),
-                    ) else {
-                        sink.push(CompilerErrorKind::ForeignKeyReferencesInvalidOrUnknownColumn);
-                        continue;
-                    };
-
-                    first_field.cidl_type.is_nullable()
-                };
-
-                let mut fk_columns = Vec::new();
-                for (field_name, adj_field_name) in &fk.references {
-                    let Some(field) =
-                        table.lookup(&field_name.0, SymbolScope::Model(model_block.name.clone()))
-                    else {
-                        sink.push(CompilerErrorKind::ForeignKeyReferencesInvalidOrUnknownColumn);
-                        continue;
-                    };
-
-                    if !fk_columns_seen.insert(field.clone()) {
-                        sink.push(CompilerErrorKind::ForeignKeyColumnAlreadyInForeignKey);
-                        continue;
-                    }
-
-                    fk_columns.push(field.clone());
-
-                    let Some(adj_field) =
-                        adj_model.fields.iter().find(|f| f.name == adj_field_name.0)
-                    else {
-                        sink.push(CompilerErrorKind::ForeignKeyReferencesInvalidOrUnknownColumn);
-                        continue;
-                    };
-
-                    // Nullability must be consistent between all FK columns
-                    if field.cidl_type.is_nullable() != is_nullable {
-                        sink.push(CompilerErrorKind::ForeignKeyInconsistentNullability);
-                        continue;
-                    }
-
-                    // Types must be equal (comparing root types to allow nullable FKs)
-                    if field.cidl_type.root_type() != adj_field.cidl_type.root_type() {
-                        sink.push(CompilerErrorKind::ForeignKeyReferencesIncompatibleColumnType);
-                        continue;
-                    }
-
-                    model_field_to_adj_model
-                        .insert((field.clone(), model_sym.clone()), adj_model_sym.clone());
-
-                    if !field.cidl_type.is_nullable() {
-                        // One To One: Person has a Dog ..(sql)=> Person has a fk to Dog
-                        // Dog must come before Person
-                        graph
-                            .entry(adj_model_sym.clone())
-                            .or_default()
-                            .push(model_sym.clone());
-                        *in_degree.entry(model_sym.clone()).or_insert(0) += 1;
-                    }
-                }
-
-                foreign_keys.push(ForeignKey {
-                    adj_model: adj_model_sym,
-                    columns: fk_columns,
-                });
+                // // A nav field must be of cidl type Object, that Object must be the adjacent model OR an array of the adjacent model
+                // let name = match &nav_field.cidl_type {
+                //     CidlType::Object(name) => {
+                //         // Must be a model name
+                //     }
+                //     _ => {
+                //         sink.push(
+                //             CompilerErrorKind::NavigationPropertyReferencesInvalidOrUnknownColumn,
+                //         );
+                //         continue;
+                //     }
+                // };
             }
 
             models.insert(
-                model_sym.clone(),
+                model_block.id,
                 Model {
                     hash: 0,
-                    symbol: model_sym.clone(),
-                    d1_binding: Some(binding_symbol),
+                    symbol: model_block.id,
+                    d1_binding: Some(*d1_binding),
                     columns,
                     primary_key_columns,
                     foreign_keys,
+                    navigation_properties,
                 },
             );
         }

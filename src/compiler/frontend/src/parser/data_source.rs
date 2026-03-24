@@ -6,9 +6,9 @@ use chumsky::prelude::*;
 use ast::CidlType;
 
 use crate::{
-    DataSourceBlock, DataSourceMethod, IncludeTree, SpannedTypedName, UnresolvedName,
+    DataSourceBlock, DataSourceBlockMethod, IncludeTree, SpannedTypedName,
     lexer::Token,
-    parser::{Extra, cidl_type},
+    parser::{Extra, It, IdScope, cidl_type},
 };
 
 enum PendingSqlParam {
@@ -23,24 +23,12 @@ enum PendingSqlParam {
 ///
 /// ```cloesce
 /// source SourceName for ModelName {
-///     include {
-///         ident1,
-///         ident2,
-///         ident3 {
-///             ident4, ...
-///         }
-///     }
-///
-///     sql get(ident5: cidl_type, ...) {
-///         "..."
-///     }
-///
-///     sql list(ident7: cidl_type, ...) {
-///         "..."
-///     }
+///     include { ... }
+///     sql get(ident: cidl_type, ...) { "..." }
+///     sql list(ident: cidl_type, ...) { "..." }
 /// }
 /// ```
-pub fn data_source_block<'t>() -> impl Parser<'t, &'t [Token], DataSourceBlock, Extra<'t>> {
+pub fn data_source_block<'t>(it: It) -> impl Parser<'t, &'t [Token], DataSourceBlock, Extra<'t>> {
     // ident | ident { ... }
     let include_entry = recursive(|entry| {
         select! { Token::Ident(name) => name }
@@ -73,12 +61,17 @@ pub fn data_source_block<'t>() -> impl Parser<'t, &'t [Token], DataSourceBlock, 
             .delimited_by(just(Token::LBrace), just(Token::RBrace)),
     );
 
+    let st_get = it.clone();
+    let st_list = it.clone();
+    let st_map = it.clone();
+
     // ident: cidl_type
-    let named_parameter = || {
+    let named_parameter = move || {
+        let st_p = st_get.clone();
         select! { Token::Ident(name) => name }
             .map_with(|name, e| (name, e.span()))
             .then_ignore(just(Token::Colon))
-            .then(cidl_type())
+            .then(cidl_type(st_p))
             .map(|((name, name_span), cidl_type)| PendingSqlParam::Field {
                 name,
                 span: name_span,
@@ -91,7 +84,7 @@ pub fn data_source_block<'t>() -> impl Parser<'t, &'t [Token], DataSourceBlock, 
         .delimited_by(just(Token::LBrace), just(Token::RBrace));
 
     // sql get(ident: cidl_type, ...) { "..." }
-    let method_params = || {
+    let method_params = move || {
         named_parameter()
             .separated_by(just(Token::Comma))
             .allow_trailing()
@@ -105,10 +98,29 @@ pub fn data_source_block<'t>() -> impl Parser<'t, &'t [Token], DataSourceBlock, 
         .ignore_then(method_params())
         .then(sql_block.clone());
 
+    let named_parameter_list = move || {
+        let st_p = st_list.clone();
+        select! { Token::Ident(name) => name }
+            .map_with(|name, e| (name, e.span()))
+            .then_ignore(just(Token::Colon))
+            .then(cidl_type(st_p))
+            .map(|((name, name_span), cidl_type)| PendingSqlParam::Field {
+                name,
+                span: name_span,
+                cidl_type,
+            })
+    };
+
     // sql list(...) { ... }
     let list_method = just(Token::Sql)
         .then_ignore(just(Token::Ident("list".into())))
-        .ignore_then(method_params())
+        .ignore_then(
+            named_parameter_list()
+                .separated_by(just(Token::Comma))
+                .allow_trailing()
+                .collect::<Vec<_>>()
+                .delimited_by(just(Token::LParen), just(Token::RParen)),
+        )
         .then(sql_block);
 
     // source SourceName for ModelName { ... }
@@ -123,8 +135,9 @@ pub fn data_source_block<'t>() -> impl Parser<'t, &'t [Token], DataSourceBlock, 
                 .delimited_by(just(Token::LBrace), just(Token::RBrace)),
         )
         .map_with(
-            |((name, model), ((include_entries, get_method), list_method)), e| {
+            move |((name, model), ((include_entries, get_method), list_method)), e| {
                 map_data_source(
+                    &st_map,
                     name,
                     model,
                     include_entries,
@@ -137,6 +150,7 @@ pub fn data_source_block<'t>() -> impl Parser<'t, &'t [Token], DataSourceBlock, 
 }
 
 fn map_data_source(
+    it: &It,
     name: String,
     model: String,
     include_entries: Vec<(String, IncludeTree)>,
@@ -144,7 +158,10 @@ fn map_data_source(
     list_method: Option<(Vec<PendingSqlParam>, String)>,
     span: SimpleSpan,
 ) -> DataSourceBlock {
+    let id = it.borrow_mut().intern(name.clone(), IdScope::Global);
+    let model_ref = it.borrow_mut().intern(model, IdScope::Global);
     let tree = IncludeTree(include_entries.into_iter().collect());
+    let ds_scope = IdScope::DataSource(name.clone());
 
     let map_params = |params: Vec<PendingSqlParam>| {
         params
@@ -154,32 +171,37 @@ fn map_data_source(
                     name,
                     span: name_span,
                     cidl_type,
-                } => SpannedTypedName {
-                    span: name_span,
-                    name,
-                    cidl_type,
-                },
+                } => {
+                    let field_id = it.borrow_mut().intern(name.clone(), ds_scope.clone());
+                    SpannedTypedName {
+                        id: field_id,
+                        span: name_span,
+                        name,
+                        cidl_type,
+                    }
+                }
             })
             .collect::<Vec<_>>()
     };
 
-    let get = get_method.map(|(params, raw_sql)| DataSourceMethod {
+    let get = get_method.map(|(params, raw_sql)| DataSourceBlockMethod {
         span,
         parameters: map_params(params),
         raw_sql,
     });
 
-    let list = list_method.map(|(params, raw_sql)| DataSourceMethod {
+    let list = list_method.map(|(params, raw_sql)| DataSourceBlockMethod {
         span,
         parameters: map_params(params),
         raw_sql,
     });
 
     DataSourceBlock {
+        id,
         span,
         name,
         file: PathBuf::new(),
-        model: UnresolvedName(model),
+        model: model_ref,
         tree,
         get,
         list,

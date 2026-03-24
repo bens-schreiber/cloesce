@@ -1,13 +1,12 @@
 use std::path::PathBuf;
 
-use chumsky::prelude::*;
-
 use ast::CidlType;
+use chumsky::prelude::*;
 
 use crate::{
     SpannedName, SpannedTypedName, WranglerEnvBlock,
     lexer::Token,
-    parser::{Extra, cidl_type},
+    parser::{Extra, IdScope, It, cidl_type},
 };
 
 enum BindingKind {
@@ -30,7 +29,10 @@ enum EnvEntry {
 ///     ident3: cidl_type
 /// }
 /// ```
-pub fn env_block<'t>() -> impl Parser<'t, &'t [Token], WranglerEnvBlock, Extra<'t>> {
+pub fn env_block<'t>(it: It) -> impl Parser<'t, &'t [Token], WranglerEnvBlock, Extra<'t>> {
+    let st_vars = it.clone();
+    let st_id = it.clone();
+
     // ident: (d1 | r2 | kv | cidl_type)
     let env_entry = select! { Token::Ident(name) => name }
         .map_with(|name, e| (name, e.span()))
@@ -39,7 +41,7 @@ pub fn env_block<'t>() -> impl Parser<'t, &'t [Token], WranglerEnvBlock, Extra<'
             just(Token::D1).map(|_| EnvEntry::Binding(BindingKind::D1)),
             just(Token::R2).map(|_| EnvEntry::Binding(BindingKind::R2)),
             just(Token::Kv).map(|_| EnvEntry::Binding(BindingKind::Kv)),
-            cidl_type().map(EnvEntry::Var),
+            cidl_type(st_vars).map(EnvEntry::Var),
         )));
 
     // env { ... }
@@ -50,8 +52,10 @@ pub fn env_block<'t>() -> impl Parser<'t, &'t [Token], WranglerEnvBlock, Extra<'
                 .collect::<Vec<_>>()
                 .delimited_by(just(Token::LBrace), just(Token::RBrace)),
         )
-        .map_with(|entries, e| {
+        .map_with(move |entries, e| {
+            let id = st_id.borrow_mut().new_id();
             let mut block = WranglerEnvBlock {
+                id,
                 span: e.span(),
                 file: PathBuf::new(),
                 d1_bindings: Vec::new(),
@@ -62,16 +66,21 @@ pub fn env_block<'t>() -> impl Parser<'t, &'t [Token], WranglerEnvBlock, Extra<'
             for ((name, span), entry) in entries {
                 match entry {
                     EnvEntry::Binding(BindingKind::D1) => {
-                        block.d1_bindings.push(SpannedName { span, name });
+                        let id = st_id.borrow_mut().intern(name.clone(), IdScope::Env);
+                        block.d1_bindings.push(SpannedName { id, span, name });
                     }
                     EnvEntry::Binding(BindingKind::R2) => {
-                        block.r2_bindings.push(SpannedName { span, name });
+                        let id = st_id.borrow_mut().intern(name.clone(), IdScope::Env);
+                        block.r2_bindings.push(SpannedName { id, span, name });
                     }
                     EnvEntry::Binding(BindingKind::Kv) => {
-                        block.kv_bindings.push(SpannedName { span, name });
+                        let id = st_id.borrow_mut().intern(name.clone(), IdScope::Env);
+                        block.kv_bindings.push(SpannedName { id, span, name });
                     }
                     EnvEntry::Var(ty) => {
+                        let id = st_id.borrow_mut().intern(name.clone(), IdScope::Env);
                         block.vars.push(SpannedTypedName {
+                            id,
                             span,
                             name,
                             cidl_type: ty,
