@@ -1,3 +1,10 @@
+# [0.2.3] - 2026-3-24
+### Added
+- Added duplicate model error handling. 
+
+### Fixed
+- Fixed Windows compilation issues.
+
 # [0.2.2] - 2026-3-14
 ### Added
 
