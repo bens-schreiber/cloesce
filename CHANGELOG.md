@@ -3,7 +3,7 @@
 - Added duplicate model error handling. 
 
 ### Fixed
-- Fixed windows compilation issues.
+- Fixed Windows compilation issues.
 
 # [0.2.2] - 2026-3-14
 ### Added
