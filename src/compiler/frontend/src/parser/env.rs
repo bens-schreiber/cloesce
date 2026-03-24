@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use chumsky::prelude::*;
 
 use ast::CidlType;
@@ -5,7 +7,7 @@ use ast::CidlType;
 use crate::{
     SpannedName, SpannedTypedName, WranglerEnvBlock,
     lexer::Token,
-    parser::{Extra, sqlite_column_types},
+    parser::{Extra, cidl_type},
 };
 
 enum BindingKind {
@@ -29,12 +31,6 @@ enum EnvEntry {
 /// }
 /// ```
 pub fn env_block<'t>() -> impl Parser<'t, &'t [Token], WranglerEnvBlock, Extra<'t>> {
-    // Environment variables can only be SQLite column types or JSON
-    let env_var = choice((
-        sqlite_column_types(),
-        just(Token::Json).map(|_| CidlType::Json),
-    ));
-
     // ident: (d1 | r2 | kv | cidl_type)
     let env_entry = select! { Token::Ident(name) => name }
         .map_with(|name, e| (name, e.span()))
@@ -43,7 +39,7 @@ pub fn env_block<'t>() -> impl Parser<'t, &'t [Token], WranglerEnvBlock, Extra<'
             just(Token::D1).map(|_| EnvEntry::Binding(BindingKind::D1)),
             just(Token::R2).map(|_| EnvEntry::Binding(BindingKind::R2)),
             just(Token::Kv).map(|_| EnvEntry::Binding(BindingKind::Kv)),
-            env_var.map(EnvEntry::Var),
+            cidl_type().map(EnvEntry::Var),
         )));
 
     // env { ... }
@@ -57,6 +53,7 @@ pub fn env_block<'t>() -> impl Parser<'t, &'t [Token], WranglerEnvBlock, Extra<'
         .map_with(|entries, e| {
             let mut block = WranglerEnvBlock {
                 span: e.span(),
+                file: PathBuf::new(),
                 d1_bindings: Vec::new(),
                 kv_bindings: Vec::new(),
                 r2_bindings: Vec::new(),
@@ -74,7 +71,11 @@ pub fn env_block<'t>() -> impl Parser<'t, &'t [Token], WranglerEnvBlock, Extra<'
                         block.kv_bindings.push(SpannedName { span, name });
                     }
                     EnvEntry::Var(ty) => {
-                        block.vars.push(SpannedTypedName { span, name, ty });
+                        block.vars.push(SpannedTypedName {
+                            span,
+                            name,
+                            cidl_type: ty,
+                        });
                     }
                 }
             }

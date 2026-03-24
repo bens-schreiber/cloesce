@@ -1,15 +1,15 @@
 use std::ops::Range;
+use std::path::PathBuf;
 
 use ast::CidlType;
 use chumsky::extra;
 use chumsky::prelude::*;
 
-use crate::SpannedName;
 use crate::SpannedTypedName;
 use crate::lexer::Token;
 use crate::{
-    ApiBlock, DataSourceBlock, ModelBlock, ParseAst, PlainOldObjectBlock, ServiceBlock,
-    UnresolvedName, WranglerEnvBlock,
+    ApiBlock, DataSourceBlock, InjectBlock, ModelBlock, ParseAst, PlainOldObjectBlock,
+    ServiceBlock, WranglerEnvBlock,
 };
 
 pub(crate) type Extra<'t> = extra::Err<Rich<'t, Token>>;
@@ -52,13 +52,13 @@ impl CloesceParser {
             let mut ast = ParseAst::default();
             for item in items {
                 match item {
-                    Global::Env(env) => ast.wrangler_env.push(env),
+                    Global::Env(env) => ast.wrangler_envs.push(env),
                     Global::Model(model) => ast.models.push(model),
                     Global::Api(api) => ast.apis.push(api),
                     Global::Service(service) => ast.services.push(service),
                     Global::Poo(poo) => ast.poos.push(poo),
                     Global::DataSource(ds) => ast.sources.push(ds),
-                    Global::Inject(symbols) => ast.injectables.extend(symbols),
+                    Global::Inject(block) => ast.injects.push(block),
                 }
             }
             ast
@@ -73,7 +73,7 @@ enum Global {
     Service(ServiceBlock),
     Poo(PlainOldObjectBlock),
     DataSource(DataSourceBlock),
-    Inject(Vec<UnresolvedName>),
+    Inject(InjectBlock),
 }
 
 /// Parses a block of the form:
@@ -91,23 +91,27 @@ pub fn poo_block<'t>() -> impl Parser<'t, &'t [Token], PlainOldObjectBlock, Extr
         .map_with(|name, e| (name, e.span()))
         .then_ignore(just(Token::Colon))
         .then(cidl_type())
-        .map(|((name, span), ty)| SpannedTypedName { span, name, ty });
+        .map(|((name, span), ty)| SpannedTypedName {
+            span,
+            name,
+            cidl_type: ty,
+        });
 
     // poo MyObject { ... }
     just(Token::Poo)
-        .ignore_then(
-            select! { Token::Ident(name) => name }.map_with(|name, e| SpannedName {
-                name,
-                span: e.span(),
-            }),
-        )
+        .ignore_then(select! { Token::Ident(name) => name }.map_with(|name, e| (name, e.span())))
         .then(
             poo_field
                 .repeated()
                 .collect::<Vec<_>>()
                 .delimited_by(just(Token::LBrace), just(Token::RBrace)),
         )
-        .map(|(span_name, fields)| PlainOldObjectBlock { span_name, fields })
+        .map(|((name, span), fields)| PlainOldObjectBlock {
+            span,
+            name,
+            file: PathBuf::new(),
+            fields,
+        })
 }
 
 /// Parses a block of the form:
@@ -119,7 +123,7 @@ pub fn poo_block<'t>() -> impl Parser<'t, &'t [Token], PlainOldObjectBlock, Extr
 ///     ...
 /// }
 /// ```
-pub fn inject_block<'t>() -> impl Parser<'t, &'t [Token], Vec<UnresolvedName>, Extra<'t>> {
+pub fn inject_block<'t>() -> impl Parser<'t, &'t [Token], InjectBlock, Extra<'t>> {
     // inject { ...}
     just(Token::Inject)
         .ignore_then(
@@ -128,18 +132,11 @@ pub fn inject_block<'t>() -> impl Parser<'t, &'t [Token], Vec<UnresolvedName>, E
                 .collect::<Vec<_>>()
                 .delimited_by(just(Token::LBrace), just(Token::RBrace)),
         )
-        .map(|names| names.into_iter().map(UnresolvedName).collect())
-}
-
-/// Parses a CIDL type which can only be a SQLite column type
-pub fn sqlite_column_types<'t>() -> impl Parser<'t, &'t [Token], CidlType, Extra<'t>> + Clone {
-    choice((
-        just(Token::String).to(CidlType::String),
-        just(Token::Int).to(CidlType::Integer),
-        just(Token::Double).to(CidlType::Double),
-        just(Token::Date).to(CidlType::DateIso),
-        just(Token::Bool).to(CidlType::Boolean),
-    ))
+        .map_with(|injectables, e| InjectBlock {
+            span: e.span(),
+            file: PathBuf::new(),
+            names: injectables,
+        })
 }
 
 pub fn cidl_type<'t>() -> impl Parser<'t, &'t [Token], CidlType, Extra<'t>> {
@@ -166,12 +163,16 @@ pub fn cidl_type<'t>() -> impl Parser<'t, &'t [Token], CidlType, Extra<'t>> {
             });
 
         let primitive_keyword = choice((
-            sqlite_column_types(),
-            just(Token::Json).map(|_| CidlType::Json),
-            just(Token::Void).map(|_| CidlType::Void),
-            just(Token::Blob).map(|_| CidlType::Blob),
-            just(Token::Stream).map(|_| CidlType::Stream),
-            just(Token::R2Object).map(|_| CidlType::R2Object),
+            just(Token::String).to(CidlType::String),
+            just(Token::Int).to(CidlType::Integer),
+            just(Token::Double).to(CidlType::Double),
+            just(Token::Date).to(CidlType::DateIso),
+            just(Token::Bool).to(CidlType::Boolean),
+            just(Token::Json).to(CidlType::Json),
+            just(Token::Void).to(CidlType::Void),
+            just(Token::Blob).to(CidlType::Blob),
+            just(Token::Stream).to(CidlType::Stream),
+            just(Token::R2Object).to(CidlType::R2Object),
         ));
 
         let object_type = select! { Token::Ident(name) => CidlType::Object(name) };

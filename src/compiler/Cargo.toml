@@ -7,8 +7,8 @@ members = [
     # "workers",
     # "client",
     # "wrangler",
-    # "semantic",
-    # "generator-test",
+    "semantic",
+    "compiler-test",
     "frontend",
 ]
 

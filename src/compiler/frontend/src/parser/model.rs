@@ -1,55 +1,24 @@
+use std::path::PathBuf;
+
 use chumsky::prelude::*;
 
 use ast::CidlType;
 
 use crate::{
-    D1NavigationProperty, D1NavigationPropertyKind, ForeignKey, KvR2Field, ModelBlock, SpannedName,
-    SpannedTypedName, UnresolvedName,
+    D1NavigationProperty, ForeignKey, KvR2, ModelBlock, SpannedTypedName, UnresolvedName,
     lexer::Token,
-    parser::{Extra, sqlite_column_types},
+    parser::{Extra, cidl_type},
 };
 
-struct PendingForeignKey {
-    adj_model_name: String,
-    columns: Vec<String>,
-}
-
-struct PendingNavigation {
-    name: String,
-    adj_model: String,
-    kind: PendingNavigationKind,
-}
-
-enum PendingNavigationKind {
-    OneOrManyByFieldType { key_columns: Vec<String> },
-    ManyToMany,
-}
-
-struct PendingField {
-    name: String,
-    name_span: chumsky::span::SimpleSpan,
-    cidl_type: CidlType,
-    key_param: bool,
-    kv_navigation: Option<PendingKvNavigation>,
-    r2_navigation: Option<PendingR2Navigation>,
-}
-
-struct PendingKvNavigation {
-    namespace_binding: String,
-    format: String,
-}
-
-struct PendingR2Navigation {
-    bucket_binding: String,
-    format: String,
-}
-
-enum ModelEntry {
-    Primary(Vec<String>),
-    Unique(Vec<String>),
-    Foreign(PendingForeignKey),
-    Nav(PendingNavigation),
-    Field(PendingField),
+enum ModelField {
+    Primary(Vec<UnresolvedName>),
+    Unique(Vec<UnresolvedName>),
+    Foreign(ForeignKey),
+    Nav(D1NavigationProperty),
+    Field(SpannedTypedName),
+    KeyField(UnresolvedName),
+    KvField(KvR2),
+    R2Field(KvR2),
 }
 
 /// Parses a block of the form:
@@ -58,7 +27,7 @@ enum ModelEntry {
 /// @d1(binding)
 /// model ModelName {
 ///   ident1: sqlite_column_type
-///    
+///
 ///   @kv(namespaceBinding, "formatString") | @r2(bucketBinding, "formatString") | @keyparam
 ///   ident2: cidl_type
 ///
@@ -81,73 +50,80 @@ pub fn model_block<'t>() -> impl Parser<'t, &'t [Token], ModelBlock, Extra<'t>> 
     let primary_tag = just(Token::LBracket)
         .ignore_then(just(Token::Ident("primary".into())))
         .ignore_then(
-            select! { Token::Ident(name) => name }
+            select! { Token::Ident(name) => UnresolvedName(name) }
                 .separated_by(just(Token::Comma))
                 .at_least(1)
                 .collect::<Vec<_>>(),
         )
         .then_ignore(just(Token::RBracket))
-        .map(ModelEntry::Primary);
+        .map(ModelField::Primary);
 
     // [unique ident1, ident2, ...]
     let unique_tag = just(Token::LBracket)
         .ignore_then(just(Token::Ident("unique".into())))
         .ignore_then(
-            select! { Token::Ident(name) => name }
+            select! { Token::Ident(name) => UnresolvedName(name) }
                 .separated_by(just(Token::Comma))
                 .at_least(1)
                 .collect::<Vec<_>>(),
         )
         .then_ignore(just(Token::RBracket))
-        .map(ModelEntry::Unique);
+        .map(ModelField::Unique);
 
     // [foreign ident1, ident2 -> TargetModel::ident3, ident4, ...]
-    let foreign_tag =
-        {
-            let foreign_target_column_ref = select! { Token::Ident(model_name) => model_name }
-                .then_ignore(just(Token::DoubleColon))
-                .then(select! { Token::Ident(column_name) => column_name });
-
-            let foreign_source_column_ref = select! { Token::Ident(name) => name };
-
-            let foreign_source_ref_list = foreign_source_column_ref
-                .clone()
-                .map(|col| vec![col])
-                .or(foreign_source_column_ref
-                    .separated_by(just(Token::Comma))
-                    .at_least(1)
-                    .collect::<Vec<_>>()
-                    .delimited_by(just(Token::LParen), just(Token::RParen)));
-
-            let foreign_target_ref_list = foreign_target_column_ref
-                .clone()
-                .map(|col| vec![col])
-                .or(foreign_target_column_ref
-                    .separated_by(just(Token::Comma))
-                    .at_least(1)
-                    .collect::<Vec<_>>()
-                    .delimited_by(just(Token::LParen), just(Token::RParen)));
-
-            just(Token::LBracket)
-                .ignore_then(just(Token::Ident("foreign".into())))
-                .ignore_then(foreign_source_ref_list)
-                .then_ignore(just(Token::Arrow))
-                .then(foreign_target_ref_list)
-                .then_ignore(just(Token::RBracket))
-                .map(|(from, to)| {
-                    let to_model_name = to[0].0.clone();
-                    ModelEntry::Foreign(PendingForeignKey {
-                        adj_model_name: to_model_name,
-                        columns: from,
-                    })
-                })
-        };
-
-    // [nav RelationName -> TargetModel::ident7, ident8, ...]
-    let nav_tag = {
-        let nav_key_ref = select! { Token::Ident(model_name) => model_name }
+    let foreign_tag = {
+        let target_field_ref = select! { Token::Ident(model_name) => UnresolvedName(model_name) }
             .then_ignore(just(Token::DoubleColon))
-            .then(select! { Token::Ident(column_name) => column_name });
+            .then(select! { Token::Ident(field_name) => UnresolvedName(field_name) });
+
+        let source_field_ref = select! { Token::Ident(name) => UnresolvedName(name) };
+
+        let source_field_list = source_field_ref
+            .clone()
+            .map(|f| vec![f])
+            .or(source_field_ref
+                .separated_by(just(Token::Comma))
+                .at_least(1)
+                .collect::<Vec<_>>()
+                .delimited_by(just(Token::LParen), just(Token::RParen)));
+
+        let target_field_list = target_field_ref
+            .clone()
+            .map(|f| vec![f])
+            .or(target_field_ref
+                .separated_by(just(Token::Comma))
+                .at_least(1)
+                .collect::<Vec<_>>()
+                .delimited_by(just(Token::LParen), just(Token::RParen)));
+
+        just(Token::LBracket)
+            .ignore_then(just(Token::Ident("foreign".into())))
+            .ignore_then(source_field_list)
+            .then_ignore(just(Token::Arrow))
+            .then(target_field_list)
+            .then_ignore(just(Token::RBracket))
+            .map(|(fields, target_refs)| {
+                // target_refs: Vec<(UnresolvedName, UnresolvedName)>
+                // fields: Vec<UnresolvedName>
+                // We expect the number of source fields and target_refs to match
+                let (adj_model, _) = target_refs.first().cloned().unwrap();
+                let references = fields
+                    .into_iter()
+                    .zip(target_refs.into_iter().map(|(_, f)| f))
+                    .collect();
+                ModelField::Foreign(ForeignKey {
+                    adj_model,
+                    references,
+                })
+            })
+    };
+
+    // [nav RelationName -> TargetModel::field1, field2, ...]
+    // [nav RelationName <> TargetModel::field]
+    let nav_tag = {
+        let nav_key_ref = select! { Token::Ident(model_name) => UnresolvedName(model_name) }
+            .then_ignore(just(Token::DoubleColon))
+            .then(select! { Token::Ident(field_name) => UnresolvedName(field_name) });
 
         let nav_key_ref_list = nav_key_ref
             .clone()
@@ -161,240 +137,152 @@ pub fn model_block<'t>() -> impl Parser<'t, &'t [Token], ModelBlock, Extra<'t>> 
 
         let nav_arrow = just(Token::LBracket)
             .ignore_then(just(Token::Ident("nav".into())))
-            .ignore_then(select! { Token::Ident(name) => name })
+            .ignore_then(select! { Token::Ident(name) => UnresolvedName(name) })
             .then_ignore(just(Token::Arrow))
             .then(nav_key_ref_list)
             .then_ignore(just(Token::RBracket))
-            .map(|(name, to)| {
-                let to_model = to[0].0.clone();
-                let key_columns = to
-                    .into_iter()
-                    .map(|(_, col_name)| col_name)
-                    .collect::<Vec<_>>();
-                ModelEntry::Nav(PendingNavigation {
-                    name,
-                    adj_model: to_model,
-                    kind: PendingNavigationKind::OneOrManyByFieldType { key_columns },
+            .map(|(field, to)| {
+                let adj_model = UnresolvedName(to[0].0.0.clone());
+                let fields = to.into_iter().map(|(_, f)| f).collect::<Vec<_>>();
+                ModelField::Nav(D1NavigationProperty {
+                    field,
+                    adj_model,
+                    fields,
+                    is_many_to_many: false,
                 })
             });
 
-        // [nav ident1 <> TargetModel::ident2]
         let nav_many_to_many = just(Token::LBracket)
             .ignore_then(just(Token::Ident("nav".into())))
-            .ignore_then(select! { Token::Ident(name) => name })
+            .ignore_then(select! { Token::Ident(name) => UnresolvedName(name) })
             .then_ignore(just(Token::LAngle))
             .then_ignore(just(Token::RAngle))
             .then(nav_key_ref)
             .then_ignore(just(Token::RBracket))
-            .map(|(name, (to_model, _))| {
-                ModelEntry::Nav(PendingNavigation {
-                    name,
-                    adj_model: to_model,
-                    kind: PendingNavigationKind::ManyToMany,
+            .map(|(field, (adj_model, f))| {
+                ModelField::Nav(D1NavigationProperty {
+                    field,
+                    adj_model,
+                    fields: vec![f],
+                    is_many_to_many: true,
                 })
             });
 
         nav_arrow.or(nav_many_to_many)
     };
 
-    let object_name = select! { Token::Ident(name) => name };
-    let object_array_generic = just(Token::Ident("Array".into()))
-        .ignore_then(just(Token::LAngle))
-        .ignore_then(object_name.clone())
-        .then_ignore(just(Token::RAngle))
-        .map(|object_name| CidlType::array(CidlType::Object(object_name)));
-
-    let object_type = object_array_generic.or(object_name.map(CidlType::Object));
-
-    let model_field_type = choice((
-        sqlite_column_types(),
-        just(Token::R2Object).map(|_| CidlType::R2Object),
-        object_type,
-    ));
-
-    // @kv(namespaceBinding, "formatString")
+    // @kv(namespaceBinding, "formatString") -> (env_binding, format)
     let kv_tag = just(Token::At)
         .ignore_then(just(Token::Kv))
         .ignore_then(just(Token::LParen))
-        .ignore_then(select! { Token::Ident(name) => name })
+        .ignore_then(select! { Token::Ident(name) => UnresolvedName(name) })
         .then_ignore(just(Token::Comma))
         .then(select! { Token::StringLit(value) => unquote_string_literal(value) })
-        .then_ignore(just(Token::RParen))
-        .map(|(namespace_binding, format)| PendingKvNavigation {
-            namespace_binding,
-            format,
-        });
+        .then_ignore(just(Token::RParen));
 
-    // @r2(bucketBinding, "formatString")
+    // @r2(bucketBinding, "formatString") -> (env_binding, format)
     let r2_tag = just(Token::At)
         .ignore_then(just(Token::R2))
         .ignore_then(just(Token::LParen))
-        .ignore_then(select! { Token::Ident(name) => name })
+        .ignore_then(select! { Token::Ident(name) => UnresolvedName(name) })
         .then_ignore(just(Token::Comma))
         .then(select! { Token::StringLit(value) => unquote_string_literal(value) })
-        .then_ignore(just(Token::RParen))
-        .map(|(bucket_binding, format)| PendingR2Navigation {
-            bucket_binding,
-            format,
-        });
+        .then_ignore(just(Token::RParen));
 
     // @keyparam
-    let key_param_tag = just(Token::At)
-        .ignore_then(just(Token::Ident("keyparam".into())))
-        .to(());
+    let key_param_tag = just(Token::At).ignore_then(just(Token::Ident("keyparam".into())));
 
-    // @kv(...) | @r2(...) | @keyparam
-    let anchored_field_tags = choice((
-        key_param_tag.map(|_| (true, None, None)),
+    type Binding = (UnresolvedName, String);
+    let field_tag = choice((
+        key_param_tag.map(|_| (true, None::<Binding>, None::<Binding>)),
         kv_tag.map(|kv| (false, Some(kv), None)),
         r2_tag.map(|r2| (false, None, Some(r2))),
     ))
     .or_not()
-    .map(|tags| tags.unwrap_or((false, None, None)));
+    .map(|opt| opt.unwrap_or((false, None, None)));
 
-    let field = anchored_field_tags
+    let field = field_tag
         .then(select! { Token::Ident(name) => name }.map_with(|name, e| (name, e.span())))
         .then_ignore(just(Token::Colon))
-        .then(model_field_type)
-        .map(
-            |(((key_param, kv_navigation, r2_navigation), (name, name_span)), cidl_type)| {
-                ModelEntry::Field(PendingField {
-                    name,
-                    name_span,
+        .then(cidl_type())
+        .map(|(((key_param, kv, r2), (name, span)), cidl_type)| {
+            if let Some((env_binding, format)) = kv {
+                ModelField::KvField(KvR2 {
+                    field: UnresolvedName(name),
+                    span,
                     cidl_type,
-                    key_param,
-                    kv_navigation,
-                    r2_navigation,
+                    format,
+                    env_binding,
                 })
-            },
-        );
+            } else if let Some((env_binding, format)) = r2 {
+                ModelField::R2Field(KvR2 {
+                    field: UnresolvedName(name),
+                    span,
+                    cidl_type,
+                    format,
+                    env_binding,
+                })
+            } else if key_param {
+                ModelField::KeyField(UnresolvedName(name))
+            } else {
+                ModelField::Field(SpannedTypedName {
+                    span,
+                    name,
+                    cidl_type,
+                })
+            }
+        });
 
     d1_binding
         .then_ignore(just(Token::Model))
-        .then(
-            select! { Token::Ident(name) => name }.map_with(|name, e| SpannedName {
-                name,
-                span: e.span(),
-            }),
-        )
+        .then(select! { Token::Ident(name) => name }.map_with(|name, e| (name, e.span())))
         .then(
             choice((primary_tag, unique_tag, foreign_tag, nav_tag, field))
                 .repeated()
                 .collect::<Vec<_>>()
                 .delimited_by(just(Token::LBrace), just(Token::RBrace)),
         )
-        .map(|((d1_binding, span_name), items)| map_model(span_name, d1_binding, items))
+        .map(|((d1_binding, (name, span)), items)| map_model(name, span, d1_binding, items))
 }
 
 fn map_model(
-    span_name: SpannedName,
+    name: String,
+    span: SimpleSpan,
     d1_binding: Option<String>,
-    items: Vec<ModelEntry>,
+    items: Vec<ModelField>,
 ) -> ModelBlock {
-    let mut columns: Vec<SpannedTypedName> = Vec::new();
+    let mut fields: Vec<SpannedTypedName> = Vec::new();
     let mut foreign_keys: Vec<ForeignKey> = Vec::new();
-    let mut pending_navs: Vec<PendingNavigation> = Vec::new();
-    let mut primary_key_names: Vec<String> = Vec::new();
-    let mut unique_constraint_names: Vec<Vec<String>> = Vec::new();
-    let mut key_field_names: Vec<String> = Vec::new();
-    let mut kv_fields: Vec<KvR2Field> = Vec::new();
-    let mut r2_fields: Vec<KvR2Field> = Vec::new();
+    let mut navigation_properties: Vec<D1NavigationProperty> = Vec::new();
+    let mut primary_keys: Vec<UnresolvedName> = Vec::new();
+    let mut unique_constraints: Vec<Vec<UnresolvedName>> = Vec::new();
+    let mut key_fields: Vec<UnresolvedName> = Vec::new();
+    let mut kvs: Vec<KvR2> = Vec::new();
+    let mut r2s: Vec<KvR2> = Vec::new();
 
     for item in items {
         match item {
-            ModelEntry::Primary(cols) => primary_key_names.extend(cols),
-            ModelEntry::Unique(cols) => unique_constraint_names.push(cols),
-            ModelEntry::Foreign(fk) => foreign_keys.push(ForeignKey {
-                adj_model_name: UnresolvedName(fk.adj_model_name),
-                column_names: fk.columns.into_iter().map(UnresolvedName).collect(),
-            }),
-            ModelEntry::Nav(nav) => pending_navs.push(nav),
-            ModelEntry::Field(field) => {
-                let typed_name = SpannedTypedName {
-                    span: field.name_span,
-                    name: field.name.clone(),
-                    ty: field.cidl_type.clone(),
-                };
-
-                if field.key_param {
-                    key_field_names.push(field.name.clone());
-                }
-
-                if let Some(kv) = field.kv_navigation {
-                    kv_fields.push(KvR2Field {
-                        typed_name: typed_name.clone(),
-                        format: kv.format,
-                        env_binding: UnresolvedName(kv.namespace_binding),
-                    });
-                }
-
-                if let Some(r2) = field.r2_navigation {
-                    r2_fields.push(KvR2Field {
-                        typed_name: typed_name.clone(),
-                        format: r2.format,
-                        env_binding: UnresolvedName(r2.bucket_binding),
-                    });
-                }
-
-                columns.push(typed_name);
-            }
+            ModelField::Primary(cols) => primary_keys.extend(cols),
+            ModelField::Unique(cols) => unique_constraints.push(cols),
+            ModelField::Foreign(fk) => foreign_keys.push(fk),
+            ModelField::Nav(nav) => navigation_properties.push(nav),
+            ModelField::Field(field) => fields.push(field),
+            ModelField::KeyField(name) => key_fields.push(name),
+            ModelField::KvField(kv) => kvs.push(kv),
+            ModelField::R2Field(r2) => r2s.push(r2),
         }
     }
 
-    let primary_key_columns = primary_key_names
-        .iter()
-        .filter_map(|name| columns.iter().find(|c| &c.name == name).cloned())
-        .collect();
-
-    let key_fields = key_field_names
-        .iter()
-        .filter_map(|name| columns.iter().find(|c| &c.name == name).cloned())
-        .collect();
-
-    let unique_constraints = unique_constraint_names
-        .into_iter()
-        .map(|names| names.into_iter().map(UnresolvedName).collect())
-        .collect();
-
-    let navigation_properties = pending_navs
-        .into_iter()
-        .map(|nav| {
-            let kind = match nav.kind {
-                PendingNavigationKind::ManyToMany => D1NavigationPropertyKind::ManyToMany {
-                    column: UnresolvedName(nav.name.clone()),
-                },
-                PendingNavigationKind::OneOrManyByFieldType { key_columns } => {
-                    let is_array = columns
-                        .iter()
-                        .find(|c| c.name == nav.name)
-                        .map(|c| matches!(&c.ty, CidlType::Array(_)))
-                        .unwrap_or(false);
-
-                    let cols = key_columns.into_iter().map(UnresolvedName).collect();
-                    if is_array {
-                        D1NavigationPropertyKind::OneToMany { columns: cols }
-                    } else {
-                        D1NavigationPropertyKind::OneToOne { columns: cols }
-                    }
-                }
-            };
-
-            D1NavigationProperty {
-                field_name: UnresolvedName(nav.name),
-                adj_model_name: UnresolvedName(nav.adj_model),
-                kind,
-            }
-        })
-        .collect();
-
     ModelBlock {
-        span_name,
+        span,
+        name,
+        file: PathBuf::new(), // TODO
         d1_binding: d1_binding.map(UnresolvedName),
-        columns,
-        primary_key_columns,
+        fields,
+        primary_keys,
         key_fields,
-        kv_fields,
-        r2_fields,
+        kvs,
+        r2s,
         navigation_properties,
         foreign_keys,
         unique_constraints,

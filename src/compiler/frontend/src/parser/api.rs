@@ -1,15 +1,18 @@
+use std::path::PathBuf;
+
 use chumsky::prelude::*;
 
 use ast::{CidlType, CrudKind, HttpVerb};
 
 use crate::{
-    ApiBlock, ApiMethod, SpannedName, SpannedTypedName, UnresolvedName,
+    ApiBlock, ApiMethod, SpannedTypedName, UnresolvedName,
     lexer::Token,
     parser::{Extra, cidl_type},
 };
 
 struct PendingApiMethod {
-    span_name: SpannedName,
+    name: String,
+    span: SimpleSpan,
     http_verb: HttpVerb,
     return_type: CidlType,
     parameters: Vec<PendingApiParam>,
@@ -58,24 +61,20 @@ pub fn api_block<'t>() -> impl Parser<'t, &'t [Token], ApiBlock, Extra<'t>> {
     // api ApiName for ModelName { ... }
     crud_tag
         .then_ignore(just(Token::Api))
-        .then(
-            select! { Token::Ident(name) => name }.map_with(|name, e| SpannedName {
-                name,
-                span: e.span(),
-            }),
-        )
+        .then(select! { Token::Ident(name) => name })
         .then(
             method()
                 .repeated()
                 .collect::<Vec<_>>()
                 .delimited_by(just(Token::LBrace), just(Token::RBrace)),
         )
-        .map_with(|((cruds, model_span_name), methods), e| {
+        .map_with(|((cruds, model_name), methods), e| {
             let methods = methods.into_iter().map(map_method).collect();
 
             ApiBlock {
                 span: e.span(),
-                model_name: UnresolvedName(model_span_name.name),
+                file: PathBuf::new(),
+                model: UnresolvedName(model_name),
                 cruds,
                 methods,
             }
@@ -85,12 +84,7 @@ pub fn api_block<'t>() -> impl Parser<'t, &'t [Token], ApiBlock, Extra<'t>> {
 fn method<'t>() -> impl Parser<'t, &'t [Token], PendingApiMethod, Extra<'t>> {
     // http_verb methodName(ident1: cidl_type, ...) -> cidl_type
     http_verb()
-        .then(
-            select! { Token::Ident(name) => name }.map_with(|name, e| SpannedName {
-                name,
-                span: e.span(),
-            }),
-        )
+        .then(select! { Token::Ident(name) => name }.map_with(|name, e| (name, e.span())))
         .then(
             parameter()
                 .separated_by(just(Token::Comma))
@@ -101,8 +95,9 @@ fn method<'t>() -> impl Parser<'t, &'t [Token], PendingApiMethod, Extra<'t>> {
         .then_ignore(just(Token::Arrow))
         .then(cidl_type())
         .map(
-            |(((http_verb, span_name), parameters), return_type)| PendingApiMethod {
-                span_name,
+            |(((http_verb, (name, span)), parameters), return_type)| PendingApiMethod {
+                name,
+                span,
                 http_verb,
                 return_type,
                 parameters,
@@ -181,14 +176,15 @@ fn map_method(method: PendingApiMethod) -> ApiMethod {
                 parameters.push(SpannedTypedName {
                     span: name_span,
                     name,
-                    ty: cidl_type,
+                    cidl_type,
                 });
             }
         }
     }
 
     ApiMethod {
-        span_name: method.span_name,
+        span: method.span,
+        name: method.name,
         is_static,
         data_source_name: data_source,
         http_verb: method.http_verb,

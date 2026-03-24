@@ -1,8 +1,10 @@
+use std::path::PathBuf;
+
 use chumsky::prelude::*;
 
 use ast::CidlType;
 
-use crate::{ServiceBlock, SpannedName, SpannedTypedName, lexer::Token, parser::Extra};
+use crate::{ServiceBlock, SpannedTypedName, lexer::Token, parser::Extra};
 
 /// Parses a block of the form:
 ///
@@ -21,28 +23,30 @@ pub fn service_block<'t>() -> impl Parser<'t, &'t [Token], ServiceBlock, Extra<'
 
     // service ServiceName { ... }
     just(Token::Service)
-        .ignore_then(
-            select! { Token::Ident(name) => name }.map_with(|name, e| SpannedName {
-                name,
-                span: e.span(),
-            }),
-        )
+        .ignore_then(select! { Token::Ident(name) => name }.map_with(|name, e| (name, e.span())))
         .then(
             attribute
                 .repeated()
                 .collect::<Vec<_>>()
                 .delimited_by(just(Token::LBrace), just(Token::RBrace)),
         )
-        .map(|(span_name, fields)| {
+        .map(|((name, span), fields)| {
             let fields = fields
                 .into_iter()
-                .map(|((name, name_span), inject_reference)| SpannedTypedName {
-                    span: name_span,
-                    name,
-                    ty: CidlType::Object(inject_reference),
-                })
+                .map(
+                    |((field_name, name_span), inject_reference)| SpannedTypedName {
+                        span: name_span,
+                        name: field_name,
+                        cidl_type: CidlType::Object(inject_reference),
+                    },
+                )
                 .collect();
 
-            ServiceBlock { span_name, fields }
+            ServiceBlock {
+                span,
+                name,
+                file: PathBuf::new(),
+                fields,
+            }
         })
 }

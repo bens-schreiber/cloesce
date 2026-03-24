@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use std::path::PathBuf;
 
 use chumsky::prelude::*;
 
@@ -156,7 +157,7 @@ fn map_data_source(
                 } => SpannedTypedName {
                     span: name_span,
                     name,
-                    ty: cidl_type,
+                    cidl_type,
                 },
             })
             .collect::<Vec<_>>()
@@ -177,7 +178,8 @@ fn map_data_source(
     DataSourceBlock {
         span,
         name,
-        model_name: UnresolvedName(model),
+        file: PathBuf::new(),
+        model: UnresolvedName(model),
         tree,
         get,
         list,

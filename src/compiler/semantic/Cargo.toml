@@ -5,9 +5,11 @@ edition = "2024"
 
 [dependencies]
 ast = { path = "../ast" }
+frontend = { path = "../frontend" }
+indexmap = { workspace = true }
 
 [dev-dependencies]
-generator-test = { path = "../generator-test" }
-serde_json = { workspace = true }
-wrangler = { path = "../wrangler" }
-toml = { workspace = true }
+compiler-test = { path = "../compiler-test" }
+# serde_json = { workspace = true }
+# wrangler = { path = "../wrangler" }
+# toml = { workspace = true }

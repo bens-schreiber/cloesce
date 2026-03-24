@@ -7,3 +7,6 @@ edition = "2024"
 ast = { path = "../ast" }
 chumsky = "0.12.0"
 logos = "0.16.1"
+
+[dev-dependencies]
+compiler-test = { path = "../compiler-test" }
