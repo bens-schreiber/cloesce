@@ -9,9 +9,11 @@ use serde::Deserialize;
 use serde::Serialize;
 use serde_json::Value;
 
-#[derive(Serialize, Deserialize, Debug, Hash, PartialEq, Eq, PartialOrd, Ord, Clone)]
+#[derive(Serialize, Deserialize, Debug, Hash, PartialEq, Eq, PartialOrd, Ord, Clone, Default)]
 pub enum CidlType {
+    #[default]
     Void,
+
     Integer,
     Double,
     String,
@@ -99,12 +101,6 @@ impl CidlType {
     }
 }
 
-impl Default for CidlType {
-    fn default() -> Self {
-        CidlType::Void
-    }
-}
-
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Default)]
 pub struct FileSpan {
     pub start: usize,
@@ -121,7 +117,7 @@ pub enum WranglerEnvBindingKind {
     R2,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub enum SymbolKind {
     ModelDecl,
     ModelField,
@@ -132,17 +128,19 @@ pub enum SymbolKind {
     ModelKvTag,
     ModelR2Tag,
     WranglerEnvDecl,
-    WranglerEnvBinding { kind: WranglerEnvBindingKind },
+    WranglerEnvBinding {
+        kind: WranglerEnvBindingKind,
+    },
     WranglerEnvVar,
     PlainOldObjectDecl,
     PlainOldObjectField,
-    Null,
-}
 
-impl Default for SymbolKind {
-    fn default() -> Self {
-        SymbolKind::Null
-    }
+    ApiDecl,
+    ApiMethodDecl,
+    ApiMethodParam,
+
+    #[default]
+    Null,
 }
 
 #[derive(Clone)]
@@ -230,6 +228,42 @@ impl NavigationProperty {
     // }
 }
 
+/// The expected media type for request/response bodies.
+/// An API endpoint may expect data in some format, and return data in some format.
+/// Defaults to JSON.
+#[derive(Default)]
+pub enum MediaType {
+    #[default]
+    Json,
+
+    Octet,
+}
+
+pub struct ApiMethod {
+    /// Symbol name of the method.
+    pub name: String,
+
+    /// If true, the method is static (instantiated on a class, not an instance).
+    /// Static methods require no hydration or data source.
+    pub is_static: bool,
+    pub data_source: Option<SymbolRef>,
+
+    pub http_verb: HttpVerb,
+
+    /// The media format the client should use to read the response body.
+    pub return_media: MediaType,
+    pub return_type: CidlType,
+
+    /// The media format the client should use to send the request body.
+    pub parameters_media: MediaType,
+    pub parameters: Vec<SymbolRef>,
+}
+
+pub struct ModelApi {
+    pub symbol: SymbolRef,
+    pub methods: Vec<ApiMethod>,
+}
+
 #[derive(Default)]
 pub struct Model {
     pub hash: u64,
@@ -240,10 +274,13 @@ pub struct Model {
     pub primary_key_columns: HashSet<SymbolRef>,
     pub foreign_keys: Vec<ForeignKey>,
     pub navigation_properties: Vec<NavigationProperty>,
+    pub unique_constraints: Vec<Vec<SymbolRef>>,
 
     pub key_fields: HashSet<SymbolRef>,
     pub kv_properties: Vec<KvProperty>,
     pub r2_properties: Vec<R2Property>,
+
+    pub apis: Vec<ModelApi>,
 }
 
 #[derive(PartialEq, Debug, Clone, Copy)]

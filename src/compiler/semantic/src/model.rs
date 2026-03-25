@@ -171,11 +171,33 @@ impl ModelAnalysis {
             }
         }
 
+        // Unique constraints
+        let mut unique_constraints = Vec::new();
+        for constraint in &model_block.unique_constraints {
+            let mut constraint_columns = Vec::new();
+            for column in &constraint.fields {
+                if !columns.contains(column) {
+                    self.sink.push(
+                        CompilerErrorKind::UniqueConstraintReferencesInvalidOrUnknownField {
+                            tag: constraint.id,
+                            field: *column,
+                        },
+                    );
+                    continue;
+                }
+
+                constraint_columns.push(*column);
+            }
+
+            unique_constraints.push(constraint_columns);
+        }
+
         model.d1_binding = Some(d1_binding.env_binding);
         model.columns = columns;
         model.primary_key_columns = primary_key_columns;
         model.foreign_keys = foreign_keys;
         model.navigation_properties = navigation_properties;
+        model.unique_constraints = unique_constraints;
     }
 
     /// Validates a foreign key, returning an ast [ForeignKey]

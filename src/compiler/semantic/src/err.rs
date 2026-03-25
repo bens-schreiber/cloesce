@@ -133,6 +133,11 @@ pub enum CompilerErrorKind {
         second_m2m_nav: SymbolRef,
     },
 
+    UniqueConstraintReferencesInvalidOrUnknownField {
+        tag: SymbolRef,
+        field: SymbolRef,
+    },
+
     CyclicalRelationship {
         cycle: Vec<SymbolRef>,
     },
@@ -175,6 +180,33 @@ pub enum CompilerErrorKind {
 
     PlainOldObjectInvalidFieldType {
         field: SymbolRef,
+    },
+
+    /// An API block references a model that does not exist.
+    ApiUnknownModelReference {
+        api: SymbolRef,
+    },
+
+    /// A non-static API method has a data source but the method is marked static.
+    ApiStaticMethodWithDataSource {
+        method: SymbolRef,
+    },
+
+    /// An API method references a data source that does not exist on the model.
+    ApiUnknownDataSourceReference {
+        method: SymbolRef,
+        data_source: SymbolRef,
+    },
+
+    /// An API method has an invalid return type.
+    ApiInvalidReturn {
+        method: SymbolRef,
+    },
+
+    /// An API method has an invalid parameter.
+    ApiInvalidParam {
+        method: SymbolRef,
+        param: SymbolRef,
     },
 }
 

@@ -803,7 +803,7 @@ fn d1_model_nullability_prevents_cycle() {
 }
 
 #[test]
-fn kv_r2_basic_errors() {
+fn kv_r2_errors() {
     // Arrange
     let src = &with_env(
         r#"
@@ -892,6 +892,65 @@ fn kv_and_d1_coexist() {
     assert!(user.d1_binding.is_some());
     assert_eq!(user.kv_properties.len(), 1);
     assert_eq!(user.columns.len(), 3); // id, name, cached
+}
+
+#[test]
+fn api_errors() {
+    // Arrange
+    let src = &with_env(
+        r#"
+        @d1(my_d1)
+        model User {
+            [primary id]
+            id: int
+            name: string
+        }
+
+        // Unknown model reference
+        api BadModelApi for NonExistentModel {}
+
+        // Unknown return type (references non-existent object)
+        api BadReturnApi for User {
+            get badReturn() -> UnknownObj
+        }
+
+        // Void parameter
+        api BadParamApi for User {
+            post badVoidParam(v: void) -> string
+        }
+
+        // Object parameter on GET
+        api GetObjectApi for User {
+            get badGetObj(u: User) -> string
+        }
+
+        // R2Object parameter on GET
+        api GetR2Api for User {
+            get badGetR2(r: R2Object) -> string
+        }
+
+        // Stream param with extra non-inject params (invalid)
+        api BadStreamApi for User {
+            post badStream(s: stream, extra: string) -> stream
+        }
+    "#,
+    );
+    let parse = lex_and_parse(src);
+
+    // Act
+    let (ast, errors) = SemanticAnalysis::analyze(parse, &create_spec());
+
+    // Assert
+    assert_eq!(errors.len(), 6);
+
+    expect_err!(errors, CompilerErrorKind::ApiUnknownModelReference { .. });
+
+    expect_err!(errors, CompilerErrorKind::ApiInvalidReturn { .. });
+
+    assert_eq!(
+        count_errs!(errors, CompilerErrorKind::ApiInvalidParam { .. }),
+        4
+    );
 }
 
 #[test]

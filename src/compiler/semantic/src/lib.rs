@@ -1,5 +1,5 @@
 use ast::{
-    CidlType, CloesceAst, FileSpan, Model, PlainOldObject, Symbol, SymbolKind, SymbolRef,
+    CidlType, CloesceAst, FileSpan, Model, ModelApi, PlainOldObject, Symbol, SymbolKind, SymbolRef,
     SymbolTable, WranglerEnv, WranglerEnvBindingKind, WranglerSpec,
 };
 use frontend::{ModelBlock, ParseAst};
@@ -8,10 +8,12 @@ use indexmap::IndexMap;
 use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
 
 use crate::{
+    api::ApiAnalysis,
     err::{CompilerErrorKind, ErrorSink},
     model::ModelAnalysis,
 };
 
+mod api;
 pub mod err;
 mod model;
 
@@ -22,8 +24,16 @@ impl SemanticAnalysis {
 
         let mut table = Self::symbol_table(&parse, &mut sink);
         let wrangler_env = Self::wrangler(&parse, spec, &mut sink);
-        let models = Self::models(&parse, &mut table, &mut sink);
+        let mut models = Self::models(&parse, &mut table, &mut sink);
         let poos = Self::poos(&parse, &mut table, &mut sink);
+        let api_map = Self::apis(&parse, &table, &mut sink);
+
+        // Merge API methods into their respective models
+        for (model_ref, api) in api_map {
+            if let Some(model) = models.get_mut(&model_ref) {
+                model.apis.push(api);
+            }
+        }
 
         let ast = CloesceAst {
             wrangler_env,
@@ -259,6 +269,80 @@ impl SemanticAnalysis {
             }
         }
 
+        for api in &parse.apis {
+            let new_span = FileSpan {
+                start: api.span.start,
+                end: api.span.end,
+                file: api.file.clone(),
+            };
+            let symbol = Symbol {
+                id: api.id,
+                name: api.name.clone(),
+                span: new_span.clone(),
+                kind: SymbolKind::ApiDecl,
+                ..Default::default()
+            };
+
+            if let Some(existing) = table.insert(symbol) {
+                let first_span = existing.span.clone();
+                sink.push(CompilerErrorKind::DuplicateSymbol {
+                    symbol: api.id,
+                    first_span,
+                    second_span: new_span,
+                });
+            }
+
+            for method in &api.methods {
+                let new_span = FileSpan {
+                    start: method.span.start,
+                    end: method.span.end,
+                    file: api.file.clone(),
+                };
+                let symbol = Symbol {
+                    id: method.id,
+                    name: String::default(),
+                    span: new_span.clone(),
+                    kind: SymbolKind::ApiMethodDecl,
+                    parent: api.id,
+                    cidl_type: method.return_type.clone(),
+                };
+
+                if let Some(existing) = table.insert(symbol) {
+                    let first_span = existing.span.clone();
+                    sink.push(CompilerErrorKind::DuplicateSymbol {
+                        symbol: method.id,
+                        first_span,
+                        second_span: new_span,
+                    });
+                }
+
+                for param in &method.parameters {
+                    let new_span = FileSpan {
+                        start: param.span.start,
+                        end: param.span.end,
+                        file: api.file.clone(),
+                    };
+                    let symbol = Symbol {
+                        id: param.id,
+                        name: param.name.clone(),
+                        span: new_span.clone(),
+                        kind: SymbolKind::ApiMethodParam,
+                        parent: method.id,
+                        cidl_type: param.cidl_type.clone(),
+                    };
+
+                    if let Some(existing) = table.insert(symbol) {
+                        let first_span = existing.span.clone();
+                        sink.push(CompilerErrorKind::DuplicateSymbol {
+                            symbol: param.id,
+                            first_span,
+                            second_span: new_span,
+                        });
+                    }
+                }
+            }
+        }
+
         for poo in &parse.poos {
             let new_span = FileSpan {
                 start: poo.span.start,
@@ -413,6 +497,20 @@ impl SemanticAnalysis {
             Err(errs) => {
                 sink.extend(errs);
                 IndexMap::new()
+            }
+        }
+    }
+
+    fn apis(
+        parse: &ParseAst,
+        table: &SymbolTable,
+        sink: &mut ErrorSink,
+    ) -> Vec<(SymbolRef, ModelApi)> {
+        match ApiAnalysis::default().analyze(&parse.apis, parse, table) {
+            Ok(apis) => apis,
+            Err(errs) => {
+                sink.extend(errs);
+                Vec::new()
             }
         }
     }
