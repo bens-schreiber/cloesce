@@ -4,9 +4,10 @@ use ast::{
     WranglerEnvBindingKind, WranglerSpec,
 };
 use frontend::{ForeignKeyTag, ModelBlock, NavigationTag, ParseAst};
+use indexmap::IndexMap;
 
 use std::{
-    collections::{BTreeMap, HashMap, HashSet},
+    collections::{BTreeMap, HashMap, HashSet, VecDeque},
     ops::Not,
 };
 
@@ -14,7 +15,7 @@ use crate::err::{BatchResult, CompilerErrorKind, ErrorSink};
 
 pub mod err;
 
-// type AdjacencyList<'a> = BTreeMap<&'a str, Vec<&'a str>>;
+type AdjacencyList = BTreeMap<SymbolRef, Vec<SymbolRef>>;
 
 pub struct SemanticAnalysis;
 impl SemanticAnalysis {
@@ -312,7 +313,7 @@ impl SemanticAnalysis {
         parse: &ParseAst,
         table: &mut SymbolTable,
         sink: &mut ErrorSink,
-    ) -> HashMap<SymbolRef, Model> {
+    ) -> IndexMap<SymbolRef, Model> {
         let mut d1_model_blocks = HashMap::<SymbolRef, &ModelBlock>::new();
         for model in &parse.models {
             if model.d1_binding.is_some()
@@ -329,14 +330,14 @@ impl SemanticAnalysis {
         }
 
         if d1_model_blocks.is_empty() {
-            return HashMap::new();
+            return IndexMap::new();
         }
 
         match D1ModelAnalysis::default().analyze(d1_model_blocks, table) {
             Ok(models) => models,
             Err(errs) => {
                 sink.extend(errs);
-                HashMap::new()
+                IndexMap::new()
             }
         }
     }
@@ -357,12 +358,22 @@ impl D1ModelAnalysis {
         mut self,
         d1_model_blocks: HashMap<SymbolRef, &ModelBlock>,
         table: &mut SymbolTable,
-    ) -> BatchResult<HashMap<SymbolRef, Model>> {
-        let mut models = HashMap::new();
+    ) -> BatchResult<IndexMap<SymbolRef, Model>> {
+        let mut models = IndexMap::new();
 
         for model_block in d1_model_blocks.values() {
             if let Some(model) = self.model(model_block, d1_model_blocks.clone(), table) {
                 models.insert(model.symbol, model);
+            }
+        }
+
+        match kahns(self.graph, self.in_degree, d1_model_blocks.len()) {
+            Ok(rank) => {
+                // Sort models according to topological rank
+                models.sort_by_key(|k, _| rank.get(k).unwrap_or(&usize::MAX));
+            }
+            Err(e) => {
+                self.sink.push(e);
             }
         }
 
@@ -459,7 +470,7 @@ impl D1ModelAnalysis {
         // Navigation properties
         let mut navigation_properties = Vec::new();
         for nav in &model_block.navigation_properties {
-            let nav_result = self.nav(model_block, nav, &columns, table, &d1_model_blocks);
+            let nav_result = self.nav(model_block, nav, table, &d1_model_blocks);
 
             if let Some(nav) = nav_result {
                 navigation_properties.push(nav);
@@ -688,7 +699,6 @@ impl D1ModelAnalysis {
         &mut self,
         model_block: &ModelBlock,
         nav: &NavigationTag,
-        columns: &HashSet<SymbolRef>,
         table: &mut SymbolTable,
         d1_model_blocks: &HashMap<SymbolRef, &ModelBlock>,
     ) -> Option<D1NavigationProperty> {
@@ -984,4 +994,49 @@ fn compare_vecs_ignoring_order<T: Ord>(a: &Vec<T>, b: &Vec<T>) -> bool {
     b_sorted.sort();
 
     a_sorted == b_sorted
+}
+
+// Kahns algorithm for topological sort + cycle detection.
+// If no cycles, returns a map of id to position used for sorting the original collection.
+fn kahns(
+    graph: AdjacencyList,
+    mut in_degree: BTreeMap<SymbolRef, usize>,
+    len: usize,
+) -> Result<HashMap<SymbolRef, usize>, CompilerErrorKind> {
+    let mut queue = in_degree
+        .iter()
+        .filter_map(|(&name, &deg)| (deg == 0).then_some(name))
+        .collect::<VecDeque<_>>();
+
+    let mut rank = HashMap::with_capacity(len);
+    let mut counter = 0usize;
+
+    while let Some(id) = queue.pop_front() {
+        rank.insert(id, counter);
+        counter += 1;
+
+        if let Some(adjs) = graph.get(&id) {
+            for adj in adjs {
+                let deg = in_degree.get_mut(adj).expect("names to be validated");
+                *deg -= 1;
+
+                if *deg == 0 {
+                    queue.push_back(*adj);
+                }
+            }
+        }
+    }
+
+    if rank.len() != len {
+        let cycle: Vec<SymbolRef> = in_degree
+            .iter()
+            .filter_map(|(&n, &d)| (d > 0).then_some(n))
+            .collect();
+
+        if cycle.len() > 0 {
+            return Err(CompilerErrorKind::CyclicalModelRelationship { cycle });
+        }
+    }
+
+    Ok(rank)
 }

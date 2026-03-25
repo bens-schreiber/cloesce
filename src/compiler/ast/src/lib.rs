@@ -4,6 +4,7 @@ use std::hash::Hash;
 use std::path::PathBuf;
 use std::usize;
 
+use indexmap::IndexMap;
 use serde::Deserialize;
 use serde::Serialize;
 use serde_json::Value;
@@ -253,7 +254,7 @@ impl SymbolTable {
 #[derive(Default)]
 pub struct CloesceAst {
     pub wrangler_env: Option<WranglerEnv>,
-    pub models: HashMap<SymbolRef, Model>,
+    pub models: IndexMap<SymbolRef, Model>,
     pub table: SymbolTable,
 }
 

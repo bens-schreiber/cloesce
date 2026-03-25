@@ -729,3 +729,104 @@ fn d1_model_nav_many_to_many() {
         unreachable!()
     };
 }
+
+#[test]
+fn d1_model_cyclical_relationship_error() {
+    // Arrange
+    let src = &with_env(
+        r#"
+        @d1(my_d1)
+        model A {
+            [primary id]
+            id: int
+
+            [foreign bId -> B::id]
+            [nav toB -> B::id]
+            bId: int
+            toB: B
+        }
+
+        @d1(my_d1)
+        model B {
+            [primary id]
+            id: int
+
+            [foreign cId -> C::id]
+            [nav toC -> C::id]
+            cId: int
+            toC: C
+        }
+
+        @d1(my_d1)
+        model C {
+            [primary id]
+            id: int
+
+            [foreign aId -> A::id]
+            [nav toA -> A::id]
+            aId: int
+            toA: A
+        }
+        "#,
+    );
+
+    // Act
+    let parse = lex_and_parse(src);
+    let (ast, errors) = SemanticAnalysis::analyze(parse, &create_spec());
+
+    // Assert
+    assert_eq!(errors.len(), 1);
+    let cycle = expect_err!(errors,
+        CompilerErrorKind::CyclicalModelRelationship { cycle } => cycle.clone()
+    );
+    let cycle_names: Vec<&str> = cycle.iter().map(|&sym| ast.table.name(sym)).collect();
+    assert_eq!(cycle_names, vec!["B", "A", "C"]);
+}
+
+#[test]
+fn d1_model_nullability_prevents_cycle() {
+    // Arrange
+    let src = &with_env(
+        r#"
+        @d1(my_d1)
+        model A {
+            [primary id]
+            id: int
+
+            [foreign bId -> B::id]
+            [nav toB -> B::id]
+            bId: Option<int>
+            toB: Option<B>
+        }
+
+        @d1(my_d1)
+        model B {
+            [primary id]
+            id: int
+
+            [foreign cId -> C::id]
+            [nav toC -> C::id]
+            cId: Option<int>
+            toC: Option<C>
+        }
+
+        @d1(my_d1)
+        model C {
+            [primary id]
+            id: int
+
+            [foreign aId -> A::id]
+            [nav toA -> A::id]
+            aId: Option<int>
+            toA: Option<A>
+        }
+        "#,
+    );
+
+    // Act
+    let parse = lex_and_parse(src);
+    let (ast, errors) = SemanticAnalysis::analyze(parse, &create_spec());
+
+    // Assert
+    assert_eq!(errors.len(), 0);
+}

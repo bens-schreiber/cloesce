@@ -136,6 +136,10 @@ pub enum CompilerErrorKind {
         first_m2m_nav: SymbolRef,
         second_m2m_nav: SymbolRef,
     },
+
+    CyclicalModelRelationship {
+        cycle: Vec<SymbolRef>,
+    },
 }
 
 #[derive(Debug, Default)]
