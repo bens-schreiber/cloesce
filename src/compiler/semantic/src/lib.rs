@@ -1,6 +1,7 @@
 use ast::{
-    CidlType, CloesceAst, FileSpan, Model, Api, PlainOldObject, Service, Symbol, SymbolKind,
-    SymbolRef, SymbolTable, WranglerEnv, WranglerEnvBindingKind, WranglerSpec,
+    Api, CidlType, CloesceAst, DataSource, DataSourceMethod, FileSpan, IncludeTree, Model,
+    PlainOldObject, Service, Symbol, SymbolKind, SymbolRef, SymbolTable, WranglerEnv,
+    WranglerEnvBindingKind, WranglerSpec,
 };
 use frontend::{ModelBlock, ParseAst};
 use indexmap::IndexMap;
@@ -27,12 +28,20 @@ impl SemanticAnalysis {
         let mut models = Self::models(&parse, &mut table, &mut sink);
         let poos = Self::poos(&parse, &mut table, &mut sink);
         let api_map = Self::apis(&parse, &table, &mut sink);
+        let data_source_map = Self::data_sources(&parse, &models, &table, &mut sink);
         let services = Self::services(&parse, &table, &mut sink);
 
         // Merge API methods into their respective models
         for (model_ref, api) in api_map {
             if let Some(model) = models.get_mut(&model_ref) {
                 model.apis.push(api);
+            }
+        }
+
+        // Merge data sources into their respective models
+        for (model_ref, ds) in data_source_map {
+            if let Some(model) = models.get_mut(&model_ref) {
+                model.data_sources.push(ds);
             }
         }
 
@@ -393,6 +402,58 @@ impl SemanticAnalysis {
             }
         }
 
+        for source in &parse.sources {
+            let new_span = FileSpan {
+                start: source.span.start,
+                end: source.span.end,
+                file: source.file.clone(),
+            };
+            let symbol = Symbol {
+                id: source.id,
+                name: source.name.clone(),
+                span: new_span.clone(),
+                kind: SymbolKind::DataSourceDecl,
+                parent: source.model,
+                ..Default::default()
+            };
+
+            if let Some(existing) = table.insert(symbol) {
+                let first_span = existing.span.clone();
+                sink.push(CompilerErrorKind::DuplicateSymbol {
+                    symbol: source.id,
+                    first_span,
+                    second_span: new_span,
+                });
+            }
+
+            for method in [&source.list, &source.get].into_iter().flatten() {
+                for param in &method.parameters {
+                    let new_span = FileSpan {
+                        start: param.span.start,
+                        end: param.span.end,
+                        file: source.file.clone(),
+                    };
+                    let symbol = Symbol {
+                        id: param.id,
+                        name: param.name.clone(),
+                        span: new_span.clone(),
+                        kind: SymbolKind::DataSourceMethodParam,
+                        parent: source.id,
+                        cidl_type: param.cidl_type.clone(),
+                    };
+
+                    if let Some(existing) = table.insert(symbol) {
+                        let first_span = existing.span.clone();
+                        sink.push(CompilerErrorKind::DuplicateSymbol {
+                            symbol: param.id,
+                            first_span,
+                            second_span: new_span,
+                        });
+                    }
+                }
+            }
+        }
+
         for service in &parse.services {
             let new_span = FileSpan {
                 start: service.span.start,
@@ -577,11 +638,7 @@ impl SemanticAnalysis {
         }
     }
 
-    fn apis(
-        parse: &ParseAst,
-        table: &SymbolTable,
-        sink: &mut ErrorSink,
-    ) -> Vec<(SymbolRef, Api)> {
+    fn apis(parse: &ParseAst, table: &SymbolTable, sink: &mut ErrorSink) -> Vec<(SymbolRef, Api)> {
         match ApiAnalysis::default().analyze(&parse.apis, parse, table) {
             Ok(apis) => apis,
             Err(errs) => {
@@ -589,6 +646,123 @@ impl SemanticAnalysis {
                 Vec::new()
             }
         }
+    }
+
+    fn data_sources(
+        parse: &ParseAst,
+        models: &IndexMap<SymbolRef, Model>,
+        table: &SymbolTable,
+        sink: &mut ErrorSink,
+    ) -> Vec<(SymbolRef, DataSource)> {
+        let mut result = Vec::new();
+
+        // Validate list and get method parameters
+        fn analyze_method(
+            source: &frontend::DataSourceBlock,
+            method: &frontend::DataSourceBlockMethod,
+            sink: &mut ErrorSink,
+        ) -> Option<DataSourceMethod> {
+            let mut params = Vec::new();
+            for param in &method.parameters {
+                if !is_valid_sql_type(&param.cidl_type) {
+                    sink.push(CompilerErrorKind::DataSourceInvalidMethodParam {
+                        source: source.id,
+                        param: param.id,
+                    });
+                }
+                params.push(param.id);
+            }
+            Some(DataSourceMethod {
+                symbol: source.id,
+                parameters: params,
+                raw_sql: method.raw_sql.clone(),
+            })
+        }
+
+        for source in &parse.sources {
+            // Validate the model reference
+            let Some(model_sym) = table.lookup(source.model) else {
+                sink.push(CompilerErrorKind::DataSourceUnknownModelReference { source: source.id });
+                continue;
+            };
+
+            if !matches!(model_sym.kind, SymbolKind::ModelDecl) {
+                sink.push(CompilerErrorKind::DataSourceUnknownModelReference { source: source.id });
+                continue;
+            }
+
+            let Some(model) = models.get(&source.model) else {
+                sink.push(CompilerErrorKind::DataSourceUnknownModelReference { source: source.id });
+                continue;
+            };
+
+            // Validate include tree via BFS
+            let mut q = VecDeque::new();
+            q.push_back((&source.tree, source.model, model));
+
+            while let Some((node, parent_model_ref, parent_model)) = q.pop_front() {
+                for (var_name, child) in &node.0 {
+                    // Check navigation properties
+                    let nav = parent_model
+                        .navigation_properties
+                        .iter()
+                        .find(|nav| table.name(nav.field) == var_name.as_str());
+
+                    if let Some(nav) = nav {
+                        // Navigate into the adjacent model
+                        if let Some(adj_model) = models.get(&nav.adj_model) {
+                            q.push_back((child, nav.adj_model, adj_model));
+                        }
+                        continue;
+                    }
+
+                    // Check KV properties
+                    if parent_model
+                        .kv_properties
+                        .iter()
+                        .any(|kv| table.name(kv.field) == var_name.as_str())
+                    {
+                        continue;
+                    }
+
+                    // Check R2 properties
+                    if parent_model
+                        .r2_properties
+                        .iter()
+                        .any(|r2| table.name(r2.field) == var_name.as_str())
+                    {
+                        continue;
+                    }
+
+                    sink.push(CompilerErrorKind::DataSourceInvalidIncludeTreeReference {
+                        source: source.id,
+                        model: parent_model_ref,
+                        name: var_name.clone(),
+                    });
+                }
+            }
+
+            let list = source
+                .list
+                .as_ref()
+                .and_then(|m| analyze_method(source, m, sink));
+            let get = source
+                .get
+                .as_ref()
+                .and_then(|m| analyze_method(source, m, sink));
+
+            result.push((
+                source.model,
+                DataSource {
+                    symbol: source.id,
+                    tree: IncludeTree(source.tree.0.clone()),
+                    list,
+                    get,
+                },
+            ));
+        }
+
+        result
     }
 
     fn poos(
@@ -711,9 +885,7 @@ impl SemanticAnalysis {
                         }
                     }
                     _ => {
-                        sink.push(CompilerErrorKind::ServiceInvalidFieldType {
-                            field: field.id,
-                        });
+                        sink.push(CompilerErrorKind::ServiceInvalidFieldType { field: field.id });
                     }
                 }
             }
@@ -736,6 +908,24 @@ impl SemanticAnalysis {
             }
         }
     }
+}
+
+/// Returns if a column in a D1 model is a valid SQLite type
+pub fn is_valid_sql_type(cidl_type: &CidlType) -> bool {
+    let inner = match cidl_type {
+        CidlType::Nullable(inner) => inner.as_ref(),
+        other => other,
+    };
+
+    matches!(
+        inner,
+        CidlType::Integer
+            | CidlType::Double
+            | CidlType::String
+            | CidlType::Blob
+            | CidlType::Boolean
+            | CidlType::DateIso
+    )
 }
 
 type AdjacencyList = BTreeMap<SymbolRef, Vec<SymbolRef>>;
@@ -784,4 +974,3 @@ pub fn kahns(
 
     Ok(rank)
 }
-

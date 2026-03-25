@@ -954,6 +954,135 @@ fn api_errors() {
 }
 
 #[test]
+fn data_source_errors() {
+    // Arrange
+    let src = &with_env(
+        r#"
+        @d1(my_d1)
+        model User {
+            [primary id]
+            id: int
+            name: string
+
+            @kv(my_kv, "users/{id}")
+            cached: string
+
+            @r2(my_r2, "avatars/{id}")
+            avatar: R2Object
+
+            [nav posts -> Post::authorId]
+            posts: Array<Post>
+        }
+
+        @d1(my_d1)
+        model Post {
+            [primary id]
+            id: int
+            title: string
+
+            [foreign authorId -> User::id]
+            authorId: int
+        }
+
+        // Unknown model reference
+        source BadModelSource for NonExistent {
+            include { nonexistent }
+        }
+
+        // Invalid include tree reference
+        source BadTreeSource for User {
+            include { nonexistent }
+        }
+
+        // Invalid nested include tree reference
+        source BadNestedTreeSource for User {
+            include { posts { bogus } }
+        }
+
+        // Invalid method param type (Object, not a sqlite type)
+        source BadParamSource for User {
+            include { posts }
+            sql get(u: User) {
+                "SELECT * FROM users WHERE id = ?"
+            }
+        }
+
+    "#,
+    );
+    let parse = lex_and_parse(src);
+
+    // Act
+    let (ast, errors) = SemanticAnalysis::analyze(parse, &create_spec());
+
+    // Assert
+    // BadModelSource: unknown model
+    expect_err!(
+        errors,
+        CompilerErrorKind::DataSourceUnknownModelReference { .. }
+    );
+
+    // BadTreeSource: "nonexistent" is not a field on User
+    assert!(errors.iter().any(|e| matches!(
+        e,
+        CompilerErrorKind::DataSourceInvalidIncludeTreeReference { name, .. }
+            if name == "nonexistent"
+    )));
+
+    // BadNestedTreeSource: "bogus" is not a field on Post
+    assert!(errors.iter().any(|e| matches!(
+        e,
+        CompilerErrorKind::DataSourceInvalidIncludeTreeReference { name, .. }
+            if name == "bogus"
+    )));
+
+    // BadParamSource: User is not a valid sql type
+    expect_err!(
+        errors,
+        CompilerErrorKind::DataSourceInvalidMethodParam { .. }
+    );
+}
+
+#[test]
+fn data_source_include_tree_kv_r2() {
+    // Arrange
+    let src = &with_env(
+        r#"
+        @d1(my_d1)
+        model User {
+            [primary id]
+            id: int
+            name: string
+
+            @kv(my_kv, "users/{id}")
+            cached: string
+
+            @r2(my_r2, "avatars/{id}")
+            avatar: R2Object
+        }
+
+        source WithKvR2 for User {
+            include { cached, avatar }
+        }
+    "#,
+    );
+    let parse = lex_and_parse(src);
+
+    // Act
+    let (ast, errors) = SemanticAnalysis::analyze(parse, &create_spec());
+
+    // Assert
+    assert_eq!(errors.len(), 0);
+
+    let user = ast
+        .models
+        .values()
+        .find(|m| ast.table.name(m.symbol) == "User")
+        .unwrap();
+    assert_eq!(user.data_sources.len(), 1);
+    assert_eq!(ast.table.name(user.data_sources[0].symbol), "WithKvR2");
+}
+
+#[test]
 fn poo_errors() {
     // Arrange
     let src = r#"

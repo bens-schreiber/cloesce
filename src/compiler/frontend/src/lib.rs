@@ -1,6 +1,6 @@
 use std::{collections::BTreeMap, path::PathBuf};
 
-use ast::{CidlType, CrudKind, HttpVerb};
+use ast::{CidlType, CrudKind, HttpVerb, IncludeTree};
 use chumsky::span::SimpleSpan;
 
 use crate::parser::ParseId;
@@ -44,8 +44,6 @@ pub struct ApiBlockMethod {
     pub return_type: CidlType,
     pub parameters: Vec<SpannedTypedName>,
 }
-
-pub struct IncludeTree(pub BTreeMap<String, IncludeTree>);
 
 pub struct DataSourceBlockMethod {
     pub span: SimpleSpan,

@@ -13,7 +13,7 @@ use std::{
 use crate::{
     ensure,
     err::{BatchResult, CompilerErrorKind, ErrorSink},
-    kahns,
+    is_valid_sql_type, kahns,
 };
 
 #[derive(Default)]
@@ -771,24 +771,6 @@ impl ModelAnalysis {
             model.key_fields.insert(key_field.field);
         }
     }
-}
-
-/// Returns if a column in a D1 model is a valid SQLite type
-fn is_valid_sql_type(cidl_type: &CidlType) -> bool {
-    let inner = match cidl_type {
-        CidlType::Nullable(inner) => inner.as_ref(),
-        other => other,
-    };
-
-    matches!(
-        inner,
-        CidlType::Integer
-            | CidlType::Double
-            | CidlType::String
-            | CidlType::Blob
-            | CidlType::Boolean
-            | CidlType::DateIso
-    )
 }
 
 fn compare_vecs_ignoring_order<T: Ord>(a: &Vec<T>, b: &Vec<T>) -> bool {

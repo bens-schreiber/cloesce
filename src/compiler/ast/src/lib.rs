@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::hash::Hash;
@@ -139,6 +140,10 @@ pub enum SymbolKind {
     ApiMethodDecl,
     ApiMethodParam,
 
+    DataSourceDecl,
+    DataSourceMethodDecl,
+    DataSourceMethodParam,
+
     ServiceDecl,
     ServiceField,
 
@@ -269,6 +274,22 @@ pub struct Api {
     pub methods: Vec<ApiMethod>,
 }
 
+pub struct DataSourceMethod {
+    pub symbol: SymbolRef,
+    pub parameters: Vec<SymbolRef>,
+    pub raw_sql: String,
+}
+
+pub struct DataSource {
+    pub symbol: SymbolRef,
+    pub tree: IncludeTree,
+    pub list: Option<DataSourceMethod>,
+    pub get: Option<DataSourceMethod>,
+}
+
+#[derive(Clone)]
+pub struct IncludeTree(pub BTreeMap<String, IncludeTree>);
+
 #[derive(Default)]
 pub struct Model {
     pub hash: u64,
@@ -286,6 +307,7 @@ pub struct Model {
     pub r2_properties: Vec<R2Property>,
 
     pub apis: Vec<Api>,
+    pub data_sources: Vec<DataSource>,
 }
 
 #[derive(PartialEq, Debug, Clone, Copy)]

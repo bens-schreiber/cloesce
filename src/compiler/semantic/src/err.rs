@@ -187,6 +187,24 @@ pub enum CompilerErrorKind {
         field: SymbolRef,
     },
 
+    /// A data source references a model that does not exist or is not a model.
+    DataSourceUnknownModelReference {
+        source: SymbolRef,
+    },
+
+    /// A data source include tree references a name that is not a navigation property, KV, or R2 on the model.
+    DataSourceInvalidIncludeTreeReference {
+        source: SymbolRef,
+        model: SymbolRef,
+        name: String,
+    },
+
+    /// A data source method parameter is not a valid SQLite type.
+    DataSourceInvalidMethodParam {
+        source: SymbolRef,
+        param: SymbolRef,
+    },
+
     /// An API block references a model that does not exist.
     ApiUnknownModelReference {
         api: SymbolRef,
