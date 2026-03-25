@@ -308,6 +308,8 @@ pub struct Model {
 
     pub apis: Vec<Api>,
     pub data_sources: Vec<DataSource>,
+
+    pub cruds: Vec<CrudKind>,
 }
 
 #[derive(PartialEq, Debug, Clone, Copy)]

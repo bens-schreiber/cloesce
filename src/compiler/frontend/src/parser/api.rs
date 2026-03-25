@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use chumsky::prelude::*;
 
-use ast::{CidlType, CrudKind, HttpVerb};
+use ast::{CidlType, HttpVerb};
 
 use crate::{
     ApiBlock, ApiBlockMethod, SpannedTypedName,
@@ -32,7 +32,6 @@ enum PendingApiParam {
 /// Parses a block of the form:
 ///
 /// ```cloesce
-/// @crud(get | save | list, ...)
 /// api ApiName for ModelName {
 ///     http_verb methodName(ident1: cidl_type, ...) -> cidl_type
 ///
@@ -44,27 +43,12 @@ enum PendingApiParam {
 /// }
 /// ```
 pub fn api_block<'t>(st: It) -> impl Parser<'t, &'t [Token], ApiBlock, Extra<'t>> {
-    // @crud(get | save | list, ...)
-    let crud_tag = just(Token::At)
-        .ignore_then(just(Token::Crud))
-        .ignore_then(just(Token::LParen))
-        .ignore_then(
-            crud_kind()
-                .separated_by(just(Token::Comma))
-                .at_least(1)
-                .collect::<Vec<_>>(),
-        )
-        .then_ignore(just(Token::RParen))
-        .or_not()
-        .map(|cruds| cruds.unwrap_or_default());
-
     let st_methods = st.clone();
     let st_map = st.clone();
 
     // api ApiName for ModelName { ... }
-    crud_tag
-        .then_ignore(just(Token::Api))
-        .then(select! { Token::Ident(name) => name })
+    just(Token::Api)
+        .ignore_then(select! { Token::Ident(name) => name })
         .then_ignore(just(Token::For))
         .then(select! { Token::Ident(name) => name })
         .then(
@@ -74,7 +58,7 @@ pub fn api_block<'t>(st: It) -> impl Parser<'t, &'t [Token], ApiBlock, Extra<'t>
                 .delimited_by(just(Token::LBrace), just(Token::RBrace)),
         )
         .map_with(
-            move |(((cruds, api_name), model_name), pending_methods), e| {
+            move |((api_name, model_name), pending_methods), e| {
                 let id = st_map
                     .borrow_mut()
                     .intern(api_name.clone(), IdScope::Global);
@@ -92,7 +76,6 @@ pub fn api_block<'t>(st: It) -> impl Parser<'t, &'t [Token], ApiBlock, Extra<'t>
                     span: e.span(),
                     file: PathBuf::new(),
                     model,
-                    cruds,
                     methods,
                 }
             },
@@ -161,15 +144,6 @@ fn http_verb<'t>() -> impl Parser<'t, &'t [Token], HttpVerb, Extra<'t>> {
         just(Token::Put).map(|_| HttpVerb::Put),
         just(Token::Patch).map(|_| HttpVerb::Patch),
         just(Token::Delete).map(|_| HttpVerb::Delete),
-    ))
-}
-
-fn crud_kind<'t>() -> impl Parser<'t, &'t [Token], CrudKind, Extra<'t>> {
-    choice((
-        just(Token::Get).map(|_| CrudKind::GET),
-        select! { Token::Ident(name) if name == "get" => CrudKind::GET },
-        select! { Token::Ident(name) if name == "save" => CrudKind::SAVE },
-        select! { Token::Ident(name) if name == "list" => CrudKind::LIST },
     ))
 }
 

@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use chumsky::prelude::*;
 
-use ast::CidlType;
+use ast::{CidlType, CrudKind};
 
 use crate::{
     D1Tag, ForeignKeyTag, KeyFieldTag, KvR2Tag, ModelBlock, NavigationTag, PrimaryKeyTag,
@@ -50,6 +50,7 @@ enum ModelField {
 ///
 ///```cloesce
 /// @d1(binding)
+/// @crud(get | save | list, ...)
 /// model ModelName {
 ///   ident1: sqlite_column_type
 ///
@@ -63,6 +64,20 @@ enum ModelField {
 /// }
 /// ```
 pub fn model_block<'t>(it: It) -> impl Parser<'t, &'t [Token], ModelBlock, Extra<'t>> {
+    // @crud(get | save | list, ...)
+    let crud_tag = just(Token::At)
+        .ignore_then(just(Token::Crud))
+        .ignore_then(just(Token::LParen))
+        .ignore_then(
+            crud_kind()
+                .separated_by(just(Token::Comma))
+                .at_least(1)
+                .collect::<Vec<_>>(),
+        )
+        .then_ignore(just(Token::RParen))
+        .or_not()
+        .map(|cruds| cruds.unwrap_or_default());
+
     // @d1(binding)
     let d1_binding = just(Token::At)
         .ignore_then(just(Token::D1))
@@ -266,7 +281,8 @@ pub fn model_block<'t>(it: It) -> impl Parser<'t, &'t [Token], ModelBlock, Extra
             }
         });
 
-    d1_binding
+    crud_tag
+        .then(d1_binding)
         .then_ignore(just(Token::Model))
         .then(select! { Token::Ident(name) => name }.map_with(|name, e| (name, e.span())))
         .then(
@@ -275,8 +291,8 @@ pub fn model_block<'t>(it: It) -> impl Parser<'t, &'t [Token], ModelBlock, Extra
                 .collect::<Vec<_>>()
                 .delimited_by(just(Token::LBrace), just(Token::RBrace)),
         )
-        .map(move |((d1_binding, (name, span)), items)| {
-            map_model(&it, name, span, d1_binding, items)
+        .map(move |(((cruds, d1_binding), (name, span)), items)| {
+            map_model(&it, name, span, d1_binding, cruds, items)
         })
 }
 
@@ -285,6 +301,7 @@ fn map_model(
     name: String,
     span: SimpleSpan,
     d1_binding: Option<(String, SimpleSpan)>,
+    cruds: Vec<CrudKind>,
     items: Vec<ModelField>,
 ) -> ModelBlock {
     let model_scope = IdScope::Model(name.clone());
@@ -440,7 +457,17 @@ fn map_model(
         navigation_properties,
         foreign_keys,
         unique_constraints,
+        cruds,
     }
+}
+
+fn crud_kind<'t>() -> impl Parser<'t, &'t [Token], CrudKind, Extra<'t>> {
+    choice((
+        just(Token::Get).map(|_| CrudKind::GET),
+        select! { Token::Ident(name) if name == "get" => CrudKind::GET },
+        select! { Token::Ident(name) if name == "save" => CrudKind::SAVE },
+        select! { Token::Ident(name) if name == "list" => CrudKind::LIST },
+    ))
 }
 
 fn unquote_string_literal(literal: String) -> String {

@@ -205,6 +205,11 @@ pub enum CompilerErrorKind {
         param: SymbolRef,
     },
 
+    /// A model has a CRUD operation that is not supported for its backing store.
+    UnsupportedCrudOperation {
+        model: SymbolRef,
+    },
+
     /// An API block references a model that does not exist.
     ApiUnknownModelReference {
         api: SymbolRef,

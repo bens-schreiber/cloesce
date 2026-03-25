@@ -1,5 +1,5 @@
 use ast::{
-    CidlType, ForeignKey, KvProperty, Model, NavigationProperty, NavigationPropertyKind,
+    CidlType, CrudKind, ForeignKey, KvProperty, Model, NavigationProperty, NavigationPropertyKind,
     R2Property, Symbol, SymbolKind, SymbolRef, SymbolTable, WranglerEnvBindingKind,
 };
 use frontend::{ForeignKeyTag, KvR2Tag, ModelBlock, NavigationTag};
@@ -53,6 +53,17 @@ impl ModelAnalysis {
                 self.kv_r2_properties(&mut model, model_block, table);
             }
 
+            // Validate CRUD
+            for crud in &model_block.cruds {
+                if matches!(crud, CrudKind::LIST) && model.d1_binding.is_none() {
+                    self.sink
+                        .push(CompilerErrorKind::UnsupportedCrudOperation {
+                            model: model_block.id,
+                        });
+                }
+            }
+
+            model.cruds = model_block.cruds.clone();
             models.insert(model_block.id, model);
         }
 

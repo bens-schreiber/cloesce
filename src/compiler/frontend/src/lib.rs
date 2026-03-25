@@ -30,7 +30,6 @@ pub struct ApiBlock {
     pub file: PathBuf,
 
     pub model: ParseId,
-    pub cruds: Vec<CrudKind>,
     pub methods: Vec<ApiBlockMethod>,
 }
 
@@ -146,6 +145,8 @@ pub struct ModelBlock {
 
     pub navigation_properties: Vec<NavigationTag>,
     pub foreign_keys: Vec<ForeignKeyTag>,
+
+    pub cruds: Vec<CrudKind>,
 }
 
 pub struct ServiceBlock {

@@ -444,13 +444,13 @@ fn model_block_nav_many_to_many() {
 fn api_block() {
     let (ast, it) = lex_and_parse_with_id(
         r#"
+        @crud(get, save, list)
         model User {
             [primary id]
             id: int
             name: string
         }
 
-        @crud(get, save, list)
         api UserApi for User {
             post someMethod(
                 @source(mySource)
@@ -461,16 +461,25 @@ fn api_block() {
             get anotherMethod() -> void
         }
 
-        @crud(get)
         api UserGetApi for User {
             get getById(id: int) -> void
         }
 
-        @crud(save, list)
         api UserMutApi for User {
             post update(self) -> void
         }
         "#,
+    );
+
+    // Verify cruds are on the model
+    let user_model = ast
+        .models
+        .iter()
+        .find(|m| m.name == "User")
+        .expect("User model to be present");
+    assert_eq!(
+        user_model.cruds,
+        vec![CrudKind::GET, CrudKind::SAVE, CrudKind::LIST]
     );
 
     // ParseAst keeps api blocks separate
@@ -481,7 +490,7 @@ fn api_block() {
         .collect();
     assert_eq!(user_api_blocks.len(), 3);
 
-    // First block: @crud(get, save, list) with someMethod + anotherMethod
+    // First block: someMethod + anotherMethod
     let first = user_api_blocks
         .iter()
         .find(|a| {
@@ -490,10 +499,6 @@ fn api_block() {
                 .any(|m| it.name_of(m.id) == Some("someMethod"))
         })
         .expect("block with someMethod");
-    assert_eq!(
-        first.cruds,
-        vec![CrudKind::GET, CrudKind::SAVE, CrudKind::LIST]
-    );
 
     let some_method = first
         .methods
@@ -522,7 +527,7 @@ fn api_block() {
     assert_eq!(another_method.parameters.len(), 0);
     assert_eq!(another_method.return_type, CidlType::Void);
 
-    // Second block: @crud(get) with getById
+    // Second block: getById
     let second = user_api_blocks
         .iter()
         .find(|a| {
@@ -531,14 +536,14 @@ fn api_block() {
                 .any(|m| it.name_of(m.id) == Some("getById"))
         })
         .expect("block with getById");
-    assert_eq!(second.cruds, vec![CrudKind::GET]);
+    assert_eq!(second.methods.len(), 1);
 
-    // Third block: @crud(save, list) with update
+    // Third block: update
     let third = user_api_blocks
         .iter()
         .find(|a| a.methods.iter().any(|m| it.name_of(m.id) == Some("update")))
         .expect("block with update");
-    assert_eq!(third.cruds, vec![CrudKind::SAVE, CrudKind::LIST]);
+    assert_eq!(third.methods.len(), 1);
 }
 
 #[test]
