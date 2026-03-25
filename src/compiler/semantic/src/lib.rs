@@ -1,11 +1,11 @@
 use ast::{
-    CloesceAst, FileSpan, Model, Symbol, SymbolKind, SymbolRef, SymbolTable, WranglerEnv,
-    WranglerEnvBindingKind, WranglerSpec,
+    CidlType, CloesceAst, FileSpan, Model, PlainOldObject, Symbol, SymbolKind, SymbolRef,
+    SymbolTable, WranglerEnv, WranglerEnvBindingKind, WranglerSpec,
 };
 use frontend::{ModelBlock, ParseAst};
 use indexmap::IndexMap;
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
 
 use crate::{
     err::{CompilerErrorKind, ErrorSink},
@@ -23,11 +23,13 @@ impl SemanticAnalysis {
         let mut table = Self::symbol_table(&parse, &mut sink);
         let wrangler_env = Self::wrangler(&parse, spec, &mut sink);
         let models = Self::models(&parse, &mut table, &mut sink);
+        let poos = Self::poos(&parse, &mut table, &mut sink);
 
         let ast = CloesceAst {
             wrangler_env,
             models,
             table,
+            poos,
             ..Default::default()
         };
 
@@ -257,6 +259,55 @@ impl SemanticAnalysis {
             }
         }
 
+        for poo in &parse.poos {
+            let new_span = FileSpan {
+                start: poo.span.start,
+                end: poo.span.end,
+                file: poo.file.clone(),
+            };
+            let symbol = Symbol {
+                id: poo.id,
+                name: poo.name.clone(),
+                span: new_span.clone(),
+                kind: SymbolKind::PlainOldObjectDecl,
+                ..Default::default()
+            };
+
+            if let Some(existing) = table.insert(symbol) {
+                let first_span = existing.span.clone();
+                sink.push(CompilerErrorKind::DuplicateSymbol {
+                    symbol: poo.id,
+                    first_span,
+                    second_span: new_span,
+                });
+            }
+
+            for field in &poo.fields {
+                let new_span = FileSpan {
+                    start: field.span.start,
+                    end: field.span.end,
+                    file: poo.file.clone(),
+                };
+                let symbol = Symbol {
+                    id: field.id,
+                    name: field.name.clone(),
+                    span: new_span.clone(),
+                    kind: SymbolKind::PlainOldObjectField,
+                    parent: poo.id,
+                    cidl_type: field.cidl_type.clone(),
+                };
+
+                if let Some(existing) = table.insert(symbol) {
+                    let first_span = existing.span.clone();
+                    sink.push(CompilerErrorKind::DuplicateSymbol {
+                        symbol: field.id,
+                        first_span,
+                        second_span: new_span,
+                    });
+                }
+            }
+        }
+
         table
     }
 
@@ -365,4 +416,125 @@ impl SemanticAnalysis {
             }
         }
     }
+
+    fn poos(
+        parse: &ParseAst,
+        table: &mut SymbolTable,
+        sink: &mut ErrorSink,
+    ) -> HashMap<SymbolRef, PlainOldObject> {
+        let mut poos = HashMap::new();
+
+        // Cycle detection
+        let mut in_degree = BTreeMap::<SymbolRef, usize>::new();
+        let mut graph = BTreeMap::<SymbolRef, Vec<SymbolRef>>::new();
+
+        for poo in &parse.poos {
+            let mut fields = HashSet::new();
+            graph.entry(poo.id).or_default();
+            in_degree.entry(poo.id).or_insert(0);
+
+            for field in &poo.fields {
+                let Some(field_sym) = table.lookup(field.id) else {
+                    sink.push(CompilerErrorKind::UnresolvedSymbol { symbol: field.id });
+                    continue;
+                };
+
+                match field_sym.cidl_type.root_type() {
+                    // TODO: data sources
+                    CidlType::Object(o) | CidlType::Partial(o) => {
+                        let Some(poo_sym) = table.lookup(*o) else {
+                            sink.push(CompilerErrorKind::UnresolvedSymbol { symbol: *o });
+                            continue;
+                        };
+
+                        ensure!(
+                            matches!(
+                                poo_sym.kind,
+                                SymbolKind::PlainOldObjectDecl | SymbolKind::ModelDecl
+                            ),
+                            sink,
+                            CompilerErrorKind::PlainOldObjectInvalidFieldType { field: field.id }
+                        );
+
+                        if matches!(poo_sym.kind, SymbolKind::PlainOldObjectDecl) {
+                            graph.entry(*o).or_default().push(poo.id);
+                            in_degree.entry(poo.id).and_modify(|d| *d += 1);
+                        }
+                    }
+                    CidlType::Stream | CidlType::Void => {
+                        sink.push(CompilerErrorKind::PlainOldObjectInvalidFieldType {
+                            field: field.id,
+                        });
+                    }
+                    _ => {
+                        // All other types are valid
+                        fields.insert(field.id);
+                    }
+                }
+            }
+
+            poos.insert(
+                poo.id,
+                PlainOldObject {
+                    symbol: poo.id,
+                    fields,
+                },
+            );
+        }
+
+        match kahns(graph, in_degree, parse.poos.len()) {
+            Ok(_) => poos,
+            Err(err) => {
+                sink.push(err);
+                HashMap::new()
+            }
+        }
+    }
+}
+
+type AdjacencyList = BTreeMap<SymbolRef, Vec<SymbolRef>>;
+
+// Kahns algorithm for topological sort + cycle detection.
+// If no cycles, returns a map of id to position used for sorting the original collection.
+pub fn kahns(
+    graph: AdjacencyList,
+    mut in_degree: BTreeMap<SymbolRef, usize>,
+    len: usize,
+) -> Result<HashMap<SymbolRef, usize>, CompilerErrorKind> {
+    let mut queue = in_degree
+        .iter()
+        .filter_map(|(&id, &deg)| (deg == 0).then_some(id))
+        .collect::<VecDeque<_>>();
+
+    let mut rank = HashMap::with_capacity(len);
+    let mut counter = 0usize;
+
+    while let Some(id) = queue.pop_front() {
+        rank.insert(id, counter);
+        counter += 1;
+
+        if let Some(adjs) = graph.get(&id) {
+            for adj in adjs {
+                let deg = in_degree.get_mut(adj).expect("names to be validated");
+                *deg -= 1;
+
+                if *deg == 0 {
+                    queue.push_back(*adj);
+                }
+            }
+        }
+    }
+
+    if rank.len() != len {
+        let cycle: Vec<SymbolRef> = in_degree
+            .iter()
+            .filter_map(|(&n, &d)| (d > 0).then_some(n))
+            .collect();
+
+        if cycle.len() > 0 {
+            return Err(CompilerErrorKind::CyclicalRelationship { cycle });
+        }
+    }
+
+    Ok(rank)
 }

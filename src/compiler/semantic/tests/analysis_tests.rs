@@ -748,7 +748,7 @@ fn d1_model_cyclical_relationship_error() {
     // Assert
     assert_eq!(errors.len(), 1);
     let cycle = expect_err!(errors,
-        CompilerErrorKind::CyclicalModelRelationship { cycle } => cycle.clone()
+        CompilerErrorKind::CyclicalRelationship { cycle } => cycle.clone()
     );
     let cycle_names: Vec<&str> = cycle.iter().map(|&sym| ast.table.name(sym)).collect();
     assert_eq!(cycle_names, vec!["B", "A", "C"]);
@@ -892,4 +892,39 @@ fn kv_and_d1_coexist() {
     assert!(user.d1_binding.is_some());
     assert_eq!(user.kv_properties.len(), 1);
     assert_eq!(user.columns.len(), 3); // id, name, cached
+}
+
+#[test]
+fn poo_errors() {
+    // Arrange
+    let src = r#"
+        poo MyPoo {
+            streamField: stream
+            voidField: void
+            cyclicalField: MyPoo
+        }
+    "#;
+
+    // Act
+    let parse = lex_and_parse(src);
+    let (ast, errors) = SemanticAnalysis::analyze(parse, &create_spec());
+
+    // Assert
+    assert_eq!(errors.len(), 3);
+
+    let cycle = expect_err!(errors,
+        CompilerErrorKind::CyclicalRelationship { cycle } => cycle.clone()
+    );
+    let cycle_names: Vec<&str> = cycle.iter().map(|&sym| ast.table.name(sym)).collect();
+    assert_eq!(cycle_names, vec!["MyPoo"]);
+
+    assert!(errors.iter().find(|e| matches!(
+        e,
+        CompilerErrorKind::PlainOldObjectInvalidFieldType { field } if ast.table.name(*field) == "streamField"
+    )).is_some());
+
+    assert!(errors.iter().find(|e| matches!(
+        e,
+        CompilerErrorKind::PlainOldObjectInvalidFieldType { field } if ast.table.name(*field) == "voidField"
+    )).is_some());
 }

@@ -6,16 +6,15 @@ use frontend::{ForeignKeyTag, KvR2Tag, ModelBlock, NavigationTag};
 use indexmap::IndexMap;
 
 use std::{
-    collections::{BTreeMap, HashMap, HashSet, VecDeque},
+    collections::{BTreeMap, HashMap, HashSet},
     ops::Not,
 };
 
 use crate::{
     ensure,
     err::{BatchResult, CompilerErrorKind, ErrorSink},
+    kahns,
 };
-
-type AdjacencyList = BTreeMap<SymbolRef, Vec<SymbolRef>>;
 
 #[derive(Default)]
 pub struct ModelAnalysis {
@@ -782,51 +781,6 @@ fn compare_vecs_ignoring_order<T: Ord>(a: &Vec<T>, b: &Vec<T>) -> bool {
     b_sorted.sort();
 
     a_sorted == b_sorted
-}
-
-// Kahns algorithm for topological sort + cycle detection.
-// If no cycles, returns a map of id to position used for sorting the original collection.
-fn kahns(
-    graph: AdjacencyList,
-    mut in_degree: BTreeMap<SymbolRef, usize>,
-    len: usize,
-) -> Result<HashMap<SymbolRef, usize>, CompilerErrorKind> {
-    let mut queue = in_degree
-        .iter()
-        .filter_map(|(&name, &deg)| (deg == 0).then_some(name))
-        .collect::<VecDeque<_>>();
-
-    let mut rank = HashMap::with_capacity(len);
-    let mut counter = 0usize;
-
-    while let Some(id) = queue.pop_front() {
-        rank.insert(id, counter);
-        counter += 1;
-
-        if let Some(adjs) = graph.get(&id) {
-            for adj in adjs {
-                let deg = in_degree.get_mut(adj).expect("names to be validated");
-                *deg -= 1;
-
-                if *deg == 0 {
-                    queue.push_back(*adj);
-                }
-            }
-        }
-    }
-
-    if rank.len() != len {
-        let cycle: Vec<SymbolRef> = in_degree
-            .iter()
-            .filter_map(|(&n, &d)| (d > 0).then_some(n))
-            .collect();
-
-        if cycle.len() > 0 {
-            return Err(CompilerErrorKind::CyclicalModelRelationship { cycle });
-        }
-    }
-
-    Ok(rank)
 }
 
 /// Extracts braced variables from a format string.

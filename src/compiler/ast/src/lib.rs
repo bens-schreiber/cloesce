@@ -285,10 +285,16 @@ impl SymbolTable {
     }
 }
 
+pub struct PlainOldObject {
+    pub symbol: SymbolRef,
+    pub fields: HashSet<SymbolRef>,
+}
+
 #[derive(Default)]
 pub struct CloesceAst {
     pub wrangler_env: Option<WranglerEnv>,
     pub models: IndexMap<SymbolRef, Model>,
+    pub poos: HashMap<SymbolRef, PlainOldObject>,
     pub table: SymbolTable,
 }
 

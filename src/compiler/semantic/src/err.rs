@@ -133,7 +133,7 @@ pub enum CompilerErrorKind {
         second_m2m_nav: SymbolRef,
     },
 
-    CyclicalModelRelationship {
+    CyclicalRelationship {
         cycle: Vec<SymbolRef>,
     },
 
@@ -170,6 +170,10 @@ pub enum CompilerErrorKind {
     /// A Kv/R2 key param must be of type String
     KvR2InvalidKeyParam {
         tag: SymbolRef,
+        field: SymbolRef,
+    },
+
+    PlainOldObjectInvalidFieldType {
         field: SymbolRef,
     },
 }
