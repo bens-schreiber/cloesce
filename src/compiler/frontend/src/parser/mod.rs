@@ -25,7 +25,6 @@ pub type ParseId = usize;
 pub enum IdScope {
     Global,
     Env,
-    Inject,
     Model(String),
     Api(String),
     DataSource(String),
@@ -55,7 +54,6 @@ impl IdTable {
         match scope {
             IdScope::Global => format!("global::{}", name),
             IdScope::Env => format!("env::{}", name),
-            IdScope::Inject => format!("inject::{}", name),
             IdScope::Model(model_name) => format!("model::{}::{}", model_name, name),
             IdScope::Api(api_name) => format!("api::{}::{}", api_name, name),
             IdScope::Service(service_name) => format!("service::{}::{}", service_name, name),
@@ -231,7 +229,7 @@ pub(crate) fn inject_block<'t>(st: It) -> impl Parser<'t, &'t [Token], InjectBlo
             let id = table.new_id();
             let names = injectables
                 .into_iter()
-                .map(|name| table.intern(name, IdScope::Inject))
+                .map(|name| table.intern(name, IdScope::Global))
                 .collect();
             InjectBlock {
                 id,

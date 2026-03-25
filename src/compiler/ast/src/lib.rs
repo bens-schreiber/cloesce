@@ -139,6 +139,11 @@ pub enum SymbolKind {
     ApiMethodDecl,
     ApiMethodParam,
 
+    ServiceDecl,
+    ServiceField,
+
+    InjectDecl,
+
     #[default]
     Null,
 }
@@ -259,7 +264,7 @@ pub struct ApiMethod {
     pub parameters: Vec<SymbolRef>,
 }
 
-pub struct ModelApi {
+pub struct Api {
     pub symbol: SymbolRef,
     pub methods: Vec<ApiMethod>,
 }
@@ -280,7 +285,7 @@ pub struct Model {
     pub kv_properties: Vec<KvProperty>,
     pub r2_properties: Vec<R2Property>,
 
-    pub apis: Vec<ModelApi>,
+    pub apis: Vec<Api>,
 }
 
 #[derive(PartialEq, Debug, Clone, Copy)]
@@ -327,10 +332,17 @@ pub struct PlainOldObject {
     pub fields: HashSet<SymbolRef>,
 }
 
+pub struct Service {
+    pub symbol: SymbolRef,
+    pub fields: HashSet<SymbolRef>,
+    pub apis: Vec<Api>,
+}
+
 #[derive(Default)]
 pub struct CloesceAst {
     pub wrangler_env: Option<WranglerEnv>,
     pub models: IndexMap<SymbolRef, Model>,
+    pub services: IndexMap<SymbolRef, Service>,
     pub poos: HashMap<SymbolRef, PlainOldObject>,
     pub table: SymbolTable,
 }

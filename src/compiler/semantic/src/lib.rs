@@ -1,6 +1,6 @@
 use ast::{
-    CidlType, CloesceAst, FileSpan, Model, ModelApi, PlainOldObject, Symbol, SymbolKind, SymbolRef,
-    SymbolTable, WranglerEnv, WranglerEnvBindingKind, WranglerSpec,
+    CidlType, CloesceAst, FileSpan, Model, Api, PlainOldObject, Service, Symbol, SymbolKind,
+    SymbolRef, SymbolTable, WranglerEnv, WranglerEnvBindingKind, WranglerSpec,
 };
 use frontend::{ModelBlock, ParseAst};
 use indexmap::IndexMap;
@@ -27,6 +27,7 @@ impl SemanticAnalysis {
         let mut models = Self::models(&parse, &mut table, &mut sink);
         let poos = Self::poos(&parse, &mut table, &mut sink);
         let api_map = Self::apis(&parse, &table, &mut sink);
+        let services = Self::services(&parse, &table, &mut sink);
 
         // Merge API methods into their respective models
         for (model_ref, api) in api_map {
@@ -38,9 +39,9 @@ impl SemanticAnalysis {
         let ast = CloesceAst {
             wrangler_env,
             models,
+            services,
             table,
             poos,
-            ..Default::default()
         };
 
         (ast, sink.drain())
@@ -392,6 +393,81 @@ impl SemanticAnalysis {
             }
         }
 
+        for service in &parse.services {
+            let new_span = FileSpan {
+                start: service.span.start,
+                end: service.span.end,
+                file: service.file.clone(),
+            };
+            let symbol = Symbol {
+                id: service.id,
+                name: service.name.clone(),
+                span: new_span.clone(),
+                kind: SymbolKind::ServiceDecl,
+                ..Default::default()
+            };
+
+            if let Some(existing) = table.insert(symbol) {
+                let first_span = existing.span.clone();
+                sink.push(CompilerErrorKind::DuplicateSymbol {
+                    symbol: service.id,
+                    first_span,
+                    second_span: new_span,
+                });
+            }
+
+            for field in &service.fields {
+                let new_span = FileSpan {
+                    start: field.span.start,
+                    end: field.span.end,
+                    file: service.file.clone(),
+                };
+                let symbol = Symbol {
+                    id: field.id,
+                    name: field.name.clone(),
+                    span: new_span.clone(),
+                    kind: SymbolKind::ServiceField,
+                    parent: service.id,
+                    cidl_type: field.cidl_type.clone(),
+                };
+
+                if let Some(existing) = table.insert(symbol) {
+                    let first_span = existing.span.clone();
+                    sink.push(CompilerErrorKind::DuplicateSymbol {
+                        symbol: field.id,
+                        first_span,
+                        second_span: new_span,
+                    });
+                }
+            }
+        }
+
+        for inject in &parse.injects {
+            for &ref_id in &inject.refs {
+                let new_span = FileSpan {
+                    start: inject.span.start,
+                    end: inject.span.end,
+                    file: inject.file.clone(),
+                };
+                let symbol = Symbol {
+                    id: ref_id,
+                    name: String::default(),
+                    span: new_span.clone(),
+                    kind: SymbolKind::InjectDecl,
+                    ..Default::default()
+                };
+
+                if let Some(existing) = table.insert(symbol) {
+                    let first_span = existing.span.clone();
+                    sink.push(CompilerErrorKind::DuplicateSymbol {
+                        symbol: ref_id,
+                        first_span,
+                        second_span: new_span,
+                    });
+                }
+            }
+        }
+
         table
     }
 
@@ -505,7 +581,7 @@ impl SemanticAnalysis {
         parse: &ParseAst,
         table: &SymbolTable,
         sink: &mut ErrorSink,
-    ) -> Vec<(SymbolRef, ModelApi)> {
+    ) -> Vec<(SymbolRef, Api)> {
         match ApiAnalysis::default().analyze(&parse.apis, parse, table) {
             Ok(apis) => apis,
             Err(errs) => {
@@ -588,6 +664,78 @@ impl SemanticAnalysis {
             }
         }
     }
+
+    fn services(
+        parse: &ParseAst,
+        table: &SymbolTable,
+        sink: &mut ErrorSink,
+    ) -> IndexMap<SymbolRef, Service> {
+        let mut services = IndexMap::new();
+
+        // Cycle detection via Kahn's
+        let mut in_degree = BTreeMap::<SymbolRef, usize>::new();
+        let mut graph = BTreeMap::<SymbolRef, Vec<SymbolRef>>::new();
+
+        for service in &parse.services {
+            let mut fields = HashSet::new();
+            graph.entry(service.id).or_default();
+            in_degree.entry(service.id).or_insert(0);
+
+            for field in &service.fields {
+                let Some(field_sym) = table.lookup(field.id) else {
+                    sink.push(CompilerErrorKind::UnresolvedSymbol { symbol: field.id });
+                    continue;
+                };
+
+                match field_sym.cidl_type.root_type() {
+                    CidlType::Object(ref_id) => {
+                        let Some(target_sym) = table.lookup(*ref_id) else {
+                            sink.push(CompilerErrorKind::UnresolvedSymbol { symbol: *ref_id });
+                            continue;
+                        };
+
+                        match target_sym.kind {
+                            SymbolKind::InjectDecl => {
+                                fields.insert(field.id);
+                            }
+                            SymbolKind::ServiceDecl => {
+                                graph.entry(*ref_id).or_default().push(service.id);
+                                *in_degree.entry(service.id).or_insert(0) += 1;
+                                fields.insert(field.id);
+                            }
+                            _ => {
+                                sink.push(CompilerErrorKind::ServiceInvalidFieldType {
+                                    field: field.id,
+                                });
+                            }
+                        }
+                    }
+                    _ => {
+                        sink.push(CompilerErrorKind::ServiceInvalidFieldType {
+                            field: field.id,
+                        });
+                    }
+                }
+            }
+
+            services.insert(
+                service.id,
+                Service {
+                    symbol: service.id,
+                    fields,
+                    apis: Vec::new(),
+                },
+            );
+        }
+
+        match kahns(graph, in_degree, parse.services.len()) {
+            Ok(_) => services,
+            Err(err) => {
+                sink.push(err);
+                IndexMap::new()
+            }
+        }
+    }
 }
 
 type AdjacencyList = BTreeMap<SymbolRef, Vec<SymbolRef>>;
@@ -636,3 +784,4 @@ pub fn kahns(
 
     Ok(rank)
 }
+

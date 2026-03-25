@@ -1,6 +1,6 @@
 use std::ops::Not;
 
-use ast::{ApiMethod, CidlType, HttpVerb, MediaType, ModelApi, SymbolKind, SymbolRef, SymbolTable};
+use ast::{Api, ApiMethod, CidlType, HttpVerb, MediaType, SymbolKind, SymbolRef, SymbolTable};
 use frontend::{ApiBlock, ApiBlockMethod, ParseAst};
 
 use crate::{
@@ -19,7 +19,7 @@ impl ApiAnalysis {
         apis: &[ApiBlock],
         parse: &ParseAst,
         table: &SymbolTable,
-    ) -> BatchResult<Vec<(SymbolRef, ModelApi)>> {
+    ) -> BatchResult<Vec<(SymbolRef, Api)>> {
         let mut result = Vec::new();
 
         for api in apis {
@@ -36,7 +36,7 @@ impl ApiAnalysis {
                 continue;
             }
 
-            let mut model_api = ModelApi {
+            let mut model_api = Api {
                 symbol: api.model,
                 methods: Vec::new(),
             };

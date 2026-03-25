@@ -182,6 +182,11 @@ pub enum CompilerErrorKind {
         field: SymbolRef,
     },
 
+    /// A service field must be of type Inject or another Service.
+    ServiceInvalidFieldType {
+        field: SymbolRef,
+    },
+
     /// An API block references a model that does not exist.
     ApiUnknownModelReference {
         api: SymbolRef,

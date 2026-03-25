@@ -987,3 +987,52 @@ fn poo_errors() {
         CompilerErrorKind::PlainOldObjectInvalidFieldType { field } if ast.table.name(*field) == "voidField"
     )).is_some());
 }
+
+#[test]
+fn service_errors() {
+    let src = &with_env(
+        r#"
+        inject {
+            OpenApiService
+            YouTubeApi
+        }
+
+        @d1(my_d1)
+        model User {
+            [primary id]
+            id: int
+            name: string
+        }
+
+        // Error: primitive field type
+        service BadPrimitive {
+            name: string
+        }
+
+        // Error: model field type
+        service BadModel {
+            user: User
+        }
+    "#,
+    );
+
+    let parse = lex_and_parse(src);
+    let (ast, errors) = SemanticAnalysis::analyze(parse, &create_spec());
+
+    assert!(errors.iter().any(|e| matches!(
+        e,
+        CompilerErrorKind::ServiceInvalidFieldType { field }
+            if ast.table.name(*field) == "name"
+    )));
+
+    assert!(errors.iter().any(|e| matches!(
+        e,
+        CompilerErrorKind::ServiceInvalidFieldType { field }
+            if ast.table.name(*field) == "user"
+    )));
+
+    assert_eq!(
+        count_errs!(errors, CompilerErrorKind::ServiceInvalidFieldType { .. }),
+        2
+    );
+}
