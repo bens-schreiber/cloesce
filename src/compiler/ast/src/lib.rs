@@ -140,6 +140,12 @@ pub enum SymbolKind {
     ModelD1Tag {
         parent: SymbolRef,
     },
+    ModelKvTag {
+        parent: SymbolRef,
+    },
+    ModelR2Tag {
+        parent: SymbolRef,
+    },
     WranglerEnvDecl,
     WranglerEnvBinding {
         kind: WranglerEnvBindingKind,
@@ -184,7 +190,7 @@ pub enum NavigationPropertyKind {
     ManyToMany,
 }
 
-pub struct D1NavigationProperty {
+pub struct NavigationProperty {
     pub hash: u64,
     pub symbol: SymbolRef,
 
@@ -193,7 +199,21 @@ pub struct D1NavigationProperty {
     pub kind: NavigationPropertyKind,
 }
 
-impl D1NavigationProperty {
+pub struct KvProperty {
+    pub symbol: SymbolRef,
+    pub field: SymbolRef,
+    pub env_binding: SymbolRef,
+    pub format: String,
+}
+
+pub struct R2Property {
+    pub symbol: SymbolRef,
+    pub field: SymbolRef,
+    pub env_binding: SymbolRef,
+    pub format: String,
+}
+
+impl NavigationProperty {
     // pub fn many_to_many_table_name(&self, parent_model: &Symbol) -> String {
     //     let mut names = [&parent_model.name, &self.adj_model.name];
     //     names.sort();
@@ -201,6 +221,7 @@ impl D1NavigationProperty {
     // }
 }
 
+#[derive(Default)]
 pub struct Model {
     pub hash: u64,
     pub symbol: SymbolRef,
@@ -209,7 +230,11 @@ pub struct Model {
     pub columns: HashSet<SymbolRef>,
     pub primary_key_columns: HashSet<SymbolRef>,
     pub foreign_keys: Vec<ForeignKey>,
-    pub navigation_properties: Vec<D1NavigationProperty>,
+    pub navigation_properties: Vec<NavigationProperty>,
+
+    pub key_fields: HashSet<SymbolRef>,
+    pub kv_properties: Vec<KvProperty>,
+    pub r2_properties: Vec<R2Property>,
 }
 
 #[derive(PartialEq, Debug, Clone, Copy)]

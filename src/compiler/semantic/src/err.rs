@@ -94,11 +94,6 @@ pub enum CompilerErrorKind {
         second_column: SymbolRef,
     },
 
-    ForeignKeyReferencesNonD1Model {
-        tag: SymbolRef,
-        model: SymbolRef,
-    },
-
     /// A column in a D1 model can only participate in a single foreign key relationship
     ForeignKeyColumnAlreadyInForeignKey {
         tag: SymbolRef,
@@ -120,9 +115,10 @@ pub enum CompilerErrorKind {
         binding: SymbolRef,
     },
 
-    NavigationPropertyReferencesNonD1Model {
+    /// A field in a D1 model can only participate in a single navigation property
+    NavigationPropertyFieldAlreadyInNavigationProperty {
         tag: SymbolRef,
-        model: SymbolRef,
+        field: SymbolRef,
     },
 
     /// A many-to-many navigation property requires exactly one reciprocal M2M nav on the adjacent model, but none was found.
@@ -139,6 +135,42 @@ pub enum CompilerErrorKind {
 
     CyclicalModelRelationship {
         cycle: Vec<SymbolRef>,
+    },
+
+    /// A KV tag references an env binding that is not a KV namespace
+    KvInvalidBinding {
+        tag: SymbolRef,
+        binding: SymbolRef,
+    },
+
+    /// An R2 tag references an env binding that is not an R2 bucket
+    R2InvalidBinding {
+        tag: SymbolRef,
+        binding: SymbolRef,
+    },
+
+    /// A KV/R2 key format string references a variable that is not a field or key param on the model
+    KvR2UnknownKeyVariable {
+        tag: SymbolRef,
+        variable: String,
+    },
+
+    /// A KV/R2 key format string has invalid syntax (e.g. nested or unclosed braces)
+    KvR2InvalidKeyFormat {
+        tag: SymbolRef,
+        reason: String,
+    },
+
+    /// A KV/R2 tag references a field that does not exist on the model
+    KvR2InvalidField {
+        tag: SymbolRef,
+        field: SymbolRef,
+    },
+
+    /// A Kv/R2 key param must be of type String
+    KvR2InvalidKeyParam {
+        tag: SymbolRef,
+        field: SymbolRef,
     },
 }
 

@@ -8,12 +8,12 @@ use indexmap::IndexMap;
 use std::collections::{HashMap, HashSet};
 
 use crate::{
-    d1_model::D1ModelAnalysis,
     err::{CompilerErrorKind, ErrorSink},
+    model::ModelAnalysis,
 };
 
-mod d1_model;
 pub mod err;
+mod model;
 
 pub struct SemanticAnalysis;
 impl SemanticAnalysis {
@@ -216,6 +216,34 @@ impl SemanticAnalysis {
                 };
                 table.insert(symbol);
             }
+
+            for kv in &model.kvs {
+                let symbol = Symbol {
+                    id: kv.id,
+                    name: String::default(),
+                    span: FileSpan {
+                        start: kv.span.start,
+                        end: kv.span.end,
+                        file: model.file.clone(),
+                    },
+                    kind: SymbolKind::ModelKvTag { parent: model.id },
+                };
+                table.insert(symbol);
+            }
+
+            for r2 in &model.r2s {
+                let symbol = Symbol {
+                    id: r2.id,
+                    name: String::default(),
+                    span: FileSpan {
+                        start: r2.span.start,
+                        end: r2.span.end,
+                        file: model.file.clone(),
+                    },
+                    kind: SymbolKind::ModelR2Tag { parent: model.id },
+                };
+                table.insert(symbol);
+            }
         }
 
         table
@@ -312,26 +340,13 @@ impl SemanticAnalysis {
         table: &mut SymbolTable,
         sink: &mut ErrorSink,
     ) -> IndexMap<SymbolRef, Model> {
-        let mut d1_model_blocks = HashMap::<SymbolRef, &ModelBlock>::new();
-        for model in &parse.models {
-            if model.d1_binding.is_some()
-                || model.primary_keys.len() > 0
-                || model.navigation_properties.len() > 0
-                || model.foreign_keys.len() > 0
-            {
-                d1_model_blocks.insert(model.id, model);
-            }
+        let model_map = parse
+            .models
+            .iter()
+            .map(|m| (m.id, m))
+            .collect::<HashMap<SymbolRef, &ModelBlock>>();
 
-            if model.kvs.len() > 0 || model.r2s.len() > 0 {
-                // Self::kv_r2_models(parse, model, sink);
-            }
-        }
-
-        if d1_model_blocks.is_empty() {
-            return IndexMap::new();
-        }
-
-        match D1ModelAnalysis::default().analyze(d1_model_blocks, table) {
+        match ModelAnalysis::default().analyze(model_map, table) {
             Ok(models) => models,
             Err(errs) => {
                 sink.extend(errs);

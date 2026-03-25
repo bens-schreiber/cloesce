@@ -5,7 +5,8 @@ use chumsky::prelude::*;
 use ast::CidlType;
 
 use crate::{
-    D1Tag, ForeignKeyTag, KvR2Tag, ModelBlock, NavigationTag, SpannedTypedName, UniqueTag,
+    D1Tag, ForeignKeyTag, KeyFieldTag, KvR2Tag, ModelBlock, NavigationTag, PrimaryKeyTag,
+    SpannedTypedName, UniqueTag,
     lexer::Token,
     parser::{Extra, IdScope, It, cidl_type},
 };
@@ -35,12 +36,12 @@ struct PendingKvR2Tag {
 }
 
 enum ModelField {
-    Primary(Vec<String>),
+    Primary(SimpleSpan, Vec<String>),
     Unique(SimpleSpan, Vec<String>),
     Foreign(PendingForeignKeyTag),
     Nav(PendingNavTag),
     Field(SpannedTypedName),
-    KeyField(String),
+    KeyField(SpannedTypedName),
     KvField(PendingKvR2Tag),
     R2Field(PendingKvR2Tag),
 }
@@ -81,7 +82,7 @@ pub fn model_block<'t>(it: It) -> impl Parser<'t, &'t [Token], ModelBlock, Extra
                 .collect::<Vec<_>>(),
         )
         .then_ignore(just(Token::RBracket))
-        .map(ModelField::Primary);
+        .map_with(|cols, e| ModelField::Primary(e.span(), cols));
 
     // [unique ident1, ident2, ...]
     let unique_tag = just(Token::LBracket)
@@ -249,7 +250,12 @@ pub fn model_block<'t>(it: It) -> impl Parser<'t, &'t [Token], ModelBlock, Extra
                     env_binding,
                 })
             } else if key_param {
-                ModelField::KeyField(name)
+                ModelField::KeyField(SpannedTypedName {
+                    id: 0, // resolved in map_model
+                    span,
+                    name,
+                    cidl_type,
+                })
             } else {
                 ModelField::Field(SpannedTypedName {
                     id: 0, // resolved in map_model
@@ -296,17 +302,22 @@ fn map_model(
     let mut fields: Vec<SpannedTypedName> = Vec::new();
     let mut foreign_keys: Vec<ForeignKeyTag> = Vec::new();
     let mut navigation_properties: Vec<NavigationTag> = Vec::new();
-    let mut primary_keys = Vec::new();
+    let mut primary_keys: Vec<PrimaryKeyTag> = Vec::new();
     let mut unique_constraints: Vec<UniqueTag> = Vec::new();
-    let mut key_fields = Vec::new();
+    let mut key_fields: Vec<KeyFieldTag> = Vec::new();
     let mut kvs: Vec<KvR2Tag> = Vec::new();
     let mut r2s: Vec<KvR2Tag> = Vec::new();
 
     for item in items {
         match item {
-            ModelField::Primary(cols) => {
+            ModelField::Primary(pk_span, cols) => {
                 for col in cols {
-                    primary_keys.push(it.borrow_mut().intern(col, model_scope.clone()));
+                    let field = it.borrow_mut().intern(col, model_scope.clone());
+                    primary_keys.push(PrimaryKeyTag {
+                        id: it.borrow_mut().new_id(),
+                        span: pk_span,
+                        field,
+                    });
                 }
             }
             ModelField::Unique(span, cols) => {
@@ -365,8 +376,14 @@ fn map_model(
                 f.id = it.borrow_mut().intern(f.name.clone(), model_scope.clone());
                 fields.push(f);
             }
-            ModelField::KeyField(n) => {
-                key_fields.push(it.borrow_mut().intern(n, model_scope.clone()));
+            ModelField::KeyField(mut f) => {
+                f.id = it.borrow_mut().intern(f.name.clone(), model_scope.clone());
+                key_fields.push(KeyFieldTag {
+                    id: it.borrow_mut().new_id(),
+                    span: f.span,
+                    field: f.id,
+                });
+                fields.push(f);
             }
             ModelField::KvField(kv) => {
                 let field = it

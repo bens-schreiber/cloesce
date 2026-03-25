@@ -102,7 +102,7 @@ fn model_block_scalar() {
         model
             .primary_keys
             .iter()
-            .map(|&c| it.name_of(c).unwrap())
+            .map(|p| it.name_of(p.field).unwrap())
             .collect::<Vec<_>>(),
         vec!["id", "age"]
     );
@@ -161,7 +161,7 @@ fn model_block_kv_r2_anchored_tags() {
     let key_param_names: Vec<&str> = foo
         .key_fields
         .iter()
-        .map(|&f| it.name_of(f).unwrap())
+        .map(|k| it.name_of(k.field).unwrap())
         .collect();
     assert_eq!(key_param_names, vec!["category"]);
 

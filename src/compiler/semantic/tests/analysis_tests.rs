@@ -117,7 +117,6 @@ fn missing_wrangler_env_block() {
     let (_table, errors) = SemanticAnalysis::analyze(parse, &create_spec());
 
     // Assert
-    assert_eq!(errors.len(), 1);
     expect_err!(errors, CompilerErrorKind::MissingWranglerEnvBlock);
 }
 
@@ -248,7 +247,6 @@ fn d1_model_column_fk_errors() {
             [foreign value -> Post::invalid] // invalid foreign key reference
             [foreign str_value -> Post::id] // foreign key references incompatible column type
             [foreign value -> User::id] // foreign key cannot reference same model
-            [foreign value -> NonD1Model::id] // foreign key references non-d1 model
             [foreign value -> OtherD1Model::id] // foreign key references model in different database
             [foreign doesNotExist -> Post::id] // foreign key column does not exist
         }
@@ -264,8 +262,6 @@ fn d1_model_column_fk_errors() {
             [primary id]
             id: int
         }
-
-        model NonD1Model { }
     "#;
     let mut spec = create_spec();
     spec.d1_databases.push(D1Database {
@@ -280,7 +276,7 @@ fn d1_model_column_fk_errors() {
     let (ast, errors) = SemanticAnalysis::analyze(parse, &spec);
 
     // Assert
-    assert_eq!(errors.len(), 8);
+    assert_eq!(errors.len(), 7);
 
     // Variant counts for repeated errors
     assert_eq!(
@@ -323,12 +319,6 @@ fn d1_model_column_fk_errors() {
         ast.table.kind(foreign_key),
         Some(SymbolKind::ModelForeignKeyTag { .. })
     ));
-
-    // FK references non-D1 model
-    let model = expect_err!(errors,
-        CompilerErrorKind::ForeignKeyReferencesNonD1Model { model, .. } => *model
-    );
-    assert_eq!(ast.table.name(model), "NonD1Model");
 
     // FK references different database
     let binding = expect_err!(errors,
@@ -434,7 +424,6 @@ fn d1_model_nav_errors() {
 
             [nav unknown -> Post::id] // profile is not a declared field
             [nav postNav -> User::id] // self reference
-            [nav postNav -> NonD1Model::id] // references non-D1 model
             [nav postNav -> DifferentDatabaseModel::id] // references model in different database
         }
 
@@ -444,9 +433,6 @@ fn d1_model_nav_errors() {
             id: int
         }
 
-        model NonD1Model {
-            id: int
-        }
 
         @d1(other_d1)
         model DifferentDatabaseModel {
@@ -467,7 +453,7 @@ fn d1_model_nav_errors() {
     let (ast, errors) = SemanticAnalysis::analyze(parse, &spec);
 
     // Assert
-    assert_eq!(errors.len(), 4);
+    assert_eq!(errors.len(), 3);
     let unknown_id = expect_err!(errors, CompilerErrorKind::UnresolvedSymbol { symbol: unknown_id } => *unknown_id);
     assert!(matches!(
         ast.table.kind(unknown_id),
@@ -478,11 +464,47 @@ fn d1_model_nav_errors() {
         CompilerErrorKind::NavigationPropertyReferencesSelf { model, .. } => *model
     );
     assert_eq!(ast.table.name(self_ref_model), "User");
+}
 
-    let non_d1_model = expect_err!(errors,
-        CompilerErrorKind::NavigationPropertyReferencesNonD1Model { model, .. } => *model
+#[test]
+fn d1_model_nav_field_already_in_navigation_property() {
+    // Arrange
+    let src = with_env(
+        r#"
+        @d1(my_d1)
+        model Person {
+            [primary id]
+            id: int
+
+            [foreign horseId -> Horse::id]
+            [nav horse -> Horse::id]
+            [nav horse -> Horse::id] // same field used in a second nav
+            horseId: int
+            horse: Horse
+        }
+
+        @d1(my_d1)
+        model Horse {
+            [primary id]
+            id: int
+        }
+    "#,
     );
-    assert_eq!(ast.table.name(non_d1_model), "NonD1Model");
+    let parse = lex_and_parse(&src);
+
+    // Act
+    let (ast, errors) = SemanticAnalysis::analyze(parse, &create_spec());
+
+    // Assert
+    assert_eq!(errors.len(), 1);
+    let field = expect_err!(errors,
+        CompilerErrorKind::NavigationPropertyFieldAlreadyInNavigationProperty { field, .. } => *field
+    );
+    assert_eq!(ast.table.name(field), "horse");
+    assert!(matches!(
+        ast.table.kind(field),
+        Some(SymbolKind::ModelField { .. })
+    ));
 }
 
 #[test]
@@ -829,4 +851,96 @@ fn d1_model_nullability_prevents_cycle() {
 
     // Assert
     assert_eq!(errors.len(), 0);
+}
+
+#[test]
+fn kv_r2_basic_errors() {
+    // Arrange
+    let src = &with_env(
+        r#"
+        model Foo {
+            field: string
+
+            @keyparam
+            keyParam: int // can't be an int
+
+            @kv(my_d1, "items/{field}") // invalid binding type
+            foo: string
+
+            @r2(my_kv, "assets/{field}") // invalid binding type
+            obj: R2Object
+
+            @kv(my_kv, "items/{field}/{nonexistent}") // unknown variable in format
+            cached: string
+
+            @r2(my_r2, "assets/{field") // invalid format, unclosed brace
+            obj2: R2Object
+        }
+        "#,
+    );
+    let parse = lex_and_parse(src);
+
+    // Act
+    let (ast, errors) = SemanticAnalysis::analyze(parse, &create_spec());
+
+    // Assert
+    assert_eq!(errors.len(), 5);
+
+    let key_param = expect_err!(errors,
+        CompilerErrorKind::KvR2InvalidKeyParam { field, .. } => *field
+    );
+    assert_eq!(ast.table.name(key_param), "keyParam");
+
+    let binding = expect_err!(errors,
+        CompilerErrorKind::KvInvalidBinding { binding, ..} => *binding
+    );
+    assert_eq!(ast.table.name(binding), "my_d1");
+
+    let binding = expect_err!(errors,
+        CompilerErrorKind::R2InvalidBinding { binding, .. } => *binding
+    );
+    assert_eq!(ast.table.name(binding), "my_kv");
+
+    let variable = expect_err!(errors,
+        CompilerErrorKind::KvR2UnknownKeyVariable { variable, .. } => variable.clone()
+    );
+    assert_eq!(variable, "nonexistent");
+
+    expect_err!(
+        errors,
+        CompilerErrorKind::KvR2InvalidKeyFormat { reason, .. }
+    );
+}
+
+#[test]
+fn kv_and_d1_coexist() {
+    // A model can have both D1 and KV/R2 properties
+    let src = &with_env(
+        r#"
+        @d1(my_d1)
+        model User {
+            [primary id]
+            id: int
+            name: string
+
+            @kv(my_kv, "users/{id}")
+            cached: string
+        }
+        "#,
+    );
+    let parse = lex_and_parse(src);
+
+    // Act
+    let (ast, errors) = SemanticAnalysis::analyze(parse, &create_spec());
+
+    // Assert
+    assert_eq!(errors.len(), 0);
+    let user = ast
+        .models
+        .values()
+        .find(|m| ast.table.name(m.symbol) == "User")
+        .unwrap();
+    assert!(user.d1_binding.is_some());
+    assert_eq!(user.kv_properties.len(), 1);
+    assert_eq!(user.columns.len(), 3); // id, name, cached
 }

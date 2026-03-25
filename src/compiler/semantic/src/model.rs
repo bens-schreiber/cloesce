@@ -1,8 +1,8 @@
 use ast::{
-    CidlType, D1NavigationProperty, ForeignKey, Model, NavigationPropertyKind, Symbol, SymbolKind,
-    SymbolRef, SymbolTable, WranglerEnvBindingKind,
+    CidlType, ForeignKey, KvProperty, Model, NavigationProperty, NavigationPropertyKind,
+    R2Property, Symbol, SymbolKind, SymbolRef, SymbolTable, WranglerEnvBindingKind,
 };
-use frontend::{ForeignKeyTag, ModelBlock, NavigationTag};
+use frontend::{ForeignKeyTag, KvR2Tag, ModelBlock, NavigationTag};
 use indexmap::IndexMap;
 
 use std::{
@@ -18,7 +18,7 @@ use crate::{
 type AdjacencyList = BTreeMap<SymbolRef, Vec<SymbolRef>>;
 
 #[derive(Default)]
-pub struct D1ModelAnalysis {
+pub struct ModelAnalysis {
     sink: ErrorSink,
     in_degree: BTreeMap<SymbolRef, usize>,
     graph: BTreeMap<SymbolRef, Vec<SymbolRef>>,
@@ -27,21 +27,37 @@ pub struct D1ModelAnalysis {
     /// Ie, Person.dogId => { (Person, dogId): "Dog" }
     model_field_to_adj_model: HashMap<(SymbolRef, SymbolRef), SymbolRef>,
 }
-impl D1ModelAnalysis {
+impl ModelAnalysis {
     pub fn analyze(
         mut self,
-        d1_model_blocks: HashMap<SymbolRef, &ModelBlock>,
+        model_blocks: HashMap<SymbolRef, &ModelBlock>,
         table: &mut SymbolTable,
     ) -> BatchResult<IndexMap<SymbolRef, Model>> {
         let mut models = IndexMap::new();
 
-        for model_block in d1_model_blocks.values() {
-            if let Some(model) = self.model(model_block, d1_model_blocks.clone(), table) {
-                models.insert(model.symbol, model);
+        for model_block in model_blocks.values() {
+            let mut model = Model::default();
+            model.symbol = model_block.id;
+
+            if model_block.d1_binding.is_some()
+                || !model_block.foreign_keys.is_empty()
+                || !model_block.navigation_properties.is_empty()
+                || !model_block.primary_keys.is_empty()
+            {
+                self.d1_properties(&mut model, model_block, model_blocks.clone(), table);
             }
+
+            if !model_block.kvs.is_empty()
+                || !model_block.r2s.is_empty()
+                || !model_block.key_fields.is_empty()
+            {
+                self.kv_r2_properties(&mut model, model_block, table);
+            }
+
+            models.insert(model_block.id, model);
         }
 
-        match kahns(self.graph, self.in_degree, d1_model_blocks.len()) {
+        match kahns(self.graph, self.in_degree, model_blocks.len()) {
             Ok(rank) => {
                 // Sort models according to topological rank
                 models.sort_by_key(|k, _| rank.get(k).unwrap_or(&usize::MAX));
@@ -55,25 +71,26 @@ impl D1ModelAnalysis {
         Ok(models)
     }
 
-    /// Validates a D1 model, returning an ast [Model]
-    fn model(
+    /// Validates and sets all D1-related properties of a model
+    fn d1_properties(
         &mut self,
+        model: &mut Model,
         model_block: &ModelBlock,
-        d1_model_blocks: HashMap<SymbolRef, &ModelBlock>,
+        model_blocks: HashMap<SymbolRef, &ModelBlock>,
         table: &mut SymbolTable,
-    ) -> Option<Model> {
+    ) {
         let Some(d1_binding) = &model_block.d1_binding else {
             self.sink.push(CompilerErrorKind::D1ModelMissingD1Binding {
                 model: model_block.id,
             });
-            return None;
+            return;
         };
 
         let Some(binding_symbol) = table.lookup(d1_binding.env_binding) else {
             self.sink.push(CompilerErrorKind::UnresolvedSymbol {
                 symbol: d1_binding.env_binding,
             });
-            return None;
+            return;
         };
 
         if matches!(
@@ -88,7 +105,7 @@ impl D1ModelAnalysis {
                 model: model_block.id,
                 tag: d1_binding.id,
             });
-            return None;
+            return;
         };
 
         // At least one primary key must be defined
@@ -96,7 +113,7 @@ impl D1ModelAnalysis {
             self.sink.push(CompilerErrorKind::D1ModelMissingPrimaryKey {
                 model: model_block.id,
             });
-            return None;
+            return;
         }
 
         // Columns
@@ -109,7 +126,10 @@ impl D1ModelAnalysis {
 
             columns.insert(field.id);
 
-            let is_pk = model_block.primary_keys.iter().any(|id| *id == field.id);
+            let is_pk = model_block
+                .primary_keys
+                .iter()
+                .any(|pk| pk.field == field.id);
             if is_pk {
                 ensure!(
                     !field.cidl_type.is_nullable(),
@@ -134,7 +154,7 @@ impl D1ModelAnalysis {
                 &columns,
                 &mut fk_columns_seen,
                 table,
-                &d1_model_blocks,
+                &model_blocks,
             );
             if let Some(fk) = fk_result {
                 foreign_keys.push(fk);
@@ -143,23 +163,20 @@ impl D1ModelAnalysis {
 
         // Navigation properties
         let mut navigation_properties = Vec::new();
+        let mut nav_fields_seen = HashSet::<SymbolRef>::new();
         for nav in &model_block.navigation_properties {
-            let nav_result = self.nav(model_block, nav, table, &d1_model_blocks);
+            let nav_result = self.nav(model_block, nav, &mut nav_fields_seen, table, &model_blocks);
 
             if let Some(nav) = nav_result {
                 navigation_properties.push(nav);
             }
         }
 
-        return Some(Model {
-            hash: 0,
-            symbol: model_block.id,
-            d1_binding: Some(d1_binding.env_binding),
-            columns,
-            primary_key_columns,
-            foreign_keys,
-            navigation_properties,
-        });
+        model.d1_binding = Some(d1_binding.env_binding);
+        model.columns = columns;
+        model.primary_key_columns = primary_key_columns;
+        model.foreign_keys = foreign_keys;
+        model.navigation_properties = navigation_properties;
     }
 
     /// Validates a foreign key, returning an ast [ForeignKey]
@@ -170,7 +187,7 @@ impl D1ModelAnalysis {
         columns: &HashSet<SymbolRef>,
         fk_columns_seen: &mut HashSet<SymbolRef>,
         table: &mut SymbolTable,
-        d1_model_blocks: &HashMap<SymbolRef, &ModelBlock>,
+        model_blocks: &HashMap<SymbolRef, &ModelBlock>,
     ) -> Option<ForeignKey> {
         if table.lookup(fk.adj_model).is_none() {
             self.sink.push(CompilerErrorKind::UnresolvedSymbol {
@@ -179,12 +196,10 @@ impl D1ModelAnalysis {
             return None;
         }
 
-        let Some(adj_model) = d1_model_blocks.get(&fk.adj_model) else {
-            self.sink
-                .push(CompilerErrorKind::ForeignKeyReferencesNonD1Model {
-                    tag: fk.id,
-                    model: fk.adj_model,
-                });
+        let Some(adj_model) = model_blocks.get(&fk.adj_model) else {
+            self.sink.push(CompilerErrorKind::UnresolvedSymbol {
+                symbol: fk.adj_model,
+            });
             return None;
         };
 
@@ -294,15 +309,6 @@ impl D1ModelAnalysis {
                     continue;
                 };
 
-                if !d1_model_blocks.get(&fk.adj_model).is_some() {
-                    self.sink
-                        .push(CompilerErrorKind::ForeignKeyReferencesNonD1Model {
-                            tag: fk.id,
-                            model: fk.adj_model,
-                        });
-                    continue;
-                }
-
                 let SymbolKind::ModelField {
                     parent: adj_field_parent,
                     cidl_type: adj_field_cidl_type,
@@ -373,9 +379,20 @@ impl D1ModelAnalysis {
         &mut self,
         model_block: &ModelBlock,
         nav: &NavigationTag,
+        nav_fields_seen: &mut HashSet<SymbolRef>,
         table: &mut SymbolTable,
-        d1_model_blocks: &HashMap<SymbolRef, &ModelBlock>,
-    ) -> Option<D1NavigationProperty> {
+        model_blocks: &HashMap<SymbolRef, &ModelBlock>,
+    ) -> Option<NavigationProperty> {
+        if !nav_fields_seen.insert(nav.field) {
+            self.sink.push(
+                CompilerErrorKind::NavigationPropertyFieldAlreadyInNavigationProperty {
+                    tag: nav.id,
+                    field: nav.field,
+                },
+            );
+            return None;
+        }
+
         let Some(nav_field_sym) = table.lookup(nav.field) else {
             self.sink
                 .push(CompilerErrorKind::UnresolvedSymbol { symbol: nav.id });
@@ -424,12 +441,10 @@ impl D1ModelAnalysis {
             return None;
         }
 
-        let Some(adj_model) = d1_model_blocks.get(&adj_model_sym.id) else {
-            self.sink
-                .push(CompilerErrorKind::NavigationPropertyReferencesNonD1Model {
-                    tag: nav.id,
-                    model: adj_model_sym.id,
-                });
+        let Some(adj_model) = model_blocks.get(&adj_model_sym.id) else {
+            self.sink.push(CompilerErrorKind::UnresolvedSymbol {
+                symbol: nav.adj_model,
+            });
             return None;
         };
 
@@ -548,7 +563,7 @@ impl D1ModelAnalysis {
                     }
                 );
 
-                D1NavigationProperty {
+                NavigationProperty {
                     hash: 0,
                     symbol: nav.id,
                     field: nav.field,
@@ -577,7 +592,7 @@ impl D1ModelAnalysis {
                     }
                 );
 
-                D1NavigationProperty {
+                NavigationProperty {
                     hash: 0,
                     symbol: nav.id,
                     field: nav.field,
@@ -615,7 +630,7 @@ impl D1ModelAnalysis {
                     }
                 );
 
-                D1NavigationProperty {
+                NavigationProperty {
                     hash: 0,
                     symbol: nav.id,
                     field: nav.field,
@@ -635,6 +650,204 @@ impl D1ModelAnalysis {
         };
 
         Some(nav)
+    }
+
+    /// Validates and sets all KV/R2-related properties of a model
+    fn kv_r2_properties(
+        &mut self,
+        model: &mut Model,
+        model_block: &ModelBlock,
+        table: &SymbolTable,
+    ) {
+        // Validates that a KV/R2 tag's env binding exists and is of the correct WranglerEnvBindingKind
+        let validate_binding =
+            |sink: &mut ErrorSink, tag: &KvR2Tag, expected: WranglerEnvBindingKind| -> bool {
+                let Some(binding_sym) = table.lookup(tag.env_binding) else {
+                    sink.push(CompilerErrorKind::UnresolvedSymbol {
+                        symbol: tag.env_binding,
+                    });
+                    return false;
+                };
+
+                let matches_kind = matches!(
+                    (&binding_sym.kind, &expected),
+                    (
+                        SymbolKind::WranglerEnvBinding {
+                            kind: WranglerEnvBindingKind::KV
+                        },
+                        WranglerEnvBindingKind::KV
+                    ) | (
+                        SymbolKind::WranglerEnvBinding {
+                            kind: WranglerEnvBindingKind::R2
+                        },
+                        WranglerEnvBindingKind::R2
+                    )
+                );
+
+                if !matches_kind {
+                    let err = match expected {
+                        WranglerEnvBindingKind::KV => CompilerErrorKind::KvInvalidBinding {
+                            tag: tag.id,
+                            binding: tag.env_binding,
+                        },
+                        WranglerEnvBindingKind::R2 => CompilerErrorKind::R2InvalidBinding {
+                            tag: tag.id,
+                            binding: tag.env_binding,
+                        },
+                        _ => unreachable!(),
+                    };
+                    sink.push(err);
+                    return false;
+                }
+
+                true
+            };
+
+        // Extracts variables from a formatted string, then validates that they
+        // correspond to fields on the models that are of valid SQLite types
+        let validate_key_format = |sink: &mut ErrorSink, tag_id: SymbolRef, format: &str| -> bool {
+            let vars = match extract_braced(format) {
+                Ok(vars) => vars,
+                Err(reason) => {
+                    sink.push(CompilerErrorKind::KvR2InvalidKeyFormat {
+                        tag: tag_id,
+                        reason,
+                    });
+                    return false;
+                }
+            };
+
+            for var in vars {
+                // Look through fields for a matching name
+                let matching_field = model_block.fields.iter().find(|f| {
+                    let field_sym = table.lookup(f.id).unwrap();
+                    let SymbolKind::ModelField { cidl_type, .. } = &field_sym.kind else {
+                        return false;
+                    };
+
+                    field_sym.name == var && is_valid_sql_type(cidl_type)
+                });
+
+                if matching_field.is_none() {
+                    sink.push(CompilerErrorKind::KvR2UnknownKeyVariable {
+                        tag: tag_id,
+                        variable: var,
+                    });
+                    return false;
+                }
+            }
+
+            true
+        };
+
+        for kv in &model_block.kvs {
+            validate_binding(&mut self.sink, kv, WranglerEnvBindingKind::KV);
+
+            let Some(symbol) = table.lookup(kv.field) else {
+                self.sink
+                    .push(CompilerErrorKind::UnresolvedSymbol { symbol: kv.field });
+                continue;
+            };
+
+            let SymbolKind::ModelField { parent, .. } = symbol.kind else {
+                self.sink.push(CompilerErrorKind::KvR2InvalidField {
+                    tag: kv.id,
+                    field: kv.field,
+                });
+                continue;
+            };
+
+            if parent != model_block.id {
+                self.sink.push(CompilerErrorKind::KvR2InvalidField {
+                    tag: kv.id,
+                    field: kv.field,
+                });
+                continue;
+            };
+
+            if !validate_key_format(&mut self.sink, kv.id, &kv.format) {
+                continue;
+            }
+
+            model.kv_properties.push(KvProperty {
+                symbol: kv.id,
+                field: kv.field,
+                env_binding: kv.env_binding,
+                format: kv.format.clone(),
+            });
+        }
+
+        for r2 in &model_block.r2s {
+            validate_binding(&mut self.sink, r2, WranglerEnvBindingKind::R2);
+
+            let Some(symbol) = table.lookup(r2.field) else {
+                self.sink
+                    .push(CompilerErrorKind::UnresolvedSymbol { symbol: r2.field });
+                continue;
+            };
+
+            let SymbolKind::ModelField { parent, cidl_type } = &symbol.kind else {
+                self.sink.push(CompilerErrorKind::KvR2InvalidField {
+                    tag: r2.id,
+                    field: r2.field,
+                });
+                continue;
+            };
+
+            if *parent != model_block.id {
+                self.sink.push(CompilerErrorKind::KvR2InvalidField {
+                    tag: r2.id,
+                    field: r2.field,
+                });
+                continue;
+            }
+
+            if !validate_key_format(&mut self.sink, r2.id, &r2.format) {
+                continue;
+            }
+
+            if *cidl_type != CidlType::R2Object {
+                self.sink.push(CompilerErrorKind::KvR2InvalidField {
+                    tag: r2.id,
+                    field: r2.field,
+                });
+                continue;
+            }
+
+            model.r2_properties.push(R2Property {
+                symbol: r2.id,
+                field: r2.field,
+                env_binding: r2.env_binding,
+                format: r2.format.clone(),
+            });
+        }
+
+        for key_field in &model_block.key_fields {
+            let Some(symbol) = table.lookup(key_field.field) else {
+                self.sink.push(CompilerErrorKind::UnresolvedSymbol {
+                    symbol: key_field.field,
+                });
+                continue;
+            };
+
+            let SymbolKind::ModelField { parent, cidl_type } = &symbol.kind else {
+                self.sink.push(CompilerErrorKind::KvR2InvalidKeyParam {
+                    tag: key_field.id,
+                    field: key_field.field,
+                });
+                continue;
+            };
+
+            if *parent != model_block.id || *cidl_type != CidlType::String {
+                self.sink.push(CompilerErrorKind::KvR2InvalidKeyParam {
+                    tag: key_field.id,
+                    field: key_field.field,
+                });
+                continue;
+            }
+
+            model.key_fields.insert(key_field.field);
+        }
     }
 }
 
@@ -713,4 +926,34 @@ fn kahns(
     }
 
     Ok(rank)
+}
+
+/// Extracts braced variables from a format string.
+/// e.g, "users/{userId}/posts/{postId}" => ["userId", "postId"].
+///
+/// Returns an error string if the format string is invalid.
+fn extract_braced(s: &str) -> Result<Vec<String>, String> {
+    let mut out = Vec::new();
+    let mut current = None;
+
+    for c in s.chars() {
+        match (current.as_mut(), c) {
+            (None, '{') => current = Some(String::new()),
+            (Some(_), '{') => {
+                return Err("nested brace in key".to_string());
+            }
+            (Some(buf), '}') => {
+                out.push(std::mem::take(buf));
+                current = None;
+            }
+            (Some(buf), c) => buf.push(c),
+            _ => {}
+        }
+    }
+
+    if current.is_some() {
+        return Err("unclosed brace in key".to_string());
+    }
+
+    Ok(out)
 }

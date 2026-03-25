@@ -117,6 +117,20 @@ pub struct D1Tag {
     pub env_binding: ParseId,
 }
 
+pub struct KeyFieldTag {
+    pub id: ParseId,
+    pub span: SimpleSpan,
+
+    pub field: ParseId,
+}
+
+pub struct PrimaryKeyTag {
+    pub id: ParseId,
+    pub span: SimpleSpan,
+
+    pub field: ParseId,
+}
+
 pub struct ModelBlock {
     pub id: ParseId,
     pub span: SimpleSpan,
@@ -125,9 +139,9 @@ pub struct ModelBlock {
 
     pub fields: Vec<SpannedTypedName>,
 
-    pub primary_keys: Vec<ParseId>,
+    pub primary_keys: Vec<PrimaryKeyTag>,
     pub d1_binding: Option<D1Tag>,
-    pub key_fields: Vec<ParseId>,
+    pub key_fields: Vec<KeyFieldTag>,
     pub unique_constraints: Vec<UniqueTag>,
     pub kvs: Vec<KvR2Tag>,
     pub r2s: Vec<KvR2Tag>,
