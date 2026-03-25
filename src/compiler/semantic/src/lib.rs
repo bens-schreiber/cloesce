@@ -61,471 +61,237 @@ impl SemanticAnalysis {
     fn symbol_table(parse: &ParseAst, sink: &mut ErrorSink) -> SymbolTable {
         let mut table = SymbolTable::default();
 
-        for env in &parse.wrangler_envs {
-            let new_span = FileSpan {
-                start: env.span.start,
-                end: env.span.end,
-                file: env.file.clone(),
-            };
-            let symbol = Symbol {
-                id: env.id,
-                name: String::default(),
-                span: new_span.clone(),
-                kind: SymbolKind::WranglerEnvDecl,
-                ..Default::default()
-            };
+        let span = |start, end, file: &std::path::Path| FileSpan {
+            start,
+            end,
+            file: file.to_path_buf(),
+        };
 
+        let mut insert_unique = |table: &mut SymbolTable, symbol: Symbol| {
+            let id = symbol.id;
+            let new_span = symbol.span.clone();
             if let Some(existing) = table.insert(symbol) {
-                let first_span = existing.span.clone();
                 sink.push(CompilerErrorKind::DuplicateSymbol {
-                    symbol: env.id,
-                    first_span,
+                    symbol: id,
+                    first_span: existing.span.clone(),
                     second_span: new_span,
                 });
             }
+        };
+
+        for env in &parse.wrangler_envs {
+            insert_unique(&mut table, Symbol {
+                id: env.id,
+                span: span(env.span.start, env.span.end, &env.file),
+                kind: SymbolKind::WranglerEnvDecl,
+                ..Default::default()
+            });
 
             let bindings = env
                 .d1_bindings
                 .iter()
                 .map(|b| (b, WranglerEnvBindingKind::D1))
-                .chain(
-                    env.kv_bindings
-                        .iter()
-                        .map(|b| (b, WranglerEnvBindingKind::KV)),
-                )
-                .chain(
-                    env.r2_bindings
-                        .iter()
-                        .map(|b| (b, WranglerEnvBindingKind::R2)),
-                );
+                .chain(env.kv_bindings.iter().map(|b| (b, WranglerEnvBindingKind::KV)))
+                .chain(env.r2_bindings.iter().map(|b| (b, WranglerEnvBindingKind::R2)));
 
-            for binding in bindings {
-                let new_span = FileSpan {
-                    start: binding.0.span.start,
-                    end: binding.0.span.end,
-                    file: env.file.clone(),
-                };
-                let symbol = Symbol {
-                    id: binding.0.id,
-                    name: binding.0.name.clone(),
-                    span: new_span.clone(),
-                    kind: SymbolKind::WranglerEnvBinding {
-                        kind: binding.1.clone(),
-                    },
+            for (b, kind) in bindings {
+                insert_unique(&mut table, Symbol {
+                    id: b.id,
+                    name: b.name.clone(),
+                    span: span(b.span.start, b.span.end, &env.file),
+                    kind: SymbolKind::WranglerEnvBinding { kind },
                     ..Default::default()
-                };
-
-                if let Some(existing) = table.insert(symbol) {
-                    let first_span = existing.span.clone();
-                    sink.push(CompilerErrorKind::DuplicateSymbol {
-                        symbol: binding.0.id,
-                        first_span,
-                        second_span: new_span,
-                    });
-                }
+                });
             }
 
             for var in &env.vars {
-                let new_span = FileSpan {
-                    start: var.span.start,
-                    end: var.span.end,
-                    file: env.file.clone(),
-                };
-                let symbol = Symbol {
+                insert_unique(&mut table, Symbol {
                     id: var.id,
                     name: var.name.clone(),
-                    span: new_span.clone(),
+                    span: span(var.span.start, var.span.end, &env.file),
                     kind: SymbolKind::WranglerEnvVar,
                     ..Default::default()
-                };
-
-                if let Some(existing) = table.insert(symbol) {
-                    let first_span = existing.span.clone();
-                    sink.push(CompilerErrorKind::DuplicateSymbol {
-                        symbol: var.id,
-                        first_span,
-                        second_span: new_span,
-                    });
-                }
+                });
             }
         }
 
         for model in &parse.models {
-            let new_span = FileSpan {
-                start: model.span.start,
-                end: model.span.end,
-                file: model.file.clone(),
-            };
-            let symbol = Symbol {
+            insert_unique(&mut table, Symbol {
                 id: model.id,
                 name: model.name.clone(),
-                span: new_span.clone(),
+                span: span(model.span.start, model.span.end, &model.file),
                 kind: SymbolKind::ModelDecl,
                 ..Default::default()
-            };
-
-            if let Some(existing) = table.insert(symbol) {
-                let first_span = existing.span.clone();
-                sink.push(CompilerErrorKind::DuplicateSymbol {
-                    symbol: model.id,
-                    first_span,
-                    second_span: new_span,
-                });
-            }
+            });
 
             if let Some(d1_tag) = &model.d1_binding {
-                let symbol = Symbol {
+                table.insert(Symbol {
                     id: d1_tag.id,
-                    name: String::default(),
-                    span: FileSpan {
-                        start: d1_tag.span.start,
-                        end: d1_tag.span.end,
-                        file: model.file.clone(),
-                    },
+                    span: span(d1_tag.span.start, d1_tag.span.end, &model.file),
                     kind: SymbolKind::ModelD1Tag,
                     parent: model.id,
                     ..Default::default()
-                };
-                table.insert(symbol);
+                });
             }
 
             for field in &model.fields {
-                let new_span = FileSpan {
-                    start: field.span.start,
-                    end: field.span.end,
-                    file: model.file.clone(),
-                };
-                let symbol = Symbol {
+                insert_unique(&mut table, Symbol {
                     id: field.id,
                     name: field.name.clone(),
-                    span: new_span.clone(),
+                    span: span(field.span.start, field.span.end, &model.file),
                     kind: SymbolKind::ModelField,
                     parent: model.id,
                     cidl_type: field.cidl_type.clone(),
-                };
-
-                if let Some(existing) = table.insert(symbol) {
-                    let first_span = existing.span.clone();
-                    sink.push(CompilerErrorKind::DuplicateSymbol {
-                        symbol: field.id,
-                        first_span,
-                        second_span: new_span,
-                    });
-                }
+                });
             }
 
             for fk in &model.foreign_keys {
-                let symbol = Symbol {
+                table.insert(Symbol {
                     id: fk.id,
-                    name: String::default(),
-                    span: FileSpan {
-                        start: 0,
-                        end: 0,
-                        file: model.file.clone(),
-                    },
+                    span: span(0, 0, &model.file),
                     kind: SymbolKind::ModelForeignKeyTag,
                     parent: model.id,
                     ..Default::default()
-                };
-                table.insert(symbol);
+                });
             }
 
             for nav in &model.navigation_properties {
-                let symbol = Symbol {
+                table.insert(Symbol {
                     id: nav.id,
-                    name: String::default(),
-                    span: FileSpan {
-                        start: nav.span.start,
-                        end: nav.span.end,
-                        file: model.file.clone(),
-                    },
+                    span: span(nav.span.start, nav.span.end, &model.file),
                     kind: SymbolKind::ModelNavigationTag,
                     parent: model.id,
                     ..Default::default()
-                };
-                table.insert(symbol);
+                });
             }
 
             for kv in &model.kvs {
-                let symbol = Symbol {
+                table.insert(Symbol {
                     id: kv.id,
-                    name: String::default(),
-                    span: FileSpan {
-                        start: kv.span.start,
-                        end: kv.span.end,
-                        file: model.file.clone(),
-                    },
+                    span: span(kv.span.start, kv.span.end, &model.file),
                     kind: SymbolKind::ModelKvTag,
                     parent: model.id,
                     ..Default::default()
-                };
-                table.insert(symbol);
+                });
             }
 
             for r2 in &model.r2s {
-                let symbol = Symbol {
+                table.insert(Symbol {
                     id: r2.id,
-                    name: String::default(),
-                    span: FileSpan {
-                        start: r2.span.start,
-                        end: r2.span.end,
-                        file: model.file.clone(),
-                    },
+                    span: span(r2.span.start, r2.span.end, &model.file),
                     kind: SymbolKind::ModelR2Tag,
                     parent: model.id,
                     ..Default::default()
-                };
-                table.insert(symbol);
+                });
             }
         }
 
         for api in &parse.apis {
-            let new_span = FileSpan {
-                start: api.span.start,
-                end: api.span.end,
-                file: api.file.clone(),
-            };
-            let symbol = Symbol {
+            insert_unique(&mut table, Symbol {
                 id: api.id,
                 name: api.name.clone(),
-                span: new_span.clone(),
+                span: span(api.span.start, api.span.end, &api.file),
                 kind: SymbolKind::ApiDecl,
                 ..Default::default()
-            };
-
-            if let Some(existing) = table.insert(symbol) {
-                let first_span = existing.span.clone();
-                sink.push(CompilerErrorKind::DuplicateSymbol {
-                    symbol: api.id,
-                    first_span,
-                    second_span: new_span,
-                });
-            }
+            });
 
             for method in &api.methods {
-                let new_span = FileSpan {
-                    start: method.span.start,
-                    end: method.span.end,
-                    file: api.file.clone(),
-                };
-                let symbol = Symbol {
+                insert_unique(&mut table, Symbol {
                     id: method.id,
-                    name: String::default(),
-                    span: new_span.clone(),
+                    span: span(method.span.start, method.span.end, &api.file),
                     kind: SymbolKind::ApiMethodDecl,
                     parent: api.id,
                     cidl_type: method.return_type.clone(),
-                };
-
-                if let Some(existing) = table.insert(symbol) {
-                    let first_span = existing.span.clone();
-                    sink.push(CompilerErrorKind::DuplicateSymbol {
-                        symbol: method.id,
-                        first_span,
-                        second_span: new_span,
-                    });
-                }
+                    ..Default::default()
+                });
 
                 for param in &method.parameters {
-                    let new_span = FileSpan {
-                        start: param.span.start,
-                        end: param.span.end,
-                        file: api.file.clone(),
-                    };
-                    let symbol = Symbol {
+                    insert_unique(&mut table, Symbol {
                         id: param.id,
                         name: param.name.clone(),
-                        span: new_span.clone(),
+                        span: span(param.span.start, param.span.end, &api.file),
                         kind: SymbolKind::ApiMethodParam,
                         parent: method.id,
                         cidl_type: param.cidl_type.clone(),
-                    };
-
-                    if let Some(existing) = table.insert(symbol) {
-                        let first_span = existing.span.clone();
-                        sink.push(CompilerErrorKind::DuplicateSymbol {
-                            symbol: param.id,
-                            first_span,
-                            second_span: new_span,
-                        });
-                    }
+                    });
                 }
             }
         }
 
         for poo in &parse.poos {
-            let new_span = FileSpan {
-                start: poo.span.start,
-                end: poo.span.end,
-                file: poo.file.clone(),
-            };
-            let symbol = Symbol {
+            insert_unique(&mut table, Symbol {
                 id: poo.id,
                 name: poo.name.clone(),
-                span: new_span.clone(),
+                span: span(poo.span.start, poo.span.end, &poo.file),
                 kind: SymbolKind::PlainOldObjectDecl,
                 ..Default::default()
-            };
-
-            if let Some(existing) = table.insert(symbol) {
-                let first_span = existing.span.clone();
-                sink.push(CompilerErrorKind::DuplicateSymbol {
-                    symbol: poo.id,
-                    first_span,
-                    second_span: new_span,
-                });
-            }
+            });
 
             for field in &poo.fields {
-                let new_span = FileSpan {
-                    start: field.span.start,
-                    end: field.span.end,
-                    file: poo.file.clone(),
-                };
-                let symbol = Symbol {
+                insert_unique(&mut table, Symbol {
                     id: field.id,
                     name: field.name.clone(),
-                    span: new_span.clone(),
+                    span: span(field.span.start, field.span.end, &poo.file),
                     kind: SymbolKind::PlainOldObjectField,
                     parent: poo.id,
                     cidl_type: field.cidl_type.clone(),
-                };
-
-                if let Some(existing) = table.insert(symbol) {
-                    let first_span = existing.span.clone();
-                    sink.push(CompilerErrorKind::DuplicateSymbol {
-                        symbol: field.id,
-                        first_span,
-                        second_span: new_span,
-                    });
-                }
+                });
             }
         }
 
         for source in &parse.sources {
-            let new_span = FileSpan {
-                start: source.span.start,
-                end: source.span.end,
-                file: source.file.clone(),
-            };
-            let symbol = Symbol {
+            insert_unique(&mut table, Symbol {
                 id: source.id,
                 name: source.name.clone(),
-                span: new_span.clone(),
+                span: span(source.span.start, source.span.end, &source.file),
                 kind: SymbolKind::DataSourceDecl,
                 parent: source.model,
                 ..Default::default()
-            };
-
-            if let Some(existing) = table.insert(symbol) {
-                let first_span = existing.span.clone();
-                sink.push(CompilerErrorKind::DuplicateSymbol {
-                    symbol: source.id,
-                    first_span,
-                    second_span: new_span,
-                });
-            }
+            });
 
             for method in [&source.list, &source.get].into_iter().flatten() {
                 for param in &method.parameters {
-                    let new_span = FileSpan {
-                        start: param.span.start,
-                        end: param.span.end,
-                        file: source.file.clone(),
-                    };
-                    let symbol = Symbol {
+                    insert_unique(&mut table, Symbol {
                         id: param.id,
                         name: param.name.clone(),
-                        span: new_span.clone(),
+                        span: span(param.span.start, param.span.end, &source.file),
                         kind: SymbolKind::DataSourceMethodParam,
                         parent: source.id,
                         cidl_type: param.cidl_type.clone(),
-                    };
-
-                    if let Some(existing) = table.insert(symbol) {
-                        let first_span = existing.span.clone();
-                        sink.push(CompilerErrorKind::DuplicateSymbol {
-                            symbol: param.id,
-                            first_span,
-                            second_span: new_span,
-                        });
-                    }
+                    });
                 }
             }
         }
 
         for service in &parse.services {
-            let new_span = FileSpan {
-                start: service.span.start,
-                end: service.span.end,
-                file: service.file.clone(),
-            };
-            let symbol = Symbol {
+            insert_unique(&mut table, Symbol {
                 id: service.id,
                 name: service.name.clone(),
-                span: new_span.clone(),
+                span: span(service.span.start, service.span.end, &service.file),
                 kind: SymbolKind::ServiceDecl,
                 ..Default::default()
-            };
-
-            if let Some(existing) = table.insert(symbol) {
-                let first_span = existing.span.clone();
-                sink.push(CompilerErrorKind::DuplicateSymbol {
-                    symbol: service.id,
-                    first_span,
-                    second_span: new_span,
-                });
-            }
+            });
 
             for field in &service.fields {
-                let new_span = FileSpan {
-                    start: field.span.start,
-                    end: field.span.end,
-                    file: service.file.clone(),
-                };
-                let symbol = Symbol {
+                insert_unique(&mut table, Symbol {
                     id: field.id,
                     name: field.name.clone(),
-                    span: new_span.clone(),
+                    span: span(field.span.start, field.span.end, &service.file),
                     kind: SymbolKind::ServiceField,
                     parent: service.id,
                     cidl_type: field.cidl_type.clone(),
-                };
-
-                if let Some(existing) = table.insert(symbol) {
-                    let first_span = existing.span.clone();
-                    sink.push(CompilerErrorKind::DuplicateSymbol {
-                        symbol: field.id,
-                        first_span,
-                        second_span: new_span,
-                    });
-                }
+                });
             }
         }
 
         for inject in &parse.injects {
             for &ref_id in &inject.refs {
-                let new_span = FileSpan {
-                    start: inject.span.start,
-                    end: inject.span.end,
-                    file: inject.file.clone(),
-                };
-                let symbol = Symbol {
+                insert_unique(&mut table, Symbol {
                     id: ref_id,
-                    name: String::default(),
-                    span: new_span.clone(),
+                    span: span(inject.span.start, inject.span.end, &inject.file),
                     kind: SymbolKind::InjectDecl,
                     ..Default::default()
-                };
-
-                if let Some(existing) = table.insert(symbol) {
-                    let first_span = existing.span.clone();
-                    sink.push(CompilerErrorKind::DuplicateSymbol {
-                        symbol: ref_id,
-                        first_span,
-                        second_span: new_span,
-                    });
-                }
+                });
             }
         }
 

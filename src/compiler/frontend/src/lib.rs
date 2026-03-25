@@ -1,4 +1,4 @@
-use std::{collections::BTreeMap, path::PathBuf};
+use std::path::PathBuf;
 
 use ast::{CidlType, CrudKind, HttpVerb, IncludeTree};
 use chumsky::span::SimpleSpan;
