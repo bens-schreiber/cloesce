@@ -414,7 +414,7 @@ impl D1ModelAnalysis {
             return None;
         }
 
-        // Validate and collect columns
+        // Columns
         let mut columns = HashSet::new();
         let mut primary_key_columns = HashSet::new();
         for field in &model_block.fields {
@@ -439,7 +439,7 @@ impl D1ModelAnalysis {
         self.graph.entry(model_block.id).or_default();
         self.in_degree.entry(model_block.id).or_insert(0);
 
-        // Validate foreign keys
+        // Foreign keys
         let mut foreign_keys = Vec::new();
         let mut fk_columns_seen = HashSet::<SymbolRef>::new();
         for fk in &model_block.foreign_keys {
@@ -456,7 +456,7 @@ impl D1ModelAnalysis {
             }
         }
 
-        // Validate navigation properties
+        // Navigation properties
         let mut navigation_properties = Vec::new();
         for nav in &model_block.navigation_properties {
             let nav_result = self.nav(model_block, nav, &columns, table, &d1_model_blocks);
@@ -473,7 +473,7 @@ impl D1ModelAnalysis {
             columns,
             primary_key_columns,
             foreign_keys,
-            navigation_properties: vec![],
+            navigation_properties,
         });
     }
 
@@ -779,16 +779,6 @@ impl D1ModelAnalysis {
                     return None;
                 };
 
-                if !columns.contains(&field_sym.id) {
-                    self.sink.push(
-                        CompilerErrorKind::NavigationPropertyReferencesInvalidOrUnknownField {
-                            tag: nav.id,
-                            field: *f,
-                        },
-                    );
-                    return None;
-                }
-
                 Some(field_sym)
             })
             .collect::<Vec<&Symbol>>();
@@ -852,10 +842,17 @@ impl D1ModelAnalysis {
                 // One to One navigation property
                 // References must be a foreign key to the adjacent model
                 let has_matching_fk = model_block.foreign_keys.iter().any(|fk| {
-                    compare_vecs_ignoring_order(
-                        &fk.references.iter().map(|(field, _)| *field).collect(),
+                    let found_fk_vec = compare_vecs_ignoring_order(
+                        &fk.references
+                            .iter()
+                            .map(|(_, adj_field)| *adj_field)
+                            .collect(),
                         &nav.fields,
-                    ) && fk.adj_model == adj_model_sym.id
+                    );
+
+                    let it_matches_ids = fk.adj_model == adj_model_sym.id;
+
+                    found_fk_vec && it_matches_ids
                 });
 
                 ensure!(
@@ -869,6 +866,7 @@ impl D1ModelAnalysis {
 
                 D1NavigationProperty {
                     hash: 0,
+                    symbol: nav.id,
                     field: nav.field,
                     adj_model: nav.adj_model,
                     kind: NavigationPropertyKind::OneToOne {
@@ -881,10 +879,7 @@ impl D1ModelAnalysis {
                 // References must be a foreign key from the adjacent model to this model
                 let has_matching_fk = adj_model.foreign_keys.iter().any(|fk| {
                     compare_vecs_ignoring_order(
-                        &fk.references
-                            .iter()
-                            .map(|(_, adj_field)| *adj_field)
-                            .collect(),
+                        &fk.references.iter().map(|(field, _)| *field).collect(),
                         &nav.fields,
                     ) && fk.adj_model == model_block.id
                 });
@@ -900,6 +895,7 @@ impl D1ModelAnalysis {
 
                 D1NavigationProperty {
                     hash: 0,
+                    symbol: nav.id,
                     field: nav.field,
                     adj_model: nav.adj_model,
                     kind: NavigationPropertyKind::OneToMany {
@@ -937,6 +933,7 @@ impl D1ModelAnalysis {
 
                 D1NavigationProperty {
                     hash: 0,
+                    symbol: nav.id,
                     field: nav.field,
                     adj_model: nav.adj_model,
                     kind: NavigationPropertyKind::ManyToMany,

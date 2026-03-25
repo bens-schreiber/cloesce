@@ -2,7 +2,10 @@
 
 use std::collections::HashMap;
 
-use ast::{D1Database, KVNamespace, R2Bucket, SymbolKind, WranglerEnvBindingKind, WranglerSpec};
+use ast::{
+    CidlType, D1Database, KVNamespace, NavigationPropertyKind, R2Bucket, SymbolKind,
+    WranglerEnvBindingKind, WranglerSpec,
+};
 use compiler_test::lex_and_parse;
 use semantic::{SemanticAnalysis, err::CompilerErrorKind};
 
@@ -480,4 +483,249 @@ fn d1_model_nav_errors() {
         CompilerErrorKind::NavigationPropertyReferencesNonD1Model { model, .. } => *model
     );
     assert_eq!(ast.table.name(non_d1_model), "NonD1Model");
+}
+
+#[test]
+fn d1_model_nav_one_to_one() {
+    // Arrange
+    let src = &with_env(
+        r#"
+        @d1(my_d1)
+        model Person {
+            [primary id]
+            id: int
+
+            [foreign horseId -> Horse::id]
+            [nav horse -> Horse::id]
+            horseId: int
+            horse: Horse
+        }
+
+        @d1(my_d1)
+        model Horse {
+            [primary id]
+            id: int
+        }
+        "#,
+    );
+    let parse = lex_and_parse(src);
+
+    // Act
+    let (ast, errors) = SemanticAnalysis::analyze(parse, &create_spec());
+
+    // Assert
+    assert_eq!(errors.len(), 0);
+
+    let person = ast
+        .models
+        .values()
+        .find(|m| ast.table.name(m.symbol) == "Person")
+        .unwrap();
+    let horse = ast
+        .models
+        .values()
+        .find(|m| ast.table.name(m.symbol) == "Horse")
+        .unwrap();
+
+    let person_horse_nav = person.navigation_properties.first().unwrap();
+    let person_nav_symbol = ast.table.lookup(person_horse_nav.symbol).unwrap();
+    let SymbolKind::ModelNavigationTag {
+        parent: person_horse_nav_parent,
+    } = person_nav_symbol.kind
+    else {
+        unreachable!()
+    };
+    assert_eq!(person.symbol, person_horse_nav_parent);
+    assert_eq!(person_horse_nav.adj_model, horse.symbol);
+
+    let person_horse_field = ast.table.lookup(person_horse_nav.field).unwrap();
+    let SymbolKind::ModelField {
+        parent: person_horse_field_parent,
+        cidl_type: person_horse_field_type,
+    } = &person_horse_field.kind
+    else {
+        unreachable!()
+    };
+
+    assert_eq!(*person_horse_field_parent, person.symbol);
+    assert_eq!(person_horse_field_type, &CidlType::Object(horse.symbol));
+
+    let NavigationPropertyKind::OneToOne {
+        columns: person_horse_nav_columns,
+    } = &person_horse_nav.kind
+    else {
+        unreachable!()
+    };
+
+    assert_eq!(person_horse_nav_columns.len(), 1);
+    let person_horse_nav_column_symbol = ast.table.lookup(person_horse_nav_columns[0]).unwrap();
+    let SymbolKind::ModelField {
+        parent: person_horse_nav_column_parent,
+        cidl_type: person_horse_nav_column_type,
+    } = &person_horse_nav_column_symbol.kind
+    else {
+        unreachable!()
+    };
+    assert_eq!(*person_horse_nav_column_parent, horse.symbol);
+    assert_eq!(person_horse_nav_column_type, &CidlType::Integer);
+}
+
+#[test]
+fn d1_model_nav_one_to_many() {
+    // Arrange
+    let src = &with_env(
+        r#"
+        @d1(my_d1)
+        model Author {
+            [primary id]
+            id: int
+
+            [nav posts -> Post::authorId]
+            posts: Array<Post>
+        }
+
+        @d1(my_d1)
+        model Post {
+            [primary id]
+            id: int
+
+            [foreign authorId -> Author::id]
+            authorId: int
+        }
+        "#,
+    );
+
+    // Act
+    let parse = lex_and_parse(src);
+    let (ast, errors) = SemanticAnalysis::analyze(parse, &create_spec());
+
+    // Assert
+    assert_eq!(errors.len(), 0);
+
+    let author = ast
+        .models
+        .values()
+        .find(|m| ast.table.name(m.symbol) == "Author")
+        .unwrap();
+    let post = ast
+        .models
+        .values()
+        .find(|m| ast.table.name(m.symbol) == "Post")
+        .unwrap();
+
+    let author_posts_nav = author.navigation_properties.first().unwrap();
+    let author_nav_symbol = ast.table.lookup(author_posts_nav.symbol).unwrap();
+    let SymbolKind::ModelNavigationTag {
+        parent: author_posts_nav_parent,
+    } = author_nav_symbol.kind
+    else {
+        unreachable!()
+    };
+    assert_eq!(author.symbol, author_posts_nav_parent);
+    assert_eq!(author_posts_nav.adj_model, post.symbol);
+
+    let author_posts_field = ast.table.lookup(author_posts_nav.field).unwrap();
+    let SymbolKind::ModelField {
+        parent: author_posts_field_parent,
+        cidl_type: author_posts_field_type,
+    } = &author_posts_field.kind
+    else {
+        unreachable!()
+    };
+    assert_eq!(*author_posts_field_parent, author.symbol);
+    assert_eq!(
+        author_posts_field_type,
+        &CidlType::array(CidlType::Object(post.symbol))
+    );
+
+    let NavigationPropertyKind::OneToMany {
+        columns: author_posts_nav_columns,
+    } = &author_posts_nav.kind
+    else {
+        unreachable!()
+    };
+    assert_eq!(author_posts_nav_columns.len(), 1);
+    let author_posts_nav_column_symbol = ast.table.lookup(author_posts_nav_columns[0]).unwrap();
+    let SymbolKind::ModelField {
+        parent: author_posts_nav_column_parent,
+        cidl_type: author_posts_nav_column_type,
+    } = &author_posts_nav_column_symbol.kind
+    else {
+        unreachable!()
+    };
+    assert_eq!(*author_posts_nav_column_parent, post.symbol);
+    assert_eq!(author_posts_nav_column_type, &CidlType::Integer);
+}
+
+#[test]
+fn d1_model_nav_many_to_many() {
+    // Arrange
+    let src = &with_env(
+        r#"
+        @d1(my_d1)
+        model Student {
+            [primary id]
+            id: int
+
+            [nav courses <> Course::students]
+            courses: Array<Course>
+        }
+
+        @d1(my_d1)
+        model Course {
+            [primary id]
+            id: int
+
+            [nav students <> Student::courses]
+            students: Array<Student>
+        }
+        "#,
+    );
+
+    // Act
+    let parse = lex_and_parse(src);
+    let (ast, errors) = SemanticAnalysis::analyze(parse, &create_spec());
+
+    // Assert
+    assert_eq!(errors.len(), 0);
+
+    let student = ast
+        .models
+        .values()
+        .find(|m| ast.table.name(m.symbol) == "Student")
+        .unwrap();
+    let course = ast
+        .models
+        .values()
+        .find(|m| ast.table.name(m.symbol) == "Course")
+        .unwrap();
+
+    let student_courses_nav = student.navigation_properties.first().unwrap();
+    let student_nav_symbol = ast.table.lookup(student_courses_nav.symbol).unwrap();
+    let SymbolKind::ModelNavigationTag {
+        parent: student_courses_nav_parent,
+    } = student_nav_symbol.kind
+    else {
+        unreachable!()
+    };
+    assert_eq!(student.symbol, student_courses_nav_parent);
+    assert_eq!(student_courses_nav.adj_model, course.symbol);
+
+    let student_courses_field = ast.table.lookup(student_courses_nav.field).unwrap();
+    let SymbolKind::ModelField {
+        parent: student_courses_field_parent,
+        cidl_type: student_courses_field_type,
+    } = &student_courses_field.kind
+    else {
+        unreachable!()
+    };
+    assert_eq!(*student_courses_field_parent, student.symbol);
+    assert_eq!(
+        student_courses_field_type,
+        &CidlType::array(CidlType::Object(course.symbol))
+    );
+
+    let NavigationPropertyKind::ManyToMany = &student_courses_nav.kind else {
+        unreachable!()
+    };
 }

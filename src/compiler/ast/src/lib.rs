@@ -185,6 +185,8 @@ pub enum NavigationPropertyKind {
 
 pub struct D1NavigationProperty {
     pub hash: u64,
+    pub symbol: SymbolRef,
+
     pub field: SymbolRef,
     pub adj_model: SymbolRef,
     pub kind: NavigationPropertyKind,
