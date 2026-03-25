@@ -25,11 +25,6 @@ pub enum CompilerErrorKind {
     /// A model relies on a Wrangler environment block that is not defined within the project.
     MissingWranglerEnvBlock,
 
-    /// An environment block has a binding that is inconsistent with the actual wrangler configuration.
-    WranglerBindingInconsistentWithSpec {
-        binding: SymbolRef,
-    },
-
     /// A model with any columns or navigation properties requires a specific D1 binding to be specified.
     D1ModelMissingD1Binding {
         model: SymbolRef,

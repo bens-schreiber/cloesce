@@ -1,7 +1,7 @@
 use ast::{
     Api, CidlType, CloesceAst, DataSource, DataSourceMethod, FileSpan, IncludeTree, Model,
     PlainOldObject, Service, Symbol, SymbolKind, SymbolRef, SymbolTable, WranglerEnv,
-    WranglerEnvBindingKind, WranglerSpec,
+    WranglerEnvBindingKind,
 };
 use frontend::{ModelBlock, ParseAst};
 use indexmap::IndexMap;
@@ -20,11 +20,11 @@ mod model;
 
 pub struct SemanticAnalysis;
 impl SemanticAnalysis {
-    pub fn analyze(parse: ParseAst, spec: &WranglerSpec) -> (CloesceAst, Vec<CompilerErrorKind>) {
+    pub fn analyze(parse: ParseAst) -> (CloesceAst, Vec<CompilerErrorKind>) {
         let mut sink = ErrorSink::new();
 
         let mut table = Self::symbol_table(&parse, &mut sink);
-        let wrangler_env = Self::wrangler(&parse, spec, &mut sink);
+        let wrangler_env = Self::wrangler(&parse, &mut sink);
         let mut models = Self::models(&parse, &mut table, &mut sink);
         let poos = Self::poos(&parse, &mut table, &mut sink);
         let api_map = Self::apis(&parse, &table, &mut sink);
@@ -80,49 +80,70 @@ impl SemanticAnalysis {
         };
 
         for env in &parse.wrangler_envs {
-            insert_unique(&mut table, Symbol {
-                id: env.id,
-                span: span(env.span.start, env.span.end, &env.file),
-                kind: SymbolKind::WranglerEnvDecl,
-                ..Default::default()
-            });
+            insert_unique(
+                &mut table,
+                Symbol {
+                    id: env.id,
+                    span: span(env.span.start, env.span.end, &env.file),
+                    kind: SymbolKind::WranglerEnvDecl,
+                    ..Default::default()
+                },
+            );
 
             let bindings = env
                 .d1_bindings
                 .iter()
                 .map(|b| (b, WranglerEnvBindingKind::D1))
-                .chain(env.kv_bindings.iter().map(|b| (b, WranglerEnvBindingKind::KV)))
-                .chain(env.r2_bindings.iter().map(|b| (b, WranglerEnvBindingKind::R2)));
+                .chain(
+                    env.kv_bindings
+                        .iter()
+                        .map(|b| (b, WranglerEnvBindingKind::KV)),
+                )
+                .chain(
+                    env.r2_bindings
+                        .iter()
+                        .map(|b| (b, WranglerEnvBindingKind::R2)),
+                );
 
             for (b, kind) in bindings {
-                insert_unique(&mut table, Symbol {
-                    id: b.id,
-                    name: b.name.clone(),
-                    span: span(b.span.start, b.span.end, &env.file),
-                    kind: SymbolKind::WranglerEnvBinding { kind },
-                    ..Default::default()
-                });
+                insert_unique(
+                    &mut table,
+                    Symbol {
+                        id: b.id,
+                        name: b.name.clone(),
+                        span: span(b.span.start, b.span.end, &env.file),
+                        kind: SymbolKind::WranglerEnvBinding { kind },
+                        ..Default::default()
+                    },
+                );
             }
 
             for var in &env.vars {
-                insert_unique(&mut table, Symbol {
-                    id: var.id,
-                    name: var.name.clone(),
-                    span: span(var.span.start, var.span.end, &env.file),
-                    kind: SymbolKind::WranglerEnvVar,
-                    ..Default::default()
-                });
+                insert_unique(
+                    &mut table,
+                    Symbol {
+                        id: var.id,
+                        name: var.name.clone(),
+                        span: span(var.span.start, var.span.end, &env.file),
+                        kind: SymbolKind::WranglerEnvVar,
+                        cidl_type: var.cidl_type.clone(),
+                        ..Default::default()
+                    },
+                );
             }
         }
 
         for model in &parse.models {
-            insert_unique(&mut table, Symbol {
-                id: model.id,
-                name: model.name.clone(),
-                span: span(model.span.start, model.span.end, &model.file),
-                kind: SymbolKind::ModelDecl,
-                ..Default::default()
-            });
+            insert_unique(
+                &mut table,
+                Symbol {
+                    id: model.id,
+                    name: model.name.clone(),
+                    span: span(model.span.start, model.span.end, &model.file),
+                    kind: SymbolKind::ModelDecl,
+                    ..Default::default()
+                },
+            );
 
             if let Some(d1_tag) = &model.d1_binding {
                 table.insert(Symbol {
@@ -135,14 +156,17 @@ impl SemanticAnalysis {
             }
 
             for field in &model.fields {
-                insert_unique(&mut table, Symbol {
-                    id: field.id,
-                    name: field.name.clone(),
-                    span: span(field.span.start, field.span.end, &model.file),
-                    kind: SymbolKind::ModelField,
-                    parent: model.id,
-                    cidl_type: field.cidl_type.clone(),
-                });
+                insert_unique(
+                    &mut table,
+                    Symbol {
+                        id: field.id,
+                        name: field.name.clone(),
+                        span: span(field.span.start, field.span.end, &model.file),
+                        kind: SymbolKind::ModelField,
+                        parent: model.id,
+                        cidl_type: field.cidl_type.clone(),
+                    },
+                );
             }
 
             for fk in &model.foreign_keys {
@@ -187,111 +211,141 @@ impl SemanticAnalysis {
         }
 
         for api in &parse.apis {
-            insert_unique(&mut table, Symbol {
-                id: api.id,
-                name: api.name.clone(),
-                span: span(api.span.start, api.span.end, &api.file),
-                kind: SymbolKind::ApiDecl,
-                ..Default::default()
-            });
+            insert_unique(
+                &mut table,
+                Symbol {
+                    id: api.id,
+                    name: api.name.clone(),
+                    span: span(api.span.start, api.span.end, &api.file),
+                    kind: SymbolKind::ApiDecl,
+                    ..Default::default()
+                },
+            );
 
             for method in &api.methods {
-                insert_unique(&mut table, Symbol {
-                    id: method.id,
-                    span: span(method.span.start, method.span.end, &api.file),
-                    kind: SymbolKind::ApiMethodDecl,
-                    parent: api.id,
-                    cidl_type: method.return_type.clone(),
-                    ..Default::default()
-                });
+                insert_unique(
+                    &mut table,
+                    Symbol {
+                        id: method.id,
+                        span: span(method.span.start, method.span.end, &api.file),
+                        kind: SymbolKind::ApiMethodDecl,
+                        parent: api.id,
+                        cidl_type: method.return_type.clone(),
+                        ..Default::default()
+                    },
+                );
 
                 for param in &method.parameters {
-                    insert_unique(&mut table, Symbol {
-                        id: param.id,
-                        name: param.name.clone(),
-                        span: span(param.span.start, param.span.end, &api.file),
-                        kind: SymbolKind::ApiMethodParam,
-                        parent: method.id,
-                        cidl_type: param.cidl_type.clone(),
-                    });
+                    insert_unique(
+                        &mut table,
+                        Symbol {
+                            id: param.id,
+                            name: param.name.clone(),
+                            span: span(param.span.start, param.span.end, &api.file),
+                            kind: SymbolKind::ApiMethodParam,
+                            parent: method.id,
+                            cidl_type: param.cidl_type.clone(),
+                        },
+                    );
                 }
             }
         }
 
         for poo in &parse.poos {
-            insert_unique(&mut table, Symbol {
-                id: poo.id,
-                name: poo.name.clone(),
-                span: span(poo.span.start, poo.span.end, &poo.file),
-                kind: SymbolKind::PlainOldObjectDecl,
-                ..Default::default()
-            });
+            insert_unique(
+                &mut table,
+                Symbol {
+                    id: poo.id,
+                    name: poo.name.clone(),
+                    span: span(poo.span.start, poo.span.end, &poo.file),
+                    kind: SymbolKind::PlainOldObjectDecl,
+                    ..Default::default()
+                },
+            );
 
             for field in &poo.fields {
-                insert_unique(&mut table, Symbol {
-                    id: field.id,
-                    name: field.name.clone(),
-                    span: span(field.span.start, field.span.end, &poo.file),
-                    kind: SymbolKind::PlainOldObjectField,
-                    parent: poo.id,
-                    cidl_type: field.cidl_type.clone(),
-                });
+                insert_unique(
+                    &mut table,
+                    Symbol {
+                        id: field.id,
+                        name: field.name.clone(),
+                        span: span(field.span.start, field.span.end, &poo.file),
+                        kind: SymbolKind::PlainOldObjectField,
+                        parent: poo.id,
+                        cidl_type: field.cidl_type.clone(),
+                    },
+                );
             }
         }
 
         for source in &parse.sources {
-            insert_unique(&mut table, Symbol {
-                id: source.id,
-                name: source.name.clone(),
-                span: span(source.span.start, source.span.end, &source.file),
-                kind: SymbolKind::DataSourceDecl,
-                parent: source.model,
-                ..Default::default()
-            });
+            insert_unique(
+                &mut table,
+                Symbol {
+                    id: source.id,
+                    name: source.name.clone(),
+                    span: span(source.span.start, source.span.end, &source.file),
+                    kind: SymbolKind::DataSourceDecl,
+                    parent: source.model,
+                    ..Default::default()
+                },
+            );
 
             for method in [&source.list, &source.get].into_iter().flatten() {
                 for param in &method.parameters {
-                    insert_unique(&mut table, Symbol {
-                        id: param.id,
-                        name: param.name.clone(),
-                        span: span(param.span.start, param.span.end, &source.file),
-                        kind: SymbolKind::DataSourceMethodParam,
-                        parent: source.id,
-                        cidl_type: param.cidl_type.clone(),
-                    });
+                    insert_unique(
+                        &mut table,
+                        Symbol {
+                            id: param.id,
+                            name: param.name.clone(),
+                            span: span(param.span.start, param.span.end, &source.file),
+                            kind: SymbolKind::DataSourceMethodParam,
+                            parent: source.id,
+                            cidl_type: param.cidl_type.clone(),
+                        },
+                    );
                 }
             }
         }
 
         for service in &parse.services {
-            insert_unique(&mut table, Symbol {
-                id: service.id,
-                name: service.name.clone(),
-                span: span(service.span.start, service.span.end, &service.file),
-                kind: SymbolKind::ServiceDecl,
-                ..Default::default()
-            });
+            insert_unique(
+                &mut table,
+                Symbol {
+                    id: service.id,
+                    name: service.name.clone(),
+                    span: span(service.span.start, service.span.end, &service.file),
+                    kind: SymbolKind::ServiceDecl,
+                    ..Default::default()
+                },
+            );
 
             for field in &service.fields {
-                insert_unique(&mut table, Symbol {
-                    id: field.id,
-                    name: field.name.clone(),
-                    span: span(field.span.start, field.span.end, &service.file),
-                    kind: SymbolKind::ServiceField,
-                    parent: service.id,
-                    cidl_type: field.cidl_type.clone(),
-                });
+                insert_unique(
+                    &mut table,
+                    Symbol {
+                        id: field.id,
+                        name: field.name.clone(),
+                        span: span(field.span.start, field.span.end, &service.file),
+                        kind: SymbolKind::ServiceField,
+                        parent: service.id,
+                        cidl_type: field.cidl_type.clone(),
+                    },
+                );
             }
         }
 
         for inject in &parse.injects {
             for &ref_id in &inject.refs {
-                insert_unique(&mut table, Symbol {
-                    id: ref_id,
-                    span: span(inject.span.start, inject.span.end, &inject.file),
-                    kind: SymbolKind::InjectDecl,
-                    ..Default::default()
-                });
+                insert_unique(
+                    &mut table,
+                    Symbol {
+                        id: ref_id,
+                        span: span(inject.span.start, inject.span.end, &inject.file),
+                        kind: SymbolKind::InjectDecl,
+                        ..Default::default()
+                    },
+                );
             }
         }
 
@@ -300,11 +354,7 @@ impl SemanticAnalysis {
 
     /// If multiple environments are declared, sinks an error but returns the first environments bindings.
     /// If no environment is declared, sinks an error if there are any models (since models require an env), but returns None.
-    fn wrangler(
-        parse: &ParseAst,
-        spec: &WranglerSpec,
-        sink: &mut ErrorSink,
-    ) -> Option<WranglerEnv> {
+    fn wrangler(parse: &ParseAst, sink: &mut ErrorSink) -> Option<WranglerEnv> {
         ensure!(
             parse.wrangler_envs.len() < 2,
             sink,
@@ -324,63 +374,12 @@ impl SemanticAnalysis {
             return None;
         };
 
-        let mut vars = HashSet::new();
-        let mut d1_bindings = HashSet::new();
-        let mut kv_bindings = HashSet::new();
-        let mut r2_bindings = HashSet::new();
-
-        for var in &parsed_env.vars {
-            ensure!(
-                spec.vars.contains_key(var.name.as_str()),
-                sink,
-                CompilerErrorKind::WranglerBindingInconsistentWithSpec { binding: var.id }
-            );
-
-            vars.insert(var.id);
-        }
-
-        for db in &parsed_env.d1_bindings {
-            ensure!(
-                spec.d1_databases
-                    .iter()
-                    .any(|d| d.binding.as_ref().is_some_and(|b| b == db.name.as_str())),
-                sink,
-                CompilerErrorKind::WranglerBindingInconsistentWithSpec { binding: db.id }
-            );
-
-            d1_bindings.insert(db.id);
-        }
-
-        for kv in &parsed_env.kv_bindings {
-            ensure!(
-                spec.kv_namespaces
-                    .iter()
-                    .any(|ns| ns.binding.as_ref().is_some_and(|b| b == kv.name.as_str())),
-                sink,
-                CompilerErrorKind::WranglerBindingInconsistentWithSpec { binding: kv.id }
-            );
-
-            kv_bindings.insert(kv.id);
-        }
-
-        for r2 in &parsed_env.r2_bindings {
-            ensure!(
-                spec.r2_buckets
-                    .iter()
-                    .any(|b| b.binding.as_ref().is_some_and(|b| b == r2.name.as_str())),
-                sink,
-                CompilerErrorKind::WranglerBindingInconsistentWithSpec { binding: r2.id }
-            );
-
-            r2_bindings.insert(r2.id);
-        }
-
         Some(WranglerEnv {
             symbol: parsed_env.id,
-            d1_bindings: d1_bindings,
-            kv_bindings: kv_bindings,
-            r2_bindings: r2_bindings,
-            vars: vars,
+            d1_bindings: parsed_env.d1_bindings.iter().map(|b| b.id).collect(),
+            kv_bindings: parsed_env.kv_bindings.iter().map(|b| b.id).collect(),
+            r2_bindings: parsed_env.r2_bindings.iter().map(|b| b.id).collect(),
+            vars: parsed_env.vars.iter().map(|v| v.id).collect(),
         })
     }
 

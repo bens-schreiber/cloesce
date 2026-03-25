@@ -1,11 +1,6 @@
 #![allow(unused_variables)]
 
-use std::collections::HashMap;
-
-use ast::{
-    CidlType, D1Database, KVNamespace, NavigationPropertyKind, R2Bucket, SymbolKind,
-    WranglerEnvBindingKind, WranglerSpec,
-};
+use ast::{CidlType, NavigationPropertyKind, SymbolKind, WranglerEnvBindingKind};
 use compiler_test::lex_and_parse;
 use semantic::{SemanticAnalysis, err::CompilerErrorKind};
 
@@ -39,30 +34,6 @@ macro_rules! count_errs {
     };
 }
 
-// TODO: use wrangler defaults
-fn create_spec() -> WranglerSpec {
-    WranglerSpec {
-        d1_databases: vec![D1Database {
-            binding: Some("my_d1".into()),
-            database_name: None,
-            database_id: None,
-            migrations_dir: None,
-        }],
-        kv_namespaces: vec![KVNamespace {
-            binding: Some("my_kv".into()),
-            id: None,
-        }],
-        r2_buckets: vec![R2Bucket {
-            binding: Some("my_r2".into()),
-            bucket_name: None,
-        }],
-        vars: HashMap::new(),
-        name: None,
-        compatibility_date: None,
-        main: None,
-    }
-}
-
 fn with_env(src: &str) -> String {
     format!(
         r#"
@@ -88,7 +59,7 @@ fn multiple_wrangler_env_blocks() {
     let parse = lex_and_parse(src);
 
     // Act
-    let (ast, errors) = SemanticAnalysis::analyze(parse, &create_spec());
+    let (ast, errors) = SemanticAnalysis::analyze(parse);
 
     // Assert
     assert_eq!(errors.len(), 1);
@@ -114,40 +85,10 @@ fn missing_wrangler_env_block() {
     let parse = lex_and_parse(src);
 
     // Act
-    let (_table, errors) = SemanticAnalysis::analyze(parse, &create_spec());
+    let (_table, errors) = SemanticAnalysis::analyze(parse);
 
     // Assert
     expect_err!(errors, CompilerErrorKind::MissingWranglerEnvBlock);
-}
-
-#[test]
-fn wrangler_binding_inconsistent_with_spec() {
-    // Arrange
-    let src = r#"
-        env {
-            my_d1: d1
-            my_kv: kv
-            my_r2: r2
-            other_d1: d1 // NOT consistent with the spec
-        }
-    "#;
-    let parse = lex_and_parse(src);
-
-    // Act
-    let (ast, errors) = SemanticAnalysis::analyze(parse, &create_spec());
-
-    // Assert
-    assert_eq!(errors.len(), 1);
-    let binding = expect_err!(errors,
-        CompilerErrorKind::WranglerBindingInconsistentWithSpec { binding } => *binding
-    );
-    assert_eq!(ast.table.name(binding), "other_d1");
-    assert!(matches!(
-        ast.table.kind(binding),
-        Some(SymbolKind::WranglerEnvBinding {
-            kind: WranglerEnvBindingKind::D1
-        })
-    ));
 }
 
 #[test]
@@ -164,7 +105,7 @@ fn wrangler_duplicate_symbol() {
     let parse = lex_and_parse(src);
 
     // Act
-    let (ast, errors) = SemanticAnalysis::analyze(parse, &create_spec());
+    let (ast, errors) = SemanticAnalysis::analyze(parse);
 
     // Assert
     assert_eq!(errors.len(), 1);
@@ -203,7 +144,7 @@ fn d1_model_basic_errors() {
     let parse = lex_and_parse(&src);
 
     // Act
-    let (ast, errors) = SemanticAnalysis::analyze(parse, &create_spec());
+    let (ast, errors) = SemanticAnalysis::analyze(parse);
 
     // Assert
     assert_eq!(errors.len(), 3);
@@ -263,17 +204,10 @@ fn d1_model_column_fk_errors() {
             id: int
         }
     "#;
-    let mut spec = create_spec();
-    spec.d1_databases.push(D1Database {
-        binding: Some("other_d1".into()),
-        database_name: None,
-        database_id: None,
-        migrations_dir: None,
-    });
     let parse = lex_and_parse(src);
 
     // Act
-    let (ast, errors) = SemanticAnalysis::analyze(parse, &spec);
+    let (ast, errors) = SemanticAnalysis::analyze(parse);
 
     // Assert
     assert_eq!(errors.len(), 7);
@@ -356,7 +290,7 @@ fn d1_model_consistent_nullability_error() {
     let parse = lex_and_parse(src);
 
     // Act
-    let (ast, errors) = SemanticAnalysis::analyze(parse, &create_spec());
+    let (ast, errors) = SemanticAnalysis::analyze(parse);
 
     // Assert
     assert_eq!(errors.len(), 1);
@@ -392,7 +326,7 @@ fn d1_model_fk_column_already_in_foreign_key() {
     let parse = lex_and_parse(&src);
 
     // Act
-    let (ast, errors) = SemanticAnalysis::analyze(parse, &create_spec());
+    let (ast, errors) = SemanticAnalysis::analyze(parse);
 
     // Assert
     assert_eq!(errors.len(), 1);
@@ -440,17 +374,10 @@ fn d1_model_nav_errors() {
             id: int
         }
     "#;
-    let mut spec = create_spec();
-    spec.d1_databases.push(D1Database {
-        binding: Some("other_d1".into()),
-        database_name: None,
-        database_id: None,
-        migrations_dir: None,
-    });
     let parse = lex_and_parse(&src);
 
     // Act
-    let (ast, errors) = SemanticAnalysis::analyze(parse, &spec);
+    let (ast, errors) = SemanticAnalysis::analyze(parse);
 
     // Assert
     assert_eq!(errors.len(), 3);
@@ -493,7 +420,7 @@ fn d1_model_nav_field_already_in_navigation_property() {
     let parse = lex_and_parse(&src);
 
     // Act
-    let (ast, errors) = SemanticAnalysis::analyze(parse, &create_spec());
+    let (ast, errors) = SemanticAnalysis::analyze(parse);
 
     // Assert
     assert_eq!(errors.len(), 1);
@@ -533,7 +460,7 @@ fn d1_model_nav_one_to_one() {
     let parse = lex_and_parse(src);
 
     // Act
-    let (ast, errors) = SemanticAnalysis::analyze(parse, &create_spec());
+    let (ast, errors) = SemanticAnalysis::analyze(parse);
 
     // Assert
     assert_eq!(errors.len(), 0);
@@ -600,7 +527,7 @@ fn d1_model_nav_one_to_many() {
 
     // Act
     let parse = lex_and_parse(src);
-    let (ast, errors) = SemanticAnalysis::analyze(parse, &create_spec());
+    let (ast, errors) = SemanticAnalysis::analyze(parse);
 
     // Assert
     assert_eq!(errors.len(), 0);
@@ -668,7 +595,7 @@ fn d1_model_nav_many_to_many() {
 
     // Act
     let parse = lex_and_parse(src);
-    let (ast, errors) = SemanticAnalysis::analyze(parse, &create_spec());
+    let (ast, errors) = SemanticAnalysis::analyze(parse);
 
     // Assert
     assert_eq!(errors.len(), 0);
@@ -743,7 +670,7 @@ fn d1_model_cyclical_relationship_error() {
 
     // Act
     let parse = lex_and_parse(src);
-    let (ast, errors) = SemanticAnalysis::analyze(parse, &create_spec());
+    let (ast, errors) = SemanticAnalysis::analyze(parse);
 
     // Assert
     assert_eq!(errors.len(), 1);
@@ -796,7 +723,7 @@ fn d1_model_nullability_prevents_cycle() {
 
     // Act
     let parse = lex_and_parse(src);
-    let (ast, errors) = SemanticAnalysis::analyze(parse, &create_spec());
+    let (ast, errors) = SemanticAnalysis::analyze(parse);
 
     // Assert
     assert_eq!(errors.len(), 0);
@@ -830,7 +757,7 @@ fn kv_r2_errors() {
     let parse = lex_and_parse(src);
 
     // Act
-    let (ast, errors) = SemanticAnalysis::analyze(parse, &create_spec());
+    let (ast, errors) = SemanticAnalysis::analyze(parse);
 
     // Assert
     assert_eq!(errors.len(), 5);
@@ -880,7 +807,7 @@ fn kv_and_d1_coexist() {
     let parse = lex_and_parse(src);
 
     // Act
-    let (ast, errors) = SemanticAnalysis::analyze(parse, &create_spec());
+    let (ast, errors) = SemanticAnalysis::analyze(parse);
 
     // Assert
     assert_eq!(errors.len(), 0);
@@ -938,7 +865,7 @@ fn api_errors() {
     let parse = lex_and_parse(src);
 
     // Act
-    let (ast, errors) = SemanticAnalysis::analyze(parse, &create_spec());
+    let (ast, errors) = SemanticAnalysis::analyze(parse);
 
     // Assert
     assert_eq!(errors.len(), 6);
@@ -1012,7 +939,7 @@ fn data_source_errors() {
     let parse = lex_and_parse(src);
 
     // Act
-    let (ast, errors) = SemanticAnalysis::analyze(parse, &create_spec());
+    let (ast, errors) = SemanticAnalysis::analyze(parse);
 
     // Assert
     // BadModelSource: unknown model
@@ -1068,7 +995,7 @@ fn data_source_include_tree_kv_r2() {
     let parse = lex_and_parse(src);
 
     // Act
-    let (ast, errors) = SemanticAnalysis::analyze(parse, &create_spec());
+    let (ast, errors) = SemanticAnalysis::analyze(parse);
 
     // Assert
     assert_eq!(errors.len(), 0);
@@ -1095,7 +1022,7 @@ fn poo_errors() {
 
     // Act
     let parse = lex_and_parse(src);
-    let (ast, errors) = SemanticAnalysis::analyze(parse, &create_spec());
+    let (ast, errors) = SemanticAnalysis::analyze(parse);
 
     // Assert
     assert_eq!(errors.len(), 3);
@@ -1146,7 +1073,7 @@ fn service_errors() {
     );
 
     let parse = lex_and_parse(src);
-    let (ast, errors) = SemanticAnalysis::analyze(parse, &create_spec());
+    let (ast, errors) = SemanticAnalysis::analyze(parse);
 
     assert!(errors.iter().any(|e| matches!(
         e,
