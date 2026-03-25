@@ -1,12 +1,14 @@
 use ast::{
-    Api, CidlType, CloesceAst, DataSource, DataSourceMethod, FileSpan, IncludeTree, Model,
-    PlainOldObject, Service, Symbol, SymbolKind, SymbolRef, SymbolTable, WranglerEnv,
-    WranglerEnvBindingKind,
+    Api, CidlType, CloesceAst, DataSource, DataSourceMethod, Field, IncludeTree, Model,
+    PlainOldObject, Service, ServiceField, WranglerEnv,
 };
-use frontend::{ModelBlock, ParseAst};
+use frontend::{ModelBlock, ParseAst, parser::ParseId};
 use indexmap::IndexMap;
 
-use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
+use std::{
+    collections::{BTreeMap, HashMap, VecDeque},
+    path::PathBuf,
+};
 
 use crate::{
     api::ApiAnalysis,
@@ -18,47 +20,116 @@ mod api;
 pub mod err;
 mod model;
 
-pub struct SemanticAnalysis;
-impl SemanticAnalysis {
-    pub fn analyze(parse: ParseAst) -> (CloesceAst, Vec<CompilerErrorKind>) {
-        let mut sink = ErrorSink::new();
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Default)]
+pub struct FileSpan {
+    pub start: usize,
+    pub end: usize,
+    pub file: PathBuf,
+}
 
-        let mut table = Self::symbol_table(&parse, &mut sink);
-        let wrangler_env = Self::wrangler(&parse, &mut sink);
-        let mut models = Self::models(&parse, &mut table, &mut sink);
-        let poos = Self::poos(&parse, &mut table, &mut sink);
-        let api_map = Self::apis(&parse, &table, &mut sink);
-        let data_source_map = Self::data_sources(&parse, &models, &table, &mut sink);
-        let services = Self::services(&parse, &table, &mut sink);
+#[derive(Clone)]
+pub enum WranglerEnvBindingKind {
+    D1,
+    R2,
+    KV,
+}
 
-        // Merge API methods into their respective models
-        for (model_ref, api) in api_map {
-            if let Some(model) = models.get_mut(&model_ref) {
-                model.apis.push(api);
-            }
+#[derive(Clone, Default)]
+pub enum SymbolKind {
+    ModelDecl,
+    ModelField,
+    ModelPrimaryKeyTag,
+    ModelForeignKeyTag,
+    ModelNavigationTag,
+    ModelD1Tag,
+    ModelKvTag,
+    ModelR2Tag,
+
+    WranglerEnvDecl,
+    WranglerEnvBinding {
+        kind: WranglerEnvBindingKind,
+    },
+    WranglerEnvVar,
+
+    PlainOldObjectDecl,
+    PlainOldObjectField,
+
+    ApiDecl,
+    ApiMethodDecl,
+    ApiMethodParam,
+
+    DataSourceDecl,
+    DataSourceMethodDecl,
+    DataSourceMethodParam,
+
+    ServiceDecl,
+    ServiceField,
+
+    InjectDecl,
+
+    #[default]
+    Null,
+}
+
+#[derive(Clone)]
+pub struct Symbol {
+    pub id: ParseId,
+
+    /// Empty for symbols that are not named (e.g. declarations)
+    pub name: String,
+
+    /// Void for symbols that have no type (e.g. declarations)
+    pub cidl_type: CidlType,
+
+    /// [usize::MAX] for symbols that have no parent (e.g. declarations)
+    pub parent: ParseId,
+
+    pub span: FileSpan,
+    pub kind: SymbolKind,
+}
+
+impl Default for Symbol {
+    fn default() -> Self {
+        Symbol {
+            id: usize::MAX,
+            name: String::new(),
+            cidl_type: CidlType::Void,
+            parent: usize::MAX,
+            span: FileSpan::default(),
+            kind: SymbolKind::Null,
         }
+    }
+}
 
-        // Merge data sources into their respective models
-        for (model_ref, ds) in data_source_map {
-            if let Some(model) = models.get_mut(&model_ref) {
-                model.data_sources.push(ds);
-            }
-        }
+#[derive(Default)]
+pub struct SymbolTable {
+    table: HashMap<ParseId, Symbol>,
+}
 
-        let ast = CloesceAst {
-            wrangler_env,
-            models,
-            services,
-            table,
-            poos,
-        };
+impl SymbolTable {
+    pub fn insert(&mut self, symbol: Symbol) -> Option<Symbol> {
+        self.table.insert(symbol.id, symbol)
+    }
 
-        (ast, sink.drain())
+    pub fn lookup(&self, id: ParseId) -> Option<&Symbol> {
+        self.table.get(&id)
+    }
+
+    pub fn name(&self, id: ParseId) -> &str {
+        self.lookup(id).map(|s| s.name.as_str()).unwrap_or("")
+    }
+
+    pub fn kind(&self, id: ParseId) -> Option<&SymbolKind> {
+        self.lookup(id).map(|s| &s.kind)
+    }
+
+    pub fn table_iter(&self) -> impl Iterator<Item = (ParseId, &Symbol)> {
+        self.table.iter().map(|(&id, sym)| (id, sym))
     }
 
     /// Converts all declared [ParseId]s into [Symbol]s,
     /// catching duplicate declaration errors along the way.
-    fn symbol_table(parse: &ParseAst, sink: &mut ErrorSink) -> SymbolTable {
+    fn from_parse(parse: &ParseAst, sink: &mut ErrorSink) -> SymbolTable {
         let mut table = SymbolTable::default();
 
         let span = |start, end, file: &std::path::Path| FileSpan {
@@ -351,6 +422,49 @@ impl SemanticAnalysis {
 
         table
     }
+}
+
+pub struct SemanticResult {
+    pub ast: CloesceAst,
+    pub table: SymbolTable,
+}
+
+pub struct SemanticAnalysis;
+impl SemanticAnalysis {
+    pub fn analyze(parse: ParseAst) -> (SemanticResult, Vec<CompilerErrorKind>) {
+        let mut sink = ErrorSink::new();
+
+        let mut table = SymbolTable::from_parse(&parse, &mut sink);
+        let wrangler_env = Self::wrangler(&parse, &mut sink);
+        let mut models = Self::models(&parse, &mut table, &mut sink);
+        let poos = Self::poos(&parse, &mut table, &mut sink);
+        let api_map = Self::apis(&parse, &table, &mut sink);
+        let data_source_map = Self::data_sources(&parse, &models, &table, &mut sink);
+        let services = Self::services(&parse, &table, &mut sink);
+
+        // Merge API methods into their respective models
+        for (model_name, api) in api_map {
+            if let Some(model) = models.get_mut(&model_name) {
+                model.apis.push(api);
+            }
+        }
+
+        // Merge data sources into their respective models
+        for (model_name, ds) in data_source_map {
+            if let Some(model) = models.get_mut(&model_name) {
+                model.data_sources.push(ds);
+            }
+        }
+
+        let ast = CloesceAst {
+            wrangler_env,
+            models,
+            services,
+            poos,
+        };
+
+        (SemanticResult { ast, table }, sink.drain())
+    }
 
     /// If multiple environments are declared, sinks an error but returns the first environments bindings.
     /// If no environment is declared, sinks an error if there are any models (since models require an env), but returns None.
@@ -375,11 +489,29 @@ impl SemanticAnalysis {
         };
 
         Some(WranglerEnv {
-            symbol: parsed_env.id,
-            d1_bindings: parsed_env.d1_bindings.iter().map(|b| b.id).collect(),
-            kv_bindings: parsed_env.kv_bindings.iter().map(|b| b.id).collect(),
-            r2_bindings: parsed_env.r2_bindings.iter().map(|b| b.id).collect(),
-            vars: parsed_env.vars.iter().map(|v| v.id).collect(),
+            d1_bindings: parsed_env
+                .d1_bindings
+                .iter()
+                .map(|b| b.name.clone())
+                .collect(),
+            kv_bindings: parsed_env
+                .kv_bindings
+                .iter()
+                .map(|b| b.name.clone())
+                .collect(),
+            r2_bindings: parsed_env
+                .r2_bindings
+                .iter()
+                .map(|b| b.name.clone())
+                .collect(),
+            vars: parsed_env
+                .vars
+                .iter()
+                .map(|v| Field {
+                    name: v.name.clone(),
+                    cidl_type: v.cidl_type.clone(),
+                })
+                .collect(),
         })
     }
 
@@ -387,12 +519,12 @@ impl SemanticAnalysis {
         parse: &ParseAst,
         table: &mut SymbolTable,
         sink: &mut ErrorSink,
-    ) -> IndexMap<SymbolRef, Model> {
+    ) -> IndexMap<String, Model> {
         let model_map = parse
             .models
             .iter()
             .map(|m| (m.id, m))
-            .collect::<HashMap<SymbolRef, &ModelBlock>>();
+            .collect::<HashMap<ParseId, &ModelBlock>>();
 
         match ModelAnalysis::default().analyze(model_map, table) {
             Ok(models) => models,
@@ -403,7 +535,7 @@ impl SemanticAnalysis {
         }
     }
 
-    fn apis(parse: &ParseAst, table: &SymbolTable, sink: &mut ErrorSink) -> Vec<(SymbolRef, Api)> {
+    fn apis(parse: &ParseAst, table: &SymbolTable, sink: &mut ErrorSink) -> Vec<(String, Api)> {
         match ApiAnalysis::default().analyze(&parse.apis, parse, table) {
             Ok(apis) => apis,
             Err(errs) => {
@@ -415,19 +547,20 @@ impl SemanticAnalysis {
 
     fn data_sources(
         parse: &ParseAst,
-        models: &IndexMap<SymbolRef, Model>,
+        models: &IndexMap<String, Model>,
         table: &SymbolTable,
         sink: &mut ErrorSink,
-    ) -> Vec<(SymbolRef, DataSource)> {
+    ) -> Vec<(String, DataSource)> {
         let mut result = Vec::new();
 
         // Validate list and get method parameters
         fn analyze_method(
             source: &frontend::DataSourceBlock,
             method: &frontend::DataSourceBlockMethod,
+            _table: &SymbolTable,
             sink: &mut ErrorSink,
         ) -> Option<DataSourceMethod> {
-            let mut params = Vec::new();
+            let mut parameters = Vec::new();
             for param in &method.parameters {
                 if !is_valid_sql_type(&param.cidl_type) {
                     sink.push(CompilerErrorKind::DataSourceInvalidMethodParam {
@@ -435,11 +568,13 @@ impl SemanticAnalysis {
                         param: param.id,
                     });
                 }
-                params.push(param.id);
+                parameters.push(Field {
+                    name: param.name.clone(),
+                    cidl_type: param.cidl_type.clone(),
+                });
             }
             Some(DataSourceMethod {
-                symbol: source.id,
-                parameters: params,
+                parameters,
                 raw_sql: method.raw_sql.clone(),
             })
         }
@@ -456,52 +591,53 @@ impl SemanticAnalysis {
                 continue;
             }
 
-            let Some(model) = models.get(&source.model) else {
+            let model_name = model_sym.name.clone();
+            let Some(model) = models.get(&model_name) else {
                 sink.push(CompilerErrorKind::DataSourceUnknownModelReference { source: source.id });
                 continue;
             };
 
             // Validate include tree via BFS
             let mut q = VecDeque::new();
-            q.push_back((&source.tree, source.model, model));
+            q.push_back((&source.tree, &model_name, model));
 
-            while let Some((node, parent_model_ref, parent_model)) = q.pop_front() {
+            while let Some((node, _parent_model_name, parent_model)) = q.pop_front() {
                 for (var_name, child) in &node.0 {
                     // Check navigation properties
                     let nav = parent_model
                         .navigation_properties
                         .iter()
-                        .find(|nav| table.name(nav.field) == var_name.as_str());
+                        .find(|nav| nav.field.name == var_name.as_str());
 
                     if let Some(nav) = nav {
                         // Navigate into the adjacent model
-                        if let Some(adj_model) = models.get(&nav.adj_model) {
-                            q.push_back((child, nav.adj_model, adj_model));
+                        if let Some(adj_model) = models.get(&nav.model_reference) {
+                            q.push_back((child, &nav.model_reference, adj_model));
                         }
                         continue;
                     }
 
                     // Check KV properties
                     if parent_model
-                        .kv_properties
+                        .kv_fields
                         .iter()
-                        .any(|kv| table.name(kv.field) == var_name.as_str())
+                        .any(|kv| kv.name == var_name.as_str())
                     {
                         continue;
                     }
 
                     // Check R2 properties
                     if parent_model
-                        .r2_properties
+                        .r2_fields
                         .iter()
-                        .any(|r2| table.name(r2.field) == var_name.as_str())
+                        .any(|r2| r2.name == var_name.as_str())
                     {
                         continue;
                     }
 
                     sink.push(CompilerErrorKind::DataSourceInvalidIncludeTreeReference {
                         source: source.id,
-                        model: parent_model_ref,
+                        model: source.model,
                         name: var_name.clone(),
                     });
                 }
@@ -510,16 +646,16 @@ impl SemanticAnalysis {
             let list = source
                 .list
                 .as_ref()
-                .and_then(|m| analyze_method(source, m, sink));
+                .and_then(|m| analyze_method(source, m, table, sink));
             let get = source
                 .get
                 .as_ref()
-                .and_then(|m| analyze_method(source, m, sink));
+                .and_then(|m| analyze_method(source, m, table, sink));
 
             result.push((
-                source.model,
+                model_name,
                 DataSource {
-                    symbol: source.id,
+                    name: table.name(source.id).to_string(),
                     tree: IncludeTree(source.tree.0.clone()),
                     list,
                     get,
@@ -534,15 +670,15 @@ impl SemanticAnalysis {
         parse: &ParseAst,
         table: &mut SymbolTable,
         sink: &mut ErrorSink,
-    ) -> HashMap<SymbolRef, PlainOldObject> {
-        let mut poos = HashMap::new();
+    ) -> BTreeMap<String, PlainOldObject> {
+        let mut poos = BTreeMap::new();
 
         // Cycle detection
-        let mut in_degree = BTreeMap::<SymbolRef, usize>::new();
-        let mut graph = BTreeMap::<SymbolRef, Vec<SymbolRef>>::new();
+        let mut in_degree = BTreeMap::<ParseId, usize>::new();
+        let mut graph = BTreeMap::<ParseId, Vec<ParseId>>::new();
 
         for poo in &parse.poos {
-            let mut fields = HashSet::new();
+            let mut fields = Vec::new();
             graph.entry(poo.id).or_default();
             in_degree.entry(poo.id).or_insert(0);
 
@@ -553,10 +689,9 @@ impl SemanticAnalysis {
                 };
 
                 match field_sym.cidl_type.root_type() {
-                    // TODO: data sources
-                    CidlType::Object(o) | CidlType::Partial(o) => {
-                        let Some(poo_sym) = table.lookup(*o) else {
-                            sink.push(CompilerErrorKind::UnresolvedSymbol { symbol: *o });
+                    CidlType::Object { id, .. } | CidlType::Partial { id, .. } => {
+                        let Some(poo_sym) = table.lookup(*id) else {
+                            sink.push(CompilerErrorKind::UnresolvedSymbol { symbol: *id });
                             continue;
                         };
 
@@ -570,7 +705,7 @@ impl SemanticAnalysis {
                         );
 
                         if matches!(poo_sym.kind, SymbolKind::PlainOldObjectDecl) {
-                            graph.entry(*o).or_default().push(poo.id);
+                            graph.entry(*id).or_default().push(poo.id);
                             in_degree.entry(poo.id).and_modify(|d| *d += 1);
                         }
                     }
@@ -581,15 +716,19 @@ impl SemanticAnalysis {
                     }
                     _ => {
                         // All other types are valid
-                        fields.insert(field.id);
                     }
                 }
+
+                fields.push(Field {
+                    name: field_sym.name.clone(),
+                    cidl_type: field_sym.cidl_type.clone(),
+                });
             }
 
             poos.insert(
-                poo.id,
+                poo.name.clone(),
                 PlainOldObject {
-                    symbol: poo.id,
+                    name: poo.name.clone(),
                     fields,
                 },
             );
@@ -599,7 +738,7 @@ impl SemanticAnalysis {
             Ok(_) => poos,
             Err(err) => {
                 sink.push(err);
-                HashMap::new()
+                BTreeMap::new()
             }
         }
     }
@@ -608,15 +747,15 @@ impl SemanticAnalysis {
         parse: &ParseAst,
         table: &SymbolTable,
         sink: &mut ErrorSink,
-    ) -> IndexMap<SymbolRef, Service> {
+    ) -> IndexMap<String, Service> {
         let mut services = IndexMap::new();
 
         // Cycle detection via Kahn's
-        let mut in_degree = BTreeMap::<SymbolRef, usize>::new();
-        let mut graph = BTreeMap::<SymbolRef, Vec<SymbolRef>>::new();
+        let mut in_degree = BTreeMap::<ParseId, usize>::new();
+        let mut graph = BTreeMap::<ParseId, Vec<ParseId>>::new();
 
         for service in &parse.services {
-            let mut fields = HashSet::new();
+            let mut fields = Vec::new();
             graph.entry(service.id).or_default();
             in_degree.entry(service.id).or_insert(0);
 
@@ -627,7 +766,11 @@ impl SemanticAnalysis {
                 };
 
                 match field_sym.cidl_type.root_type() {
-                    CidlType::Object(ref_id) => {
+                    CidlType::Object {
+                        id: ref_id,
+                        name: ref_name,
+                        ..
+                    } => {
                         let Some(target_sym) = table.lookup(*ref_id) else {
                             sink.push(CompilerErrorKind::UnresolvedSymbol { symbol: *ref_id });
                             continue;
@@ -635,12 +778,18 @@ impl SemanticAnalysis {
 
                         match target_sym.kind {
                             SymbolKind::InjectDecl => {
-                                fields.insert(field.id);
+                                fields.push(ServiceField {
+                                    name: field_sym.name.clone(),
+                                    inject_reference: ref_name.clone(),
+                                });
                             }
                             SymbolKind::ServiceDecl => {
                                 graph.entry(*ref_id).or_default().push(service.id);
                                 *in_degree.entry(service.id).or_insert(0) += 1;
-                                fields.insert(field.id);
+                                fields.push(ServiceField {
+                                    name: field_sym.name.clone(),
+                                    inject_reference: ref_name.clone(),
+                                });
                             }
                             _ => {
                                 sink.push(CompilerErrorKind::ServiceInvalidFieldType {
@@ -656,9 +805,9 @@ impl SemanticAnalysis {
             }
 
             services.insert(
-                service.id,
+                service.name.clone(),
                 Service {
-                    symbol: service.id,
+                    name: service.name.clone(),
                     fields,
                     apis: Vec::new(),
                 },
@@ -693,15 +842,15 @@ pub fn is_valid_sql_type(cidl_type: &CidlType) -> bool {
     )
 }
 
-type AdjacencyList = BTreeMap<SymbolRef, Vec<SymbolRef>>;
+type AdjacencyList = BTreeMap<ParseId, Vec<ParseId>>;
 
 // Kahns algorithm for topological sort + cycle detection.
 // If no cycles, returns a map of id to position used for sorting the original collection.
 pub fn kahns(
     graph: AdjacencyList,
-    mut in_degree: BTreeMap<SymbolRef, usize>,
+    mut in_degree: BTreeMap<ParseId, usize>,
     len: usize,
-) -> Result<HashMap<SymbolRef, usize>, CompilerErrorKind> {
+) -> Result<HashMap<ParseId, usize>, CompilerErrorKind> {
     let mut queue = in_degree
         .iter()
         .filter_map(|(&id, &deg)| (deg == 0).then_some(id))
@@ -727,7 +876,7 @@ pub fn kahns(
     }
 
     if rank.len() != len {
-        let cycle: Vec<SymbolRef> = in_degree
+        let cycle: Vec<ParseId> = in_degree
             .iter()
             .filter_map(|(&n, &d)| (d > 0).then_some(n))
             .collect();

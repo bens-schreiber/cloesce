@@ -1,8 +1,8 @@
 use ast::{
-    CidlType, CrudKind, ForeignKey, KvProperty, Model, NavigationProperty, NavigationPropertyKind,
-    R2Property, Symbol, SymbolKind, SymbolRef, SymbolTable, WranglerEnvBindingKind,
+    CidlType, Column, CrudKind, Field, ForeignKeyReference, KvR2Field, Model, NavigationField,
+    NavigationPropertyKind,
 };
-use frontend::{ForeignKeyTag, KvR2Tag, ModelBlock, NavigationTag};
+use frontend::{ForeignKeyTag, KvR2Tag, ModelBlock, NavigationTag, parser::ParseId};
 use indexmap::IndexMap;
 
 use std::{
@@ -11,6 +11,7 @@ use std::{
 };
 
 use crate::{
+    Symbol, SymbolKind, SymbolTable, WranglerEnvBindingKind,
     ensure,
     err::{BatchResult, CompilerErrorKind, ErrorSink},
     is_valid_sql_type, kahns,
@@ -19,24 +20,37 @@ use crate::{
 #[derive(Default)]
 pub struct ModelAnalysis {
     sink: ErrorSink,
-    in_degree: BTreeMap<SymbolRef, usize>,
-    graph: BTreeMap<SymbolRef, Vec<SymbolRef>>,
-
-    /// Maps a field foreign key reference to the model it is referencing
-    /// Ie, Person.dogId => { (Person, dogId): "Dog" }
-    model_field_to_adj_model: HashMap<(SymbolRef, SymbolRef), SymbolRef>,
+    in_degree: BTreeMap<ParseId, usize>,
+    graph: BTreeMap<ParseId, Vec<ParseId>>,
 }
+
 impl ModelAnalysis {
     pub fn analyze(
         mut self,
-        model_blocks: HashMap<SymbolRef, &ModelBlock>,
+        model_blocks: HashMap<ParseId, &ModelBlock>,
         table: &mut SymbolTable,
-    ) -> BatchResult<IndexMap<SymbolRef, Model>> {
-        let mut models = IndexMap::new();
+    ) -> BatchResult<IndexMap<String, Model>> {
+        let mut models: IndexMap<String, Model> = IndexMap::new();
+        // Map from ParseId -> model name for ordering
+        let mut id_to_name: HashMap<ParseId, String> = HashMap::new();
 
         for model_block in model_blocks.values() {
-            let mut model = Model::default();
-            model.symbol = model_block.id;
+            let model_name = model_block.name.clone();
+            id_to_name.insert(model_block.id, model_name.clone());
+
+            let mut model = Model {
+                name: model_name.clone(),
+                d1_binding: None,
+                primary_columns: Vec::new(),
+                columns: Vec::new(),
+                kv_fields: Vec::new(),
+                r2_fields: Vec::new(),
+                navigation_properties: Vec::new(),
+                key_fields: Vec::new(),
+                apis: Vec::new(),
+                data_sources: Vec::new(),
+                cruds: Vec::new(),
+            };
 
             if model_block.d1_binding.is_some()
                 || !model_block.foreign_keys.is_empty()
@@ -56,21 +70,28 @@ impl ModelAnalysis {
             // Validate CRUD
             for crud in &model_block.cruds {
                 if matches!(crud, CrudKind::LIST) && model.d1_binding.is_none() {
-                    self.sink
-                        .push(CompilerErrorKind::UnsupportedCrudOperation {
-                            model: model_block.id,
-                        });
+                    self.sink.push(CompilerErrorKind::UnsupportedCrudOperation {
+                        model: model_block.id,
+                    });
                 }
             }
 
             model.cruds = model_block.cruds.clone();
-            models.insert(model_block.id, model);
+            models.insert(model_name, model);
         }
 
         match kahns(self.graph, self.in_degree, model_blocks.len()) {
             Ok(rank) => {
-                // Sort models according to topological rank
-                models.sort_by_key(|k, _| rank.get(k).unwrap_or(&usize::MAX));
+                // Sort models according to topological rank using id_to_name mapping
+                models.sort_by_key(|name, _| {
+                    // Find the ParseId for this model name
+                    id_to_name
+                        .iter()
+                        .find(|(_, n)| *n == name)
+                        .map(|(id, _)| rank.get(id).unwrap_or(&usize::MAX))
+                        .copied()
+                        .unwrap_or(usize::MAX)
+                });
             }
             Err(e) => {
                 self.sink.push(e);
@@ -86,7 +107,7 @@ impl ModelAnalysis {
         &mut self,
         model: &mut Model,
         model_block: &ModelBlock,
-        model_blocks: HashMap<SymbolRef, &ModelBlock>,
+        model_blocks: HashMap<ParseId, &ModelBlock>,
         table: &mut SymbolTable,
     ) {
         let Some(d1_binding) = &model_block.d1_binding else {
@@ -118,6 +139,8 @@ impl ModelAnalysis {
             return;
         };
 
+        let binding_name = binding_symbol.name.clone();
+
         // At least one primary key must be defined
         if model_block.primary_keys.is_empty() {
             self.sink.push(CompilerErrorKind::D1ModelMissingPrimaryKey {
@@ -126,15 +149,20 @@ impl ModelAnalysis {
             return;
         }
 
-        // Columns
-        let mut columns = HashSet::new();
-        let mut primary_key_columns = HashSet::new();
+        // Columns - track ParseId -> field name for FK resolution
+        let mut column_ids = HashSet::new();
+        let mut primary_column_ids = HashSet::new();
+
+        // Track foreign key info per column: ParseId -> (adj_model_name, adj_column_name, composite_id)
+        let mut fk_info: HashMap<ParseId, (String, String, Option<usize>)> = HashMap::new();
+        // Track unique constraint membership per column: ParseId -> Vec<usize>
+        let mut unique_info: HashMap<ParseId, Vec<usize>> = HashMap::new();
+
         for field in &model_block.fields {
             if !is_valid_sql_type(&field.cidl_type) {
                 continue;
             }
-
-            columns.insert(field.id);
+            column_ids.insert(field.id);
 
             let is_pk = model_block
                 .primary_keys
@@ -146,8 +174,7 @@ impl ModelAnalysis {
                     self.sink,
                     CompilerErrorKind::NullablePrimaryKey { column: field.id }
                 );
-
-                primary_key_columns.insert(field.id);
+                primary_column_ids.insert(field.id);
             }
         }
 
@@ -155,27 +182,27 @@ impl ModelAnalysis {
         self.in_degree.entry(model_block.id).or_insert(0);
 
         // Foreign keys
-        let mut foreign_keys = Vec::new();
-        let mut fk_columns_seen = HashSet::<SymbolRef>::new();
+        let mut fk_columns_seen = HashSet::<ParseId>::new();
+        let mut composite_counter = 0usize;
         for fk in &model_block.foreign_keys {
-            let fk_result = self.foreign_key(
+            self.foreign_key(
                 model_block,
                 fk,
-                &columns,
+                &column_ids,
                 &mut fk_columns_seen,
                 table,
                 &model_blocks,
+                &mut fk_info,
+                &mut composite_counter,
             );
-            if let Some(fk) = fk_result {
-                foreign_keys.push(fk);
-            }
         }
 
         // Navigation properties
         let mut navigation_properties = Vec::new();
-        let mut nav_fields_seen = HashSet::<SymbolRef>::new();
+        let mut nav_fields_seen = HashSet::<ParseId>::new();
         for nav in &model_block.navigation_properties {
-            let nav_result = self.nav(model_block, nav, &mut nav_fields_seen, table, &model_blocks);
+            let nav_result =
+                self.nav(model_block, nav, &mut nav_fields_seen, table, &model_blocks);
 
             if let Some(nav) = nav_result {
                 navigation_properties.push(nav);
@@ -183,11 +210,9 @@ impl ModelAnalysis {
         }
 
         // Unique constraints
-        let mut unique_constraints = Vec::new();
-        for constraint in &model_block.unique_constraints {
-            let mut constraint_columns = Vec::new();
+        for (constraint_idx, constraint) in model_block.unique_constraints.iter().enumerate() {
             for column in &constraint.fields {
-                if !columns.contains(column) {
+                if !column_ids.contains(column) {
                     self.sink.push(
                         CompilerErrorKind::UniqueConstraintReferencesInvalidOrUnknownField {
                             tag: constraint.id,
@@ -196,43 +221,77 @@ impl ModelAnalysis {
                     );
                     continue;
                 }
-
-                constraint_columns.push(*column);
+                unique_info
+                    .entry(*column)
+                    .or_default()
+                    .push(constraint_idx);
             }
-
-            unique_constraints.push(constraint_columns);
         }
 
-        model.d1_binding = Some(d1_binding.env_binding);
+        // Build Column structs
+        let mut primary_columns = Vec::new();
+        let mut columns = Vec::new();
+        for field in &model_block.fields {
+            if !column_ids.contains(&field.id) {
+                continue;
+            }
+
+            let foreign_key_reference = fk_info.get(&field.id).map(|(model_name, col_name, _)| {
+                ForeignKeyReference {
+                    model_name: model_name.clone(),
+                    column_name: col_name.clone(),
+                }
+            });
+            let composite_id = fk_info.get(&field.id).and_then(|(_, _, cid)| *cid);
+            let unique_ids_val = unique_info.remove(&field.id).unwrap_or_default();
+
+            let col = Column {
+                field: Field {
+                    name: field.name.clone(),
+                    cidl_type: field.cidl_type.clone(),
+                },
+                foreign_key_reference,
+                unique_ids: unique_ids_val,
+                composite_id,
+            };
+
+            if primary_column_ids.contains(&field.id) {
+                primary_columns.push(col);
+            } else {
+                columns.push(col);
+            }
+        }
+
+        model.d1_binding = Some(binding_name);
         model.columns = columns;
-        model.primary_key_columns = primary_key_columns;
-        model.foreign_keys = foreign_keys;
+        model.primary_columns = primary_columns;
         model.navigation_properties = navigation_properties;
-        model.unique_constraints = unique_constraints;
     }
 
-    /// Validates a foreign key, returning an ast [ForeignKey]
+    /// Validates a foreign key and populates fk_info map
     fn foreign_key(
         &mut self,
         model_block: &ModelBlock,
         fk: &ForeignKeyTag,
-        columns: &HashSet<SymbolRef>,
-        fk_columns_seen: &mut HashSet<SymbolRef>,
+        columns: &HashSet<ParseId>,
+        fk_columns_seen: &mut HashSet<ParseId>,
         table: &mut SymbolTable,
-        model_blocks: &HashMap<SymbolRef, &ModelBlock>,
-    ) -> Option<ForeignKey> {
+        model_blocks: &HashMap<ParseId, &ModelBlock>,
+        fk_info: &mut HashMap<ParseId, (String, String, Option<usize>)>,
+        composite_counter: &mut usize,
+    ) {
         if table.lookup(fk.adj_model).is_none() {
             self.sink.push(CompilerErrorKind::UnresolvedSymbol {
                 symbol: fk.adj_model,
             });
-            return None;
+            return;
         }
 
         let Some(adj_model) = model_blocks.get(&fk.adj_model) else {
             self.sink.push(CompilerErrorKind::UnresolvedSymbol {
                 symbol: fk.adj_model,
             });
-            return None;
+            return;
         };
 
         if fk.adj_model == model_block.id {
@@ -240,7 +299,7 @@ impl ModelAnalysis {
                 model: model_block.id,
                 foreign_key: fk.id,
             });
-            return None;
+            return;
         }
 
         // Must belong to the same database
@@ -256,7 +315,7 @@ impl ModelAnalysis {
                         .map(|t| t.env_binding)
                         .unwrap_or(0),
                 });
-            return None;
+            return;
         }
 
         let first_ref = fk.references.first().unwrap().0;
@@ -267,14 +326,22 @@ impl ModelAnalysis {
                     column: first_ref,
                 },
             );
-            return None;
+            return;
         };
         let is_nullable = first_ref_sym.cidl_type.is_nullable();
 
-        let mut fk_columns = Vec::new();
-        for (field, adj_field) in &fk.references {
-            fk_columns.push(*field);
+        let is_composite = fk.references.len() > 1;
+        let composite_id = if is_composite {
+            let id = *composite_counter;
+            *composite_counter += 1;
+            Some(id)
+        } else {
+            None
+        };
 
+        let adj_model_name = adj_model.name.clone();
+
+        for (field, adj_field) in &fk.references {
             // Validate the field from this model
             let field_cidl_type = {
                 // Field should be a column on this model
@@ -320,7 +387,7 @@ impl ModelAnalysis {
             };
 
             // Validate the field from the adjacent model
-            let adj_field_cidl_type = {
+            let (adj_field_cidl_type, adj_field_name) = {
                 let Some(adj_field_sym) = table.lookup(*adj_field) else {
                     self.sink.push(
                         CompilerErrorKind::ForeignKeyReferencesInvalidOrUnknownColumn {
@@ -349,7 +416,7 @@ impl ModelAnalysis {
                     }
                 );
 
-                &adj_field_sym.cidl_type
+                (&adj_field_sym.cidl_type, adj_field_sym.name.clone())
             };
 
             if field_cidl_type.root_type() != adj_field_cidl_type.root_type() {
@@ -363,8 +430,8 @@ impl ModelAnalysis {
                 continue;
             }
 
-            self.model_field_to_adj_model
-                .insert((*field, model_block.id), adj_model.id);
+            // Store FK info for this column
+            fk_info.insert(*field, (adj_model_name.clone(), adj_field_name, composite_id));
 
             if !field_cidl_type.is_nullable() {
                 // One To One: Person has a Dog ..(sql)=> Person has a fk to Dog
@@ -376,21 +443,16 @@ impl ModelAnalysis {
                 *self.in_degree.entry(model_block.id).or_insert(0) += 1;
             }
         }
-
-        Some(ForeignKey {
-            adj_model: fk.adj_model,
-            columns: fk_columns,
-        })
     }
 
     fn nav(
         &mut self,
         model_block: &ModelBlock,
         nav: &NavigationTag,
-        nav_fields_seen: &mut HashSet<SymbolRef>,
+        nav_fields_seen: &mut HashSet<ParseId>,
         table: &mut SymbolTable,
-        model_blocks: &HashMap<SymbolRef, &ModelBlock>,
-    ) -> Option<NavigationProperty> {
+        model_blocks: &HashMap<ParseId, &ModelBlock>,
+    ) -> Option<NavigationField> {
         if !nav_fields_seen.insert(nav.field) {
             self.sink.push(
                 CompilerErrorKind::NavigationPropertyFieldAlreadyInNavigationProperty {
@@ -496,8 +558,8 @@ impl ModelAnalysis {
         }
 
         match unwrap_arr_and_null(&nav_field_sym.cidl_type) {
-            CidlType::Object(symbol_ref) => {
-                if *symbol_ref != adj_model_sym.id {
+            CidlType::Object { id, .. } => {
+                if *id != adj_model_sym.id {
                     self.sink.push(
                         CompilerErrorKind::NavigationPropertyReferencesInvalidOrUnknownField {
                             tag: nav.id,
@@ -518,8 +580,21 @@ impl ModelAnalysis {
             }
         }
 
+        let adj_model_name = adj_model_sym.name.clone();
+        let nav_field = Field {
+            name: nav_field_sym.name.clone(),
+            cidl_type: nav_field_sym.cidl_type.clone(),
+        };
+
+        // Convert referenced field ParseIds to names
+        let referenced_field_names: Vec<String> = nav
+            .fields
+            .iter()
+            .filter_map(|f| table.lookup(*f).map(|s| s.name.clone()))
+            .collect();
+
         let has_arr = matches!(nav_field_sym.cidl_type, CidlType::Array(_));
-        let nav = match (has_arr, nav.is_many_to_many) {
+        let nav_result = match (has_arr, nav.is_many_to_many) {
             (false, false) => {
                 // One to One navigation property
                 // References must be a foreign key to the adjacent model
@@ -546,13 +621,11 @@ impl ModelAnalysis {
                     }
                 );
 
-                NavigationProperty {
-                    hash: 0,
-                    symbol: nav.id,
-                    field: nav.field,
-                    adj_model: nav.adj_model,
+                NavigationField {
+                    field: nav_field,
+                    model_reference: adj_model_name,
                     kind: NavigationPropertyKind::OneToOne {
-                        columns: nav.fields.clone(),
+                        columns: referenced_field_names,
                     },
                 }
             }
@@ -575,13 +648,11 @@ impl ModelAnalysis {
                     }
                 );
 
-                NavigationProperty {
-                    hash: 0,
-                    symbol: nav.id,
-                    field: nav.field,
-                    adj_model: nav.adj_model,
+                NavigationField {
+                    field: nav_field,
+                    model_reference: adj_model_name,
                     kind: NavigationPropertyKind::OneToMany {
-                        columns: nav.fields.clone(),
+                        columns: referenced_field_names,
                     },
                 }
             }
@@ -613,11 +684,9 @@ impl ModelAnalysis {
                     }
                 );
 
-                NavigationProperty {
-                    hash: 0,
-                    symbol: nav.id,
-                    field: nav.field,
-                    adj_model: nav.adj_model,
+                NavigationField {
+                    field: nav_field,
+                    model_reference: adj_model_name,
                     kind: NavigationPropertyKind::ManyToMany,
                 }
             }
@@ -632,7 +701,7 @@ impl ModelAnalysis {
             }
         };
 
-        Some(nav)
+        Some(nav_result)
     }
 
     /// Validates and sets all KV/R2-related properties of a model
@@ -644,12 +713,12 @@ impl ModelAnalysis {
     ) {
         // Validates that a KV/R2 tag's env binding exists and is of the correct WranglerEnvBindingKind
         let validate_binding =
-            |sink: &mut ErrorSink, tag: &KvR2Tag, expected: WranglerEnvBindingKind| -> bool {
+            |sink: &mut ErrorSink, tag: &KvR2Tag, expected: WranglerEnvBindingKind| -> Option<String> {
                 let Some(binding_sym) = table.lookup(tag.env_binding) else {
                     sink.push(CompilerErrorKind::UnresolvedSymbol {
                         symbol: tag.env_binding,
                     });
-                    return false;
+                    return None;
                 };
 
                 let matches_kind = matches!(
@@ -680,15 +749,15 @@ impl ModelAnalysis {
                         _ => unreachable!(),
                     };
                     sink.push(err);
-                    return false;
+                    return None;
                 }
 
-                true
+                Some(binding_sym.name.clone())
             };
 
         // Extracts variables from a formatted string, then validates that they
         // correspond to fields on the models that are of valid SQLite types
-        let validate_key_format = |sink: &mut ErrorSink, tag_id: SymbolRef, format: &str| -> bool {
+        let validate_key_format = |sink: &mut ErrorSink, tag_id: ParseId, format: &str| -> bool {
             let vars = match extract_braced(format) {
                 Ok(vars) => vars,
                 Err(reason) => {
@@ -720,22 +789,29 @@ impl ModelAnalysis {
         };
 
         for kv in &model_block.kvs {
-            validate_binding(&mut self.sink, kv, WranglerEnvBindingKind::KV);
+            let binding_name = validate_binding(&mut self.sink, kv, WranglerEnvBindingKind::KV);
 
             if !validate_key_format(&mut self.sink, kv.id, &kv.format) {
                 continue;
             }
 
-            model.kv_properties.push(KvProperty {
-                symbol: kv.id,
-                field: kv.field,
-                env_binding: kv.env_binding,
+            let Some(field_sym) = table.lookup(kv.field) else {
+                self.sink
+                    .push(CompilerErrorKind::UnresolvedSymbol { symbol: kv.field });
+                continue;
+            };
+
+            model.kv_fields.push(KvR2Field {
+                name: field_sym.name.clone(),
+                cidl_type: field_sym.cidl_type.clone(),
                 format: kv.format.clone(),
+                binding: binding_name.unwrap_or_default(),
+                list_prefix: false,
             });
         }
 
         for r2 in &model_block.r2s {
-            validate_binding(&mut self.sink, r2, WranglerEnvBindingKind::R2);
+            let binding_name = validate_binding(&mut self.sink, r2, WranglerEnvBindingKind::R2);
 
             let Some(symbol) = table.lookup(r2.field) else {
                 self.sink
@@ -755,11 +831,12 @@ impl ModelAnalysis {
                 continue;
             }
 
-            model.r2_properties.push(R2Property {
-                symbol: r2.id,
-                field: r2.field,
-                env_binding: r2.env_binding,
+            model.r2_fields.push(KvR2Field {
+                name: symbol.name.clone(),
+                cidl_type: symbol.cidl_type.clone(),
                 format: r2.format.clone(),
+                binding: binding_name.unwrap_or_default(),
+                list_prefix: false,
             });
         }
 
@@ -779,7 +856,7 @@ impl ModelAnalysis {
                 continue;
             }
 
-            model.key_fields.insert(key_field.field);
+            model.key_fields.push(symbol.name.clone());
         }
     }
 }

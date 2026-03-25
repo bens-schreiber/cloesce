@@ -689,12 +689,12 @@ fn poo_block() {
             ("active", CidlType::Boolean),
             ("balance", CidlType::Double),
             ("created", CidlType::DateIso),
-            ("address", CidlType::Object(it.id("Address"))),
+            ("address", CidlType::Object { name: "Address".to_string(), id: it.id("Address") }),
             ("tags", CidlType::array(CidlType::String)),
             ("metadata", CidlType::nullable(CidlType::Json)),
             (
                 "optional_items",
-                CidlType::nullable(CidlType::array(CidlType::Object(it.id("Item"))))
+                CidlType::nullable(CidlType::array(CidlType::Object { name: "Item".to_string(), id: it.id("Item") }))
             ),
             (
                 "nullable_arrays",
@@ -785,14 +785,14 @@ fn service_block() {
         .iter()
         .find(|f| f.name == "api1")
         .expect("api1 field");
-    assert_eq!(api1.cidl_type, CidlType::Object(it.id("OpenApiService")));
+    assert_eq!(api1.cidl_type, CidlType::Object { name: "OpenApiService".to_string(), id: it.id("OpenApiService") });
 
     let api2 = service
         .fields
         .iter()
         .find(|f| f.name == "api2")
         .expect("api2 field");
-    assert_eq!(api2.cidl_type, CidlType::Object(it.id("YouTubeApi")));
+    assert_eq!(api2.cidl_type, CidlType::Object { name: "YouTubeApi".to_string(), id: it.id("YouTubeApi") });
 
     // Fields have distinct spans
     assert_ne!(api1.span, api2.span);

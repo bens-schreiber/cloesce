@@ -1,5 +1,5 @@
 use codegen::wrangler::{WranglerDefault, WranglerGenerator};
-use compiler_test::src_to_ast;
+use compiler_test::{SemanticResult, src_to_ast};
 
 #[test]
 fn test_serialize_wrangler_spec() {
@@ -26,7 +26,7 @@ fn generates_default_wrangler_value() {
             THRESHOLD: double
         }
     "#;
-    let ast = src_to_ast(src);
+    let SemanticResult { ast, .. } = src_to_ast(src);
 
     // Act
     let specs = vec![
@@ -68,7 +68,7 @@ fn generates_default_d1_wrangler_values() {
             id: int
         }
     "#;
-    let ast = src_to_ast(src);
+    let SemanticResult { ast, .. } = src_to_ast(src);
 
     // Act
     let specs = vec![
@@ -116,7 +116,7 @@ fn generates_default_kv_wrangler_values() {
             obj: json
         }
     "#;
-    let ast = src_to_ast(src);
+    let SemanticResult { ast, .. } = src_to_ast(src);
 
     // Act
     let specs = vec![
@@ -150,7 +150,7 @@ fn handles_d1_database_with_missing_values() {
         [[d1_databases]]
         binding = "db"
     "#;
-    let ast = src_to_ast(
+    let SemanticResult { ast, .. } = src_to_ast(
         r#"
             env {
                 db: d1

@@ -1,8 +1,8 @@
 #![allow(unused_variables)]
 
-use ast::{CidlType, NavigationPropertyKind, SymbolKind, WranglerEnvBindingKind};
+use ast::{CidlType, NavigationPropertyKind};
 use compiler_test::lex_and_parse;
-use semantic::{SemanticAnalysis, err::CompilerErrorKind};
+use semantic::{SemanticAnalysis, SymbolKind, WranglerEnvBindingKind, err::CompilerErrorKind};
 
 /// Find exactly one error matching the pattern. Panics if not found.
 /// Destructure with `=> expr` to extract fields in one step.
@@ -59,7 +59,7 @@ fn multiple_wrangler_env_blocks() {
     let parse = lex_and_parse(src);
 
     // Act
-    let (ast, errors) = SemanticAnalysis::analyze(parse);
+    let (result, errors) = SemanticAnalysis::analyze(parse);
 
     // Assert
     assert_eq!(errors.len(), 1);
@@ -67,11 +67,11 @@ fn multiple_wrangler_env_blocks() {
         CompilerErrorKind::MultipleWranglerEnvBlocks { first, second } => (*first, *second)
     );
     assert!(matches!(
-        ast.table.kind(first),
+        result.table.kind(first),
         Some(SymbolKind::WranglerEnvDecl)
     ));
     assert!(matches!(
-        ast.table.kind(second),
+        result.table.kind(second),
         Some(SymbolKind::WranglerEnvDecl)
     ));
 }
@@ -85,7 +85,7 @@ fn missing_wrangler_env_block() {
     let parse = lex_and_parse(src);
 
     // Act
-    let (_table, errors) = SemanticAnalysis::analyze(parse);
+    let (_, errors) = SemanticAnalysis::analyze(parse);
 
     // Assert
     expect_err!(errors, CompilerErrorKind::MissingWranglerEnvBlock);
@@ -105,16 +105,16 @@ fn wrangler_duplicate_symbol() {
     let parse = lex_and_parse(src);
 
     // Act
-    let (ast, errors) = SemanticAnalysis::analyze(parse);
+    let (result, errors) = SemanticAnalysis::analyze(parse);
 
     // Assert
     assert_eq!(errors.len(), 1);
     let symbol = expect_err!(errors,
         CompilerErrorKind::DuplicateSymbol { symbol, .. } => *symbol
     );
-    assert_eq!(ast.table.name(symbol), "my_d1");
+    assert_eq!(result.table.name(symbol), "my_d1");
     assert!(matches!(
-        ast.table.kind(symbol),
+        result.table.kind(symbol),
         Some(SymbolKind::WranglerEnvBinding {
             kind: WranglerEnvBindingKind::D1
         })
@@ -144,7 +144,7 @@ fn d1_model_basic_errors() {
     let parse = lex_and_parse(&src);
 
     // Act
-    let (ast, errors) = SemanticAnalysis::analyze(parse);
+    let (result, errors) = SemanticAnalysis::analyze(parse);
 
     // Assert
     assert_eq!(errors.len(), 3);
@@ -153,8 +153,11 @@ fn d1_model_basic_errors() {
     let model = expect_err!(errors,
         CompilerErrorKind::D1ModelMissingPrimaryKey { model } => *model
     );
-    assert_eq!(ast.table.name(model), "User");
-    assert!(matches!(ast.table.kind(model), Some(SymbolKind::ModelDecl)));
+    assert_eq!(result.table.name(model), "User");
+    assert!(matches!(
+        result.table.kind(model),
+        Some(SymbolKind::ModelDecl)
+    ));
 
     // Post references @d1(other_d1) which is not in the env block
     expect_err!(errors, CompilerErrorKind::UnresolvedSymbol { .. });
@@ -163,7 +166,7 @@ fn d1_model_basic_errors() {
     let model = expect_err!(errors,
         CompilerErrorKind::D1ModelMissingD1Binding { model } => *model
     );
-    assert_eq!(ast.table.name(model), "Comment");
+    assert_eq!(result.table.name(model), "Comment");
 }
 
 #[test]
@@ -207,7 +210,7 @@ fn d1_model_column_fk_errors() {
     let parse = lex_and_parse(src);
 
     // Act
-    let (ast, errors) = SemanticAnalysis::analyze(parse);
+    let (result, errors) = SemanticAnalysis::analyze(parse);
 
     // Assert
     assert_eq!(errors.len(), 7);
@@ -225,9 +228,9 @@ fn d1_model_column_fk_errors() {
     let column = expect_err!(errors,
         CompilerErrorKind::NullablePrimaryKey { column } => *column
     );
-    assert_eq!(ast.table.name(column), "id");
+    assert_eq!(result.table.name(column), "id");
     assert!(matches!(
-        ast.table.kind(column),
+        result.table.kind(column),
         Some(SymbolKind::ModelField { .. })
     ));
 
@@ -235,22 +238,22 @@ fn d1_model_column_fk_errors() {
     let symbol = expect_err!(errors,
         CompilerErrorKind::DuplicateSymbol { symbol, .. } => *symbol
     );
-    assert_eq!(ast.table.name(symbol), "id");
+    assert_eq!(result.table.name(symbol), "id");
 
     // FK incompatible type: str_value (string) -> Post::id (int)
     let (column, adj_column) = expect_err!(errors,
         CompilerErrorKind::ForeignKeyReferencesIncompatibleColumnType { column, adj_column, .. } => (*column, *adj_column)
     );
-    assert_eq!(ast.table.name(column), "str_value");
-    assert_eq!(ast.table.name(adj_column), "id");
+    assert_eq!(result.table.name(column), "str_value");
+    assert_eq!(result.table.name(adj_column), "id");
 
     // FK references self
     let (model, foreign_key) = expect_err!(errors,
         CompilerErrorKind::ForeignKeyReferenceSelf { model, foreign_key } => (*model, *foreign_key)
     );
-    assert_eq!(ast.table.name(model), "User");
+    assert_eq!(result.table.name(model), "User");
     assert!(matches!(
-        ast.table.kind(foreign_key),
+        result.table.kind(foreign_key),
         Some(SymbolKind::ModelForeignKeyTag { .. })
     ));
 
@@ -258,7 +261,7 @@ fn d1_model_column_fk_errors() {
     let binding = expect_err!(errors,
         CompilerErrorKind::ForeignKeyReferencesDifferentDatabase { binding, .. } => *binding
     );
-    assert_eq!(ast.table.name(binding), "other_d1");
+    assert_eq!(result.table.name(binding), "other_d1");
 }
 
 #[test]
@@ -290,15 +293,15 @@ fn d1_model_consistent_nullability_error() {
     let parse = lex_and_parse(src);
 
     // Act
-    let (ast, errors) = SemanticAnalysis::analyze(parse);
+    let (result, errors) = SemanticAnalysis::analyze(parse);
 
     // Assert
     assert_eq!(errors.len(), 1);
     let (first_column, second_column) = expect_err!(errors,
         CompilerErrorKind::ForeignKeyInconsistentNullability { first_column, second_column, .. } => (*first_column, *second_column)
     );
-    assert_eq!(ast.table.name(first_column), "postId");
-    assert_eq!(ast.table.name(second_column), "name");
+    assert_eq!(result.table.name(first_column), "postId");
+    assert_eq!(result.table.name(second_column), "name");
 }
 
 #[test]
@@ -326,16 +329,16 @@ fn d1_model_fk_column_already_in_foreign_key() {
     let parse = lex_and_parse(&src);
 
     // Act
-    let (ast, errors) = SemanticAnalysis::analyze(parse);
+    let (result, errors) = SemanticAnalysis::analyze(parse);
 
     // Assert
     assert_eq!(errors.len(), 1);
     let column = expect_err!(errors,
         CompilerErrorKind::ForeignKeyColumnAlreadyInForeignKey { column, .. } => *column
     );
-    assert_eq!(ast.table.name(column), "postId");
+    assert_eq!(result.table.name(column), "postId");
     assert!(matches!(
-        ast.table.kind(column),
+        result.table.kind(column),
         Some(SymbolKind::ModelField { .. })
     ));
 }
@@ -377,20 +380,20 @@ fn d1_model_nav_errors() {
     let parse = lex_and_parse(&src);
 
     // Act
-    let (ast, errors) = SemanticAnalysis::analyze(parse);
+    let (result, errors) = SemanticAnalysis::analyze(parse);
 
     // Assert
     assert_eq!(errors.len(), 3);
     let unknown_id = expect_err!(errors, CompilerErrorKind::UnresolvedSymbol { symbol: unknown_id } => *unknown_id);
     assert!(matches!(
-        ast.table.kind(unknown_id),
+        result.table.kind(unknown_id),
         Some(SymbolKind::ModelNavigationTag { .. })
     ));
 
     let self_ref_model = expect_err!(errors,
         CompilerErrorKind::NavigationPropertyReferencesSelf { model, .. } => *model
     );
-    assert_eq!(ast.table.name(self_ref_model), "User");
+    assert_eq!(result.table.name(self_ref_model), "User");
 }
 
 #[test]
@@ -420,16 +423,16 @@ fn d1_model_nav_field_already_in_navigation_property() {
     let parse = lex_and_parse(&src);
 
     // Act
-    let (ast, errors) = SemanticAnalysis::analyze(parse);
+    let (result, errors) = SemanticAnalysis::analyze(parse);
 
     // Assert
     assert_eq!(errors.len(), 1);
     let field = expect_err!(errors,
         CompilerErrorKind::NavigationPropertyFieldAlreadyInNavigationProperty { field, .. } => *field
     );
-    assert_eq!(ast.table.name(field), "horse");
+    assert_eq!(result.table.name(field), "horse");
     assert!(matches!(
-        ast.table.kind(field),
+        result.table.kind(field),
         Some(SymbolKind::ModelField { .. })
     ));
 }
@@ -460,32 +463,36 @@ fn d1_model_nav_one_to_one() {
     let parse = lex_and_parse(src);
 
     // Act
-    let (ast, errors) = SemanticAnalysis::analyze(parse);
+    let (result, errors) = SemanticAnalysis::analyze(parse);
 
     // Assert
     assert_eq!(errors.len(), 0);
 
-    let person = ast
-        .models
-        .values()
-        .find(|m| ast.table.name(m.symbol) == "Person")
-        .unwrap();
-    let horse = ast
-        .models
-        .values()
-        .find(|m| ast.table.name(m.symbol) == "Horse")
-        .unwrap();
+    let person = result.ast.models.get("Person").unwrap();
+    let horse = result.ast.models.get("Horse").unwrap();
 
     let person_horse_nav = person.navigation_properties.first().unwrap();
-    let person_nav_symbol = ast.table.lookup(person_horse_nav.symbol).unwrap();
+    assert_eq!(person_horse_nav.field.name, "horse");
+    assert_eq!(person_horse_nav.model_reference, "Horse");
 
-    assert_eq!(person.symbol, person_nav_symbol.parent);
-    assert_eq!(person_horse_nav.adj_model, horse.symbol);
-
-    let person_horse_field = ast.table.lookup(person_horse_nav.field).unwrap();
-
-    assert_eq!(person_horse_field.parent, person.symbol);
-    assert_eq!(person_horse_field.cidl_type, CidlType::Object(horse.symbol));
+    assert_eq!(
+        person_horse_nav.field.cidl_type,
+        CidlType::Object {
+            name: "Horse".to_string(),
+            id: result
+                .table
+                .lookup(
+                    result
+                        .table
+                        .table_iter()
+                        .find(|(_, s)| s.name == "Horse" && matches!(s.kind, SymbolKind::ModelDecl))
+                        .unwrap()
+                        .0
+                )
+                .unwrap()
+                .id,
+        }
+    );
 
     let NavigationPropertyKind::OneToOne {
         columns: person_horse_nav_columns,
@@ -495,9 +502,7 @@ fn d1_model_nav_one_to_one() {
     };
 
     assert_eq!(person_horse_nav_columns.len(), 1);
-    let person_horse_nav_column_symbol = ast.table.lookup(person_horse_nav_columns[0]).unwrap();
-    assert_eq!(person_horse_nav_column_symbol.parent, horse.symbol);
-    assert_eq!(person_horse_nav_column_symbol.cidl_type, CidlType::Integer);
+    assert_eq!(person_horse_nav_columns[0], "id");
 }
 
 #[test]
@@ -527,34 +532,16 @@ fn d1_model_nav_one_to_many() {
 
     // Act
     let parse = lex_and_parse(src);
-    let (ast, errors) = SemanticAnalysis::analyze(parse);
+    let (result, errors) = SemanticAnalysis::analyze(parse);
 
     // Assert
     assert_eq!(errors.len(), 0);
 
-    let author = ast
-        .models
-        .values()
-        .find(|m| ast.table.name(m.symbol) == "Author")
-        .unwrap();
-    let post = ast
-        .models
-        .values()
-        .find(|m| ast.table.name(m.symbol) == "Post")
-        .unwrap();
+    let author = result.ast.models.get("Author").unwrap();
 
     let author_posts_nav = author.navigation_properties.first().unwrap();
-    let author_nav_symbol = ast.table.lookup(author_posts_nav.symbol).unwrap();
-
-    assert_eq!(author.symbol, author_nav_symbol.parent);
-    assert_eq!(author_posts_nav.adj_model, post.symbol);
-
-    let author_posts_field = ast.table.lookup(author_posts_nav.field).unwrap();
-    assert_eq!(author_posts_field.parent, author.symbol);
-    assert_eq!(
-        author_posts_field.cidl_type,
-        CidlType::array(CidlType::Object(post.symbol))
-    );
+    assert_eq!(author_posts_nav.field.name, "posts");
+    assert_eq!(author_posts_nav.model_reference, "Post");
 
     let NavigationPropertyKind::OneToMany {
         columns: author_posts_nav_columns,
@@ -563,9 +550,7 @@ fn d1_model_nav_one_to_many() {
         unreachable!()
     };
     assert_eq!(author_posts_nav_columns.len(), 1);
-    let author_posts_nav_column_symbol = ast.table.lookup(author_posts_nav_columns[0]).unwrap();
-    assert_eq!(author_posts_nav_column_symbol.parent, post.symbol);
-    assert_eq!(author_posts_nav_column_symbol.cidl_type, CidlType::Integer);
+    assert_eq!(author_posts_nav_columns[0], "authorId");
 }
 
 #[test]
@@ -595,33 +580,16 @@ fn d1_model_nav_many_to_many() {
 
     // Act
     let parse = lex_and_parse(src);
-    let (ast, errors) = SemanticAnalysis::analyze(parse);
+    let (result, errors) = SemanticAnalysis::analyze(parse);
 
     // Assert
     assert_eq!(errors.len(), 0);
 
-    let student = ast
-        .models
-        .values()
-        .find(|m| ast.table.name(m.symbol) == "Student")
-        .unwrap();
-    let course = ast
-        .models
-        .values()
-        .find(|m| ast.table.name(m.symbol) == "Course")
-        .unwrap();
+    let student = result.ast.models.get("Student").unwrap();
 
     let student_courses_nav = student.navigation_properties.first().unwrap();
-    let student_nav_symbol = ast.table.lookup(student_courses_nav.symbol).unwrap();
-    assert_eq!(student.symbol, student_nav_symbol.parent);
-    assert_eq!(student_courses_nav.adj_model, course.symbol);
-
-    let student_courses_field = ast.table.lookup(student_courses_nav.field).unwrap();
-    assert_eq!(student_courses_field.parent, student.symbol);
-    assert_eq!(
-        student_courses_field.cidl_type,
-        CidlType::array(CidlType::Object(course.symbol))
-    );
+    assert_eq!(student_courses_nav.field.name, "courses");
+    assert_eq!(student_courses_nav.model_reference, "Course");
 
     let NavigationPropertyKind::ManyToMany = &student_courses_nav.kind else {
         unreachable!()
@@ -670,14 +638,14 @@ fn d1_model_cyclical_relationship_error() {
 
     // Act
     let parse = lex_and_parse(src);
-    let (ast, errors) = SemanticAnalysis::analyze(parse);
+    let (result, errors) = SemanticAnalysis::analyze(parse);
 
     // Assert
     assert_eq!(errors.len(), 1);
     let cycle = expect_err!(errors,
         CompilerErrorKind::CyclicalRelationship { cycle } => cycle.clone()
     );
-    let cycle_names: Vec<&str> = cycle.iter().map(|&sym| ast.table.name(sym)).collect();
+    let cycle_names: Vec<&str> = cycle.iter().map(|&sym| result.table.name(sym)).collect();
     assert_eq!(cycle_names, vec!["B", "A", "C"]);
 }
 
@@ -723,7 +691,7 @@ fn d1_model_nullability_prevents_cycle() {
 
     // Act
     let parse = lex_and_parse(src);
-    let (ast, errors) = SemanticAnalysis::analyze(parse);
+    let (_, errors) = SemanticAnalysis::analyze(parse);
 
     // Assert
     assert_eq!(errors.len(), 0);
@@ -757,7 +725,7 @@ fn kv_r2_errors() {
     let parse = lex_and_parse(src);
 
     // Act
-    let (ast, errors) = SemanticAnalysis::analyze(parse);
+    let (result, errors) = SemanticAnalysis::analyze(parse);
 
     // Assert
     assert_eq!(errors.len(), 5);
@@ -765,17 +733,17 @@ fn kv_r2_errors() {
     let key_param = expect_err!(errors,
         CompilerErrorKind::KvR2InvalidKeyParam { field, .. } => *field
     );
-    assert_eq!(ast.table.name(key_param), "keyParam");
+    assert_eq!(result.table.name(key_param), "keyParam");
 
     let binding = expect_err!(errors,
         CompilerErrorKind::KvInvalidBinding { binding, ..} => *binding
     );
-    assert_eq!(ast.table.name(binding), "my_d1");
+    assert_eq!(result.table.name(binding), "my_d1");
 
     let binding = expect_err!(errors,
         CompilerErrorKind::R2InvalidBinding { binding, .. } => *binding
     );
-    assert_eq!(ast.table.name(binding), "my_kv");
+    assert_eq!(result.table.name(binding), "my_kv");
 
     let variable = expect_err!(errors,
         CompilerErrorKind::KvR2UnknownKeyVariable { variable, .. } => variable.clone()
@@ -807,18 +775,15 @@ fn kv_and_d1_coexist() {
     let parse = lex_and_parse(src);
 
     // Act
-    let (ast, errors) = SemanticAnalysis::analyze(parse);
+    let (result, errors) = SemanticAnalysis::analyze(parse);
 
     // Assert
     assert_eq!(errors.len(), 0);
-    let user = ast
-        .models
-        .values()
-        .find(|m| ast.table.name(m.symbol) == "User")
-        .unwrap();
+    let user = result.ast.models.get("User").unwrap();
     assert!(user.d1_binding.is_some());
-    assert_eq!(user.kv_properties.len(), 1);
-    assert_eq!(user.columns.len(), 3); // id, name, cached
+    assert_eq!(user.kv_fields.len(), 1);
+    // id is primary, name + cached are regular columns
+    assert_eq!(user.columns.len(), 2);
 }
 
 #[test]
@@ -865,7 +830,7 @@ fn api_errors() {
     let parse = lex_and_parse(src);
 
     // Act
-    let (ast, errors) = SemanticAnalysis::analyze(parse);
+    let (_, errors) = SemanticAnalysis::analyze(parse);
 
     // Assert
     assert_eq!(errors.len(), 6);
@@ -939,7 +904,7 @@ fn data_source_errors() {
     let parse = lex_and_parse(src);
 
     // Act
-    let (ast, errors) = SemanticAnalysis::analyze(parse);
+    let (_, errors) = SemanticAnalysis::analyze(parse);
 
     // Assert
     // BadModelSource: unknown model
@@ -995,18 +960,14 @@ fn data_source_include_tree_kv_r2() {
     let parse = lex_and_parse(src);
 
     // Act
-    let (ast, errors) = SemanticAnalysis::analyze(parse);
+    let (result, errors) = SemanticAnalysis::analyze(parse);
 
     // Assert
     assert_eq!(errors.len(), 0);
 
-    let user = ast
-        .models
-        .values()
-        .find(|m| ast.table.name(m.symbol) == "User")
-        .unwrap();
+    let user = result.ast.models.get("User").unwrap();
     assert_eq!(user.data_sources.len(), 1);
-    assert_eq!(ast.table.name(user.data_sources[0].symbol), "WithKvR2");
+    assert_eq!(user.data_sources[0].name, "WithKvR2");
 }
 
 #[test]
@@ -1022,7 +983,7 @@ fn poo_errors() {
 
     // Act
     let parse = lex_and_parse(src);
-    let (ast, errors) = SemanticAnalysis::analyze(parse);
+    let (result, errors) = SemanticAnalysis::analyze(parse);
 
     // Assert
     assert_eq!(errors.len(), 3);
@@ -1030,17 +991,17 @@ fn poo_errors() {
     let cycle = expect_err!(errors,
         CompilerErrorKind::CyclicalRelationship { cycle } => cycle.clone()
     );
-    let cycle_names: Vec<&str> = cycle.iter().map(|&sym| ast.table.name(sym)).collect();
+    let cycle_names: Vec<&str> = cycle.iter().map(|&sym| result.table.name(sym)).collect();
     assert_eq!(cycle_names, vec!["MyPoo"]);
 
     assert!(errors.iter().find(|e| matches!(
         e,
-        CompilerErrorKind::PlainOldObjectInvalidFieldType { field } if ast.table.name(*field) == "streamField"
+        CompilerErrorKind::PlainOldObjectInvalidFieldType { field } if result.table.name(*field) == "streamField"
     )).is_some());
 
     assert!(errors.iter().find(|e| matches!(
         e,
-        CompilerErrorKind::PlainOldObjectInvalidFieldType { field } if ast.table.name(*field) == "voidField"
+        CompilerErrorKind::PlainOldObjectInvalidFieldType { field } if result.table.name(*field) == "voidField"
     )).is_some());
 }
 
@@ -1073,18 +1034,18 @@ fn service_errors() {
     );
 
     let parse = lex_and_parse(src);
-    let (ast, errors) = SemanticAnalysis::analyze(parse);
+    let (result, errors) = SemanticAnalysis::analyze(parse);
 
     assert!(errors.iter().any(|e| matches!(
         e,
         CompilerErrorKind::ServiceInvalidFieldType { field }
-            if ast.table.name(*field) == "name"
+            if result.table.name(*field) == "name"
     )));
 
     assert!(errors.iter().any(|e| matches!(
         e,
         CompilerErrorKind::ServiceInvalidFieldType { field }
-            if ast.table.name(*field) == "user"
+            if result.table.name(*field) == "user"
     )));
 
     assert_eq!(

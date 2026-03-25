@@ -1,8 +1,6 @@
 use std::collections::BTreeMap;
 use std::collections::HashMap;
-use std::collections::HashSet;
 use std::hash::Hash;
-use std::path::PathBuf;
 use std::usize;
 
 use indexmap::IndexMap;
@@ -35,18 +33,38 @@ pub enum CidlType {
     R2Object,
 
     /// A dependency injected instance, containing a type name.
-    Inject(SymbolRef),
+    Inject {
+        name: String,
+
+        /// The ParseId of the injected type
+        id: usize,
+    },
 
     /// A model, or plain old object, containing the name of the class.
-    Object(SymbolRef),
+    Object {
+        name: String,
+
+        /// The ParseId of a model or plain old object
+        id: usize,
+    },
 
     /// A part of a model or plain object, containing the name of the class.
     ///
     /// Only valid as a method argument.
-    Partial(SymbolRef),
+    Partial {
+        name: String,
+
+        /// The ParseId of a model or plain old object
+        id: usize,
+    },
 
     /// A data source of some model
-    DataSource(SymbolRef),
+    DataSource {
+        name: String,
+
+        /// The ParseId of a model
+        id: usize,
+    },
 
     /// An array of any type
     Array(Box<CidlType>),
@@ -102,224 +120,7 @@ impl CidlType {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Default)]
-pub struct FileSpan {
-    pub start: usize,
-    pub end: usize,
-    pub file: PathBuf,
-}
-
-pub type SymbolRef = usize;
-
-#[derive(Clone)]
-pub enum WranglerEnvBindingKind {
-    D1,
-    KV,
-    R2,
-}
-
-#[derive(Clone, Default)]
-pub enum SymbolKind {
-    ModelDecl,
-    ModelField,
-    ModelPrimaryKeyTag,
-    ModelForeignKeyTag,
-    ModelNavigationTag,
-    ModelD1Tag,
-    ModelKvTag,
-    ModelR2Tag,
-    WranglerEnvDecl,
-    WranglerEnvBinding {
-        kind: WranglerEnvBindingKind,
-    },
-    WranglerEnvVar,
-    PlainOldObjectDecl,
-    PlainOldObjectField,
-
-    ApiDecl,
-    ApiMethodDecl,
-    ApiMethodParam,
-
-    DataSourceDecl,
-    DataSourceMethodDecl,
-    DataSourceMethodParam,
-
-    ServiceDecl,
-    ServiceField,
-
-    InjectDecl,
-
-    #[default]
-    Null,
-}
-
-#[derive(Clone)]
-pub struct Symbol {
-    pub id: usize,
-
-    /// Empty for symbols that are not named (e.g. declarations)
-    pub name: String,
-
-    /// Void for symbols that have no type (e.g. declarations)
-    pub cidl_type: CidlType,
-
-    /// Default for symbols that have no parent (e.g. declarations)
-    pub parent: SymbolRef,
-
-    pub span: FileSpan,
-    pub kind: SymbolKind,
-}
-
-impl Default for Symbol {
-    fn default() -> Self {
-        Symbol {
-            id: usize::MAX,
-            name: String::new(),
-            cidl_type: CidlType::Void,
-            parent: usize::MAX,
-            span: FileSpan::default(),
-            kind: SymbolKind::Null,
-        }
-    }
-}
-
-pub struct ForeignKey {
-    pub adj_model: SymbolRef,
-    pub columns: Vec<SymbolRef>,
-}
-
-/// A D1 Navigation property, representing a relationship to another model
-/// through a foreign key or composite foreign key.
-pub enum NavigationPropertyKind {
-    OneToOne {
-        /// The columns on the current model that reference the other model's primary key.
-        /// Multiple columns indicate a composite foreign key.
-        columns: Vec<SymbolRef>,
-    },
-    OneToMany {
-        /// The columns on the other model that reference the current model's primary key.
-        /// Multiple columns indicate a composite foreign key.
-        columns: Vec<SymbolRef>,
-    },
-
-    /// A many to many relationship expressed through a join table,
-    /// consisting of the two models primary keys (be they composite or not).
-    ManyToMany,
-}
-
-pub struct NavigationProperty {
-    pub hash: u64,
-    pub symbol: SymbolRef,
-
-    pub field: SymbolRef,
-    pub adj_model: SymbolRef,
-    pub kind: NavigationPropertyKind,
-}
-
-pub struct KvProperty {
-    pub symbol: SymbolRef,
-    pub field: SymbolRef,
-    pub env_binding: SymbolRef,
-    pub format: String,
-}
-
-pub struct R2Property {
-    pub symbol: SymbolRef,
-    pub field: SymbolRef,
-    pub env_binding: SymbolRef,
-    pub format: String,
-}
-
-impl NavigationProperty {
-    // pub fn many_to_many_table_name(&self, parent_model: &Symbol) -> String {
-    //     let mut names = [&parent_model.name, &self.adj_model.name];
-    //     names.sort();
-    //     format!("{}{}", names[0], names[1])
-    // }
-}
-
-/// The expected media type for request/response bodies.
-/// An API endpoint may expect data in some format, and return data in some format.
-/// Defaults to JSON.
-#[derive(Default)]
-pub enum MediaType {
-    #[default]
-    Json,
-
-    Octet,
-}
-
-pub struct ApiMethod {
-    /// Symbol name of the method.
-    pub name: String,
-
-    /// If true, the method is static (instantiated on a class, not an instance).
-    /// Static methods require no hydration or data source.
-    pub is_static: bool,
-    pub data_source: Option<SymbolRef>,
-
-    pub http_verb: HttpVerb,
-
-    /// The media format the client should use to read the response body.
-    pub return_media: MediaType,
-    pub return_type: CidlType,
-
-    /// The media format the client should use to send the request body.
-    pub parameters_media: MediaType,
-    pub parameters: Vec<SymbolRef>,
-}
-
-pub struct Api {
-    pub symbol: SymbolRef,
-    pub methods: Vec<ApiMethod>,
-}
-
-pub struct DataSourceMethod {
-    pub symbol: SymbolRef,
-    pub parameters: Vec<SymbolRef>,
-    pub raw_sql: String,
-}
-
-pub struct DataSource {
-    pub symbol: SymbolRef,
-    pub tree: IncludeTree,
-    pub list: Option<DataSourceMethod>,
-    pub get: Option<DataSourceMethod>,
-}
-
-#[derive(Clone)]
-pub struct IncludeTree(pub BTreeMap<String, IncludeTree>);
-
-#[derive(Default)]
-pub struct Model {
-    pub hash: u64,
-    pub symbol: SymbolRef,
-
-    pub d1_binding: Option<SymbolRef>,
-    pub columns: HashSet<SymbolRef>,
-    pub primary_key_columns: HashSet<SymbolRef>,
-    pub foreign_keys: Vec<ForeignKey>,
-    pub navigation_properties: Vec<NavigationProperty>,
-    pub unique_constraints: Vec<Vec<SymbolRef>>,
-
-    pub key_fields: HashSet<SymbolRef>,
-    pub kv_properties: Vec<KvProperty>,
-    pub r2_properties: Vec<R2Property>,
-
-    pub apis: Vec<Api>,
-    pub data_sources: Vec<DataSource>,
-
-    pub cruds: Vec<CrudKind>,
-}
-
-#[derive(PartialEq, Debug, Clone, Copy)]
-pub enum CrudKind {
-    GET,
-    LIST,
-    SAVE,
-}
-
-#[derive(PartialEq, Debug, Clone, Copy)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Copy)]
 pub enum HttpVerb {
     Get,
     Post,
@@ -328,56 +129,389 @@ pub enum HttpVerb {
     Delete,
 }
 
-#[derive(Default)]
-pub struct SymbolTable {
-    table: HashMap<SymbolRef, Symbol>,
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash)]
+pub struct Field {
+    pub name: String,
+    pub cidl_type: CidlType,
 }
 
-impl SymbolTable {
-    pub fn insert(&mut self, symbol: Symbol) -> Option<Symbol> {
-        self.table.insert(symbol.id, symbol)
-    }
+#[derive(Serialize, Deserialize, Debug, Default, Clone)]
+pub struct IncludeTree(pub BTreeMap<String, IncludeTree>);
 
-    pub fn lookup(&self, id: usize) -> Option<&Symbol> {
-        self.table.get(&id)
-    }
+/// A D1 Navigation property, representing a relationship to another model
+/// through a foreign key or composite foreign key.
+#[derive(Serialize, Deserialize, Debug, Clone, Hash)]
+pub enum NavigationPropertyKind {
+    OneToOne {
+        /// The columns on the current model that reference the other model's primary key.
+        /// Multiple columns indicate a composite foreign key.
+        columns: Vec<String>,
+    },
+    OneToMany {
+        /// The columns on the other model that reference the current model's primary key.
+        /// Multiple columns indicate a composite foreign key.
+        columns: Vec<String>,
+    },
 
-    pub fn name(&self, id: SymbolRef) -> &str {
-        self.lookup(id).map(|s| s.name.as_str()).unwrap_or("")
-    }
+    /// A many to many relationship expressed through a join table,
+    /// consisting of the two models primary keys (be they composite or not).
+    ManyToMany,
+}
 
-    pub fn kind(&self, id: SymbolRef) -> Option<&SymbolKind> {
-        self.lookup(id).map(|s| &s.kind)
+#[derive(Serialize, Deserialize, Debug)]
+pub struct NavigationField {
+    pub field: Field,
+
+    /// Referenced model name.
+    pub model_reference: String,
+    pub kind: NavigationPropertyKind,
+}
+
+impl NavigationField {
+    pub fn many_to_many_table_name(&self, parent_model_name: &str) -> String {
+        let mut names = [parent_model_name, &self.model_reference];
+        names.sort();
+        format!("{}{}", names[0], names[1])
     }
 }
 
-pub struct PlainOldObject {
-    pub symbol: SymbolRef,
-    pub fields: HashSet<SymbolRef>,
+pub struct ForeignKeyReference {
+    pub model_name: String,
+    pub column_name: String,
+}
+
+pub struct Column {
+    pub field: Field,
+
+    /// If the attribute is a foreign key, the referenced model and column.
+    pub foreign_key_reference: Option<ForeignKeyReference>,
+
+    /// IDs of unique constraints that this column participates in.
+    pub unique_ids: Vec<usize>,
+
+    /// An ID indicating which composite key this column belongs to, if any.
+    /// Columns with the same composite_id belong to the same composite key.
+    ///
+    /// A primary key, will not fill this slot as a composite key as it's already identified as
+    /// a key by being in the primary_key_columns list. Thus, a column that makes up
+    /// a primary key can be apart of a composite foreign key.
+    pub composite_id: Option<usize>,
+}
+
+#[derive(Serialize, Deserialize, Hash, PartialEq, Eq, Debug, Clone)]
+pub enum CrudKind {
+    GET,
+    LIST,
+    SAVE,
+}
+
+pub struct DataSourceMethod {
+    pub parameters: Vec<Field>,
+    pub raw_sql: String,
+}
+
+pub struct DataSource {
+    pub name: String,
+    pub tree: IncludeTree,
+    pub list: Option<DataSourceMethod>,
+    pub get: Option<DataSourceMethod>,
+}
+
+pub struct KvR2Field {
+    pub name: String,
+    pub cidl_type: CidlType,
+    pub format: String,
+    pub binding: String,
+    pub list_prefix: bool,
+}
+
+/// The expected media type for request/response bodies.
+/// An API endpoint may expect data in some format, and return data in some format.
+/// Defaults to JSON.
+#[derive(Serialize, Deserialize, Debug, Default)]
+pub enum MediaType {
+    #[default]
+    Json,
+
+    Octet,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct ApiMethod {
+    pub name: String,
+
+    /// If true, the method is static (instantiated on a class, not an instance).
+    /// Static methods require no hydration or data source.
+    pub is_static: bool,
+    pub data_source: Option<String>,
+
+    pub http_verb: HttpVerb,
+
+    /// The media format the client should use to read the response body.
+    #[serde(default)]
+    pub return_media: MediaType,
+    pub return_type: CidlType,
+
+    /// The media format the client should use to send the request body.
+    #[serde(default)]
+    pub parameters_media: MediaType,
+    pub parameters: Vec<Field>,
+}
+
+pub struct Api {
+    pub name: String,
+    pub methods: Vec<ApiMethod>,
+}
+
+pub struct Model {
+    pub name: String,
+
+    pub d1_binding: Option<String>,
+    pub primary_columns: Vec<Column>,
+    pub columns: Vec<Column>,
+
+    pub kv_fields: Vec<KvR2Field>,
+    pub r2_fields: Vec<KvR2Field>,
+    pub navigation_properties: Vec<NavigationField>,
+    pub key_fields: Vec<String>,
+
+    pub apis: Vec<Api>,
+    pub data_sources: Vec<DataSource>,
+    pub cruds: Vec<CrudKind>,
+}
+
+impl Model {
+    pub fn has_d1(&self) -> bool {
+        self.d1_binding.is_some()
+    }
+
+    pub fn has_kv(&self) -> bool {
+        !self.kv_fields.is_empty()
+    }
+
+    pub fn has_r2(&self) -> bool {
+        !self.r2_fields.is_empty()
+    }
+
+    /// Returns the data source with the symbol name "default", if it exists.
+    pub fn default_data_source(&self) -> Option<&DataSource> {
+        self.data_sources.iter().find(|ds| ds.name == "default")
+    }
+
+    pub fn has_composite_pk(&self) -> bool {
+        self.primary_columns.len() > 1
+    }
+
+    /// Returns all columns, including primary key columns, as a single list.
+    /// The boolean indicates whether the column is a primary key column.
+    pub fn all_columns(&self) -> impl Iterator<Item = (&Column, bool)> {
+        self.columns
+            .iter()
+            .map(|c| (c, false))
+            .chain(self.primary_columns.iter().map(|c| (c, true)))
+    }
+}
+
+pub struct ServiceField {
+    pub name: String,
+
+    /// Injected symbol name
+    pub inject_reference: String,
 }
 
 pub struct Service {
-    pub symbol: SymbolRef,
-    pub fields: HashSet<SymbolRef>,
+    pub name: String,
+    pub fields: Vec<ServiceField>,
     pub apis: Vec<Api>,
 }
 
-#[derive(Default)]
-pub struct CloesceAst {
-    pub wrangler_env: Option<WranglerEnv>,
-    pub models: IndexMap<SymbolRef, Model>,
-    pub services: IndexMap<SymbolRef, Service>,
-    pub poos: HashMap<SymbolRef, PlainOldObject>,
-    pub table: SymbolTable,
+pub struct PlainOldObject {
+    pub name: String,
+    pub fields: Vec<Field>,
 }
 
 pub struct WranglerEnv {
-    pub symbol: SymbolRef,
-    pub d1_bindings: HashSet<SymbolRef>,
-    pub kv_bindings: HashSet<SymbolRef>,
-    pub r2_bindings: HashSet<SymbolRef>,
-    pub vars: HashSet<SymbolRef>,
+    pub d1_bindings: Vec<String>,
+    pub kv_bindings: Vec<String>,
+    pub r2_bindings: Vec<String>,
+    pub vars: Vec<Field>,
 }
+
+pub struct CloesceAst {
+    pub wrangler_env: Option<WranglerEnv>,
+    pub models: IndexMap<String, Model>,
+    pub services: IndexMap<String, Service>,
+    pub poos: BTreeMap<String, PlainOldObject>,
+}
+
+impl CloesceAst {
+    // pub fn from_json(path: &std::path::Path) -> Result<Self> {
+    //     let cidl_contents = std::fs::read_to_string(path).map_err(|e| {
+    //         GeneratorErrorKind::InvalidInputFile
+    //             .to_error()
+    //             .with_context(e.to_string())
+    //     })?;
+    //     serde_json::from_str::<Self>(&cidl_contents).map_err(|e| {
+    //         GeneratorErrorKind::InvalidInputFile
+    //             .to_error()
+    //             .with_context(e.to_string())
+    //     })
+    // }
+
+    // pub fn to_json(&self) -> String {
+    //     serde_json::to_string_pretty(self).expect("serialize self to work")
+    // }
+
+    // pub fn to_migrations_json(self) -> String {
+    //     let Self { hash, models, .. } = self;
+
+    //     let migrations_models: IndexMap<String, MigrationsModel> = models
+    //         .into_iter()
+    //         .filter_map(|(name, model)| {
+    //             if !model.has_d1() {
+    //                 return None;
+    //             }
+
+    //             let m = MigrationsModel {
+    //                 hash: model.hash,
+    //                 name: model.name,
+    //                 d1_binding: model.d1_binding,
+    //                 primary_key_columns: model.primary_key_columns,
+    //                 columns: model.columns,
+    //                 navigation_properties: model.navigation_properties,
+    //             };
+    //             Some((name, m))
+    //         })
+    //         .collect();
+
+    //     let migrations_ast = MigrationsAst {
+    //         hash,
+    //         models: migrations_models,
+    //     };
+
+    //     serde_json::to_string_pretty(&migrations_ast).expect("serialize migrations ast to work")
+    // }
+
+    // /// Traverses the AST setting the `hash` field as a merkle hash, meaning a parents hash depends on it's childrens hashes.
+    // pub fn set_merkle_hash(&mut self) {
+    //     if self.hash != 0u64 {
+    //         // If the root is hashed, it's safe to assume all children are hashed.
+    //         // No work to be done.
+    //         return;
+    //     }
+
+    //     let mut root_h = FxHasher::default();
+    //     for model in self.models.values_mut() {
+    //         let mut model_h = FxHasher::default();
+    //         model_h.write(b"Model");
+    //         model.name.hash(&mut model_h);
+    //         model.d1_binding.hash(&mut model_h);
+
+    //         for pk_col in model.primary_key_columns.iter_mut() {
+    //             let pk_col_h = {
+    //                 let mut h = FxHasher::default();
+    //                 h.write(b"ModelPrimaryKeyColumn");
+    //                 pk_col.value.hash(&mut h);
+    //                 pk_col.foreign_key_reference.hash(&mut h);
+    //                 pk_col.unique_ids.hash(&mut h);
+    //                 h.finish()
+    //             };
+
+    //             pk_col.hash = pk_col_h;
+    //             model_h.write_u64(pk_col_h);
+    //         }
+
+    //         for col in model.columns.iter_mut() {
+    //             let col_h = {
+    //                 let mut h = FxHasher::default();
+    //                 h.write(b"ModelColumn");
+    //                 col.value.hash(&mut h);
+    //                 col.foreign_key_reference.hash(&mut h);
+    //                 col.unique_ids.hash(&mut h);
+    //                 h.finish()
+    //             };
+
+    //             col.hash = col_h;
+    //             model_h.write_u64(col_h);
+    //         }
+
+    //         for nav in model.navigation_properties.iter_mut() {
+    //             let nav_h = {
+    //                 let mut h = FxHasher::default();
+    //                 h.write(b"ModelNavigationProperty");
+    //                 nav.model_reference.hash(&mut h);
+    //                 nav.var_name.hash(&mut h);
+    //                 nav.kind.hash(&mut h);
+    //                 h.finish()
+    //             };
+
+    //             nav.hash = nav_h;
+    //             model_h.write_u64(nav_h);
+    //         }
+
+    //         let model_h_finished = model_h.finish();
+    //         model.hash = model_h_finished;
+    //         root_h.write_u64(model_h_finished);
+    //     }
+
+    //     self.hash = root_h.finish();
+    // }
+}
+
+/// A subset of [Model] suited for migrations.
+///
+/// Assumed that the tree is semantically valid.
+// #[derive(Serialize, Deserialize)]
+// pub struct MigrationsModel {
+//     pub hash: u64,
+//     pub name: String,
+
+//     #[serde(skip_serializing_if = "Option::is_none")]
+//     pub d1_binding: Option<String>,
+
+//     pub primary_key_columns: Vec<Column>,
+//     pub columns: Vec<Column>,
+//     pub navigation_properties: Vec<NavigationField>,
+// }
+
+// impl MigrationsModel {
+//     pub fn all_columns(&self) -> impl Iterator<Item = (&Column, bool)> {
+//         self.columns
+//             .iter()
+//             .map(|c| (c, false))
+//             .chain(self.primary_key_columns.iter().map(|c| (c, true)))
+//     }
+// }
+
+// // /// A subset of [CloesceAst] suited for D1 migrations.
+// ///
+// /// Assumed that the tree is semantically valid.
+// #[derive(Serialize, Deserialize)]
+// pub struct MigrationsAst {
+//     pub hash: u64,
+
+//     #[serde(deserialize_with = "skip_if_not_d1")]
+//     pub models: IndexMap<String, MigrationsModel>,
+// }
+
+// impl MigrationsAst {
+//     pub fn from_json(path: &std::path::Path) -> Result<Self> {
+//         let contents = std::fs::read_to_string(path).map_err(|e| {
+//             GeneratorErrorKind::InvalidInputFile
+//                 .to_error()
+//                 .with_context(e.to_string())
+//         })?;
+//         serde_json::from_str::<Self>(&contents).map_err(|e| {
+//             GeneratorErrorKind::InvalidInputFile
+//                 .to_error()
+//                 .with_context(e.to_string())
+//         })
+//     }
+
+//     pub fn to_json(&self) -> String {
+//         serde_json::to_string_pretty(self).expect("serialize self to work")
+//     }
+// }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
 pub struct D1Database {
@@ -417,3 +551,39 @@ pub struct WranglerSpec {
     #[serde(default)]
     pub vars: HashMap<String, Value>,
 }
+
+// fn skip_if_not_d1<'de, D>(
+//     deserializer: D,
+// ) -> std::result::Result<IndexMap<String, MigrationsModel>, D::Error>
+// where
+//     D: serde::Deserializer<'de>,
+// {
+//     #[derive(Deserialize)]
+//     struct Temp {
+//         hash: u64,
+//         name: String,
+//         d1_binding: Option<String>,
+//         primary_key_columns: Vec<D1Column>,
+//         columns: Vec<D1Column>,
+//         navigation_properties: Vec<NavigationProperty>,
+//     }
+
+//     let temps: IndexMap<String, Temp> = Deserialize::deserialize(deserializer)?;
+
+//     Ok(temps
+//         .into_iter()
+//         .filter_map(|(key, t)| {
+//             (!t.columns.is_empty() || !t.primary_key_columns.is_empty()).then_some({
+//                 let m = MigrationsModel {
+//                     hash: t.hash,
+//                     name: t.name,
+//                     d1_binding: t.d1_binding,
+//                     primary_key_columns: t.primary_key_columns,
+//                     columns: t.columns,
+//                     navigation_properties: t.navigation_properties,
+//                 };
+//                 (key, m)
+//             })
+//         })
+//         .collect())
+// }

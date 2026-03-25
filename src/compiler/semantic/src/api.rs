@@ -1,9 +1,10 @@
 use std::ops::Not;
 
-use ast::{Api, ApiMethod, CidlType, HttpVerb, MediaType, SymbolKind, SymbolRef, SymbolTable};
-use frontend::{ApiBlock, ApiBlockMethod, ParseAst};
+use ast::{Api, ApiMethod, CidlType, Field, HttpVerb, MediaType};
+use frontend::{ApiBlock, ApiBlockMethod, ParseAst, parser::ParseId};
 
 use crate::{
+    SymbolKind, SymbolTable,
     ensure,
     err::{BatchResult, CompilerErrorKind, ErrorSink},
 };
@@ -19,7 +20,7 @@ impl ApiAnalysis {
         apis: &[ApiBlock],
         parse: &ParseAst,
         table: &SymbolTable,
-    ) -> BatchResult<Vec<(SymbolRef, Api)>> {
+    ) -> BatchResult<Vec<(String, Api)>> {
         let mut result = Vec::new();
 
         for api in apis {
@@ -34,10 +35,11 @@ impl ApiAnalysis {
                 self.sink
                     .push(CompilerErrorKind::ApiUnknownModelReference { api: api.id });
                 continue;
-            }
+            };
 
+            let model_name = model_sym.name.clone();
             let mut model_api = Api {
-                symbol: api.model,
+                name: api.name.clone(),
                 methods: Vec::new(),
             };
             for method in &api.methods {
@@ -45,7 +47,7 @@ impl ApiAnalysis {
                     model_api.methods.push(api_method);
                 }
             }
-            result.push((api.model, model_api));
+            result.push((model_name, model_api));
         }
 
         self.sink.finish()?;
@@ -54,13 +56,13 @@ impl ApiAnalysis {
 
     fn method(
         &mut self,
-        model: SymbolRef,
+        model: ParseId,
         method: &ApiBlockMethod,
         parse: &ParseAst,
         table: &SymbolTable,
     ) -> Option<ApiMethod> {
         // Validate data source reference
-        if let Some(ds) = method.data_source_name {
+        let data_source_name = if let Some(ds) = method.data_source_name {
             ensure!(
                 !method.is_static,
                 self.sink,
@@ -78,7 +80,11 @@ impl ApiAnalysis {
                     data_source: ds,
                 }
             );
-        }
+
+            Some(table.name(ds).to_string())
+        } else {
+            None
+        };
 
         // Validate return type
         self.return_type(method, table);
@@ -89,7 +95,7 @@ impl ApiAnalysis {
         let data_source = if method.is_static {
             None
         } else {
-            method.data_source_name
+            data_source_name
         };
 
         Some(ApiMethod {
@@ -108,8 +114,8 @@ impl ApiAnalysis {
         let err = || CompilerErrorKind::ApiInvalidReturn { method: method.id };
 
         match method.return_type.root_type() {
-            CidlType::Object(o) | CidlType::Partial(o) => {
-                let valid = table.lookup(*o).is_some_and(|s| {
+            CidlType::Object { id, .. } | CidlType::Partial { id, .. } => {
+                let valid = table.lookup(*id).is_some_and(|s| {
                     matches!(
                         s.kind,
                         SymbolKind::ModelDecl | SymbolKind::PlainOldObjectDecl
@@ -118,14 +124,14 @@ impl ApiAnalysis {
                 ensure!(valid, self.sink, err());
             }
 
-            CidlType::DataSource(model_ref) => {
+            CidlType::DataSource { id: model_ref, .. } => {
                 let valid = table
                     .lookup(*model_ref)
                     .is_some_and(|s| matches!(s.kind, SymbolKind::ModelDecl));
                 ensure!(valid, self.sink, err());
             }
 
-            CidlType::Inject(_) => {
+            CidlType::Inject { .. } => {
                 self.sink.push(err());
             }
 
@@ -143,8 +149,8 @@ impl ApiAnalysis {
         }
     }
 
-    fn parameters(&mut self, method: &ApiBlockMethod, table: &SymbolTable) -> Vec<SymbolRef> {
-        let mut param_refs = Vec::new();
+    fn parameters(&mut self, method: &ApiBlockMethod, table: &SymbolTable) -> Vec<Field> {
+        let mut params = Vec::new();
 
         for param in &method.parameters {
             let err = || CompilerErrorKind::ApiInvalidParam {
@@ -159,23 +165,25 @@ impl ApiAnalysis {
             };
 
             // DataSource parameters validated separately
-            if let CidlType::DataSource(model_ref) = &param_sym.cidl_type {
+            if let CidlType::DataSource { id: model_ref, .. } = &param_sym.cidl_type {
                 let valid = table
                     .lookup(*model_ref)
                     .is_some_and(|s| matches!(s.kind, SymbolKind::ModelDecl));
                 ensure!(valid, self.sink, err());
-                param_refs.push(param.id);
+                params.push(Field {
+                    name: param_sym.name.clone(),
+                    cidl_type: param_sym.cidl_type.clone(),
+                });
                 continue;
             }
 
             match param_sym.cidl_type.root_type() {
-                // TODO: data sources
                 CidlType::Void => {
                     self.sink.push(err());
                 }
 
-                CidlType::Object(o) | CidlType::Partial(o) => {
-                    let valid = table.lookup(*o).is_some_and(|s| {
+                CidlType::Object { id, .. } | CidlType::Partial { id, .. } => {
+                    let valid = table.lookup(*id).is_some_and(|s| {
                         matches!(
                             s.kind,
                             SymbolKind::ModelDecl | SymbolKind::PlainOldObjectDecl
@@ -201,7 +209,7 @@ impl ApiAnalysis {
                         .parameters
                         .iter()
                         .filter(|p| {
-                            !matches!(p.cidl_type, CidlType::Inject(_) | CidlType::DataSource(_))
+                            !matches!(p.cidl_type, CidlType::Inject { .. } | CidlType::DataSource { .. })
                         })
                         .count();
 
@@ -215,9 +223,12 @@ impl ApiAnalysis {
                 _ => {}
             }
 
-            param_refs.push(param.id);
+            params.push(Field {
+                name: param_sym.name.clone(),
+                cidl_type: param_sym.cidl_type.clone(),
+            });
         }
 
-        param_refs
+        params
     }
 }

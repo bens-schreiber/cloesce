@@ -50,20 +50,10 @@ impl Default for IdTable {
 }
 
 impl IdTable {
-    fn _key(name: &str, scope: &IdScope) -> String {
-        match scope {
-            IdScope::Global => format!("global::{}", name),
-            IdScope::Env => format!("env::{}", name),
-            IdScope::Model(model_name) => format!("model::{}::{}", model_name, name),
-            IdScope::Api(api_name) => format!("api::{}::{}", api_name, name),
-            IdScope::Service(service_name) => format!("service::{}::{}", service_name, name),
-            IdScope::PlainOldObject(poo_name) => format!("poo::{}::{}", poo_name, name),
-            IdScope::DataSource(ds_name) => format!("source::{}::{}", ds_name, name),
-        }
-    }
-
+    /// Determines if a [ParseId] already exists for the given name and scope. If so, returns it.
+    /// If not, creates a new [ParseId], stores it, and returns it.
     pub fn intern(&mut self, name: String, scope: IdScope) -> ParseId {
-        let key = Self::_key(&name, &scope);
+        let key = Self::key(&name, &scope);
         if let Some(&existing) = self.table.get(&key) {
             return existing;
         }
@@ -74,6 +64,7 @@ impl IdTable {
         symbol_ref
     }
 
+    /// Creates a new unique [ParseId] that is not associated with any name.
     pub fn new_id(&mut self) -> ParseId {
         let id = self.counter;
         self.counter += 1;
@@ -84,12 +75,26 @@ impl IdTable {
         self.names.get(&id).map(|s| s.as_str())
     }
 
+    /// Finds the ParseId for a global name.
+    /// Panics if the name is not found.
     pub fn id(&self, name: &str) -> ParseId {
         let key = format!("global::{}", name);
         *self
             .table
             .get(&key)
             .unwrap_or_else(|| panic!("global symbol '{}' not found in symbol table", name))
+    }
+
+    fn key(name: &str, scope: &IdScope) -> String {
+        match scope {
+            IdScope::Global => format!("global::{}", name),
+            IdScope::Env => format!("env::{}", name),
+            IdScope::Model(model_name) => format!("model::{}::{}", model_name, name),
+            IdScope::Api(api_name) => format!("api::{}::{}", api_name, name),
+            IdScope::Service(service_name) => format!("service::{}::{}", service_name, name),
+            IdScope::PlainOldObject(poo_name) => format!("poo::{}::{}", poo_name, name),
+            IdScope::DataSource(ds_name) => format!("source::{}::{}", ds_name, name),
+        }
     }
 }
 
@@ -163,11 +168,9 @@ enum Global {
 ///     ...
 /// }
 /// ```
-pub(crate) fn poo_block<'t>(
-    st: It,
-) -> impl Parser<'t, &'t [Token], PlainOldObjectBlock, Extra<'t>> {
-    let st_fields = st.clone();
-    let st_id = st.clone();
+fn poo_block<'t>(it: It) -> impl Parser<'t, &'t [Token], PlainOldObjectBlock, Extra<'t>> {
+    let st_fields = it.clone();
+    let st_id = it.clone();
 
     // ident: cidl_type
     let poo_field = select! { Token::Ident(name) => name }
@@ -215,7 +218,7 @@ pub(crate) fn poo_block<'t>(
 ///     ...
 /// }
 /// ```
-pub(crate) fn inject_block<'t>(st: It) -> impl Parser<'t, &'t [Token], InjectBlock, Extra<'t>> {
+fn inject_block<'t>(it: It) -> impl Parser<'t, &'t [Token], InjectBlock, Extra<'t>> {
     // inject { ...}
     just(Token::Inject)
         .ignore_then(
@@ -225,7 +228,7 @@ pub(crate) fn inject_block<'t>(st: It) -> impl Parser<'t, &'t [Token], InjectBlo
                 .delimited_by(just(Token::LBrace), just(Token::RBrace)),
         )
         .map_with(move |injectables, e| {
-            let mut table = st.borrow_mut();
+            let mut table = it.borrow_mut();
             let id = table.new_id();
             let names = injectables
                 .into_iter()
@@ -240,9 +243,9 @@ pub(crate) fn inject_block<'t>(st: It) -> impl Parser<'t, &'t [Token], InjectBlo
         })
 }
 
-pub(crate) fn cidl_type<'t>(st: It) -> impl Parser<'t, &'t [Token], CidlType, Extra<'t>> {
+fn cidl_type<'t>(it: It) -> impl Parser<'t, &'t [Token], CidlType, Extra<'t>> {
     recursive(move |cidl_type| {
-        let st_obj = st.clone();
+        let st_obj = it.clone();
 
         let wrapper = select! { Token::Ident(name) => name }
             .then_ignore(just(Token::LAngle))
@@ -255,11 +258,11 @@ pub(crate) fn cidl_type<'t>(st: It) -> impl Parser<'t, &'t [Token], CidlType, Ex
                 "Paginated" => Ok(CidlType::paginated(inner)),
                 "KvObject" => Ok(CidlType::KvObject(Box::new(inner))),
                 "Partial" => match inner {
-                    CidlType::Object(sym) => Ok(CidlType::Partial(sym)),
+                    CidlType::Object { name, id } => Ok(CidlType::Partial { name, id }),
                     _ => Err(Rich::custom(span, "Partial<T> expects an object type")),
                 },
                 "DataSource" => match inner {
-                    CidlType::Object(sym) => Ok(CidlType::DataSource(sym)),
+                    CidlType::Object { name, id } => Ok(CidlType::DataSource { name, id }),
                     _ => Err(Rich::custom(span, "DataSource<T> expects an object type")),
                 },
                 _ => Err(Rich::custom(span, "Unknown generic type wrapper")),
@@ -278,8 +281,11 @@ pub(crate) fn cidl_type<'t>(st: It) -> impl Parser<'t, &'t [Token], CidlType, Ex
             just(Token::R2Object).to(CidlType::R2Object),
         ));
 
-        let object_type = select! { Token::Ident(name) => name }
-            .map(move |name| CidlType::Object(st_obj.borrow_mut().intern(name, IdScope::Global)));
+        let object_type =
+            select! { Token::Ident(name) => name }.map(move |name| CidlType::Object {
+                name: name.clone(),
+                id: st_obj.borrow_mut().intern(name, IdScope::Global),
+            });
 
         choice((wrapper, primitive_keyword, object_type)).boxed()
     })
