@@ -105,7 +105,7 @@ impl Default for CidlType {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Default)]
 pub struct FileSpan {
     pub start: usize,
     pub end: usize,
@@ -124,46 +124,55 @@ pub enum WranglerEnvBindingKind {
 #[derive(Clone)]
 pub enum SymbolKind {
     ModelDecl,
-    ModelField {
-        parent: SymbolRef,
-        cidl_type: CidlType,
-    },
-    ModelPrimaryKeyTag {
-        parent: SymbolRef,
-    },
-    ModelForeignKeyTag {
-        parent: SymbolRef,
-    },
-    ModelNavigationTag {
-        parent: SymbolRef,
-    },
-    ModelD1Tag {
-        parent: SymbolRef,
-    },
-    ModelKvTag {
-        parent: SymbolRef,
-    },
-    ModelR2Tag {
-        parent: SymbolRef,
-    },
+    ModelField,
+    ModelPrimaryKeyTag,
+    ModelForeignKeyTag,
+    ModelNavigationTag,
+    ModelD1Tag,
+    ModelKvTag,
+    ModelR2Tag,
     WranglerEnvDecl,
-    WranglerEnvBinding {
-        kind: WranglerEnvBindingKind,
-    },
-    WranglerEnvVar {
-        cidl_type: CidlType,
-    },
+    WranglerEnvBinding { kind: WranglerEnvBindingKind },
+    WranglerEnvVar,
+    PlainOldObjectDecl,
+    PlainOldObjectField,
+    Null,
+}
+
+impl Default for SymbolKind {
+    fn default() -> Self {
+        SymbolKind::Null
+    }
 }
 
 #[derive(Clone)]
 pub struct Symbol {
     pub id: usize,
 
-    /// Empty for some symbols
+    /// Empty for symbols that are not named (e.g. declarations)
     pub name: String,
+
+    /// Void for symbols that have no type (e.g. declarations)
+    pub cidl_type: CidlType,
+
+    /// Default for symbols that have no parent (e.g. declarations)
+    pub parent: SymbolRef,
 
     pub span: FileSpan,
     pub kind: SymbolKind,
+}
+
+impl Default for Symbol {
+    fn default() -> Self {
+        Symbol {
+            id: usize::MAX,
+            name: String::new(),
+            cidl_type: CidlType::Void,
+            parent: usize::MAX,
+            span: FileSpan::default(),
+            kind: SymbolKind::Null,
+        }
+    }
 }
 
 pub struct ForeignKey {

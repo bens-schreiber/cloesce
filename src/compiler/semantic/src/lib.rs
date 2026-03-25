@@ -50,6 +50,7 @@ impl SemanticAnalysis {
                 name: String::default(),
                 span: new_span.clone(),
                 kind: SymbolKind::WranglerEnvDecl,
+                ..Default::default()
             };
 
             if let Some(existing) = table.insert(symbol) {
@@ -89,6 +90,7 @@ impl SemanticAnalysis {
                     kind: SymbolKind::WranglerEnvBinding {
                         kind: binding.1.clone(),
                     },
+                    ..Default::default()
                 };
 
                 if let Some(existing) = table.insert(symbol) {
@@ -111,9 +113,8 @@ impl SemanticAnalysis {
                     id: var.id,
                     name: var.name.clone(),
                     span: new_span.clone(),
-                    kind: SymbolKind::WranglerEnvVar {
-                        cidl_type: var.cidl_type.clone(),
-                    },
+                    kind: SymbolKind::WranglerEnvVar,
+                    ..Default::default()
                 };
 
                 if let Some(existing) = table.insert(symbol) {
@@ -138,6 +139,7 @@ impl SemanticAnalysis {
                 name: model.name.clone(),
                 span: new_span.clone(),
                 kind: SymbolKind::ModelDecl,
+                ..Default::default()
             };
 
             if let Some(existing) = table.insert(symbol) {
@@ -158,7 +160,9 @@ impl SemanticAnalysis {
                         end: d1_tag.span.end,
                         file: model.file.clone(),
                     },
-                    kind: SymbolKind::ModelD1Tag { parent: model.id },
+                    kind: SymbolKind::ModelD1Tag,
+                    parent: model.id,
+                    ..Default::default()
                 };
                 table.insert(symbol);
             }
@@ -173,10 +177,9 @@ impl SemanticAnalysis {
                     id: field.id,
                     name: field.name.clone(),
                     span: new_span.clone(),
-                    kind: SymbolKind::ModelField {
-                        parent: model.id,
-                        cidl_type: field.cidl_type.clone(),
-                    },
+                    kind: SymbolKind::ModelField,
+                    parent: model.id,
+                    cidl_type: field.cidl_type.clone(),
                 };
 
                 if let Some(existing) = table.insert(symbol) {
@@ -198,7 +201,9 @@ impl SemanticAnalysis {
                         end: 0,
                         file: model.file.clone(),
                     },
-                    kind: SymbolKind::ModelForeignKeyTag { parent: model.id },
+                    kind: SymbolKind::ModelForeignKeyTag,
+                    parent: model.id,
+                    ..Default::default()
                 };
                 table.insert(symbol);
             }
@@ -212,7 +217,9 @@ impl SemanticAnalysis {
                         end: nav.span.end,
                         file: model.file.clone(),
                     },
-                    kind: SymbolKind::ModelNavigationTag { parent: model.id },
+                    kind: SymbolKind::ModelNavigationTag,
+                    parent: model.id,
+                    ..Default::default()
                 };
                 table.insert(symbol);
             }
@@ -226,7 +233,9 @@ impl SemanticAnalysis {
                         end: kv.span.end,
                         file: model.file.clone(),
                     },
-                    kind: SymbolKind::ModelKvTag { parent: model.id },
+                    kind: SymbolKind::ModelKvTag,
+                    parent: model.id,
+                    ..Default::default()
                 };
                 table.insert(symbol);
             }
@@ -240,7 +249,9 @@ impl SemanticAnalysis {
                         end: r2.span.end,
                         file: model.file.clone(),
                     },
-                    kind: SymbolKind::ModelR2Tag { parent: model.id },
+                    kind: SymbolKind::ModelR2Tag,
+                    parent: model.id,
+                    ..Default::default()
                 };
                 table.insert(symbol);
             }

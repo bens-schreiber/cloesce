@@ -228,10 +228,16 @@ impl ModelAnalysis {
         }
 
         let first_ref = fk.references.first().unwrap().0;
-        let is_nullable = table.lookup(first_ref).and_then(|sym| match &sym.kind {
-            SymbolKind::ModelField { cidl_type, .. } => Some(cidl_type.is_nullable()),
-            _ => None,
-        });
+        let Some(first_ref_sym) = table.lookup(first_ref) else {
+            self.sink.push(
+                CompilerErrorKind::ForeignKeyReferencesInvalidOrUnknownColumn {
+                    tag: fk.id,
+                    column: first_ref,
+                },
+            );
+            return None;
+        };
+        let is_nullable = first_ref_sym.cidl_type.is_nullable();
 
         let mut fk_columns = Vec::new();
         for (field, adj_field) in &fk.references {
@@ -269,32 +275,16 @@ impl ModelAnalysis {
                         });
                 }
 
-                let SymbolKind::ModelField {
-                    cidl_type: field_cidl_type,
-                    ..
-                } = &field_sym.kind
-                else {
-                    self.sink.push(
-                        CompilerErrorKind::ForeignKeyReferencesInvalidOrUnknownColumn {
+                if field_sym.cidl_type.is_nullable() != is_nullable {
+                    self.sink
+                        .push(CompilerErrorKind::ForeignKeyInconsistentNullability {
                             tag: fk.id,
-                            column: *field,
-                        },
-                    );
-                    continue;
-                };
-
-                if let Some(is_nullable) = is_nullable {
-                    if field_cidl_type.is_nullable() != is_nullable {
-                        self.sink
-                            .push(CompilerErrorKind::ForeignKeyInconsistentNullability {
-                                tag: fk.id,
-                                first_column: first_ref,
-                                second_column: *field,
-                            });
-                    }
+                            first_column: first_ref,
+                            second_column: *field,
+                        });
                 }
 
-                field_cidl_type
+                &field_sym.cidl_type
             };
 
             // Validate the field from the adjacent model
@@ -309,21 +299,7 @@ impl ModelAnalysis {
                     continue;
                 };
 
-                let SymbolKind::ModelField {
-                    parent: adj_field_parent,
-                    cidl_type: adj_field_cidl_type,
-                } = &adj_field_sym.kind
-                else {
-                    self.sink.push(
-                        CompilerErrorKind::ForeignKeyReferencesInvalidOrUnknownColumn {
-                            tag: fk.id,
-                            column: *adj_field,
-                        },
-                    );
-                    continue;
-                };
-
-                if !is_valid_sql_type(adj_field_cidl_type) {
+                if !is_valid_sql_type(&adj_field_sym.cidl_type) {
                     self.sink.push(
                         CompilerErrorKind::ForeignKeyReferencesInvalidOrUnknownColumn {
                             tag: fk.id,
@@ -333,7 +309,7 @@ impl ModelAnalysis {
                 }
 
                 ensure!(
-                    *adj_field_parent == fk.adj_model,
+                    adj_field_sym.parent == fk.adj_model,
                     self.sink,
                     CompilerErrorKind::ForeignKeyReferencesInvalidOrUnknownColumn {
                         tag: fk.id,
@@ -341,7 +317,7 @@ impl ModelAnalysis {
                     }
                 );
 
-                adj_field_cidl_type
+                &adj_field_sym.cidl_type
             };
 
             if field_cidl_type.root_type() != adj_field_cidl_type.root_type() {
@@ -398,31 +374,6 @@ impl ModelAnalysis {
                 .push(CompilerErrorKind::UnresolvedSymbol { symbol: nav.id });
             return None;
         };
-
-        let SymbolKind::ModelField {
-            parent,
-            cidl_type: nav_field_cidl_type,
-        } = &nav_field_sym.kind
-        else {
-            self.sink.push(
-                CompilerErrorKind::NavigationPropertyReferencesInvalidOrUnknownField {
-                    tag: nav.id,
-                    field: nav.field,
-                },
-            );
-            return None;
-        };
-
-        // The nav property must exist on this model
-        if *parent != model_block.id {
-            self.sink.push(
-                CompilerErrorKind::NavigationPropertyReferencesInvalidOrUnknownField {
-                    tag: nav.id,
-                    field: nav.field,
-                },
-            );
-            return None;
-        }
 
         let Some(adj_model_sym) = table.lookup(nav.adj_model) else {
             self.sink.push(CompilerErrorKind::UnresolvedSymbol {
@@ -512,7 +463,7 @@ impl ModelAnalysis {
             }
         }
 
-        match unwrap_arr_and_null(nav_field_cidl_type) {
+        match unwrap_arr_and_null(&nav_field_sym.cidl_type) {
             CidlType::Object(symbol_ref) => {
                 if *symbol_ref != adj_model_sym.id {
                     self.sink.push(
@@ -535,7 +486,7 @@ impl ModelAnalysis {
             }
         }
 
-        let has_arr = matches!(nav_field_cidl_type, CidlType::Array(_));
+        let has_arr = matches!(nav_field_sym.cidl_type, CidlType::Array(_));
         let nav = match (has_arr, nav.is_many_to_many) {
             (false, false) => {
                 // One to One navigation property
@@ -721,11 +672,7 @@ impl ModelAnalysis {
                 // Look through fields for a matching name
                 let matching_field = model_block.fields.iter().find(|f| {
                     let field_sym = table.lookup(f.id).unwrap();
-                    let SymbolKind::ModelField { cidl_type, .. } = &field_sym.kind else {
-                        return false;
-                    };
-
-                    field_sym.name == var && is_valid_sql_type(cidl_type)
+                    field_sym.name == var && is_valid_sql_type(&field_sym.cidl_type)
                 });
 
                 if matching_field.is_none() {
@@ -742,28 +689,6 @@ impl ModelAnalysis {
 
         for kv in &model_block.kvs {
             validate_binding(&mut self.sink, kv, WranglerEnvBindingKind::KV);
-
-            let Some(symbol) = table.lookup(kv.field) else {
-                self.sink
-                    .push(CompilerErrorKind::UnresolvedSymbol { symbol: kv.field });
-                continue;
-            };
-
-            let SymbolKind::ModelField { parent, .. } = symbol.kind else {
-                self.sink.push(CompilerErrorKind::KvR2InvalidField {
-                    tag: kv.id,
-                    field: kv.field,
-                });
-                continue;
-            };
-
-            if parent != model_block.id {
-                self.sink.push(CompilerErrorKind::KvR2InvalidField {
-                    tag: kv.id,
-                    field: kv.field,
-                });
-                continue;
-            };
 
             if !validate_key_format(&mut self.sink, kv.id, &kv.format) {
                 continue;
@@ -786,27 +711,11 @@ impl ModelAnalysis {
                 continue;
             };
 
-            let SymbolKind::ModelField { parent, cidl_type } = &symbol.kind else {
-                self.sink.push(CompilerErrorKind::KvR2InvalidField {
-                    tag: r2.id,
-                    field: r2.field,
-                });
-                continue;
-            };
-
-            if *parent != model_block.id {
-                self.sink.push(CompilerErrorKind::KvR2InvalidField {
-                    tag: r2.id,
-                    field: r2.field,
-                });
-                continue;
-            }
-
             if !validate_key_format(&mut self.sink, r2.id, &r2.format) {
                 continue;
             }
 
-            if *cidl_type != CidlType::R2Object {
+            if symbol.cidl_type != CidlType::R2Object {
                 self.sink.push(CompilerErrorKind::KvR2InvalidField {
                     tag: r2.id,
                     field: r2.field,
@@ -830,15 +739,7 @@ impl ModelAnalysis {
                 continue;
             };
 
-            let SymbolKind::ModelField { parent, cidl_type } = &symbol.kind else {
-                self.sink.push(CompilerErrorKind::KvR2InvalidKeyParam {
-                    tag: key_field.id,
-                    field: key_field.field,
-                });
-                continue;
-            };
-
-            if *parent != model_block.id || *cidl_type != CidlType::String {
+            if symbol.cidl_type != CidlType::String {
                 self.sink.push(CompilerErrorKind::KvR2InvalidKeyParam {
                     tag: key_field.id,
                     field: key_field.field,

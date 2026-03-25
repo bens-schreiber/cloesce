@@ -551,26 +551,14 @@ fn d1_model_nav_one_to_one() {
 
     let person_horse_nav = person.navigation_properties.first().unwrap();
     let person_nav_symbol = ast.table.lookup(person_horse_nav.symbol).unwrap();
-    let SymbolKind::ModelNavigationTag {
-        parent: person_horse_nav_parent,
-    } = person_nav_symbol.kind
-    else {
-        unreachable!()
-    };
-    assert_eq!(person.symbol, person_horse_nav_parent);
+
+    assert_eq!(person.symbol, person_nav_symbol.parent);
     assert_eq!(person_horse_nav.adj_model, horse.symbol);
 
     let person_horse_field = ast.table.lookup(person_horse_nav.field).unwrap();
-    let SymbolKind::ModelField {
-        parent: person_horse_field_parent,
-        cidl_type: person_horse_field_type,
-    } = &person_horse_field.kind
-    else {
-        unreachable!()
-    };
 
-    assert_eq!(*person_horse_field_parent, person.symbol);
-    assert_eq!(person_horse_field_type, &CidlType::Object(horse.symbol));
+    assert_eq!(person_horse_field.parent, person.symbol);
+    assert_eq!(person_horse_field.cidl_type, CidlType::Object(horse.symbol));
 
     let NavigationPropertyKind::OneToOne {
         columns: person_horse_nav_columns,
@@ -581,15 +569,8 @@ fn d1_model_nav_one_to_one() {
 
     assert_eq!(person_horse_nav_columns.len(), 1);
     let person_horse_nav_column_symbol = ast.table.lookup(person_horse_nav_columns[0]).unwrap();
-    let SymbolKind::ModelField {
-        parent: person_horse_nav_column_parent,
-        cidl_type: person_horse_nav_column_type,
-    } = &person_horse_nav_column_symbol.kind
-    else {
-        unreachable!()
-    };
-    assert_eq!(*person_horse_nav_column_parent, horse.symbol);
-    assert_eq!(person_horse_nav_column_type, &CidlType::Integer);
+    assert_eq!(person_horse_nav_column_symbol.parent, horse.symbol);
+    assert_eq!(person_horse_nav_column_symbol.cidl_type, CidlType::Integer);
 }
 
 #[test]
@@ -637,27 +618,15 @@ fn d1_model_nav_one_to_many() {
 
     let author_posts_nav = author.navigation_properties.first().unwrap();
     let author_nav_symbol = ast.table.lookup(author_posts_nav.symbol).unwrap();
-    let SymbolKind::ModelNavigationTag {
-        parent: author_posts_nav_parent,
-    } = author_nav_symbol.kind
-    else {
-        unreachable!()
-    };
-    assert_eq!(author.symbol, author_posts_nav_parent);
+
+    assert_eq!(author.symbol, author_nav_symbol.parent);
     assert_eq!(author_posts_nav.adj_model, post.symbol);
 
     let author_posts_field = ast.table.lookup(author_posts_nav.field).unwrap();
-    let SymbolKind::ModelField {
-        parent: author_posts_field_parent,
-        cidl_type: author_posts_field_type,
-    } = &author_posts_field.kind
-    else {
-        unreachable!()
-    };
-    assert_eq!(*author_posts_field_parent, author.symbol);
+    assert_eq!(author_posts_field.parent, author.symbol);
     assert_eq!(
-        author_posts_field_type,
-        &CidlType::array(CidlType::Object(post.symbol))
+        author_posts_field.cidl_type,
+        CidlType::array(CidlType::Object(post.symbol))
     );
 
     let NavigationPropertyKind::OneToMany {
@@ -668,15 +637,8 @@ fn d1_model_nav_one_to_many() {
     };
     assert_eq!(author_posts_nav_columns.len(), 1);
     let author_posts_nav_column_symbol = ast.table.lookup(author_posts_nav_columns[0]).unwrap();
-    let SymbolKind::ModelField {
-        parent: author_posts_nav_column_parent,
-        cidl_type: author_posts_nav_column_type,
-    } = &author_posts_nav_column_symbol.kind
-    else {
-        unreachable!()
-    };
-    assert_eq!(*author_posts_nav_column_parent, post.symbol);
-    assert_eq!(author_posts_nav_column_type, &CidlType::Integer);
+    assert_eq!(author_posts_nav_column_symbol.parent, post.symbol);
+    assert_eq!(author_posts_nav_column_symbol.cidl_type, CidlType::Integer);
 }
 
 #[test]
@@ -724,27 +686,14 @@ fn d1_model_nav_many_to_many() {
 
     let student_courses_nav = student.navigation_properties.first().unwrap();
     let student_nav_symbol = ast.table.lookup(student_courses_nav.symbol).unwrap();
-    let SymbolKind::ModelNavigationTag {
-        parent: student_courses_nav_parent,
-    } = student_nav_symbol.kind
-    else {
-        unreachable!()
-    };
-    assert_eq!(student.symbol, student_courses_nav_parent);
+    assert_eq!(student.symbol, student_nav_symbol.parent);
     assert_eq!(student_courses_nav.adj_model, course.symbol);
 
     let student_courses_field = ast.table.lookup(student_courses_nav.field).unwrap();
-    let SymbolKind::ModelField {
-        parent: student_courses_field_parent,
-        cidl_type: student_courses_field_type,
-    } = &student_courses_field.kind
-    else {
-        unreachable!()
-    };
-    assert_eq!(*student_courses_field_parent, student.symbol);
+    assert_eq!(student_courses_field.parent, student.symbol);
     assert_eq!(
-        student_courses_field_type,
-        &CidlType::array(CidlType::Object(course.symbol))
+        student_courses_field.cidl_type,
+        CidlType::array(CidlType::Object(course.symbol))
     );
 
     let NavigationPropertyKind::ManyToMany = &student_courses_nav.kind else {
