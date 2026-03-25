@@ -104,7 +104,7 @@ impl Default for CidlType {
     }
 }
 
-#[derive(Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct FileSpan {
     pub start: usize,
     pub end: usize,
@@ -123,15 +123,27 @@ pub enum WranglerEnvBindingKind {
 #[derive(Clone)]
 pub enum SymbolKind {
     ModelDecl,
+    ModelField {
+        parent: SymbolRef,
+        cidl_type: CidlType,
+    },
+    ModelPrimaryKeyTag {
+        parent: SymbolRef,
+    },
+    ModelForeignKeyTag {
+        parent: SymbolRef,
+    },
+    ModelNavigationTag {
+        parent: SymbolRef,
+    },
+    ModelD1Tag {
+        parent: SymbolRef,
+    },
     WranglerEnvDecl,
     WranglerEnvBinding {
         kind: WranglerEnvBindingKind,
     },
     WranglerEnvVar {
-        cidl_type: CidlType,
-    },
-    ModelField {
-        parent: SymbolRef,
         cidl_type: CidlType,
     },
 }
@@ -214,9 +226,33 @@ pub enum HttpVerb {
 }
 
 #[derive(Default)]
+pub struct SymbolTable {
+    table: HashMap<SymbolRef, Symbol>,
+}
+
+impl SymbolTable {
+    pub fn insert(&mut self, symbol: Symbol) -> Option<Symbol> {
+        self.table.insert(symbol.id, symbol)
+    }
+
+    pub fn lookup(&self, id: usize) -> Option<&Symbol> {
+        self.table.get(&id)
+    }
+
+    pub fn name(&self, id: SymbolRef) -> &str {
+        self.lookup(id).map(|s| s.name.as_str()).unwrap_or("")
+    }
+
+    pub fn kind(&self, id: SymbolRef) -> Option<&SymbolKind> {
+        self.lookup(id).map(|s| &s.kind)
+    }
+}
+
+#[derive(Default)]
 pub struct CloesceAst {
+    pub wrangler_env: Option<WranglerEnv>,
     pub models: HashMap<SymbolRef, Model>,
-    pub symbols: HashMap<SymbolRef, Symbol>,
+    pub table: SymbolTable,
 }
 
 pub struct WranglerEnv {

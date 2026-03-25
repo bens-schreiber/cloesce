@@ -5,18 +5,21 @@ use chumsky::prelude::*;
 use ast::CidlType;
 
 use crate::{
-    ForeignKeyTag, KvR2Tag, ModelBlock, NavigationTag, SpannedTypedName,
+    D1Tag, ForeignKeyTag, KvR2Tag, ModelBlock, NavigationTag, SpannedTypedName, UniqueTag,
     lexer::Token,
     parser::{Extra, IdScope, It, cidl_type},
 };
 
 struct PendingForeignKeyTag {
+    span: SimpleSpan,
     adj_model: String,
+
     /// (source_field_name, target_field_name)
     references: Vec<(String, String)>,
 }
 
 struct PendingNavTag {
+    span: SimpleSpan,
     field: String,
     adj_model: String,
     fields: Vec<String>,
@@ -33,7 +36,7 @@ struct PendingKvR2Tag {
 
 enum ModelField {
     Primary(Vec<String>),
-    Unique(Vec<String>),
+    Unique(SimpleSpan, Vec<String>),
     Foreign(PendingForeignKeyTag),
     Nav(PendingNavTag),
     Field(SpannedTypedName),
@@ -65,6 +68,7 @@ pub fn model_block<'t>(it: It) -> impl Parser<'t, &'t [Token], ModelBlock, Extra
         .ignore_then(just(Token::LParen))
         .ignore_then(select! { Token::Ident(name) => name })
         .then_ignore(just(Token::RParen))
+        .map_with(|name, e| (name, e.span()))
         .or_not();
 
     // [primary ident1, ident2, ...]
@@ -89,7 +93,7 @@ pub fn model_block<'t>(it: It) -> impl Parser<'t, &'t [Token], ModelBlock, Extra
                 .collect::<Vec<_>>(),
         )
         .then_ignore(just(Token::RBracket))
-        .map(ModelField::Unique);
+        .map_with(|cols, e| ModelField::Unique(e.span(), cols));
 
     // [foreign ident1, ident2 -> TargetModel::ident3, ident4, ...]
     let foreign_tag = {
@@ -123,7 +127,7 @@ pub fn model_block<'t>(it: It) -> impl Parser<'t, &'t [Token], ModelBlock, Extra
             .then_ignore(just(Token::Arrow))
             .then(target_field_list)
             .then_ignore(just(Token::RBracket))
-            .map(|(fields, target_refs)| {
+            .map_with(|(fields, target_refs), e| {
                 let (adj_model, _) = target_refs.first().cloned().unwrap();
                 let references = fields
                     .into_iter()
@@ -132,6 +136,7 @@ pub fn model_block<'t>(it: It) -> impl Parser<'t, &'t [Token], ModelBlock, Extra
                 ModelField::Foreign(PendingForeignKeyTag {
                     adj_model,
                     references,
+                    span: e.span(),
                 })
             })
     };
@@ -159,10 +164,11 @@ pub fn model_block<'t>(it: It) -> impl Parser<'t, &'t [Token], ModelBlock, Extra
             .then_ignore(just(Token::Arrow))
             .then(nav_key_ref_list)
             .then_ignore(just(Token::RBracket))
-            .map(|(field, to)| {
+            .map_with(|(field, to), e| {
                 let adj_model = to[0].0.clone();
                 let fields = to.into_iter().map(|(_, f)| f).collect::<Vec<_>>();
                 ModelField::Nav(PendingNavTag {
+                    span: e.span(),
                     field,
                     adj_model,
                     fields,
@@ -177,8 +183,9 @@ pub fn model_block<'t>(it: It) -> impl Parser<'t, &'t [Token], ModelBlock, Extra
             .then_ignore(just(Token::RAngle))
             .then(nav_key_ref)
             .then_ignore(just(Token::RBracket))
-            .map(|(field, (adj_model, f))| {
+            .map_with(|(field, (adj_model, f)), e| {
                 ModelField::Nav(PendingNavTag {
+                    span: e.span(),
                     field,
                     adj_model,
                     fields: vec![f],
@@ -271,18 +278,26 @@ fn map_model(
     it: &It,
     name: String,
     span: SimpleSpan,
-    d1_binding: Option<String>,
+    d1_binding: Option<(String, SimpleSpan)>,
     items: Vec<ModelField>,
 ) -> ModelBlock {
     let model_scope = IdScope::Model(name.clone());
     let id = it.borrow_mut().intern(name.clone(), IdScope::Global);
-    let d1_binding = d1_binding.map(|b| it.borrow_mut().intern(b, IdScope::Env));
+    let d1_binding = d1_binding.map(|(b, d1_span)| {
+        let id = it.borrow_mut().new_id();
+        let env_binding = it.borrow_mut().intern(b, IdScope::Env);
+        D1Tag {
+            id,
+            span: d1_span,
+            env_binding,
+        }
+    });
 
     let mut fields: Vec<SpannedTypedName> = Vec::new();
     let mut foreign_keys: Vec<ForeignKeyTag> = Vec::new();
     let mut navigation_properties: Vec<NavigationTag> = Vec::new();
     let mut primary_keys = Vec::new();
-    let mut unique_constraints: Vec<Vec<_>> = Vec::new();
+    let mut unique_constraints: Vec<UniqueTag> = Vec::new();
     let mut key_fields = Vec::new();
     let mut kvs: Vec<KvR2Tag> = Vec::new();
     let mut r2s: Vec<KvR2Tag> = Vec::new();
@@ -294,12 +309,16 @@ fn map_model(
                     primary_keys.push(it.borrow_mut().intern(col, model_scope.clone()));
                 }
             }
-            ModelField::Unique(cols) => {
-                let refs = cols
+            ModelField::Unique(span, cols) => {
+                let fields = cols
                     .into_iter()
                     .map(|c| it.borrow_mut().intern(c, model_scope.clone()))
                     .collect();
-                unique_constraints.push(refs);
+                unique_constraints.push(UniqueTag {
+                    id: it.borrow_mut().new_id(),
+                    span,
+                    fields,
+                });
             }
             ModelField::Foreign(fk) => {
                 let adj_model = it
@@ -316,6 +335,8 @@ fn map_model(
                     })
                     .collect();
                 foreign_keys.push(ForeignKeyTag {
+                    id: it.borrow_mut().new_id(),
+                    span: fk.span,
                     adj_model,
                     references,
                 });
@@ -332,6 +353,8 @@ fn map_model(
                     .map(|f| it.borrow_mut().intern(f, adj_scope.clone()))
                     .collect();
                 navigation_properties.push(NavigationTag {
+                    id: it.borrow_mut().new_id(),
+                    span: nav.span,
                     field,
                     adj_model,
                     fields: fields_refs,
@@ -346,23 +369,39 @@ fn map_model(
                 key_fields.push(it.borrow_mut().intern(n, model_scope.clone()));
             }
             ModelField::KvField(kv) => {
-                let field = it.borrow_mut().intern(kv.field, model_scope.clone());
+                let field = it
+                    .borrow_mut()
+                    .intern(kv.field.clone(), model_scope.clone());
                 let env_binding = it.borrow_mut().intern(kv.env_binding, IdScope::Env);
+                fields.push(SpannedTypedName {
+                    id: field,
+                    span: kv.span,
+                    name: kv.field,
+                    cidl_type: kv.cidl_type,
+                });
                 kvs.push(KvR2Tag {
+                    id: it.borrow_mut().new_id(),
                     field,
                     span: kv.span,
-                    cidl_type: kv.cidl_type,
                     format: kv.format,
                     env_binding,
                 });
             }
             ModelField::R2Field(r2) => {
-                let field = it.borrow_mut().intern(r2.field, model_scope.clone());
+                let field = it
+                    .borrow_mut()
+                    .intern(r2.field.clone(), model_scope.clone());
                 let env_binding = it.borrow_mut().intern(r2.env_binding, IdScope::Env);
+                fields.push(SpannedTypedName {
+                    id: field,
+                    span: r2.span,
+                    name: r2.field,
+                    cidl_type: r2.cidl_type,
+                });
                 r2s.push(KvR2Tag {
+                    id: it.borrow_mut().new_id(),
                     field,
                     span: r2.span,
-                    cidl_type: r2.cidl_type,
                     format: r2.format,
                     env_binding,
                 });

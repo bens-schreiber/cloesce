@@ -90,7 +90,13 @@ fn model_block_scalar() {
 
     let model = ast.models.first().expect("model to be present");
     assert_eq!(model.name, "Person");
-    assert_eq!(model.d1_binding.and_then(|b| it.name_of(b)), Some("d1_a"));
+    assert_eq!(
+        model
+            .d1_binding
+            .as_ref()
+            .and_then(|b| it.name_of(b.env_binding)),
+        Some("d1_a")
+    );
 
     assert_eq!(
         model
@@ -196,7 +202,13 @@ fn model_block_unique_constraints() {
     let unique_constraints: Vec<Vec<&str>> = foo
         .unique_constraints
         .iter()
-        .map(|constraint| constraint.iter().map(|&n| it.name_of(n).unwrap()).collect())
+        .map(|constraint| {
+            constraint
+                .fields
+                .iter()
+                .map(|&n| it.name_of(n).unwrap())
+                .collect()
+        })
         .collect();
 
     assert_eq!(unique_constraints, vec![vec!["a", "b", "c"], vec!["email"]]);
@@ -228,7 +240,12 @@ fn model_block_single_foreign_key() {
         .find(|m| m.name == "Dog")
         .expect("Dog model to be present");
 
-    assert_eq!(dog.d1_binding.and_then(|b| it.name_of(b)), Some("d1_a"));
+    assert_eq!(
+        dog.d1_binding
+            .as_ref()
+            .and_then(|b| it.name_of(b.env_binding)),
+        Some("d1_a")
+    );
 
     assert_eq!(dog.foreign_keys.len(), 1);
     let fk = &dog.foreign_keys[0];
@@ -273,7 +290,13 @@ fn model_block_composite_foreign_key() {
         .find(|m| m.name == "Child")
         .expect("Child model to be present");
 
-    assert_eq!(child.d1_binding.and_then(|b| it.name_of(b)), Some("d1_a"));
+    assert_eq!(
+        child
+            .d1_binding
+            .as_ref()
+            .and_then(|b| it.name_of(b.env_binding)),
+        Some("d1_a")
+    );
 
     assert_eq!(child.foreign_keys.len(), 1);
     let fk = &child.foreign_keys[0];

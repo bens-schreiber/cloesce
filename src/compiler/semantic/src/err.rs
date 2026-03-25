@@ -1,89 +1,141 @@
-pub type Result<T> = std::result::Result<T, CompilerErrorKind>;
+use ast::{FileSpan, SymbolRef};
+
 pub type BatchResult<T> = std::result::Result<T, Vec<CompilerErrorKind>>;
 
-#[derive(Debug, PartialEq, Eq, Clone, PartialOrd, Ord)]
+#[derive(Debug, Clone)]
 pub enum CompilerErrorKind {
     /// A symbol was defined more than once in the same scope.
-    DuplicateSymbol,
+    DuplicateSymbol {
+        symbol: SymbolRef,
+        first_span: FileSpan,
+        second_span: FileSpan,
+    },
 
     /// A symbol was referenced but not defined in any visible scope.
-    UnresolvedSymbol,
+    UnresolvedSymbol {
+        symbol: SymbolRef,
+    },
 
     /// A wrangler environment was defined more than once within the project.
-    MultipleWranglerEnvBlocks,
+    MultipleWranglerEnvBlocks {
+        first: SymbolRef,
+        second: SymbolRef,
+    },
 
     /// A model relies on a Wrangler environment block that is not defined within the project.
     MissingWranglerEnvBlock,
 
     /// An environment block has a binding that is inconsistent with the actual wrangler configuration.
-    WranglerBindingInconsistentWithSpec,
+    WranglerBindingInconsistentWithSpec {
+        binding: SymbolRef,
+    },
 
     /// A model with any columns or navigation properties requires a specific D1 binding to be specified.
-    D1ModelMissingD1Binding,
+    D1ModelMissingD1Binding {
+        model: SymbolRef,
+    },
 
     /// A model that specifies a D1 binding that does not resolve to an actual Wrangler D1 binding.
-    D1ModelInvalidD1Binding,
+    D1ModelInvalidD1Binding {
+        model: SymbolRef,
+        tag: SymbolRef,
+    },
 
     /// A model that specifies a D1 binding but does not specify a primary key.
-    D1ModelMissingPrimaryKey,
+    D1ModelMissingPrimaryKey {
+        model: SymbolRef,
+    },
 
     /// A column in a D1 model can only be a SQLite type
-    InvalidColumnType,
+    InvalidColumnType {
+        column: SymbolRef,
+    },
 
     /// A primary key column in a D1 model cannot be nullable
-    NullablePrimaryKey,
+    NullablePrimaryKey {
+        column: SymbolRef,
+    },
 
     /// A foreign key in a D1 model cannot reference it's own model
-    ForeignKeyReferenceSelf,
+    ForeignKeyReferenceSelf {
+        model: SymbolRef,
+        foreign_key: SymbolRef,
+    },
 
     /// A foreign key references a model in a different database (i.e. one with a different D1 binding)
-    ForeignKeyReferencesDifferentDatabase,
+    ForeignKeyReferencesDifferentDatabase {
+        tag: SymbolRef,
+        binding: SymbolRef,
+    },
 
-    ForeignKeyReferencesInvalidOrUnknownColumn,
+    ForeignKeyReferencesInvalidOrUnknownColumn {
+        tag: SymbolRef,
+        column: SymbolRef,
+    },
+
+    /// A foreign key can only be to a single adjacent model
+    ForeignKeyReferencesMultipleModels {
+        tag: SymbolRef,
+        first_model: SymbolRef,
+        second_model: SymbolRef,
+    },
 
     /// A foreign key must reference a column of the same type (e.g. you can't reference an Integer column from a String column)
-    ForeignKeyReferencesIncompatibleColumnType,
+    ForeignKeyReferencesIncompatibleColumnType {
+        tag: SymbolRef,
+        column: SymbolRef,
+        adj_column: SymbolRef,
+    },
 
     /// All columns involved in a foreign key must be consistently nullable or non-nullable
-    ForeignKeyInconsistentNullability,
+    ForeignKeyInconsistentNullability {
+        tag: SymbolRef,
+        first_column: SymbolRef,
+        second_column: SymbolRef,
+    },
 
-    ForeignKeyReferencesNonD1Model,
+    ForeignKeyReferencesNonD1Model {
+        tag: SymbolRef,
+        model: SymbolRef,
+    },
 
     /// A column in a D1 model can only participate in a single foreign key relationship
-    ForeignKeyColumnAlreadyInForeignKey,
+    ForeignKeyColumnAlreadyInForeignKey {
+        tag: SymbolRef,
+        column: SymbolRef,
+    },
 
-    NavigationPropertyReferencesInvalidOrUnknownColumn,
+    NavigationPropertyReferencesInvalidOrUnknownField {
+        tag: SymbolRef,
+        field: SymbolRef,
+    },
 
-    NavigationPropertyReferencesSelf,
-    // UnknownBinding,
-    // MultipleWranglerEnvs,
-    // NullSqlType,
-    // NullPrimaryKey,
-    // InvalidSqlType,
-    // UnknownObject,
-    // UnexpectedVoid,
-    // UnexpectedInject,
-    // NotYetSupported,
-    // InvalidMapping,
-    // MissingPrimaryKey,
-    // MismatchedForeignKeyTypes,
-    // MismatchedNavigationPropertyTypes,
-    // InvalidNavigationPropertyReference,
-    // CyclicalDependency,
-    // UnknownIncludeTreeReference,
-    // UnknownDataSourceReference,
-    // InvalidDataSourceReference,
-    // ExtraneousManyToManyReferences,
-    // MissingManyToManyReference,
-    // MissingWranglerEnv,
-    // InconsistentWranglerBinding,
-    // InvalidStream,
-    // InvalidModelReference,
-    // InvalidKeyFormat,
-    // UnknownKeyReference,
-    // UnsupportedCrudOperation,
-    // UnknownCompositeKeyReference,
-    // InvalidCompositeKey,
+    NavigationPropertyReferencesSelf {
+        model: SymbolRef,
+        tag: SymbolRef,
+    },
+
+    NavigationPropertyReferencesDifferentDatabase {
+        tag: SymbolRef,
+        binding: SymbolRef,
+    },
+
+    NavigationPropertyReferencesNonD1Model {
+        tag: SymbolRef,
+        model: SymbolRef,
+    },
+
+    /// A many-to-many navigation property requires exactly one reciprocal M2M nav on the adjacent model, but none was found.
+    NavigationPropertyMissingReciprocalM2M {
+        tag: SymbolRef,
+    },
+
+    /// A many-to-many navigation property found multiple reciprocal M2M navs on the adjacent model.
+    NavigationPropertyAmbiguousM2M {
+        tag: SymbolRef,
+        first_m2m_nav: SymbolRef,
+        second_m2m_nav: SymbolRef,
+    },
 }
 
 #[derive(Debug, Default)]
@@ -108,6 +160,10 @@ impl ErrorSink {
         std::mem::take(&mut self.errors)
     }
 
+    pub fn extend(&mut self, other: Vec<CompilerErrorKind>) {
+        self.errors.extend(other);
+    }
+
     /// Push a fatal error, drain everything, and return as Err payload
     pub fn bail(&mut self, kind: CompilerErrorKind) -> Vec<CompilerErrorKind> {
         self.push(kind);
@@ -124,27 +180,9 @@ impl ErrorSink {
     }
 }
 
-/// A fatal error that immediately returns from the current function with Err
-#[macro_export]
-macro_rules! bail {
-    ($kind:expr) => {
-        return Err($kind)
-    };
-}
-
-/// If the condition is false, pushes a fatal error into the sink and returns Err immediately
-#[macro_export]
-macro_rules! ensure_bail {
-    ($cond:expr, $sink:expr, $kind:expr) => {
-        if !$cond {
-            return Err($sink.bail($kind));
-        }
-    };
-}
-
 /// If the condition is false, pushes an error into the sink but continues execution
 #[macro_export]
-macro_rules! ensure_sink {
+macro_rules! ensure {
     ($cond:expr, $sink:expr, $kind:expr) => {
         if !$cond {
             $sink.push($kind)

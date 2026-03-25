@@ -1,8 +1,40 @@
+#![allow(unused_variables)]
+
 use std::collections::HashMap;
 
-use ast::{D1Database, KVNamespace, R2Bucket, WranglerSpec};
+use ast::{D1Database, KVNamespace, R2Bucket, SymbolKind, WranglerEnvBindingKind, WranglerSpec};
 use compiler_test::lex_and_parse;
 use semantic::{SemanticAnalysis, err::CompilerErrorKind};
+
+/// Find exactly one error matching the pattern. Panics if not found.
+/// Destructure with `=> expr` to extract fields in one step.
+macro_rules! expect_err {
+    ($errors:expr, $pat:pat) => {
+        $errors
+            .iter()
+            .find(|e| matches!(e, $pat))
+            .unwrap_or_else(|| {
+                panic!(
+                    "expected error matching `{}`, got: {:#?}",
+                    stringify!($pat),
+                    $errors
+                )
+            })
+    };
+    ($errors:expr, $pat:pat => $result:expr) => {{
+        let __found = expect_err!($errors, $pat);
+        match __found {
+            $pat => $result,
+            _ => unreachable!(),
+        }
+    }};
+}
+
+macro_rules! count_errs {
+    ($errors:expr, $pat:pat) => {
+        $errors.iter().filter(|e| matches!(e, $pat)).count()
+    };
+}
 
 // TODO: use wrangler defaults
 fn create_spec() -> WranglerSpec {
@@ -33,7 +65,7 @@ fn with_env(src: &str) -> String {
         r#"
         env {{
             my_d1: d1
-            my_kv: kv 
+            my_kv: kv
             my_r2: r2
         }}
 
@@ -41,14 +73,6 @@ fn with_env(src: &str) -> String {
     "#,
         src
     )
-}
-
-fn assert_errors_eq(got: Vec<CompilerErrorKind>, expected: Vec<CompilerErrorKind>) {
-    let mut got_sorted = got.clone();
-    got_sorted.sort();
-    let mut expected_sorted = expected.clone();
-    expected_sorted.sort();
-    assert_eq!(got_sorted, expected_sorted);
 }
 
 #[test]
@@ -61,13 +85,21 @@ fn multiple_wrangler_env_blocks() {
     let parse = lex_and_parse(src);
 
     // Act
-    let res = SemanticAnalysis::analyze(parse, &create_spec());
+    let (ast, errors) = SemanticAnalysis::analyze(parse, &create_spec());
 
     // Assert
-    assert_eq!(
-        res.unwrap_err(),
-        vec![CompilerErrorKind::MultipleWranglerEnvBlocks]
+    assert_eq!(errors.len(), 1);
+    let (first, second) = expect_err!(errors,
+        CompilerErrorKind::MultipleWranglerEnvBlocks { first, second } => (*first, *second)
     );
+    assert!(matches!(
+        ast.table.kind(first),
+        Some(SymbolKind::WranglerEnvDecl)
+    ));
+    assert!(matches!(
+        ast.table.kind(second),
+        Some(SymbolKind::WranglerEnvDecl)
+    ));
 }
 
 #[test]
@@ -79,13 +111,11 @@ fn missing_wrangler_env_block() {
     let parse = lex_and_parse(src);
 
     // Act
-    let res = SemanticAnalysis::analyze(parse, &create_spec());
+    let (_table, errors) = SemanticAnalysis::analyze(parse, &create_spec());
 
     // Assert
-    assert_eq!(
-        res.unwrap_err(),
-        vec![CompilerErrorKind::MissingWranglerEnvBlock]
-    );
+    assert_eq!(errors.len(), 1);
+    expect_err!(errors, CompilerErrorKind::MissingWranglerEnvBlock);
 }
 
 #[test]
@@ -94,7 +124,7 @@ fn wrangler_binding_inconsistent_with_spec() {
     let src = r#"
         env {
             my_d1: d1
-            my_kv: kv 
+            my_kv: kv
             my_r2: r2
             other_d1: d1 // NOT consistent with the spec
         }
@@ -102,13 +132,20 @@ fn wrangler_binding_inconsistent_with_spec() {
     let parse = lex_and_parse(src);
 
     // Act
-    let res = SemanticAnalysis::analyze(parse, &create_spec());
+    let (ast, errors) = SemanticAnalysis::analyze(parse, &create_spec());
 
     // Assert
-    assert_eq!(
-        res.unwrap_err(),
-        vec![CompilerErrorKind::WranglerBindingInconsistentWithSpec]
+    assert_eq!(errors.len(), 1);
+    let binding = expect_err!(errors,
+        CompilerErrorKind::WranglerBindingInconsistentWithSpec { binding } => *binding
     );
+    assert_eq!(ast.table.name(binding), "other_d1");
+    assert!(matches!(
+        ast.table.kind(binding),
+        Some(SymbolKind::WranglerEnvBinding {
+            kind: WranglerEnvBindingKind::D1
+        })
+    ));
 }
 
 #[test]
@@ -117,7 +154,7 @@ fn wrangler_duplicate_symbol() {
     let src = r#"
         env {
             my_d1: d1
-            my_kv: kv 
+            my_kv: kv
             my_r2: r2
             my_d1: d1 // duplicate symbol
         }
@@ -125,10 +162,20 @@ fn wrangler_duplicate_symbol() {
     let parse = lex_and_parse(src);
 
     // Act
-    let res = SemanticAnalysis::analyze(parse, &create_spec());
+    let (ast, errors) = SemanticAnalysis::analyze(parse, &create_spec());
 
     // Assert
-    assert_eq!(res.unwrap_err(), vec![CompilerErrorKind::DuplicateSymbol]);
+    assert_eq!(errors.len(), 1);
+    let symbol = expect_err!(errors,
+        CompilerErrorKind::DuplicateSymbol { symbol, .. } => *symbol
+    );
+    assert_eq!(ast.table.name(symbol), "my_d1");
+    assert!(matches!(
+        ast.table.kind(symbol),
+        Some(SymbolKind::WranglerEnvBinding {
+            kind: WranglerEnvBindingKind::D1
+        })
+    ));
 }
 
 #[test]
@@ -154,17 +201,26 @@ fn d1_model_basic_errors() {
     let parse = lex_and_parse(&src);
 
     // Act
-    let res = SemanticAnalysis::analyze(parse, &create_spec());
+    let (ast, errors) = SemanticAnalysis::analyze(parse, &create_spec());
 
     // Assert
-    assert_errors_eq(
-        res.unwrap_err(),
-        vec![
-            CompilerErrorKind::UnresolvedSymbol,
-            CompilerErrorKind::D1ModelMissingPrimaryKey,
-            CompilerErrorKind::D1ModelMissingD1Binding,
-        ],
+    assert_eq!(errors.len(), 3);
+
+    // User has @d1 but no primary key
+    let model = expect_err!(errors,
+        CompilerErrorKind::D1ModelMissingPrimaryKey { model } => *model
     );
+    assert_eq!(ast.table.name(model), "User");
+    assert!(matches!(ast.table.kind(model), Some(SymbolKind::ModelDecl)));
+
+    // Post references @d1(other_d1) which is not in the env block
+    expect_err!(errors, CompilerErrorKind::UnresolvedSymbol { .. });
+
+    // Comment has fields but no @d1 binding
+    let model = expect_err!(errors,
+        CompilerErrorKind::D1ModelMissingD1Binding { model } => *model
+    );
+    assert_eq!(ast.table.name(model), "Comment");
 }
 
 #[test]
@@ -183,7 +239,6 @@ fn d1_model_column_fk_errors() {
             [primary id]
             id: Option<int> // primary key cannot be nullable
             id: int // duplicate symbol
-            name: Object // invalid column type
             value: int
             str_value: string
 
@@ -192,6 +247,7 @@ fn d1_model_column_fk_errors() {
             [foreign value -> User::id] // foreign key cannot reference same model
             [foreign value -> NonD1Model::id] // foreign key references non-d1 model
             [foreign value -> OtherD1Model::id] // foreign key references model in different database
+            [foreign doesNotExist -> Post::id] // foreign key column does not exist
         }
 
         @d1(my_d1)
@@ -215,26 +271,67 @@ fn d1_model_column_fk_errors() {
         database_id: None,
         migrations_dir: None,
     });
-
     let parse = lex_and_parse(src);
 
     // Act
-    let res = SemanticAnalysis::analyze(parse, &spec);
+    let (ast, errors) = SemanticAnalysis::analyze(parse, &spec);
 
     // Assert
-    assert_errors_eq(
-        res.unwrap_err(),
-        vec![
-            CompilerErrorKind::NullablePrimaryKey,
-            CompilerErrorKind::DuplicateSymbol,
-            CompilerErrorKind::InvalidColumnType,
-            CompilerErrorKind::ForeignKeyReferencesInvalidOrUnknownColumn,
-            CompilerErrorKind::ForeignKeyReferencesIncompatibleColumnType,
-            CompilerErrorKind::ForeignKeyReferenceSelf,
-            CompilerErrorKind::ForeignKeyReferencesNonD1Model,
-            CompilerErrorKind::ForeignKeyReferencesDifferentDatabase,
-        ],
+    assert_eq!(errors.len(), 8);
+
+    // Variant counts for repeated errors
+    assert_eq!(
+        count_errs!(
+            errors,
+            CompilerErrorKind::ForeignKeyReferencesInvalidOrUnknownColumn { .. }
+        ),
+        2
     );
+
+    // Nullable primary key: id is Option<int>
+    let column = expect_err!(errors,
+        CompilerErrorKind::NullablePrimaryKey { column } => *column
+    );
+    assert_eq!(ast.table.name(column), "id");
+    assert!(matches!(
+        ast.table.kind(column),
+        Some(SymbolKind::ModelField { .. })
+    ));
+
+    // Duplicate symbol: id declared twice
+    let symbol = expect_err!(errors,
+        CompilerErrorKind::DuplicateSymbol { symbol, .. } => *symbol
+    );
+    assert_eq!(ast.table.name(symbol), "id");
+
+    // FK incompatible type: str_value (string) -> Post::id (int)
+    let (column, adj_column) = expect_err!(errors,
+        CompilerErrorKind::ForeignKeyReferencesIncompatibleColumnType { column, adj_column, .. } => (*column, *adj_column)
+    );
+    assert_eq!(ast.table.name(column), "str_value");
+    assert_eq!(ast.table.name(adj_column), "id");
+
+    // FK references self
+    let (model, foreign_key) = expect_err!(errors,
+        CompilerErrorKind::ForeignKeyReferenceSelf { model, foreign_key } => (*model, *foreign_key)
+    );
+    assert_eq!(ast.table.name(model), "User");
+    assert!(matches!(
+        ast.table.kind(foreign_key),
+        Some(SymbolKind::ModelForeignKeyTag { .. })
+    ));
+
+    // FK references non-D1 model
+    let model = expect_err!(errors,
+        CompilerErrorKind::ForeignKeyReferencesNonD1Model { model, .. } => *model
+    );
+    assert_eq!(ast.table.name(model), "NonD1Model");
+
+    // FK references different database
+    let binding = expect_err!(errors,
+        CompilerErrorKind::ForeignKeyReferencesDifferentDatabase { binding, .. } => *binding
+    );
+    assert_eq!(ast.table.name(binding), "other_d1");
 }
 
 #[test]
@@ -263,17 +360,18 @@ fn d1_model_consistent_nullability_error() {
             title: string
         }
     "#;
-
     let parse = lex_and_parse(src);
 
     // Act
-    let res = SemanticAnalysis::analyze(parse, &create_spec());
+    let (ast, errors) = SemanticAnalysis::analyze(parse, &create_spec());
 
     // Assert
-    assert_errors_eq(
-        res.unwrap_err(),
-        vec![CompilerErrorKind::ForeignKeyInconsistentNullability],
+    assert_eq!(errors.len(), 1);
+    let (first_column, second_column) = expect_err!(errors,
+        CompilerErrorKind::ForeignKeyInconsistentNullability { first_column, second_column, .. } => (*first_column, *second_column)
     );
+    assert_eq!(ast.table.name(first_column), "postId");
+    assert_eq!(ast.table.name(second_column), "name");
 }
 
 #[test]
@@ -301,11 +399,85 @@ fn d1_model_fk_column_already_in_foreign_key() {
     let parse = lex_and_parse(&src);
 
     // Act
-    let res = SemanticAnalysis::analyze(parse, &create_spec());
+    let (ast, errors) = SemanticAnalysis::analyze(parse, &create_spec());
 
     // Assert
-    assert_errors_eq(
-        res.unwrap_err(),
-        vec![CompilerErrorKind::ForeignKeyColumnAlreadyInForeignKey],
+    assert_eq!(errors.len(), 1);
+    let column = expect_err!(errors,
+        CompilerErrorKind::ForeignKeyColumnAlreadyInForeignKey { column, .. } => *column
     );
+    assert_eq!(ast.table.name(column), "postId");
+    assert!(matches!(
+        ast.table.kind(column),
+        Some(SymbolKind::ModelField { .. })
+    ));
+}
+
+#[test]
+fn d1_model_nav_errors() {
+    // Arrange
+    let src = r#"
+        env {
+            my_d1: d1
+            other_d1: d1
+        }
+
+        @d1(my_d1)
+        model User {
+            [primary id]
+            id: int
+
+            postNav: Post
+
+            [nav unknown -> Post::id] // profile is not a declared field
+            [nav postNav -> User::id] // self reference
+            [nav postNav -> NonD1Model::id] // references non-D1 model
+            [nav postNav -> DifferentDatabaseModel::id] // references model in different database
+        }
+
+        @d1(my_d1)
+        model Post {
+            [primary id]
+            id: int
+        }
+
+        model NonD1Model {
+            id: int
+        }
+
+        @d1(other_d1)
+        model DifferentDatabaseModel {
+            [primary id]
+            id: int
+        }
+    "#;
+    let mut spec = create_spec();
+    spec.d1_databases.push(D1Database {
+        binding: Some("other_d1".into()),
+        database_name: None,
+        database_id: None,
+        migrations_dir: None,
+    });
+    let parse = lex_and_parse(&src);
+
+    // Act
+    let (ast, errors) = SemanticAnalysis::analyze(parse, &spec);
+
+    // Assert
+    assert_eq!(errors.len(), 4);
+    let unknown_id = expect_err!(errors, CompilerErrorKind::UnresolvedSymbol { symbol: unknown_id } => *unknown_id);
+    assert!(matches!(
+        ast.table.kind(unknown_id),
+        Some(SymbolKind::ModelNavigationTag { .. })
+    ));
+
+    let self_ref_model = expect_err!(errors,
+        CompilerErrorKind::NavigationPropertyReferencesSelf { model, .. } => *model
+    );
+    assert_eq!(ast.table.name(self_ref_model), "User");
+
+    let non_d1_model = expect_err!(errors,
+        CompilerErrorKind::NavigationPropertyReferencesNonD1Model { model, .. } => *model
+    );
+    assert_eq!(ast.table.name(non_d1_model), "NonD1Model");
 }

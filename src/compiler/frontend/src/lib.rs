@@ -66,6 +66,9 @@ pub struct DataSourceBlock {
 }
 
 pub struct NavigationTag {
+    pub id: ParseId,
+    pub span: SimpleSpan,
+
     /// The field on the current model that represents the relationship
     pub field: ParseId,
 
@@ -79,19 +82,38 @@ pub struct NavigationTag {
 }
 
 pub struct ForeignKeyTag {
+    pub id: ParseId,
+    pub span: SimpleSpan,
+
     pub adj_model: ParseId,
     pub references: Vec<(ParseId, ParseId)>, // (current model field, adjacent model field)
 }
 
 pub struct KvR2Tag {
-    pub field: ParseId,
+    pub id: ParseId,
     pub span: SimpleSpan,
-    pub cidl_type: CidlType,
+
+    pub field: ParseId,
 
     /// Key format e.g. "users/{id}/profile.jpg"
     pub format: String,
 
     /// The symbol of the environment variable binding the KV namespace
+    pub env_binding: ParseId,
+}
+
+pub struct UniqueTag {
+    pub id: ParseId,
+    pub span: SimpleSpan,
+
+    pub fields: Vec<ParseId>,
+}
+
+pub struct D1Tag {
+    pub id: ParseId,
+    pub span: SimpleSpan,
+
+    /// The symbol of the environment variable binding the D1 database
     pub env_binding: ParseId,
 }
 
@@ -104,9 +126,9 @@ pub struct ModelBlock {
     pub fields: Vec<SpannedTypedName>,
 
     pub primary_keys: Vec<ParseId>,
-    pub d1_binding: Option<ParseId>,
+    pub d1_binding: Option<D1Tag>,
     pub key_fields: Vec<ParseId>,
-    pub unique_constraints: Vec<Vec<ParseId>>,
+    pub unique_constraints: Vec<UniqueTag>,
     pub kvs: Vec<KvR2Tag>,
     pub r2s: Vec<KvR2Tag>,
 
