@@ -141,7 +141,12 @@ impl ModelAnalysis {
         let mut unique_info: HashMap<String, Vec<usize>> = HashMap::new();
 
         for field in &model_block.fields {
-            if !is_valid_sql_type(&field.cidl_type) {
+            if !is_valid_sql_type(&field.cidl_type)
+                || model_block
+                    .key_fields
+                    .iter()
+                    .any(|kf| kf.field == field.name)
+            {
                 continue;
             }
             column_names.insert(field.name.clone());
@@ -779,9 +784,17 @@ impl ModelAnalysis {
                 continue;
             };
 
+            // Always wrap in KvObject
+            let cidl_type = match &field_sym.cidl_type {
+                CidlType::Paginated(inner) => {
+                    CidlType::paginated(CidlType::KvObject(inner.clone()))
+                }
+                _ => CidlType::KvObject(Box::new(field_sym.cidl_type.clone())),
+            };
+
             model.kv_fields.push(KvR2Field {
                 name: field_sym.name.clone(),
-                cidl_type: field_sym.cidl_type.clone(),
+                cidl_type,
                 format: kv.format.clone(),
                 binding: binding_name.unwrap_or_default(),
                 list_prefix: false,

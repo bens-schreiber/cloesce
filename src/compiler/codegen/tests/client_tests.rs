@@ -1,4 +1,5 @@
-use compiler_test::src_to_ast;
+use codegen::{client::ClientGenerator, workers::WorkersGenerator};
+use compiler_test::{SemanticResult, src_to_ast};
 
 #[test]
 fn test_client_code_generation_snapshot() {
@@ -84,7 +85,7 @@ fn test_client_code_generation_snapshot() {
         }
 
         api ModelWithCompositePkApi for ModelWithCompositePk {
-            post instanceMethod(input: string) -> string
+            post instanceMethod(self, input: string) -> string
         }
 
         model ModelWithKv {
@@ -105,11 +106,11 @@ fn test_client_code_generation_snapshot() {
         }
 
         api ModelWithKvApi for ModelWithKv {
-            post instanceMethod(input: string) -> string
+            post instanceMethod(self, input: string) -> string
             get staticMethod(input: int) -> int
-            post hasKvParamAndRes(input: KvObject<string>) -> KvObject<string>
+            post hasKvParamAndRes(self, input: KvObject<string>) -> KvObject<string>
         }
-
+        
         model ModelWithR2 {
             @keyparam
             id: string
@@ -122,9 +123,7 @@ fn test_client_code_generation_snapshot() {
         }
 
         api ModelWithR2Api for ModelWithR2 {
-            post instanceMethod(input: string) -> string
-            get staticMethod(input: int) -> int
-            post hasR2ParamAndRes(input: R2Object) -> R2Object
+            post hasR2ParamAndRes(self, input: R2Object) -> R2Object
         }
 
         @d1(db)
@@ -143,6 +142,10 @@ fn test_client_code_generation_snapshot() {
 
             @r2(my_r2, "{modelYear}/photos")
             photoData: R2Object
+        }
+        
+        api ToyotaPriusApi for ToyotaPrius {
+             post instanceMethod(self, input: string) -> string
         }
 
         source WithKv for ToyotaPrius {
@@ -168,10 +171,10 @@ fn test_client_code_generation_snapshot() {
 
         service BasicService {}
         api BasicServiceApi for BasicService {
-            post instanceMethod(input: string) -> string
-            get staticMethod(input: int) -> int
-            post hasStreamParam(input: stream) -> string
-            get hasStreamRes() -> stream
+            get downloadData() -> stream
+            post instanceMethod(input: int) -> int
+            get staticMethod(input: string) -> string
+            post uploadData(data: stream) -> bool
         }
 
         poo BasicPoo {
@@ -185,7 +188,10 @@ fn test_client_code_generation_snapshot() {
         }
     
     "#;
-    src_to_ast(src);
+    const WORKERS_URL: &str = "http://example.com/path/to/api";
+    let SemanticResult { mut ast, .. } = src_to_ast(src);
+    WorkersGenerator::generate(&mut ast, WORKERS_URL);
 
-    // let client_code = ClientGenerator::generate(&ast, "http://example.com/path/to/api");
+    let client_code = ClientGenerator::generate(&ast, WORKERS_URL);
+    insta::assert_snapshot!(client_code);
 }

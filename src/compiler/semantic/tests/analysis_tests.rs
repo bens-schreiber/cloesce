@@ -992,3 +992,29 @@ fn service_errors() {
         2
     );
 }
+
+#[test]
+fn service_collects_api_blocks() {
+    // Arrange
+    let src = r#"
+        service MyService {}
+        api FirstApi for MyService {
+            post firstMethod() -> string
+        }
+
+        api SecondApi for MyService {
+            get secondMethod() -> string
+        }
+    "#;
+
+    // Act
+    let parse = lex_and_parse(src);
+    let (result, errors) = SemanticAnalysis::analyze(parse);
+    assert_eq!(errors.len(), 0);
+
+    // Assert
+    let service = result.ast.services.get("MyService").unwrap();
+    assert_eq!(service.apis.len(), 2);
+    assert!(service.apis.iter().any(|api| api.name == "FirstApi"));
+    assert!(service.apis.iter().any(|api| api.name == "SecondApi"));
+}

@@ -185,12 +185,14 @@ impl SemanticAnalysis {
         let poos = Self::poos(&parse, &table, &mut sink);
         let api_map = Self::apis(&parse, &table, &mut sink);
         let data_source_map = Self::data_sources(&parse, &models, &table, &mut sink);
-        let services = Self::services(&parse, &table, &mut sink);
+        let mut services = Self::services(&parse, &table, &mut sink);
 
         // Merge API methods into their respective models
-        for (model_name, api) in api_map {
-            if let Some(model) = models.get_mut(&model_name) {
+        for (namespace, api) in api_map {
+            if let Some(model) = models.get_mut(&namespace) {
                 model.apis.push(api);
+            } else if let Some(service) = services.get_mut(&namespace) {
+                service.apis.push(api);
             }
         }
 

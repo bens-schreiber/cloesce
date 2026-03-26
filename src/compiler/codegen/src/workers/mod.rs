@@ -181,7 +181,16 @@ impl WorkersGenerator {
     }
 
     fn default_data_source(model: &Model, tree: IncludeTree, ast: &CloesceAst) -> DataSource {
-        let include_sql = SelectModel::query(&model.name, None, Some(tree.clone()), ast).unwrap();
+        let Ok(include_sql) = SelectModel::query(&model.name, None, Some(tree.clone()), ast) else {
+            // Model doesn't have any D1 fields, no SQL needed.
+            return DataSource {
+                name: "default".into(),
+                tree,
+                is_private: false,
+                list: None,
+                get: None,
+            };
+        };
 
         let list = {
             // The list method does a seek by primary key approach to pagination.

@@ -1,5 +1,5 @@
 ---
-source: client/tests/snaphot_tests.rs
+source: codegen/tests/client_tests.rs
 expression: client_code
 ---
 // GENERATED CODE. DO NOT MODIFY.
@@ -131,15 +131,15 @@ export class HasOneToOne {
 }
 export class HasSqlColumnTypes {
   id: number;
-  string: string;
+  str: string;
   integer: number;
-  real: number;
-  boolean: boolean;
-  date: Date;
-  stringNull: string | null;
+  dub: number;
+  boo: boolean;
+  dat: Date;
+  strNull: string | null;
   integerNull: number | null;
-  realNull: number | null;
-  booleanNull: boolean | null;
+  dubNull: number | null;
+  booNull: boolean | null;
   dateNull: Date | null;
 
 
@@ -184,8 +184,6 @@ export class ModelWithCompositePk {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<string>> {
     const id = [
-    encodeURIComponent(String(this.tenantId)),
-    encodeURIComponent(String(this.rowId)),
     ].join("/");
     const baseUrl = new URL(
       `http://example.com/path/to/api/ModelWithCompositePk/${id}/instanceMethod`
@@ -240,6 +238,32 @@ export class ModelWithCruds {
       false
     );
   }
+  static async SAVE(
+    model: DeepPartial<ModelWithCruds>,
+    __datasource: "default" = "default",
+    fetchImpl: typeof fetch = fetch
+  ): Promise<HttpResult<ModelWithCruds>> {
+    const baseUrl = new URL(
+      `http://example.com/path/to/api/ModelWithCruds/SAVE`
+    );
+    const payload: any = {};
+
+    payload["model"] = model;
+    baseUrl.searchParams.append("__datasource", String(__datasource));
+
+    const res = await fetchImpl(baseUrl, {
+      method: "Post",
+      headers: { "Content-Type": "application/json" },
+      body: requestBody(MediaType.Json, payload),
+    });
+
+    return await HttpResult.fromResponse(
+      res,
+      MediaType.Json,
+      ModelWithCruds,
+      false
+    );
+  }
   static async LIST(
     lastSeen_id: number | null,
     limit: number | null,
@@ -267,32 +291,6 @@ export class ModelWithCruds {
       true
     );
   }
-  static async SAVE(
-    model: DeepPartial<ModelWithCruds>,
-    __datasource: "default" = "default",
-    fetchImpl: typeof fetch = fetch
-  ): Promise<HttpResult<ModelWithCruds>> {
-    const baseUrl = new URL(
-      `http://example.com/path/to/api/ModelWithCruds/SAVE`
-    );
-    const payload: any = {};
-
-    payload["model"] = model;
-    baseUrl.searchParams.append("__datasource", String(__datasource));
-
-    const res = await fetchImpl(baseUrl, {
-      method: "Post",
-      headers: { "Content-Type": "application/json" },
-      body: requestBody(MediaType.Json, payload),
-    });
-
-    return await HttpResult.fromResponse(
-      res,
-      MediaType.Json,
-      ModelWithCruds,
-      false
-    );
-  }
 
   static fromJson(data: any): ModelWithCruds {
     const res = Object.assign(new ModelWithCruds(), data);
@@ -306,41 +304,11 @@ export class ModelWithKv {
   manyValues: Paginated<KValue<unknown>>;
   streamValue: KValue<void>;
 
-  async hasKvParamAndRes(
-    input: KValue<string>,
-    fetchImpl: typeof fetch = fetch
-  ): Promise<HttpResult<KValue<string>>> {
-    const id = [
-      encodeURIComponent(String(this.id1)),
-      encodeURIComponent(String(this.id2)),
-    ].join("/");
-    const baseUrl = new URL(
-      `http://example.com/path/to/api/ModelWithKv/${id}/hasKvParamAndRes`
-    );
-    const payload: any = {};
-
-    payload["input"] = input;
-
-    const res = await fetchImpl(baseUrl, {
-      method: "Post",
-      headers: { "Content-Type": "application/json" },
-      body: requestBody(MediaType.Json, payload),
-    });
-
-    return await HttpResult.fromResponse(
-      res,
-      MediaType.Json,
-      undefined,
-      false
-    );
-  }
   async instanceMethod(
     input: string,
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<string>> {
     const id = [
-      encodeURIComponent(String(this.id1)),
-      encodeURIComponent(String(this.id2)),
     ].join("/");
     const baseUrl = new URL(
       `http://example.com/path/to/api/ModelWithKv/${id}/instanceMethod`
@@ -383,6 +351,32 @@ export class ModelWithKv {
       false
     );
   }
+  async hasKvParamAndRes(
+    input: KValue<string>,
+    fetchImpl: typeof fetch = fetch
+  ): Promise<HttpResult<KValue<string>>> {
+    const id = [
+    ].join("/");
+    const baseUrl = new URL(
+      `http://example.com/path/to/api/ModelWithKv/${id}/hasKvParamAndRes`
+    );
+    const payload: any = {};
+
+    payload["input"] = input;
+
+    const res = await fetchImpl(baseUrl, {
+      method: "Post",
+      headers: { "Content-Type": "application/json" },
+      body: requestBody(MediaType.Json, payload),
+    });
+
+    return await HttpResult.fromResponse(
+      res,
+      MediaType.Json,
+      undefined,
+      false
+    );
+  }
 
   static fromJson(data: any): ModelWithKv {
     const res = Object.assign(new ModelWithKv(), data);
@@ -392,13 +386,11 @@ export class ModelWithKv {
         res.manyValues.results[i] = Object.assign(new KValue<unknown>(), res.manyValues.results[i]);
       }
     }
-    
     return res;
   }
 }
 export class ModelWithR2 {
-  id: number;
-  r2Id: string;
+  id: string;
   fileData: R2Object;
   manyFileDatas: Paginated<R2Object>;
 
@@ -407,8 +399,6 @@ export class ModelWithR2 {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<R2Object>> {
     const id = [
-    encodeURIComponent(String(this.id)),
-      encodeURIComponent(String(this.r2Id)),
     ].join("/");
     const baseUrl = new URL(
       `http://example.com/path/to/api/ModelWithR2/${id}/hasR2ParamAndRes`
@@ -456,9 +446,9 @@ export class OneToManyModel {
 }
 export class ToyotaPrius {
   id: number;
-  modelYear: number;
   ownerId: string;
-  vehicleId: string;
+  modelYear: number;
+  someKey: string;
   metadata: KValue<unknown>;
   photoData: R2Object;
 
@@ -467,9 +457,6 @@ export class ToyotaPrius {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<string>> {
     const id = [
-    encodeURIComponent(String(this.id)),
-      encodeURIComponent(String(this.ownerId)),
-      encodeURIComponent(String(this.vehicleId)),
     ].join("/");
     const baseUrl = new URL(
       `http://example.com/path/to/api/ToyotaPrius/${id}/instanceMethod`

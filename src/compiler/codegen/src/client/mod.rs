@@ -17,6 +17,7 @@ macro_rules! cidl_type_contains {
                 CidlType::Array(inner)
                 | CidlType::Nullable(inner)
                 | CidlType::HttpResult(inner)
+                | CidlType::KvObject(inner)
                 | CidlType::Paginated(inner) => {
                     if matches!(cur, $pattern) {
                         break true;
@@ -61,7 +62,18 @@ handlebars_helper!(is_blob_array: |cidl_type: CidlType| matches!(cidl_type.root_
 // True for any [CidlType::DataSource] or given the verb [HttpVerb::GET]
 handlebars_helper!(is_url_param: |cidl_type: CidlType, verb: HttpVerb| matches!(verb, HttpVerb::Get) || matches!(cidl_type, CidlType::DataSource { .. }));
 handlebars_helper!(is_stream: |cidl_type: CidlType| matches!(cidl_type.root_type(), CidlType::Stream));
-handlebars_helper!(is_some: |val: Value| !val.is_null());
+handlebars_helper!(contains_stream: |cidl_type: CidlType| cidl_type_contains!(&cidl_type, CidlType::Stream));
+handlebars_helper!(is_paginated: |cidl_type: CidlType| matches!(cidl_type, CidlType::Paginated(_)));
+
+// For KvObject or Paginated<KvObject<T>>, returns the CidlType of T (the inner type of KvObject)
+handlebars_helper!(kv_inner_cidl_type: |cidl_type: CidlType| match &cidl_type {
+    CidlType::KvObject(inner) => serde_json::to_value(inner.as_ref()).unwrap(),
+    CidlType::Paginated(inner) => match inner.as_ref() {
+        CidlType::KvObject(inner) => serde_json::to_value(inner.as_ref()).unwrap(),
+        _ => serde_json::to_value(&cidl_type).unwrap(),
+    },
+    _ => serde_json::to_value(&cidl_type).unwrap(),
+});
 
 const TYPESCRIPT_TEMPLATE: &str = include_str!("./templates/ts.hbs");
 const TEMPLATE_STRING: &str = "client_api";
@@ -112,7 +124,9 @@ fn register_helpers<'a>(
         ("is_url_param", Box::new(is_url_param)),
         ("is_get_request", Box::new(is_get_request)),
         ("is_stream", Box::new(is_stream)),
-        ("is_some", Box::new(is_some)),
+        ("contains_stream", Box::new(contains_stream)),
+        ("is_paginated", Box::new(is_paginated)),
+        ("kv_inner_cidl_type", Box::new(kv_inner_cidl_type)),
     ];
 
     for (name, helper) in simple_helpers {
@@ -151,6 +165,27 @@ fn register_helpers<'a>(
             |value: Value, mapper: &dyn ClientLanguageTypeMapper, ast: &CloesceAst| -> String {
                 let cidl_type: CidlType = serde_json::from_value(value).unwrap();
                 mapper.cidl_type(&cidl_type, ast)
+            },
+        ),
+    );
+
+    hbs.register_helper(
+        "map_kv_inner_type",
+        make_mapper_helper(
+            mapper.clone(),
+            ast,
+            |value: Value, mapper: &dyn ClientLanguageTypeMapper, ast: &CloesceAst| -> String {
+                let cidl_type: CidlType = serde_json::from_value(value).unwrap();
+                // For KvObject(T) or Paginated(KvObject(T)), map the KvObject(T) part
+                let kv_type = match &cidl_type {
+                    CidlType::KvObject(_) => &cidl_type,
+                    CidlType::Paginated(inner) => match inner.as_ref() {
+                        kv @ CidlType::KvObject(_) => kv,
+                        _ => &cidl_type,
+                    },
+                    _ => &cidl_type,
+                };
+                mapper.cidl_type(kv_type, ast)
             },
         ),
     );
