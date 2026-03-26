@@ -2,13 +2,10 @@ use ast::{
     Api, CidlType, CloesceAst, DataSource, DataSourceMethod, Field, IncludeTree, Model,
     PlainOldObject, Service, ServiceField, WranglerEnv,
 };
-use frontend::{ModelBlock, ParseAst, parser::ParseId};
+use frontend::{ModelBlock, ParseAst};
 use indexmap::IndexMap;
 
-use std::{
-    collections::{BTreeMap, HashMap, VecDeque},
-    path::PathBuf,
-};
+use std::collections::{BTreeMap, HashMap, VecDeque};
 
 use crate::{
     api::ApiAnalysis,
@@ -20,407 +17,155 @@ mod api;
 pub mod err;
 mod model;
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Default)]
-pub struct FileSpan {
-    pub start: usize,
-    pub end: usize,
-    pub file: PathBuf,
-}
-
-#[derive(Clone)]
-pub enum WranglerEnvBindingKind {
-    D1,
-    R2,
-    KV,
-}
-
-#[derive(Clone, Default)]
-pub enum SymbolKind {
-    ModelDecl,
-    ModelField,
-    ModelPrimaryKeyTag,
-    ModelForeignKeyTag,
-    ModelNavigationTag,
-    ModelD1Tag,
-    ModelKvTag,
-    ModelR2Tag,
-
-    WranglerEnvDecl,
-    WranglerEnvBinding {
-        kind: WranglerEnvBindingKind,
-    },
-    WranglerEnvVar,
-
-    PlainOldObjectDecl,
-    PlainOldObjectField,
-
-    ApiDecl,
-    ApiMethodDecl,
-    ApiMethodParam,
-
-    DataSourceDecl,
-    DataSourceMethodDecl,
-    DataSourceMethodParam,
-
-    ServiceDecl,
-    ServiceField,
-
-    InjectDecl,
-
-    #[default]
-    Null,
-}
-
-#[derive(Clone)]
-pub struct Symbol {
-    pub id: ParseId,
-
-    /// Empty for symbols that are not named (e.g. declarations)
-    pub name: String,
-
-    /// Void for symbols that have no type (e.g. declarations)
-    pub cidl_type: CidlType,
-
-    /// [usize::MAX] for symbols that have no parent (e.g. declarations)
-    pub parent: ParseId,
-
-    pub span: FileSpan,
-    pub kind: SymbolKind,
-}
-
-impl Default for Symbol {
-    fn default() -> Self {
-        Symbol {
-            id: usize::MAX,
-            name: String::new(),
-            cidl_type: CidlType::Void,
-            parent: usize::MAX,
-            span: FileSpan::default(),
-            kind: SymbolKind::Null,
-        }
-    }
-}
+pub use frontend::{FileSpan, Symbol, SymbolKind, WranglerEnvBindingKind};
 
 #[derive(Default)]
 pub struct SymbolTable {
-    table: HashMap<ParseId, Symbol>,
+    table: HashMap<String, Symbol>,
 }
 
 impl SymbolTable {
-    pub fn insert(&mut self, symbol: Symbol) -> Option<Symbol> {
-        self.table.insert(symbol.id, symbol)
+    fn key(&self, symbol: &Symbol) -> String {
+        match symbol.kind {
+            // Global symbols
+            SymbolKind::ModelDecl
+            | SymbolKind::PlainOldObjectDecl
+            | SymbolKind::ServiceDecl
+            | SymbolKind::ApiDecl
+            | SymbolKind::DataSourceDecl
+            | SymbolKind::WranglerEnvBinding { .. }
+            | SymbolKind::WranglerEnvDecl
+            | SymbolKind::InjectDecl => symbol.name.clone(),
+
+            // Scoped symbols
+            SymbolKind::ModelField
+            | SymbolKind::ServiceField
+            | SymbolKind::ApiMethodDecl
+            | SymbolKind::ApiMethodParam
+            | SymbolKind::PlainOldObjectField
+            | SymbolKind::DataSourceMethodParam
+            | SymbolKind::DataSourceMethodDecl
+            | SymbolKind::WranglerEnvVar => {
+                format!("{}::{}", symbol.parent_name, symbol.name)
+            }
+
+            _ => panic!("cannot generate key for Null symbol"),
+        }
     }
 
-    pub fn lookup(&self, id: ParseId) -> Option<&Symbol> {
-        self.table.get(&id)
+    /// Resolves a name to a symbol
+    fn resolve(&self, name: &str, kind: SymbolKind, parent_name: Option<&str>) -> Option<&Symbol> {
+        let key = self.key(&Symbol {
+            name: name.to_string(),
+            kind: kind.clone(),
+            parent_name: parent_name.unwrap_or("").to_string(),
+            ..Default::default()
+        });
+
+        let symbol = self.table.get(&key);
+        if let Some(symbol) = symbol {
+            match (&kind, &symbol.kind) {
+                (
+                    SymbolKind::WranglerEnvBinding { kind: got },
+                    SymbolKind::WranglerEnvBinding { kind: found },
+                ) if got != found => {
+                    // Wrangler env bindings are all in the same scope (so names can collide), but
+                    // bindings of different kinds cannot resolve to each other
+                    return None;
+                }
+                _ => {}
+            };
+        }
+
+        symbol
     }
 
-    pub fn name(&self, id: ParseId) -> &str {
-        self.lookup(id).map(|s| s.name.as_str()).unwrap_or("")
-    }
-
-    pub fn kind(&self, id: ParseId) -> Option<&SymbolKind> {
-        self.lookup(id).map(|s| &s.kind)
-    }
-
-    pub fn table_iter(&self) -> impl Iterator<Item = (ParseId, &Symbol)> {
-        self.table.iter().map(|(&id, sym)| (id, sym))
-    }
-
-    /// Converts all declared [ParseId]s into [Symbol]s,
-    /// catching duplicate declaration errors along the way.
+    /// Creates a [SymbolTable] from a [ParseAst], catching [CompilerErrorKind::DuplicateSymbol]'s
     fn from_parse(parse: &ParseAst, sink: &mut ErrorSink) -> SymbolTable {
-        let mut table = SymbolTable::default();
+        let mut st = SymbolTable::default();
 
-        let span = |start, end, file: &std::path::Path| FileSpan {
-            start,
-            end,
-            file: file.to_path_buf(),
-        };
-
-        let mut insert_unique = |table: &mut SymbolTable, symbol: Symbol| {
-            let id = symbol.id;
-            let new_span = symbol.span.clone();
-            if let Some(existing) = table.insert(symbol) {
+        let insert_unique =  |st: &mut SymbolTable, sink: &mut ErrorSink, symbol: &Symbol| {
+            if let Some(existing) = st.table.insert(st.key(&symbol), symbol.clone()) {
                 sink.push(CompilerErrorKind::DuplicateSymbol {
-                    symbol: id,
-                    first_span: existing.span.clone(),
-                    second_span: new_span,
+                    first: existing,
+                    second: symbol.clone(),
                 });
             }
         };
 
         for env in &parse.wrangler_envs {
-            insert_unique(
-                &mut table,
-                Symbol {
-                    id: env.id,
-                    span: span(env.span.start, env.span.end, &env.file),
-                    kind: SymbolKind::WranglerEnvDecl,
-                    ..Default::default()
-                },
-            );
+            insert_unique(&mut st, sink, &env.symbol);
 
-            let bindings = env
-                .d1_bindings
-                .iter()
-                .map(|b| (b, WranglerEnvBindingKind::D1))
-                .chain(
-                    env.kv_bindings
-                        .iter()
-                        .map(|b| (b, WranglerEnvBindingKind::KV)),
-                )
-                .chain(
-                    env.r2_bindings
-                        .iter()
-                        .map(|b| (b, WranglerEnvBindingKind::R2)),
-                );
+            for b in &env.d1_bindings {
+                insert_unique(&mut st, sink, b);
+            }
 
-            for (b, kind) in bindings {
-                insert_unique(
-                    &mut table,
-                    Symbol {
-                        id: b.id,
-                        name: b.name.clone(),
-                        span: span(b.span.start, b.span.end, &env.file),
-                        kind: SymbolKind::WranglerEnvBinding { kind },
-                        ..Default::default()
-                    },
-                );
+            for b in &env.r2_bindings {
+                insert_unique(&mut st, sink, b);
+            }
+
+            for b in &env.kv_bindings {
+                insert_unique(&mut st, sink, b);
             }
 
             for var in &env.vars {
-                insert_unique(
-                    &mut table,
-                    Symbol {
-                        id: var.id,
-                        name: var.name.clone(),
-                        span: span(var.span.start, var.span.end, &env.file),
-                        kind: SymbolKind::WranglerEnvVar,
-                        cidl_type: var.cidl_type.clone(),
-                        ..Default::default()
-                    },
-                );
+                insert_unique(&mut st, sink, var);
             }
         }
 
         for model in &parse.models {
-            insert_unique(
-                &mut table,
-                Symbol {
-                    id: model.id,
-                    name: model.name.clone(),
-                    span: span(model.span.start, model.span.end, &model.file),
-                    kind: SymbolKind::ModelDecl,
-                    ..Default::default()
-                },
-            );
-
-            if let Some(d1_tag) = &model.d1_binding {
-                table.insert(Symbol {
-                    id: d1_tag.id,
-                    span: span(d1_tag.span.start, d1_tag.span.end, &model.file),
-                    kind: SymbolKind::ModelD1Tag,
-                    parent: model.id,
-                    ..Default::default()
-                });
-            }
+            insert_unique(&mut st, sink, &model.symbol);
 
             for field in &model.fields {
-                insert_unique(
-                    &mut table,
-                    Symbol {
-                        id: field.id,
-                        name: field.name.clone(),
-                        span: span(field.span.start, field.span.end, &model.file),
-                        kind: SymbolKind::ModelField,
-                        parent: model.id,
-                        cidl_type: field.cidl_type.clone(),
-                    },
-                );
-            }
-
-            for fk in &model.foreign_keys {
-                table.insert(Symbol {
-                    id: fk.id,
-                    span: span(0, 0, &model.file),
-                    kind: SymbolKind::ModelForeignKeyTag,
-                    parent: model.id,
-                    ..Default::default()
-                });
-            }
-
-            for nav in &model.navigation_properties {
-                table.insert(Symbol {
-                    id: nav.id,
-                    span: span(nav.span.start, nav.span.end, &model.file),
-                    kind: SymbolKind::ModelNavigationTag,
-                    parent: model.id,
-                    ..Default::default()
-                });
-            }
-
-            for kv in &model.kvs {
-                table.insert(Symbol {
-                    id: kv.id,
-                    span: span(kv.span.start, kv.span.end, &model.file),
-                    kind: SymbolKind::ModelKvTag,
-                    parent: model.id,
-                    ..Default::default()
-                });
-            }
-
-            for r2 in &model.r2s {
-                table.insert(Symbol {
-                    id: r2.id,
-                    span: span(r2.span.start, r2.span.end, &model.file),
-                    kind: SymbolKind::ModelR2Tag,
-                    parent: model.id,
-                    ..Default::default()
-                });
+                insert_unique(&mut st, sink, field);
             }
         }
 
         for api in &parse.apis {
-            insert_unique(
-                &mut table,
-                Symbol {
-                    id: api.id,
-                    name: api.name.clone(),
-                    span: span(api.span.start, api.span.end, &api.file),
-                    kind: SymbolKind::ApiDecl,
-                    ..Default::default()
-                },
-            );
+            insert_unique(&mut st, sink, &api.symbol);
 
             for method in &api.methods {
-                insert_unique(
-                    &mut table,
-                    Symbol {
-                        id: method.id,
-                        span: span(method.span.start, method.span.end, &api.file),
-                        kind: SymbolKind::ApiMethodDecl,
-                        parent: api.id,
-                        cidl_type: method.return_type.clone(),
-                        ..Default::default()
-                    },
-                );
+                insert_unique(&mut st, sink, &method.symbol);
 
                 for param in &method.parameters {
-                    insert_unique(
-                        &mut table,
-                        Symbol {
-                            id: param.id,
-                            name: param.name.clone(),
-                            span: span(param.span.start, param.span.end, &api.file),
-                            kind: SymbolKind::ApiMethodParam,
-                            parent: method.id,
-                            cidl_type: param.cidl_type.clone(),
-                        },
-                    );
+                    insert_unique(&mut st, sink, param);
                 }
             }
         }
 
         for poo in &parse.poos {
-            insert_unique(
-                &mut table,
-                Symbol {
-                    id: poo.id,
-                    name: poo.name.clone(),
-                    span: span(poo.span.start, poo.span.end, &poo.file),
-                    kind: SymbolKind::PlainOldObjectDecl,
-                    ..Default::default()
-                },
-            );
+            insert_unique(&mut st, sink, &poo.symbol);
 
             for field in &poo.fields {
-                insert_unique(
-                    &mut table,
-                    Symbol {
-                        id: field.id,
-                        name: field.name.clone(),
-                        span: span(field.span.start, field.span.end, &poo.file),
-                        kind: SymbolKind::PlainOldObjectField,
-                        parent: poo.id,
-                        cidl_type: field.cidl_type.clone(),
-                    },
-                );
+                insert_unique(&mut st, sink, field);
             }
         }
 
         for source in &parse.sources {
-            insert_unique(
-                &mut table,
-                Symbol {
-                    id: source.id,
-                    name: source.name.clone(),
-                    span: span(source.span.start, source.span.end, &source.file),
-                    kind: SymbolKind::DataSourceDecl,
-                    parent: source.model,
-                    ..Default::default()
-                },
-            );
+            insert_unique(&mut st, sink, &source.symbol);
 
             for method in [&source.list, &source.get].into_iter().flatten() {
                 for param in &method.parameters {
-                    insert_unique(
-                        &mut table,
-                        Symbol {
-                            id: param.id,
-                            name: param.name.clone(),
-                            span: span(param.span.start, param.span.end, &source.file),
-                            kind: SymbolKind::DataSourceMethodParam,
-                            parent: source.id,
-                            cidl_type: param.cidl_type.clone(),
-                        },
-                    );
+                    insert_unique(&mut st, sink, param);
                 }
             }
         }
 
         for service in &parse.services {
-            insert_unique(
-                &mut table,
-                Symbol {
-                    id: service.id,
-                    name: service.name.clone(),
-                    span: span(service.span.start, service.span.end, &service.file),
-                    kind: SymbolKind::ServiceDecl,
-                    ..Default::default()
-                },
-            );
+            insert_unique(&mut st, sink, &service.symbol);
 
             for field in &service.fields {
-                insert_unique(
-                    &mut table,
-                    Symbol {
-                        id: field.id,
-                        name: field.name.clone(),
-                        span: span(field.span.start, field.span.end, &service.file),
-                        kind: SymbolKind::ServiceField,
-                        parent: service.id,
-                        cidl_type: field.cidl_type.clone(),
-                    },
-                );
+                insert_unique(&mut st, sink, field);
             }
         }
 
         for inject in &parse.injects {
-            for &ref_id in &inject.refs {
-                insert_unique(
-                    &mut table,
-                    Symbol {
-                        id: ref_id,
-                        span: span(inject.span.start, inject.span.end, &inject.file),
-                        kind: SymbolKind::InjectDecl,
-                        ..Default::default()
-                    },
-                );
+            for field in &inject.fields {
+                insert_unique(&mut st, sink, field);
             }
         }
 
-        table
+        st
     }
 }
 
@@ -437,7 +182,7 @@ impl SemanticAnalysis {
         let mut table = SymbolTable::from_parse(&parse, &mut sink);
         let wrangler_env = Self::wrangler(&parse, &mut sink);
         let mut models = Self::models(&parse, &mut table, &mut sink);
-        let poos = Self::poos(&parse, &mut table, &mut sink);
+        let poos = Self::poos(&parse, &table, &mut sink);
         let api_map = Self::apis(&parse, &table, &mut sink);
         let data_source_map = Self::data_sources(&parse, &models, &table, &mut sink);
         let services = Self::services(&parse, &table, &mut sink);
@@ -466,18 +211,7 @@ impl SemanticAnalysis {
         (SemanticResult { ast, table }, sink.drain())
     }
 
-    /// If multiple environments are declared, sinks an error but returns the first environments bindings.
-    /// If no environment is declared, sinks an error if there are any models (since models require an env), but returns None.
     fn wrangler(parse: &ParseAst, sink: &mut ErrorSink) -> Option<WranglerEnv> {
-        ensure!(
-            parse.wrangler_envs.len() < 2,
-            sink,
-            CompilerErrorKind::MultipleWranglerEnvBlocks {
-                first: parse.wrangler_envs[0].id,
-                second: parse.wrangler_envs[1].id,
-            }
-        );
-
         let Some(parsed_env) = parse.wrangler_envs.first() else {
             ensure!(
                 parse.models.is_empty(),
@@ -520,13 +254,13 @@ impl SemanticAnalysis {
         table: &mut SymbolTable,
         sink: &mut ErrorSink,
     ) -> IndexMap<String, Model> {
-        let model_map = parse
+        let model_blocks = parse
             .models
             .iter()
-            .map(|m| (m.id, m))
-            .collect::<HashMap<ParseId, &ModelBlock>>();
+            .map(|m| (m.symbol.name.clone(), m))
+            .collect::<HashMap<String, &ModelBlock>>();
 
-        match ModelAnalysis::default().analyze(model_map, table) {
+        match ModelAnalysis::default().analyze(model_blocks, table) {
             Ok(models) => models,
             Err(errs) => {
                 sink.extend(errs);
@@ -555,17 +289,16 @@ impl SemanticAnalysis {
 
         // Validate list and get method parameters
         fn analyze_method(
-            source: &frontend::DataSourceBlock,
+            source_sym: &Symbol,
             method: &frontend::DataSourceBlockMethod,
-            _table: &SymbolTable,
             sink: &mut ErrorSink,
         ) -> Option<DataSourceMethod> {
             let mut parameters = Vec::new();
             for param in &method.parameters {
                 if !is_valid_sql_type(&param.cidl_type) {
                     sink.push(CompilerErrorKind::DataSourceInvalidMethodParam {
-                        source: source.id,
-                        param: param.id,
+                        source: source_sym.clone(),
+                        param: param.clone(),
                     });
                 }
                 parameters.push(Field {
@@ -581,19 +314,25 @@ impl SemanticAnalysis {
 
         for source in &parse.sources {
             // Validate the model reference
-            let Some(model_sym) = table.lookup(source.model) else {
-                sink.push(CompilerErrorKind::DataSourceUnknownModelReference { source: source.id });
+            let Some(model_sym) = table.resolve(&source.model, SymbolKind::ModelDecl, None) else {
+                sink.push(CompilerErrorKind::DataSourceUnknownModelReference {
+                    source: source.symbol.clone(),
+                });
                 continue;
             };
 
             if !matches!(model_sym.kind, SymbolKind::ModelDecl) {
-                sink.push(CompilerErrorKind::DataSourceUnknownModelReference { source: source.id });
+                sink.push(CompilerErrorKind::DataSourceUnknownModelReference {
+                    source: source.symbol.clone(),
+                });
                 continue;
             }
 
             let model_name = model_sym.name.clone();
             let Some(model) = models.get(&model_name) else {
-                sink.push(CompilerErrorKind::DataSourceUnknownModelReference { source: source.id });
+                sink.push(CompilerErrorKind::DataSourceUnknownModelReference {
+                    source: source.symbol.clone(),
+                });
                 continue;
             };
 
@@ -636,8 +375,8 @@ impl SemanticAnalysis {
                     }
 
                     sink.push(CompilerErrorKind::DataSourceInvalidIncludeTreeReference {
-                        source: source.id,
-                        model: source.model,
+                        source: source.symbol.clone(),
+                        model: source.model.clone(),
                         name: var_name.clone(),
                     });
                 }
@@ -646,16 +385,16 @@ impl SemanticAnalysis {
             let list = source
                 .list
                 .as_ref()
-                .and_then(|m| analyze_method(source, m, table, sink));
+                .and_then(|m| analyze_method(&source.symbol, m, sink));
             let get = source
                 .get
                 .as_ref()
-                .and_then(|m| analyze_method(source, m, table, sink));
+                .and_then(|m| analyze_method(&source.symbol, m, sink));
 
             result.push((
                 model_name,
                 DataSource {
-                    name: table.name(source.id).to_string(),
+                    name: source.symbol.name.clone(),
                     tree: IncludeTree(source.tree.0.clone()),
                     list,
                     get,
@@ -669,50 +408,56 @@ impl SemanticAnalysis {
 
     fn poos(
         parse: &ParseAst,
-        table: &mut SymbolTable,
+        table: &SymbolTable,
         sink: &mut ErrorSink,
     ) -> BTreeMap<String, PlainOldObject> {
         let mut poos = BTreeMap::new();
 
         // Cycle detection
-        let mut in_degree = BTreeMap::<ParseId, usize>::new();
-        let mut graph = BTreeMap::<ParseId, Vec<ParseId>>::new();
+        let mut in_degree = BTreeMap::<String, usize>::new();
+        let mut graph = BTreeMap::<String, Vec<String>>::new();
 
         for poo in &parse.poos {
+            let poo_name = poo.symbol.name.clone();
             let mut fields = Vec::new();
-            graph.entry(poo.id).or_default();
-            in_degree.entry(poo.id).or_insert(0);
+            graph.entry(poo_name.clone()).or_default();
+            in_degree.entry(poo_name.clone()).or_insert(0);
 
             for field in &poo.fields {
-                let Some(field_sym) = table.lookup(field.id) else {
-                    sink.push(CompilerErrorKind::UnresolvedSymbol { symbol: field.id });
-                    continue;
-                };
-
-                match field_sym.cidl_type.root_type() {
-                    CidlType::Object { id, .. } | CidlType::Partial { id, .. } => {
-                        let Some(poo_sym) = table.lookup(*id) else {
-                            sink.push(CompilerErrorKind::UnresolvedSymbol { symbol: *id });
+                match field.cidl_type.root_type() {
+                    CidlType::Object { name, .. } | CidlType::Partial { name, .. } => {
+                        let Some(ref_sym) = table
+                            .resolve(name, SymbolKind::PlainOldObjectDecl, None)
+                            .or_else(|| table.resolve(name, SymbolKind::ModelDecl, None))
+                        else {
+                            sink.push(CompilerErrorKind::UnresolvedSymbol {
+                                span: field.span.clone(),
+                            });
                             continue;
                         };
 
                         ensure!(
                             matches!(
-                                poo_sym.kind,
+                                ref_sym.kind,
                                 SymbolKind::PlainOldObjectDecl | SymbolKind::ModelDecl
                             ),
                             sink,
-                            CompilerErrorKind::PlainOldObjectInvalidFieldType { field: field.id }
+                            CompilerErrorKind::PlainOldObjectInvalidFieldType {
+                                field: field.clone(),
+                            }
                         );
 
-                        if matches!(poo_sym.kind, SymbolKind::PlainOldObjectDecl) {
-                            graph.entry(*id).or_default().push(poo.id);
-                            in_degree.entry(poo.id).and_modify(|d| *d += 1);
+                        if matches!(ref_sym.kind, SymbolKind::PlainOldObjectDecl) {
+                            graph
+                                .entry(name.clone())
+                                .or_default()
+                                .push(poo_name.clone());
+                            in_degree.entry(poo_name.clone()).and_modify(|d| *d += 1);
                         }
                     }
                     CidlType::Stream | CidlType::Void => {
                         sink.push(CompilerErrorKind::PlainOldObjectInvalidFieldType {
-                            field: field.id,
+                            field: field.clone(),
                         });
                     }
                     _ => {
@@ -721,15 +466,15 @@ impl SemanticAnalysis {
                 }
 
                 fields.push(Field {
-                    name: field_sym.name.clone(),
-                    cidl_type: field_sym.cidl_type.clone(),
+                    name: field.name.clone(),
+                    cidl_type: field.cidl_type.clone(),
                 });
             }
 
             poos.insert(
-                poo.name.clone(),
+                poo_name.clone(),
                 PlainOldObject {
-                    name: poo.name.clone(),
+                    name: poo_name,
                     fields,
                 },
             );
@@ -752,63 +497,67 @@ impl SemanticAnalysis {
         let mut services = IndexMap::new();
 
         // Cycle detection via Kahn's
-        let mut in_degree = BTreeMap::<ParseId, usize>::new();
-        let mut graph = BTreeMap::<ParseId, Vec<ParseId>>::new();
+        let mut in_degree = BTreeMap::<String, usize>::new();
+        let mut graph = BTreeMap::<String, Vec<String>>::new();
 
         for service in &parse.services {
+            let service_name = service.symbol.name.clone();
             let mut fields = Vec::new();
-            graph.entry(service.id).or_default();
-            in_degree.entry(service.id).or_insert(0);
+            graph.entry(service_name.clone()).or_default();
+            in_degree.entry(service_name.clone()).or_insert(0);
 
             for field in &service.fields {
-                let Some(field_sym) = table.lookup(field.id) else {
-                    sink.push(CompilerErrorKind::UnresolvedSymbol { symbol: field.id });
-                    continue;
-                };
+                match field.cidl_type.root_type() {
+                    CidlType::Object { name: ref_name, .. } => {
+                        // Try to resolve as inject first, then service
+                        let target_sym = table
+                            .resolve(ref_name, SymbolKind::InjectDecl, None)
+                            .or_else(|| table.resolve(ref_name, SymbolKind::ServiceDecl, None));
 
-                match field_sym.cidl_type.root_type() {
-                    CidlType::Object {
-                        id: ref_id,
-                        name: ref_name,
-                        ..
-                    } => {
-                        let Some(target_sym) = table.lookup(*ref_id) else {
-                            sink.push(CompilerErrorKind::UnresolvedSymbol { symbol: *ref_id });
+                        let Some(target_sym) = target_sym else {
+                            sink.push(CompilerErrorKind::ServiceInvalidFieldType {
+                                field: field.clone(),
+                            });
                             continue;
                         };
 
                         match target_sym.kind {
                             SymbolKind::InjectDecl => {
                                 fields.push(ServiceField {
-                                    name: field_sym.name.clone(),
+                                    name: field.name.clone(),
                                     inject_reference: ref_name.clone(),
                                 });
                             }
                             SymbolKind::ServiceDecl => {
-                                graph.entry(*ref_id).or_default().push(service.id);
-                                *in_degree.entry(service.id).or_insert(0) += 1;
+                                graph
+                                    .entry(ref_name.clone())
+                                    .or_default()
+                                    .push(service_name.clone());
+                                *in_degree.entry(service_name.clone()).or_insert(0) += 1;
                                 fields.push(ServiceField {
-                                    name: field_sym.name.clone(),
+                                    name: field.name.clone(),
                                     inject_reference: ref_name.clone(),
                                 });
                             }
                             _ => {
                                 sink.push(CompilerErrorKind::ServiceInvalidFieldType {
-                                    field: field.id,
+                                    field: field.clone(),
                                 });
                             }
                         }
                     }
                     _ => {
-                        sink.push(CompilerErrorKind::ServiceInvalidFieldType { field: field.id });
+                        sink.push(CompilerErrorKind::ServiceInvalidFieldType {
+                            field: field.clone(),
+                        });
                     }
                 }
             }
 
             services.insert(
-                service.name.clone(),
+                service_name.clone(),
                 Service {
-                    name: service.name.clone(),
+                    name: service_name,
                     fields,
                     apis: Vec::new(),
                 },
@@ -843,46 +592,46 @@ pub fn is_valid_sql_type(cidl_type: &CidlType) -> bool {
     )
 }
 
-type AdjacencyList = BTreeMap<ParseId, Vec<ParseId>>;
+type AdjacencyList = BTreeMap<String, Vec<String>>;
 
 // Kahns algorithm for topological sort + cycle detection.
-// If no cycles, returns a map of id to position used for sorting the original collection.
+// If no cycles, returns a map of name to position used for sorting the original collection.
 pub fn kahns(
     graph: AdjacencyList,
-    mut in_degree: BTreeMap<ParseId, usize>,
+    mut in_degree: BTreeMap<String, usize>,
     len: usize,
-) -> Result<HashMap<ParseId, usize>, CompilerErrorKind> {
+) -> Result<HashMap<String, usize>, CompilerErrorKind> {
     let mut queue = in_degree
         .iter()
-        .filter_map(|(&id, &deg)| (deg == 0).then_some(id))
+        .filter_map(|(name, &deg)| (deg == 0).then_some(name.clone()))
         .collect::<VecDeque<_>>();
 
     let mut rank = HashMap::with_capacity(len);
     let mut counter = 0usize;
 
-    while let Some(id) = queue.pop_front() {
-        rank.insert(id, counter);
+    while let Some(name) = queue.pop_front() {
+        rank.insert(name.clone(), counter);
         counter += 1;
 
-        if let Some(adjs) = graph.get(&id) {
+        if let Some(adjs) = graph.get(&name) {
             for adj in adjs {
                 let deg = in_degree.get_mut(adj).expect("names to be validated");
                 *deg -= 1;
 
                 if *deg == 0 {
-                    queue.push_back(*adj);
+                    queue.push_back(adj.clone());
                 }
             }
         }
     }
 
     if rank.len() != len {
-        let cycle: Vec<ParseId> = in_degree
+        let cycle: Vec<String> = in_degree
             .iter()
-            .filter_map(|(&n, &d)| (d > 0).then_some(n))
+            .filter_map(|(n, &d)| (d > 0).then_some(n.clone()))
             .collect();
 
-        if cycle.len() > 0 {
+        if !cycle.is_empty() {
             return Err(CompilerErrorKind::CyclicalRelationship { cycle });
         }
     }

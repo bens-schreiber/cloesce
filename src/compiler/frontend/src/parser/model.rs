@@ -1,49 +1,34 @@
-use std::path::PathBuf;
-
 use chumsky::prelude::*;
 
 use ast::{CidlType, CrudKind};
 
 use crate::{
-    D1Tag, ForeignKeyTag, KeyFieldTag, KvR2Tag, ModelBlock, NavigationTag, PrimaryKeyTag,
-    SpannedTypedName, UniqueTag,
+    D1Tag, FileSpan, ForeignKeyTag, KeyFieldTag, KvR2Tag, ModelBlock, NavigationTag, PrimaryKeyTag,
+    Symbol, SymbolKind, UniqueTag,
     lexer::Token,
-    parser::{Extra, IdScope, It, cidl_type},
+    parser::{Extra, cidl_type},
 };
 
-struct PendingForeignKeyTag {
-    span: SimpleSpan,
-    adj_model: String,
-
-    /// (source_field_name, target_field_name)
-    references: Vec<(String, String)>,
-}
-
-struct PendingNavTag {
-    span: SimpleSpan,
-    field: String,
-    adj_model: String,
-    fields: Vec<String>,
-    is_many_to_many: bool,
-}
-
-struct PendingKvR2Tag {
-    field: String,
-    span: SimpleSpan,
-    cidl_type: CidlType,
-    format: String,
-    env_binding: String,
+enum ModelTag {
+    Crud(Vec<CrudKind>),
+    D1(String, SimpleSpan),
 }
 
 enum ModelField {
     Primary(SimpleSpan, Vec<String>),
     Unique(SimpleSpan, Vec<String>),
-    Foreign(PendingForeignKeyTag),
-    Nav(PendingNavTag),
-    Field(SpannedTypedName),
-    KeyField(SpannedTypedName),
-    KvField(PendingKvR2Tag),
-    R2Field(PendingKvR2Tag),
+    Foreign(ForeignKeyTag),
+    Nav {
+        span: SimpleSpan,
+        field: String,
+        /// (model_name or None for current model, field_name)
+        fields: Vec<(Option<String>, String)>,
+        is_many_to_many: bool,
+    },
+    Field(Symbol),
+    KeyField(String, SimpleSpan, CidlType),
+    KvField(Symbol, KvR2Tag),
+    R2Field(Symbol, KvR2Tag),
 }
 
 /// Parses a block of the form:
@@ -60,10 +45,10 @@ enum ModelField {
 ///   [primary ident3, ident4, ...]
 ///   [unique ident5, ident6, ...]
 ///   [foreign ident5 -> TargetModel::ident6]
-///   [nav RelationName -> TargetModel::ident7, ident8, ...]
+///   [nav RelationName -> ident7, TargetModel::ident8, ...]
 /// }
 /// ```
-pub fn model_block<'t>(it: It) -> impl Parser<'t, &'t [Token], ModelBlock, Extra<'t>> {
+pub fn model_block<'t>() -> impl Parser<'t, &'t [Token], ModelBlock, Extra<'t>> {
     // @crud(get | save | list, ...)
     let crud_tag = just(Token::At)
         .ignore_then(just(Token::Crud))
@@ -146,7 +131,7 @@ pub fn model_block<'t>(it: It) -> impl Parser<'t, &'t [Token], ModelBlock, Extra
                     .into_iter()
                     .zip(target_refs.into_iter().map(|(_, f)| f))
                     .collect();
-                ModelField::Foreign(PendingForeignKeyTag {
+                ModelField::Foreign(ForeignKeyTag {
                     adj_model,
                     references,
                     span: e.span(),
@@ -154,12 +139,22 @@ pub fn model_block<'t>(it: It) -> impl Parser<'t, &'t [Token], ModelBlock, Extra
             })
     };
 
-    // [nav RelationName -> TargetModel::field1, field2, ...]
-    // [nav RelationName <> TargetModel::field]
+    // [nav RelationName -> Model::field1, field2, ...]
+    // [nav RelationName -> field1, field2, ...]  (assumes current model)
+    // [nav RelationName <> Model::field]
+    // [nav RelationName <> field]  (assumes current model)
     let nav_tag = {
-        let nav_key_ref = select! { Token::Ident(model_name) => model_name }
-            .then_ignore(just(Token::DoubleColon))
-            .then(select! { Token::Ident(field_name) => field_name });
+        // A field ref is either Model::field or just field (None means current model)
+        let nav_key_ref = select! { Token::Ident(name) => name }
+            .then(
+                just(Token::DoubleColon)
+                    .ignore_then(select! { Token::Ident(field_name) => field_name })
+                    .or_not(),
+            )
+            .map(|(first, second)| match second {
+                Some(field) => (Some(first), field),
+                None => (None, first),
+            });
 
         let nav_key_ref_list = nav_key_ref
             .clone()
@@ -177,16 +172,11 @@ pub fn model_block<'t>(it: It) -> impl Parser<'t, &'t [Token], ModelBlock, Extra
             .then_ignore(just(Token::Arrow))
             .then(nav_key_ref_list)
             .then_ignore(just(Token::RBracket))
-            .map_with(|(field, to), e| {
-                let adj_model = to[0].0.clone();
-                let fields = to.into_iter().map(|(_, f)| f).collect::<Vec<_>>();
-                ModelField::Nav(PendingNavTag {
-                    span: e.span(),
-                    field,
-                    adj_model,
-                    fields,
-                    is_many_to_many: false,
-                })
+            .map_with(|(field, fields), e| ModelField::Nav {
+                span: e.span(),
+                field,
+                fields,
+                is_many_to_many: false,
             });
 
         let nav_many_to_many = just(Token::LBracket)
@@ -196,14 +186,11 @@ pub fn model_block<'t>(it: It) -> impl Parser<'t, &'t [Token], ModelBlock, Extra
             .then_ignore(just(Token::RAngle))
             .then(nav_key_ref)
             .then_ignore(just(Token::RBracket))
-            .map_with(|(field, (adj_model, f)), e| {
-                ModelField::Nav(PendingNavTag {
-                    span: e.span(),
-                    field,
-                    adj_model,
-                    fields: vec![f],
-                    is_many_to_many: true,
-                })
+            .map_with(|(field, key_ref), e| ModelField::Nav {
+                span: e.span(),
+                field,
+                fields: vec![key_ref],
+                is_many_to_many: true,
             });
 
         nav_arrow.or(nav_many_to_many)
@@ -230,7 +217,6 @@ pub fn model_block<'t>(it: It) -> impl Parser<'t, &'t [Token], ModelBlock, Extra
     // @keyparam
     let key_param_tag = just(Token::At).ignore_then(just(Token::Ident("keyparam".into())));
 
-    let st_field = it.clone();
     type Binding = (String, String);
     let field_tag = choice((
         key_param_tag.map(|_| (true, None::<Binding>, None::<Binding>)),
@@ -243,45 +229,38 @@ pub fn model_block<'t>(it: It) -> impl Parser<'t, &'t [Token], ModelBlock, Extra
     let field = field_tag
         .then(select! { Token::Ident(name) => name }.map_with(|name, e| (name, e.span())))
         .then_ignore(just(Token::Colon))
-        .then(cidl_type(st_field))
+        .then(cidl_type())
         .map(|(((key_param, kv, r2), (name, span)), cidl_type)| {
-            if let Some((env_binding, format)) = kv {
-                ModelField::KvField(PendingKvR2Tag {
-                    field: name,
-                    span,
-                    cidl_type,
-                    format,
-                    env_binding,
-                })
-            } else if let Some((env_binding, format)) = r2 {
-                ModelField::R2Field(PendingKvR2Tag {
-                    field: name,
-                    span,
-                    cidl_type,
-                    format,
-                    env_binding,
-                })
-            } else if key_param {
-                ModelField::KeyField(SpannedTypedName {
-                    id: 0, // resolved in map_model
-                    span,
-                    name,
-                    cidl_type,
-                })
-            } else {
-                ModelField::Field(SpannedTypedName {
-                    id: 0, // resolved in map_model
-                    span,
-                    name,
-                    cidl_type,
-                })
+            let typed = Symbol {
+                span: FileSpan::from_simple_span(span),
+                name: name.clone(),
+                cidl_type,
+                kind: SymbolKind::ModelField,
+                ..Default::default()
+            };
+            match (key_param, kv, r2) {
+                (_, Some((env_binding, format)), _) => ModelField::KvField(
+                    typed,
+                    KvR2Tag {
+                        field: name,
+                        span,
+                        format,
+                        env_binding,
+                    },
+                ),
+                (_, _, Some((env_binding, format))) => ModelField::R2Field(
+                    typed,
+                    KvR2Tag {
+                        field: name,
+                        span,
+                        format,
+                        env_binding,
+                    },
+                ),
+                (true, _, _) => ModelField::KeyField(name, span, typed.cidl_type),
+                _ => ModelField::Field(typed),
             }
         });
-
-    enum ModelTag {
-        Crud(Vec<CrudKind>),
-        D1(String, SimpleSpan),
-    }
 
     let model_tags = choice((
         crud_tag.map(ModelTag::Crud),
@@ -299,182 +278,108 @@ pub fn model_block<'t>(it: It) -> impl Parser<'t, &'t [Token], ModelBlock, Extra
                 .collect::<Vec<_>>()
                 .delimited_by(just(Token::LBrace), just(Token::RBrace)),
         )
-        .map(move |((tags, (name, span)), items)| {
+        .map(|((tags, (model_name, model_span)), items)| {
             let mut cruds = Vec::new();
-            let mut d1_binding = None;
+            let mut d1_tag = None;
             for tag in tags {
                 match tag {
                     ModelTag::Crud(c) => cruds = c,
-                    ModelTag::D1(b, s) => d1_binding = Some((b, s)),
+                    ModelTag::D1(b, span) => {
+                        d1_tag = Some(D1Tag {
+                            span,
+                            env_binding: b,
+                        })
+                    }
                 }
             }
-            map_model(&it, name, span, d1_binding, cruds, items)
-        })
-}
 
-fn map_model(
-    it: &It,
-    name: String,
-    span: SimpleSpan,
-    d1_binding: Option<(String, SimpleSpan)>,
-    cruds: Vec<CrudKind>,
-    items: Vec<ModelField>,
-) -> ModelBlock {
-    let model_scope = IdScope::Model(name.clone());
-    let id = it.borrow_mut().intern(name.clone(), IdScope::Global);
-    let d1_binding = d1_binding.map(|(b, d1_span)| {
-        let id = it.borrow_mut().new_id();
-        let env_binding = it.borrow_mut().intern(b, IdScope::Env);
-        D1Tag {
-            id,
-            span: d1_span,
-            env_binding,
-        }
-    });
+            let mut fields: Vec<Symbol> = Vec::new();
+            let mut foreign_keys: Vec<ForeignKeyTag> = Vec::new();
+            let mut navigation_properties: Vec<NavigationTag> = Vec::new();
+            let mut primary_keys: Vec<PrimaryKeyTag> = Vec::new();
+            let mut unique_constraints: Vec<UniqueTag> = Vec::new();
+            let mut key_fields: Vec<KeyFieldTag> = Vec::new();
+            let mut kvs: Vec<KvR2Tag> = Vec::new();
+            let mut r2s: Vec<KvR2Tag> = Vec::new();
 
-    let mut fields: Vec<SpannedTypedName> = Vec::new();
-    let mut foreign_keys: Vec<ForeignKeyTag> = Vec::new();
-    let mut navigation_properties: Vec<NavigationTag> = Vec::new();
-    let mut primary_keys: Vec<PrimaryKeyTag> = Vec::new();
-    let mut unique_constraints: Vec<UniqueTag> = Vec::new();
-    let mut key_fields: Vec<KeyFieldTag> = Vec::new();
-    let mut kvs: Vec<KvR2Tag> = Vec::new();
-    let mut r2s: Vec<KvR2Tag> = Vec::new();
-
-    for item in items {
-        match item {
-            ModelField::Primary(pk_span, cols) => {
-                for col in cols {
-                    let field = it.borrow_mut().intern(col, model_scope.clone());
-                    primary_keys.push(PrimaryKeyTag {
-                        id: it.borrow_mut().new_id(),
-                        span: pk_span,
+            for item in items {
+                match item {
+                    ModelField::Primary(span, fields) => {
+                        for field in fields {
+                            primary_keys.push(PrimaryKeyTag { span, field });
+                        }
+                    }
+                    ModelField::Unique(span, fields) => {
+                        unique_constraints.push(UniqueTag { span, fields });
+                    }
+                    ModelField::Foreign(fk) => foreign_keys.push(fk),
+                    ModelField::Nav {
+                        span,
                         field,
-                    });
+                        fields: nav_fields,
+                        is_many_to_many,
+                    } => {
+                        let resolved = nav_fields
+                            .into_iter()
+                            .map(|(model, f)| (model.unwrap_or_else(|| model_name.clone()), f))
+                            .collect();
+                        navigation_properties.push(NavigationTag {
+                            span,
+                            field,
+                            fields: resolved,
+                            is_many_to_many,
+                        });
+                    }
+                    ModelField::Field(mut f) => {
+                        f.parent_name = model_name.clone();
+                        fields.push(f);
+                    }
+                    ModelField::KeyField(field, span, cidl_type) => {
+                        key_fields.push(KeyFieldTag {
+                            span,
+                            field: field.clone(),
+                        });
+                        fields.push(Symbol {
+                            span: FileSpan::from_simple_span(span),
+                            name: field,
+                            cidl_type,
+                            kind: SymbolKind::ModelField,
+                            parent_name: model_name.clone(),
+                            ..Default::default()
+                        });
+                    }
+                    ModelField::KvField(mut f, tag) => {
+                        f.parent_name = model_name.clone();
+                        fields.push(f);
+                        kvs.push(tag);
+                    }
+                    ModelField::R2Field(mut f, tag) => {
+                        f.parent_name = model_name.clone();
+                        fields.push(f);
+                        r2s.push(tag);
+                    }
                 }
             }
-            ModelField::Unique(span, cols) => {
-                let fields = cols
-                    .into_iter()
-                    .map(|c| it.borrow_mut().intern(c, model_scope.clone()))
-                    .collect();
-                unique_constraints.push(UniqueTag {
-                    id: it.borrow_mut().new_id(),
-                    span,
-                    fields,
-                });
-            }
-            ModelField::Foreign(fk) => {
-                let adj_model = it
-                    .borrow_mut()
-                    .intern(fk.adj_model.clone(), IdScope::Global);
-                let adj_scope = IdScope::Model(fk.adj_model);
-                let references = fk
-                    .references
-                    .into_iter()
-                    .map(|(src, tgt)| {
-                        let src_ref = it.borrow_mut().intern(src, model_scope.clone());
-                        let tgt_ref = it.borrow_mut().intern(tgt, adj_scope.clone());
-                        (src_ref, tgt_ref)
-                    })
-                    .collect();
-                foreign_keys.push(ForeignKeyTag {
-                    id: it.borrow_mut().new_id(),
-                    span: fk.span,
-                    adj_model,
-                    references,
-                });
-            }
-            ModelField::Nav(nav) => {
-                let field = it.borrow_mut().intern(nav.field, model_scope.clone());
-                let adj_model = it
-                    .borrow_mut()
-                    .intern(nav.adj_model.clone(), IdScope::Global);
-                let adj_scope = IdScope::Model(nav.adj_model);
-                let fields_refs = nav
-                    .fields
-                    .into_iter()
-                    .map(|f| it.borrow_mut().intern(f, adj_scope.clone()))
-                    .collect();
-                navigation_properties.push(NavigationTag {
-                    id: it.borrow_mut().new_id(),
-                    span: nav.span,
-                    field,
-                    adj_model,
-                    fields: fields_refs,
-                    is_many_to_many: nav.is_many_to_many,
-                });
-            }
-            ModelField::Field(mut f) => {
-                f.id = it.borrow_mut().intern(f.name.clone(), model_scope.clone());
-                fields.push(f);
-            }
-            ModelField::KeyField(mut f) => {
-                f.id = it.borrow_mut().intern(f.name.clone(), model_scope.clone());
-                key_fields.push(KeyFieldTag {
-                    id: it.borrow_mut().new_id(),
-                    span: f.span,
-                    field: f.id,
-                });
-                fields.push(f);
-            }
-            ModelField::KvField(kv) => {
-                let field = it
-                    .borrow_mut()
-                    .intern(kv.field.clone(), model_scope.clone());
-                let env_binding = it.borrow_mut().intern(kv.env_binding, IdScope::Env);
-                fields.push(SpannedTypedName {
-                    id: field,
-                    span: kv.span,
-                    name: kv.field,
-                    cidl_type: kv.cidl_type,
-                });
-                kvs.push(KvR2Tag {
-                    id: it.borrow_mut().new_id(),
-                    field,
-                    span: kv.span,
-                    format: kv.format,
-                    env_binding,
-                });
-            }
-            ModelField::R2Field(r2) => {
-                let field = it
-                    .borrow_mut()
-                    .intern(r2.field.clone(), model_scope.clone());
-                let env_binding = it.borrow_mut().intern(r2.env_binding, IdScope::Env);
-                fields.push(SpannedTypedName {
-                    id: field,
-                    span: r2.span,
-                    name: r2.field,
-                    cidl_type: r2.cidl_type,
-                });
-                r2s.push(KvR2Tag {
-                    id: it.borrow_mut().new_id(),
-                    field,
-                    span: r2.span,
-                    format: r2.format,
-                    env_binding,
-                });
-            }
-        }
-    }
 
-    ModelBlock {
-        id,
-        span,
-        name,
-        file: PathBuf::new(),
-        d1_binding,
-        fields,
-        primary_keys,
-        key_fields,
-        kvs,
-        r2s,
-        navigation_properties,
-        foreign_keys,
-        unique_constraints,
-        cruds,
-    }
+            ModelBlock {
+                symbol: Symbol {
+                    span: FileSpan::from_simple_span(model_span),
+                    name: model_name,
+                    kind: SymbolKind::ModelDecl,
+                    ..Default::default()
+                },
+                d1_binding: d1_tag,
+                fields,
+                primary_keys,
+                key_fields,
+                kvs,
+                r2s,
+                navigation_properties,
+                foreign_keys,
+                unique_constraints,
+                cruds,
+            }
+        })
 }
 
 fn crud_kind<'t>() -> impl Parser<'t, &'t [Token], CrudKind, Extra<'t>> {

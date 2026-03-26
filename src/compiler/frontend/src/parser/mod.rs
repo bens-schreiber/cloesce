@@ -1,10 +1,12 @@
-use std::{cell::RefCell, collections::HashMap, ops::Range, path::PathBuf, rc::Rc};
+use std::ops::Range;
 
 use ast::CidlType;
 use chumsky::extra;
 use chumsky::prelude::*;
 
-use crate::SpannedTypedName;
+use crate::FileSpan;
+use crate::Symbol;
+use crate::SymbolKind;
 use crate::lexer::Token;
 use crate::{
     ApiBlock, DataSourceBlock, InjectBlock, ModelBlock, ParseAst, PlainOldObjectBlock,
@@ -17,88 +19,6 @@ mod api;
 mod data_source;
 mod env;
 mod model;
-mod service;
-
-pub type ParseId = usize;
-
-#[derive(Clone)]
-pub enum IdScope {
-    Global,
-    Env,
-    Model(String),
-    Api(String),
-    DataSource(String),
-    Service(String),
-    PlainOldObject(String),
-}
-
-#[derive(Clone)]
-pub struct IdTable {
-    counter: usize,
-    table: HashMap<String, ParseId>,
-    names: HashMap<ParseId, String>,
-}
-
-impl Default for IdTable {
-    fn default() -> Self {
-        Self {
-            counter: 0,
-            table: HashMap::new(),
-            names: HashMap::new(),
-        }
-    }
-}
-
-impl IdTable {
-    /// Determines if a [ParseId] already exists for the given name and scope. If so, returns it.
-    /// If not, creates a new [ParseId], stores it, and returns it.
-    pub fn intern(&mut self, name: String, scope: IdScope) -> ParseId {
-        let key = Self::key(&name, &scope);
-        if let Some(&existing) = self.table.get(&key) {
-            return existing;
-        }
-        let symbol_ref = self.counter;
-        self.counter += 1;
-        self.names.entry(symbol_ref).or_insert_with(|| name.clone());
-        self.table.insert(key, symbol_ref);
-        symbol_ref
-    }
-
-    /// Creates a new unique [ParseId] that is not associated with any name.
-    pub fn new_id(&mut self) -> ParseId {
-        let id = self.counter;
-        self.counter += 1;
-        id
-    }
-
-    pub fn name_of(&self, id: ParseId) -> Option<&str> {
-        self.names.get(&id).map(|s| s.as_str())
-    }
-
-    /// Finds the ParseId for a global name.
-    /// Panics if the name is not found.
-    pub fn id(&self, name: &str) -> ParseId {
-        let key = format!("global::{}", name);
-        *self
-            .table
-            .get(&key)
-            .unwrap_or_else(|| panic!("global symbol '{}' not found in symbol table", name))
-    }
-
-    fn key(name: &str, scope: &IdScope) -> String {
-        match scope {
-            IdScope::Global => format!("global::{}", name),
-            IdScope::Env => format!("env::{}", name),
-            IdScope::Model(model_name) => format!("model::{}::{}", model_name, name),
-            IdScope::Api(api_name) => format!("api::{}::{}", api_name, name),
-            IdScope::Service(service_name) => format!("service::{}::{}", service_name, name),
-            IdScope::PlainOldObject(poo_name) => format!("poo::{}::{}", poo_name, name),
-            IdScope::DataSource(ds_name) => format!("source::{}::{}", ds_name, name),
-        }
-    }
-}
-
-pub type It = Rc<RefCell<IdTable>>;
 
 #[derive(Default)]
 pub struct CloesceParser;
@@ -107,27 +27,25 @@ impl CloesceParser {
     pub fn parse(
         &self,
         tokens: Vec<(Token, Range<usize>)>,
-    ) -> Result<(ParseAst, IdTable), Vec<Rich<'static, Token>>> {
+    ) -> Result<ParseAst, Vec<Rich<'static, Token>>> {
         let tokens = tokens.into_iter().map(|(t, _)| t).collect::<Vec<_>>();
-        let it: It = Rc::new(RefCell::new(IdTable::default()));
         let result = self
-            ._parse(it.clone())
+            ._parse()
             .parse(&tokens)
             .into_result()
             .map_err(|errs| errs.into_iter().map(|e| e.into_owned()).collect::<Vec<_>>())?;
-        let sym_table = it.borrow().clone();
-        Ok((result, sym_table))
+        Ok(result)
     }
 
-    fn _parse<'t>(&self, it: It) -> impl chumsky::Parser<'t, &'t [Token], ParseAst, Extra<'t>> {
+    fn _parse<'t>(&self) -> impl chumsky::Parser<'t, &'t [Token], ParseAst, Extra<'t>> {
         choice((
-            env::env_block(it.clone()).map(Global::Env),
-            model::model_block(it.clone()).map(Global::Model),
-            api::api_block(it.clone()).map(Global::Api),
-            service::service_block(it.clone()).map(Global::Service),
-            poo_block(it.clone()).map(Global::Poo),
-            data_source::data_source_block(it.clone()).map(Global::DataSource),
-            inject_block(it).map(Global::Inject),
+            env::env_block().map(Global::Env),
+            model::model_block().map(Global::Model),
+            api::api_block().map(Global::Api),
+            data_source::data_source_block().map(Global::DataSource),
+            service_block().map(Global::Service),
+            poo_block().map(Global::Poo),
+            inject_block().map(Global::Inject),
         ))
         .repeated()
         .collect::<Vec<_>>()
@@ -168,20 +86,18 @@ enum Global {
 ///     ...
 /// }
 /// ```
-fn poo_block<'t>(it: It) -> impl Parser<'t, &'t [Token], PlainOldObjectBlock, Extra<'t>> {
-    let st_fields = it.clone();
-    let st_id = it.clone();
-
+fn poo_block<'t>() -> impl Parser<'t, &'t [Token], PlainOldObjectBlock, Extra<'t>> {
     // ident: cidl_type
     let poo_field = select! { Token::Ident(name) => name }
         .map_with(|name, e| (name, e.span()))
         .then_ignore(just(Token::Colon))
-        .then(cidl_type(st_fields))
-        .map(|((name, span), ty)| SpannedTypedName {
-            id: 0, // resolved in outer map
-            span,
+        .then(cidl_type())
+        .map(|((name, span), ty)| Symbol {
+            span: FileSpan::from_simple_span(span),
             name,
             cidl_type: ty,
+            kind: SymbolKind::PlainOldObjectField,
+            ..Default::default()
         });
 
     // poo MyObject { ... }
@@ -193,19 +109,14 @@ fn poo_block<'t>(it: It) -> impl Parser<'t, &'t [Token], PlainOldObjectBlock, Ex
                 .collect::<Vec<_>>()
                 .delimited_by(just(Token::LBrace), just(Token::RBrace)),
         )
-        .map(move |((name, span), mut fields)| {
-            let id = st_id.borrow_mut().intern(name.clone(), IdScope::Global);
-            let poo_scope = IdScope::PlainOldObject(name.clone());
-            for f in &mut fields {
-                f.id = st_id.borrow_mut().intern(f.name.clone(), poo_scope.clone());
-            }
-            PlainOldObjectBlock {
-                id,
-                span,
+        .map(move |((name, span), fields)| PlainOldObjectBlock {
+            symbol: Symbol {
+                span: FileSpan::from_simple_span(span),
                 name,
-                file: PathBuf::new(),
-                fields,
-            }
+                kind: SymbolKind::PlainOldObjectDecl,
+                ..Default::default()
+            },
+            fields,
         })
 }
 
@@ -218,7 +129,7 @@ fn poo_block<'t>(it: It) -> impl Parser<'t, &'t [Token], PlainOldObjectBlock, Ex
 ///     ...
 /// }
 /// ```
-fn inject_block<'t>(it: It) -> impl Parser<'t, &'t [Token], InjectBlock, Extra<'t>> {
+fn inject_block<'t>() -> impl Parser<'t, &'t [Token], InjectBlock, Extra<'t>> {
     // inject { ...}
     just(Token::Inject)
         .ignore_then(
@@ -227,26 +138,74 @@ fn inject_block<'t>(it: It) -> impl Parser<'t, &'t [Token], InjectBlock, Extra<'
                 .collect::<Vec<_>>()
                 .delimited_by(just(Token::LBrace), just(Token::RBrace)),
         )
-        .map_with(move |injectables, e| {
-            let mut table = it.borrow_mut();
-            let id = table.new_id();
-            let names = injectables
+        .map_with(move |fields, e| InjectBlock {
+            symbol: Symbol {
+                span: FileSpan::from_simple_span(e.span()),
+                kind: SymbolKind::InjectDecl,
+                ..Default::default()
+            },
+            fields: fields
                 .into_iter()
-                .map(|name| table.intern(name, IdScope::Global))
+                .map(|field_name| Symbol {
+                    span: FileSpan::from_simple_span(e.span()),
+                    name: field_name,
+                    kind: SymbolKind::InjectDecl,
+                    ..Default::default()
+                })
+                .collect(),
+        })
+}
+
+/// Parses a block of the form:
+///
+/// ```cloesce
+/// service MyAppService {
+///     ident1: InjectedService1
+///     ident2: InjectedService2
+/// }
+/// ```
+pub fn service_block<'t>() -> impl Parser<'t, &'t [Token], ServiceBlock, Extra<'t>> {
+    // ident: InjectedService
+    let attribute = select! { Token::Ident(var_name) => var_name }
+        .map_with(|name, e| (name, e.span()))
+        .then_ignore(just(Token::Colon))
+        .then(cidl_type());
+
+    // service ServiceName { ... }
+    just(Token::Service)
+        .ignore_then(select! { Token::Ident(name) => name }.map_with(|name, e| (name, e.span())))
+        .then(
+            attribute
+                .repeated()
+                .collect::<Vec<_>>()
+                .delimited_by(just(Token::LBrace), just(Token::RBrace)),
+        )
+        .map(move |((name, span), fields)| {
+            let fields = fields
+                .into_iter()
+                .map(|((name, span), cidl_type)| Symbol {
+                    span: FileSpan::from_simple_span(span),
+                    name,
+                    cidl_type,
+                    kind: SymbolKind::ServiceField,
+                    ..Default::default()
+                })
                 .collect();
-            InjectBlock {
-                id,
-                span: e.span(),
-                file: PathBuf::new(),
-                refs: names,
+
+            ServiceBlock {
+                symbol: Symbol {
+                    span: FileSpan::from_simple_span(span),
+                    name,
+                    kind: SymbolKind::ServiceDecl,
+                    ..Default::default()
+                },
+                fields,
             }
         })
 }
 
-fn cidl_type<'t>(it: It) -> impl Parser<'t, &'t [Token], CidlType, Extra<'t>> {
+fn cidl_type<'t>() -> impl Parser<'t, &'t [Token], CidlType, Extra<'t>> {
     recursive(move |cidl_type| {
-        let st_obj = it.clone();
-
         let wrapper = select! { Token::Ident(name) => name }
             .then_ignore(just(Token::LAngle))
             .then(cidl_type.clone())
@@ -258,11 +217,11 @@ fn cidl_type<'t>(it: It) -> impl Parser<'t, &'t [Token], CidlType, Extra<'t>> {
                 "Paginated" => Ok(CidlType::paginated(inner)),
                 "KvObject" => Ok(CidlType::KvObject(Box::new(inner))),
                 "Partial" => match inner {
-                    CidlType::Object { name, id } => Ok(CidlType::Partial { name, id }),
+                    CidlType::Object { name } => Ok(CidlType::Partial { name }),
                     _ => Err(Rich::custom(span, "Partial<T> expects an object type")),
                 },
                 "DataSource" => match inner {
-                    CidlType::Object { name, id } => Ok(CidlType::DataSource { name, id }),
+                    CidlType::Object { name } => Ok(CidlType::DataSource { name }),
                     _ => Err(Rich::custom(span, "DataSource<T> expects an object type")),
                 },
                 _ => Err(Rich::custom(span, "Unknown generic type wrapper")),
@@ -281,11 +240,8 @@ fn cidl_type<'t>(it: It) -> impl Parser<'t, &'t [Token], CidlType, Extra<'t>> {
             just(Token::R2Object).to(CidlType::R2Object),
         ));
 
-        let object_type =
-            select! { Token::Ident(name) => name }.map(move |name| CidlType::Object {
-                name: name.clone(),
-                id: st_obj.borrow_mut().intern(name, IdScope::Global),
-            });
+        let object_type = select! { Token::Ident(name) => name }
+            .map(move |name| CidlType::Object { name: name.clone() });
 
         choice((wrapper, primitive_keyword, object_type)).boxed()
     })

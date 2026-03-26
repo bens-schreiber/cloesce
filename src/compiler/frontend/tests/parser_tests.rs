@@ -1,5 +1,5 @@
 use ast::{CidlType, CrudKind, HttpVerb};
-use compiler_test::{lex_and_parse, lex_and_parse_with_id};
+use compiler_test::lex_and_parse;
 
 #[test]
 fn env_block() {
@@ -70,7 +70,7 @@ fn env_block() {
 
 #[test]
 fn model_block_scalar() {
-    let (ast, it) = lex_and_parse_with_id(
+    let ast = lex_and_parse(
         r#"
         @d1(d1_a)
         model Person {
@@ -89,12 +89,9 @@ fn model_block_scalar() {
     );
 
     let model = ast.models.first().expect("model to be present");
-    assert_eq!(model.name, "Person");
+    assert_eq!(model.symbol.name, "Person");
     assert_eq!(
-        model
-            .d1_binding
-            .as_ref()
-            .and_then(|b| it.name_of(b.env_binding)),
+        model.d1_binding.as_ref().map(|b| b.env_binding.as_str()),
         Some("d1_a")
     );
 
@@ -102,7 +99,7 @@ fn model_block_scalar() {
         model
             .primary_keys
             .iter()
-            .map(|p| it.name_of(p.field).unwrap())
+            .map(|p| p.field.as_str())
             .collect::<Vec<_>>(),
         vec!["id", "age"]
     );
@@ -126,7 +123,7 @@ fn model_block_scalar() {
 
 #[test]
 fn model_block_kv_r2_anchored_tags() {
-    let (ast, it) = lex_and_parse_with_id(
+    let ast = lex_and_parse(
         r#"
         env {
             cache_ns: kv
@@ -151,32 +148,28 @@ fn model_block_kv_r2_anchored_tags() {
     let foo = ast
         .models
         .iter()
-        .find(|m| m.name == "Foo")
+        .find(|m| m.symbol.name == "Foo")
         .expect("Foo model to be present");
 
     assert_eq!(foo.kvs.len(), 1);
     assert_eq!(foo.r2s.len(), 1);
     assert_eq!(foo.key_fields.len(), 1);
 
-    let key_param_names: Vec<&str> = foo
-        .key_fields
-        .iter()
-        .map(|k| it.name_of(k.field).unwrap())
-        .collect();
+    let key_param_names: Vec<&str> = foo.key_fields.iter().map(|k| k.field.as_str()).collect();
     assert_eq!(key_param_names, vec!["category"]);
 
     let kv = &foo.kvs[0];
-    assert_eq!(it.name_of(kv.field), Some("kv_value"));
+    assert_eq!(kv.field, "kv_value");
     assert_eq!(kv.format, "my-interpolated-format{field}-{category}");
 
     let r2 = &foo.r2s[0];
-    assert_eq!(it.name_of(r2.field), Some("obj"));
+    assert_eq!(r2.field, "obj");
     assert_eq!(r2.format, "my_interpolated_format{field}");
 }
 
 #[test]
 fn model_block_unique_constraints() {
-    let (ast, it) = lex_and_parse_with_id(
+    let ast = lex_and_parse(
         r#"
         @d1(d1_a)
         model Foo {
@@ -196,19 +189,13 @@ fn model_block_unique_constraints() {
     let foo = ast
         .models
         .iter()
-        .find(|m| m.name == "Foo")
+        .find(|m| m.symbol.name == "Foo")
         .expect("Foo model to be present");
 
     let unique_constraints: Vec<Vec<&str>> = foo
         .unique_constraints
         .iter()
-        .map(|constraint| {
-            constraint
-                .fields
-                .iter()
-                .map(|&n| it.name_of(n).unwrap())
-                .collect()
-        })
+        .map(|constraint| constraint.fields.iter().map(|n| n.as_str()).collect())
         .collect();
 
     assert_eq!(unique_constraints, vec![vec!["a", "b", "c"], vec!["email"]]);
@@ -216,7 +203,7 @@ fn model_block_unique_constraints() {
 
 #[test]
 fn model_block_single_foreign_key() {
-    let (ast, it) = lex_and_parse_with_id(
+    let ast = lex_and_parse(
         r#"
         @d1(d1_a)
         model Person {
@@ -237,23 +224,21 @@ fn model_block_single_foreign_key() {
     let dog = ast
         .models
         .iter()
-        .find(|m| m.name == "Dog")
+        .find(|m| m.symbol.name == "Dog")
         .expect("Dog model to be present");
 
     assert_eq!(
-        dog.d1_binding
-            .as_ref()
-            .and_then(|b| it.name_of(b.env_binding)),
+        dog.d1_binding.as_ref().map(|b| b.env_binding.as_str()),
         Some("d1_a")
     );
 
     assert_eq!(dog.foreign_keys.len(), 1);
     let fk = &dog.foreign_keys[0];
-    assert_eq!(it.name_of(fk.adj_model), Some("Person"));
+    assert_eq!(fk.adj_model, "Person");
     assert_eq!(
         fk.references
             .iter()
-            .map(|(src, _)| it.name_of(*src).unwrap())
+            .map(|(src, _)| src.as_str())
             .collect::<Vec<_>>(),
         vec!["userId"]
     );
@@ -261,7 +246,7 @@ fn model_block_single_foreign_key() {
 
 #[test]
 fn model_block_composite_foreign_key() {
-    let (ast, it) = lex_and_parse_with_id(
+    let ast = lex_and_parse(
         r#"
         @d1(d1_a)
         model Parent {
@@ -287,24 +272,21 @@ fn model_block_composite_foreign_key() {
     let child = ast
         .models
         .iter()
-        .find(|m| m.name == "Child")
+        .find(|m| m.symbol.name == "Child")
         .expect("Child model to be present");
 
     assert_eq!(
-        child
-            .d1_binding
-            .as_ref()
-            .and_then(|b| it.name_of(b.env_binding)),
+        child.d1_binding.as_ref().map(|b| b.env_binding.as_str()),
         Some("d1_a")
     );
 
     assert_eq!(child.foreign_keys.len(), 1);
     let fk = &child.foreign_keys[0];
-    assert_eq!(it.name_of(fk.adj_model), Some("Parent"));
+    assert_eq!(fk.adj_model, "Parent");
     assert_eq!(
         fk.references
             .iter()
-            .map(|(src, _)| it.name_of(*src).unwrap())
+            .map(|(src, _)| src.as_str())
             .collect::<Vec<_>>(),
         vec!["orgId", "userId"]
     );
@@ -312,7 +294,7 @@ fn model_block_composite_foreign_key() {
 
 #[test]
 fn model_block_nav_one_to_one() {
-    let (ast, it) = lex_and_parse_with_id(
+    let ast = lex_and_parse(
         r#"
         @d1(d1_a)
         model Bar {
@@ -337,26 +319,25 @@ fn model_block_nav_one_to_one() {
     let foo = ast
         .models
         .iter()
-        .find(|m| m.name == "Foo")
+        .find(|m| m.symbol.name == "Foo")
         .expect("Foo model to be present");
 
     assert_eq!(foo.navigation_properties.len(), 1);
     let nav = &foo.navigation_properties[0];
-    assert_eq!(it.name_of(nav.field), Some("bar"));
-    assert_eq!(it.name_of(nav.adj_model), Some("Bar"));
+    assert_eq!(nav.field, "bar");
     assert!(!nav.is_many_to_many);
     assert_eq!(
         nav.fields
             .iter()
-            .map(|&n| it.name_of(n).unwrap())
+            .map(|(m, f)| (m.as_str(), f.as_str()))
             .collect::<Vec<_>>(),
-        vec!["id"]
+        vec![("Bar", "id")]
     );
 }
 
 #[test]
 fn model_block_nav_one_to_many() {
-    let (ast, it) = lex_and_parse_with_id(
+    let ast = lex_and_parse(
         r#"
         @d1(d1_a)
         model Foo {
@@ -381,19 +362,25 @@ fn model_block_nav_one_to_many() {
     let foo = ast
         .models
         .iter()
-        .find(|m| m.name == "Foo")
+        .find(|m| m.symbol.name == "Foo")
         .expect("Foo model to be present");
 
     assert_eq!(foo.navigation_properties.len(), 1);
     let nav = &foo.navigation_properties[0];
-    assert_eq!(it.name_of(nav.field), Some("bars"));
-    assert_eq!(it.name_of(nav.adj_model), Some("Bar"));
+    assert_eq!(nav.field, "bars");
     assert!(!nav.is_many_to_many);
+    assert_eq!(
+        nav.fields
+            .iter()
+            .map(|(m, f)| (m.as_str(), f.as_str()))
+            .collect::<Vec<_>>(),
+        vec![("Bar", "fooId")]
+    );
 }
 
 #[test]
 fn model_block_nav_many_to_many() {
-    let (ast, it) = lex_and_parse_with_id(
+    let ast = lex_and_parse(
         r#"
         @d1(d1_a)
         model Student {
@@ -418,31 +405,122 @@ fn model_block_nav_many_to_many() {
     let student = ast
         .models
         .iter()
-        .find(|m| m.name == "Student")
+        .find(|m| m.symbol.name == "Student")
         .expect("Student model to be present");
 
     let course = ast
         .models
         .iter()
-        .find(|m| m.name == "Course")
+        .find(|m| m.symbol.name == "Course")
         .expect("Course model to be present");
 
     assert_eq!(student.navigation_properties.len(), 1);
     let student_nav = &student.navigation_properties[0];
-    assert_eq!(it.name_of(student_nav.field), Some("courses"));
-    assert_eq!(it.name_of(student_nav.adj_model), Some("Course"));
+    assert_eq!(student_nav.field, "courses");
     assert!(student_nav.is_many_to_many);
+    assert_eq!(
+        student_nav
+            .fields
+            .iter()
+            .map(|(m, f)| (m.as_str(), f.as_str()))
+            .collect::<Vec<_>>(),
+        vec![("Course", "students")]
+    );
 
     assert_eq!(course.navigation_properties.len(), 1);
     let course_nav = &course.navigation_properties[0];
-    assert_eq!(it.name_of(course_nav.field), Some("students"));
-    assert_eq!(it.name_of(course_nav.adj_model), Some("Student"));
+    assert_eq!(course_nav.field, "students");
     assert!(course_nav.is_many_to_many);
+    assert_eq!(
+        course_nav
+            .fields
+            .iter()
+            .map(|(m, f)| (m.as_str(), f.as_str()))
+            .collect::<Vec<_>>(),
+        vec![("Student", "courses")]
+    );
+}
+
+#[test]
+fn model_block_nav_implicit_model() {
+    let ast = lex_and_parse(
+        r#"
+        @d1(d1_a)
+        model Bar {
+            [primary id]
+            id: int
+            col: int
+
+            [nav foo -> col]
+            foo: Bar
+        }
+        "#,
+    );
+
+    let bar = ast
+        .models
+        .iter()
+        .find(|m| m.symbol.name == "Bar")
+        .expect("Bar model to be present");
+
+    assert_eq!(bar.navigation_properties.len(), 1);
+    let nav = &bar.navigation_properties[0];
+    assert_eq!(nav.field, "foo");
+    assert!(!nav.is_many_to_many);
+    assert_eq!(
+        nav.fields
+            .iter()
+            .map(|(m, f)| (m.as_str(), f.as_str()))
+            .collect::<Vec<_>>(),
+        vec![("Bar", "col")]
+    );
+}
+
+#[test]
+fn model_block_nav_mixed_refs() {
+    let ast = lex_and_parse(
+        r#"
+        @d1(d1_a)
+        model Foo {
+            [primary id]
+            id: int
+            col: int
+        }
+
+        @d1(d1_a)
+        model Bar {
+            [primary id]
+            id: int
+            localCol: int
+
+            [nav baz -> (Foo::col, localCol)]
+            baz: Foo
+        }
+        "#,
+    );
+
+    let bar = ast
+        .models
+        .iter()
+        .find(|m| m.symbol.name == "Bar")
+        .expect("Bar model to be present");
+
+    assert_eq!(bar.navigation_properties.len(), 1);
+    let nav = &bar.navigation_properties[0];
+    assert_eq!(nav.field, "baz");
+    assert!(!nav.is_many_to_many);
+    assert_eq!(
+        nav.fields
+            .iter()
+            .map(|(m, f)| (m.as_str(), f.as_str()))
+            .collect::<Vec<_>>(),
+        vec![("Foo", "col"), ("Bar", "localCol")]
+    );
 }
 
 #[test]
 fn api_block() {
-    let (ast, it) = lex_and_parse_with_id(
+    let ast = lex_and_parse(
         r#"
         @crud(get, save, list)
         model User {
@@ -475,7 +553,7 @@ fn api_block() {
     let user_model = ast
         .models
         .iter()
-        .find(|m| m.name == "User")
+        .find(|m| m.symbol.name == "User")
         .expect("User model to be present");
     assert_eq!(
         user_model.cruds,
@@ -483,31 +561,23 @@ fn api_block() {
     );
 
     // ParseAst keeps api blocks separate
-    let user_api_blocks: Vec<_> = ast
-        .apis
-        .iter()
-        .filter(|a| it.name_of(a.model) == Some("User"))
-        .collect();
+    let user_api_blocks: Vec<_> = ast.apis.iter().filter(|a| a.model == "User").collect();
     assert_eq!(user_api_blocks.len(), 3);
 
     // First block: someMethod + anotherMethod
     let first = user_api_blocks
         .iter()
-        .find(|a| {
-            a.methods
-                .iter()
-                .any(|m| it.name_of(m.id) == Some("someMethod"))
-        })
+        .find(|a| a.methods.iter().any(|m| m.symbol.name == "someMethod"))
         .expect("block with someMethod");
 
     let some_method = first
         .methods
         .iter()
-        .find(|m| it.name_of(m.id) == Some("someMethod"))
+        .find(|m| m.symbol.name == "someMethod")
         .expect("someMethod to be present");
     assert_eq!(some_method.http_verb, HttpVerb::Post);
     assert!(!some_method.is_static);
-    assert!(some_method.data_source_name.is_some());
+    assert!(some_method.data_source.is_some());
     assert_eq!(some_method.parameters.len(), 1);
     assert_eq!(some_method.parameters[0].name, "id");
     assert_eq!(
@@ -519,36 +589,32 @@ fn api_block() {
     let another_method = first
         .methods
         .iter()
-        .find(|m| it.name_of(m.id) == Some("anotherMethod"))
+        .find(|m| m.symbol.name == "anotherMethod")
         .expect("anotherMethod to be present");
     assert_eq!(another_method.http_verb, HttpVerb::Get);
     assert!(another_method.is_static);
-    assert!(another_method.data_source_name.is_none());
+    assert!(another_method.data_source.is_none());
     assert_eq!(another_method.parameters.len(), 0);
     assert_eq!(another_method.return_type, CidlType::Void);
 
     // Second block: getById
     let second = user_api_blocks
         .iter()
-        .find(|a| {
-            a.methods
-                .iter()
-                .any(|m| it.name_of(m.id) == Some("getById"))
-        })
+        .find(|a| a.methods.iter().any(|m| m.symbol.name == "getById"))
         .expect("block with getById");
     assert_eq!(second.methods.len(), 1);
 
     // Third block: update
     let third = user_api_blocks
         .iter()
-        .find(|a| a.methods.iter().any(|m| it.name_of(m.id) == Some("update")))
+        .find(|a| a.methods.iter().any(|m| m.symbol.name == "update"))
         .expect("block with update");
     assert_eq!(third.methods.len(), 1);
 }
 
 #[test]
 fn data_source_block() {
-    let (ast, it) = lex_and_parse_with_id(
+    let ast = lex_and_parse(
         r#"
         source UserSource for User {
             include { id, name, address { street, city } }
@@ -573,9 +639,9 @@ fn data_source_block() {
     let user_source = ast
         .sources
         .iter()
-        .find(|s| s.name == "UserSource")
+        .find(|s| s.symbol.name == "UserSource")
         .expect("UserSource to be present");
-    assert_eq!(it.name_of(user_source.model), Some("User"));
+    assert_eq!(user_source.model, "User");
 
     let tree = &user_source.tree;
     assert!(tree.0.contains_key("id"));
@@ -609,9 +675,9 @@ fn data_source_block() {
     let minimal = ast
         .sources
         .iter()
-        .find(|s| s.name == "MinimalSource")
+        .find(|s| s.symbol.name == "MinimalSource")
         .expect("MinimalSource to be present");
-    assert_eq!(it.name_of(minimal.model), Some("Post"));
+    assert_eq!(minimal.model, "Post");
     assert!(minimal.get.is_none());
     assert!(minimal.list.is_none());
 
@@ -622,7 +688,7 @@ fn data_source_block() {
 
 #[test]
 fn poo_block() {
-    let (ast, it) = lex_and_parse_with_id(
+    let ast = lex_and_parse(
         r#"
         poo Address {
             street: string
@@ -657,7 +723,7 @@ fn poo_block() {
     let address_poo = ast
         .poos
         .iter()
-        .find(|p| p.name == "Address")
+        .find(|p| p.symbol.name == "Address")
         .expect("Address poo to be present");
     assert_eq!(address_poo.fields.len(), 3);
 
@@ -671,7 +737,7 @@ fn poo_block() {
     let user_poo = ast
         .poos
         .iter()
-        .find(|p| p.name == "User")
+        .find(|p| p.symbol.name == "User")
         .expect("User poo to be present");
     assert_eq!(user_poo.fields.len(), 12);
 
@@ -689,12 +755,19 @@ fn poo_block() {
             ("active", CidlType::Boolean),
             ("balance", CidlType::Double),
             ("created", CidlType::DateIso),
-            ("address", CidlType::Object { name: "Address".to_string(), id: it.id("Address") }),
+            (
+                "address",
+                CidlType::Object {
+                    name: "Address".to_string(),
+                }
+            ),
             ("tags", CidlType::array(CidlType::String)),
             ("metadata", CidlType::nullable(CidlType::Json)),
             (
                 "optional_items",
-                CidlType::nullable(CidlType::array(CidlType::Object { name: "Item".to_string(), id: it.id("Item") }))
+                CidlType::nullable(CidlType::array(CidlType::Object {
+                    name: "Item".to_string(),
+                }))
             ),
             (
                 "nullable_arrays",
@@ -706,7 +779,7 @@ fn poo_block() {
     let container_poo = ast
         .poos
         .iter()
-        .find(|p| p.name == "Container")
+        .find(|p| p.symbol.name == "Container")
         .expect("Container poo to be present");
     assert_eq!(container_poo.fields.len(), 2);
     assert_eq!(
@@ -722,7 +795,7 @@ fn poo_block() {
 
 #[test]
 fn inject_block() {
-    let (ast, it) = lex_and_parse_with_id(
+    let ast = lex_and_parse(
         r#"
         inject {
             OpenApiService
@@ -738,9 +811,8 @@ fn inject_block() {
     assert_eq!(
         ast.injects
             .iter()
-            .map(|s| s.refs.iter())
-            .flatten()
-            .map(|&r| it.name_of(r).unwrap())
+            .flat_map(|s| s.fields.iter())
+            .map(|r| r.name.as_str())
             .collect::<Vec<_>>(),
         vec!["OpenApiService", "YouTubeApi", "SlackApi"]
     );
@@ -748,7 +820,7 @@ fn inject_block() {
 
 #[test]
 fn service_block() {
-    let (ast, it) = lex_and_parse_with_id(
+    let ast = lex_and_parse(
         r#"
         service MyAppService {
             api1: OpenApiService
@@ -775,7 +847,7 @@ fn service_block() {
     let service = ast
         .services
         .iter()
-        .find(|s| s.name == "MyAppService")
+        .find(|s| s.symbol.name == "MyAppService")
         .expect("MyAppService service to be present");
 
     assert_eq!(service.fields.len(), 2);
@@ -785,14 +857,24 @@ fn service_block() {
         .iter()
         .find(|f| f.name == "api1")
         .expect("api1 field");
-    assert_eq!(api1.cidl_type, CidlType::Object { name: "OpenApiService".to_string(), id: it.id("OpenApiService") });
+    assert_eq!(
+        api1.cidl_type,
+        CidlType::Object {
+            name: "OpenApiService".to_string(),
+        }
+    );
 
     let api2 = service
         .fields
         .iter()
         .find(|f| f.name == "api2")
         .expect("api2 field");
-    assert_eq!(api2.cidl_type, CidlType::Object { name: "YouTubeApi".to_string(), id: it.id("YouTubeApi") });
+    assert_eq!(
+        api2.cidl_type,
+        CidlType::Object {
+            name: "YouTubeApi".to_string(),
+        }
+    );
 
     // Fields have distinct spans
     assert_ne!(api1.span, api2.span);
@@ -800,33 +882,29 @@ fn service_block() {
     let empty = ast
         .services
         .iter()
-        .find(|s| s.name == "EmptyService")
+        .find(|s| s.symbol.name == "EmptyService")
         .expect("EmptyService to be present");
     assert_eq!(empty.fields.len(), 0);
 
     // Services have distinct name spans
-    assert_ne!(service.span, empty.span);
+    assert_ne!(service.symbol.span, empty.symbol.span);
 
     // Two api blocks for MyAppService kept separate
     let app_api_blocks: Vec<_> = ast
         .apis
         .iter()
-        .filter(|a| it.name_of(a.model) == Some("MyAppService"))
+        .filter(|a| a.model == "MyAppService")
         .collect();
     assert_eq!(app_api_blocks.len(), 2);
 
     let create_block = app_api_blocks
         .iter()
-        .find(|a| {
-            a.methods
-                .iter()
-                .any(|m| it.name_of(m.id) == Some("createItem"))
-        })
+        .find(|a| a.methods.iter().any(|m| m.symbol.name == "createItem"))
         .expect("block with createItem");
     let create = create_block
         .methods
         .iter()
-        .find(|m| it.name_of(m.id) == Some("createItem"))
+        .find(|m| m.symbol.name == "createItem")
         .unwrap();
     assert_eq!(create.http_verb, HttpVerb::Post);
     assert!(create.is_static);
@@ -835,16 +913,12 @@ fn service_block() {
 
     let list_block = app_api_blocks
         .iter()
-        .find(|a| {
-            a.methods
-                .iter()
-                .any(|m| it.name_of(m.id) == Some("listItems"))
-        })
+        .find(|a| a.methods.iter().any(|m| m.symbol.name == "listItems"))
         .expect("block with listItems");
     let list = list_block
         .methods
         .iter()
-        .find(|m| it.name_of(m.id) == Some("listItems"))
+        .find(|m| m.symbol.name == "listItems")
         .unwrap();
     assert_eq!(list.http_verb, HttpVerb::Get);
     assert!(!list.is_static);

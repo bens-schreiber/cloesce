@@ -1,11 +1,10 @@
 use std::ops::Not;
 
 use ast::{Api, ApiMethod, CidlType, Field, HttpVerb, MediaType};
-use frontend::{ApiBlock, ApiBlockMethod, ParseAst, parser::ParseId};
+use frontend::{ApiBlock, ApiBlockMethod, ParseAst};
 
 use crate::{
-    SymbolKind, SymbolTable,
-    ensure,
+    SymbolKind, SymbolTable, ensure,
     err::{BatchResult, CompilerErrorKind, ErrorSink},
 };
 
@@ -25,25 +24,29 @@ impl ApiAnalysis {
 
         for api in apis {
             // Validate the model reference
-            let Some(model_sym) = table.lookup(api.model) else {
+            let Some(model_sym) = table.resolve(&api.model, SymbolKind::ModelDecl, None) else {
                 self.sink
-                    .push(CompilerErrorKind::ApiUnknownModelReference { api: api.id });
+                    .push(CompilerErrorKind::ApiUnknownModelReference {
+                        api: api.symbol.clone(),
+                    });
                 continue;
             };
 
             if matches!(model_sym.kind, SymbolKind::ModelDecl).not() {
                 self.sink
-                    .push(CompilerErrorKind::ApiUnknownModelReference { api: api.id });
+                    .push(CompilerErrorKind::ApiUnknownModelReference {
+                        api: api.symbol.clone(),
+                    });
                 continue;
             };
 
             let model_name = model_sym.name.clone();
             let mut model_api = Api {
-                name: api.name.clone(),
+                name: api.symbol.name.clone(),
                 methods: Vec::new(),
             };
             for method in &api.methods {
-                if let Some(api_method) = self.method(api.model, method, parse, table) {
+                if let Some(api_method) = self.method(&api.model, method, parse, table) {
                     model_api.methods.push(api_method);
                 }
             }
@@ -56,32 +59,37 @@ impl ApiAnalysis {
 
     fn method(
         &mut self,
-        model: ParseId,
+        model_name: &str,
         method: &ApiBlockMethod,
         parse: &ParseAst,
         table: &SymbolTable,
     ) -> Option<ApiMethod> {
         // Validate data source reference
-        let data_source_name = if let Some(ds) = method.data_source_name {
+        let data_source_name = if let Some(ref ds) = method.data_source {
             ensure!(
                 !method.is_static,
                 self.sink,
-                CompilerErrorKind::ApiStaticMethodWithDataSource { method: method.id }
+                CompilerErrorKind::ApiStaticMethodWithDataSource {
+                    method: method.symbol.clone(),
+                }
             );
 
             // Check that the data source exists on this model
-            let ds_exists = parse.sources.iter().any(|s| s.id == ds && s.model == model);
+            let ds_exists = parse
+                .sources
+                .iter()
+                .any(|s| s.symbol.name == *ds && s.model == model_name);
 
             ensure!(
                 ds_exists,
                 self.sink,
                 CompilerErrorKind::ApiUnknownDataSourceReference {
-                    method: method.id,
-                    data_source: ds,
+                    method: method.symbol.clone(),
+                    data_source: ds.clone(),
                 }
             );
 
-            Some(table.name(ds).to_string())
+            Some(ds.clone())
         } else {
             None
         };
@@ -99,7 +107,7 @@ impl ApiAnalysis {
         };
 
         Some(ApiMethod {
-            name: table.name(method.id).to_string(),
+            name: method.symbol.name.clone(),
             is_static: method.is_static,
             data_source,
             http_verb: method.http_verb,
@@ -111,23 +119,23 @@ impl ApiAnalysis {
     }
 
     fn return_type(&mut self, method: &ApiBlockMethod, table: &SymbolTable) {
-        let err = || CompilerErrorKind::ApiInvalidReturn { method: method.id };
+        let err = || CompilerErrorKind::ApiInvalidReturn {
+            method: method.symbol.clone(),
+        };
 
         match method.return_type.root_type() {
-            CidlType::Object { id, .. } | CidlType::Partial { id, .. } => {
-                let valid = table.lookup(*id).is_some_and(|s| {
-                    matches!(
-                        s.kind,
-                        SymbolKind::ModelDecl | SymbolKind::PlainOldObjectDecl
-                    )
-                });
+            CidlType::Object { name, .. } | CidlType::Partial { name, .. } => {
+                let valid = table
+                    .resolve(name, SymbolKind::ModelDecl, None)
+                    .or_else(|| table.resolve(name, SymbolKind::PlainOldObjectDecl, None))
+                    .is_some();
                 ensure!(valid, self.sink, err());
             }
 
-            CidlType::DataSource { id: model_ref, .. } => {
+            CidlType::DataSource { name, .. } => {
                 let valid = table
-                    .lookup(*model_ref)
-                    .is_some_and(|s| matches!(s.kind, SymbolKind::ModelDecl));
+                    .resolve(name, SymbolKind::ModelDecl, None)
+                    .is_some();
                 ensure!(valid, self.sink, err());
             }
 
@@ -154,41 +162,33 @@ impl ApiAnalysis {
 
         for param in &method.parameters {
             let err = || CompilerErrorKind::ApiInvalidParam {
-                method: method.id,
-                param: param.id,
-            };
-
-            let Some(param_sym) = table.lookup(param.id) else {
-                self.sink
-                    .push(CompilerErrorKind::UnresolvedSymbol { symbol: param.id });
-                continue;
+                method: method.symbol.clone(),
+                param: param.clone(),
             };
 
             // DataSource parameters validated separately
-            if let CidlType::DataSource { id: model_ref, .. } = &param_sym.cidl_type {
+            if let CidlType::DataSource { name, .. } = &param.cidl_type {
                 let valid = table
-                    .lookup(*model_ref)
-                    .is_some_and(|s| matches!(s.kind, SymbolKind::ModelDecl));
+                    .resolve(name, SymbolKind::ModelDecl, None)
+                    .is_some();
                 ensure!(valid, self.sink, err());
                 params.push(Field {
-                    name: param_sym.name.clone(),
-                    cidl_type: param_sym.cidl_type.clone(),
+                    name: param.name.clone(),
+                    cidl_type: param.cidl_type.clone(),
                 });
                 continue;
             }
 
-            match param_sym.cidl_type.root_type() {
+            match param.cidl_type.root_type() {
                 CidlType::Void => {
                     self.sink.push(err());
                 }
 
-                CidlType::Object { id, .. } | CidlType::Partial { id, .. } => {
-                    let valid = table.lookup(*id).is_some_and(|s| {
-                        matches!(
-                            s.kind,
-                            SymbolKind::ModelDecl | SymbolKind::PlainOldObjectDecl
-                        )
-                    });
+                CidlType::Object { name, .. } | CidlType::Partial { name, .. } => {
+                    let valid = table
+                        .resolve(name, SymbolKind::ModelDecl, None)
+                        .or_else(|| table.resolve(name, SymbolKind::PlainOldObjectDecl, None))
+                        .is_some();
                     ensure!(valid, self.sink, err());
 
                     // GET requests do not support Object parameters
@@ -209,12 +209,15 @@ impl ApiAnalysis {
                         .parameters
                         .iter()
                         .filter(|p| {
-                            !matches!(p.cidl_type, CidlType::Inject { .. } | CidlType::DataSource { .. })
+                            !matches!(
+                                p.cidl_type,
+                                CidlType::Inject { .. } | CidlType::DataSource { .. }
+                            )
                         })
                         .count();
 
                     ensure!(
-                        required_params == 1 && matches!(param_sym.cidl_type, CidlType::Stream),
+                        required_params == 1 && matches!(param.cidl_type, CidlType::Stream),
                         self.sink,
                         err()
                     );
@@ -224,8 +227,8 @@ impl ApiAnalysis {
             }
 
             params.push(Field {
-                name: param_sym.name.clone(),
-                cidl_type: param_sym.cidl_type.clone(),
+                name: param.name.clone(),
+                cidl_type: param.cidl_type.clone(),
             });
         }
 

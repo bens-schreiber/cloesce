@@ -1,12 +1,10 @@
-use std::path::PathBuf;
-
 use ast::CidlType;
 use chumsky::prelude::*;
 
 use crate::{
-    SpannedName, SpannedTypedName, WranglerEnvBlock,
+    FileSpan, Symbol, SymbolKind, WranglerEnvBindingKind, WranglerEnvBlock,
     lexer::Token,
-    parser::{Extra, IdScope, It, cidl_type},
+    parser::{Extra, cidl_type},
 };
 
 enum BindingKind {
@@ -20,6 +18,8 @@ enum EnvEntry {
     Var(CidlType),
 }
 
+pub const WRANGLER_ENV_SYMBOL_NAME: &str = "$$wrangler_env";
+
 /// Parses a block of the form:
 ///
 /// ```cloesce
@@ -29,10 +29,7 @@ enum EnvEntry {
 ///     ident3: cidl_type
 /// }
 /// ```
-pub fn env_block<'t>(it: It) -> impl Parser<'t, &'t [Token], WranglerEnvBlock, Extra<'t>> {
-    let st_vars = it.clone();
-    let st_id = it.clone();
-
+pub fn env_block<'t>() -> impl Parser<'t, &'t [Token], WranglerEnvBlock, Extra<'t>> {
     // ident: (d1 | r2 | kv | cidl_type)
     let env_entry = select! { Token::Ident(name) => name }
         .map_with(|name, e| (name, e.span()))
@@ -41,7 +38,7 @@ pub fn env_block<'t>(it: It) -> impl Parser<'t, &'t [Token], WranglerEnvBlock, E
             just(Token::D1).map(|_| EnvEntry::Binding(BindingKind::D1)),
             just(Token::R2).map(|_| EnvEntry::Binding(BindingKind::R2)),
             just(Token::Kv).map(|_| EnvEntry::Binding(BindingKind::Kv)),
-            cidl_type(st_vars).map(EnvEntry::Var),
+            cidl_type().map(EnvEntry::Var),
         )));
 
     // env { ... }
@@ -53,37 +50,59 @@ pub fn env_block<'t>(it: It) -> impl Parser<'t, &'t [Token], WranglerEnvBlock, E
                 .delimited_by(just(Token::LBrace), just(Token::RBrace)),
         )
         .map_with(move |entries, e| {
-            let id = st_id.borrow_mut().new_id();
             let mut block = WranglerEnvBlock {
-                id,
-                span: e.span(),
-                file: PathBuf::new(),
+                symbol: Symbol {
+                    name: WRANGLER_ENV_SYMBOL_NAME.to_string(),
+                    span: FileSpan::from_simple_span(e.span()),
+                    kind: SymbolKind::WranglerEnvDecl,
+                    ..Default::default()
+                },
                 d1_bindings: Vec::new(),
                 kv_bindings: Vec::new(),
                 r2_bindings: Vec::new(),
                 vars: Vec::new(),
             };
             for ((name, span), entry) in entries {
+                let span = FileSpan::from_simple_span(span);
                 match entry {
                     EnvEntry::Binding(BindingKind::D1) => {
-                        let id = st_id.borrow_mut().intern(name.clone(), IdScope::Env);
-                        block.d1_bindings.push(SpannedName { id, span, name });
-                    }
-                    EnvEntry::Binding(BindingKind::R2) => {
-                        let id = st_id.borrow_mut().intern(name.clone(), IdScope::Env);
-                        block.r2_bindings.push(SpannedName { id, span, name });
-                    }
-                    EnvEntry::Binding(BindingKind::Kv) => {
-                        let id = st_id.borrow_mut().intern(name.clone(), IdScope::Env);
-                        block.kv_bindings.push(SpannedName { id, span, name });
-                    }
-                    EnvEntry::Var(ty) => {
-                        let id = st_id.borrow_mut().intern(name.clone(), IdScope::Env);
-                        block.vars.push(SpannedTypedName {
-                            id,
+                        block.d1_bindings.push(Symbol {
                             span,
                             name,
-                            cidl_type: ty,
+                            kind: SymbolKind::WranglerEnvBinding {
+                                kind: WranglerEnvBindingKind::D1,
+                            },
+                            ..Default::default()
+                        });
+                    }
+                    EnvEntry::Binding(BindingKind::R2) => {
+                        block.r2_bindings.push(Symbol {
+                            span,
+                            name,
+                            kind: SymbolKind::WranglerEnvBinding {
+                                kind: WranglerEnvBindingKind::R2,
+                            },
+                            ..Default::default()
+                        });
+                    }
+                    EnvEntry::Binding(BindingKind::Kv) => {
+                        block.kv_bindings.push(Symbol {
+                            span,
+                            name,
+                            kind: SymbolKind::WranglerEnvBinding {
+                                kind: WranglerEnvBindingKind::Kv,
+                            },
+                            ..Default::default()
+                        });
+                    }
+                    EnvEntry::Var(cidl_type) => {
+                        block.vars.push(Symbol {
+                            span,
+                            name,
+                            cidl_type,
+                            kind: SymbolKind::WranglerEnvVar,
+                            parent_name: WRANGLER_ENV_SYMBOL_NAME.to_string(),
+                            ..Default::default()
                         });
                     }
                 }

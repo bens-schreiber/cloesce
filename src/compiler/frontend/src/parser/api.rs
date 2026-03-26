@@ -1,13 +1,11 @@
-use std::path::PathBuf;
-
 use chumsky::prelude::*;
 
 use ast::{CidlType, HttpVerb};
 
 use crate::{
-    ApiBlock, ApiBlockMethod, SpannedTypedName,
+    ApiBlock, ApiBlockMethod, FileSpan, Symbol, SymbolKind,
     lexer::Token,
-    parser::{Extra, IdScope, It, cidl_type},
+    parser::{Extra, cidl_type},
 };
 
 struct PendingApiMethod {
@@ -24,7 +22,7 @@ enum PendingApiParam {
     },
     Field {
         name: String,
-        name_span: chumsky::span::SimpleSpan,
+        span: SimpleSpan,
         cidl_type: CidlType,
     },
 }
@@ -42,61 +40,47 @@ enum PendingApiParam {
 ///     ) -> cidl_type
 /// }
 /// ```
-pub fn api_block<'t>(st: It) -> impl Parser<'t, &'t [Token], ApiBlock, Extra<'t>> {
-    let st_methods = st.clone();
-    let st_map = st.clone();
-
+pub fn api_block<'t>() -> impl Parser<'t, &'t [Token], ApiBlock, Extra<'t>> {
     // api ApiName for ModelName { ... }
     just(Token::Api)
         .ignore_then(select! { Token::Ident(name) => name })
         .then_ignore(just(Token::For))
         .then(select! { Token::Ident(name) => name })
         .then(
-            method(st_methods)
+            method()
                 .repeated()
                 .collect::<Vec<_>>()
                 .delimited_by(just(Token::LBrace), just(Token::RBrace)),
         )
-        .map_with(
-            move |((api_name, model_name), pending_methods), e| {
-                let id = st_map
-                    .borrow_mut()
-                    .intern(api_name.clone(), IdScope::Global);
-                let model = st_map.borrow_mut().intern(model_name, IdScope::Global);
-                let api_scope = IdScope::Api(api_name.clone());
+        .map_with(|((name, model), pending_methods), e| {
+            let methods = pending_methods.into_iter().map(map_method).collect();
 
-                let methods = pending_methods
-                    .into_iter()
-                    .map(|m| map_method(m, &st_map, &api_scope))
-                    .collect();
-
-                ApiBlock {
-                    id,
-                    name: api_name,
-                    span: e.span(),
-                    file: PathBuf::new(),
-                    model,
-                    methods,
-                }
-            },
-        )
+            ApiBlock {
+                symbol: Symbol {
+                    span: FileSpan::from_simple_span(e.span()),
+                    name,
+                    kind: SymbolKind::ApiDecl,
+                    ..Default::default()
+                },
+                model,
+                methods,
+            }
+        })
 }
 
-fn method<'t>(st: It) -> impl Parser<'t, &'t [Token], PendingApiMethod, Extra<'t>> {
-    let st_param = st.clone();
-
+fn method<'t>() -> impl Parser<'t, &'t [Token], PendingApiMethod, Extra<'t>> {
     // http_verb methodName(ident1: cidl_type, ...) -> cidl_type
     http_verb()
         .then(select! { Token::Ident(name) => name }.map_with(|name, e| (name, e.span())))
         .then(
-            parameter(st_param)
+            parameter()
                 .separated_by(just(Token::Comma))
                 .allow_trailing()
                 .collect::<Vec<_>>()
                 .delimited_by(just(Token::LParen), just(Token::RParen)),
         )
         .then_ignore(just(Token::Arrow))
-        .then(cidl_type(st))
+        .then(cidl_type())
         .map(
             |(((http_verb, (name, span)), parameters), return_type)| PendingApiMethod {
                 name,
@@ -108,7 +92,7 @@ fn method<'t>(st: It) -> impl Parser<'t, &'t [Token], PendingApiMethod, Extra<'t
         )
 }
 
-fn parameter<'t>(st: It) -> impl Parser<'t, &'t [Token], PendingApiParam, Extra<'t>> {
+fn parameter<'t>() -> impl Parser<'t, &'t [Token], PendingApiParam, Extra<'t>> {
     // @source(DataSourceName) self
     let source_tag = just(Token::At)
         .ignore_then(just(Token::Source))
@@ -126,10 +110,10 @@ fn parameter<'t>(st: It) -> impl Parser<'t, &'t [Token], PendingApiParam, Extra<
     let named_parameter = select! { Token::Ident(name) => name }
         .map_with(|name, e| (name, e.span()))
         .then_ignore(just(Token::Colon))
-        .then(cidl_type(st))
-        .map(|((name, name_span), cidl_type)| PendingApiParam::Field {
+        .then(cidl_type())
+        .map(|((name, span), cidl_type)| PendingApiParam::Field {
             name,
-            name_span,
+            span,
             cidl_type,
         });
 
@@ -147,9 +131,7 @@ fn http_verb<'t>() -> impl Parser<'t, &'t [Token], HttpVerb, Extra<'t>> {
     ))
 }
 
-fn map_method(method: PendingApiMethod, st: &It, api_scope: &IdScope) -> ApiBlockMethod {
-    let id = st.borrow_mut().intern(method.name, api_scope.clone());
-
+fn map_method(method: PendingApiMethod) -> ApiBlockMethod {
     let mut is_static = true;
     let mut data_source = None;
     let mut parameters = Vec::new();
@@ -161,31 +143,34 @@ fn map_method(method: PendingApiMethod, st: &It, api_scope: &IdScope) -> ApiBloc
             } => {
                 is_static = false;
                 if data_source.is_none() {
-                    data_source =
-                        explicit_source.map(|s| st.borrow_mut().intern(s, IdScope::Global));
+                    data_source = explicit_source;
                 }
             }
             PendingApiParam::Field {
                 name,
-                name_span,
+                span,
                 cidl_type,
             } => {
-                let id = st.borrow_mut().intern(name.clone(), api_scope.clone());
-                parameters.push(SpannedTypedName {
-                    id,
-                    span: name_span,
+                parameters.push(Symbol {
+                    span: FileSpan::from_simple_span(span),
                     name,
                     cidl_type,
+                    kind: SymbolKind::ApiMethodParam,
+                    ..Default::default()
                 });
             }
         }
     }
 
     ApiBlockMethod {
-        id,
-        span: method.span,
+        symbol: Symbol {
+            span: FileSpan::from_simple_span(method.span),
+            name: method.name,
+            kind: SymbolKind::ApiMethodDecl,
+            ..Default::default()
+        },
         is_static,
-        data_source_name: data_source,
+        data_source,
         http_verb: method.http_verb,
         return_type: method.return_type,
         parameters,

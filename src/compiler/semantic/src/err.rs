@@ -1,6 +1,6 @@
-use frontend::parser::ParseId;
+use frontend::{D1Tag, FileSpan};
 
-use crate::FileSpan;
+use crate::Symbol;
 
 pub type BatchResult<T> = std::result::Result<T, Vec<CompilerErrorKind>>;
 
@@ -8,20 +8,13 @@ pub type BatchResult<T> = std::result::Result<T, Vec<CompilerErrorKind>>;
 pub enum CompilerErrorKind {
     /// A symbol was defined more than once in the same scope.
     DuplicateSymbol {
-        symbol: ParseId,
-        first_span: FileSpan,
-        second_span: FileSpan,
+        first: Symbol,
+        second: Symbol,
     },
 
     /// A symbol was referenced but not defined in any visible scope.
     UnresolvedSymbol {
-        symbol: ParseId,
-    },
-
-    /// A wrangler environment was defined more than once within the project.
-    MultipleWranglerEnvBlocks {
-        first: ParseId,
-        second: ParseId,
+        span: FileSpan,
     },
 
     /// A model relies on a Wrangler environment block that is not defined within the project.
@@ -29,209 +22,202 @@ pub enum CompilerErrorKind {
 
     /// A model with any columns or navigation properties requires a specific D1 binding to be specified.
     D1ModelMissingD1Binding {
-        model: ParseId,
+        model: Symbol,
     },
 
     /// A model that specifies a D1 binding that does not resolve to an actual Wrangler D1 binding.
     D1ModelInvalidD1Binding {
-        model: ParseId,
-        tag: ParseId,
+        model: Symbol,
+        tag: D1Tag,
     },
 
     /// A model that specifies a D1 binding but does not specify a primary key.
     D1ModelMissingPrimaryKey {
-        model: ParseId,
+        model: Symbol,
     },
 
     /// A column in a D1 model can only be a SQLite type
     InvalidColumnType {
-        column: ParseId,
+        column: Symbol,
     },
 
     /// A primary key column in a D1 model cannot be nullable
     NullablePrimaryKey {
-        column: ParseId,
+        column: Symbol,
     },
 
     /// A foreign key in a D1 model cannot reference it's own model
-    ForeignKeyReferenceSelf {
-        model: ParseId,
-        foreign_key: ParseId,
+    ForeignKeyReferencesSelf {
+        model: Symbol,
+        foreign_key: FileSpan,
     },
 
     /// A foreign key references a model in a different database (i.e. one with a different D1 binding)
     ForeignKeyReferencesDifferentDatabase {
-        tag: ParseId,
-        binding: ParseId,
+        tag: FileSpan,
+        binding: String,
     },
 
     ForeignKeyReferencesInvalidOrUnknownColumn {
-        tag: ParseId,
-        column: ParseId,
+        tag: FileSpan,
+        column: String,
     },
 
     /// A foreign key can only be to a single adjacent model
     ForeignKeyReferencesMultipleModels {
-        tag: ParseId,
-        first_model: ParseId,
-        second_model: ParseId,
+        tag: FileSpan,
+        first_model: String,
+        second_model: String,
     },
 
     /// A foreign key must reference a column of the same type (e.g. you can't reference an Integer column from a String column)
     ForeignKeyReferencesIncompatibleColumnType {
-        tag: ParseId,
-        column: ParseId,
-        adj_column: ParseId,
+        tag: FileSpan,
+        column: Symbol,
+        adj_column: Symbol,
     },
 
     /// All columns involved in a foreign key must be consistently nullable or non-nullable
     ForeignKeyInconsistentNullability {
-        tag: ParseId,
-        first_column: ParseId,
-        second_column: ParseId,
+        tag: FileSpan,
+        first_column: Symbol,
+        second_column: Symbol,
     },
 
     /// A column in a D1 model can only participate in a single foreign key relationship
     ForeignKeyColumnAlreadyInForeignKey {
-        tag: ParseId,
-        column: ParseId,
+        tag: FileSpan,
+        column: Symbol,
     },
 
     NavigationPropertyReferencesInvalidOrUnknownField {
-        tag: ParseId,
-        field: ParseId,
-    },
-
-    NavigationPropertyReferencesSelf {
-        model: ParseId,
-        tag: ParseId,
+        tag: FileSpan,
+        field: String,
     },
 
     NavigationPropertyReferencesDifferentDatabase {
-        tag: ParseId,
-        binding: ParseId,
+        tag: FileSpan,
+        binding: String,
     },
 
     /// A field in a D1 model can only participate in a single navigation property
     NavigationPropertyFieldAlreadyInNavigationProperty {
-        tag: ParseId,
-        field: ParseId,
+        tag: FileSpan,
+        field: Symbol,
     },
 
     /// A many-to-many navigation property requires exactly one reciprocal M2M nav on the adjacent model, but none was found.
     NavigationPropertyMissingReciprocalM2M {
-        tag: ParseId,
+        tag: FileSpan,
     },
 
     /// A many-to-many navigation property found multiple reciprocal M2M navs on the adjacent model.
     NavigationPropertyAmbiguousM2M {
-        tag: ParseId,
-        first_m2m_nav: ParseId,
-        second_m2m_nav: ParseId,
+        tag: FileSpan,
     },
 
     UniqueConstraintReferencesInvalidOrUnknownField {
-        tag: ParseId,
-        field: ParseId,
+        tag: FileSpan,
+        field: String,
     },
 
     CyclicalRelationship {
-        cycle: Vec<ParseId>,
+        cycle: Vec<String>,
     },
 
     /// A KV tag references an env binding that is not a KV namespace
     KvInvalidBinding {
-        tag: ParseId,
-        binding: ParseId,
+        tag: FileSpan,
+        binding: String,
     },
 
     /// An R2 tag references an env binding that is not an R2 bucket
     R2InvalidBinding {
-        tag: ParseId,
-        binding: ParseId,
+        tag: FileSpan,
+        binding: String,
     },
 
     /// A KV/R2 key format string references a variable that is not a field or key param on the model
     KvR2UnknownKeyVariable {
-        tag: ParseId,
+        tag: FileSpan,
         variable: String,
     },
 
     /// A KV/R2 key format string has invalid syntax (e.g. nested or unclosed braces)
     KvR2InvalidKeyFormat {
-        tag: ParseId,
+        tag: FileSpan,
         reason: String,
     },
 
     /// A KV/R2 tag references a field that does not exist on the model
     KvR2InvalidField {
-        tag: ParseId,
-        field: ParseId,
+        tag: FileSpan,
+        field: String,
     },
 
     /// A Kv/R2 key param must be of type String
     KvR2InvalidKeyParam {
-        tag: ParseId,
-        field: ParseId,
+        tag: FileSpan,
+        field: Symbol,
     },
 
     PlainOldObjectInvalidFieldType {
-        field: ParseId,
+        field: Symbol,
     },
 
     /// A service field must be of type Inject or another Service.
     ServiceInvalidFieldType {
-        field: ParseId,
+        field: Symbol,
     },
 
     /// A data source references a model that does not exist or is not a model.
     DataSourceUnknownModelReference {
-        source: ParseId,
+        source: Symbol,
     },
 
     /// A data source include tree references a name that is not a navigation property, KV, or R2 on the model.
     DataSourceInvalidIncludeTreeReference {
-        source: ParseId,
-        model: ParseId,
+        source: Symbol,
+        model: String,
         name: String,
     },
 
     /// A data source method parameter is not a valid SQLite type.
     DataSourceInvalidMethodParam {
-        source: ParseId,
-        param: ParseId,
+        source: Symbol,
+        param: Symbol,
     },
 
     /// A model has a CRUD operation that is not supported for its backing store.
     UnsupportedCrudOperation {
-        model: ParseId,
+        model: Symbol,
     },
 
     /// An API block references a model that does not exist.
     ApiUnknownModelReference {
-        api: ParseId,
+        api: Symbol,
     },
 
     /// A non-static API method has a data source but the method is marked static.
     ApiStaticMethodWithDataSource {
-        method: ParseId,
+        method: Symbol,
     },
 
     /// An API method references a data source that does not exist on the model.
     ApiUnknownDataSourceReference {
-        method: ParseId,
-        data_source: ParseId,
+        method: Symbol,
+        data_source: String,
     },
 
     /// An API method has an invalid return type.
     ApiInvalidReturn {
-        method: ParseId,
+        method: Symbol,
     },
 
     /// An API method has an invalid parameter.
     ApiInvalidParam {
-        method: ParseId,
-        param: ParseId,
+        method: Symbol,
+        param: Symbol,
     },
 }
 

@@ -35,17 +35,11 @@ pub enum CidlType {
     /// A dependency injected instance, containing a type name.
     Inject {
         name: String,
-
-        /// The ParseId of the injected type
-        id: usize,
     },
 
     /// A model, or plain old object, containing the name of the class.
     Object {
         name: String,
-
-        /// The ParseId of a model or plain old object
-        id: usize,
     },
 
     /// A part of a model or plain object, containing the name of the class.
@@ -53,17 +47,11 @@ pub enum CidlType {
     /// Only valid as a method argument.
     Partial {
         name: String,
-
-        /// The ParseId of a model or plain old object
-        id: usize,
     },
 
     /// A data source of some model
     DataSource {
         name: String,
-
-        /// The ParseId of a model
-        id: usize,
     },
 
     /// An array of any type

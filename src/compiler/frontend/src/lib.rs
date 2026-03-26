@@ -3,138 +3,171 @@ use std::path::PathBuf;
 use ast::{CidlType, CrudKind, HttpVerb, IncludeTree};
 use chumsky::span::SimpleSpan;
 
-use crate::parser::ParseId;
-
 pub mod lexer;
 pub mod parser;
 
-#[derive(Clone)]
-pub struct SpannedTypedName {
-    pub id: ParseId,
-    pub span: SimpleSpan,
-    pub name: String,
-    pub cidl_type: CidlType,
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Default)]
+pub struct FileSpan {
+    pub start: usize,
+    pub end: usize,
+    pub file: PathBuf,
 }
 
-#[derive(Clone)]
-pub struct SpannedName {
-    pub id: ParseId,
-    pub span: SimpleSpan,
+impl FileSpan {
+    pub fn from_simple_span(span: SimpleSpan) -> Self {
+        FileSpan {
+            start: span.start,
+            end: span.end,
+            file: PathBuf::default(), // TODO: track files
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum WranglerEnvBindingKind {
+    D1,
+    R2,
+    Kv,
+}
+
+#[derive(Clone, Default, Debug)]
+pub enum SymbolKind {
+    ModelDecl,
+    ModelField,
+
+    WranglerEnvDecl,
+    WranglerEnvBinding {
+        kind: WranglerEnvBindingKind,
+    },
+    WranglerEnvVar,
+
+    PlainOldObjectDecl,
+    PlainOldObjectField,
+
+    ApiDecl,
+    ApiMethodDecl,
+    ApiMethodParam,
+
+    DataSourceDecl,
+    DataSourceMethodDecl,
+    DataSourceMethodParam,
+
+    ServiceDecl,
+    ServiceField,
+
+    InjectDecl,
+
+    #[default]
+    Null,
+}
+
+#[derive(Clone, Debug, Default)]
+pub struct Symbol {
+    /// [String::default()] for symbols with no name
     pub name: String,
+
+    /// [CidlType::default()] for symbols with no type
+    pub cidl_type: CidlType,
+
+    /// [String::default()] for symbols with no parent
+    pub parent_name: String,
+
+    pub span: FileSpan,
+    pub kind: SymbolKind,
 }
 
 pub struct ApiBlock {
-    pub id: ParseId,
-    pub name: String,
-    pub span: SimpleSpan,
-    pub file: PathBuf,
+    pub symbol: Symbol,
 
-    pub model: ParseId,
+    pub model: String,
     pub methods: Vec<ApiBlockMethod>,
 }
 
 pub struct ApiBlockMethod {
-    pub id: ParseId,
-    pub span: SimpleSpan,
+    pub symbol: Symbol,
 
     pub is_static: bool,
     pub http_verb: HttpVerb,
-    pub data_source_name: Option<ParseId>,
+    pub data_source: Option<String>,
     pub return_type: CidlType,
-    pub parameters: Vec<SpannedTypedName>,
+    pub parameters: Vec<Symbol>,
 }
 
 pub struct DataSourceBlockMethod {
     pub span: SimpleSpan,
-    pub parameters: Vec<SpannedTypedName>,
+    pub parameters: Vec<Symbol>,
     pub raw_sql: String,
 }
 
 pub struct DataSourceBlock {
-    pub id: ParseId,
-    pub span: SimpleSpan,
-    pub name: String,
-    pub file: PathBuf,
+    pub symbol: Symbol,
 
-    pub model: ParseId,
+    pub model: String,
     pub tree: IncludeTree,
     pub list: Option<DataSourceBlockMethod>,
     pub get: Option<DataSourceBlockMethod>,
 }
 
 pub struct NavigationTag {
-    pub id: ParseId,
     pub span: SimpleSpan,
 
     /// The field on the current model that represents the relationship
-    pub field: ParseId,
-
-    /// The model that this this navigation field points to
-    pub adj_model: ParseId,
+    pub field: String,
 
     /// All columns involved in the relationship
-    pub fields: Vec<ParseId>,
-
+    /// (model, field)
+    pub fields: Vec<(String, String)>,
     pub is_many_to_many: bool,
 }
 
 pub struct ForeignKeyTag {
-    pub id: ParseId,
     pub span: SimpleSpan,
 
-    pub adj_model: ParseId,
-    pub references: Vec<(ParseId, ParseId)>, // (current model field, adjacent model field)
+    pub adj_model: String,
+
+    /// (this model field, adjacent model field)
+    pub references: Vec<(String, String)>,
 }
 
 pub struct KvR2Tag {
-    pub id: ParseId,
     pub span: SimpleSpan,
 
-    pub field: ParseId,
+    pub field: String,
 
     /// Key format e.g. "users/{id}/profile.jpg"
     pub format: String,
 
     /// The symbol of the environment variable binding the KV namespace
-    pub env_binding: ParseId,
+    pub env_binding: String,
 }
 
 pub struct UniqueTag {
-    pub id: ParseId,
     pub span: SimpleSpan,
-
-    pub fields: Vec<ParseId>,
+    pub fields: Vec<String>,
 }
 
+#[derive(Clone, Debug)]
 pub struct D1Tag {
-    pub id: ParseId,
     pub span: SimpleSpan,
 
     /// The symbol of the environment variable binding the D1 database
-    pub env_binding: ParseId,
+    pub env_binding: String,
 }
 
 pub struct KeyFieldTag {
-    pub id: ParseId,
     pub span: SimpleSpan,
-
-    pub field: ParseId,
+    pub field: String,
 }
 
 pub struct PrimaryKeyTag {
-    pub id: ParseId,
     pub span: SimpleSpan,
-
-    pub field: ParseId,
+    pub field: String,
 }
 
 pub struct ModelBlock {
-    pub id: ParseId,
-    pub span: SimpleSpan,
-    pub name: String,
-    pub file: PathBuf,
+    pub symbol: Symbol,
 
-    pub fields: Vec<SpannedTypedName>,
+    pub fields: Vec<Symbol>,
 
     pub primary_keys: Vec<PrimaryKeyTag>,
     pub d1_binding: Option<D1Tag>,
@@ -150,40 +183,26 @@ pub struct ModelBlock {
 }
 
 pub struct ServiceBlock {
-    pub id: ParseId,
-    pub span: SimpleSpan,
-    pub name: String,
-    pub file: PathBuf,
-
-    pub fields: Vec<SpannedTypedName>,
+    pub symbol: Symbol,
+    pub fields: Vec<Symbol>,
 }
 
 pub struct PlainOldObjectBlock {
-    pub id: ParseId,
-    pub span: SimpleSpan,
-    pub name: String,
-    pub file: PathBuf,
-
-    pub fields: Vec<SpannedTypedName>,
+    pub symbol: Symbol,
+    pub fields: Vec<Symbol>,
 }
 
 pub struct WranglerEnvBlock {
-    pub id: ParseId,
-    pub span: SimpleSpan,
-    pub file: PathBuf,
-
-    pub d1_bindings: Vec<SpannedName>,
-    pub kv_bindings: Vec<SpannedName>,
-    pub r2_bindings: Vec<SpannedName>,
-    pub vars: Vec<SpannedTypedName>,
+    pub symbol: Symbol,
+    pub d1_bindings: Vec<Symbol>,
+    pub kv_bindings: Vec<Symbol>,
+    pub r2_bindings: Vec<Symbol>,
+    pub vars: Vec<Symbol>,
 }
 
 pub struct InjectBlock {
-    pub id: ParseId,
-    pub span: SimpleSpan,
-    pub file: PathBuf,
-
-    pub refs: Vec<ParseId>,
+    pub symbol: Symbol,
+    pub fields: Vec<Symbol>,
 }
 
 /// An IR for the raw parsed structure of a Cloesce project
