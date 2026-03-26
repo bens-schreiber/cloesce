@@ -93,10 +93,10 @@ export class {{this.name}} {
   {{this}}: string;
 {{/each}}
 {{#each this.kv_fields}}
-  {{name}}: {{#if (contains_stream cidl_type)}}KValue<void>{{else}}{{map_cidl_type cidl_type}}{{/if}};
+  {{field.name}}: {{#if (contains_stream field.cidl_type)}}KValue<void>{{else}}{{map_cidl_type field.cidl_type}}{{/if}};
 {{/each}}
 {{#each this.r2_fields}}
-  {{name}}: {{map_cidl_type cidl_type}};
+  {{field.name}}: {{map_cidl_type field.cidl_type}};
 {{/each}}
 
 {{#each this.apis}}
@@ -179,29 +179,29 @@ export class {{this.name}} {
 {{/if}}
 {{/each}}
 {{#each this.kv_fields}}
-{{#if (is_paginated cidl_type)}}
-    if (res.{{name}}?.results) {
-      for (let i = 0; i < res.{{name}}.results.length; i++) {
-        res.{{name}}.results[i] = Object.assign(new {{map_kv_inner_type cidl_type}}(), res.{{name}}.results[i]);
-{{#if (is_object (kv_inner_cidl_type cidl_type))}}
-        if (res.{{name}}.results[i].raw) res.{{name}}.results[i].raw = {{get_object_name (kv_inner_cidl_type cidl_type)}}.fromJson(res.{{name}}.results[i].raw);
+{{#if (is_paginated field.cidl_type)}}
+    if (res.{{field.name}}?.results) {
+      for (let i = 0; i < res.{{field.name}}.results.length; i++) {
+        res.{{field.name}}.results[i] = Object.assign(new {{map_kv_inner_type field.cidl_type}}(), res.{{field.name}}.results[i]);
+{{#if (is_object (kv_inner_cidl_type field.cidl_type))}}
+        if (res.{{field.name}}.results[i].raw) res.{{field.name}}.results[i].raw = {{get_object_name (kv_inner_cidl_type field.cidl_type)}}.fromJson(res.{{field.name}}.results[i].raw);
 {{/if}}
       }
     }
 {{else}}
-{{#unless (contains_stream cidl_type)}}
-    if (res.{{name}}) res.{{name}} = Object.assign(new {{map_kv_inner_type cidl_type}}(), res.{{name}});
-{{#if (is_object (kv_inner_cidl_type cidl_type))}}
-    if (res.{{name}}?.raw) res.{{name}}.raw = {{get_object_name (kv_inner_cidl_type cidl_type)}}.fromJson(res.{{name}}.raw);
+{{#unless (contains_stream field.cidl_type)}}
+    if (res.{{field.name}}) res.{{field.name}} = Object.assign(new {{map_kv_inner_type field.cidl_type}}(), res.{{field.name}});
+{{#if (is_object (kv_inner_cidl_type field.cidl_type))}}
+    if (res.{{field.name}}?.raw) res.{{field.name}}.raw = {{get_object_name (kv_inner_cidl_type field.cidl_type)}}.fromJson(res.{{field.name}}.raw);
 {{/if}}
 {{/unless}}
 {{/if}}
 {{/each}}
 {{#each this.r2_fields}}
-{{#if (is_paginated cidl_type)}}
-    if (res.{{name}}?.results) {
-      for (let i = 0; i < res.{{name}}.results.length; i++) {
-        res.{{name}}.results[i] = Object.assign(new R2Object(), res.{{name}}.results[i]);
+{{#if (is_paginated field.cidl_type)}}
+    if (res.{{field.name}}?.results) {
+      for (let i = 0; i < res.{{field.name}}.results.length; i++) {
+        res.{{field.name}}.results[i] = Object.assign(new R2Object(), res.{{field.name}}.results[i]);
       }
     }
 {{/if}}

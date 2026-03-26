@@ -363,7 +363,7 @@ impl SemanticAnalysis {
                     if parent_model
                         .kv_fields
                         .iter()
-                        .any(|kv| kv.name == var_name.as_str())
+                        .any(|kv| kv.field.name == var_name.as_str())
                     {
                         continue;
                     }
@@ -372,7 +372,7 @@ impl SemanticAnalysis {
                     if parent_model
                         .r2_fields
                         .iter()
-                        .any(|r2| r2.name == var_name.as_str())
+                        .any(|r2| r2.field.name == var_name.as_str())
                     {
                         continue;
                     }

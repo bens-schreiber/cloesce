@@ -793,8 +793,10 @@ impl ModelAnalysis {
             };
 
             model.kv_fields.push(KvR2Field {
-                name: field_sym.name.clone(),
-                cidl_type,
+                field: Field {
+                    name: field_sym.name.clone(),
+                    cidl_type,
+                },
                 format: kv.format.clone(),
                 binding: binding_name.unwrap_or_default(),
                 list_prefix: false,
@@ -828,8 +830,10 @@ impl ModelAnalysis {
             }
 
             model.r2_fields.push(KvR2Field {
-                name: field_sym.name.clone(),
-                cidl_type: field_sym.cidl_type.clone(),
+                field: Field {
+                    name: field_sym.name.clone(),
+                    cidl_type: field_sym.cidl_type.clone(),
+                },
                 format: r2.format.clone(),
                 binding: binding_name.unwrap_or_default(),
                 list_prefix: false,

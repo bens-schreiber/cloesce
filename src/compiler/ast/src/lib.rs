@@ -220,8 +220,7 @@ pub struct DataSource {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct KvR2Field {
-    pub name: String,
-    pub cidl_type: CidlType,
+    pub field: Field,
     pub format: String,
     pub binding: String,
     pub list_prefix: bool,

@@ -386,13 +386,13 @@ impl WorkersGenerator {
             for kv in &model.kv_fields {
                 current_node
                     .0
-                    .insert(kv.name.clone(), IncludeTree::default());
+                    .insert(kv.field.name.clone(), IncludeTree::default());
             }
 
             for r2 in &model.r2_fields {
                 current_node
                     .0
-                    .insert(r2.name.clone(), IncludeTree::default());
+                    .insert(r2.field.name.clone(), IncludeTree::default());
             }
 
             visited.remove(current_model);
