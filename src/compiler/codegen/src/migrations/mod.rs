@@ -840,7 +840,7 @@ impl MigrateTables {
     }
 }
 
-fn alias(name: impl Into<String>) -> sea_query::Alias {
+pub fn alias(name: impl Into<String>) -> sea_query::Alias {
     sea_query::Alias::new(name)
 }
 
