@@ -1,8 +1,11 @@
 use std::collections::HashSet;
 
 use ast::{
-    Api, ApiMethod, CidlType, CloesceAst, CrudKind, DataSource, DataSourceMethod, Field, HttpVerb, IncludeTree, MediaType, Model, NavigationFieldKind
+    Api, ApiMethod, CidlType, CloesceAst, CrudKind, DataSource, DataSourceMethod, Field, HttpVerb,
+    IncludeTree, MediaType, Model, NavigationFieldKind,
 };
+
+use crate::orm::select::SelectModel;
 
 // TODO: This is all hardcoded to TypeScript workers
 pub struct WorkersGenerator;
@@ -177,37 +180,130 @@ impl WorkersGenerator {
         }
     }
 
-    fn default_data_source(model: &Model, tree: &IncludeTree) -> DataSource {
-        // The list method does a seek by primary key approach to pagination.
-        // That means it must take each primary key as a parameter (lastSeen_{pk})
-        // as well as a limit, then have the raw SQL query to select the next page based off those params.
-        let list_parameters = model
-            .primary_columns
-            .iter()
-            .map(|pk| Field {
-                name: format!("lastSeen_{}", pk.field.name),
-                cidl_type: CidlType::nullable(pk.field.cidl_type.clone()),
-            })
-            .chain(vec![
-                Field {
+    fn default_data_source(model: &Model, tree: IncludeTree, ast: &CloesceAst) -> DataSource {
+        let include_sql = SelectModel::query(&model.name, None, Some(tree.clone()), ast).unwrap();
+
+        let list = {
+            // The list method does a seek by primary key approach to pagination.
+            // That means it must take each primary key as a parameter (lastSeen_{pk})
+            // as well as a limit, then have the raw SQL query to select the next page based off those params.
+            let parameters = model
+                .primary_columns
+                .iter()
+                .map(|pk| Field {
+                    name: format!("lastSeen_{}", pk.field.name),
+                    cidl_type: CidlType::nullable(pk.field.cidl_type.clone()),
+                })
+                .chain(vec![Field {
                     name: "limit".into(),
                     cidl_type: CidlType::nullable(CidlType::Integer),
-                },
-            ])
-            .collect();
-        let list_raw_sql = format!(
-            r#"
-            SELECT * FROM {}    
-            "#
-        )
+                }])
+                .collect();
 
+            // WHERE (Model.pk1, Model.pk2, ...) > (?, ?, ...)
+            let where_clause = if model.primary_columns.len() == 1 {
+                let pk = &model.primary_columns[0];
+                format!(r#""{}"."{}""#, model.name, pk.field.name)
+            } else {
+                model
+                    .primary_columns
+                    .iter()
+                    .map(|pk| format!(r#""{}"."{}""#, model.name, pk.field.name))
+                    .collect::<Vec<String>>()
+                    .join(", ")
+            };
 
-        // let list = DataSourceMethod {
-        //     parameters: model.primary_columns.iter().map(|pk| pk.field.clone()).collect(),
-        //     raw_sql: format!(r#"
-        //         SELECT * FROM {}
-        //     "#)
-        // }
+            let params = (0..model.primary_columns.len())
+                .map(|_| "?".to_string())
+                .collect::<Vec<String>>()
+                .join(", ");
+
+            let where_expr = if model.primary_columns.len() == 1 {
+                format!("{where_clause} > ?")
+            } else {
+                format!("({where_clause}) > ({params})")
+            };
+
+            // ORDER BY Model.pk1 ASC, Model.pk2 ASC, ...
+            let order = model
+                .primary_columns
+                .iter()
+                .map(|pk| format!(r#""{}"."{}""#, model.name, pk.field.name))
+                .collect::<Vec<String>>()
+                .join(" ASC, ")
+                + " ASC";
+
+            let raw_sql = format!(
+                r#"
+                {include_sql}
+                WHERE {where_expr}
+                ORDER BY {order}
+                "#
+            );
+
+            DataSourceMethod {
+                parameters,
+                raw_sql,
+            }
+        };
+
+        let get = {
+            // Simple get by primary keys
+            let parameters = model
+                .primary_columns
+                .iter()
+                .map(|pk| Field {
+                    name: pk.field.name.clone(),
+                    cidl_type: pk.field.cidl_type.clone(),
+                })
+                .collect();
+
+            let where_clause = if model.primary_columns.len() == 1 {
+                let pk = &model.primary_columns[0];
+                format!(r#""{}"."{}""#, model.name, pk.field.name)
+            } else {
+                model
+                    .primary_columns
+                    .iter()
+                    .map(|pk| format!(r#""{}"."{}""#, model.name, pk.field.name))
+                    .collect::<Vec<String>>()
+                    .join(", ")
+            };
+
+            let params = (0..model.primary_columns.len())
+                .map(|_| "?".to_string())
+                .collect::<Vec<String>>()
+                .join(", ");
+
+            let raw_sql = if model.primary_columns.len() == 1 {
+                format!(
+                    r#"
+                {include_sql}
+                WHERE {where_clause} = ?
+                "#
+                )
+            } else {
+                format!(
+                    r#"
+                {include_sql}
+                WHERE ({where_clause}) = ({params})
+                "#
+                )
+            };
+
+            DataSourceMethod {
+                parameters,
+                raw_sql,
+            }
+        };
+
+        DataSource {
+            name: "default".into(),
+            tree,
+            is_private: false,
+            list: Some(list),
+            get: Some(get),
+        }
     }
 
     /// Generates a default [DataSource] for any model that doesn't have one.
@@ -228,22 +324,14 @@ impl WorkersGenerator {
             let mut visited = HashSet::new();
             dfs(ast, &model_name, &mut tree, &mut visited);
 
-            let data_source = DataSource {
-                name: "default".into(),
-                tree,
-                is_private: false,
-                list: Some(
-                    DataSourceMethod {
-                        parameters: 
-                    }
-                )
-            };
+            let model = ast.models.get(&model_name).unwrap();
+            let data_source = Self::default_data_source(model, tree, ast);
 
             ast.models
                 .get_mut(&model_name)
                 .unwrap()
                 .data_sources
-                .insert(data_source.name.clone(), data_source);
+                .push(data_source);
         }
 
         fn dfs(
@@ -257,7 +345,7 @@ impl WorkersGenerator {
             }
 
             let model = ast.models.get(current_model).unwrap();
-            for nav in &model.navigation_properties {
+            for nav in &model.navigation_fields {
                 match nav.kind {
                     NavigationFieldKind::OneToOne { .. } => {
                         if nav.model_reference == current_model {
@@ -277,8 +365,7 @@ impl WorkersGenerator {
                         dfs(ast, &nav.model_reference, &mut new_node, visited);
                         current_node.0.insert(nav.field.name.clone(), new_node);
                     }
-                    NavigationFieldKind::OneToMany { .. }
-                    | NavigationFieldKind::ManyToMany => {
+                    NavigationFieldKind::OneToMany { .. } | NavigationFieldKind::ManyToMany => {
                         // Include the related model as a leaf, but don't recurse.
                         current_node
                             .0

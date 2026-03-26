@@ -13,8 +13,9 @@ json_comments = "0.2.2"
 handlebars = "6.4.0"
 sqlformat = "0.5.0"
 pathdiff = "0.2.3"
-sea-query = { workspace = true }
+sea-query = "0.32.7"
 indexmap = { workspace = true }
+
 
 [dev-dependencies]
 compiler-test = { path = "../compiler-test" }
