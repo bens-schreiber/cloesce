@@ -84,7 +84,7 @@ impl SymbolTable {
     fn from_parse(parse: &ParseAst, sink: &mut ErrorSink) -> SymbolTable {
         let mut st = SymbolTable::default();
 
-        let insert_unique =  |st: &mut SymbolTable, sink: &mut ErrorSink, symbol: &Symbol| {
+        let insert_unique = |st: &mut SymbolTable, sink: &mut ErrorSink, symbol: &Symbol| {
             if let Some(existing) = st.table.insert(st.key(&symbol), symbol.clone()) {
                 sink.push(CompilerErrorKind::DuplicateSymbol {
                     first: existing,
@@ -425,7 +425,10 @@ impl SemanticAnalysis {
 
             for field in &poo.fields {
                 match field.cidl_type.root_type() {
-                    CidlType::Object { name, .. } | CidlType::Partial { name, .. } => {
+                    CidlType::Object { name, .. }
+                    | CidlType::Partial {
+                        object_name: name, ..
+                    } => {
                         let Some(ref_sym) = table
                             .resolve(name, SymbolKind::PlainOldObjectDecl, None)
                             .or_else(|| table.resolve(name, SymbolKind::ModelDecl, None))

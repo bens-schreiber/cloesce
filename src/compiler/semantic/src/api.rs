@@ -120,7 +120,10 @@ impl ApiAnalysis {
         };
 
         match method.return_type.root_type() {
-            CidlType::Object { name, .. } | CidlType::Partial { name, .. } => {
+            CidlType::Object { name, .. }
+            | CidlType::Partial {
+                object_name: name, ..
+            } => {
                 let valid = table
                     .resolve(name, SymbolKind::ModelDecl, None)
                     .or_else(|| table.resolve(name, SymbolKind::PlainOldObjectDecl, None))
@@ -128,8 +131,10 @@ impl ApiAnalysis {
                 ensure!(valid, self.sink, err());
             }
 
-            CidlType::DataSource { name, .. } => {
-                let valid = table.resolve(name, SymbolKind::ModelDecl, None).is_some();
+            CidlType::DataSource { model_name, .. } => {
+                let valid = table
+                    .resolve(model_name, SymbolKind::ModelDecl, None)
+                    .is_some();
                 ensure!(valid, self.sink, err());
             }
 
@@ -161,8 +166,10 @@ impl ApiAnalysis {
             };
 
             // DataSource parameters validated separately
-            if let CidlType::DataSource { name, .. } = &param.cidl_type {
-                let valid = table.resolve(name, SymbolKind::ModelDecl, None).is_some();
+            if let CidlType::DataSource { model_name, .. } = &param.cidl_type {
+                let valid = table
+                    .resolve(model_name, SymbolKind::ModelDecl, None)
+                    .is_some();
                 ensure!(valid, self.sink, err());
                 params.push(Field {
                     name: param.name.clone(),
@@ -176,7 +183,10 @@ impl ApiAnalysis {
                     self.sink.push(err());
                 }
 
-                CidlType::Object { name, .. } | CidlType::Partial { name, .. } => {
+                CidlType::Object { name, .. }
+                | CidlType::Partial {
+                    object_name: name, ..
+                } => {
                     let valid = table
                         .resolve(name, SymbolKind::ModelDecl, None)
                         .or_else(|| table.resolve(name, SymbolKind::PlainOldObjectDecl, None))

@@ -223,11 +223,13 @@ fn cidl_type<'t>() -> impl Parser<'t, &'t [Token], CidlType, Extra<'t>> {
                 "Paginated" => Ok(CidlType::paginated(inner)),
                 "KvObject" => Ok(CidlType::KvObject(Box::new(inner))),
                 "Partial" => match inner {
-                    CidlType::Object { name } => Ok(CidlType::Partial { name }),
+                    CidlType::Object { name: object_name } => Ok(CidlType::Partial { object_name }),
                     _ => Err(Rich::custom(span, "Partial<T> expects an object type")),
                 },
                 "DataSource" => match inner {
-                    CidlType::Object { name } => Ok(CidlType::DataSource { name }),
+                    CidlType::Object { name: model_name } => {
+                        Ok(CidlType::DataSource { model_name })
+                    }
                     _ => Err(Rich::custom(span, "DataSource<T> expects an object type")),
                 },
                 _ => Err(Rich::custom(span, "Unknown generic type wrapper")),

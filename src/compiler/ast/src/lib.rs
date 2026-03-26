@@ -46,12 +46,12 @@ pub enum CidlType {
     ///
     /// Only valid as a method argument.
     Partial {
-        name: String,
+        object_name: String,
     },
 
     /// A data source of some model
     DataSource {
-        name: String,
+        model_name: String,
     },
 
     /// An array of any type
@@ -117,7 +117,7 @@ pub enum HttpVerb {
     Delete,
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
 pub struct Field {
     pub name: String,
     pub cidl_type: CidlType,
