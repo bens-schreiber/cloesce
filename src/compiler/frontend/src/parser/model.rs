@@ -74,9 +74,7 @@ pub fn model_block<'t>(it: It) -> impl Parser<'t, &'t [Token], ModelBlock, Extra
                 .at_least(1)
                 .collect::<Vec<_>>(),
         )
-        .then_ignore(just(Token::RParen))
-        .or_not()
-        .map(|cruds| cruds.unwrap_or_default());
+        .then_ignore(just(Token::RParen));
 
     // @d1(binding)
     let d1_binding = just(Token::At)
@@ -84,8 +82,7 @@ pub fn model_block<'t>(it: It) -> impl Parser<'t, &'t [Token], ModelBlock, Extra
         .ignore_then(just(Token::LParen))
         .ignore_then(select! { Token::Ident(name) => name })
         .then_ignore(just(Token::RParen))
-        .map_with(|name, e| (name, e.span()))
-        .or_not();
+        .map_with(|name, e| (name, e.span()));
 
     // [primary ident1, ident2, ...]
     let primary_tag = just(Token::LBracket)
@@ -281,8 +278,19 @@ pub fn model_block<'t>(it: It) -> impl Parser<'t, &'t [Token], ModelBlock, Extra
             }
         });
 
-    crud_tag
-        .then(d1_binding)
+    enum ModelTag {
+        Crud(Vec<CrudKind>),
+        D1(String, SimpleSpan),
+    }
+
+    let model_tags = choice((
+        crud_tag.map(ModelTag::Crud),
+        d1_binding.map(|(name, span)| ModelTag::D1(name, span)),
+    ))
+    .repeated()
+    .collect::<Vec<_>>();
+
+    model_tags
         .then_ignore(just(Token::Model))
         .then(select! { Token::Ident(name) => name }.map_with(|name, e| (name, e.span())))
         .then(
@@ -291,7 +299,15 @@ pub fn model_block<'t>(it: It) -> impl Parser<'t, &'t [Token], ModelBlock, Extra
                 .collect::<Vec<_>>()
                 .delimited_by(just(Token::LBrace), just(Token::RBrace)),
         )
-        .map(move |(((cruds, d1_binding), (name, span)), items)| {
+        .map(move |((tags, (name, span)), items)| {
+            let mut cruds = Vec::new();
+            let mut d1_binding = None;
+            for tag in tags {
+                match tag {
+                    ModelTag::Crud(c) => cruds = c,
+                    ModelTag::D1(b, s) => d1_binding = Some((b, s)),
+                }
+            }
             map_model(&it, name, span, d1_binding, cruds, items)
         })
 }

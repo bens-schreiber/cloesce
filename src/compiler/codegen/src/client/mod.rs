@@ -2,24 +2,42 @@ mod mappers;
 
 use std::sync::Arc;
 
-use ast::{
-    CidlType, CloesceAst, HttpVerb, MediaType, NavigationProperty, NavigationPropertyKind,
-    cidl_type_contains,
-};
+use ast::{CidlType, CloesceAst, HttpVerb, MediaType, NavigationField, NavigationFieldKind};
 use mappers::{ClientLanguageTypeMapper, TypeScriptMapper};
 
 use handlebars::{Handlebars, handlebars_helper};
 use serde_json::Value;
 
+macro_rules! cidl_type_contains {
+    ($value:expr, $pattern:pat) => {{
+        let mut cur = $value;
+
+        loop {
+            match cur {
+                $pattern => break true,
+
+                CidlType::Array(inner)
+                | CidlType::Nullable(inner)
+                | CidlType::HttpResult(inner)
+                | CidlType::Paginated(inner) => {
+                    cur = inner;
+                }
+
+                _ => break false,
+            }
+        }
+    }};
+}
+
 handlebars_helper!(needs_constructor: |cidl_type: CidlType| matches!(cidl_type.root_type(),
-    CidlType::Object(_)
+    CidlType::Object { .. }
     | CidlType::Blob
     | CidlType::DateIso
     | CidlType::Stream
 ));
 
 handlebars_helper!(get_object_name: |cidl_type: CidlType| match cidl_type.root_type() {
-    CidlType::Inject(name) | CidlType::Object(name) | CidlType::Partial(name) => serde_json::to_value(name).unwrap(),
+    CidlType::Inject { name, ..} | CidlType::Object { name, ..} | CidlType::Partial { name, .. } => serde_json::to_value(name).unwrap(),
     ty => serde_json::to_value(ty).unwrap()
 });
 handlebars_helper!(get_content_type: |media: MediaType| match media {
@@ -28,19 +46,19 @@ handlebars_helper!(get_content_type: |media: MediaType| match media {
 });
 
 handlebars_helper!(is_blob: |cidl_type: CidlType| matches!(cidl_type.root_type(), CidlType::Blob));
-handlebars_helper!(is_one_to_one: |nav: NavigationProperty| matches!(nav.kind, NavigationPropertyKind::OneToOne {..}));
+handlebars_helper!(is_one_to_one: |nav: NavigationField| matches!(nav.kind, NavigationFieldKind::OneToOne {..}));
 handlebars_helper!(is_get_request: |verb: HttpVerb| matches!(verb, HttpVerb::Get));
-handlebars_helper!(is_serializable: |cidl_type: CidlType| !matches!(cidl_type.root_type(), CidlType::Inject(_)));
-handlebars_helper!(is_object: |cidl_type: CidlType| matches!(cidl_type.root_type(), CidlType::Object(_) | CidlType::Partial(_)));
+handlebars_helper!(is_serializable: |cidl_type: CidlType| !matches!(cidl_type.root_type(), CidlType::Inject { .. }));
+handlebars_helper!(is_object: |cidl_type: CidlType| matches!(cidl_type.root_type(), CidlType::Object { .. } | CidlType::Partial { .. }));
 
 // TODO: This method of generating fromJson for arrays won't help for n-dimensional arrays
 handlebars_helper!(has_array: |cidl_type: CidlType| cidl_type_contains!(&cidl_type, CidlType::Array(_)));
-handlebars_helper!(is_object_array: |cidl_type: CidlType| matches!(cidl_type.root_type(), CidlType::Object(_)) && cidl_type_contains!(&cidl_type, CidlType::Array(_)));
+handlebars_helper!(is_object_array: |cidl_type: CidlType| matches!(cidl_type.root_type(), CidlType::Object { .. }) && cidl_type_contains!(&cidl_type, CidlType::Array(_)));
 handlebars_helper!(is_blob_array: |cidl_type: CidlType| matches!(cidl_type.root_type(), CidlType::Blob) && cidl_type_contains!(&cidl_type, CidlType::Array(_)));
 
 // If a parameter should be placed in the url instead of the body.
 // True for any [CidlType::DataSource] or given the verb [HttpVerb::GET]
-handlebars_helper!(is_url_param: |cidl_type: CidlType, verb: HttpVerb| matches!(verb, HttpVerb::Get) || matches!(cidl_type, CidlType::DataSource(_)));
+handlebars_helper!(is_url_param: |cidl_type: CidlType, verb: HttpVerb| matches!(verb, HttpVerb::Get) || matches!(cidl_type, CidlType::DataSource { .. }));
 handlebars_helper!(is_stream: |cidl_type: CidlType| matches!(cidl_type.root_type(), CidlType::Stream));
 handlebars_helper!(is_some: |val: Value| !val.is_null());
 
@@ -106,15 +124,18 @@ fn register_helpers<'a>(
             mapper.clone(),
             ast,
             |value: Value, mapper: &dyn ClientLanguageTypeMapper, ast: &CloesceAst| -> String {
-                let nav: NavigationProperty = serde_json::from_value(value).unwrap();
+                let nav: NavigationField = serde_json::from_value(value).unwrap();
 
                 let cidl_type = match nav.kind {
-                    NavigationPropertyKind::OneToOne { .. } => {
-                        CidlType::Object(nav.model_reference)
-                    }
-                    NavigationPropertyKind::OneToMany { .. }
-                    | NavigationPropertyKind::ManyToMany => {
-                        CidlType::array(CidlType::Object(nav.model_reference))
+                    NavigationFieldKind::OneToOne { .. } => CidlType::Object {
+                        name: nav.model_reference,
+                        id: 0, // doesn't matter for client gen
+                    },
+                    NavigationFieldKind::OneToMany { .. } | NavigationFieldKind::ManyToMany => {
+                        CidlType::array(CidlType::Object {
+                            name: nav.model_reference,
+                            id: 0, // doesn't matter for client gen
+                        })
                     }
                 };
 

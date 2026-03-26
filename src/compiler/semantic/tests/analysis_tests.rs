@@ -1,6 +1,6 @@
 #![allow(unused_variables)]
 
-use ast::{CidlType, NavigationPropertyKind};
+use ast::{CidlType, NavigationFieldKind};
 use compiler_test::lex_and_parse;
 use semantic::{SemanticAnalysis, SymbolKind, WranglerEnvBindingKind, err::CompilerErrorKind};
 
@@ -494,7 +494,7 @@ fn d1_model_nav_one_to_one() {
         }
     );
 
-    let NavigationPropertyKind::OneToOne {
+    let NavigationFieldKind::OneToOne {
         columns: person_horse_nav_columns,
     } = &person_horse_nav.kind
     else {
@@ -543,7 +543,7 @@ fn d1_model_nav_one_to_many() {
     assert_eq!(author_posts_nav.field.name, "posts");
     assert_eq!(author_posts_nav.model_reference, "Post");
 
-    let NavigationPropertyKind::OneToMany {
+    let NavigationFieldKind::OneToMany {
         columns: author_posts_nav_columns,
     } = &author_posts_nav.kind
     else {
@@ -591,7 +591,7 @@ fn d1_model_nav_many_to_many() {
     assert_eq!(student_courses_nav.field.name, "courses");
     assert_eq!(student_courses_nav.model_reference, "Course");
 
-    let NavigationPropertyKind::ManyToMany = &student_courses_nav.kind else {
+    let NavigationFieldKind::ManyToMany = &student_courses_nav.kind else {
         unreachable!()
     };
 }

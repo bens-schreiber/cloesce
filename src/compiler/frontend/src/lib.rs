@@ -69,7 +69,7 @@ pub struct NavigationTag {
     /// The field on the current model that represents the relationship
     pub field: ParseId,
 
-    /// The model that this this navigation property points to
+    /// The model that this this navigation field points to
     pub adj_model: ParseId,
 
     /// All columns involved in the relationship

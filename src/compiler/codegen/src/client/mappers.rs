@@ -9,14 +9,14 @@ pub struct TypeScriptMapper;
 impl ClientLanguageTypeMapper for TypeScriptMapper {
     fn cidl_type(&self, ty: &CidlType, ast: &CloesceAst) -> String {
         match ty {
-            CidlType::JsonValue => "unknown".to_string(),
+            CidlType::Json => "unknown".to_string(),
             CidlType::Integer => "number".to_string(),
-            CidlType::Real => "number".to_string(),
-            CidlType::Text => "string".to_string(),
+            CidlType::Double => "number".to_string(),
+            CidlType::String => "string".to_string(),
             CidlType::Boolean => "boolean".to_string(),
             CidlType::DateIso => "Date".to_string(),
             CidlType::Blob => "Uint8Array".to_string(),
-            CidlType::Object(name) => name.clone(),
+            CidlType::Object { name, .. } => name.clone(),
             CidlType::Nullable(inner) => {
                 if matches!(inner.as_ref(), CidlType::Void) {
                     return "null".to_string();
@@ -31,17 +31,13 @@ impl ClientLanguageTypeMapper for TypeScriptMapper {
             }
             CidlType::HttpResult(inner) => self.cidl_type(inner, ast),
             CidlType::Void => "void".to_string(),
-            CidlType::Partial(name) => format!("DeepPartial<{name}>"),
-            CidlType::DataSource(model_name) => {
-                let ds = &ast
-                    .models
-                    .get(model_name)
-                    .expect("Model to exist")
-                    .data_sources;
+            CidlType::Partial { name, .. } => format!("DeepPartial<{name}>"),
+            CidlType::DataSource { name, .. } => {
+                let ds = &ast.models.get(name).expect("Model to exist").data_sources;
 
                 let joined = ds
                     .iter()
-                    .filter_map(|(k, v)| (!v.is_private).then_some(format!("\"{k}\"")))
+                    .filter_map(|d| (!d.is_private).then_some(format!("\"{}\"", d.name)))
                     .collect::<Vec<_>>()
                     .join(" | ");
 

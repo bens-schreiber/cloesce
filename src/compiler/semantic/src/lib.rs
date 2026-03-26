@@ -659,6 +659,7 @@ impl SemanticAnalysis {
                     tree: IncludeTree(source.tree.0.clone()),
                     list,
                     get,
+                    is_private: false, // TODO: figure out parser scheme for privacy
                 },
             ));
         }

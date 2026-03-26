@@ -138,10 +138,10 @@ pub struct Field {
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct IncludeTree(pub BTreeMap<String, IncludeTree>);
 
-/// A D1 Navigation property, representing a relationship to another model
+/// A D1 Navigation field, representing a relationship to another model
 /// through a foreign key or composite foreign key.
 #[derive(Serialize, Deserialize, Debug, Clone, Hash)]
-pub enum NavigationPropertyKind {
+pub enum NavigationFieldKind {
     OneToOne {
         /// The columns on the current model that reference the other model's primary key.
         /// Multiple columns indicate a composite foreign key.
@@ -164,7 +164,7 @@ pub struct NavigationField {
 
     /// Referenced model name.
     pub model_reference: String,
-    pub kind: NavigationPropertyKind,
+    pub kind: NavigationFieldKind,
 }
 
 impl NavigationField {
@@ -175,11 +175,13 @@ impl NavigationField {
     }
 }
 
+#[derive(Serialize, Deserialize, Debug)]
 pub struct ForeignKeyReference {
     pub model_name: String,
     pub column_name: String,
 }
 
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Column {
     pub field: Field,
 
@@ -205,18 +207,22 @@ pub enum CrudKind {
     SAVE,
 }
 
+#[derive(Serialize, Deserialize, Debug)]
 pub struct DataSourceMethod {
     pub parameters: Vec<Field>,
     pub raw_sql: String,
 }
 
+#[derive(Serialize, Deserialize, Debug)]
 pub struct DataSource {
     pub name: String,
     pub tree: IncludeTree,
     pub list: Option<DataSourceMethod>,
     pub get: Option<DataSourceMethod>,
+    pub is_private: bool,
 }
 
+#[derive(Serialize, Deserialize, Debug)]
 pub struct KvR2Field {
     pub name: String,
     pub cidl_type: CidlType,
@@ -258,11 +264,13 @@ pub struct ApiMethod {
     pub parameters: Vec<Field>,
 }
 
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Api {
     pub name: String,
     pub methods: Vec<ApiMethod>,
 }
 
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Model {
     pub name: String,
 
@@ -312,6 +320,7 @@ impl Model {
     }
 }
 
+#[derive(Serialize, Deserialize, Debug)]
 pub struct ServiceField {
     pub name: String,
 
@@ -319,17 +328,20 @@ pub struct ServiceField {
     pub inject_reference: String,
 }
 
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Service {
     pub name: String,
     pub fields: Vec<ServiceField>,
     pub apis: Vec<Api>,
 }
 
+#[derive(Serialize, Deserialize, Debug)]
 pub struct PlainOldObject {
     pub name: String,
     pub fields: Vec<Field>,
 }
 
+#[derive(Serialize, Deserialize, Debug)]
 pub struct WranglerEnv {
     pub d1_bindings: Vec<String>,
     pub kv_bindings: Vec<String>,
@@ -337,6 +349,7 @@ pub struct WranglerEnv {
     pub vars: Vec<Field>,
 }
 
+#[derive(Serialize, Deserialize, Debug)]
 pub struct CloesceAst {
     pub wrangler_env: Option<WranglerEnv>,
     pub models: IndexMap<String, Model>,

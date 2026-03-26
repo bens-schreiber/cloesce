@@ -1,390 +1,195 @@
-// use std::{collections::BTreeMap, path::PathBuf};
+use compiler_test::{SemanticResult, src_to_ast};
 
-// use ast::{
-//     ApiMethod, CidlType, CrudKind, ForeignKey, HttpVerb, IncludeTree, MediaType,
-//     Field, PlainOldObject, Service, ServiceAttribute,
-// };
-// use client::ClientGenerator;
-// use generator_test::{IncludeTreeBuilder, ModelBuilder, create_ast, create_spec};
-// use semantic::SemanticAnalysis;
-// use workers::WorkersGenerator;
+#[test]
+fn test_client_code_generation_snapshot() {
+    let src = r#"
+        env {
+            db: d1
+            my_kv: kv
+            my_r2: r2
+        }
 
-// /**
-//  * Snapshot tests for client code generation.
-//  *
-//  * Note that the regression tests (cloesce/tests/regression) also cover client code generation.
-//  */
-// #[test]
-// fn test_client_code_generation_snapshot() {
-//     let mut ast = create_ast(vec![
-//         ModelBuilder::new("BasicModel")
-//             .default_db()
-//             .id_pk()
-//             .col(
-//                 "fk_to_model",
-//                 CidlType::Integer,
-//                 Some(ForeignKey {
-//                     model_name: "OneToManyModel".into(),
-//                     column_name: "id".into(),
-//                 }),
-//                 None,
-//             )
-//             .build(),
-//         // All valid SQL column types
-//         ModelBuilder::new("HasSqlColumnTypes")
-//             .default_db()
-//             .id_pk()
-//             .col("string", CidlType::Text, None, None)
-//             .col("integer", CidlType::Integer, None, None)
-//             .col("real", CidlType::Real, None, None)
-//             .col("boolean", CidlType::Boolean, None, None)
-//             .col("date", CidlType::DateIso, None, None)
-//             .col("stringNull", CidlType::nullable(CidlType::Text), None, None)
-//             .col(
-//                 "integerNull",
-//                 CidlType::nullable(CidlType::Integer),
-//                 None,
-//                 None,
-//             )
-//             .col("realNull", CidlType::nullable(CidlType::Real), None, None)
-//             .col(
-//                 "booleanNull",
-//                 CidlType::nullable(CidlType::Boolean),
-//                 None,
-//                 None,
-//             )
-//             .col(
-//                 "dateNull",
-//                 CidlType::nullable(CidlType::DateIso),
-//                 None,
-//                 None,
-//             )
-//             .build(),
-//         // One to One Navigation Property
-//         ModelBuilder::new("HasOneToOne")
-//             .default_db()
-//             .id_pk()
-//             // one to one
-//             .col(
-//                 "basicModelId",
-//                 CidlType::Integer,
-//                 Some(ForeignKey {
-//                     model_name: "BasicModel".into(),
-//                     column_name: "id".into(),
-//                 }),
-//                 None,
-//             )
-//             .nav_p(
-//                 "oneToOneNav",
-//                 "BasicModel",
-//                 ast::NavigationPropertyKind::OneToOne {
-//                     key_columns: vec!["id".into()],
-//                 },
-//             )
-//             .build(),
-//         // One to Many Navigation Property
-//         ModelBuilder::new("OneToManyModel")
-//             .default_db()
-//             .id_pk()
-//             .nav_p(
-//                 "oneToManyNav",
-//                 "BasicModel",
-//                 ast::NavigationPropertyKind::OneToMany {
-//                     key_columns: vec!["fk_to_model".into()],
-//                 },
-//             )
-//             .build(),
-//         // Many to Many
-//         ModelBuilder::new("ManyToManyModelA")
-//             .default_db()
-//             .id_pk()
-//             .nav_p(
-//                 "manyToManyNav",
-//                 "ManyToManyModelB",
-//                 ast::NavigationPropertyKind::ManyToMany,
-//             )
-//             .build(),
-//         ModelBuilder::new("ManyToManyModelB")
-//             .default_db()
-//             .id_pk()
-//             .nav_p(
-//                 "manyToManyNav",
-//                 "ManyToManyModelA",
-//                 ast::NavigationPropertyKind::ManyToMany,
-//             )
-//             .build(),
-//         // Composite PK model
-//         ModelBuilder::new("ModelWithCompositePk")
-//             .default_db()
-//             .pk("tenantId", CidlType::Text)
-//             .pk("rowId", CidlType::Integer)
-//             .col("name", CidlType::Text, None, None)
-//             .method(
-//                 "instanceMethod",
-//                 HttpVerb::Post,
-//                 false,
-//                 vec![Field {
-//                     name: "input".into(),
-//                     cidl_type: CidlType::Text,
-//                 }],
-//                 CidlType::Text,
-//                 None,
-//             )
-//             .build(),
-//         // KV
-//         ModelBuilder::new("ModelWithKv")
-//             .key_param("id1")
-//             .key_param("id2")
-//             .kv_object("{id1}", "kv", "someValue", false, CidlType::JsonValue)
-//             .kv_object("", "kv", "manyValues", true, CidlType::JsonValue)
-//             .kv_object("constant", "kv", "streamValue", false, CidlType::Stream)
-//             .method(
-//                 "instanceMethod",
-//                 HttpVerb::Post,
-//                 false,
-//                 vec![Field {
-//                     name: "input".into(),
-//                     cidl_type: CidlType::Text,
-//                 }],
-//                 CidlType::Text,
-//                 None,
-//             )
-//             .method(
-//                 "staticMethod",
-//                 HttpVerb::Get,
-//                 true,
-//                 vec![Field {
-//                     name: "input".into(),
-//                     cidl_type: CidlType::Integer,
-//                 }],
-//                 CidlType::Integer,
-//                 None,
-//             )
-//             .method(
-//                 "hasKvParamAndRes",
-//                 HttpVerb::Post,
-//                 false,
-//                 vec![Field {
-//                     name: "input".into(),
-//                     cidl_type: CidlType::KvObject(Box::new(CidlType::Text)),
-//                 }],
-//                 CidlType::KvObject(Box::new(CidlType::Text)),
-//                 None,
-//             )
-//             .build(),
-//         // R2
-//         ModelBuilder::new("ModelWithR2")
-//             .default_db()
-//             .id_pk()
-//             .key_param("r2Id")
-//             .r2_object("r2/{id}/{r2Id}", "r2", "fileData", false)
-//             .r2_object("r2", "r2", "manyFileDatas", true)
-//             .method(
-//                 "hasR2ParamAndRes",
-//                 HttpVerb::Post,
-//                 false,
-//                 vec![Field {
-//                     name: "input".into(),
-//                     cidl_type: CidlType::R2Object,
-//                 }],
-//                 CidlType::R2Object,
-//                 None,
-//             )
-//             .build(),
-//         // Hybrid (D1, KV, R2)
-//         ModelBuilder::new("ToyotaPrius")
-//             .default_db()
-//             .id_pk()
-//             .col("modelYear", CidlType::Integer, None, None)
-//             .key_param("ownerId")
-//             .key_param("vehicleId")
-//             .kv_object(
-//                 "{ownerId}/{modelYear}",
-//                 "kv",
-//                 "metadata",
-//                 false,
-//                 CidlType::JsonValue,
-//             )
-//             .r2_object("{vehicleId}", "r2", "photoData", false)
-//             .method(
-//                 "instanceMethod",
-//                 HttpVerb::Post,
-//                 false,
-//                 vec![Field {
-//                     name: "input".into(),
-//                     cidl_type: CidlType::Text,
-//                 }],
-//                 CidlType::Text,
-//                 None,
-//             )
-//             .data_source(
-//                 "withKV",
-//                 IncludeTreeBuilder::default().add_node("metadata").build(),
-//                 false,
-//             )
-//             .data_source(
-//                 "withR2",
-//                 IncludeTreeBuilder::default().add_node("photoData").build(),
-//                 false,
-//             )
-//             .data_source("private", IncludeTree::default(), true)
-//             .build(),
-//     ]);
+        @d1(db)
+        model BasicModel {
+            [primary id]
+            id: int
 
-//     ast.models
-//         .get_mut("HasOneToOne")
-//         .unwrap()
-//         .primary_key_columns
-//         .first_mut()
-//         .unwrap()
-//         .foreign_key_reference = Some(ForeignKey {
-//         model_name: "BasicModel".into(),
-//         column_name: "id".into(),
-//     });
+            [foreign fk_to_model -> OneToManyModel::id]
+            fk_to_model: int
+        }
 
-//     // CRUD methods
-//     {
-//         let mut model_with_cruds = ModelBuilder::new("ModelWithCruds")
-//             .default_db()
-//             .id_pk()
-//             .col("name", CidlType::Text, None, None)
-//             .build();
-//         model_with_cruds.cruds.push(CrudKind::GET);
-//         model_with_cruds.cruds.push(CrudKind::SAVE);
-//         model_with_cruds.cruds.push(CrudKind::LIST);
-//         ast.models
-//             .insert(model_with_cruds.name.clone(), model_with_cruds);
-//     }
+        // All valid SQL column types for D1
+        @d1(db)
+        model HasSqlColumnTypes {
+            [primary id]
+            id: int
 
-//     // services + stream methods
-//     {
-//         let mut methods = BTreeMap::new();
-//         methods.insert(
-//             "staticMethod".into(),
-//             ApiMethod {
-//                 name: "staticMethod".into(),
-//                 is_static: true,
-//                 http_verb: HttpVerb::Get,
-//                 return_type: CidlType::http(CidlType::Text),
-//                 parameters_media: MediaType::default(),
-//                 parameters: vec![Field {
-//                     name: "input".into(),
-//                     cidl_type: CidlType::Text,
-//                 }],
-//                 return_media: MediaType::default(),
-//                 data_source: None,
-//             },
-//         );
-//         methods.insert(
-//             "instanceMethod".into(),
-//             ApiMethod {
-//                 name: "instanceMethod".into(),
-//                 is_static: false,
-//                 http_verb: HttpVerb::Post,
-//                 return_type: CidlType::http(CidlType::Integer),
-//                 parameters_media: MediaType::default(),
-//                 parameters: vec![Field {
-//                     name: "input".into(),
-//                     cidl_type: CidlType::Integer,
-//                 }],
-//                 return_media: MediaType::default(),
-//                 data_source: None,
-//             },
-//         );
+            str: string
+            integer: int
+            dub: double
+            boo: bool
+            dat: date
+            strNull: Option<string>
+            integerNull: Option<int>
+            dubNull: Option<double>
+            booNull: Option<bool>
+            dateNull: Option<date>
+        }
 
-//         // Intake stream
-//         methods.insert(
-//             "uploadData".into(),
-//             ApiMethod {
-//                 name: "uploadData".into(),
-//                 is_static: false,
-//                 http_verb: HttpVerb::Post,
-//                 return_type: CidlType::http(CidlType::Boolean),
-//                 parameters_media: ast::MediaType::Octet,
-//                 parameters: vec![Field {
-//                     name: "data".into(),
-//                     cidl_type: CidlType::Stream,
-//                 }],
-//                 return_media: ast::MediaType::default(),
-//                 data_source: None,
-//             },
-//         );
+        @d1(db)
+        model HasOneToOne {
+            [primary id]
+            id: int
 
-//         // Output stream
-//         methods.insert(
-//             "downloadData".into(),
-//             ApiMethod {
-//                 name: "downloadData".into(),
-//                 is_static: false,
-//                 http_verb: HttpVerb::Get,
-//                 return_type: CidlType::Stream,
-//                 parameters_media: MediaType::default(),
-//                 parameters: vec![],
-//                 return_media: ast::MediaType::Octet,
-//                 data_source: None,
-//             },
-//         );
+            [foreign basicModelId -> BasicModel::id]
+            basicModelId: int
 
-//         ast.services.insert(
-//             "BasicService".into(),
-//             Service {
-//                 name: "BasicService".into(),
-//                 attributes: vec![ServiceAttribute {
-//                     var_name: "db".into(),
-//                     inject_reference: "D1Database".into(),
-//                 }],
-//                 initializer: None,
-//                 methods,
-//                 source_path: PathBuf::default(),
-//             },
-//         );
-//     }
+            [nav oneToOneNav -> HasOneToOne::basicModelId]
+            oneToOneNav: BasicModel
+        }
 
-//     // plain old objects
-//     {
-//         ast.poos.insert(
-//             "BasicPoo".into(),
-//             PlainOldObject {
-//                 name: "BasicPoo".into(),
-//                 attributes: vec![
-//                     Field {
-//                         name: "field1".into(),
-//                         cidl_type: CidlType::Text,
-//                     },
-//                     Field {
-//                         name: "field2".into(),
-//                         cidl_type: CidlType::Integer,
-//                     },
-//                 ],
-//                 source_path: PathBuf::default(),
-//             },
-//         );
+        @d1(db)
+        model OneToManyModel {
+            [primary id]
+            id: int
 
-//         ast.poos.insert(
-//             "PooWithComposition".into(),
-//             PlainOldObject {
-//                 name: "PooWithComposition".into(),
-//                 attributes: vec![
-//                     Field {
-//                         name: "field1".into(),
-//                         cidl_type: CidlType::Object("BasicPoo".into()),
-//                     },
-//                     Field {
-//                         name: "field2".into(),
-//                         cidl_type: CidlType::Object("BasicModel".into()),
-//                     },
-//                 ],
-//                 source_path: PathBuf::default(),
-//             },
-//         );
-//     }
+            [nav oneToManyNav -> BasicModel::fk_to_model]
+            oneToManyNav: Array<BasicModel>
+        }
 
-//     let spec = create_spec(&ast);
-//     SemanticAnalysis::analyze(&mut ast, &spec).expect("Semantic analysis to pass");
-//     WorkersGenerator::generate_default_data_sources(&mut ast);
-//     WorkersGenerator::finalize_api_methods(&mut ast);
+        @d1(db)
+        model ManyToManyModelA {
+            [primary id]
+            id: int
 
-//     let client_code = ClientGenerator::generate(&ast, "http://example.com/path/to/api");
+            [nav manyToManyNav <> ManyToManyModelB::manyToManyNav]
+            manyToManyNav: Array<ManyToManyModelB>
+        }
 
-//     insta::assert_snapshot!("client_code_generation_snapshot", client_code);
-// }
+        @d1(db)
+        model ManyToManyModelB {
+            [primary id]
+            id: int
+
+            [nav manyToManyNav <> ManyToManyModelA::manyToManyNav]
+            manyToManyNav: Array<ManyToManyModelA>
+        }
+
+        @d1(db)
+        model ModelWithCompositePk {
+            [primary tenantId, rowId]
+            tenantId: string
+            rowId: int
+
+            name: string
+        }
+
+        api ModelWithCompositePkApi for ModelWithCompositePk {
+            post instanceMethod(input: string) -> string
+        }
+
+        model ModelWithKv {
+            @keyparam
+            id1: string
+
+            @keyparam
+            id2: string
+
+            @kv(my_kv, "{id1}")
+            someValue: json
+
+            @kv(my_kv, "")
+            manyValues: Paginated<json>
+
+            @kv(my_kv, "constant")
+            streamValue: stream
+        }
+
+        api ModelWithKvApi for ModelWithKv {
+            post instanceMethod(input: string) -> string
+            get staticMethod(input: int) -> int
+            post hasKvParamAndRes(input: KvObject<string>) -> KvObject<string>
+        }
+
+        model ModelWithR2 {
+            @keyparam
+            id: string
+
+            @r2(my_r2,"{id}")
+            fileData: blob
+
+            @r2(my_r2, "{id}/files")
+            manyFileDatas: Paginated<blob>
+        }
+
+        api ModelWithR2Api for ModelWithR2 {
+            post instanceMethod(input: string) -> string
+            get staticMethod(input: int) -> int
+            post hasR2ParamAndRes(input: R2Object) -> R2Object
+        }
+
+        @d1(db)
+        model ToyotaPrius {
+            [primary id]
+            id: int
+
+            ownerId: string
+            modelYear: int
+
+            @keyparam
+            ownerId: string
+
+            @keyparam
+            modelYear: int
+
+            @kv(my_kv, "{ownerId}/{modelYear}")
+            metadata: json
+
+            @r2(my_r2, "{modelYear}/photos")
+            photoData: blob
+        }
+
+        source WithKv for ToyotaPrius {
+            include {
+                metadata
+            }
+        }
+
+        source WithR2 for ToyotaPrius {
+            include {
+                photoData
+            }
+        }
+
+        @d1(db)
+        @crud(get, save, list)
+        model ModelWithCruds {
+            [primary id]
+            id: int
+
+            name: string
+        }
+
+        service BasicService {}
+        api BasicServiceApi for BasicService {
+            post instanceMethod(input: string) -> string
+            get staticMethod(input: int) -> int
+            post hasStreamParam(input: stream) -> string
+            get hasStreamRes() -> stream
+        }
+
+        poo BasicPoo {
+            field1: string
+            field2: int
+        }
+
+        poo PooWithComposition {
+            field1: BasicPoo
+            field2: BasicModel
+        }
+    
+    "#;
+    let SemanticResult { ast, .. } = src_to_ast(src);
+
+    // let client_code = ClientGenerator::generate(&ast, "http://example.com/path/to/api");
+}

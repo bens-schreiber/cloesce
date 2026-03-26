@@ -1,6 +1,6 @@
 use ast::{
     CidlType, Column, CrudKind, Field, ForeignKeyReference, KvR2Field, Model, NavigationField,
-    NavigationPropertyKind,
+    NavigationFieldKind,
 };
 use frontend::{ForeignKeyTag, KvR2Tag, ModelBlock, NavigationTag, parser::ParseId};
 use indexmap::IndexMap;
@@ -11,8 +11,7 @@ use std::{
 };
 
 use crate::{
-    Symbol, SymbolKind, SymbolTable, WranglerEnvBindingKind,
-    ensure,
+    Symbol, SymbolKind, SymbolTable, WranglerEnvBindingKind, ensure,
     err::{BatchResult, CompilerErrorKind, ErrorSink},
     is_valid_sql_type, kahns,
 };
@@ -201,8 +200,7 @@ impl ModelAnalysis {
         let mut navigation_properties = Vec::new();
         let mut nav_fields_seen = HashSet::<ParseId>::new();
         for nav in &model_block.navigation_properties {
-            let nav_result =
-                self.nav(model_block, nav, &mut nav_fields_seen, table, &model_blocks);
+            let nav_result = self.nav(model_block, nav, &mut nav_fields_seen, table, &model_blocks);
 
             if let Some(nav) = nav_result {
                 navigation_properties.push(nav);
@@ -221,10 +219,7 @@ impl ModelAnalysis {
                     );
                     continue;
                 }
-                unique_info
-                    .entry(*column)
-                    .or_default()
-                    .push(constraint_idx);
+                unique_info.entry(*column).or_default().push(constraint_idx);
             }
         }
 
@@ -236,12 +231,13 @@ impl ModelAnalysis {
                 continue;
             }
 
-            let foreign_key_reference = fk_info.get(&field.id).map(|(model_name, col_name, _)| {
-                ForeignKeyReference {
-                    model_name: model_name.clone(),
-                    column_name: col_name.clone(),
-                }
-            });
+            let foreign_key_reference =
+                fk_info
+                    .get(&field.id)
+                    .map(|(model_name, col_name, _)| ForeignKeyReference {
+                        model_name: model_name.clone(),
+                        column_name: col_name.clone(),
+                    });
             let composite_id = fk_info.get(&field.id).and_then(|(_, _, cid)| *cid);
             let unique_ids_val = unique_info.remove(&field.id).unwrap_or_default();
 
@@ -431,7 +427,10 @@ impl ModelAnalysis {
             }
 
             // Store FK info for this column
-            fk_info.insert(*field, (adj_model_name.clone(), adj_field_name, composite_id));
+            fk_info.insert(
+                *field,
+                (adj_model_name.clone(), adj_field_name, composite_id),
+            );
 
             if !field_cidl_type.is_nullable() {
                 // One To One: Person has a Dog ..(sql)=> Person has a fk to Dog
@@ -624,7 +623,7 @@ impl ModelAnalysis {
                 NavigationField {
                     field: nav_field,
                     model_reference: adj_model_name,
-                    kind: NavigationPropertyKind::OneToOne {
+                    kind: NavigationFieldKind::OneToOne {
                         columns: referenced_field_names,
                     },
                 }
@@ -651,7 +650,7 @@ impl ModelAnalysis {
                 NavigationField {
                     field: nav_field,
                     model_reference: adj_model_name,
-                    kind: NavigationPropertyKind::OneToMany {
+                    kind: NavigationFieldKind::OneToMany {
                         columns: referenced_field_names,
                     },
                 }
@@ -687,7 +686,7 @@ impl ModelAnalysis {
                 NavigationField {
                     field: nav_field,
                     model_reference: adj_model_name,
-                    kind: NavigationPropertyKind::ManyToMany,
+                    kind: NavigationFieldKind::ManyToMany,
                 }
             }
             _ => {
@@ -712,48 +711,50 @@ impl ModelAnalysis {
         table: &SymbolTable,
     ) {
         // Validates that a KV/R2 tag's env binding exists and is of the correct WranglerEnvBindingKind
-        let validate_binding =
-            |sink: &mut ErrorSink, tag: &KvR2Tag, expected: WranglerEnvBindingKind| -> Option<String> {
-                let Some(binding_sym) = table.lookup(tag.env_binding) else {
-                    sink.push(CompilerErrorKind::UnresolvedSymbol {
-                        symbol: tag.env_binding,
-                    });
-                    return None;
-                };
-
-                let matches_kind = matches!(
-                    (&binding_sym.kind, &expected),
-                    (
-                        SymbolKind::WranglerEnvBinding {
-                            kind: WranglerEnvBindingKind::KV
-                        },
-                        WranglerEnvBindingKind::KV
-                    ) | (
-                        SymbolKind::WranglerEnvBinding {
-                            kind: WranglerEnvBindingKind::R2
-                        },
-                        WranglerEnvBindingKind::R2
-                    )
-                );
-
-                if !matches_kind {
-                    let err = match expected {
-                        WranglerEnvBindingKind::KV => CompilerErrorKind::KvInvalidBinding {
-                            tag: tag.id,
-                            binding: tag.env_binding,
-                        },
-                        WranglerEnvBindingKind::R2 => CompilerErrorKind::R2InvalidBinding {
-                            tag: tag.id,
-                            binding: tag.env_binding,
-                        },
-                        _ => unreachable!(),
-                    };
-                    sink.push(err);
-                    return None;
-                }
-
-                Some(binding_sym.name.clone())
+        let validate_binding = |sink: &mut ErrorSink,
+                                tag: &KvR2Tag,
+                                expected: WranglerEnvBindingKind|
+         -> Option<String> {
+            let Some(binding_sym) = table.lookup(tag.env_binding) else {
+                sink.push(CompilerErrorKind::UnresolvedSymbol {
+                    symbol: tag.env_binding,
+                });
+                return None;
             };
+
+            let matches_kind = matches!(
+                (&binding_sym.kind, &expected),
+                (
+                    SymbolKind::WranglerEnvBinding {
+                        kind: WranglerEnvBindingKind::KV
+                    },
+                    WranglerEnvBindingKind::KV
+                ) | (
+                    SymbolKind::WranglerEnvBinding {
+                        kind: WranglerEnvBindingKind::R2
+                    },
+                    WranglerEnvBindingKind::R2
+                )
+            );
+
+            if !matches_kind {
+                let err = match expected {
+                    WranglerEnvBindingKind::KV => CompilerErrorKind::KvInvalidBinding {
+                        tag: tag.id,
+                        binding: tag.env_binding,
+                    },
+                    WranglerEnvBindingKind::R2 => CompilerErrorKind::R2InvalidBinding {
+                        tag: tag.id,
+                        binding: tag.env_binding,
+                    },
+                    _ => unreachable!(),
+                };
+                sink.push(err);
+                return None;
+            }
+
+            Some(binding_sym.name.clone())
+        };
 
         // Extracts variables from a formatted string, then validates that they
         // correspond to fields on the models that are of valid SQLite types
