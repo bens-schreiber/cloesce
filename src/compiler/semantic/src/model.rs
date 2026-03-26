@@ -32,13 +32,14 @@ impl ModelAnalysis {
 
         for model_block in model_blocks.values() {
             let mut model = Model {
+                hash: 0,
                 name: model_block.symbol.name.clone(),
                 d1_binding: None,
                 primary_columns: Vec::new(),
                 columns: Vec::new(),
                 kv_fields: Vec::new(),
                 r2_fields: Vec::new(),
-                navigation_properties: Vec::new(),
+                navigation_fields: Vec::new(),
                 key_fields: Vec::new(),
                 apis: Vec::new(),
                 data_sources: Vec::new(),
@@ -229,6 +230,7 @@ impl ModelAnalysis {
             let unique_ids_val = unique_info.remove(&field.name).unwrap_or_default();
 
             let col = Column {
+                hash: 0,
                 field: Field {
                     name: field.name.clone(),
                     cidl_type: field.cidl_type.clone(),
@@ -248,7 +250,7 @@ impl ModelAnalysis {
         model.d1_binding = Some(binding_name);
         model.columns = columns;
         model.primary_columns = primary_columns;
-        model.navigation_properties = navigation_properties;
+        model.navigation_fields = navigation_properties;
     }
 
     /// Validates a foreign key and populates fk_info map
@@ -593,6 +595,7 @@ impl ModelAnalysis {
                 );
 
                 NavigationField {
+                    hash: 0,
                     field: nav_field,
                     model_reference: adj_model_name,
                     kind: NavigationFieldKind::OneToOne {
@@ -625,6 +628,7 @@ impl ModelAnalysis {
                 );
 
                 NavigationField {
+                    hash: 0,
                     field: nav_field,
                     model_reference: adj_model_name,
                     kind: NavigationFieldKind::OneToMany {
@@ -664,6 +668,7 @@ impl ModelAnalysis {
                 );
 
                 NavigationField {
+                    hash: 0,
                     field: nav_field,
                     model_reference: adj_model_name,
                     kind: NavigationFieldKind::ManyToMany,

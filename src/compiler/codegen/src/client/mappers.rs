@@ -31,9 +31,13 @@ impl ClientLanguageTypeMapper for TypeScriptMapper {
             }
             CidlType::HttpResult(inner) => self.cidl_type(inner, ast),
             CidlType::Void => "void".to_string(),
-            CidlType::Partial { name, .. } => format!("DeepPartial<{name}>"),
-            CidlType::DataSource { name, .. } => {
-                let ds = &ast.models.get(name).expect("Model to exist").data_sources;
+            CidlType::Partial { object_name, .. } => format!("DeepPartial<{object_name}>"),
+            CidlType::DataSource { model_name, .. } => {
+                let ds = &ast
+                    .models
+                    .get(model_name)
+                    .expect("Model to exist")
+                    .data_sources;
 
                 let joined = ds
                     .iter()

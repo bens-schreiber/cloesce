@@ -202,6 +202,7 @@ impl SemanticAnalysis {
         }
 
         let ast = CloesceAst {
+            hash: 0,
             wrangler_env,
             models,
             services,
@@ -344,7 +345,7 @@ impl SemanticAnalysis {
                 for (var_name, child) in &node.0 {
                     // Check navigation properties
                     let nav = parent_model
-                        .navigation_properties
+                        .navigation_fields
                         .iter()
                         .find(|nav| nav.field.name == var_name.as_str());
 

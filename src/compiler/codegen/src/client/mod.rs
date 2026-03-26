@@ -38,7 +38,7 @@ handlebars_helper!(needs_constructor: |cidl_type: CidlType| matches!(cidl_type.r
 ));
 
 handlebars_helper!(get_object_name: |cidl_type: CidlType| match cidl_type.root_type() {
-    CidlType::Inject { name, ..} | CidlType::Object { name, ..} | CidlType::Partial { name, .. } => serde_json::to_value(name).unwrap(),
+    CidlType::Inject { name, ..} | CidlType::Object { name, ..} | CidlType::Partial { object_name: name, .. } => serde_json::to_value(name).unwrap(),
     ty => serde_json::to_value(ty).unwrap()
 });
 handlebars_helper!(get_content_type: |media: MediaType| match media {

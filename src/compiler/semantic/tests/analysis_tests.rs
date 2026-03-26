@@ -417,7 +417,7 @@ fn d1_model_nav_one_to_one() {
 
     let person = result.ast.models.get("Person").unwrap();
 
-    let person_horse_nav = person.navigation_properties.first().unwrap();
+    let person_horse_nav = person.navigation_fields.first().unwrap();
     assert_eq!(person_horse_nav.field.name, "horse");
     assert_eq!(person_horse_nav.model_reference, "Horse");
 
@@ -473,7 +473,7 @@ fn d1_model_nav_one_to_many() {
 
     let author = result.ast.models.get("Author").unwrap();
 
-    let author_posts_nav = author.navigation_properties.first().unwrap();
+    let author_posts_nav = author.navigation_fields.first().unwrap();
     assert_eq!(author_posts_nav.field.name, "posts");
     assert_eq!(author_posts_nav.model_reference, "Post");
 
@@ -521,7 +521,7 @@ fn d1_model_nav_many_to_many() {
 
     let student = result.ast.models.get("Student").unwrap();
 
-    let student_courses_nav = student.navigation_properties.first().unwrap();
+    let student_courses_nav = student.navigation_fields.first().unwrap();
     assert_eq!(student_courses_nav.field.name, "courses");
     assert_eq!(student_courses_nav.model_reference, "Course");
 

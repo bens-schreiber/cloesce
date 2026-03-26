@@ -2,9 +2,7 @@ mod fmt;
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 
-use ast::{
-    CidlType, D1Column, MigrationsAst, MigrationsModel, NavigationProperty, NavigationPropertyKind,
-};
+use ast::{CidlType, Column, MigrationsAst, MigrationsModel, NavigationField, NavigationFieldKind};
 
 use indexmap::IndexMap;
 use sea_query::{
@@ -79,14 +77,14 @@ enum AlterKind<'a> {
     RebuildTable,
 
     AddColumn {
-        col: &'a D1Column,
+        col: &'a Column,
     },
     AlterColumnType {
-        col: &'a D1Column,
-        lm_col: &'a D1Column,
+        col: &'a Column,
+        lm_col: &'a Column,
     },
     DropColumn {
-        lm_col: &'a D1Column,
+        lm_col: &'a Column,
     },
 
     AddManyToMany {
@@ -110,9 +108,9 @@ impl MigrateTables {
         let mut res = vec![];
 
         for model in sorted_models {
-            let is_composite_pk = model.primary_key_columns.len() > 1;
-            let mut unique_columns_by_id = BTreeMap::<u32, Vec<&str>>::new();
-            let mut fk_groups = BTreeMap::<String, Vec<&D1Column>>::new();
+            let is_composite_pk = model.primary_columns.len() > 1;
+            let mut unique_columns_by_id = BTreeMap::<usize, Vec<&str>>::new();
+            let mut fk_groups = BTreeMap::<String, Vec<&Column>>::new();
 
             let mut table = Table::create();
             table.table(alias(&model.name));
@@ -121,7 +119,7 @@ impl MigrateTables {
             for (col, is_pk) in model.all_columns() {
                 // Set primary keys
                 if is_pk {
-                    let mut column = typed_column(&col.value.name, &col.value.cidl_type, false);
+                    let mut column = typed_column(&col.field.name, &col.field.cidl_type, false);
                     if is_composite_pk {
                         column.not_null();
                     } else {
@@ -136,7 +134,7 @@ impl MigrateTables {
                     unique_columns_by_id
                         .entry(*unique_id)
                         .or_default()
-                        .push(col.value.name.as_str());
+                        .push(col.field.name.as_str());
                 }
 
                 // Gather foreign key groups
@@ -146,7 +144,7 @@ impl MigrateTables {
 
                 let ref_model_has_composite_pk = model_lookup
                     .get(fk_ref.model_name.as_str())
-                    .map(|m| m.primary_key_columns.len() > 1)
+                    .map(|m| m.primary_columns.len() > 1)
                     .unwrap_or(false);
 
                 let group_key = if let Some(composite_id) = col.composite_id {
@@ -154,7 +152,7 @@ impl MigrateTables {
                 } else if ref_model_has_composite_pk {
                     format!("{}::composite", fk_ref.model_name)
                 } else {
-                    format!("{}::{}", fk_ref.model_name, col.value.name)
+                    format!("{}::{}", fk_ref.model_name, col.field.name)
                 };
 
                 fk_groups.entry(group_key).or_default().push(col);
@@ -163,26 +161,26 @@ impl MigrateTables {
             // Composite primary key index
             if is_composite_pk {
                 let mut pk = Index::create();
-                for pk_col in model.primary_key_columns.iter() {
-                    pk.col(alias(pk_col.value.name.as_str()));
+                for pk_col in model.primary_columns.iter() {
+                    pk.col(alias(pk_col.field.name.as_str()));
                 }
                 table.primary_key(&mut pk);
             }
 
             // Columns
             for col in model.columns.iter() {
-                let mut column = typed_column(&col.value.name, &col.value.cidl_type, false);
+                let mut column = typed_column(&col.field.name, &col.field.cidl_type, false);
 
                 let single_column_unique = col.unique_ids.iter().any(|id| {
                     unique_columns_by_id
                         .get(id)
-                        .is_some_and(|cols| cols.len() == 1 && cols[0] == col.value.name)
+                        .is_some_and(|cols| cols.len() == 1 && cols[0] == col.field.name)
                 });
                 if single_column_unique {
                     column.unique_key();
                 }
 
-                if !col.value.cidl_type.is_nullable() {
+                if !col.field.cidl_type.is_nullable() {
                     column.not_null();
                 }
 
@@ -191,7 +189,7 @@ impl MigrateTables {
 
             // Foreign keys
             for cols in fk_groups.values_mut() {
-                cols.sort_by_key(|c| c.value.name.as_str());
+                cols.sort_by_key(|c| c.field.name.as_str());
 
                 let fk_ref = cols
                     .first()
@@ -200,7 +198,7 @@ impl MigrateTables {
 
                 let mut fk = ForeignKey::create();
                 for col in cols.iter() {
-                    fk.from(alias(model.name.as_str()), alias(col.value.name.as_str()));
+                    fk.from(alias(model.name.as_str()), alias(col.field.name.as_str()));
                     fk.to(
                         alias(fk_ref.model_name.as_str()),
                         alias(
@@ -246,8 +244,8 @@ impl MigrateTables {
 
             table.table(alias(&id)).if_not_exists();
 
-            for (join_col_name, pk_col) in left_join_cols.iter().chain(right_join_cols.iter()) {
-                let mut col = typed_column(join_col_name.as_str(), &pk_col.value.cidl_type, false);
+            for (join_col_name, pk) in left_join_cols.iter().chain(right_join_cols.iter()) {
+                let mut col = typed_column(join_col_name.as_str(), &pk.field.cidl_type, false);
                 table.col(col.not_null());
             }
 
@@ -258,10 +256,10 @@ impl MigrateTables {
             table.primary_key(&mut pk_index);
 
             let mut left_fk = ForeignKey::create();
-            for (join_col_name, pk_col) in left_join_cols {
+            for (join_col_name, pk) in left_join_cols {
                 left_fk
                     .from(alias(id.as_str()), alias(join_col_name.as_str()))
-                    .to(alias(left.name.as_str()), alias(pk_col.value.name.as_str()));
+                    .to(alias(left.name.as_str()), alias(pk.field.name.as_str()));
             }
             left_fk
                 .on_update(sea_query::ForeignKeyAction::Cascade)
@@ -269,13 +267,10 @@ impl MigrateTables {
             table.foreign_key(&mut left_fk);
 
             let mut right_fk = ForeignKey::create();
-            for (join_col_name, pk_col) in right_join_cols {
+            for (join_col_name, pk) in right_join_cols {
                 right_fk
                     .from(alias(id.as_str()), alias(join_col_name.as_str()))
-                    .to(
-                        alias(right.name.as_str()),
-                        alias(pk_col.value.name.as_str()),
-                    );
+                    .to(alias(right.name.as_str()), alias(pk.field.name.as_str()));
             }
             right_fk
                 .on_update(sea_query::ForeignKeyAction::Cascade)
@@ -316,7 +311,7 @@ impl MigrateTables {
         let mut renamed = HashSet::new();
 
         for (model, lm_model) in alter_models {
-            let mut needs_rename_intent = HashMap::<&String, &D1Column>::new();
+            let mut needs_rename_intent = HashMap::<&String, &Column>::new();
             let mut needs_drop_intent = vec![];
             let alterations = identify_alterations(model, lm_model, &renamed);
 
@@ -337,7 +332,7 @@ impl MigrateTables {
                         tracing::info!("Renamed table \"{}\" to \"{}\"", lm_model.name, model.name);
                     }
                     AlterKind::AddColumn { col } => {
-                        needs_rename_intent.insert(&col.value.name, col);
+                        needs_rename_intent.insert(&col.field.name, col);
                     }
                     AlterKind::AlterColumnType { col, lm_col } => {
                         // Drop the last migrated column
@@ -345,7 +340,7 @@ impl MigrateTables {
                             res.push(to_sqlite(
                                 Table::alter()
                                     .table(alias(&model.name))
-                                    .drop_column(alias(&lm_col.value.name))
+                                    .drop_column(alias(&lm_col.field.name))
                                     .to_owned(),
                             ));
                         }
@@ -356,8 +351,8 @@ impl MigrateTables {
                                 Table::alter()
                                     .table(alias(&model.name))
                                     .add_column(typed_column(
-                                        &col.value.name,
-                                        &col.value.cidl_type,
+                                        &col.field.name,
+                                        &col.field.cidl_type,
                                         true,
                                     ))
                                     .to_owned(),
@@ -367,8 +362,8 @@ impl MigrateTables {
                         tracing::info!(
                             "Altered column type of \"{}.{:?}\" to {:?}",
                             lm_model.name,
-                            lm_col.value.cidl_type,
-                            col.value.cidl_type
+                            lm_col.field.cidl_type,
+                            col.field.cidl_type
                         );
                         tracing::warn!(
                             "Altering column types drops the previous column. Data can be lost."
@@ -457,12 +452,12 @@ impl MigrateTables {
                         {
                             let lm_col_lookup = lm_model
                                 .all_columns()
-                                .map(|(c, _)| (&c.value.name, &c.value))
+                                .map(|(c, _)| (&c.field.name, &c.field))
                                 .collect::<HashMap<_, _>>();
 
                             let columns = model
                                 .all_columns()
-                                .map(|(c, _)| &c.value)
+                                .map(|(c, _)| &c.field)
                                 .collect::<Vec<_>>();
 
                             let insert = Query::insert()
@@ -491,8 +486,8 @@ impl MigrateTables {
                                                     CidlType::Integer | CidlType::Boolean => {
                                                         "integer"
                                                     }
-                                                    CidlType::Real => "real",
-                                                    CidlType::Text | CidlType::DateIso => "text",
+                                                    CidlType::Double => "real",
+                                                    CidlType::String | CidlType::DateIso => "text",
                                                     _ => unreachable!(),
                                                 };
 
@@ -527,21 +522,21 @@ impl MigrateTables {
 
                 let rename_options = needs_rename_intent
                     .values()
-                    .filter(|ma| ma.value.cidl_type == lm_col.value.cidl_type)
-                    .map(|ma| &ma.value.name)
+                    .filter(|ma| ma.field.cidl_type == lm_col.field.cidl_type)
+                    .map(|ma| &ma.field.name)
                     .collect::<Vec<_>>();
 
                 if !rename_options.is_empty() {
                     let i = intent.ask(MigrationsDilemma::RenameOrDropColumn {
                         model_name: model.name.clone(),
-                        column_name: lm_col.value.name.clone(),
+                        column_name: lm_col.field.name.clone(),
                         options: &rename_options,
                     });
 
                     // Rename
                     if let Some(i) = i {
                         let option = &rename_options[i];
-                        alter.rename_column(alias(&lm_col.value.name), alias(*option));
+                        alter.rename_column(alias(&lm_col.field.name), alias(*option));
                         res.push(to_sqlite(alter));
 
                         // Remove from the rename pool
@@ -550,7 +545,7 @@ impl MigrateTables {
                         tracing::info!(
                             "Renamed a column \"{}.{}\" to \"{}.{}\"",
                             lm_model.name,
-                            lm_col.value.name,
+                            lm_col.field.name,
                             model.name,
                             option
                         );
@@ -559,9 +554,9 @@ impl MigrateTables {
                 }
 
                 // Drop
-                alter.drop_column(alias(&lm_col.value.name));
+                alter.drop_column(alias(&lm_col.field.name));
                 res.push(to_sqlite(alter));
-                tracing::info!("Dropped a column \"{}.{}\"", model.name, lm_col.value.name);
+                tracing::info!("Dropped a column \"{}.{}\"", model.name, lm_col.field.name);
             }
 
             // Add column
@@ -570,13 +565,13 @@ impl MigrateTables {
                     Table::alter()
                         .table(alias(&model.name))
                         .add_column(typed_column(
-                            &add_col.value.name,
-                            &add_col.value.cidl_type,
+                            &add_col.field.name,
+                            &add_col.field.cidl_type,
                             true,
                         ))
                         .to_owned(),
                 ));
-                tracing::info!("Added a column \"{}.{}\"", model.name, add_col.value.name);
+                tracing::info!("Added a column \"{}.{}\"", model.name, add_col.field.name);
             }
         }
 
@@ -600,11 +595,11 @@ impl MigrateTables {
             let mut lm_cols = lm_model
                 .columns
                 .iter()
-                .map(|a| (&a.value.name, a))
-                .collect::<HashMap<&String, &D1Column>>();
+                .map(|a| (&a.field.name, a))
+                .collect::<HashMap<&String, &Column>>();
 
             for col in &model.columns {
-                let Some(lm_col) = lm_cols.remove(&col.value.name) else {
+                let Some(lm_col) = lm_cols.remove(&col.field.name) else {
                     if col.foreign_key_reference.is_some()
                         || !col.unique_ids.is_empty()
                         || col.composite_id.is_some()
@@ -624,7 +619,7 @@ impl MigrateTables {
                     (&col.foreign_key_reference, &lm_col.foreign_key_reference)
                     && renamed.contains(&(&lm_fk_ref.model_name, &model_fk_ref.model_name))
                     && lm_fk_ref.column_name == model_fk_ref.column_name
-                    && lm_col.value.cidl_type == col.value.cidl_type
+                    && lm_col.field.cidl_type == col.field.cidl_type
                 {
                     // If the last migrated column and current column share the same foreign key reference,
                     // and that reference is marked as renamed only, and no type change occurred,
@@ -645,7 +640,7 @@ impl MigrateTables {
                     return vec![AlterKind::RebuildTable];
                 }
 
-                if lm_col.value.cidl_type != col.value.cidl_type {
+                if lm_col.field.cidl_type != col.field.cidl_type {
                     alterations.push(AlterKind::AlterColumnType { col, lm_col });
                 }
             }
@@ -664,18 +659,18 @@ impl MigrateTables {
             }
 
             let mut lm_m2ms = lm_model
-                .navigation_properties
+                .navigation_fields
                 .iter()
                 .filter_map(|n| match &n.kind {
-                    NavigationPropertyKind::ManyToMany => {
+                    NavigationFieldKind::ManyToMany => {
                         Some((n.many_to_many_table_name(&lm_model.name), n))
                     }
                     _ => None,
                 })
-                .collect::<HashMap<String, &NavigationProperty>>();
+                .collect::<HashMap<String, &NavigationField>>();
 
-            for nav in &model.navigation_properties {
-                let NavigationPropertyKind::ManyToMany = &nav.kind else {
+            for nav in &model.navigation_fields {
+                let NavigationFieldKind::ManyToMany = &nav.kind else {
                     continue;
                 };
 
@@ -707,10 +702,10 @@ impl MigrateTables {
         for &lm_model in sorted_lm_models.iter().rev() {
             // Drop M2M's
             for m2m_id in lm_model
-                .navigation_properties
+                .navigation_fields
                 .iter()
                 .filter_map(|n| match &n.kind {
-                    NavigationPropertyKind::ManyToMany => {
+                    NavigationFieldKind::ManyToMany => {
                         Some(n.many_to_many_table_name(&lm_model.name))
                     }
                     _ => None,
@@ -759,8 +754,8 @@ impl MigrateTables {
                         alters.push((model, lm_model));
                     }
                     None => {
-                        for nav in &model.navigation_properties {
-                            let NavigationPropertyKind::ManyToMany = &nav.kind else {
+                        for nav in &model.navigation_fields {
+                            let NavigationFieldKind::ManyToMany = &nav.kind else {
                                 continue;
                             };
 
@@ -850,17 +845,17 @@ fn alias(name: impl Into<String>) -> sea_query::Alias {
 }
 
 fn is_same_primary_key(model: &MigrationsModel, lm_model: &MigrationsModel) -> bool {
-    if model.primary_key_columns.len() != lm_model.primary_key_columns.len() {
+    if model.primary_columns.len() != lm_model.primary_columns.len() {
         return false;
     }
 
     model
-        .primary_key_columns
+        .primary_columns
         .iter()
-        .zip(lm_model.primary_key_columns.iter())
+        .zip(lm_model.primary_columns.iter())
         .all(|(a, b)| {
-            a.value.name == b.value.name
-                && a.value.cidl_type == b.value.cidl_type
+            a.field.name == b.field.name
+                && a.field.cidl_type == b.field.cidl_type
                 && a.foreign_key_reference
                     .as_ref()
                     .map(|a| (&a.model_name, &a.column_name))
@@ -874,15 +869,15 @@ fn is_same_primary_key(model: &MigrationsModel, lm_model: &MigrationsModel) -> b
 fn join_columns_for_side<'a>(
     model: &'a MigrationsModel,
     side: &'a str,
-) -> Vec<(String, &'a D1Column)> {
-    if model.primary_key_columns.len() == 1 {
-        return vec![(side.into(), &model.primary_key_columns[0])];
+) -> Vec<(String, &'a Column)> {
+    if model.primary_columns.len() == 1 {
+        return vec![(side.into(), &model.primary_columns[0])];
     }
 
     model
-        .primary_key_columns
+        .primary_columns
         .iter()
-        .map(|pk| (format!("{side}_{}", pk.value.name), pk))
+        .map(|pk| (format!("{side}_{}", pk.field.name), pk))
         .collect()
 }
 
@@ -894,8 +889,8 @@ fn sql_default(ty: &CidlType) -> sea_query::Value {
 
     match ty {
         CidlType::Integer => sea_query::Value::Int(Some(0i32)),
-        CidlType::Text => sea_query::Value::String(Some(Box::new("".into()))),
-        CidlType::Real => sea_query::Value::Float(Some(0.0)),
+        CidlType::String => sea_query::Value::String(Some(Box::new("".into()))),
+        CidlType::Double => sea_query::Value::Float(Some(0.0)),
         _ => unreachable!(),
     }
 }
@@ -913,8 +908,8 @@ fn typed_column(name: &str, ty: &CidlType, with_default: bool) -> ColumnDef {
 
     match inner {
         CidlType::Integer | CidlType::Boolean => col.integer(),
-        CidlType::Real => col.decimal(),
-        CidlType::Text | CidlType::DateIso => col.text(),
+        CidlType::Double => col.decimal(),
+        CidlType::String | CidlType::DateIso => col.text(),
         CidlType::Blob => col.blob(),
         _ => unreachable!("column type must be validated"),
     };
