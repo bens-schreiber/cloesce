@@ -14,16 +14,17 @@ macro_rules! cidl_type_contains {
 
         loop {
             match cur {
-                $pattern => break true,
-
                 CidlType::Array(inner)
                 | CidlType::Nullable(inner)
                 | CidlType::HttpResult(inner)
                 | CidlType::Paginated(inner) => {
+                    if matches!(cur, $pattern) {
+                        break true;
+                    }
                     cur = inner;
                 }
 
-                _ => break false,
+                other => break matches!(other, $pattern),
             }
         }
     }};
@@ -129,12 +130,10 @@ fn register_helpers<'a>(
                 let cidl_type = match nav.kind {
                     NavigationFieldKind::OneToOne { .. } => CidlType::Object {
                         name: nav.model_reference,
-                        id: 0, // doesn't matter for client gen
                     },
                     NavigationFieldKind::OneToMany { .. } | NavigationFieldKind::ManyToMany => {
                         CidlType::array(CidlType::Object {
                             name: nav.model_reference,
-                            id: 0, // doesn't matter for client gen
                         })
                     }
                 };

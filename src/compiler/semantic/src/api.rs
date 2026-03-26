@@ -1,5 +1,3 @@
-use std::ops::Not;
-
 use ast::{Api, ApiMethod, CidlType, Field, HttpVerb, MediaType};
 use frontend::{ApiBlock, ApiBlockMethod, ParseAst};
 
@@ -22,35 +20,33 @@ impl ApiAnalysis {
     ) -> BatchResult<Vec<(String, Api)>> {
         let mut result = Vec::new();
 
-        for api in apis {
+        for api_block in apis {
             // Validate the model reference
-            let Some(model_sym) = table.resolve(&api.model, SymbolKind::ModelDecl, None) else {
-                self.sink
-                    .push(CompilerErrorKind::ApiUnknownModelReference {
-                        api: api.symbol.clone(),
-                    });
-                continue;
+            let namespace = match (
+                table.resolve(&api_block.model, SymbolKind::ModelDecl, None),
+                table.resolve(&api_block.model, SymbolKind::ServiceDecl, None),
+            ) {
+                (Some(model), _) => &model,
+                (_, Some(service)) => service,
+                (None, None) => {
+                    self.sink
+                        .push(CompilerErrorKind::ApiUnknownNamespaceReference {
+                            api: api_block.symbol.clone(),
+                        });
+                    continue;
+                }
             };
 
-            if matches!(model_sym.kind, SymbolKind::ModelDecl).not() {
-                self.sink
-                    .push(CompilerErrorKind::ApiUnknownModelReference {
-                        api: api.symbol.clone(),
-                    });
-                continue;
-            };
-
-            let model_name = model_sym.name.clone();
-            let mut model_api = Api {
-                name: api.symbol.name.clone(),
+            let mut api = Api {
+                name: api_block.symbol.name.clone(),
                 methods: Vec::new(),
             };
-            for method in &api.methods {
-                if let Some(api_method) = self.method(&api.model, method, parse, table) {
-                    model_api.methods.push(api_method);
+            for method in &api_block.methods {
+                if let Some(api_method) = self.method(&namespace.name, method, parse, table) {
+                    api.methods.push(api_method);
                 }
             }
-            result.push((model_name, model_api));
+            result.push((namespace.name.clone(), api));
         }
 
         self.sink.finish()?;
@@ -59,7 +55,7 @@ impl ApiAnalysis {
 
     fn method(
         &mut self,
-        model_name: &str,
+        namespace: &str,
         method: &ApiBlockMethod,
         parse: &ParseAst,
         table: &SymbolTable,
@@ -74,11 +70,11 @@ impl ApiAnalysis {
                 }
             );
 
-            // Check that the data source exists on this model
+            // Check that the data source exists on this namespace
             let ds_exists = parse
                 .sources
                 .iter()
-                .any(|s| s.symbol.name == *ds && s.model == model_name);
+                .any(|s| s.symbol.name == *ds && s.model == namespace);
 
             ensure!(
                 ds_exists,
@@ -133,9 +129,7 @@ impl ApiAnalysis {
             }
 
             CidlType::DataSource { name, .. } => {
-                let valid = table
-                    .resolve(name, SymbolKind::ModelDecl, None)
-                    .is_some();
+                let valid = table.resolve(name, SymbolKind::ModelDecl, None).is_some();
                 ensure!(valid, self.sink, err());
             }
 
@@ -168,9 +162,7 @@ impl ApiAnalysis {
 
             // DataSource parameters validated separately
             if let CidlType::DataSource { name, .. } = &param.cidl_type {
-                let valid = table
-                    .resolve(name, SymbolKind::ModelDecl, None)
-                    .is_some();
+                let valid = table.resolve(name, SymbolKind::ModelDecl, None).is_some();
                 ensure!(valid, self.sink, err());
                 params.push(Field {
                     name: param.name.clone(),

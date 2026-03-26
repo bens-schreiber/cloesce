@@ -112,14 +112,21 @@ pub fn data_source_block<'t>() -> impl Parser<'t, &'t [Token], DataSourceBlock, 
         .map_with(
             |((name, model), ((include_entries, get_method), list_method)), e| {
                 let tree = IncludeTree(include_entries.into_iter().collect());
+                let set_parent = |mut params: Vec<Symbol>, method: &str| -> Vec<Symbol> {
+                    let parent = format!("{name}::{method}");
+                    for p in &mut params {
+                        p.parent_name = parent.clone();
+                    }
+                    params
+                };
                 let get = get_method.map(|(params, raw_sql)| DataSourceBlockMethod {
                     span: e.span(),
-                    parameters: params,
+                    parameters: set_parent(params, "get"),
                     raw_sql,
                 });
                 let list = list_method.map(|(params, raw_sql)| DataSourceBlockMethod {
                     span: e.span(),
-                    parameters: params,
+                    parameters: set_parent(params, "list"),
                     raw_sql,
                 });
 

@@ -772,7 +772,10 @@ fn api_errors() {
     // Assert
     assert_eq!(errors.len(), 6);
 
-    expect_err!(errors, CompilerErrorKind::ApiUnknownModelReference { .. });
+    expect_err!(
+        errors,
+        CompilerErrorKind::ApiUnknownNamespaceReference { .. }
+    );
 
     expect_err!(errors, CompilerErrorKind::ApiInvalidReturn { .. });
 

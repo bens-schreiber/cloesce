@@ -194,7 +194,7 @@ pub enum CompilerErrorKind {
     },
 
     /// An API block references a model that does not exist.
-    ApiUnknownModelReference {
+    ApiUnknownNamespaceReference {
         api: Symbol,
     },
 

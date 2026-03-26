@@ -1,4 +1,4 @@
-use compiler_test::{SemanticResult, src_to_ast};
+use compiler_test::src_to_ast;
 
 #[test]
 fn test_client_code_generation_snapshot() {
@@ -56,139 +56,136 @@ fn test_client_code_generation_snapshot() {
             oneToManyNav: Array<BasicModel>
         }
 
-        // @d1(db)
-        // model ManyToManyModelA {
-        //     [primary id]
-        //     id: int
+        @d1(db)
+        model ManyToManyModelA {
+            [primary id]
+            id: int
 
-        //     [nav manyToManyNav <> ManyToManyModelB::manyToManyNav]
-        //     manyToManyNav: Array<ManyToManyModelB>
-        // }
+            [nav manyToManyNav <> ManyToManyModelB::manyToManyNav]
+            manyToManyNav: Array<ManyToManyModelB>
+        }
 
-        // @d1(db)
-        // model ManyToManyModelB {
-        //     [primary id]
-        //     id: int
+        @d1(db)
+        model ManyToManyModelB {
+            [primary id]
+            id: int
 
-        //     [nav manyToManyNav <> ManyToManyModelA::manyToManyNav]
-        //     manyToManyNav: Array<ManyToManyModelA>
-        // }
+            [nav manyToManyNav <> ManyToManyModelA::manyToManyNav]
+            manyToManyNav: Array<ManyToManyModelA>
+        }
 
-        // @d1(db)
-        // model ModelWithCompositePk {
-        //     [primary tenantId, rowId]
-        //     tenantId: string
-        //     rowId: int
+        @d1(db)
+        model ModelWithCompositePk {
+            [primary tenantId, rowId]
+            tenantId: string
+            rowId: int
 
-        //     name: string
-        // }
+            name: string
+        }
 
-        // api ModelWithCompositePkApi for ModelWithCompositePk {
-        //     post instanceMethod(input: string) -> string
-        // }
+        api ModelWithCompositePkApi for ModelWithCompositePk {
+            post instanceMethod(input: string) -> string
+        }
 
-        // model ModelWithKv {
-        //     @keyparam
-        //     id1: string
+        model ModelWithKv {
+            @keyparam
+            id1: string
 
-        //     @keyparam
-        //     id2: string
+            @keyparam
+            id2: string
 
-        //     @kv(my_kv, "{id1}")
-        //     someValue: json
+            @kv(my_kv, "{id1}")
+            someValue: json
 
-        //     @kv(my_kv, "")
-        //     manyValues: Paginated<json>
+            @kv(my_kv, "")
+            manyValues: Paginated<json>
 
-        //     @kv(my_kv, "constant")
-        //     streamValue: stream
-        // }
+            @kv(my_kv, "constant")
+            streamValue: stream
+        }
 
-        // api ModelWithKvApi for ModelWithKv {
-        //     post instanceMethod(input: string) -> string
-        //     get staticMethod(input: int) -> int
-        //     post hasKvParamAndRes(input: KvObject<string>) -> KvObject<string>
-        // }
+        api ModelWithKvApi for ModelWithKv {
+            post instanceMethod(input: string) -> string
+            get staticMethod(input: int) -> int
+            post hasKvParamAndRes(input: KvObject<string>) -> KvObject<string>
+        }
 
-        // model ModelWithR2 {
-        //     @keyparam
-        //     id: string
+        model ModelWithR2 {
+            @keyparam
+            id: string
 
-        //     @r2(my_r2,"{id}")
-        //     fileData: blob
+            @r2(my_r2, "{id}")
+            fileData: R2Object
 
-        //     @r2(my_r2, "{id}/files")
-        //     manyFileDatas: Paginated<blob>
-        // }
+            @r2(my_r2, "{id}/files")
+            manyFileDatas: Paginated<R2Object>
+        }
 
-        // api ModelWithR2Api for ModelWithR2 {
-        //     post instanceMethod(input: string) -> string
-        //     get staticMethod(input: int) -> int
-        //     post hasR2ParamAndRes(input: R2Object) -> R2Object
-        // }
+        api ModelWithR2Api for ModelWithR2 {
+            post instanceMethod(input: string) -> string
+            get staticMethod(input: int) -> int
+            post hasR2ParamAndRes(input: R2Object) -> R2Object
+        }
 
-        // @d1(db)
-        // model ToyotaPrius {
-        //     [primary id]
-        //     id: int
+        @d1(db)
+        model ToyotaPrius {
+            [primary id]
+            id: int
+            
+            ownerId: string
+            modelYear: int
 
-        //     ownerId: string
-        //     modelYear: int
+            @keyparam
+            someKey: string
 
-        //     @keyparam
-        //     ownerId: string
+            @kv(my_kv, "{ownerId}/{modelYear}")
+            metadata: json
 
-        //     @keyparam
-        //     modelYear: int
+            @r2(my_r2, "{modelYear}/photos")
+            photoData: R2Object
+        }
 
-        //     @kv(my_kv, "{ownerId}/{modelYear}")
-        //     metadata: json
+        source WithKv for ToyotaPrius {
+            include {
+                metadata
+            }
+        }
 
-        //     @r2(my_r2, "{modelYear}/photos")
-        //     photoData: blob
-        // }
+        source WithR2 for ToyotaPrius {
+            include {
+                photoData
+            }
+        }
 
-        // source WithKv for ToyotaPrius {
-        //     include {
-        //         metadata
-        //     }
-        // }
+        @d1(db)
+        @crud(get, save, list)
+        model ModelWithCruds {
+            [primary id]
+            id: int
 
-        // source WithR2 for ToyotaPrius {
-        //     include {
-        //         photoData
-        //     }
-        // }
+            name: string
+        }
 
-        // @d1(db)
-        // @crud(get, save, list)
-        // model ModelWithCruds {
-        //     [primary id]
-        //     id: int
+        service BasicService {}
+        api BasicServiceApi for BasicService {
+            post instanceMethod(input: string) -> string
+            get staticMethod(input: int) -> int
+            post hasStreamParam(input: stream) -> string
+            get hasStreamRes() -> stream
+        }
 
-        //     name: string
-        // }
+        poo BasicPoo {
+            field1: string
+            field2: int
+        }
 
-        // service BasicService {}
-        // api BasicServiceApi for BasicService {
-        //     post instanceMethod(input: string) -> string
-        //     get staticMethod(input: int) -> int
-        //     post hasStreamParam(input: stream) -> string
-        //     get hasStreamRes() -> stream
-        // }
-
-        // poo BasicPoo {
-        //     field1: string
-        //     field2: int
-        // }
-
-        // poo PooWithComposition {
-        //     field1: BasicPoo
-        //     field2: BasicModel
-        // }
+        poo PooWithComposition {
+            field1: BasicPoo
+            field2: BasicModel
+        }
     
     "#;
-    let SemanticResult { ast, .. } = src_to_ast(src);
+    src_to_ast(src);
 
     // let client_code = ClientGenerator::generate(&ast, "http://example.com/path/to/api");
 }

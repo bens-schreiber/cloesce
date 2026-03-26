@@ -109,14 +109,20 @@ fn poo_block<'t>() -> impl Parser<'t, &'t [Token], PlainOldObjectBlock, Extra<'t
                 .collect::<Vec<_>>()
                 .delimited_by(just(Token::LBrace), just(Token::RBrace)),
         )
-        .map(move |((name, span), fields)| PlainOldObjectBlock {
-            symbol: Symbol {
-                span: FileSpan::from_simple_span(span),
-                name,
-                kind: SymbolKind::PlainOldObjectDecl,
-                ..Default::default()
-            },
-            fields,
+        .map(|((name, span), mut fields)| {
+            for field in &mut fields {
+                field.parent_name = name.clone();
+            }
+
+            PlainOldObjectBlock {
+                symbol: Symbol {
+                    span: FileSpan::from_simple_span(span),
+                    name,
+                    kind: SymbolKind::PlainOldObjectDecl,
+                    ..Default::default()
+                },
+                fields,
+            }
         })
 }
 

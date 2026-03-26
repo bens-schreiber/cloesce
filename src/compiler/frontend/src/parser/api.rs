@@ -53,13 +53,17 @@ pub fn api_block<'t>() -> impl Parser<'t, &'t [Token], ApiBlock, Extra<'t>> {
                 .delimited_by(just(Token::LBrace), just(Token::RBrace)),
         )
         .map_with(|((name, model), pending_methods), e| {
-            let methods = pending_methods.into_iter().map(map_method).collect();
+            let methods = pending_methods
+                .into_iter()
+                .map(|m| map_method(m, &name))
+                .collect();
 
             ApiBlock {
                 symbol: Symbol {
                     span: FileSpan::from_simple_span(e.span()),
                     name,
                     kind: SymbolKind::ApiDecl,
+                    parent_name: model.clone(),
                     ..Default::default()
                 },
                 model,
@@ -131,7 +135,7 @@ fn http_verb<'t>() -> impl Parser<'t, &'t [Token], HttpVerb, Extra<'t>> {
     ))
 }
 
-fn map_method(method: PendingApiMethod) -> ApiBlockMethod {
+fn map_method(method: PendingApiMethod, api_name: &str) -> ApiBlockMethod {
     let mut is_static = true;
     let mut data_source = None;
     let mut parameters = Vec::new();
@@ -156,6 +160,7 @@ fn map_method(method: PendingApiMethod) -> ApiBlockMethod {
                     name,
                     cidl_type,
                     kind: SymbolKind::ApiMethodParam,
+                    parent_name: format!("{api_name}::{}", method.name),
                     ..Default::default()
                 });
             }
@@ -167,6 +172,7 @@ fn map_method(method: PendingApiMethod) -> ApiBlockMethod {
             span: FileSpan::from_simple_span(method.span),
             name: method.name,
             kind: SymbolKind::ApiMethodDecl,
+            parent_name: api_name.to_string(),
             ..Default::default()
         },
         is_static,

@@ -799,7 +799,9 @@ impl ModelAnalysis {
                 continue;
             }
 
-            if field_sym.cidl_type != CidlType::R2Object {
+            if field_sym.cidl_type != CidlType::R2Object
+                && field_sym.cidl_type != CidlType::paginated(CidlType::R2Object)
+            {
                 self.sink.push(CompilerErrorKind::KvR2InvalidField {
                     tag: r2_span,
                     field: r2.field.clone(),

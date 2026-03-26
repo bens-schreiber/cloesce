@@ -3,7 +3,7 @@ resolver = "3"
 members = [
     # "cli",
     "ast",
-    # "codegen",
+    "codegen",
     "semantic",
     "compiler-test",
     "frontend",
