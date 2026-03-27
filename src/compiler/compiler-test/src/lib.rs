@@ -1,5 +1,5 @@
+use ast::CloesceAst;
 use frontend::{ParseAst, lexer::CloesceLexer, parser::CloesceParser};
-pub use semantic::SemanticResult;
 
 /// Compares two strings disregarding tabs, amount of spaces, and amount of newlines.
 /// Ensures that some expr is present in another expr.
@@ -24,7 +24,7 @@ pub fn lex_and_parse(src: &str) -> ParseAst {
         .expect("parse to succeed")
 }
 
-pub fn src_to_ast(src: &str) -> SemanticResult {
+pub fn src_to_ast(src: &str) -> CloesceAst {
     let tokens = CloesceLexer::default().lex(src).expect("lex to succeed");
     let parse = CloesceParser::default()
         .parse(tokens)

@@ -24,30 +24,54 @@ pub struct SymbolTable {
 
 impl SymbolTable {
     fn key(&self, symbol: &Symbol) -> String {
-        match symbol.kind {
-            // Global symbols
-            SymbolKind::ModelDecl
-            | SymbolKind::PlainOldObjectDecl
-            | SymbolKind::ServiceDecl
-            | SymbolKind::DataSourceDecl
-            | SymbolKind::WranglerEnvBinding { .. }
-            | SymbolKind::WranglerEnvDecl
-            | SymbolKind::InjectDecl => symbol.name.clone(),
+        match &symbol.kind {
+            // Global
+            SymbolKind::ModelDecl => format!("model::{}", symbol.name),
+            SymbolKind::PlainOldObjectDecl => format!("poo::{}", symbol.name),
+            SymbolKind::ServiceDecl => format!("service::{}", symbol.name),
+            SymbolKind::WranglerEnvDecl => format!("wrangler_env"),
+            SymbolKind::InjectDecl => format!("inject::{}", symbol.name),
 
-            // Scoped symbols
-            SymbolKind::ApiDecl
-            | SymbolKind::ModelField
-            | SymbolKind::ServiceField
-            | SymbolKind::ApiMethodDecl
-            | SymbolKind::ApiMethodParam
-            | SymbolKind::PlainOldObjectField
-            | SymbolKind::DataSourceMethodParam
-            | SymbolKind::DataSourceMethodDecl
-            | SymbolKind::WranglerEnvVar => {
-                format!("{}::{}", symbol.parent_name, symbol.name)
+            // Scoped
+            SymbolKind::WranglerEnvVar => format!("wrangler_env::var::{}", symbol.name),
+            SymbolKind::WranglerEnvBinding { kind } => {
+                format!("wrangler_env::{}::{}", kind, symbol.name)
+            }
+            SymbolKind::ModelField => {
+                let model_name = &symbol.parent_name;
+                format!("model::{model_name}::{}", symbol.name)
+            }
+            SymbolKind::PlainOldObjectField => {
+                let poo_name = &symbol.parent_name;
+                format!("poo::{poo_name}::{}", symbol.name)
+            }
+            SymbolKind::ServiceField => {
+                let service_name = &symbol.parent_name;
+                format!("service::{service_name}::{}", symbol.name)
+            }
+            SymbolKind::ApiMethodDecl => {
+                let namespace = &symbol.parent_name;
+                format!("api::{}::{}", namespace, symbol.name)
+            }
+            SymbolKind::ApiMethodParam => {
+                let namespace_method = &symbol.parent_name; // namespace::method
+                format!("api::{namespace_method}::{}", symbol.name)
+            }
+            SymbolKind::DataSourceDecl => {
+                let model = &symbol.parent_name;
+                format!("datasource::{model}::{}", symbol.name)
+            }
+            SymbolKind::DataSourceMethodParam => {
+                // model::datasource::method
+                // where method is "get" or "list"
+                let model_datasource_method = &symbol.parent_name;
+                format!("datasource::{model_datasource_method}::{}", symbol.name)
             }
 
-            _ => panic!("cannot generate key for Null symbol"),
+            _ => panic!(
+                "unexpected symbol kind in key generation: {:?}",
+                symbol.kind
+            ),
         }
     }
 
@@ -60,104 +84,125 @@ impl SymbolTable {
             ..Default::default()
         });
 
-        let symbol = self.table.get(&key);
-        if let Some(symbol) = symbol {
-            match (&kind, &symbol.kind) {
-                (
-                    SymbolKind::WranglerEnvBinding { kind: got },
-                    SymbolKind::WranglerEnvBinding { kind: found },
-                ) if got != found => {
-                    // Wrangler env bindings are all in the same scope (so names can collide), but
-                    // bindings of different kinds cannot resolve to each other
-                    return None;
-                }
-                _ => {}
-            };
-        }
-
-        symbol
+        self.table.get(&key)
     }
 
     /// Creates a [SymbolTable] from a [ParseAst], catching [CompilerErrorKind::DuplicateSymbol]'s
     fn from_parse(parse: &ParseAst, sink: &mut ErrorSink) -> SymbolTable {
         let mut st = SymbolTable::default();
+        let mut global_names = HashMap::new();
 
-        let insert_unique = |st: &mut SymbolTable, sink: &mut ErrorSink, symbol: &Symbol| {
+        let mut insert_global_name = |sink: &mut ErrorSink, symbol: &Symbol| {
+            if let Some(existing) = global_names.insert(symbol.name.to_string(), symbol.clone()) {
+                sink.push(CompilerErrorKind::DuplicateSymbol {
+                    first: existing,
+                    second: symbol.clone(),
+                });
+
+                return false;
+            }
+
+            true
+        };
+
+        let insert_symbol = |st: &mut SymbolTable, sink: &mut ErrorSink, symbol: &Symbol| {
             if let Some(existing) = st.table.insert(st.key(&symbol), symbol.clone()) {
                 sink.push(CompilerErrorKind::DuplicateSymbol {
                     first: existing,
                     second: symbol.clone(),
                 });
+
+                return false;
             }
+
+            true
         };
 
         for env in &parse.wrangler_envs {
-            insert_unique(&mut st, sink, &env.symbol);
+            insert_symbol(&mut st, sink, &env.symbol);
 
             for b in &env.d1_bindings {
-                insert_unique(&mut st, sink, b);
+                if insert_symbol(&mut st, sink, b) {
+                    insert_global_name(sink, b);
+                }
             }
 
             for b in &env.r2_bindings {
-                insert_unique(&mut st, sink, b);
+                if insert_symbol(&mut st, sink, b) {
+                    insert_global_name(sink, b);
+                }
             }
 
             for b in &env.kv_bindings {
-                insert_unique(&mut st, sink, b);
+                if insert_symbol(&mut st, sink, b) {
+                    insert_global_name(sink, b);
+                }
             }
 
             for var in &env.vars {
-                insert_unique(&mut st, sink, var);
+                if insert_symbol(&mut st, sink, var) {
+                    insert_global_name(sink, var);
+                }
             }
         }
 
         for model in &parse.models {
-            insert_unique(&mut st, sink, &model.symbol);
+            if insert_symbol(&mut st, sink, &model.symbol) {
+                insert_global_name(sink, &model.symbol);
+            }
 
             for field in &model.fields {
-                insert_unique(&mut st, sink, field);
+                insert_symbol(&mut st, sink, field);
             }
         }
 
         for api in &parse.apis {
             for method in &api.methods {
-                insert_unique(&mut st, sink, &method.symbol);
+                insert_symbol(&mut st, sink, &method.symbol);
 
                 for param in &method.parameters {
-                    insert_unique(&mut st, sink, param);
+                    insert_symbol(&mut st, sink, param);
                 }
             }
         }
 
         for poo in &parse.poos {
-            insert_unique(&mut st, sink, &poo.symbol);
+            if insert_symbol(&mut st, sink, &poo.symbol) {
+                insert_global_name(sink, &poo.symbol);
+            }
 
             for field in &poo.fields {
-                insert_unique(&mut st, sink, field);
+                insert_symbol(&mut st, sink, field);
             }
         }
 
         for source in &parse.sources {
-            insert_unique(&mut st, sink, &source.symbol);
+            if insert_symbol(&mut st, sink, &source.symbol) {
+                insert_global_name(sink, &source.symbol);
+            }
 
             for method in [&source.list, &source.get].into_iter().flatten() {
                 for param in &method.parameters {
-                    insert_unique(&mut st, sink, param);
+                    insert_symbol(&mut st, sink, param);
                 }
             }
         }
 
         for service in &parse.services {
-            insert_unique(&mut st, sink, &service.symbol);
+            if insert_symbol(&mut st, sink, &service.symbol) {
+                insert_global_name(sink, &service.symbol);
+            }
 
             for field in &service.fields {
-                insert_unique(&mut st, sink, field);
+                insert_symbol(&mut st, sink, field);
             }
         }
 
         for inject in &parse.injects {
             for field in &inject.fields {
-                insert_unique(&mut st, sink, field);
+                if insert_symbol(&mut st, sink, field) {
+                    insert_global_name(sink, field);
+                }
             }
         }
 
@@ -165,14 +210,11 @@ impl SymbolTable {
     }
 }
 
-pub struct SemanticResult {
-    pub ast: CloesceAst,
-    pub table: SymbolTable,
-}
-
 pub struct SemanticAnalysis;
 impl SemanticAnalysis {
-    pub fn analyze(parse: ParseAst) -> (SemanticResult, Vec<CompilerErrorKind>) {
+    pub fn analyze_with_table(
+        parse: ParseAst,
+    ) -> ((SymbolTable, CloesceAst), Vec<CompilerErrorKind>) {
         let mut sink = ErrorSink::new();
 
         let mut table = SymbolTable::from_parse(&parse, &mut sink);
@@ -207,7 +249,12 @@ impl SemanticAnalysis {
             poos,
         };
 
-        (SemanticResult { ast, table }, sink.drain())
+        ((table, ast), sink.drain())
+    }
+
+    pub fn analyze(parse: ParseAst) -> (CloesceAst, Vec<CompilerErrorKind>) {
+        let ((_, ast), errors) = Self::analyze_with_table(parse);
+        (ast, errors)
     }
 
     fn wrangler(parse: &ParseAst, sink: &mut ErrorSink) -> Option<WranglerEnv> {
@@ -437,21 +484,18 @@ impl SemanticAnalysis {
 
                 match resolved_type.root_type() {
                     CidlType::Object { name, .. } => {
-                        let Some(ref_sym) =
+                        if let Some(ref_sym) =
                             table.resolve(name, SymbolKind::PlainOldObjectDecl, None)
-                        else {
-                            // Types are already validated in [resolve_cidl_type]
-                            continue;
-                        };
-
-                        if matches!(ref_sym.kind, SymbolKind::PlainOldObjectDecl)
-                            && !field.cidl_type.is_nullable()
                         {
-                            graph
-                                .entry(name.clone())
-                                .or_default()
-                                .push(poo_name.clone());
-                            in_degree.entry(poo_name.clone()).and_modify(|d| *d += 1);
+                            if matches!(ref_sym.kind, SymbolKind::PlainOldObjectDecl)
+                                && !field.cidl_type.is_nullable()
+                            {
+                                graph
+                                    .entry(name.clone())
+                                    .or_default()
+                                    .push(poo_name.clone());
+                                in_degree.entry(poo_name.clone()).and_modify(|d| *d += 1);
+                            }
                         }
                     }
                     CidlType::Stream | CidlType::Void => {

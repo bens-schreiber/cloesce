@@ -98,8 +98,7 @@ async fn scalar_model(db: SqlitePool) {
                 name: string
             }
         "#,
-    )
-    .ast;
+    );
 
     let insert_query = r#"
             INSERT INTO Person (id, name) VALUES (1, 'Alice'), (2, 'Bob');
@@ -149,8 +148,7 @@ async fn one_to_one(db: SqlitePool) {
                 id: int
             }
         "#,
-    )
-    .ast;
+    );
 
     let insert_query = r#"
             INSERT INTO Dog (id) VALUES (1), (2);
@@ -225,8 +223,7 @@ async fn one_to_many(db: SqlitePool) {
                 persons: Array<Person>
             }
         "#,
-    )
-    .ast;
+    );
 
     let insert_query = r#"
             INSERT INTO Boss (id) VALUES (1);
@@ -308,8 +305,7 @@ async fn many_to_many(db: SqlitePool) {
                 students: Array<Student>
             }
         "#,
-    )
-    .ast;
+    );
 
     let insert_query = r#"
             INSERT INTO Student (id) VALUES (1), (2);
@@ -364,7 +360,7 @@ async fn composite_one_to_one(db: SqlitePool) {
                 course: string
                 student: Student
             }
-        "#).ast;
+        "#);
 
     let insert_query = r#"
             INSERT INTO Student (school_id, student_number, name) VALUES (10, 5001, 'Alice'), (10, 5002, 'Bob');
@@ -429,8 +425,7 @@ async fn composite_one_to_many(db: SqlitePool) {
                 product: string
             }
         "#,
-    )
-    .ast;
+    );
 
     let insert_query = r#"
             INSERT INTO "Order" (region_id, order_number, customer) VALUES (1, 100, 'Bob');
@@ -508,8 +503,7 @@ async fn composite_many_to_many(db: SqlitePool) {
                 teachers: Array<Teacher>
             }
         "#,
-    )
-    .ast;
+    );
 
     let insert_query = r#"
             INSERT INTO Teacher (school_id, employee_id, name) VALUES (1, 123, 'Dr. Smith');
@@ -580,8 +574,7 @@ async fn gensym_stops_ambigious_table(db: SqlitePool) {
                 horse2: Horse
             }
         "#,
-    )
-    .ast;
+    );
 
     let include_tree = json!({
         "matches": {
@@ -629,8 +622,7 @@ async fn custom_from(db: SqlitePool) {
                 name: string
             }
         "#,
-    )
-    .ast;
+    );
 
     let insert_query = r#"
             INSERT INTO Person (id, name) VALUES (1, 'Alice'), (2, 'Bob');

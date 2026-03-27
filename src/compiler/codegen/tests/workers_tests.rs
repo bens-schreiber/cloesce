@@ -1,6 +1,6 @@
 use ast::{ApiMethod, CidlType, HttpVerb, MediaType, Model};
 use codegen::workers::WorkersGenerator;
-use compiler_test::{SemanticResult, src_to_ast};
+use compiler_test::src_to_ast;
 use sqlx::{Row, SqlitePool};
 
 fn find_method<'a>(model: &'a Model, name: &str) -> Option<&'a ApiMethod> {
@@ -18,7 +18,7 @@ async fn create_tables(db: &SqlitePool, ddl: &str) {
 
 #[test]
 fn finalize_adds_crud_methods_to_model() {
-    let SemanticResult { mut ast, .. } = src_to_ast(
+    let mut ast = src_to_ast(
         r#"
         env { db: d1 }
 
@@ -41,7 +41,7 @@ fn finalize_adds_crud_methods_to_model() {
 
 #[test]
 fn finalize_sets_json_media_type() {
-    let SemanticResult { mut ast, .. } = src_to_ast(
+    let mut ast = src_to_ast(
         r#"
         env { db: d1 }
 
@@ -64,7 +64,7 @@ fn finalize_sets_json_media_type() {
 
 #[test]
 fn finalize_sets_octet_media_type() {
-    let SemanticResult { mut ast, .. } = src_to_ast(
+    let mut ast = src_to_ast(
         r#"
         env { db: d1 }
 
@@ -90,7 +90,7 @@ fn finalize_sets_octet_media_type() {
 
 #[test]
 fn finalize_get_crud_adds_primary_key_for_d1_model() {
-    let SemanticResult { mut ast, .. } = src_to_ast(
+    let mut ast = src_to_ast(
         r#"
         env { db: d1 }
 
@@ -127,7 +127,7 @@ fn finalize_get_crud_adds_primary_key_for_d1_model() {
 
 #[test]
 fn finalize_get_and_list_crud_adds_composite_primary_keys() {
-    let SemanticResult { mut ast, .. } = src_to_ast(
+    let mut ast = src_to_ast(
         r#"
         env { db: d1 }
 
@@ -172,7 +172,7 @@ fn finalize_get_and_list_crud_adds_composite_primary_keys() {
 
 #[test]
 fn finalize_get_crud_adds_key_params() {
-    let SemanticResult { mut ast, .. } = src_to_ast(
+    let mut ast = src_to_ast(
         r#"
         env {
             db: d1
@@ -233,7 +233,7 @@ fn finalize_get_crud_adds_key_params() {
 
 #[sqlx::test]
 async fn generate_default_data_sources(db: SqlitePool) {
-    let SemanticResult { mut ast, .. } = src_to_ast(
+    let mut ast = src_to_ast(
         r#"
         env {
             db: d1
@@ -378,7 +378,7 @@ async fn generate_default_data_sources(db: SqlitePool) {
 
 #[sqlx::test]
 async fn generate_default_data_sources_does_not_include_manys(db: SqlitePool) {
-    let SemanticResult { mut ast, .. } = src_to_ast(
+    let mut ast = src_to_ast(
         r#"
         env { db: d1 }
 
@@ -474,7 +474,7 @@ async fn generate_default_data_sources_does_not_include_manys(db: SqlitePool) {
 
 #[sqlx::test]
 async fn generate_default_data_sources_includes_multiple_one_to_ones(db: SqlitePool) {
-    let SemanticResult { mut ast, .. } = src_to_ast(
+    let mut ast = src_to_ast(
         r#"
         env { db: d1 }
 
@@ -577,7 +577,7 @@ async fn generate_default_data_sources_includes_multiple_one_to_ones(db: SqliteP
 
 #[sqlx::test]
 async fn generate_default_data_sources_diamond_does_not_duplicate_traversal(db: SqlitePool) {
-    let SemanticResult { mut ast, .. } = src_to_ast(
+    let mut ast = src_to_ast(
         r#"
         env { db: d1 }
 
@@ -681,7 +681,7 @@ async fn generate_default_data_sources_diamond_does_not_duplicate_traversal(db: 
 
 #[sqlx::test]
 async fn generate_default_data_sources_composite_pk(db: SqlitePool) {
-    let SemanticResult { mut ast, .. } = src_to_ast(
+    let mut ast = src_to_ast(
         r#"
         env { db: d1 }
 

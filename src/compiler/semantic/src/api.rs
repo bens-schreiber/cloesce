@@ -168,6 +168,11 @@ impl ApiAnalysis {
                 }
             };
             match resolved_type.root_type() {
+                CidlType::Inject { .. } => {
+                    // Option, Array or any other wrapper types are not allowed to wrap Inject
+                    ensure!(*resolved_type.root_type() == resolved_type, self.sink, err);
+                }
+
                 CidlType::Void => {
                     self.sink.push(err);
                 }

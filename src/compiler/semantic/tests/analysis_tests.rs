@@ -416,7 +416,7 @@ fn d1_model_nav_one_to_one() {
     // Assert
     assert_eq!(errors.len(), 0, "unexpected errors: {:#?}", errors);
 
-    let person = result.ast.models.get("Person").unwrap();
+    let person = result.models.get("Person").unwrap();
 
     let person_horse_nav = person.navigation_fields.first().unwrap();
     assert_eq!(person_horse_nav.field.name, "horse");
@@ -472,7 +472,7 @@ fn d1_model_nav_one_to_many() {
     // Assert
     assert_eq!(errors.len(), 0);
 
-    let author = result.ast.models.get("Author").unwrap();
+    let author = result.models.get("Author").unwrap();
 
     let author_posts_nav = author.navigation_fields.first().unwrap();
     assert_eq!(author_posts_nav.field.name, "posts");
@@ -520,7 +520,7 @@ fn d1_model_nav_many_to_many() {
     // Assert
     assert_eq!(errors.len(), 0);
 
-    let student = result.ast.models.get("Student").unwrap();
+    let student = result.models.get("Student").unwrap();
 
     let student_courses_nav = student.navigation_fields.first().unwrap();
     assert_eq!(student_courses_nav.field.name, "courses");
@@ -717,7 +717,7 @@ fn kv_and_d1_coexist() {
 
     // Assert
     assert_eq!(errors.len(), 0);
-    let user = result.ast.models.get("User").unwrap();
+    let user = result.models.get("User").unwrap();
     assert!(user.d1_binding.is_some());
     assert_eq!(user.kv_fields.len(), 1);
     // id is primary, name + cached are regular columns
@@ -906,7 +906,7 @@ fn data_source_include_tree_kv_r2() {
     // Assert
     assert_eq!(errors.len(), 0);
 
-    let user = result.ast.models.get("User").unwrap();
+    let user = result.models.get("User").unwrap();
     assert_eq!(user.data_sources.len(), 1);
     assert_eq!(user.data_sources[0].name, "WithKvR2");
 }
@@ -1014,6 +1014,83 @@ fn service_collects_api_blocks() {
 
     // Assert
     assert_eq!(errors.len(), 0);
-    let service = result.ast.services.get("MyService").unwrap();
+    let service = result.services.get("MyService").unwrap();
     assert_eq!(service.apis.len(), 2);
+}
+
+#[test]
+fn cidl_types_resolve() {
+    // Arrange
+    let src = r#"
+        env { my_d1: d1 }
+
+        @d1(my_d1)
+        model User {
+            [primary id]
+            id: int
+        }
+
+        poo MyPoo {
+            field: string
+        }
+
+        service MyService {}
+
+        api User {
+            post resolveAll(e: env, p: Array<MyPoo>, u: User, s: MyService) -> string
+        }
+    "#;
+
+    // Act
+    let parse = lex_and_parse(src);
+    let (result, errors) = SemanticAnalysis::analyze(parse);
+
+    // Assert
+    assert_eq!(errors.len(), 0);
+
+    let api = result.models.get("User").unwrap().apis.first().unwrap();
+    let param_types: Vec<_> = api.parameters.iter().map(|p| p.cidl_type.clone()).collect();
+    assert_eq!(
+        param_types,
+        vec![
+            CidlType::Env,
+            CidlType::Array(Box::new(CidlType::Object {
+                name: "MyPoo".to_string()
+            })),
+            CidlType::Object {
+                name: "User".to_string()
+            },
+            CidlType::Inject {
+                name: "MyService".to_string()
+            },
+        ]
+    );
+}
+
+#[test]
+fn poo_with_model_reference() {
+    let src = r#"
+        env { db: d1 }
+
+        @d1(db)
+        model BasicModel {
+            [primary id]
+            id: int
+        }
+
+        poo PooWithComposition {
+            field1: string
+            field2: BasicModel
+        }
+    "#;
+
+    let parse = lex_and_parse(src);
+    let (result, errors) = SemanticAnalysis::analyze(parse);
+
+    eprintln!("Errors: {:#?}", errors);
+    eprintln!("POO fields: {:#?}", result.poos.get("PooWithComposition").map(|p| &p.fields));
+
+    assert_eq!(errors.len(), 0);
+    let poo = result.poos.get("PooWithComposition").unwrap();
+    assert_eq!(poo.fields.len(), 2);
 }

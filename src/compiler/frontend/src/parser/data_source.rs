@@ -113,7 +113,7 @@ pub fn data_source_block<'t>() -> impl Parser<'t, &'t [Token], DataSourceBlock, 
             |((name, model), ((include_entries, get_method), list_method)), e| {
                 let tree = IncludeTree(include_entries.into_iter().collect());
                 let set_parent = |mut params: Vec<Symbol>, method: &str| -> Vec<Symbol> {
-                    let parent = format!("{name}::{method}");
+                    let parent = format!("{model}::{name}::{method}");
                     for p in &mut params {
                         p.parent_name = parent.clone();
                     }
@@ -135,6 +135,7 @@ pub fn data_source_block<'t>() -> impl Parser<'t, &'t [Token], DataSourceBlock, 
                         name,
                         span: FileSpan::from_simple_span(e.span()),
                         kind: SymbolKind::DataSourceDecl,
+                        parent_name: model.clone(),
                         ..Default::default()
                     },
                     model,

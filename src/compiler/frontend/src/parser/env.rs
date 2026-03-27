@@ -2,8 +2,7 @@ use ast::CidlType;
 use chumsky::prelude::*;
 
 use crate::{
-    FileSpan, Symbol, SymbolKind, WRANGLER_ENV_SYMBOL_NAME, WranglerEnvBindingKind,
-    WranglerEnvBlock,
+    FileSpan, Symbol, SymbolKind, WranglerEnvBindingKind, WranglerEnvBlock,
     lexer::Token,
     parser::{Extra, cidl_type},
 };
@@ -51,7 +50,6 @@ pub fn env_block<'t>() -> impl Parser<'t, &'t [Token], WranglerEnvBlock, Extra<'
         .map_with(move |entries, e| {
             let mut block = WranglerEnvBlock {
                 symbol: Symbol {
-                    name: WRANGLER_ENV_SYMBOL_NAME.to_string(),
                     span: FileSpan::from_simple_span(e.span()),
                     kind: SymbolKind::WranglerEnvDecl,
                     ..Default::default()
@@ -100,7 +98,6 @@ pub fn env_block<'t>() -> impl Parser<'t, &'t [Token], WranglerEnvBlock, Extra<'
                             name,
                             cidl_type,
                             kind: SymbolKind::WranglerEnvVar,
-                            parent_name: WRANGLER_ENV_SYMBOL_NAME.to_string(),
                             ..Default::default()
                         });
                     }

@@ -6,8 +6,6 @@ use chumsky::span::SimpleSpan;
 pub mod lexer;
 pub mod parser;
 
-pub const WRANGLER_ENV_SYMBOL_NAME: &str = "$$wrangler_env";
-
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Default)]
 pub struct FileSpan {
     pub start: usize,
@@ -32,6 +30,16 @@ pub enum WranglerEnvBindingKind {
     Kv,
 }
 
+impl std::fmt::Display for WranglerEnvBindingKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            WranglerEnvBindingKind::D1 => write!(f, "D1"),
+            WranglerEnvBindingKind::R2 => write!(f, "R2"),
+            WranglerEnvBindingKind::Kv => write!(f, "Kv"),
+        }
+    }
+}
+
 #[derive(Clone, Default, Debug)]
 pub enum SymbolKind {
     ModelDecl,
@@ -51,7 +59,6 @@ pub enum SymbolKind {
     ApiMethodParam,
 
     DataSourceDecl,
-    DataSourceMethodDecl,
     DataSourceMethodParam,
 
     ServiceDecl,

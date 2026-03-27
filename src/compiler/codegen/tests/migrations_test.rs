@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use ast::{CloesceAst, MigrationsAst, MigrationsModel};
 
 use codegen::migrations::{MigrationsDilemma, MigrationsGenerator, MigrationsIntent};
-use compiler_test::{SemanticResult, expected_str, src_to_ast};
+use compiler_test::{expected_str, src_to_ast};
 
 use indexmap::IndexMap;
 use sqlx::SqlitePool;
@@ -60,7 +60,7 @@ fn empty_migration() -> MigrationsAst {
 }
 
 fn src_to_migration(src: &str) -> MigrationsAst {
-    let SemanticResult { mut ast, .. } = src_to_ast(src);
+    let mut ast = src_to_ast(src);
     ast.set_merkle_hash();
     as_migration(ast)
 }
