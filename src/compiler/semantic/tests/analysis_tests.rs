@@ -2,7 +2,8 @@
 
 use ast::{CidlType, NavigationFieldKind};
 use compiler_test::lex_and_parse;
-use semantic::{SemanticAnalysis, SymbolKind, WranglerEnvBindingKind, err::CompilerErrorKind};
+use frontend::{SymbolKind, WranglerEnvBindingKind};
+use semantic::{SemanticAnalysis, err::CompilerErrorKind};
 
 /// Find exactly one error matching the pattern. Panics if not found.
 /// Destructure with `=> expr` to extract fields in one step.
@@ -738,9 +739,9 @@ fn api_errors() {
         // Unknown model reference
         api NonExistentModel {}
 
-        // Unknown return type (references non-existent object)
+        // Invalid return type
         api User {
-            get badReturn() -> UnknownObj
+            get badReturn() -> Option<stream>
         }
 
         // Void parameter
@@ -999,7 +1000,7 @@ fn service_collects_api_blocks() {
     let src = r#"
         service MyService {}
         api MyService {
-            post firstMethod() -> string
+            post firstMethod(e: env) -> string
         }
 
         api MyService {
@@ -1010,10 +1011,9 @@ fn service_collects_api_blocks() {
     // Act
     let parse = lex_and_parse(src);
     let (result, errors) = SemanticAnalysis::analyze(parse);
-    // panic!("errors: {:#?}", errors);
-    assert_eq!(errors.len(), 0);
 
     // Assert
+    assert_eq!(errors.len(), 0);
     let service = result.ast.services.get("MyService").unwrap();
     assert_eq!(service.apis.len(), 2);
 }

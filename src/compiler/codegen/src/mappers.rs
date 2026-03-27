@@ -118,6 +118,10 @@ impl LanguageTypeMapper for TypeScriptMapper {
             }
             CidlType::R2Object => "R2Object".to_string(),
             CidlType::Inject { name } => self.namespace(ast, name),
+            CidlType::Env => "Cloesce.Env".to_string(),
+            CidlType::UnresolvedReference { name } => {
+                unreachable!("Unresolved reference should have been resolved by this point: {name}")
+            }
         }
     }
 

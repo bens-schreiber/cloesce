@@ -82,34 +82,34 @@ export namespace Cloesce {
     export namespace Apis {
         export abstract class ModelWithCompositePk {
             readonly tag = "ModelWithCompositePk";
-            abstract instanceMethod(self: Cloesce.Models.ModelWithCompositePk): HttpResult<string>;
+            abstract instanceMethod(self: Cloesce.Models.ModelWithCompositePk, e: Cloesce.Env, input: string): HttpResult<string>;
         }
         export abstract class ModelWithCruds {
             readonly tag = "ModelWithCruds";
-            abstract GET(): HttpResult<Cloesce.Models.ModelWithCruds>;
-            abstract SAVE(): HttpResult<Cloesce.Models.ModelWithCruds>;
-            abstract LIST(): HttpResult<Cloesce.Models.ModelWithCruds[]>;
+            abstract $get(id: number, __datasource: "default" = "default"): HttpResult<Cloesce.Models.ModelWithCruds>;
+            abstract $save(model: DeepPartial<Cloesce.Models.ModelWithCruds>, __datasource: "default" = "default"): HttpResult<Cloesce.Models.ModelWithCruds>;
+            abstract $list(lastSeen_id: number | null, limit: number | null, offset: number | null, __datasource: "default" = "default"): HttpResult<Cloesce.Models.ModelWithCruds[]>;
         }
         export abstract class ModelWithKv {
             readonly tag = "ModelWithKv";
-            abstract instanceMethod(self: Cloesce.Models.ModelWithKv): HttpResult<string>;
-            abstract staticMethod(): HttpResult<number>;
-            abstract hasKvParamAndRes(self: Cloesce.Models.ModelWithKv): HttpResult<KValue<string>>;
+            abstract instanceMethod(self: Cloesce.Models.ModelWithKv, e: Cloesce.Env, input: string): HttpResult<string>;
+            abstract staticMethod(input: number): HttpResult<number>;
+            abstract hasKvParamAndRes(self: Cloesce.Models.ModelWithKv, input: KValue<string>): HttpResult<KValue<string>>;
         }
         export abstract class ModelWithR2 {
             readonly tag = "ModelWithR2";
-            abstract hasR2ParamAndRes(self: Cloesce.Models.ModelWithR2): HttpResult<R2Object>;
+            abstract hasR2ParamAndRes(self: Cloesce.Models.ModelWithR2, input: R2Object): HttpResult<R2Object>;
         }
         export abstract class ToyotaPrius {
             readonly tag = "ToyotaPrius";
-            abstract instanceMethod(self: Cloesce.Models.ToyotaPrius): HttpResult<string>;
+            abstract instanceMethod(self: Cloesce.Models.ToyotaPrius, input: string): HttpResult<string>;
         }
         export abstract class BasicService {
             readonly tag = "BasicService";
             abstract downloadData(): HttpResult<Uint8Array>;
-            abstract instanceMethod(): HttpResult<number>;
-            abstract staticMethod(): HttpResult<string>;
-            abstract uploadData(): HttpResult<boolean>;
+            abstract instanceMethod(input: number): HttpResult<number>;
+            abstract staticMethod(input: string): HttpResult<string>;
+            abstract uploadData(data: Uint8Array): HttpResult<boolean>;
         }
     }
 }

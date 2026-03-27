@@ -34,9 +34,9 @@ fn finalize_adds_crud_methods_to_model() {
     WorkersGenerator::finalize_api_methods(&mut ast);
 
     let user = ast.models.get("User").unwrap();
-    assert!(find_method(user, "GET").is_some());
-    assert!(find_method(user, "LIST").is_some());
-    assert!(find_method(user, "SAVE").is_some());
+    assert!(find_method(user, "$get").is_some());
+    assert!(find_method(user, "$list").is_some());
+    assert!(find_method(user, "$save").is_some());
 }
 
 #[test]
@@ -61,7 +61,7 @@ fn finalize_does_not_overwrite_existing_method() {
     WorkersGenerator::finalize_api_methods(&mut ast);
 
     let user = ast.models.get("User").unwrap();
-    let method = find_method(user, "GET").unwrap();
+    let method = find_method(user, "$get").unwrap();
 
     assert_eq!(method.http_verb, HttpVerb::Post);
     assert_eq!(method.parameters.len(), 1);
@@ -85,7 +85,7 @@ fn finalize_sets_json_media_type() {
     WorkersGenerator::finalize_api_methods(&mut ast);
 
     let user = ast.models.get("User").unwrap();
-    let method = find_method(user, "GET").unwrap();
+    let method = find_method(user, "$get").unwrap();
     assert!(matches!(method.return_media, MediaType::Json));
     assert!(matches!(method.parameters_media, MediaType::Json));
 }
@@ -134,7 +134,7 @@ fn finalize_get_crud_adds_primary_key_for_d1_model() {
     WorkersGenerator::finalize_api_methods(&mut ast);
 
     let user = ast.models.get("User").unwrap();
-    let get_method = find_method(user, "GET").unwrap();
+    let get_method = find_method(user, "$get").unwrap();
 
     assert!(
         get_method
@@ -173,7 +173,7 @@ fn finalize_get_and_list_crud_adds_composite_primary_keys() {
 
     let order_item = ast.models.get("OrderItem").unwrap();
 
-    let get_method = find_method(order_item, "GET").unwrap();
+    let get_method = find_method(order_item, "$get").unwrap();
     assert!(get_method.parameters.iter().any(|p| p.name == "orderId"));
     assert!(get_method.parameters.iter().any(|p| p.name == "productId"));
     assert!(
@@ -183,7 +183,7 @@ fn finalize_get_and_list_crud_adds_composite_primary_keys() {
             .any(|p| matches!(p.cidl_type, CidlType::DataSource { .. }))
     );
 
-    let list_method = find_method(order_item, "LIST").unwrap();
+    let list_method = find_method(order_item, "$list").unwrap();
     let last_seen_order = list_method
         .parameters
         .iter()
@@ -228,7 +228,7 @@ fn finalize_get_crud_adds_key_params() {
     WorkersGenerator::finalize_api_methods(&mut ast);
 
     let product = ast.models.get("Product").unwrap();
-    let get_method = find_method(product, "GET").unwrap();
+    let get_method = find_method(product, "$get").unwrap();
 
     assert!(
         get_method

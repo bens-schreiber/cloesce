@@ -2,7 +2,7 @@ use ast::{
     ApiMethod, CidlType, CloesceAst, DataSource, DataSourceMethod, Field, IncludeTree, Model,
     PlainOldObject, Service, ServiceField, WranglerEnv,
 };
-use frontend::{ModelBlock, ParseAst};
+use frontend::{ModelBlock, ParseAst, Symbol, SymbolKind};
 use indexmap::IndexMap;
 
 use std::collections::{BTreeMap, HashMap, VecDeque};
@@ -16,8 +16,6 @@ use crate::{
 mod api;
 pub mod err;
 mod model;
-
-pub use frontend::{FileSpan, Symbol, SymbolKind, WranglerEnvBindingKind};
 
 #[derive(Default)]
 pub struct SymbolTable {
@@ -429,33 +427,26 @@ impl SemanticAnalysis {
             in_degree.entry(poo_name.clone()).or_insert(0);
 
             for field in &poo.fields {
-                match field.cidl_type.root_type() {
-                    CidlType::Object { name, .. }
-                    | CidlType::Partial {
-                        object_name: name, ..
-                    } => {
-                        let Some(ref_sym) = table
-                            .resolve(name, SymbolKind::PlainOldObjectDecl, None)
-                            .or_else(|| table.resolve(name, SymbolKind::ModelDecl, None))
+                let resolved_type = match resolve_cidl_type(&field, &field.cidl_type, table) {
+                    Ok(t) => t,
+                    Err(err) => {
+                        sink.push(err);
+                        continue;
+                    }
+                };
+
+                match resolved_type.root_type() {
+                    CidlType::Object { name, .. } => {
+                        let Some(ref_sym) =
+                            table.resolve(name, SymbolKind::PlainOldObjectDecl, None)
                         else {
-                            sink.push(CompilerErrorKind::UnresolvedSymbol {
-                                span: field.span.clone(),
-                            });
+                            // Types are already validated in [resolve_cidl_type]
                             continue;
                         };
 
-                        ensure!(
-                            matches!(
-                                ref_sym.kind,
-                                SymbolKind::PlainOldObjectDecl | SymbolKind::ModelDecl
-                            ),
-                            sink,
-                            CompilerErrorKind::PlainOldObjectInvalidFieldType {
-                                field: field.clone(),
-                            }
-                        );
-
-                        if matches!(ref_sym.kind, SymbolKind::PlainOldObjectDecl) {
+                        if matches!(ref_sym.kind, SymbolKind::PlainOldObjectDecl)
+                            && !field.cidl_type.is_nullable()
+                        {
                             graph
                                 .entry(name.clone())
                                 .or_default()
@@ -475,7 +466,7 @@ impl SemanticAnalysis {
 
                 fields.push(Field {
                     name: field.name.clone(),
-                    cidl_type: field.cidl_type.clone(),
+                    cidl_type: resolved_type,
                 });
             }
 
@@ -515,51 +506,31 @@ impl SemanticAnalysis {
             in_degree.entry(service_name.clone()).or_insert(0);
 
             for field in &service.fields {
-                match field.cidl_type.root_type() {
-                    CidlType::Object { name: ref_name, .. } => {
-                        // Try to resolve as inject first, then service
-                        let target_sym = table
-                            .resolve(ref_name, SymbolKind::InjectDecl, None)
-                            .or_else(|| table.resolve(ref_name, SymbolKind::ServiceDecl, None));
+                let resolved_type = match resolve_cidl_type(&field, &field.cidl_type, table) {
+                    Ok(t) => t,
+                    Err(err) => {
+                        sink.push(err);
+                        continue;
+                    }
+                };
 
-                        let Some(target_sym) = target_sym else {
-                            sink.push(CompilerErrorKind::ServiceInvalidFieldType {
-                                field: field.clone(),
-                            });
-                            continue;
-                        };
-
-                        match target_sym.kind {
-                            SymbolKind::InjectDecl => {
-                                fields.push(ServiceField {
-                                    name: field.name.clone(),
-                                    inject_reference: ref_name.clone(),
-                                });
-                            }
-                            SymbolKind::ServiceDecl => {
-                                graph
-                                    .entry(ref_name.clone())
-                                    .or_default()
-                                    .push(service_name.clone());
-                                *in_degree.entry(service_name.clone()).or_insert(0) += 1;
-                                fields.push(ServiceField {
-                                    name: field.name.clone(),
-                                    inject_reference: ref_name.clone(),
-                                });
-                            }
-                            _ => {
-                                sink.push(CompilerErrorKind::ServiceInvalidFieldType {
-                                    field: field.clone(),
-                                });
-                            }
-                        }
+                let inject_reference = match resolved_type {
+                    CidlType::Inject { name } => {
+                        // Only injected fields are allowed in a service
+                        name
                     }
                     _ => {
                         sink.push(CompilerErrorKind::ServiceInvalidFieldType {
                             field: field.clone(),
                         });
+                        continue;
                     }
-                }
+                };
+
+                fields.push(ServiceField {
+                    name: field.name.clone(),
+                    inject_reference,
+                });
             }
 
             services.insert(
@@ -582,8 +553,93 @@ impl SemanticAnalysis {
     }
 }
 
+/// Converts a [CidlType::UnresolvedReference] to a resolved type of [CidlType::Object] or [CidlType::Inject]
+/// if possible, recursively. Also validates [CidlType::DataSource] and [CidlType::Partial] references.
+///
+/// Returns an error if the type cannot be resolved or is invalid.
+pub(crate) fn resolve_cidl_type(
+    symbol: &Symbol,
+    cidl_type: &CidlType,
+    table: &SymbolTable,
+) -> Result<CidlType, CompilerErrorKind> {
+    match cidl_type {
+        CidlType::UnresolvedReference { name } => {
+            if let Some(sym) = table.resolve(&name, SymbolKind::ModelDecl, None) {
+                return Ok(CidlType::Object {
+                    name: sym.name.clone(),
+                });
+            }
+
+            if let Some(sym) = table.resolve(&name, SymbolKind::PlainOldObjectDecl, None) {
+                return Ok(CidlType::Object {
+                    name: sym.name.clone(),
+                });
+            }
+
+            if let Some(sym) = table.resolve(&name, SymbolKind::ServiceDecl, None) {
+                return Ok(CidlType::Inject {
+                    name: sym.name.clone(),
+                });
+            }
+
+            if let Some(sym) = table.resolve(&name, SymbolKind::InjectDecl, None) {
+                return Ok(CidlType::Inject {
+                    name: sym.name.clone(),
+                });
+            }
+
+            return Err(CompilerErrorKind::UnresolvedSymbol {
+                span: symbol.span.clone(),
+            });
+        }
+        CidlType::DataSource { model_name } => {
+            let valid = table
+                .resolve(model_name, SymbolKind::ModelDecl, None)
+                .is_some();
+            if !valid {
+                return Err(CompilerErrorKind::UnresolvedSymbol {
+                    span: symbol.span.clone(),
+                });
+            }
+            return Ok(cidl_type.clone());
+        }
+        CidlType::Partial { object_name } => {
+            let valid = table
+                .resolve(object_name, SymbolKind::PlainOldObjectDecl, None)
+                .is_some()
+                || table
+                    .resolve(object_name, SymbolKind::ModelDecl, None)
+                    .is_some();
+
+            if !valid {
+                return Err(CompilerErrorKind::UnresolvedSymbol {
+                    span: symbol.span.clone(),
+                });
+            }
+            return Ok(cidl_type.clone());
+        }
+        CidlType::Nullable(inner) => {
+            let resolved_inner = resolve_cidl_type(symbol, inner, table)?;
+            return Ok(CidlType::Nullable(Box::new(resolved_inner)));
+        }
+        CidlType::Array(inner) => {
+            let resolved_inner = resolve_cidl_type(symbol, inner, table)?;
+            return Ok(CidlType::Array(Box::new(resolved_inner)));
+        }
+        CidlType::Paginated(inner) => {
+            let resolved_inner = resolve_cidl_type(symbol, inner, table)?;
+            return Ok(CidlType::Paginated(Box::new(resolved_inner)));
+        }
+        CidlType::KvObject(inner) => {
+            let resolved_inner = resolve_cidl_type(symbol, inner, table)?;
+            return Ok(CidlType::KvObject(Box::new(resolved_inner)));
+        }
+        _ => Ok(cidl_type.clone()),
+    }
+}
+
 /// Returns if a column in a D1 model is a valid SQLite type
-pub fn is_valid_sql_type(cidl_type: &CidlType) -> bool {
+pub(crate) fn is_valid_sql_type(cidl_type: &CidlType) -> bool {
     let inner = match cidl_type {
         CidlType::Nullable(inner) => inner.as_ref(),
         other => other,
@@ -600,12 +656,10 @@ pub fn is_valid_sql_type(cidl_type: &CidlType) -> bool {
     )
 }
 
-type AdjacencyList = BTreeMap<String, Vec<String>>;
-
 // Kahns algorithm for topological sort + cycle detection.
 // If no cycles, returns a map of name to position used for sorting the original collection.
-pub fn kahns(
-    graph: AdjacencyList,
+pub(crate) fn kahns(
+    graph: BTreeMap<String, Vec<String>>,
     mut in_degree: BTreeMap<String, usize>,
     len: usize,
 ) -> Result<HashMap<String, usize>, CompilerErrorKind> {

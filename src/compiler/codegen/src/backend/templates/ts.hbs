@@ -45,7 +45,7 @@ export namespace Cloesce {
         export abstract class {{this.name}} {
             readonly tag = "{{this.name}}";
             {{#each this.apis}}
-            abstract {{this.name}}({{#unless this.is_static}}self: Cloesce.Models.{{../name}}{{#if this.args}}, {{/if}}{{/unless}}{{#each this.args}}{{this.name}}: {{map_cidl_type this.cidl_type}}{{#unless @last}}, {{/unless}}{{/each}}): HttpResult<{{map_cidl_type this.return_type}}>;
+            abstract {{this.name}}({{#unless this.is_static}}self: Cloesce.Models.{{../name}}{{#if this.parameters}}, {{/if}}{{/unless}}{{#each this.parameters}}{{this.name}}: {{map_cidl_type this.cidl_type}}{{#unless @last}}, {{/unless}}{{/each}}): HttpResult<{{map_cidl_type this.return_type}}>;
             {{/each}}
         }
     {{/if}}
@@ -55,7 +55,7 @@ export namespace Cloesce {
         export abstract class {{this.name}} {
             readonly tag = "{{this.name}}";
             {{#each this.apis}}
-            abstract {{this.name}}({{#unless this.is_static}}self: Cloesce.Services.{{../name}}{{#if this.args}}, {{/if}}{{/unless}}{{#each this.args}}{{this.name}}: {{map_cidl_type this.cidl_type}}{{#unless @last}}, {{/unless}}{{/each}}): HttpResult<{{map_cidl_type this.return_type}}>;
+            abstract {{this.name}}({{#unless this.is_static}}self: Cloesce.Services.{{../name}}{{#if this.parameters}}, {{/if}}{{/unless}}{{#each this.parameters}}{{this.name}}: {{map_cidl_type this.cidl_type}}{{#unless @last}}, {{/unless}}{{/each}}): HttpResult<{{map_cidl_type this.return_type}}>;
             {{/each}}
         }
     {{/if}}

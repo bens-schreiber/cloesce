@@ -540,7 +540,7 @@ fn api_block() {
         }
 
         api User {
-            get getById(id: int) -> void
+            get getById(id: int, e: env) -> void
         }
 
         api User {
@@ -557,7 +557,7 @@ fn api_block() {
         .expect("User model to be present");
     assert_eq!(
         user_model.cruds,
-        vec![CrudKind::GET, CrudKind::SAVE, CrudKind::LIST]
+        vec![CrudKind::Get, CrudKind::Save, CrudKind::List]
     );
 
     // ParseAst keeps api blocks separate
@@ -603,6 +603,11 @@ fn api_block() {
         .find(|a| a.methods.iter().any(|m| m.symbol.name == "getById"))
         .expect("block with getById");
     assert_eq!(second.methods.len(), 1);
+    let get_by_id = &second.methods[0];
+    assert_eq!(get_by_id.parameters.len(), 2);
+    assert_eq!(get_by_id.parameters[0].cidl_type, CidlType::Integer);
+    assert_eq!(get_by_id.parameters[1].name, "e");
+    assert_eq!(get_by_id.parameters[1].cidl_type, CidlType::Env);
 
     // Third block: update
     let third = user_api_blocks
@@ -757,7 +762,7 @@ fn poo_block() {
             ("created", CidlType::DateIso),
             (
                 "address",
-                CidlType::Object {
+                CidlType::UnresolvedReference {
                     name: "Address".to_string(),
                 }
             ),
@@ -765,7 +770,7 @@ fn poo_block() {
             ("metadata", CidlType::nullable(CidlType::Json)),
             (
                 "optional_items",
-                CidlType::nullable(CidlType::array(CidlType::Object {
+                CidlType::nullable(CidlType::array(CidlType::UnresolvedReference {
                     name: "Item".to_string(),
                 }))
             ),
@@ -859,7 +864,7 @@ fn service_block() {
         .expect("api1 field");
     assert_eq!(
         api1.cidl_type,
-        CidlType::Object {
+        CidlType::UnresolvedReference {
             name: "OpenApiService".to_string(),
         }
     );
@@ -871,7 +876,7 @@ fn service_block() {
         .expect("api2 field");
     assert_eq!(
         api2.cidl_type,
-        CidlType::Object {
+        CidlType::UnresolvedReference {
             name: "YouTubeApi".to_string(),
         }
     );

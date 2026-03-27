@@ -6,6 +6,8 @@ use chumsky::span::SimpleSpan;
 pub mod lexer;
 pub mod parser;
 
+pub const WRANGLER_ENV_SYMBOL_NAME: &str = "$$wrangler_env";
+
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Default)]
 pub struct FileSpan {
     pub start: usize,

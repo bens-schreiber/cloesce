@@ -12,7 +12,7 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use crate::{
     SymbolKind, SymbolTable, ensure,
     err::{BatchResult, CompilerErrorKind, ErrorSink},
-    is_valid_sql_type, kahns,
+    is_valid_sql_type, kahns, resolve_cidl_type,
 };
 
 #[derive(Default)]
@@ -32,20 +32,11 @@ impl ModelAnalysis {
 
         for model_block in model_blocks.values() {
             let mut model = Model {
-                hash: 0,
                 name: model_block.symbol.name.clone(),
-                d1_binding: None,
-                primary_columns: Vec::new(),
-                columns: Vec::new(),
-                kv_fields: Vec::new(),
-                r2_fields: Vec::new(),
-                navigation_fields: Vec::new(),
-                key_fields: Vec::new(),
-                apis: Vec::new(),
-                data_sources: Vec::new(),
-                cruds: Vec::new(),
+                ..Default::default()
             };
 
+            // If any D1 properties occur, treat the model as a D1 model
             if model_block.d1_binding.is_some()
                 || !model_block.foreign_keys.is_empty()
                 || !model_block.navigation_properties.is_empty()
@@ -54,6 +45,7 @@ impl ModelAnalysis {
                 self.d1_properties(&mut model, model_block, &model_blocks, table);
             }
 
+            // If any KV/R2 properties occur, validate them and set the model's KV/R2 fields
             if !model_block.kvs.is_empty()
                 || !model_block.r2s.is_empty()
                 || !model_block.key_fields.is_empty()
@@ -63,11 +55,13 @@ impl ModelAnalysis {
 
             // Validate CRUD
             for crud in &model_block.cruds {
-                if matches!(crud, CrudKind::LIST) && model.d1_binding.is_none() {
-                    self.sink.push(CompilerErrorKind::UnsupportedCrudOperation {
+                ensure!(
+                    !matches!(crud, CrudKind::List) || model.d1_binding.is_some(),
+                    self.sink,
+                    CompilerErrorKind::UnsupportedCrudOperation {
                         model: model_block.symbol.clone(),
-                    });
-                }
+                    }
+                );
             }
 
             model.cruds = model_block.cruds.clone();
@@ -100,36 +94,39 @@ impl ModelAnalysis {
         let model_symbol = &model_block.symbol;
 
         // All D1 models require a binding
-        let Some(d1_binding) = &model_block.d1_binding else {
-            self.sink.push(CompilerErrorKind::D1ModelMissingD1Binding {
-                model: model_symbol.clone(),
-            });
-            return;
-        };
+        let binding_symbol = {
+            let Some(d1_binding) = &model_block.d1_binding else {
+                self.sink.push(CompilerErrorKind::D1ModelMissingD1Binding {
+                    model: model_symbol.clone(),
+                });
+                return;
+            };
 
-        let Some(binding_symbol) = table.resolve(
-            &d1_binding.env_binding,
-            SymbolKind::WranglerEnvBinding {
-                kind: WranglerEnvBindingKind::D1,
-            },
-            None,
-        ) else {
-            self.sink.push(CompilerErrorKind::D1ModelInvalidD1Binding {
-                model: model_symbol.clone(),
-                tag: d1_binding.clone(),
-            });
-            return;
-        };
+            let Some(binding_symbol) = table.resolve(
+                &d1_binding.env_binding,
+                SymbolKind::WranglerEnvBinding {
+                    kind: WranglerEnvBindingKind::D1,
+                },
+                None,
+            ) else {
+                self.sink.push(CompilerErrorKind::D1ModelInvalidD1Binding {
+                    model: model_symbol.clone(),
+                    tag: d1_binding.clone(),
+                });
+                return;
+            };
 
-        let binding_name = binding_symbol.name.clone();
+            binding_symbol.clone()
+        };
 
         // At least one primary key must be defined
-        if model_block.primary_keys.is_empty() {
-            self.sink.push(CompilerErrorKind::D1ModelMissingPrimaryKey {
+        ensure!(
+            !model_block.primary_keys.is_empty(),
+            self.sink,
+            CompilerErrorKind::D1ModelMissingPrimaryKey {
                 model: model_symbol.clone(),
-            });
-            return;
-        }
+            }
+        );
 
         let mut column_names = HashSet::new();
         let mut primary_column_names = HashSet::new();
@@ -140,13 +137,21 @@ impl ModelAnalysis {
         // Column name -> Vec<usize>
         let mut unique_info: HashMap<String, Vec<usize>> = HashMap::new();
 
+        // Validate columns
         for field in &model_block.fields {
-            if !is_valid_sql_type(&field.cidl_type)
-                || model_block
-                    .key_fields
-                    .iter()
-                    .any(|kf| kf.field == field.name)
-            {
+            let resolved_type = match resolve_cidl_type(field, &field.cidl_type, table) {
+                Ok(t) => t,
+                Err(err) => {
+                    self.sink.push(err);
+                    continue;
+                }
+            };
+
+            let is_key_field = model_block
+                .key_fields
+                .iter()
+                .any(|kf| kf.field == field.name);
+            if !is_valid_sql_type(&resolved_type) || is_key_field {
                 continue;
             }
             column_names.insert(field.name.clone());
@@ -156,13 +161,13 @@ impl ModelAnalysis {
                 .iter()
                 .any(|pk| pk.field == field.name);
             if is_pk {
-                ensure!(
-                    !field.cidl_type.is_nullable(),
-                    self.sink,
-                    CompilerErrorKind::NullablePrimaryKey {
-                        column: field.clone()
-                    }
-                );
+                if field.cidl_type.is_nullable() {
+                    self.sink.push(CompilerErrorKind::NullablePrimaryKey {
+                        column: field.clone(),
+                    });
+                    continue;
+                }
+
                 primary_column_names.insert(field.name.clone());
             }
         }
@@ -190,9 +195,8 @@ impl ModelAnalysis {
         let mut navigation_properties = Vec::new();
         let mut nav_fields_seen = HashSet::<String>::new();
         for nav in &model_block.navigation_properties {
-            let nav_result = self.nav(model_block, nav, &mut nav_fields_seen, table, model_blocks);
-
-            if let Some(nav) = nav_result {
+            if let Some(nav) = self.nav(model_block, nav, &mut nav_fields_seen, table, model_blocks)
+            {
                 navigation_properties.push(nav);
             }
         }
@@ -209,6 +213,7 @@ impl ModelAnalysis {
                     );
                     continue;
                 }
+
                 unique_info
                     .entry(column.clone())
                     .or_default()
@@ -252,7 +257,8 @@ impl ModelAnalysis {
             }
         }
 
-        model.d1_binding = Some(binding_name);
+        // Set D1 model properties
+        model.d1_binding = Some(binding_symbol.name);
         model.columns = columns;
         model.primary_columns = primary_columns;
         model.navigation_fields = navigation_properties;
@@ -459,17 +465,6 @@ impl ModelAnalysis {
         let model_name = &model_block.symbol.name;
         let nav_span = FileSpan::from_simple_span(nav.span);
 
-        if !nav_fields_seen.insert(nav.field.clone()) {
-            let field_sym = table.resolve(&nav.field, SymbolKind::ModelField, Some(model_name))?;
-            self.sink.push(
-                CompilerErrorKind::NavigationPropertyFieldAlreadyInNavigationProperty {
-                    tag: nav_span,
-                    field: field_sym.clone(),
-                },
-            );
-            return None;
-        }
-
         let Some(nav_field_sym) =
             table.resolve(&nav.field, SymbolKind::ModelField, Some(model_name))
         else {
@@ -477,47 +472,53 @@ impl ModelAnalysis {
                 .push(CompilerErrorKind::UnresolvedSymbol { span: nav_span });
             return None;
         };
-        let nav_field_sym = nav_field_sym.clone();
 
-        // Derive the referenced model from the first field's model name
-        if nav.fields.is_empty() {
-            self.sink
-                .push(CompilerErrorKind::UnresolvedSymbol { span: nav_span });
+        // A nav field cannot be in multiple navigation properties
+        if !nav_fields_seen.insert(nav.field.clone()) {
+            self.sink.push(
+                CompilerErrorKind::NavigationPropertyFieldAlreadyInNavigationProperty {
+                    tag: nav_span,
+                    field: nav_field_sym.clone(),
+                },
+            );
             return None;
         }
 
         // Validate all referenced fields exist
         let mut referenced_field_names = Vec::new();
-        let mut all_valid = true;
-        for (ref_model_name, ref_field_name) in &nav.fields {
-            let Some(_field_sym) =
-                table.resolve(ref_field_name, SymbolKind::ModelField, Some(ref_model_name))
-            else {
-                self.sink.push(
-                    CompilerErrorKind::NavigationPropertyReferencesInvalidOrUnknownField {
-                        tag: nav_span.clone(),
-                        field: ref_field_name.clone(),
-                    },
-                );
-                all_valid = false;
-                continue;
-            };
-            referenced_field_names.push(ref_field_name.clone());
-        }
-        if !all_valid {
-            return None;
-        }
-
-        // A nav field must be of cidl type Object, that Object must be the adjacent model OR an array of the adjacent model
-        fn unwrap_arr_and_null(cidl_type: &CidlType) -> &CidlType {
-            match cidl_type {
-                CidlType::Array(inner) => inner.as_ref(),
-                CidlType::Nullable(inner) => inner.as_ref(),
-                other => other,
+        {
+            let mut all_valid = true;
+            for (ref_model_name, ref_field_name) in &nav.fields {
+                let Some(_field_sym) =
+                    table.resolve(ref_field_name, SymbolKind::ModelField, Some(ref_model_name))
+                else {
+                    self.sink.push(
+                        CompilerErrorKind::NavigationPropertyReferencesInvalidOrUnknownField {
+                            tag: nav_span.clone(),
+                            field: ref_field_name.clone(),
+                        },
+                    );
+                    all_valid = false;
+                    continue;
+                };
+                referenced_field_names.push(ref_field_name.clone());
+            }
+            if !all_valid {
+                return None;
             }
         }
 
-        let adj_model_name = match unwrap_arr_and_null(&nav_field_sym.cidl_type) {
+        let resolved_nav_field_type =
+            match resolve_cidl_type(nav_field_sym, &nav_field_sym.cidl_type, table) {
+                Ok(t) => t,
+                Err(err) => {
+                    self.sink.push(err);
+                    return None;
+                }
+            };
+
+        // A nav field must be of cidl type Object, that Object must be the adjacent model OR an array of the adjacent model
+        let adj_model_name = match unwrap_arr_and_null(&resolved_nav_field_type) {
             CidlType::Object { name, .. } => {
                 if !model_blocks.contains_key(name.as_str()) {
                     self.sink.push(
@@ -562,7 +563,7 @@ impl ModelAnalysis {
 
         let nav_field = Field {
             name: nav_field_sym.name.clone(),
-            cidl_type: nav_field_sym.cidl_type.clone(),
+            cidl_type: resolved_nav_field_type,
         };
 
         let has_arr = matches!(nav_field_sym.cidl_type, CidlType::Array(_));
@@ -708,30 +709,29 @@ impl ModelAnalysis {
                                 expected: WranglerEnvBindingKind|
          -> Option<String> {
             let tag_span = FileSpan::from_simple_span(tag.span);
-
-            let Some(binding_sym) = table.resolve(
+            if let Some(binding_sym) = table.resolve(
                 &tag.env_binding,
                 SymbolKind::WranglerEnvBinding {
                     kind: expected.clone(),
                 },
                 None,
-            ) else {
-                let err = match expected {
-                    WranglerEnvBindingKind::Kv => CompilerErrorKind::KvInvalidBinding {
-                        tag: tag_span,
-                        binding: tag.env_binding.clone(),
-                    },
-                    WranglerEnvBindingKind::R2 => CompilerErrorKind::R2InvalidBinding {
-                        tag: tag_span,
-                        binding: tag.env_binding.clone(),
-                    },
-                    _ => CompilerErrorKind::UnresolvedSymbol { span: tag_span },
-                };
-                sink.push(err);
-                return None;
-            };
+            ) {
+                return Some(binding_sym.name.clone());
+            }
 
-            Some(binding_sym.name.clone())
+            let err = match expected {
+                WranglerEnvBindingKind::Kv => CompilerErrorKind::KvInvalidBinding {
+                    tag: tag_span,
+                    binding: tag.env_binding.clone(),
+                },
+                WranglerEnvBindingKind::R2 => CompilerErrorKind::R2InvalidBinding {
+                    tag: tag_span,
+                    binding: tag.env_binding.clone(),
+                },
+                _ => CompilerErrorKind::UnresolvedSymbol { span: tag_span },
+            };
+            sink.push(err);
+            return None;
         };
 
         // Extracts variables from a formatted string, then validates that they
@@ -785,11 +785,18 @@ impl ModelAnalysis {
             };
 
             // Always wrap in KvObject
-            let cidl_type = match &field_sym.cidl_type {
+            let resolved_type = match resolve_cidl_type(field_sym, &field_sym.cidl_type, table) {
+                Ok(t) => t,
+                Err(err) => {
+                    self.sink.push(err);
+                    continue;
+                }
+            };
+            let cidl_type = match &resolved_type {
                 CidlType::Paginated(inner) => {
                     CidlType::paginated(CidlType::KvObject(inner.clone()))
                 }
-                _ => CidlType::KvObject(Box::new(field_sym.cidl_type.clone())),
+                _ => CidlType::KvObject(Box::new(resolved_type.clone())),
             };
 
             model.kv_fields.push(KvR2Field {
@@ -905,4 +912,12 @@ fn extract_braced(s: &str) -> Result<Vec<String>, String> {
     }
 
     Ok(out)
+}
+
+fn unwrap_arr_and_null(cidl_type: &CidlType) -> &CidlType {
+    match cidl_type {
+        CidlType::Array(inner) => inner.as_ref(),
+        CidlType::Nullable(inner) => inner.as_ref(),
+        other => other,
+    }
 }

@@ -215,13 +215,13 @@ export class ModelWithCruds {
   id: number;
   name: string;
 
-  static async GET(
+  static async $get(
     id: number,
     __datasource: "default" = "default",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<ModelWithCruds>> {
     const baseUrl = new URL(
-      `http://example.com/path/to/api/ModelWithCruds/GET`
+      `http://example.com/path/to/api/ModelWithCruds/$get`
     );
 
     baseUrl.searchParams.append("id", String(id));
@@ -238,13 +238,13 @@ export class ModelWithCruds {
       false
     );
   }
-  static async SAVE(
+  static async $save(
     model: DeepPartial<ModelWithCruds>,
     __datasource: "default" = "default",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<ModelWithCruds>> {
     const baseUrl = new URL(
-      `http://example.com/path/to/api/ModelWithCruds/SAVE`
+      `http://example.com/path/to/api/ModelWithCruds/$save`
     );
     const payload: any = {};
 
@@ -264,7 +264,7 @@ export class ModelWithCruds {
       false
     );
   }
-  static async LIST(
+  static async $list(
     lastSeen_id: number | null,
     limit: number | null,
     offset: number | null,
@@ -272,7 +272,7 @@ export class ModelWithCruds {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<ModelWithCruds[]>> {
     const baseUrl = new URL(
-      `http://example.com/path/to/api/ModelWithCruds/LIST`
+      `http://example.com/path/to/api/ModelWithCruds/$list`
     );
 
     baseUrl.searchParams.append("lastSeen_id", String(lastSeen_id));

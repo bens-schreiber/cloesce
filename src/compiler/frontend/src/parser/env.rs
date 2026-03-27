@@ -2,7 +2,8 @@ use ast::CidlType;
 use chumsky::prelude::*;
 
 use crate::{
-    FileSpan, Symbol, SymbolKind, WranglerEnvBindingKind, WranglerEnvBlock,
+    FileSpan, Symbol, SymbolKind, WRANGLER_ENV_SYMBOL_NAME, WranglerEnvBindingKind,
+    WranglerEnvBlock,
     lexer::Token,
     parser::{Extra, cidl_type},
 };
@@ -17,8 +18,6 @@ enum EnvEntry {
     Binding(BindingKind),
     Var(CidlType),
 }
-
-pub const WRANGLER_ENV_SYMBOL_NAME: &str = "$$wrangler_env";
 
 /// Parses a block of the form:
 ///

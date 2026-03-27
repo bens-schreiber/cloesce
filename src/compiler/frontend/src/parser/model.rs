@@ -384,10 +384,10 @@ pub fn model_block<'t>() -> impl Parser<'t, &'t [Token], ModelBlock, Extra<'t>> 
 
 fn crud_kind<'t>() -> impl Parser<'t, &'t [Token], CrudKind, Extra<'t>> {
     choice((
-        just(Token::Get).map(|_| CrudKind::GET),
-        select! { Token::Ident(name) if name == "get" => CrudKind::GET },
-        select! { Token::Ident(name) if name == "save" => CrudKind::SAVE },
-        select! { Token::Ident(name) if name == "list" => CrudKind::LIST },
+        just(Token::Get).map(|_| CrudKind::Get),
+        select! { Token::Ident(name) if name == "get" => CrudKind::Get },
+        select! { Token::Ident(name) if name == "save" => CrudKind::Save },
+        select! { Token::Ident(name) if name == "list" => CrudKind::List },
     ))
 }
 

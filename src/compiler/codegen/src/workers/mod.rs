@@ -35,7 +35,7 @@ impl WorkersGenerator {
             let mut crud_methods = vec![];
             for crud in &model.cruds {
                 let method = match crud {
-                    CrudKind::GET => {
+                    CrudKind::Get => {
                         let mut parameters = vec![];
 
                         for pk in &model.primary_columns {
@@ -60,7 +60,7 @@ impl WorkersGenerator {
                         });
 
                         ApiMethod {
-                            name: "GET".into(),
+                            name: "$get".into(),
                             is_static: true,
                             http_verb: HttpVerb::Get,
                             return_type: CidlType::http(CidlType::Object {
@@ -72,7 +72,7 @@ impl WorkersGenerator {
                             data_source: None,
                         }
                     }
-                    CrudKind::LIST => {
+                    CrudKind::List => {
                         let parameters = model
                             .primary_columns
                             .iter()
@@ -100,7 +100,7 @@ impl WorkersGenerator {
                             .collect();
 
                         ApiMethod {
-                            name: "LIST".into(),
+                            name: "$list".into(),
                             is_static: true,
                             http_verb: HttpVerb::Get,
                             return_type: CidlType::http(CidlType::array(CidlType::Object {
@@ -112,8 +112,8 @@ impl WorkersGenerator {
                             data_source: None,
                         }
                     }
-                    CrudKind::SAVE => ApiMethod {
-                        name: "SAVE".into(),
+                    CrudKind::Save => ApiMethod {
+                        name: "$save".into(),
                         is_static: true,
                         http_verb: HttpVerb::Post,
                         return_type: CidlType::http(CidlType::Object {

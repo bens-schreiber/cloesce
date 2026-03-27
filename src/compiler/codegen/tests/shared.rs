@@ -81,7 +81,7 @@ model ModelWithCompositePk {
 }
 
 api ModelWithCompositePk {
-    post instanceMethod(self, input: string) -> string
+    post instanceMethod(self, e: env, input: string) -> string
 }
 
 model ModelWithKv {
@@ -102,7 +102,7 @@ model ModelWithKv {
 }
 
 api ModelWithKv {
-    post instanceMethod(self, input: string) -> string
+    post instanceMethod(self, e: env, input: string) -> string
     get staticMethod(input: int) -> int
     post hasKvParamAndRes(self, input: KvObject<string>) -> KvObject<string>
 }

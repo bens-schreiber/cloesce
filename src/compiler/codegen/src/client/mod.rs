@@ -48,7 +48,7 @@ handlebars_helper!(get_content_type: |media: MediaType| match media {
 handlebars_helper!(is_blob: |cidl_type: CidlType| matches!(cidl_type.root_type(), CidlType::Blob));
 handlebars_helper!(is_one_to_one: |nav: NavigationField| matches!(nav.kind, NavigationFieldKind::OneToOne {..}));
 handlebars_helper!(is_get_request: |verb: HttpVerb| matches!(verb, HttpVerb::Get));
-handlebars_helper!(is_serializable: |cidl_type: CidlType| !matches!(cidl_type.root_type(), CidlType::Inject { .. }));
+handlebars_helper!(is_serializable: |cidl_type: CidlType| !matches!(cidl_type.root_type(), CidlType::Inject { .. } | CidlType::Env));
 handlebars_helper!(is_object: |cidl_type: CidlType| matches!(cidl_type.root_type(), CidlType::Object { .. } | CidlType::Partial { .. }));
 
 // TODO: This method of generating fromJson for arrays won't help for n-dimensional arrays

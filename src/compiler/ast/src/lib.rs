@@ -34,6 +34,9 @@ pub enum CidlType {
     /// A Cloudflare R2 object (HEAD object response)
     R2Object,
 
+    /// Cloudflare Wrangler Environment
+    Env,
+
     /// A dependency injected instance, containing a type name.
     Inject {
         name: String,
@@ -71,6 +74,11 @@ pub enum CidlType {
 
     /// A Cloudflare Workers KV object (GET value response)
     KvObject(Box<CidlType>),
+
+    /// A reference to an object or injected type that is not yet resolved by the parser
+    UnresolvedReference {
+        name: String,
+    },
 }
 
 impl CidlType {
@@ -198,9 +206,9 @@ pub struct Column {
 
 #[derive(Serialize, Deserialize, Hash, PartialEq, Eq, Debug, Clone)]
 pub enum CrudKind {
-    GET,
-    LIST,
-    SAVE,
+    Get,
+    List,
+    Save,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -259,7 +267,7 @@ pub struct ApiMethod {
     pub parameters: Vec<Field>,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 pub struct Model {
     #[serde(default)]
     pub hash: u64,

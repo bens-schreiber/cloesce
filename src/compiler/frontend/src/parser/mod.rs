@@ -222,11 +222,13 @@ fn cidl_type<'t>() -> impl Parser<'t, &'t [Token], CidlType, Extra<'t>> {
                 "Paginated" => Ok(CidlType::paginated(inner)),
                 "KvObject" => Ok(CidlType::KvObject(Box::new(inner))),
                 "Partial" => match inner {
-                    CidlType::Object { name: object_name } => Ok(CidlType::Partial { object_name }),
+                    CidlType::UnresolvedReference { name } => {
+                        Ok(CidlType::Partial { object_name: name })
+                    }
                     _ => Err(Rich::custom(span, "Partial<T> expects an object type")),
                 },
                 "DataSource" => match inner {
-                    CidlType::Object { name: model_name } => {
+                    CidlType::UnresolvedReference { name: model_name } => {
                         Ok(CidlType::DataSource { model_name })
                     }
                     _ => Err(Rich::custom(span, "DataSource<T> expects an object type")),
@@ -245,11 +247,12 @@ fn cidl_type<'t>() -> impl Parser<'t, &'t [Token], CidlType, Extra<'t>> {
             just(Token::Blob).to(CidlType::Blob),
             just(Token::Stream).to(CidlType::Stream),
             just(Token::R2Object).to(CidlType::R2Object),
+            just(Token::Env).to(CidlType::Env),
         ));
 
-        let object_type = select! { Token::Ident(name) => name }
-            .map(move |name| CidlType::Object { name: name.clone() });
+        let unresolved_type = select! { Token::Ident(name) => name }
+            .map(move |name| CidlType::UnresolvedReference { name: name.clone() });
 
-        choice((wrapper, primitive_keyword, object_type)).boxed()
+        choice((wrapper, primitive_keyword, unresolved_type)).boxed()
     })
 }

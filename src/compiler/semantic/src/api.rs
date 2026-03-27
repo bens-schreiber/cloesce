@@ -4,6 +4,7 @@ use frontend::{ApiBlockMethod, ParseAst};
 use crate::{
     SymbolKind, SymbolTable, ensure,
     err::{BatchResult, CompilerErrorKind, ErrorSink},
+    resolve_cidl_type,
 };
 
 #[derive(Default)]
@@ -87,7 +88,7 @@ impl ApiAnalysis {
         };
 
         // Validate return type
-        self.return_type(method, table);
+        let return_type = self.return_type(method, table);
 
         // Validate parameters
         let parameters = self.parameters(method, table);
@@ -104,102 +105,74 @@ impl ApiAnalysis {
             data_source,
             http_verb: method.http_verb,
             return_media: MediaType::default(),
-            return_type: CidlType::http(method.return_type.clone()),
+            return_type,
             parameters_media: MediaType::default(),
             parameters,
         })
     }
 
-    fn return_type(&mut self, method: &ApiBlockMethod, table: &SymbolTable) {
-        let err = || CompilerErrorKind::ApiInvalidReturn {
+    fn return_type(&mut self, method: &ApiBlockMethod, table: &SymbolTable) -> CidlType {
+        let err = CompilerErrorKind::ApiInvalidReturn {
             method: method.symbol.clone(),
         };
 
-        match method.return_type.root_type() {
-            CidlType::Object { name, .. }
-            | CidlType::Partial {
-                object_name: name, ..
-            } => {
-                let valid = table
-                    .resolve(name, SymbolKind::ModelDecl, None)
-                    .or_else(|| table.resolve(name, SymbolKind::PlainOldObjectDecl, None))
-                    .is_some();
-                ensure!(valid, self.sink, err());
+        let resolved_type = match resolve_cidl_type(&method.symbol, &method.return_type, table) {
+            Ok(t) => t,
+            Err(e) => {
+                self.sink.push(e);
+                return CidlType::Void;
             }
+        };
 
-            CidlType::DataSource { model_name, .. } => {
-                let valid = table
-                    .resolve(model_name, SymbolKind::ModelDecl, None)
-                    .is_some();
-                ensure!(valid, self.sink, err());
-            }
-
-            CidlType::Inject { .. } => {
-                self.sink.push(err());
+        match resolved_type.root_type() {
+            CidlType::Inject { .. } | CidlType::Env => {
+                self.sink.push(err);
             }
 
             CidlType::Stream => {
-                // Stream is only valid as bare Stream or HttpResult<Stream>
-                let valid = matches!(method.return_type, CidlType::Stream)
-                    || matches!(
-                        &method.return_type,
-                        CidlType::HttpResult(boxed) if matches!(**boxed, CidlType::Stream)
-                    );
-                ensure!(valid, self.sink, err());
+                // Stream is only valid as bare Stream
+                ensure!(
+                    matches!(method.return_type, CidlType::Stream),
+                    self.sink,
+                    err
+                );
             }
 
             _ => {}
         }
+
+        CidlType::http(resolved_type)
     }
 
     fn parameters(&mut self, method: &ApiBlockMethod, table: &SymbolTable) -> Vec<Field> {
         let mut params = Vec::new();
 
         for param in &method.parameters {
-            let err = || CompilerErrorKind::ApiInvalidParam {
+            let err = CompilerErrorKind::ApiInvalidParam {
                 method: method.symbol.clone(),
                 param: param.clone(),
             };
 
-            // DataSource parameters validated separately
-            if let CidlType::DataSource { model_name, .. } = &param.cidl_type {
-                let valid = table
-                    .resolve(model_name, SymbolKind::ModelDecl, None)
-                    .is_some();
-                ensure!(valid, self.sink, err());
-                params.push(Field {
-                    name: param.name.clone(),
-                    cidl_type: param.cidl_type.clone(),
-                });
-                continue;
-            }
-
-            match param.cidl_type.root_type() {
+            let resolved_type = match resolve_cidl_type(&param, &param.cidl_type, table) {
+                Ok(t) => t,
+                Err(e) => {
+                    self.sink.push(e);
+                    continue;
+                }
+            };
+            match resolved_type.root_type() {
                 CidlType::Void => {
-                    self.sink.push(err());
+                    self.sink.push(err);
                 }
 
-                CidlType::Object { name, .. }
-                | CidlType::Partial {
-                    object_name: name, ..
-                } => {
-                    let valid = table
-                        .resolve(name, SymbolKind::ModelDecl, None)
-                        .or_else(|| table.resolve(name, SymbolKind::PlainOldObjectDecl, None))
-                        .is_some();
-                    ensure!(valid, self.sink, err());
-
+                CidlType::Object { .. } | CidlType::Partial { .. } => {
                     // GET requests do not support Object parameters
-                    if method.http_verb == HttpVerb::Get {
-                        self.sink.push(err());
-                    }
+                    ensure!(method.http_verb != HttpVerb::Get, self.sink, err);
                 }
 
                 CidlType::R2Object => {
                     // GET requests do not support R2Object parameters
-                    if method.http_verb == HttpVerb::Get {
-                        self.sink.push(err());
-                    }
+                    ensure!(method.http_verb != HttpVerb::Get, self.sink, err);
                 }
 
                 CidlType::Stream => {
@@ -217,7 +190,7 @@ impl ApiAnalysis {
                     ensure!(
                         required_params == 1 && matches!(param.cidl_type, CidlType::Stream),
                         self.sink,
-                        err()
+                        err
                     );
                 }
 
@@ -226,7 +199,7 @@ impl ApiAnalysis {
 
             params.push(Field {
                 name: param.name.clone(),
-                cidl_type: param.cidl_type.clone(),
+                cidl_type: resolved_type,
             });
         }
 
