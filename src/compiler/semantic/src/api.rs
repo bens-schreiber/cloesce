@@ -57,6 +57,13 @@ impl ApiAnalysis {
         method: &ApiBlockMethod,
         table: &SymbolTable,
     ) -> Option<ApiMethod> {
+        // Generated API methods start with a '$'
+        if method.symbol.name.starts_with('$') {
+            self.sink.push(CompilerErrorKind::ApiReservedMethod {
+                method: method.symbol.clone(),
+            });
+        }
+
         // Validate data source reference
         let data_source_name = if let Some(ref ds) = method.data_source {
             ensure!(

@@ -219,6 +219,11 @@ pub enum CompilerErrorKind {
         method: Symbol,
         param: Symbol,
     },
+
+    /// An API method uses a reserved name (e.g. $get, $list, $save)
+    ApiReservedMethod {
+        method: Symbol,
+    },
 }
 
 #[derive(Debug, Default)]

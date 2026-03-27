@@ -13,7 +13,7 @@ impl BackendGenerator {
     pub fn generate(ast: &CloesceAst) -> String {
         // TODO: Hardcoded TypeScript for now
         let template = TYPESCRIPT_TEMPLATE;
-        let mapper = Arc::new(TypeScriptMapper::with_namespaces());
+        let mapper = Arc::new(TypeScriptMapper::backend());
         let mut handlebars = Handlebars::new();
         handlebars
             .register_template_string(TEMPLATE_STRING, template)

@@ -40,34 +40,6 @@ fn finalize_adds_crud_methods_to_model() {
 }
 
 #[test]
-fn finalize_does_not_overwrite_existing_method() {
-    let SemanticResult { mut ast, .. } = src_to_ast(
-        r#"
-        env { db: d1 }
-
-        @d1(db)
-        @crud(get)
-        model User {
-            [primary id]
-            id: int
-        }
-
-        api User {
-            post GET(id: int) -> void
-        }
-    "#,
-    );
-
-    WorkersGenerator::finalize_api_methods(&mut ast);
-
-    let user = ast.models.get("User").unwrap();
-    let method = find_method(user, "$get").unwrap();
-
-    assert_eq!(method.http_verb, HttpVerb::Post);
-    assert_eq!(method.parameters.len(), 1);
-}
-
-#[test]
 fn finalize_sets_json_media_type() {
     let SemanticResult { mut ast, .. } = src_to_ast(
         r#"

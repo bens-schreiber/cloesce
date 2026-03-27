@@ -30,23 +30,29 @@ pub trait LanguageTypeMapper {
     fn media_type(&self, ty: &MediaType) -> String;
 }
 
+pub enum TypescriptMapperKind {
+    BackendTypes,
+    ClientApi,
+}
+
 pub struct TypeScriptMapper {
-    use_namespaces: bool,
+    kind: TypescriptMapperKind,
 }
 impl TypeScriptMapper {
-    pub fn new() -> Self {
+    pub fn backend() -> Self {
         Self {
-            use_namespaces: false,
+            kind: TypescriptMapperKind::BackendTypes,
         }
     }
-    pub fn with_namespaces() -> Self {
+
+    pub fn client() -> Self {
         Self {
-            use_namespaces: true,
+            kind: TypescriptMapperKind::ClientApi,
         }
     }
 
     fn namespace(&self, ast: &CloesceAst, name: &str) -> String {
-        if !self.use_namespaces {
+        if matches!(self.kind, TypescriptMapperKind::ClientApi) {
             return name.to_string();
         }
 
@@ -105,7 +111,11 @@ impl LanguageTypeMapper for TypeScriptMapper {
                     .collect::<Vec<_>>()
                     .join(" | ");
 
-                format!("{joined} = \"default\"")
+                if matches!(self.kind, TypescriptMapperKind::ClientApi) {
+                    format!("{joined} = \"default\"")
+                } else {
+                    joined
+                }
             }
             CidlType::Stream => "Uint8Array".to_string(),
             CidlType::KvObject(inner) => {

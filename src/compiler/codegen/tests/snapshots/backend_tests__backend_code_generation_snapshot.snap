@@ -4,6 +4,13 @@ expression: backend_code
 ---
 // GENERATED CODE. DO NOT MODIFY.
 export namespace Cloesce {
+    export interface Env {
+        db: D1Database;
+        my_kv: KVNamespace;
+        my_r2: R2Bucket;
+        MY_VAR: string;
+    }
+
     export namespace PlainOldObjects {
         export interface BasicPoo {
             field1: string;
@@ -86,9 +93,9 @@ export namespace Cloesce {
         }
         export abstract class ModelWithCruds {
             readonly tag = "ModelWithCruds";
-            abstract $get(id: number, __datasource: "default" = "default"): HttpResult<Cloesce.Models.ModelWithCruds>;
-            abstract $save(model: DeepPartial<Cloesce.Models.ModelWithCruds>, __datasource: "default" = "default"): HttpResult<Cloesce.Models.ModelWithCruds>;
-            abstract $list(lastSeen_id: number | null, limit: number | null, offset: number | null, __datasource: "default" = "default"): HttpResult<Cloesce.Models.ModelWithCruds[]>;
+            abstract $get(id: number, __datasource: "default"): HttpResult<Cloesce.Models.ModelWithCruds>;
+            abstract $save(model: DeepPartial<Cloesce.Models.ModelWithCruds>, __datasource: "default"): HttpResult<Cloesce.Models.ModelWithCruds>;
+            abstract $list(lastSeen_id: number | null, limit: number | null, offset: number | null, __datasource: "default"): HttpResult<Cloesce.Models.ModelWithCruds[]>;
         }
         export abstract class ModelWithKv {
             readonly tag = "ModelWithKv";

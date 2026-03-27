@@ -139,16 +139,6 @@ impl WorkersGenerator {
                     },
                 };
 
-                if let Some(api) = model.apis.iter().find(|api| api.name == method.name) {
-                    // Don't overwrite an existing method
-                    tracing::warn!(
-                        "Found an overwritten CRUD method {}::{}::{}, skipping.",
-                        model.name,
-                        api.name,
-                        method.name
-                    );
-                    continue;
-                }
                 crud_methods.push(method);
             }
 

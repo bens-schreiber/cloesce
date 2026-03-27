@@ -81,7 +81,7 @@ impl ClientGenerator {
     pub fn generate(ast: &CloesceAst, worker_url: &str) -> String {
         // TODO: Hardcoded TypeScript for now
         let template = TYPESCRIPT_TEMPLATE;
-        let mapper = Arc::new(TypeScriptMapper::new());
+        let mapper = Arc::new(TypeScriptMapper::client());
 
         let mut handlebars = Handlebars::new();
         handlebars

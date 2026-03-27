@@ -1,5 +1,22 @@
 // GENERATED CODE. DO NOT MODIFY.
 export namespace Cloesce {
+    {{#if wrangler_env}}
+    export interface Env {
+        {{#each wrangler_env.d1_bindings}}
+        {{this}}: D1Database;
+        {{/each}}
+        {{#each wrangler_env.kv_bindings}}
+        {{this}}: KVNamespace;
+        {{/each}}
+        {{#each wrangler_env.r2_bindings}}
+        {{this}}: R2Bucket;
+        {{/each}}
+        {{#each wrangler_env.vars}}
+        {{name}}: {{map_cidl_type cidl_type}};
+        {{/each}}
+    }
+    {{/if}}
+
     export namespace PlainOldObjects {
         {{#each poos}}
         export interface {{this.name}} {

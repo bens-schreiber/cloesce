@@ -4,6 +4,7 @@ env {
     db: d1
     my_kv: kv
     my_r2: r2
+    MY_VAR: string
 }
 
 @d1(db)
