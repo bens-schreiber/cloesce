@@ -529,21 +529,21 @@ fn api_block() {
             name: string
         }
 
-        api UserApi for User {
+        api User {
             post someMethod(
                 @source(mySource)
                 self,
                 id: Option<int>
-            ) -> Result<double>
+            ) -> double
 
             get anotherMethod() -> void
         }
 
-        api UserGetApi for User {
+        api User {
             get getById(id: int) -> void
         }
 
-        api UserMutApi for User {
+        api User {
             post update(self) -> void
         }
         "#,
@@ -561,7 +561,7 @@ fn api_block() {
     );
 
     // ParseAst keeps api blocks separate
-    let user_api_blocks: Vec<_> = ast.apis.iter().filter(|a| a.model == "User").collect();
+    let user_api_blocks: Vec<_> = ast.apis.iter().filter(|a| a.namespace == "User").collect();
     assert_eq!(user_api_blocks.len(), 3);
 
     // First block: someMethod + anotherMethod
@@ -584,7 +584,7 @@ fn api_block() {
         some_method.parameters[0].cidl_type,
         CidlType::nullable(CidlType::Integer)
     );
-    assert_eq!(some_method.return_type, CidlType::http(CidlType::Double));
+    assert_eq!(some_method.return_type, CidlType::Double);
 
     let another_method = first
         .methods
@@ -829,14 +829,14 @@ fn service_block() {
 
         service EmptyService {}
 
-        api MyAppServiceCreate for MyAppService {
+        api MyAppService {
             post createItem(
                 name: string,
                 count: int
-            ) -> Result<string>
+            ) -> string
         }
 
-        api MyAppServiceList for MyAppService {
+        api MyAppService {
             get listItems(self) -> Array<string>
         }
         "#,
@@ -893,7 +893,7 @@ fn service_block() {
     let app_api_blocks: Vec<_> = ast
         .apis
         .iter()
-        .filter(|a| a.model == "MyAppService")
+        .filter(|a| a.namespace == "MyAppService")
         .collect();
     assert_eq!(app_api_blocks.len(), 2);
 
@@ -909,7 +909,7 @@ fn service_block() {
     assert_eq!(create.http_verb, HttpVerb::Post);
     assert!(create.is_static);
     assert_eq!(create.parameters.len(), 2);
-    assert_eq!(create.return_type, CidlType::http(CidlType::String));
+    assert_eq!(create.return_type, CidlType::String);
 
     let list_block = app_api_blocks
         .iter()

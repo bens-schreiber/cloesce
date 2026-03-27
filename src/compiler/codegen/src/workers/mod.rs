@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 
 use ast::{
-    Api, ApiMethod, CidlType, CloesceAst, CrudKind, DataSource, DataSourceMethod, Field, HttpVerb,
+    ApiMethod, CidlType, CloesceAst, CrudKind, DataSource, DataSourceMethod, Field, HttpVerb,
     IncludeTree, MediaType, Model, NavigationFieldKind,
 };
 
@@ -139,12 +139,7 @@ impl WorkersGenerator {
                     },
                 };
 
-                if let Some(api) = model.apis.iter().find(|api| {
-                    api.methods
-                        .iter()
-                        .map(|m| &m.name)
-                        .any(|n| *n == method.name)
-                }) {
+                if let Some(api) = model.apis.iter().find(|api| api.name == method.name) {
                     // Don't overwrite an existing method
                     tracing::warn!(
                         "Found an overwritten CRUD method {}::{}::{}, skipping.",
@@ -157,24 +152,14 @@ impl WorkersGenerator {
                 crud_methods.push(method);
             }
 
-            let crud_api = Api {
-                name: "$CrudApi".into(),
-                methods: crud_methods,
-            };
-
-            model.apis.push(crud_api);
-
-            for method in model.apis.iter_mut().flat_map(|api| api.methods.iter_mut()) {
+            model.apis.extend(crud_methods);
+            for method in model.apis.iter_mut() {
                 set_media_types(method);
             }
         }
 
         for service in ast.services.values_mut() {
-            for method in service
-                .apis
-                .iter_mut()
-                .flat_map(|api| api.methods.iter_mut())
-            {
+            for method in service.apis.iter_mut() {
                 set_media_types(method);
             }
         }

@@ -1,5 +1,5 @@
-use ast::{Api, ApiMethod, CidlType, Field, HttpVerb, MediaType};
-use frontend::{ApiBlock, ApiBlockMethod, ParseAst};
+use ast::{ApiMethod, CidlType, Field, HttpVerb, MediaType};
+use frontend::{ApiBlockMethod, ParseAst};
 
 use crate::{
     SymbolKind, SymbolTable, ensure,
@@ -14,17 +14,16 @@ pub struct ApiAnalysis {
 impl ApiAnalysis {
     pub fn analyze(
         mut self,
-        apis: &[ApiBlock],
         parse: &ParseAst,
         table: &SymbolTable,
-    ) -> BatchResult<Vec<(String, Api)>> {
+    ) -> BatchResult<Vec<(String, Vec<ApiMethod>)>> {
         let mut result = Vec::new();
 
-        for api_block in apis {
+        for api_block in &parse.apis {
             // Validate the model reference
             let namespace = match (
-                table.resolve(&api_block.model, SymbolKind::ModelDecl, None),
-                table.resolve(&api_block.model, SymbolKind::ServiceDecl, None),
+                table.resolve(&api_block.namespace, SymbolKind::ModelDecl, None),
+                table.resolve(&api_block.namespace, SymbolKind::ServiceDecl, None),
             ) {
                 (Some(model), _) => &model,
                 (_, Some(service)) => service,
@@ -37,16 +36,13 @@ impl ApiAnalysis {
                 }
             };
 
-            let mut api = Api {
-                name: api_block.symbol.name.clone(),
-                methods: Vec::new(),
-            };
+            let mut methods = Vec::new();
             for method in &api_block.methods {
-                if let Some(api_method) = self.method(&namespace.name, method, parse, table) {
-                    api.methods.push(api_method);
+                if let Some(api_method) = self.method(&namespace.name, parse, method, table) {
+                    methods.push(api_method);
                 }
             }
-            result.push((namespace.name.clone(), api));
+            result.push((namespace.name.clone(), methods));
         }
 
         self.sink.finish()?;
@@ -56,8 +52,8 @@ impl ApiAnalysis {
     fn method(
         &mut self,
         namespace: &str,
-        method: &ApiBlockMethod,
         parse: &ParseAst,
+        method: &ApiBlockMethod,
         table: &SymbolTable,
     ) -> Option<ApiMethod> {
         // Validate data source reference
@@ -108,7 +104,7 @@ impl ApiAnalysis {
             data_source,
             http_verb: method.http_verb,
             return_media: MediaType::default(),
-            return_type: method.return_type.clone(),
+            return_type: CidlType::http(method.return_type.clone()),
             parameters_media: MediaType::default(),
             parameters,
         })

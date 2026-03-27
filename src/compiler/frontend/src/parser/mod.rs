@@ -218,7 +218,6 @@ fn cidl_type<'t>() -> impl Parser<'t, &'t [Token], CidlType, Extra<'t>> {
             .then_ignore(just(Token::RAngle))
             .try_map(|(wrapper, inner), span| match wrapper.as_str() {
                 "Option" => Ok(CidlType::nullable(inner)),
-                "Result" => Ok(CidlType::http(inner)),
                 "Array" => Ok(CidlType::array(inner)),
                 "Paginated" => Ok(CidlType::paginated(inner)),
                 "KvObject" => Ok(CidlType::KvObject(Box::new(inner))),

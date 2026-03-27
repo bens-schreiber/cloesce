@@ -1,0 +1,115 @@
+---
+source: codegen/tests/backend_tests.rs
+expression: backend_code
+---
+// GENERATED CODE. DO NOT MODIFY.
+export namespace Cloesce {
+    export namespace PlainOldObjects {
+        export interface BasicPoo {
+            field1: string;
+            field2: number;
+        }
+        export interface PooWithComposition {
+            field1: Cloesce.PlainOldObjects.BasicPoo;
+            field2: Cloesce.Models.BasicModel;
+        }
+    }
+
+    export namespace Services {
+        export interface BasicService {
+        }
+    }
+
+    export namespace Models {
+        export interface BasicModel {
+            id: number;
+            fk_to_model: number;
+        }
+        export interface HasOneToOne {
+            id: number;
+            basicModelId: number;
+            oneToOneNav: Cloesce.Models.BasicModel;
+        }
+        export interface HasSqlColumnTypes {
+            id: number;
+            str: string;
+            integer: number;
+            dub: number;
+            boo: boolean;
+            dat: Date;
+            strNull: string | null;
+            integerNull: number | null;
+            dubNull: number | null;
+            booNull: boolean | null;
+            dateNull: Date | null;
+        }
+        export interface ManyToManyModelA {
+            id: number;
+            manyToManyNav: Cloesce.Models.ManyToManyModelB[];
+        }
+        export interface ManyToManyModelB {
+            id: number;
+            manyToManyNav: Cloesce.Models.ManyToManyModelA[];
+        }
+        export interface ModelWithCompositePk {
+            tenantId: string;
+            rowId: number;
+            name: string;
+        }
+        export interface ModelWithCruds {
+            id: number;
+            name: string;
+        }
+        export interface ModelWithKv {
+            id1: string;
+            id2: string;
+        }
+        export interface ModelWithR2 {
+            id: string;
+        }
+        export interface OneToManyModel {
+            id: number;
+            oneToManyNav: Cloesce.Models.BasicModel[];
+        }
+        export interface ToyotaPrius {
+            id: number;
+            someKey: string;
+            ownerId: string;
+            modelYear: number;
+        }
+    }
+
+    export namespace Apis {
+        export abstract class ModelWithCompositePk {
+            readonly tag = "ModelWithCompositePk";
+            abstract instanceMethod(self: Cloesce.Models.ModelWithCompositePk): HttpResult<string>;
+        }
+        export abstract class ModelWithCruds {
+            readonly tag = "ModelWithCruds";
+            abstract GET(): HttpResult<Cloesce.Models.ModelWithCruds>;
+            abstract SAVE(): HttpResult<Cloesce.Models.ModelWithCruds>;
+            abstract LIST(): HttpResult<Cloesce.Models.ModelWithCruds[]>;
+        }
+        export abstract class ModelWithKv {
+            readonly tag = "ModelWithKv";
+            abstract instanceMethod(self: Cloesce.Models.ModelWithKv): HttpResult<string>;
+            abstract staticMethod(): HttpResult<number>;
+            abstract hasKvParamAndRes(self: Cloesce.Models.ModelWithKv): HttpResult<KValue<string>>;
+        }
+        export abstract class ModelWithR2 {
+            readonly tag = "ModelWithR2";
+            abstract hasR2ParamAndRes(self: Cloesce.Models.ModelWithR2): HttpResult<R2Object>;
+        }
+        export abstract class ToyotaPrius {
+            readonly tag = "ToyotaPrius";
+            abstract instanceMethod(self: Cloesce.Models.ToyotaPrius): HttpResult<string>;
+        }
+        export abstract class BasicService {
+            readonly tag = "BasicService";
+            abstract downloadData(): HttpResult<Uint8Array>;
+            abstract instanceMethod(): HttpResult<number>;
+            abstract staticMethod(): HttpResult<string>;
+            abstract uploadData(): HttpResult<boolean>;
+        }
+    }
+}

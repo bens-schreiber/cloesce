@@ -7,7 +7,6 @@ fn find_method<'a>(model: &'a Model, name: &str) -> Option<&'a ApiMethod> {
     model
         .apis
         .iter()
-        .flat_map(|api| &api.methods)
         .find(|m| m.name.eq_ignore_ascii_case(name))
 }
 
@@ -53,7 +52,7 @@ fn finalize_does_not_overwrite_existing_method() {
             id: int
         }
 
-        api UserApi for User {
+        api User {
             post GET(id: int) -> void
         }
     "#,
@@ -103,7 +102,7 @@ fn finalize_sets_octet_media_type() {
             id: int
         }
 
-        api UserApi for User {
+        api User {
             post acceptReturnOctet(input: stream) -> stream
         }
     "#,
@@ -390,18 +389,14 @@ async fn generate_default_data_sources(db: SqlitePool) {
         .unwrap();
 
     let get_sql = &default_ds.get.as_ref().unwrap().raw_sql;
-    let rows = sqlx::query(get_sql)
-        .bind(1)
-        .fetch_all(&db)
-        .await
-        .unwrap();
+    let rows = sqlx::query(get_sql).bind(1).fetch_all(&db).await.unwrap();
     assert!(!rows.is_empty(), "GET query should return rows");
     assert_eq!(rows[0].get::<u32, _>("id"), 1);
     assert_eq!(rows[0].get::<u32, _>("profile.id"), 1);
 
     let list_sql = &default_ds.list.as_ref().unwrap().raw_sql;
     let rows = sqlx::query(list_sql)
-        .bind(0)  // lastSeen_id
+        .bind(0) // lastSeen_id
         .bind(10) // limit
         .fetch_all(&db)
         .await
@@ -489,11 +484,7 @@ async fn generate_default_data_sources_does_not_include_manys(db: SqlitePool) {
         .unwrap();
 
     let get_sql = &default_ds.get.as_ref().unwrap().raw_sql;
-    let rows = sqlx::query(get_sql)
-        .bind(1)
-        .fetch_all(&db)
-        .await
-        .unwrap();
+    let rows = sqlx::query(get_sql).bind(1).fetch_all(&db).await.unwrap();
     assert_eq!(rows.len(), 2, "GET should return 2 rows (1 per student)");
     assert_eq!(rows[0].get::<u32, _>("id"), 1);
     assert_eq!(rows[0].get::<u32, _>("students.id"), 10);
@@ -596,11 +587,7 @@ async fn generate_default_data_sources_includes_multiple_one_to_ones(db: SqliteP
         .unwrap();
 
     let get_sql = &default_ds.get.as_ref().unwrap().raw_sql;
-    let row = sqlx::query(get_sql)
-        .bind(1)
-        .fetch_one(&db)
-        .await
-        .unwrap();
+    let row = sqlx::query(get_sql).bind(1).fetch_one(&db).await.unwrap();
     assert_eq!(row.get::<String, _>("name"), "Alice");
     assert_eq!(row.get::<String, _>("dog.breed"), "poodle");
     assert_eq!(row.get::<String, _>("dog.toy.color"), "red");
@@ -705,11 +692,7 @@ async fn generate_default_data_sources_diamond_does_not_duplicate_traversal(db: 
         .unwrap();
 
     let get_sql = &default_ds.get.as_ref().unwrap().raw_sql;
-    let row = sqlx::query(get_sql)
-        .bind(1)
-        .fetch_one(&db)
-        .await
-        .unwrap();
+    let row = sqlx::query(get_sql).bind(1).fetch_one(&db).await.unwrap();
     assert_eq!(row.get::<u32, _>("id"), 1);
     assert_eq!(row.get::<String, _>("team.name"), "Beta");
     assert_eq!(row.get::<String, _>("department.team.name"), "Alpha");
@@ -748,10 +731,12 @@ async fn generate_default_data_sources_composite_pk(db: SqlitePool) {
     )
     .await;
 
-    sqlx::query("INSERT INTO OrderItem (orderId, productId, qty) VALUES (1, 1, 5), (1, 2, 3), (2, 1, 7)")
-        .execute(&db)
-        .await
-        .unwrap();
+    sqlx::query(
+        "INSERT INTO OrderItem (orderId, productId, qty) VALUES (1, 1, 5), (1, 2, 3), (2, 1, 7)",
+    )
+    .execute(&db)
+    .await
+    .unwrap();
 
     let ds = ast
         .models
@@ -775,8 +760,8 @@ async fn generate_default_data_sources_composite_pk(db: SqlitePool) {
     // LIST with seek pagination
     let list_sql = &ds.list.as_ref().unwrap().raw_sql;
     let rows = sqlx::query(list_sql)
-        .bind(0)  // lastSeen_orderId
-        .bind(0)  // lastSeen_productId
+        .bind(0) // lastSeen_orderId
+        .bind(0) // lastSeen_productId
         .bind(10) // limit
         .fetch_all(&db)
         .await

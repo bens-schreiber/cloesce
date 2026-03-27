@@ -1,9 +1,7 @@
-mod mappers;
-
 use std::sync::Arc;
 
+use crate::mappers::{LanguageTypeMapper, TypeScriptMapper, make_mapper_helper};
 use ast::{CidlType, CloesceAst, HttpVerb, MediaType, NavigationField, NavigationFieldKind};
-use mappers::{ClientLanguageTypeMapper, TypeScriptMapper};
 
 use handlebars::{Handlebars, handlebars_helper};
 use serde_json::Value;
@@ -83,7 +81,7 @@ impl ClientGenerator {
     pub fn generate(ast: &CloesceAst, worker_url: &str) -> String {
         // TODO: Hardcoded TypeScript for now
         let template = TYPESCRIPT_TEMPLATE;
-        let mapper = Arc::new(TypeScriptMapper);
+        let mapper = Arc::new(TypeScriptMapper::new());
 
         let mut handlebars = Handlebars::new();
         handlebars
@@ -107,7 +105,7 @@ impl ClientGenerator {
 
 fn register_helpers<'a>(
     hbs: &mut Handlebars<'a>,
-    mapper: Arc<dyn ClientLanguageTypeMapper + Send + Sync>,
+    mapper: Arc<dyn LanguageTypeMapper + Send + Sync>,
     ast: &'a CloesceAst,
 ) {
     let simple_helpers: Vec<(&str, Box<dyn handlebars::HelperDef + Send + Sync>)> = vec![
@@ -138,7 +136,7 @@ fn register_helpers<'a>(
         make_mapper_helper(
             mapper.clone(),
             ast,
-            |value: Value, mapper: &dyn ClientLanguageTypeMapper, ast: &CloesceAst| -> String {
+            |value: Value, mapper: &dyn LanguageTypeMapper, ast: &CloesceAst| -> String {
                 let nav: NavigationField = serde_json::from_value(value).unwrap();
 
                 let cidl_type = match nav.kind {
@@ -162,7 +160,7 @@ fn register_helpers<'a>(
         make_mapper_helper(
             mapper.clone(),
             ast,
-            |value: Value, mapper: &dyn ClientLanguageTypeMapper, ast: &CloesceAst| -> String {
+            |value: Value, mapper: &dyn LanguageTypeMapper, ast: &CloesceAst| -> String {
                 let cidl_type: CidlType = serde_json::from_value(value).unwrap();
                 mapper.cidl_type(&cidl_type, ast)
             },
@@ -174,7 +172,7 @@ fn register_helpers<'a>(
         make_mapper_helper(
             mapper.clone(),
             ast,
-            |value: Value, mapper: &dyn ClientLanguageTypeMapper, ast: &CloesceAst| -> String {
+            |value: Value, mapper: &dyn LanguageTypeMapper, ast: &CloesceAst| -> String {
                 let cidl_type: CidlType = serde_json::from_value(value).unwrap();
                 // For KvObject(T) or Paginated(KvObject(T)), map the KvObject(T) part
                 let kv_type = match &cidl_type {
@@ -195,7 +193,7 @@ fn register_helpers<'a>(
         make_mapper_helper(
             mapper.clone(),
             ast,
-            |value: Value, mapper: &dyn ClientLanguageTypeMapper, ast: &CloesceAst| -> String {
+            |value: Value, mapper: &dyn LanguageTypeMapper, ast: &CloesceAst| -> String {
                 let cidl_type: CidlType = serde_json::from_value(value).unwrap();
                 mapper.cidl_type(cidl_type.root_type(), ast)
             },
@@ -207,32 +205,10 @@ fn register_helpers<'a>(
         make_mapper_helper(
             mapper.clone(),
             ast,
-            |value: Value, mapper: &dyn ClientLanguageTypeMapper, _ast: &CloesceAst| -> String {
+            |value: Value, mapper: &dyn LanguageTypeMapper, _ast: &CloesceAst| -> String {
                 let media_type: MediaType = serde_json::from_value(value).unwrap();
                 mapper.media_type(&media_type)
             },
         ),
     );
-
-    fn make_mapper_helper<'a, F>(
-        mapper: Arc<dyn ClientLanguageTypeMapper + Send + Sync + 'a>,
-        ast: &'a CloesceAst,
-        f: F,
-    ) -> Box<dyn handlebars::HelperDef + Send + Sync + 'a>
-    where
-        F: Fn(Value, &dyn ClientLanguageTypeMapper, &CloesceAst) -> String + Send + Sync + 'a,
-    {
-        Box::new(
-            move |h: &handlebars::Helper<'_>,
-                  _hb: &Handlebars<'_>,
-                  _ctx: &handlebars::Context,
-                  _rc: &mut handlebars::RenderContext<'_, '_>,
-                  out: &mut dyn handlebars::Output| {
-                let value = h.param(0).unwrap().value().clone();
-                let rendered = f(value, mapper.as_ref(), ast);
-                out.write(&rendered)?;
-                Ok(())
-            },
-        )
-    }
 }

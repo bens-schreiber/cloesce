@@ -30,7 +30,6 @@ export class {{this.name}} {
 {{#each services}}
 export class {{this.name}} {
 {{#each this.apis}}
-{{#each this.methods}}
   static async {{this.name}}(
 {{#each this.parameters}}
 {{#if (is_serializable cidl_type)}}
@@ -39,7 +38,7 @@ export class {{this.name}} {
 {{/each}}
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<{{#unless (is_stream this.return_type)}}{{map_cidl_type this.return_type}}{{else}}Response{{/unless}}>> {
-    const baseUrl = new URL("{{../../../worker_url}}/{{../../name}}/{{this.name}}");
+    const baseUrl = new URL("{{../../worker_url}}/{{../name}}/{{this.name}}");
 {{#unless (is_get_request this.http_verb)}}
     const payload: any = {};
 {{/unless}}
@@ -73,7 +72,6 @@ export class {{this.name}} {
       {{has_array this.return_type}}
     );
   }
-{{/each}}
 {{/each}}
 }
 {{/each}}
@@ -100,7 +98,6 @@ export class {{this.name}} {
 {{/each}}
 
 {{#each this.apis}}
-{{#each this.methods}}
   {{#if this.is_static}}static {{/if}}async {{this.name}}(
 {{#each this.parameters}}
 {{#if (is_serializable cidl_type)}}
@@ -120,7 +117,7 @@ export class {{this.name}} {
     ].join("/");
 {{/unless}}
     const baseUrl = new URL(
-      `{{../../../worker_url}}/{{../../name}}/{{#unless this.is_static}}${id}/{{/unless}}{{this.name}}`
+      `{{../../worker_url}}/{{../name}}/{{#unless this.is_static}}${id}/{{/unless}}{{this.name}}`
     );
 {{#unless (is_get_request this.http_verb)}}
     const payload: any = {};
@@ -155,7 +152,6 @@ export class {{this.name}} {
       {{has_array this.return_type}}
     );
   }
-{{/each}}
 {{/each}}
 
   static fromJson(data: any): {{this.name}} {

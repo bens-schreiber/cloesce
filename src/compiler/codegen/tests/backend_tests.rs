@@ -1,14 +1,14 @@
-use codegen::{client::ClientGenerator, workers::WorkersGenerator};
+use codegen::{backend::BackendGenerator, workers::WorkersGenerator};
 use compiler_test::{SemanticResult, src_to_ast};
 
 mod shared;
 
 #[test]
-fn client_code_generation_snapshot() {
+fn backend_code_generation_snapshot() {
     const WORKERS_URL: &str = "http://example.com/path/to/api";
     let SemanticResult { mut ast, .. } = src_to_ast(shared::COMPREHENSIVE_SRC);
     WorkersGenerator::generate(&mut ast, WORKERS_URL);
 
-    let client_code = ClientGenerator::generate(&ast, WORKERS_URL);
-    insta::assert_snapshot!(client_code);
+    let backend_code = BackendGenerator::generate(&ast);
+    insta::assert_snapshot!(backend_code);
 }

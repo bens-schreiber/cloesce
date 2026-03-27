@@ -736,30 +736,30 @@ fn api_errors() {
         }
 
         // Unknown model reference
-        api BadModelApi for NonExistentModel {}
+        api NonExistentModel {}
 
         // Unknown return type (references non-existent object)
-        api BadReturnApi for User {
+        api User {
             get badReturn() -> UnknownObj
         }
 
         // Void parameter
-        api BadParamApi for User {
+        api User {
             post badVoidParam(v: void) -> string
         }
 
         // Object parameter on GET
-        api GetObjectApi for User {
+        api User {
             get badGetObj(u: User) -> string
         }
 
         // R2Object parameter on GET
-        api GetR2Api for User {
+        api User {
             get badGetR2(r: R2Object) -> string
         }
 
         // Stream param with extra non-inject params (invalid)
-        api BadStreamApi for User {
+        api User {
             post badStream(s: stream, extra: string) -> stream
         }
     "#,
@@ -998,11 +998,11 @@ fn service_collects_api_blocks() {
     // Arrange
     let src = r#"
         service MyService {}
-        api FirstApi for MyService {
+        api MyService {
             post firstMethod() -> string
         }
 
-        api SecondApi for MyService {
+        api MyService {
             get secondMethod() -> string
         }
     "#;
@@ -1010,11 +1010,10 @@ fn service_collects_api_blocks() {
     // Act
     let parse = lex_and_parse(src);
     let (result, errors) = SemanticAnalysis::analyze(parse);
+    // panic!("errors: {:#?}", errors);
     assert_eq!(errors.len(), 0);
 
     // Assert
     let service = result.ast.services.get("MyService").unwrap();
     assert_eq!(service.apis.len(), 2);
-    assert!(service.apis.iter().any(|api| api.name == "FirstApi"));
-    assert!(service.apis.iter().any(|api| api.name == "SecondApi"));
 }

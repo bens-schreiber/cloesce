@@ -79,7 +79,7 @@ pub struct Symbol {
 pub struct ApiBlock {
     pub symbol: Symbol,
 
-    pub model: String,
+    pub namespace: String,
     pub methods: Vec<ApiBlockMethod>,
 }
 

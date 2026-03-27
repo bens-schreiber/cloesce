@@ -30,7 +30,7 @@ enum PendingApiParam {
 /// Parses a block of the form:
 ///
 /// ```cloesce
-/// api ApiName for ModelName {
+/// api Namespace {
 ///     http_verb methodName(ident1: cidl_type, ...) -> cidl_type
 ///
 ///     http_verb methodName(
@@ -41,32 +41,29 @@ enum PendingApiParam {
 /// }
 /// ```
 pub fn api_block<'t>() -> impl Parser<'t, &'t [Token], ApiBlock, Extra<'t>> {
-    // api ApiName for ModelName { ... }
+    // api Namespace { ... }
     just(Token::Api)
         .ignore_then(select! { Token::Ident(name) => name })
-        .then_ignore(just(Token::For))
-        .then(select! { Token::Ident(name) => name })
         .then(
             method()
                 .repeated()
                 .collect::<Vec<_>>()
                 .delimited_by(just(Token::LBrace), just(Token::RBrace)),
         )
-        .map_with(|((name, model), pending_methods), e| {
+        .map_with(|(namespace, pending_methods), e| {
             let methods = pending_methods
                 .into_iter()
-                .map(|m| map_method(m, &name))
+                .map(|m| map_method(m, &namespace))
                 .collect();
 
             ApiBlock {
                 symbol: Symbol {
                     span: FileSpan::from_simple_span(e.span()),
-                    name,
                     kind: SymbolKind::ApiDecl,
-                    parent_name: model.clone(),
+                    parent_name: namespace.clone(),
                     ..Default::default()
                 },
-                model,
+                namespace,
                 methods,
             }
         })
@@ -135,7 +132,7 @@ fn http_verb<'t>() -> impl Parser<'t, &'t [Token], HttpVerb, Extra<'t>> {
     ))
 }
 
-fn map_method(method: PendingApiMethod, api_name: &str) -> ApiBlockMethod {
+fn map_method(method: PendingApiMethod, namespace: &str) -> ApiBlockMethod {
     let mut is_static = true;
     let mut data_source = None;
     let mut parameters = Vec::new();
@@ -160,7 +157,7 @@ fn map_method(method: PendingApiMethod, api_name: &str) -> ApiBlockMethod {
                     name,
                     cidl_type,
                     kind: SymbolKind::ApiMethodParam,
-                    parent_name: format!("{api_name}::{}", method.name),
+                    parent_name: format!("{namespace}::{}", method.name),
                     ..Default::default()
                 });
             }
@@ -172,7 +169,7 @@ fn map_method(method: PendingApiMethod, api_name: &str) -> ApiBlockMethod {
             span: FileSpan::from_simple_span(method.span),
             name: method.name,
             kind: SymbolKind::ApiMethodDecl,
-            parent_name: api_name.to_string(),
+            parent_name: namespace.to_string(),
             ..Default::default()
         },
         is_static,

@@ -1,5 +1,5 @@
 use ast::{
-    Api, CidlType, CloesceAst, DataSource, DataSourceMethod, Field, IncludeTree, Model,
+    ApiMethod, CidlType, CloesceAst, DataSource, DataSourceMethod, Field, IncludeTree, Model,
     PlainOldObject, Service, ServiceField, WranglerEnv,
 };
 use frontend::{ModelBlock, ParseAst};
@@ -31,14 +31,14 @@ impl SymbolTable {
             SymbolKind::ModelDecl
             | SymbolKind::PlainOldObjectDecl
             | SymbolKind::ServiceDecl
-            | SymbolKind::ApiDecl
             | SymbolKind::DataSourceDecl
             | SymbolKind::WranglerEnvBinding { .. }
             | SymbolKind::WranglerEnvDecl
             | SymbolKind::InjectDecl => symbol.name.clone(),
 
             // Scoped symbols
-            SymbolKind::ModelField
+            SymbolKind::ApiDecl
+            | SymbolKind::ModelField
             | SymbolKind::ServiceField
             | SymbolKind::ApiMethodDecl
             | SymbolKind::ApiMethodParam
@@ -122,8 +122,6 @@ impl SymbolTable {
         }
 
         for api in &parse.apis {
-            insert_unique(&mut st, sink, &api.symbol);
-
             for method in &api.methods {
                 insert_unique(&mut st, sink, &method.symbol);
 
@@ -187,12 +185,12 @@ impl SemanticAnalysis {
         let data_source_map = Self::data_sources(&parse, &models, &table, &mut sink);
         let mut services = Self::services(&parse, &table, &mut sink);
 
-        // Merge API methods into their respective models
-        for (namespace, api) in api_map {
+        // Merge API methods into their respective namespaces
+        for (namespace, apis) in api_map {
             if let Some(model) = models.get_mut(&namespace) {
-                model.apis.push(api);
+                model.apis.extend(apis);
             } else if let Some(service) = services.get_mut(&namespace) {
-                service.apis.push(api);
+                service.apis.extend(apis);
             }
         }
 
@@ -272,8 +270,12 @@ impl SemanticAnalysis {
         }
     }
 
-    fn apis(parse: &ParseAst, table: &SymbolTable, sink: &mut ErrorSink) -> Vec<(String, Api)> {
-        match ApiAnalysis::default().analyze(&parse.apis, parse, table) {
+    fn apis(
+        parse: &ParseAst,
+        table: &SymbolTable,
+        sink: &mut ErrorSink,
+    ) -> Vec<(String, Vec<ApiMethod>)> {
+        match ApiAnalysis::default().analyze(parse, table) {
             Ok(apis) => apis,
             Err(errs) => {
                 sink.extend(errs);

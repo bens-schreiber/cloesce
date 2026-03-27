@@ -1,0 +1,64 @@
+// GENERATED CODE. DO NOT MODIFY.
+export namespace Cloesce {
+    export namespace PlainOldObjects {
+        {{#each poos}}
+        export interface {{this.name}} {
+        {{#each this.fields}}
+            {{name}}: {{map_cidl_type cidl_type}};
+        {{/each}}
+        }
+        {{/each}}
+    }
+
+    export namespace Services {
+        {{#each services}}
+        export interface {{this.name}} {
+            {{#each this.fields}}
+            {{name}}: {{inject_reference}};
+            {{/each}}
+        }
+        {{/each}}
+    }
+
+    export namespace Models {
+        {{#each models}}
+        export interface {{this.name}} {
+            {{#each this.primary_columns}}
+            {{field.name}}: {{map_cidl_type field.cidl_type}};
+            {{/each}}
+            {{#each this.key_fields}}
+            {{this}}: string;
+            {{/each}}
+            {{#each this.columns}}
+            {{field.name}}: {{map_cidl_type field.cidl_type}};
+            {{/each}}
+            {{#each this.navigation_fields}}
+            {{field.name}}: {{map_cidl_type field.cidl_type}};
+            {{/each}}
+        }
+        {{/each}}
+    }
+
+    export namespace Apis {
+    {{#each models}}
+    {{#if this.apis}}
+        export abstract class {{this.name}} {
+            readonly tag = "{{this.name}}";
+            {{#each this.apis}}
+            abstract {{this.name}}({{#unless this.is_static}}self: Cloesce.Models.{{../name}}{{#if this.args}}, {{/if}}{{/unless}}{{#each this.args}}{{this.name}}: {{map_cidl_type this.cidl_type}}{{#unless @last}}, {{/unless}}{{/each}}): HttpResult<{{map_cidl_type this.return_type}}>;
+            {{/each}}
+        }
+    {{/if}}
+    {{/each}}
+    {{#each services}}
+    {{#if this.apis}}
+        export abstract class {{this.name}} {
+            readonly tag = "{{this.name}}";
+            {{#each this.apis}}
+            abstract {{this.name}}({{#unless this.is_static}}self: Cloesce.Services.{{../name}}{{#if this.args}}, {{/if}}{{/unless}}{{#each this.args}}{{this.name}}: {{map_cidl_type this.cidl_type}}{{#unless @last}}, {{/unless}}{{/each}}): HttpResult<{{map_cidl_type this.return_type}}>;
+            {{/each}}
+        }
+    {{/if}}
+    {{/each}}
+    }
+}

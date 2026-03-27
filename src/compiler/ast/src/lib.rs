@@ -260,12 +260,6 @@ pub struct ApiMethod {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct Api {
-    pub name: String,
-    pub methods: Vec<ApiMethod>,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
 pub struct Model {
     #[serde(default)]
     pub hash: u64,
@@ -281,7 +275,7 @@ pub struct Model {
     pub navigation_fields: Vec<NavigationField>,
     pub key_fields: Vec<String>,
 
-    pub apis: Vec<Api>,
+    pub apis: Vec<ApiMethod>,
     pub data_sources: Vec<DataSource>,
     pub cruds: Vec<CrudKind>,
 }
@@ -330,7 +324,7 @@ pub struct ServiceField {
 pub struct Service {
     pub name: String,
     pub fields: Vec<ServiceField>,
-    pub apis: Vec<Api>,
+    pub apis: Vec<ApiMethod>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
