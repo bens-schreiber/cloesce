@@ -1,7 +1,10 @@
 use std::sync::Arc;
 
 use crate::mappers::{LanguageTypeMapper, TypeScriptMapper, make_mapper_helper};
-use ast::{CidlType, CloesceAst, HttpVerb, MediaType, NavigationField, NavigationFieldKind};
+use ast::{
+    CidlType, CloesceAst, CrudKind, DataSource, HttpVerb, MediaType, NavigationField,
+    NavigationFieldKind,
+};
 
 use handlebars::{Handlebars, handlebars_helper};
 use serde_json::Value;
@@ -60,8 +63,17 @@ handlebars_helper!(is_blob_array: |cidl_type: CidlType| matches!(cidl_type.root_
 // True for any [CidlType::DataSource] or given the verb [HttpVerb::GET]
 handlebars_helper!(is_url_param: |cidl_type: CidlType, verb: HttpVerb| matches!(verb, HttpVerb::Get) || matches!(cidl_type, CidlType::DataSource { .. }));
 handlebars_helper!(is_stream: |cidl_type: CidlType| matches!(cidl_type.root_type(), CidlType::Stream));
+handlebars_helper!(is_crud_method: |name: String| name == "$get" || name == "$save" || name == "$list");
 handlebars_helper!(contains_stream: |cidl_type: CidlType| cidl_type_contains!(&cidl_type, CidlType::Stream));
 handlebars_helper!(is_paginated: |cidl_type: CidlType| matches!(cidl_type, CidlType::Paginated(_)));
+
+handlebars_helper!(is_datasource: |cidl_type: CidlType| matches!(cidl_type, CidlType::DataSource { .. }));
+handlebars_helper!(is_crud_kind: |crud: CrudKind, kind: str| match kind {
+    "Get" => matches!(crud, CrudKind::Get),
+    "List" => matches!(crud, CrudKind::List),
+    "Save" => matches!(crud, CrudKind::Save),
+    _ => panic!("Unknown CRUD kind: {}", kind),
+});
 
 // For KvObject or Paginated<KvObject<T>>, returns the CidlType of T (the inner type of KvObject)
 handlebars_helper!(kv_inner_cidl_type: |cidl_type: CidlType| match &cidl_type {
@@ -103,6 +115,55 @@ impl ClientGenerator {
     }
 }
 
+/// Generates the args type for a CRUD method.
+/// For $get/$list: `DataSources.Model.$get.DS1 | DataSources.Model.$get.DS2`
+/// For $save: `DataSources.Model.$save`
+fn crud_args_type_helper(
+    h: &handlebars::Helper<'_>,
+    _hb: &Handlebars<'_>,
+    _ctx: &handlebars::Context,
+    _rc: &mut handlebars::RenderContext<'_, '_>,
+    out: &mut dyn handlebars::Output,
+) -> Result<(), handlebars::RenderError> {
+    let method_name = h.param(0).unwrap().value().as_str().unwrap();
+    let model_name = h.param(1).unwrap().value().as_str().unwrap();
+    let data_sources: Vec<DataSource> =
+        serde_json::from_value(h.param(2).unwrap().value().clone()).unwrap();
+
+    if method_name == "$save" {
+        out.write(&format!("DataSources.{}.{}", model_name, method_name))?;
+    } else {
+        let parts: Vec<String> = data_sources
+            .iter()
+            .filter(|ds| !ds.is_private)
+            .map(|ds| format!("DataSources.{}.{}.{}", model_name, method_name, ds.name))
+            .collect();
+        out.write(&parts.join(" | "))?;
+    }
+    Ok(())
+}
+
+/// Generates `"DS1" | "DS2"` for $save kind union
+fn ds_kind_union_helper(
+    h: &handlebars::Helper<'_>,
+    _hb: &Handlebars<'_>,
+    _ctx: &handlebars::Context,
+    _rc: &mut handlebars::RenderContext<'_, '_>,
+    out: &mut dyn handlebars::Output,
+) -> Result<(), handlebars::RenderError> {
+    let data_sources: Vec<DataSource> =
+        serde_json::from_value(h.param(0).unwrap().value().clone()).unwrap();
+
+    let parts: Vec<String> = data_sources
+        .iter()
+        .filter(|ds| !ds.is_private)
+        .map(|ds| format!("\"{}\"", ds.name))
+        .collect();
+
+    out.write(&parts.join(" | "))?;
+    Ok(())
+}
+
 fn register_helpers<'a>(
     hbs: &mut Handlebars<'a>,
     mapper: Arc<dyn LanguageTypeMapper + Send + Sync>,
@@ -122,14 +183,20 @@ fn register_helpers<'a>(
         ("is_url_param", Box::new(is_url_param)),
         ("is_get_request", Box::new(is_get_request)),
         ("is_stream", Box::new(is_stream)),
+        ("is_crud_method", Box::new(is_crud_method)),
         ("contains_stream", Box::new(contains_stream)),
         ("is_paginated", Box::new(is_paginated)),
         ("kv_inner_cidl_type", Box::new(kv_inner_cidl_type)),
+        ("is_datasource", Box::new(is_datasource)),
+        ("is_crud_kind", Box::new(is_crud_kind)),
     ];
 
     for (name, helper) in simple_helpers {
         hbs.register_helper(name, helper);
     }
+
+    hbs.register_helper("crud_args_type", Box::new(crud_args_type_helper));
+    hbs.register_helper("ds_kind_union", Box::new(ds_kind_union_helper));
 
     hbs.register_helper(
         "get_nav_cidl_type",

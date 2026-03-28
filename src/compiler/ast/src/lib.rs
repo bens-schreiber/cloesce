@@ -301,9 +301,9 @@ impl Model {
         !self.r2_fields.is_empty()
     }
 
-    /// Returns the data source with the symbol name "default", if it exists.
+    /// Returns the data source with the symbol name "Default", if it exists.
     pub fn default_data_source(&self) -> Option<&DataSource> {
-        self.data_sources.iter().find(|ds| ds.name == "default")
+        self.data_sources.iter().find(|ds| ds.name == "Default")
     }
 
     pub fn has_composite_pk(&self) -> bool {

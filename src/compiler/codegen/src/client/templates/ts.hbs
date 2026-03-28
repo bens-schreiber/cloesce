@@ -98,6 +98,51 @@ export class {{this.name}} {
 {{/each}}
 
 {{#each this.apis}}
+{{#if (is_crud_method this.name)}}
+  static async {{this.name}}(
+    args: {{crud_args_type this.name ../name ../data_sources}},
+    fetchImpl: typeof fetch = fetch
+  ): Promise<HttpResult<{{map_cidl_type this.return_type}}>> {
+    const baseUrl = new URL(
+      `{{../../worker_url}}/{{../name}}/{{this.name}}`
+    );
+{{#unless (is_get_request this.http_verb)}}
+    const payload: any = {};
+{{/unless}}
+
+{{#each this.parameters}}
+{{#if (is_serializable cidl_type)}}
+{{#unless (is_datasource cidl_type)}}
+{{#if (is_url_param cidl_type ../http_verb)}}
+    if ("{{name}}" in args) baseUrl.searchParams.append("{{name}}", String((args as any).{{name}}));
+{{else}}
+    payload["{{name}}"] = (args as any).{{name}};
+{{/if}}
+{{/unless}}
+{{/if}}
+{{/each}}
+    baseUrl.searchParams.append("__datasource", args.kind);
+
+    const res = await fetchImpl(baseUrl, {
+      method: "{{this.http_verb}}",
+{{#unless (is_get_request this.http_verb)}}
+      headers: { "Content-Type": "{{get_content_type this.parameters_media}}" },
+      body: requestBody({{get_media_type this.parameters_media}}, payload),
+{{/unless}}
+    });
+
+    return await HttpResult.fromResponse(
+      res,
+      {{get_media_type this.return_media}},
+{{#if (needs_constructor this.return_type)}}
+      {{map_root_cidl_type this.return_type}},
+{{else}}
+      undefined,
+{{/if}}
+      {{has_array this.return_type}}
+    );
+  }
+{{else}}
   {{#if this.is_static}}static {{/if}}async {{this.name}}(
 {{#each this.parameters}}
 {{#if (is_serializable cidl_type)}}
@@ -152,6 +197,7 @@ export class {{this.name}} {
       {{has_array this.return_type}}
     );
   }
+{{/if}}
 {{/each}}
 
   static fromJson(data: any): {{this.name}} {
@@ -357,3 +403,52 @@ export class HttpResult<T = unknown> {
     );
   }
 }
+
+{{#each models}}
+{{#if this.cruds}}
+export namespace DataSources {
+  export namespace {{this.name}} {
+{{#each this.cruds}}
+{{#if (is_crud_kind this "Get")}}
+    export namespace $get {
+{{#each ../data_sources}}
+{{#unless this.is_private}}
+      export type {{this.name}} = {
+        kind: "{{this.name}}";
+{{#if this.get}}
+{{#each this.get.parameters}}
+        {{this.name}}: {{map_cidl_type this.cidl_type}};
+{{/each}}
+{{/if}}
+      }
+{{/unless}}
+{{/each}}
+    }
+{{/if}}
+{{#if (is_crud_kind this "List")}}
+    export namespace $list {
+{{#each ../data_sources}}
+{{#unless this.is_private}}
+      export type {{this.name}} = {
+        kind: "{{this.name}}";
+{{#if this.list}}
+{{#each this.list.parameters}}
+        {{this.name}}: {{map_cidl_type this.cidl_type}};
+{{/each}}
+{{/if}}
+      }
+{{/unless}}
+{{/each}}
+    }
+{{/if}}
+{{#if (is_crud_kind this "Save")}}
+    export type $save = {
+      model: DeepPartial<{{../name}}>;
+      kind: {{ds_kind_union ../data_sources}};
+    }
+{{/if}}
+{{/each}}
+  }
+}
+{{/if}}
+{{/each}}

@@ -1,9 +1,11 @@
 use std::sync::Arc;
 
 use ast::{CidlType, CloesceAst};
-use handlebars::Handlebars;
+use handlebars::{Handlebars, handlebars_helper};
 
 use crate::mappers::{LanguageTypeMapper, TypeScriptMapper, make_mapper_helper};
+
+handlebars_helper!(is_crud_method: |name: String| name == "$get" || name == "$save" || name == "$list");
 
 const TYPESCRIPT_TEMPLATE: &str = include_str!("./templates/ts.hbs");
 const TEMPLATE_STRING: &str = "backend_types";
@@ -20,6 +22,8 @@ impl BackendGenerator {
             .unwrap();
 
         let context = serde_json::to_value(ast).unwrap();
+
+        handlebars.register_helper("is_crud_method", Box::new(is_crud_method));
 
         handlebars.register_helper(
             "map_cidl_type",

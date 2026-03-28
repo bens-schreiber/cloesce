@@ -66,6 +66,7 @@ export namespace Cloesce {
         export interface ModelWithCruds {
             id: number;
             name: string;
+            categoryId: number;
         }
         export interface ModelWithKv {
             id1: string;
@@ -93,9 +94,6 @@ export namespace Cloesce {
         }
         export abstract class ModelWithCruds {
             readonly tag = "ModelWithCruds";
-            abstract $get(id: number, __datasource: "default"): HttpResult<Cloesce.Models.ModelWithCruds>;
-            abstract $save(model: DeepPartial<Cloesce.Models.ModelWithCruds>, __datasource: "default"): HttpResult<Cloesce.Models.ModelWithCruds>;
-            abstract $list(lastSeen_id: number | null, limit: number | null, offset: number | null, __datasource: "default"): HttpResult<Cloesce.Models.ModelWithCruds[]>;
         }
         export abstract class ModelWithKv {
             readonly tag = "ModelWithKv";

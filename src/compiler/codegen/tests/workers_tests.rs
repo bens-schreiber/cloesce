@@ -103,6 +103,7 @@ fn finalize_get_crud_adds_primary_key_for_d1_model() {
     "#,
     );
 
+    WorkersGenerator::generate_default_data_sources(&mut ast);
     WorkersGenerator::finalize_api_methods(&mut ast);
 
     let user = ast.models.get("User").unwrap();
@@ -141,6 +142,7 @@ fn finalize_get_and_list_crud_adds_composite_primary_keys() {
     "#,
     );
 
+    WorkersGenerator::generate_default_data_sources(&mut ast);
     WorkersGenerator::finalize_api_methods(&mut ast);
 
     let order_item = ast.models.get("OrderItem").unwrap();
@@ -197,6 +199,7 @@ fn finalize_get_crud_adds_key_params() {
     "#,
     );
 
+    WorkersGenerator::generate_default_data_sources(&mut ast);
     WorkersGenerator::finalize_api_methods(&mut ast);
 
     let product = ast.models.get("Product").unwrap();
@@ -213,8 +216,8 @@ fn finalize_get_crud_adds_key_params() {
     let category_param = get_method.parameters.iter().find(|p| p.name == "category");
     assert!(category_param.is_some(), "Should have category key param");
     assert!(
-        matches!(category_param.unwrap().cidl_type, CidlType::String),
-        "Key params should be String type"
+        category_param.unwrap().cidl_type.is_nullable(),
+        "Key params should be nullable in union"
     );
 
     let subcategory_param = get_method
@@ -226,9 +229,165 @@ fn finalize_get_crud_adds_key_params() {
         "Should have subcategory key param"
     );
     assert!(
-        matches!(subcategory_param.unwrap().cidl_type, CidlType::String),
-        "Key params should be String type"
+        subcategory_param.unwrap().cidl_type.is_nullable(),
+        "Key params should be nullable in union"
     );
+}
+
+#[test]
+fn finalize_crud_params_are_union_of_data_source_params() {
+    let mut ast = src_to_ast(
+        r#"
+        env { db: d1 }
+
+        @d1(db)
+        @crud(get, list, save)
+        model Product {
+            [primary id]
+            id: int
+            name: string
+            category: string
+        }
+
+        source ByName for Product {
+            include {}
+
+            sql get(name: string) {
+                "SELECT * FROM Product WHERE name = ?"
+            }
+
+            sql list(name: string, limit: int) {
+                "SELECT * FROM Product WHERE name LIKE ? LIMIT ?"
+            }
+        }
+    "#,
+    );
+
+    WorkersGenerator::generate_default_data_sources(&mut ast);
+    WorkersGenerator::finalize_api_methods(&mut ast);
+
+    let product = ast.models.get("Product").unwrap();
+
+    // $get should have union of default (id) and ByName (name), all nullable
+    let get_method = find_method(product, "$get").unwrap();
+    let get_param_names: Vec<&str> = get_method
+        .parameters
+        .iter()
+        .filter(|p| p.name != "__datasource")
+        .map(|p| p.name.as_str())
+        .collect();
+    assert!(
+        get_param_names.contains(&"id"),
+        "GET should have 'id' from default data source"
+    );
+    assert!(
+        get_param_names.contains(&"name"),
+        "GET should have 'name' from ByName data source"
+    );
+    // All non-datasource params should be nullable
+    for p in &get_method.parameters {
+        if p.name != "__datasource" {
+            assert!(
+                p.cidl_type.is_nullable(),
+                "GET param '{}' should be nullable",
+                p.name
+            );
+        }
+    }
+
+    // $list should have union of default (lastSeen_id, limit) and ByName (name, limit)
+    let list_method = find_method(product, "$list").unwrap();
+    let list_param_names: Vec<&str> = list_method
+        .parameters
+        .iter()
+        .filter(|p| p.name != "__datasource")
+        .map(|p| p.name.as_str())
+        .collect();
+    assert!(
+        list_param_names.contains(&"lastSeen_id"),
+        "LIST should have 'lastSeen_id' from default data source"
+    );
+    assert!(
+        list_param_names.contains(&"limit"),
+        "LIST should have 'limit' (shared between both data sources)"
+    );
+    assert!(
+        list_param_names.contains(&"name"),
+        "LIST should have 'name' from ByName data source"
+    );
+    // 'limit' should not be duplicated
+    assert_eq!(
+        list_param_names.iter().filter(|&&n| n == "limit").count(),
+        1,
+        "LIST should not have duplicate 'limit' param"
+    );
+
+    // $save should just have model + __datasource
+    let save_method = find_method(product, "$save").unwrap();
+    assert!(
+        save_method.parameters.iter().any(|p| p.name == "model"),
+        "SAVE should have 'model' parameter"
+    );
+    assert!(
+        save_method
+            .parameters
+            .iter()
+            .any(|p| matches!(p.cidl_type, CidlType::DataSource { .. })),
+        "SAVE should have __datasource parameter"
+    );
+}
+
+#[test]
+fn fill_default_methods_for_data_sources_without_get_list() {
+    let mut ast = src_to_ast(
+        r#"
+        env {
+            db: d1
+            my_kv: kv
+        }
+
+        @d1(db)
+        @crud(get, list)
+        model Item {
+            [primary id]
+            id: int
+
+            @keyparam
+            tag: string
+
+            @kv(my_kv, "{tag}")
+            cached: json
+        }
+
+        source WithKv for Item {
+            include { cached }
+        }
+    "#,
+    );
+
+    WorkersGenerator::generate_default_data_sources(&mut ast);
+
+    let item = ast.models.get("Item").unwrap();
+
+    // The WithKv data source should now have default get/list methods
+    let with_kv = item
+        .data_sources
+        .iter()
+        .find(|ds| ds.name == "WithKv")
+        .expect("WithKv data source should exist");
+    assert!(
+        with_kv.get.is_some(),
+        "WithKv should have a default get method"
+    );
+    assert!(
+        with_kv.list.is_some(),
+        "WithKv should have a default list method"
+    );
+
+    // The default data source should also have get/list
+    let default_ds = item.default_data_source().expect("Should have default ds");
+    assert!(default_ds.get.is_some());
+    assert!(default_ds.list.is_some());
 }
 
 #[sqlx::test]
@@ -324,7 +483,7 @@ async fn generate_default_data_sources(db: SqlitePool) {
         "Default data source should be public"
     );
     assert_eq!(
-        default_ds.name, "default",
+        default_ds.name, "Default",
         "Data source should be named 'default'"
     );
 

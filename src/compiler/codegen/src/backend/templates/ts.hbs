@@ -62,7 +62,9 @@ export namespace Cloesce {
         export abstract class {{this.name}} {
             readonly tag = "{{this.name}}";
             {{#each this.apis}}
+            {{#unless (is_crud_method this.name)}}
             abstract {{this.name}}({{#unless this.is_static}}self: Cloesce.Models.{{../name}}{{#if this.parameters}}, {{/if}}{{/unless}}{{#each this.parameters}}{{this.name}}: {{map_cidl_type this.cidl_type}}{{#unless @last}}, {{/unless}}{{/each}}): HttpResult<{{map_cidl_type this.return_type}}>;
+            {{/unless}}
             {{/each}}
         }
     {{/if}}

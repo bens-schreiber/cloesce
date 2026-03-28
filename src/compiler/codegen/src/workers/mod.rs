@@ -10,7 +10,8 @@ use crate::orm::select::SelectModel;
 // TODO: This is all hardcoded to TypeScript workers
 pub struct WorkersGenerator;
 impl WorkersGenerator {
-    /// Sets the [MediaType] of all ApiMethods; generates CRUD methods.
+    /// - Sets the [MediaType] of all ApiMethods
+    /// - Generates CRUD methods
     ///
     /// Public for tests
     pub fn finalize_api_methods(ast: &mut CloesceAst) {
@@ -36,20 +37,20 @@ impl WorkersGenerator {
             for crud in &model.cruds {
                 let method = match crud {
                     CrudKind::Get => {
+                        let mut seen = HashSet::new();
                         let mut parameters = vec![];
 
-                        for pk in &model.primary_columns {
-                            parameters.push(Field {
-                                name: pk.field.name.clone(),
-                                cidl_type: pk.field.cidl_type.clone(),
-                            });
-                        }
-
-                        for key in &model.key_fields {
-                            parameters.push(Field {
-                                name: key.clone(),
-                                cidl_type: CidlType::String,
-                            });
+                        for ds in &model.data_sources {
+                            if let Some(get) = &ds.get {
+                                for param in &get.parameters {
+                                    if seen.insert(param.name.clone()) {
+                                        parameters.push(Field {
+                                            name: param.name.clone(),
+                                            cidl_type: CidlType::nullable(param.cidl_type.clone()),
+                                        });
+                                    }
+                                }
+                            }
                         }
 
                         parameters.push(Field {
@@ -73,31 +74,28 @@ impl WorkersGenerator {
                         }
                     }
                     CrudKind::List => {
-                        let parameters = model
-                            .primary_columns
-                            .iter()
-                            .map(|pk| Field {
-                                // TODO: some nice naming config
-                                name: format!("lastSeen_{}", pk.field.name),
-                                cidl_type: CidlType::nullable(pk.field.cidl_type.clone()),
-                            })
-                            .chain(vec![
-                                Field {
-                                    name: "limit".into(),
-                                    cidl_type: CidlType::nullable(CidlType::Integer),
-                                },
-                                Field {
-                                    name: "offset".into(),
-                                    cidl_type: CidlType::nullable(CidlType::Integer),
-                                },
-                                Field {
-                                    name: "__datasource".into(),
-                                    cidl_type: CidlType::DataSource {
-                                        model_name: model.name.clone(),
-                                    },
-                                },
-                            ])
-                            .collect();
+                        let mut seen = HashSet::new();
+                        let mut parameters = vec![];
+
+                        for ds in &model.data_sources {
+                            if let Some(list) = &ds.list {
+                                for param in &list.parameters {
+                                    if seen.insert(param.name.clone()) {
+                                        parameters.push(Field {
+                                            name: param.name.clone(),
+                                            cidl_type: CidlType::nullable(param.cidl_type.clone()),
+                                        });
+                                    }
+                                }
+                            }
+                        }
+
+                        parameters.push(Field {
+                            name: "__datasource".into(),
+                            cidl_type: CidlType::DataSource {
+                                model_name: model.name.clone(),
+                            },
+                        });
 
                         ApiMethod {
                             name: "$list".into(),
@@ -159,7 +157,7 @@ impl WorkersGenerator {
         let Ok(include_sql) = SelectModel::query(&model.name, None, Some(tree.clone()), ast) else {
             // Model doesn't have any D1 fields, no SQL needed.
             return DataSource {
-                name: "default".into(),
+                name: "Default".into(),
                 tree,
                 is_private: false,
                 list: None,
@@ -167,130 +165,19 @@ impl WorkersGenerator {
             };
         };
 
-        let list = {
-            // The list method does a seek by primary key approach to pagination.
-            // That means it must take each primary key as a parameter (lastSeen_{pk})
-            // as well as a limit, then have the raw SQL query to select the next page based off those params.
-            let parameters = model
-                .primary_columns
-                .iter()
-                .map(|pk| Field {
-                    name: format!("lastSeen_{}", pk.field.name),
-                    cidl_type: CidlType::nullable(pk.field.cidl_type.clone()),
-                })
-                .chain(vec![Field {
-                    name: "limit".into(),
-                    cidl_type: CidlType::nullable(CidlType::Integer),
-                }])
-                .collect();
-
-            // WHERE (Model.pk1, Model.pk2, ...) > (?, ?, ...)
-            let where_clause = if model.primary_columns.len() == 1 {
-                let pk = &model.primary_columns[0];
-                format!(r#""{}"."{}""#, model.name, pk.field.name)
-            } else {
-                model
-                    .primary_columns
-                    .iter()
-                    .map(|pk| format!(r#""{}"."{}""#, model.name, pk.field.name))
-                    .collect::<Vec<String>>()
-                    .join(", ")
-            };
-
-            let params = (0..model.primary_columns.len())
-                .map(|_| "?".to_string())
-                .collect::<Vec<String>>()
-                .join(", ");
-
-            let where_expr = if model.primary_columns.len() == 1 {
-                format!("{where_clause} > ?")
-            } else {
-                format!("({where_clause}) > ({params})")
-            };
-
-            // ORDER BY Model.pk1 ASC, Model.pk2 ASC, ...
-            let order = model
-                .primary_columns
-                .iter()
-                .map(|pk| format!(r#""{}"."{}""#, model.name, pk.field.name))
-                .collect::<Vec<String>>()
-                .join(" ASC, ")
-                + " ASC";
-
-            let raw_sql = format!(
-                r#"
-                {include_sql}
-                WHERE {where_expr}
-                ORDER BY {order}
-                "#
-            );
-
-            DataSourceMethod {
-                parameters,
-                raw_sql,
-            }
-        };
-
-        let get = {
-            // Simple get by primary keys
-            let parameters = model
-                .primary_columns
-                .iter()
-                .map(|pk| Field {
-                    name: pk.field.name.clone(),
-                    cidl_type: pk.field.cidl_type.clone(),
-                })
-                .collect();
-
-            let where_clause = if model.primary_columns.len() == 1 {
-                let pk = &model.primary_columns[0];
-                format!(r#""{}"."{}""#, model.name, pk.field.name)
-            } else {
-                model
-                    .primary_columns
-                    .iter()
-                    .map(|pk| format!(r#""{}"."{}""#, model.name, pk.field.name))
-                    .collect::<Vec<String>>()
-                    .join(", ")
-            };
-
-            let params = (0..model.primary_columns.len())
-                .map(|_| "?".to_string())
-                .collect::<Vec<String>>()
-                .join(", ");
-
-            let raw_sql = if model.primary_columns.len() == 1 {
-                format!(
-                    r#"
-                {include_sql}
-                WHERE {where_clause} = ?
-                "#
-                )
-            } else {
-                format!(
-                    r#"
-                {include_sql}
-                WHERE ({where_clause}) = ({params})
-                "#
-                )
-            };
-
-            DataSourceMethod {
-                parameters,
-                raw_sql,
-            }
-        };
-
         DataSource {
-            name: "default".into(),
+            name: "Default".into(),
             tree,
             is_private: false,
-            list: Some(list),
-            get: Some(get),
+            list: Some(Self::build_default_list(model, &include_sql)),
+            get: Some(Self::build_default_get(model, &include_sql)),
         }
     }
 
     /// Generates a default [DataSource] for any model that doesn't have one.
+    /// Also ensures every existing data source has default get/list implementations
+    /// if they don't already define them.
+    ///
     /// Includes all KV, R2, 1:1, 1:N and M:N relationships by default.
     /// Does not include relationships after a 1:N or M:N to avoid infinite trees.
     ///
@@ -316,6 +203,43 @@ impl WorkersGenerator {
                 .unwrap()
                 .data_sources
                 .push(data_source);
+        }
+
+        // For each data source that lacks a `get` or `list` method, fills in
+        // the default implementation (primary key get, seek pagination list).
+        // Only applies to models with D1 bindings.
+        let fills: Vec<_> = ast
+            .models
+            .values()
+            .filter(|m| m.has_d1())
+            .flat_map(|model| {
+                model.data_sources.iter().enumerate().filter_map(|(i, ds)| {
+                    if ds.get.is_some() && ds.list.is_some() {
+                        return None;
+                    }
+                    let sql =
+                        SelectModel::query(&model.name, None, Some(ds.tree.clone()), ast).ok()?;
+                    let get = ds
+                        .get
+                        .is_none()
+                        .then(|| Self::build_default_get(model, &sql));
+                    let list = ds
+                        .list
+                        .is_none()
+                        .then(|| Self::build_default_list(model, &sql));
+                    Some((model.name.clone(), i, get, list))
+                })
+            })
+            .collect();
+
+        for (name, i, get, list) in fills {
+            let ds = &mut ast.models.get_mut(&name).unwrap().data_sources[i];
+            if let Some(g) = get {
+                ds.get = Some(g);
+            }
+            if let Some(l) = list {
+                ds.list = Some(l);
+            }
         }
 
         fn dfs(
@@ -371,6 +295,118 @@ impl WorkersGenerator {
             }
 
             visited.remove(current_model);
+        }
+    }
+
+    fn build_default_get(model: &Model, include_sql: &str) -> DataSourceMethod {
+        let parameters = model
+            .primary_columns
+            .iter()
+            .map(|pk| Field {
+                name: pk.field.name.clone(),
+                cidl_type: pk.field.cidl_type.clone(),
+            })
+            .chain(model.key_fields.iter().map(|key| Field {
+                name: key.clone(),
+                cidl_type: CidlType::String,
+            }))
+            .collect();
+
+        let where_clause = if model.primary_columns.len() == 1 {
+            let pk = &model.primary_columns[0];
+            format!(r#""{}"."{}""#, model.name, pk.field.name)
+        } else {
+            model
+                .primary_columns
+                .iter()
+                .map(|pk| format!(r#""{}"."{}""#, model.name, pk.field.name))
+                .collect::<Vec<String>>()
+                .join(", ")
+        };
+
+        let params = (0..model.primary_columns.len())
+            .map(|_| "?".to_string())
+            .collect::<Vec<String>>()
+            .join(", ");
+
+        let raw_sql = if model.primary_columns.len() == 1 {
+            format!(
+                r#"
+                {include_sql}
+                WHERE {where_clause} = ?
+                "#
+            )
+        } else {
+            format!(
+                r#"
+                {include_sql}
+                WHERE ({where_clause}) = ({params})
+                "#
+            )
+        };
+
+        DataSourceMethod {
+            parameters,
+            raw_sql,
+        }
+    }
+
+    fn build_default_list(model: &Model, include_sql: &str) -> DataSourceMethod {
+        let parameters = model
+            .primary_columns
+            .iter()
+            .map(|pk| Field {
+                name: format!("lastSeen_{}", pk.field.name),
+                cidl_type: CidlType::nullable(pk.field.cidl_type.clone()),
+            })
+            .chain(vec![Field {
+                name: "limit".into(),
+                cidl_type: CidlType::nullable(CidlType::Integer),
+            }])
+            .collect();
+
+        let where_clause = if model.primary_columns.len() == 1 {
+            let pk = &model.primary_columns[0];
+            format!(r#""{}"."{}""#, model.name, pk.field.name)
+        } else {
+            model
+                .primary_columns
+                .iter()
+                .map(|pk| format!(r#""{}"."{}""#, model.name, pk.field.name))
+                .collect::<Vec<String>>()
+                .join(", ")
+        };
+
+        let params = (0..model.primary_columns.len())
+            .map(|_| "?".to_string())
+            .collect::<Vec<String>>()
+            .join(", ");
+
+        let where_expr = if model.primary_columns.len() == 1 {
+            format!("{where_clause} > ?")
+        } else {
+            format!("({where_clause}) > ({params})")
+        };
+
+        let order = model
+            .primary_columns
+            .iter()
+            .map(|pk| format!(r#""{}"."{}""#, model.name, pk.field.name))
+            .collect::<Vec<String>>()
+            .join(" ASC, ")
+            + " ASC";
+
+        let raw_sql = format!(
+            r#"
+                {include_sql}
+                WHERE {where_expr}
+                ORDER BY {order}
+                "#
+        );
+
+        DataSourceMethod {
+            parameters,
+            raw_sql,
         }
     }
 

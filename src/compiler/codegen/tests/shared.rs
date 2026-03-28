@@ -164,6 +164,21 @@ model ModelWithCruds {
     id: int
 
     name: string
+
+    [foreign categoryId -> BasicModel::id]
+    categoryId: int
+}
+
+source WithName for ModelWithCruds {
+    include {}
+
+    sql get(name: string) {
+        "SELECT * FROM ModelWithCruds WHERE name = ?"
+    }
+
+    sql list(name: string, limit: int) {
+        "SELECT * FROM ModelWithCruds WHERE name LIKE ? LIMIT ?"
+    }
 }
 
 service BasicService {}

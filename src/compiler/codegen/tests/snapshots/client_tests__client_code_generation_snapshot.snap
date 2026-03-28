@@ -214,18 +214,19 @@ export class ModelWithCompositePk {
 export class ModelWithCruds {
   id: number;
   name: string;
+  categoryId: number;
 
   static async $get(
-    id: number,
-    __datasource: "default" = "default",
+    args: DataSources.ModelWithCruds.$get.WithName | DataSources.ModelWithCruds.$get.Default,
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<ModelWithCruds>> {
     const baseUrl = new URL(
       `http://example.com/path/to/api/ModelWithCruds/$get`
     );
 
-    baseUrl.searchParams.append("id", String(id));
-    baseUrl.searchParams.append("__datasource", String(__datasource));
+    if ("name" in args) baseUrl.searchParams.append("name", String((args as any).name));
+    if ("id" in args) baseUrl.searchParams.append("id", String((args as any).id));
+    baseUrl.searchParams.append("__datasource", args.kind);
 
     const res = await fetchImpl(baseUrl, {
       method: "Get",
@@ -239,8 +240,7 @@ export class ModelWithCruds {
     );
   }
   static async $save(
-    model: DeepPartial<ModelWithCruds>,
-    __datasource: "default" = "default",
+    args: DataSources.ModelWithCruds.$save,
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<ModelWithCruds>> {
     const baseUrl = new URL(
@@ -248,8 +248,8 @@ export class ModelWithCruds {
     );
     const payload: any = {};
 
-    payload["model"] = model;
-    baseUrl.searchParams.append("__datasource", String(__datasource));
+    payload["model"] = (args as any).model;
+    baseUrl.searchParams.append("__datasource", args.kind);
 
     const res = await fetchImpl(baseUrl, {
       method: "Post",
@@ -265,20 +265,17 @@ export class ModelWithCruds {
     );
   }
   static async $list(
-    lastSeen_id: number | null,
-    limit: number | null,
-    offset: number | null,
-    __datasource: "default" = "default",
+    args: DataSources.ModelWithCruds.$list.WithName | DataSources.ModelWithCruds.$list.Default,
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<ModelWithCruds[]>> {
     const baseUrl = new URL(
       `http://example.com/path/to/api/ModelWithCruds/$list`
     );
 
-    baseUrl.searchParams.append("lastSeen_id", String(lastSeen_id));
-    baseUrl.searchParams.append("limit", String(limit));
-    baseUrl.searchParams.append("offset", String(offset));
-    baseUrl.searchParams.append("__datasource", String(__datasource));
+    if ("name" in args) baseUrl.searchParams.append("name", String((args as any).name));
+    if ("limit" in args) baseUrl.searchParams.append("limit", String((args as any).limit));
+    if ("lastSeen_id" in args) baseUrl.searchParams.append("lastSeen_id", String((args as any).lastSeen_id));
+    baseUrl.searchParams.append("__datasource", args.kind);
 
     const res = await fetchImpl(baseUrl, {
       method: "Get",
@@ -634,5 +631,36 @@ export class HttpResult<T = unknown> {
       response.headers,
       await data(),
     );
+  }
+}
+
+export namespace DataSources {
+  export namespace ModelWithCruds {
+    export namespace $get {
+      export type WithName = {
+        kind: "WithName";
+        name: string;
+      }
+      export type Default = {
+        kind: "Default";
+        id: number;
+      }
+    }
+    export type $save = {
+      model: DeepPartial<ModelWithCruds>;
+      kind: "WithName" | "Default";
+    }
+    export namespace $list {
+      export type WithName = {
+        kind: "WithName";
+        name: string;
+        limit: number;
+      }
+      export type Default = {
+        kind: "Default";
+        lastSeen_id: number | null;
+        limit: number | null;
+      }
+    }
   }
 }
