@@ -1,6 +1,6 @@
 #![allow(unused_variables)]
 
-use ast::{CidlType, NavigationFieldKind};
+use ast::{CidlType, MediaType, NavigationFieldKind};
 use compiler_test::lex_and_parse;
 use frontend::{SymbolKind, WranglerEnvBindingKind};
 use semantic::{SemanticAnalysis, err::CompilerErrorKind};
@@ -787,6 +787,47 @@ fn api_errors() {
 }
 
 #[test]
+fn api_sets_media_types() {
+    // Arrange
+    let src = &with_env(
+        r#"
+        @d1(my_d1)
+        model User {
+            [primary id]
+            id: int
+            name: string
+        }
+
+        api User {
+            get streamInputOutput(s: stream) -> stream
+            get jsonInputOutput(j: json) -> json
+        }
+    "#,
+    );
+    let parse = lex_and_parse(src);
+
+    // Act
+    let (result, errors) = SemanticAnalysis::analyze(parse);
+
+    // Assert
+    assert_eq!(errors.len(), 0);
+    let user_apis = &result.models.first().unwrap().1.apis;
+    let stream_method = user_apis
+        .iter()
+        .find(|m| m.name == "streamInputOutput")
+        .unwrap();
+    assert!(matches!(stream_method.return_media, MediaType::Octet));
+    assert!(matches!(stream_method.parameters_media, MediaType::Octet));
+
+    let json_method = user_apis
+        .iter()
+        .find(|m| m.name == "jsonInputOutput")
+        .unwrap();
+    assert!(matches!(json_method.return_media, MediaType::Json));
+    assert!(matches!(json_method.parameters_media, MediaType::Json));
+}
+
+#[test]
 fn data_source_errors() {
     // Arrange
     let src = &with_env(
@@ -907,7 +948,7 @@ fn data_source_include_tree_kv_r2() {
     assert_eq!(errors.len(), 0);
 
     let user = result.models.get("User").unwrap();
-    assert_eq!(user.data_sources.len(), 1);
+    assert_eq!(user.data_sources.len(), 2); // including the implicit default source
     assert_eq!(user.data_sources[0].name, "WithKvR2");
 }
 
@@ -1019,6 +1060,37 @@ fn service_collects_api_blocks() {
 }
 
 #[test]
+fn poo_with_model_reference() {
+    let src = r#"
+        env { db: d1 }
+
+        @d1(db)
+        model BasicModel {
+            [primary id]
+            id: int
+        }
+
+        poo PooWithComposition {
+            field1: string
+            field2: BasicModel
+        }
+    "#;
+
+    let parse = lex_and_parse(src);
+    let (result, errors) = SemanticAnalysis::analyze(parse);
+
+    eprintln!("Errors: {:#?}", errors);
+    eprintln!(
+        "POO fields: {:#?}",
+        result.poos.get("PooWithComposition").map(|p| &p.fields)
+    );
+
+    assert_eq!(errors.len(), 0);
+    let poo = result.poos.get("PooWithComposition").unwrap();
+    assert_eq!(poo.fields.len(), 2);
+}
+
+#[test]
 fn cidl_types_resolve() {
     // Arrange
     let src = r#"
@@ -1065,32 +1137,4 @@ fn cidl_types_resolve() {
             },
         ]
     );
-}
-
-#[test]
-fn poo_with_model_reference() {
-    let src = r#"
-        env { db: d1 }
-
-        @d1(db)
-        model BasicModel {
-            [primary id]
-            id: int
-        }
-
-        poo PooWithComposition {
-            field1: string
-            field2: BasicModel
-        }
-    "#;
-
-    let parse = lex_and_parse(src);
-    let (result, errors) = SemanticAnalysis::analyze(parse);
-
-    eprintln!("Errors: {:#?}", errors);
-    eprintln!("POO fields: {:#?}", result.poos.get("PooWithComposition").map(|p| &p.fields));
-
-    assert_eq!(errors.len(), 0);
-    let poo = result.poos.get("PooWithComposition").unwrap();
-    assert_eq!(poo.fields.len(), 2);
 }

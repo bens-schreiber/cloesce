@@ -9,11 +9,15 @@ use std::collections::{BTreeMap, HashMap, VecDeque};
 
 use crate::{
     api::ApiAnalysis,
+    crud::CrudExpansion,
+    data_source::DataSourceExpansion,
     err::{CompilerErrorKind, ErrorSink},
     model::ModelAnalysis,
 };
 
 mod api;
+mod crud;
+mod data_source;
 pub mod err;
 mod model;
 
@@ -241,15 +245,21 @@ impl SemanticAnalysis {
             }
         }
 
-        let ast = CloesceAst {
+        let mut ast = CloesceAst {
             hash: 0,
             wrangler_env,
             models,
             services,
             poos,
         };
+        let errs = sink.drain();
+        if !errs.is_empty() {
+            return ((table, ast), errs);
+        }
 
-        ((table, ast), sink.drain())
+        DataSourceExpansion::expand(&mut ast);
+        CrudExpansion::expand(&mut ast);
+        ((table, ast), vec![])
     }
 
     pub fn analyze(parse: ParseAst) -> (CloesceAst, Vec<CompilerErrorKind>) {

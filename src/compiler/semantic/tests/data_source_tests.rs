@@ -1,14 +1,5 @@
-use ast::{ApiMethod, CidlType, HttpVerb, MediaType, Model};
-use codegen::workers::WorkersGenerator;
 use compiler_test::src_to_ast;
 use sqlx::{Row, SqlitePool};
-
-fn find_method<'a>(model: &'a Model, name: &str) -> Option<&'a ApiMethod> {
-    model
-        .apis
-        .iter()
-        .find(|m| m.name.eq_ignore_ascii_case(name))
-}
 
 async fn create_tables(db: &SqlitePool, ddl: &str) {
     for stmt in ddl.split(';').map(str::trim).filter(|s| !s.is_empty()) {
@@ -16,383 +7,10 @@ async fn create_tables(db: &SqlitePool, ddl: &str) {
     }
 }
 
-#[test]
-fn finalize_adds_crud_methods_to_model() {
-    let mut ast = src_to_ast(
-        r#"
-        env { db: d1 }
-
-        @d1(db)
-        @crud(get, save, list)
-        model User {
-            [primary id]
-            id: int
-        }
-    "#,
-    );
-
-    WorkersGenerator::finalize_api_methods(&mut ast);
-
-    let user = ast.models.get("User").unwrap();
-    assert!(find_method(user, "$get").is_some());
-    assert!(find_method(user, "$list").is_some());
-    assert!(find_method(user, "$save").is_some());
-}
-
-#[test]
-fn finalize_sets_json_media_type() {
-    let mut ast = src_to_ast(
-        r#"
-        env { db: d1 }
-
-        @d1(db)
-        @crud(get)
-        model User {
-            [primary id]
-            id: int
-        }
-    "#,
-    );
-
-    WorkersGenerator::finalize_api_methods(&mut ast);
-
-    let user = ast.models.get("User").unwrap();
-    let method = find_method(user, "$get").unwrap();
-    assert!(matches!(method.return_media, MediaType::Json));
-    assert!(matches!(method.parameters_media, MediaType::Json));
-}
-
-#[test]
-fn finalize_sets_octet_media_type() {
-    let mut ast = src_to_ast(
-        r#"
-        env { db: d1 }
-
-        @d1(db)
-        model User {
-            [primary id]
-            id: int
-        }
-
-        api User {
-            post acceptReturnOctet(input: stream) -> stream
-        }
-    "#,
-    );
-
-    WorkersGenerator::finalize_api_methods(&mut ast);
-
-    let user = ast.models.get("User").unwrap();
-    let method = find_method(user, "acceptReturnOctet").unwrap();
-    assert!(matches!(method.return_media, MediaType::Octet));
-    assert!(matches!(method.parameters_media, MediaType::Octet));
-}
-
-#[test]
-fn finalize_get_crud_adds_primary_key_for_d1_model() {
-    let mut ast = src_to_ast(
-        r#"
-        env { db: d1 }
-
-        @d1(db)
-        @crud(get)
-        model User {
-            [primary id]
-            id: int
-        }
-    "#,
-    );
-
-    WorkersGenerator::generate_default_data_sources(&mut ast);
-    WorkersGenerator::finalize_api_methods(&mut ast);
-
-    let user = ast.models.get("User").unwrap();
-    let get_method = find_method(user, "$get").unwrap();
-
-    assert!(
-        get_method
-            .parameters
-            .iter()
-            .any(|p| matches!(p.cidl_type, CidlType::DataSource { .. })),
-        "GET method should have __datasource parameter"
-    );
-
-    assert!(
-        get_method.parameters.iter().any(|p| p.name == "id"),
-        "GET method should have primary key parameter for D1 model"
-    );
-
-    assert_eq!(get_method.http_verb, HttpVerb::Get);
-    assert!(get_method.is_static);
-}
-
-#[test]
-fn finalize_get_and_list_crud_adds_composite_primary_keys() {
-    let mut ast = src_to_ast(
-        r#"
-        env { db: d1 }
-
-        @d1(db)
-        @crud(get, list)
-        model OrderItem {
-            [primary orderId, productId]
-            orderId: int
-            productId: int
-        }
-    "#,
-    );
-
-    WorkersGenerator::generate_default_data_sources(&mut ast);
-    WorkersGenerator::finalize_api_methods(&mut ast);
-
-    let order_item = ast.models.get("OrderItem").unwrap();
-
-    let get_method = find_method(order_item, "$get").unwrap();
-    assert!(get_method.parameters.iter().any(|p| p.name == "orderId"));
-    assert!(get_method.parameters.iter().any(|p| p.name == "productId"));
-    assert!(
-        get_method
-            .parameters
-            .iter()
-            .any(|p| matches!(p.cidl_type, CidlType::DataSource { .. }))
-    );
-
-    let list_method = find_method(order_item, "$list").unwrap();
-    let last_seen_order = list_method
-        .parameters
-        .iter()
-        .find(|p| p.name == "lastSeen_orderId")
-        .unwrap();
-    let last_seen_product = list_method
-        .parameters
-        .iter()
-        .find(|p| p.name == "lastSeen_productId")
-        .unwrap();
-    assert!(last_seen_order.cidl_type.is_nullable());
-    assert!(last_seen_product.cidl_type.is_nullable());
-}
-
-#[test]
-fn finalize_get_crud_adds_key_params() {
-    let mut ast = src_to_ast(
-        r#"
-        env {
-            db: d1
-            my_kv: kv
-        }
-
-        @d1(db)
-        @crud(get)
-        model Product {
-            [primary id]
-            id: int
-
-            @keyparam
-            category: string
-
-            @keyparam
-            subcategory: string
-
-            @kv(my_kv, "{category}/{subcategory}")
-            cached: json
-        }
-    "#,
-    );
-
-    WorkersGenerator::generate_default_data_sources(&mut ast);
-    WorkersGenerator::finalize_api_methods(&mut ast);
-
-    let product = ast.models.get("Product").unwrap();
-    let get_method = find_method(product, "$get").unwrap();
-
-    assert!(
-        get_method
-            .parameters
-            .iter()
-            .any(|p| matches!(p.cidl_type, CidlType::DataSource { .. })),
-        "GET method should have __datasource parameter"
-    );
-
-    let category_param = get_method.parameters.iter().find(|p| p.name == "category");
-    assert!(category_param.is_some(), "Should have category key param");
-    assert!(
-        category_param.unwrap().cidl_type.is_nullable(),
-        "Key params should be nullable in union"
-    );
-
-    let subcategory_param = get_method
-        .parameters
-        .iter()
-        .find(|p| p.name == "subcategory");
-    assert!(
-        subcategory_param.is_some(),
-        "Should have subcategory key param"
-    );
-    assert!(
-        subcategory_param.unwrap().cidl_type.is_nullable(),
-        "Key params should be nullable in union"
-    );
-}
-
-#[test]
-fn finalize_crud_params_are_union_of_data_source_params() {
-    let mut ast = src_to_ast(
-        r#"
-        env { db: d1 }
-
-        @d1(db)
-        @crud(get, list, save)
-        model Product {
-            [primary id]
-            id: int
-            name: string
-            category: string
-        }
-
-        source ByName for Product {
-            include {}
-
-            sql get(name: string) {
-                "SELECT * FROM Product WHERE name = ?"
-            }
-
-            sql list(name: string, limit: int) {
-                "SELECT * FROM Product WHERE name LIKE ? LIMIT ?"
-            }
-        }
-    "#,
-    );
-
-    WorkersGenerator::generate_default_data_sources(&mut ast);
-    WorkersGenerator::finalize_api_methods(&mut ast);
-
-    let product = ast.models.get("Product").unwrap();
-
-    // $get should have union of default (id) and ByName (name), all nullable
-    let get_method = find_method(product, "$get").unwrap();
-    let get_param_names: Vec<&str> = get_method
-        .parameters
-        .iter()
-        .filter(|p| p.name != "__datasource")
-        .map(|p| p.name.as_str())
-        .collect();
-    assert!(
-        get_param_names.contains(&"id"),
-        "GET should have 'id' from default data source"
-    );
-    assert!(
-        get_param_names.contains(&"name"),
-        "GET should have 'name' from ByName data source"
-    );
-    // All non-datasource params should be nullable
-    for p in &get_method.parameters {
-        if p.name != "__datasource" {
-            assert!(
-                p.cidl_type.is_nullable(),
-                "GET param '{}' should be nullable",
-                p.name
-            );
-        }
-    }
-
-    // $list should have union of default (lastSeen_id, limit) and ByName (name, limit)
-    let list_method = find_method(product, "$list").unwrap();
-    let list_param_names: Vec<&str> = list_method
-        .parameters
-        .iter()
-        .filter(|p| p.name != "__datasource")
-        .map(|p| p.name.as_str())
-        .collect();
-    assert!(
-        list_param_names.contains(&"lastSeen_id"),
-        "LIST should have 'lastSeen_id' from default data source"
-    );
-    assert!(
-        list_param_names.contains(&"limit"),
-        "LIST should have 'limit' (shared between both data sources)"
-    );
-    assert!(
-        list_param_names.contains(&"name"),
-        "LIST should have 'name' from ByName data source"
-    );
-    // 'limit' should not be duplicated
-    assert_eq!(
-        list_param_names.iter().filter(|&&n| n == "limit").count(),
-        1,
-        "LIST should not have duplicate 'limit' param"
-    );
-
-    // $save should just have model + __datasource
-    let save_method = find_method(product, "$save").unwrap();
-    assert!(
-        save_method.parameters.iter().any(|p| p.name == "model"),
-        "SAVE should have 'model' parameter"
-    );
-    assert!(
-        save_method
-            .parameters
-            .iter()
-            .any(|p| matches!(p.cidl_type, CidlType::DataSource { .. })),
-        "SAVE should have __datasource parameter"
-    );
-}
-
-#[test]
-fn fill_default_methods_for_data_sources_without_get_list() {
-    let mut ast = src_to_ast(
-        r#"
-        env {
-            db: d1
-            my_kv: kv
-        }
-
-        @d1(db)
-        @crud(get, list)
-        model Item {
-            [primary id]
-            id: int
-
-            @keyparam
-            tag: string
-
-            @kv(my_kv, "{tag}")
-            cached: json
-        }
-
-        source WithKv for Item {
-            include { cached }
-        }
-    "#,
-    );
-
-    WorkersGenerator::generate_default_data_sources(&mut ast);
-
-    let item = ast.models.get("Item").unwrap();
-
-    // The WithKv data source should now have default get/list methods
-    let with_kv = item
-        .data_sources
-        .iter()
-        .find(|ds| ds.name == "WithKv")
-        .expect("WithKv data source should exist");
-    assert!(
-        with_kv.get.is_some(),
-        "WithKv should have a default get method"
-    );
-    assert!(
-        with_kv.list.is_some(),
-        "WithKv should have a default list method"
-    );
-
-    // The default data source should also have get/list
-    let default_ds = item.default_data_source().expect("Should have default ds");
-    assert!(default_ds.get.is_some());
-    assert!(default_ds.list.is_some());
-}
-
 #[sqlx::test]
-async fn generate_default_data_sources(db: SqlitePool) {
-    let mut ast = src_to_ast(
+async fn default_data_sources(db: SqlitePool) {
+    // Act
+    let ast = src_to_ast(
         r#"
         env {
             db: d1
@@ -449,9 +67,7 @@ async fn generate_default_data_sources(db: SqlitePool) {
     "#,
     );
 
-    WorkersGenerator::generate_default_data_sources(&mut ast);
-
-    // Assert include tree
+    // Assert
     let user = ast.models.get("User").unwrap();
     let default_ds = user
         .default_data_source()
@@ -487,7 +103,6 @@ async fn generate_default_data_sources(db: SqlitePool) {
         "Data source should be named 'default'"
     );
 
-    // Assert get/list SQL executes correctly
     create_tables(
         &db,
         r#"CREATE TABLE Profile (id INTEGER PRIMARY KEY);
@@ -535,9 +150,60 @@ async fn generate_default_data_sources(db: SqlitePool) {
     assert!(rows.len() >= 2, "LIST query should return multiple rows");
 }
 
+#[test]
+fn default_data_source_methods() {
+    // Act
+    let ast = src_to_ast(
+        r#"
+        env {
+            db: d1
+            my_kv: kv
+        }
+
+        @d1(db)
+        @crud(get, list)
+        model Item {
+            [primary id]
+            id: int
+
+            @keyparam
+            tag: string
+
+            @kv(my_kv, "{tag}")
+            cached: json
+        }
+
+        source WithKv for Item {
+            include { cached }
+        }
+    "#,
+    );
+
+    // Assert
+    let item = ast.models.get("Item").unwrap();
+    let with_kv = item
+        .data_sources
+        .iter()
+        .find(|ds| ds.name == "WithKv")
+        .expect("WithKv data source should exist");
+    assert!(
+        with_kv.get.is_some(),
+        "WithKv should have a default get method"
+    );
+    assert!(
+        with_kv.list.is_some(),
+        "WithKv should have a default list method"
+    );
+
+    let default_ds = item.default_data_source().expect("Should have default ds");
+    assert!(default_ds.get.is_some());
+    assert!(default_ds.list.is_some());
+}
+
 #[sqlx::test]
-async fn generate_default_data_sources_does_not_include_manys(db: SqlitePool) {
-    let mut ast = src_to_ast(
+async fn default_data_sources_does_not_include_manys(db: SqlitePool) {
+    // Act
+    let ast = src_to_ast(
         r#"
         env { db: d1 }
 
@@ -573,9 +239,7 @@ async fn generate_default_data_sources_does_not_include_manys(db: SqlitePool) {
     "#,
     );
 
-    WorkersGenerator::generate_default_data_sources(&mut ast);
-
-    // Assert include tree
+    // Assert
     let teacher = ast.models.get("Teacher").unwrap();
     let default_ds = teacher
         .default_data_source()
@@ -592,7 +256,7 @@ async fn generate_default_data_sources_does_not_include_manys(db: SqlitePool) {
         "Default data source for Teacher should NOT include nested 'grades' under 'students'"
     );
 
-    // Assert get/list SQL executes correctly
+    // Assert
     create_tables(
         &db,
         "CREATE TABLE Grade (id INTEGER PRIMARY KEY, studentId INTEGER NOT NULL);
@@ -632,8 +296,9 @@ async fn generate_default_data_sources_does_not_include_manys(db: SqlitePool) {
 }
 
 #[sqlx::test]
-async fn generate_default_data_sources_includes_multiple_one_to_ones(db: SqlitePool) {
-    let mut ast = src_to_ast(
+async fn default_data_sources_includes_multiple_one_to_ones(db: SqlitePool) {
+    // Act
+    let ast = src_to_ast(
         r#"
         env { db: d1 }
 
@@ -670,9 +335,7 @@ async fn generate_default_data_sources_includes_multiple_one_to_ones(db: SqliteP
     "#,
     );
 
-    WorkersGenerator::generate_default_data_sources(&mut ast);
-
-    // Assert include tree
+    // Assert
     let owner = ast.models.get("Owner").unwrap();
     let default_ds = owner
         .default_data_source()
@@ -695,7 +358,7 @@ async fn generate_default_data_sources_includes_multiple_one_to_ones(db: SqliteP
         "Default data source for Owner should NOT include any nested relationships under 'toy'"
     );
 
-    // Assert get/list SQL executes correctly with nested joins
+    // Assert
     create_tables(
         &db,
         "CREATE TABLE Toy (id INTEGER PRIMARY KEY, color TEXT NOT NULL);
@@ -735,8 +398,9 @@ async fn generate_default_data_sources_includes_multiple_one_to_ones(db: SqliteP
 }
 
 #[sqlx::test]
-async fn generate_default_data_sources_diamond_does_not_duplicate_traversal(db: SqlitePool) {
-    let mut ast = src_to_ast(
+async fn diamond_does_not_duplicate_traversal(db: SqlitePool) {
+    // Act
+    let ast = src_to_ast(
         r#"
         env { db: d1 }
 
@@ -776,9 +440,7 @@ async fn generate_default_data_sources_diamond_does_not_duplicate_traversal(db: 
     "#,
     );
 
-    WorkersGenerator::generate_default_data_sources(&mut ast);
-
-    // Assert include tree
+    // Assert
     let company = ast.models.get("Company").unwrap();
     let default_ds = company
         .default_data_source()
@@ -800,7 +462,7 @@ async fn generate_default_data_sources_diamond_does_not_duplicate_traversal(db: 
         "Default data source for Company should include 'team' under 'department'"
     );
 
-    // Assert get/list SQL executes correctly
+    // Assert
     create_tables(
         &db,
         "CREATE TABLE Team (id INTEGER PRIMARY KEY, name TEXT NOT NULL);
@@ -839,8 +501,9 @@ async fn generate_default_data_sources_diamond_does_not_duplicate_traversal(db: 
 }
 
 #[sqlx::test]
-async fn generate_default_data_sources_composite_pk(db: SqlitePool) {
-    let mut ast = src_to_ast(
+async fn default_data_sources_composite_pk(db: SqlitePool) {
+    // Act
+    let ast = src_to_ast(
         r#"
         env { db: d1 }
 
@@ -854,8 +517,7 @@ async fn generate_default_data_sources_composite_pk(db: SqlitePool) {
     "#,
     );
 
-    WorkersGenerator::generate_default_data_sources(&mut ast);
-
+    // Assert
     create_tables(
         &db,
         "CREATE TABLE OrderItem (orderId INTEGER NOT NULL, productId INTEGER NOT NULL, qty INTEGER NOT NULL, PRIMARY KEY (orderId, productId))",

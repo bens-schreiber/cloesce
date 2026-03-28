@@ -95,10 +95,10 @@ impl ApiAnalysis {
         };
 
         // Validate return type
-        let return_type = self.return_type(method, table);
+        let (return_type, return_media) = self.return_type(method, table);
 
         // Validate parameters
-        let parameters = self.parameters(method, table);
+        let (parameters, parameters_media) = self.parameters(method, table);
 
         let data_source = if method.is_static {
             None
@@ -111,14 +111,18 @@ impl ApiAnalysis {
             is_static: method.is_static,
             data_source,
             http_verb: method.http_verb,
-            return_media: MediaType::default(),
+            return_media,
             return_type,
-            parameters_media: MediaType::default(),
+            parameters_media,
             parameters,
         })
     }
 
-    fn return_type(&mut self, method: &ApiBlockMethod, table: &SymbolTable) -> CidlType {
+    fn return_type(
+        &mut self,
+        method: &ApiBlockMethod,
+        table: &SymbolTable,
+    ) -> (CidlType, MediaType) {
         let err = CompilerErrorKind::ApiInvalidReturn {
             method: method.symbol.clone(),
         };
@@ -127,8 +131,13 @@ impl ApiAnalysis {
             Ok(t) => t,
             Err(e) => {
                 self.sink.push(e);
-                return CidlType::Void;
+                return (CidlType::Void, MediaType::default());
             }
+        };
+
+        let return_media = match resolved_type.root_type() {
+            CidlType::Stream => MediaType::Octet,
+            _ => MediaType::Json,
         };
 
         match resolved_type.root_type() {
@@ -148,12 +157,17 @@ impl ApiAnalysis {
             _ => {}
         }
 
-        CidlType::http(resolved_type)
+        (CidlType::http(resolved_type), return_media)
     }
 
-    fn parameters(&mut self, method: &ApiBlockMethod, table: &SymbolTable) -> Vec<Field> {
+    fn parameters(
+        &mut self,
+        method: &ApiBlockMethod,
+        table: &SymbolTable,
+    ) -> (Vec<Field>, MediaType) {
         let mut params = Vec::new();
 
+        let mut has_stream = false;
         for param in &method.parameters {
             let err = CompilerErrorKind::ApiInvalidParam {
                 method: method.symbol.clone(),
@@ -188,6 +202,7 @@ impl ApiAnalysis {
                 }
 
                 CidlType::Stream => {
+                    has_stream = true;
                     let required_params = method
                         .parameters
                         .iter()
@@ -215,6 +230,13 @@ impl ApiAnalysis {
             });
         }
 
-        params
+        (
+            params,
+            if has_stream {
+                MediaType::Octet
+            } else {
+                MediaType::Json
+            },
+        )
     }
 }

@@ -7,8 +7,10 @@ edition = "2024"
 ast = { path = "../ast" }
 frontend = { path = "../frontend" }
 indexmap = { workspace = true }
+codegen = { path = "../codegen" }
 
 [dev-dependencies]
+sqlx = { version = "0.8", features = ["sqlite", "runtime-tokio"] }
 compiler-test = { path = "../compiler-test" }
 # serde_json = { workspace = true }
 # wrangler = { path = "../wrangler" }

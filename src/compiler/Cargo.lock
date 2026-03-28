@@ -1339,9 +1339,11 @@ name = "semantic"
 version = "0.0.1"
 dependencies = [
  "ast",
+ "codegen",
  "compiler-test",
  "frontend",
  "indexmap",
+ "sqlx",
 ]
 
 [[package]]
