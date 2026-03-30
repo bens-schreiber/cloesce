@@ -1,13 +1,6 @@
 [workspace]
+members = ["cli", "ast", "frontend", "semantic", "codegen", "compiler-test"]
 resolver = "3"
-members = [
-    # "cli",
-    "ast",
-    "codegen",
-    "semantic",
-    "compiler-test",
-    "frontend",
-]
 
 [workspace.dependencies]
 indexmap = { version = "2.13.0", features = ["serde"] }

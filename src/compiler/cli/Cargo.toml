@@ -5,15 +5,18 @@ edition = "2024"
 
 [dependencies]
 ast = { path = "../ast" }
+ariadne = "0.6.0"
 clap = { version = "4.5.60", features = ["derive"] }
-migrations = { path = "../migrations" }
-client = { path = "../client" }
-workers = { path = "../workers" }
-wrangler = { path = "../wrangler" }
+codegen = { path = "../codegen" }
+frontend = { path = "../frontend" }
 semantic = { path = "../semantic" }
 tracing-subscriber = "0.3.22"
 tracing = { workspace = true }
 
 [[bin]]
-name = "cli"
-path = "src/main.rs"
+name = "compile"
+path = "bin/compile.rs"
+
+[[bin]]
+name = "migrate"
+path = "bin/migrate.rs"

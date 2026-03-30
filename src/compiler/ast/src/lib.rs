@@ -214,6 +214,8 @@ pub enum CrudKind {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct DataSourceMethod {
     pub parameters: Vec<Field>,
+
+    #[serde(skip)]
     pub raw_sql: String,
 }
 
@@ -401,7 +403,7 @@ impl CloesceAst {
         serde_json::to_string_pretty(&migrations_ast).expect("serialize migrations ast to work")
     }
 
-    /// Traverses the AST setting the `hash` field as a merkle hash, meaning a parents hash depends on it's childrens hashes.
+    /// Traverses the AST setting the `hash` field as a merkle hash (a parents hash depends on it's childrens hashes)
     pub fn set_merkle_hash(&mut self) {
         if self.hash != 0u64 {
             // If the root is hashed, it's safe to assume all children are hashed.

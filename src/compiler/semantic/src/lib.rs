@@ -259,6 +259,8 @@ impl SemanticAnalysis {
 
         DataSourceExpansion::expand(&mut ast);
         CrudExpansion::expand(&mut ast);
+        ast.set_merkle_hash();
+
         ((table, ast), vec![])
     }
 

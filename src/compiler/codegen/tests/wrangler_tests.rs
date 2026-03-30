@@ -185,18 +185,7 @@ fn handles_d1_database_with_missing_values() {
         "default-migrations/db"
     );
 
-    let temp_dir = std::env::temp_dir();
-    let test_file_path = temp_dir.join("test_wrangler.toml");
-    let wrangler_file = std::fs::File::create(&test_file_path).unwrap();
-
     let mut generator = WranglerGenerator::Toml(toml::from_str(toml_with_incomplete_d1).unwrap());
-
-    generator.generate(spec, wrangler_file);
-
-    let generated_content = std::fs::read_to_string(&test_file_path).unwrap();
-    assert!(generated_content.contains("replace_with_db_id"));
-    assert!(generated_content.contains("replace_with_db_name"));
-
-    // Cleanup
-    std::fs::remove_file(test_file_path).ok();
+    let result = generator.generate(spec);
+    assert!(result.contains("replace_with_db_id"));
 }

@@ -1,5 +1,4 @@
 use std::path::Path;
-use std::{fs::File, io::Write};
 
 use ast::{CidlType, CloesceAst, D1Database, KVNamespace, WranglerSpec};
 
@@ -38,7 +37,7 @@ impl WranglerGenerator {
         }
     }
 
-    pub fn generate(&mut self, spec: WranglerSpec, mut wrangler_file: File) {
+    pub fn generate(&mut self, spec: WranglerSpec) -> String {
         if let Some(name) = &spec.name {
             self.insert("name".into(), name.clone());
         }
@@ -260,16 +259,12 @@ impl WranglerGenerator {
             }
         }
 
-        let data = match self {
+        match self {
             WranglerGenerator::Json(val) => {
                 serde_json::to_string_pretty(val).expect("JSON to serialize")
             }
             WranglerGenerator::Toml(val) => toml::to_string_pretty(val).expect("TOML to serialize"),
-        };
-
-        let _ = wrangler_file
-            .write(data.as_bytes())
-            .expect("Failed to write data to the provided wrangler path");
+        }
     }
 
     /// Takes the entire Wrangler config and interprets only a [WranglerSpec]
