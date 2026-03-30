@@ -225,7 +225,7 @@ pub struct DataSource {
     pub tree: IncludeTree,
     pub list: Option<DataSourceMethod>,
     pub get: Option<DataSourceMethod>,
-    pub is_private: bool,
+    pub is_internal: bool,
 }
 
 #[derive(Serialize, Deserialize, Debug)]

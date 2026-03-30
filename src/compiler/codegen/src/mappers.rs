@@ -107,7 +107,7 @@ impl LanguageTypeMapper for TypeScriptMapper {
 
                 let joined = ds
                     .iter()
-                    .filter_map(|d| (!d.is_private).then_some(format!("\"{}\"", d.name)))
+                    .filter_map(|d| (!d.is_internal).then_some(format!("\"{}\"", d.name)))
                     .collect::<Vec<_>>()
                     .join(" | ");
 

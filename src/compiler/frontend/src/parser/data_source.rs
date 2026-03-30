@@ -98,9 +98,15 @@ pub fn data_source_block<'t>() -> impl Parser<'t, &'t [Token], DataSourceBlock, 
         )
         .then(sql_block);
 
+    // @internal
+    let internal_decorator = just(Token::At)
+        .ignore_then(just(Token::Ident("internal".into())))
+        .ignored();
+
     // source SourceName for ModelName { ... }
-    just(Token::Source)
-        .ignore_then(select! { Token::Ident(name) => name })
+    internal_decorator
+        .or_not()
+        .then(just(Token::Source).ignore_then(select! { Token::Ident(name) => name }))
         .then_ignore(just(Token::For))
         .then(select! { Token::Ident(model) => model })
         .then(
@@ -110,7 +116,7 @@ pub fn data_source_block<'t>() -> impl Parser<'t, &'t [Token], DataSourceBlock, 
                 .delimited_by(just(Token::LBrace), just(Token::RBrace)),
         )
         .map_with(
-            |((name, model), ((include_entries, get_method), list_method)), e| {
+            |(((is_internal, name), model), ((include_entries, get_method), list_method)), e| {
                 let tree = IncludeTree(include_entries.into_iter().collect());
                 let set_parent = |mut params: Vec<Symbol>, method: &str| -> Vec<Symbol> {
                     let parent = format!("{model}::{name}::{method}");
@@ -142,6 +148,7 @@ pub fn data_source_block<'t>() -> impl Parser<'t, &'t [Token], DataSourceBlock, 
                     tree,
                     get,
                     list,
+                    is_internal: is_internal.is_some(),
                 }
             },
         )

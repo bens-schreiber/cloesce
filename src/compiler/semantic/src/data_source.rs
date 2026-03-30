@@ -15,7 +15,7 @@ impl DataSourceExpansion {
             return DataSource {
                 name: "Default".into(),
                 tree,
-                is_private: false,
+                is_internal: false,
                 list: None,
                 get: None,
             };
@@ -24,7 +24,7 @@ impl DataSourceExpansion {
         DataSource {
             name: "Default".into(),
             tree,
-            is_private: false,
+            is_internal: false,
             list: Some(Self::build_default_list(model, &include_sql)),
             get: Some(Self::build_default_get(model, &include_sql)),
         }

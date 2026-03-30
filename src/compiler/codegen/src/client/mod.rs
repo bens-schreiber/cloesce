@@ -135,7 +135,7 @@ fn crud_args_type_helper(
     } else {
         let parts: Vec<String> = data_sources
             .iter()
-            .filter(|ds| !ds.is_private)
+            .filter(|ds| !ds.is_internal)
             .map(|ds| format!("DataSources.{}.{}.{}", model_name, method_name, ds.name))
             .collect();
         out.write(&parts.join(" | "))?;
@@ -156,7 +156,7 @@ fn ds_kind_union_helper(
 
     let parts: Vec<String> = data_sources
         .iter()
-        .filter(|ds| !ds.is_private)
+        .filter(|ds| !ds.is_internal)
         .map(|ds| format!("\"{}\"", ds.name))
         .collect();
 

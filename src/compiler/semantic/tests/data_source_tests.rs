@@ -95,8 +95,8 @@ async fn default_data_sources(db: SqlitePool) {
         "Default data source should include R2 object 'userDocuments'"
     );
     assert!(
-        !default_ds.is_private,
-        "Default data source should be public"
+        !default_ds.is_internal,
+        "Default data source should not be internal"
     );
     assert_eq!(
         default_ds.name, "Default",

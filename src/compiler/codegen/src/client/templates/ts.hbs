@@ -412,7 +412,7 @@ export namespace DataSources {
 {{#if (is_crud_kind this "Get")}}
     export namespace $get {
 {{#each ../data_sources}}
-{{#unless this.is_private}}
+{{#unless this.is_internal}}
       export type {{this.name}} = {
         kind: "{{this.name}}";
 {{#if this.get}}
@@ -428,7 +428,7 @@ export namespace DataSources {
 {{#if (is_crud_kind this "List")}}
     export namespace $list {
 {{#each ../data_sources}}
-{{#unless this.is_private}}
+{{#unless this.is_internal}}
       export type {{this.name}} = {
         kind: "{{this.name}}";
 {{#if this.list}}

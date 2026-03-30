@@ -115,6 +115,7 @@ pub struct DataSourceBlock {
     pub tree: IncludeTree,
     pub list: Option<DataSourceBlockMethod>,
     pub get: Option<DataSourceBlockMethod>,
+    pub is_internal: bool,
 }
 
 pub struct NavigationTag {
