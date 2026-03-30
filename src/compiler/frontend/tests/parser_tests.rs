@@ -661,7 +661,7 @@ fn data_source_block() {
     assert!(id_subtree.0.is_empty());
 
     let get = user_source.get.as_ref().expect("get method to be present");
-    assert_eq!(get.raw_sql, "\"SELECT * FROM users WHERE id = ?\"");
+    assert_eq!(get.raw_sql, "SELECT * FROM users WHERE id = ?");
     assert_eq!(get.parameters.len(), 1);
     assert_eq!(get.parameters[0].name, "id");
     assert_eq!(get.parameters[0].cidl_type, CidlType::Integer);
@@ -670,7 +670,7 @@ fn data_source_block() {
         .list
         .as_ref()
         .expect("list method to be present");
-    assert_eq!(list.raw_sql, "\"SELECT * FROM users LIMIT ? OFFSET ?\"");
+    assert_eq!(list.raw_sql, "SELECT * FROM users LIMIT ? OFFSET ?");
     assert_eq!(list.parameters.len(), 2);
     assert_eq!(list.parameters[0].name, "offset");
     assert_eq!(list.parameters[0].cidl_type, CidlType::Integer);

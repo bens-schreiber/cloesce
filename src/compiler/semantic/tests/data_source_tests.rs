@@ -561,3 +561,107 @@ async fn default_data_sources_composite_pk(db: SqlitePool) {
         .unwrap();
     assert_eq!(rows.len(), 3);
 }
+
+#[test]
+fn resolve_sql_params() {
+    // Act
+    let ast = src_to_ast(
+        r#"
+        env { db: d1 }
+
+        @d1(db)
+        model Item {
+            [primary id]
+            id: int
+            price: int
+        }
+
+        source ById for Item {
+            include {}
+            sql get(itemId: int) { "SELECT * FROM Item WHERE id = $itemId AND id != $itemId" }
+        }
+
+        source ByPriceRange for Item {
+            include {}
+            sql list(minPrice: int, maxPrice: int, limit: int) {
+                "SELECT * FROM Item WHERE price >= $minPrice AND price <= $maxPrice LIMIT $limit"
+            }
+        }
+    "#,
+    );
+
+    // Assert
+    let item = ast.models.get("Item").unwrap();
+    let by_id = item
+        .data_sources
+        .iter()
+        .find(|ds| ds.name == "ById")
+        .unwrap();
+    let get_sql = &by_id.get.as_ref().unwrap().raw_sql;
+    assert!(!get_sql.contains("$itemId"), "got: {get_sql}");
+    assert_eq!(get_sql.matches("?1").count(), 2, "got: {get_sql}");
+
+    let by_range = item
+        .data_sources
+        .iter()
+        .find(|ds| ds.name == "ByPriceRange")
+        .unwrap();
+    let list_sql = &by_range.list.as_ref().unwrap().raw_sql;
+    assert!(!list_sql.contains('$'), "got: {list_sql}");
+    let pos = |n: &str| list_sql.find(n).unwrap();
+    assert!(
+        pos("?1") < pos("?2") && pos("?2") < pos("?3"),
+        "got: {list_sql}"
+    );
+}
+
+#[sqlx::test]
+async fn include_placeholder_expands_to_select(db: SqlitePool) {
+    // Arrange
+    let ast = src_to_ast(
+        r#"
+        env { db: d1 }
+
+        @d1(db)
+        model Post {
+            [primary id]
+            id: int
+            title: string
+        }
+
+        source Recent for Post {
+            include {}
+            sql get(id: int) { "$include WHERE Post.id = $id" }
+        }
+    "#,
+    );
+
+    let ds = ast
+        .models
+        .get("Post")
+        .unwrap()
+        .data_sources
+        .iter()
+        .find(|ds| ds.name == "Recent")
+        .unwrap();
+
+    let raw_sql = &ds.get.as_ref().unwrap().raw_sql;
+
+    // $include should be gone and replaced with a SELECT statement
+    assert!(!raw_sql.contains("$include"), "got: {raw_sql}");
+    assert!(raw_sql.to_uppercase().contains("SELECT"), "got: {raw_sql}");
+    // $id should be resolved to ?1
+    assert!(!raw_sql.contains("$id"), "got: {raw_sql}");
+    assert!(raw_sql.contains("?1"), "got: {raw_sql}");
+
+    // The expanded SQL should be executable
+    create_tables(&db, "CREATE TABLE Post (id INTEGER PRIMARY KEY, title TEXT NOT NULL)").await;
+    sqlx::query("INSERT INTO Post (id, title) VALUES (1, 'hello'), (2, 'world')")
+        .execute(&db)
+        .await
+        .unwrap();
+
+    let row = sqlx::query(raw_sql).bind(1).fetch_one(&db).await.unwrap();
+    assert_eq!(row.get::<u32, _>("id"), 1);
+    assert_eq!(row.get::<String, _>("title"), "hello");
+}

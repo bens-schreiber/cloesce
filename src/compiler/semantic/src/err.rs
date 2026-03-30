@@ -188,6 +188,14 @@ pub enum CompilerErrorKind {
         param: Symbol,
     },
 
+    /// A data source method SQL references a `$name` placeholder that does not match any parameter
+    /// (and is not the reserved `$include` placeholder).
+    DataSourceUnknownSqlParam {
+        source: Symbol,
+        name: String,
+    },
+
+
     /// A model has a CRUD operation that is not supported for its backing store.
     UnsupportedCrudOperation {
         model: Symbol,

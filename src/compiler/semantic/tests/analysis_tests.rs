@@ -881,6 +881,12 @@ fn data_source_errors() {
             }
         }
 
+        // SQL references $ghost which is not a declared param
+        source UnknownSqlParam for User {
+            include {}
+            sql get(id: int) { "($include) WHERE id = $ghost" }
+        }
+
     "#,
     );
     let parse = lex_and_parse(src);
@@ -914,6 +920,12 @@ fn data_source_errors() {
         errors,
         CompilerErrorKind::DataSourceInvalidMethodParam { .. }
     );
+
+    // UnknownSqlParam: $ghost is not a declared param
+    assert!(errors.iter().any(|e| matches!(
+        e,
+        CompilerErrorKind::DataSourceUnknownSqlParam { name, .. } if name == "ghost"
+    )));
 }
 
 #[test]

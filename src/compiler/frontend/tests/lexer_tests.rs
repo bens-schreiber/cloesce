@@ -21,7 +21,7 @@ fn token_regexes_simple() {
         ("->", Token::Arrow),
         ("::", Token::DoubleColon),
         ("@", Token::At),
-        ("\"hello\"", Token::StringLit("\"hello\"".into())),
+        ("\"hello\"", Token::StringLit("hello".into())),
         ("123", Token::IntLit(123)),
         ("1_000_000", Token::IntLit(1_000_000)),
         ("3.14", Token::DoubleLit(3.14)),

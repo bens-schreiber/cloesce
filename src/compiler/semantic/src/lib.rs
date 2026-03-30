@@ -368,6 +368,26 @@ impl SemanticAnalysis {
                     cidl_type: param.cidl_type.clone(),
                 });
             }
+
+            // Verify every $name placeholder in the SQL is either $include or matches a parameter.
+            let param_names: std::collections::HashSet<&str> =
+                parameters.iter().map(|p| p.name.as_str()).collect();
+            let mut chars = method.raw_sql.chars().peekable();
+            while let Some(ch) = chars.next() {
+                if ch == '$' {
+                    let name: String =
+                        std::iter::from_fn(|| chars.next_if(|c| c.is_alphanumeric() || *c == '_'))
+                            .collect();
+                    if !name.is_empty() && name != "include" && !param_names.contains(name.as_str())
+                    {
+                        sink.push(CompilerErrorKind::DataSourceUnknownSqlParam {
+                            source: source_sym.clone(),
+                            name,
+                        });
+                    }
+                }
+            }
+
             Some(DataSourceMethod {
                 parameters,
                 raw_sql: method.raw_sql.clone(),

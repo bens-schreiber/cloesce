@@ -142,68 +142,103 @@ impl DataSourceExpansion {
         }
     }
 
+    /// Resolves `$parameterName` placeholders in the raw SQL to positional `?N` syntax for prepared statements.
+    pub fn resolve_sql_params(method: &mut DataSourceMethod) {
+        for (i, param) in method.parameters.iter().enumerate() {
+            let placeholder = format!("${}", param.name);
+            let positional = format!("?{}", i + 1);
+            method.raw_sql = method.raw_sql.replace(&placeholder, &positional);
+        }
+    }
+
     /// Creates a default [DataSource] for any model that doesn't have one,
     /// including default get/list SQL queries for models with D1 fields.
     ///
     /// Creates a default [IncludeTree] with all KV, R2, 1:1, 1:N and M:N relationships by default.
     /// Does not include relationships after a 1:N or M:N to avoid infinite trees.
     pub fn expand(ast: &mut CloesceAst) {
-        let models_to_process = ast
-            .models
-            .iter()
-            .filter(|(_, model)| model.default_data_source().is_none())
-            .map(|(_, model)| model.name.clone())
-            .collect::<Vec<String>>();
+        // For each model without a default DS, build one
+        {
+            let models_to_process = ast
+                .models
+                .iter()
+                .filter(|(_, model)| model.default_data_source().is_none())
+                .map(|(_, model)| model.name.clone())
+                .collect::<Vec<String>>();
 
-        for model_name in models_to_process {
-            let mut tree = IncludeTree::default();
-            let mut visited = HashSet::new();
-            dfs(ast, &model_name, &mut tree, &mut visited);
+            for model_name in models_to_process {
+                let mut tree = IncludeTree::default();
+                let mut visited = HashSet::new();
+                dfs(ast, &model_name, &mut tree, &mut visited);
 
-            let model = ast.models.get(&model_name).unwrap();
-            let data_source = Self::default_data_source(model, tree, ast);
+                let model = ast.models.get(&model_name).unwrap();
+                let data_source = Self::default_data_source(model, tree, ast);
 
-            ast.models
-                .get_mut(&model_name)
-                .unwrap()
-                .data_sources
-                .push(data_source);
+                ast.models
+                    .get_mut(&model_name)
+                    .unwrap()
+                    .data_sources
+                    .push(data_source);
+            }
         }
 
-        // For each data source that lacks a `get` or `list` method, fills in
-        // the default implementation (primary key get, seek pagination list).
-        // Only applies to models with D1 bindings.
-        let fills: Vec<_> = ast
+        // Fill in any missing get/list with the default implementation
+        let pending = ast
             .models
             .values()
             .filter(|m| m.has_d1())
-            .flat_map(|model| {
-                model.data_sources.iter().enumerate().filter_map(|(i, ds)| {
-                    if ds.get.is_some() && ds.list.is_some() {
-                        return None;
-                    }
-                    let sql =
-                        SelectModel::query(&model.name, None, Some(ds.tree.clone()), ast).ok()?;
-                    let get = ds
-                        .get
-                        .is_none()
-                        .then(|| Self::build_default_get(model, &sql));
-                    let list = ds
-                        .list
-                        .is_none()
-                        .then(|| Self::build_default_list(model, &sql));
-                    Some((model.name.clone(), i, get, list))
-                })
+            .map(|model| {
+                let defaults = model
+                    .data_sources
+                    .iter()
+                    .enumerate()
+                    .map(|(i, ds)| {
+                        let sql = SelectModel::query(&model.name, None, Some(ds.tree.clone()), ast)
+                            .expect("select model to work");
+                        let get = ds
+                            .get
+                            .is_none()
+                            .then(|| Self::build_default_get(model, &sql));
+                        let list = ds
+                            .list
+                            .is_none()
+                            .then(|| Self::build_default_list(model, &sql));
+                        (i, get, list, sql)
+                    })
+                    .collect();
+                (model.name.clone(), defaults)
             })
-            .collect();
+            .collect::<Vec<(
+                String,
+                Vec<(
+                    usize,
+                    Option<DataSourceMethod>,
+                    Option<DataSourceMethod>,
+                    String,
+                )>,
+            )>>();
 
-        for (name, i, get, list) in fills {
-            let ds = &mut ast.models.get_mut(&name).unwrap().data_sources[i];
-            if let Some(g) = get {
-                ds.get = Some(g);
-            }
-            if let Some(l) = list {
-                ds.list = Some(l);
+        for (name, defaults) in pending {
+            let model = ast.models.get_mut(&name).unwrap();
+            for (i, get, list, include_sql) in defaults {
+                // Update the existing data source with missing get/list methods
+                let ds = &mut model.data_sources[i];
+                if let Some(g) = get {
+                    ds.get = Some(g);
+                }
+                if let Some(l) = list {
+                    ds.list = Some(l);
+                }
+
+                // Expand $include then resolve $paramName -> ?N
+                if let Some(m) = &mut ds.get {
+                    m.raw_sql = m.raw_sql.replace("$include", &include_sql);
+                    Self::resolve_sql_params(m);
+                }
+                if let Some(m) = &mut ds.list {
+                    m.raw_sql = m.raw_sql.replace("$include", &include_sql);
+                    Self::resolve_sql_params(m);
+                }
             }
         }
 

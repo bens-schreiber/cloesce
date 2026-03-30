@@ -102,7 +102,7 @@ pub enum Token {
     At,
 
     // Literals
-    #[regex(r#""[^"]*""#, |lex| lex.slice().to_string())]
+    #[regex(r#""[^"]*""#, |lex| { let s = lex.slice(); s[1..s.len()-1].to_string() })]
     StringLit(String),
 
     #[regex(r"[0-9][0-9_]*", |lex| lex.slice().replace('_', "").parse::<i64>().ok())]

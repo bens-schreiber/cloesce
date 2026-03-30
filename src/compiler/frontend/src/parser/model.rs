@@ -202,7 +202,7 @@ pub fn model_block<'t>() -> impl Parser<'t, &'t [Token], ModelBlock, Extra<'t>> 
         .ignore_then(just(Token::LParen))
         .ignore_then(select! { Token::Ident(name) => name })
         .then_ignore(just(Token::Comma))
-        .then(select! { Token::StringLit(value) => unquote_string_literal(value) })
+        .then(select! { Token::StringLit(value) => value })
         .then_ignore(just(Token::RParen));
 
     // @r2(bucketBinding, "formatString") -> (env_binding, format)
@@ -211,7 +211,7 @@ pub fn model_block<'t>() -> impl Parser<'t, &'t [Token], ModelBlock, Extra<'t>> 
         .ignore_then(just(Token::LParen))
         .ignore_then(select! { Token::Ident(name) => name })
         .then_ignore(just(Token::Comma))
-        .then(select! { Token::StringLit(value) => unquote_string_literal(value) })
+        .then(select! { Token::StringLit(value) => value })
         .then_ignore(just(Token::RParen));
 
     // @keyparam
@@ -391,10 +391,3 @@ fn crud_kind<'t>() -> impl Parser<'t, &'t [Token], CrudKind, Extra<'t>> {
     ))
 }
 
-fn unquote_string_literal(literal: String) -> String {
-    literal
-        .strip_prefix('"')
-        .and_then(|value| value.strip_suffix('"'))
-        .unwrap_or(&literal)
-        .to_owned()
-}
