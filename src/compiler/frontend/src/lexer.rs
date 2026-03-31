@@ -1,5 +1,7 @@
+use ariadne::{Color, Label, Report};
 use logos::Logos;
 
+use std::fs;
 use std::ops::Range;
 use std::path::PathBuf;
 
@@ -123,45 +125,121 @@ pub enum Token {
 
 pub struct CloesceLexer;
 impl CloesceLexer {
-    pub fn lex(&self, source: &str) -> Result<Vec<(Token, Range<usize>)>, Vec<String>> {
-        let mut tokens = Vec::new();
-        let mut errors = Vec::new();
+    pub fn lex(&self, source: impl LexSource) -> Result<LexedFile, LexedFileError> {
+        let path = source.path();
+        let path_str = path.display().to_string();
+        let src = match source.content() {
+            Ok(s) => s,
+            Err(e) => {
+                let msg = format!("failed to read file: {}", e);
+                let report = fail_file_report(&path_str, msg);
+                return Err(LexedFileError {
+                    reports: vec![report],
+                    path_str,
+                    src: String::new(),
+                });
+            }
+        };
 
-        for (result, span) in Token::lexer(source).spanned() {
+        let mut tokens = Vec::new();
+        let mut spans: Vec<Range<usize>> = Vec::new();
+
+        for (result, span) in Token::lexer(&src).spanned() {
             match result {
                 Ok(token) => tokens.push((token, span)),
-                Err(_) => errors.push(format!("{}:{:?}: unexpected token", source, span)),
+                Err(_) => spans.push(span),
             }
         }
 
-        if errors.is_empty() {
-            Ok(tokens)
-        } else {
-            Err(errors)
+        if spans.is_empty() {
+            return Ok(LexedFile { tokens, path });
         }
+
+        let reports = spans
+            .into_iter()
+            .map(|span| lex_error(&path_str, span))
+            .collect();
+        Err(LexedFileError {
+            reports,
+            path_str,
+            src,
+        })
     }
 
     pub fn lex_targets(
         &self,
         targets: Vec<PathBuf>,
-    ) -> Result<Vec<(Token, Range<usize>)>, Vec<String>> {
-        let mut tokens = Vec::new();
+    ) -> Result<Vec<LexedFile>, Vec<LexedFileError>> {
+        let mut lexed_files = Vec::new();
         let mut errors = Vec::new();
 
-        for target in targets {
-            match self.lex(&std::fs::read_to_string(&target).unwrap_or_else(|e| {
-                errors.push(format!("Failed to read {:?}: {}", target, e));
-                String::new()
-            })) {
-                Ok(new_tokens) => tokens.extend(new_tokens),
-                Err(new_errors) => errors.extend(new_errors),
+        // TODO: should optimize by doing this in parallel, as well as stream the file
+        // instead of reading it all into memory at once
+        for path in targets {
+            match self.lex(path) {
+                Ok(res) => lexed_files.push(res),
+                Err(e) => errors.push(e),
             }
         }
 
         if errors.is_empty() {
-            Ok(tokens)
+            Ok(lexed_files)
         } else {
             Err(errors)
         }
     }
+}
+
+pub trait LexSource {
+    fn path(&self) -> PathBuf;
+    fn content(&self) -> std::io::Result<String>;
+}
+
+impl LexSource for PathBuf {
+    fn path(&self) -> PathBuf {
+        self.clone()
+    }
+    fn content(&self) -> std::io::Result<String> {
+        fs::read_to_string(self)
+    }
+}
+
+pub type TokenRange = (Token, Range<usize>);
+pub struct LexedFile {
+    pub tokens: Vec<TokenRange>,
+    pub path: PathBuf,
+}
+
+type LexReport = Report<'static, (String, Range<usize>)>;
+
+pub struct LexedFileError {
+    pub reports: Vec<LexReport>,
+    pub path_str: String,
+    pub src: String,
+}
+
+impl LexedFileError {
+    pub fn eprint(&self) {
+        let mut cache = ariadne::sources([(self.path_str.clone(), &self.src)]);
+        for report in &self.reports {
+            report.write(&mut cache, std::io::stderr()).ok();
+        }
+    }
+}
+
+fn fail_file_report(path_str: &String, msg: String) -> LexReport {
+    Report::build(ariadne::ReportKind::Error, (path_str.clone(), 0..0))
+        .with_message(msg)
+        .finish()
+}
+
+fn lex_error(path_str: &String, span: Range<usize>) -> LexReport {
+    Report::build(ariadne::ReportKind::Error, (path_str.clone(), span.clone()))
+        .with_message("unexpected token")
+        .with_label(
+            Label::new((path_str.clone(), span))
+                .with_message("not a valid token")
+                .with_color(Color::Red),
+        )
+        .finish()
 }

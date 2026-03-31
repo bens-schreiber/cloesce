@@ -47,10 +47,11 @@ fn compile() -> Result<(), String> {
 
     // Frontend
     let ast = {
-        let tokens = CloesceLexer
+        let lexed = CloesceLexer
             .lex_targets(args.targets)
             .expect("TODO: error handling");
 
+        let tokens = lexed.into_iter().flat_map(|f| f.tokens).collect::<Vec<_>>();
         let parse = CloesceParser.parse(tokens).expect("TODO: error handling");
 
         let (result, _errors) = SemanticAnalysis::analyze(parse);
