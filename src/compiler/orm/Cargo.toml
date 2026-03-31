@@ -1,0 +1,28 @@
+[package]
+name = "orm"
+version = "0.0.1"
+edition = "2024"
+
+[dependencies]
+ast = { path = "../ast" }
+migrations = { path = "../migrations" }
+indexmap = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+sea-query = "0.32.7"
+base64 = "0.22"
+chrono = { version = "0.4", features = ["serde"] }
+
+[dev-dependencies]
+migrations = { path = "../migrations" }
+compiler-test = { path = "../compiler-test" }
+serde_json = { workspace = true }
+base64 = "0.22"
+sqlx = { version = "0.8", features = ["sqlite", "runtime-tokio"] }
+
+[[bin]]
+name = "orm"
+path = "bin/orm.rs"
+
+[lib]
+doctest = false

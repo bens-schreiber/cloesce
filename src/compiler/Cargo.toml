@@ -1,5 +1,14 @@
 [workspace]
-members = ["cli", "ast", "frontend", "semantic", "codegen", "compiler-test"]
+members = [
+    "cli",
+    "ast",
+    "frontend",
+    "semantic",
+    "codegen",
+    "compiler-test",
+    "migrations",
+    "orm",
+]
 resolver = "3"
 
 [workspace.dependencies]

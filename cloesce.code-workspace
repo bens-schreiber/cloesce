@@ -4,14 +4,12 @@
 			"path": "."
 		},
 		{
-			"path": "src/generator"
-		},
-		{
-			"path": "src/orm"
+			"name": "compiler",
+			"path": "src/compiler"
 		},
 		{
 			"name": "ts",
-			"path": "src/ts"
+			"path": "src/runtime/ts"
 		},
 		{
 			"path": "tests/e2e"

@@ -10,3 +10,6 @@ logos = "0.16.1"
 
 [dev-dependencies]
 compiler-test = { path = "../compiler-test" }
+
+[lib]
+doctest = false

@@ -3,6 +3,8 @@ use std::sync::Arc;
 use ast::{CidlType, CloesceAst, MediaType};
 use handlebars::Handlebars;
 
+/// Helper function to create a Handlebars helper which
+/// has access to a [LanguageTypeMapper] and the [CloesceAst].
 pub fn make_mapper_helper<'a, F>(
     mapper: Arc<dyn LanguageTypeMapper + Send + Sync + 'a>,
     ast: &'a CloesceAst,

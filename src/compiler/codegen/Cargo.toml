@@ -5,6 +5,8 @@ edition = "2024"
 
 [dependencies]
 ast = { path = "../ast" }
+migrations = { path = "../migrations" }
+orm = { path = "../orm" }
 tracing = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
@@ -13,10 +15,12 @@ json_comments = "0.2.2"
 handlebars = "6.4.0"
 sqlformat = "0.5.0"
 pathdiff = "0.2.3"
-sea-query = "0.32.7"
 indexmap = { workspace = true }
 
 [dev-dependencies]
 compiler-test = { path = "../compiler-test" }
 insta = "1.46.3"
-sqlx = { version = "0.8", features = ["sqlite", "runtime-tokio"] }
+
+
+[lib]
+doctest = false

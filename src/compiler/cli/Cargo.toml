@@ -8,6 +8,7 @@ ast = { path = "../ast" }
 ariadne = "0.6.0"
 clap = { version = "4.5.60", features = ["derive"] }
 codegen = { path = "../codegen" }
+migrations = { path = "../migrations" }
 frontend = { path = "../frontend" }
 semantic = { path = "../semantic" }
 tracing-subscriber = "0.3.22"
@@ -20,3 +21,6 @@ path = "bin/compile.rs"
 [[bin]]
 name = "migrate"
 path = "bin/migrate.rs"
+
+[lib]
+doctest = false

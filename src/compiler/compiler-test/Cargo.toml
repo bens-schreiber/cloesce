@@ -7,3 +7,6 @@ edition = "2024"
 ast = { path = "../ast" }
 frontend = { path = "../frontend" }
 semantic = { path = "../semantic" }
+
+[lib]
+doctest = false

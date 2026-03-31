@@ -7,10 +7,8 @@ use std::{
 use ast::MigrationsAst;
 use clap::{Parser, arg, command};
 use cli::open_file_or_create;
-use codegen::{
-    migrations::{MigrationsDilemma, MigrationsGenerator, MigrationsIntent},
-    wrangler::WranglerGenerator,
-};
+use codegen::wrangler::WranglerGenerator;
+use migrations::{MigrationsDilemma, MigrationsGenerator, MigrationsIntent};
 
 #[derive(Parser)]
 #[command(name = "compile", version = "0.0.3")]

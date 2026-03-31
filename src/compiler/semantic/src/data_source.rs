@@ -5,7 +5,7 @@ use ast::{
     NavigationFieldKind,
 };
 
-use codegen::orm::select::SelectModel;
+use orm::select::SelectModel;
 
 pub struct DataSourceExpansion;
 impl DataSourceExpansion {
