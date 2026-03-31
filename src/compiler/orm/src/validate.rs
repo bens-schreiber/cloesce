@@ -246,12 +246,15 @@ pub fn validate_cidl_type(
                 let nav_value = obj.remove(&nav.field.name);
 
                 let nav_cidl_type = match nav.kind {
-                    NavigationFieldKind::ManyToMany
-                    | NavigationFieldKind::OneToMany { .. } => {
-                        CidlType::Array(Box::new(CidlType::Object { name: nav.model_reference.clone() }))
+                    NavigationFieldKind::ManyToMany | NavigationFieldKind::OneToMany { .. } => {
+                        CidlType::Array(Box::new(CidlType::Object {
+                            name: nav.model_reference.clone(),
+                        }))
                     }
 
-                    _ => CidlType::Object { name: nav.model_reference.clone() },
+                    _ => CidlType::Object {
+                        name: nav.model_reference.clone(),
+                    },
                 };
 
                 let res = validate_cidl_type(nav_cidl_type, nav_value, ast, is_partial)?;
@@ -348,4 +351,3 @@ pub fn validate_cidl_type(
         _ => unimplemented!(),
     }
 }
-

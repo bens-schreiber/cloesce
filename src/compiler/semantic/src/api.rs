@@ -3,7 +3,7 @@ use frontend::{ApiBlockMethod, ParseAst};
 
 use crate::{
     SymbolKind, SymbolTable, ensure,
-    err::{BatchResult, CompilerErrorKind, ErrorSink},
+    err::{BatchResult, CompilerError, ErrorSink},
     resolve_cidl_type,
 };
 
@@ -26,13 +26,12 @@ impl ApiAnalysis {
                 table.resolve(&api_block.namespace, SymbolKind::ModelDecl, None),
                 table.resolve(&api_block.namespace, SymbolKind::ServiceDecl, None),
             ) {
-                (Some(model), _) => &model,
+                (Some(model), _) => model,
                 (_, Some(service)) => service,
                 (None, None) => {
-                    self.sink
-                        .push(CompilerErrorKind::ApiUnknownNamespaceReference {
-                            api: api_block.symbol.clone(),
-                        });
+                    self.sink.push(CompilerError::ApiUnknownNamespaceReference {
+                        api: Box::new(api_block.symbol.clone()),
+                    });
                     continue;
                 }
             };
@@ -59,8 +58,8 @@ impl ApiAnalysis {
     ) -> Option<ApiMethod> {
         // Generated API methods start with a '$'
         if method.symbol.name.starts_with('$') {
-            self.sink.push(CompilerErrorKind::ApiReservedMethod {
-                method: method.symbol.clone(),
+            self.sink.push(CompilerError::ApiReservedMethod {
+                method: Box::new(method.symbol.clone()),
             });
         }
 
@@ -69,8 +68,8 @@ impl ApiAnalysis {
             ensure!(
                 !method.is_static,
                 self.sink,
-                CompilerErrorKind::ApiStaticMethodWithDataSource {
-                    method: method.symbol.clone(),
+                CompilerError::ApiStaticMethodWithDataSource {
+                    method: Box::new(method.symbol.clone())
                 }
             );
 
@@ -83,8 +82,8 @@ impl ApiAnalysis {
             ensure!(
                 ds_exists,
                 self.sink,
-                CompilerErrorKind::ApiUnknownDataSourceReference {
-                    method: method.symbol.clone(),
+                CompilerError::ApiUnknownDataSourceReference {
+                    method: Box::new(method.symbol.clone()),
                     data_source: ds.clone(),
                 }
             );
@@ -123,8 +122,8 @@ impl ApiAnalysis {
         method: &ApiBlockMethod,
         table: &SymbolTable,
     ) -> (CidlType, MediaType) {
-        let err = CompilerErrorKind::ApiInvalidReturn {
-            method: method.symbol.clone(),
+        let err = CompilerError::ApiInvalidReturn {
+            method: Box::new(method.symbol.clone()),
         };
 
         let resolved_type = match resolve_cidl_type(&method.symbol, &method.return_type, table) {
@@ -169,12 +168,12 @@ impl ApiAnalysis {
 
         let mut has_stream = false;
         for param in &method.parameters {
-            let err = CompilerErrorKind::ApiInvalidParam {
-                method: method.symbol.clone(),
-                param: param.clone(),
+            let err = CompilerError::ApiInvalidParam {
+                method: Box::new(method.symbol.clone()),
+                param: Box::new(param.clone()),
             };
 
-            let resolved_type = match resolve_cidl_type(&param, &param.cidl_type, table) {
+            let resolved_type = match resolve_cidl_type(param, &param.cidl_type, table) {
                 Ok(t) => t,
                 Err(e) => {
                     self.sink.push(e);

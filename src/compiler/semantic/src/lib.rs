@@ -11,7 +11,7 @@ use crate::{
     api::ApiAnalysis,
     crud::CrudExpansion,
     data_source::DataSourceExpansion,
-    err::{CompilerErrorKind, ErrorSink},
+    err::{CompilerError, ErrorSink},
     model::ModelAnalysis,
 };
 
@@ -33,7 +33,7 @@ impl SymbolTable {
             SymbolKind::ModelDecl => format!("model::{}", symbol.name),
             SymbolKind::PlainOldObjectDecl => format!("poo::{}", symbol.name),
             SymbolKind::ServiceDecl => format!("service::{}", symbol.name),
-            SymbolKind::WranglerEnvDecl => format!("wrangler_env"),
+            SymbolKind::WranglerEnvDecl => "wrangler_env".into(),
             SymbolKind::InjectDecl => format!("inject::{}", symbol.name),
 
             // Scoped
@@ -98,9 +98,9 @@ impl SymbolTable {
 
         let mut insert_global_name = |sink: &mut ErrorSink, symbol: &Symbol| {
             if let Some(existing) = global_names.insert(symbol.name.to_string(), symbol.clone()) {
-                sink.push(CompilerErrorKind::DuplicateSymbol {
-                    first: existing,
-                    second: symbol.clone(),
+                sink.push(CompilerError::DuplicateSymbol {
+                    first: Box::new(existing),
+                    second: Box::new(symbol.clone()),
                 });
 
                 return false;
@@ -110,10 +110,10 @@ impl SymbolTable {
         };
 
         let insert_symbol = |st: &mut SymbolTable, sink: &mut ErrorSink, symbol: &Symbol| {
-            if let Some(existing) = st.table.insert(st.key(&symbol), symbol.clone()) {
-                sink.push(CompilerErrorKind::DuplicateSymbol {
-                    first: existing,
-                    second: symbol.clone(),
+            if let Some(existing) = st.table.insert(st.key(symbol), symbol.clone()) {
+                sink.push(CompilerError::DuplicateSymbol {
+                    first: Box::new(existing),
+                    second: Box::new(symbol.clone()),
                 });
 
                 return false;
@@ -216,9 +216,7 @@ impl SymbolTable {
 
 pub struct SemanticAnalysis;
 impl SemanticAnalysis {
-    pub fn analyze_with_table(
-        parse: ParseAst,
-    ) -> ((SymbolTable, CloesceAst), Vec<CompilerErrorKind>) {
+    pub fn analyze_with_table(parse: ParseAst) -> ((SymbolTable, CloesceAst), Vec<CompilerError>) {
         let mut sink = ErrorSink::new();
 
         let mut table = SymbolTable::from_parse(&parse, &mut sink);
@@ -264,7 +262,7 @@ impl SemanticAnalysis {
         ((table, ast), vec![])
     }
 
-    pub fn analyze(parse: ParseAst) -> (CloesceAst, Vec<CompilerErrorKind>) {
+    pub fn analyze(parse: ParseAst) -> (CloesceAst, Vec<CompilerError>) {
         let ((_, ast), errors) = Self::analyze_with_table(parse);
         (ast, errors)
     }
@@ -274,7 +272,7 @@ impl SemanticAnalysis {
             ensure!(
                 parse.models.is_empty(),
                 sink,
-                CompilerErrorKind::MissingWranglerEnvBlock
+                CompilerError::MissingWranglerEnvBlock
             );
 
             return None;
@@ -358,9 +356,9 @@ impl SemanticAnalysis {
             let mut parameters = Vec::new();
             for param in &method.parameters {
                 if !is_valid_sql_type(&param.cidl_type) {
-                    sink.push(CompilerErrorKind::DataSourceInvalidMethodParam {
-                        source: source_sym.clone(),
-                        param: param.clone(),
+                    sink.push(CompilerError::DataSourceInvalidMethodParam {
+                        source: Box::new(source_sym.clone()),
+                        param: Box::new(param.clone()),
                     });
                 }
                 parameters.push(Field {
@@ -380,8 +378,8 @@ impl SemanticAnalysis {
                             .collect();
                     if !name.is_empty() && name != "include" && !param_names.contains(name.as_str())
                     {
-                        sink.push(CompilerErrorKind::DataSourceUnknownSqlParam {
-                            source: source_sym.clone(),
+                        sink.push(CompilerError::DataSourceUnknownSqlParam {
+                            source: Box::new(source_sym.clone()),
                             name,
                         });
                     }
@@ -397,23 +395,23 @@ impl SemanticAnalysis {
         for source in &parse.sources {
             // Validate the model reference
             let Some(model_sym) = table.resolve(&source.model, SymbolKind::ModelDecl, None) else {
-                sink.push(CompilerErrorKind::DataSourceUnknownModelReference {
-                    source: source.symbol.clone(),
+                sink.push(CompilerError::DataSourceUnknownModelReference {
+                    source: Box::new(source.symbol.clone()),
                 });
                 continue;
             };
 
             if !matches!(model_sym.kind, SymbolKind::ModelDecl) {
-                sink.push(CompilerErrorKind::DataSourceUnknownModelReference {
-                    source: source.symbol.clone(),
+                sink.push(CompilerError::DataSourceUnknownModelReference {
+                    source: Box::new(source.symbol.clone()),
                 });
                 continue;
             }
 
             let model_name = model_sym.name.clone();
             let Some(model) = models.get(&model_name) else {
-                sink.push(CompilerErrorKind::DataSourceUnknownModelReference {
-                    source: source.symbol.clone(),
+                sink.push(CompilerError::DataSourceUnknownModelReference {
+                    source: Box::new(source.symbol.clone()),
                 });
                 continue;
             };
@@ -456,8 +454,8 @@ impl SemanticAnalysis {
                         continue;
                     }
 
-                    sink.push(CompilerErrorKind::DataSourceInvalidIncludeTreeReference {
-                        source: source.symbol.clone(),
+                    sink.push(CompilerError::DataSourceInvalidIncludeTreeReference {
+                        source: Box::new(source.symbol.clone()),
                         model: source.model.clone(),
                         name: var_name.clone(),
                     });
@@ -506,7 +504,7 @@ impl SemanticAnalysis {
             in_degree.entry(poo_name.clone()).or_insert(0);
 
             for field in &poo.fields {
-                let resolved_type = match resolve_cidl_type(&field, &field.cidl_type, table) {
+                let resolved_type = match resolve_cidl_type(field, &field.cidl_type, table) {
                     Ok(t) => t,
                     Err(err) => {
                         sink.push(err);
@@ -518,21 +516,19 @@ impl SemanticAnalysis {
                     CidlType::Object { name, .. } => {
                         if let Some(ref_sym) =
                             table.resolve(name, SymbolKind::PlainOldObjectDecl, None)
+                            && (matches!(ref_sym.kind, SymbolKind::PlainOldObjectDecl)
+                                && !field.cidl_type.is_nullable())
                         {
-                            if matches!(ref_sym.kind, SymbolKind::PlainOldObjectDecl)
-                                && !field.cidl_type.is_nullable()
-                            {
-                                graph
-                                    .entry(name.clone())
-                                    .or_default()
-                                    .push(poo_name.clone());
-                                in_degree.entry(poo_name.clone()).and_modify(|d| *d += 1);
-                            }
+                            graph
+                                .entry(name.clone())
+                                .or_default()
+                                .push(poo_name.clone());
+                            in_degree.entry(poo_name.clone()).and_modify(|d| *d += 1);
                         }
                     }
                     CidlType::Stream | CidlType::Void => {
-                        sink.push(CompilerErrorKind::PlainOldObjectInvalidFieldType {
-                            field: field.clone(),
+                        sink.push(CompilerError::PlainOldObjectInvalidFieldType {
+                            field: Box::new(field.clone()),
                         });
                     }
                     _ => {
@@ -582,7 +578,7 @@ impl SemanticAnalysis {
             in_degree.entry(service_name.clone()).or_insert(0);
 
             for field in &service.fields {
-                let resolved_type = match resolve_cidl_type(&field, &field.cidl_type, table) {
+                let resolved_type = match resolve_cidl_type(field, &field.cidl_type, table) {
                     Ok(t) => t,
                     Err(err) => {
                         sink.push(err);
@@ -596,8 +592,8 @@ impl SemanticAnalysis {
                         name
                     }
                     _ => {
-                        sink.push(CompilerErrorKind::ServiceInvalidFieldType {
-                            field: field.clone(),
+                        sink.push(CompilerError::ServiceInvalidFieldType {
+                            field: Box::new(field.clone()),
                         });
                         continue;
                     }
@@ -637,47 +633,47 @@ pub(crate) fn resolve_cidl_type(
     symbol: &Symbol,
     cidl_type: &CidlType,
     table: &SymbolTable,
-) -> Result<CidlType, CompilerErrorKind> {
+) -> Result<CidlType, CompilerError> {
     match cidl_type {
         CidlType::UnresolvedReference { name } => {
-            if let Some(sym) = table.resolve(&name, SymbolKind::ModelDecl, None) {
+            if let Some(sym) = table.resolve(name, SymbolKind::ModelDecl, None) {
                 return Ok(CidlType::Object {
                     name: sym.name.clone(),
                 });
             }
 
-            if let Some(sym) = table.resolve(&name, SymbolKind::PlainOldObjectDecl, None) {
+            if let Some(sym) = table.resolve(name, SymbolKind::PlainOldObjectDecl, None) {
                 return Ok(CidlType::Object {
                     name: sym.name.clone(),
                 });
             }
 
-            if let Some(sym) = table.resolve(&name, SymbolKind::ServiceDecl, None) {
+            if let Some(sym) = table.resolve(name, SymbolKind::ServiceDecl, None) {
                 return Ok(CidlType::Inject {
                     name: sym.name.clone(),
                 });
             }
 
-            if let Some(sym) = table.resolve(&name, SymbolKind::InjectDecl, None) {
+            if let Some(sym) = table.resolve(name, SymbolKind::InjectDecl, None) {
                 return Ok(CidlType::Inject {
                     name: sym.name.clone(),
                 });
             }
 
-            return Err(CompilerErrorKind::UnresolvedSymbol {
+            Err(CompilerError::UnresolvedSymbol {
                 span: symbol.span.clone(),
-            });
+            })
         }
         CidlType::DataSource { model_name } => {
             let valid = table
                 .resolve(model_name, SymbolKind::ModelDecl, None)
                 .is_some();
             if !valid {
-                return Err(CompilerErrorKind::UnresolvedSymbol {
+                return Err(CompilerError::UnresolvedSymbol {
                     span: symbol.span.clone(),
                 });
             }
-            return Ok(cidl_type.clone());
+            Ok(cidl_type.clone())
         }
         CidlType::Partial { object_name } => {
             let valid = table
@@ -688,27 +684,27 @@ pub(crate) fn resolve_cidl_type(
                     .is_some();
 
             if !valid {
-                return Err(CompilerErrorKind::UnresolvedSymbol {
+                return Err(CompilerError::UnresolvedSymbol {
                     span: symbol.span.clone(),
                 });
             }
-            return Ok(cidl_type.clone());
+            Ok(cidl_type.clone())
         }
         CidlType::Nullable(inner) => {
             let resolved_inner = resolve_cidl_type(symbol, inner, table)?;
-            return Ok(CidlType::Nullable(Box::new(resolved_inner)));
+            Ok(CidlType::Nullable(Box::new(resolved_inner)))
         }
         CidlType::Array(inner) => {
             let resolved_inner = resolve_cidl_type(symbol, inner, table)?;
-            return Ok(CidlType::Array(Box::new(resolved_inner)));
+            Ok(CidlType::Array(Box::new(resolved_inner)))
         }
         CidlType::Paginated(inner) => {
             let resolved_inner = resolve_cidl_type(symbol, inner, table)?;
-            return Ok(CidlType::Paginated(Box::new(resolved_inner)));
+            Ok(CidlType::Paginated(Box::new(resolved_inner)))
         }
         CidlType::KvObject(inner) => {
             let resolved_inner = resolve_cidl_type(symbol, inner, table)?;
-            return Ok(CidlType::KvObject(Box::new(resolved_inner)));
+            Ok(CidlType::KvObject(Box::new(resolved_inner)))
         }
         _ => Ok(cidl_type.clone()),
     }
@@ -738,7 +734,7 @@ pub(crate) fn kahns(
     graph: BTreeMap<String, Vec<String>>,
     mut in_degree: BTreeMap<String, usize>,
     len: usize,
-) -> Result<HashMap<String, usize>, CompilerErrorKind> {
+) -> Result<HashMap<String, usize>, CompilerError> {
     let mut queue = in_degree
         .iter()
         .filter_map(|(name, &deg)| (deg == 0).then_some(name.clone()))
@@ -770,7 +766,7 @@ pub(crate) fn kahns(
             .collect();
 
         if !cycle.is_empty() {
-            return Err(CompilerErrorKind::CyclicalRelationship { cycle });
+            return Err(CompilerError::CyclicalRelationship { cycle });
         }
     }
 

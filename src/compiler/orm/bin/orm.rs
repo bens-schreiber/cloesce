@@ -22,6 +22,10 @@ pub extern "C" fn alloc(len: usize) -> *mut u8 {
 }
 
 /// WASM free memory handler.
+///
+/// # Safety
+/// `ptr` must be a pointer returned from [alloc] and `cap` must be
+/// the same capacity that was passed to [alloc] when the pointer was created.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn dealloc(ptr: *mut u8, cap: usize) {
     unsafe {
@@ -35,6 +39,10 @@ thread_local! {
 }
 
 /// Sets the [AST] global variable, returning 0 on success.
+///
+/// # Safety
+/// `ptr` must be a pointer to a UTF-8 encoded JSON string representing the AST
+/// and `cap` must be the length of the JSON string in bytes.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn set_ast_ptr(ptr: *mut u8, cap: usize) -> i32 {
     let slice = unsafe { std::slice::from_raw_parts(ptr, cap) };
@@ -76,6 +84,11 @@ pub extern "C" fn get_return_ptr() -> *const u8 {
 /// Panics on any error.
 ///
 /// Returns 0 on pass 1 on fail. Stores result in [RETURN_PTR].
+///
+/// # Safety
+/// `model_name_ptr` must be a pointer to a UTF-8 encoded string representing the
+/// model name, `new_model_ptr` must be a pointer to a UTF-8 encoded JSON string
+/// representing the new model, and `include_tree_ptr` must be a pointer to a UTF-8 encoded JSON string representing the include tree.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn upsert_model(
     // Model Name
@@ -136,6 +149,11 @@ pub unsafe extern "C" fn upsert_model(
 /// Panics on any error.
 ///
 /// Returns 0 on pass 1 on fail. Stores result in [RETURN_PTR].
+///
+/// # Safety
+/// `model_name_ptr` must be a pointer to a UTF-8 encoded string representing the
+/// model name, `from_ptr` must be a pointer to a UTF-8 encoded string representing the "from" clause,
+/// and `include_tree_ptr` must be a pointer to a UTF-8 encoded JSON string representing the include tree.  
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn select_model(
     // Model Name
@@ -187,6 +205,11 @@ pub unsafe extern "C" fn select_model(
 /// Panics on any error.
 ///
 /// Returns 0 on pass 1 on fail. Stores result in [RETURN_PTR].
+///
+/// # Safety
+/// `model_name_ptr` must be a pointer to a UTF-8 encoded string representing the
+/// model name, `d1_results_ptr` must be a pointer to a UTF-8 encoded JSON string
+/// representing the D1 results and `include_tree_ptr` must be a pointer to a UTF-8 encoded JSON string
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn map(
     // Model name
@@ -246,6 +269,10 @@ pub unsafe extern "C" fn map(
 /// Panics on any error.
 ///
 /// Returns 0 on pass 1 on fail. Stores result in [RETURN_PTR].
+///
+/// # Safety
+/// `cidl_type_ptr` must be a pointer to a UTF-8 encoded JSON string representing the CidlType
+///  and `value_ptr` must be a pointer to a UTF-8 encoded JSON string representing the value to be validated.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn validate_type(
     // Cidl Type

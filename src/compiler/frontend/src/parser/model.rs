@@ -101,14 +101,11 @@ pub fn model_block<'t>() -> impl Parser<'t, &'t [Token], ModelBlock, Extra<'t>> 
 
         let source_field_ref = select! { Token::Ident(name) => name };
 
-        let source_field_list = source_field_ref
-            .clone()
-            .map(|f| vec![f])
-            .or(source_field_ref
-                .separated_by(just(Token::Comma))
-                .at_least(1)
-                .collect::<Vec<_>>()
-                .delimited_by(just(Token::LParen), just(Token::RParen)));
+        let source_field_list = source_field_ref.map(|f| vec![f]).or(source_field_ref
+            .separated_by(just(Token::Comma))
+            .at_least(1)
+            .collect::<Vec<_>>()
+            .delimited_by(just(Token::LParen), just(Token::RParen)));
 
         let target_field_list = target_field_ref
             .clone()
@@ -345,7 +342,6 @@ pub fn model_block<'t>() -> impl Parser<'t, &'t [Token], ModelBlock, Extra<'t>> 
                             cidl_type,
                             kind: SymbolKind::ModelField,
                             parent_name: model_name.clone(),
-                            ..Default::default()
                         });
                     }
                     ModelField::KvField(mut f, tag) => {
@@ -390,4 +386,3 @@ fn crud_kind<'t>() -> impl Parser<'t, &'t [Token], CrudKind, Extra<'t>> {
         select! { Token::Ident(name) if name == "list" => CrudKind::List },
     ))
 }
-

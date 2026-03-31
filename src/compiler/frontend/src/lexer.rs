@@ -121,7 +121,6 @@ pub enum Token {
     Error,
 }
 
-#[derive(Default)]
 pub struct CloesceLexer;
 impl CloesceLexer {
     pub fn lex(&self, source: &str) -> Result<Vec<(Token, Range<usize>)>, Vec<String>> {

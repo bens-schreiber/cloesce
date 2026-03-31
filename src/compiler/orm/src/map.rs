@@ -5,8 +5,8 @@ use indexmap::IndexMap;
 use serde_json::Map;
 use serde_json::Value;
 
-use crate::fail;
 use crate::OrmErrorKind;
+use crate::fail;
 
 use super::Result;
 

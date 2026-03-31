@@ -2,8 +2,8 @@ use std::collections::HashMap;
 
 use ast::{CloesceAst, MigrationsAst, MigrationsModel};
 
-use migrations::{MigrationsDilemma, MigrationsGenerator, MigrationsIntent};
 use compiler_test::{expected_str, src_to_ast};
+use migrations::{MigrationsDilemma, MigrationsGenerator, MigrationsIntent};
 
 use indexmap::IndexMap;
 use sqlx::SqlitePool;

@@ -655,7 +655,11 @@ async fn include_placeholder_expands_to_select(db: SqlitePool) {
     assert!(raw_sql.contains("?1"), "got: {raw_sql}");
 
     // The expanded SQL should be executable
-    create_tables(&db, "CREATE TABLE Post (id INTEGER PRIMARY KEY, title TEXT NOT NULL)").await;
+    create_tables(
+        &db,
+        "CREATE TABLE Post (id INTEGER PRIMARY KEY, title TEXT NOT NULL)",
+    )
+    .await;
     sqlx::query("INSERT INTO Post (id, title) VALUES (1, 'hello'), (2, 'world')")
         .execute(&db)
         .await

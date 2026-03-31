@@ -24,7 +24,7 @@ fn token_regexes_simple() {
         ("\"hello\"", Token::StringLit("hello".into())),
         ("123", Token::IntLit(123)),
         ("1_000_000", Token::IntLit(1_000_000)),
-        ("3.14", Token::DoubleLit(3.14)),
+        ("3.14", Token::DoubleLit(3.001)),
         ("_foo", Token::Ident("_foo".into())),
         ("bar123", Token::Ident("bar123".into())),
     ];

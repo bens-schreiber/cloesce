@@ -334,7 +334,7 @@ impl WranglerDefault {
                 let db = spec
                     .d1_databases
                     .iter_mut()
-                    .find(|db| db.binding.as_ref() == Some(&d1));
+                    .find(|db| db.binding.as_ref() == Some(d1));
 
                 match db {
                     Some(db) => {
@@ -382,7 +382,7 @@ impl WranglerDefault {
                 let kv = spec
                     .kv_namespaces
                     .iter_mut()
-                    .find(|ns| ns.binding.as_ref() == Some(&kv_binding));
+                    .find(|ns| ns.binding.as_ref() == Some(kv_binding));
 
                 match kv {
                     Some(ns) => {

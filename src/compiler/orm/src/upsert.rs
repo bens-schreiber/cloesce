@@ -110,9 +110,8 @@ impl<'a> UpsertModel<'a> {
                     }
                     _ => SqlUpsertBuilder::value_from_ctx(&pk_path),
                 };
-                select_root_model = select_root_model.and_where(
-                    Expr::col((alias(&model.name), alias(&col.field.name))).eq(pk_expr),
-                );
+                select_root_model = select_root_model
+                    .and_where(Expr::col((alias(&model.name), alias(&col.field.name))).eq(pk_expr));
             }
 
             generator

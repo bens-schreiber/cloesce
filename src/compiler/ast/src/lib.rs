@@ -2,7 +2,6 @@ use std::collections::BTreeMap;
 use std::collections::HashMap;
 use std::hash::Hash;
 use std::hash::Hasher;
-use std::usize;
 
 use indexmap::IndexMap;
 use rustc_hash::FxHasher;

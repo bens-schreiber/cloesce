@@ -3,7 +3,7 @@
 use ast::{CidlType, MediaType, NavigationFieldKind};
 use compiler_test::lex_and_parse;
 use frontend::{SymbolKind, WranglerEnvBindingKind};
-use semantic::{SemanticAnalysis, err::CompilerErrorKind};
+use semantic::{SemanticAnalysis, err::CompilerError};
 
 /// Find exactly one error matching the pattern. Panics if not found.
 /// Destructure with `=> expr` to extract fields in one step.
@@ -62,7 +62,7 @@ fn missing_wrangler_env_block() {
     let (_, errors) = SemanticAnalysis::analyze(parse);
 
     // Assert
-    expect_err!(errors, CompilerErrorKind::MissingWranglerEnvBlock);
+    expect_err!(errors, CompilerError::MissingWranglerEnvBlock);
 }
 
 #[test]
@@ -84,7 +84,7 @@ fn wrangler_duplicate_symbol() {
     // Assert
     assert_eq!(errors.len(), 1);
     let second = expect_err!(errors,
-        CompilerErrorKind::DuplicateSymbol { second, .. } => second
+        CompilerError::DuplicateSymbol { second, .. } => second
     );
     assert_eq!(second.name, "my_d1");
     assert!(matches!(
@@ -125,17 +125,17 @@ fn d1_model_basic_errors() {
 
     // User has @d1 but no primary key
     let model = expect_err!(errors,
-        CompilerErrorKind::D1ModelMissingPrimaryKey { model } => model
+        CompilerError::D1ModelMissingPrimaryKey { model } => model
     );
     assert_eq!(model.name, "User");
     assert!(matches!(model.kind, SymbolKind::ModelDecl));
 
     // Post references @d1(other_d1) which is not in the env block
-    expect_err!(errors, CompilerErrorKind::D1ModelInvalidD1Binding { .. });
+    expect_err!(errors, CompilerError::D1ModelInvalidD1Binding { .. });
 
     // Comment has fields but no @d1 binding
     let model = expect_err!(errors,
-        CompilerErrorKind::D1ModelMissingD1Binding { model } => model
+        CompilerError::D1ModelMissingD1Binding { model } => model
     );
     assert_eq!(model.name, "Comment");
 }
@@ -190,40 +190,40 @@ fn d1_model_column_fk_errors() {
     assert_eq!(
         count_errs!(
             errors,
-            CompilerErrorKind::ForeignKeyReferencesInvalidOrUnknownColumn { .. }
+            CompilerError::ForeignKeyReferencesInvalidOrUnknownColumn { .. }
         ),
         2
     );
 
     // Nullable primary key: id is Option<int>
     let column = expect_err!(errors,
-        CompilerErrorKind::NullablePrimaryKey { column } => column
+        CompilerError::NullablePrimaryKey { column } => column
     );
     assert_eq!(column.name, "id");
-    assert!(matches!(column.kind, SymbolKind::ModelField { .. }));
+    assert!(matches!(column.kind, SymbolKind::ModelField));
 
     // Duplicate symbol: id declared twice
     let second = expect_err!(errors,
-        CompilerErrorKind::DuplicateSymbol { second, .. } => second
+        CompilerError::DuplicateSymbol { second, .. } => second
     );
     assert_eq!(second.name, "id");
 
     // FK incompatible type: str_value (string) -> Post::id (int)
     let (column, adj_column) = expect_err!(errors,
-        CompilerErrorKind::ForeignKeyReferencesIncompatibleColumnType { column, adj_column, .. } => (column, adj_column)
+        CompilerError::ForeignKeyReferencesIncompatibleColumnType { column, adj_column, .. } => (column, adj_column)
     );
     assert_eq!(column.name, "str_value");
     assert_eq!(adj_column.name, "id");
 
     // FK references self
     let model = expect_err!(errors,
-        CompilerErrorKind::ForeignKeyReferencesSelf { model, .. } => model
+        CompilerError::ForeignKeyReferencesSelf { model, .. } => model
     );
     assert_eq!(model.name, "User");
 
     // FK references different database
     let binding = expect_err!(errors,
-        CompilerErrorKind::ForeignKeyReferencesDifferentDatabase { binding, .. } => binding.clone()
+        CompilerError::ForeignKeyReferencesDifferentDatabase { binding, .. } => binding.clone()
     );
     assert_eq!(binding, "other_d1");
 }
@@ -262,7 +262,7 @@ fn d1_model_consistent_nullability_error() {
     // Assert
     assert_eq!(errors.len(), 1);
     let (first_column, second_column) = expect_err!(errors,
-        CompilerErrorKind::ForeignKeyInconsistentNullability { first_column, second_column, .. } => (first_column, second_column)
+        CompilerError::ForeignKeyInconsistentNullability { first_column, second_column, .. } => (first_column, second_column)
     );
     assert_eq!(first_column.name, "postId");
     assert_eq!(second_column.name, "name");
@@ -298,10 +298,10 @@ fn d1_model_fk_column_already_in_foreign_key() {
     // Assert
     assert_eq!(errors.len(), 1);
     let column = expect_err!(errors,
-        CompilerErrorKind::ForeignKeyColumnAlreadyInForeignKey { column, .. } => column
+        CompilerError::ForeignKeyColumnAlreadyInForeignKey { column, .. } => column
     );
     assert_eq!(column.name, "postId");
-    assert!(matches!(column.kind, SymbolKind::ModelField { .. }));
+    assert!(matches!(column.kind, SymbolKind::ModelField));
 }
 
 #[test]
@@ -337,14 +337,14 @@ fn d1_model_nav_errors() {
             id: int
         }
     "#;
-    let parse = lex_and_parse(&src);
+    let parse = lex_and_parse(src);
 
     // Act
     let (result, errors) = SemanticAnalysis::analyze(parse);
 
     // Assert
     assert_eq!(errors.len(), 2);
-    expect_err!(errors, CompilerErrorKind::UnresolvedSymbol { .. });
+    expect_err!(errors, CompilerError::UnresolvedSymbol { .. });
 }
 
 #[test]
@@ -379,10 +379,10 @@ fn d1_model_nav_field_already_in_navigation_property() {
     // Assert
     assert_eq!(errors.len(), 1, "unexpected errors: {:#?}", errors);
     let field = expect_err!(errors,
-        CompilerErrorKind::NavigationPropertyFieldAlreadyInNavigationProperty { field, .. } => field
+        CompilerError::NavigationPropertyFieldAlreadyInNavigationProperty { field, .. } => field
     );
     assert_eq!(field.name, "horse");
-    assert!(matches!(field.kind, SymbolKind::ModelField { .. }));
+    assert!(matches!(field.kind, SymbolKind::ModelField));
 }
 
 #[test]
@@ -578,7 +578,7 @@ fn d1_model_cyclical_relationship_error() {
     // Assert
     assert_eq!(errors.len(), 1);
     let cycle = expect_err!(errors,
-        CompilerErrorKind::CyclicalRelationship { cycle } => cycle.clone()
+        CompilerError::CyclicalRelationship { cycle } => cycle.clone()
     );
     // Cycle contains model names now
     assert_eq!(cycle.len(), 3);
@@ -669,29 +669,26 @@ fn kv_r2_errors() {
     assert_eq!(errors.len(), 5);
 
     let field = expect_err!(errors,
-        CompilerErrorKind::KvR2InvalidKeyParam { field, .. } => field
+        CompilerError::KvR2InvalidKeyParam { field, .. } => field
     );
     assert_eq!(field.name, "keyParam");
 
     let binding = expect_err!(errors,
-        CompilerErrorKind::KvInvalidBinding { binding, ..} => binding.clone()
+        CompilerError::KvInvalidBinding { binding, ..} => binding.clone()
     );
     assert_eq!(binding, "my_d1");
 
     let binding = expect_err!(errors,
-        CompilerErrorKind::R2InvalidBinding { binding, .. } => binding.clone()
+        CompilerError::R2InvalidBinding { binding, .. } => binding.clone()
     );
     assert_eq!(binding, "my_kv");
 
     let variable = expect_err!(errors,
-        CompilerErrorKind::KvR2UnknownKeyVariable { variable, .. } => variable.clone()
+        CompilerError::KvR2UnknownKeyVariable { variable, .. } => variable.clone()
     );
     assert_eq!(variable, "nonexistent");
 
-    expect_err!(
-        errors,
-        CompilerErrorKind::KvR2InvalidKeyFormat { reason, .. }
-    );
+    expect_err!(errors, CompilerError::KvR2InvalidKeyFormat { reason, .. });
 }
 
 #[test]
@@ -773,15 +770,12 @@ fn api_errors() {
     // Assert
     assert_eq!(errors.len(), 6);
 
-    expect_err!(
-        errors,
-        CompilerErrorKind::ApiUnknownNamespaceReference { .. }
-    );
+    expect_err!(errors, CompilerError::ApiUnknownNamespaceReference { .. });
 
-    expect_err!(errors, CompilerErrorKind::ApiInvalidReturn { .. });
+    expect_err!(errors, CompilerError::ApiInvalidReturn { .. });
 
     assert_eq!(
-        count_errs!(errors, CompilerErrorKind::ApiInvalidParam { .. }),
+        count_errs!(errors, CompilerError::ApiInvalidParam { .. }),
         4
     );
 }
@@ -898,33 +892,30 @@ fn data_source_errors() {
     // BadModelSource: unknown model
     expect_err!(
         errors,
-        CompilerErrorKind::DataSourceUnknownModelReference { .. }
+        CompilerError::DataSourceUnknownModelReference { .. }
     );
 
     // BadTreeSource: "nonexistent" is not a field on User
     assert!(errors.iter().any(|e| matches!(
         e,
-        CompilerErrorKind::DataSourceInvalidIncludeTreeReference { name, .. }
+        CompilerError::DataSourceInvalidIncludeTreeReference { name, .. }
             if name == "nonexistent"
     )));
 
     // BadNestedTreeSource: "bogus" is not a field on Post
     assert!(errors.iter().any(|e| matches!(
         e,
-        CompilerErrorKind::DataSourceInvalidIncludeTreeReference { name, .. }
+        CompilerError::DataSourceInvalidIncludeTreeReference { name, .. }
             if name == "bogus"
     )));
 
     // BadParamSource: User is not a valid sql type
-    expect_err!(
-        errors,
-        CompilerErrorKind::DataSourceInvalidMethodParam { .. }
-    );
+    expect_err!(errors, CompilerError::DataSourceInvalidMethodParam { .. });
 
     // UnknownSqlParam: $ghost is not a declared param
     assert!(errors.iter().any(|e| matches!(
         e,
-        CompilerErrorKind::DataSourceUnknownSqlParam { name, .. } if name == "ghost"
+        CompilerError::DataSourceUnknownSqlParam { name, .. } if name == "ghost"
     )));
 }
 
@@ -983,18 +974,18 @@ fn poo_errors() {
     assert_eq!(errors.len(), 3);
 
     let cycle = expect_err!(errors,
-        CompilerErrorKind::CyclicalRelationship { cycle } => cycle.clone()
+        CompilerError::CyclicalRelationship { cycle } => cycle.clone()
     );
     assert_eq!(cycle, vec!["MyPoo"]);
 
     assert!(errors.iter().any(|e| matches!(
         e,
-        CompilerErrorKind::PlainOldObjectInvalidFieldType { field } if field.name == "streamField"
+        CompilerError::PlainOldObjectInvalidFieldType { field } if field.name == "streamField"
     )));
 
     assert!(errors.iter().any(|e| matches!(
         e,
-        CompilerErrorKind::PlainOldObjectInvalidFieldType { field } if field.name == "voidField"
+        CompilerError::PlainOldObjectInvalidFieldType { field } if field.name == "voidField"
     )));
 }
 
@@ -1031,18 +1022,18 @@ fn service_errors() {
 
     assert!(errors.iter().any(|e| matches!(
         e,
-        CompilerErrorKind::ServiceInvalidFieldType { field }
+        CompilerError::ServiceInvalidFieldType { field }
             if field.name == "name"
     )));
 
     assert!(errors.iter().any(|e| matches!(
         e,
-        CompilerErrorKind::ServiceInvalidFieldType { field }
+        CompilerError::ServiceInvalidFieldType { field }
             if field.name == "user"
     )));
 
     assert_eq!(
-        count_errs!(errors, CompilerErrorKind::ServiceInvalidFieldType { .. }),
+        count_errs!(errors, CompilerError::ServiceInvalidFieldType { .. }),
         2
     );
 }

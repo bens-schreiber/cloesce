@@ -2,14 +2,14 @@ use frontend::{D1Tag, FileSpan};
 
 use crate::Symbol;
 
-pub type BatchResult<T> = std::result::Result<T, Vec<CompilerErrorKind>>;
+pub type BatchResult<T> = std::result::Result<T, Vec<CompilerError>>;
 
 #[derive(Debug, Clone)]
-pub enum CompilerErrorKind {
+pub enum CompilerError {
     /// A symbol was defined more than once in the same scope.
     DuplicateSymbol {
-        first: Symbol,
-        second: Symbol,
+        first: Box<Symbol>,
+        second: Box<Symbol>,
     },
 
     /// A symbol was referenced but not defined in any visible scope.
@@ -22,33 +22,33 @@ pub enum CompilerErrorKind {
 
     /// A model with any columns or navigation properties requires a specific D1 binding to be specified.
     D1ModelMissingD1Binding {
-        model: Symbol,
+        model: Box<Symbol>,
     },
 
     /// A model that specifies a D1 binding that does not resolve to an actual Wrangler D1 binding.
     D1ModelInvalidD1Binding {
-        model: Symbol,
+        model: Box<Symbol>,
         tag: D1Tag,
     },
 
     /// A model that specifies a D1 binding but does not specify a primary key.
     D1ModelMissingPrimaryKey {
-        model: Symbol,
+        model: Box<Symbol>,
     },
 
     /// A column in a D1 model can only be a SQLite type
     InvalidColumnType {
-        column: Symbol,
+        column: Box<Symbol>,
     },
 
     /// A primary key column in a D1 model cannot be nullable
     NullablePrimaryKey {
-        column: Symbol,
+        column: Box<Symbol>,
     },
 
     /// A foreign key in a D1 model cannot reference it's own model
     ForeignKeyReferencesSelf {
-        model: Symbol,
+        model: Box<Symbol>,
         foreign_key: FileSpan,
     },
 
@@ -73,21 +73,21 @@ pub enum CompilerErrorKind {
     /// A foreign key must reference a column of the same type (e.g. you can't reference an Integer column from a String column)
     ForeignKeyReferencesIncompatibleColumnType {
         tag: FileSpan,
-        column: Symbol,
-        adj_column: Symbol,
+        column: Box<Symbol>,
+        adj_column: Box<Symbol>,
     },
 
     /// All columns involved in a foreign key must be consistently nullable or non-nullable
     ForeignKeyInconsistentNullability {
         tag: FileSpan,
-        first_column: Symbol,
-        second_column: Symbol,
+        first_column: Box<Symbol>,
+        second_column: Box<Symbol>,
     },
 
     /// A column in a D1 model can only participate in a single foreign key relationship
     ForeignKeyColumnAlreadyInForeignKey {
         tag: FileSpan,
-        column: Symbol,
+        column: Box<Symbol>,
     },
 
     NavigationPropertyReferencesInvalidOrUnknownField {
@@ -103,7 +103,7 @@ pub enum CompilerErrorKind {
     /// A field in a D1 model can only participate in a single navigation property
     NavigationPropertyFieldAlreadyInNavigationProperty {
         tag: FileSpan,
-        field: Symbol,
+        field: Box<Symbol>,
     },
 
     /// A many-to-many navigation property requires exactly one reciprocal M2M nav on the adjacent model, but none was found.
@@ -158,85 +158,84 @@ pub enum CompilerErrorKind {
     /// A Kv/R2 key param must be of type String
     KvR2InvalidKeyParam {
         tag: FileSpan,
-        field: Symbol,
+        field: Box<Symbol>,
     },
 
     PlainOldObjectInvalidFieldType {
-        field: Symbol,
+        field: Box<Symbol>,
     },
 
     /// A service field must be of type Inject or another Service.
     ServiceInvalidFieldType {
-        field: Symbol,
+        field: Box<Symbol>,
     },
 
     /// A data source references a model that does not exist or is not a model.
     DataSourceUnknownModelReference {
-        source: Symbol,
+        source: Box<Symbol>,
     },
 
     /// A data source include tree references a name that is not a navigation property, KV, or R2 on the model.
     DataSourceInvalidIncludeTreeReference {
-        source: Symbol,
+        source: Box<Symbol>,
         model: String,
         name: String,
     },
 
     /// A data source method parameter is not a valid SQLite type.
     DataSourceInvalidMethodParam {
-        source: Symbol,
-        param: Symbol,
+        source: Box<Symbol>,
+        param: Box<Symbol>,
     },
 
     /// A data source method SQL references a `$name` placeholder that does not match any parameter
     /// (and is not the reserved `$include` placeholder).
     DataSourceUnknownSqlParam {
-        source: Symbol,
+        source: Box<Symbol>,
         name: String,
     },
 
-
     /// A model has a CRUD operation that is not supported for its backing store.
     UnsupportedCrudOperation {
-        model: Symbol,
+        model: Box<Symbol>,
     },
 
     /// An API block references a model that does not exist.
     ApiUnknownNamespaceReference {
-        api: Symbol,
+        api: Box<Symbol>,
     },
 
     /// A non-static API method has a data source but the method is marked static.
     ApiStaticMethodWithDataSource {
-        method: Symbol,
+        method: Box<Symbol>,
     },
 
     /// An API method references a data source that does not exist on the model.
     ApiUnknownDataSourceReference {
-        method: Symbol,
+        method: Box<Symbol>,
         data_source: String,
     },
 
     /// An API method has an invalid return type.
     ApiInvalidReturn {
-        method: Symbol,
+        method: Box<Symbol>,
     },
 
     /// An API method has an invalid parameter.
     ApiInvalidParam {
-        method: Symbol,
-        param: Symbol,
+        method: Box<Symbol>,
+        param: Box<Symbol>,
     },
 
     /// An API method uses a reserved name (e.g. $get, $list, $save)
     ApiReservedMethod {
-        method: Symbol,
+        method: Box<Symbol>,
     },
 }
 
 #[derive(Debug, Default)]
 pub struct ErrorSink {
-    pub errors: Vec<CompilerErrorKind>,
+    pub errors: Vec<CompilerError>,
 }
 
 impl ErrorSink {
@@ -244,7 +243,7 @@ impl ErrorSink {
         Self::default()
     }
 
-    pub fn push(&mut self, kind: CompilerErrorKind) {
+    pub fn push(&mut self, kind: CompilerError) {
         self.errors.push(kind);
     }
 
@@ -252,22 +251,22 @@ impl ErrorSink {
         !self.errors.is_empty()
     }
 
-    pub fn drain(&mut self) -> Vec<CompilerErrorKind> {
+    pub fn drain(&mut self) -> Vec<CompilerError> {
         std::mem::take(&mut self.errors)
     }
 
-    pub fn extend(&mut self, other: Vec<CompilerErrorKind>) {
+    pub fn extend(&mut self, other: Vec<CompilerError>) {
         self.errors.extend(other);
     }
 
     /// Push a fatal error, drain everything, and return as Err payload
-    pub fn bail(&mut self, kind: CompilerErrorKind) -> Vec<CompilerErrorKind> {
+    pub fn bail(&mut self, kind: CompilerError) -> Vec<CompilerError> {
         self.push(kind);
         self.drain()
     }
 
     /// Returns Err if any errors were accumulated
-    pub fn finish(self) -> std::result::Result<(), Vec<CompilerErrorKind>> {
+    pub fn finish(self) -> std::result::Result<(), Vec<CompilerError>> {
         if self.errors.is_empty() {
             Ok(())
         } else {

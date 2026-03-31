@@ -19,12 +19,16 @@ fn undefined() {
 
     // Allowed for partial types
     {
-        let ast = src_to_ast(r#"
+        let ast = src_to_ast(
+            r#"
             env { db: d1 }
             @d1(db) model SomeModel { [primary id] id: int }
-        "#);
+        "#,
+        );
         let result = validate_cidl_type(
-            CidlType::Partial { object_name: "SomeModel".to_string() },
+            CidlType::Partial {
+                object_name: "SomeModel".to_string(),
+            },
             None,
             &ast,
             false,
@@ -76,12 +80,16 @@ fn null_value() {
 
     // Null allowed for partial type
     {
-        let ast = src_to_ast(r#"
+        let ast = src_to_ast(
+            r#"
             env { db: d1 }
             @d1(db) model SomeModel { [primary id] id: int }
-        "#);
+        "#,
+        );
         let result = validate_cidl_type(
-            CidlType::Partial { object_name: "SomeModel".to_string() },
+            CidlType::Partial {
+                object_name: "SomeModel".to_string(),
+            },
             Some(Value::Null),
             &ast,
             false,
@@ -95,8 +103,7 @@ fn integer() {
     // Non integer returns error
     {
         let ast = empty_ast();
-        let result =
-            validate_cidl_type(CidlType::Integer, Some(json!("not_an_int")), &ast, false);
+        let result = validate_cidl_type(CidlType::Integer, Some(json!("not_an_int")), &ast, false);
         assert!(matches!(result, Err(ValidatorErrorKind::NonI64)));
     }
 
@@ -323,12 +330,16 @@ fn r2() {
 fn data_source() {
     // Unknown data source
     {
-        let ast = src_to_ast(r#"
+        let ast = src_to_ast(
+            r#"
             env { db: d1 }
             @d1(db) model Horse { [primary id] id: int }
-        "#);
+        "#,
+        );
         let result = validate_cidl_type(
-            CidlType::DataSource { model_name: "Horse".to_string() },
+            CidlType::DataSource {
+                model_name: "Horse".to_string(),
+            },
             Some(json!("nonexistent_source")),
             &ast,
             false,
@@ -338,12 +349,16 @@ fn data_source() {
 
     // "none" is valid data source
     {
-        let ast = src_to_ast(r#"
+        let ast = src_to_ast(
+            r#"
             env { db: d1 }
             @d1(db) model Horse { [primary id] id: int }
-        "#);
+        "#,
+        );
         let result = validate_cidl_type(
-            CidlType::DataSource { model_name: "Horse".to_string() },
+            CidlType::DataSource {
+                model_name: "Horse".to_string(),
+            },
             Some(json!("none")),
             &ast,
             false,
@@ -356,20 +371,24 @@ fn data_source() {
 fn objects_partials() {
     // Invalid column propagates
     {
-        let ast = src_to_ast(r#"
+        let ast = src_to_ast(
+            r#"
             env { db: d1 }
             @d1(db) model Horse {
                 [primary id]
                 id: int
                 name: string
             }
-        "#);
+        "#,
+        );
         let value = json!({
             "id": 1,
             "name": 99
         });
         let result = validate_cidl_type(
-            CidlType::Object { name: "Horse".to_string() },
+            CidlType::Object {
+                name: "Horse".to_string(),
+            },
             Some(value),
             &ast,
             false,
@@ -379,7 +398,8 @@ fn objects_partials() {
 
     // Valid object passes
     {
-        let ast = src_to_ast(r#"
+        let ast = src_to_ast(
+            r#"
             env { db: d1 }
             @d1(db) model Horse {
                 [primary id]
@@ -397,14 +417,17 @@ fn objects_partials() {
                 horseId: int
                 nickname: string
             }
-        "#);
+        "#,
+        );
         let value = json!({
             "id": 1,
             "name": "Shadowfax",
             "riders": []
         });
         let result = validate_cidl_type(
-            CidlType::Object { name: "Horse".to_string() },
+            CidlType::Object {
+                name: "Horse".to_string(),
+            },
             Some(value.clone()),
             &ast,
             false,
@@ -415,17 +438,21 @@ fn objects_partials() {
 
     // Partial type allows missing fields
     {
-        let ast = src_to_ast(r#"
+        let ast = src_to_ast(
+            r#"
             env { db: d1 }
             @d1(db) model Horse {
                 [primary id]
                 id: int
                 name: string
             }
-        "#);
+        "#,
+        );
         let value = json!({ "id": 1 });
         let result = validate_cidl_type(
-            CidlType::Partial { object_name: "Horse".to_string() },
+            CidlType::Partial {
+                object_name: "Horse".to_string(),
+            },
             Some(value),
             &ast,
             false,

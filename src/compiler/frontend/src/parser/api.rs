@@ -158,7 +158,6 @@ fn map_method(method: PendingApiMethod, namespace: &str) -> ApiBlockMethod {
                     cidl_type,
                     kind: SymbolKind::ApiMethodParam,
                     parent_name: format!("{namespace}::{}", method.name),
-                    ..Default::default()
                 });
             }
         }

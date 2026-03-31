@@ -4,15 +4,15 @@ version = "0.0.1"
 edition = "2024"
 
 [dependencies]
-ast = { path = "../ast" }
 ariadne = "0.6.0"
+ast = { path = "../ast" }
 clap = { version = "4.5.60", features = ["derive"] }
 codegen = { path = "../codegen" }
-migrations = { path = "../migrations" }
 frontend = { path = "../frontend" }
+migrations = { path = "../migrations" }
 semantic = { path = "../semantic" }
-tracing-subscriber = "0.3.22"
 tracing = { workspace = true }
+tracing-subscriber = "0.3.22"
 
 [[bin]]
 name = "compile"

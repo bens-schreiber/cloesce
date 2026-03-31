@@ -3,9 +3,9 @@ use sea_query::{
     Expr, IntoCondition, IntoIden, Query, SelectStatement, SqliteQueryBuilder, TableRef,
 };
 
+use crate::OrmErrorKind;
 use crate::fail;
 use migrations::alias;
-use crate::OrmErrorKind;
 
 use super::Result;
 

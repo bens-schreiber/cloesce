@@ -20,7 +20,6 @@ mod data_source;
 mod env;
 mod model;
 
-#[derive(Default)]
 pub struct CloesceParser;
 
 impl CloesceParser {

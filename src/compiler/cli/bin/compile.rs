@@ -47,13 +47,11 @@ fn compile() -> Result<(), String> {
 
     // Frontend
     let ast = {
-        let tokens = CloesceLexer::default()
+        let tokens = CloesceLexer
             .lex_targets(args.targets)
             .expect("TODO: error handling");
 
-        let parse = CloesceParser::default()
-            .parse(tokens)
-            .expect("TODO: error handling");
+        let parse = CloesceParser.parse(tokens).expect("TODO: error handling");
 
         let (result, _errors) = SemanticAnalysis::analyze(parse);
         result
@@ -67,7 +65,7 @@ fn compile() -> Result<(), String> {
         WranglerDefault::set_defaults(
             &mut spec,
             &ast,
-            &args.default_migrations_path.to_str().unwrap(),
+            args.default_migrations_path.to_str().unwrap(),
         );
         generator.generate(spec)
     };
