@@ -9,8 +9,12 @@ use orm::select::SelectModel;
 
 use common::test_sql;
 
-fn include(val: serde_json::Value) -> Option<IncludeTree> {
-    Some(serde_json::from_value(val).unwrap())
+fn include(val: serde_json::Value) -> Option<IncludeTree<'static>> {
+    let s = serde_json::to_string(&val).unwrap();
+
+    // hack to convert the string to a Cow<'static, str> without copying
+    let tree: IncludeTree<'static> = serde_json::from_str(Box::leak(s.into_boxed_str())).unwrap();
+    Some(tree)
 }
 
 #[sqlx::test]

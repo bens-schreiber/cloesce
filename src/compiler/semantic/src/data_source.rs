@@ -47,12 +47,12 @@ impl<'src, 'p> DataSourceAnalysis {
             q.push_back((&ds.tree, &model_name, model));
 
             while let Some((node, _parent_model_name, parent_model)) = q.pop_front() {
-                for (var_name, child) in &node.0 {
+                for (field_name, child) in &node.0 {
                     // Check navigation properties
                     let nav = parent_model
                         .navigation_fields
                         .iter()
-                        .find(|nav| nav.field.name == *var_name);
+                        .find(|nav| &nav.field.name == field_name);
 
                     if let Some(nav) = nav {
                         // Navigate into the adjacent model
@@ -66,7 +66,7 @@ impl<'src, 'p> DataSourceAnalysis {
                     if parent_model
                         .kv_fields
                         .iter()
-                        .any(|kv| kv.field.name == *var_name)
+                        .any(|kv| &kv.field.name == field_name)
                     {
                         continue;
                     }
@@ -75,7 +75,7 @@ impl<'src, 'p> DataSourceAnalysis {
                     if parent_model
                         .r2_fields
                         .iter()
-                        .any(|r2| r2.field.name == *var_name)
+                        .any(|r2| &r2.field.name == field_name)
                     {
                         continue;
                     }
@@ -83,7 +83,7 @@ impl<'src, 'p> DataSourceAnalysis {
                     sink.push(SemanticError::DataSourceInvalidIncludeTreeReference {
                         source: &ds.symbol,
                         model: model_name,
-                        name: var_name.clone(),
+                        name: field_name.clone(),
                     });
                 }
             }
@@ -161,7 +161,7 @@ pub struct DataSourceExpansion;
 impl<'src> DataSourceExpansion {
     fn default_data_source(
         model: &Model<'src>,
-        tree: IncludeTree,
+        tree: IncludeTree<'src>,
         ast: &CloesceAst,
     ) -> DataSource<'src> {
         let Ok(include_sql) = SelectModel::query(model.name, None, Some(tree.clone()), ast) else {
@@ -322,7 +322,7 @@ impl<'src> DataSourceExpansion {
 
             for model_name in models_to_process {
                 let data_source = {
-                    let tree = Self::include_dfs(ast, model_name, &mut HashSet::new());
+                    let tree = Self::include_dfs(&ast.models, model_name, &mut HashSet::new());
                     let model = ast.models.get(&model_name).unwrap();
                     Self::default_data_source(model, tree, ast)
                 };
@@ -396,18 +396,18 @@ impl<'src> DataSourceExpansion {
         }
     }
 
-    fn include_dfs(
-        ast: &CloesceAst<'src>,
+    fn include_dfs<'m>(
+        models: &'m IndexMap<&'src str, Model<'src>>,
         current_model: &'src str,
         visited: &mut HashSet<&'src str>,
-    ) -> IncludeTree {
+    ) -> IncludeTree<'src> {
         if !visited.insert(current_model) {
             return IncludeTree::default();
         }
 
         let mut current_node = IncludeTree::default();
 
-        let model = ast.models.get(current_model).unwrap();
+        let model = models.get(current_model).unwrap();
         for nav in &model.navigation_fields {
             match nav.kind {
                 NavigationFieldKind::OneToOne { .. } => {
@@ -415,7 +415,7 @@ impl<'src> DataSourceExpansion {
                         // Self-referencing 1:1. Include but don't recurse.
                         current_node
                             .0
-                            .insert(nav.field.name.to_string(), IncludeTree::default());
+                            .insert(nav.field.name.clone(), IncludeTree::default());
                         continue;
                     }
 
@@ -424,14 +424,14 @@ impl<'src> DataSourceExpansion {
                         continue;
                     }
 
-                    let new_node = Self::include_dfs(ast, nav.model_reference, visited);
-                    current_node.0.insert(nav.field.name.to_string(), new_node);
+                    let new_node = Self::include_dfs(models, nav.model_reference, visited);
+                    current_node.0.insert(nav.field.name.clone(), new_node);
                 }
                 NavigationFieldKind::OneToMany { .. } | NavigationFieldKind::ManyToMany => {
                     // Include the related model as a leaf, but don't recurse.
                     current_node
                         .0
-                        .insert(nav.field.name.to_string(), IncludeTree::default());
+                        .insert(nav.field.name.clone(), IncludeTree::default());
                 }
             }
         }
@@ -439,13 +439,13 @@ impl<'src> DataSourceExpansion {
         for kv in &model.kv_fields {
             current_node
                 .0
-                .insert(kv.field.name.to_string(), IncludeTree::default());
+                .insert(kv.field.name.clone(), IncludeTree::default());
         }
 
         for r2 in &model.r2_fields {
             current_node
                 .0
-                .insert(r2.field.name.to_string(), IncludeTree::default());
+                .insert(r2.field.name.clone(), IncludeTree::default());
         }
 
         visited.remove(current_model);

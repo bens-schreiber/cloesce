@@ -123,7 +123,7 @@ pub struct DataSourceBlock<'src> {
     pub symbol: Symbol<'src>,
 
     pub model: &'src str,
-    pub tree: IncludeTree,
+    pub tree: IncludeTree<'src>,
     pub list: Option<DataSourceBlockMethod<'src>>,
     pub get: Option<DataSourceBlockMethod<'src>>,
     pub is_internal: bool,

@@ -140,10 +140,8 @@ pub struct Field<'src> {
     pub cidl_type: CidlType<'src>,
 }
 
-// TODO: I'd love to make [IncludeTree] use the 'src lifetime, but I can't
-// fight the borrow checker in the expander (semantic/data_source.rs)
 #[derive(Deserialize, Serialize, Debug, Default, Clone)]
-pub struct IncludeTree(pub BTreeMap<String, IncludeTree>);
+pub struct IncludeTree<'src>(#[serde(borrow)] pub BTreeMap<Cow<'src, str>, IncludeTree<'src>>);
 
 /// A D1 Navigation field, representing a relationship to another model
 /// through a foreign key or composite foreign key.
@@ -243,7 +241,8 @@ pub struct DataSource<'src> {
     #[serde(borrow)]
     pub name: &'src str,
 
-    pub tree: IncludeTree,
+    #[serde(borrow)]
+    pub tree: IncludeTree<'src>,
 
     #[serde(borrow)]
     pub list: Option<DataSourceMethod<'src>>,

@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use frontend::{D1Tag, Span};
 
 use crate::Symbol;
@@ -179,7 +181,7 @@ pub enum SemanticError<'src, 'p> {
     DataSourceInvalidIncludeTreeReference {
         source: &'p Symbol<'src>,
         model: &'src str,
-        name: String,
+        name: Cow<'src, str>,
     },
 
     /// A data source method parameter is not a valid SQLite type.

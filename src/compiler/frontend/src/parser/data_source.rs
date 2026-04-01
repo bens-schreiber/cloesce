@@ -39,7 +39,7 @@ pub fn data_source_block<'tokens, 'src: 'tokens>()
                         .into_iter()
                         .collect::<BTreeMap<_, _>>(),
                 );
-                (name.to_string(), subtree)
+                (Cow::Borrowed(name), subtree)
             })
             .boxed()
     });
@@ -118,7 +118,7 @@ pub fn data_source_block<'tokens, 'src: 'tokens>()
         )
         .map_with(
             |(((is_internal, name), model), ((include_entries, get_method), list_method)), e| {
-                let tree = IncludeTree(include_entries.into_iter().collect());
+                let tree = IncludeTree(include_entries.into_iter().collect::<BTreeMap<_, _>>());
 
                 let get = get_method.map(|(params, raw_sql)| DataSourceBlockMethod {
                     span: e.span(),
