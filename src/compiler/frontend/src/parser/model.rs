@@ -1,34 +1,36 @@
+use std::borrow::Cow;
+
 use chumsky::prelude::*;
 
 use ast::{CidlType, CrudKind};
 
 use crate::{
-    D1Tag, FileSpan, ForeignKeyTag, KeyFieldTag, KvR2Tag, ModelBlock, NavigationTag, PrimaryKeyTag,
-    Symbol, SymbolKind, UniqueTag,
+    D1Tag, ForeignKeyTag, KeyFieldTag, KvR2Tag, ModelBlock, NavigationTag, PrimaryKeyTag, Symbol,
+    SymbolKind, UniqueTag,
     lexer::Token,
-    parser::{Extra, cidl_type},
+    parser::{Extra, Span, TokenInput, cidl_type},
 };
 
-enum ModelTag {
+enum ModelTag<'src> {
     Crud(Vec<CrudKind>),
-    D1(String, SimpleSpan),
+    D1(&'src str, Span),
 }
 
-enum ModelField {
-    Primary(SimpleSpan, Vec<String>),
-    Unique(SimpleSpan, Vec<String>),
-    Foreign(ForeignKeyTag),
+enum ModelField<'src> {
+    Primary(Span, Vec<&'src str>),
+    Unique(Span, Vec<&'src str>),
+    Foreign(ForeignKeyTag<'src>),
     Nav {
-        span: SimpleSpan,
-        field: String,
+        span: Span,
+        field: &'src str,
         /// (model_name or None for current model, field_name)
-        fields: Vec<(Option<String>, String)>,
+        fields: Vec<(Option<&'src str>, &'src str)>,
         is_many_to_many: bool,
     },
-    Field(Symbol),
-    KeyField(String, SimpleSpan, CidlType),
-    KvField(Symbol, KvR2Tag),
-    R2Field(Symbol, KvR2Tag),
+    Field(Symbol<'src>),
+    KeyField(&'src str, Span, CidlType),
+    KvField(Symbol<'src>, KvR2Tag<'src>),
+    R2Field(Symbol<'src>, KvR2Tag<'src>),
 }
 
 /// Parses a block of the form:
@@ -48,7 +50,8 @@ enum ModelField {
 ///   [nav RelationName -> ident7, TargetModel::ident8, ...]
 /// }
 /// ```
-pub fn model_block<'t>() -> impl Parser<'t, &'t [Token], ModelBlock, Extra<'t>> {
+pub fn model_block<'tokens, 'src: 'tokens>()
+-> impl Parser<'tokens, TokenInput<'tokens, 'src>, ModelBlock<'src>, Extra<'tokens, 'src>> {
     // @crud(get | save | list, ...)
     let crud_tag = just(Token::At)
         .ignore_then(just(Token::Crud))
@@ -71,7 +74,7 @@ pub fn model_block<'t>() -> impl Parser<'t, &'t [Token], ModelBlock, Extra<'t>> 
 
     // [primary ident1, ident2, ...]
     let primary_tag = just(Token::LBracket)
-        .ignore_then(just(Token::Ident("primary".into())))
+        .ignore_then(just(Token::Ident("primary")))
         .ignore_then(
             select! { Token::Ident(name) => name }
                 .separated_by(just(Token::Comma))
@@ -83,7 +86,7 @@ pub fn model_block<'t>() -> impl Parser<'t, &'t [Token], ModelBlock, Extra<'t>> 
 
     // [unique ident1, ident2, ...]
     let unique_tag = just(Token::LBracket)
-        .ignore_then(just(Token::Ident("unique".into())))
+        .ignore_then(just(Token::Ident("unique")))
         .ignore_then(
             select! { Token::Ident(name) => name }
                 .separated_by(just(Token::Comma))
@@ -117,7 +120,7 @@ pub fn model_block<'t>() -> impl Parser<'t, &'t [Token], ModelBlock, Extra<'t>> 
                 .delimited_by(just(Token::LParen), just(Token::RParen)));
 
         just(Token::LBracket)
-            .ignore_then(just(Token::Ident("foreign".into())))
+            .ignore_then(just(Token::Ident("foreign")))
             .ignore_then(source_field_list)
             .then_ignore(just(Token::Arrow))
             .then(target_field_list)
@@ -164,7 +167,7 @@ pub fn model_block<'t>() -> impl Parser<'t, &'t [Token], ModelBlock, Extra<'t>> 
                 .delimited_by(just(Token::LParen), just(Token::RParen)));
 
         let nav_arrow = just(Token::LBracket)
-            .ignore_then(just(Token::Ident("nav".into())))
+            .ignore_then(just(Token::Ident("nav")))
             .ignore_then(select! { Token::Ident(name) => name })
             .then_ignore(just(Token::Arrow))
             .then(nav_key_ref_list)
@@ -177,7 +180,7 @@ pub fn model_block<'t>() -> impl Parser<'t, &'t [Token], ModelBlock, Extra<'t>> 
             });
 
         let nav_many_to_many = just(Token::LBracket)
-            .ignore_then(just(Token::Ident("nav".into())))
+            .ignore_then(just(Token::Ident("nav")))
             .ignore_then(select! { Token::Ident(name) => name })
             .then_ignore(just(Token::LAngle))
             .then_ignore(just(Token::RAngle))
@@ -212,16 +215,15 @@ pub fn model_block<'t>() -> impl Parser<'t, &'t [Token], ModelBlock, Extra<'t>> 
         .then_ignore(just(Token::RParen));
 
     // @keyparam
-    let key_param_tag = just(Token::At).ignore_then(just(Token::Ident("keyparam".into())));
+    let key_param_tag = just(Token::At).ignore_then(just(Token::Ident("keyparam")));
 
-    type Binding = (String, String);
     let field_tag = choice((
-        key_param_tag.map(|_| (true, None::<Binding>, None::<Binding>)),
-        kv_tag.map(|kv| (false, Some(kv), None)),
-        r2_tag.map(|r2| (false, None, Some(r2))),
+        key_param_tag.map(|_| (true, None::<(&str, &str)>, None::<(&str, &str)>)),
+        kv_tag.map(|kv| (false, Some(kv), None::<(&str, &str)>)),
+        r2_tag.map(|r2| (false, None::<(&str, &str)>, Some(r2))),
     ))
     .or_not()
-    .map(|opt| opt.unwrap_or((false, None, None)));
+    .map(|opt| opt.unwrap_or((false, None::<(&str, &str)>, None::<(&str, &str)>)));
 
     let field = field_tag
         .then(select! { Token::Ident(name) => name }.map_with(|name, e| (name, e.span())))
@@ -229,8 +231,8 @@ pub fn model_block<'t>() -> impl Parser<'t, &'t [Token], ModelBlock, Extra<'t>> 
         .then(cidl_type())
         .map(|(((key_param, kv, r2), (name, span)), cidl_type)| {
             let typed = Symbol {
-                span: FileSpan::from_simple_span(span),
-                name: name.clone(),
+                span,
+                name,
                 cidl_type,
                 kind: SymbolKind::ModelField,
                 ..Default::default()
@@ -290,24 +292,24 @@ pub fn model_block<'t>() -> impl Parser<'t, &'t [Token], ModelBlock, Extra<'t>> 
                 }
             }
 
-            let mut fields: Vec<Symbol> = Vec::new();
-            let mut foreign_keys: Vec<ForeignKeyTag> = Vec::new();
-            let mut navigation_properties: Vec<NavigationTag> = Vec::new();
-            let mut primary_keys: Vec<PrimaryKeyTag> = Vec::new();
-            let mut unique_constraints: Vec<UniqueTag> = Vec::new();
-            let mut key_fields: Vec<KeyFieldTag> = Vec::new();
-            let mut kvs: Vec<KvR2Tag> = Vec::new();
-            let mut r2s: Vec<KvR2Tag> = Vec::new();
+            let mut fields: Vec<Symbol<'src>> = Vec::new();
+            let mut foreign_keys: Vec<ForeignKeyTag<'src>> = Vec::new();
+            let mut navigation_properties: Vec<NavigationTag<'src>> = Vec::new();
+            let mut primary_keys: Vec<PrimaryKeyTag<'src>> = Vec::new();
+            let mut unique_constraints: Vec<UniqueTag<'src>> = Vec::new();
+            let mut key_fields: Vec<KeyFieldTag<'src>> = Vec::new();
+            let mut kvs: Vec<KvR2Tag<'src>> = Vec::new();
+            let mut r2s: Vec<KvR2Tag<'src>> = Vec::new();
 
             for item in items {
                 match item {
-                    ModelField::Primary(span, fields) => {
-                        for field in fields {
+                    ModelField::Primary(span, cols) => {
+                        for field in cols {
                             primary_keys.push(PrimaryKeyTag { span, field });
                         }
                     }
-                    ModelField::Unique(span, fields) => {
-                        unique_constraints.push(UniqueTag { span, fields });
+                    ModelField::Unique(span, cols) => {
+                        unique_constraints.push(UniqueTag { span, fields: cols });
                     }
                     ModelField::Foreign(fk) => foreign_keys.push(fk),
                     ModelField::Nav {
@@ -318,7 +320,7 @@ pub fn model_block<'t>() -> impl Parser<'t, &'t [Token], ModelBlock, Extra<'t>> 
                     } => {
                         let resolved = nav_fields
                             .into_iter()
-                            .map(|(model, f)| (model.unwrap_or_else(|| model_name.clone()), f))
+                            .map(|(model, f)| (model.unwrap_or(model_name), f))
                             .collect();
                         navigation_properties.push(NavigationTag {
                             span,
@@ -328,29 +330,26 @@ pub fn model_block<'t>() -> impl Parser<'t, &'t [Token], ModelBlock, Extra<'t>> 
                         });
                     }
                     ModelField::Field(mut f) => {
-                        f.parent_name = model_name.clone();
+                        f.parent_name = Cow::Borrowed(model_name);
                         fields.push(f);
                     }
                     ModelField::KeyField(field, span, cidl_type) => {
-                        key_fields.push(KeyFieldTag {
-                            span,
-                            field: field.clone(),
-                        });
+                        key_fields.push(KeyFieldTag { span, field });
                         fields.push(Symbol {
-                            span: FileSpan::from_simple_span(span),
+                            span,
                             name: field,
                             cidl_type,
                             kind: SymbolKind::ModelField,
-                            parent_name: model_name.clone(),
+                            parent_name: Cow::Borrowed(model_name),
                         });
                     }
                     ModelField::KvField(mut f, tag) => {
-                        f.parent_name = model_name.clone();
+                        f.parent_name = Cow::Borrowed(model_name);
                         fields.push(f);
                         kvs.push(tag);
                     }
                     ModelField::R2Field(mut f, tag) => {
-                        f.parent_name = model_name.clone();
+                        f.parent_name = Cow::Borrowed(model_name);
                         fields.push(f);
                         r2s.push(tag);
                     }
@@ -359,7 +358,7 @@ pub fn model_block<'t>() -> impl Parser<'t, &'t [Token], ModelBlock, Extra<'t>> 
 
             ModelBlock {
                 symbol: Symbol {
-                    span: FileSpan::from_simple_span(model_span),
+                    span: model_span,
                     name: model_name,
                     kind: SymbolKind::ModelDecl,
                     ..Default::default()
@@ -378,7 +377,8 @@ pub fn model_block<'t>() -> impl Parser<'t, &'t [Token], ModelBlock, Extra<'t>> 
         })
 }
 
-fn crud_kind<'t>() -> impl Parser<'t, &'t [Token], CrudKind, Extra<'t>> {
+fn crud_kind<'tokens, 'src: 'tokens>()
+-> impl Parser<'tokens, TokenInput<'tokens, 'src>, CrudKind, Extra<'tokens, 'src>> {
     choice((
         just(Token::Get).map(|_| CrudKind::Get),
         select! { Token::Ident(name) if name == "get" => CrudKind::Get },

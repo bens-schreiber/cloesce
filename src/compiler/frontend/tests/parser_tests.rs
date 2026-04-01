@@ -5,10 +5,12 @@ use compiler_test::lex_and_parse;
 fn env_block() {
     let ast = lex_and_parse(
         r#"
+
         env {
             // bindings
             db: d1
             db2: d1
+
             assets: r2
             cache: kv
 
@@ -29,33 +31,24 @@ fn env_block() {
         .expect("wrangler_env to be present");
 
     assert_eq!(
-        env.d1_bindings
-            .iter()
-            .map(|b| b.name.as_str())
-            .collect::<Vec<_>>(),
+        env.d1_bindings.iter().map(|b| b.name).collect::<Vec<_>>(),
         vec!["db", "db2"]
     );
 
     assert_eq!(
-        env.r2_bindings
-            .iter()
-            .map(|b| b.name.as_str())
-            .collect::<Vec<_>>(),
+        env.r2_bindings.iter().map(|b| b.name).collect::<Vec<_>>(),
         vec!["assets"]
     );
 
     assert_eq!(
-        env.kv_bindings
-            .iter()
-            .map(|b| b.name.as_str())
-            .collect::<Vec<_>>(),
+        env.kv_bindings.iter().map(|b| b.name).collect::<Vec<_>>(),
         vec!["cache"]
     );
 
     assert_eq!(
         env.vars
             .iter()
-            .map(|v| (v.name.as_str(), &v.cidl_type))
+            .map(|v| (v.name, &v.cidl_type))
             .collect::<Vec<_>>(),
         vec![
             ("api_url", &CidlType::String),
@@ -91,7 +84,7 @@ fn model_block_scalar() {
     let model = ast.models.first().expect("model to be present");
     assert_eq!(model.symbol.name, "Person");
     assert_eq!(
-        model.d1_binding.as_ref().map(|b| b.env_binding.as_str()),
+        model.d1_binding.as_ref().map(|b| b.env_binding),
         Some("d1_a")
     );
 
@@ -99,7 +92,7 @@ fn model_block_scalar() {
         model
             .primary_keys
             .iter()
-            .map(|p| p.field.as_str())
+            .map(|p| p.field)
             .collect::<Vec<_>>(),
         vec!["id", "age"]
     );
@@ -108,7 +101,7 @@ fn model_block_scalar() {
         model
             .fields
             .iter()
-            .map(|c| (c.name.as_str(), c.cidl_type.clone()))
+            .map(|c| (c.name, c.cidl_type.clone()))
             .collect::<Vec<_>>(),
         vec![
             ("age", CidlType::Integer),
@@ -155,7 +148,7 @@ fn model_block_kv_r2_anchored_tags() {
     assert_eq!(foo.r2s.len(), 1);
     assert_eq!(foo.key_fields.len(), 1);
 
-    let key_param_names: Vec<&str> = foo.key_fields.iter().map(|k| k.field.as_str()).collect();
+    let key_param_names: Vec<&str> = foo.key_fields.iter().map(|k| k.field).collect();
     assert_eq!(key_param_names, vec!["category"]);
 
     let kv = &foo.kvs[0];
@@ -195,7 +188,7 @@ fn model_block_unique_constraints() {
     let unique_constraints: Vec<Vec<&str>> = foo
         .unique_constraints
         .iter()
-        .map(|constraint| constraint.fields.iter().map(|n| n.as_str()).collect())
+        .map(|constraint| constraint.fields.to_vec())
         .collect();
 
     assert_eq!(unique_constraints, vec![vec!["a", "b", "c"], vec!["email"]]);
@@ -227,10 +220,7 @@ fn model_block_single_foreign_key() {
         .find(|m| m.symbol.name == "Dog")
         .expect("Dog model to be present");
 
-    assert_eq!(
-        dog.d1_binding.as_ref().map(|b| b.env_binding.as_str()),
-        Some("d1_a")
-    );
+    assert_eq!(dog.d1_binding.as_ref().map(|b| b.env_binding), Some("d1_a"));
 
     assert_eq!(dog.foreign_keys.len(), 1);
     let fk = &dog.foreign_keys[0];
@@ -238,7 +228,7 @@ fn model_block_single_foreign_key() {
     assert_eq!(
         fk.references
             .iter()
-            .map(|(src, _)| src.as_str())
+            .map(|(src, _)| *src)
             .collect::<Vec<_>>(),
         vec!["userId"]
     );
@@ -276,7 +266,7 @@ fn model_block_composite_foreign_key() {
         .expect("Child model to be present");
 
     assert_eq!(
-        child.d1_binding.as_ref().map(|b| b.env_binding.as_str()),
+        child.d1_binding.as_ref().map(|b| b.env_binding),
         Some("d1_a")
     );
 
@@ -286,7 +276,7 @@ fn model_block_composite_foreign_key() {
     assert_eq!(
         fk.references
             .iter()
-            .map(|(src, _)| src.as_str())
+            .map(|(src, _)| *src)
             .collect::<Vec<_>>(),
         vec!["orgId", "userId"]
     );
@@ -327,10 +317,7 @@ fn model_block_nav_one_to_one() {
     assert_eq!(nav.field, "bar");
     assert!(!nav.is_many_to_many);
     assert_eq!(
-        nav.fields
-            .iter()
-            .map(|(m, f)| (m.as_str(), f.as_str()))
-            .collect::<Vec<_>>(),
+        nav.fields.iter().map(|(m, f)| (*m, *f)).collect::<Vec<_>>(),
         vec![("Bar", "id")]
     );
 }
@@ -370,10 +357,7 @@ fn model_block_nav_one_to_many() {
     assert_eq!(nav.field, "bars");
     assert!(!nav.is_many_to_many);
     assert_eq!(
-        nav.fields
-            .iter()
-            .map(|(m, f)| (m.as_str(), f.as_str()))
-            .collect::<Vec<_>>(),
+        nav.fields.iter().map(|(m, f)| (*m, *f)).collect::<Vec<_>>(),
         vec![("Bar", "fooId")]
     );
 }
@@ -422,7 +406,7 @@ fn model_block_nav_many_to_many() {
         student_nav
             .fields
             .iter()
-            .map(|(m, f)| (m.as_str(), f.as_str()))
+            .map(|(m, f)| (*m, *f))
             .collect::<Vec<_>>(),
         vec![("Course", "students")]
     );
@@ -435,7 +419,7 @@ fn model_block_nav_many_to_many() {
         course_nav
             .fields
             .iter()
-            .map(|(m, f)| (m.as_str(), f.as_str()))
+            .map(|(m, f)| (*m, *f))
             .collect::<Vec<_>>(),
         vec![("Student", "courses")]
     );
@@ -468,10 +452,7 @@ fn model_block_nav_implicit_model() {
     assert_eq!(nav.field, "foo");
     assert!(!nav.is_many_to_many);
     assert_eq!(
-        nav.fields
-            .iter()
-            .map(|(m, f)| (m.as_str(), f.as_str()))
-            .collect::<Vec<_>>(),
+        nav.fields.iter().map(|(m, f)| (*m, *f)).collect::<Vec<_>>(),
         vec![("Bar", "col")]
     );
 }
@@ -510,10 +491,7 @@ fn model_block_nav_mixed_refs() {
     assert_eq!(nav.field, "baz");
     assert!(!nav.is_many_to_many);
     assert_eq!(
-        nav.fields
-            .iter()
-            .map(|(m, f)| (m.as_str(), f.as_str()))
-            .collect::<Vec<_>>(),
+        nav.fields.iter().map(|(m, f)| (*m, *f)).collect::<Vec<_>>(),
         vec![("Foo", "col"), ("Bar", "localCol")]
     );
 }
@@ -750,7 +728,7 @@ fn poo_block() {
         user_poo
             .fields
             .iter()
-            .map(|f| (f.name.as_str(), f.cidl_type.clone()))
+            .map(|f| (f.name, f.cidl_type.clone()))
             .collect::<Vec<_>>(),
         vec![
             ("id", CidlType::Integer),
@@ -817,7 +795,7 @@ fn inject_block() {
         ast.injects
             .iter()
             .flat_map(|s| s.fields.iter())
-            .map(|r| r.name.as_str())
+            .map(|r| r.name)
             .collect::<Vec<_>>(),
         vec!["OpenApiService", "YouTubeApi", "SlackApi"]
     );

@@ -1,8 +1,8 @@
 use std::path::PathBuf;
 
-use ast::CloesceAst;
 use frontend::{
     ParseAst,
+    fmt::DisplayError,
     lexer::{CloesceLexer, LexSource},
     parser::CloesceParser,
 };
@@ -22,49 +22,37 @@ macro_rules! expected_str {
     }};
 }
 
-pub struct InMemorySource {
-    pub src: String,
-}
-
-impl InMemorySource {
-    pub fn new(src: impl Into<String>) -> Self {
-        InMemorySource { src: src.into() }
-    }
-}
-
-impl LexSource for InMemorySource {
-    fn path(&self) -> PathBuf {
-        PathBuf::from("<test>")
-    }
-    fn content(&self) -> std::io::Result<String> {
-        Ok(self.src.clone())
-    }
-}
-
 /// Given a source string, lex and parse it into a [ParseAst], panicking if either step fails.
-pub fn lex_and_parse(src: &str) -> ParseAst {
-    let tokens = match CloesceLexer.lex(InMemorySource::new(src)) {
-        Ok(tokens) => tokens,
-        Err(e) => {
-            e.eprint();
-            panic!("lexing should succeed")
-        }
+pub fn lex_and_parse(src: &str) -> ParseAst<'_> {
+    let source = LexSource {
+        src,
+        path: PathBuf::from("<test>"),
     };
 
-    CloesceParser
-        .parse(tokens.tokens)
-        .expect("parse to succeed")
+    let lexed = CloesceLexer::lex(vec![source]);
+    if lexed.has_errors() {
+        lexed.display_error(&lexed.file_table);
+        panic!("lexing should succeed");
+    }
+
+    let result = CloesceParser::parse(&lexed.results, &lexed.file_table);
+    if result.has_errors() {
+        result.display_error(&lexed.file_table);
+        panic!("parse should succeed");
+    }
+
+    result.ast
 }
 
-/// Given a source string, lex, parse, and semantically analyze it into a [CloesceAst],
-/// panicking if any step fails.
-pub fn src_to_ast(src: &str) -> CloesceAst {
-    let parse = lex_and_parse(src);
-    let (result, errors) = semantic::SemanticAnalysis::analyze(parse);
-    assert!(
-        errors.is_empty(),
-        "semantic analysis should succeed: {:#?}",
-        errors
-    );
-    result
-}
+// /// Given a source string, lex, parse, and semantically analyze it into a [CloesceAst],
+// /// panicking if any step fails.
+// pub fn src_to_ast(src: &str) -> CloesceAst {
+//     let parse = lex_and_parse(src);
+//     let (result, errors) = semantic::SemanticAnalysis::analyze(parse);
+//     assert!(
+//         errors.is_empty(),
+//         "semantic analysis should succeed: {:#?}",
+//         errors
+//     );
+//     result
+// }

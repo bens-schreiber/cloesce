@@ -1,12 +1,14 @@
-use ariadne::{Color, Label, Report};
+use chumsky::span::{SimpleSpan, Spanned};
 use logos::Logos;
 
-use std::fs;
+use std::collections::HashMap;
 use std::ops::Range;
 use std::path::PathBuf;
 
+use crate::{FileId, FileTable, Span};
+
 #[derive(Logos, Debug, PartialEq, Clone)]
-pub enum Token {
+pub enum Token<'src> {
     // Keywords
     #[token("env")]
     Env,
@@ -104,8 +106,12 @@ pub enum Token {
     At,
 
     // Literals
-    #[regex(r#""[^"]*""#, |lex| { let s = lex.slice(); s[1..s.len()-1].to_string() })]
-    StringLit(String),
+    #[regex(r#""[^"]*""#, |lex| {
+        let s = lex.slice();
+        // Return a string slice without the quotes
+        &s[1..s.len()-1]
+    })]
+    StringLit(&'src str),
 
     #[regex(r"[0-9][0-9_]*", |lex| lex.slice().replace('_', "").parse::<i64>().ok())]
     IntLit(i64),
@@ -114,8 +120,8 @@ pub enum Token {
     DoubleLit(f64),
 
     // Identifiers (must come after keywords)
-    #[regex(r"[a-zA-Z_][a-zA-Z0-9_]*", |lex| lex.slice().to_string())]
-    Ident(String),
+    #[regex(r"[a-zA-Z_][a-zA-Z0-9_]*", |lex| lex.slice())]
+    Ident(&'src str),
 
     // Skip whitespace and comments
     #[regex(r"[ \t\r\n]+", logos::skip)]
@@ -123,123 +129,95 @@ pub enum Token {
     Error,
 }
 
-pub struct CloesceLexer;
-impl CloesceLexer {
-    pub fn lex(&self, source: impl LexSource) -> Result<LexedFile, LexedFileError> {
-        let path = source.path();
-        let path_str = path.display().to_string();
-        let src = match source.content() {
-            Ok(s) => s,
-            Err(e) => {
-                let msg = format!("failed to read file: {}", e);
-                let report = fail_file_report(&path_str, msg);
-                return Err(LexedFileError {
-                    reports: vec![report],
-                    path_str,
-                    src: String::new(),
-                });
-            }
-        };
+pub struct LexSource<'src> {
+    /// The full program source string.
+    pub src: &'src str,
 
-        let mut tokens = Vec::new();
-        let mut spans: Vec<Range<usize>> = Vec::new();
-
-        for (result, span) in Token::lexer(&src).spanned() {
-            match result {
-                Ok(token) => tokens.push((token, span)),
-                Err(_) => spans.push(span),
-            }
-        }
-
-        if spans.is_empty() {
-            return Ok(LexedFile { tokens, path });
-        }
-
-        let reports = spans
-            .into_iter()
-            .map(|span| lex_error(&path_str, span))
-            .collect();
-        Err(LexedFileError {
-            reports,
-            path_str,
-            src,
-        })
-    }
-
-    pub fn lex_targets(
-        &self,
-        targets: Vec<PathBuf>,
-    ) -> Result<Vec<LexedFile>, Vec<LexedFileError>> {
-        let mut lexed_files = Vec::new();
-        let mut errors = Vec::new();
-
-        // TODO: should optimize by doing this in parallel, as well as stream the file
-        // instead of reading it all into memory at once
-        for path in targets {
-            match self.lex(path) {
-                Ok(res) => lexed_files.push(res),
-                Err(e) => errors.push(e),
-            }
-        }
-
-        if errors.is_empty() {
-            Ok(lexed_files)
-        } else {
-            Err(errors)
-        }
-    }
-}
-
-pub trait LexSource {
-    fn path(&self) -> PathBuf;
-    fn content(&self) -> std::io::Result<String>;
-}
-
-impl LexSource for PathBuf {
-    fn path(&self) -> PathBuf {
-        self.clone()
-    }
-    fn content(&self) -> std::io::Result<String> {
-        fs::read_to_string(self)
-    }
-}
-
-pub type TokenRange = (Token, Range<usize>);
-pub struct LexedFile {
-    pub tokens: Vec<TokenRange>,
+    /// The file path of the source, used for error reporting. Safe to be a dummy value for tests.
     pub path: PathBuf,
 }
 
-type LexReport = Report<'static, (String, Range<usize>)>;
+pub type SpannedToken<'src> = Spanned<Token<'src>, Span>;
+pub struct LexedFile<'src> {
+    /// The list of tokens produced by lexing the source string.
+    /// Each token is annotated with it a file span, along with the file ID
+    pub tokens: Vec<SpannedToken<'src>>,
 
-pub struct LexedFileError {
-    pub reports: Vec<LexReport>,
-    pub path_str: String,
-    pub src: String,
+    /// The file ID assigned to this source file, used for error reporting.
+    /// Unique across all lexed files.
+    pub file_id: FileId,
 }
 
-impl LexedFileError {
-    pub fn eprint(&self) {
-        let mut cache = ariadne::sources([(self.path_str.clone(), &self.src)]);
-        for report in &self.reports {
-            report.write(&mut cache, std::io::stderr()).ok();
-        }
+pub struct LexResult<'src> {
+    pub results: Vec<LexedFile<'src>>,
+    pub file_table: FileTable<'src>,
+    pub errors: Vec<LexError>,
+}
+impl LexResult<'_> {
+    pub fn has_errors(&self) -> bool {
+        !self.errors.is_empty()
     }
 }
 
-fn fail_file_report(path_str: &String, msg: String) -> LexReport {
-    Report::build(ariadne::ReportKind::Error, (path_str.clone(), 0..0))
-        .with_message(msg)
-        .finish()
+pub struct LexError {
+    pub error_spans: Vec<Range<usize>>,
+    pub file_id: FileId,
 }
 
-fn lex_error(path_str: &String, span: Range<usize>) -> LexReport {
-    Report::build(ariadne::ReportKind::Error, (path_str.clone(), span.clone()))
-        .with_message("unexpected token")
-        .with_label(
-            Label::new((path_str.clone(), span))
-                .with_message("not a valid token")
-                .with_color(Color::Red),
-        )
-        .finish()
+pub struct CloesceLexer;
+impl<'src> CloesceLexer {
+    fn lex_file(src: &'src str, file_id: FileId) -> (Vec<SpannedToken<'src>>, Vec<LexError>) {
+        let mut tokens = Vec::new();
+        let mut error_spans: Vec<Range<usize>> = Vec::new();
+
+        for (result, span) in Token::lexer(src).spanned() {
+            match result {
+                Ok(token) => tokens.push(Spanned {
+                    inner: token,
+                    span: SimpleSpan {
+                        start: span.start,
+                        end: span.end,
+                        context: file_id,
+                    },
+                }),
+                Err(_) => error_spans.push(span),
+            }
+        }
+
+        let errors = error_spans
+            .into_iter()
+            .map(|span| LexError {
+                error_spans: vec![span],
+                file_id,
+            })
+            .collect();
+
+        (tokens, errors)
+    }
+
+    pub fn lex(targets: impl IntoIterator<Item = LexSource<'src>>) -> LexResult<'src> {
+        let mut file_table = FileTable {
+            table: HashMap::new(),
+        };
+
+        let mut results = Vec::new();
+        let mut errors = Vec::new();
+
+        // todo: could be parallelized
+        for (id_seed, source) in targets.into_iter().enumerate() {
+            let file_id = id_seed.try_into().expect("too many files to lex");
+
+            file_table.table.insert(file_id, (source.src, source.path));
+
+            let (tokens, errs) = Self::lex_file(source.src, file_id);
+            results.push(LexedFile { tokens, file_id });
+            errors.extend(errs);
+        }
+
+        LexResult {
+            results,
+            errors,
+            file_table,
+        }
+    }
 }

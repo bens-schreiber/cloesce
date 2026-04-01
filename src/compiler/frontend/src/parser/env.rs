@@ -2,9 +2,9 @@ use ast::CidlType;
 use chumsky::prelude::*;
 
 use crate::{
-    FileSpan, Symbol, SymbolKind, WranglerEnvBindingKind, WranglerEnvBlock,
+    Symbol, SymbolKind, WranglerEnvBindingKind, WranglerEnvBlock,
     lexer::Token,
-    parser::{Extra, cidl_type},
+    parser::{Extra, TokenInput, cidl_type},
 };
 
 enum BindingKind {
@@ -27,7 +27,8 @@ enum EnvEntry {
 ///     ident3: cidl_type
 /// }
 /// ```
-pub fn env_block<'t>() -> impl Parser<'t, &'t [Token], WranglerEnvBlock, Extra<'t>> {
+pub fn env_block<'tokens, 'src: 'tokens>()
+-> impl Parser<'tokens, TokenInput<'tokens, 'src>, WranglerEnvBlock<'src>, Extra<'tokens, 'src>> {
     // ident: (d1 | r2 | kv | cidl_type)
     let env_entry = select! { Token::Ident(name) => name }
         .map_with(|name, e| (name, e.span()))
@@ -47,10 +48,10 @@ pub fn env_block<'t>() -> impl Parser<'t, &'t [Token], WranglerEnvBlock, Extra<'
                 .collect::<Vec<_>>()
                 .delimited_by(just(Token::LBrace), just(Token::RBrace)),
         )
-        .map_with(move |entries, e| {
+        .map_with(|entries, e| {
             let mut block = WranglerEnvBlock {
                 symbol: Symbol {
-                    span: FileSpan::from_simple_span(e.span()),
+                    span: e.span(),
                     kind: SymbolKind::WranglerEnvDecl,
                     ..Default::default()
                 },
@@ -60,7 +61,6 @@ pub fn env_block<'t>() -> impl Parser<'t, &'t [Token], WranglerEnvBlock, Extra<'
                 vars: Vec::new(),
             };
             for ((name, span), entry) in entries {
-                let span = FileSpan::from_simple_span(span);
                 match entry {
                     EnvEntry::Binding(BindingKind::D1) => {
                         block.d1_bindings.push(Symbol {

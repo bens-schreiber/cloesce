@@ -1,13 +1,13 @@
-use std::collections::BTreeMap;
+use std::{borrow::Cow, collections::BTreeMap};
 
 use chumsky::prelude::*;
 
 use ast::IncludeTree;
 
 use crate::{
-    DataSourceBlock, DataSourceBlockMethod, FileSpan, Symbol, SymbolKind,
+    DataSourceBlock, DataSourceBlockMethod, Symbol, SymbolKind,
     lexer::Token,
-    parser::{Extra, cidl_type},
+    parser::{Extra, TokenInput, cidl_type},
 };
 
 /// Parses a block of the form:
@@ -19,7 +19,8 @@ use crate::{
 ///     sql list(ident: cidl_type, ...) { "..." }
 /// }
 /// ```
-pub fn data_source_block<'t>() -> impl Parser<'t, &'t [Token], DataSourceBlock, Extra<'t>> {
+pub fn data_source_block<'tokens, 'src: 'tokens>()
+-> impl Parser<'tokens, TokenInput<'tokens, 'src>, DataSourceBlock<'src>, Extra<'tokens, 'src>> {
     // ident | ident { ... }
     let include_entry = recursive(|entry| {
         select! { Token::Ident(name) => name }
@@ -38,7 +39,7 @@ pub fn data_source_block<'t>() -> impl Parser<'t, &'t [Token], DataSourceBlock, 
                         .into_iter()
                         .collect::<BTreeMap<_, _>>(),
                 );
-                (name, subtree)
+                (name.to_string(), subtree)
             })
             .boxed()
     });
@@ -60,7 +61,7 @@ pub fn data_source_block<'t>() -> impl Parser<'t, &'t [Token], DataSourceBlock, 
             .then(cidl_type())
             .map(|((name, span), cidl_type)| Symbol {
                 name,
-                span: FileSpan::from_simple_span(span),
+                span,
                 cidl_type,
                 kind: SymbolKind::DataSourceMethodParam,
                 ..Default::default()
@@ -88,7 +89,7 @@ pub fn data_source_block<'t>() -> impl Parser<'t, &'t [Token], DataSourceBlock, 
 
     // sql list(...) { ... }
     let list_method = just(Token::Sql)
-        .then_ignore(just(Token::Ident("list".into())))
+        .then_ignore(just(Token::Ident("list")))
         .ignore_then(
             named_parameter()
                 .separated_by(just(Token::Comma))
@@ -100,7 +101,7 @@ pub fn data_source_block<'t>() -> impl Parser<'t, &'t [Token], DataSourceBlock, 
 
     // @internal
     let internal_decorator = just(Token::At)
-        .ignore_then(just(Token::Ident("internal".into())))
+        .ignore_then(just(Token::Ident("internal")))
         .ignored();
 
     // source SourceName for ModelName { ... }
@@ -118,30 +119,24 @@ pub fn data_source_block<'t>() -> impl Parser<'t, &'t [Token], DataSourceBlock, 
         .map_with(
             |(((is_internal, name), model), ((include_entries, get_method), list_method)), e| {
                 let tree = IncludeTree(include_entries.into_iter().collect());
-                let set_parent = |mut params: Vec<Symbol>, method: &str| -> Vec<Symbol> {
-                    let parent = format!("{model}::{name}::{method}");
-                    for p in &mut params {
-                        p.parent_name = parent.clone();
-                    }
-                    params
-                };
+
                 let get = get_method.map(|(params, raw_sql)| DataSourceBlockMethod {
                     span: e.span(),
-                    parameters: set_parent(params, "get"),
+                    parameters: set_params_parent(model, "get", params, name),
                     raw_sql,
                 });
                 let list = list_method.map(|(params, raw_sql)| DataSourceBlockMethod {
                     span: e.span(),
-                    parameters: set_parent(params, "list"),
+                    parameters: set_params_parent(model, "list", params, name),
                     raw_sql,
                 });
 
                 DataSourceBlock {
                     symbol: Symbol {
                         name,
-                        span: FileSpan::from_simple_span(e.span()),
+                        span: e.span(),
                         kind: SymbolKind::DataSourceDecl,
-                        parent_name: model.clone(),
+                        parent_name: Cow::Borrowed(model),
                         ..Default::default()
                     },
                     model,
@@ -152,4 +147,20 @@ pub fn data_source_block<'t>() -> impl Parser<'t, &'t [Token], DataSourceBlock, 
                 }
             },
         )
+}
+
+fn set_params_parent<'src>(
+    model: &str,
+    method: &str,
+    params: Vec<Symbol<'src>>,
+    name: &str,
+) -> Vec<Symbol<'src>> {
+    let parent = format!("{model}::{name}::{method}");
+    params
+        .into_iter()
+        .map(|mut p| {
+            p.parent_name = Cow::Owned(parent.clone());
+            p
+        })
+        .collect()
 }

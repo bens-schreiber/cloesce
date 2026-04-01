@@ -1,28 +1,30 @@
+use std::borrow::Cow;
+
 use chumsky::prelude::*;
 
 use ast::{CidlType, HttpVerb};
 
 use crate::{
-    ApiBlock, ApiBlockMethod, FileSpan, Symbol, SymbolKind,
+    ApiBlock, ApiBlockMethod, Span, Symbol, SymbolKind,
     lexer::Token,
-    parser::{Extra, cidl_type},
+    parser::{Extra, TokenInput, cidl_type},
 };
 
-struct PendingApiMethod {
-    name: String,
-    span: SimpleSpan,
+struct PendingApiMethod<'src> {
+    name: &'src str,
+    span: Span,
     http_verb: HttpVerb,
     return_type: CidlType,
-    parameters: Vec<PendingApiParam>,
+    parameters: Vec<PendingApiParam<'src>>,
 }
 
-enum PendingApiParam {
+enum PendingApiParam<'src> {
     SelfParam {
-        data_source: Option<String>,
+        data_source: Option<&'src str>,
     },
     Field {
-        name: String,
-        span: SimpleSpan,
+        name: &'src str,
+        span: Span,
         cidl_type: CidlType,
     },
 }
@@ -40,7 +42,8 @@ enum PendingApiParam {
 ///     ) -> cidl_type
 /// }
 /// ```
-pub fn api_block<'t>() -> impl Parser<'t, &'t [Token], ApiBlock, Extra<'t>> {
+pub fn api_block<'tokens, 'src: 'tokens>()
+-> impl Parser<'tokens, TokenInput<'tokens, 'src>, ApiBlock<'src>, Extra<'tokens, 'src>> {
     // api Namespace { ... }
     just(Token::Api)
         .ignore_then(select! { Token::Ident(name) => name })
@@ -53,14 +56,14 @@ pub fn api_block<'t>() -> impl Parser<'t, &'t [Token], ApiBlock, Extra<'t>> {
         .map_with(|(namespace, pending_methods), e| {
             let methods = pending_methods
                 .into_iter()
-                .map(|m| map_method(m, &namespace))
+                .map(|m| map_method(m, namespace))
                 .collect();
 
             ApiBlock {
                 symbol: Symbol {
-                    span: FileSpan::from_simple_span(e.span()),
+                    span: e.span(),
                     kind: SymbolKind::ApiDecl,
-                    parent_name: namespace.clone(),
+                    parent_name: Cow::Borrowed(namespace),
                     ..Default::default()
                 },
                 namespace,
@@ -69,7 +72,8 @@ pub fn api_block<'t>() -> impl Parser<'t, &'t [Token], ApiBlock, Extra<'t>> {
         })
 }
 
-fn method<'t>() -> impl Parser<'t, &'t [Token], PendingApiMethod, Extra<'t>> {
+fn method<'tokens, 'src: 'tokens>()
+-> impl Parser<'tokens, TokenInput<'tokens, 'src>, PendingApiMethod<'src>, Extra<'tokens, 'src>> {
     // http_verb methodName(ident1: cidl_type, ...) -> cidl_type
     http_verb()
         .then(select! { Token::Ident(name) => name }.map_with(|name, e| (name, e.span())))
@@ -93,7 +97,8 @@ fn method<'t>() -> impl Parser<'t, &'t [Token], PendingApiMethod, Extra<'t>> {
         )
 }
 
-fn parameter<'t>() -> impl Parser<'t, &'t [Token], PendingApiParam, Extra<'t>> {
+fn parameter<'tokens, 'src: 'tokens>()
+-> impl Parser<'tokens, TokenInput<'tokens, 'src>, PendingApiParam<'src>, Extra<'tokens, 'src>> {
     // @source(DataSourceName) self
     let source_tag = just(Token::At)
         .ignore_then(just(Token::Source))
@@ -122,7 +127,8 @@ fn parameter<'t>() -> impl Parser<'t, &'t [Token], PendingApiParam, Extra<'t>> {
     self_parameter.or(named_parameter)
 }
 
-fn http_verb<'t>() -> impl Parser<'t, &'t [Token], HttpVerb, Extra<'t>> {
+fn http_verb<'tokens, 'src: 'tokens>()
+-> impl Parser<'tokens, TokenInput<'tokens, 'src>, HttpVerb, Extra<'tokens, 'src>> {
     choice((
         just(Token::Get).map(|_| HttpVerb::Get),
         just(Token::Post).map(|_| HttpVerb::Post),
@@ -132,7 +138,7 @@ fn http_verb<'t>() -> impl Parser<'t, &'t [Token], HttpVerb, Extra<'t>> {
     ))
 }
 
-fn map_method(method: PendingApiMethod, namespace: &str) -> ApiBlockMethod {
+fn map_method<'src>(method: PendingApiMethod<'src>, namespace: &'src str) -> ApiBlockMethod<'src> {
     let mut is_static = true;
     let mut data_source = None;
     let mut parameters = Vec::new();
@@ -153,11 +159,11 @@ fn map_method(method: PendingApiMethod, namespace: &str) -> ApiBlockMethod {
                 cidl_type,
             } => {
                 parameters.push(Symbol {
-                    span: FileSpan::from_simple_span(span),
+                    span,
                     name,
                     cidl_type,
                     kind: SymbolKind::ApiMethodParam,
-                    parent_name: format!("{namespace}::{}", method.name),
+                    parent_name: Cow::Owned(format!("{namespace}::{}", method.name)),
                 });
             }
         }
@@ -165,10 +171,10 @@ fn map_method(method: PendingApiMethod, namespace: &str) -> ApiBlockMethod {
 
     ApiBlockMethod {
         symbol: Symbol {
-            span: FileSpan::from_simple_span(method.span),
+            span: method.span,
             name: method.name,
             kind: SymbolKind::ApiMethodDecl,
-            parent_name: namespace.to_string(),
+            parent_name: Cow::Borrowed(namespace),
             ..Default::default()
         },
         is_static,
