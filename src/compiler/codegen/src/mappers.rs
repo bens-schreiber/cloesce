@@ -1,31 +1,4 @@
-use std::sync::Arc;
-
 use ast::{CidlType, CloesceAst, MediaType};
-use handlebars::Handlebars;
-
-/// Helper function to create a Handlebars helper which
-/// has access to a [LanguageTypeMapper] and the [CloesceAst].
-pub fn make_mapper_helper<'a, F>(
-    mapper: Arc<dyn LanguageTypeMapper + Send + Sync + 'a>,
-    ast: &'a CloesceAst,
-    f: F,
-) -> Box<dyn handlebars::HelperDef + Send + Sync + 'a>
-where
-    F: Fn(serde_json::Value, &dyn LanguageTypeMapper, &CloesceAst) -> String + Send + Sync + 'a,
-{
-    Box::new(
-        move |h: &handlebars::Helper<'_>,
-              _hb: &Handlebars<'_>,
-              _ctx: &handlebars::Context,
-              _rc: &mut handlebars::RenderContext<'_, '_>,
-              out: &mut dyn handlebars::Output| {
-            let value = h.param(0).unwrap().value().clone();
-            let rendered = f(value, mapper.as_ref(), ast);
-            out.write(&rendered)?;
-            Ok(())
-        },
-    )
-}
 
 pub trait LanguageTypeMapper {
     fn cidl_type(&self, ty: &CidlType, ast: &CloesceAst) -> String;

@@ -64,19 +64,24 @@ pub enum CidlType<'src> {
     },
 
     /// An array of any type
+    #[serde(borrow)]
     Array(Box<CidlType<'src>>),
 
     /// A REST API response, which can contain any type or nothing.
+    #[serde(borrow)]
     HttpResult(Box<CidlType<'src>>),
 
     /// A wrapper denoting the type within can be null.
     /// If the inner value is void, represents just null.
+    #[serde(borrow)]
     Nullable(Box<CidlType<'src>>),
 
     /// A paginated response containing list metadata and a page of results.
+    #[serde(borrow)]
     Paginated(Box<CidlType<'src>>),
 
     /// A Cloudflare Workers KV object (GET value response)
+    #[serde(borrow)]
     KvObject(Box<CidlType<'src>>),
 
     /// A reference to an object or injected type that is not yet resolved by the parser

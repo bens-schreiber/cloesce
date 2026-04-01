@@ -1,0 +1,450 @@
+// GENERATED CODE. DO NOT MODIFY.
+{%- for (_key, poo) in &ast.poos %}
+export class {{ poo.name }} {
+{%- for field in &poo.fields %}
+  {{ field.name }}: {{ self.map_type(&field.cidl_type) }};
+{%- endfor %}
+
+  static fromJson(data: any): {{ poo.name }} {
+    const res = Object.assign(new {{ poo.name }}(), data);
+{%- for field in &poo.fields %}
+{%- if self.is_object_array(&field.cidl_type) %}
+    for (let i = 0; i < res.{{ field.name }}?.length; i++) {
+      res.{{ field.name }}[i] = {{ self.object_name(&field.cidl_type) }}.fromJson(res.{{ field.name }}[i]);
+    }
+{%- else if self.is_object(&field.cidl_type) %}
+    res["{{ field.name }}"] &&= {{ self.object_name(&field.cidl_type) }}.fromJson(res.{{ field.name }});
+{%- else if self.is_blob_array(&field.cidl_type) %}
+    for (let i = 0; i < res.{{ field.name }}.length; i++) {
+      res.{{ field.name }}[i] = b64ToU8(res.{{ field.name }}[i]);
+    }
+{%- else if self.is_blob(&field.cidl_type) %}
+    res.{{ field.name }} = b64ToU8(res.{{ field.name }});
+{%- endif %}
+{%- endfor %}
+    return res;
+  }
+}
+{%- endfor %}
+
+{%- for (_key, service) in &ast.services %}
+export class {{ service.name }} {
+{%- for api in &service.apis %}
+  static async {{ api.name }}(
+{%- for param in &api.parameters %}
+{%- if self.is_serializable(&param.cidl_type) %}
+    {{ param.name }}: {{ self.map_type(&param.cidl_type) }},
+{%- endif %}
+{%- endfor %}
+    fetchImpl: typeof fetch = fetch
+  ): Promise<HttpResult<{% if !self.is_stream(&api.return_type) %}{{ self.map_type(&api.return_type) }}{% else %}Response{% endif %}>> {
+    const baseUrl = new URL("{{ worker_url }}/{{ service.name }}/{{ api.name }}");
+{%- if !self.is_get_request(&api.http_verb) %}
+    const payload: any = {};
+{%- endif %}
+
+{%- for param in &api.parameters %}
+{%- if self.is_serializable(&param.cidl_type) %}
+{%- if self.is_url_param(&param.cidl_type, &api.http_verb) %}
+    baseUrl.searchParams.append("{{ param.name }}", String({{ param.name }}));
+{%- else %}
+    payload["{{ param.name }}"] = {{ param.name }};
+{%- endif %}
+{%- endif %}
+{%- endfor %}
+
+    const res = await fetchImpl(baseUrl, {
+      method: "{{ self.fmt_verb(&api.http_verb) }}",
+{%- if !self.is_get_request(&api.http_verb) %}
+      headers: { "Content-Type": "{{ self.fmt_content_type(&api.parameters_media) }}" },
+      body: requestBody({{ self.map_media(&api.parameters_media) }}, payload),
+{%- endif %}
+    });
+
+    return await HttpResult.fromResponse(
+      res,
+      {{ self.map_media(&api.return_media) }},
+{%- if self.needs_constructor(&api.return_type) %}
+      {{ self.map_root_type(&api.return_type) }},
+{%- else %}
+      undefined,
+{%- endif %}
+      {{ self.has_array(&api.return_type) }}
+    );
+  }
+{%- endfor %}
+}
+{%- endfor %}
+
+{%- for (_key, model) in &ast.models %}
+export class {{ model.name }} {
+{%- for col in &model.primary_columns %}
+  {{ col.field.name }}: {{ self.map_type(&col.field.cidl_type) }};
+{%- endfor %}
+{%- for col in &model.columns %}
+  {{ col.field.name }}: {{ self.map_type(&col.field.cidl_type) }};
+{%- endfor %}
+{%- for nav in &model.navigation_fields %}
+  {{ nav.field.name }}: {{ self.nav_type(nav) }}{% if self.is_one_to_one(nav) %} | undefined{% endif %};
+{%- endfor %}
+{%- for key in &model.key_fields %}
+  {{ key }}: string;
+{%- endfor %}
+{%- for kv in &model.kv_fields %}
+  {{ kv.field.name }}: {% if self.contains_stream(&kv.field.cidl_type) %}KValue<void>{% else %}{{ self.map_type(&kv.field.cidl_type) }}{% endif %};
+{%- endfor %}
+{%- for r2 in &model.r2_fields %}
+  {{ r2.field.name }}: {{ self.map_type(&r2.field.cidl_type) }};
+{%- endfor %}
+
+{%- for api in &model.apis %}
+{%- if self.is_crud_method(api.name) %}
+  static async {{ api.name }}(
+    args: {{ self.crud_args_type(api.name, model.name, &model.data_sources) }},
+    fetchImpl: typeof fetch = fetch
+  ): Promise<HttpResult<{{ self.map_type(&api.return_type) }}>> {
+    const baseUrl = new URL(
+      `{{ worker_url }}/{{ model.name }}/{{ api.name }}`
+    );
+{%- if !self.is_get_request(&api.http_verb) %}
+    const payload: any = {};
+{%- endif %}
+
+{%- for param in &api.parameters %}
+{%- if self.is_serializable(&param.cidl_type) %}
+{%- if !self.is_datasource(&param.cidl_type) %}
+{%- if self.is_url_param(&param.cidl_type, &api.http_verb) %}
+    if ("{{ param.name }}" in args) baseUrl.searchParams.append("{{ param.name }}", String((args as any).{{ param.name }}));
+{%- else %}
+    payload["{{ param.name }}"] = (args as any).{{ param.name }};
+{%- endif %}
+{%- endif %}
+{%- endif %}
+{%- endfor %}
+    baseUrl.searchParams.append("__datasource", args.kind);
+
+    const res = await fetchImpl(baseUrl, {
+      method: "{{ self.fmt_verb(&api.http_verb) }}",
+{%- if !self.is_get_request(&api.http_verb) %}
+      headers: { "Content-Type": "{{ self.fmt_content_type(&api.parameters_media) }}" },
+      body: requestBody({{ self.map_media(&api.parameters_media) }}, payload),
+{%- endif %}
+    });
+
+    return await HttpResult.fromResponse(
+      res,
+      {{ self.map_media(&api.return_media) }},
+{%- if self.needs_constructor(&api.return_type) %}
+      {{ self.map_root_type(&api.return_type) }},
+{%- else %}
+      undefined,
+{%- endif %}
+      {{ self.has_array(&api.return_type) }}
+    );
+  }
+{%- else %}
+  {% if api.is_static %}static {% endif %}async {{ api.name }}(
+{%- for param in &api.parameters %}
+{%- if self.is_serializable(&param.cidl_type) %}
+    {{ param.name }}: {{ self.map_type(&param.cidl_type) }},
+{%- endif %}
+{%- endfor %}
+    fetchImpl: typeof fetch = fetch
+  ): Promise<HttpResult<{% if !self.is_stream(&api.return_type) %}{{ self.map_type(&api.return_type) }}{% else %}Response{% endif %}>> {
+{%- if !api.is_static %}
+    const id = [
+{%- for col in &model.primary_columns %}
+      encodeURIComponent(String(this.{{ col.field.name }})),
+{%- endfor %}
+{%- for key in &model.key_fields %}
+      encodeURIComponent(String(this.{{ key }})),
+{%- endfor %}
+    ].join("/");
+{%- endif %}
+    const baseUrl = new URL(
+      `{{ worker_url }}/{{ model.name }}/{% if !api.is_static %}${id}/{% endif %}{{ api.name }}`
+    );
+{%- if !self.is_get_request(&api.http_verb) %}
+    const payload: any = {};
+{%- endif %}
+
+{%- for param in &api.parameters %}
+{%- if self.is_serializable(&param.cidl_type) %}
+{%- if self.is_url_param(&param.cidl_type, &api.http_verb) %}
+    baseUrl.searchParams.append("{{ param.name }}", String({{ param.name }}));
+{%- else %}
+    payload["{{ param.name }}"] = {{ param.name }};
+{%- endif %}
+{%- endif %}
+{%- endfor %}
+
+    const res = await fetchImpl(baseUrl, {
+      method: "{{ self.fmt_verb(&api.http_verb) }}",
+{%- if !self.is_get_request(&api.http_verb) %}
+      headers: { "Content-Type": "{{ self.fmt_content_type(&api.parameters_media) }}" },
+      body: requestBody({{ self.map_media(&api.parameters_media) }}, payload),
+{%- endif %}
+    });
+
+    return await HttpResult.fromResponse(
+      res,
+      {{ self.map_media(&api.return_media) }},
+{%- if self.needs_constructor(&api.return_type) %}
+      {{ self.map_root_type(&api.return_type) }},
+{%- else %}
+      undefined,
+{%- endif %}
+      {{ self.has_array(&api.return_type) }}
+    );
+  }
+{%- endif %}
+{%- endfor %}
+
+  static fromJson(data: any): {{ model.name }} {
+    const res = Object.assign(new {{ model.name }}(), data);
+{%- for nav in &model.navigation_fields %}
+{%- if self.is_one_to_one(nav) %}
+    res["{{ nav.field.name }}"] &&= {{ nav.model_reference }}.fromJson(res.{{ nav.field.name }});
+{%- else %}
+    for (let i = 0; i < res.{{ nav.field.name }}?.length; i++) {
+      res.{{ nav.field.name }}[i] = {{ nav.model_reference }}.fromJson(res.{{ nav.field.name }}[i]);
+    }
+{%- endif %}
+{%- endfor %}
+{%- for col in &model.columns %}
+{%- if self.is_blob_array(&col.field.cidl_type) %}
+    for (let i = 0; i < res.{{ col.field.name }}.length; i++) {
+      res.{{ col.field.name }}[i] = b64ToU8(res.{{ col.field.name }}[i]);
+    }
+{%- else if self.is_blob(&col.field.cidl_type) %}
+    res.{{ col.field.name }} = b64ToU8(res.{{ col.field.name }});
+{%- endif %}
+{%- endfor %}
+{%- for kv in &model.kv_fields %}
+{%- if self.is_paginated(&kv.field.cidl_type) %}
+    if (res.{{ kv.field.name }}?.results) {
+      for (let i = 0; i < res.{{ kv.field.name }}.results.length; i++) {
+        res.{{ kv.field.name }}.results[i] = Object.assign(new {{ self.map_kv_inner_type(&kv.field.cidl_type) }}(), res.{{ kv.field.name }}.results[i]);
+{%- if self.is_object(self.kv_inner_type(&kv.field.cidl_type)) %}
+        if (res.{{ kv.field.name }}.results[i].raw) res.{{ kv.field.name }}.results[i].raw = {{ self.object_name(self.kv_inner_type(&kv.field.cidl_type)) }}.fromJson(res.{{ kv.field.name }}.results[i].raw);
+{%- endif %}
+      }
+    }
+{%- else if !self.contains_stream(&kv.field.cidl_type) %}
+    if (res.{{ kv.field.name }}) res.{{ kv.field.name }} = Object.assign(new {{ self.map_kv_inner_type(&kv.field.cidl_type) }}(), res.{{ kv.field.name }});
+{%- if self.is_object(self.kv_inner_type(&kv.field.cidl_type)) %}
+    if (res.{{ kv.field.name }}?.raw) res.{{ kv.field.name }}.raw = {{ self.object_name(self.kv_inner_type(&kv.field.cidl_type)) }}.fromJson(res.{{ kv.field.name }}.raw);
+{%- endif %}
+{%- endif %}
+{%- endfor %}
+{%- for r2 in &model.r2_fields %}
+{%- if self.is_paginated(&r2.field.cidl_type) %}
+    if (res.{{ r2.field.name }}?.results) {
+      for (let i = 0; i < res.{{ r2.field.name }}.results.length; i++) {
+        res.{{ r2.field.name }}.results[i] = Object.assign(new R2Object(), res.{{ r2.field.name }}.results[i]);
+      }
+    }
+{%- endif %}
+{%- endfor %}
+    return res;
+  }
+}
+{%- endfor %}
+
+type DeepPartialInner<T> = T extends (infer U)[]
+  ? DeepPartialInner<U>[]
+  : T extends object
+  ? { [K in keyof T]?: DeepPartialInner<T[K]> }
+  : T | (null extends T ? null : never);
+export type DeepPartial<T> = DeepPartialInner<T> & { __brand?: "Partial" };
+
+export class KValue<V> {
+  key!: string;
+  raw: unknown | null;
+  metadata: unknown | null;
+  get value(): V | null {
+    return this.raw as V | null;
+  }
+}
+
+export interface Paginated<T> {
+  results: T[];
+  cursor: string | null;
+  complete: boolean;
+}
+
+export enum MediaType {
+  Json = "Json",
+  Octet = "Octet",
+}
+
+declare const Buffer: any;
+export function b64ToU8(b64: string): Uint8Array {
+  if (typeof Buffer !== "undefined") {
+    const buffer = Buffer.from(b64, "base64");
+    return new Uint8Array(buffer);
+  }
+  const s = atob(b64);
+  const u8 = new Uint8Array(s.length);
+  for (let i = 0; i < s.length; i++) {
+    u8[i] = s.charCodeAt(i);
+  }
+  return u8;
+}
+
+export function u8ToB64(u8: Uint8Array): string {
+  if (typeof Buffer !== "undefined") {
+    return Buffer.from(u8).toString("base64");
+  }
+  let s = "";
+  for (let i = 0; i < u8.length; i++) {
+    s += String.fromCharCode(u8[i]);
+  }
+  return btoa(s);
+}
+
+export class R2Object {
+  key!: string;
+  version!: string;
+  size!: number;
+  etag!: string;
+  httpEtag!: string;
+  uploaded!: Date;
+  customMetadata?: Record<string, string>;
+}
+
+function requestBody(
+  mediaType: MediaType,
+  data: any | string | undefined,
+): BodyInit | undefined {
+  switch (mediaType) {
+    case MediaType.Json: {
+      return JSON.stringify(data ?? {}, (_, v) => {
+        if (v instanceof Uint8Array) {
+          return u8ToB64(v);
+        }
+        return v;
+      });
+    }
+    case MediaType.Octet: {
+      return Object.values(data)[0] as BodyInit;
+    }
+  }
+}
+
+export class HttpResult<T = unknown> {
+  public constructor(
+    public ok: boolean,
+    public status: number,
+    public headers: Headers,
+    public data?: T,
+    public message?: string,
+    public mediaType?: MediaType,
+  ) { }
+
+  static async fromResponse(
+    response: Response,
+    mediaType: MediaType,
+    ctor?: any,
+    array: boolean = false,
+  ): Promise<HttpResult<any>> {
+    if (response.status >= 400) {
+      return new HttpResult(
+        false,
+        response.status,
+        response.headers,
+        undefined,
+        await response.text(),
+      );
+    }
+
+    function instantiate(json: any, ctor?: any) {
+      switch (ctor) {
+        case Date: {
+          return new Date(json);
+        }
+        case Uint8Array: {
+          return b64ToU8(json);
+        }
+        case undefined: {
+          return json;
+        }
+        default: {
+          return ctor.fromJson(json);
+        }
+      }
+    }
+
+    async function data() {
+      switch (mediaType) {
+        case MediaType.Json: {
+          const data = await response.json();
+
+          if (array && Array.isArray(data)) {
+            for (let i = 0; i < data.length; i++) {
+              data[i] = instantiate(data[i], ctor);
+            }
+            return data;
+          }
+          return instantiate(data, ctor);
+        }
+        case MediaType.Octet: {
+          return response;
+        }
+      }
+    }
+    return new HttpResult(
+      true,
+      response.status,
+      response.headers,
+      await data(),
+    );
+  }
+}
+
+{%- for (_key, model) in &ast.models %}
+{%- if !model.cruds.is_empty() %}
+export namespace DataSources {
+  export namespace {{ model.name }} {
+{%- for crud in &model.cruds %}
+{%- if self.is_crud_get(crud) %}
+    export namespace $get {
+{%- for ds in &model.data_sources %}
+{%- if !ds.is_internal %}
+      export type {{ ds.name }} = {
+        kind: "{{ ds.name }}";
+{%- if let Some(get) = &ds.get %}
+{%- for param in &get.parameters %}
+        {{ param.name }}: {{ self.map_type(&param.cidl_type) }};
+{%- endfor %}
+{%- endif %}
+      }
+{%- endif %}
+{%- endfor %}
+    }
+{%- else if self.is_crud_list(crud) %}
+    export namespace $list {
+{%- for ds in &model.data_sources %}
+{%- if !ds.is_internal %}
+      export type {{ ds.name }} = {
+        kind: "{{ ds.name }}";
+{%- if let Some(list) = &ds.list %}
+{%- for param in &list.parameters %}
+        {{ param.name }}: {{ self.map_type(&param.cidl_type) }};
+{%- endfor %}
+{%- endif %}
+      }
+{%- endif %}
+{%- endfor %}
+    }
+{%- else if self.is_crud_save(crud) %}
+    export type $save = {
+      model: DeepPartial<{{ model.name }}>;
+      kind: {{ self.ds_kind_union(&model.data_sources) }};
+    }
+{%- endif %}
+{%- endfor %}
+  }
+}
+{%- endif %}
+{%- endfor %}

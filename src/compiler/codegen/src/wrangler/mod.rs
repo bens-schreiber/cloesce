@@ -334,7 +334,7 @@ impl WranglerDefault {
                 let db = spec
                     .d1_databases
                     .iter_mut()
-                    .find(|db| db.binding.as_ref() == Some(d1));
+                    .find(|db| db.binding.as_deref() == Some(d1));
 
                 match db {
                     Some(db) => {
@@ -382,7 +382,7 @@ impl WranglerDefault {
                 let kv = spec
                     .kv_namespaces
                     .iter_mut()
-                    .find(|ns| ns.binding.as_ref() == Some(kv_binding));
+                    .find(|ns| ns.binding.as_deref() == Some(kv_binding));
 
                 match kv {
                     Some(ns) => {
@@ -412,7 +412,7 @@ impl WranglerDefault {
                 let r2 = spec
                     .r2_buckets
                     .iter_mut()
-                    .find(|bucket| bucket.binding.as_ref() == Some(r2_binding));
+                    .find(|bucket| bucket.binding.as_deref() == Some(r2_binding));
 
                 match r2 {
                     Some(bucket) => {
@@ -442,7 +442,7 @@ impl WranglerDefault {
         // Generate default vars from the AST's WranglerEnv
         if let Some(env) = &ast.wrangler_env {
             for var in &env.vars {
-                spec.vars.entry(var.name.clone()).or_insert_with(|| {
+                spec.vars.entry(var.name.to_string()).or_insert_with(|| {
                     let default = match var.cidl_type {
                         CidlType::String => "default_string",
                         CidlType::Integer | CidlType::Double => "0",

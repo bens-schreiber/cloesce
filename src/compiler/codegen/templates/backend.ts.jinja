@@ -1,0 +1,83 @@
+// GENERATED CODE. DO NOT MODIFY.
+export namespace Cloesce {
+{%- if let Some(env) = &ast.wrangler_env %}
+    export interface Env {
+{%- for binding in &env.d1_bindings %}
+        {{ binding }}: D1Database;
+{%- endfor %}
+{%- for binding in &env.kv_bindings %}
+        {{ binding }}: KVNamespace;
+{%- endfor %}
+{%- for binding in &env.r2_bindings %}
+        {{ binding }}: R2Bucket;
+{%- endfor %}
+{%- for var in &env.vars %}
+        {{ var.name }}: {{ self.map_type(&var.cidl_type) }};
+{%- endfor %}
+    }
+{%- endif %}
+
+    export namespace PlainOldObjects {
+{%- for (_key, poo) in &ast.poos %}
+        export interface {{ poo.name }} {
+{%- for field in &poo.fields %}
+            {{ field.name }}: {{ self.map_type(&field.cidl_type) }};
+{%- endfor %}
+        }
+{%- endfor %}
+    }
+
+    export namespace Services {
+{%- for (_key, service) in &ast.services %}
+        export interface {{ service.name }} {
+{%- for field in &service.fields %}
+            {{ field.name }}: {{ field.inject_reference }};
+{%- endfor %}
+        }
+{%- endfor %}
+    }
+
+    export namespace Models {
+{%- for (_key, model) in &ast.models %}
+        export interface {{ model.name }} {
+{%- for col in &model.primary_columns %}
+            {{ col.field.name }}: {{ self.map_type(&col.field.cidl_type) }};
+{%- endfor %}
+{%- for key in &model.key_fields %}
+            {{ key }}: string;
+{%- endfor %}
+{%- for col in &model.columns %}
+            {{ col.field.name }}: {{ self.map_type(&col.field.cidl_type) }};
+{%- endfor %}
+{%- for nav in &model.navigation_fields %}
+            {{ nav.field.name }}: {{ self.map_type(&nav.field.cidl_type) }};
+{%- endfor %}
+        }
+{%- endfor %}
+    }
+
+    export namespace Apis {
+{%- for (_key, model) in &ast.models %}
+{%- if !model.apis.is_empty() %}
+        export abstract class {{ model.name }} {
+            readonly tag = "{{ model.name }}";
+{%- for api in &model.apis %}
+{%- if !self.is_crud_method(api.name) %}
+            abstract {{ api.name }}({% if !api.is_static %}self: Cloesce.Models.{{ model.name }}{% if !api.parameters.is_empty() %}, {% endif %}{% endif %}{% for (i, param) in api.parameters.iter().enumerate() %}{{ param.name }}: {{ self.map_type(&param.cidl_type) }}{% if i + 1 < api.parameters.len() %}, {% endif %}{% endfor %}): HttpResult<{{ self.map_type(&api.return_type) }}>;
+{%- endif %}
+{%- endfor %}
+        }
+{%- endif %}
+{%- endfor %}
+{%- for (_key, service) in &ast.services %}
+{%- if !service.apis.is_empty() %}
+        export abstract class {{ service.name }} {
+            readonly tag = "{{ service.name }}";
+{%- for api in &service.apis %}
+            abstract {{ api.name }}({% if !api.is_static %}self: Cloesce.Services.{{ service.name }}{% if !api.parameters.is_empty() %}, {% endif %}{% endif %}{% for (i, param) in api.parameters.iter().enumerate() %}{{ param.name }}: {{ self.map_type(&param.cidl_type) }}{% if i + 1 < api.parameters.len() %}, {% endif %}{% endfor %}): HttpResult<{{ self.map_type(&api.return_type) }}>;
+{%- endfor %}
+        }
+{%- endif %}
+{%- endfor %}
+    }
+}

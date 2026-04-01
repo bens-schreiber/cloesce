@@ -23,16 +23,14 @@ export class PooWithComposition {
     return res;
   }
 }
-
 export class BasicService {
   static async downloadData(
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Response>> {
     const baseUrl = new URL("http://example.com/path/to/api/BasicService/downloadData");
 
-
     const res = await fetchImpl(baseUrl, {
-      method: "Get",
+      method: "GET",
     });
 
     return await HttpResult.fromResponse(
@@ -48,11 +46,10 @@ export class BasicService {
   ): Promise<HttpResult<number>> {
     const baseUrl = new URL("http://example.com/path/to/api/BasicService/instanceMethod");
     const payload: any = {};
-
     payload["input"] = input;
 
     const res = await fetchImpl(baseUrl, {
-      method: "Post",
+      method: "POST",
       headers: { "Content-Type": "application/json" },
       body: requestBody(MediaType.Json, payload),
     });
@@ -69,11 +66,10 @@ export class BasicService {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<string>> {
     const baseUrl = new URL("http://example.com/path/to/api/BasicService/staticMethod");
-
     baseUrl.searchParams.append("input", String(input));
 
     const res = await fetchImpl(baseUrl, {
-      method: "Get",
+      method: "GET",
     });
 
     return await HttpResult.fromResponse(
@@ -89,11 +85,10 @@ export class BasicService {
   ): Promise<HttpResult<boolean>> {
     const baseUrl = new URL("http://example.com/path/to/api/BasicService/uploadData");
     const payload: any = {};
-
     payload["data"] = data;
 
     const res = await fetchImpl(baseUrl, {
-      method: "Post",
+      method: "POST",
       headers: { "Content-Type": "application/octet-stream" },
       body: requestBody(MediaType.Octet, payload),
     });
@@ -104,29 +99,6 @@ export class BasicService {
       undefined,
       false
     );
-  }
-}
-
-export class BasicModel {
-  id: number;
-  fk_to_model: number;
-
-
-  static fromJson(data: any): BasicModel {
-    const res = Object.assign(new BasicModel(), data);
-    return res;
-  }
-}
-export class HasOneToOne {
-  id: number;
-  basicModelId: number;
-  oneToOneNav: BasicModel | undefined;
-
-
-  static fromJson(data: any): HasOneToOne {
-    const res = Object.assign(new HasOneToOne(), data);
-    res["oneToOneNav"] &&= BasicModel.fromJson(res.oneToOneNav);
-    return res;
   }
 }
 export class HasSqlColumnTypes {
@@ -142,7 +114,6 @@ export class HasSqlColumnTypes {
   booNull: boolean | null;
   dateNull: Date | null;
 
-
   static fromJson(data: any): HasSqlColumnTypes {
     const res = Object.assign(new HasSqlColumnTypes(), data);
     return res;
@@ -151,7 +122,6 @@ export class HasSqlColumnTypes {
 export class ManyToManyModelA {
   id: number;
   manyToManyNav: ManyToManyModelB[];
-
 
   static fromJson(data: any): ManyToManyModelA {
     const res = Object.assign(new ManyToManyModelA(), data);
@@ -165,7 +135,6 @@ export class ManyToManyModelB {
   id: number;
   manyToManyNav: ManyToManyModelA[];
 
-
   static fromJson(data: any): ManyToManyModelB {
     const res = Object.assign(new ManyToManyModelB(), data);
     for (let i = 0; i < res.manyToManyNav?.length; i++) {
@@ -178,22 +147,22 @@ export class ModelWithCompositePk {
   tenantId: string;
   rowId: number;
   name: string;
-
   async instanceMethod(
     input: string,
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<string>> {
     const id = [
+      encodeURIComponent(String(this.tenantId)),
+      encodeURIComponent(String(this.rowId)),
     ].join("/");
     const baseUrl = new URL(
       `http://example.com/path/to/api/ModelWithCompositePk/${id}/instanceMethod`
     );
     const payload: any = {};
-
     payload["input"] = input;
 
     const res = await fetchImpl(baseUrl, {
-      method: "Post",
+      method: "POST",
       headers: { "Content-Type": "application/json" },
       body: requestBody(MediaType.Json, payload),
     });
@@ -211,11 +180,83 @@ export class ModelWithCompositePk {
     return res;
   }
 }
+export class OneToManyModel {
+  id: number;
+  oneToManyNav: BasicModel[];
+
+  static fromJson(data: any): OneToManyModel {
+    const res = Object.assign(new OneToManyModel(), data);
+    for (let i = 0; i < res.oneToManyNav?.length; i++) {
+      res.oneToManyNav[i] = BasicModel.fromJson(res.oneToManyNav[i]);
+    }
+    return res;
+  }
+}
+export class ToyotaPrius {
+  id: number;
+  ownerId: string;
+  modelYear: number;
+  someKey: string;
+  metadata: KValue<unknown>;
+  photoData: R2Object;
+  async instanceMethod(
+    input: string,
+    fetchImpl: typeof fetch = fetch
+  ): Promise<HttpResult<string>> {
+    const id = [
+      encodeURIComponent(String(this.id)),
+      encodeURIComponent(String(this.someKey)),
+    ].join("/");
+    const baseUrl = new URL(
+      `http://example.com/path/to/api/ToyotaPrius/${id}/instanceMethod`
+    );
+    const payload: any = {};
+    payload["input"] = input;
+
+    const res = await fetchImpl(baseUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: requestBody(MediaType.Json, payload),
+    });
+
+    return await HttpResult.fromResponse(
+      res,
+      MediaType.Json,
+      undefined,
+      false
+    );
+  }
+
+  static fromJson(data: any): ToyotaPrius {
+    const res = Object.assign(new ToyotaPrius(), data);
+    if (res.metadata) res.metadata = Object.assign(new unknown(), res.metadata);
+    return res;
+  }
+}
+export class BasicModel {
+  id: number;
+  fk_to_model: number;
+
+  static fromJson(data: any): BasicModel {
+    const res = Object.assign(new BasicModel(), data);
+    return res;
+  }
+}
+export class HasOneToOne {
+  id: number;
+  basicModelId: number;
+  oneToOneNav: BasicModel | undefined;
+
+  static fromJson(data: any): HasOneToOne {
+    const res = Object.assign(new HasOneToOne(), data);
+    res["oneToOneNav"] &&= BasicModel.fromJson(res.oneToOneNav);
+    return res;
+  }
+}
 export class ModelWithCruds {
   id: number;
   name: string;
   categoryId: number;
-
   static async $get(
     args: DataSources.ModelWithCruds.$get.WithName | DataSources.ModelWithCruds.$get.Default,
     fetchImpl: typeof fetch = fetch
@@ -223,13 +264,12 @@ export class ModelWithCruds {
     const baseUrl = new URL(
       `http://example.com/path/to/api/ModelWithCruds/$get`
     );
-
     if ("name" in args) baseUrl.searchParams.append("name", String((args as any).name));
     if ("id" in args) baseUrl.searchParams.append("id", String((args as any).id));
     baseUrl.searchParams.append("__datasource", args.kind);
 
     const res = await fetchImpl(baseUrl, {
-      method: "Get",
+      method: "GET",
     });
 
     return await HttpResult.fromResponse(
@@ -247,12 +287,11 @@ export class ModelWithCruds {
       `http://example.com/path/to/api/ModelWithCruds/$save`
     );
     const payload: any = {};
-
     payload["model"] = (args as any).model;
     baseUrl.searchParams.append("__datasource", args.kind);
 
     const res = await fetchImpl(baseUrl, {
-      method: "Post",
+      method: "POST",
       headers: { "Content-Type": "application/json" },
       body: requestBody(MediaType.Json, payload),
     });
@@ -271,14 +310,13 @@ export class ModelWithCruds {
     const baseUrl = new URL(
       `http://example.com/path/to/api/ModelWithCruds/$list`
     );
-
     if ("name" in args) baseUrl.searchParams.append("name", String((args as any).name));
     if ("limit" in args) baseUrl.searchParams.append("limit", String((args as any).limit));
     if ("lastSeen_id" in args) baseUrl.searchParams.append("lastSeen_id", String((args as any).lastSeen_id));
     baseUrl.searchParams.append("__datasource", args.kind);
 
     const res = await fetchImpl(baseUrl, {
-      method: "Get",
+      method: "GET",
     });
 
     return await HttpResult.fromResponse(
@@ -294,118 +332,25 @@ export class ModelWithCruds {
     return res;
   }
 }
-export class ModelWithKv {
-  id1: string;
-  id2: string;
-  someValue: KValue<unknown>;
-  manyValues: Paginated<KValue<unknown>>;
-  streamValue: KValue<void>;
-
-  async instanceMethod(
-    input: string,
-    fetchImpl: typeof fetch = fetch
-  ): Promise<HttpResult<string>> {
-    const id = [
-    ].join("/");
-    const baseUrl = new URL(
-      `http://example.com/path/to/api/ModelWithKv/${id}/instanceMethod`
-    );
-    const payload: any = {};
-
-    payload["input"] = input;
-
-    const res = await fetchImpl(baseUrl, {
-      method: "Post",
-      headers: { "Content-Type": "application/json" },
-      body: requestBody(MediaType.Json, payload),
-    });
-
-    return await HttpResult.fromResponse(
-      res,
-      MediaType.Json,
-      undefined,
-      false
-    );
-  }
-  static async staticMethod(
-    input: number,
-    fetchImpl: typeof fetch = fetch
-  ): Promise<HttpResult<number>> {
-    const baseUrl = new URL(
-      `http://example.com/path/to/api/ModelWithKv/staticMethod`
-    );
-
-    baseUrl.searchParams.append("input", String(input));
-
-    const res = await fetchImpl(baseUrl, {
-      method: "Get",
-    });
-
-    return await HttpResult.fromResponse(
-      res,
-      MediaType.Json,
-      undefined,
-      false
-    );
-  }
-  async hasKvParamAndRes(
-    input: KValue<string>,
-    fetchImpl: typeof fetch = fetch
-  ): Promise<HttpResult<KValue<string>>> {
-    const id = [
-    ].join("/");
-    const baseUrl = new URL(
-      `http://example.com/path/to/api/ModelWithKv/${id}/hasKvParamAndRes`
-    );
-    const payload: any = {};
-
-    payload["input"] = input;
-
-    const res = await fetchImpl(baseUrl, {
-      method: "Post",
-      headers: { "Content-Type": "application/json" },
-      body: requestBody(MediaType.Json, payload),
-    });
-
-    return await HttpResult.fromResponse(
-      res,
-      MediaType.Json,
-      undefined,
-      false
-    );
-  }
-
-  static fromJson(data: any): ModelWithKv {
-    const res = Object.assign(new ModelWithKv(), data);
-    if (res.someValue) res.someValue = Object.assign(new KValue<unknown>(), res.someValue);
-    if (res.manyValues?.results) {
-      for (let i = 0; i < res.manyValues.results.length; i++) {
-        res.manyValues.results[i] = Object.assign(new KValue<unknown>(), res.manyValues.results[i]);
-      }
-    }
-    return res;
-  }
-}
 export class ModelWithR2 {
   id: string;
   fileData: R2Object;
   manyFileDatas: Paginated<R2Object>;
-
   async hasR2ParamAndRes(
     input: R2Object,
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<R2Object>> {
     const id = [
+      encodeURIComponent(String(this.id)),
     ].join("/");
     const baseUrl = new URL(
       `http://example.com/path/to/api/ModelWithR2/${id}/hasR2ParamAndRes`
     );
     const payload: any = {};
-
     payload["input"] = input;
 
     const res = await fetchImpl(baseUrl, {
-      method: "Post",
+      method: "POST",
       headers: { "Content-Type": "application/json" },
       body: requestBody(MediaType.Json, payload),
     });
@@ -428,42 +373,75 @@ export class ModelWithR2 {
     return res;
   }
 }
-export class OneToManyModel {
-  id: number;
-  oneToManyNav: BasicModel[];
-
-
-  static fromJson(data: any): OneToManyModel {
-    const res = Object.assign(new OneToManyModel(), data);
-    for (let i = 0; i < res.oneToManyNav?.length; i++) {
-      res.oneToManyNav[i] = BasicModel.fromJson(res.oneToManyNav[i]);
-    }
-    return res;
-  }
-}
-export class ToyotaPrius {
-  id: number;
-  ownerId: string;
-  modelYear: number;
-  someKey: string;
-  metadata: KValue<unknown>;
-  photoData: R2Object;
-
+export class ModelWithKv {
+  id1: string;
+  id2: string;
+  someValue: KValue<unknown>;
+  manyValues: Paginated<KValue<unknown>>;
+  streamValue: KValue<void>;
   async instanceMethod(
     input: string,
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<string>> {
     const id = [
+      encodeURIComponent(String(this.id1)),
+      encodeURIComponent(String(this.id2)),
     ].join("/");
     const baseUrl = new URL(
-      `http://example.com/path/to/api/ToyotaPrius/${id}/instanceMethod`
+      `http://example.com/path/to/api/ModelWithKv/${id}/instanceMethod`
     );
     const payload: any = {};
-
     payload["input"] = input;
 
     const res = await fetchImpl(baseUrl, {
-      method: "Post",
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: requestBody(MediaType.Json, payload),
+    });
+
+    return await HttpResult.fromResponse(
+      res,
+      MediaType.Json,
+      undefined,
+      false
+    );
+  }
+  static async staticMethod(
+    input: number,
+    fetchImpl: typeof fetch = fetch
+  ): Promise<HttpResult<number>> {
+    const baseUrl = new URL(
+      `http://example.com/path/to/api/ModelWithKv/staticMethod`
+    );
+    baseUrl.searchParams.append("input", String(input));
+
+    const res = await fetchImpl(baseUrl, {
+      method: "GET",
+    });
+
+    return await HttpResult.fromResponse(
+      res,
+      MediaType.Json,
+      undefined,
+      false
+    );
+  }
+  async hasKvParamAndRes(
+    input: KValue<string>,
+    fetchImpl: typeof fetch = fetch
+  ): Promise<HttpResult<KValue<string>>> {
+    const id = [
+      encodeURIComponent(String(this.id1)),
+      encodeURIComponent(String(this.id2)),
+    ].join("/");
+    const baseUrl = new URL(
+      `http://example.com/path/to/api/ModelWithKv/${id}/hasKvParamAndRes`
+    );
+    const payload: any = {};
+    payload["input"] = input;
+
+    const res = await fetchImpl(baseUrl, {
+      method: "POST",
       headers: { "Content-Type": "application/json" },
       body: requestBody(MediaType.Json, payload),
     });
@@ -476,9 +454,14 @@ export class ToyotaPrius {
     );
   }
 
-  static fromJson(data: any): ToyotaPrius {
-    const res = Object.assign(new ToyotaPrius(), data);
-    if (res.metadata) res.metadata = Object.assign(new KValue<unknown>(), res.metadata);
+  static fromJson(data: any): ModelWithKv {
+    const res = Object.assign(new ModelWithKv(), data);
+    if (res.someValue) res.someValue = Object.assign(new unknown(), res.someValue);
+    if (res.manyValues?.results) {
+      for (let i = 0; i < res.manyValues.results.length; i++) {
+        res.manyValues.results[i] = Object.assign(new unknown(), res.manyValues.results[i]);
+      }
+    }
     return res;
   }
 }
@@ -633,7 +616,6 @@ export class HttpResult<T = unknown> {
     );
   }
 }
-
 export namespace DataSources {
   export namespace ModelWithCruds {
     export namespace $get {

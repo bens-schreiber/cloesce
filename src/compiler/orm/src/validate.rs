@@ -154,7 +154,7 @@ pub fn validate_cidl_type(
         }
 
         CidlType::DataSource { model_name } => {
-            let model = ast.models.get(&model_name).unwrap();
+            let model = ast.models.get(model_name).unwrap();
             let Some(value_str) = value.as_str() else {
                 return Err(ValidatorErrorKind::NonString);
             };
@@ -205,7 +205,7 @@ pub fn validate_cidl_type(
             let mut new_obj = serde_json::Map::<String, Value>::new();
 
             // Handle Plain Old Objects
-            if let Some(poo) = ast.poos.get(&name) {
+            if let Some(poo) = ast.poos.get(name) {
                 for attr in &poo.fields {
                     let attr_value = obj.remove(attr.name.as_ref());
                     let res =
@@ -220,7 +220,7 @@ pub fn validate_cidl_type(
             }
 
             // Handle Models
-            let model = ast.models.get(&name).unwrap();
+            let model = ast.models.get(name).unwrap();
             let obj = value.as_object_mut().ok_or(ValidatorErrorKind::NonObject)?;
 
             for key_param in &model.key_fields {

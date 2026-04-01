@@ -1,13 +1,10 @@
-use std::sync::Arc;
-
-use crate::mappers::{LanguageTypeMapper, TypeScriptMapper, make_mapper_helper};
+use askama::Template;
 use ast::{
     CidlType, CloesceAst, CrudKind, DataSource, HttpVerb, MediaType, NavigationField,
     NavigationFieldKind,
 };
 
-use handlebars::{Handlebars, handlebars_helper};
-use serde_json::Value;
+use crate::mappers::{LanguageTypeMapper, TypeScriptMapper};
 
 macro_rules! cidl_type_contains {
     ($value:expr, $pattern:pat) => {{
@@ -32,250 +29,196 @@ macro_rules! cidl_type_contains {
     }};
 }
 
-handlebars_helper!(needs_constructor: |cidl_type: CidlType| matches!(cidl_type.root_type(),
-    CidlType::Object { .. }
-    | CidlType::Blob
-    | CidlType::DateIso
-    | CidlType::Stream
-));
+#[derive(Template)]
+#[template(path = "client.ts.jinja", escape = "none")]
+struct ClientTemplate<'a> {
+    ast: &'a CloesceAst<'a>,
+    worker_url: &'a str,
+    mapper: TypeScriptMapper,
+}
 
-handlebars_helper!(get_object_name: |cidl_type: CidlType| match cidl_type.root_type() {
-    CidlType::Inject { name, ..} | CidlType::Object { name, ..} | CidlType::Partial { object_name: name, .. } => serde_json::to_value(name).unwrap(),
-    ty => serde_json::to_value(ty).unwrap()
-});
-handlebars_helper!(get_content_type: |media: MediaType| match media {
-    MediaType::Json=>"application/json",
-    MediaType::Octet => "application/octet-stream",
-});
+impl<'a> ClientTemplate<'a> {
+    fn fmt_verb(&self, verb: &HttpVerb) -> &'static str {
+        match verb {
+            HttpVerb::Get => "GET",
+            HttpVerb::Post => "POST",
+            HttpVerb::Put => "PUT",
+            HttpVerb::Patch => "PATCH",
+            HttpVerb::Delete => "DELETE",
+        }
+    }
 
-handlebars_helper!(is_blob: |cidl_type: CidlType| matches!(cidl_type.root_type(), CidlType::Blob));
-handlebars_helper!(is_one_to_one: |nav: NavigationField| matches!(nav.kind, NavigationFieldKind::OneToOne {..}));
-handlebars_helper!(is_get_request: |verb: HttpVerb| matches!(verb, HttpVerb::Get));
-handlebars_helper!(is_serializable: |cidl_type: CidlType| !matches!(cidl_type.root_type(), CidlType::Inject { .. } | CidlType::Env));
-handlebars_helper!(is_object: |cidl_type: CidlType| matches!(cidl_type.root_type(), CidlType::Object { .. } | CidlType::Partial { .. }));
+    fn fmt_content_type(&self, media: &MediaType) -> &'static str {
+        match media {
+            MediaType::Json => "application/json",
+            MediaType::Octet => "application/octet-stream",
+        }
+    }
 
-// TODO: This method of generating fromJson for arrays won't help for n-dimensional arrays
-handlebars_helper!(has_array: |cidl_type: CidlType| cidl_type_contains!(&cidl_type, CidlType::Array(_)));
-handlebars_helper!(is_object_array: |cidl_type: CidlType| matches!(cidl_type.root_type(), CidlType::Object { .. }) && cidl_type_contains!(&cidl_type, CidlType::Array(_)));
-handlebars_helper!(is_blob_array: |cidl_type: CidlType| matches!(cidl_type.root_type(), CidlType::Blob) && cidl_type_contains!(&cidl_type, CidlType::Array(_)));
+    fn map_type(&self, ty: &CidlType<'_>) -> String {
+        self.mapper.cidl_type(ty, self.ast)
+    }
 
-// If a parameter should be placed in the url instead of the body.
-// True for any [CidlType::DataSource] or given the verb [HttpVerb::GET]
-handlebars_helper!(is_url_param: |cidl_type: CidlType, verb: HttpVerb| matches!(verb, HttpVerb::Get) || matches!(cidl_type, CidlType::DataSource { .. }));
-handlebars_helper!(is_stream: |cidl_type: CidlType| matches!(cidl_type.root_type(), CidlType::Stream));
-handlebars_helper!(is_crud_method: |name: String| name == "$get" || name == "$save" || name == "$list");
-handlebars_helper!(contains_stream: |cidl_type: CidlType| cidl_type_contains!(&cidl_type, CidlType::Stream));
-handlebars_helper!(is_paginated: |cidl_type: CidlType| matches!(cidl_type, CidlType::Paginated(_)));
+    fn map_root_type(&self, ty: &CidlType<'_>) -> String {
+        self.mapper.cidl_type(ty.root_type(), self.ast)
+    }
 
-handlebars_helper!(is_datasource: |cidl_type: CidlType| matches!(cidl_type, CidlType::DataSource { .. }));
-handlebars_helper!(is_crud_kind: |crud: CrudKind, kind: str| match kind {
-    "Get" => matches!(crud, CrudKind::Get),
-    "List" => matches!(crud, CrudKind::List),
-    "Save" => matches!(crud, CrudKind::Save),
-    _ => panic!("Unknown CRUD kind: {}", kind),
-});
+    fn map_media(&self, ty: &MediaType) -> String {
+        self.mapper.media_type(ty)
+    }
 
-// For KvObject or Paginated<KvObject<T>>, returns the CidlType of T (the inner type of KvObject)
-handlebars_helper!(kv_inner_cidl_type: |cidl_type: CidlType| match &cidl_type {
-    CidlType::KvObject(inner) => serde_json::to_value(inner.as_ref()).unwrap(),
-    CidlType::Paginated(inner) => match inner.as_ref() {
-        CidlType::KvObject(inner) => serde_json::to_value(inner.as_ref()).unwrap(),
-        _ => serde_json::to_value(&cidl_type).unwrap(),
-    },
-    _ => serde_json::to_value(&cidl_type).unwrap(),
-});
+    fn nav_type(&self, nav: &NavigationField<'_>) -> String {
+        let cidl_type = match &nav.kind {
+            NavigationFieldKind::OneToOne { .. } => CidlType::Object {
+                name: nav.model_reference,
+            },
+            NavigationFieldKind::OneToMany { .. } | NavigationFieldKind::ManyToMany => {
+                CidlType::array(CidlType::Object {
+                    name: nav.model_reference,
+                })
+            }
+        };
+        self.mapper.cidl_type(&cidl_type, self.ast)
+    }
 
-const TYPESCRIPT_TEMPLATE: &str = include_str!("./templates/ts.hbs");
-const TEMPLATE_STRING: &str = "client_api";
+    fn kv_inner_type<'b>(&self, ty: &'b CidlType<'b>) -> &'b CidlType<'b> {
+        match ty {
+            CidlType::KvObject(inner) => inner.as_ref(),
+            CidlType::Paginated(inner) => match inner.as_ref() {
+                CidlType::KvObject(inner) => inner.as_ref(),
+                _ => ty,
+            },
+            _ => ty,
+        }
+    }
+
+    fn map_kv_inner_type(&self, ty: &CidlType<'_>) -> String {
+        self.mapper.cidl_type(self.kv_inner_type(ty), self.ast)
+    }
+
+    fn object_name<'b>(&self, ty: &'b CidlType<'b>) -> &'b str {
+        match ty.root_type() {
+            CidlType::Inject { name } | CidlType::Object { name } => name,
+            CidlType::Partial { object_name } => object_name,
+            _ => "",
+        }
+    }
+
+    fn needs_constructor(&self, ty: &CidlType<'_>) -> bool {
+        matches!(
+            ty.root_type(),
+            CidlType::Object { .. } | CidlType::Blob | CidlType::DateIso | CidlType::Stream
+        )
+    }
+
+    fn has_array(&self, ty: &CidlType<'_>) -> bool {
+        cidl_type_contains!(ty, CidlType::Array(_))
+    }
+
+    fn is_blob(&self, ty: &CidlType<'_>) -> bool {
+        matches!(ty.root_type(), CidlType::Blob)
+    }
+
+    fn is_object(&self, ty: &CidlType<'_>) -> bool {
+        matches!(
+            ty.root_type(),
+            CidlType::Object { .. } | CidlType::Partial { .. }
+        )
+    }
+
+    fn is_object_array(&self, ty: &CidlType<'_>) -> bool {
+        matches!(ty.root_type(), CidlType::Object { .. })
+            && cidl_type_contains!(ty, CidlType::Array(_))
+    }
+
+    fn is_blob_array(&self, ty: &CidlType<'_>) -> bool {
+        matches!(ty.root_type(), CidlType::Blob) && cidl_type_contains!(ty, CidlType::Array(_))
+    }
+
+    fn is_serializable(&self, ty: &CidlType<'_>) -> bool {
+        !matches!(ty.root_type(), CidlType::Inject { .. } | CidlType::Env)
+    }
+
+    fn is_get_request(&self, verb: &HttpVerb) -> bool {
+        matches!(verb, HttpVerb::Get)
+    }
+
+    fn is_url_param(&self, ty: &CidlType<'_>, verb: &HttpVerb) -> bool {
+        matches!(verb, HttpVerb::Get) || matches!(ty, CidlType::DataSource { .. })
+    }
+
+    fn is_datasource(&self, ty: &CidlType<'_>) -> bool {
+        matches!(ty, CidlType::DataSource { .. })
+    }
+
+    fn is_stream(&self, ty: &CidlType<'_>) -> bool {
+        matches!(ty.root_type(), CidlType::Stream)
+    }
+
+    fn contains_stream(&self, ty: &CidlType<'_>) -> bool {
+        cidl_type_contains!(ty, CidlType::Stream)
+    }
+
+    fn is_paginated(&self, ty: &CidlType<'_>) -> bool {
+        matches!(ty, CidlType::Paginated(_))
+    }
+
+    fn is_one_to_one(&self, nav: &NavigationField<'_>) -> bool {
+        matches!(nav.kind, NavigationFieldKind::OneToOne { .. })
+    }
+
+    fn is_crud_method(&self, name: &str) -> bool {
+        name == "$get" || name == "$save" || name == "$list"
+    }
+
+    fn is_crud_get(&self, crud: &CrudKind) -> bool {
+        matches!(crud, CrudKind::Get)
+    }
+
+    fn is_crud_list(&self, crud: &CrudKind) -> bool {
+        matches!(crud, CrudKind::List)
+    }
+
+    fn is_crud_save(&self, crud: &CrudKind) -> bool {
+        matches!(crud, CrudKind::Save)
+    }
+
+    fn crud_args_type(
+        &self,
+        method_name: &str,
+        model_name: &str,
+        data_sources: &[DataSource<'_>],
+    ) -> String {
+        if method_name == "$save" {
+            format!("DataSources.{}.{}", model_name, method_name)
+        } else {
+            let parts: Vec<String> = data_sources
+                .iter()
+                .filter(|ds| !ds.is_internal)
+                .map(|ds| format!("DataSources.{}.{}.{}", model_name, method_name, ds.name))
+                .collect();
+            parts.join(" | ")
+        }
+    }
+
+    fn ds_kind_union(&self, data_sources: &[DataSource<'_>]) -> String {
+        let parts: Vec<String> = data_sources
+            .iter()
+            .filter(|ds| !ds.is_internal)
+            .map(|ds| format!("\"{}\"", ds.name))
+            .collect();
+        parts.join(" | ")
+    }
+}
 
 pub struct ClientGenerator;
 impl ClientGenerator {
     pub fn generate(ast: &CloesceAst, worker_url: &str) -> String {
-        // TODO: Hardcoded TypeScript for now
-        let template = TYPESCRIPT_TEMPLATE;
-        let mapper = Arc::new(TypeScriptMapper::client());
-
-        let mut handlebars = Handlebars::new();
-        handlebars
-            .register_template_string(TEMPLATE_STRING, template)
-            .unwrap();
-        register_helpers(&mut handlebars, mapper, ast);
-
-        let mut context = serde_json::to_value(ast).unwrap();
-
-        // Manually set the "worker_url" field in the context
-        if let serde_json::Value::Object(ref mut map) = context {
-            map.insert(
-                "worker_url".to_string(),
-                serde_json::Value::String(worker_url.to_string()),
-            );
-        }
-
-        handlebars.render(TEMPLATE_STRING, &context).unwrap()
+        let tmpl = ClientTemplate {
+            ast,
+            worker_url,
+            mapper: TypeScriptMapper::client(),
+        };
+        tmpl.render().unwrap()
     }
-}
-
-/// Generates the args type for a CRUD method.
-/// For $get/$list: `DataSources.Model.$get.DS1 | DataSources.Model.$get.DS2`
-/// For $save: `DataSources.Model.$save`
-fn crud_args_type_helper(
-    h: &handlebars::Helper<'_>,
-    _hb: &Handlebars<'_>,
-    _ctx: &handlebars::Context,
-    _rc: &mut handlebars::RenderContext<'_, '_>,
-    out: &mut dyn handlebars::Output,
-) -> Result<(), handlebars::RenderError> {
-    let method_name = h.param(0).unwrap().value().as_str().unwrap();
-    let model_name = h.param(1).unwrap().value().as_str().unwrap();
-    let data_sources: Vec<DataSource> =
-        serde_json::from_value(h.param(2).unwrap().value().clone()).unwrap();
-
-    if method_name == "$save" {
-        out.write(&format!("DataSources.{}.{}", model_name, method_name))?;
-    } else {
-        let parts: Vec<String> = data_sources
-            .iter()
-            .filter(|ds| !ds.is_internal)
-            .map(|ds| format!("DataSources.{}.{}.{}", model_name, method_name, ds.name))
-            .collect();
-        out.write(&parts.join(" | "))?;
-    }
-    Ok(())
-}
-
-/// Generates `"DS1" | "DS2"` for $save kind union
-fn ds_kind_union_helper(
-    h: &handlebars::Helper<'_>,
-    _hb: &Handlebars<'_>,
-    _ctx: &handlebars::Context,
-    _rc: &mut handlebars::RenderContext<'_, '_>,
-    out: &mut dyn handlebars::Output,
-) -> Result<(), handlebars::RenderError> {
-    let data_sources: Vec<DataSource> =
-        serde_json::from_value(h.param(0).unwrap().value().clone()).unwrap();
-
-    let parts: Vec<String> = data_sources
-        .iter()
-        .filter(|ds| !ds.is_internal)
-        .map(|ds| format!("\"{}\"", ds.name))
-        .collect();
-
-    out.write(&parts.join(" | "))?;
-    Ok(())
-}
-
-fn register_helpers<'a>(
-    hbs: &mut Handlebars<'a>,
-    mapper: Arc<dyn LanguageTypeMapper + Send + Sync>,
-    ast: &'a CloesceAst,
-) {
-    let simple_helpers: Vec<(&str, Box<dyn handlebars::HelperDef + Send + Sync>)> = vec![
-        ("is_serializable", Box::new(is_serializable)),
-        ("is_blob", Box::new(is_blob)),
-        ("is_one_to_one", Box::new(is_one_to_one)),
-        ("get_content_type", Box::new(get_content_type)),
-        ("has_array", Box::new(has_array)),
-        ("needs_constructor", Box::new(needs_constructor)),
-        ("get_object_name", Box::new(get_object_name)),
-        ("is_object", Box::new(is_object)),
-        ("is_object_array", Box::new(is_object_array)),
-        ("is_blob_array", Box::new(is_blob_array)),
-        ("is_url_param", Box::new(is_url_param)),
-        ("is_get_request", Box::new(is_get_request)),
-        ("is_stream", Box::new(is_stream)),
-        ("is_crud_method", Box::new(is_crud_method)),
-        ("contains_stream", Box::new(contains_stream)),
-        ("is_paginated", Box::new(is_paginated)),
-        ("kv_inner_cidl_type", Box::new(kv_inner_cidl_type)),
-        ("is_datasource", Box::new(is_datasource)),
-        ("is_crud_kind", Box::new(is_crud_kind)),
-    ];
-
-    for (name, helper) in simple_helpers {
-        hbs.register_helper(name, helper);
-    }
-
-    hbs.register_helper("crud_args_type", Box::new(crud_args_type_helper));
-    hbs.register_helper("ds_kind_union", Box::new(ds_kind_union_helper));
-
-    hbs.register_helper(
-        "get_nav_cidl_type",
-        make_mapper_helper(
-            mapper.clone(),
-            ast,
-            |value: Value, mapper: &dyn LanguageTypeMapper, ast: &CloesceAst| -> String {
-                let nav: NavigationField = serde_json::from_value(value).unwrap();
-
-                let cidl_type = match nav.kind {
-                    NavigationFieldKind::OneToOne { .. } => CidlType::Object {
-                        name: nav.model_reference,
-                    },
-                    NavigationFieldKind::OneToMany { .. } | NavigationFieldKind::ManyToMany => {
-                        CidlType::array(CidlType::Object {
-                            name: nav.model_reference,
-                        })
-                    }
-                };
-
-                mapper.cidl_type(&cidl_type, ast)
-            },
-        ),
-    );
-
-    hbs.register_helper(
-        "map_cidl_type",
-        make_mapper_helper(
-            mapper.clone(),
-            ast,
-            |value: Value, mapper: &dyn LanguageTypeMapper, ast: &CloesceAst| -> String {
-                let cidl_type: CidlType = serde_json::from_value(value).unwrap();
-                mapper.cidl_type(&cidl_type, ast)
-            },
-        ),
-    );
-
-    hbs.register_helper(
-        "map_kv_inner_type",
-        make_mapper_helper(
-            mapper.clone(),
-            ast,
-            |value: Value, mapper: &dyn LanguageTypeMapper, ast: &CloesceAst| -> String {
-                let cidl_type: CidlType = serde_json::from_value(value).unwrap();
-                // For KvObject(T) or Paginated(KvObject(T)), map the KvObject(T) part
-                let kv_type = match &cidl_type {
-                    CidlType::KvObject(_) => &cidl_type,
-                    CidlType::Paginated(inner) => match inner.as_ref() {
-                        kv @ CidlType::KvObject(_) => kv,
-                        _ => &cidl_type,
-                    },
-                    _ => &cidl_type,
-                };
-                mapper.cidl_type(kv_type, ast)
-            },
-        ),
-    );
-
-    hbs.register_helper(
-        "map_root_cidl_type",
-        make_mapper_helper(
-            mapper.clone(),
-            ast,
-            |value: Value, mapper: &dyn LanguageTypeMapper, ast: &CloesceAst| -> String {
-                let cidl_type: CidlType = serde_json::from_value(value).unwrap();
-                mapper.cidl_type(cidl_type.root_type(), ast)
-            },
-        ),
-    );
-
-    hbs.register_helper(
-        "get_media_type",
-        make_mapper_helper(
-            mapper.clone(),
-            ast,
-            |value: Value, mapper: &dyn LanguageTypeMapper, _ast: &CloesceAst| -> String {
-                let media_type: MediaType = serde_json::from_value(value).unwrap();
-                mapper.media_type(&media_type)
-            },
-        ),
-    );
 }

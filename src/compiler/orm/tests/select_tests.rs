@@ -12,7 +12,7 @@ use common::test_sql;
 fn include(val: serde_json::Value) -> Option<IncludeTree<'static>> {
     let s = serde_json::to_string(&val).unwrap();
 
-    // hack to convert the string to a Cow<'static, str> without copying
+    // leak the string so IncludeTree can have a 'static lifetime
     let tree: IncludeTree<'static> = serde_json::from_str(Box::leak(s.into_boxed_str())).unwrap();
     Some(tree)
 }
