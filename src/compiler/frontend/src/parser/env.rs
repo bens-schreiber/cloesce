@@ -13,9 +13,9 @@ enum BindingKind {
     Kv,
 }
 
-enum EnvEntry {
+enum EnvEntry<'src> {
     Binding(BindingKind),
-    Var(CidlType),
+    Var(CidlType<'src>),
 }
 
 /// Parses a block of the form:

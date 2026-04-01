@@ -8,7 +8,6 @@ ast = { path = "../ast" }
 base64 = "0.22"
 chrono = { version = "0.4.44", features = ["serde"] }
 indexmap = { workspace = true }
-migrations = { path = "../migrations" }
 sea-query = "0.32.7"
 serde = { workspace = true }
 serde_json = { workspace = true }

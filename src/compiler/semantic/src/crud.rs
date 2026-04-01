@@ -30,17 +30,15 @@ impl CrudExpansion {
                         parameters.push(Field {
                             name: "__datasource".into(),
                             cidl_type: CidlType::DataSource {
-                                model_name: model.name.clone(),
+                                model_name: model.name,
                             },
                         });
 
                         ApiMethod {
-                            name: "$get".into(),
+                            name: "$get",
                             is_static: true,
                             http_verb: HttpVerb::Get,
-                            return_type: CidlType::http(CidlType::Object {
-                                name: model.name.clone(),
-                            }),
+                            return_type: CidlType::http(CidlType::Object { name: model.name }),
                             parameters,
                             parameters_media: MediaType::Json,
                             return_media: MediaType::Json,
@@ -67,16 +65,16 @@ impl CrudExpansion {
                         parameters.push(Field {
                             name: "__datasource".into(),
                             cidl_type: CidlType::DataSource {
-                                model_name: model.name.clone(),
+                                model_name: model.name,
                             },
                         });
 
                         ApiMethod {
-                            name: "$list".into(),
+                            name: "$list",
                             is_static: true,
                             http_verb: HttpVerb::Get,
                             return_type: CidlType::http(CidlType::array(CidlType::Object {
-                                name: model.name.clone(),
+                                name: model.name,
                             })),
                             parameters,
                             parameters_media: MediaType::Json,
@@ -85,23 +83,21 @@ impl CrudExpansion {
                         }
                     }
                     CrudKind::Save => ApiMethod {
-                        name: "$save".into(),
+                        name: "$save",
                         is_static: true,
                         http_verb: HttpVerb::Post,
-                        return_type: CidlType::http(CidlType::Object {
-                            name: model.name.clone(),
-                        }),
+                        return_type: CidlType::http(CidlType::Object { name: model.name }),
                         parameters: vec![
                             Field {
                                 name: "model".into(),
                                 cidl_type: CidlType::Partial {
-                                    object_name: model.name.clone(),
+                                    object_name: model.name,
                                 },
                             },
                             Field {
                                 name: "__datasource".into(),
                                 cidl_type: CidlType::DataSource {
-                                    model_name: model.name.clone(),
+                                    model_name: model.name,
                                 },
                             },
                         ],

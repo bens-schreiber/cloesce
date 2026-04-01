@@ -3,7 +3,7 @@ members = [
     # "cli",
     "ast",
     "frontend",
-    # "semantic",
+    "semantic",
     # "codegen",
     "compiler-test",
     # "migrations",

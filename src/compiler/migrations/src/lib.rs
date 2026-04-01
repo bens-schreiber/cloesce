@@ -1,6 +1,9 @@
 mod fmt;
 
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::{
+    borrow::Cow,
+    collections::{BTreeMap, HashMap, HashSet},
+};
 
 use ast::{CidlType, Column, MigrationsAst, MigrationsModel, NavigationField, NavigationFieldKind};
 
@@ -55,13 +58,13 @@ impl MigrationsGenerator {
 
 pub enum MigrationsDilemma<'a> {
     RenameOrDropModel {
-        model_name: String,
-        options: &'a Vec<&'a String>,
+        model_name: &'a str,
+        options: &'a Vec<&'a str>,
     },
     RenameOrDropColumn {
-        model_name: String,
-        column_name: String,
-        options: &'a Vec<&'a String>,
+        model_name: &'a str,
+        column_name: &'a str,
+        options: &'a Vec<&'a Cow<'a, str>>,
     },
 }
 
@@ -77,19 +80,19 @@ enum AlterKind<'a> {
     RebuildTable,
 
     AddColumn {
-        col: &'a Column,
+        col: &'a Column<'a>,
     },
     AlterColumnType {
-        col: &'a Column,
-        lm_col: &'a Column,
+        col: &'a Column<'a>,
+        lm_col: &'a Column<'a>,
     },
     DropColumn {
-        lm_col: &'a Column,
+        lm_col: &'a Column<'a>,
     },
 
     AddManyToMany {
         m2m_table_name: String,
-        model_name: &'a String,
+        model_name: &'a str,
     },
     DropManyToMany {
         m2m_table_name: String,
@@ -134,7 +137,7 @@ impl MigrateTables {
                     unique_columns_by_id
                         .entry(*unique_id)
                         .or_default()
-                        .push(col.field.name.as_str());
+                        .push(col.field.name.as_ref());
                 }
 
                 // Gather foreign key groups
@@ -143,7 +146,7 @@ impl MigrateTables {
                 };
 
                 let ref_model_has_composite_pk = model_lookup
-                    .get(fk_ref.model_name.as_str())
+                    .get(fk_ref.model_name)
                     .map(|m| m.primary_columns.len() > 1)
                     .unwrap_or(false);
 
@@ -162,7 +165,7 @@ impl MigrateTables {
             if is_composite_pk {
                 let mut pk = Index::create();
                 for pk_col in model.primary_columns.iter() {
-                    pk.col(alias(pk_col.field.name.as_str()));
+                    pk.col(alias(pk_col.field.name.as_ref()));
                 }
                 table.primary_key(&mut pk);
             }
@@ -189,7 +192,7 @@ impl MigrateTables {
 
             // Foreign keys
             for cols in fk_groups.values_mut() {
-                cols.sort_by_key(|c| c.field.name.as_str());
+                cols.sort_by_key(|c| c.field.name.as_ref());
 
                 let fk_ref = cols
                     .first()
@@ -198,16 +201,10 @@ impl MigrateTables {
 
                 let mut fk = ForeignKey::create();
                 for col in cols.iter() {
-                    fk.from(alias(model.name.as_str()), alias(col.field.name.as_str()));
+                    fk.from(alias(&model.name), alias(col.field.name.as_ref()));
                     fk.to(
-                        alias(fk_ref.model_name.as_str()),
-                        alias(
-                            col.foreign_key_reference
-                                .as_ref()
-                                .unwrap()
-                                .column_name
-                                .as_str(),
-                        ),
+                        alias(fk_ref.model_name),
+                        alias(col.foreign_key_reference.as_ref().unwrap().column_name),
                     );
                 }
 
@@ -245,7 +242,7 @@ impl MigrateTables {
             table.table(alias(&id)).if_not_exists();
 
             for (join_col_name, pk) in left_join_cols.iter().chain(right_join_cols.iter()) {
-                let mut col = typed_column(join_col_name.as_str(), &pk.field.cidl_type, false);
+                let mut col = typed_column(join_col_name, &pk.field.cidl_type, false);
                 table.col(col.not_null());
             }
 
@@ -258,8 +255,8 @@ impl MigrateTables {
             let mut left_fk = ForeignKey::create();
             for (join_col_name, pk) in left_join_cols {
                 left_fk
-                    .from(alias(id.as_str()), alias(join_col_name.as_str()))
-                    .to(alias(left.name.as_str()), alias(pk.field.name.as_str()));
+                    .from(alias(id.as_str()), alias(join_col_name))
+                    .to(alias(left.name.as_str()), alias(pk.field.name.as_ref()));
             }
             left_fk
                 .on_update(sea_query::ForeignKeyAction::Cascade)
@@ -269,8 +266,8 @@ impl MigrateTables {
             let mut right_fk = ForeignKey::create();
             for (join_col_name, pk) in right_join_cols {
                 right_fk
-                    .from(alias(id.as_str()), alias(join_col_name.as_str()))
-                    .to(alias(right.name.as_str()), alias(pk.field.name.as_str()));
+                    .from(alias(id.as_str()), alias(join_col_name))
+                    .to(alias(right.name.as_str()), alias(pk.field.name.as_ref()));
             }
             right_fk
                 .on_update(sea_query::ForeignKeyAction::Cascade)
@@ -311,7 +308,7 @@ impl MigrateTables {
         let mut renamed = HashSet::new();
 
         for (model, lm_model) in alter_models {
-            let mut needs_rename_intent = HashMap::<&String, &Column>::new();
+            let mut needs_rename_intent = HashMap::<&str, &Column>::new();
             let mut needs_drop_intent = vec![];
             let alterations = identify_alterations(model, lm_model, &renamed);
 
@@ -340,7 +337,7 @@ impl MigrateTables {
                             res.push(to_sqlite(
                                 Table::alter()
                                     .table(alias(&model.name))
-                                    .drop_column(alias(&lm_col.field.name))
+                                    .drop_column(alias(lm_col.field.name.as_ref()))
                                     .to_owned(),
                             ));
                         }
@@ -382,7 +379,7 @@ impl MigrateTables {
 
                         let mut jcts = HashMap::new();
 
-                        let join = model_lookup.get(model_name.as_str()).unwrap();
+                        let join = model_lookup.get(model_name).unwrap();
                         jcts.insert(m2m_table_name.clone(), (model, join));
 
                         res.extend(Self::create(vec![], jcts, model_lookup));
@@ -462,7 +459,7 @@ impl MigrateTables {
 
                             let insert = Query::insert()
                                 .into_table(alias(&model.name))
-                                .columns(columns.iter().map(|a| alias(&a.name)))
+                                .columns(columns.iter().map(|a| alias(a.name.as_ref())))
                                 .select_from(
                                     Query::select()
                                         .from(alias(name_hash))
@@ -475,7 +472,7 @@ impl MigrateTables {
                                                 ));
                                             };
 
-                                            let col = Expr::col(alias(&lm_c.name));
+                                            let col = Expr::col(alias(lm_c.name.as_ref()));
                                             if lm_c.cidl_type == model_c.cidl_type {
                                                 // Column directly transfers to the new table
                                                 col.into()
@@ -528,19 +525,22 @@ impl MigrateTables {
 
                 if !rename_options.is_empty() {
                     let i = intent.ask(MigrationsDilemma::RenameOrDropColumn {
-                        model_name: model.name.clone(),
-                        column_name: lm_col.field.name.clone(),
+                        model_name: &model.name,
+                        column_name: &lm_col.field.name,
                         options: &rename_options,
                     });
 
                     // Rename
                     if let Some(i) = i {
                         let option = &rename_options[i];
-                        alter.rename_column(alias(&lm_col.field.name), alias(*option));
+                        alter.rename_column(
+                            alias(lm_col.field.name.as_ref()),
+                            alias(option.as_ref()),
+                        );
                         res.push(to_sqlite(alter));
 
                         // Remove from the rename pool
-                        needs_rename_intent.remove(option);
+                        needs_rename_intent.remove(option.as_ref());
 
                         tracing::info!(
                             "Renamed a column \"{}.{}\" to \"{}.{}\"",
@@ -554,7 +554,7 @@ impl MigrateTables {
                 }
 
                 // Drop
-                alter.drop_column(alias(&lm_col.field.name));
+                alter.drop_column(alias(lm_col.field.name.as_ref()));
                 res.push(to_sqlite(alter));
                 tracing::info!("Dropped a column \"{}.{}\"", model.name, lm_col.field.name);
             }
@@ -580,7 +580,7 @@ impl MigrateTables {
         fn identify_alterations<'a>(
             model: &'a MigrationsModel,
             lm_model: &'a MigrationsModel,
-            renamed: &HashSet<(&String, &String)>,
+            renamed: &HashSet<(&str, &str)>,
         ) -> Vec<AlterKind<'a>> {
             let mut alterations = vec![];
 
@@ -595,11 +595,11 @@ impl MigrateTables {
             let mut lm_cols = lm_model
                 .columns
                 .iter()
-                .map(|a| (&a.field.name, a))
-                .collect::<HashMap<&String, &Column>>();
+                .map(|a| (a.field.name.as_ref(), a))
+                .collect::<HashMap<&str, &Column>>();
 
             for col in &model.columns {
-                let Some(lm_col) = lm_cols.remove(&col.field.name) else {
+                let Some(lm_col) = lm_cols.remove(col.field.name.as_ref()) else {
                     if col.foreign_key_reference.is_some()
                         || !col.unique_ids.is_empty()
                         || col.composite_id.is_some()
@@ -617,7 +617,7 @@ impl MigrateTables {
 
                 if let (Some(model_fk_ref), Some(lm_fk_ref)) =
                     (&col.foreign_key_reference, &lm_col.foreign_key_reference)
-                    && renamed.contains(&(&lm_fk_ref.model_name, &model_fk_ref.model_name))
+                    && renamed.contains(&(lm_fk_ref.model_name, model_fk_ref.model_name))
                     && lm_fk_ref.column_name == model_fk_ref.column_name
                     && lm_col.field.cidl_type == col.field.cidl_type
                 {
@@ -678,7 +678,7 @@ impl MigrateTables {
                 if lm_m2ms.remove(&m2m_table_name).is_none() {
                     alterations.push(AlterKind::AddManyToMany {
                         m2m_table_name,
-                        model_name: &nav.model_reference,
+                        model_name: nav.model_reference,
                     });
                 };
             }
@@ -760,7 +760,7 @@ impl MigrateTables {
                             };
 
                             let m2m_table_name = nav.many_to_many_table_name(&model.name);
-                            let jct_model = ast.models.get(&nav.model_reference).unwrap();
+                            let jct_model = ast.models.get(nav.model_reference).unwrap();
                             create_m2ms.insert(
                                 m2m_table_name,
                                 if jct_model.name > model.name {
@@ -795,8 +795,8 @@ impl MigrateTables {
                 drops.retain(|lm_model| {
                     // Blocking input for intentions
                     let solution = intent.ask(MigrationsDilemma::RenameOrDropModel {
-                        model_name: lm_model.name.clone(),
-                        options: &creates.iter().map(|m| &m.name).collect(),
+                        model_name: lm_model.name.as_ref(),
+                        options: &creates.iter().map(|m| m.name.as_str()).collect(),
                     });
 
                     let Some(solution) = solution else {
@@ -869,7 +869,7 @@ fn is_same_primary_key(model: &MigrationsModel, lm_model: &MigrationsModel) -> b
 fn join_columns_for_side<'a>(
     model: &'a MigrationsModel,
     side: &'a str,
-) -> Vec<(String, &'a Column)> {
+) -> Vec<(String, &'a Column<'a>)> {
     if model.primary_columns.len() == 1 {
         return vec![(side.into(), &model.primary_columns[0])];
     }

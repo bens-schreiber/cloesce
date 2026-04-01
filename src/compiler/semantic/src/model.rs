@@ -1,38 +1,34 @@
+use crate::{
+    SymbolKind, SymbolTable, ensure,
+    err::{BatchResult, ErrorSink, SemanticError},
+    is_valid_sql_type, kahns, resolve_cidl_type,
+};
 use ast::{
     CidlType, Column, CrudKind, Field, ForeignKeyReference, KvR2Field, Model, NavigationField,
     NavigationFieldKind,
 };
-use frontend::{
-    FileSpan, ForeignKeyTag, KvR2Tag, ModelBlock, NavigationTag, WranglerEnvBindingKind,
-};
+use frontend::{ForeignKeyTag, KvR2Tag, ModelBlock, NavigationTag, Span, WranglerEnvBindingKind};
 use indexmap::IndexMap;
-
 use std::collections::{BTreeMap, HashMap, HashSet};
 
-use crate::{
-    SymbolKind, SymbolTable, ensure,
-    err::{BatchResult, CompilerError, ErrorSink},
-    is_valid_sql_type, kahns, resolve_cidl_type,
-};
-
 #[derive(Default)]
-pub struct ModelAnalysis {
-    sink: ErrorSink,
-    in_degree: BTreeMap<String, usize>,
-    graph: BTreeMap<String, Vec<String>>,
+pub struct ModelAnalysis<'src, 'p> {
+    sink: ErrorSink<'src, 'p>,
+    in_degree: BTreeMap<&'src str, usize>,
+    graph: BTreeMap<&'src str, Vec<&'src str>>,
 }
 
-impl ModelAnalysis {
+impl<'src, 'p> ModelAnalysis<'src, 'p> {
     pub fn analyze(
         mut self,
-        model_blocks: HashMap<String, &ModelBlock>,
-        table: &mut SymbolTable,
-    ) -> BatchResult<IndexMap<String, Model>> {
-        let mut models: IndexMap<String, Model> = IndexMap::new();
+        model_blocks: HashMap<&'src str, &'p ModelBlock<'src>>,
+        table: &mut SymbolTable<'src, 'p>,
+    ) -> BatchResult<'src, 'p, IndexMap<&'src str, Model<'src>>> {
+        let mut models: IndexMap<&'src str, Model<'src>> = IndexMap::new();
 
-        for model_block in model_blocks.values() {
+        for &model_block in model_blocks.values() {
             let mut model = Model {
-                name: model_block.symbol.name.clone(),
+                name: model_block.symbol.name,
                 ..Default::default()
             };
 
@@ -58,14 +54,14 @@ impl ModelAnalysis {
                 ensure!(
                     !matches!(crud, CrudKind::List) || model.d1_binding.is_some(),
                     self.sink,
-                    CompilerError::UnsupportedCrudOperation {
-                        model: Box::new(model_block.symbol.clone()),
+                    SemanticError::UnsupportedCrudOperation {
+                        model: &model_block.symbol
                     }
                 );
             }
 
             model.cruds = model_block.cruds.clone();
-            models.insert(model.name.clone(), model);
+            models.insert(model.name, model);
         }
 
         // Topologically sort models based on FK relationships
@@ -85,33 +81,33 @@ impl ModelAnalysis {
     /// Validates and sets all D1-related properties of a model
     fn d1_properties(
         &mut self,
-        model: &mut Model,
-        model_block: &ModelBlock,
-        model_blocks: &HashMap<String, &ModelBlock>,
-        table: &mut SymbolTable,
+        model: &mut Model<'src>,
+        model_block: &'p ModelBlock<'src>,
+        model_blocks: &HashMap<&'src str, &'p ModelBlock<'src>>,
+        table: &mut SymbolTable<'src, 'p>,
     ) {
-        let model_name = &model_block.symbol.name;
+        let model_name = model_block.symbol.name;
         let model_symbol = &model_block.symbol;
 
         // All D1 models require a binding
         let binding_symbol = {
             let Some(d1_binding) = &model_block.d1_binding else {
-                self.sink.push(CompilerError::D1ModelMissingD1Binding {
-                    model: Box::new(model_symbol.clone()),
+                self.sink.push(SemanticError::D1ModelMissingD1Binding {
+                    model: model_symbol,
                 });
                 return;
             };
 
             let Some(binding_symbol) = table.resolve(
-                &d1_binding.env_binding,
+                d1_binding.env_binding,
                 SymbolKind::WranglerEnvBinding {
                     kind: WranglerEnvBindingKind::D1,
                 },
                 None,
             ) else {
-                self.sink.push(CompilerError::D1ModelInvalidD1Binding {
-                    model: Box::new(model_symbol.clone()),
-                    tag: d1_binding.clone(),
+                self.sink.push(SemanticError::D1ModelInvalidD1Binding {
+                    model: model_symbol,
+                    tag: d1_binding,
                 });
                 return;
             };
@@ -123,19 +119,19 @@ impl ModelAnalysis {
         ensure!(
             !model_block.primary_keys.is_empty(),
             self.sink,
-            CompilerError::D1ModelMissingPrimaryKey {
-                model: Box::new(model_symbol.clone()),
+            SemanticError::D1ModelMissingPrimaryKey {
+                model: model_symbol,
             }
         );
 
-        let mut column_names = HashSet::new();
-        let mut primary_column_names = HashSet::new();
+        let mut column_names: HashSet<&str> = HashSet::new();
+        let mut primary_column_names: HashSet<&str> = HashSet::new();
 
         // Column name -> (adj_model_name, adj_column_name, composite_id)
-        let mut fk_info: HashMap<String, (String, String, Option<usize>)> = HashMap::new();
+        let mut fk_info: HashMap<&str, (&str, &str, Option<usize>)> = HashMap::new();
 
         // Column name -> Vec<usize>
-        let mut unique_info: HashMap<String, Vec<usize>> = HashMap::new();
+        let mut unique_info: HashMap<&str, Vec<usize>> = HashMap::new();
 
         // Validate columns
         for field in &model_block.fields {
@@ -154,7 +150,7 @@ impl ModelAnalysis {
             if !is_valid_sql_type(&resolved_type) || is_key_field {
                 continue;
             }
-            column_names.insert(field.name.clone());
+            column_names.insert(field.name);
 
             let is_pk = model_block
                 .primary_keys
@@ -162,40 +158,37 @@ impl ModelAnalysis {
                 .any(|pk| pk.field == field.name);
             if is_pk {
                 if field.cidl_type.is_nullable() {
-                    self.sink.push(CompilerError::NullablePrimaryKey {
-                        column: Box::new(field.clone()),
-                    });
+                    self.sink
+                        .push(SemanticError::NullablePrimaryKey { column: field });
                     continue;
                 }
 
-                primary_column_names.insert(field.name.clone());
+                primary_column_names.insert(field.name);
             }
         }
 
-        self.graph.entry(model_name.clone()).or_default();
-        self.in_degree.entry(model_name.clone()).or_insert(0);
+        self.graph.entry(model_name).or_default();
+        self.in_degree.entry(model_name).or_insert(0);
 
         // Foreign keys
-        let mut fk_columns_seen = HashSet::<String>::new();
+        let mut fk_columns_seen = HashSet::<&str>::new();
         let mut composite_counter = 0usize;
         for fk in &model_block.foreign_keys {
             self.foreign_key(
-                FkCtx {
-                    model_block,
-                    columns: &column_names,
-                    table,
-                    model_blocks,
-                },
+                model_block,
+                &column_names,
                 fk,
                 &mut fk_columns_seen,
                 &mut fk_info,
                 &mut composite_counter,
+                table,
+                model_blocks,
             );
         }
 
         // Navigation properties
         let mut navigation_properties = Vec::new();
-        let mut nav_fields_seen = HashSet::<String>::new();
+        let mut nav_fields_seen = HashSet::<&'src str>::new();
         for nav in &model_block.navigation_properties {
             if let Some(nav) = self.nav(model_block, nav, &mut nav_fields_seen, table, model_blocks)
             {
@@ -205,21 +198,18 @@ impl ModelAnalysis {
 
         // Unique constraints
         for (constraint_idx, constraint) in model_block.unique_constraints.iter().enumerate() {
-            for column in &constraint.fields {
-                if !column_names.contains(column.as_str()) {
+            for &column in &constraint.fields {
+                if !column_names.contains(column) {
                     self.sink.push(
-                        CompilerError::UniqueConstraintReferencesInvalidOrUnknownField {
-                            tag: FileSpan::from_simple_span(constraint.span),
-                            field: column.clone(),
+                        SemanticError::UniqueConstraintReferencesInvalidOrUnknownField {
+                            span: constraint.span,
+                            field: column,
                         },
                     );
                     continue;
                 }
 
-                unique_info
-                    .entry(column.clone())
-                    .or_default()
-                    .push(constraint_idx);
+                unique_info.entry(column).or_default().push(constraint_idx);
             }
         }
 
@@ -227,24 +217,24 @@ impl ModelAnalysis {
         let mut primary_columns = Vec::new();
         let mut columns = Vec::new();
         for field in &model_block.fields {
-            if !column_names.contains(&field.name) {
+            if !column_names.contains(field.name) {
                 continue;
             }
 
             let foreign_key_reference =
                 fk_info
-                    .get(&field.name)
-                    .map(|(model_name, col_name, _)| ForeignKeyReference {
-                        model_name: model_name.clone(),
-                        column_name: col_name.clone(),
+                    .get(field.name)
+                    .map(|(model_name, column_name, _)| ForeignKeyReference {
+                        model_name,
+                        column_name,
                     });
-            let composite_id = fk_info.get(&field.name).and_then(|(_, _, cid)| *cid);
-            let unique_ids_val = unique_info.remove(&field.name).unwrap_or_default();
+            let composite_id = fk_info.get(field.name).and_then(|(_, _, cid)| *cid);
+            let unique_ids_val = unique_info.remove(field.name).unwrap_or_default();
 
             let col = Column {
                 hash: 0,
                 field: Field {
-                    name: field.name.clone(),
+                    name: field.name.into(),
                     cidl_type: field.cidl_type.clone(),
                 },
                 foreign_key_reference,
@@ -252,7 +242,7 @@ impl ModelAnalysis {
                 composite_id,
             };
 
-            if primary_column_names.contains(&field.name) {
+            if primary_column_names.contains(field.name) {
                 primary_columns.push(col);
             } else {
                 columns.push(col);
@@ -267,35 +257,32 @@ impl ModelAnalysis {
     }
 
     /// Validates a foreign key and populates fk_info map
+    #[allow(clippy::too_many_arguments)]
+    #[inline(always)]
     fn foreign_key(
         &mut self,
-        ctx: FkCtx<'_>,
-        fk: &ForeignKeyTag,
-        fk_columns_seen: &mut HashSet<String>,
-        fk_info: &mut HashMap<String, (String, String, Option<usize>)>,
+        model_block: &'p ModelBlock<'src>,
+        columns: &HashSet<&'src str>,
+        fk: &'p ForeignKeyTag<'src>,
+        fk_columns_seen: &mut HashSet<&'src str>,
+        fk_info: &mut HashMap<&'src str, (&'src str, &'src str, Option<usize>)>,
         composite_counter: &mut usize,
+        table: &mut SymbolTable<'src, 'p>,
+        model_blocks: &HashMap<&'src str, &'p ModelBlock<'src>>,
     ) {
-        let FkCtx {
-            model_block,
-            columns,
-            table,
-            model_blocks,
-        } = ctx;
-        let fk_span = FileSpan::from_simple_span(fk.span);
-        let model_name = &model_block.symbol.name;
+        let model_name = model_block.symbol.name;
 
         // Check that the adjacent model exists
-        let Some(adj_model_block) = model_blocks.get(&fk.adj_model) else {
-            self.sink.push(CompilerError::UnresolvedSymbol {
-                span: fk_span.clone(),
-            });
+        let Some(adj_model_block) = model_blocks.get(fk.adj_model) else {
+            self.sink
+                .push(SemanticError::UnresolvedSymbol { span: fk.span });
             return;
         };
 
-        if fk.adj_model == *model_name {
-            self.sink.push(CompilerError::ForeignKeyReferencesSelf {
-                model: Box::new(model_block.symbol.clone()),
-                foreign_key: fk_span,
+        if fk.adj_model == model_name {
+            self.sink.push(SemanticError::ForeignKeyReferencesSelf {
+                model: &model_block.symbol,
+                foreign_key: fk.span,
             });
             return;
         }
@@ -305,12 +292,12 @@ impl ModelAnalysis {
             != adj_model_block.d1_binding.as_ref().map(|t| &t.env_binding)
         {
             self.sink
-                .push(CompilerError::ForeignKeyReferencesDifferentDatabase {
-                    tag: fk_span,
+                .push(SemanticError::ForeignKeyReferencesDifferentDatabase {
+                    span: fk.span,
                     binding: adj_model_block
                         .d1_binding
                         .as_ref()
-                        .map(|t| t.env_binding.clone())
+                        .map(|t| t.env_binding)
                         .unwrap_or_default(),
                 });
             return;
@@ -321,9 +308,9 @@ impl ModelAnalysis {
             table.resolve(first_ref_field, SymbolKind::ModelField, Some(model_name))
         else {
             self.sink
-                .push(CompilerError::ForeignKeyReferencesInvalidOrUnknownColumn {
-                    tag: fk_span,
-                    column: first_ref_field.clone(),
+                .push(SemanticError::ForeignKeyReferencesInvalidOrUnknownColumn {
+                    span: fk.span,
+                    column: first_ref_field,
                 });
             return;
         };
@@ -338,19 +325,17 @@ impl ModelAnalysis {
             None
         };
 
-        let adj_model_name = fk.adj_model.clone();
+        let adj_model_name = fk.adj_model;
 
         for (field_name, adj_field_name) in &fk.references {
-            let fk_span = fk_span.clone();
-
             // Validate the field from this model
             let field_cidl_type = {
                 // Field should be a column on this model
-                if !columns.contains(field_name.as_str()) {
+                if !columns.contains(field_name) {
                     self.sink
-                        .push(CompilerError::ForeignKeyReferencesInvalidOrUnknownColumn {
-                            tag: fk_span,
-                            column: field_name.clone(),
+                        .push(SemanticError::ForeignKeyReferencesInvalidOrUnknownColumn {
+                            span: fk.span,
+                            column: field_name,
                         });
                     continue;
                 }
@@ -359,28 +344,28 @@ impl ModelAnalysis {
                     table.resolve(field_name, SymbolKind::ModelField, Some(model_name))
                 else {
                     self.sink
-                        .push(CompilerError::ForeignKeyReferencesInvalidOrUnknownColumn {
-                            tag: fk_span,
-                            column: field_name.clone(),
+                        .push(SemanticError::ForeignKeyReferencesInvalidOrUnknownColumn {
+                            span: fk.span,
+                            column: field_name,
                         });
                     continue;
                 };
 
                 // A column cannot be in multiple foreign keys
-                if !fk_columns_seen.insert(field_name.clone()) {
+                if !fk_columns_seen.insert(field_name) {
                     self.sink
-                        .push(CompilerError::ForeignKeyColumnAlreadyInForeignKey {
-                            tag: fk_span.clone(),
-                            column: Box::new(field_sym.clone()),
+                        .push(SemanticError::ForeignKeyColumnAlreadyInForeignKey {
+                            span: fk.span,
+                            column: &field_sym,
                         });
                 }
 
                 if field_sym.cidl_type.is_nullable() != is_nullable {
                     self.sink
-                        .push(CompilerError::ForeignKeyInconsistentNullability {
-                            tag: fk_span.clone(),
-                            first_column: Box::new(first_ref_sym.clone()),
-                            second_column: Box::new(field_sym.clone()),
+                        .push(SemanticError::ForeignKeyInconsistentNullability {
+                            span: fk.span,
+                            first_column: &first_ref_sym,
+                            second_column: &field_sym,
                         });
                 }
 
@@ -389,24 +374,22 @@ impl ModelAnalysis {
 
             // Validate the field from the adjacent model
             let adj_field_cidl_type = {
-                let Some(adj_field_sym) = table.resolve(
-                    adj_field_name,
-                    SymbolKind::ModelField,
-                    Some(&adj_model_name),
-                ) else {
+                let Some(adj_field_sym) =
+                    table.resolve(adj_field_name, SymbolKind::ModelField, Some(adj_model_name))
+                else {
                     self.sink
-                        .push(CompilerError::ForeignKeyReferencesInvalidOrUnknownColumn {
-                            tag: fk_span,
-                            column: adj_field_name.clone(),
+                        .push(SemanticError::ForeignKeyReferencesInvalidOrUnknownColumn {
+                            span: fk.span,
+                            column: adj_field_name,
                         });
                     continue;
                 };
 
                 if !is_valid_sql_type(&adj_field_sym.cidl_type) {
                     self.sink
-                        .push(CompilerError::ForeignKeyReferencesInvalidOrUnknownColumn {
-                            tag: fk_span.clone(),
-                            column: adj_field_name.clone(),
+                        .push(SemanticError::ForeignKeyReferencesInvalidOrUnknownColumn {
+                            span: fk.span,
+                            column: adj_field_name,
                         });
                 }
 
@@ -414,70 +397,61 @@ impl ModelAnalysis {
             };
 
             if field_cidl_type.root_type() != adj_field_cidl_type.root_type() {
-                let field_sym = table
+                let column = table
                     .resolve(field_name, SymbolKind::ModelField, Some(model_name))
-                    .unwrap()
-                    .clone();
-                let adj_field_sym = table
-                    .resolve(
-                        adj_field_name,
-                        SymbolKind::ModelField,
-                        Some(&adj_model_name),
-                    )
-                    .unwrap()
-                    .clone();
+                    .unwrap();
+                let adj_column = table
+                    .resolve(adj_field_name, SymbolKind::ModelField, Some(adj_model_name))
+                    .unwrap();
+
                 self.sink
-                    .push(CompilerError::ForeignKeyReferencesIncompatibleColumnType {
-                        tag: fk_span,
-                        column: Box::new(field_sym),
-                        adj_column: Box::new(adj_field_sym),
+                    .push(SemanticError::ForeignKeyReferencesIncompatibleColumnType {
+                        span: fk.span,
+                        column: &column,
+                        adj_column: &adj_column,
                     });
                 continue;
             }
 
             // Store FK info for this column
-            fk_info.insert(
-                field_name.clone(),
-                (adj_model_name.clone(), adj_field_name.clone(), composite_id),
-            );
+            fk_info.insert(*field_name, (adj_model_name, *adj_field_name, composite_id));
 
             if !field_cidl_type.is_nullable() {
                 // One To One: Person has a Dog ..(sql)=> Person has a fk to Dog
                 // Dog must come before Person
                 self.graph
-                    .entry(adj_model_name.clone())
+                    .entry(adj_model_name)
                     .or_default()
-                    .push(model_name.clone());
-                *self.in_degree.entry(model_name.clone()).or_insert(0) += 1;
+                    .push(model_name);
+                *self.in_degree.entry(model_name).or_insert(0) += 1;
             }
         }
     }
 
     fn nav(
         &mut self,
-        model_block: &ModelBlock,
-        nav: &NavigationTag,
-        nav_fields_seen: &mut HashSet<String>,
-        table: &mut SymbolTable,
-        model_blocks: &HashMap<String, &ModelBlock>,
-    ) -> Option<NavigationField> {
-        let model_name = &model_block.symbol.name;
-        let nav_span = FileSpan::from_simple_span(nav.span);
+        model_block: &'p ModelBlock<'src>,
+        nav: &'p NavigationTag<'src>,
+        nav_fields_seen: &mut HashSet<&'src str>,
+        table: &mut SymbolTable<'src, 'p>,
+        model_blocks: &HashMap<&'src str, &'p ModelBlock<'src>>,
+    ) -> Option<NavigationField<'src>> {
+        let model_name = model_block.symbol.name;
 
         let Some(nav_field_sym) =
-            table.resolve(&nav.field, SymbolKind::ModelField, Some(model_name))
+            table.resolve(nav.field, SymbolKind::ModelField, Some(model_name))
         else {
             self.sink
-                .push(CompilerError::UnresolvedSymbol { span: nav_span });
+                .push(SemanticError::UnresolvedSymbol { span: nav.span });
             return None;
         };
 
         // A nav field cannot be in multiple navigation properties
-        if !nav_fields_seen.insert(nav.field.clone()) {
+        if !nav_fields_seen.insert(nav.field) {
             self.sink.push(
-                CompilerError::NavigationPropertyFieldAlreadyInNavigationProperty {
-                    tag: nav_span,
-                    field: Box::new(nav_field_sym.clone()),
+                SemanticError::NavigationPropertyFieldAlreadyInNavigationProperty {
+                    span: nav.span,
+                    field: nav_field_sym,
                 },
             );
             return None;
@@ -492,15 +466,15 @@ impl ModelAnalysis {
                     table.resolve(ref_field_name, SymbolKind::ModelField, Some(ref_model_name))
                 else {
                     self.sink.push(
-                        CompilerError::NavigationPropertyReferencesInvalidOrUnknownField {
-                            tag: nav_span.clone(),
-                            field: ref_field_name.clone(),
+                        SemanticError::NavigationPropertyReferencesInvalidOrUnknownField {
+                            span: nav.span,
+                            field: ref_field_name,
                         },
                     );
                     all_valid = false;
                     continue;
                 };
-                referenced_field_names.push(ref_field_name.clone());
+                referenced_field_names.push(*ref_field_name);
             }
             if !all_valid {
                 return None;
@@ -516,25 +490,32 @@ impl ModelAnalysis {
                 }
             };
 
-        // A nav field must be of cidl type Object, that Object must be the adjacent model OR an array of the adjacent model
-        let adj_model_name = match unwrap_arr_and_null(&resolved_nav_field_type) {
+        // A nav field must be of cidl type Object, that Object must be the adjacent model
+        // OR an array/nullable wrapper around the adjacent model.
+        let base_type = match resolved_nav_field_type.clone() {
+            CidlType::Array(inner) => *inner,
+            CidlType::Nullable(inner) => *inner,
+            other => other,
+        };
+
+        let adj_model_name = match base_type {
             CidlType::Object { name, .. } => {
-                if !model_blocks.contains_key(name.as_str()) {
+                if !model_blocks.contains_key(name) {
                     self.sink.push(
-                        CompilerError::NavigationPropertyReferencesInvalidOrUnknownField {
-                            tag: nav_span,
-                            field: nav.field.clone(),
+                        SemanticError::NavigationPropertyReferencesInvalidOrUnknownField {
+                            span: nav.span,
+                            field: nav.field,
                         },
                     );
                     return None;
                 }
-                name.clone()
+                name
             }
             _ => {
                 self.sink.push(
-                    CompilerError::NavigationPropertyReferencesInvalidOrUnknownField {
-                        tag: nav_span,
-                        field: nav.field.clone(),
+                    SemanticError::NavigationPropertyReferencesInvalidOrUnknownField {
+                        span: nav.span,
+                        field: nav.field,
                     },
                 );
                 return None;
@@ -547,12 +528,12 @@ impl ModelAnalysis {
                 != model_block.d1_binding.as_ref().map(|t| &t.env_binding)
         {
             self.sink.push(
-                CompilerError::NavigationPropertyReferencesDifferentDatabase {
-                    tag: nav_span,
+                SemanticError::NavigationPropertyReferencesDifferentDatabase {
+                    span: nav.span,
                     binding: adj_block
                         .d1_binding
                         .as_ref()
-                        .map(|t| t.env_binding.clone())
+                        .map(|t| t.env_binding)
                         .unwrap_or_default(),
                 },
             );
@@ -560,8 +541,8 @@ impl ModelAnalysis {
         }
 
         let nav_field = Field {
-            name: nav_field_sym.name.clone(),
-            cidl_type: resolved_nav_field_type,
+            name: nav_field_sym.name.into(),
+            cidl_type: resolved_nav_field_type.clone(),
         };
 
         let has_arr = matches!(nav_field_sym.cidl_type, CidlType::Array(_));
@@ -574,17 +555,17 @@ impl ModelAnalysis {
                     if fk.adj_model != adj_model_name {
                         return false;
                     }
-                    let nav_fields_ref: Vec<&String> = referenced_field_names.iter().collect();
+                    let nav_fields_ref: Vec<&&'src str> = referenced_field_names.iter().collect();
 
                     // Match against FK source fields (current model columns)
-                    let fk_source_fields: Vec<&String> =
+                    let fk_source_fields: Vec<&&'src str> =
                         fk.references.iter().map(|(src, _)| src).collect();
                     if compare_vecs_ignoring_order(&fk_source_fields, &nav_fields_ref) {
                         return true;
                     }
 
                     // Match against FK adj fields (adjacent model columns)
-                    let fk_adj_fields: Vec<&String> =
+                    let fk_adj_fields: Vec<&&'src str> =
                         fk.references.iter().map(|(_, adj)| adj).collect();
                     compare_vecs_ignoring_order(&fk_adj_fields, &nav_fields_ref)
                 });
@@ -592,9 +573,9 @@ impl ModelAnalysis {
                 ensure!(
                     has_matching_fk,
                     self.sink,
-                    CompilerError::NavigationPropertyReferencesInvalidOrUnknownField {
-                        tag: nav_span,
-                        field: nav.field.clone(),
+                    SemanticError::NavigationPropertyReferencesInvalidOrUnknownField {
+                        span: nav.span,
+                        field: nav.field,
                     }
                 );
 
@@ -613,21 +594,22 @@ impl ModelAnalysis {
                 let adj_block = model_blocks.get(&adj_model_name);
                 let has_matching_fk = adj_block.is_some_and(|ab| {
                     ab.foreign_keys.iter().any(|fk| {
-                        let fk_fields: Vec<&String> =
+                        let fk_fields: Vec<&&'src str> =
                             fk.references.iter().map(|(field, _)| field).collect();
-                        let nav_fields_ref: Vec<&String> = referenced_field_names.iter().collect();
+                        let nav_fields_ref: Vec<&&'src str> =
+                            referenced_field_names.iter().collect();
 
                         compare_vecs_ignoring_order(&fk_fields, &nav_fields_ref)
-                            && fk.adj_model == *model_name
+                            && fk.adj_model == model_name
                     })
                 });
 
                 ensure!(
                     has_matching_fk,
                     self.sink,
-                    CompilerError::NavigationPropertyReferencesInvalidOrUnknownField {
-                        tag: nav_span,
-                        field: nav.field.clone(),
+                    SemanticError::NavigationPropertyReferencesInvalidOrUnknownField {
+                        span: nav.span,
+                        field: nav.field,
                     }
                 );
 
@@ -651,7 +633,7 @@ impl ModelAnalysis {
                                 && adj_nav
                                     .fields
                                     .first()
-                                    .map(|(m, _)| m == model_name)
+                                    .map(|(m, _)| *m == model_name)
                                     .unwrap_or(false)
                         })
                         .count()
@@ -659,8 +641,8 @@ impl ModelAnalysis {
 
                 if matching_nav_count == 0 {
                     self.sink
-                        .push(CompilerError::NavigationPropertyMissingReciprocalM2M {
-                            tag: nav_span,
+                        .push(SemanticError::NavigationPropertyMissingReciprocalM2M {
+                            span: nav.span,
                         });
                     return None;
                 }
@@ -668,7 +650,7 @@ impl ModelAnalysis {
                 ensure!(
                     matching_nav_count == 1,
                     self.sink,
-                    CompilerError::NavigationPropertyAmbiguousM2M { tag: nav_span }
+                    SemanticError::NavigationPropertyAmbiguousM2M { span: nav.span }
                 );
 
                 NavigationField {
@@ -680,9 +662,9 @@ impl ModelAnalysis {
             }
             _ => {
                 self.sink.push(
-                    CompilerError::NavigationPropertyReferencesInvalidOrUnknownField {
-                        tag: nav_span,
-                        field: nav.field.clone(),
+                    SemanticError::NavigationPropertyReferencesInvalidOrUnknownField {
+                        span: nav.span,
+                        field: nav.field,
                     },
                 );
                 return None;
@@ -695,38 +677,37 @@ impl ModelAnalysis {
     /// Validates and sets all KV/R2-related properties of a model
     fn kv_r2_properties(
         &mut self,
-        model: &mut Model,
-        model_block: &ModelBlock,
-        table: &SymbolTable,
+        model: &mut Model<'src>,
+        model_block: &'p ModelBlock<'src>,
+        table: &SymbolTable<'src, 'p>,
     ) {
-        let model_name = &model_block.symbol.name;
+        let model_name = model_block.symbol.name;
 
         // Validates that a KV/R2 tag's env binding exists and is of the correct WranglerEnvBindingKind
-        let validate_binding = |sink: &mut ErrorSink,
-                                tag: &KvR2Tag,
+        let validate_binding = |sink: &mut ErrorSink<'src, 'p>,
+                                tag: &KvR2Tag<'src>,
                                 expected: WranglerEnvBindingKind|
-         -> Option<String> {
-            let tag_span = FileSpan::from_simple_span(tag.span);
+         -> Option<&'src str> {
             if let Some(binding_sym) = table.resolve(
-                &tag.env_binding,
+                tag.env_binding,
                 SymbolKind::WranglerEnvBinding {
                     kind: expected.clone(),
                 },
                 None,
             ) {
-                return Some(binding_sym.name.clone());
+                return Some(binding_sym.name);
             }
 
             let err = match expected {
-                WranglerEnvBindingKind::Kv => CompilerError::KvInvalidBinding {
-                    tag: tag_span,
-                    binding: tag.env_binding.clone(),
+                WranglerEnvBindingKind::Kv => SemanticError::KvInvalidBinding {
+                    span: tag.span,
+                    binding: tag.env_binding,
                 },
-                WranglerEnvBindingKind::R2 => CompilerError::R2InvalidBinding {
-                    tag: tag_span,
-                    binding: tag.env_binding.clone(),
+                WranglerEnvBindingKind::R2 => SemanticError::R2InvalidBinding {
+                    span: tag.span,
+                    binding: tag.env_binding,
                 },
-                _ => CompilerError::UnresolvedSymbol { span: tag_span },
+                _ => SemanticError::UnresolvedSymbol { span: tag.span },
             };
             sink.push(err);
             None
@@ -735,14 +716,11 @@ impl ModelAnalysis {
         // Extracts variables from a formatted string, then validates that they
         // correspond to fields on the models that are of valid SQLite types
         let validate_key_format =
-            |sink: &mut ErrorSink, tag_span: FileSpan, format: &str| -> bool {
+            |sink: &mut ErrorSink<'src, 'p>, span: Span, format: &'src str| -> bool {
                 let vars = match extract_braced(format) {
                     Ok(vars) => vars,
                     Err(reason) => {
-                        sink.push(CompilerError::KvR2InvalidKeyFormat {
-                            tag: tag_span,
-                            reason,
-                        });
+                        sink.push(SemanticError::KvR2InvalidKeyFormat { span, reason });
                         return false;
                     }
                 };
@@ -755,8 +733,8 @@ impl ModelAnalysis {
                         .find(|f| f.name == var && is_valid_sql_type(&f.cidl_type));
 
                     if matching_field.is_none() {
-                        sink.push(CompilerError::KvR2UnknownKeyVariable {
-                            tag: tag_span.clone(),
+                        sink.push(SemanticError::KvR2UnknownKeyVariable {
+                            span,
                             variable: var,
                         });
                         return false;
@@ -767,18 +745,16 @@ impl ModelAnalysis {
             };
 
         for kv in &model_block.kvs {
-            let kv_span = FileSpan::from_simple_span(kv.span);
             let binding_name = validate_binding(&mut self.sink, kv, WranglerEnvBindingKind::Kv);
 
-            if !validate_key_format(&mut self.sink, kv_span.clone(), &kv.format) {
+            if !validate_key_format(&mut self.sink, kv.span, kv.format) {
                 continue;
             }
 
-            let Some(field_sym) =
-                table.resolve(&kv.field, SymbolKind::ModelField, Some(model_name))
+            let Some(field_sym) = table.resolve(kv.field, SymbolKind::ModelField, Some(model_name))
             else {
                 self.sink
-                    .push(CompilerError::UnresolvedSymbol { span: kv_span });
+                    .push(SemanticError::UnresolvedSymbol { span: kv.span });
                 continue;
             };
 
@@ -799,71 +775,67 @@ impl ModelAnalysis {
 
             model.kv_fields.push(KvR2Field {
                 field: Field {
-                    name: field_sym.name.clone(),
+                    name: field_sym.name.into(),
                     cidl_type,
                 },
-                format: kv.format.clone(),
+                format: kv.format,
                 binding: binding_name.unwrap_or_default(),
                 list_prefix: false,
             });
         }
 
         for r2 in &model_block.r2s {
-            let r2_span = FileSpan::from_simple_span(r2.span);
             let binding_name = validate_binding(&mut self.sink, r2, WranglerEnvBindingKind::R2);
 
-            let Some(field_sym) =
-                table.resolve(&r2.field, SymbolKind::ModelField, Some(model_name))
+            let Some(field_sym) = table.resolve(r2.field, SymbolKind::ModelField, Some(model_name))
             else {
                 self.sink
-                    .push(CompilerError::UnresolvedSymbol { span: r2_span });
+                    .push(SemanticError::UnresolvedSymbol { span: r2.span });
                 continue;
             };
 
-            if !validate_key_format(&mut self.sink, r2_span.clone(), &r2.format) {
+            if !validate_key_format(&mut self.sink, r2.span, r2.format) {
                 continue;
             }
 
             if field_sym.cidl_type != CidlType::R2Object
                 && field_sym.cidl_type != CidlType::paginated(CidlType::R2Object)
             {
-                self.sink.push(CompilerError::KvR2InvalidField {
-                    tag: r2_span,
-                    field: r2.field.clone(),
+                self.sink.push(SemanticError::KvR2InvalidField {
+                    span: r2.span,
+                    field: r2.field,
                 });
                 continue;
             }
 
             model.r2_fields.push(KvR2Field {
                 field: Field {
-                    name: field_sym.name.clone(),
+                    name: field_sym.name.into(),
                     cidl_type: field_sym.cidl_type.clone(),
                 },
-                format: r2.format.clone(),
+                format: r2.format,
                 binding: binding_name.unwrap_or_default(),
                 list_prefix: false,
             });
         }
 
-        for key_field in &model_block.key_fields {
-            let kf_span = FileSpan::from_simple_span(key_field.span);
-            let Some(field_sym) =
-                table.resolve(&key_field.field, SymbolKind::ModelField, Some(model_name))
+        for kf in &model_block.key_fields {
+            let Some(field_sym) = table.resolve(kf.field, SymbolKind::ModelField, Some(model_name))
             else {
                 self.sink
-                    .push(CompilerError::UnresolvedSymbol { span: kf_span });
+                    .push(SemanticError::UnresolvedSymbol { span: kf.span });
                 continue;
             };
 
             if field_sym.cidl_type != CidlType::String {
-                self.sink.push(CompilerError::KvR2InvalidKeyParam {
-                    tag: kf_span,
-                    field: Box::new(field_sym.clone()),
+                self.sink.push(SemanticError::KvR2InvalidKeyParam {
+                    span: kf.span,
+                    field: field_sym,
                 });
                 continue;
             }
 
-            model.key_fields.push(field_sym.name.clone());
+            model.key_fields.push(field_sym.name);
         }
     }
 }
@@ -886,43 +858,28 @@ fn compare_vecs_ignoring_order<T: Ord>(a: &[T], b: &[T]) -> bool {
 /// e.g, "users/{userId}/posts/{postId}" => ["userId", "postId"].
 ///
 /// Returns an error string if the format string is invalid.
-fn extract_braced(s: &str) -> Result<Vec<String>, String> {
+fn extract_braced(s: &str) -> Result<Vec<&str>, String> {
     let mut out = Vec::new();
     let mut current = None;
-
-    for c in s.chars() {
-        match (current.as_mut(), c) {
-            (None, '{') => current = Some(String::new()),
-            (Some(_), '{') => {
+    let chars = s.char_indices().peekable();
+    for (i, c) in chars {
+        match (current.is_some(), c) {
+            (false, '{') => {
+                current = Some(i + 1);
+            }
+            (true, '{') => {
                 return Err("nested brace in key".to_string());
             }
-            (Some(buf), '}') => {
-                out.push(std::mem::take(buf));
-                current = None;
+            (true, '}') => {
+                let start_idx = current.take().unwrap();
+                out.push(&s[start_idx..i]);
             }
-            (Some(buf), c) => buf.push(c),
+            (true, _) => {}
             _ => {}
         }
     }
-
     if current.is_some() {
         return Err("unclosed brace in key".to_string());
     }
-
     Ok(out)
-}
-
-fn unwrap_arr_and_null(cidl_type: &CidlType) -> &CidlType {
-    match cidl_type {
-        CidlType::Array(inner) => inner.as_ref(),
-        CidlType::Nullable(inner) => inner.as_ref(),
-        other => other,
-    }
-}
-
-struct FkCtx<'a> {
-    model_block: &'a ModelBlock,
-    columns: &'a HashSet<String>,
-    table: &'a mut SymbolTable,
-    model_blocks: &'a HashMap<String, &'a ModelBlock>,
 }

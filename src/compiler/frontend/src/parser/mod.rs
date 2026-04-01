@@ -245,7 +245,7 @@ pub fn service_block<'tokens, 'src: 'tokens>()
 }
 
 fn cidl_type<'tokens, 'src: 'tokens>()
--> impl Parser<'tokens, TokenInput<'tokens, 'src>, CidlType, Extra<'tokens, 'src>> {
+-> impl Parser<'tokens, TokenInput<'tokens, 'src>, CidlType<'src>, Extra<'tokens, 'src>> {
     recursive(|cidl_type| {
         let wrapper = select! { Token::Ident(name) => name }
             .then_ignore(just(Token::LAngle))
@@ -285,11 +285,8 @@ fn cidl_type<'tokens, 'src: 'tokens>()
             just(Token::Env).to(CidlType::Env),
         ));
 
-        let unresolved_type = select! { Token::Ident(name) => name }.map(|name: &str| {
-            CidlType::UnresolvedReference {
-                name: name.to_string(),
-            }
-        });
+        let unresolved_type = select! { Token::Ident(name) => name }
+            .map(|name: &str| CidlType::UnresolvedReference { name });
 
         choice((wrapper, primitive_keyword, unresolved_type)).boxed()
     })

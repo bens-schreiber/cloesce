@@ -3,14 +3,12 @@ use sea_query::{
     Expr, IntoCondition, IntoIden, Query, SelectStatement, SqliteQueryBuilder, TableRef,
 };
 
-use crate::OrmErrorKind;
-use crate::fail;
-use migrations::alias;
+use crate::{OrmErrorKind, alias, fail};
 
 use super::Result;
 
 pub struct SelectModel<'a> {
-    ast: &'a CloesceAst,
+    ast: &'a CloesceAst<'a>,
     path: Vec<String>,
     counter: usize,
     query: SelectStatement,
@@ -21,7 +19,7 @@ impl<'a> SelectModel<'a> {
         model_name: &str,
         from: Option<String>,
         include_tree: Option<IncludeTree>,
-        ast: &'a CloesceAst,
+        ast: &'a CloesceAst<'a>,
     ) -> Result<String> {
         let model = match ast.models.get(model_name) {
             Some(m) => m,
@@ -42,7 +40,7 @@ impl<'a> SelectModel<'a> {
                 query.from(TableRef::Table(alias(CUSTOM_FROM).into_iden()));
             }
             None => {
-                query.from(alias(&model.name));
+                query.from(alias(model.name));
             }
         }
 
@@ -54,7 +52,7 @@ impl<'a> SelectModel<'a> {
         };
 
         let include_tree = include_tree.unwrap_or_default();
-        sm.dfs(model, &include_tree, model.name.clone(), None);
+        sm.dfs(model, &include_tree, model.name.to_string(), None);
         let res = sm.query.to_string(SqliteQueryBuilder);
 
         // Dumb hack to support custom FROM clauses
@@ -91,7 +89,7 @@ impl<'a> SelectModel<'a> {
                 // For M:M tables with composite PKs:
                 // - single PK: use "left" or "right" (alphabetically sorted)
                 // - composite PK: use "left_<pk_name>" or "right_<pk_name>"
-                let base = if model.name.as_str() < m2m_alias.trim_end_matches("_") {
+                let base = if model.name < m2m_alias.trim_end_matches("_") {
                     "left"
                 } else {
                     "right"
@@ -105,28 +103,28 @@ impl<'a> SelectModel<'a> {
 
                 Expr::col((alias(m2m_alias), alias(&col_name)))
             } else {
-                Expr::col((alias(&model_alias), alias(pk_name)))
+                Expr::col((alias(&model_alias), alias(pk_name.as_ref())))
             };
 
-            self.query.expr_as(col, alias(join_path(pk_name)));
+            self.query.expr_as(col, alias(join_path(pk_name.as_ref())));
         }
 
         // Columns
         for col in &model.columns {
             self.query.expr_as(
-                Expr::col((alias(&model_alias), alias(&col.field.name))),
-                alias(join_path(&col.field.name)),
+                Expr::col((alias(&model_alias), alias(col.field.name.as_ref()))),
+                alias(join_path(col.field.name.as_ref())),
             );
         }
 
         // Navigation fields
         for nav in &model.navigation_fields {
-            let Some(child_tree) = tree.0.get(&nav.field.name) else {
+            let Some(child_tree) = tree.0.get(nav.field.name.as_ref()) else {
                 continue;
             };
 
             let child = self.ast.models.get(&nav.model_reference).unwrap();
-            let child_alias = self.id(&child.name);
+            let child_alias = self.id(child.name);
             let mut child_m2m_alias = None;
 
             match &nav.kind {
@@ -136,12 +134,12 @@ impl<'a> SelectModel<'a> {
 
                     for (fk, pk) in columns.iter().zip(child.primary_columns.iter()) {
                         condition = condition.add(
-                            Expr::col((alias(&model_alias), alias(fk)))
-                                .equals((alias(&child_alias), alias(&pk.field.name))),
+                            Expr::col((alias(&model_alias), alias(*fk)))
+                                .equals((alias(&child_alias), alias(pk.field.name.as_ref()))),
                         );
                     }
 
-                    left_join_as(&mut self.query, &child.name, &child_alias, condition);
+                    left_join_as(&mut self.query, child.name, &child_alias, condition);
                 }
                 NavigationFieldKind::OneToMany { columns } => {
                     // Build join condition for all key columns
@@ -149,15 +147,15 @@ impl<'a> SelectModel<'a> {
 
                     for (pk, fk) in model.primary_columns.iter().zip(columns.iter()) {
                         condition = condition.add(
-                            Expr::col((alias(&model_alias), alias(&pk.field.name)))
-                                .equals((alias(&child_alias), alias(fk))),
+                            Expr::col((alias(&model_alias), alias(pk.field.name.as_ref())))
+                                .equals((alias(&child_alias), alias(*fk))),
                         );
                     }
 
-                    left_join_as(&mut self.query, &child.name, &child_alias, condition);
+                    left_join_as(&mut self.query, child.name, &child_alias, condition);
                 }
                 NavigationFieldKind::ManyToMany => {
-                    let m2m_table_name = nav.many_to_many_table_name(&model.name);
+                    let m2m_table_name = nav.many_to_many_table_name(model.name);
                     let m2m_alias = self.id(&m2m_table_name);
 
                     let (side_a, side_b) = if model.name < nav.model_reference {
@@ -177,7 +175,7 @@ impl<'a> SelectModel<'a> {
                         };
 
                         condition_a = condition_a.add(
-                            Expr::col((alias(&model_alias), alias(&pk.field.name)))
+                            Expr::col((alias(&model_alias), alias(pk.field.name.as_ref())))
                                 .equals((alias(&m2m_alias), alias(&m2m_col))),
                         );
                     }
@@ -196,17 +194,17 @@ impl<'a> SelectModel<'a> {
 
                         condition_b = condition_b.add(
                             Expr::col((alias(&m2m_alias), alias(&m2m_col)))
-                                .equals((alias(&child_alias), alias(&pk.field.name))),
+                                .equals((alias(&child_alias), alias(pk.field.name.as_ref()))),
                         );
                     }
 
-                    left_join_as(&mut self.query, &child.name, &child_alias, condition_b);
+                    left_join_as(&mut self.query, child.name, &child_alias, condition_b);
 
                     child_m2m_alias = Some(m2m_alias);
                 }
             }
 
-            self.path.push(nav.field.name.clone());
+            self.path.push(nav.field.name.to_string());
             self.dfs(child, child_tree, child_alias, child_m2m_alias.as_ref());
             self.path.pop();
         }

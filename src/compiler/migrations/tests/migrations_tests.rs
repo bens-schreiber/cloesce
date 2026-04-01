@@ -37,13 +37,13 @@ fn as_migration(ast: CloesceAst) -> MigrationsAst {
         .map(|(name, model)| {
             let m = MigrationsModel {
                 hash: model.hash,
-                name: model.name,
+                name: model.name.to_string(),
                 d1_binding: Some("db".into()),
                 primary_columns: model.primary_columns,
                 columns: model.columns,
                 navigation_fields: model.navigation_fields,
             };
-            (name, m)
+            (name.to_string(), m)
         })
         .collect();
 
@@ -53,13 +53,13 @@ fn as_migration(ast: CloesceAst) -> MigrationsAst {
     }
 }
 
-fn empty_migration() -> MigrationsAst {
+fn empty_migration() -> MigrationsAst<'static> {
     let mut empty_ast = CloesceAst::default();
     empty_ast.set_merkle_hash();
     as_migration(empty_ast)
 }
 
-fn src_to_migration(src: &str) -> MigrationsAst {
+fn src_to_migration(src: &'static str) -> MigrationsAst<'static> {
     let mut ast = src_to_ast(src);
     ast.set_merkle_hash();
     as_migration(ast)
@@ -76,16 +76,22 @@ impl MigrationsIntent for MockMigrationsIntent {
             MigrationsDilemma::RenameOrDropModel {
                 model_name,
                 options,
-            } => ((model_name.clone(), None), options),
+            } => (
+                (model_name.to_string(), None),
+                options.iter().map(|s| s.to_string()).collect::<Vec<_>>(),
+            ),
             MigrationsDilemma::RenameOrDropColumn {
                 model_name,
                 options,
                 column_name: attribute_name,
-            } => ((model_name.clone(), Some(attribute_name.clone())), options),
+            } => (
+                ((*model_name).to_string(), Some(attribute_name.to_string())),
+                options.iter().map(|s| s.to_string()).collect::<Vec<_>>(),
+            ),
         };
 
         let ans = self.answers.get(&key).unwrap().clone();
-        ans.map(|a| opts.iter().enumerate().find(|(_, o)| ***o == a).unwrap().0)
+        ans.map(|a| opts.iter().enumerate().find(|(_, o)| **o == a).unwrap().0)
     }
 }
 

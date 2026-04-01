@@ -4,7 +4,7 @@ use compiler_test::src_to_ast;
 use orm::validate::{ValidatorErrorKind, validate_cidl_type};
 use serde_json::{Value, json};
 
-fn empty_ast() -> ast::CloesceAst {
+fn empty_ast() -> ast::CloesceAst<'static> {
     src_to_ast("env { db: d1 }")
 }
 
@@ -27,7 +27,7 @@ fn undefined() {
         );
         let result = validate_cidl_type(
             CidlType::Partial {
-                object_name: "SomeModel".to_string(),
+                object_name: "SomeModel",
             },
             None,
             &ast,
@@ -88,7 +88,7 @@ fn null_value() {
         );
         let result = validate_cidl_type(
             CidlType::Partial {
-                object_name: "SomeModel".to_string(),
+                object_name: "SomeModel",
             },
             Some(Value::Null),
             &ast,
@@ -338,7 +338,7 @@ fn data_source() {
         );
         let result = validate_cidl_type(
             CidlType::DataSource {
-                model_name: "Horse".to_string(),
+                model_name: "Horse",
             },
             Some(json!("nonexistent_source")),
             &ast,
@@ -357,7 +357,7 @@ fn data_source() {
         );
         let result = validate_cidl_type(
             CidlType::DataSource {
-                model_name: "Horse".to_string(),
+                model_name: "Horse",
             },
             Some(json!("none")),
             &ast,
@@ -385,14 +385,8 @@ fn objects_partials() {
             "id": 1,
             "name": 99
         });
-        let result = validate_cidl_type(
-            CidlType::Object {
-                name: "Horse".to_string(),
-            },
-            Some(value),
-            &ast,
-            false,
-        );
+        let result =
+            validate_cidl_type(CidlType::Object { name: "Horse" }, Some(value), &ast, false);
         assert!(matches!(result, Err(ValidatorErrorKind::NonString)));
     }
 
@@ -425,9 +419,7 @@ fn objects_partials() {
             "riders": []
         });
         let result = validate_cidl_type(
-            CidlType::Object {
-                name: "Horse".to_string(),
-            },
+            CidlType::Object { name: "Horse" },
             Some(value.clone()),
             &ast,
             false,
@@ -451,7 +443,7 @@ fn objects_partials() {
         let value = json!({ "id": 1 });
         let result = validate_cidl_type(
             CidlType::Partial {
-                object_name: "Horse".to_string(),
+                object_name: "Horse",
             },
             Some(value),
             &ast,

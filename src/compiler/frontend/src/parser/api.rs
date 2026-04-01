@@ -14,7 +14,7 @@ struct PendingApiMethod<'src> {
     name: &'src str,
     span: Span,
     http_verb: HttpVerb,
-    return_type: CidlType,
+    return_type: CidlType<'src>,
     parameters: Vec<PendingApiParam<'src>>,
 }
 
@@ -25,7 +25,7 @@ enum PendingApiParam<'src> {
     Field {
         name: &'src str,
         span: Span,
-        cidl_type: CidlType,
+        cidl_type: CidlType<'src>,
     },
 }
 

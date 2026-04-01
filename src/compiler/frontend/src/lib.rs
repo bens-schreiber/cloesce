@@ -78,13 +78,13 @@ pub enum SymbolKind {
 
 pub type FileId = u16;
 
-#[derive(Clone, Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct Symbol<'src> {
     /// [String::default()] for symbols with no name
     pub name: &'src str,
 
     /// [CidlType::default()] for symbols with no type
-    pub cidl_type: CidlType,
+    pub cidl_type: CidlType<'src>,
 
     /// [String::default()] for symbols with no parent
     /// Uses a [Cow] to avoid unnecessary allocations for symbols with parents,
@@ -109,7 +109,7 @@ pub struct ApiBlockMethod<'src> {
     pub is_static: bool,
     pub http_verb: HttpVerb,
     pub data_source: Option<&'src str>,
-    pub return_type: CidlType,
+    pub return_type: CidlType<'src>,
     pub parameters: Vec<Symbol<'src>>,
 }
 

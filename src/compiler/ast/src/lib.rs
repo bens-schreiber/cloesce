@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::collections::HashMap;
 use std::hash::Hash;
@@ -9,8 +10,8 @@ use serde::Deserialize;
 use serde::Serialize;
 use serde_json::Value;
 
-#[derive(Serialize, Deserialize, Debug, Hash, PartialEq, Eq, PartialOrd, Ord, Clone, Default)]
-pub enum CidlType {
+#[derive(Deserialize, Serialize, Debug, Hash, PartialEq, Eq, PartialOrd, Ord, Clone, Default)]
+pub enum CidlType<'src> {
     #[default]
     Void,
 
@@ -38,50 +39,55 @@ pub enum CidlType {
 
     /// A dependency injected instance, containing a type name.
     Inject {
-        name: String,
+        #[serde(borrow)]
+        name: &'src str,
     },
 
     /// A model, or plain old object, containing the name of the class.
     Object {
-        name: String,
+        #[serde(borrow)]
+        name: &'src str,
     },
 
     /// A part of a model or plain object, containing the name of the class.
     ///
     /// Only valid as a method argument.
     Partial {
-        object_name: String,
+        #[serde(borrow)]
+        object_name: &'src str,
     },
 
     /// A data source of some model
     DataSource {
-        model_name: String,
+        #[serde(borrow)]
+        model_name: &'src str,
     },
 
     /// An array of any type
-    Array(Box<CidlType>),
+    Array(Box<CidlType<'src>>),
 
     /// A REST API response, which can contain any type or nothing.
-    HttpResult(Box<CidlType>),
+    HttpResult(Box<CidlType<'src>>),
 
     /// A wrapper denoting the type within can be null.
     /// If the inner value is void, represents just null.
-    Nullable(Box<CidlType>),
+    Nullable(Box<CidlType<'src>>),
 
     /// A paginated response containing list metadata and a page of results.
-    Paginated(Box<CidlType>),
+    Paginated(Box<CidlType<'src>>),
 
     /// A Cloudflare Workers KV object (GET value response)
-    KvObject(Box<CidlType>),
+    KvObject(Box<CidlType<'src>>),
 
     /// A reference to an object or injected type that is not yet resolved by the parser
     UnresolvedReference {
-        name: String,
+        #[serde(borrow)]
+        name: &'src str,
     },
 }
 
-impl CidlType {
-    pub fn root_type(&self) -> &CidlType {
+impl<'src> CidlType<'src> {
+    pub fn root_type(&self) -> &CidlType<'src> {
         match self {
             CidlType::Array(inner) => inner.root_type(),
             CidlType::HttpResult(inner) => inner.root_type(),
@@ -96,28 +102,28 @@ impl CidlType {
         matches!(self, CidlType::Nullable(_))
     }
 
-    pub fn array(cidl_type: CidlType) -> CidlType {
+    pub fn array(cidl_type: CidlType<'src>) -> CidlType<'src> {
         CidlType::Array(Box::new(cidl_type))
     }
 
-    pub fn nullable(cidl_type: CidlType) -> CidlType {
+    pub fn nullable(cidl_type: CidlType<'src>) -> CidlType<'src> {
         CidlType::Nullable(Box::new(cidl_type))
     }
 
-    pub fn null() -> CidlType {
+    pub fn null() -> CidlType<'src> {
         CidlType::Nullable(Box::new(CidlType::Void))
     }
 
-    pub fn http(cidl_type: CidlType) -> CidlType {
+    pub fn http(cidl_type: CidlType<'src>) -> CidlType<'src> {
         CidlType::HttpResult(Box::new(cidl_type))
     }
 
-    pub fn paginated(cidl_type: CidlType) -> CidlType {
+    pub fn paginated(cidl_type: CidlType<'src>) -> CidlType<'src> {
         CidlType::Paginated(Box::new(cidl_type))
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Copy)]
+#[derive(Deserialize, Serialize, Debug, PartialEq, Clone, Copy)]
 pub enum HttpVerb {
     Get,
     Post,
@@ -126,28 +132,34 @@ pub enum HttpVerb {
     Delete,
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, Clone)]
-pub struct Field {
-    pub name: String,
-    pub cidl_type: CidlType,
+#[derive(Deserialize, Serialize, Debug, PartialEq, Eq, Hash, Clone)]
+pub struct Field<'src> {
+    pub name: Cow<'src, str>,
+
+    #[serde(borrow)]
+    pub cidl_type: CidlType<'src>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Default, Clone)]
+// TODO: I'd love to make [IncludeTree] use the 'src lifetime, but I can't
+// fight the borrow checker in the expander (semantic/data_source.rs)
+#[derive(Deserialize, Serialize, Debug, Default, Clone)]
 pub struct IncludeTree(pub BTreeMap<String, IncludeTree>);
 
 /// A D1 Navigation field, representing a relationship to another model
 /// through a foreign key or composite foreign key.
-#[derive(Serialize, Deserialize, Debug, Clone, Hash)]
-pub enum NavigationFieldKind {
+#[derive(Deserialize, Serialize, Debug, Clone, Hash)]
+pub enum NavigationFieldKind<'src> {
     OneToOne {
         /// The columns on the current model that reference the other model's primary key.
         /// Multiple columns indicate a composite foreign key.
-        columns: Vec<String>,
+        #[serde(borrow)]
+        columns: Vec<&'src str>,
     },
     OneToMany {
         /// The columns on the other model that reference the current model's primary key.
         /// Multiple columns indicate a composite foreign key.
-        columns: Vec<String>,
+        #[serde(borrow)]
+        columns: Vec<&'src str>,
     },
 
     /// A many to many relationship expressed through a join table,
@@ -155,41 +167,48 @@ pub enum NavigationFieldKind {
     ManyToMany,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
-pub struct NavigationField {
-    #[serde(default)]
+#[derive(Deserialize, Serialize, Debug)]
+pub struct NavigationField<'src> {
     pub hash: u64,
 
-    pub field: Field,
+    #[serde(borrow)]
+    pub field: Field<'src>,
 
     /// Referenced model name.
-    pub model_reference: String,
-    pub kind: NavigationFieldKind,
+    #[serde(borrow)]
+    pub model_reference: &'src str,
+
+    #[serde(borrow)]
+    pub kind: NavigationFieldKind<'src>,
 }
 
-impl NavigationField {
-    pub fn many_to_many_table_name(&self, parent_model_name: &str) -> String {
-        let mut names = [parent_model_name, &self.model_reference];
+impl<'src> NavigationField<'src> {
+    pub fn many_to_many_table_name(&self, parent_model_name: &'src str) -> String {
+        let mut names = [parent_model_name, self.model_reference];
         names.sort();
         format!("{}{}", names[0], names[1])
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Hash)]
-pub struct ForeignKeyReference {
-    pub model_name: String,
-    pub column_name: String,
+#[derive(Deserialize, Serialize, Debug, Hash)]
+pub struct ForeignKeyReference<'src> {
+    #[serde(borrow)]
+    pub model_name: &'src str,
+
+    #[serde(borrow)]
+    pub column_name: &'src str,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
-pub struct Column {
-    #[serde(default)]
+#[derive(Deserialize, Serialize, Debug)]
+pub struct Column<'src> {
     pub hash: u64,
 
-    pub field: Field,
+    #[serde(borrow)]
+    pub field: Field<'src>,
 
     /// If the attribute is a foreign key, the referenced model and column.
-    pub foreign_key_reference: Option<ForeignKeyReference>,
+    #[serde(borrow)]
+    pub foreign_key_reference: Option<ForeignKeyReference<'src>>,
 
     /// IDs of unique constraints that this column participates in.
     pub unique_ids: Vec<usize>,
@@ -203,93 +222,123 @@ pub struct Column {
     pub composite_id: Option<usize>,
 }
 
-#[derive(Serialize, Deserialize, Hash, PartialEq, Eq, Debug, Clone)]
+#[derive(Deserialize, Serialize, Hash, PartialEq, Eq, Debug, Clone)]
 pub enum CrudKind {
     Get,
     List,
     Save,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
-pub struct DataSourceMethod {
-    pub parameters: Vec<Field>,
+#[derive(Deserialize, Serialize, Debug)]
+pub struct DataSourceMethod<'src> {
+    #[serde(borrow)]
+    pub parameters: Vec<Field<'src>>,
 
     #[serde(skip)]
     pub raw_sql: String,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
-pub struct DataSource {
-    pub name: String,
+#[derive(Deserialize, Serialize, Debug)]
+pub struct DataSource<'src> {
+    #[serde(borrow)]
+    pub name: &'src str,
+
     pub tree: IncludeTree,
-    pub list: Option<DataSourceMethod>,
-    pub get: Option<DataSourceMethod>,
+
+    #[serde(borrow)]
+    pub list: Option<DataSourceMethod<'src>>,
+
+    #[serde(borrow)]
+    pub get: Option<DataSourceMethod<'src>>,
+
     pub is_internal: bool,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
-pub struct KvR2Field {
-    pub field: Field,
-    pub format: String,
-    pub binding: String,
+#[derive(Deserialize, Serialize, Debug)]
+pub struct KvR2Field<'src> {
+    #[serde(borrow)]
+    pub field: Field<'src>,
+
+    #[serde(borrow)]
+    pub format: &'src str,
+
+    #[serde(borrow)]
+    pub binding: &'src str,
+
     pub list_prefix: bool,
 }
 
-/// The expected media type for request/response bodies.
-/// An API endpoint may expect data in some format, and return data in some format.
-/// Defaults to JSON.
-#[derive(Serialize, Deserialize, Debug, Default)]
+#[derive(Deserialize, Serialize, Debug)]
 pub enum MediaType {
-    #[default]
     Json,
-
     Octet,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
-pub struct ApiMethod {
-    pub name: String,
+#[derive(Deserialize, Serialize, Debug)]
+pub struct ApiMethod<'src> {
+    #[serde(borrow)]
+    pub name: &'src str,
 
     /// If true, the method is static (instantiated on a class, not an instance).
     /// Static methods require no hydration or data source.
     pub is_static: bool,
-    pub data_source: Option<String>,
+
+    #[serde(borrow)]
+    pub data_source: Option<&'src str>,
 
     pub http_verb: HttpVerb,
 
     /// The media format the client should use to read the response body.
-    #[serde(default)]
     pub return_media: MediaType,
-    pub return_type: CidlType,
+
+    #[serde(borrow)]
+    pub return_type: CidlType<'src>,
 
     /// The media format the client should use to send the request body.
-    #[serde(default)]
     pub parameters_media: MediaType,
-    pub parameters: Vec<Field>,
+
+    #[serde(borrow)]
+    pub parameters: Vec<Field<'src>>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Default)]
-pub struct Model {
-    #[serde(default)]
+#[derive(Deserialize, Serialize, Debug, Default)]
+pub struct Model<'src> {
     pub hash: u64,
 
-    pub name: String,
+    #[serde(borrow)]
+    pub name: &'src str,
 
-    pub d1_binding: Option<String>,
-    pub primary_columns: Vec<Column>,
-    pub columns: Vec<Column>,
+    #[serde(borrow)]
+    pub d1_binding: Option<&'src str>,
 
-    pub kv_fields: Vec<KvR2Field>,
-    pub r2_fields: Vec<KvR2Field>,
-    pub navigation_fields: Vec<NavigationField>,
-    pub key_fields: Vec<String>,
+    #[serde(borrow)]
+    pub primary_columns: Vec<Column<'src>>,
 
-    pub apis: Vec<ApiMethod>,
-    pub data_sources: Vec<DataSource>,
+    #[serde(borrow)]
+    pub columns: Vec<Column<'src>>,
+
+    #[serde(borrow)]
+    pub kv_fields: Vec<KvR2Field<'src>>,
+
+    #[serde(borrow)]
+    pub r2_fields: Vec<KvR2Field<'src>>,
+
+    #[serde(borrow)]
+    pub navigation_fields: Vec<NavigationField<'src>>,
+
+    #[serde(borrow)]
+    pub key_fields: Vec<&'src str>,
+
+    #[serde(borrow)]
+    pub apis: Vec<ApiMethod<'src>>,
+
+    #[serde(borrow)]
+    pub data_sources: Vec<DataSource<'src>>,
+
     pub cruds: Vec<CrudKind>,
 }
 
-impl Model {
+impl Model<'_> {
     pub fn has_d1(&self) -> bool {
         self.d1_binding.is_some()
     }
@@ -303,7 +352,7 @@ impl Model {
     }
 
     /// Returns the data source with the symbol name "Default", if it exists.
-    pub fn default_data_source(&self) -> Option<&DataSource> {
+    pub fn default_data_source(&self) -> Option<&DataSource<'_>> {
         self.data_sources.iter().find(|ds| ds.name == "Default")
     }
 
@@ -313,7 +362,7 @@ impl Model {
 
     /// Returns all columns, including primary key columns, as a single list.
     /// The boolean indicates whether the column is a primary key column.
-    pub fn all_columns(&self) -> impl Iterator<Item = (&Column, bool)> {
+    pub fn all_columns(&self) -> impl Iterator<Item = (&Column<'_>, bool)> {
         self.columns
             .iter()
             .map(|c| (c, false))
@@ -321,85 +370,72 @@ impl Model {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug)]
-pub struct ServiceField {
-    pub name: String,
+#[derive(Deserialize, Serialize, Debug)]
+pub struct ServiceField<'src> {
+    #[serde(borrow)]
+    pub name: &'src str,
 
     /// Injected symbol name
-    pub inject_reference: String,
+    #[serde(borrow)]
+    pub inject_reference: &'src str,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
-pub struct Service {
-    pub name: String,
-    pub fields: Vec<ServiceField>,
-    pub apis: Vec<ApiMethod>,
+#[derive(Deserialize, Serialize, Debug)]
+pub struct Service<'src> {
+    #[serde(borrow)]
+    pub name: &'src str,
+
+    #[serde(borrow)]
+    pub fields: Vec<ServiceField<'src>>,
+
+    #[serde(borrow)]
+    pub apis: Vec<ApiMethod<'src>>,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
-pub struct PlainOldObject {
-    pub name: String,
-    pub fields: Vec<Field>,
+#[derive(Deserialize, Serialize, Debug)]
+pub struct PlainOldObject<'src> {
+    #[serde(borrow)]
+    pub name: &'src str,
+
+    #[serde(borrow)]
+    pub fields: Vec<Field<'src>>,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
-pub struct WranglerEnv {
-    pub d1_bindings: Vec<String>,
-    pub kv_bindings: Vec<String>,
-    pub r2_bindings: Vec<String>,
-    pub vars: Vec<Field>,
+#[derive(Deserialize, Serialize, Debug)]
+pub struct WranglerEnv<'src> {
+    #[serde(borrow)]
+    pub d1_bindings: Vec<&'src str>,
+
+    #[serde(borrow)]
+    pub kv_bindings: Vec<&'src str>,
+
+    #[serde(borrow)]
+    pub r2_bindings: Vec<&'src str>,
+
+    #[serde(borrow)]
+    pub vars: Vec<Field<'src>>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Default)]
-pub struct CloesceAst {
-    #[serde(default)]
+#[derive(Deserialize, Serialize, Debug, Default)]
+pub struct CloesceAst<'src> {
     pub hash: u64,
 
-    pub wrangler_env: Option<WranglerEnv>,
-    pub models: IndexMap<String, Model>,
-    pub services: IndexMap<String, Service>,
-    pub poos: BTreeMap<String, PlainOldObject>,
+    #[serde(borrow)]
+    pub wrangler_env: Option<WranglerEnv<'src>>,
+
+    #[serde(borrow)]
+    pub models: IndexMap<&'src str, Model<'src>>,
+
+    #[serde(borrow)]
+    pub services: IndexMap<&'src str, Service<'src>>,
+
+    #[serde(borrow)]
+    pub poos: BTreeMap<&'src str, PlainOldObject<'src>>,
 }
 
-impl CloesceAst {
-    pub fn from_json(path: &std::path::Path) -> Result<Self, String> {
-        let cidl_contents = std::fs::read_to_string(path).map_err(|e| e.to_string())?;
-        serde_json::from_str::<Self>(&cidl_contents)
-            .map_err(|e| format!("failed to parse ast json: {e}"))
-    }
-
+impl CloesceAst<'_> {
     pub fn to_json(&self) -> String {
         serde_json::to_string_pretty(self).expect("serialize self to work")
-    }
-
-    pub fn to_migrations_json(self) -> String {
-        let Self { hash, models, .. } = self;
-
-        let migrations_models: IndexMap<String, MigrationsModel> = models
-            .into_iter()
-            .filter_map(|(name, model)| {
-                if !model.has_d1() {
-                    return None;
-                }
-
-                let m = MigrationsModel {
-                    hash: model.hash,
-                    name: model.name,
-                    d1_binding: model.d1_binding,
-                    primary_columns: model.primary_columns,
-                    columns: model.columns,
-                    navigation_fields: model.navigation_fields,
-                };
-                Some((name, m))
-            })
-            .collect();
-
-        let migrations_ast = MigrationsAst {
-            hash,
-            models: migrations_models,
-        };
-
-        serde_json::to_string_pretty(&migrations_ast).expect("serialize migrations ast to work")
     }
 
     /// Traverses the AST setting the `hash` field as a merkle hash (a parents hash depends on it's childrens hashes)
@@ -468,53 +504,6 @@ impl CloesceAst {
     }
 }
 
-/// A subset of [Model] suited for migrations.
-///
-/// Assumed that the tree is semantically valid.
-#[derive(Serialize, Deserialize)]
-pub struct MigrationsModel {
-    pub hash: u64,
-    pub name: String,
-
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub d1_binding: Option<String>,
-
-    pub primary_columns: Vec<Column>,
-    pub columns: Vec<Column>,
-    pub navigation_fields: Vec<NavigationField>,
-}
-
-impl MigrationsModel {
-    pub fn all_columns(&self) -> impl Iterator<Item = (&Column, bool)> {
-        self.columns
-            .iter()
-            .map(|c| (c, false))
-            .chain(self.primary_columns.iter().map(|c| (c, true)))
-    }
-}
-
-// /// A subset of [CloesceAst] suited for D1 migrations.
-///
-/// Assumed that the tree is semantically valid.
-#[derive(Serialize, Deserialize)]
-pub struct MigrationsAst {
-    pub hash: u64,
-
-    #[serde(deserialize_with = "skip_if_not_d1")]
-    pub models: IndexMap<String, MigrationsModel>,
-}
-
-impl MigrationsAst {
-    pub fn from_json(path: &std::path::Path) -> Result<Self, String> {
-        let contents = std::fs::read_to_string(path).map_err(|e| e.to_string())?;
-        serde_json::from_str::<Self>(&contents).map_err(|e| e.to_string())
-    }
-
-    pub fn to_json(&self) -> String {
-        serde_json::to_string_pretty(self).expect("serialize self to work")
-    }
-}
-
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
 pub struct D1Database {
     pub binding: Option<String>,
@@ -554,38 +543,55 @@ pub struct WranglerSpec {
     pub vars: HashMap<String, Value>,
 }
 
-fn skip_if_not_d1<'de, D>(
-    deserializer: D,
-) -> std::result::Result<IndexMap<String, MigrationsModel>, D::Error>
-where
-    D: serde::Deserializer<'de>,
-{
-    #[derive(Deserialize)]
-    struct Temp {
-        hash: u64,
-        name: String,
-        d1_binding: Option<String>,
-        primary_columns: Vec<Column>,
-        columns: Vec<Column>,
-        navigation_fields: Vec<NavigationField>,
+/// A subset of [Model] suited for migrations.
+///
+/// Assumed that the tree is semantically valid.
+#[derive(Serialize, Deserialize)]
+pub struct MigrationsModel<'src> {
+    pub hash: u64,
+    pub name: String,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub d1_binding: Option<String>,
+
+    #[serde(borrow)]
+    pub primary_columns: Vec<Column<'src>>,
+
+    #[serde(borrow)]
+    pub columns: Vec<Column<'src>>,
+
+    #[serde(borrow)]
+    pub navigation_fields: Vec<NavigationField<'src>>,
+}
+
+impl<'src> MigrationsModel<'src> {
+    /// Returns all columns, including primary key columns, as a single iterator.
+    /// The boolean indicates whether the column is a primary key column.
+    pub fn all_columns(&self) -> impl Iterator<Item = (&Column<'src>, bool)> {
+        self.columns
+            .iter()
+            .map(|c| (c, false))
+            .chain(self.primary_columns.iter().map(|c| (c, true)))
+    }
+}
+
+/// A subset of [CloesceAst] suited for D1 migrations.
+///
+/// Assumed that the tree is semantically valid.
+#[derive(Serialize, Deserialize)]
+pub struct MigrationsAst<'src> {
+    pub hash: u64,
+
+    #[serde(borrow)]
+    pub models: IndexMap<String, MigrationsModel<'src>>,
+}
+
+impl<'src> MigrationsAst<'src> {
+    pub fn from_json(json: &'src str) -> std::result::Result<Self, String> {
+        serde_json::from_str::<Self>(json).map_err(|e| e.to_string())
     }
 
-    let temps: IndexMap<String, Temp> = Deserialize::deserialize(deserializer)?;
-
-    Ok(temps
-        .into_iter()
-        .filter_map(|(key, t)| {
-            (!t.columns.is_empty() || !t.primary_columns.is_empty()).then_some({
-                let m = MigrationsModel {
-                    hash: t.hash,
-                    name: t.name,
-                    d1_binding: t.d1_binding,
-                    primary_columns: t.primary_columns,
-                    columns: t.columns,
-                    navigation_fields: t.navigation_fields,
-                };
-                (key, m)
-            })
-        })
-        .collect())
+    pub fn to_json(&self) -> String {
+        serde_json::to_string_pretty(self).expect("serialize self to work")
+    }
 }

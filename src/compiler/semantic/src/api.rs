@@ -1,36 +1,35 @@
+use crate::{
+    SymbolKind, SymbolTable, ensure,
+    err::{BatchResult, ErrorSink, SemanticError},
+    resolve_cidl_type,
+};
 use ast::{ApiMethod, CidlType, Field, HttpVerb, MediaType};
 use frontend::{ApiBlockMethod, ParseAst};
 
-use crate::{
-    SymbolKind, SymbolTable, ensure,
-    err::{BatchResult, CompilerError, ErrorSink},
-    resolve_cidl_type,
-};
-
 #[derive(Default)]
-pub struct ApiAnalysis {
-    sink: ErrorSink,
+pub struct ApiAnalysis<'src, 'p> {
+    sink: ErrorSink<'src, 'p>,
 }
 
-impl ApiAnalysis {
+impl<'src, 'p> ApiAnalysis<'src, 'p> {
     pub fn analyze(
         mut self,
-        parse: &ParseAst,
-        table: &SymbolTable,
-    ) -> BatchResult<Vec<(String, Vec<ApiMethod>)>> {
+        parse: &'p ParseAst<'src>,
+        table: &SymbolTable<'src, 'p>,
+    ) -> BatchResult<'src, 'p, Vec<(&'src str, Vec<ApiMethod<'src>>)>> {
         let mut result = Vec::new();
 
         for api_block in &parse.apis {
             // Validate the model reference
             let namespace = match (
-                table.resolve(&api_block.namespace, SymbolKind::ModelDecl, None),
-                table.resolve(&api_block.namespace, SymbolKind::ServiceDecl, None),
+                table.resolve(api_block.namespace, SymbolKind::ModelDecl, None),
+                table.resolve(api_block.namespace, SymbolKind::ServiceDecl, None),
             ) {
                 (Some(model), _) => model,
                 (_, Some(service)) => service,
                 (None, None) => {
-                    self.sink.push(CompilerError::ApiUnknownNamespaceReference {
-                        api: Box::new(api_block.symbol.clone()),
+                    self.sink.push(SemanticError::ApiUnknownNamespaceReference {
+                        api: &api_block.symbol,
                     });
                     continue;
                 }
@@ -38,11 +37,11 @@ impl ApiAnalysis {
 
             let mut methods = Vec::new();
             for method in &api_block.methods {
-                if let Some(api_method) = self.method(&namespace.name, parse, method, table) {
+                if let Some(api_method) = self.method(namespace.name, parse, method, table) {
                     methods.push(api_method);
                 }
             }
-            result.push((namespace.name.clone(), methods));
+            result.push((namespace.name, methods));
         }
 
         self.sink.finish()?;
@@ -51,25 +50,25 @@ impl ApiAnalysis {
 
     fn method(
         &mut self,
-        namespace: &str,
-        parse: &ParseAst,
-        method: &ApiBlockMethod,
-        table: &SymbolTable,
-    ) -> Option<ApiMethod> {
+        namespace: &'src str,
+        parse: &'p ParseAst<'src>,
+        method: &'p ApiBlockMethod<'src>,
+        table: &SymbolTable<'src, 'p>,
+    ) -> Option<ApiMethod<'src>> {
         // Generated API methods start with a '$'
         if method.symbol.name.starts_with('$') {
-            self.sink.push(CompilerError::ApiReservedMethod {
-                method: Box::new(method.symbol.clone()),
+            self.sink.push(SemanticError::ApiReservedMethod {
+                method: &method.symbol,
             });
         }
 
         // Validate data source reference
-        let data_source_name = if let Some(ref ds) = method.data_source {
+        let data_source_name = if let Some(ds) = method.data_source {
             ensure!(
                 !method.is_static,
                 self.sink,
-                CompilerError::ApiStaticMethodWithDataSource {
-                    method: Box::new(method.symbol.clone())
+                SemanticError::ApiStaticMethodWithDataSource {
+                    method: &method.symbol,
                 }
             );
 
@@ -77,18 +76,18 @@ impl ApiAnalysis {
             let ds_exists = parse
                 .sources
                 .iter()
-                .any(|s| s.symbol.name == *ds && s.model == namespace);
+                .any(|s| s.symbol.name == ds && s.model == namespace);
 
             ensure!(
                 ds_exists,
                 self.sink,
-                CompilerError::ApiUnknownDataSourceReference {
-                    method: Box::new(method.symbol.clone()),
-                    data_source: ds.clone(),
+                SemanticError::ApiUnknownDataSourceReference {
+                    method: &method.symbol,
+                    data_source: ds,
                 }
             );
 
-            Some(ds.clone())
+            Some(ds)
         } else {
             None
         };
@@ -106,7 +105,7 @@ impl ApiAnalysis {
         };
 
         Some(ApiMethod {
-            name: method.symbol.name.clone(),
+            name: method.symbol.name,
             is_static: method.is_static,
             data_source,
             http_verb: method.http_verb,
@@ -119,18 +118,18 @@ impl ApiAnalysis {
 
     fn return_type(
         &mut self,
-        method: &ApiBlockMethod,
-        table: &SymbolTable,
-    ) -> (CidlType, MediaType) {
-        let err = CompilerError::ApiInvalidReturn {
-            method: Box::new(method.symbol.clone()),
+        method: &'p ApiBlockMethod<'src>,
+        table: &SymbolTable<'src, 'p>,
+    ) -> (CidlType<'src>, MediaType) {
+        let err = SemanticError::ApiInvalidReturn {
+            method: &method.symbol,
         };
 
         let resolved_type = match resolve_cidl_type(&method.symbol, &method.return_type, table) {
             Ok(t) => t,
             Err(e) => {
                 self.sink.push(e);
-                return (CidlType::Void, MediaType::default());
+                return (CidlType::Void, MediaType::Json);
             }
         };
 
@@ -161,16 +160,16 @@ impl ApiAnalysis {
 
     fn parameters(
         &mut self,
-        method: &ApiBlockMethod,
-        table: &SymbolTable,
-    ) -> (Vec<Field>, MediaType) {
+        method: &'p ApiBlockMethod<'src>,
+        table: &SymbolTable<'src, 'p>,
+    ) -> (Vec<Field<'src>>, MediaType) {
         let mut params = Vec::new();
 
         let mut has_stream = false;
         for param in &method.parameters {
-            let err = CompilerError::ApiInvalidParam {
-                method: Box::new(method.symbol.clone()),
-                param: Box::new(param.clone()),
+            let err = SemanticError::ApiInvalidParam {
+                method: &method.symbol,
+                param,
             };
 
             let resolved_type = match resolve_cidl_type(param, &param.cidl_type, table) {
@@ -224,7 +223,7 @@ impl ApiAnalysis {
             }
 
             params.push(Field {
-                name: param.name.clone(),
+                name: param.name.into(),
                 cidl_type: resolved_type,
             });
         }

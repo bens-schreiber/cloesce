@@ -1,7 +1,7 @@
 use ast::{ApiMethod, CidlType, HttpVerb, Model};
 use compiler_test::src_to_ast;
 
-fn find_method<'a>(model: &'a Model, name: &str) -> Option<&'a ApiMethod> {
+fn find_method<'src>(model: &'src Model, name: &str) -> Option<&'src ApiMethod<'src>> {
     model
         .apis
         .iter()
@@ -45,7 +45,7 @@ fn adds_crud_methods_to_models() {
         get_method
             .parameters
             .iter()
-            .map(|p| p.name.as_str())
+            .map(|p| p.name.to_string())
             .collect::<Vec<_>>(),
         vec!["orderId", "productId", "__datasource"]
     );
@@ -150,18 +150,18 @@ fn crud_params_union_data_source_params() {
 
     // $get should have union of default (id) and ByName (name), all nullable
     let get_method = find_method(product, "$get").unwrap();
-    let get_param_names: Vec<&str> = get_method
+    let get_param_names: Vec<String> = get_method
         .parameters
         .iter()
         .filter(|p| p.name != "__datasource")
-        .map(|p| p.name.as_str())
+        .map(|p| p.name.to_string())
         .collect();
     assert!(
-        get_param_names.contains(&"id"),
+        get_param_names.contains(&"id".into()),
         "GET should have 'id' from default data source"
     );
     assert!(
-        get_param_names.contains(&"name"),
+        get_param_names.contains(&"name".into()),
         "GET should have 'name' from ByName data source"
     );
     // All non-datasource params should be nullable
@@ -177,27 +177,27 @@ fn crud_params_union_data_source_params() {
 
     // $list should have union of default (lastSeen_id, limit) and ByName (name, limit)
     let list_method = find_method(product, "$list").unwrap();
-    let list_param_names: Vec<&str> = list_method
+    let list_param_names: Vec<String> = list_method
         .parameters
         .iter()
         .filter(|p| p.name != "__datasource")
-        .map(|p| p.name.as_str())
+        .map(|p| p.name.to_string())
         .collect();
     assert!(
-        list_param_names.contains(&"lastSeen_id"),
+        list_param_names.contains(&"lastSeen_id".into()),
         "LIST should have 'lastSeen_id' from default data source"
     );
     assert!(
-        list_param_names.contains(&"limit"),
+        list_param_names.contains(&"limit".into()),
         "LIST should have 'limit' (shared between both data sources)"
     );
     assert!(
-        list_param_names.contains(&"name"),
+        list_param_names.contains(&"name".into()),
         "LIST should have 'name' from ByName data source"
     );
     // 'limit' should not be duplicated
     assert_eq!(
-        list_param_names.iter().filter(|&&n| n == "limit").count(),
+        list_param_names.iter().filter(|&n| n == "limit").count(),
         1,
         "LIST should not have duplicate 'limit' param"
     );

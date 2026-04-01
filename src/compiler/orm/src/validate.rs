@@ -207,12 +207,12 @@ pub fn validate_cidl_type(
             // Handle Plain Old Objects
             if let Some(poo) = ast.poos.get(&name) {
                 for attr in &poo.fields {
-                    let attr_value = obj.remove(&attr.name);
+                    let attr_value = obj.remove(attr.name.as_ref());
                     let res =
                         validate_cidl_type(attr.cidl_type.clone(), attr_value, ast, is_partial)?;
 
                     if let Some(res) = res {
-                        new_obj.insert(attr.name.clone(), res);
+                        new_obj.insert(attr.name.to_string(), res);
                     }
                 }
 
@@ -224,48 +224,48 @@ pub fn validate_cidl_type(
             let obj = value.as_object_mut().ok_or(ValidatorErrorKind::NonObject)?;
 
             for key_param in &model.key_fields {
-                let key_param_value = obj.remove(key_param);
+                let key_param_value = obj.remove(*key_param);
                 let res = validate_cidl_type(CidlType::String, key_param_value, ast, is_partial)?;
 
                 if let Some(res) = res {
-                    new_obj.insert(key_param.clone(), res);
+                    new_obj.insert(key_param.to_string(), res);
                 }
             }
 
             for (col, _) in model.all_columns() {
-                let col_value = obj.remove(&col.field.name);
+                let col_value = obj.remove(col.field.name.as_ref());
                 let res =
                     validate_cidl_type(col.field.cidl_type.clone(), col_value, ast, is_partial)?;
 
                 if let Some(res) = res {
-                    new_obj.insert(col.field.name.clone(), res);
+                    new_obj.insert(col.field.name.to_string(), res);
                 }
             }
 
             for nav in &model.navigation_fields {
-                let nav_value = obj.remove(&nav.field.name);
+                let nav_value = obj.remove(nav.field.name.as_ref());
 
                 let nav_cidl_type = match nav.kind {
                     NavigationFieldKind::ManyToMany | NavigationFieldKind::OneToMany { .. } => {
                         CidlType::Array(Box::new(CidlType::Object {
-                            name: nav.model_reference.clone(),
+                            name: nav.model_reference,
                         }))
                     }
 
                     _ => CidlType::Object {
-                        name: nav.model_reference.clone(),
+                        name: nav.model_reference,
                     },
                 };
 
                 let res = validate_cidl_type(nav_cidl_type, nav_value, ast, is_partial)?;
 
                 if let Some(res) = res {
-                    new_obj.insert(nav.field.name.clone(), res);
+                    new_obj.insert(nav.field.name.to_string(), res);
                 }
             }
 
             for kv_obj_meta in &model.kv_fields {
-                let kv_obj_value = obj.remove(&kv_obj_meta.field.name);
+                let kv_obj_value = obj.remove(kv_obj_meta.field.name.as_ref());
 
                 let cidl_type = if kv_obj_meta.list_prefix {
                     CidlType::Paginated(Box::new(CidlType::KvObject(Box::new(
@@ -278,12 +278,12 @@ pub fn validate_cidl_type(
                 let res = validate_cidl_type(cidl_type, kv_obj_value, ast, is_partial)?;
 
                 if let Some(res) = res {
-                    new_obj.insert(kv_obj_meta.field.name.clone(), res);
+                    new_obj.insert(kv_obj_meta.field.name.to_string(), res);
                 }
             }
 
             for r2_obj_meta in &model.r2_fields {
-                let r2_obj_value = obj.remove(&r2_obj_meta.field.name);
+                let r2_obj_value = obj.remove(r2_obj_meta.field.name.as_ref());
 
                 let cidl_type = if r2_obj_meta.list_prefix {
                     CidlType::Paginated(Box::new(CidlType::R2Object))
@@ -294,7 +294,7 @@ pub fn validate_cidl_type(
                 let res = validate_cidl_type(cidl_type, r2_obj_value, ast, is_partial)?;
 
                 if let Some(res) = res {
-                    new_obj.insert(r2_obj_meta.field.name.clone(), res);
+                    new_obj.insert(r2_obj_meta.field.name.to_string(), res);
                 }
             }
 

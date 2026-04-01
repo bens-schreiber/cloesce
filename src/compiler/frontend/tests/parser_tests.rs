@@ -738,18 +738,13 @@ fn poo_block() {
             ("active", CidlType::Boolean),
             ("balance", CidlType::Double),
             ("created", CidlType::DateIso),
-            (
-                "address",
-                CidlType::UnresolvedReference {
-                    name: "Address".to_string(),
-                }
-            ),
+            ("address", CidlType::UnresolvedReference { name: "Address" }),
             ("tags", CidlType::array(CidlType::String)),
             ("metadata", CidlType::nullable(CidlType::Json)),
             (
                 "optional_items",
                 CidlType::nullable(CidlType::array(CidlType::UnresolvedReference {
-                    name: "Item".to_string(),
+                    name: "Item",
                 }))
             ),
             (
@@ -843,7 +838,7 @@ fn service_block() {
     assert_eq!(
         api1.cidl_type,
         CidlType::UnresolvedReference {
-            name: "OpenApiService".to_string(),
+            name: "OpenApiService",
         }
     );
 
@@ -854,9 +849,7 @@ fn service_block() {
         .expect("api2 field");
     assert_eq!(
         api2.cidl_type,
-        CidlType::UnresolvedReference {
-            name: "YouTubeApi".to_string(),
-        }
+        CidlType::UnresolvedReference { name: "YouTubeApi" }
     );
 
     // Fields have distinct spans

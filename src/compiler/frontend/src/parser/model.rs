@@ -23,12 +23,14 @@ enum ModelField<'src> {
     Nav {
         span: Span,
         field: &'src str,
+
         /// (model_name or None for current model, field_name)
         fields: Vec<(Option<&'src str>, &'src str)>,
+
         is_many_to_many: bool,
     },
     Field(Symbol<'src>),
-    KeyField(&'src str, Span, CidlType),
+    KeyField(&'src str, Span, CidlType<'src>),
     KvField(Symbol<'src>, KvR2Tag<'src>),
     R2Field(Symbol<'src>, KvR2Tag<'src>),
 }

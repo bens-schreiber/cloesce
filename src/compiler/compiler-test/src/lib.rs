@@ -1,11 +1,13 @@
 use std::path::PathBuf;
 
+use ast::CloesceAst;
 use frontend::{
     ParseAst,
     fmt::DisplayError,
     lexer::{CloesceLexer, LexSource},
     parser::CloesceParser,
 };
+use semantic::SemanticAnalysis;
 
 /// Compares two strings disregarding tabs, amount of spaces, and amount of newlines.
 /// Ensures that some expr is present in another expr.
@@ -44,15 +46,15 @@ pub fn lex_and_parse(src: &str) -> ParseAst<'_> {
     result.ast
 }
 
-// /// Given a source string, lex, parse, and semantically analyze it into a [CloesceAst],
-// /// panicking if any step fails.
-// pub fn src_to_ast(src: &str) -> CloesceAst {
-//     let parse = lex_and_parse(src);
-//     let (result, errors) = semantic::SemanticAnalysis::analyze(parse);
-//     assert!(
-//         errors.is_empty(),
-//         "semantic analysis should succeed: {:#?}",
-//         errors
-//     );
-//     result
-// }
+/// Given a source string, lex, parse, and semantically analyze it into a [CloesceAst],
+/// panicking if any step fails.
+pub fn src_to_ast(src: &str) -> CloesceAst<'_> {
+    let parse = lex_and_parse(src);
+    let (result, errors) = SemanticAnalysis::analyze(&parse);
+    assert!(
+        errors.is_empty(),
+        "semantic analysis should succeed: {:#?}",
+        errors
+    );
+    result
+}

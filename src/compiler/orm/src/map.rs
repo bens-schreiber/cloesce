@@ -17,7 +17,7 @@ pub fn map_sql(
     model_name: &str,
     rows: D1Result,
     include_tree: Option<IncludeTreeJson>,
-    ast: &CloesceAst,
+    ast: &CloesceAst<'_>,
 ) -> Result<Vec<Value>> {
     let model = match ast.models.get(model_name) {
         Some(m) => m,
@@ -40,8 +40,8 @@ pub fn map_sql(
         let mut all_pks_present = true;
         for col in &model.primary_columns {
             let name = &col.field.name;
-            if let Some(value) = row.get(name) {
-                pk_values.push((name.clone(), value.clone()));
+            if let Some(value) = row.get(name.as_ref()) {
+                pk_values.push((name.to_string(), value.clone()));
             } else {
                 all_pks_present = false;
                 break;
@@ -69,9 +69,9 @@ pub fn map_sql(
             // Set scalar columns
             for col in &model.columns {
                 let name = &col.field.name;
-                let val = row.get(name).or_else(|| row.get(name)).cloned();
+                let val = row.get(name.as_ref()).or_else(|| row.get(name.as_ref())).cloned();
                 if let Some(v) = val {
-                    m.insert(name.clone(), v);
+                    m.insert(name.to_string(), v);
                 }
             }
 
@@ -80,7 +80,7 @@ pub fn map_sql(
                 if matches!(nav.kind, NavigationFieldKind::OneToMany { .. })
                     || matches!(nav.kind, NavigationFieldKind::ManyToMany)
                 {
-                    m.insert(nav.field.name.clone(), serde_json::Value::Array(vec![]));
+                    m.insert(nav.field.name.to_string(), serde_json::Value::Array(vec![]));
                 }
             }
 
@@ -103,15 +103,15 @@ pub fn map_sql(
 
 fn process_navigation_properties(
     model_json: &mut Map<String, Value>,
-    model: &Model,
+    model: &Model<'_>,
     prefix: &str,
     include_tree: &IncludeTreeJson,
     row: &Map<String, Value>,
-    ast: &CloesceAst,
+    ast: &CloesceAst<'_>,
 ) -> Result<()> {
     for nav_prop in &model.navigation_fields {
         // Skip any property not in the tree.
-        if !include_tree.contains_key(&nav_prop.field.name) {
+        if !include_tree.contains_key(nav_prop.field.name.as_ref()) {
             continue;
         }
 
@@ -138,7 +138,7 @@ fn process_navigation_properties(
                     all_nested_pks_present = false;
                     break;
                 }
-                nested_pk_values.push((nested_pk_name.clone(), nested_pk_value.clone()));
+                nested_pk_values.push((nested_pk_name.to_string(), nested_pk_value.clone()));
             } else {
                 all_nested_pks_present = false;
                 break;
@@ -163,7 +163,7 @@ fn process_navigation_properties(
                 .or_else(|| row.get(&format!("{}.{}", nav_prop.field.name, name)))
                 .cloned();
             if let Some(v) = val {
-                nested_model_json.insert(name.clone(), v);
+                nested_model_json.insert(name.to_string(), v);
             }
         }
 
@@ -172,14 +172,14 @@ fn process_navigation_properties(
             if matches!(nested_nav_prop.kind, NavigationFieldKind::OneToMany { .. })
                 || matches!(nested_nav_prop.kind, NavigationFieldKind::ManyToMany)
             {
-                nested_model_json.insert(nested_nav_prop.field.name.clone(), Value::Array(vec![]));
+                nested_model_json.insert(nested_nav_prop.field.name.to_string(), Value::Array(vec![]));
             }
         }
 
         // Recursively process the nested model if it's in the include tree
-        if let Some(Value::Object(nested_include_tree)) = include_tree.get(&nav_prop.field.name) {
+        if let Some(Value::Object(nested_include_tree)) = include_tree.get(nav_prop.field.name.as_ref()) {
             let prefix = if prefix.is_empty() {
-                nav_prop.field.name.clone()
+                nav_prop.field.name.to_string()
             } else {
                 format!("{prefix}.{}", nav_prop.field.name)
             };
@@ -196,12 +196,12 @@ fn process_navigation_properties(
         if matches!(nav_prop.kind, NavigationFieldKind::OneToMany { .. })
             || matches!(nav_prop.kind, NavigationFieldKind::ManyToMany)
         {
-            if let Value::Array(arr) = model_json.get_mut(&nav_prop.field.name).unwrap() {
+            if let Value::Array(arr) = model_json.get_mut(nav_prop.field.name.as_ref()).unwrap() {
                 // Check if this nested object already exists by comparing all primary key values
                 let already_exists = arr.iter().any(|existing| {
                     nested_pk_values
                         .iter()
-                        .all(|(pk_name, pk_value)| existing.get(pk_name) == Some(pk_value))
+                        .all(|(pk_name, pk_value)| existing.get(pk_name.as_str()) == Some(pk_value))
                 });
 
                 if !already_exists {
@@ -210,7 +210,7 @@ fn process_navigation_properties(
             }
         } else {
             model_json.insert(
-                nav_prop.field.name.clone(),
+                nav_prop.field.name.to_string(),
                 Value::Object(nested_model_json),
             );
         }

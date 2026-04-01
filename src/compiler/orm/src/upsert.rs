@@ -48,7 +48,7 @@ pub struct UpsertResult {
 }
 
 pub struct UpsertModel<'a> {
-    ast: &'a CloesceAst,
+    ast: &'a CloesceAst<'a>,
     context: HashMap<String, Option<Value>>,
     sql_acc: Vec<SqlStatement>,
     kv_upload_acc: Vec<KvUpload>,
@@ -66,7 +66,7 @@ impl<'a> UpsertModel<'a> {
     /// Returns a string of SQL statements, or a descriptive error string.
     pub fn query(
         model_name: &'a str,
-        ast: &'a CloesceAst,
+        ast: &'a CloesceAst<'a>,
         new_model: Map<String, Value>,
         include_tree: Option<IncludeTreeJson>,
     ) -> Result<UpsertResult> {
@@ -90,9 +90,9 @@ impl<'a> UpsertModel<'a> {
         let model = ast.models.get(model_name).expect("Model to exist");
         if model.has_d1() {
             // Final select to return the upserted model
+            let include_tree_json_str = serde_json::to_string(&include_tree).unwrap_or_default();
             let include_tree_typed: IncludeTree =
-                serde_json::from_value(serde_json::Value::Object(include_tree.clone()))
-                    .unwrap_or_default();
+                serde_json::from_str(&include_tree_json_str).unwrap_or_default();
             let select_query = SelectModel::query(model_name, None, Some(include_tree_typed), ast)?
                 .trim_start_matches("SELECT ")
                 .to_string();
@@ -110,8 +110,9 @@ impl<'a> UpsertModel<'a> {
                     }
                     _ => SqlUpsertBuilder::value_from_ctx(&pk_path),
                 };
-                select_root_model = select_root_model
-                    .and_where(Expr::col((alias(&model.name), alias(&col.field.name))).eq(pk_expr));
+                select_root_model = select_root_model.and_where(
+                    Expr::col((alias(model.name), alias(col.field.name.as_ref()))).eq(pk_expr),
+                );
             }
 
             generator
@@ -133,7 +134,7 @@ impl<'a> UpsertModel<'a> {
     // post order traversal for sql dependencies
     fn dfs(
         &mut self,
-        parent_model_name: Option<&String>,
+        parent_model_name: Option<&str>,
         model_name: &str,
         mut new_model: Map<String, Value>,
         include_tree: &IncludeTreeJson,
@@ -147,7 +148,8 @@ impl<'a> UpsertModel<'a> {
         // KV objects
         for kv in &model.kv_fields {
             // TODO: Lists?
-            let Some(Value::Object(mut kv_object)) = new_model.remove(&kv.field.name) else {
+            let Some(Value::Object(mut kv_object)) = new_model.remove(kv.field.name.as_ref())
+            else {
                 fail!(
                     OrmErrorKind::TypeMismatch,
                     "{}.{} must be an object",
@@ -167,20 +169,20 @@ impl<'a> UpsertModel<'a> {
             let metadata = kv_object.remove("metadata").unwrap_or(Value::Null);
 
             let (key, placeholders_remain) =
-                key_format_interpolation(&kv.format, &new_model, model)?;
+                key_format_interpolation(kv.format, &new_model, model)?;
 
             if placeholders_remain {
                 let path_parts: Vec<String> = path.split('.').skip(1).map(String::from).collect();
                 self.kv_delayed_upload_acc.push(DelayedKvUpload {
                     path: path_parts,
-                    namespace_binding: kv.binding.clone(),
+                    namespace_binding: kv.binding.to_string(),
                     key,
                     value,
                     metadata,
                 })
             } else {
                 self.kv_upload_acc.push(KvUpload {
-                    namespace_binding: kv.binding.clone(),
+                    namespace_binding: kv.binding.to_string(),
                     key,
                     value,
                     metadata,
@@ -198,9 +200,9 @@ impl<'a> UpsertModel<'a> {
         let mut pk_vals: Vec<(String, Option<Value>)> = Vec::new();
         let mut pk_missing = true;
         for pk_col in &model.primary_columns {
-            match new_model.remove(&pk_col.field.name) {
+            match new_model.remove(pk_col.field.name.as_ref()) {
                 Some(val) => {
-                    pk_vals.push((pk_col.field.name.clone(), Some(val)));
+                    pk_vals.push((pk_col.field.name.to_string(), Some(val)));
                     pk_missing = false;
                 }
                 None if matches!(pk_col.field.cidl_type, CidlType::Integer) => {
@@ -213,7 +215,7 @@ impl<'a> UpsertModel<'a> {
                     }
 
                     // The value is auto incremented and will be generated on insertion.
-                    pk_vals.push((pk_col.field.name.clone(), None));
+                    pk_vals.push((pk_col.field.name.to_string(), None));
                 }
                 _ => {
                     fail!(
@@ -235,10 +237,10 @@ impl<'a> UpsertModel<'a> {
         // table insertion (granted the include tree references them).
         let mut nav_ref_to_path = HashMap::new();
         for nav in one_to_ones {
-            let Some(Value::Object(nested_tree)) = include_tree.get(&nav.field.name) else {
+            let Some(Value::Object(nested_tree)) = include_tree.get(nav.field.name.as_ref()) else {
                 continue;
             };
-            let Some(Value::Object(nav_model)) = new_model.remove(&nav.field.name) else {
+            let Some(Value::Object(nav_model)) = new_model.remove(nav.field.name.as_ref()) else {
                 continue;
             };
             let NavigationFieldKind::OneToOne {
@@ -250,8 +252,8 @@ impl<'a> UpsertModel<'a> {
 
             // Recursively handle nested inserts
             self.dfs(
-                Some(&model.name),
-                &nav.model_reference,
+                Some(model.name),
+                nav.model_reference,
                 nav_model,
                 nested_tree,
                 format!("{path}.{}", nav.field.name),
@@ -270,7 +272,7 @@ impl<'a> UpsertModel<'a> {
                     .expect("foreign key to exist");
 
                 nav_ref_to_path.insert(
-                    key.as_str(),
+                    *key,
                     format!("{path}.{}.{}", nav.field.name, fk.column_name),
                 );
             }
@@ -295,12 +297,12 @@ impl<'a> UpsertModel<'a> {
                 .unwrap_or_default();
 
             for attr in &model.columns {
-                let path_key = nav_ref_to_path.get(attr.field.name.as_str()).or_else(|| {
+                let path_key = nav_ref_to_path.get(attr.field.name.as_ref()).or_else(|| {
                     // Check if this column is part of a foreign key from parent
                     let fk = &attr.foreign_key_reference.as_ref()?;
                     let parent_name = parent_model_name?;
 
-                    if fk.model_name.as_str() != parent_name {
+                    if fk.model_name != parent_name {
                         return None;
                     }
 
@@ -311,12 +313,16 @@ impl<'a> UpsertModel<'a> {
                 });
 
                 match (
-                    new_model.remove(&attr.field.name),
+                    new_model.remove(attr.field.name.as_ref()),
                     &attr.foreign_key_reference,
                 ) {
                     (Some(value), _) => {
                         // A value was provided in `new_model`
-                        builder.push_val(&attr.field.name, &value, &attr.field.cidl_type)?;
+                        builder.push_val(
+                            attr.field.name.as_ref(),
+                            &value,
+                            &attr.field.cidl_type,
+                        )?;
                     }
                     (None, Some(_)) if path_key.is_some() => {
                         // No value provided, but this column is a FK reference
@@ -325,14 +331,18 @@ impl<'a> UpsertModel<'a> {
                         let ctx = self.context.get(path_key).expect("Context path missing");
                         builder.push_val_ctx(
                             ctx,
-                            &attr.field.name,
+                            attr.field.name.as_ref(),
                             &attr.field.cidl_type,
                             path_key,
                         )?;
                     }
                     (None, _) if pk_missing && attr.field.cidl_type.is_nullable() => {
                         // Default to null for INSERT (no PK provided).
-                        builder.push_val(&attr.field.name, &Value::Null, &attr.field.cidl_type)?;
+                        builder.push_val(
+                            attr.field.name.as_ref(),
+                            &Value::Null,
+                            &attr.field.cidl_type,
+                        )?;
                     }
                     (None, _) if !pk_missing => {
                         if !attr.field.cidl_type.is_nullable() {
@@ -358,11 +368,11 @@ impl<'a> UpsertModel<'a> {
 
         // Traverse navigation properties, using the include tree as a guide
         for nav in others {
-            let Some(Value::Object(nested_tree)) = include_tree.get(&nav.field.name) else {
+            let Some(Value::Object(nested_tree)) = include_tree.get(nav.field.name.as_ref()) else {
                 continue;
             };
 
-            match (&nav.kind, new_model.remove(&nav.field.name)) {
+            match (&nav.kind, new_model.remove(nav.field.name.as_ref())) {
                 (NavigationFieldKind::OneToMany { .. }, Some(Value::Array(nav_models))) => {
                     for nav_model in nav_models {
                         let Value::Object(obj) = nav_model else {
@@ -370,8 +380,8 @@ impl<'a> UpsertModel<'a> {
                         };
 
                         self.dfs(
-                            Some(&model.name),
-                            &nav.model_reference,
+                            Some(model.name),
+                            nav.model_reference,
                             obj,
                             nested_tree,
                             format!("{path}.{}", nav.field.name),
@@ -385,8 +395,8 @@ impl<'a> UpsertModel<'a> {
                         };
 
                         self.dfs(
-                            Some(&model.name),
-                            &nav.model_reference,
+                            Some(model.name),
+                            nav.model_reference,
                             obj,
                             nested_tree,
                             format!("{path}.{}", nav.field.name),
@@ -442,12 +452,11 @@ impl<'a> UpsertModel<'a> {
         }
 
         // Determine which is "left" and which is "right" (alphabetically)
-        let (left_vals, right_vals, left_model, right_model) =
-            if nav.model_reference.as_str() < model.name.as_str() {
-                (left_entries, right_entries, nav_meta, model)
-            } else {
-                (right_entries, left_entries, model, nav_meta)
-            };
+        let (left_vals, right_vals, left_model, right_model) = if nav.model_reference < model.name {
+            (left_entries, right_entries, nav_meta, model)
+        } else {
+            (right_entries, left_entries, model, nav_meta)
+        };
 
         let mut columns = Vec::new();
         let mut values = Vec::new();
@@ -585,16 +594,16 @@ struct SqlUpsertBuilder<'a> {
     model_name: &'a str,
     cols: Vec<Alias>,
     vals: Vec<SimpleExpr>,
-    pk_cols: &'a [Column],
-    ast: &'a CloesceAst,
+    pk_cols: &'a [Column<'a>],
+    ast: &'a CloesceAst<'a>,
     has_missing_non_nullable: bool,
 }
 
 impl<'a> SqlUpsertBuilder<'a> {
     fn new(
         model_name: &'a str,
-        pk_cols: &'a [Column],
-        ast: &'a CloesceAst,
+        pk_cols: &'a [Column<'a>],
+        ast: &'a CloesceAst<'a>,
     ) -> SqlUpsertBuilder<'a> {
         Self {
             model_name,
@@ -826,7 +835,7 @@ fn build_sqlite<T: sea_query::QueryStatementWriter>(qb: T) -> SqlStatement {
 fn validate_and_transform(
     cidl_type: CidlType,
     value: &Value,
-    ast: &CloesceAst,
+    ast: &CloesceAst<'_>,
 ) -> Result<SimpleExpr> {
     let res = validate_cidl_type(cidl_type.clone(), Some(value.clone()), ast, false);
     let value = match res {

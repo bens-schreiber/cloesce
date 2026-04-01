@@ -46,15 +46,15 @@ fn compile() -> Result<(), String> {
     let args = Args::parse();
 
     // Frontend
+    let lexed = CloesceLexer
+        .lex_targets(args.targets)
+        .expect("TODO: error handling");
+
+    let tokens = lexed.into_iter().flat_map(|f| f.tokens).collect::<Vec<_>>();
+    let parse = CloesceParser.parse(tokens).expect("TODO: error handling");
+
     let ast = {
-        let lexed = CloesceLexer
-            .lex_targets(args.targets)
-            .expect("TODO: error handling");
-
-        let tokens = lexed.into_iter().flat_map(|f| f.tokens).collect::<Vec<_>>();
-        let parse = CloesceParser.parse(tokens).expect("TODO: error handling");
-
-        let (result, _errors) = SemanticAnalysis::analyze(parse);
+        let (result, _errors) = SemanticAnalysis::analyze(&parse);
         result
     };
 

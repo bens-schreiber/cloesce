@@ -3,7 +3,7 @@
 use ast::{CidlType, MediaType, NavigationFieldKind};
 use compiler_test::lex_and_parse;
 use frontend::{SymbolKind, WranglerEnvBindingKind};
-use semantic::{SemanticAnalysis, err::CompilerError};
+use semantic::{SemanticAnalysis, err::SemanticError};
 
 /// Find exactly one error matching the pattern. Panics if not found.
 /// Destructure with `=> expr` to extract fields in one step.
@@ -59,10 +59,10 @@ fn missing_wrangler_env_block() {
     let parse = lex_and_parse(src);
 
     // Act
-    let (_, errors) = SemanticAnalysis::analyze(parse);
+    let (_, errors) = SemanticAnalysis::analyze(&parse);
 
     // Assert
-    expect_err!(errors, CompilerError::MissingWranglerEnvBlock);
+    expect_err!(errors, SemanticError::MissingWranglerEnvBlock);
 }
 
 #[test]
@@ -79,12 +79,12 @@ fn wrangler_duplicate_symbol() {
     let parse = lex_and_parse(src);
 
     // Act
-    let (result, errors) = SemanticAnalysis::analyze(parse);
+    let (result, errors) = SemanticAnalysis::analyze(&parse);
 
     // Assert
     assert_eq!(errors.len(), 1);
     let second = expect_err!(errors,
-        CompilerError::DuplicateSymbol { second, .. } => second
+        SemanticError::DuplicateSymbol { second, .. } => second
     );
     assert_eq!(second.name, "my_d1");
     assert!(matches!(
@@ -118,24 +118,24 @@ fn d1_model_basic_errors() {
     let parse = lex_and_parse(&src);
 
     // Act
-    let (result, errors) = SemanticAnalysis::analyze(parse);
+    let (result, errors) = SemanticAnalysis::analyze(&parse);
 
     // Assert
     assert_eq!(errors.len(), 3);
 
     // User has @d1 but no primary key
     let model = expect_err!(errors,
-        CompilerError::D1ModelMissingPrimaryKey { model } => model
+        SemanticError::D1ModelMissingPrimaryKey { model } => model
     );
     assert_eq!(model.name, "User");
     assert!(matches!(model.kind, SymbolKind::ModelDecl));
 
     // Post references @d1(other_d1) which is not in the env block
-    expect_err!(errors, CompilerError::D1ModelInvalidD1Binding { .. });
+    expect_err!(errors, SemanticError::D1ModelInvalidD1Binding { .. });
 
     // Comment has fields but no @d1 binding
     let model = expect_err!(errors,
-        CompilerError::D1ModelMissingD1Binding { model } => model
+        SemanticError::D1ModelMissingD1Binding { model } => model
     );
     assert_eq!(model.name, "Comment");
 }
@@ -181,7 +181,7 @@ fn d1_model_column_fk_errors() {
     let parse = lex_and_parse(src);
 
     // Act
-    let (result, errors) = SemanticAnalysis::analyze(parse);
+    let (result, errors) = SemanticAnalysis::analyze(&parse);
 
     // Assert
     assert_eq!(errors.len(), 7);
@@ -190,40 +190,40 @@ fn d1_model_column_fk_errors() {
     assert_eq!(
         count_errs!(
             errors,
-            CompilerError::ForeignKeyReferencesInvalidOrUnknownColumn { .. }
+            SemanticError::ForeignKeyReferencesInvalidOrUnknownColumn { .. }
         ),
         2
     );
 
     // Nullable primary key: id is Option<int>
     let column = expect_err!(errors,
-        CompilerError::NullablePrimaryKey { column } => column
+        SemanticError::NullablePrimaryKey { column } => column
     );
     assert_eq!(column.name, "id");
     assert!(matches!(column.kind, SymbolKind::ModelField));
 
     // Duplicate symbol: id declared twice
     let second = expect_err!(errors,
-        CompilerError::DuplicateSymbol { second, .. } => second
+        SemanticError::DuplicateSymbol { second, .. } => second
     );
     assert_eq!(second.name, "id");
 
     // FK incompatible type: str_value (string) -> Post::id (int)
     let (column, adj_column) = expect_err!(errors,
-        CompilerError::ForeignKeyReferencesIncompatibleColumnType { column, adj_column, .. } => (column, adj_column)
+        SemanticError::ForeignKeyReferencesIncompatibleColumnType { column, adj_column, .. } => (column, adj_column)
     );
     assert_eq!(column.name, "str_value");
     assert_eq!(adj_column.name, "id");
 
     // FK references self
     let model = expect_err!(errors,
-        CompilerError::ForeignKeyReferencesSelf { model, .. } => model
+        SemanticError::ForeignKeyReferencesSelf { model, .. } => model
     );
     assert_eq!(model.name, "User");
 
     // FK references different database
     let binding = expect_err!(errors,
-        CompilerError::ForeignKeyReferencesDifferentDatabase { binding, .. } => binding.clone()
+        SemanticError::ForeignKeyReferencesDifferentDatabase { binding, .. } => *binding
     );
     assert_eq!(binding, "other_d1");
 }
@@ -257,12 +257,12 @@ fn d1_model_consistent_nullability_error() {
     let parse = lex_and_parse(src);
 
     // Act
-    let (result, errors) = SemanticAnalysis::analyze(parse);
+    let (result, errors) = SemanticAnalysis::analyze(&parse);
 
     // Assert
     assert_eq!(errors.len(), 1);
     let (first_column, second_column) = expect_err!(errors,
-        CompilerError::ForeignKeyInconsistentNullability { first_column, second_column, .. } => (first_column, second_column)
+        SemanticError::ForeignKeyInconsistentNullability { first_column, second_column, .. } => (first_column, second_column)
     );
     assert_eq!(first_column.name, "postId");
     assert_eq!(second_column.name, "name");
@@ -293,12 +293,12 @@ fn d1_model_fk_column_already_in_foreign_key() {
     let parse = lex_and_parse(&src);
 
     // Act
-    let (result, errors) = SemanticAnalysis::analyze(parse);
+    let (result, errors) = SemanticAnalysis::analyze(&parse);
 
     // Assert
     assert_eq!(errors.len(), 1);
     let column = expect_err!(errors,
-        CompilerError::ForeignKeyColumnAlreadyInForeignKey { column, .. } => column
+        SemanticError::ForeignKeyColumnAlreadyInForeignKey { column, .. } => column
     );
     assert_eq!(column.name, "postId");
     assert!(matches!(column.kind, SymbolKind::ModelField));
@@ -340,11 +340,11 @@ fn d1_model_nav_errors() {
     let parse = lex_and_parse(src);
 
     // Act
-    let (result, errors) = SemanticAnalysis::analyze(parse);
+    let (result, errors) = SemanticAnalysis::analyze(&parse);
 
     // Assert
     assert_eq!(errors.len(), 2);
-    expect_err!(errors, CompilerError::UnresolvedSymbol { .. });
+    expect_err!(errors, SemanticError::UnresolvedSymbol { .. });
 }
 
 #[test]
@@ -374,12 +374,12 @@ fn d1_model_nav_field_already_in_navigation_property() {
     let parse = lex_and_parse(&src);
 
     // Act
-    let (result, errors) = SemanticAnalysis::analyze(parse);
+    let (result, errors) = SemanticAnalysis::analyze(&parse);
 
     // Assert
     assert_eq!(errors.len(), 1, "unexpected errors: {:#?}", errors);
     let field = expect_err!(errors,
-        CompilerError::NavigationPropertyFieldAlreadyInNavigationProperty { field, .. } => field
+        SemanticError::NavigationPropertyFieldAlreadyInNavigationProperty { field, .. } => field
     );
     assert_eq!(field.name, "horse");
     assert!(matches!(field.kind, SymbolKind::ModelField));
@@ -411,7 +411,7 @@ fn d1_model_nav_one_to_one() {
     let parse = lex_and_parse(src);
 
     // Act
-    let (result, errors) = SemanticAnalysis::analyze(parse);
+    let (result, errors) = SemanticAnalysis::analyze(&parse);
 
     // Assert
     assert_eq!(errors.len(), 0, "unexpected errors: {:#?}", errors);
@@ -424,9 +424,7 @@ fn d1_model_nav_one_to_one() {
 
     assert_eq!(
         person_horse_nav.field.cidl_type,
-        CidlType::Object {
-            name: "Horse".to_string(),
-        }
+        CidlType::Object { name: "Horse" }
     );
 
     let NavigationFieldKind::OneToOne {
@@ -467,7 +465,7 @@ fn d1_model_nav_one_to_many() {
 
     // Act
     let parse = lex_and_parse(src);
-    let (result, errors) = SemanticAnalysis::analyze(parse);
+    let (result, errors) = SemanticAnalysis::analyze(&parse);
 
     // Assert
     assert_eq!(errors.len(), 0);
@@ -515,7 +513,7 @@ fn d1_model_nav_many_to_many() {
 
     // Act
     let parse = lex_and_parse(src);
-    let (result, errors) = SemanticAnalysis::analyze(parse);
+    let (result, errors) = SemanticAnalysis::analyze(&parse);
 
     // Assert
     assert_eq!(errors.len(), 0);
@@ -573,18 +571,18 @@ fn d1_model_cyclical_relationship_error() {
 
     // Act
     let parse = lex_and_parse(src);
-    let (result, errors) = SemanticAnalysis::analyze(parse);
+    let (result, errors) = SemanticAnalysis::analyze(&parse);
 
     // Assert
     assert_eq!(errors.len(), 1);
     let cycle = expect_err!(errors,
-        CompilerError::CyclicalRelationship { cycle } => cycle.clone()
+        SemanticError::CyclicalRelationship { cycle } => cycle.clone()
     );
     // Cycle contains model names now
     assert_eq!(cycle.len(), 3);
-    assert!(cycle.contains(&"A".to_string()));
-    assert!(cycle.contains(&"B".to_string()));
-    assert!(cycle.contains(&"C".to_string()));
+    assert!(cycle.contains(&"A"));
+    assert!(cycle.contains(&"B"));
+    assert!(cycle.contains(&"C"));
 }
 
 #[test]
@@ -629,7 +627,7 @@ fn d1_model_nullability_prevents_cycle() {
 
     // Act
     let parse = lex_and_parse(src);
-    let (_, errors) = SemanticAnalysis::analyze(parse);
+    let (_, errors) = SemanticAnalysis::analyze(&parse);
 
     // Assert
     assert_eq!(errors.len(), 0);
@@ -663,32 +661,32 @@ fn kv_r2_errors() {
     let parse = lex_and_parse(src);
 
     // Act
-    let (result, errors) = SemanticAnalysis::analyze(parse);
+    let (result, errors) = SemanticAnalysis::analyze(&parse);
 
     // Assert
     assert_eq!(errors.len(), 5);
 
     let field = expect_err!(errors,
-        CompilerError::KvR2InvalidKeyParam { field, .. } => field
+        SemanticError::KvR2InvalidKeyParam { field, .. } => field
     );
     assert_eq!(field.name, "keyParam");
 
     let binding = expect_err!(errors,
-        CompilerError::KvInvalidBinding { binding, ..} => binding.clone()
+        SemanticError::KvInvalidBinding { binding, ..} => *binding
     );
     assert_eq!(binding, "my_d1");
 
     let binding = expect_err!(errors,
-        CompilerError::R2InvalidBinding { binding, .. } => binding.clone()
+        SemanticError::R2InvalidBinding { binding, .. } => *binding
     );
     assert_eq!(binding, "my_kv");
 
     let variable = expect_err!(errors,
-        CompilerError::KvR2UnknownKeyVariable { variable, .. } => variable.clone()
+        SemanticError::KvR2UnknownKeyVariable { variable, .. } => *variable
     );
     assert_eq!(variable, "nonexistent");
 
-    expect_err!(errors, CompilerError::KvR2InvalidKeyFormat { reason, .. });
+    expect_err!(errors, SemanticError::KvR2InvalidKeyFormat { reason, .. });
 }
 
 #[test]
@@ -710,7 +708,7 @@ fn kv_and_d1_coexist() {
     let parse = lex_and_parse(src);
 
     // Act
-    let (result, errors) = SemanticAnalysis::analyze(parse);
+    let (result, errors) = SemanticAnalysis::analyze(&parse);
 
     // Assert
     assert_eq!(errors.len(), 0);
@@ -765,17 +763,17 @@ fn api_errors() {
     let parse = lex_and_parse(src);
 
     // Act
-    let (_, errors) = SemanticAnalysis::analyze(parse);
+    let (_, errors) = SemanticAnalysis::analyze(&parse);
 
     // Assert
     assert_eq!(errors.len(), 6);
 
-    expect_err!(errors, CompilerError::ApiUnknownNamespaceReference { .. });
+    expect_err!(errors, SemanticError::ApiUnknownNamespaceReference { .. });
 
-    expect_err!(errors, CompilerError::ApiInvalidReturn { .. });
+    expect_err!(errors, SemanticError::ApiInvalidReturn { .. });
 
     assert_eq!(
-        count_errs!(errors, CompilerError::ApiInvalidParam { .. }),
+        count_errs!(errors, SemanticError::ApiInvalidParam { .. }),
         4
     );
 }
@@ -801,7 +799,7 @@ fn api_sets_media_types() {
     let parse = lex_and_parse(src);
 
     // Act
-    let (result, errors) = SemanticAnalysis::analyze(parse);
+    let (result, errors) = SemanticAnalysis::analyze(&parse);
 
     // Assert
     assert_eq!(errors.len(), 0);
@@ -886,36 +884,36 @@ fn data_source_errors() {
     let parse = lex_and_parse(src);
 
     // Act
-    let (_, errors) = SemanticAnalysis::analyze(parse);
+    let (_, errors) = SemanticAnalysis::analyze(&parse);
 
     // Assert
     // BadModelSource: unknown model
     expect_err!(
         errors,
-        CompilerError::DataSourceUnknownModelReference { .. }
+        SemanticError::DataSourceUnknownModelReference { .. }
     );
 
     // BadTreeSource: "nonexistent" is not a field on User
     assert!(errors.iter().any(|e| matches!(
         e,
-        CompilerError::DataSourceInvalidIncludeTreeReference { name, .. }
-            if name == "nonexistent"
+        SemanticError::DataSourceInvalidIncludeTreeReference { name, .. }
+            if *name == "nonexistent"
     )));
 
     // BadNestedTreeSource: "bogus" is not a field on Post
     assert!(errors.iter().any(|e| matches!(
         e,
-        CompilerError::DataSourceInvalidIncludeTreeReference { name, .. }
-            if name == "bogus"
+        SemanticError::DataSourceInvalidIncludeTreeReference { name, .. }
+            if *name == "bogus"
     )));
 
     // BadParamSource: User is not a valid sql type
-    expect_err!(errors, CompilerError::DataSourceInvalidMethodParam { .. });
+    expect_err!(errors, SemanticError::DataSourceInvalidMethodParam { .. });
 
     // UnknownSqlParam: $ghost is not a declared param
     assert!(errors.iter().any(|e| matches!(
         e,
-        CompilerError::DataSourceUnknownSqlParam { name, .. } if name == "ghost"
+        SemanticError::DataSourceUnknownSqlParam { name, .. } if name == "ghost"
     )));
 }
 
@@ -945,7 +943,7 @@ fn data_source_include_tree_kv_r2() {
     let parse = lex_and_parse(src);
 
     // Act
-    let (result, errors) = SemanticAnalysis::analyze(parse);
+    let (result, errors) = SemanticAnalysis::analyze(&parse);
 
     // Assert
     assert_eq!(errors.len(), 0);
@@ -968,24 +966,24 @@ fn poo_errors() {
 
     // Act
     let parse = lex_and_parse(src);
-    let (result, errors) = SemanticAnalysis::analyze(parse);
+    let (result, errors) = SemanticAnalysis::analyze(&parse);
 
     // Assert
     assert_eq!(errors.len(), 3);
 
     let cycle = expect_err!(errors,
-        CompilerError::CyclicalRelationship { cycle } => cycle.clone()
+        SemanticError::CyclicalRelationship { cycle } => cycle.clone()
     );
     assert_eq!(cycle, vec!["MyPoo"]);
 
     assert!(errors.iter().any(|e| matches!(
         e,
-        CompilerError::PlainOldObjectInvalidFieldType { field } if field.name == "streamField"
+        SemanticError::PlainOldObjectInvalidFieldType { field } if field.name == "streamField"
     )));
 
     assert!(errors.iter().any(|e| matches!(
         e,
-        CompilerError::PlainOldObjectInvalidFieldType { field } if field.name == "voidField"
+        SemanticError::PlainOldObjectInvalidFieldType { field } if field.name == "voidField"
     )));
 }
 
@@ -1018,22 +1016,22 @@ fn service_errors() {
     );
 
     let parse = lex_and_parse(src);
-    let (result, errors) = SemanticAnalysis::analyze(parse);
+    let (result, errors) = SemanticAnalysis::analyze(&parse);
 
     assert!(errors.iter().any(|e| matches!(
         e,
-        CompilerError::ServiceInvalidFieldType { field }
+        SemanticError::ServiceInvalidFieldType { field }
             if field.name == "name"
     )));
 
     assert!(errors.iter().any(|e| matches!(
         e,
-        CompilerError::ServiceInvalidFieldType { field }
+        SemanticError::ServiceInvalidFieldType { field }
             if field.name == "user"
     )));
 
     assert_eq!(
-        count_errs!(errors, CompilerError::ServiceInvalidFieldType { .. }),
+        count_errs!(errors, SemanticError::ServiceInvalidFieldType { .. }),
         2
     );
 }
@@ -1054,7 +1052,7 @@ fn service_collects_api_blocks() {
 
     // Act
     let parse = lex_and_parse(src);
-    let (result, errors) = SemanticAnalysis::analyze(parse);
+    let (result, errors) = SemanticAnalysis::analyze(&parse);
 
     // Assert
     assert_eq!(errors.len(), 0);
@@ -1080,7 +1078,7 @@ fn poo_with_model_reference() {
     "#;
 
     let parse = lex_and_parse(src);
-    let (result, errors) = SemanticAnalysis::analyze(parse);
+    let (result, errors) = SemanticAnalysis::analyze(&parse);
 
     eprintln!("Errors: {:#?}", errors);
     eprintln!(
@@ -1118,7 +1116,7 @@ fn cidl_types_resolve() {
 
     // Act
     let parse = lex_and_parse(src);
-    let (result, errors) = SemanticAnalysis::analyze(parse);
+    let (result, errors) = SemanticAnalysis::analyze(&parse);
 
     // Assert
     assert_eq!(errors.len(), 0);
@@ -1129,15 +1127,9 @@ fn cidl_types_resolve() {
         param_types,
         vec![
             CidlType::Env,
-            CidlType::Array(Box::new(CidlType::Object {
-                name: "MyPoo".to_string()
-            })),
-            CidlType::Object {
-                name: "User".to_string()
-            },
-            CidlType::Inject {
-                name: "MyService".to_string()
-            },
+            CidlType::Array(Box::new(CidlType::Object { name: "MyPoo" })),
+            CidlType::Object { name: "User" },
+            CidlType::Inject { name: "MyService" },
         ]
     );
 }

@@ -1,21 +1,21 @@
+use ast::{CloesceAst, MigrationsAst, MigrationsModel};
+
 pub async fn test_sql(
-    ast: ast::CloesceAst,
+    ast: CloesceAst<'_>,
     stmts: Vec<(String, Vec<serde_json::Value>)>,
     db: sqlx::SqlitePool,
 ) -> std::result::Result<Vec<Vec<sqlx::sqlite::SqliteRow>>, sqlx::Error> {
     // Generate and run schema migration
     let migration_ast = {
-        use ast::{CloesceAst, MigrationsAst, MigrationsModel};
-
         let CloesceAst { models, hash, .. } = ast;
         let migrations_models = models
             .into_iter()
             .map(|(name, model)| {
                 (
-                    name,
+                    name.to_string(),
                     MigrationsModel {
                         hash: model.hash,
-                        name: model.name,
+                        name: model.name.to_string(),
                         d1_binding: None, // Not used in test
                         primary_columns: model.primary_columns,
                         columns: model.columns,

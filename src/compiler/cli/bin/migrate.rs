@@ -134,12 +134,17 @@ fn migrate() -> Result<(), String> {
         let mut migrated_cidl_file = open_file_or_create(&migrated_cidl_path);
         let mut migrated_sql_file = open_file_or_create(&migrated_sql_path);
 
-        let lm_ast = last_migrated_cidl_path
-            .map(|p| MigrationsAst::from_json(&p))
+        let lm_ast_contents = last_migrated_cidl_path
+            .map(|p| std::fs::read_to_string(&p).map_err(|e| e.to_string()))
+            .transpose()?;
+        let lm_ast = lm_ast_contents
+            .as_deref()
+            .map(MigrationsAst::from_json)
             .transpose()?;
 
         // Migrate only the models with the specified D1 binding
-        let mut ast = MigrationsAst::from_json(&args.cidl_path)?;
+        let ast_contents = std::fs::read_to_string(&args.cidl_path).map_err(|e| e.to_string())?;
+        let mut ast = MigrationsAst::from_json(&ast_contents)?;
         ast.models
             .retain(|_, m| m.d1_binding == Some(current_binding.to_string()));
 

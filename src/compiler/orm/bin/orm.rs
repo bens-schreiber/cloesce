@@ -35,7 +35,7 @@ pub unsafe extern "C" fn dealloc(ptr: *mut u8, cap: usize) {
 
 thread_local! {
     /// intended to be imported once at WASM initializaton
-    pub static AST: RefCell<CloesceAst> = RefCell::new(CloesceAst::default());
+    pub static AST: RefCell<CloesceAst<'static>> = RefCell::new(CloesceAst::default());
 }
 
 /// Sets the [AST] global variable, returning 0 on success.
