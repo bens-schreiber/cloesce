@@ -19,6 +19,7 @@ mod api;
 mod crud;
 mod data_source;
 pub mod err;
+pub mod fmt;
 mod model;
 
 #[derive(Default)]

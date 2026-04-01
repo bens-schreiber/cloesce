@@ -1233,6 +1233,7 @@ dependencies = [
 name = "semantic"
 version = "0.0.1"
 dependencies = [
+ "ariadne",
  "ast",
  "compiler-test",
  "frontend",

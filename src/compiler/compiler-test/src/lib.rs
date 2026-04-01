@@ -49,12 +49,30 @@ pub fn lex_and_parse(src: &str) -> ParseAst<'_> {
 /// Given a source string, lex, parse, and semantically analyze it into a [CloesceAst],
 /// panicking if any step fails.
 pub fn src_to_ast(src: &str) -> CloesceAst<'_> {
-    let parse = lex_and_parse(src);
-    let (result, errors) = SemanticAnalysis::analyze(&parse);
-    assert!(
-        errors.is_empty(),
-        "semantic analysis should succeed: {:#?}",
-        errors
-    );
+    let source = LexSource {
+        src,
+        path: PathBuf::from("<test>"),
+    };
+
+    let lexed = CloesceLexer::lex(vec![source]);
+    if lexed.has_errors() {
+        lexed.display_error(&lexed.file_table);
+        panic!("lexing should succeed");
+    }
+
+    let result = CloesceParser::parse(&lexed.results, &lexed.file_table);
+    if result.has_errors() {
+        result.display_error(&lexed.file_table);
+        panic!("parse should succeed");
+    }
+
+    let (result, errors) = SemanticAnalysis::analyze(&result.ast);
+    if errors.len() > 0 {
+        for error in &errors {
+            error.display_error(&lexed.file_table);
+        }
+        panic!("semantic analysis should succeed");
+    }
+
     result
 }

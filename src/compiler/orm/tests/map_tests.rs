@@ -46,7 +46,8 @@ fn no_records_returns_empty() {
     let ast = src_to_ast(
         r#"
         env { db: d1 }
-        @d1(db) model Horse {
+        @d1(db) 
+        model Horse {
             [primary id]
             id: int
             name: Option<string>
@@ -54,7 +55,9 @@ fn no_records_returns_empty() {
             [nav riders -> Rider::horseId]
             riders: Array<Rider>
         }
-        @d1(db) model Rider {
+
+        @d1(db) 
+        model Rider {
             [primary id]
             id: int
             nickname: Option<string>

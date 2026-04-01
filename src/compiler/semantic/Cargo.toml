@@ -8,6 +8,7 @@ ast = { path = "../ast" }
 frontend = { path = "../frontend" }
 indexmap = { workspace = true }
 orm = { path = "../orm" }
+ariadne = { workspace = true }
 
 [dev-dependencies]
 sqlx = { version = "0.8", features = ["sqlite", "runtime-tokio"] }
