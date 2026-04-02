@@ -4,7 +4,7 @@ use ast::CloesceAst;
 use frontend::{
     ParseAst,
     fmt::DisplayError,
-    lexer::{CloesceLexer, LexSource},
+    lexer::{CloesceLexer, LexTarget},
     parser::CloesceParser,
 };
 use semantic::SemanticAnalysis;
@@ -26,7 +26,7 @@ macro_rules! expected_str {
 
 /// Given a source string, lex and parse it into a [ParseAst], panicking if either step fails.
 pub fn lex_and_parse(src: &str) -> ParseAst<'_> {
-    let source = LexSource {
+    let source = LexTarget {
         src,
         path: PathBuf::from("<test>"),
     };
@@ -49,7 +49,7 @@ pub fn lex_and_parse(src: &str) -> ParseAst<'_> {
 /// Given a source string, lex, parse, and semantically analyze it into a [CloesceAst],
 /// panicking if any step fails.
 pub fn src_to_ast(src: &str) -> CloesceAst<'_> {
-    let source = LexSource {
+    let source = LexTarget {
         src,
         path: PathBuf::from("<test>"),
     };

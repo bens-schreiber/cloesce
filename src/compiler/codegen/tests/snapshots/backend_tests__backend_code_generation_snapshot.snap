@@ -68,15 +68,15 @@ export namespace Cloesce {
             id: number;
             fk_to_model: number;
         }
-        export interface ModelWithCruds {
-            id: number;
-            name: string;
-            categoryId: number;
-        }
         export interface HasOneToOne {
             id: number;
             basicModelId: number;
             oneToOneNav: Cloesce.Models.BasicModel;
+        }
+        export interface ModelWithCruds {
+            id: number;
+            name: string;
+            categoryId: number;
         }
         export interface ModelWithKv {
             id1: string;

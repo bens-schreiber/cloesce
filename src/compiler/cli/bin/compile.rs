@@ -2,7 +2,10 @@ use std::{io::Write, panic, path::PathBuf};
 
 use clap::Parser;
 use cli::open_file_or_create;
-use frontend::lexer::CloesceLexer;
+use frontend::{
+    fmt::DisplayError,
+    lexer::{CloesceLexer, LexTarget},
+};
 use tracing_subscriber::FmtSubscriber;
 
 use codegen::{
@@ -45,18 +48,41 @@ fn compile() -> Result<(), String> {
 
     let args = Args::parse();
 
-    // Frontend
-    let lexed = CloesceLexer
-        .lex_targets(args.targets)
-        .expect("TODO: error handling");
+    // Lexing
+    let sources = args
+        .targets
+        .into_iter()
+        .map(|p| {
+            let src = std::fs::read_to_string(&p)
+                .unwrap_or_else(|_| panic!("Failed to read source file: {}", p.display()));
+            (src, p)
+        })
+        .collect::<Vec<(String, PathBuf)>>();
 
-    let tokens = lexed.into_iter().flat_map(|f| f.tokens).collect::<Vec<_>>();
-    let parse = CloesceParser.parse(tokens).expect("TODO: error handling");
+    let lexed = CloesceLexer::lex(sources.iter().map(|(src, path)| LexTarget {
+        src: src.as_str(),
+        path: path.clone(),
+    }));
+    if lexed.has_errors() {
+        lexed.display_error(&lexed.file_table);
+        return Err("lexing failed".to_string());
+    }
 
-    let ast = {
-        let (result, _errors) = SemanticAnalysis::analyze(&parse);
-        result
-    };
+    // Parsing
+    let parse = CloesceParser::parse(&lexed.results, &lexed.file_table);
+    if parse.has_errors() {
+        parse.display_error(&lexed.file_table);
+        return Err("parsing failed".to_string());
+    }
+
+    // Semantic
+    let (ast, errors) = SemanticAnalysis::analyze(&parse.ast);
+    if errors.len() > 0 {
+        for error in &errors {
+            error.display_error(&lexed.file_table);
+        }
+        return Err("semantic analysis failed".to_string());
+    }
 
     // Codegen
     let wrangler = {

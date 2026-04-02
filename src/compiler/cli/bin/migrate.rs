@@ -177,14 +177,15 @@ impl MigrationsIntent for MigrationsCli {
                 options,
             } => {
                 let target = format!("{model_name}.{attribute_name}");
-                Self::rename_or_drop(&target, options, "attribute")
+                let options = options.iter().map(|s| s.as_ref()).collect::<Vec<_>>();
+                Self::rename_or_drop(&target, options.as_slice(), "column")
             }
         }
     }
 }
 
 impl MigrationsCli {
-    fn rename_or_drop(target: &str, options: &[&String], kind: &str) -> Option<usize> {
+    fn rename_or_drop(target: &str, options: &[&str], kind: &str) -> Option<usize> {
         println!("Did you intend to rename or drop {kind} \"{target}\"?");
         println!("  [r] Rename");
         println!("  [d] Drop");

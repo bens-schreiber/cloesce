@@ -332,47 +332,6 @@ export class ModelWithCruds {
     return res;
   }
 }
-export class ModelWithR2 {
-  id: string;
-  fileData: R2Object;
-  manyFileDatas: Paginated<R2Object>;
-  async hasR2ParamAndRes(
-    input: R2Object,
-    fetchImpl: typeof fetch = fetch
-  ): Promise<HttpResult<R2Object>> {
-    const id = [
-      encodeURIComponent(String(this.id)),
-    ].join("/");
-    const baseUrl = new URL(
-      `http://example.com/path/to/api/ModelWithR2/${id}/hasR2ParamAndRes`
-    );
-    const payload: any = {};
-    payload["input"] = input;
-
-    const res = await fetchImpl(baseUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: requestBody(MediaType.Json, payload),
-    });
-
-    return await HttpResult.fromResponse(
-      res,
-      MediaType.Json,
-      undefined,
-      false
-    );
-  }
-
-  static fromJson(data: any): ModelWithR2 {
-    const res = Object.assign(new ModelWithR2(), data);
-    if (res.manyFileDatas?.results) {
-      for (let i = 0; i < res.manyFileDatas.results.length; i++) {
-        res.manyFileDatas.results[i] = Object.assign(new R2Object(), res.manyFileDatas.results[i]);
-      }
-    }
-    return res;
-  }
-}
 export class ModelWithKv {
   id1: string;
   id2: string;
@@ -460,6 +419,47 @@ export class ModelWithKv {
     if (res.manyValues?.results) {
       for (let i = 0; i < res.manyValues.results.length; i++) {
         res.manyValues.results[i] = Object.assign(new unknown(), res.manyValues.results[i]);
+      }
+    }
+    return res;
+  }
+}
+export class ModelWithR2 {
+  id: string;
+  fileData: R2Object;
+  manyFileDatas: Paginated<R2Object>;
+  async hasR2ParamAndRes(
+    input: R2Object,
+    fetchImpl: typeof fetch = fetch
+  ): Promise<HttpResult<R2Object>> {
+    const id = [
+      encodeURIComponent(String(this.id)),
+    ].join("/");
+    const baseUrl = new URL(
+      `http://example.com/path/to/api/ModelWithR2/${id}/hasR2ParamAndRes`
+    );
+    const payload: any = {};
+    payload["input"] = input;
+
+    const res = await fetchImpl(baseUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: requestBody(MediaType.Json, payload),
+    });
+
+    return await HttpResult.fromResponse(
+      res,
+      MediaType.Json,
+      undefined,
+      false
+    );
+  }
+
+  static fromJson(data: any): ModelWithR2 {
+    const res = Object.assign(new ModelWithR2(), data);
+    if (res.manyFileDatas?.results) {
+      for (let i = 0; i < res.manyFileDatas.results.length; i++) {
+        res.manyFileDatas.results[i] = Object.assign(new R2Object(), res.manyFileDatas.results[i]);
       }
     }
     return res;

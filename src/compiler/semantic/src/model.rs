@@ -7,7 +7,7 @@ use ast::{
     CidlType, Column, CrudKind, Field, ForeignKeyReference, KvR2Field, Model, NavigationField,
     NavigationFieldKind,
 };
-use frontend::{ForeignKeyTag, KvR2Tag, ModelBlock, NavigationTag, Span, WranglerEnvBindingKind};
+use frontend::{KvR2Tag, ModelBlock, NavigationTag, Span, WranglerEnvBindingKind};
 use indexmap::IndexMap;
 use std::collections::{BTreeMap, HashMap, HashSet};
 
@@ -21,7 +21,7 @@ pub struct ModelAnalysis<'src, 'p> {
 impl<'src, 'p> ModelAnalysis<'src, 'p> {
     pub fn analyze(
         mut self,
-        model_blocks: HashMap<&'src str, &'p ModelBlock<'src>>,
+        model_blocks: BTreeMap<&'src str, &'p ModelBlock<'src>>,
         table: &mut SymbolTable<'src, 'p>,
     ) -> BatchResult<'src, 'p, IndexMap<&'src str, Model<'src>>> {
         let mut models: IndexMap<&'src str, Model<'src>> = IndexMap::new();
@@ -67,7 +67,11 @@ impl<'src, 'p> ModelAnalysis<'src, 'p> {
         // Topologically sort models based on FK relationships
         match kahns(self.graph, self.in_degree, model_blocks.len()) {
             Ok(rank) => {
-                models.sort_by_key(|name, _| rank.get(name).copied().unwrap_or(usize::MAX));
+                models.sort_by(|a_name, _, b_name, _| {
+                    let a_rank = rank.get(a_name).copied().unwrap_or(usize::MAX);
+                    let b_rank: usize = rank.get(b_name).copied().unwrap_or(usize::MAX);
+                    a_rank.cmp(&b_rank).then_with(|| a_name.cmp(b_name))
+                });
             }
             Err(e) => {
                 self.sink.push(e);
@@ -83,7 +87,7 @@ impl<'src, 'p> ModelAnalysis<'src, 'p> {
         &mut self,
         model: &mut Model<'src>,
         model_block: &'p ModelBlock<'src>,
-        model_blocks: &HashMap<&'src str, &'p ModelBlock<'src>>,
+        model_blocks: &BTreeMap<&'src str, &'p ModelBlock<'src>>,
         table: &mut SymbolTable<'src, 'p>,
     ) {
         let model_name = model_block.symbol.name;
@@ -174,16 +178,156 @@ impl<'src, 'p> ModelAnalysis<'src, 'p> {
         let mut fk_columns_seen = HashSet::<&str>::new();
         let mut composite_counter = 0usize;
         for fk in &model_block.foreign_keys {
-            self.foreign_key(
-                model_block,
-                &column_names,
-                fk,
-                &mut fk_columns_seen,
-                &mut fk_info,
-                &mut composite_counter,
-                table,
-                model_blocks,
-            );
+            // Check that the adjacent model exists
+            let Some(adj_model_block) = model_blocks.get(fk.adj_model) else {
+                self.sink
+                    .push(SemanticError::UnresolvedSymbol { span: fk.span });
+                continue;
+            };
+
+            if fk.adj_model == model_name {
+                self.sink.push(SemanticError::ForeignKeyReferencesSelf {
+                    model: &model_block.symbol,
+                    foreign_key: fk.span,
+                });
+                continue;
+            }
+
+            // Must belong to the same database
+            if model_block.d1_binding.as_ref().map(|t| &t.env_binding)
+                != adj_model_block.d1_binding.as_ref().map(|t| &t.env_binding)
+            {
+                self.sink
+                    .push(SemanticError::ForeignKeyReferencesDifferentDatabase {
+                        span: fk.span,
+                        binding: adj_model_block
+                            .d1_binding
+                            .as_ref()
+                            .map(|t| t.env_binding)
+                            .unwrap_or_default(),
+                    });
+                continue;
+            }
+
+            let first_ref_field = &fk.references.first().unwrap().0;
+            let Some(first_ref_sym) =
+                table.resolve(first_ref_field, SymbolKind::ModelField, Some(model_name))
+            else {
+                self.sink
+                    .push(SemanticError::ForeignKeyReferencesInvalidOrUnknownColumn {
+                        span: fk.span,
+                        column: first_ref_field,
+                    });
+                continue;
+            };
+            let is_nullable = first_ref_sym.cidl_type.is_nullable();
+
+            let composite_id = if fk.references.len() > 1 {
+                let id = composite_counter;
+                composite_counter += 1;
+                Some(id)
+            } else {
+                None
+            };
+
+            let adj_model_name = fk.adj_model;
+
+            for (field_name, adj_field_name) in &fk.references {
+                // Validate the field from this model
+                let field_cidl_type = {
+                    if !column_names.contains(field_name) {
+                        self.sink
+                            .push(SemanticError::ForeignKeyReferencesInvalidOrUnknownColumn {
+                                span: fk.span,
+                                column: field_name,
+                            });
+                        continue;
+                    }
+
+                    let Some(field_sym) =
+                        table.resolve(field_name, SymbolKind::ModelField, Some(model_name))
+                    else {
+                        self.sink
+                            .push(SemanticError::ForeignKeyReferencesInvalidOrUnknownColumn {
+                                span: fk.span,
+                                column: field_name,
+                            });
+                        continue;
+                    };
+
+                    if !fk_columns_seen.insert(field_name) {
+                        self.sink
+                            .push(SemanticError::ForeignKeyColumnAlreadyInForeignKey {
+                                span: fk.span,
+                                column: &field_sym,
+                            });
+                    }
+
+                    if field_sym.cidl_type.is_nullable() != is_nullable {
+                        self.sink
+                            .push(SemanticError::ForeignKeyInconsistentNullability {
+                                span: fk.span,
+                                first_column: &first_ref_sym,
+                                second_column: &field_sym,
+                            });
+                    }
+
+                    field_sym.cidl_type.clone()
+                };
+
+                // Validate the field from the adjacent model
+                let adj_field_cidl_type = {
+                    let Some(adj_field_sym) =
+                        table.resolve(adj_field_name, SymbolKind::ModelField, Some(adj_model_name))
+                    else {
+                        self.sink
+                            .push(SemanticError::ForeignKeyReferencesInvalidOrUnknownColumn {
+                                span: fk.span,
+                                column: adj_field_name,
+                            });
+                        continue;
+                    };
+
+                    if !is_valid_sql_type(&adj_field_sym.cidl_type) {
+                        self.sink
+                            .push(SemanticError::ForeignKeyReferencesInvalidOrUnknownColumn {
+                                span: fk.span,
+                                column: adj_field_name,
+                            });
+                    }
+
+                    adj_field_sym.cidl_type.clone()
+                };
+
+                if field_cidl_type.root_type() != adj_field_cidl_type.root_type() {
+                    let column = table
+                        .resolve(field_name, SymbolKind::ModelField, Some(model_name))
+                        .unwrap();
+                    let adj_column = table
+                        .resolve(adj_field_name, SymbolKind::ModelField, Some(adj_model_name))
+                        .unwrap();
+
+                    self.sink
+                        .push(SemanticError::ForeignKeyReferencesIncompatibleColumnType {
+                            span: fk.span,
+                            column: &column,
+                            adj_column: &adj_column,
+                        });
+                    continue;
+                }
+
+                fk_info.insert(*field_name, (adj_model_name, *adj_field_name, composite_id));
+
+                if !field_cidl_type.is_nullable() {
+                    // One To One: Person has a Dog ..(sql)=> Person has a fk to Dog
+                    // Dog must come before Person
+                    self.graph
+                        .entry(adj_model_name)
+                        .or_default()
+                        .push(model_name);
+                    *self.in_degree.entry(model_name).or_insert(0) += 1;
+                }
+            }
         }
 
         // Navigation properties
@@ -256,185 +400,13 @@ impl<'src, 'p> ModelAnalysis<'src, 'p> {
         model.navigation_fields = navigation_properties;
     }
 
-    /// Validates a foreign key and populates fk_info map
-    #[allow(clippy::too_many_arguments)]
-    #[inline(always)]
-    fn foreign_key(
-        &mut self,
-        model_block: &'p ModelBlock<'src>,
-        columns: &HashSet<&'src str>,
-        fk: &'p ForeignKeyTag<'src>,
-        fk_columns_seen: &mut HashSet<&'src str>,
-        fk_info: &mut HashMap<&'src str, (&'src str, &'src str, Option<usize>)>,
-        composite_counter: &mut usize,
-        table: &mut SymbolTable<'src, 'p>,
-        model_blocks: &HashMap<&'src str, &'p ModelBlock<'src>>,
-    ) {
-        let model_name = model_block.symbol.name;
-
-        // Check that the adjacent model exists
-        let Some(adj_model_block) = model_blocks.get(fk.adj_model) else {
-            self.sink
-                .push(SemanticError::UnresolvedSymbol { span: fk.span });
-            return;
-        };
-
-        if fk.adj_model == model_name {
-            self.sink.push(SemanticError::ForeignKeyReferencesSelf {
-                model: &model_block.symbol,
-                foreign_key: fk.span,
-            });
-            return;
-        }
-
-        // Must belong to the same database
-        if model_block.d1_binding.as_ref().map(|t| &t.env_binding)
-            != adj_model_block.d1_binding.as_ref().map(|t| &t.env_binding)
-        {
-            self.sink
-                .push(SemanticError::ForeignKeyReferencesDifferentDatabase {
-                    span: fk.span,
-                    binding: adj_model_block
-                        .d1_binding
-                        .as_ref()
-                        .map(|t| t.env_binding)
-                        .unwrap_or_default(),
-                });
-            return;
-        }
-
-        let first_ref_field = &fk.references.first().unwrap().0;
-        let Some(first_ref_sym) =
-            table.resolve(first_ref_field, SymbolKind::ModelField, Some(model_name))
-        else {
-            self.sink
-                .push(SemanticError::ForeignKeyReferencesInvalidOrUnknownColumn {
-                    span: fk.span,
-                    column: first_ref_field,
-                });
-            return;
-        };
-        let is_nullable = first_ref_sym.cidl_type.is_nullable();
-
-        let is_composite = fk.references.len() > 1;
-        let composite_id = if is_composite {
-            let id = *composite_counter;
-            *composite_counter += 1;
-            Some(id)
-        } else {
-            None
-        };
-
-        let adj_model_name = fk.adj_model;
-
-        for (field_name, adj_field_name) in &fk.references {
-            // Validate the field from this model
-            let field_cidl_type = {
-                // Field should be a column on this model
-                if !columns.contains(field_name) {
-                    self.sink
-                        .push(SemanticError::ForeignKeyReferencesInvalidOrUnknownColumn {
-                            span: fk.span,
-                            column: field_name,
-                        });
-                    continue;
-                }
-
-                let Some(field_sym) =
-                    table.resolve(field_name, SymbolKind::ModelField, Some(model_name))
-                else {
-                    self.sink
-                        .push(SemanticError::ForeignKeyReferencesInvalidOrUnknownColumn {
-                            span: fk.span,
-                            column: field_name,
-                        });
-                    continue;
-                };
-
-                // A column cannot be in multiple foreign keys
-                if !fk_columns_seen.insert(field_name) {
-                    self.sink
-                        .push(SemanticError::ForeignKeyColumnAlreadyInForeignKey {
-                            span: fk.span,
-                            column: &field_sym,
-                        });
-                }
-
-                if field_sym.cidl_type.is_nullable() != is_nullable {
-                    self.sink
-                        .push(SemanticError::ForeignKeyInconsistentNullability {
-                            span: fk.span,
-                            first_column: &first_ref_sym,
-                            second_column: &field_sym,
-                        });
-                }
-
-                field_sym.cidl_type.clone()
-            };
-
-            // Validate the field from the adjacent model
-            let adj_field_cidl_type = {
-                let Some(adj_field_sym) =
-                    table.resolve(adj_field_name, SymbolKind::ModelField, Some(adj_model_name))
-                else {
-                    self.sink
-                        .push(SemanticError::ForeignKeyReferencesInvalidOrUnknownColumn {
-                            span: fk.span,
-                            column: adj_field_name,
-                        });
-                    continue;
-                };
-
-                if !is_valid_sql_type(&adj_field_sym.cidl_type) {
-                    self.sink
-                        .push(SemanticError::ForeignKeyReferencesInvalidOrUnknownColumn {
-                            span: fk.span,
-                            column: adj_field_name,
-                        });
-                }
-
-                adj_field_sym.cidl_type.clone()
-            };
-
-            if field_cidl_type.root_type() != adj_field_cidl_type.root_type() {
-                let column = table
-                    .resolve(field_name, SymbolKind::ModelField, Some(model_name))
-                    .unwrap();
-                let adj_column = table
-                    .resolve(adj_field_name, SymbolKind::ModelField, Some(adj_model_name))
-                    .unwrap();
-
-                self.sink
-                    .push(SemanticError::ForeignKeyReferencesIncompatibleColumnType {
-                        span: fk.span,
-                        column: &column,
-                        adj_column: &adj_column,
-                    });
-                continue;
-            }
-
-            // Store FK info for this column
-            fk_info.insert(*field_name, (adj_model_name, *adj_field_name, composite_id));
-
-            if !field_cidl_type.is_nullable() {
-                // One To One: Person has a Dog ..(sql)=> Person has a fk to Dog
-                // Dog must come before Person
-                self.graph
-                    .entry(adj_model_name)
-                    .or_default()
-                    .push(model_name);
-                *self.in_degree.entry(model_name).or_insert(0) += 1;
-            }
-        }
-    }
-
     fn nav(
         &mut self,
         model_block: &'p ModelBlock<'src>,
         nav: &'p NavigationTag<'src>,
         nav_fields_seen: &mut HashSet<&'src str>,
         table: &mut SymbolTable<'src, 'p>,
-        model_blocks: &HashMap<&'src str, &'p ModelBlock<'src>>,
+        model_blocks: &BTreeMap<&'src str, &'p ModelBlock<'src>>,
     ) -> Option<NavigationField<'src>> {
         let model_name = model_block.symbol.name;
 

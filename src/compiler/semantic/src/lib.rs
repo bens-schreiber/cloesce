@@ -226,10 +226,7 @@ impl<'src, 'p> SymbolTable<'src, 'p> {
 }
 
 pub struct SemanticAnalysis;
-impl<'src, 'p> SemanticAnalysis
-where
-    'src: 'p,
-{
+impl<'src, 'p> SemanticAnalysis {
     pub fn analyze(parse: &'p ParseAst<'src>) -> (CloesceAst<'src>, Vec<SemanticError<'src, 'p>>) {
         let mut sink = ErrorSink::new();
         let mut table = SymbolTable::from_parse(parse, &mut sink);
@@ -241,7 +238,7 @@ where
                 .models
                 .iter()
                 .map(|m| (m.symbol.name, m))
-                .collect::<HashMap<&str, &ModelBlock>>();
+                .collect::<BTreeMap<&str, &ModelBlock>>();
 
             match ModelAnalysis::default().analyze(model_blocks, &mut table) {
                 Ok(models) => models,

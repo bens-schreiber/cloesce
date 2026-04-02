@@ -129,7 +129,7 @@ pub enum Token<'src> {
     Error,
 }
 
-pub struct LexSource<'src> {
+pub struct LexTarget<'src> {
     /// The full program source string.
     pub src: &'src str,
 
@@ -195,7 +195,7 @@ impl<'src> CloesceLexer {
         (tokens, errors)
     }
 
-    pub fn lex(targets: impl IntoIterator<Item = LexSource<'src>>) -> LexResult<'src> {
+    pub fn lex(targets: impl IntoIterator<Item = LexTarget<'src>>) -> LexResult<'src> {
         let mut file_table = FileTable {
             table: HashMap::new(),
         };
