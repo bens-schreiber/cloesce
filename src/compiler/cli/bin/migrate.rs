@@ -11,7 +11,7 @@ use codegen::wrangler::WranglerGenerator;
 use migrations::{MigrationsDilemma, MigrationsGenerator, MigrationsIntent};
 
 #[derive(Parser)]
-#[command(name = "compile", version = "0.0.3")]
+#[command(name = "migrate", version = "0.0.3")]
 struct Args {
     cidl_path: PathBuf,
 

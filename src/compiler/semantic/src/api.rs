@@ -207,7 +207,9 @@ impl<'src, 'p> ApiAnalysis<'src, 'p> {
                         .filter(|p| {
                             !matches!(
                                 p.cidl_type,
-                                CidlType::Inject { .. } | CidlType::DataSource { .. }
+                                CidlType::Inject { .. }
+                                    | CidlType::DataSource { .. }
+                                    | CidlType::Env
                             )
                         })
                         .count();

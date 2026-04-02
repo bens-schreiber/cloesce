@@ -1,0 +1,12 @@
+@d1(db)
+@crud(get, list, save)
+model WeatherReport {
+    [primary id]
+    id: int
+
+    title: string
+    description: string
+
+    [nav weatherEntries -> Weather::weatherReportId]
+    weatherEntries: Array<Weather>
+}

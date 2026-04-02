@@ -17,7 +17,7 @@ import {
   getNavigationPropertyCidlType,
 } from "../ast.js";
 import { InternalError, u8ToB64 } from "../common.js";
-import { IncludeTree, DeepPartial, KValue, Paginated } from "../ui/backend.js";
+import { DeepPartial, IncludeTree, KValue, Paginated } from "../ui/backend.js";
 
 /**
  * Defines a Data Source for a Model, which can include
@@ -94,7 +94,7 @@ function treeFromInclude<T>(
 }
 
 export class Orm {
-  private constructor(private env: unknown) {}
+  private constructor(private env: unknown) { }
 
   /**
    * Creates an instance of an `Orm`
@@ -234,8 +234,8 @@ export class Orm {
       from?: string | null;
       include?: Include<T>;
     } = {
-      from: null,
-    },
+        from: null,
+      },
   ): string {
     const { wasm } = RuntimeContainer.get();
     const fromRes = WasmResource.fromString(
@@ -277,9 +277,9 @@ export class Orm {
       keyParams?: Record<string, string>;
       include?: Include<T>;
     } = {
-      base: {},
-      keyParams: {},
-    },
+        base: {},
+        keyParams: {},
+      },
   ): Promise<T> {
     const { ast, constructorRegistry } = RuntimeContainer.get();
     if (!ast.models[ctor.name]) {

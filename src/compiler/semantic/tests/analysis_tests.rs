@@ -791,7 +791,7 @@ fn api_sets_media_types() {
         }
 
         api User {
-            get streamInputOutput(s: stream) -> stream
+            get streamInputOutput(e: env, s: stream) -> stream
             get jsonInputOutput(j: json) -> json
         }
     "#,

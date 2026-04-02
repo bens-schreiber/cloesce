@@ -334,5 +334,4 @@ fn yield_error(e: impl ToString) {
     yield_result(bytes);
 }
 
-#[cfg(not(target_arch = "wasm32"))]
 fn main() {}

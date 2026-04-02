@@ -1,7 +1,7 @@
 {
   "name": "cloesce",
   "version": "0.2.0",
-  "description": "Compile simple TypeScript classes into a full stack Cloudflare project.",
+  "description": "The \"full stack\" language for Cloudflare",
   "type": "module",
   "license": "Apache-2.0",
   "scripts": {
@@ -9,9 +9,10 @@
     "format:fix": "prettier --write .",
     "format": "prettier --check .",
     "typecheck": "tsc --noEmit",
-    "build": "tsc -p tsconfig.json && npm run copy-rs-orm-wasm && npm run copy-generator-wasm && chmod +x dist/cli.js",
-    "copy-rs-orm-wasm": "cp ../orm/target/wasm32-unknown-unknown/release/orm.wasm ./dist/orm.wasm",
-    "copy-generator-wasm": "cp ../generator/target/wasm32-wasip1/release/cli.wasm ./dist/generator.wasm"
+    "build": "tsc -p tsconfig.json && npm run copy-rs-orm-wasm && npm run copy-compiler-wasm && npm run copy-migrate-wasm && chmod +x dist/cli.js",
+    "copy-rs-orm-wasm": "cp ../../compiler/target/wasm32-unknown-unknown/release/orm.wasm ./dist/orm.wasm",
+    "copy-compiler-wasm": "cp ../../compiler/target/wasm32-wasip1/release/compile.wasm ./dist/compile.wasm",
+    "copy-migrate-wasm": "cp ../../compiler/target/wasm32-wasip1/release/migrate.wasm ./dist/migrate.wasm"
   },
   "dependencies": {
     "cmd-ts": "^0.15.0",
@@ -30,13 +31,9 @@
     "vitest": "^4.0.18"
   },
   "exports": {
-    "./backend": {
-      "types": "./dist/ui/backend.d.ts",
-      "import": "./dist/ui/backend.js"
-    },
-    "./config": {
-      "types": "./dist/config.d.ts",
-      "import": "./dist/config.js"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
     }
   },
   "bin": {
@@ -44,11 +41,8 @@
   },
   "typesVersions": {
     "*": {
-      "backend": [
-        "dist/ui/backend.d.ts"
-      ],
-      "config": [
-        "dist/config.d.ts"
+      ".": [
+        "dist/index.d.ts"
       ]
     }
   },

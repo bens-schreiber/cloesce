@@ -1,0 +1,28 @@
+@d1(db)
+model Weather {
+    [primary id]
+    id: int
+
+    [foreign weatherReportId -> WeatherReport::id]
+    [nav weatherReport -> weatherReportId]
+    weatherReportId: int
+    weatherReport: WeatherReport
+
+    dateTime: date
+    location: string
+    temperature: int
+    condition: string
+
+    @r2(bucket, "weather/photo/{id}")
+    photo: R2Object
+}
+
+api Weather {
+    post upload_photo(self, e: env, s: stream) -> void
+    get download_photo(@source(R2Only) self) -> stream
+}
+
+@internal
+source R2Only for Weather {
+    include { photo }
+}

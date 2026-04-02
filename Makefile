@@ -45,9 +45,6 @@ format-check:
 	npx --prefix $(TS_DIR) oxlint . --deny-warnings
 	npx --prefix $(E2E_DIR) oxlint . --deny-warnings
 
-.PHONY: build
-build: build-src
-
 .PHONY: build-src
 build-src:
 	@echo "CLOESCE: Installing dependencies for Rust and TypeScript code..."
@@ -55,24 +52,9 @@ build-src:
 	npm install --prefix $(E2E_DIR)
 
 	@echo "CLOESCE: Building Rust and TypeScript code..."
-	cargo build --target $(WASM_TARGET) --release --manifest-path $(COMPILER_MANIFEST)
-	
-# Disabled for the time being since github actions is stupid
-#
-# 	@if command -v wasm-opt >/dev/null 2>&1; then \
-# 		echo "CLOESCE: Optimizing WASM with wasm-opt..."; \
-# 		WASM_FEATURE_FLAGS="--enable-bulk-memory --enable-sign-ext"; \
-# 		if wasm-opt --help | grep -q -- "--all-features"; then \
-# 			WASM_FEATURE_FLAGS="--all-features"; \
-# 		fi; \
-# 		wasm-opt -Oz $$WASM_FEATURE_FLAGS --strip-debug --strip-producers \
-# 			$(ORM_DIR)/target/$(WASM_TARGET)/release/orm.wasm \
-# 			-o $(ORM_DIR)/target/$(WASM_TARGET)/release/orm.wasm; \
-# 	else \
-# 		echo "CLOESCE: wasm-opt not found, skipping WASM optimization (https://github.com/WebAssembly/binaryen)"; \
-# 	fi
+	cargo build --target $(WASI_TARGET) --release --manifest-path $(COMPILER_DIR)/cli/Cargo.toml
+	cargo build --target $(WASM_TARGET) --release --manifest-path $(COMPILER_DIR)/orm/Cargo.toml
 
-	cargo build --target $(WASI_TARGET) --release --manifest-path $(COMPILER_MANIFEST)
 	npm run build --prefix $(TS_DIR)
 
 .PHONY: test

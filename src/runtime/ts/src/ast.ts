@@ -1,4 +1,4 @@
-/** NOTE: These definitions mirror the definitions in the Generator */
+/** NOTE: These definitions mirror the definitions in the Compiler */
 
 /**
  * Kinds of CRUD operations supported for a model.

@@ -57,7 +57,7 @@ export class WasmResource {
     private wasm: OrmWasmExports,
     public ptr: number,
     public len: number,
-  ) {}
+  ) { }
 
   free() {
     this.wasm.dealloc(this.ptr, this.len);
