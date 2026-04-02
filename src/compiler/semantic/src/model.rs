@@ -259,7 +259,7 @@ impl<'src, 'p> ModelAnalysis<'src, 'p> {
                         self.sink
                             .push(SemanticError::ForeignKeyColumnAlreadyInForeignKey {
                                 span: fk.span,
-                                column: &field_sym,
+                                column: field_sym,
                             });
                     }
 
@@ -267,8 +267,8 @@ impl<'src, 'p> ModelAnalysis<'src, 'p> {
                         self.sink
                             .push(SemanticError::ForeignKeyInconsistentNullability {
                                 span: fk.span,
-                                first_column: &first_ref_sym,
-                                second_column: &field_sym,
+                                first_column: first_ref_sym,
+                                second_column: field_sym,
                             });
                     }
 
@@ -310,8 +310,8 @@ impl<'src, 'p> ModelAnalysis<'src, 'p> {
                     self.sink
                         .push(SemanticError::ForeignKeyReferencesIncompatibleColumnType {
                             span: fk.span,
-                            column: &column,
-                            adj_column: &adj_column,
+                            column,
+                            adj_column,
                         });
                     continue;
                 }

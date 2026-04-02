@@ -94,7 +94,7 @@ impl<'src, 'p> SymbolTable<'src, 'p> {
             ..Default::default()
         });
 
-        self.table.get(&key).map(|v| *v)
+        self.table.get(&key).copied()
     }
 
     /// Creates a [SymbolTable] from a [ParseAst], catching [CompilerErrorKind::DuplicateSymbol]'s

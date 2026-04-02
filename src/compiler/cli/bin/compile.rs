@@ -77,7 +77,7 @@ fn compile() -> Result<(), String> {
 
     // Semantic
     let (ast, errors) = SemanticAnalysis::analyze(&parse.ast);
-    if errors.len() > 0 {
+    if !errors.is_empty() {
         for error in &errors {
             error.display_error(&lexed.file_table);
         }

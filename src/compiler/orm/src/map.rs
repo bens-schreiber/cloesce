@@ -69,7 +69,10 @@ pub fn map_sql(
             // Set scalar columns
             for col in &model.columns {
                 let name = &col.field.name;
-                let val = row.get(name.as_ref()).or_else(|| row.get(name.as_ref())).cloned();
+                let val = row
+                    .get(name.as_ref())
+                    .or_else(|| row.get(name.as_ref()))
+                    .cloned();
                 if let Some(v) = val {
                     m.insert(name.to_string(), v);
                 }
@@ -172,12 +175,15 @@ fn process_navigation_properties(
             if matches!(nested_nav_prop.kind, NavigationFieldKind::OneToMany { .. })
                 || matches!(nested_nav_prop.kind, NavigationFieldKind::ManyToMany)
             {
-                nested_model_json.insert(nested_nav_prop.field.name.to_string(), Value::Array(vec![]));
+                nested_model_json
+                    .insert(nested_nav_prop.field.name.to_string(), Value::Array(vec![]));
             }
         }
 
         // Recursively process the nested model if it's in the include tree
-        if let Some(Value::Object(nested_include_tree)) = include_tree.get(nav_prop.field.name.as_ref()) {
+        if let Some(Value::Object(nested_include_tree)) =
+            include_tree.get(nav_prop.field.name.as_ref())
+        {
             let prefix = if prefix.is_empty() {
                 nav_prop.field.name.to_string()
             } else {

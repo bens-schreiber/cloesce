@@ -170,7 +170,7 @@ impl MigrationsIntent for MigrationsCli {
             MigrationsDilemma::RenameOrDropModel {
                 model_name,
                 options,
-            } => Self::rename_or_drop(&model_name, options, "model"),
+            } => Self::rename_or_drop(model_name, options, "model"),
             MigrationsDilemma::RenameOrDropColumn {
                 model_name,
                 column_name: attribute_name,

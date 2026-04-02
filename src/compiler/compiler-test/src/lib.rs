@@ -67,7 +67,7 @@ pub fn src_to_ast(src: &str) -> CloesceAst<'_> {
     }
 
     let (result, errors) = SemanticAnalysis::analyze(&result.ast);
-    if errors.len() > 0 {
+    if !errors.is_empty() {
         for error in &errors {
             error.display_error(&lexed.file_table);
         }

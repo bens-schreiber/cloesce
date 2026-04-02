@@ -10,7 +10,7 @@ impl DisplayError for SemanticError<'_, '_> {
     }
 }
 
-fn span_parts<'a>(span: &Span, file_table: &'a FileTable) -> (String, std::ops::Range<usize>) {
+fn span_parts(span: &Span, file_table: &FileTable) -> (String, std::ops::Range<usize>) {
     let (_, path) = file_table.resolve(span.context);
     (path.display().to_string(), span.start..span.end)
 }
