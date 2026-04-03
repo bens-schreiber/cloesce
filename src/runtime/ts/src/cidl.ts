@@ -87,8 +87,6 @@ export interface Model {
   r2_fields: KvR2Field[];
   apis: ApiMethod[];
   cruds: CrudKind[];
-
-  // Assigned at runtime 
   data_sources: Record<string, DataSource>;
 }
 
@@ -107,11 +105,24 @@ export interface IncludeTree {
   [key: string]: IncludeTree;
 }
 
+export interface DataSourceMethod {
+  parameters: Field[];
+}
 
-export interface DataSource {
-  include: IncludeTree;
+export interface DataSourceImpl {
+  tree: IncludeTree;
   get?: (env: any, ...args: unknown[]) => D1PreparedStatement;
   list?: (env: any, ...args: unknown[]) => D1PreparedStatement;
+}
+
+export interface DataSource {
+  name: string;
+  list?: DataSourceMethod;
+  get?: DataSourceMethod;
+  is_internal: boolean;
+
+  // Generated at runtime, not serialized.
+  gen: DataSourceImpl;
 }
 
 export interface WranglerEnv {
@@ -129,9 +140,8 @@ export interface Cidl {
 }
 
 /** @internal */
-export function getNavigationCidlType(
-  nav: NavigationField,
-): CidlType {
-  return typeof nav.kind === "object" && "OneToOne" in nav.kind ? { Object: { name: nav.model_reference } }
+export function getNavigationCidlType(nav: NavigationField): CidlType {
+  return typeof nav.kind === "object" && "OneToOne" in nav.kind
+    ? { Object: { name: nav.model_reference } }
     : { Array: { Object: { name: nav.model_reference } } };
 }

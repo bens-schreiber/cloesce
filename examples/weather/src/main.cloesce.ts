@@ -2,7 +2,7 @@ import { HttpResult } from "cloesce";
 import { ExecutionContext } from "@cloudflare/workers-types";
 import { Cloesce } from "../.cloesce/backend";
 
-export default async function fetch(request: Request, env: Cloesce.Env, ctx: ExecutionContext): Promise<Response> {
+export default async function fetch(request: Request, env: Cloesce.Env, _ctx: ExecutionContext): Promise<Response> {
     // preflight
     if (request.method === "OPTIONS") {
         return HttpResult.ok(200, undefined, {

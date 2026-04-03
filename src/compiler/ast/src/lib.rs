@@ -232,18 +232,29 @@ pub enum CrudKind {
     Save,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct DataSourceMethod<'src> {
+    #[serde(borrow)]
     pub parameters: Vec<Field<'src>>,
+
+    #[serde(skip)]
     pub raw_sql: String,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct DataSource<'src> {
+    #[serde(borrow)]
     pub name: &'src str,
+
+    #[serde(skip)]
     pub tree: IncludeTree<'src>,
+
+    #[serde(borrow)]
     pub list: Option<DataSourceMethod<'src>>,
+
+    #[serde(borrow)]
     pub get: Option<DataSourceMethod<'src>>,
+
     pub is_internal: bool,
 }
 
@@ -324,7 +335,6 @@ pub struct Model<'src> {
     #[serde(borrow)]
     pub apis: Vec<ApiMethod<'src>>,
 
-    #[serde(skip)]
     pub data_sources: Vec<DataSource<'src>>,
 
     pub cruds: Vec<CrudKind>,

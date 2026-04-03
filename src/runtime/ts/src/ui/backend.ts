@@ -34,14 +34,21 @@ export class KValue<V> {
   }
 }
 
-export type Primitive = string | number | boolean | bigint | symbol | null | undefined;
+export type Primitive =
+  | string
+  | number
+  | boolean
+  | bigint
+  | symbol
+  | null
+  | undefined;
 export type IncludeTree<T> = T extends Primitive
   ? never
   : {
-    [K in keyof T]?: T[K] extends (infer U)[]
-    ? IncludeTree<NonNullable<U>>
-    : IncludeTree<NonNullable<T[K]>>;
-  };
+      [K in keyof T]?: T[K] extends (infer U)[]
+        ? IncludeTree<NonNullable<U>>
+        : IncludeTree<NonNullable<T[K]>>;
+    };
 
 export interface Paginated<T> {
   results: T[];
@@ -71,7 +78,7 @@ export class HttpResult<T = unknown> {
     public data?: T,
     public message?: string,
     public mediaType?: MediaType,
-  ) { }
+  ) {}
 
   static ok<T>(status: number, data?: T, init?: HeadersInit): HttpResult<T> {
     const headers: Headers = new Headers(init);
@@ -147,8 +154,8 @@ export class HttpResult<T = unknown> {
 type DeepPartialInner<T> = T extends (infer U)[]
   ? DeepPartialInner<U>[]
   : T extends object
-  ? { [K in keyof T]?: DeepPartialInner<T[K]> }
-  : T | (null extends T ? null : never);
+    ? { [K in keyof T]?: DeepPartialInner<T[K]> }
+    : T | (null extends T ? null : never);
 
 /**
  * Recursively makes all properties of a type optional, including nested objects and arrays.

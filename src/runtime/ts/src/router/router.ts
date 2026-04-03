@@ -16,9 +16,10 @@ import {
 import { Either, InternalError } from "../common.js";
 import { Orm, KeysOfType, HttpResult } from "../ui/backend.js";
 import { hydrateType } from "./orm.js";
+import { crudRoute } from "./crud.js";
 
 const ENV_TAG = "$$env";
-export type DependencyKey = { tag: string; } | Function;
+export type DependencyKey = { tag: string } | Function;
 
 /**
  * Dependency injection container, mapping an object type name to an instance of that object.
@@ -65,17 +66,10 @@ export class RuntimeContainer {
     public readonly workerUrl: string,
   ) { }
 
-  static async init(
-    ast: Cidl,
-    workerUrl: string,
-  ) {
+  static async init(ast: Cidl, workerUrl: string) {
     if (this.instance) return;
     const wasmAbi = await loadOrmWasm(ast);
-    this.instance = new RuntimeContainer(
-      ast,
-      wasmAbi,
-      workerUrl,
-    );
+    this.instance = new RuntimeContainer(ast, wasmAbi, workerUrl);
   }
 
   static get(): RuntimeContainer {
@@ -109,7 +103,7 @@ export enum RouterError {
   UnknownRoute,
   NotImplemented,
   UnmatchedHttpVerb,
-  InstantiatedMethodMissingPrimaryKey,
+  InstantiatedMethodMissingGetParam,
   InstantiatedMethodMissingKeyParam,
   RequestMissingBody,
   RequestBodyMissingParameters,
@@ -120,10 +114,7 @@ export enum RouterError {
 }
 
 export class CloesceApp {
-  public static async init(
-    cidl: Cidl,
-    workerUrl: string,
-  ): Promise<CloesceApp> {
+  public static async init(cidl: Cidl, workerUrl: string): Promise<CloesceApp> {
     await RuntimeContainer.init(cidl, workerUrl);
     return new CloesceApp();
   }
@@ -222,7 +213,9 @@ export class CloesceApp {
       }
 
       // Run init method
-      const serviceApi = this.apiRegistry.get(serviceMeta.name) as { init: (self: any) => Promise<HttpResult<void> | void> } | undefined;
+      const serviceApi = this.apiRegistry.get(serviceMeta.name) as
+        | { init: (self: any) => Promise<HttpResult<void> | void> }
+        | undefined;
       if (serviceApi?.init) {
         const res = await serviceApi.init(service);
         if (res) {
@@ -234,7 +227,7 @@ export class CloesceApp {
     }
 
     // Route match
-    const routeRes = matchRoute(request, ast, workerUrl, this.apiRegistry);
+    const routeRes = matchRoute(request, ast, workerUrl, this.apiRegistry, env);
     if (routeRes.isLeft()) {
       return routeRes.value;
     }
@@ -258,13 +251,7 @@ export class CloesceApp {
     }
 
     // Request validation
-    const validation = await validateRequest(
-      request,
-      wasm,
-      ast,
-      env,
-      route,
-    );
+    const validation = await validateRequest(request, wasm, ast, env, route);
     if (validation.isLeft()) {
       return validation.value;
     }
@@ -300,11 +287,7 @@ export class CloesceApp {
    * @returns A Response object representing the result of the request.
    */
   public async run(request: Request, env: any): Promise<Response> {
-    const {
-      ast,
-      wasm,
-      workerUrl,
-    } = RuntimeContainer.get();
+    const { ast, wasm, workerUrl } = RuntimeContainer.get();
 
     // DI will always contain the WranglerEnv and Request.
     const di = new DependencyContainer();
@@ -360,16 +343,19 @@ export class CloesceApp {
 }
 
 /** @internal */
-export type ApiImplementation = (...args: unknown[]) => Promise<unknown> | unknown;
+export type ApiImplementation = (
+  ...args: unknown[]
+) => Promise<unknown> | unknown;
 
 /** @internal */
 export type MatchedRoute = {
   kind: "model" | "service";
   namespace: string;
   method: ApiMethod;
-  impl: ApiImplementation;
-  primaryKeyValues: Record<string, string>;
+  getParamValues: Record<string, string>;
   keyFields: Record<string, string>;
+  impl: ApiImplementation;
+  dataSource?: DataSource;
   model?: Model;
   service?: Service;
 };
@@ -382,6 +368,7 @@ function matchRoute(
   ast: Cidl,
   workerUrl: string,
   registry: Map<string, any>,
+  env: any,
 ): Either<HttpResult, MatchedRoute> {
   const url = new URL(request.url);
   const parts = url.pathname.split("/").filter(Boolean);
@@ -390,7 +377,8 @@ function matchRoute(
   // Error state: We expect an exact request format, and expect that the model
   // and are apart of the CIDL
   const notFound = (c: RouterError) => exit(404, c, "Unknown route");
-  const notImplemented = () => exit(501, RouterError.NotImplemented, "Not implemented");
+  const notImplemented = () =>
+    exit(501, RouterError.NotImplemented, "Not implemented");
 
   for (const p of prefix) {
     if (parts.shift() !== p) return notFound(RouterError.UnknownPrefix);
@@ -400,63 +388,29 @@ function matchRoute(
     return notFound(RouterError.UnknownPrefix);
   }
 
-  // Route format: /{namespace}/...{id}/{method}
+  // instantiated method route format: /{namespace}/{dataSourceGetParams}/{keyFields}/{method}
+  // static/service method route format: /{namespace}/{method}
   const namespace = parts[0];
   const methodName = parts[parts.length - 1];
-  const id =
-    parts.length > 2
-      ? parts.slice(1, parts.length - 1).map(decodeURIComponent)
-      : [];
-
-  const model = ast.models[namespace];
-  if (model) {
-    const method = model.apis.find((a) => a.name === methodName);
-    if (!method) return notFound(RouterError.UnknownRoute);
-
-    if (request.method.toLowerCase() !== method.http_verb.toLowerCase()) {
-      return notFound(RouterError.UnmatchedHttpVerb);
-    }
-
-    const impl = registry.get(model.name)?.[method.name] as ((...args: unknown[]) => Promise<unknown> | unknown) | undefined;
-    if (!impl) {
-      return notImplemented();
-    }
-
-    const numPrimaryKeys = model.primary_columns.length;
-    const primaryKeyValues: Record<string, string> = {};
-
-    for (let i = 0; i < numPrimaryKeys; i++) {
-      const pkCol = model.primary_columns[i];
-      if (i < id.length) {
-        primaryKeyValues[pkCol.field.name] = id[i];
-      }
-    }
-
-    const keyFields = Object.fromEntries(
-      id.slice(numPrimaryKeys).map((v, i) => [model.key_fields[i], v]),
-    );
-
-    return Either.right({
-      kind: "model",
-      namespace,
-      method,
-      model,
-      impl,
-      primaryKeyValues,
-      keyFields,
-    });
-  }
 
   const service = ast.services[namespace];
   if (service) {
+    if (parts.length !== 2) {
+      return notFound(RouterError.UnknownRoute);
+    }
+
     const method = service.apis.find((a) => a.name === methodName);
-    if (!method || id.length > 0) return notFound(RouterError.UnknownRoute);
+    if (!method) {
+      return notFound(RouterError.UnknownRoute);
+    }
 
     if (request.method.toLowerCase() !== method.http_verb.toLowerCase()) {
       return notFound(RouterError.UnmatchedHttpVerb);
     }
 
-    const impl = registry.get(service.name)?.[method.name] as ((...args: unknown[]) => Promise<unknown> | unknown) | undefined;
+    const impl = registry.get(service.name)?.[method.name] as
+      | ApiImplementation
+      | undefined;
     if (!impl) {
       return notImplemented();
     }
@@ -465,14 +419,80 @@ function matchRoute(
       kind: "service",
       namespace,
       method,
-      service,
       impl,
-      primaryKeyValues: {},
+      getParamValues: {},
       keyFields: {},
+      service,
     });
   }
 
-  return notFound(RouterError.UnknownRoute);
+  const model = ast.models[namespace];
+  if (!model) {
+    return notFound(RouterError.UnknownRoute);
+  }
+
+  const method = model.apis.find((a) => a.name === methodName);
+  if (!method) {
+    return notFound(RouterError.UnknownRoute);
+  }
+  if (request.method.toLowerCase() !== method.http_verb.toLowerCase()) {
+    return notFound(RouterError.UnmatchedHttpVerb);
+  }
+
+  let impl =
+    registry.get(model.name)?.[method.name] ??
+    (crudRoute(model, method.name, env) as ApiImplementation | undefined);
+  if (!impl) {
+    return notImplemented();
+  }
+
+  if (method.is_static) {
+    if (parts.length !== 2) {
+      return notFound(RouterError.UnknownRoute);
+    }
+
+    return Either.right({
+      kind: "model",
+      namespace,
+      method,
+      impl,
+      getParamValues: {},
+      keyFields: {},
+      model,
+    });
+  }
+
+  // With N data source get params and M key fields, the id portion of the route
+  // should be N+M segments long, with the first N segments in the order of the data source get parameters
+  const dataSource = model.data_sources[method.data_source!];
+  const numGetParams = dataSource.get ? dataSource.get.parameters.length : 0;
+  const numKeyFields = model.key_fields.length;
+  if (parts.length !== 2 + numGetParams + numKeyFields) {
+    return notFound(RouterError.UnknownRoute);
+  }
+
+  const getParamValues: Record<string, string> = {};
+  for (let i = 0; i < numGetParams; i++) {
+    const param = dataSource.get!.parameters[i];
+    getParamValues[param.name] = parts[1 + i];
+  }
+
+  const keyFields: Record<string, string> = {};
+  for (let i = 0; i < numKeyFields; i++) {
+    const keyField = model.key_fields[i];
+    keyFields[keyField] = parts[1 + numGetParams + i];
+  }
+
+  return Either.right({
+    kind: "model",
+    namespace,
+    method,
+    impl,
+    getParamValues,
+    keyFields,
+    dataSource,
+    model,
+  });
 }
 
 /**
@@ -491,19 +511,15 @@ async function validateRequest(
   const invalidRequest = (c: RouterError) =>
     exit(400, c, "Invalid Request Body");
 
-  // Validate instantiated model ids
+  // Validate instantiated invocation
   if (route.kind === "model" && !route.method.is_static) {
     const model = route.model!;
 
-    // Validate all primary key columns are present
-    for (const pkCol of model.primary_columns) {
-      if (!(pkCol.field.name in route.primaryKeyValues)) {
-        return invalidRequest(RouterError.InstantiatedMethodMissingPrimaryKey);
+    // Validate all data source get parameters are present
+    for (const field of route.dataSource?.get?.parameters ?? []) {
+      if (!(field.name in route.getParamValues)) {
+        return invalidRequest(RouterError.InstantiatedMethodMissingGetParam);
       }
-    }
-
-    if (model.key_fields.length !== Object.keys(route.keyFields).length) {
-      return invalidRequest(RouterError.InstantiatedMethodMissingKeyParam);
     }
 
     for (const keyParam of model.key_fields) {
@@ -604,7 +620,8 @@ async function hydrate(
   }
 
   const meta = route.model!;
-  const dataSource: DataSource = meta.data_sources[route.method.data_source ?? "Default"];
+  const dataSource: DataSource =
+    meta.data_sources[route.method.data_source ?? "Default"];
   const orm = Orm.fromEnv(env);
 
   // Error state: If some outside force tweaked the database schema, the query may fail.
@@ -618,21 +635,34 @@ async function hydrate(
 
   try {
     let result = null;
-    if (dataSource.get === undefined) {
+    if (dataSource.gen.get === undefined) {
       // Must be a KV or R2 based model
-      result = await orm.getCustom(meta, null, {}, route.keyFields, dataSource.include as any);
+      result = await orm.hydrate(
+        meta,
+        {},
+        route.keyFields,
+        dataSource.gen.tree,
+      );
     } else {
-      const query = dataSource.get(...Object.values(route.primaryKeyValues));
-      result = await orm.getQuery(meta, query, dataSource.include as any, route.keyFields);
+      const query = dataSource.gen.get(
+        env,
+        ...Object.values(route.getParamValues),
+      );
+      result = await orm.getQuery(
+        meta,
+        query,
+        dataSource.gen.tree,
+        route.keyFields,
+      );
     }
 
-    // Result will only be null if the record does not exist for a D1 query.
+    // Result will only be null if the record does not exist for a D1 query
+    // (KV or R2 based models will just be empty, as that is a valid state).
     if (result === null) {
-      const pkValues = Object.values(route.primaryKeyValues).join(", ");
       return exit(
         404,
         RouterError.ModelNotFound,
-        `Model instance of type ${meta.name} with primary key (${pkValues}) not found`,
+        `Model instance of type ${meta.name} with id: ${JSON.stringify(route.getParamValues)} not found`,
       );
     }
 
@@ -660,10 +690,7 @@ async function methodDispatch(
     }
 
     // Assume injected parameter
-    const injected = resolveInjected(
-      di,
-      param.cidl_type,
-    );
+    const injected = resolveInjected(di, param.cidl_type);
     paramArray.push(injected);
   }
 
@@ -704,7 +731,10 @@ function exit(
  * Finds an injected dependency from the DI container.
  * @returns The injected dependency, or undefined if not found.
  */
-function resolveInjected(di: DependencyContainer, ty: CidlType): any | undefined {
+function resolveInjected(
+  di: DependencyContainer,
+  ty: CidlType,
+): any | undefined {
   let tag = null;
   if (typeof ty === "object" && "Inject" in ty) {
     tag = ty.Inject.name;

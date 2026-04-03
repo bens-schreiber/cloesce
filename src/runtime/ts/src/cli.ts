@@ -107,7 +107,9 @@ const cmds = subcommands({
             wranglerConfigPath,
             config.migrationsPath,
             config.workersUrl,
-            ...findCloesceFiles(config.srcPaths, root).map((p) => path.relative(root, p)),
+            ...findCloesceFiles(config.srcPaths, root).map((p) =>
+              path.relative(root, p),
+            ),
           ],
           wranglerConfigPath,
         };
@@ -230,9 +232,7 @@ async function compile(config: WasmConfig) {
   let instance = await WebAssembly.instantiate(mod, {
     wasi_snapshot_preview1: wasi.wasiImport,
   });
-  debug(
-    `Read and compiled wasm binary in ${Date.now() - readWasmStart}ms`,
-  );
+  debug(`Read and compiled wasm binary in ${Date.now() - readWasmStart}ms`);
   debug(`Executing WASM with args: ${config.args.join(" ")}`);
 
   try {
@@ -241,7 +241,9 @@ async function compile(config: WasmConfig) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error(`WASM execution failed for ${config.name}: ${msg}`);
   } finally {
-    debug(`Compilation ${config.name} completed in ${Date.now() - debugStart}ms`);
+    debug(
+      `Compilation ${config.name} completed in ${Date.now() - debugStart}ms`,
+    );
   }
 }
 
@@ -259,11 +261,9 @@ async function loadCloesceConfig(root: string): Promise<DefaultCloesceConfig> {
   debug(
     "Using default config since no cloesce.config.ts was found or failed to load.",
   );
-  return defaultConfig(
-    {
-      srcPaths: []
-    }
-  );
+  return defaultConfig({
+    srcPaths: [],
+  });
 
   async function _loadCloesceConfig(
     configTsPath: string,

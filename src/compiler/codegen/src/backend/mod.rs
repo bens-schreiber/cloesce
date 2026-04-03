@@ -20,14 +20,7 @@ impl BackendTemplate<'_> {
     }
 
     fn include_tree_to_js(&self, tree: &IncludeTree<'_>) -> String {
-        if tree.0.is_empty() {
-            return "{}".to_string();
-        }
-        let mut parts = Vec::new();
-        for (key, subtree) in &tree.0 {
-            parts.push(format!("{}: {}", key, self.include_tree_to_js(subtree)));
-        }
-        format!("{{ {} }}", parts.join(", "))
+        serde_json::to_string(&tree).unwrap()
     }
 }
 

@@ -9,12 +9,7 @@ import type {
 
 import { RuntimeContainer } from "./router.js";
 import { WasmResource, invokeOrmWasm } from "./wasm.js";
-import {
-  Model,
-  CidlType,
-  Cidl,
-  getNavigationCidlType,
-} from "../cidl.js";
+import { Model, CidlType, Cidl, getNavigationCidlType } from "../cidl.js";
 import { InternalError, u8ToB64 } from "../common.js";
 import { DeepPartial, IncludeTree, KValue, Paginated } from "../ui/backend.js";
 
@@ -22,8 +17,6 @@ export class Orm {
   private constructor(private env: unknown) { }
 
   static fromEnv(env: unknown): Orm {
-    // TODO: We could validate that `env` is of the correct type defined by the `＠WranglerEnv` class
-    // by putting the class definition in the Constructor Registry at compile time.
     return new Orm(env);
   }
 
@@ -37,7 +30,10 @@ export class Orm {
       JSON.stringify(d1Results.results),
       wasm,
     );
-    const includeTreeRes = WasmResource.fromString(JSON.stringify(includeTree), wasm);
+    const includeTreeRes = WasmResource.fromString(
+      JSON.stringify(includeTree),
+      wasm,
+    );
     const mapQueryRes = invokeOrmWasm(
       wasm.map,
       [WasmResource.fromString(meta.name, wasm), d1ResultsRes, includeTreeRes],
@@ -57,11 +53,11 @@ export class Orm {
     includeTree: IncludeTree<T>,
   ): string {
     const { wasm } = RuntimeContainer.get();
-    const fromRes = WasmResource.fromString(
-      JSON.stringify(from ?? null),
+    const fromRes = WasmResource.fromString(JSON.stringify(from ?? null), wasm);
+    const includeTreeRes = WasmResource.fromString(
+      JSON.stringify(includeTree),
       wasm,
     );
-    const includeTreeRes = WasmResource.fromString(JSON.stringify(includeTree), wasm);
     const selectQueryRes = invokeOrmWasm(
       wasm.select_model,
       [WasmResource.fromString(meta.name, wasm), fromRes, includeTreeRes],
@@ -106,7 +102,6 @@ export class Orm {
   // TODO: Better ORM error handling strategies
   async upsert<T extends object>(
     meta: Model,
-    db: D1Database | null,
     newModel: DeepPartial<T>,
     includeTree: IncludeTree<T>,
   ): Promise<T | null> {
@@ -171,9 +166,8 @@ export class Orm {
       },
     );
 
-    const queries = res.sql.map((s) =>
-      db!.prepare(s.query).bind(...s.values),
-    );
+    const db = (this.env as any).db as D1Database | undefined;
+    const queries = res.sql.map((s) => db!.prepare(s.query).bind(...s.values));
 
     // Concurrently execute SQL with KV uploads.
     const [batchRes] = await Promise.all([
@@ -283,42 +277,50 @@ export class Orm {
     );
 
     // Hydrate and return the upserted model
-    return await this.hydrate(meta, base, keyFields, includeTree);
-  }
-
-  // A get method that does not use a generated data source query, but takes a custom query instead.
-  async getCustom<T extends object>(
-    meta: Model,
-    db: D1Database | null,
-    primaryKey: Record<string, string>,
-    keyFields: Record<string, string>,
-    includeTree: IncludeTree<T>,
-  ): Promise<T | null> {
-    if (!db) {
-      return await this.hydrate(meta, {}, keyFields, includeTree);
-    }
-
-    const selectQuery = Orm.select(meta, null, includeTree);
-    const res = await db.prepare(selectQuery).bind(...Object.values(primaryKey)).first();
-    if (!res) {
-      return null;
-    }
-
-    return await this.hydrate(meta, res, keyFields, includeTree);
+    return await this.hydrate(meta, base, {}, includeTree);
   }
 
   async getQuery<T extends object>(
     meta: Model,
-    query: D1PreparedStatement,
+    query: D1PreparedStatement | null | undefined,
     includeTree: IncludeTree<T>,
     keyFields: Record<string, string>,
   ): Promise<T | null> {
+    if (!query || !meta.d1_binding) {
+      return await this.hydrate(meta, {}, keyFields, includeTree);
+    }
+
     const res = await query.first();
     if (!res) {
       return null;
     }
 
     return await this.hydrate(meta, res, keyFields, includeTree);
+  }
+
+  async listQuery<T extends object>(
+    meta: Model,
+    query: D1PreparedStatement | null | undefined,
+    includeTree: IncludeTree<T>,
+  ): Promise<T[]> {
+    if (!query || !meta.d1_binding) {
+      // Not supported for non D1 models
+      return [];
+    }
+    const rows = await query.all();
+    const results = Orm.map(meta, rows, includeTree);
+    await Promise.all(
+      results.map(async (modelJson, index) => {
+        results[index] = (await this.hydrate(
+          meta,
+          modelJson,
+          {},
+          includeTree,
+        )) as T;
+      }),
+    );
+
+    return results;
   }
 }
 
