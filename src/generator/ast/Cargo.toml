@@ -4,7 +4,7 @@ version = "0.0.1"
 edition = "2024"
 
 [dependencies]
-rustc-hash = "2.1.1"
+rustc-hash = "2.1.2"
 indexmap = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
