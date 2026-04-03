@@ -149,12 +149,21 @@ export class {{ model.name }} {
     {{ param.name }}: {{ self.map_type(&param.cidl_type) }},
 {%- endif %}
 {%- endfor %}
+{%- if !api.is_static %}
+{%- for extra in self.ds_extra_params(model, api) %}
+    {{ extra.name }}: {{ self.map_type(&extra.cidl_type) }},
+{%- endfor %}
+{%- endif %}
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<{% if !self.is_stream(&api.return_type) %}{{ self.map_type(&api.return_type) }}{% else %}Response{% endif %}>> {
 {%- if !api.is_static %}
     const id = [
-{%- for col in &model.primary_columns %}
-      encodeURIComponent(String(this.{{ col.field.name }})),
+{%- for param in self.ds_get_params(model, api) %}
+{%- if self.is_ds_extra_param(model, api, &param.name) %}
+      encodeURIComponent(String({{ param.name }})),
+{%- else %}
+      encodeURIComponent(String(this.{{ param.name }})),
+{%- endif %}
 {%- endfor %}
 {%- for key in &model.key_fields %}
       encodeURIComponent(String(this.{{ key }})),

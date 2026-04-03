@@ -1,4 +1,4 @@
-import { CloesceAst } from "../ast.js";
+import { Cidl } from "../cidl.js";
 import { Either } from "../common.js";
 
 // NOTE: Requires the ORM binary to have been built
@@ -80,7 +80,7 @@ export class WasmResource {
 }
 
 /** @internal */
-export async function loadOrmWasm(ast: CloesceAst): Promise<OrmWasmExports> {
+export async function loadOrmWasm(ast: Cidl): Promise<OrmWasmExports> {
   // Load WASM
   let exports: OrmWasmExports;
   if (

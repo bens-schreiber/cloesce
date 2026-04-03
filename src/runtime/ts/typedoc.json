@@ -3,6 +3,7 @@
   "out": "typedocs",
   "name": "Cloesce",
   "exclude": [
+    "src/cidl.ts",
     "src/extractor/**/*",
     "src/global.d.ts",
     "src/cli.ts",

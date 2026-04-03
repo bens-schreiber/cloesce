@@ -1,4 +1,4 @@
-import { MediaType } from "../ast.js";
+import type { MediaType } from "../cidl.js";
 import { u8ToB64 } from "../common.js";
 
 /**
@@ -6,8 +6,7 @@ import { u8ToB64 } from "../common.js";
  */
 export { CloesceApp, DependencyContainer } from "../router/router.js";
 export type { MiddlewareFn } from "../router/router.js";
-export type { CrudKind } from "../ast.js";
-export type { DataSource } from "../router/orm.js";
+export type { CrudKind } from "../cidl.js";
 export { Orm } from "../router/orm.js";
 export { R2ObjectBody } from "@cloudflare/workers-types";
 
@@ -87,7 +86,7 @@ export class HttpResult<T = unknown> {
   toResponse(): Response {
     let body: BodyInit;
     switch (this.mediaType) {
-      case MediaType.Json: {
+      case "Json": {
         this.headers.set("Content-Type", "application/json");
         body = JSON.stringify(this.data ?? {}, (_, v) => {
           // Convert Uint8Arrays to base64 strings
@@ -116,7 +115,7 @@ export class HttpResult<T = unknown> {
         });
         break;
       }
-      case MediaType.Octet: {
+      case "Octet": {
         this.headers.set("Content-Type", "application/octet-stream");
 
         // Assume proper BodyInit

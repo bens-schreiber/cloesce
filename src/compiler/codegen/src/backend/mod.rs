@@ -1,12 +1,12 @@
 use askama::Template;
-use ast::{CidlType, CloesceAst};
+use ast::{CidlType, CloesceAst, IncludeTree};
 
 use crate::mappers::{LanguageTypeMapper, TypeScriptMapper};
 
 #[derive(Template)]
 #[template(path = "backend.ts.jinja", escape = "none")]
-struct BackendTemplate<'a> {
-    ast: &'a CloesceAst<'a>,
+struct BackendTemplate<'src> {
+    ast: &'src CloesceAst<'src>,
     mapper: TypeScriptMapper,
 }
 
@@ -17,6 +17,17 @@ impl BackendTemplate<'_> {
 
     fn is_crud_method(&self, name: &str) -> bool {
         name == "$get" || name == "$save" || name == "$list"
+    }
+
+    fn include_tree_to_js(&self, tree: &IncludeTree<'_>) -> String {
+        if tree.0.is_empty() {
+            return "{}".to_string();
+        }
+        let mut parts = Vec::new();
+        for (key, subtree) in &tree.0 {
+            parts.push(format!("{}: {}", key, self.include_tree_to_js(subtree)));
+        }
+        format!("{{ {} }}", parts.join(", "))
     }
 }
 

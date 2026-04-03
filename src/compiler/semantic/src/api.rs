@@ -98,8 +98,14 @@ impl<'src, 'p> ApiAnalysis<'src, 'p> {
         // Validate parameters
         let (parameters, parameters_media) = self.parameters(method, table);
 
+        let namespace_is_model = table
+            .resolve(namespace, SymbolKind::ModelDecl, None)
+            .is_some();
+
         let data_source = if method.is_static {
             None
+        } else if namespace_is_model {
+            Some(data_source_name.unwrap_or("Default"))
         } else {
             data_source_name
         };

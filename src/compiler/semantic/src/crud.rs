@@ -14,6 +14,17 @@ impl CrudExpansion {
                         let mut seen = HashSet::new();
                         let mut parameters = vec![];
 
+                        // Include all key fields
+                        for &name in &model.key_fields {
+                            if seen.insert(name.into()) {
+                                parameters.push(Field {
+                                    name: name.into(),
+                                    cidl_type: CidlType::String,
+                                });
+                            }
+                        }
+
+                        // Include parameters from all data sources, ensuring no duplicates
                         for ds in &model.data_sources {
                             if let Some(get) = &ds.get {
                                 for param in &get.parameters {
@@ -27,6 +38,7 @@ impl CrudExpansion {
                             }
                         }
 
+                        // Last parameter is always the data source
                         parameters.push(Field {
                             name: "__datasource".into(),
                             cidl_type: CidlType::DataSource {
@@ -49,6 +61,7 @@ impl CrudExpansion {
                         let mut seen = HashSet::new();
                         let mut parameters = vec![];
 
+                        // Include parameters from all data sources, ensuring no duplicates
                         for ds in &model.data_sources {
                             if let Some(list) = &ds.list {
                                 for param in &list.parameters {
@@ -62,6 +75,7 @@ impl CrudExpansion {
                             }
                         }
 
+                        // Last parameter is always the data source
                         parameters.push(Field {
                             name: "__datasource".into(),
                             cidl_type: CidlType::DataSource {

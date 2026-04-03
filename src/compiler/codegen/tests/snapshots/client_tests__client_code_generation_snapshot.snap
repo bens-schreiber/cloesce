@@ -180,6 +180,43 @@ export class ModelWithCompositePk {
     return res;
   }
 }
+export class ModelWithCustomDs {
+  id: number;
+  name: string;
+  async instanceMethod(
+    input: string,
+    externalParam: string,
+    fetchImpl: typeof fetch = fetch
+  ): Promise<HttpResult<string>> {
+    const id = [
+      encodeURIComponent(String(this.id)),
+      encodeURIComponent(String(externalParam)),
+    ].join("/");
+    const baseUrl = new URL(
+      `http://example.com/path/to/api/ModelWithCustomDs/${id}/instanceMethod`
+    );
+    const payload: any = {};
+    payload["input"] = input;
+
+    const res = await fetchImpl(baseUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: requestBody(MediaType.Json, payload),
+    });
+
+    return await HttpResult.fromResponse(
+      res,
+      MediaType.Json,
+      undefined,
+      false
+    );
+  }
+
+  static fromJson(data: any): ModelWithCustomDs {
+    const res = Object.assign(new ModelWithCustomDs(), data);
+    return res;
+  }
+}
 export class OneToManyModel {
   id: number;
   oneToManyNav: BasicModel[];
@@ -258,7 +295,7 @@ export class ModelWithCruds {
   name: string;
   categoryId: number;
   static async $get(
-    args: DataSources.ModelWithCruds.$get.WithName | DataSources.ModelWithCruds.$get.Default,
+    args: DataSources.ModelWithCruds.$get.ByName | DataSources.ModelWithCruds.$get.Default,
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<ModelWithCruds>> {
     const baseUrl = new URL(
@@ -304,7 +341,7 @@ export class ModelWithCruds {
     );
   }
   static async $list(
-    args: DataSources.ModelWithCruds.$list.WithName | DataSources.ModelWithCruds.$list.Default,
+    args: DataSources.ModelWithCruds.$list.ByName | DataSources.ModelWithCruds.$list.Default,
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<ModelWithCruds[]>> {
     const baseUrl = new URL(
@@ -619,8 +656,8 @@ export class HttpResult<T = unknown> {
 export namespace DataSources {
   export namespace ModelWithCruds {
     export namespace $get {
-      export type WithName = {
-        kind: "WithName";
+      export type ByName = {
+        kind: "ByName";
         name: string;
       }
       export type Default = {
@@ -630,18 +667,18 @@ export namespace DataSources {
     }
     export type $save = {
       model: DeepPartial<ModelWithCruds>;
-      kind: "WithName" | "Default";
+      kind: "ByName" | "Default";
     }
     export namespace $list {
-      export type WithName = {
-        kind: "WithName";
+      export type ByName = {
+        kind: "ByName";
         name: string;
         limit: number;
       }
       export type Default = {
         kind: "Default";
-        lastSeen_id: number | null;
-        limit: number | null;
+        lastSeen_id: number;
+        limit: number;
       }
     }
   }

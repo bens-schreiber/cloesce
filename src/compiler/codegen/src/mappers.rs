@@ -32,7 +32,7 @@ impl TypeScriptMapper {
         }
 
         if ast.models.contains_key(name) {
-            format!("Cloesce.Models.{name}")
+            format!("Cloesce.Models.{name}.Type")
         } else if ast.services.contains_key(name) {
             format!("Cloesce.Services.{name}")
         } else if ast.poos.contains_key(name) {

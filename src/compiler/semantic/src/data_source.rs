@@ -184,6 +184,7 @@ impl<'src> DataSourceExpansion {
         }
     }
 
+    // Simple get by primary key
     fn build_default_get(model: &Model<'src>, include_sql: &String) -> DataSourceMethod<'src> {
         let parameters = model
             .primary_columns
@@ -192,10 +193,6 @@ impl<'src> DataSourceExpansion {
                 name: pk.field.name.clone(),
                 cidl_type: pk.field.cidl_type.clone(),
             })
-            .chain(model.key_fields.iter().map(|&key| Field {
-                name: key.into(),
-                cidl_type: CidlType::String,
-            }))
             .collect();
 
         let where_clause = if model.primary_columns.len() == 1 {
@@ -211,24 +208,15 @@ impl<'src> DataSourceExpansion {
         };
 
         let params = (0..model.primary_columns.len())
-            .map(|_| "?".to_string())
+            .enumerate()
+            .map(|(i, _)| format!("?{}", i + 1))
             .collect::<Vec<String>>()
             .join(", ");
 
         let raw_sql = if model.primary_columns.len() == 1 {
-            format!(
-                r#"
-                {include_sql}
-                WHERE {where_clause} = ?
-                "#
-            )
+            format!("{include_sql} WHERE {where_clause} = ?1")
         } else {
-            format!(
-                r#"
-                {include_sql}
-                WHERE ({where_clause}) = ({params})
-                "#
-            )
+            format!("{include_sql} WHERE ({where_clause}) = ({params})")
         };
 
         DataSourceMethod {
@@ -237,17 +225,18 @@ impl<'src> DataSourceExpansion {
         }
     }
 
+    // Seek pagination based on primary keys with a limit, ordered by primary key ascending.
     fn build_default_list(model: &Model<'src>, include_sql: &String) -> DataSourceMethod<'src> {
         let parameters = model
             .primary_columns
             .iter()
             .map(|pk| Field {
                 name: format!("lastSeen_{}", pk.field.name).into(),
-                cidl_type: CidlType::nullable(pk.field.cidl_type.clone()),
+                cidl_type: CidlType::Integer,
             })
             .chain(vec![Field {
                 name: "limit".into(),
-                cidl_type: CidlType::nullable(CidlType::Integer),
+                cidl_type: CidlType::Integer,
             }])
             .collect();
 
@@ -264,12 +253,13 @@ impl<'src> DataSourceExpansion {
         };
 
         let params = (0..model.primary_columns.len())
-            .map(|_| "?".to_string())
+            .enumerate()
+            .map(|(i, _)| format!("?{}", i + 1))
             .collect::<Vec<String>>()
             .join(", ");
 
         let where_expr = if model.primary_columns.len() == 1 {
-            format!("{where_clause} > ?")
+            format!("{where_clause} > ?1")
         } else {
             format!("({where_clause}) > ({params})")
         };
@@ -282,13 +272,9 @@ impl<'src> DataSourceExpansion {
             .join(" ASC, ")
             + " ASC";
 
-        let raw_sql = format!(
-            r#"
-                {include_sql}
-                WHERE {where_expr}
-                ORDER BY {order}
-                "#
-        );
+        let limit_param = model.primary_columns.len() + 1;
+        let raw_sql =
+            format!("{include_sql} WHERE {where_expr} ORDER BY {order} LIMIT ?{limit_param}");
 
         DataSourceMethod {
             parameters,
@@ -296,8 +282,14 @@ impl<'src> DataSourceExpansion {
         }
     }
 
-    /// Resolves `$parameterName` placeholders in the raw SQL to positional `?N` syntax for prepared statements.
+    /// Normalizes input and resolves `$parameterName` placeholders
+    /// to positional `?N` syntax for prepared statements.
     pub fn resolve_sql_params(method: &mut DataSourceMethod) {
+        method.raw_sql = method
+            .raw_sql
+            .split_whitespace()
+            .collect::<Vec<_>>()
+            .join(" ");
         for (i, param) in method.parameters.iter().enumerate() {
             let placeholder = format!("${}", param.name);
             let positional = format!("?{}", i + 1);
@@ -308,8 +300,8 @@ impl<'src> DataSourceExpansion {
     /// Creates a default [DataSource] for any model that doesn't have one,
     /// including default get/list SQL queries for models with D1 fields.
     ///
-    /// Creates a default [IncludeTree] with all KV, R2, 1:1, 1:N and M:N relationships by default.
-    /// Does not include relationships after a 1:N or M:N to avoid infinite trees.
+    /// Each data source has a default [IncludeTree] with all KV, R2, 1:1, 1:N and M:N relationships by default.
+    /// Does not include relationships after a 1:N or M:N to avoid explosion (of sql joins not the computer).
     pub fn expand(ast: &mut CloesceAst<'src>) {
         // For each model without a default DS, build one
         {

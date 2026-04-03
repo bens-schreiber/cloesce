@@ -169,16 +169,36 @@ model ModelWithCruds {
     categoryId: int
 }
 
-source WithName for ModelWithCruds {
+source ByName for ModelWithCruds {
     include {}
 
     sql get(name: string) {
-        "SELECT * FROM ModelWithCruds WHERE name = ?"
+        "SELECT * FROM ModelWithCruds WHERE name = $name"
     }
 
     sql list(name: string, limit: int) {
-        "SELECT * FROM ModelWithCruds WHERE name LIKE ? LIMIT ?"
+        "SELECT * FROM ModelWithCruds WHERE name LIKE $name LIMIT $limit"
     }
+}
+
+@d1(db)
+model ModelWithCustomDs {
+    [primary id]
+    id: int
+
+    name: string
+}
+
+source Custom for ModelWithCustomDs {
+    include {}
+
+    sql get(id: int, externalParam: string) {
+        "SELECT * FROM ModelWithCustomDs WHERE id = $id AND name LIKE $externalParam"
+    }
+}
+
+api ModelWithCustomDs {
+    post instanceMethod(@source(Custom) self, input: string) -> string
 }
 
 service BasicService {}

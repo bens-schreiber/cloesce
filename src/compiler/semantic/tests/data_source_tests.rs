@@ -669,3 +669,56 @@ async fn include_placeholder_expands_to_select(db: SqlitePool) {
     assert_eq!(row.get::<u32, _>("id"), 1);
     assert_eq!(row.get::<String, _>("title"), "hello");
 }
+
+#[test]
+fn api_method_defaults_to_default_data_source() {
+    // Act
+    let ast = src_to_ast(
+        r#"
+        env { db: d1 }
+
+        @d1(db)
+        model Item {
+            [primary id]
+            id: int
+        }
+
+        source Custom for Item {
+            include {}
+        }
+
+        api Item {
+            // Instantiated no explicit data source, should default to "Default"
+            get fetch(self) -> Item
+
+            // Instantiated explicit data source, should use "Custom"
+            post fetchCustom(@source(Custom) self) -> Item
+
+            // Static, should have no data source
+            post create() -> Item
+        }
+    "#,
+    );
+
+    let item = ast.models.get("Item").unwrap();
+
+    let fetch = item.apis.iter().find(|m| m.name == "fetch").unwrap();
+    assert_eq!(
+        fetch.data_source,
+        Some("Default"),
+        "non-static method without explicit data source should default to 'Default'"
+    );
+
+    let fetch_custom = item.apis.iter().find(|m| m.name == "fetchCustom").unwrap();
+    assert_eq!(
+        fetch_custom.data_source,
+        Some("Custom"),
+        "non-static method with explicit data source should use it"
+    );
+
+    let create = item.apis.iter().find(|m| m.name == "create").unwrap();
+    assert_eq!(
+        create.data_source, None,
+        "static method should have no data source"
+    );
+}

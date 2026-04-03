@@ -96,10 +96,6 @@ fn crud_key_params() {
 
     let category_param = get_method.parameters.iter().find(|p| p.name == "category");
     assert!(category_param.is_some(), "Should have category key param");
-    assert!(
-        category_param.unwrap().cidl_type.is_nullable(),
-        "Key params should be nullable in union"
-    );
 
     let subcategory_param = get_method
         .parameters
@@ -108,10 +104,6 @@ fn crud_key_params() {
     assert!(
         subcategory_param.is_some(),
         "Should have subcategory key param"
-    );
-    assert!(
-        subcategory_param.unwrap().cidl_type.is_nullable(),
-        "Key params should be nullable in union"
     );
 }
 

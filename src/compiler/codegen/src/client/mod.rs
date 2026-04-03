@@ -1,7 +1,7 @@
 use askama::Template;
 use ast::{
-    CidlType, CloesceAst, CrudKind, DataSource, HttpVerb, MediaType, NavigationField,
-    NavigationFieldKind,
+    ApiMethod, CidlType, CloesceAst, CrudKind, DataSource, Field, HttpVerb, MediaType, Model,
+    NavigationField, NavigationFieldKind,
 };
 
 use crate::mappers::{LanguageTypeMapper, TypeScriptMapper};
@@ -31,13 +31,13 @@ macro_rules! cidl_type_contains {
 
 #[derive(Template)]
 #[template(path = "client.ts.jinja", escape = "none")]
-struct ClientTemplate<'a> {
-    ast: &'a CloesceAst<'a>,
-    worker_url: &'a str,
+struct ClientTemplate<'src> {
+    ast: &'src CloesceAst<'src>,
+    worker_url: &'src str,
     mapper: TypeScriptMapper,
 }
 
-impl<'a> ClientTemplate<'a> {
+impl ClientTemplate<'_> {
     fn fmt_verb(&self, verb: &HttpVerb) -> &'static str {
         match verb {
             HttpVerb::Get => "GET",
@@ -81,7 +81,7 @@ impl<'a> ClientTemplate<'a> {
         self.mapper.cidl_type(&cidl_type, self.ast)
     }
 
-    fn kv_inner_type<'b>(&self, ty: &'b CidlType<'b>) -> &'b CidlType<'b> {
+    fn kv_inner_type<'t>(&self, ty: &'t CidlType<'t>) -> &'t CidlType<'t> {
         match ty {
             CidlType::KvObject(inner) => inner.as_ref(),
             CidlType::Paginated(inner) => match inner.as_ref() {
@@ -96,7 +96,7 @@ impl<'a> ClientTemplate<'a> {
         self.mapper.cidl_type(self.kv_inner_type(ty), self.ast)
     }
 
-    fn object_name<'b>(&self, ty: &'b CidlType<'b>) -> &'b str {
+    fn object_name<'t>(&self, ty: &'t CidlType<'t>) -> &'t str {
         match ty.root_type() {
             CidlType::Inject { name } | CidlType::Object { name } => name,
             CidlType::Partial { object_name } => object_name,
@@ -208,6 +208,45 @@ impl<'a> ClientTemplate<'a> {
             .map(|ds| format!("\"{}\"", ds.name))
             .collect();
         parts.join(" | ")
+    }
+
+    fn ds_get_params<'t>(&self, model: &'t Model<'t>, api: &ApiMethod<'_>) -> Vec<&'t Field<'t>> {
+        let ds_name = match api.data_source {
+            Some(name) => name,
+            None => return vec![],
+        };
+        let ds = match model.data_sources.iter().find(|ds| ds.name == ds_name) {
+            Some(ds) => ds,
+            None => return vec![],
+        };
+        match &ds.get {
+            Some(get) => get.parameters.iter().collect(),
+            None => vec![],
+        }
+    }
+
+    /// Returns DS get params that are NOT fields (primary columns, columns, or key_fields) of the model.
+    /// These must be passed explicitly as method parameters.
+    fn ds_extra_params<'t>(&self, model: &'t Model<'t>, api: &ApiMethod<'_>) -> Vec<&'t Field<'t>> {
+        let all_field_names: std::collections::HashSet<&str> = model
+            .primary_columns
+            .iter()
+            .map(|c| c.field.name.as_ref())
+            .chain(model.columns.iter().map(|c| c.field.name.as_ref()))
+            .chain(model.key_fields.iter().copied())
+            .collect();
+
+        self.ds_get_params(model, api)
+            .into_iter()
+            .filter(|p| !all_field_names.contains(p.name.as_ref()))
+            .collect()
+    }
+
+    /// Returns true if a DS get parameter name is an "extra" param (not a field of the model).
+    fn is_ds_extra_param(&self, model: &Model<'_>, api: &ApiMethod<'_>, param_name: &str) -> bool {
+        self.ds_extra_params(model, api)
+            .iter()
+            .any(|p| p.name == param_name)
     }
 }
 

@@ -145,7 +145,7 @@ pub struct Field<'src> {
     pub cidl_type: CidlType<'src>,
 }
 
-#[derive(Deserialize, Serialize, Debug, Default, Clone)]
+#[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct IncludeTree<'src>(#[serde(borrow)] pub BTreeMap<Cow<'src, str>, IncludeTree<'src>>);
 
 /// A D1 Navigation field, representing a relationship to another model
@@ -232,29 +232,18 @@ pub enum CrudKind {
     Save,
 }
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Debug)]
 pub struct DataSourceMethod<'src> {
-    #[serde(borrow)]
     pub parameters: Vec<Field<'src>>,
-
-    #[serde(skip)]
     pub raw_sql: String,
 }
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Debug)]
 pub struct DataSource<'src> {
-    #[serde(borrow)]
     pub name: &'src str,
-
-    #[serde(borrow)]
     pub tree: IncludeTree<'src>,
-
-    #[serde(borrow)]
     pub list: Option<DataSourceMethod<'src>>,
-
-    #[serde(borrow)]
     pub get: Option<DataSourceMethod<'src>>,
-
     pub is_internal: bool,
 }
 
@@ -287,7 +276,6 @@ pub struct ApiMethod<'src> {
     /// Static methods require no hydration or data source.
     pub is_static: bool,
 
-    #[serde(borrow)]
     pub data_source: Option<&'src str>,
 
     pub http_verb: HttpVerb,
@@ -336,7 +324,7 @@ pub struct Model<'src> {
     #[serde(borrow)]
     pub apis: Vec<ApiMethod<'src>>,
 
-    #[serde(borrow)]
+    #[serde(skip)]
     pub data_sources: Vec<DataSource<'src>>,
 
     pub cruds: Vec<CrudKind>,
