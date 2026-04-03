@@ -15,5 +15,5 @@ members = [
 indexmap = { version = "2.13.0", features = ["serde"] }
 serde = { version = "1.0.219", features = ["derive"] }
 serde_json = "1.0.149"
-toml = "1.0.4"
+toml = "1.1.2"
 tracing = "0.1.44"
