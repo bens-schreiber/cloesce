@@ -64,7 +64,7 @@ export class RuntimeContainer {
     public readonly ast: Cidl,
     public readonly wasm: OrmWasmExports,
     public readonly workerUrl: string,
-  ) { }
+  ) {}
 
   static async init(ast: Cidl, workerUrl: string) {
     if (this.instance) return;

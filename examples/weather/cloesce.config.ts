@@ -1,7 +1,7 @@
 import { CloesceConfigOptions } from "cloesce";
 
 const config: CloesceConfigOptions = {
-    srcPaths: ["./src/data"],
+    srcPaths: ["./schema"],
     workersUrl: "http://localhost:5000/api",
     migrationsPath: "./customDir",
     wranglerConfigFormat: "jsonc",

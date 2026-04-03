@@ -74,7 +74,6 @@ export namespace {{ model.name }} {
 
     export namespace DataSources {
 {%- for ds in model.data_sources.values() %}
-{%- if !ds.is_internal %}
         export const {{ ds.name }} = {
             include: {{ self.include_tree_to_js(&ds.tree) }},
 {%- if let Some(get) = &ds.get %}
@@ -90,7 +89,6 @@ export namespace {{ model.name }} {
             },
 {%- endif %}
         }
-{%- endif %}
 {%- endfor %}
     }
 {%- endif %}

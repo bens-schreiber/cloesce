@@ -591,18 +591,12 @@ fn resolve_sql_params() {
 
     // Assert
     let item = ast.models.get("Item").unwrap();
-    let by_id = item
-        .data_sources
-        .get("ById")
-        .unwrap();
+    let by_id = item.data_sources.get("ById").unwrap();
     let get_sql = &by_id.get.as_ref().unwrap().raw_sql;
     assert!(!get_sql.contains("$itemId"), "got: {get_sql}");
     assert_eq!(get_sql.matches("?1").count(), 2, "got: {get_sql}");
 
-    let by_range = item
-        .data_sources
-        .get("ByPriceRange")
-        .unwrap();
+    let by_range = item.data_sources.get("ByPriceRange").unwrap();
     let list_sql = &by_range.list.as_ref().unwrap().raw_sql;
     assert!(!list_sql.contains('$'), "got: {list_sql}");
     let pos = |n: &str| list_sql.find(n).unwrap();
