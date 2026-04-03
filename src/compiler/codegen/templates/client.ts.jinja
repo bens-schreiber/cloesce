@@ -418,7 +418,7 @@ export namespace DataSources {
 {%- for crud in &model.cruds %}
 {%- if self.is_crud_get(crud) %}
     export namespace $get {
-{%- for ds in &model.data_sources %}
+{%- for ds in model.data_sources.values() %}
 {%- if !ds.is_internal %}
       export type {{ ds.name }} = {
         kind: "{{ ds.name }}";
@@ -433,7 +433,7 @@ export namespace DataSources {
     }
 {%- else if self.is_crud_list(crud) %}
     export namespace $list {
-{%- for ds in &model.data_sources %}
+{%- for ds in model.data_sources.values() %}
 {%- if !ds.is_internal %}
       export type {{ ds.name }} = {
         kind: "{{ ds.name }}";

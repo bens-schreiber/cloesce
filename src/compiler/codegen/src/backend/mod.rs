@@ -7,6 +7,7 @@ use crate::mappers::{LanguageTypeMapper, TypeScriptMapper};
 #[template(path = "backend.ts.jinja", escape = "none")]
 struct BackendTemplate<'src> {
     ast: &'src CloesceAst<'src>,
+    worker_url: &'src str,
     mapper: TypeScriptMapper,
 }
 
@@ -26,9 +27,10 @@ impl BackendTemplate<'_> {
 
 pub struct BackendGenerator;
 impl BackendGenerator {
-    pub fn generate(ast: &CloesceAst) -> String {
+    pub fn generate(ast: &CloesceAst, worker_url: &str) -> String {
         let tmpl = BackendTemplate {
             ast,
+            worker_url,
             mapper: TypeScriptMapper::backend(),
         };
         tmpl.render().unwrap()

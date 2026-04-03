@@ -1,3 +1,21 @@
+env {
+    db: d1
+    bucket: r2
+}
+
+@d1(db)
+@crud(get, list, save)
+model WeatherReport {
+    [primary id]
+    id: int
+
+    title: string
+    description: string
+
+    [nav weatherEntries -> Weather::weatherReportId]
+    weatherEntries: Array<Weather>
+}
+
 @d1(db)
 model Weather {
     [primary id]
@@ -18,8 +36,8 @@ model Weather {
 }
 
 api Weather {
-    post upload_photo(self, e: env, s: stream) -> void
-    get download_photo(@source(R2Only) self) -> stream
+    post uploadPhoto(self, e: env, s: stream) -> void
+    get downloadPhoto(@source(R2Only) self) -> stream
 }
 
 @internal

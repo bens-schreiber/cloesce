@@ -97,7 +97,7 @@ fn compile() -> Result<(), String> {
         generator.generate(spec)
     };
 
-    let backend = BackendGenerator::generate(&ast);
+    let backend = BackendGenerator::generate(&ast, &args.worker_url);
     let client = ClientGenerator::generate(&ast, &args.worker_url);
 
     // Output CIDL

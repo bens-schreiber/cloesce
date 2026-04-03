@@ -8,7 +8,7 @@
       "migrations_dir": "./customDir/db"
     }
   ],
-  "main": "workers.ts",
+  "main": "./src/api/main.ts",
   "name": "cloesce",
   "r2_buckets": [
     {

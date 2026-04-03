@@ -25,7 +25,7 @@ impl CrudExpansion {
                         }
 
                         // Include parameters from all data sources, ensuring no duplicates
-                        for ds in &model.data_sources {
+                        for ds in model.data_sources.values() {
                             if let Some(get) = &ds.get {
                                 for param in &get.parameters {
                                     if seen.insert(param.name.clone()) {
@@ -62,7 +62,7 @@ impl CrudExpansion {
                         let mut parameters = vec![];
 
                         // Include parameters from all data sources, ensuring no duplicates
-                        for ds in &model.data_sources {
+                        for ds in model.data_sources.values() {
                             if let Some(list) = &ds.list {
                                 for param in &list.parameters {
                                     if seen.insert(param.name.clone()) {

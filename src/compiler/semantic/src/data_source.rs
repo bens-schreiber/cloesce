@@ -323,7 +323,7 @@ impl<'src> DataSourceExpansion {
                     .get_mut(model_name)
                     .unwrap()
                     .data_sources
-                    .push(data_source);
+                    .insert(data_source.name, data_source);
             }
         }
 
@@ -336,8 +336,7 @@ impl<'src> DataSourceExpansion {
                 let defaults = model
                     .data_sources
                     .iter()
-                    .enumerate()
-                    .map(|(i, ds)| {
+                    .map(|(ds_name, ds)| {
                         let sql = SelectModel::query(model.name, None, Some(ds.tree.clone()), ast)
                             .expect("select model to work");
                         let get = ds
@@ -348,7 +347,7 @@ impl<'src> DataSourceExpansion {
                             .list
                             .is_none()
                             .then(|| Self::build_default_list(model, &sql));
-                        (i, get, list, sql)
+                        (*ds_name, get, list, sql)
                     })
                     .collect();
                 (model.name, defaults)
@@ -356,7 +355,7 @@ impl<'src> DataSourceExpansion {
             .collect::<Vec<(
                 &str,
                 Vec<(
-                    usize,
+                    &str,
                     Option<DataSourceMethod>,
                     Option<DataSourceMethod>,
                     String,
@@ -365,9 +364,9 @@ impl<'src> DataSourceExpansion {
 
         for (name, defaults) in pending {
             let model = ast.models.get_mut(name).unwrap();
-            for (i, get, list, include_sql) in defaults {
+            for (ds_name, get, list, include_sql) in defaults {
                 // Update the existing data source with missing get/list methods
-                let ds = &mut model.data_sources[i];
+                let ds = model.data_sources.get_mut(ds_name).unwrap();
                 if let Some(g) = get {
                     ds.get = Some(g);
                 }

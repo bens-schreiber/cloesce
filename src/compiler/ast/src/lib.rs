@@ -335,7 +335,8 @@ pub struct Model<'src> {
     #[serde(borrow)]
     pub apis: Vec<ApiMethod<'src>>,
 
-    pub data_sources: Vec<DataSource<'src>>,
+    #[serde(borrow)]
+    pub data_sources: BTreeMap<&'src str, DataSource<'src>>,
 
     pub cruds: Vec<CrudKind>,
 }
@@ -353,9 +354,9 @@ impl Model<'_> {
         !self.r2_fields.is_empty()
     }
 
-    /// Returns the data source with the symbol name "Default", if it exists.
+    /// Returns the data source with name "Default"
     pub fn default_data_source(&self) -> Option<&DataSource<'_>> {
-        self.data_sources.iter().find(|ds| ds.name == "Default")
+        self.data_sources.get("Default")
     }
 
     pub fn has_composite_pk(&self) -> bool {

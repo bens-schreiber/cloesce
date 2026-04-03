@@ -950,7 +950,7 @@ fn data_source_include_tree_kv_r2() {
 
     let user = result.models.get("User").unwrap();
     assert_eq!(user.data_sources.len(), 2); // including the implicit default source
-    assert_eq!(user.data_sources[0].name, "WithKvR2");
+    assert!(user.data_sources.contains_key("WithKvR2"));
 }
 
 #[test]

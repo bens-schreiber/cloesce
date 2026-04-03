@@ -161,7 +161,7 @@ pub fn validate_cidl_type(
 
             // TODO: adjust this when data sources are revamped
             // for now we allow "none"
-            if value_str == "none" || model.data_sources.iter().any(|ds| ds.name == value_str) {
+            if value_str == "none" || model.data_sources.contains_key(value_str) {
                 return Ok(Some(value));
             }
 

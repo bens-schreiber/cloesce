@@ -183,8 +183,7 @@ fn default_data_source_methods() {
     let item = ast.models.get("Item").unwrap();
     let with_kv = item
         .data_sources
-        .iter()
-        .find(|ds| ds.name == "WithKv")
+        .get("WithKv")
         .expect("WithKv data source should exist");
     assert!(
         with_kv.get.is_some(),
@@ -594,8 +593,7 @@ fn resolve_sql_params() {
     let item = ast.models.get("Item").unwrap();
     let by_id = item
         .data_sources
-        .iter()
-        .find(|ds| ds.name == "ById")
+        .get("ById")
         .unwrap();
     let get_sql = &by_id.get.as_ref().unwrap().raw_sql;
     assert!(!get_sql.contains("$itemId"), "got: {get_sql}");
@@ -603,8 +601,7 @@ fn resolve_sql_params() {
 
     let by_range = item
         .data_sources
-        .iter()
-        .find(|ds| ds.name == "ByPriceRange")
+        .get("ByPriceRange")
         .unwrap();
     let list_sql = &by_range.list.as_ref().unwrap().raw_sql;
     assert!(!list_sql.contains('$'), "got: {list_sql}");
@@ -641,8 +638,7 @@ async fn include_placeholder_expands_to_select(db: SqlitePool) {
         .get("Post")
         .unwrap()
         .data_sources
-        .iter()
-        .find(|ds| ds.name == "Recent")
+        .get("Recent")
         .unwrap();
 
     let raw_sql = &ds.get.as_ref().unwrap().raw_sql;

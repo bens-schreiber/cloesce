@@ -1,6 +1,6 @@
-import { CloesceConfig } from "cloesce";
+import { CloesceConfigOptions } from "cloesce";
 
-const config: CloesceConfig = {
+const config: CloesceConfigOptions = {
     srcPaths: ["./src/data"],
     workersUrl: "http://localhost:5000/api",
     migrationsPath: "./customDir",

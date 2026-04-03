@@ -276,7 +276,7 @@ impl<'src, 'p> SemanticAnalysis {
         // Merge data sources into their respective models
         for (model_name, ds) in data_source_map {
             if let Some(model) = models.get_mut(&model_name) {
-                model.data_sources.push(ds);
+                model.data_sources.insert(ds.name, ds);
             }
         }
 

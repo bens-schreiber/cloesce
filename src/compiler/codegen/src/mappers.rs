@@ -32,16 +32,9 @@ impl TypeScriptMapper {
         }
 
         if ast.models.contains_key(name) {
-            format!("Cloesce.Models.{name}.Type")
-        } else if ast.services.contains_key(name) {
-            format!("Cloesce.Services.{name}")
-        } else if ast.poos.contains_key(name) {
-            format!("Cloesce.PlainOldObjects.{name}")
+            format!("{name}.Self")
         } else {
-            panic!(
-                "Type {} not found in models, services, or plain old objects",
-                name
-            );
+            name.to_string()
         }
     }
 }
@@ -81,7 +74,7 @@ impl LanguageTypeMapper for TypeScriptMapper {
                     .data_sources;
 
                 let joined = ds
-                    .iter()
+                    .values()
                     .filter_map(|d| (!d.is_internal).then_some(format!("\"{}\"", d.name)))
                     .collect::<Vec<_>>()
                     .join(" | ");
@@ -92,7 +85,10 @@ impl LanguageTypeMapper for TypeScriptMapper {
                     joined
                 }
             }
-            CidlType::Stream => "Uint8Array".to_string(),
+            CidlType::Stream => match self.kind {
+                TypescriptMapperKind::BackendTypes => "ReadableStream".to_string(),
+                TypescriptMapperKind::ClientApi => "Uint8Array".to_string(),
+            },
             CidlType::KvObject(inner) => {
                 let inner_ts = self.cidl_type(inner, ast);
                 format!("KValue<{inner_ts}>")
@@ -101,9 +97,12 @@ impl LanguageTypeMapper for TypeScriptMapper {
                 let inner_ts = self.cidl_type(inner, ast);
                 format!("Paginated<{inner_ts}>")
             }
-            CidlType::R2Object => "R2Object".to_string(),
+            CidlType::R2Object => match self.kind {
+                TypescriptMapperKind::BackendTypes => "R2ObjectBody".to_string(),
+                TypescriptMapperKind::ClientApi => "R2Object".to_string(),
+            },
             CidlType::Inject { name } => self.namespace(ast, name),
-            CidlType::Env => "Cloesce.Env".to_string(),
+            CidlType::Env => "Env".to_string(),
             CidlType::UnresolvedReference { name } => {
                 unreachable!("Unresolved reference should have been resolved by this point: {name}")
             }

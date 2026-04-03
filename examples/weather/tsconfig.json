@@ -9,16 +9,11 @@
 
     // Cloesce required options
     "resolveJsonModule": true,
-    "strict": true,
-    "strictPropertyInitialization": false,
-    "experimentalDecorators": true,
-    "emitDecoratorMetadata": true,
-    "allowSyntheticDefaultImports": true,
     "paths": {
       "@data/*": ["./src/data/*"],
-      "@generated/*": ["./.generated/*"],
+      "@cloesce/*": ["./.cloesce/*"],
     },
     "outDir": "dist",
   },
-  "include": [".generated/*.ts", "src/**/*.ts", "test/**/*.ts"],
+  "include": [".cloesce/*.ts", "src/**/*.ts", "test/**/*.ts"],
 }

@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use askama::Template;
 use ast::{
     ApiMethod, CidlType, CloesceAst, CrudKind, DataSource, Field, HttpVerb, MediaType, Model,
@@ -187,13 +189,13 @@ impl ClientTemplate<'_> {
         &self,
         method_name: &str,
         model_name: &str,
-        data_sources: &[DataSource<'_>],
+        data_sources: &BTreeMap<&str, DataSource<'_>>,
     ) -> String {
         if method_name == "$save" {
             format!("DataSources.{}.{}", model_name, method_name)
         } else {
             let parts: Vec<String> = data_sources
-                .iter()
+                .values()
                 .filter(|ds| !ds.is_internal)
                 .map(|ds| format!("DataSources.{}.{}.{}", model_name, method_name, ds.name))
                 .collect();
@@ -201,9 +203,9 @@ impl ClientTemplate<'_> {
         }
     }
 
-    fn ds_kind_union(&self, data_sources: &[DataSource<'_>]) -> String {
+    fn ds_kind_union(&self, data_sources: &BTreeMap<&str, DataSource<'_>>) -> String {
         let parts: Vec<String> = data_sources
-            .iter()
+            .values()
             .filter(|ds| !ds.is_internal)
             .map(|ds| format!("\"{}\"", ds.name))
             .collect();
@@ -215,7 +217,7 @@ impl ClientTemplate<'_> {
             Some(name) => name,
             None => return vec![],
         };
-        let ds = match model.data_sources.iter().find(|ds| ds.name == ds_name) {
+        let ds = match model.data_sources.get(ds_name) {
             Some(ds) => ds,
             None => return vec![],
         };
