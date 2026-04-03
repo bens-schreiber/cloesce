@@ -9,7 +9,7 @@ crate-type = ["cdylib"]
 [dependencies]
 ast = { path = "../generator/ast" }
 base64 = "0.22.1"
-indexmap = { version = "2.13.0" }
+indexmap = { version = "2.13.1" }
 sea-query = { version = "0.32.7", features = ["backend-sqlite"] }
 serde = "1.0.219"
 serde_json = "1.0.149"
