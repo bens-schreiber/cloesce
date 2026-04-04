@@ -40,10 +40,30 @@ pub enum Token<'src> {
     Patch,
     #[token("delete")]
     Delete,
+    #[token("save")]
+    Save,
+    #[token("list")]
+    List,
     #[token("include")]
     Include,
     #[token("crud")]
     Crud,
+    #[token("nav")]
+    Nav,
+    #[token("primary")]
+    Primary,
+    #[token("foreign")]
+    Foreign,
+    #[token("unique")]
+    Unique,
+    #[token("use")]
+    Use,
+    #[token("keyfield")]
+    Keyfield,
+    #[token("paginated")]
+    Paginated,
+    #[token("optional")]
+    Optional,
 
     // Environment binding types
     #[token("d1")]
@@ -52,6 +72,8 @@ pub enum Token<'src> {
     R2,
     #[token("kv")]
     Kv,
+    #[token("vars")]
+    Vars,
 
     // Primitive types
     #[token("string")]
@@ -98,12 +120,10 @@ pub enum Token<'src> {
     Comma,
     #[token(".")]
     Dot,
-    #[token("->")]
-    Arrow,
     #[token("::")]
     DoubleColon,
-    #[token("@")]
-    At,
+    #[token("->")]
+    Arrow,
 
     // Literals
     #[regex(r#""[^"]*""#, |lex| {

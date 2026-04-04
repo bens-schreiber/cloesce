@@ -5,7 +5,13 @@ use orm::validate::{ValidatorErrorKind, validate_cidl_type};
 use serde_json::{Value, json};
 
 fn empty_ast() -> ast::CloesceAst<'static> {
-    src_to_ast("env { db: d1 }")
+    src_to_ast(
+        r#"
+        env {
+            d1 { db }
+        }
+        "#,
+    )
 }
 
 #[test]
@@ -21,8 +27,16 @@ fn undefined() {
     {
         let ast = src_to_ast(
             r#"
-            env { db: d1 }
-            @d1(db) model SomeModel { [primary id] id: int }
+            env {
+                d1 { db }
+            }
+
+            [use db]
+            model SomeModel {
+                primary {
+                    id: int
+                }
+            }
         "#,
         );
         let result = validate_cidl_type(
@@ -82,8 +96,16 @@ fn null_value() {
     {
         let ast = src_to_ast(
             r#"
-            env { db: d1 }
-            @d1(db) model SomeModel { [primary id] id: int }
+            env {
+                d1 { db }
+            }
+
+            [use db]
+            model SomeModel {
+                primary {
+                    id: int
+                }
+            }
         "#,
         );
         let result = validate_cidl_type(
@@ -332,8 +354,16 @@ fn data_source() {
     {
         let ast = src_to_ast(
             r#"
-            env { db: d1 }
-            @d1(db) model Horse { [primary id] id: int }
+            env {
+                d1 { db }
+            }
+
+            [use db]
+            model Horse {
+                primary {
+                    id: int
+                }
+            }
         "#,
         );
         let result = validate_cidl_type(
@@ -351,8 +381,16 @@ fn data_source() {
     {
         let ast = src_to_ast(
             r#"
-            env { db: d1 }
-            @d1(db) model Horse { [primary id] id: int }
+            env {
+                d1 { db }
+            }
+
+            [use db]
+            model Horse {
+                primary {
+                    id: int
+                }
+            }
         "#,
         );
         let result = validate_cidl_type(
@@ -373,10 +411,16 @@ fn objects_partials() {
     {
         let ast = src_to_ast(
             r#"
-            env { db: d1 }
-            @d1(db) model Horse {
-                [primary id]
-                id: int
+            env {
+                d1 { db }
+            }
+
+            [use db]
+            model Horse {
+                primary {
+                    id: int
+                }
+
                 name: string
             }
         "#,
@@ -394,21 +438,33 @@ fn objects_partials() {
     {
         let ast = src_to_ast(
             r#"
-            env { db: d1 }
-            @d1(db) model Horse {
-                [primary id]
-                id: int
+            env {
+                d1 { db }
+            }
+
+            [use db]
+            model Horse {
+                primary {
+                    id: int
+                }
+
                 name: string
 
-                [nav riders -> Rider::horseId]
-                riders: Array<Rider>
+                nav(Rider::horseId) {
+                    riders
+                }
             }
-            @d1(db) model Rider {
-                [primary id]
-                id: int
 
-                [foreign horseId -> Horse::id]
-                horseId: int
+            [use db]
+            model Rider {
+                primary {
+                    id: int
+                }
+
+                foreign(Horse::id) {
+                    horseId
+                }
+
                 nickname: string
             }
         "#,
@@ -432,10 +488,16 @@ fn objects_partials() {
     {
         let ast = src_to_ast(
             r#"
-            env { db: d1 }
-            @d1(db) model Horse {
-                [primary id]
-                id: int
+            env {
+                d1 { db }
+            }
+
+            [use db]
+            model Horse {
+                primary {
+                    id: int
+                }
+
                 name: string
             }
         "#,

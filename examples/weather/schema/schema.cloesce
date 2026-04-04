@@ -1,46 +1,51 @@
 env {
-    db: d1
-    bucket: r2
+    d1 { db }
+    r2 { bucket }
 }
 
-@d1(db)
-@crud(get, list, save)
+[use db]
 model WeatherReport {
-    [primary id]
-    id: int
+    primary {
+        id: int
+        id2: int
+    }
+
+    nav (Weather::weatherReportId) {
+        weatherEntries
+    }
 
     title: string
     description: string
-
-    [nav weatherEntries -> Weather::weatherReportId]
-    weatherEntries: Array<Weather>
 }
 
-@d1(db)
+[use db]
+[use get, list, save]
 model Weather {
-    [primary id]
-    id: int
+    primary {
+        id: int
+    }
 
-    [foreign weatherReportId -> WeatherReport::id]
-    [nav weatherReport -> weatherReportId]
-    weatherReportId: int
-    weatherReport: WeatherReport
+    foreign (WeatherReport::id, WeatherReport::id2) {
+        weatherReportId
+        weatherReportId2
+        nav { weatherReport }
+    }
+
+    r2 (bucket, "weather/photos/{id}.jpg") {
+        photo
+    }
 
     dateTime: date
     location: string
     temperature: int
     condition: string
-
-    @r2(bucket, "weather/photo/{id}")
-    photo: R2Object
 }
 
 api Weather {
     post uploadPhoto(self, e: env, s: stream) -> void
-    get downloadPhoto(@source(R2Only) self) -> stream
+    get downloadPhoto([source R2Only] self) -> stream
 }
 
-@internal
 source R2Only for Weather {
     include { photo }
 }

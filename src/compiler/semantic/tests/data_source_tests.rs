@@ -13,56 +13,66 @@ async fn default_data_sources(db: SqlitePool) {
     let ast = src_to_ast(
         r#"
         env {
-            db: d1
-            kv_namespace: kv
-            r2_namespace: r2
+            d1 { db }
+            kv { kv_namespace }
+            r2 { r2_namespace }
         }
 
-        @d1(db)
+        [use db]
         model Profile {
-            [primary id]
-            id: int
+            primary {
+                id: int
+            }
         }
 
-        @d1(db)
+        [use db]
         model Role {
-            [primary id]
-            id: int
+            primary {
+                id: int
+            }
 
-            [nav users <> User::roles]
-            users: Array<User>
+            nav(User::id) {
+                users
+            }
         }
 
-        @d1(db)
+        [use db]
         model Order {
-            [primary id]
-            id: int
+            primary {
+                id: int
+            }
 
-            [foreign userId -> User::id]
-            userId: int
+            foreign(User::id) {
+                userId
+            }
         }
 
-        @d1(db)
+        [use db]
         model User {
-            [primary id]
-            id: int
+            primary {
+                id: int
+            }
 
-            [foreign profileId -> Profile::id]
-            [nav profile -> profileId]
-            profileId: int
-            profile: Profile
+            foreign(Profile::id) {
+                profileId
+                nav { profile }
+            }
 
-            [nav orders -> Order::userId]
-            orders: Array<Order>
+            nav(Order::userId) {
+                orders
+            }
 
-            [nav roles <> Role::users]
-            roles: Array<Role>
+            nav(Role::id) {
+                roles
+            }
 
-            @kv(kv_namespace, "{id}")
-            userCache: json
+            kv(kv_namespace, "{id}") {
+                userCache: json
+            }
 
-            @r2(r2_namespace, "{id}")
-            userDocuments: R2Object
+            r2(r2_namespace, "{id}") {
+                userDocuments
+            }
         }
     "#,
     );
@@ -156,21 +166,23 @@ fn default_data_source_methods() {
     let ast = src_to_ast(
         r#"
         env {
-            db: d1
-            my_kv: kv
+            d1 { db }
+            kv { my_kv }
         }
 
-        @d1(db)
-        @crud(get, list)
+        [use db, get, list]
         model Item {
-            [primary id]
-            id: int
+            primary {
+                id: int
+            }
 
-            @keyparam
-            tag: string
+            keyfield {
+                tag
+            }
 
-            @kv(my_kv, "{tag}")
-            cached: json
+            kv(my_kv, "{tag}") {
+                cached: json
+            }
         }
 
         source WithKv for Item {
@@ -204,36 +216,45 @@ async fn default_data_sources_does_not_include_manys(db: SqlitePool) {
     // Act
     let ast = src_to_ast(
         r#"
-        env { db: d1 }
+        env {
+            d1 { db }
+        }
 
-        @d1(db)
+        [use db]
         model Grade {
-            [primary id]
-            id: int
+            primary {
+                id: int
+            }
 
-            [foreign studentId -> Student::id]
-            studentId: int
+            foreign(Student::id) {
+                studentId
+            }
         }
 
-        @d1(db)
+        [use db]
         model Teacher {
-            [primary id]
-            id: int
+            primary {
+                id: int
+            }
 
-            [nav students -> Student::teacherId]
-            students: Array<Student>
+            nav(Student::teacherId) {
+                students
+            }
         }
 
-        @d1(db)
+        [use db]
         model Student {
-            [primary id]
-            id: int
+            primary {
+                id: int
+            }
 
-            [foreign teacherId -> Teacher::id]
-            teacherId: int
+            foreign(Teacher::id) {
+                teacherId
+            }
 
-            [nav grades -> Grade::studentId]
-            grades: Array<Grade>
+            nav(Grade::studentId) {
+                grades
+            }
         }
     "#,
     );
@@ -299,37 +320,42 @@ async fn default_data_sources_includes_multiple_one_to_ones(db: SqlitePool) {
     // Act
     let ast = src_to_ast(
         r#"
-        env { db: d1 }
+        env {
+            d1 { db }
+        }
 
-        @d1(db)
+        [use db]
         model Toy {
-            [primary id]
-            id: int
+            primary {
+                id: int
+            }
             color: string
         }
 
-        @d1(db)
+        [use db]
         model Dog {
-            [primary id]
-            id: int
+            primary {
+                id: int
+            }
             breed: string
 
-            [foreign toyId -> Toy::id]
-            [nav toy -> toyId]
-            toyId: int
-            toy: Toy
+            foreign(Toy::id) {
+                toyId
+                nav { toy }
+            }
         }
 
-        @d1(db)
+        [use db]
         model Owner {
-            [primary id]
-            id: int
+            primary {
+                id: int
+            }
             name: string
 
-            [foreign dogId -> Dog::id]
-            [nav dog -> dogId]
-            dogId: int
-            dog: Dog
+            foreign(Dog::id) {
+                dogId
+                nav { dog }
+            }
         }
     "#,
     );
@@ -401,40 +427,45 @@ async fn diamond_does_not_duplicate_traversal(db: SqlitePool) {
     // Act
     let ast = src_to_ast(
         r#"
-        env { db: d1 }
+        env {
+            d1 { db }
+        }
 
-        @d1(db)
+        [use db]
         model Team {
-            [primary id]
-            id: int
+            primary {
+                id: int
+            }
             name: string
         }
 
-        @d1(db)
+        [use db]
         model Department {
-            [primary id]
-            id: int
+            primary {
+                id: int
+            }
 
-            [foreign teamId -> Team::id]
-            [nav team -> teamId]
-            teamId: int
-            team: Team
+            foreign(Team::id) {
+                teamId
+                nav { team }
+            }
         }
 
-        @d1(db)
+        [use db]
         model Company {
-            [primary id]
-            id: int
+            primary {
+                id: int
+            }
 
-            [foreign departmentId -> Department::id]
-            [nav department -> departmentId]
-            departmentId: int
-            department: Department
+            foreign(Department::id) {
+                departmentId
+                nav { department }
+            }
 
-            [foreign teamId -> Team::id]
-            [nav team -> teamId]
-            teamId: int
-            team: Team
+            foreign(Team::id) {
+                directTeamId
+                nav { team }
+            }
         }
     "#,
     );
@@ -466,7 +497,7 @@ async fn diamond_does_not_duplicate_traversal(db: SqlitePool) {
         &db,
         "CREATE TABLE Team (id INTEGER PRIMARY KEY, name TEXT NOT NULL);
          CREATE TABLE Department (id INTEGER PRIMARY KEY, teamId INTEGER NOT NULL REFERENCES Team(id));
-         CREATE TABLE Company (id INTEGER PRIMARY KEY, departmentId INTEGER NOT NULL REFERENCES Department(id), teamId INTEGER NOT NULL REFERENCES Team(id))",
+         CREATE TABLE Company (id INTEGER PRIMARY KEY, departmentId INTEGER NOT NULL REFERENCES Department(id), directTeamId INTEGER NOT NULL REFERENCES Team(id))",
     )
     .await;
 
@@ -478,7 +509,7 @@ async fn diamond_does_not_duplicate_traversal(db: SqlitePool) {
         .execute(&db)
         .await
         .unwrap();
-    sqlx::query("INSERT INTO Company (id, departmentId, teamId) VALUES (1, 1, 2)")
+    sqlx::query("INSERT INTO Company (id, departmentId, directTeamId) VALUES (1, 1, 2)")
         .execute(&db)
         .await
         .unwrap();
@@ -504,13 +535,16 @@ async fn default_data_sources_composite_pk(db: SqlitePool) {
     // Act
     let ast = src_to_ast(
         r#"
-        env { db: d1 }
+        env {
+            d1 { db }
+        }
 
-        @d1(db)
+        [use db]
         model OrderItem {
-            [primary orderId, productId]
-            orderId: int
-            productId: int
+            primary {
+                orderId: int
+                productId: int
+            }
             qty: int
         }
     "#,
@@ -566,12 +600,15 @@ fn resolve_sql_params() {
     // Act
     let ast = src_to_ast(
         r#"
-        env { db: d1 }
+        env {
+            d1 { db }
+        }
 
-        @d1(db)
+        [use db]
         model Item {
-            [primary id]
-            id: int
+            primary {
+                id: int
+            }
             price: int
         }
 
@@ -611,12 +648,15 @@ async fn include_placeholder_expands_to_select(db: SqlitePool) {
     // Arrange
     let ast = src_to_ast(
         r#"
-        env { db: d1 }
+        env {
+            d1 { db }
+        }
 
-        @d1(db)
+        [use db]
         model Post {
-            [primary id]
-            id: int
+            primary {
+                id: int
+            }
             title: string
         }
 
@@ -665,12 +705,15 @@ fn api_method_defaults_to_default_data_source() {
     // Act
     let ast = src_to_ast(
         r#"
-        env { db: d1 }
+        env {
+            d1 { db }
+        }
 
-        @d1(db)
+        [use db]
         model Item {
-            [primary id]
-            id: int
+            primary {
+                id: int
+            }
         }
 
         source Custom for Item {
@@ -678,13 +721,13 @@ fn api_method_defaults_to_default_data_source() {
         }
 
         api Item {
-            // Instantiated no explicit data source, should default to "Default"
+            // Non-static no explicit data source: defaults to "Default"
             get fetch(self) -> Item
 
-            // Instantiated explicit data source, should use "Custom"
-            post fetchCustom(@source(Custom) self) -> Item
+            // Non-static explicit data source: uses "Custom"
+            post fetchCustom([source Custom] self) -> Item
 
-            // Static, should have no data source
+            // Static: no data source
             post create() -> Item
         }
     "#,

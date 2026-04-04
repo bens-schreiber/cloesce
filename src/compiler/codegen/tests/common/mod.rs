@@ -1,25 +1,30 @@
 /// Cloesce source string containing a wide variety of features for codegen tests.
 pub const COMPREHENSIVE_SRC: &str = r#"
 env {
-    db: d1
-    my_kv: kv
-    my_r2: r2
-    MY_VAR: string
+    d1 { db }
+    kv { my_kv }
+    r2 { my_r2 }
+    vars {
+        MY_VAR: string
+    }
 }
 
-@d1(db)
+[use db]
 model BasicModel {
-    [primary id]
-    id: int
+    primary {
+        id: int
+    }
 
-    [foreign fk_to_model -> OneToManyModel::id]
-    fk_to_model: int
+    foreign(OneToManyModel::id) {
+        fk_to_model
+    }
 }
 
-@d1(db)
+[use db]
 model HasSqlColumnTypes {
-    [primary id]
-    id: int
+    primary {
+        id: int
+    }
 
     str: string
     integer: int
@@ -33,50 +38,57 @@ model HasSqlColumnTypes {
     dateNull: Option<date>
 }
 
-@d1(db)
+[use db]
 model HasOneToOne {
-    [primary id]
-    id: int
+    primary {
+        id: int
+    }
 
-    [foreign basicModelId -> BasicModel::id]
-    basicModelId: int
-
-    [nav oneToOneNav -> basicModelId]
-    oneToOneNav: BasicModel
+    foreign(BasicModel::id) {
+        basicModelId
+        nav { oneToOneNav }
+    }
 }
 
-@d1(db)
+[use db]
 model OneToManyModel {
-    [primary id]
-    id: int
+    primary {
+        id: int
+    }
 
-    [nav oneToManyNav -> BasicModel::fk_to_model]
-    oneToManyNav: Array<BasicModel>
+    nav(BasicModel::fk_to_model) {
+        oneToManyNav
+    }
 }
 
-@d1(db)
+[use db]
 model ManyToManyModelA {
-    [primary id]
-    id: int
+    primary {
+        id: int
+    }
 
-    [nav manyToManyNav <> ManyToManyModelB::manyToManyNav]
-    manyToManyNav: Array<ManyToManyModelB>
+    nav(ManyToManyModelB::id) {
+        manyToManyNav
+    }
 }
 
-@d1(db)
+[use db]
 model ManyToManyModelB {
-    [primary id]
-    id: int
+    primary {
+        id: int
+    }
 
-    [nav manyToManyNav <> ManyToManyModelA::manyToManyNav]
-    manyToManyNav: Array<ManyToManyModelA>
+    nav(ManyToManyModelA::id) {
+        manyToManyNav
+    }
 }
 
-@d1(db)
+[use db]
 model ModelWithCompositePk {
-    [primary tenantId, rowId]
-    tenantId: string
-    rowId: int
+    primary {
+        tenantId: string
+        rowId: int
+    }
 
     name: string
 }
@@ -86,20 +98,22 @@ api ModelWithCompositePk {
 }
 
 model ModelWithKv {
-    @keyparam
-    id1: string
+    keyfield {
+        id1
+        id2
+    }
 
-    @keyparam
-    id2: string
+    kv(my_kv, "{id1}") {
+        someValue: json
+    }
 
-    @kv(my_kv, "{id1}")
-    someValue: json
+    kv(my_kv, "") paginated {
+        manyValues: json
+    }
 
-    @kv(my_kv, "")
-    manyValues: Paginated<json>
-
-    @kv(my_kv, "constant")
-    streamValue: stream
+    kv(my_kv, "{id1}/{id2}") {
+        streamValue: stream
+    }
 }
 
 api ModelWithKv {
@@ -109,40 +123,47 @@ api ModelWithKv {
 }
 
 model ModelWithR2 {
-    @keyparam
-    id: string
+    keyfield {
+        id
+    }
 
-    @r2(my_r2, "{id}")
-    fileData: R2Object
+    r2(my_r2, "{id}") {
+        fileData
+    }
 
-    @r2(my_r2, "{id}/files")
-    manyFileDatas: Paginated<R2Object>
+    r2(my_r2, "{id}/files") paginated {
+        manyFileDatas
+    }
 }
 
 api ModelWithR2 {
     post hasR2ParamAndRes(self, input: R2Object) -> R2Object
 }
 
-@d1(db)
+[use db]
 model ToyotaPrius {
-    [primary id]
-    id: int
+    primary {
+        id: int
+    }
 
     ownerId: string
     modelYear: int
 
-    @keyparam
-    someKey: string
+    keyfield {
+        someKey
+    }
 
-    @kv(my_kv, "{ownerId}/{modelYear}")
-    metadata: json
+    kv(my_kv, "{ownerId}/{modelYear}") {
+        metadata: json
+    }
 
-    @r2(my_r2, "{modelYear}/photos")
-    photoData: R2Object
+    r2(my_r2, "{modelYear}/photos") {
+        photoData
+    }
 }
 
 api ToyotaPrius {
-        post instanceMethod(self, input: string) -> string
+    post instanceMethod(self, input: string) -> string
 }
 
 source WithKv for ToyotaPrius {
@@ -157,16 +178,17 @@ source WithR2 for ToyotaPrius {
     }
 }
 
-@d1(db)
-@crud(get, save, list)
+[use db, get, save, list]
 model ModelWithCruds {
-    [primary id]
-    id: int
+    primary {
+        id: int
+    }
 
     name: string
 
-    [foreign categoryId -> BasicModel::id]
-    categoryId: int
+    foreign(BasicModel::id) {
+        categoryId
+    }
 }
 
 source ByName for ModelWithCruds {
@@ -181,10 +203,11 @@ source ByName for ModelWithCruds {
     }
 }
 
-@d1(db)
+[use db]
 model ModelWithCustomDs {
-    [primary id]
-    id: int
+    primary {
+        id: int
+    }
 
     name: string
 }
@@ -198,7 +221,7 @@ source Custom for ModelWithCustomDs {
 }
 
 api ModelWithCustomDs {
-    post instanceMethod(@source(Custom) self, input: string) -> string
+    post instanceMethod([source Custom] self, input: string) -> string
 }
 
 service BasicService {}

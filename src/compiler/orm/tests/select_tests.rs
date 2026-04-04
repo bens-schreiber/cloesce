@@ -22,12 +22,15 @@ async fn scalar_model(db: SqlitePool) {
     // Arrange
     let ast = src_to_ast(
         r#"
-            env { db: d1 }
+            env {
+                d1 { db }
+            }
 
-            @d1(db)
+            [use db]
             model Person {
-                [primary id]
-                id: int
+                primary {
+                    id: int
+                }
 
                 name: string
             }
@@ -63,23 +66,29 @@ async fn one_to_one(db: SqlitePool) {
     // Arrange
     let ast = src_to_ast(
         r#"
-            env { db: d1 }
-
-            @d1(db)
-            model Person {
-                [primary id]
-                id: int
-
-                [foreign dogId -> Dog::id]
-                [nav dog -> dogId]
-                dogId: int
-                dog: Dog
+            env {
+                d1 { db }
             }
 
-            @d1(db)
+            [use db]
+            model Person {
+                primary {
+                    id: int
+                }
+
+                foreign(Dog::id) {
+                    dogId
+                    nav {
+                        dog
+                    }
+                }
+            }
+
+            [use db]
             model Dog {
-                [primary id]
-                id: int
+                primary {
+                    id: int
+                }
             }
         "#,
     );
@@ -113,48 +122,60 @@ async fn one_to_one(db: SqlitePool) {
 async fn one_to_many(db: SqlitePool) {
     let ast = src_to_ast(
         r#"
-            env { db: d1 }
+            env {
+                d1 { db }
+            }
 
-            @d1(db)
+            [use db]
             model Dog {
-                [primary id]
-                id: int
+                primary {
+                    id: int
+                }
 
-                [foreign personId -> Person::id]
-                personId: int
+                foreign(Person::id) {
+                    personId
+                }
             }
 
-            @d1(db)
+            [use db]
             model Cat {
-                [primary id]
-                id: int
+                primary {
+                    id: int
+                }
 
-                [foreign personId -> Person::id]
-                personId: int
+                foreign(Person::id) {
+                    personId
+                }
             }
 
-            @d1(db)
+            [use db]
             model Person {
-                [primary id]
-                id: int
+                primary {
+                    id: int
+                }
 
-                [foreign bossId -> Boss::id]
-                bossId: int
+                foreign(Boss::id) {
+                    bossId
+                }
 
-                [nav dogs -> Dog::personId]
-                dogs: Array<Dog>
+                nav(Dog::personId) {
+                    dogs
+                }
 
-                [nav cats -> Cat::personId]
-                cats: Array<Cat>
+                nav(Cat::personId) {
+                    cats
+                }
             }
 
-            @d1(db)
+            [use db]
             model Boss {
-                [primary id]
-                id: int
+                primary {
+                    id: int
+                }
 
-                [nav persons -> Person::bossId]
-                persons: Array<Person>
+                nav(Person::bossId) {
+                    persons
+                }
             }
         "#,
     );
@@ -219,24 +240,30 @@ async fn many_to_many(db: SqlitePool) {
     // Arrange
     let ast = src_to_ast(
         r#"
-            env { db: d1 }
-
-            @d1(db)
-            model Student {
-                [primary id]
-                id: int
-
-                [nav courses <> Course::students]
-                courses: Array<Course>
+            env {
+                d1 { db }
             }
 
-            @d1(db)
-            model Course {
-                [primary id]
-                id: int
+            [use db]
+            model Student {
+                primary {
+                    id: int
+                }
 
-                [nav students <> Student::courses]
-                students: Array<Student>
+                nav(Course::id) {
+                    courses
+                }
+            }
+
+            [use db]
+            model Course {
+                primary {
+                    id: int
+                }
+
+                nav(Student::id) {
+                    students
+                }
             }
         "#,
     );
@@ -272,28 +299,35 @@ async fn composite_one_to_one(db: SqlitePool) {
     // Arrange
     let ast = src_to_ast(
         r#"
-            env { db: d1 }
+            env {
+                d1 { db }
+            }
 
-            @d1(db)
+            [use db]
             model Student {
-                [primary school_id, student_number]
-                school_id: int
-                student_number: int
+                primary {
+                    school_id: int
+                    student_number: int
+                }
 
                 name: string
             }
 
-            @d1(db)
+            [use db]
             model Enrollment {
-                [primary id]
-                id: int
+                primary {
+                    id: int
+                }
 
-                [foreign (school_id, student_number) -> (Student::school_id, Student::student_number)]
-                [nav student -> (school_id, student_number)]
-                school_id: int
-                student_number: int
+                foreign(Student::school_id, Student::student_number) {
+                    school_id
+                    student_number
+                    nav {
+                        student
+                    }
+                }
+
                 course: string
-                student: Student
             }
         "#,
     );
@@ -336,28 +370,35 @@ async fn composite_one_to_many(db: SqlitePool) {
     // Arrange
     let ast = src_to_ast(
         r#"
-            env { db: d1 }
+            env {
+                d1 { db }
+            }
 
-            @d1(db)
+            [use db]
             model Order {
-                [primary region_id, order_number]
-                region_id: int
-                order_number: int
+                primary {
+                    region_id: int
+                    order_number: int
+                }
 
                 customer: string
 
-                [nav items -> (OrderItem::region_id, order_number)]
-                items: Array<OrderItem>
+                nav(OrderItem::region_id, OrderItem::order_number) {
+                    items
+                }
             }
 
-            @d1(db)
+            [use db]
             model OrderItem {
-                [primary id]
-                id: int
+                primary {
+                    id: int
+                }
 
-                [foreign (region_id, order_number) -> (Order::region_id, Order::order_number)]
-                region_id: int
-                order_number: int
+                foreign(Order::region_id, Order::order_number) {
+                    region_id
+                    order_number
+                }
+
                 product: string
             }
         "#,
@@ -413,30 +454,36 @@ async fn composite_many_to_many(db: SqlitePool) {
     // Arrange
     let ast = src_to_ast(
         r#"
-            env { db: d1 }
+            env {
+                d1 { db }
+            }
 
-            @d1(db)
+            [use db]
             model Teacher {
-                [primary school_id, employee_id]
-                school_id: int
-                employee_id: int
+                primary {
+                    school_id: int
+                    employee_id: int
+                }
 
                 name: string
 
-                [nav courses <> Course::teachers]
-                courses: Array<Course>
+                nav(Course::department_id, Course::course_code) {
+                    courses
+                }
             }
 
-            @d1(db)
+            [use db]
             model Course {
-                [primary department_id, course_code]
-                department_id: int
-                course_code: int
+                primary {
+                    department_id: int
+                    course_code: int
+                }
 
                 title: string
 
-                [nav teachers <> Teacher::courses]
-                teachers: Array<Teacher>
+                nav(Teacher::school_id, Teacher::employee_id) {
+                    teachers
+                }
             }
         "#,
     );
@@ -483,31 +530,40 @@ async fn gensym_stops_ambigious_table(db: SqlitePool) {
     // Arrange
     let ast = src_to_ast(
         r#"
-            env { db: d1 }
+            env {
+                d1 { db }
+            }
 
-            @d1(db)
+            [use db]
             model Horse {
-                [primary id]
-                id: int
+                primary {
+                    id: int
+                }
 
                 name: string
                 bio: Option<string>
 
-                [nav matches -> Match::horseId1]
-                matches: Array<Match>
+                nav(Match::horseId1) {
+                    matches
+                }
             }
 
-            @d1(db)
+            [use db]
             model Match {
-                [primary id]
-                id: int
+                primary {
+                    id: int
+                }
 
-                [foreign horseId1 -> Horse::id]
-                [foreign horseId2 -> Horse::id]
-                [nav horse2 -> horseId2]
-                horseId1: int
-                horseId2: int
-                horse2: Horse
+                foreign(Horse::id) {
+                    horseId1
+                }
+
+                foreign(Horse::id) {
+                    horseId2
+                    nav {
+                        horse2
+                    }
+                }
             }
         "#,
     );
@@ -530,7 +586,7 @@ async fn gensym_stops_ambigious_table(db: SqlitePool) {
     // Assert
     expected_str!(
         sql,
-        r#"SELECT "Horse"."id" AS "id", "Horse"."name" AS "name", "Horse"."bio" AS "bio", "Match_1"."id" AS "matches.id", "Match_1"."horseId1" AS "matches.horseId1", "Match_1"."horseId2" AS "matches.horseId2", "Horse_2"."id" AS "matches.horse2.id", "Horse_2"."name" AS "matches.horse2.name", "Horse_2"."bio" AS "matches.horse2.bio" FROM "Horse" LEFT JOIN "Match" AS "Match_1" ON "Horse"."id" = "Match_1"."horseId1" LEFT JOIN "Horse" AS "Horse_2" ON "Match_1"."horseId2" = "Horse_2"."id""#
+        r#"SELECT "Horse"."id" AS "id", "Horse"."name" AS "name", "Horse"."bio" AS "bio", "Match_1"."id" AS "matches.id", "Match_1"."horseId1" AS "matches.horseId1", "Match_1"."horseId2" AS "matches.horseId2", "Horse_2"."id" AS "matches.horse2.id", "Horse_2"."name" AS "matches.horse2.name", "Horse_2"."bio" AS "matches.horse2.bio" FROM "Horse" LEFT JOIN "Match" AS "Match_1" ON "Horse"."id" = "Match_1"."horseId1" LEFT JOIN "Horse" AS "Horse_2" ON "Match_1"."horseId1" = "Horse_2"."id""#
     );
 
     let results = test_sql(ast, vec![(insert_query, vec![]), (sql, vec![])], db)
@@ -548,12 +604,15 @@ async fn custom_from(db: SqlitePool) {
     // Arrange
     let ast = src_to_ast(
         r#"
-            env { db: d1 }
+            env {
+                d1 { db }
+            }
 
-            @d1(db)
+            [use db]
             model Person {
-                [primary id]
-                id: int
+                primary {
+                    id: int
+                }
 
                 name: string
             }

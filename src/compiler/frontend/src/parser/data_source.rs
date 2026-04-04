@@ -89,7 +89,7 @@ pub fn data_source_block<'tokens, 'src: 'tokens>()
 
     // sql list(...) { ... }
     let list_method = just(Token::Sql)
-        .then_ignore(just(Token::Ident("list")))
+        .then_ignore(just(Token::List))
         .ignore_then(
             named_parameter()
                 .separated_by(just(Token::Comma))
@@ -99,9 +99,10 @@ pub fn data_source_block<'tokens, 'src: 'tokens>()
         )
         .then(sql_block);
 
-    // @internal
-    let internal_decorator = just(Token::At)
+    // [internal]
+    let internal_decorator = just(Token::LBracket)
         .ignore_then(just(Token::Ident("internal")))
+        .then(just(Token::RBracket))
         .ignored();
 
     // source SourceName for ModelName { ... }

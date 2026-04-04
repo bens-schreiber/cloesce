@@ -166,8 +166,30 @@ impl<'src, 'p> SymbolTable<'src, 'p> {
                 insert_global_name(sink, &model.symbol);
             }
 
-            for field in &model.fields {
+            for field in &model.typed_idents {
                 insert_symbol(&mut st, sink, field);
+            }
+
+            for kv in &model.kvs {
+                insert_symbol(&mut st, sink, &kv.field);
+            }
+
+            for r2 in &model.r2s {
+                insert_symbol(&mut st, sink, &r2.field);
+            }
+
+            for kf in &model.key_fields {
+                insert_symbol(&mut st, sink, kf);
+            }
+
+            for nav in &model.navigation_blocks {
+                insert_symbol(&mut st, sink, &nav.field);
+            }
+
+            for foreign in &model.foreign_blocks {
+                for field in &foreign.fields {
+                    insert_symbol(&mut st, sink, field);
+                }
             }
         }
 
@@ -487,14 +509,20 @@ fn resolve_cidl_type<'src, 'p>(
                 return Ok(CidlType::Inject { name: sym.name });
             }
 
-            Err(SemanticError::UnresolvedSymbol { span: symbol.span })
+            Err(SemanticError::UnresolvedSymbol {
+                span: symbol.span,
+                name,
+            })
         }
         CidlType::DataSource { model_name } => {
             let valid = table
                 .resolve(model_name, SymbolKind::ModelDecl, None)
                 .is_some();
             if !valid {
-                return Err(SemanticError::UnresolvedSymbol { span: symbol.span });
+                return Err(SemanticError::UnresolvedSymbol {
+                    span: symbol.span,
+                    name: model_name,
+                });
             }
             Ok(cidl_type.clone())
         }
@@ -507,7 +535,10 @@ fn resolve_cidl_type<'src, 'p>(
                     .is_some();
 
             if !valid {
-                return Err(SemanticError::UnresolvedSymbol { span: symbol.span });
+                return Err(SemanticError::UnresolvedSymbol {
+                    span: symbol.span,
+                    name: object_name,
+                });
             }
             Ok(cidl_type.clone())
         }

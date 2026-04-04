@@ -3,28 +3,28 @@ use compiler_test::lex_and_parse;
 
 #[test]
 fn env_block() {
+    // Act
     let ast = lex_and_parse(
         r#"
 
         env {
-            // bindings
-            db: d1
-            db2: d1
+            d1 { db db2 }
+            r2 { assets }
+            kv { cache }
 
-            assets: r2
-            cache: kv
-
-            // variables
-            api_url: string
-            max_retries: int
-            threshold: double
-            created_at: date
-            payload: json
-            enabled: bool
+            vars {
+                api_url: string
+                max_retries: int
+                threshold: double
+                created_at: date
+                payload: json
+                enabled: bool
+            }
         }
         "#,
     );
 
+    // Assert
     let env = ast
         .wrangler_envs
         .first()
@@ -62,615 +62,8 @@ fn env_block() {
 }
 
 #[test]
-fn model_block_scalar() {
-    let ast = lex_and_parse(
-        r#"
-        @d1(d1_a)
-        model Person {
-            // Composite PK id, age
-            [primary id, age]
-            age: int
-            id: int
-
-            name: string
-
-            active: bool
-            birthday: date
-            score: double
-        }
-        "#,
-    );
-
-    let model = ast.models.first().expect("model to be present");
-    assert_eq!(model.symbol.name, "Person");
-    assert_eq!(
-        model.d1_binding.as_ref().map(|b| b.env_binding),
-        Some("d1_a")
-    );
-
-    assert_eq!(
-        model
-            .primary_keys
-            .iter()
-            .map(|p| p.field)
-            .collect::<Vec<_>>(),
-        vec!["id", "age"]
-    );
-
-    assert_eq!(
-        model
-            .fields
-            .iter()
-            .map(|c| (c.name, c.cidl_type.clone()))
-            .collect::<Vec<_>>(),
-        vec![
-            ("age", CidlType::Integer),
-            ("id", CidlType::Integer),
-            ("name", CidlType::String),
-            ("active", CidlType::Boolean),
-            ("birthday", CidlType::DateIso),
-            ("score", CidlType::Double)
-        ]
-    );
-}
-
-#[test]
-fn model_block_kv_r2_anchored_tags() {
-    let ast = lex_and_parse(
-        r#"
-        env {
-            cache_ns: kv
-            assets_bucket: r2
-        }
-
-        model Foo {
-            field: string
-
-            @keyparam
-            category: string
-
-            @kv(cache_ns, "my-interpolated-format{field}-{category}")
-            kv_value: anyTypeATAll
-
-            @r2(assets_bucket, "my_interpolated_format{field}")
-            obj: R2Object
-        }
-        "#,
-    );
-
-    let foo = ast
-        .models
-        .iter()
-        .find(|m| m.symbol.name == "Foo")
-        .expect("Foo model to be present");
-
-    assert_eq!(foo.kvs.len(), 1);
-    assert_eq!(foo.r2s.len(), 1);
-    assert_eq!(foo.key_fields.len(), 1);
-
-    let key_param_names: Vec<&str> = foo.key_fields.iter().map(|k| k.field).collect();
-    assert_eq!(key_param_names, vec!["category"]);
-
-    let kv = &foo.kvs[0];
-    assert_eq!(kv.field, "kv_value");
-    assert_eq!(kv.format, "my-interpolated-format{field}-{category}");
-
-    let r2 = &foo.r2s[0];
-    assert_eq!(r2.field, "obj");
-    assert_eq!(r2.format, "my_interpolated_format{field}");
-}
-
-#[test]
-fn model_block_unique_constraints() {
-    let ast = lex_and_parse(
-        r#"
-        @d1(d1_a)
-        model Foo {
-            [primary id]
-            [unique a, b, c]
-            [unique email]
-
-            id: int
-            a: int
-            b: int
-            c: int
-            email: string
-        }
-        "#,
-    );
-
-    let foo = ast
-        .models
-        .iter()
-        .find(|m| m.symbol.name == "Foo")
-        .expect("Foo model to be present");
-
-    let unique_constraints: Vec<Vec<&str>> = foo
-        .unique_constraints
-        .iter()
-        .map(|constraint| constraint.fields.to_vec())
-        .collect();
-
-    assert_eq!(unique_constraints, vec![vec!["a", "b", "c"], vec!["email"]]);
-}
-
-#[test]
-fn model_block_single_foreign_key() {
-    let ast = lex_and_parse(
-        r#"
-        @d1(d1_a)
-        model Person {
-            [primary id]
-            id: int
-        }
-
-        @d1(d1_a)
-        model Dog {
-            [primary id]
-            [foreign userId -> Person::id]
-            id: int
-            userId: int
-        }
-        "#,
-    );
-
-    let dog = ast
-        .models
-        .iter()
-        .find(|m| m.symbol.name == "Dog")
-        .expect("Dog model to be present");
-
-    assert_eq!(dog.d1_binding.as_ref().map(|b| b.env_binding), Some("d1_a"));
-
-    assert_eq!(dog.foreign_keys.len(), 1);
-    let fk = &dog.foreign_keys[0];
-    assert_eq!(fk.adj_model, "Person");
-    assert_eq!(
-        fk.references
-            .iter()
-            .map(|(src, _)| *src)
-            .collect::<Vec<_>>(),
-        vec!["userId"]
-    );
-}
-
-#[test]
-fn model_block_composite_foreign_key() {
-    let ast = lex_and_parse(
-        r#"
-        @d1(d1_a)
-        model Parent {
-            [primary orgId, userId]
-            orgId: int
-            userId: int
-        }
-
-        @d1(d1_a)
-        model Child {
-            [primary id]
-            id: int
-
-            [foreign (orgId, userId)
-                -> (Parent::orgId, Parent::userId)]
-            orgId: int
-            userId: int
-
-        }
-        "#,
-    );
-
-    let child = ast
-        .models
-        .iter()
-        .find(|m| m.symbol.name == "Child")
-        .expect("Child model to be present");
-
-    assert_eq!(
-        child.d1_binding.as_ref().map(|b| b.env_binding),
-        Some("d1_a")
-    );
-
-    assert_eq!(child.foreign_keys.len(), 1);
-    let fk = &child.foreign_keys[0];
-    assert_eq!(fk.adj_model, "Parent");
-    assert_eq!(
-        fk.references
-            .iter()
-            .map(|(src, _)| *src)
-            .collect::<Vec<_>>(),
-        vec!["orgId", "userId"]
-    );
-}
-
-#[test]
-fn model_block_nav_one_to_one() {
-    let ast = lex_and_parse(
-        r#"
-        @d1(d1_a)
-        model Bar {
-            [primary id]
-            id: int
-        }
-
-        @d1(d1_a)
-        model Foo {
-            [primary id]
-            id: int
-
-            [foreign barId -> Bar::id]
-            barId: int
-
-            [nav bar -> Bar::id]
-            bar: Bar
-        }
-        "#,
-    );
-
-    let foo = ast
-        .models
-        .iter()
-        .find(|m| m.symbol.name == "Foo")
-        .expect("Foo model to be present");
-
-    assert_eq!(foo.navigation_properties.len(), 1);
-    let nav = &foo.navigation_properties[0];
-    assert_eq!(nav.field, "bar");
-    assert!(!nav.is_many_to_many);
-    assert_eq!(
-        nav.fields.iter().map(|(m, f)| (*m, *f)).collect::<Vec<_>>(),
-        vec![("Bar", "id")]
-    );
-}
-
-#[test]
-fn model_block_nav_one_to_many() {
-    let ast = lex_and_parse(
-        r#"
-        @d1(d1_a)
-        model Foo {
-            [primary id]
-            id: int
-
-            [nav bars -> Bar::fooId]
-            bars: Array<Bar>
-        }
-
-        @d1(d1_a)
-        model Bar {
-            [primary id]
-            id: int
-
-            [foreign fooId -> Foo::id]
-            fooId: int
-        }
-        "#,
-    );
-
-    let foo = ast
-        .models
-        .iter()
-        .find(|m| m.symbol.name == "Foo")
-        .expect("Foo model to be present");
-
-    assert_eq!(foo.navigation_properties.len(), 1);
-    let nav = &foo.navigation_properties[0];
-    assert_eq!(nav.field, "bars");
-    assert!(!nav.is_many_to_many);
-    assert_eq!(
-        nav.fields.iter().map(|(m, f)| (*m, *f)).collect::<Vec<_>>(),
-        vec![("Bar", "fooId")]
-    );
-}
-
-#[test]
-fn model_block_nav_many_to_many() {
-    let ast = lex_and_parse(
-        r#"
-        @d1(d1_a)
-        model Student {
-            [primary id]
-            id: int
-
-            [nav courses <> Course::students]
-            courses: Array<Course>
-        }
-
-        @d1(d1_a)
-        model Course {
-            [primary id]
-            id: int
-
-            [nav students <> Student::courses]
-            students: Array<Student>
-        }
-        "#,
-    );
-
-    let student = ast
-        .models
-        .iter()
-        .find(|m| m.symbol.name == "Student")
-        .expect("Student model to be present");
-
-    let course = ast
-        .models
-        .iter()
-        .find(|m| m.symbol.name == "Course")
-        .expect("Course model to be present");
-
-    assert_eq!(student.navigation_properties.len(), 1);
-    let student_nav = &student.navigation_properties[0];
-    assert_eq!(student_nav.field, "courses");
-    assert!(student_nav.is_many_to_many);
-    assert_eq!(
-        student_nav
-            .fields
-            .iter()
-            .map(|(m, f)| (*m, *f))
-            .collect::<Vec<_>>(),
-        vec![("Course", "students")]
-    );
-
-    assert_eq!(course.navigation_properties.len(), 1);
-    let course_nav = &course.navigation_properties[0];
-    assert_eq!(course_nav.field, "students");
-    assert!(course_nav.is_many_to_many);
-    assert_eq!(
-        course_nav
-            .fields
-            .iter()
-            .map(|(m, f)| (*m, *f))
-            .collect::<Vec<_>>(),
-        vec![("Student", "courses")]
-    );
-}
-
-#[test]
-fn model_block_nav_implicit_model() {
-    let ast = lex_and_parse(
-        r#"
-        @d1(d1_a)
-        model Bar {
-            [primary id]
-            id: int
-            col: int
-
-            [nav foo -> col]
-            foo: Bar
-        }
-        "#,
-    );
-
-    let bar = ast
-        .models
-        .iter()
-        .find(|m| m.symbol.name == "Bar")
-        .expect("Bar model to be present");
-
-    assert_eq!(bar.navigation_properties.len(), 1);
-    let nav = &bar.navigation_properties[0];
-    assert_eq!(nav.field, "foo");
-    assert!(!nav.is_many_to_many);
-    assert_eq!(
-        nav.fields.iter().map(|(m, f)| (*m, *f)).collect::<Vec<_>>(),
-        vec![("Bar", "col")]
-    );
-}
-
-#[test]
-fn model_block_nav_mixed_refs() {
-    let ast = lex_and_parse(
-        r#"
-        @d1(d1_a)
-        model Foo {
-            [primary id]
-            id: int
-            col: int
-        }
-
-        @d1(d1_a)
-        model Bar {
-            [primary id]
-            id: int
-            localCol: int
-
-            [nav baz -> (Foo::col, localCol)]
-            baz: Foo
-        }
-        "#,
-    );
-
-    let bar = ast
-        .models
-        .iter()
-        .find(|m| m.symbol.name == "Bar")
-        .expect("Bar model to be present");
-
-    assert_eq!(bar.navigation_properties.len(), 1);
-    let nav = &bar.navigation_properties[0];
-    assert_eq!(nav.field, "baz");
-    assert!(!nav.is_many_to_many);
-    assert_eq!(
-        nav.fields.iter().map(|(m, f)| (*m, *f)).collect::<Vec<_>>(),
-        vec![("Foo", "col"), ("Bar", "localCol")]
-    );
-}
-
-#[test]
-fn api_block() {
-    let ast = lex_and_parse(
-        r#"
-        @crud(get, save, list)
-        model User {
-            [primary id]
-            id: int
-            name: string
-        }
-
-        api User {
-            post someMethod(
-                @source(mySource)
-                self,
-                id: Option<int>
-            ) -> double
-
-            get anotherMethod() -> void
-        }
-
-        api User {
-            get getById(id: int, e: env) -> void
-        }
-
-        api User {
-            post update(self) -> void
-        }
-        "#,
-    );
-
-    // Verify cruds are on the model
-    let user_model = ast
-        .models
-        .iter()
-        .find(|m| m.symbol.name == "User")
-        .expect("User model to be present");
-    assert_eq!(
-        user_model.cruds,
-        vec![CrudKind::Get, CrudKind::Save, CrudKind::List]
-    );
-
-    // ParseAst keeps api blocks separate
-    let user_api_blocks: Vec<_> = ast.apis.iter().filter(|a| a.namespace == "User").collect();
-    assert_eq!(user_api_blocks.len(), 3);
-
-    // First block: someMethod + anotherMethod
-    let first = user_api_blocks
-        .iter()
-        .find(|a| a.methods.iter().any(|m| m.symbol.name == "someMethod"))
-        .expect("block with someMethod");
-
-    let some_method = first
-        .methods
-        .iter()
-        .find(|m| m.symbol.name == "someMethod")
-        .expect("someMethod to be present");
-    assert_eq!(some_method.http_verb, HttpVerb::Post);
-    assert!(!some_method.is_static);
-    assert!(some_method.data_source.is_some());
-    assert_eq!(some_method.parameters.len(), 1);
-    assert_eq!(some_method.parameters[0].name, "id");
-    assert_eq!(
-        some_method.parameters[0].cidl_type,
-        CidlType::nullable(CidlType::Integer)
-    );
-    assert_eq!(some_method.return_type, CidlType::Double);
-
-    let another_method = first
-        .methods
-        .iter()
-        .find(|m| m.symbol.name == "anotherMethod")
-        .expect("anotherMethod to be present");
-    assert_eq!(another_method.http_verb, HttpVerb::Get);
-    assert!(another_method.is_static);
-    assert!(another_method.data_source.is_none());
-    assert_eq!(another_method.parameters.len(), 0);
-    assert_eq!(another_method.return_type, CidlType::Void);
-
-    // Second block: getById
-    let second = user_api_blocks
-        .iter()
-        .find(|a| a.methods.iter().any(|m| m.symbol.name == "getById"))
-        .expect("block with getById");
-    assert_eq!(second.methods.len(), 1);
-    let get_by_id = &second.methods[0];
-    assert_eq!(get_by_id.parameters.len(), 2);
-    assert_eq!(get_by_id.parameters[0].cidl_type, CidlType::Integer);
-    assert_eq!(get_by_id.parameters[1].name, "e");
-    assert_eq!(get_by_id.parameters[1].cidl_type, CidlType::Env);
-
-    // Third block: update
-    let third = user_api_blocks
-        .iter()
-        .find(|a| a.methods.iter().any(|m| m.symbol.name == "update"))
-        .expect("block with update");
-    assert_eq!(third.methods.len(), 1);
-}
-
-#[test]
-fn data_source_block() {
-    let ast = lex_and_parse(
-        r#"
-        source UserSource for User {
-            include { id, name, address { street, city } }
-
-            sql get(id: int) {
-                "SELECT * FROM users WHERE id = ?"
-            }
-
-            sql list(offset: int, limit: int) {
-                "SELECT * FROM users LIMIT ? OFFSET ?"
-            }
-        }
-
-        source MinimalSource for Post {
-            include { id, title }
-        }
-        "#,
-    );
-
-    assert_eq!(ast.sources.len(), 2);
-
-    let user_source = ast
-        .sources
-        .iter()
-        .find(|s| s.symbol.name == "UserSource")
-        .expect("UserSource to be present");
-    assert_eq!(user_source.model, "User");
-
-    let tree = &user_source.tree;
-    assert!(tree.0.contains_key("id"));
-    assert!(tree.0.contains_key("name"));
-    assert!(tree.0.contains_key("address"));
-
-    let address_subtree = &tree.0["address"];
-    assert!(address_subtree.0.contains_key("street"));
-    assert!(address_subtree.0.contains_key("city"));
-
-    let id_subtree = &tree.0["id"];
-    assert!(id_subtree.0.is_empty());
-
-    let get = user_source.get.as_ref().expect("get method to be present");
-    assert_eq!(get.raw_sql, "SELECT * FROM users WHERE id = ?");
-    assert_eq!(get.parameters.len(), 1);
-    assert_eq!(get.parameters[0].name, "id");
-    assert_eq!(get.parameters[0].cidl_type, CidlType::Integer);
-
-    let list = user_source
-        .list
-        .as_ref()
-        .expect("list method to be present");
-    assert_eq!(list.raw_sql, "SELECT * FROM users LIMIT ? OFFSET ?");
-    assert_eq!(list.parameters.len(), 2);
-    assert_eq!(list.parameters[0].name, "offset");
-    assert_eq!(list.parameters[0].cidl_type, CidlType::Integer);
-    assert_eq!(list.parameters[1].name, "limit");
-    assert_eq!(list.parameters[1].cidl_type, CidlType::Integer);
-
-    let minimal = ast
-        .sources
-        .iter()
-        .find(|s| s.symbol.name == "MinimalSource")
-        .expect("MinimalSource to be present");
-    assert_eq!(minimal.model, "Post");
-    assert!(minimal.get.is_none());
-    assert!(minimal.list.is_none());
-
-    let minimal_tree = &minimal.tree;
-    assert!(minimal_tree.0.contains_key("id"));
-    assert!(minimal_tree.0.contains_key("title"));
-}
-
-#[test]
 fn poo_block() {
+    // Act
     let ast = lex_and_parse(
         r#"
         poo Address {
@@ -701,6 +94,7 @@ fn poo_block() {
         "#,
     );
 
+    // Assert
     assert_eq!(ast.poos.len(), 3);
 
     let address_poo = ast
@@ -773,6 +167,7 @@ fn poo_block() {
 
 #[test]
 fn inject_block() {
+    // Act
     let ast = lex_and_parse(
         r#"
         inject {
@@ -786,6 +181,7 @@ fn inject_block() {
         "#,
     );
 
+    // Assert
     assert_eq!(
         ast.injects
             .iter()
@@ -798,6 +194,7 @@ fn inject_block() {
 
 #[test]
 fn service_block() {
+    // Act
     let ast = lex_and_parse(
         r#"
         service MyAppService {
@@ -820,14 +217,13 @@ fn service_block() {
         "#,
     );
 
+    // Assert
     assert_eq!(ast.services.len(), 2);
-
     let service = ast
         .services
         .iter()
         .find(|s| s.symbol.name == "MyAppService")
         .expect("MyAppService service to be present");
-
     assert_eq!(service.fields.len(), 2);
 
     let api1 = service
@@ -851,9 +247,7 @@ fn service_block() {
         api2.cidl_type,
         CidlType::UnresolvedReference { name: "YouTubeApi" }
     );
-
-    // Fields have distinct spans
-    assert_ne!(api1.span, api2.span);
+    assert_ne!(api1.span, api2.span, "fields should have distinct spans");
 
     let empty = ast
         .services
@@ -861,17 +255,21 @@ fn service_block() {
         .find(|s| s.symbol.name == "EmptyService")
         .expect("EmptyService to be present");
     assert_eq!(empty.fields.len(), 0);
+    assert_ne!(
+        service.symbol.span, empty.symbol.span,
+        "services should have distinct spans"
+    );
 
-    // Services have distinct name spans
-    assert_ne!(service.symbol.span, empty.symbol.span);
-
-    // Two api blocks for MyAppService kept separate
     let app_api_blocks: Vec<_> = ast
         .apis
         .iter()
         .filter(|a| a.namespace == "MyAppService")
         .collect();
-    assert_eq!(app_api_blocks.len(), 2);
+    assert_eq!(
+        app_api_blocks.len(),
+        2,
+        "should have two separate api blocks for MyAppService"
+    );
 
     let create_block = app_api_blocks
         .iter()
@@ -899,4 +297,477 @@ fn service_block() {
     assert_eq!(list.http_verb, HttpVerb::Get);
     assert!(!list.is_static);
     assert_eq!(list.return_type, CidlType::array(CidlType::String));
+}
+
+#[test]
+fn model_block_scalar() {
+    // Act
+    let ast = lex_and_parse(
+        r#"
+        [use d1_a]
+        model Person {
+            // Composite PK: id and age
+            primary {
+                id: int
+                age: int
+            }
+
+            name: string
+            active: bool
+            birthday: date
+            score: double
+        }
+        "#,
+    );
+
+    // Assert
+    let model = ast.models.first().expect("model to be present");
+    assert_eq!(model.symbol.name, "Person");
+    assert_eq!(model.use_tag.as_ref().unwrap().env_bindings, vec!["d1_a"]);
+    assert_eq!(model.primary_fields, vec!["id", "age"]);
+
+    let all_names: Vec<&str> = model.typed_idents.iter().map(|f| f.name).collect();
+    assert!(all_names.contains(&"id")); // should include primary fields
+    assert!(all_names.contains(&"age"));
+    assert!(all_names.contains(&"name"));
+    assert!(all_names.contains(&"active"));
+    assert!(all_names.contains(&"birthday"));
+    assert!(all_names.contains(&"score"));
+}
+
+#[test]
+fn model_block_kv_r2() {
+    // Act
+    let ast = lex_and_parse(
+        r#"
+        model Foo {
+            field: string
+
+            kv(cache_ns, "my-interpolated-format{field}-{category}") {
+                kv_value: json
+            }
+
+            r2(assets_bucket, "my_interpolated_format{field}") {
+                obj
+            }
+        }
+        "#,
+    );
+
+    // Assert
+    let foo = ast
+        .models
+        .iter()
+        .find(|m| m.symbol.name == "Foo")
+        .expect("Foo model to be present");
+
+    assert_eq!(foo.kvs.len(), 1);
+    assert_eq!(foo.r2s.len(), 1);
+
+    let kv = &foo.kvs[0];
+    assert_eq!(kv.env_binding, "cache_ns");
+    assert_eq!(kv.key_format, "my-interpolated-format{field}-{category}");
+    assert_eq!(kv.field.name, "kv_value");
+
+    let r2 = &foo.r2s[0];
+    assert_eq!(r2.env_binding, "assets_bucket");
+    assert_eq!(r2.key_format, "my_interpolated_format{field}");
+    assert_eq!(r2.field.name, "obj");
+}
+
+#[test]
+fn model_block_unique_constraints() {
+    // Act
+    let ast = lex_and_parse(
+        r#"
+        [use d1_a]
+        model Foo {
+            primary {
+                id: int
+            }
+
+            unique {
+                a: int
+                b: int
+                c: int
+            }
+
+            unique {
+                email: string
+            }
+        }
+        "#,
+    );
+
+    // Assert
+    let foo = ast
+        .models
+        .iter()
+        .find(|m| m.symbol.name == "Foo")
+        .expect("Foo model to be present");
+
+    let unique_constraints: Vec<Vec<&str>> = foo
+        .unique_constraints
+        .iter()
+        .map(|constraint| constraint.fields.to_vec())
+        .collect();
+
+    assert_eq!(unique_constraints, vec![vec!["a", "b", "c"], vec!["email"]]);
+}
+
+#[test]
+fn model_block_single_foreign_key() {
+    // Act
+    let ast = lex_and_parse(
+        r#"
+        [use d1_a]
+        model Person {
+            primary {
+                id: int
+            }
+        }
+
+        [use d1_a]
+        model Dog {
+            primary {
+                id: int
+            }
+
+            foreign(Person::id) {
+                userId
+            }
+
+            userId: int
+        }
+        "#,
+    );
+
+    // Assert
+    let dog = ast
+        .models
+        .iter()
+        .find(|m| m.symbol.name == "Dog")
+        .expect("Dog model to be present");
+
+    assert_eq!(dog.use_tag.as_ref().unwrap().env_bindings, vec!["d1_a"]);
+
+    assert_eq!(dog.foreign_blocks.len(), 1);
+    let fb = &dog.foreign_blocks[0];
+    assert_eq!(fb.adj, vec![("Person", "id")]);
+    assert_eq!(
+        fb.fields.iter().map(|s| s.name).collect::<Vec<_>>(),
+        vec!["userId"]
+    );
+}
+
+#[test]
+fn model_block_composite_foreign_key() {
+    // Act
+    let ast = lex_and_parse(
+        r#"
+        [use d1_a]
+        model Parent {
+            primary {
+                orgId: int
+                userId: int
+            }
+        }
+
+        [use d1_a]
+        model Child {
+            primary {
+                id: int
+            }
+
+            foreign(Parent::orgId, Parent::userId) {
+                orgId
+                userId
+            }
+
+            orgId: int
+            userId: int
+        }
+        "#,
+    );
+
+    // Assert
+    let child = ast
+        .models
+        .iter()
+        .find(|m| m.symbol.name == "Child")
+        .expect("Child model to be present");
+
+    assert_eq!(child.use_tag.as_ref().unwrap().env_bindings, vec!["d1_a"]);
+
+    assert_eq!(child.foreign_blocks.len(), 1);
+    let fb = &child.foreign_blocks[0];
+    assert_eq!(fb.adj, vec![("Parent", "orgId"), ("Parent", "userId")]);
+    assert_eq!(
+        fb.fields.iter().map(|s| s.name).collect::<Vec<_>>(),
+        vec!["orgId", "userId"]
+    );
+}
+
+#[test]
+fn model_block_foreign_with_nav() {
+    // Act
+    let ast = lex_and_parse(
+        r#"
+        [use d1_a]
+        model Bar {
+            primary {
+                id: int
+            }
+        }
+
+        [use d1_a]
+        model Foo {
+            primary {
+                id: int
+            }
+
+            foreign(Bar::id) {
+                barId
+                nav { bar }
+            }
+
+            barId: int
+        }
+        "#,
+    );
+
+    // Assert
+    let foo = ast
+        .models
+        .iter()
+        .find(|m| m.symbol.name == "Foo")
+        .expect("Foo model to be present");
+
+    assert_eq!(foo.foreign_blocks.len(), 1);
+    let fb = &foo.foreign_blocks[0];
+    assert_eq!(fb.adj, vec![("Bar", "id")]);
+    assert_eq!(
+        fb.fields.iter().map(|s| s.name).collect::<Vec<_>>(),
+        vec!["barId"]
+    );
+
+    assert_eq!(foo.navigation_blocks.len(), 1);
+    let nav = &foo.navigation_blocks[0];
+    assert_eq!(nav.field.name, "bar");
+    assert_eq!(nav.adj, vec![("Bar", "id")]);
+}
+
+#[test]
+fn model_block_primary_foreign() {
+    // Act
+    let ast = lex_and_parse(
+        r#"
+        [use d1_a]
+        model Person {
+            primary {
+                id: int
+            }
+        }
+
+        [use d1_a]
+        model PassportEntry {
+            primary foreign(Person::id) {
+                personId
+            }
+        }
+        "#,
+    );
+
+    // Assert
+    let passport = ast
+        .models
+        .iter()
+        .find(|m| m.symbol.name == "PassportEntry")
+        .expect("PassportEntry model to be present");
+
+    assert_eq!(passport.primary_fields, vec!["personId"]);
+    assert_eq!(passport.foreign_blocks.len(), 1);
+    let fb = &passport.foreign_blocks[0];
+    assert_eq!(fb.adj, vec![("Person", "id")]);
+    assert_eq!(
+        fb.fields.iter().map(|s| s.name).collect::<Vec<_>>(),
+        vec!["personId"]
+    );
+}
+
+#[test]
+fn model_block_unique_foreign() {
+    // Act
+    let ast = lex_and_parse(
+        r#"
+        [use d1_a]
+        model Company {
+            primary {
+                id: int
+            }
+        }
+
+        [use d1_a]
+        model Employee {
+            primary {
+                id: int
+            }
+
+            unique foreign(Company::id) {
+                companyId
+            }
+
+            companyId: int
+        }
+        "#,
+    );
+
+    // Assert
+    let employee = ast
+        .models
+        .iter()
+        .find(|m| m.symbol.name == "Employee")
+        .expect("Employee model to be present");
+
+    assert_eq!(employee.unique_constraints.len(), 1);
+    assert_eq!(employee.unique_constraints[0].fields, vec!["companyId"]);
+    assert_eq!(employee.foreign_blocks.len(), 1);
+    let fb = &employee.foreign_blocks[0];
+    assert_eq!(fb.adj, vec![("Company", "id")]);
+    assert_eq!(
+        fb.fields.iter().map(|s| s.name).collect::<Vec<_>>(),
+        vec!["companyId"]
+    );
+}
+
+#[test]
+fn model_block_unique_with_nested_foreign() {
+    // Act
+    let ast = lex_and_parse(
+        r#"
+        [use d1_a]
+        model Org {
+            primary {
+                id: int
+            }
+        }
+
+        [use d1_a]
+        model Member {
+            primary {
+                id: int
+            }
+
+            unique {
+                foreign(Org::id) {
+                    orgId
+                }
+                role: string
+            }
+
+            orgId: int
+        }
+        "#,
+    );
+
+    // Assert
+    let member = ast
+        .models
+        .iter()
+        .find(|m| m.symbol.name == "Member")
+        .expect("Member model to be present");
+
+    assert_eq!(member.unique_constraints.len(), 1);
+    assert_eq!(member.unique_constraints[0].fields, vec!["orgId", "role"]);
+    assert_eq!(member.foreign_blocks.len(), 1);
+}
+
+#[test]
+fn model_block_use_tags() {
+    // Act
+    let ast = lex_and_parse(
+        r#"
+        [use d1_db, list]
+        [use get, save, d2_db]
+        model User {
+            primary {
+                id: int
+            }
+            name: string
+        }
+        "#,
+    );
+
+    // Assert
+    let user = ast
+        .models
+        .iter()
+        .find(|m| m.symbol.name == "User")
+        .expect("User model to be present");
+
+    assert_eq!(
+        user.use_tag.as_ref().unwrap().env_bindings,
+        vec!["d1_db", "d2_db"]
+    );
+    assert_eq!(
+        user.use_tag.as_ref().unwrap().cruds,
+        vec![CrudKind::List, CrudKind::Get, CrudKind::Save]
+    );
+}
+
+#[test]
+fn model_block_nav() {
+    // Act
+    let ast = lex_and_parse(
+        r#"
+        [use d1_a]
+        model WeatherReport {
+            primary {
+                id: int
+            }
+
+            foreign(Location::id) {
+                locationId
+                nav { location }
+            }
+
+            locationId: int
+
+            nav(Weather::weatherReportId) {
+                weathers
+            }
+        }
+        "#,
+    );
+
+    // Assert
+    let model = ast
+        .models
+        .iter()
+        .find(|m| m.symbol.name == "WeatherReport")
+        .expect("WeatherReport model to be present");
+
+    assert_eq!(model.navigation_blocks.len(), 2);
+
+    let fk_nav = model
+        .navigation_blocks
+        .iter()
+        .find(|n| n.field.name == "location")
+        .expect("location nav to be present");
+    assert!(
+        fk_nav.is_one_to_one,
+        "nav from foreign key should be one-to-one"
+    );
+    assert_eq!(fk_nav.adj, vec![("Location", "id")]);
+
+    let top_nav = model
+        .navigation_blocks
+        .iter()
+        .find(|n| n.field.name == "weathers")
+        .expect("weathers nav to be present");
+    assert!(
+        !top_nav.is_one_to_one,
+        "top level nav should not be one-to-oen"
+    );
+    assert_eq!(top_nav.adj, vec![("Weather", "weatherReportId")]);
 }

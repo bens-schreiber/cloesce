@@ -3,6 +3,7 @@ use logos::Logos;
 
 #[test]
 fn token_regexes_simple() {
+    // Arrange
     let cases = vec![
         ("model", Token::Model),
         ("env", Token::Env),
@@ -17,9 +18,7 @@ fn token_regexes_simple() {
         (":", Token::Colon),
         (",", Token::Comma),
         (".", Token::Dot),
-        ("->", Token::Arrow),
         ("::", Token::DoubleColon),
-        ("@", Token::At),
         ("\"hello\"", Token::StringLit("hello")),
         ("123", Token::IntLit(123)),
         ("1_000_000", Token::IntLit(1_000_000)),
@@ -28,6 +27,7 @@ fn token_regexes_simple() {
         ("bar123", Token::Ident("bar123")),
     ];
 
+    // Act
     for (input, expected) in cases {
         let mut lex = Token::lexer(input);
         let token = lex.next().unwrap();

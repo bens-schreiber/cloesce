@@ -13,14 +13,16 @@ fn adds_crud_methods_to_models() {
     // Act
     let ast = src_to_ast(
         r#"
-        env { db: d1 }
+        env {
+            d1 { db }
+        }
 
-        @d1(db)
-        @crud(get, save, list)
+        [use db, get, save, list]
         model OrderItem {
-            [primary orderId, productId]
-            orderId: int
-            productId: int
+            primary {
+                orderId: int
+                productId: int
+            }
         }
     "#,
     );
@@ -60,24 +62,24 @@ fn crud_key_params() {
     let ast = src_to_ast(
         r#"
         env {
-            db: d1
-            my_kv: kv
+            d1 { db }
+            kv { my_kv }
         }
 
-        @d1(db)
-        @crud(get)
+        [use db, get]
         model Product {
-            [primary id]
-            id: int
+            primary {
+                id: int
+            }
 
-            @keyparam
-            category: string
+            keyfield {
+                category
+                subcategory
+            }
 
-            @keyparam
-            subcategory: string
-
-            @kv(my_kv, "{category}/{subcategory}")
-            cached: json
+            kv(my_kv, "{category}/{subcategory}") {
+                cached: json
+            }
         }
     "#,
     );
@@ -112,13 +114,15 @@ fn crud_params_union_data_source_params() {
     // Act
     let ast = src_to_ast(
         r#"
-        env { db: d1 }
+        env {
+            d1 { db }
+        }
 
-        @d1(db)
-        @crud(get, list, save)
+        [use db, get, list, save]
         model Product {
-            [primary id]
-            id: int
+            primary {
+                id: int
+            }
             name: string
             category: string
         }

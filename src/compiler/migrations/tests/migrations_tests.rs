@@ -10,8 +10,8 @@ use sqlx::SqlitePool;
 
 async fn exists_in_db(db: &SqlitePool, name: &str) -> bool {
     sqlx::query_scalar::<_, i64>(
-        "SELECT COUNT(*) 
-         FROM sqlite_master 
+        "SELECT COUNT(*)
+         FROM sqlite_master
          WHERE type='table' AND name=?1",
     )
     .bind(name)
@@ -104,12 +104,15 @@ async fn migrate_models_scalars(db: SqlitePool) {
         // Arrange
         let ast = src_to_migration(
             r#"
-            env { db: d1 }
+            env {
+                d1 { db }
+            }
 
-            @d1(db)
+            [use db]
             model User {
-                [primary id]
-                id: int
+                primary {
+                    id: int
+                }
 
                 name: Option<string>
                 age: int
@@ -158,23 +161,27 @@ async fn migrate_models_one_to_one(db: SqlitePool) {
         // Arrange
         let ast = src_to_migration(
             r#"
-            env { db: d1 }
-
-            @d1(db)
-            model Person {
-                [primary id]
-                id: int
-
-                [foreign dogId -> Dog::id]
-                [nav dog -> dogId]
-                dogId: int
-                dog: Dog
+            env {
+                d1 { db }
             }
 
-            @d1(db)
+            [use db]
             model Dog {
-                [primary id]
-                id: int
+                primary {
+                    id: int
+                }
+            }
+
+            [use db]
+            model Person {
+                primary {
+                    id: int
+                }
+
+                foreign(Dog::id) {
+                    dogId
+                    nav { dog }
+                }
             }
         "#,
         );
@@ -219,48 +226,60 @@ async fn migrate_models_one_to_many(db: SqlitePool) {
         // Arrange
         let ast = src_to_migration(
             r#"
-            env { db: d1 }
-
-            @d1(db)
-            model Dog {
-                [primary id]
-                id: int
-
-                [foreign personId -> Person::id]
-                personId: int
+            env {
+                d1 { db }
             }
 
-            @d1(db)
-            model Cat {
-                [primary id]
-                id: int
-
-                [foreign personId -> Person::id]
-                personId: int
-            }
-
-            @d1(db)
-            model Person {
-                [primary id]
-                id: int
-
-                [foreign bossId -> Boss::id]
-                bossId: int
-
-                [nav dogs -> Dog::personId]
-                dogs: Array<Dog>
-
-                [nav cats -> Cat::personId]
-                cats: Array<Cat>
-            }
-
-            @d1(db)
+            [use db]
             model Boss {
-                [primary id]
-                id: int
+                primary {
+                    id: int
+                }
 
-                [nav persons -> Person::bossId]
-                persons: Array<Person>
+                nav(Person::bossId) {
+                    persons
+                }
+            }
+
+            [use db]
+            model Person {
+                primary {
+                    id: int
+                }
+
+                foreign(Boss::id) {
+                    bossId
+                }
+
+                nav(Dog::personId) {
+                    dogs
+                }
+
+                nav(Cat::personId) {
+                    cats
+                }
+            }
+
+            [use db]
+            model Dog {
+                primary {
+                    id: int
+                }
+
+                foreign(Person::id) {
+                    personId
+                }
+            }
+
+            [use db]
+            model Cat {
+                primary {
+                    id: int
+                }
+
+                foreign(Person::id) {
+                    personId
+                }
             }
         "#,
         );
@@ -319,24 +338,30 @@ async fn migrate_models_many_to_many(db: SqlitePool) {
         // Arrange
         let ast = src_to_migration(
             r#"
-            env { db: d1 }
-
-            @d1(db)
-            model Student {
-                [primary id]
-                id: int
-
-                [nav courses <> Course::students]
-                courses: Array<Course>
+            env {
+                d1 { db }
             }
 
-            @d1(db)
-            model Course {
-                [primary id]
-                id: int
+            [use db]
+            model Student {
+                primary {
+                    id: int
+                }
 
-                [nav students <> Student::courses]
-                students: Array<Student>
+                nav(Course::id) {
+                    courses
+                }
+            }
+
+            [use db]
+            model Course {
+                primary {
+                    id: int
+                }
+
+                nav(Student::id) {
+                    students
+                }
             }
         "#,
         );
@@ -382,12 +407,15 @@ async fn migrate_with_rebuild(db: SqlitePool) {
     let mut base_ast = {
         let ast = src_to_migration(
             r#"
-            env { db: d1 }
+            env {
+                d1 { db }
+            }
 
-            @d1(db)
+            [use db]
             model User {
-                [primary id]
-                id: int
+                primary {
+                    id: int
+                }
 
                 name: Option<string>
                 age: int
@@ -409,12 +437,15 @@ async fn migrate_with_rebuild(db: SqlitePool) {
         // Arrange
         let new = src_to_migration(
             r#"
-            env { db: d1 }
+            env {
+                d1 { db }
+            }
 
-            @d1(db)
+            [use db]
             model User {
-                [primary id]
-                id: int
+                primary {
+                    id: int
+                }
 
                 first_name: Option<string>
                 age: string
@@ -459,12 +490,15 @@ ALTER TABLE "User" ADD COLUMN "age" text"#
         // Arrange
         let new = src_to_migration(
             r#"
-            env { db: d1 }
+            env {
+                d1 { db }
+            }
 
-            @d1(db)
+            [use db]
             model User {
-                [primary id]
-                id: string
+                primary {
+                    id: string
+                }
 
                 first_name: Option<string>
                 age: string
@@ -500,25 +534,30 @@ ALTER TABLE "User" ADD COLUMN "age" text"#
         // Arrange
         let new = src_to_migration(
             r#"
-            env { db: d1 }
-
-            @d1(db)
-            model Dog {
-                [primary id]
-                id: int
+            env {
+                d1 { db }
             }
 
-            @d1(db)
+            [use db]
+            model Dog {
+                primary {
+                    id: int
+                }
+            }
+
+            [use db]
             model User {
-                [primary id]
-                id: string
+                primary {
+                    id: string
+                }
 
                 first_name: Option<string>
                 age: string
                 favorite_color: string
 
-                [foreign dog_id -> Dog::id]
-                dog_id: int
+                foreign(Dog::id) {
+                    dog_id
+                }
             }
         "#,
         );
@@ -531,7 +570,7 @@ ALTER TABLE "User" ADD COLUMN "age" text"#
         expected_str!(sql, r#"ALTER TABLE "User" RENAME TO "User_"#);
         expected_str!(
             sql,
-            r#"INSERT INTO "User" ("first_name", "age", "favorite_color", "dog_id", "id") SELECT "first_name", "age", "favorite_color", 0, "id" FROM "User_"#
+            r#"INSERT INTO "User" ("dog_id", "first_name", "age", "favorite_color", "id") SELECT 0, "first_name", "age", "favorite_color", "id" FROM "User_"#
         );
         expected_str!(sql, r#"DROP TABLE "User_"#);
 
@@ -546,19 +585,24 @@ ALTER TABLE "User" ADD COLUMN "age" text"#
         let mut base_unique_ast = {
             let migration = src_to_migration(
                 r#"
-                env { db: d1 }
+                env {
+                    d1 { db }
+                }
 
-                @d1(db)
+                [use db]
                 model UniqueUser {
-                    [primary id]
-                    id: int
+                    primary {
+                        id: int
+                    }
 
-                    [unique email]
-                    email: string
+                    unique {
+                        email: string
+                    }
 
-                    [unique first_name, last_name]
-                    first_name: string
-                    last_name: string
+                    unique {
+                        first_name: string
+                        last_name: string
+                    }
 
                     age: int
                 }
@@ -586,22 +630,28 @@ ALTER TABLE "User" ADD COLUMN "age" text"#
         {
             let with_age_unique_ast = src_to_migration(
                 r#"
-                env { db: d1 }
+                env {
+                    d1 { db }
+                }
 
-                @d1(db)
+                [use db]
                 model UniqueUser {
-                    [primary id]
-                    id: int
+                    primary {
+                        id: int
+                    }
 
-                    [unique email]
-                    email: string
+                    unique {
+                        email: string
+                    }
 
-                    [unique first_name, last_name]
-                    first_name: string
-                    last_name: string
+                    unique {
+                        first_name: string
+                        last_name: string
+                    }
 
-                    [unique age]
-                    age: int
+                    unique {
+                        age: int
+                    }
                 }
             "#,
             );
@@ -628,19 +678,24 @@ ALTER TABLE "User" ADD COLUMN "age" text"#
         {
             let without_age_unique_ast = src_to_migration(
                 r#"
-                env { db: d1 }
+                env {
+                    d1 { db }
+                }
 
-                @d1(db)
+                [use db]
                 model UniqueUser {
-                    [primary id]
-                    id: int
+                    primary {
+                        id: int
+                    }
 
-                    [unique email]
-                    email: string
+                    unique {
+                        email: string
+                    }
 
-                    [unique first_name, last_name]
-                    first_name: string
-                    last_name: string
+                    unique {
+                        first_name: string
+                        last_name: string
+                    }
 
                     age: int
                 }
@@ -670,25 +725,30 @@ async fn migrate_with_rename(db: SqlitePool) {
     let base_ast = {
         let migration = src_to_migration(
             r#"
-            env { db: d1 }
+            env {
+                d1 { db }
+            }
 
-            @d1(db)
+            [use db]
             model User {
-                [primary id]
-                id: int
+                primary {
+                    id: int
+                }
 
                 name: Option<string>
                 age: int
                 address: string
             }
 
-            @d1(db)
+            [use db]
             model UserSettings {
-                [primary id]
-                id: int
+                primary {
+                    id: int
+                }
 
-                [foreign userId -> User::id]
-                userId: int
+                foreign(User::id) {
+                    userId
+                }
             }
         "#,
         );
@@ -703,25 +763,30 @@ async fn migrate_with_rename(db: SqlitePool) {
 
     let new = src_to_migration(
         r#"
-        env { db: d1 }
+        env {
+            d1 { db }
+        }
 
-        @d1(db)
+        [use db]
         model AppUser {
-            [primary id]
-            id: int
+            primary {
+                id: int
+            }
 
             name: Option<string>
             age: int
             address: string
         }
 
-        @d1(db)
+        [use db]
         model UserSettings {
-            [primary id]
-            id: int
+            primary {
+                id: int
+            }
 
-            [foreign userId -> AppUser::id]
-            userId: int
+            foreign(AppUser::id) {
+                userId
+            }
         }
     "#,
     );
@@ -749,24 +814,30 @@ async fn migrate_alter_drop_m2m(db: SqlitePool) {
     let m2m_ast = {
         let migration = src_to_migration(
             r#"
-            env { db: d1 }
-
-            @d1(db)
-            model Student {
-                [primary id]
-                id: int
-
-                [nav courses <> Course::students]
-                courses: Array<Course>
+            env {
+                d1 { db }
             }
 
-            @d1(db)
-            model Course {
-                [primary id]
-                id: int
+            [use db]
+            model Student {
+                primary {
+                    id: int
+                }
 
-                [nav students <> Student::courses]
-                students: Array<Student>
+                nav(Course::id) {
+                    courses
+                }
+            }
+
+            [use db]
+            model Course {
+                primary {
+                    id: int
+                }
+
+                nav(Student::id) {
+                    students
+                }
             }
         "#,
         );
@@ -782,18 +853,22 @@ async fn migrate_alter_drop_m2m(db: SqlitePool) {
 
     let no_m2m_ast = src_to_migration(
         r#"
-        env { db: d1 }
-
-        @d1(db)
-        model Student {
-            [primary id]
-            id: int
+        env {
+            d1 { db }
         }
 
-        @d1(db)
+        [use db]
+        model Student {
+            primary {
+                id: int
+            }
+        }
+
+        [use db]
         model Course {
-            [primary id]
-            id: int
+            primary {
+                id: int
+            }
         }
     "#,
     );
@@ -819,18 +894,22 @@ async fn migrate_alter_add_m2m(db: SqlitePool) {
     let no_m2m_ast = {
         let migration = src_to_migration(
             r#"
-            env { db: d1 }
-
-            @d1(db)
-            model Student {
-                [primary id]
-                id: int
+            env {
+                d1 { db }
             }
 
-            @d1(db)
+            [use db]
+            model Student {
+                primary {
+                    id: int
+                }
+            }
+
+            [use db]
             model Course {
-                [primary id]
-                id: int
+                primary {
+                    id: int
+                }
             }
         "#,
         );
@@ -845,24 +924,30 @@ async fn migrate_alter_add_m2m(db: SqlitePool) {
 
     let m2m_ast = src_to_migration(
         r#"
-        env { db: d1 }
-
-        @d1(db)
-        model Student {
-            [primary id]
-            id: int
-
-            [nav courses <> Course::students]
-            courses: Array<Course>
+        env {
+            d1 { db }
         }
 
-        @d1(db)
-        model Course {
-            [primary id]
-            id: int
+        [use db]
+        model Student {
+            primary {
+                id: int
+            }
 
-            [nav students <> Student::courses]
-            students: Array<Student>
+            nav(Course::id) {
+                courses
+            }
+        }
+
+        [use db]
+        model Course {
+            primary {
+                id: int
+            }
+
+            nav(Student::id) {
+                students
+            }
         }
     "#,
     );
@@ -888,25 +973,30 @@ async fn migrate_models_composite_pk_and_fk(db: SqlitePool) {
 
     let ast = src_to_migration(
         r#"
-        env { db: d1 }
+        env {
+            d1 { db }
+        }
 
-        @d1(db)
+        [use db]
         model Parent {
-            [primary orgId, userId]
-            orgId: int
-            userId: int
+            primary {
+                orgId: int
+                userId: int
+            }
 
             name: string
         }
 
-        @d1(db)
+        [use db]
         model Child {
-            [primary id]
-            id: int
+            primary {
+                id: int
+            }
 
-            [foreign (orgId, userId) -> (Parent::orgId, Parent::userId)]
-            orgId: int
-            userId: int
+            foreign(Parent::orgId, Parent::userId) {
+                orgId
+                userId
+            }
         }
     "#,
     );
@@ -933,26 +1023,32 @@ async fn migrate_models_many_to_many_composite_pk(db: SqlitePool) {
 
     let ast = src_to_migration(
         r#"
-        env { db: d1 }
-
-        @d1(db)
-        model Student {
-            [primary schoolId, studentId]
-            schoolId: int
-            studentId: int
-
-            [nav courses <> Course::students]
-            courses: Array<Course>
+        env {
+            d1 { db }
         }
 
-        @d1(db)
-        model Course {
-            [primary deptId, courseId]
-            deptId: int
-            courseId: int
+        [use db]
+        model Student {
+            primary {
+                schoolId: int
+                studentId: int
+            }
 
-            [nav students <> Student::courses]
-            students: Array<Student>
+            nav(Course::deptId, Course::courseId) {
+                courses
+            }
+        }
+
+        [use db]
+        model Course {
+            primary {
+                deptId: int
+                courseId: int
+            }
+
+            nav(Student::schoolId, Student::studentId) {
+                students
+            }
         }
     "#,
     );

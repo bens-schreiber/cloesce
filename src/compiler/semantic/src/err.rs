@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use frontend::{D1Tag, Span};
+use frontend::Span;
 
 use crate::Symbol;
 
@@ -17,6 +17,7 @@ pub enum SemanticError<'src, 'p> {
     /// A symbol was referenced but not defined in any visible scope.
     UnresolvedSymbol {
         span: Span,
+        name: &'src str,
     },
 
     /// A model relies on a Wrangler environment block that is not defined within the project.
@@ -30,7 +31,12 @@ pub enum SemanticError<'src, 'p> {
     /// A model that specifies a D1 binding that does not resolve to an actual Wrangler D1 binding.
     D1ModelInvalidD1Binding {
         model: &'p Symbol<'src>,
-        tag: &'p D1Tag<'src>,
+        binding: &'src str,
+    },
+
+    D1ModelMultipleD1Bindings {
+        model: &'p Symbol<'src>,
+        bindings: Vec<&'src str>,
     },
 
     /// A model that specifies a D1 binding but does not specify a primary key.
@@ -60,67 +66,39 @@ pub enum SemanticError<'src, 'p> {
         binding: &'src str,
     },
 
-    ForeignKeyReferencesInvalidOrUnknownColumn {
+    // A foreign key references a field that is not a valid SQLite type
+    ForeignKeyInvalidColumnType {
         span: Span,
-        column: &'src str,
+        field: &'p Symbol<'src>,
     },
 
-    /// A foreign key can only be to a single adjacent model
-    ForeignKeyReferencesMultipleModels {
+    /// A foreign key has a different number of adj references than local fields
+    ForeignKeyInconsistentFieldAdj {
+        span: Span,
+        adj_count: usize,
+        field_count: usize,
+    },
+
+    /// A foreign key or navigation adj list references more than one model name
+    InconsistentModelAdjacency {
         span: Span,
         first_model: &'src str,
         second_model: &'src str,
     },
 
-    /// A foreign key must reference a column of the same type (e.g. you can't reference an Integer column from a &'src str column)
-    ForeignKeyReferencesIncompatibleColumnType {
-        span: Span,
-        column: &'p Symbol<'src>,
-        adj_column: &'p Symbol<'src>,
-    },
-
-    /// All columns involved in a foreign key must be consistently nullable or non-nullable
-    ForeignKeyInconsistentNullability {
-        span: Span,
-        first_column: &'p Symbol<'src>,
-        second_column: &'p Symbol<'src>,
-    },
-
-    /// A column in a D1 model can only participate in a single foreign key relationship
-    ForeignKeyColumnAlreadyInForeignKey {
-        span: Span,
-        column: &'p Symbol<'src>,
-    },
-
-    NavigationPropertyReferencesInvalidOrUnknownField {
-        span: Span,
-        field: &'src str,
-    },
-
-    NavigationPropertyReferencesDifferentDatabase {
+    NavigationReferencesDifferentDatabase {
         span: Span,
         binding: &'src str,
     },
 
-    /// A field in a D1 model can only participate in a single navigation property
-    NavigationPropertyFieldAlreadyInNavigationProperty {
-        span: Span,
-        field: &'p Symbol<'src>,
-    },
-
     /// A many-to-many navigation property requires exactly one reciprocal M2M nav on the adjacent model, but none was found.
-    NavigationPropertyMissingReciprocalM2M {
+    NavigationMissingReciprocalM2M {
         span: Span,
     },
 
     /// A many-to-many navigation property found multiple reciprocal M2M navs on the adjacent model.
-    NavigationPropertyAmbiguousM2M {
+    NavigationAmbiguousM2M {
         span: Span,
-    },
-
-    UniqueConstraintReferencesInvalidOrUnknownField {
-        span: Span,
-        field: &'src str,
     },
 
     CyclicalRelationship {

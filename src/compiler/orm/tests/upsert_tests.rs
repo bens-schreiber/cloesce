@@ -15,10 +15,16 @@ fn include(val: serde_json::Value) -> Option<Map<String, Value>> {
 async fn upsert_scalar_model(db: SqlitePool) {
     let ast = src_to_ast(
         r#"
-        env { db: d1 }
-        @d1(db) model Horse {
-            [primary id]
-            id: int
+        env {
+            d1 { db }
+        }
+
+        [use db]
+        model Horse {
+            primary {
+                id: int
+            }
+
             name: string
             age: int
         }
@@ -52,10 +58,16 @@ async fn upsert_scalar_model(db: SqlitePool) {
 async fn upsert_auto_increment(db: SqlitePool) {
     let ast = src_to_ast(
         r#"
-        env { db: d1 }
-        @d1(db) model Horse {
-            [primary id]
-            id: int
+        env {
+            d1 { db }
+        }
+
+        [use db]
+        model Horse {
+            primary {
+                id: int
+            }
+
             name: string
         }
     "#,
@@ -87,20 +99,32 @@ async fn upsert_one_to_one(db: SqlitePool) {
     let ast = || {
         src_to_ast(
             r#"
-            env { db: d1 }
-            @d1(db) model Horse {
-                [primary id]
-                id: int
+            env {
+                d1 { db }
+            }
+
+            [use db]
+            model Horse {
+                primary {
+                    id: int
+                }
+
                 name: string
 
-                [foreign riderId -> Rider::id]
-                [nav rider -> riderId]
-                riderId: int
-                rider: Rider
+                foreign(Rider::id) {
+                    riderId
+                    nav {
+                        rider
+                    }
+                }
             }
-            @d1(db) model Rider {
-                [primary id]
-                id: int
+
+            [use db]
+            model Rider {
+                primary {
+                    id: int
+                }
+
                 nickname: string
             }
         "#,
@@ -144,22 +168,34 @@ async fn upsert_one_to_many(db: SqlitePool) {
     let ast = || {
         src_to_ast(
             r#"
-            env { db: d1 }
-            @d1(db) model Horse {
-                [primary id]
-                id: int
+            env {
+                d1 { db }
+            }
+
+            [use db]
+            model Horse {
+                primary {
+                    id: int
+                }
+
                 name: string
 
-                [nav riders -> Rider::horseId]
-                riders: Array<Rider>
+                nav(Rider::horseId) {
+                    riders
+                }
             }
-            @d1(db) model Rider {
-                [primary id]
-                id: int
+
+            [use db]
+            model Rider {
+                primary {
+                    id: int
+                }
+
                 nickname: string
 
-                [foreign horseId -> Horse::id]
-                horseId: int
+                foreign(Horse::id) {
+                    horseId
+                }
             }
         "#,
         )
@@ -201,22 +237,34 @@ async fn upsert_many_to_many(db: SqlitePool) {
     let ast = || {
         src_to_ast(
             r#"
-            env { db: d1 }
-            @d1(db) model Student {
-                [primary id]
-                id: int
+            env {
+                d1 { db }
+            }
+
+            [use db]
+            model Student {
+                primary {
+                    id: int
+                }
+
                 name: string
 
-                [nav courses <> Course::students]
-                courses: Array<Course>
+                nav(Course::id) {
+                    courses
+                }
             }
-            @d1(db) model Course {
-                [primary id]
-                id: int
+
+            [use db]
+            model Course {
+                primary {
+                    id: int
+                }
+
                 title: string
 
-                [nav students <> Student::courses]
-                students: Array<Student>
+                nav(Student::id) {
+                    students
+                }
             }
         "#,
         )
@@ -255,11 +303,17 @@ async fn upsert_many_to_many(db: SqlitePool) {
 async fn upsert_composite_pk(db: SqlitePool) {
     let ast = src_to_ast(
         r#"
-        env { db: d1 }
-        @d1(db) model OrderItem {
-            [primary orderId, productId]
-            orderId: int
-            productId: int
+        env {
+            d1 { db }
+        }
+
+        [use db]
+        model OrderItem {
+            primary {
+                orderId: int
+                productId: int
+            }
+
             quantity: int
         }
     "#,

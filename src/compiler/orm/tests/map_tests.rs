@@ -45,25 +45,34 @@ pub fn rows_to_json(rows: &[SqliteRow]) -> Vec<Map<String, Value>> {
 fn no_records_returns_empty() {
     let ast = src_to_ast(
         r#"
-        env { db: d1 }
-        @d1(db) 
-        model Horse {
-            [primary id]
-            id: int
-            name: Option<string>
-
-            [nav riders -> Rider::horseId]
-            riders: Array<Rider>
+        env {
+            d1 { db }
         }
 
-        @d1(db) 
+        [use db]
+        model Horse {
+            primary {
+                id: int
+            }
+
+            name: Option<string>
+
+            nav(Rider::horseId) {
+                riders
+            }
+        }
+
+        [use db]
         model Rider {
-            [primary id]
-            id: int
+            primary {
+                id: int
+            }
+
             nickname: Option<string>
 
-            [foreign horseId -> Horse::id]
-            horseId: int
+            foreign(Horse::id) {
+                horseId
+            }
         }
     "#,
     );
@@ -76,10 +85,16 @@ fn no_records_returns_empty() {
 fn flat() {
     let ast = src_to_ast(
         r#"
-        env { db: d1 }
-        @d1(db) model Horse {
-            [primary id]
-            id: int
+        env {
+            d1 { db }
+        }
+
+        [use db]
+        model Horse {
+            primary {
+                id: int
+            }
+
             name: Option<string>
         }
     "#,
@@ -102,20 +117,32 @@ async fn one_to_one(db: SqlitePool) {
     let ast = || {
         src_to_ast(
             r#"
-            env { db: d1 }
-            @d1(db) model Horse {
-                [primary id]
-                id: int
+            env {
+                d1 { db }
+            }
+
+            [use db]
+            model Horse {
+                primary {
+                    id: int
+                }
+
                 name: Option<string>
 
-                [foreign bestRiderId -> Rider::id]
-                [nav bestRider -> bestRiderId]
-                bestRiderId: int
-                bestRider: Rider
+                foreign(Rider::id) {
+                    bestRiderId
+                    nav {
+                        bestRider
+                    }
+                }
             }
-            @d1(db) model Rider {
-                [primary id]
-                id: int
+
+            [use db]
+            model Rider {
+                primary {
+                    id: int
+                }
+
                 nickname: Option<string>
             }
         "#,
@@ -167,22 +194,34 @@ async fn one_to_many(db: SqlitePool) {
     let ast = || {
         src_to_ast(
             r#"
-            env { db: d1 }
-            @d1(db) model Horse {
-                [primary id]
-                id: int
+            env {
+                d1 { db }
+            }
+
+            [use db]
+            model Horse {
+                primary {
+                    id: int
+                }
+
                 name: Option<string>
 
-                [nav riders -> Rider::horseId]
-                riders: Array<Rider>
+                nav(Rider::horseId) {
+                    riders
+                }
             }
-            @d1(db) model Rider {
-                [primary id]
-                id: int
+
+            [use db]
+            model Rider {
+                primary {
+                    id: int
+                }
+
                 nickname: Option<string>
 
-                [foreign horseId -> Horse::id]
-                horseId: int
+                foreign(Horse::id) {
+                    horseId
+                }
             }
         "#,
         )
@@ -232,22 +271,34 @@ async fn many_to_many(db: SqlitePool) {
     let meta = || {
         src_to_ast(
             r#"
-            env { db: d1 }
-            @d1(db) model Student {
-                [primary id]
-                id: int
+            env {
+                d1 { db }
+            }
+
+            [use db]
+            model Student {
+                primary {
+                    id: int
+                }
+
                 name: Option<string>
 
-                [nav courses <> Course::students]
-                courses: Array<Course>
+                nav(Course::id) {
+                    courses
+                }
             }
-            @d1(db) model Course {
-                [primary id]
-                id: int
+
+            [use db]
+            model Course {
+                primary {
+                    id: int
+                }
+
                 title: Option<string>
 
-                [nav students <> Student::courses]
-                students: Array<Student>
+                nav(Student::id) {
+                    students
+                }
             }
         "#,
         )
@@ -296,11 +347,17 @@ async fn many_to_many(db: SqlitePool) {
 fn composite_primary_key_deduplication() {
     let ast = src_to_ast(
         r#"
-        env { db: d1 }
-        @d1(db) model OrderItem {
-            [primary orderId, productId]
-            orderId: int
-            productId: int
+        env {
+            d1 { db }
+        }
+
+        [use db]
+        model OrderItem {
+            primary {
+                orderId: int
+                productId: int
+            }
+
             quantity: int
         }
     "#,

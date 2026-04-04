@@ -439,8 +439,8 @@ export namespace ModelWithCruds {
 
     export interface Self {
         id: number;
-        name: string;
         categoryId: number;
+        name: string;
     }
 
     export abstract class Api {
@@ -461,11 +461,11 @@ export namespace ModelWithCruds {
         }
         export const Default = {
             include: {},
-            getQuery: (env: Env, id: number) => env.db.prepare(`SELECT "ModelWithCruds"."id" AS "id", "ModelWithCruds"."name" AS "name", "ModelWithCruds"."categoryId" AS "categoryId" FROM "ModelWithCruds" WHERE "ModelWithCruds"."id" = ?1`).bind(id),
+            getQuery: (env: Env, id: number) => env.db.prepare(`SELECT "ModelWithCruds"."id" AS "id", "ModelWithCruds"."categoryId" AS "categoryId", "ModelWithCruds"."name" AS "name" FROM "ModelWithCruds" WHERE "ModelWithCruds"."id" = ?1`).bind(id),
             async get(env: Env, id: number): Promise<ModelWithCruds.Self | null> {
                 return await Orm.fromEnv(env).getQuery<ModelWithCruds.Self>(ModelWithCruds.Meta, ModelWithCruds.DataSources.Default.getQuery(env, id), ModelWithCruds.DataSources.Default.include, {  });
             },
-            listQuery: (env: Env, lastSeen_id: number, limit: number) => env.db.prepare(`SELECT "ModelWithCruds"."id" AS "id", "ModelWithCruds"."name" AS "name", "ModelWithCruds"."categoryId" AS "categoryId" FROM "ModelWithCruds" WHERE "ModelWithCruds"."id" > ?1 ORDER BY "ModelWithCruds"."id" ASC LIMIT ?2`).bind(lastSeen_id, limit),
+            listQuery: (env: Env, lastSeen_id: number, limit: number) => env.db.prepare(`SELECT "ModelWithCruds"."id" AS "id", "ModelWithCruds"."categoryId" AS "categoryId", "ModelWithCruds"."name" AS "name" FROM "ModelWithCruds" WHERE "ModelWithCruds"."id" > ?1 ORDER BY "ModelWithCruds"."id" ASC LIMIT ?2`).bind(lastSeen_id, limit),
             async list(env: Env, lastSeen_id: number, limit: number): Promise<ModelWithCruds.Self[]> {
                 return await Orm.fromEnv(env).listQuery<ModelWithCruds.Self>(ModelWithCruds.Meta, ModelWithCruds.DataSources.Default.listQuery(env, lastSeen_id, limit), ModelWithCruds.DataSources.Default.include);
             },

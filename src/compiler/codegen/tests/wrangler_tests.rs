@@ -19,11 +19,13 @@ fn generates_default_wrangler_value() {
     // Arrange
     let src = r#"
         env {
-            db: d1
-            API_KEY: string
-            TIMEOUT: int
-            ENABLED: bool
-            THRESHOLD: double
+            d1 { db }
+            vars {
+                API_KEY: string
+                TIMEOUT: int
+                ENABLED: bool
+                THRESHOLD: double
+            }
         }
     "#;
     let ast = src_to_ast(src);
@@ -59,13 +61,14 @@ fn generates_default_d1_wrangler_values() {
     // Arrange
     let src = r#"
         env {
-            db: d1
+            d1 { db }
         }
 
-        @d1(db)
+        [use db]
         model User {
-            [primary id]
-            id: int
+            primary {
+                id: int
+            }
         }
     "#;
     let ast = src_to_ast(src);
@@ -108,12 +111,13 @@ fn generates_default_kv_wrangler_values() {
     // Arrange
     let src = r#"
         env {
-            my_kv: kv
+            kv { my_kv }
         }
 
         model MyKV {
-            @kv(my_kv, "kvObj")
-            obj: json
+            kv(my_kv, "kvObj") {
+                obj: json
+            }
         }
     "#;
     let ast = src_to_ast(src);
@@ -153,13 +157,14 @@ fn handles_d1_database_with_missing_values() {
     let ast = src_to_ast(
         r#"
             env {
-                db: d1
+                d1 { db }
             }
-    
-            @d1(db)
+
+            [use db]
             model User {
-                [primary id]
-                id: int
+                primary {
+                    id: int
+                }
             }
         "#,
     );

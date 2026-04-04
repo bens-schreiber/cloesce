@@ -292,8 +292,8 @@ export class HasOneToOne {
 }
 export class ModelWithCruds {
   id: number;
-  name: string;
   categoryId: number;
+  name: string;
   static async $get(
     args: DataSources.ModelWithCruds.$get.ByName | DataSources.ModelWithCruds.$get.Default,
     fetchImpl: typeof fetch = fetch
@@ -307,30 +307,6 @@ export class ModelWithCruds {
 
     const res = await fetchImpl(baseUrl, {
       method: "GET",
-    });
-
-    return await HttpResult.fromResponse(
-      res,
-      MediaType.Json,
-      ModelWithCruds,
-      false
-    );
-  }
-  static async $save(
-    args: DataSources.ModelWithCruds.$save,
-    fetchImpl: typeof fetch = fetch
-  ): Promise<HttpResult<ModelWithCruds>> {
-    const baseUrl = new URL(
-      `http://example.com/path/to/api/ModelWithCruds/$save`
-    );
-    const payload: any = {};
-    payload["model"] = (args as any).model;
-    baseUrl.searchParams.append("__datasource", args.kind);
-
-    const res = await fetchImpl(baseUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: requestBody(MediaType.Json, payload),
     });
 
     return await HttpResult.fromResponse(
@@ -361,6 +337,30 @@ export class ModelWithCruds {
       MediaType.Json,
       ModelWithCruds,
       true
+    );
+  }
+  static async $save(
+    args: DataSources.ModelWithCruds.$save,
+    fetchImpl: typeof fetch = fetch
+  ): Promise<HttpResult<ModelWithCruds>> {
+    const baseUrl = new URL(
+      `http://example.com/path/to/api/ModelWithCruds/$save`
+    );
+    const payload: any = {};
+    payload["model"] = (args as any).model;
+    baseUrl.searchParams.append("__datasource", args.kind);
+
+    const res = await fetchImpl(baseUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: requestBody(MediaType.Json, payload),
+    });
+
+    return await HttpResult.fromResponse(
+      res,
+      MediaType.Json,
+      ModelWithCruds,
+      false
     );
   }
 
@@ -665,10 +665,6 @@ export namespace DataSources {
         id: number;
       }
     }
-    export type $save = {
-      model: DeepPartial<ModelWithCruds>;
-      kind: "ByName" | "Default";
-    }
     export namespace $list {
       export type ByName = {
         kind: "ByName";
@@ -680,6 +676,10 @@ export namespace DataSources {
         lastSeen_id: number;
         limit: number;
       }
+    }
+    export type $save = {
+      model: DeepPartial<ModelWithCruds>;
+      kind: "ByName" | "Default";
     }
   }
 }

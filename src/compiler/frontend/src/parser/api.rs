@@ -36,7 +36,8 @@ enum PendingApiParam<'src> {
 ///     http_verb methodName(ident1: cidl_type, ...) -> cidl_type
 ///
 ///     http_verb methodName(
-///         @source(DataSourceName) self,
+///         [source MySource]
+///         self,
 ///         ident2: cidl_type,
 ///         ...
 ///     ) -> cidl_type
@@ -74,7 +75,7 @@ pub fn api_block<'tokens, 'src: 'tokens>()
 
 fn method<'tokens, 'src: 'tokens>()
 -> impl Parser<'tokens, TokenInput<'tokens, 'src>, PendingApiMethod<'src>, Extra<'tokens, 'src>> {
-    // http_verb methodName(ident1: cidl_type, ...) -> cidl_type
+    // http_verb methodName( ident* ) -> cidl_type
     http_verb()
         .then(select! { Token::Ident(name) => name }.map_with(|name, e| (name, e.span())))
         .then(
@@ -99,12 +100,11 @@ fn method<'tokens, 'src: 'tokens>()
 
 fn parameter<'tokens, 'src: 'tokens>()
 -> impl Parser<'tokens, TokenInput<'tokens, 'src>, PendingApiParam<'src>, Extra<'tokens, 'src>> {
-    // @source(DataSourceName) self
-    let source_tag = just(Token::At)
+    // [source DataSourceName]
+    let source_tag = just(Token::LBracket)
         .ignore_then(just(Token::Source))
-        .ignore_then(just(Token::LParen))
         .ignore_then(select! { Token::Ident(name) => name })
-        .then_ignore(just(Token::RParen));
+        .then_ignore(just(Token::RBracket));
 
     // self
     let self_parameter = source_tag
@@ -123,7 +123,7 @@ fn parameter<'tokens, 'src: 'tokens>()
             cidl_type,
         });
 
-    // @source(DataSourceName) self | ident: cidl_type
+    // [source DataSourceName] self | ident: cidl_type
     self_parameter.or(named_parameter)
 }
 

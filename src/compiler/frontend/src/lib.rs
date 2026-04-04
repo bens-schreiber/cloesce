@@ -49,6 +49,8 @@ impl std::fmt::Display for WranglerEnvBindingKind {
 #[derive(Clone, Default, Debug)]
 pub enum SymbolKind {
     ModelDecl,
+
+    /// Encompasses every single unique symbol declared within a model block.
     ModelField,
 
     WranglerEnvDecl,
@@ -129,78 +131,92 @@ pub struct DataSourceBlock<'src> {
     pub is_internal: bool,
 }
 
-pub struct NavigationTag<'src> {
+pub struct NavigationBlock<'src> {
     pub span: Span,
 
-    /// The field on the current model that represents the relationship
-    pub field: &'src str,
+    // nav(AdjModel::field1, AdjModel::field2, ...)
+    pub adj: Vec<(&'src str, &'src str)>,
 
-    /// All columns involved in the relationship
-    /// (model, field)
-    pub fields: Vec<(&'src str, &'src str)>,
-    pub is_many_to_many: bool,
+    // { navName }
+    pub field: Symbol<'src>,
+
+    pub is_one_to_one: bool,
 }
 
-pub struct ForeignKeyTag<'src> {
+pub struct ForeignBlock<'src> {
     pub span: Span,
 
-    pub adj_model: &'src str,
+    // foreign(AdjModel::field1, AdjModel::field2, ...)
+    pub adj: Vec<(&'src str, &'src str)>,
 
-    /// (this model field, adjacent model field)
-    pub references: Vec<(&'src str, &'src str)>,
+    // { currentModelField1, currentModelField2, ... }
+    pub fields: Vec<Symbol<'src>>,
+
+    // optional foreign(...) means all fields are nullable
+    pub optional: bool,
 }
 
-pub struct KvR2Tag<'src> {
+/// `kv(binding, "key/format/{id}") { name: type }`
+pub struct KvBlock<'src> {
     pub span: Span,
 
-    pub field: &'src str,
-
-    /// Key format e.g. "users/{id}/profile.jpg"
-    pub format: &'src str,
-
-    /// The symbol of the environment variable binding the KV namespace
+    /// The KV namespace binding name
     pub env_binding: &'src str,
+
+    /// The key format string, e.g. `"weather/data/{id}"`
+    pub key_format: &'src str,
+
+    /// The single identity field with its type
+    pub field: Symbol<'src>,
+
+    pub is_paginated: bool,
 }
 
-pub struct UniqueTag<'src> {
+/// `r2(binding, "key/format/{id}") { name }`
+pub struct R2Block<'src> {
+    pub span: Span,
+
+    /// The R2 bucket binding name
+    pub env_binding: &'src str,
+
+    /// The key format string, e.g. `"weather/photos/{id}.jpg"`
+    pub key_format: &'src str,
+
+    /// The single field name (no type)
+    pub field: Symbol<'src>,
+
+    // [paginated]
+    pub is_paginated: bool,
+}
+
+pub struct UniqueConstraint<'src> {
     pub span: Span,
     pub fields: Vec<&'src str>,
 }
 
 #[derive(Clone, Debug)]
-pub struct D1Tag<'src> {
+pub struct UseTag<'src> {
     pub span: Span,
-
-    /// The symbol of the environment variable binding the D1 database
-    pub env_binding: &'src str,
-}
-
-pub struct KeyFieldTag<'src> {
-    pub span: Span,
-    pub field: &'src str,
-}
-
-pub struct PrimaryKeyTag<'src> {
-    pub span: Span,
-    pub field: &'src str,
+    pub cruds: Vec<CrudKind>,
+    pub env_bindings: Vec<&'src str>,
 }
 
 pub struct ModelBlock<'src> {
     pub symbol: Symbol<'src>,
+    pub use_tag: Option<UseTag<'src>>,
 
-    pub fields: Vec<Symbol<'src>>,
+    /// All typed identifiers e.g., `id: int`.
+    pub typed_idents: Vec<Symbol<'src>>,
 
-    pub primary_keys: Vec<PrimaryKeyTag<'src>>,
-    pub d1_binding: Option<D1Tag<'src>>,
-    pub key_fields: Vec<KeyFieldTag<'src>>,
-    pub unique_constraints: Vec<UniqueTag<'src>>,
-    pub kvs: Vec<KvR2Tag<'src>>,
-    pub r2s: Vec<KvR2Tag<'src>>,
+    /// The names of the primary key fields, in order. Subset of `fields`.
+    pub primary_fields: Vec<&'src str>,
 
-    pub navigation_properties: Vec<NavigationTag<'src>>,
-    pub foreign_keys: Vec<ForeignKeyTag<'src>>,
-
-    pub cruds: Vec<CrudKind>,
+    pub key_fields: Vec<Symbol<'src>>,
+    pub unique_constraints: Vec<UniqueConstraint<'src>>,
+    pub kvs: Vec<KvBlock<'src>>,
+    pub r2s: Vec<R2Block<'src>>,
+    pub navigation_blocks: Vec<NavigationBlock<'src>>,
+    pub foreign_blocks: Vec<ForeignBlock<'src>>,
 }
 
 pub struct ServiceBlock<'src> {
