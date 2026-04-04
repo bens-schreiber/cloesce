@@ -18,7 +18,6 @@ check-deps:
 	@echo "CLOESCE: Checking required dependencies..."
 	@command -v cargo >/dev/null 2>&1 || { echo "❌ cargo not found. Install Rust: https://rustup.rs/"; exit 1; }
 	@command -v npm >/dev/null 2>&1 || { echo "❌ npm not found. Install Node.js: https://nodejs.org/"; exit 1; }
-	@command -v wasm-opt >/dev/null 2>&1 || echo "⚠️  wasm-opt not found (optional). Install wasm-opt: https://github.com/WebAssembly/binaryen"
 	@command -v pandoc >/dev/null 2>&1 || echo "⚠️  pandoc not found (optional, for docs). Install pandoc: https://github.com/jgm/pandoc"
 	@command -v mdbook >/dev/null 2>&1 || echo "⚠️  mdbook not found (optional, for docs). Install mdbook: cargo install mdbook"
 	@rustup target list --installed | grep -q $(WASM_TARGET) || { echo "❌ $(WASM_TARGET) target not installed. Run: rustup target add $(WASM_TARGET)"; exit 1; }

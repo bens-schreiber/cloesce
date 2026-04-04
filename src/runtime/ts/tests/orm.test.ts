@@ -5,14 +5,13 @@ import { KValue, Orm, Paginated } from "../src/ui/backend.js";
 import { _cloesceInternal } from "../src/router/router.js";
 import { R2ObjectBody } from "@cloudflare/workers-types";
 import { hydrateType } from "../src/router/orm";
-import { CloesceAst, CrudListParam } from "../src/ast";
+import { Cidl } from "../src/cidl.js";
 
 function createHydrateArgs() {
   return {
-    ast: { models: {}, poos: {} } as CloesceAst,
-    ctorReg: {},
+    ast: { models: {}, poos: {} } as Cidl,
     includeTree: null,
-    keyParams: {},
+    keyFields: {},
     env: {},
     promises: [],
   };
@@ -27,12 +26,12 @@ describe("hydrateType Tests", () => {
 
   describe("Primitive type hydration", () => {
     test("returns null as-is", () => {
-      const result = hydrateType(null, "Text", createHydrateArgs());
+      const result = hydrateType(null, "String", createHydrateArgs());
       expect(result).toBeNull();
     });
 
     test("returns undefined as-is", () => {
-      const result = hydrateType(undefined, "Text", createHydrateArgs());
+      const result = hydrateType(undefined, "String", createHydrateArgs());
       expect(result).toBeUndefined();
     });
 
@@ -58,7 +57,7 @@ describe("hydrateType Tests", () => {
     });
 
     test("passes through unknown primitive types unchanged", () => {
-      expect(hydrateType("hello", "Text", createHydrateArgs())).toBe("hello");
+      expect(hydrateType("hello", "String", createHydrateArgs())).toBe("hello");
       expect(hydrateType(42, "Integer", createHydrateArgs())).toBe(42);
     });
   });
@@ -79,7 +78,7 @@ describe("hydrateType Tests", () => {
     test("returns empty array when value is not an array", () => {
       const result = hydrateType(
         "not-an-array",
-        { Array: "Text" },
+        { Array: "String" },
         createHydrateArgs(),
       );
       expect(result).toEqual([]);
@@ -87,38 +86,30 @@ describe("hydrateType Tests", () => {
   });
 
   describe("Model column hydration", () => {
-    test("hydrates typed columns within a model instance", async () => {
+    test("hydrates typed columns within a model", async () => {
       // Arrange
+      const iso = "2024-03-10T08:00:00.000Z";
       const modelMeta = ModelBuilder.model("TypedColModel")
         .idPk()
         .col("createdAt", "DateIso")
         .col("data", "Blob")
         .build();
 
-      class TypedColModel {
-        id!: number;
-        createdAt!: Date;
-        data!: Uint8Array;
-      }
-
       const ast = createAst({ models: [modelMeta] });
-      const ctorReg = { TypedColModel };
 
       // Act
       const result = hydrateType(
-        { id: 1, createdAt: "2024-03-10T08:00:00.000Z", data: [1, 2, 3] },
-        { Object: TypedColModel.name },
+        { id: 1, createdAt: iso, data: [1, 2, 3] },
+        { Object: { name: "TypedColModel" } },
         {
           ...createHydrateArgs(),
           ast,
-          ctorReg,
         },
       );
 
       // Assert
-      expect(result).toBeInstanceOf(TypedColModel);
       expect(result.createdAt).toBeInstanceOf(Date);
-      expect(result.createdAt.toISOString()).toBe("2024-03-10T08:00:00.000Z");
+      expect(result.createdAt.toISOString()).toBe(iso);
       expect(result.data).toBeInstanceOf(Uint8Array);
       expect(Array.from(result.data)).toEqual([1, 2, 3]);
     });
@@ -130,125 +121,102 @@ describe("hydrateType Tests", () => {
         .col("createdAt", "DateIso")
         .build();
 
-      class SparseModel {
-        id!: number;
-        createdAt!: Date;
-      }
-
       const ast = createAst({ models: [modelMeta] });
-      const ctorReg = { SparseModel };
 
       // Act
       const result = hydrateType(
         { id: 1, createdAt: undefined },
-        { Object: SparseModel.name },
+        { Object: { name: "SparseModel" } },
         {
           ...createHydrateArgs(),
           ast,
-          ctorReg,
         },
       );
 
       // Assert
-      expect(result).toBeInstanceOf(SparseModel);
       expect(result.createdAt).toBeUndefined();
     });
   });
 
-  describe("Navigation property include tree behavior", () => {
-    test("nav property is left unhydrated when omitted from include tree", async () => {
+  describe("Navigation property hydration", () => {
+    test("hydrates navigation properties and their typed columns when included", () => {
       // Arrange
-      const childMeta = ModelBuilder.model("ChildModel").idPk().build();
-      class ChildModel {
-        id!: number;
-      }
+      const iso = "2024-03-10T08:00:00.000Z";
+
+      const childMeta = ModelBuilder.model("ChildModel")
+        .idPk()
+        .col("createdAt", "DateIso")
+        .build();
 
       const parentMeta = ModelBuilder.model("ParentModel")
         .idPk()
-        .col("fk", "Integer", {
-          column_name: "id",
-          model_name: "ChildModel",
+        .navP("child", "ChildModel", {
+          OneToOne: { columns: ["id"] },
         })
-        .navP("child", "ChildModel", { OneToOne: { key_columns: ["fk"] } })
         .build();
-      class ParentModel {
-        id!: number;
-        fk!: number;
-        child!: ChildModel;
-      }
 
       const ast = createAst({ models: [parentMeta, childMeta] });
-      const ctorReg = { ParentModel, ChildModel };
 
-      // Act
-      const result = hydrateType(
-        { id: 1, fk: 2, child: { id: 2 } },
-        { Object: ParentModel.name },
-        {
-          ...createHydrateArgs(),
-          ast,
-          ctorReg,
-          includeTree: {}, // empty include tree, so nav props should not be hydrated
-        },
-      );
-
-      // Assert
-      expect(result).toBeInstanceOf(ParentModel);
-      expect(result.child).not.toBeInstanceOf(ChildModel);
-    });
-
-    test("OneToMany nav property hydrates array of instances", async () => {
-      // Arrange
-      const tagMeta = ModelBuilder.model("TagModel")
-        .idPk()
-        .col("postId", "Integer", {
-          column_name: "id",
-          model_name: "PostModel",
-        })
-        .build();
-      class TagModel {
-        id!: number;
-        postId!: number;
-      }
-
-      const postMeta = ModelBuilder.model("PostModel")
-        .idPk()
-        .navP("tags", "TagModel", {
-          OneToMany: { key_columns: ["postId"] },
-        })
-        .build();
-      class PostModel {
-        id!: number;
-        tags!: TagModel[];
-      }
-
-      const ast = createAst({ models: [postMeta, tagMeta] });
-      const ctorReg = { PostModel, TagModel };
-      const obj = {
+      const base = {
         id: 1,
-        tags: [
-          { id: 10, postId: 1 },
-          { id: 11, postId: 1 },
-        ],
+        child: {
+          id: 2,
+          createdAt: iso,
+        },
       };
 
       // Act
-      const result = hydrateType(
-        obj,
-        { Object: PostModel.name },
-        {
-          ...createHydrateArgs(),
-          ast,
-          ctorReg,
-          includeTree: { tags: {} }, // include 'tags' nav prop for hydration
+      const result = hydrateType(base, { Object: { name: "ParentModel" } }, {
+        ...createHydrateArgs(),
+        ast,
+        includeTree: {
+          child: {},
         },
-      );
+      });
 
       // Assert
-      expect(result).toBeInstanceOf(PostModel);
-      expect(result.tags).toHaveLength(2);
-      expect(result.tags[0]).toBeInstanceOf(TagModel);
-      expect(result.tags[1]).toBeInstanceOf(TagModel);
+      expect(result.child).toBeDefined();
+      expect(result.child.createdAt).toBeInstanceOf(Date);
+      expect(result.child.createdAt.toISOString()).toBe(iso);
+    });
+
+    test("does not hydrate navigation properties when exclude from include tree", () => {
+      // Arrange
+      const iso = "2024-03-10T08:00:00.000Z";
+
+      const childMeta = ModelBuilder.model("ChildModel2")
+        .idPk()
+        .col("createdAt", "DateIso")
+        .build();
+
+      const parentMeta = ModelBuilder.model("ParentModel2")
+        .idPk()
+        .navP("child", "ChildModel2", {
+          OneToOne: { columns: ["id"] },
+        })
+        .build();
+
+      const ast = createAst({ models: [parentMeta, childMeta] });
+
+      const base = {
+        id: 1,
+        child: {
+          id: 2,
+          createdAt: iso,
+        },
+      };
+
+      // Act
+      const result = hydrateType(base, { Object: { name: "ParentModel2" } }, {
+        ...createHydrateArgs(),
+        ast,
+        includeTree: {},
+      });
+
+      // Assert
+      expect(result.child).toBeDefined();
+      expect(result.child.createdAt).not.toBeInstanceOf(Date);
+      expect(result.child.createdAt).toBe(iso);
     });
   });
 });
@@ -258,155 +226,26 @@ describe("ORM Hydrate Tests", () => {
     _cloesceInternal.RuntimeContainer.dispose();
   });
 
-  test("Hydrate instantiates Models and their navigation properties", async () => {
-    // // Arrange
-    const depth2ModelMeta = ModelBuilder.model("Depth2Model")
-      .idPk()
-      .col("fk", "Integer", {
-        column_name: "id",
-        model_name: "Depth1Model",
-      })
-      .build();
-    class Depth2Model {
-      id!: number;
-      fk!: number;
-    }
-
-    const depth1ModelMeta = ModelBuilder.model("Depth1Model")
-      .idPk()
-      .col("name", "Text")
-      .navP("depth2", "Depth2Model", {
-        OneToMany: { key_columns: ["fk"] },
-      })
-      .build();
-    class Depth1Model {
-      id!: number;
-      name!: string;
-      depth2!: Depth2Model[];
-    }
-
-    const modelMeta = ModelBuilder.model("TestModel")
-      .idPk()
-      .col("fk", "Integer", {
-        column_name: "id",
-        model_name: "Depth1Model",
-      })
-      .navP("depth1", "Depth1Model", {
-        OneToOne: { key_columns: ["fk"] },
-      })
-      .build();
-    class TestModel {
-      id!: number;
-      fk!: number;
-      depth1!: Depth1Model;
-    }
-
-    const base = {
-      id: 1,
-      fk: 2,
-      depth1: {
-        id: 2,
-        name: "Depth 1",
-        depth2: [
-          { id: 3, fk: 2 },
-          { id: 4, fk: 2 },
-        ],
-      },
-    };
-
-    const ast = createAst({
-      models: [modelMeta, depth1ModelMeta, depth2ModelMeta],
-    });
-
-    const ctorReg = {
-      TestModel: TestModel,
-      Depth1Model: Depth1Model,
-      Depth2Model: Depth2Model,
-    };
-
-    await _cloesceInternal.RuntimeContainer.init(ast, ctorReg, api);
-
-    const env = {};
-    const instance = Orm.fromEnv(env);
-
-    {
-      // Act
-      const noIncludeTree = await instance.hydrate(TestModel, {
-        base,
-      });
-
-      // Assert
-      expect(noIncludeTree).toBeInstanceOf(TestModel);
-      expect(noIncludeTree.depth1).not.toBeInstanceOf(Depth1Model);
-    }
-
-    {
-      // Act
-      const depth1IncludeTree = await instance.hydrate(TestModel, {
-        base,
-        include: {
-          depth1: {},
-        },
-      });
-
-      // Assert
-      expect(depth1IncludeTree).toBeInstanceOf(TestModel);
-      expect(depth1IncludeTree.depth1).toBeInstanceOf(Depth1Model);
-    }
-
-    {
-      // Act
-      const fullIncludeTree = await instance.hydrate(TestModel, {
-        base,
-        include: {
-          depth1: {
-            depth2: {},
-          },
-        },
-      });
-
-      // Assert
-      expect(fullIncludeTree).toBeInstanceOf(TestModel);
-      expect(fullIncludeTree.depth1).toBeInstanceOf(Depth1Model);
-      expect(fullIncludeTree.depth1.depth2[0]).toBeInstanceOf(Depth2Model);
-      expect(fullIncludeTree.depth1.depth2[1]).toBeInstanceOf(Depth2Model);
-    }
-  });
-
   test("Hydrate handles KV + R2", async () => {
     // Arrange
     const modelMeta = ModelBuilder.model("TestModel")
       .idPk()
-      .keyParam("configId")
-      .kvObject("config/{configId}", "namespace1", "config", false, "JsonValue")
-      .kvObject(
+      .keyField("configId")
+      .kvField("config/{configId}", "namespace1", "config", false, "Json")
+      .kvField(
         "config/{configId}",
         "namespace1",
         "configStream",
         false,
         "Stream",
       )
-      .kvObject("config", "namespace1", "configList", true, "JsonValue")
-      .kvObject("emptyConfig", "namespace1", "emptyConfig", false, "JsonValue")
-      .keyParam("imageId")
-      .r2Object("images/{imageId}", "bucket1", "image", false)
-      .r2Object("images", "bucket1", "imageList", true)
-      .r2Object("emptyImage", "bucket1", "emptyImage", false)
+      .kvField("config", "namespace1", "configList", true, "Json")
+      .kvField("emptyConfig", "namespace1", "emptyConfig", false, "Json")
+      .keyField("imageId")
+      .r2Field("images/{imageId}", "bucket1", "image", false)
+      .r2Field("images", "bucket1", "imageList", true)
+      .r2Field("emptyImage", "bucket1", "emptyImage", false)
       .build();
-
-    class TestModel {
-      id!: number;
-      configId!: string;
-      config!: KValue<unknown>;
-      configStream!: KValue<ReadableStream>;
-      configList!: Paginated<KValue<unknown>>;
-      emptyConfig!: KValue<unknown>;
-
-      imageId!: string;
-      image!: R2ObjectBody;
-      imageList!: Paginated<R2ObjectBody>;
-      emptyImage!: R2ObjectBody;
-    }
 
     const configId = "some-config-id";
     const imageId = "some-image-id";
@@ -463,31 +302,29 @@ describe("ORM Hydrate Tests", () => {
       models: [modelMeta],
     });
 
-    const ctorReg = {
-      TestModel: TestModel,
-    };
-
-    await _cloesceInternal.RuntimeContainer.init(ast, ctorReg, api);
-
     const env = {
       namespace1: namespace1,
       bucket1: bucket1,
     };
 
-    const instance = Orm.fromEnv(env);
-
     {
       // Act
-      const noIncludeTree = await instance.hydrate(TestModel, {
-        base,
-        keyParams: {
-          configId: configId,
-          imageId: imageId,
+      const promises: Promise<void>[] = [];
+      const noIncludeTree = hydrateType(
+        { ...base },
+        { Object: { name: "TestModel" } },
+        {
+          ast,
+          includeTree: {},
+          keyFields: { configId, imageId },
+          env,
+          promises,
         },
-      });
+      );
+
+      await Promise.all(promises);
 
       // Assert
-      expect(noIncludeTree).toBeInstanceOf(TestModel);
       expect(noIncludeTree.config).toBeUndefined();
       expect(noIncludeTree.configList).toEqual({
         results: [],
@@ -504,25 +341,30 @@ describe("ORM Hydrate Tests", () => {
 
     {
       // Act
-      const fullIncludeTree: TestModel = await instance.hydrate(TestModel, {
-        base,
-        keyParams: {
-          configId: configId,
-          imageId: imageId,
+      const promises: Promise<void>[] = [];
+      const fullIncludeTree = hydrateType(
+        { ...base },
+        { Object: { name: "TestModel" } },
+        {
+          ast,
+          includeTree: {
+            config: {},
+            configStream: {},
+            configList: {},
+            emptyConfig: {},
+            image: {},
+            imageList: {},
+            emptyImage: {},
+          },
+          keyFields: { configId, imageId },
+          env,
+          promises,
         },
-        include: {
-          config: {},
-          configStream: {},
-          configList: {},
-          emptyConfig: {},
-          image: {},
-          imageList: {},
-          emptyImage: {},
-        },
-      });
+      );
+
+      await Promise.all(promises);
 
       // Assert
-      expect(fullIncludeTree).toBeInstanceOf(TestModel);
       expect(fullIncludeTree.config).toEqual({
         key: baseConfigKV.key,
         raw: baseConfigKV.value,
@@ -570,13 +412,8 @@ describe("ORM Hydrate Tests", () => {
     // Arrange
     const modelMeta = ModelBuilder.model("CursorModel")
       .idPk()
-      .kvObject("cursor-test", "namespace1", "configList", true, "JsonValue")
+      .kvField("cursor-test", "namespace1", "configList", true, "Json")
       .build();
-
-    class CursorModel {
-      id!: number;
-      configList!: Paginated<KValue<unknown>>;
-    }
 
     const mf = new Miniflare({
       modules: true,
@@ -601,18 +438,21 @@ describe("ORM Hydrate Tests", () => {
 
     const ast = createAst({ models: [modelMeta] });
 
-    const ctorReg = {
-      CursorModel,
-    };
-
-    await _cloesceInternal.RuntimeContainer.init(ast, ctorReg, api);
-    const instance = Orm.fromEnv({ namespace1 });
-
     // Act
-    const hydrated = await instance.hydrate(CursorModel, {
-      base: { id: 1 },
-      include: { configList: {} },
-    });
+    const promises: Promise<void>[] = [];
+    const hydrated = hydrateType(
+      { id: 1 },
+      { Object: { name: "CursorModel" } },
+      {
+        ast,
+        includeTree: { configList: {} },
+        keyFields: {},
+        env: { namespace1 },
+        promises,
+      },
+    );
+
+    await Promise.all(promises);
 
     // Assert first page
     expect(hydrated.configList.results.length).toBe(1000);
@@ -620,7 +460,7 @@ describe("ORM Hydrate Tests", () => {
     expect(hydrated.configList.cursor).toBeTypeOf("string");
 
     const firstPageKeys = new Set(
-      hydrated.configList.results.map((item) => item.key),
+      hydrated.configList.results.map((item: { key: string }) => item.key),
     );
 
     // Act on next page using hydrated cursor
@@ -636,554 +476,4 @@ describe("ORM Hydrate Tests", () => {
       expect(firstPageKeys.has(key.name)).toBe(false);
     }
   }, 30000);
-});
-
-describe("List, Get, Upsert", () => {
-  afterEach(() => {
-    _cloesceInternal.RuntimeContainer.dispose();
-  });
-
-  test("List with default listParams (LastSeen, Limit)", async () => {
-    // Arrange
-    const modelMeta = ModelBuilder.model("Product")
-      .defaultDb()
-      .idPk()
-      .col("name", "Text")
-      .col("price", "Integer")
-      .build();
-
-    class Product {
-      id!: number;
-      name!: string;
-      price!: number;
-    }
-
-    const ast = createAst({ models: [modelMeta] });
-    const ctorReg = { Product };
-
-    await _cloesceInternal.RuntimeContainer.init(ast, ctorReg, api);
-
-    const mf = new Miniflare({
-      modules: true,
-      script: `
-        export default {
-          async fetch(request, env, ctx) {
-            return new Response("Hello Miniflare!");
-          }
-        }
-        `,
-      d1Databases: ["d1"],
-    });
-
-    const d1 = await mf.getD1Database("d1");
-
-    // Create table and insert test data
-    await d1
-      .prepare(
-        `CREATE TABLE Product (id INTEGER PRIMARY KEY, name TEXT, price INTEGER)`,
-      )
-      .run();
-    await d1
-      .prepare(
-        `INSERT INTO Product (id, name, price) VALUES
-         (1, 'Product 1', 100),
-         (2, 'Product 2', 200),
-         (3, 'Product 3', 300)`,
-      )
-      .run();
-
-    const env = { d1 };
-    const instance = Orm.fromEnv(env);
-
-    // Act
-    const products = await instance.list(Product, {
-      lastSeen: { id: 0 },
-      limit: 10,
-    });
-
-    // Assert
-    expect(products).toHaveLength(3);
-    expect(products[0]).toBeInstanceOf(Product);
-    expect(products[0].id).toBe(1);
-    expect(products[1].name).toBe("Product 2");
-    expect(products[2].price).toBe(300);
-  });
-
-  test("List with explicit custom query and pagination params", async () => {
-    // Arrange
-    const modelMeta = ModelBuilder.model("User")
-      .defaultDb()
-      .idPk()
-      .col("username", "Text")
-      .build();
-
-    class User {
-      id!: number;
-      username!: string;
-
-      static readonly custom = {
-        includeTree: {},
-        list: () =>
-          `SELECT "User"."id", "User"."username" FROM "User" ORDER BY "User"."id" LIMIT ? OFFSET ?`,
-        listParams: ["Limit", "Offset"] as CrudListParam[],
-      };
-    }
-
-    const ast = createAst({ models: [modelMeta] });
-    const ctorReg = { User };
-
-    await _cloesceInternal.RuntimeContainer.init(ast, ctorReg, api);
-
-    const mf = new Miniflare({
-      modules: true,
-      script: `
-        export default {
-          async fetch(request, env, ctx) {
-            return new Response("Hello Miniflare!");
-          }
-        }
-        `,
-      d1Databases: ["d1"],
-    });
-
-    const d1 = await mf.getD1Database("d1");
-
-    await d1
-      .prepare(`CREATE TABLE User (id INTEGER PRIMARY KEY, username TEXT)`)
-      .run();
-    await d1
-      .prepare(
-        `INSERT INTO User (id, username) VALUES
-         (1, 'alice'),
-         (2, 'bob'),
-         (3, 'charlie'),
-         (4, 'diana')`,
-      )
-      .run();
-
-    const env = { d1 };
-    const instance = Orm.fromEnv(env);
-
-    // Act
-    const users = await instance.list(User, {
-      include: User.custom,
-      limit: 2,
-      offset: 1,
-    });
-
-    // Assert
-    expect(users).toHaveLength(2);
-    expect(users[0]).toBeInstanceOf(User);
-    expect(users.map((u) => u.username)).toEqual(["bob", "charlie"]);
-  });
-
-  test("List supports custom DataSource methods with parameter binding", async () => {
-    // Arrange
-    const modelMeta = ModelBuilder.model("Record")
-      .defaultDb()
-      .idPk()
-      .col("data", "Text")
-      .build();
-
-    class Record {
-      id!: number;
-      data!: string;
-
-      static readonly custom = {
-        includeTree: {},
-        // Custom list with exact parameter binding
-        list: () =>
-          `SELECT "Record"."id", "Record"."data" FROM "Record" WHERE "Record"."id" > ? LIMIT ?`,
-        listParams: ["LastSeen", "Limit"] as CrudListParam[],
-      };
-    }
-
-    const ast = createAst({ models: [modelMeta] });
-    const ctorReg = { Record };
-
-    await _cloesceInternal.RuntimeContainer.init(ast, ctorReg, api);
-
-    const mf = new Miniflare({
-      modules: true,
-      script: `
-        export default {
-          async fetch(request, env, ctx) {
-            return new Response("Hello Miniflare!");
-          }
-        }
-        `,
-      d1Databases: ["d1"],
-    });
-
-    const d1 = await mf.getD1Database("d1");
-
-    await d1
-      .prepare(`CREATE TABLE Record (id INTEGER PRIMARY KEY, data TEXT)`)
-      .run();
-    await d1
-      .prepare(
-        `INSERT INTO Record (id, data) VALUES
-         (1, 'data1'),
-         (2, 'data2')`,
-      )
-      .run();
-
-    const env = { d1 };
-    const instance = Orm.fromEnv(env);
-
-    // Act
-    const records = await instance.list(Record, {
-      include: Record.custom,
-      lastSeen: { id: 0 },
-      limit: 5,
-    });
-
-    // Assert
-    expect(records).toHaveLength(2);
-    expect(records[0]).toBeInstanceOf(Record);
-    expect(records[0].id).toBe(1);
-    expect(records[1].id).toBe(2);
-  });
-
-  test("Get with primary key", async () => {
-    // Arrange
-    const modelMeta = ModelBuilder.model("Post")
-      .defaultDb()
-      .idPk()
-      .col("content", "Text")
-      .build();
-
-    class Post {
-      id!: number;
-      content!: string;
-    }
-
-    const ast = createAst({ models: [modelMeta] });
-    const ctorReg = { Post };
-
-    await _cloesceInternal.RuntimeContainer.init(ast, ctorReg, api);
-
-    const mf = new Miniflare({
-      modules: true,
-      script: `
-        export default {
-          async fetch(request, env, ctx) {
-            return new Response("Hello Miniflare!");
-          }
-        }
-        `,
-      d1Databases: ["d1"],
-    });
-
-    const d1 = await mf.getD1Database("d1");
-
-    // Create table and insert test data
-    await d1
-      .prepare(`CREATE TABLE Post (id INTEGER PRIMARY KEY, content TEXT)`)
-      .run();
-    await d1
-      .prepare(
-        `INSERT INTO Post (id, content) VALUES
-         (1, 'Hello World'),
-         (2, 'Second Post')`,
-      )
-      .run();
-
-    const env = { d1 };
-    const instance = Orm.fromEnv(env);
-
-    // Act
-    const post = await instance.get(Post, {
-      primaryKey: { id: 1 },
-    });
-
-    // Assert
-    expect(post).toBeInstanceOf(Post);
-    expect(post!.id).toBe(1);
-    expect(post!.content).toBe("Hello World");
-  });
-
-  test("Get returns null when not found", async () => {
-    // Arrange
-    const modelMeta = ModelBuilder.model("Comment")
-      .defaultDb()
-      .idPk()
-      .col("text", "Text")
-      .build();
-
-    class Comment {
-      id!: number;
-      text!: string;
-    }
-
-    const ast = createAst({ models: [modelMeta] });
-    const ctorReg = { Comment };
-
-    await _cloesceInternal.RuntimeContainer.init(ast, ctorReg, api);
-
-    const mf = new Miniflare({
-      modules: true,
-      script: `
-        export default {
-          async fetch(request, env, ctx) {
-            return new Response("Hello Miniflare!");
-          }
-        }
-        `,
-      d1Databases: ["d1"],
-    });
-
-    const d1 = await mf.getD1Database("d1");
-
-    // Create table but don't insert data for id=999
-    await d1
-      .prepare(`CREATE TABLE Comment (id INTEGER PRIMARY KEY, text TEXT)`)
-      .run();
-
-    const env = { d1 };
-    const instance = Orm.fromEnv(env);
-
-    // Act
-    const comment = await instance.get(Comment, {
-      primaryKey: { id: 999 },
-    });
-
-    // Assert
-    expect(comment).toBeNull();
-  });
-
-  test("List with composite primary key", async () => {
-    // Arrange
-    const modelMeta = ModelBuilder.model("Enrollment")
-      .defaultDb()
-      .pk("courseId", "Text")
-      .pk("studentId", "Integer")
-      .col("status", "Text")
-      .build();
-
-    class Enrollment {
-      courseId!: string;
-      studentId!: number;
-      status!: string;
-    }
-
-    const ast = createAst({ models: [modelMeta] });
-    const ctorReg = { Enrollment };
-
-    await _cloesceInternal.RuntimeContainer.init(ast, ctorReg, api);
-
-    const mf = new Miniflare({
-      modules: true,
-      script: `
-        export default {
-          async fetch(request, env, ctx) {
-            return new Response("Hello Miniflare!");
-          }
-        }
-        `,
-      d1Databases: ["d1"],
-    });
-
-    const d1 = await mf.getD1Database("d1");
-
-    await d1
-      .prepare(
-        `CREATE TABLE Enrollment (courseId TEXT, studentId INTEGER, status TEXT, PRIMARY KEY (courseId, studentId))`,
-      )
-      .run();
-    await d1
-      .prepare(
-        `INSERT INTO Enrollment (courseId, studentId, status) VALUES
-         ('course-a', 1, 'active'),
-         ('course-a', 2, 'active'),
-         ('course-b', 1, 'inactive')`,
-      )
-      .run();
-
-    const env = { d1 };
-    const instance = Orm.fromEnv(env);
-
-    // Act
-    const rows = await instance.list(Enrollment, {
-      lastSeen: { courseId: "course-a", studentId: 1 },
-      limit: 10,
-    });
-
-    // Assert
-    expect(rows).toHaveLength(2);
-    expect(rows[0]).toBeInstanceOf(Enrollment);
-    expect(rows[0].courseId).toBe("course-a");
-    expect(rows[0].studentId).toBe(2);
-    expect(rows[1].courseId).toBe("course-b");
-    expect(rows[1].studentId).toBe(1);
-  });
-
-  test("Get with composite primary key", async () => {
-    // Arrange
-    const modelMeta = ModelBuilder.model("Membership")
-      .defaultDb()
-      .pk("orgId", "Text")
-      .pk("userId", "Integer")
-      .col("role", "Text")
-      .build();
-
-    class Membership {
-      orgId!: string;
-      userId!: number;
-      role!: string;
-    }
-
-    const ast = createAst({ models: [modelMeta] });
-    const ctorReg = { Membership };
-
-    await _cloesceInternal.RuntimeContainer.init(ast, ctorReg, api);
-
-    const mf = new Miniflare({
-      modules: true,
-      script: `
-        export default {
-          async fetch(request, env, ctx) {
-            return new Response("Hello Miniflare!");
-          }
-        }
-        `,
-      d1Databases: ["d1"],
-    });
-
-    const d1 = await mf.getD1Database("d1");
-
-    await d1
-      .prepare(
-        `CREATE TABLE Membership (orgId TEXT, userId INTEGER, role TEXT, PRIMARY KEY (orgId, userId))`,
-      )
-      .run();
-    await d1
-      .prepare(
-        `INSERT INTO Membership (orgId, userId, role) VALUES
-         ('acme', 1, 'owner'),
-         ('acme', 2, 'member')`,
-      )
-      .run();
-
-    const env = { d1 };
-    const instance = Orm.fromEnv(env);
-
-    // Act
-    const membership = await instance.get(Membership, {
-      primaryKey: { orgId: "acme", userId: 2 },
-    });
-
-    // Assert
-    expect(membership).toBeInstanceOf(Membership);
-    expect(membership!.orgId).toBe("acme");
-    expect(membership!.userId).toBe(2);
-    expect(membership!.role).toBe("member");
-  });
-
-  test("List, Get, Upsert default DataSource when not specified", async () => {
-    // Arrange
-    const dependencyModel = ModelBuilder.model("DependentModel")
-      .defaultDb()
-      .idPk()
-      .col("value", "Text")
-      .build();
-
-    class DependentModel {
-      id!: number;
-      value!: string;
-    }
-
-    const modelMeta = ModelBuilder.model("DefaultDSModel")
-      .defaultDb()
-      .idPk()
-      .col("dependencyId", "Integer", {
-        column_name: "id",
-        model_name: "DependentModel",
-      })
-      .navP("dependency", "DependentModel", {
-        OneToOne: { key_columns: ["dependencyId"] },
-      })
-      .build();
-
-    class DefaultDSModel {
-      id!: number;
-      dependencyId!: number;
-      dependency!: DependentModel;
-    }
-
-    const ast = createAst({ models: [modelMeta, dependencyModel] });
-
-    ast.models["DefaultDSModel"].data_sources["default"] = {
-      name: "default",
-      is_private: false,
-      tree: {
-        dependency: {},
-      },
-      list_params: ["LastSeen", "Limit"],
-    };
-
-    const ctorReg = { DefaultDSModel, DependentModel };
-
-    await _cloesceInternal.RuntimeContainer.init(ast, ctorReg, api);
-
-    const mf = new Miniflare({
-      modules: true,
-      script: `
-        export default {
-          async fetch(request, env, ctx) {
-            return new Response("Hello Miniflare!");
-          }
-        }
-        `,
-      d1Databases: ["d1"],
-    });
-
-    const d1 = await mf.getD1Database("d1");
-
-    // Create tables and insert test data
-    await d1
-      .prepare(
-        `
-      CREATE TABLE IF NOT EXISTS "_cloesce_tmp" (
-      "path" text PRIMARY KEY,
-      "primary_key" text NOT NULL
-    );`,
-      )
-      .run();
-
-    await d1
-      .prepare(
-        `CREATE TABLE DependentModel (id INTEGER PRIMARY KEY, value TEXT)`,
-      )
-      .run();
-    await d1
-      .prepare(
-        `CREATE TABLE DefaultDSModel (id INTEGER PRIMARY KEY, dependencyId INTEGER)`,
-      )
-      .run();
-
-    const env = { d1 };
-    const instance = Orm.fromEnv(env);
-
-    // Act
-    const upsertResult = await instance.upsert(DefaultDSModel, {
-      id: 2,
-      dependencyId: 1,
-      dependency: { id: 1, value: "Dependency Value" },
-    });
-    const listResult = await instance.list(DefaultDSModel);
-    const getResult = await instance.get(DefaultDSModel, {
-      primaryKey: { id: 2 },
-    });
-
-    // Assert
-    expect(upsertResult).toBeInstanceOf(DefaultDSModel);
-    expect(upsertResult!.dependency).toBeInstanceOf(DependentModel);
-    expect(upsertResult!.dependency.value).toBe("Dependency Value");
-    expect(listResult).toHaveLength(1);
-    expect(listResult[0]).toBeInstanceOf(DefaultDSModel);
-    expect(listResult[0].dependency).toBeInstanceOf(DependentModel);
-    expect(getResult).toBeInstanceOf(DefaultDSModel);
-    expect(getResult!.dependency).toBeInstanceOf(DependentModel);
-  });
 });

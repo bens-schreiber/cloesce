@@ -1,40 +1,26 @@
 import { Project } from "ts-morph";
 import {
   Model,
-  CloesceAst,
-  CidlIncludeTree,
-  NamedTypedValue,
+  Cidl,
+  IncludeTree,
+  Field,
   HttpVerb,
   CidlType,
-  NavigationPropertyKind,
-  D1Column,
+  NavigationFieldKind,
+  Column,
   DataSource,
-  NavigationProperty,
+  NavigationField,
   ApiMethod,
   Service,
-  ServiceAttribute,
   MediaType,
-  KeyValue,
-  AstR2Object,
+  KvR2Field,
   CrudKind,
-  CrudListParam,
-} from "../src/ast";
-
-export function cloesceProject(): Project {
-  const project = new Project({
-    compilerOptions: {
-      strict: true,
-    },
-  });
-
-  project.addSourceFileAtPath("./src/ui/backend.ts");
-  return project;
-}
+} from "../src/cidl";
 
 export function createAst(args?: {
   models?: Model[];
   services?: Service[];
-}): CloesceAst {
+}): Cidl {
   const modelsMap = Object.fromEntries(
     args?.models?.map((m) => [m.name, m]) ?? [],
   );
@@ -44,45 +30,40 @@ export function createAst(args?: {
 
   // NOTE: these won't always be empty in real usage
   for (const model of Object.values(modelsMap)) {
-    model.data_sources["default"] ??= {
-      name: "default",
-      is_private: false,
-      tree: {},
-      list_params: [],
+    model.data_sources["Default"] ??= {
+      name: "Default",
+      is_internal: false,
+      gen: { tree: {} },
     };
   }
 
   return {
-    project_name: "test",
     models: modelsMap,
     services: serviceMap,
     poos: {},
     wrangler_env: {
-      name: "Env",
-      source_path: "source.ts",
       d1_bindings: ["d1"],
       kv_bindings: [],
       r2_bindings: [],
-      vars: {},
+      vars: [],
     },
-    main_source: null,
   };
 }
 
 abstract class ApiMethodBuilder {
-  protected methods: Record<string, ApiMethod> = {};
+  protected apis: ApiMethod[] = [];
 
   method(
     name: string,
     http_verb: HttpVerb,
     is_static: boolean,
-    parameters: NamedTypedValue[],
+    parameters: Field[],
     return_type: CidlType,
-    return_media: MediaType = MediaType.Json,
-    parameters_media: MediaType = MediaType.Json,
+    return_media: MediaType = "Json",
+    parameters_media: MediaType = "Json",
     data_source: string | null = null,
   ): this {
-    this.methods[name] = {
+    this.apis.push({
       name,
       http_verb,
       is_static,
@@ -91,13 +72,13 @@ abstract class ApiMethodBuilder {
       return_media,
       parameters_media,
       data_source,
-    };
+    });
     return this;
   }
 }
 
 export class IncludeTreeBuilder {
-  private nodes: CidlIncludeTree = {};
+  private nodes: IncludeTree = {};
 
   static new(): IncludeTreeBuilder {
     return new IncludeTreeBuilder();
@@ -117,7 +98,7 @@ export class IncludeTreeBuilder {
     return this;
   }
 
-  build(): CidlIncludeTree {
+  build(): IncludeTree {
     return this.nodes;
   }
 }
@@ -127,12 +108,12 @@ export class ModelBuilder {
   private d1_binding: string | null = null;
   private primary_key_names: string[] = [];
   private primary_key_types: Record<string, CidlType> = {};
-  private columns: D1Column[] = [];
-  private navigation_properties: NavigationProperty[] = [];
-  private key_params: string[] = [];
-  private kv_objects: KeyValue[] = [];
-  private r2_objects: AstR2Object[] = [];
-  private methods: Record<string, ApiMethod> = {};
+  private columns: Column[] = [];
+  private navigation_fields: NavigationField[] = [];
+  private key_fields: string[] = [];
+  private kv_fields: KvR2Field[] = [];
+  private r2_fields: KvR2Field[] = [];
+  private apis: ApiMethod[] = [];
   private data_sources: Record<string, DataSource> = {};
   private cruds: CrudKind[] = [];
 
@@ -160,7 +141,7 @@ export class ModelBuilder {
     foreign_key: { model_name: string; column_name: string } | null = null,
   ): this {
     this.columns.push({
-      value: { name, cidl_type },
+      field: { name, cidl_type },
       foreign_key_reference: foreign_key,
       unique_ids: [],
       composite_id: null,
@@ -169,12 +150,12 @@ export class ModelBuilder {
   }
 
   navP(
-    var_name: string,
+    name: string,
     model_reference: string,
-    kind: NavigationPropertyKind,
+    kind: NavigationFieldKind,
   ): this {
-    this.navigation_properties.push({
-      var_name,
+    this.navigation_fields.push({
+      field: { name, cidl_type: { Object: { name: model_reference } } },
       model_reference,
       kind,
     });
@@ -193,37 +174,38 @@ export class ModelBuilder {
     return this.pk("id", "Integer");
   }
 
-  keyParam(name: string): this {
-    this.key_params.push(name);
+  keyField(name: string): this {
+    this.key_fields.push(name);
     return this;
   }
 
-  kvObject(
+  kvField(
     format: string,
-    namespace_binding: string,
+    binding: string,
     name: string,
     list_prefix: boolean,
     cidl_type: CidlType,
   ): this {
-    this.kv_objects.push({
+    this.kv_fields.push({
+      field: { name, cidl_type },
       format,
-      namespace_binding,
-      value: { name, cidl_type },
+      binding,
       list_prefix,
     });
     return this;
   }
 
-  r2Object(
+  r2Field(
     format: string,
-    bucket_binding: string,
-    var_name: string,
+    binding: string,
+    name: string,
     list_prefix: boolean,
+    cidl_type: CidlType = "R2Object",
   ): this {
-    this.r2_objects.push({
+    this.r2_fields.push({
+      field: { name, cidl_type },
       format,
-      bucket_binding,
-      var_name,
+      binding,
       list_prefix,
     });
     return this;
@@ -233,34 +215,32 @@ export class ModelBuilder {
     name: string,
     http_verb: HttpVerb,
     is_static: boolean,
-    parameters: NamedTypedValue[],
+    parameters: Field[],
     return_type: CidlType,
     data_source: string | null = null,
   ): this {
-    this.methods[name] = {
+    this.apis.push({
       name,
       http_verb,
       is_static,
       parameters,
       return_type,
-      return_media: MediaType.Json,
-      parameters_media: MediaType.Json,
+      return_media: "Json",
+      parameters_media: "Json",
       data_source,
-    };
+    });
     return this;
   }
 
   dataSource(
     name: string,
-    tree: any,
-    is_private: boolean = false,
-    list_params: CrudListParam[] = [],
+    tree: IncludeTree,
+    is_internal: boolean = false,
   ): this {
     this.data_sources[name] = {
       name,
-      tree,
-      is_private,
-      list_params,
+      is_internal,
+      gen: { tree },
     };
     return this;
   }
@@ -272,16 +252,16 @@ export class ModelBuilder {
 
   build(): Model {
     const mutableColumns = [...this.columns];
-    const primary_key_columns: D1Column[] = [];
+    const primary_columns: Column[] = [];
 
     for (const pkName of this.primary_key_names) {
-      const idx = mutableColumns.findIndex((col) => col.value.name === pkName);
+      const idx = mutableColumns.findIndex((col) => col.field.name === pkName);
       if (idx >= 0) {
-        primary_key_columns.push(mutableColumns[idx]);
+        primary_columns.push(mutableColumns[idx]);
         mutableColumns.splice(idx, 1);
       } else {
-        primary_key_columns.push({
-          value: {
+        primary_columns.push({
+          field: {
             name: pkName,
             cidl_type: this.primary_key_types[pkName] ?? "Integer",
           },
@@ -295,23 +275,22 @@ export class ModelBuilder {
     return {
       name: this.name,
       d1_binding: this.d1_binding,
-      primary_key_columns,
+      primary_columns,
       columns: mutableColumns,
-      navigation_properties: this.navigation_properties,
-      key_params: this.key_params,
-      kv_objects: this.kv_objects,
-      r2_objects: this.r2_objects,
-      methods: this.methods,
+      navigation_fields: this.navigation_fields,
+      key_fields: this.key_fields,
+      kv_fields: this.kv_fields,
+      r2_fields: this.r2_fields,
+      apis: this.apis,
       data_sources: this.data_sources,
       cruds: this.cruds,
-      source_path: "",
     };
   }
 }
 
 export class ServiceBuilder extends ApiMethodBuilder {
   private name: string;
-  private attributes: ServiceAttribute[] = [];
+  private fields: Field[] = [];
 
   constructor(name: string) {
     super();
@@ -322,18 +301,16 @@ export class ServiceBuilder extends ApiMethodBuilder {
     return new ServiceBuilder(name);
   }
 
-  inject(var_name: string, inject_reference: string): this {
-    this.attributes.push({ var_name, inject_reference });
+  field(name: string, cidl_type: CidlType): this {
+    this.fields.push({ name, cidl_type });
     return this;
   }
 
   build(): Service {
     return {
       name: this.name,
-      attributes: this.attributes,
-      methods: this.methods,
-      source_path: "",
-      initializer: null,
+      fields: this.fields,
+      apis: this.apis,
     };
   }
 }

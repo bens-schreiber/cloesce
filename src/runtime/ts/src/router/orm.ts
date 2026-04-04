@@ -9,12 +9,12 @@ import type {
 
 import { RuntimeContainer } from "./router.js";
 import { WasmResource, invokeOrmWasm } from "./wasm.js";
-import { Model, CidlType, Cidl, getNavigationCidlType } from "../cidl.js";
+import { Model, CidlType, Cidl, getNavigationCidlType, KvR2Field } from "../cidl.js";
 import { InternalError, u8ToB64 } from "../common.js";
 import { DeepPartial, IncludeTree, KValue, Paginated } from "../ui/backend.js";
 
 export class Orm {
-  private constructor(private env: unknown) {}
+  private constructor(private env: unknown) { }
 
   static fromEnv(env: unknown): Orm {
     return new Orm(env);
@@ -420,7 +420,7 @@ export function hydrateType(
 
   const modelMeta = args.ast.models[objectName];
   const pooMeta = args.ast.poos[objectName];
-  const instance = {} as any;
+  const instance = value as any;
 
   if (modelMeta) {
     // Hydrate columns
@@ -564,13 +564,13 @@ export function hydrateType(
 async function hydrateKVList(
   namespace: KVNamespace,
   key: string,
-  kv: any,
+  kv: KvR2Field,
   current: any,
 ) {
   const res = await namespace.list({ prefix: key });
   const cursor = !res.list_complete ? (res.cursor ?? null) : null;
 
-  if (kv.value.cidl_type === "Stream") {
+  if (kv.field.cidl_type === "Stream") {
     const results = await Promise.all(
       res.keys.map(async (k: any) => {
         const stream = await namespace.get(k.name, { type: "stream" });
@@ -582,7 +582,7 @@ async function hydrateKVList(
       }),
     );
 
-    current[kv.value.name] = {
+    current[kv.field.name] = {
       results,
       cursor,
       complete: res.list_complete || !cursor,
@@ -603,7 +603,7 @@ async function hydrateKVList(
     }),
   );
 
-  current[kv.value.name] = {
+  current[kv.field.name] = {
     results,
     cursor,
     complete: res.list_complete || !cursor,
@@ -613,12 +613,12 @@ async function hydrateKVList(
 async function hydrateKVSingle(
   namespace: KVNamespace,
   key: string,
-  kv: any,
+  kv: KvR2Field,
   current: any,
 ) {
-  if (kv.value.cidl_type === "Stream") {
+  if (kv.field.cidl_type === "Stream") {
     const res = await namespace.get(key, { type: "stream" });
-    current[kv.value.name] = Object.assign(new KValue(), {
+    current[kv.field.name] = Object.assign(new KValue(), {
       key,
       raw: res,
       metadata: null,
@@ -628,7 +628,7 @@ async function hydrateKVSingle(
   }
 
   const res = await namespace.getWithMetadata(key, { type: "json" });
-  current[kv.value.name] = Object.assign(new KValue(), {
+  current[kv.field.name] = Object.assign(new KValue(), {
     key,
     raw: res.value,
     metadata: res.metadata,
