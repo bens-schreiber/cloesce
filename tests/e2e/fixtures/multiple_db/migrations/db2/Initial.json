@@ -5,10 +5,10 @@
       "hash": 122024037709630579,
       "name": "DB2Model",
       "d1_binding": "db2",
-      "primary_key_columns": [
+      "primary_columns": [
         {
           "hash": 6397878138472974760,
-          "value": {
+          "field": {
             "name": "id",
             "cidl_type": "Integer"
           },
@@ -20,16 +20,16 @@
       "columns": [
         {
           "hash": 3747858334280870224,
-          "value": {
+          "field": {
             "name": "someColumn",
-            "cidl_type": "Text"
+            "cidl_type": "String"
           },
           "foreign_key_reference": null,
           "unique_ids": [],
           "composite_id": null
         }
       ],
-      "navigation_properties": []
+      "navigation_fields": []
     }
   }
 }

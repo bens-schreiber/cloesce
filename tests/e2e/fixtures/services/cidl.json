@@ -1,84 +1,88 @@
 {
   "hash": 0,
-  "project_name": "runner",
   "wrangler_env": null,
   "models": {},
   "services": {
     "FooService": {
       "name": "FooService",
-      "attributes": [],
-      "initializer": null,
-      "methods": {
-        "instantiatedMethod": {
-          "name": "instantiatedMethod",
-          "is_static": false,
-          "data_source": null,
-          "http_verb": "Get",
-          "return_media": "Json",
-          "return_type": "Text",
-          "parameters_media": "Json",
-          "parameters": [
-            {
-              "name": "thing",
-              "cidl_type": {
-                "Inject": "InjectedThing"
-              }
-            }
-          ]
-        },
-        "staticMethod": {
+      "fields": [],
+      "apis": [
+        {
           "name": "staticMethod",
           "is_static": true,
           "data_source": null,
           "http_verb": "Get",
           "return_media": "Json",
-          "return_type": "Text",
+          "return_type": {
+            "HttpResult": "String"
+          },
           "parameters_media": "Json",
           "parameters": [
             {
               "name": "thing",
               "cidl_type": {
-                "Inject": "InjectedThing"
+                "Inject": {
+                  "name": "InjectedThing"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "instantiatedMethod",
+          "is_static": false,
+          "data_source": null,
+          "http_verb": "Get",
+          "return_media": "Json",
+          "return_type": {
+            "HttpResult": "String"
+          },
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "thing",
+              "cidl_type": {
+                "Inject": {
+                  "name": "InjectedThing"
+                }
               }
             }
           ]
         }
-      },
-      "source_path": "./seed__app.cloesce.ts"
+      ]
     },
     "BarService": {
       "name": "BarService",
-      "attributes": [
+      "fields": [
         {
-          "var_name": "foo",
+          "name": "foo",
           "inject_reference": "FooService"
         }
       ],
-      "initializer": [
-        "FooService"
-      ],
-      "methods": {
-        "useFoo": {
+      "apis": [
+        {
           "name": "useFoo",
           "is_static": false,
           "data_source": null,
           "http_verb": "Get",
           "return_media": "Json",
-          "return_type": "Text",
+          "return_type": {
+            "HttpResult": "String"
+          },
           "parameters_media": "Json",
           "parameters": [
             {
               "name": "injectedThing",
               "cidl_type": {
-                "Inject": "InjectedThing"
+                "Inject": {
+                  "name": "InjectedThing"
+                }
               }
             }
           ]
         }
-      },
-      "source_path": "./seed__app.cloesce.ts"
+      ]
     }
   },
-  "poos": {},
-  "main_source": "./seed__app.cloesce.ts"
+  "poos": {}
 }

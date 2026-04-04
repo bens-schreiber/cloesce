@@ -80,7 +80,7 @@ impl LanguageTypeMapper for TypeScriptMapper {
                     .join(" | ");
 
                 if matches!(self.kind, TypescriptMapperKind::ClientApi) {
-                    format!("{joined} = \"default\"")
+                    format!("{joined} = \"Default\"")
                 } else {
                     joined
                 }

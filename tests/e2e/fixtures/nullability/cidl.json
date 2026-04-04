@@ -1,25 +1,22 @@
 {
-  "hash": 17765369616828601231,
-  "project_name": "runner",
+  "hash": 17604193192701024706,
   "wrangler_env": {
-    "name": "Env",
-    "source_path": "./seed__nullability.cloesce.ts",
     "d1_bindings": [
       "db"
     ],
     "kv_bindings": [],
     "r2_bindings": [],
-    "vars": {}
+    "vars": []
   },
   "models": {
     "NullabilityChecks": {
-      "hash": 7819174499920087688,
+      "hash": 2169888974283939892,
       "name": "NullabilityChecks",
       "d1_binding": "db",
-      "primary_key_columns": [
+      "primary_columns": [
         {
           "hash": 6397878138472974760,
-          "value": {
+          "field": {
             "name": "id",
             "cidl_type": "Integer"
           },
@@ -31,20 +28,20 @@
       "columns": [
         {
           "hash": 17451028643436199502,
-          "value": {
+          "field": {
             "name": "notNullableString",
-            "cidl_type": "Text"
+            "cidl_type": "String"
           },
           "foreign_key_reference": null,
           "unique_ids": [],
           "composite_id": null
         },
         {
-          "hash": 2709437981156923332,
-          "value": {
+          "hash": 1280417303455341596,
+          "field": {
             "name": "nullableString",
             "cidl_type": {
-              "Nullable": "Text"
+              "Nullable": "String"
             }
           },
           "foreign_key_reference": null,
@@ -52,20 +49,90 @@
           "composite_id": null
         }
       ],
-      "navigation_properties": [],
-      "key_params": [],
-      "kv_objects": [],
-      "r2_objects": [],
-      "methods": {
-        "arrayTypes": {
-          "name": "arrayTypes",
+      "kv_fields": [],
+      "r2_fields": [],
+      "navigation_fields": [],
+      "key_fields": [],
+      "apis": [
+        {
+          "name": "primitiveTypes",
           "is_static": false,
-          "data_source": null,
+          "data_source": "Default",
           "http_verb": "Post",
           "return_media": "Json",
           "return_type": {
-            "Nullable": {
-              "Array": "Text"
+            "HttpResult": {
+              "Nullable": "Boolean"
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "a",
+              "cidl_type": {
+                "Nullable": "Integer"
+              }
+            },
+            {
+              "name": "b",
+              "cidl_type": {
+                "Nullable": "String"
+              }
+            }
+          ]
+        },
+        {
+          "name": "modelTypes",
+          "is_static": false,
+          "data_source": "Default",
+          "http_verb": "Post",
+          "return_media": "Json",
+          "return_type": {
+            "HttpResult": {
+              "Nullable": {
+                "Object": {
+                  "name": "NullabilityChecks"
+                }
+              }
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "a",
+              "cidl_type": {
+                "Nullable": {
+                  "Object": {
+                    "name": "NullabilityChecks"
+                  }
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "injectableTypes",
+          "is_static": false,
+          "data_source": "Default",
+          "http_verb": "Post",
+          "return_media": "Json",
+          "return_type": {
+            "HttpResult": "Void"
+          },
+          "parameters_media": "Json",
+          "parameters": []
+        },
+        {
+          "name": "arrayTypes",
+          "is_static": false,
+          "data_source": "Default",
+          "http_verb": "Post",
+          "return_media": "Json",
+          "return_type": {
+            "HttpResult": {
+              "Nullable": {
+                "Array": "String"
+              }
             }
           },
           "parameters_media": "Json",
@@ -83,25 +150,27 @@
               "cidl_type": {
                 "Nullable": {
                   "Array": {
-                    "Object": "NullabilityChecks"
+                    "Object": {
+                      "name": "NullabilityChecks"
+                    }
                   }
                 }
               }
             }
           ]
         },
-        "httpResultTypes": {
+        {
           "name": "httpResultTypes",
           "is_static": false,
-          "data_source": null,
+          "data_source": "Default",
           "http_verb": "Post",
           "return_media": "Json",
           "return_type": {
-            "Nullable": {
-              "HttpResult": {
-                "Nullable": {
-                  "Array": {
-                    "Object": "NullabilityChecks"
+            "HttpResult": {
+              "Nullable": {
+                "Array": {
+                  "Object": {
+                    "name": "NullabilityChecks"
                   }
                 }
               }
@@ -109,91 +178,37 @@
           },
           "parameters_media": "Json",
           "parameters": []
-        },
-        "injectableTypes": {
-          "name": "injectableTypes",
-          "is_static": false,
-          "data_source": null,
-          "http_verb": "Post",
-          "return_media": "Json",
-          "return_type": "Void",
-          "parameters_media": "Json",
-          "parameters": [
-            {
-              "name": "env",
-              "cidl_type": {
-                "Nullable": {
-                  "Inject": "Env"
-                }
-              }
-            }
-          ]
-        },
-        "modelTypes": {
-          "name": "modelTypes",
-          "is_static": false,
-          "data_source": null,
-          "http_verb": "Post",
-          "return_media": "Json",
-          "return_type": {
-            "Nullable": {
-              "Object": "NullabilityChecks"
-            }
-          },
-          "parameters_media": "Json",
-          "parameters": [
-            {
-              "name": "a",
-              "cidl_type": {
-                "Nullable": {
-                  "Object": "NullabilityChecks"
-                }
-              }
-            }
-          ]
-        },
-        "primitiveTypes": {
-          "name": "primitiveTypes",
-          "is_static": false,
-          "data_source": null,
-          "http_verb": "Post",
-          "return_media": "Json",
-          "return_type": {
-            "Nullable": "Boolean"
-          },
-          "parameters_media": "Json",
-          "parameters": [
-            {
-              "name": "a",
-              "cidl_type": {
-                "Nullable": "Integer"
-              }
-            },
-            {
-              "name": "b",
-              "cidl_type": {
-                "Nullable": "Text"
-              }
-            }
-          ]
         }
-      },
+      ],
       "data_sources": {
-        "default": {
-          "name": "default",
-          "tree": {},
-          "is_private": false,
-          "list_params": [
-            "LastSeen",
-            "Limit"
-          ]
+        "Default": {
+          "name": "Default",
+          "list": {
+            "parameters": [
+              {
+                "name": "lastSeen_id",
+                "cidl_type": "Integer"
+              },
+              {
+                "name": "limit",
+                "cidl_type": "Integer"
+              }
+            ]
+          },
+          "get": {
+            "parameters": [
+              {
+                "name": "id",
+                "cidl_type": "Integer"
+              }
+            ]
+          },
+          "is_internal": false
         }
       },
-      "cruds": [],
-      "source_path": "./seed__nullability.cloesce.ts"
+      "cruds": []
     }
   },
   "services": {},
-  "poos": {},
-  "main_source": null
+  "poos": {}
 }

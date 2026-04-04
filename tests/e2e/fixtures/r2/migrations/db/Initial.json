@@ -5,10 +5,10 @@
       "hash": 6703974713046051109,
       "name": "D1BackedModel",
       "d1_binding": "db",
-      "primary_key_columns": [
+      "primary_columns": [
         {
           "hash": 6397878138472974760,
-          "value": {
+          "field": {
             "name": "id",
             "cidl_type": "Integer"
           },
@@ -20,9 +20,9 @@
       "columns": [
         {
           "hash": 4638766536825732897,
-          "value": {
+          "field": {
             "name": "someColumn",
-            "cidl_type": "Real"
+            "cidl_type": "Double"
           },
           "foreign_key_reference": null,
           "unique_ids": [],
@@ -30,16 +30,16 @@
         },
         {
           "hash": 16794226563886906789,
-          "value": {
+          "field": {
             "name": "someOtherColumn",
-            "cidl_type": "Text"
+            "cidl_type": "String"
           },
           "foreign_key_reference": null,
           "unique_ids": [],
           "composite_id": null
         }
       ],
-      "navigation_properties": []
+      "navigation_fields": []
     }
   }
 }

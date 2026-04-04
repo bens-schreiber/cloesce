@@ -1,25 +1,22 @@
 {
   "hash": 4118850450692199408,
-  "project_name": "runner",
   "wrangler_env": {
-    "name": "Env",
-    "source_path": "./seed__ds.cloesce.ts",
     "d1_bindings": [
       "db"
     ],
     "kv_bindings": [],
     "r2_bindings": [],
-    "vars": {}
+    "vars": []
   },
   "models": {
     "Foo": {
       "hash": 9350576688796676214,
       "name": "Foo",
       "d1_binding": "db",
-      "primary_key_columns": [
+      "primary_columns": [
         {
           "hash": 6397878138472974760,
-          "value": {
+          "field": {
             "name": "id",
             "cidl_type": "Integer"
           },
@@ -29,75 +26,117 @@
         }
       ],
       "columns": [],
-      "navigation_properties": [],
-      "key_params": [],
-      "kv_objects": [],
-      "r2_objects": [],
-      "methods": {
-        "bar": {
+      "kv_fields": [],
+      "r2_fields": [],
+      "navigation_fields": [],
+      "key_fields": [],
+      "apis": [
+        {
           "name": "bar",
           "is_static": false,
-          "data_source": "baz",
+          "data_source": "Baz",
           "http_verb": "Post",
           "return_media": "Json",
-          "return_type": "Void",
+          "return_type": {
+            "HttpResult": "Void"
+          },
           "parameters_media": "Json",
           "parameters": [
             {
               "name": "customDs",
               "cidl_type": {
-                "DataSource": "Foo"
+                "DataSource": {
+                  "model_name": "Foo"
+                }
               }
             },
             {
               "name": "oneDs",
               "cidl_type": {
-                "DataSource": "OneDs"
+                "DataSource": {
+                  "model_name": "OneDs"
+                }
               }
             },
             {
               "name": "noDs",
               "cidl_type": {
-                "DataSource": "NoDs"
+                "DataSource": {
+                  "model_name": "NoDs"
+                }
               }
             },
             {
-              "name": "poo",
+              "name": "poop",
               "cidl_type": {
-                "Object": "Poo"
+                "Object": {
+                  "name": "Poo"
+                }
               }
             }
           ]
         }
-      },
+      ],
       "data_sources": {
-        "baz": {
-          "name": "baz",
-          "tree": {},
-          "is_private": false,
-          "list_params": []
+        "Baz": {
+          "name": "Baz",
+          "list": {
+            "parameters": [
+              {
+                "name": "lastSeen_id",
+                "cidl_type": "Integer"
+              },
+              {
+                "name": "limit",
+                "cidl_type": "Integer"
+              }
+            ]
+          },
+          "get": {
+            "parameters": [
+              {
+                "name": "id",
+                "cidl_type": "Integer"
+              }
+            ]
+          },
+          "is_internal": false
         },
-        "default": {
-          "name": "default",
-          "tree": {},
-          "is_private": false,
-          "list_params": [
-            "LastSeen",
-            "Limit"
-          ]
+        "Default": {
+          "name": "Default",
+          "list": {
+            "parameters": [
+              {
+                "name": "lastSeen_id",
+                "cidl_type": "Integer"
+              },
+              {
+                "name": "limit",
+                "cidl_type": "Integer"
+              }
+            ]
+          },
+          "get": {
+            "parameters": [
+              {
+                "name": "id",
+                "cidl_type": "Integer"
+              }
+            ]
+          },
+          "is_internal": false
         }
       },
-      "cruds": [],
-      "source_path": "./seed__ds.cloesce.ts"
+      "cruds": []
     },
     "NoDs": {
       "hash": 1047721130316512114,
       "name": "NoDs",
       "d1_binding": "db",
-      "primary_key_columns": [
+      "primary_columns": [
         {
           "hash": 6397878138472974760,
-          "value": {
+          "field": {
             "name": "id",
             "cidl_type": "Integer"
           },
@@ -107,33 +146,47 @@
         }
       ],
       "columns": [],
-      "navigation_properties": [],
-      "key_params": [],
-      "kv_objects": [],
-      "r2_objects": [],
-      "methods": {},
+      "kv_fields": [],
+      "r2_fields": [],
+      "navigation_fields": [],
+      "key_fields": [],
+      "apis": [],
       "data_sources": {
-        "default": {
-          "name": "default",
-          "tree": {},
-          "is_private": false,
-          "list_params": [
-            "LastSeen",
-            "Limit"
-          ]
+        "Default": {
+          "name": "Default",
+          "list": {
+            "parameters": [
+              {
+                "name": "lastSeen_id",
+                "cidl_type": "Integer"
+              },
+              {
+                "name": "limit",
+                "cidl_type": "Integer"
+              }
+            ]
+          },
+          "get": {
+            "parameters": [
+              {
+                "name": "id",
+                "cidl_type": "Integer"
+              }
+            ]
+          },
+          "is_internal": false
         }
       },
-      "cruds": [],
-      "source_path": "./seed__ds.cloesce.ts"
+      "cruds": []
     },
     "OneDs": {
       "hash": 7029550209668726983,
       "name": "OneDs",
       "d1_binding": "db",
-      "primary_key_columns": [
+      "primary_columns": [
         {
           "hash": 6397878138472974760,
-          "value": {
+          "field": {
             "name": "id",
             "cidl_type": "Integer"
           },
@@ -143,37 +196,78 @@
         }
       ],
       "columns": [],
-      "navigation_properties": [],
-      "key_params": [],
-      "kv_objects": [],
-      "r2_objects": [],
-      "methods": {},
+      "kv_fields": [],
+      "r2_fields": [],
+      "navigation_fields": [],
+      "key_fields": [],
+      "apis": [],
       "data_sources": {
-        "default": {
-          "name": "default",
-          "tree": {},
-          "is_private": false,
-          "list_params": []
+        "Default": {
+          "name": "Default",
+          "list": {
+            "parameters": [
+              {
+                "name": "lastSeen_id",
+                "cidl_type": "Integer"
+              },
+              {
+                "name": "limit",
+                "cidl_type": "Integer"
+              }
+            ]
+          },
+          "get": {
+            "parameters": [
+              {
+                "name": "id",
+                "cidl_type": "Integer"
+              }
+            ]
+          },
+          "is_internal": false
+        },
+        "ShitAss": {
+          "name": "ShitAss",
+          "list": {
+            "parameters": [
+              {
+                "name": "lastSeen_id",
+                "cidl_type": "Integer"
+              },
+              {
+                "name": "limit",
+                "cidl_type": "Integer"
+              }
+            ]
+          },
+          "get": {
+            "parameters": [
+              {
+                "name": "id",
+                "cidl_type": "Integer"
+              }
+            ]
+          },
+          "is_internal": false
         }
       },
-      "cruds": [],
-      "source_path": "./seed__ds.cloesce.ts"
+      "cruds": []
     }
   },
   "services": {},
   "poos": {
     "Poo": {
       "name": "Poo",
-      "attributes": [
+      "fields": [
         {
           "name": "ds",
           "cidl_type": {
-            "DataSource": "Foo"
+            "DataSource": {
+              "model_name": "Foo"
+            }
           }
         }
-      ],
-      "source_path": "./seed__ds.cloesce.ts"
+      ]
     }
-  },
-  "main_source": null
+  }
 }

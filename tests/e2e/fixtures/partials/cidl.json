@@ -1,25 +1,22 @@
 {
   "hash": 5565231451096687504,
-  "project_name": "runner",
   "wrangler_env": {
-    "name": "Env",
-    "source_path": "./seed__partials.cloesce.ts",
     "d1_bindings": [
       "db"
     ],
     "kv_bindings": [],
     "r2_bindings": [],
-    "vars": {}
+    "vars": []
   },
   "models": {
     "Dog": {
       "hash": 16625692680497709233,
       "name": "Dog",
       "d1_binding": "db",
-      "primary_key_columns": [
+      "primary_columns": [
         {
           "hash": 6397878138472974760,
-          "value": {
+          "field": {
             "name": "id",
             "cidl_type": "Integer"
           },
@@ -31,9 +28,9 @@
       "columns": [
         {
           "hash": 6788679640762437622,
-          "value": {
+          "field": {
             "name": "name",
-            "cidl_type": "Text"
+            "cidl_type": "String"
           },
           "foreign_key_reference": null,
           "unique_ids": [],
@@ -41,7 +38,7 @@
         },
         {
           "hash": 1725963293637091470,
-          "value": {
+          "field": {
             "name": "age",
             "cidl_type": "Integer"
           },
@@ -50,65 +47,117 @@
           "composite_id": null
         }
       ],
-      "navigation_properties": [],
-      "key_params": [],
-      "kv_objects": [],
-      "r2_objects": [],
-      "methods": {
-        "getPartialSelf": {
-          "name": "getPartialSelf",
-          "is_static": false,
-          "data_source": null,
-          "http_verb": "Get",
-          "return_media": "Json",
-          "return_type": {
-            "Partial": "Dog"
-          },
-          "parameters_media": "Json",
-          "parameters": []
-        },
-        "post": {
-          "name": "post",
+      "kv_fields": [],
+      "r2_fields": [],
+      "navigation_fields": [],
+      "key_fields": [],
+      "apis": [
+        {
+          "name": "create",
           "is_static": true,
           "data_source": null,
           "http_verb": "Post",
           "return_media": "Json",
           "return_type": {
-            "Object": "Dog"
+            "HttpResult": {
+              "Object": {
+                "name": "Dog"
+              }
+            }
           },
           "parameters_media": "Json",
           "parameters": [
             {
-              "name": "env",
+              "name": "dog",
               "cidl_type": {
-                "Inject": "Env"
+                "Partial": {
+                  "object_name": "Dog"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "getPartialSelf",
+          "is_static": false,
+          "data_source": "Default",
+          "http_verb": "Get",
+          "return_media": "Json",
+          "return_type": {
+            "HttpResult": {
+              "Partial": {
+                "object_name": "Dog"
+              }
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": []
+        },
+        {
+          "name": "$save",
+          "is_static": true,
+          "data_source": null,
+          "http_verb": "Post",
+          "return_media": "Json",
+          "return_type": {
+            "HttpResult": {
+              "Object": {
+                "name": "Dog"
+              }
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "model",
+              "cidl_type": {
+                "Partial": {
+                  "object_name": "Dog"
+                }
               }
             },
             {
-              "name": "dog",
+              "name": "__datasource",
               "cidl_type": {
-                "Partial": "Dog"
+                "DataSource": {
+                  "model_name": "Dog"
+                }
               }
             }
           ]
         }
-      },
+      ],
       "data_sources": {
-        "default": {
-          "name": "default",
-          "tree": {},
-          "is_private": false,
-          "list_params": [
-            "LastSeen",
-            "Limit"
-          ]
+        "Default": {
+          "name": "Default",
+          "list": {
+            "parameters": [
+              {
+                "name": "lastSeen_id",
+                "cidl_type": "Integer"
+              },
+              {
+                "name": "limit",
+                "cidl_type": "Integer"
+              }
+            ]
+          },
+          "get": {
+            "parameters": [
+              {
+                "name": "id",
+                "cidl_type": "Integer"
+              }
+            ]
+          },
+          "is_internal": false
         }
       },
-      "cruds": [],
-      "source_path": "./seed__partials.cloesce.ts"
+      "cruds": [
+        "Save"
+      ]
     }
   },
   "services": {},
-  "poos": {},
-  "main_source": null
+  "poos": {}
 }

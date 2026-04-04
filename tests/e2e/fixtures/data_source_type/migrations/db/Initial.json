@@ -5,10 +5,10 @@
       "hash": 9350576688796676214,
       "name": "Foo",
       "d1_binding": "db",
-      "primary_key_columns": [
+      "primary_columns": [
         {
           "hash": 6397878138472974760,
-          "value": {
+          "field": {
             "name": "id",
             "cidl_type": "Integer"
           },
@@ -18,16 +18,16 @@
         }
       ],
       "columns": [],
-      "navigation_properties": []
+      "navigation_fields": []
     },
     "NoDs": {
       "hash": 1047721130316512114,
       "name": "NoDs",
       "d1_binding": "db",
-      "primary_key_columns": [
+      "primary_columns": [
         {
           "hash": 6397878138472974760,
-          "value": {
+          "field": {
             "name": "id",
             "cidl_type": "Integer"
           },
@@ -37,16 +37,16 @@
         }
       ],
       "columns": [],
-      "navigation_properties": []
+      "navigation_fields": []
     },
     "OneDs": {
       "hash": 7029550209668726983,
       "name": "OneDs",
       "d1_binding": "db",
-      "primary_key_columns": [
+      "primary_columns": [
         {
           "hash": 6397878138472974760,
-          "value": {
+          "field": {
             "name": "id",
             "cidl_type": "Integer"
           },
@@ -56,7 +56,7 @@
         }
       ],
       "columns": [],
-      "navigation_properties": []
+      "navigation_fields": []
     }
   }
 }

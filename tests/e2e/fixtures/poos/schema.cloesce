@@ -1,0 +1,25 @@
+env { d1 { db } }
+
+poo PooA {
+    name: string
+    major: string
+}
+
+poo PooB {
+    color: string
+}
+
+poo PooC {
+    a: PooA
+    b: Array<PooB>
+}
+
+[use db]
+model PooAcceptYield {
+    primary { id: int }
+}
+
+api PooAcceptYield {
+    post acceptPoos(a: PooA, b: PooB, c: PooC) -> void
+    post yieldPoo() -> PooC
+}

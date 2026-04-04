@@ -1,25 +1,22 @@
 {
   "hash": 17820378546947952927,
-  "project_name": "runner",
   "wrangler_env": {
-    "name": "Env",
-    "source_path": "./seed__poo.cloesce.ts",
     "d1_bindings": [
       "db"
     ],
     "kv_bindings": [],
     "r2_bindings": [],
-    "vars": {}
+    "vars": []
   },
   "models": {
     "PooAcceptYield": {
       "hash": 8862362961581783171,
       "name": "PooAcceptYield",
       "d1_binding": "db",
-      "primary_key_columns": [
+      "primary_columns": [
         {
           "hash": 6397878138472974760,
-          "value": {
+          "field": {
             "name": "id",
             "cidl_type": "Integer"
           },
@@ -29,114 +26,140 @@
         }
       ],
       "columns": [],
-      "navigation_properties": [],
-      "key_params": [],
-      "kv_objects": [],
-      "r2_objects": [],
-      "methods": {
-        "acceptPoos": {
+      "kv_fields": [],
+      "r2_fields": [],
+      "navigation_fields": [],
+      "key_fields": [],
+      "apis": [
+        {
           "name": "acceptPoos",
           "is_static": true,
           "data_source": null,
           "http_verb": "Post",
           "return_media": "Json",
-          "return_type": "Void",
+          "return_type": {
+            "HttpResult": "Void"
+          },
           "parameters_media": "Json",
           "parameters": [
             {
               "name": "a",
               "cidl_type": {
-                "Object": "PooA"
+                "Object": {
+                  "name": "PooA"
+                }
               }
             },
             {
               "name": "b",
               "cidl_type": {
-                "Object": "PooB"
+                "Object": {
+                  "name": "PooB"
+                }
               }
             },
             {
               "name": "c",
               "cidl_type": {
-                "Object": "PooC"
+                "Object": {
+                  "name": "PooC"
+                }
               }
             }
           ]
         },
-        "yieldPoo": {
+        {
           "name": "yieldPoo",
           "is_static": true,
           "data_source": null,
           "http_verb": "Post",
           "return_media": "Json",
           "return_type": {
-            "Object": "PooC"
+            "HttpResult": {
+              "Object": {
+                "name": "PooC"
+              }
+            }
           },
           "parameters_media": "Json",
           "parameters": []
         }
-      },
+      ],
       "data_sources": {
-        "default": {
-          "name": "default",
-          "tree": {},
-          "is_private": false,
-          "list_params": [
-            "LastSeen",
-            "Limit"
-          ]
+        "Default": {
+          "name": "Default",
+          "list": {
+            "parameters": [
+              {
+                "name": "lastSeen_id",
+                "cidl_type": "Integer"
+              },
+              {
+                "name": "limit",
+                "cidl_type": "Integer"
+              }
+            ]
+          },
+          "get": {
+            "parameters": [
+              {
+                "name": "id",
+                "cidl_type": "Integer"
+              }
+            ]
+          },
+          "is_internal": false
         }
       },
-      "cruds": [],
-      "source_path": "./seed__poo.cloesce.ts"
+      "cruds": []
     }
   },
   "services": {},
   "poos": {
     "PooA": {
       "name": "PooA",
-      "attributes": [
+      "fields": [
         {
           "name": "name",
-          "cidl_type": "Text"
+          "cidl_type": "String"
         },
         {
           "name": "major",
-          "cidl_type": "Text"
+          "cidl_type": "String"
         }
-      ],
-      "source_path": "./seed__poo.cloesce.ts"
+      ]
     },
     "PooB": {
       "name": "PooB",
-      "attributes": [
+      "fields": [
         {
           "name": "color",
-          "cidl_type": "Text"
+          "cidl_type": "String"
         }
-      ],
-      "source_path": "./seed__poo.cloesce.ts"
+      ]
     },
     "PooC": {
       "name": "PooC",
-      "attributes": [
+      "fields": [
         {
           "name": "a",
           "cidl_type": {
-            "Object": "PooA"
+            "Object": {
+              "name": "PooA"
+            }
           }
         },
         {
           "name": "b",
           "cidl_type": {
             "Array": {
-              "Object": "PooB"
+              "Object": {
+                "name": "PooB"
+              }
             }
           }
         }
-      ],
-      "source_path": "./seed__poo.cloesce.ts"
+      ]
     }
-  },
-  "main_source": null
+  }
 }
