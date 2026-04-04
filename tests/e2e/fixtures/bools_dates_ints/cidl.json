@@ -1,25 +1,22 @@
 {
-  "hash": 14113549040013838164,
-  "project_name": "runner",
+  "hash": 24135014400217759,
   "wrangler_env": {
-    "name": "Env",
-    "source_path": "./seed__bools_dates_ints.cloesce.ts",
     "d1_bindings": [
       "db"
     ],
     "kv_bindings": [],
     "r2_bindings": [],
-    "vars": {}
+    "vars": []
   },
   "models": {
     "Weather": {
-      "hash": 10306382131681195126,
+      "hash": 15364676975661206143,
       "name": "Weather",
       "d1_binding": "db",
-      "primary_key_columns": [
+      "primary_columns": [
         {
           "hash": 6397878138472974760,
-          "value": {
+          "field": {
             "name": "id",
             "cidl_type": "Integer"
           },
@@ -30,9 +27,9 @@
       ],
       "columns": [
         {
-          "hash": 7419779783954734969,
-          "value": {
-            "name": "date",
+          "hash": 5885773834022601645,
+          "field": {
+            "name": "_date",
             "cidl_type": "DateIso"
           },
           "foreign_key_reference": null,
@@ -41,7 +38,7 @@
         },
         {
           "hash": 5134907052289059425,
-          "value": {
+          "field": {
             "name": "isRaining",
             "cidl_type": "Boolean"
           },
@@ -50,45 +47,53 @@
           "composite_id": null
         }
       ],
-      "navigation_properties": [],
-      "key_params": [],
-      "kv_objects": [],
-      "r2_objects": [],
-      "methods": {
-        "GET": {
-          "name": "GET",
+      "kv_fields": [],
+      "r2_fields": [],
+      "navigation_fields": [],
+      "key_fields": [],
+      "apis": [
+        {
+          "name": "$get",
           "is_static": true,
           "data_source": null,
           "http_verb": "Get",
           "return_media": "Json",
           "return_type": {
             "HttpResult": {
-              "Object": "Weather"
+              "Object": {
+                "name": "Weather"
+              }
             }
           },
           "parameters_media": "Json",
           "parameters": [
             {
               "name": "id",
-              "cidl_type": "Integer"
+              "cidl_type": {
+                "Nullable": "Integer"
+              }
             },
             {
               "name": "__datasource",
               "cidl_type": {
-                "DataSource": "Weather"
+                "DataSource": {
+                  "model_name": "Weather"
+                }
               }
             }
           ]
         },
-        "SAVE": {
-          "name": "SAVE",
+        {
+          "name": "$save",
           "is_static": true,
           "data_source": null,
           "http_verb": "Post",
           "return_media": "Json",
           "return_type": {
             "HttpResult": {
-              "Object": "Weather"
+              "Object": {
+                "name": "Weather"
+              }
             }
           },
           "parameters_media": "Json",
@@ -96,37 +101,54 @@
             {
               "name": "model",
               "cidl_type": {
-                "Partial": "Weather"
+                "Partial": {
+                  "object_name": "Weather"
+                }
               }
             },
             {
               "name": "__datasource",
               "cidl_type": {
-                "DataSource": "Weather"
+                "DataSource": {
+                  "model_name": "Weather"
+                }
               }
             }
           ]
         }
-      },
+      ],
       "data_sources": {
-        "default": {
-          "name": "default",
-          "tree": {},
-          "is_private": false,
-          "list_params": [
-            "LastSeen",
-            "Limit"
-          ]
+        "Default": {
+          "name": "Default",
+          "list": {
+            "parameters": [
+              {
+                "name": "lastSeen_id",
+                "cidl_type": "Integer"
+              },
+              {
+                "name": "limit",
+                "cidl_type": "Integer"
+              }
+            ]
+          },
+          "get": {
+            "parameters": [
+              {
+                "name": "id",
+                "cidl_type": "Integer"
+              }
+            ]
+          },
+          "is_internal": false
         }
       },
       "cruds": [
-        "GET",
-        "SAVE"
-      ],
-      "source_path": "./seed__bools_dates_ints.cloesce.ts"
+        "Get",
+        "Save"
+      ]
     }
   },
   "services": {},
-  "poos": {},
-  "main_source": null
+  "poos": {}
 }

@@ -1,25 +1,22 @@
 {
-  "hash": 12269881830252270504,
-  "project_name": "runner",
+  "hash": 4268265255132821547,
   "wrangler_env": {
-    "name": "Env",
-    "source_path": "./seed__adv_ds.cloesce.ts",
     "d1_bindings": [
       "db"
     ],
     "kv_bindings": [],
     "r2_bindings": [],
-    "vars": {}
+    "vars": []
   },
   "models": {
     "Hamburger": {
-      "hash": 16378746804444100937,
+      "hash": 11891469912896067759,
       "name": "Hamburger",
       "d1_binding": "db",
-      "primary_key_columns": [
+      "primary_columns": [
         {
           "hash": 6397878138472974760,
-          "value": {
+          "field": {
             "name": "id",
             "cidl_type": "Integer"
           },
@@ -31,29 +28,74 @@
       "columns": [
         {
           "hash": 6788679640762437622,
-          "value": {
+          "field": {
             "name": "name",
-            "cidl_type": "Text"
+            "cidl_type": "String"
           },
           "foreign_key_reference": null,
           "unique_ids": [],
           "composite_id": null
         }
       ],
-      "navigation_properties": [
+      "kv_fields": [],
+      "r2_fields": [],
+      "navigation_fields": [
         {
-          "hash": 6498092945051865391,
-          "var_name": "toppings",
+          "hash": 17379672083855794608,
+          "field": {
+            "name": "toppings",
+            "cidl_type": {
+              "Array": {
+                "Object": {
+                  "name": "Topping"
+                }
+              }
+            }
+          },
           "model_reference": "Topping",
           "kind": "ManyToMany"
         }
       ],
-      "key_params": [],
-      "kv_objects": [],
-      "r2_objects": [],
-      "methods": {
-        "LIST": {
-          "name": "LIST",
+      "key_fields": [],
+      "apis": [
+        {
+          "name": "noLettuceToppings",
+          "is_static": false,
+          "data_source": "NoLettuce",
+          "http_verb": "Get",
+          "return_media": "Json",
+          "return_type": {
+            "HttpResult": {
+              "Array": {
+                "Object": {
+                  "name": "Topping"
+                }
+              }
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": []
+        },
+        {
+          "name": "onlyBaconToppings",
+          "is_static": false,
+          "data_source": "OnlyBacon",
+          "http_verb": "Get",
+          "return_media": "Json",
+          "return_type": {
+            "HttpResult": {
+              "Array": {
+                "Object": {
+                  "name": "Topping"
+                }
+              }
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": []
+        },
+        {
+          "name": "$list",
           "is_static": true,
           "data_source": null,
           "http_verb": "Get",
@@ -61,14 +103,16 @@
           "return_type": {
             "HttpResult": {
               "Array": {
-                "Object": "Hamburger"
+                "Object": {
+                  "name": "Hamburger"
+                }
               }
             }
           },
           "parameters_media": "Json",
           "parameters": [
             {
-              "name": "lastSeen_id",
+              "name": "lastId",
               "cidl_type": {
                 "Nullable": "Integer"
               }
@@ -80,7 +124,7 @@
               }
             },
             {
-              "name": "offset",
+              "name": "lastSeen_id",
               "cidl_type": {
                 "Nullable": "Integer"
               }
@@ -88,20 +132,24 @@
             {
               "name": "__datasource",
               "cidl_type": {
-                "DataSource": "Hamburger"
+                "DataSource": {
+                  "model_name": "Hamburger"
+                }
               }
             }
           ]
         },
-        "SAVE": {
-          "name": "SAVE",
+        {
+          "name": "$save",
           "is_static": true,
           "data_source": null,
           "http_verb": "Post",
           "return_media": "Json",
           "return_type": {
             "HttpResult": {
-              "Object": "Hamburger"
+              "Object": {
+                "name": "Hamburger"
+              }
             }
           },
           "parameters_media": "Json",
@@ -109,100 +157,133 @@
             {
               "name": "model",
               "cidl_type": {
-                "Partial": "Hamburger"
+                "Partial": {
+                  "object_name": "Hamburger"
+                }
               }
             },
             {
               "name": "__datasource",
               "cidl_type": {
-                "DataSource": "Hamburger"
+                "DataSource": {
+                  "model_name": "Hamburger"
+                }
               }
             }
           ]
-        },
-        "noLettuceToppings": {
-          "name": "noLettuceToppings",
-          "is_static": false,
-          "data_source": "Hamburger:noLettuceToppings",
-          "http_verb": "Get",
-          "return_media": "Json",
-          "return_type": {
-            "Array": {
-              "Object": "Topping"
-            }
-          },
-          "parameters_media": "Json",
-          "parameters": []
-        },
-        "onlyBacon": {
-          "name": "onlyBacon",
-          "is_static": false,
-          "data_source": "Hamburger:onlyBacon",
-          "http_verb": "Get",
-          "return_media": "Json",
-          "return_type": {
-            "Array": {
-              "Object": "Topping"
-            }
-          },
-          "parameters_media": "Json",
-          "parameters": []
         }
-      },
+      ],
       "data_sources": {
-        "Hamburger:noLettuceToppings": {
-          "name": "Hamburger:noLettuceToppings",
-          "tree": {
-            "toppings": {}
+        "BurgersWithLettuceOrdered": {
+          "name": "BurgersWithLettuceOrdered",
+          "list": {
+            "parameters": [
+              {
+                "name": "lastId",
+                "cidl_type": "Integer"
+              },
+              {
+                "name": "limit",
+                "cidl_type": "Integer"
+              }
+            ]
           },
-          "is_private": true,
-          "list_params": []
+          "get": {
+            "parameters": [
+              {
+                "name": "id",
+                "cidl_type": "Integer"
+              }
+            ]
+          },
+          "is_internal": false
         },
-        "Hamburger:onlyBacon": {
-          "name": "Hamburger:onlyBacon",
-          "tree": {
-            "toppings": {}
+        "Default": {
+          "name": "Default",
+          "list": {
+            "parameters": [
+              {
+                "name": "lastSeen_id",
+                "cidl_type": "Integer"
+              },
+              {
+                "name": "limit",
+                "cidl_type": "Integer"
+              }
+            ]
           },
-          "is_private": true,
-          "list_params": []
+          "get": {
+            "parameters": [
+              {
+                "name": "id",
+                "cidl_type": "Integer"
+              }
+            ]
+          },
+          "is_internal": false
         },
-        "default": {
-          "name": "default",
-          "tree": {
-            "toppings": {}
+        "NoLettuce": {
+          "name": "NoLettuce",
+          "list": {
+            "parameters": [
+              {
+                "name": "lastSeen_id",
+                "cidl_type": "Integer"
+              },
+              {
+                "name": "limit",
+                "cidl_type": "Integer"
+              }
+            ]
           },
-          "is_private": false,
-          "list_params": [
-            "LastSeen",
-            "Limit"
-          ]
+          "get": {
+            "parameters": [
+              {
+                "name": "id",
+                "cidl_type": "Integer"
+              }
+            ]
+          },
+          "is_internal": true
         },
-        "orderedBurgersWithLettuce": {
-          "name": "orderedBurgersWithLettuce",
-          "tree": {
-            "toppings": {}
+        "OnlyBacon": {
+          "name": "OnlyBacon",
+          "list": {
+            "parameters": [
+              {
+                "name": "lastSeen_id",
+                "cidl_type": "Integer"
+              },
+              {
+                "name": "limit",
+                "cidl_type": "Integer"
+              }
+            ]
           },
-          "is_private": false,
-          "list_params": [
-            "LastSeen",
-            "Limit"
-          ]
+          "get": {
+            "parameters": [
+              {
+                "name": "id",
+                "cidl_type": "Integer"
+              }
+            ]
+          },
+          "is_internal": true
         }
       },
       "cruds": [
-        "LIST",
-        "SAVE"
-      ],
-      "source_path": "./seed__adv_ds.cloesce.ts"
+        "List",
+        "Save"
+      ]
     },
     "Topping": {
-      "hash": 14407311656640296225,
+      "hash": 6851490881146770141,
       "name": "Topping",
       "d1_binding": "db",
-      "primary_key_columns": [
+      "primary_columns": [
         {
           "hash": 6397878138472974760,
-          "value": {
+          "field": {
             "name": "id",
             "cidl_type": "Integer"
           },
@@ -214,36 +295,47 @@
       "columns": [
         {
           "hash": 6788679640762437622,
-          "value": {
+          "field": {
             "name": "name",
-            "cidl_type": "Text"
+            "cidl_type": "String"
           },
           "foreign_key_reference": null,
           "unique_ids": [],
           "composite_id": null
         }
       ],
-      "navigation_properties": [
+      "kv_fields": [],
+      "r2_fields": [],
+      "navigation_fields": [
         {
-          "hash": 8945555950776796007,
-          "var_name": "hamburgers",
+          "hash": 7547041568480358228,
+          "field": {
+            "name": "hamburger",
+            "cidl_type": {
+              "Array": {
+                "Object": {
+                  "name": "Hamburger"
+                }
+              }
+            }
+          },
           "model_reference": "Hamburger",
           "kind": "ManyToMany"
         }
       ],
-      "key_params": [],
-      "kv_objects": [],
-      "r2_objects": [],
-      "methods": {
-        "SAVE": {
-          "name": "SAVE",
+      "key_fields": [],
+      "apis": [
+        {
+          "name": "$save",
           "is_static": true,
           "data_source": null,
           "http_verb": "Post",
           "return_media": "Json",
           "return_type": {
             "HttpResult": {
-              "Object": "Topping"
+              "Object": {
+                "name": "Topping"
+              }
             }
           },
           "parameters_media": "Json",
@@ -251,38 +343,53 @@
             {
               "name": "model",
               "cidl_type": {
-                "Partial": "Topping"
+                "Partial": {
+                  "object_name": "Topping"
+                }
               }
             },
             {
               "name": "__datasource",
               "cidl_type": {
-                "DataSource": "Topping"
+                "DataSource": {
+                  "model_name": "Topping"
+                }
               }
             }
           ]
         }
-      },
+      ],
       "data_sources": {
-        "default": {
-          "name": "default",
-          "tree": {
-            "hamburgers": {}
+        "Default": {
+          "name": "Default",
+          "list": {
+            "parameters": [
+              {
+                "name": "lastSeen_id",
+                "cidl_type": "Integer"
+              },
+              {
+                "name": "limit",
+                "cidl_type": "Integer"
+              }
+            ]
           },
-          "is_private": false,
-          "list_params": [
-            "LastSeen",
-            "Limit"
-          ]
+          "get": {
+            "parameters": [
+              {
+                "name": "id",
+                "cidl_type": "Integer"
+              }
+            ]
+          },
+          "is_internal": false
         }
       },
       "cruds": [
-        "SAVE"
-      ],
-      "source_path": "./seed__adv_ds.cloesce.ts"
+        "Save"
+      ]
     }
   },
   "services": {},
-  "poos": {},
-  "main_source": null
+  "poos": {}
 }

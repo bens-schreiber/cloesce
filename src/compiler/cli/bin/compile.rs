@@ -25,6 +25,10 @@ struct Args {
 
     #[arg(required = true, num_args = 1.., value_name = "PATH")]
     targets: Vec<PathBuf>,
+
+    // For the Cloesce regression tests. Prefixes files with "out.".
+    #[arg(long)]
+    snap: bool,
 }
 
 fn main() {
@@ -100,17 +104,26 @@ fn compile() -> Result<(), String> {
     let backend = BackendGenerator::generate(&ast, &args.worker_url);
     let client = ClientGenerator::generate(&ast, &args.worker_url);
 
+    let output_name = |name: &str| {
+        if args.snap {
+            format!("out.{}", name)
+        } else {
+            name.to_string()
+        }
+    };
+
     // Output CIDL
     {
-        let cidl_path = args.cloesce_dir.join("cidl.json");
-        let mut file = open_file_or_create(&cidl_path);
+        let cidl_path = args.cloesce_dir.join(output_name("cidl.json"));
+        let mut file = open_file_or_create(&cidl_path).expect("Failed to create cidl output file");
         file.write_all(ast.to_json().as_bytes())
             .expect("file to be written");
     };
 
     // Output Wrangler
     {
-        let mut wrangler_file = open_file_or_create(&args.wrangler_path);
+        let mut wrangler_file = open_file_or_create(&args.wrangler_path)
+            .expect("Failed to create wrangler output file");
         wrangler_file
             .write_all(wrangler.as_bytes())
             .expect("file to be written");
@@ -118,16 +131,18 @@ fn compile() -> Result<(), String> {
 
     // Output backend
     {
-        let backend_path = args.cloesce_dir.join("backend.ts"); // TODO: hardcoded to ts
-        let mut file = open_file_or_create(&backend_path);
+        let backend_path = args.cloesce_dir.join(output_name("backend.ts")); // TODO: hardcoded to ts
+        let mut file =
+            open_file_or_create(&backend_path).expect("Failed to create backend output file");
         file.write_all(backend.as_bytes())
             .expect("file to be written");
     }
 
     // Output client
     {
-        let client_path = args.cloesce_dir.join("client.ts"); // TODO: hardcoded to ts
-        let mut file = open_file_or_create(&client_path);
+        let client_path = args.cloesce_dir.join(output_name("client.ts")); // TODO: hardcoded to ts
+        let mut file =
+            open_file_or_create(&client_path).expect("Failed to create client output file");
         file.write_all(client.as_bytes())
             .expect("file to be written");
     }

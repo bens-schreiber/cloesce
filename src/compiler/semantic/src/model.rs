@@ -179,6 +179,7 @@ impl<'src, 'p> ModelAnalysis<'src, 'p> {
 
         // Build foreign keys
         let mut columns = Vec::new();
+        let mut primary_columns = Vec::new();
         let mut composite_counter = 0usize;
         for fk in &model_block.foreign_blocks {
             let adj_model_name = fk.adj.first().map(|(m, _)| *m).unwrap_or("");
@@ -245,6 +246,13 @@ impl<'src, 'p> ModelAnalysis<'src, 'p> {
             };
 
             for (field, (_, adj_field_name)) in fk.fields.iter().zip(&fk.adj) {
+                let is_pk = model_block.primary_fields.contains(&field.name);
+                if is_pk && fk.optional {
+                    self.sink
+                        .push(SemanticError::NullablePrimaryKey { column: field });
+                    continue;
+                }
+
                 // Validate the field from the adjacent model
                 let Some(adj_field_sym) =
                     table.resolve(adj_field_name, SymbolKind::ModelField, Some(adj_model_name))
@@ -274,7 +282,8 @@ impl<'src, 'p> ModelAnalysis<'src, 'p> {
                 }
 
                 let unique_ids = unique_info.remove(field.name).unwrap_or_default();
-                columns.push(Column {
+
+                let col = Column {
                     hash: 0,
                     field: Field {
                         name: field.name.into(),
@@ -290,7 +299,13 @@ impl<'src, 'p> ModelAnalysis<'src, 'p> {
                     }),
                     unique_ids,
                     composite_id,
-                });
+                };
+
+                if is_pk {
+                    primary_columns.push(col);
+                } else {
+                    columns.push(col);
+                }
             }
         }
 
@@ -303,7 +318,6 @@ impl<'src, 'p> ModelAnalysis<'src, 'p> {
         }
 
         // Build Column structs
-        let mut primary_columns = Vec::new();
         for field in &model_block.typed_idents {
             if !is_valid_sql_type(&field.cidl_type) {
                 self.sink

@@ -9,6 +9,7 @@ use clap::{Parser, arg, command};
 use cli::open_file_or_create;
 use codegen::wrangler::WranglerGenerator;
 use migrations::{MigrationsDilemma, MigrationsGenerator, MigrationsIntent};
+use tracing_subscriber::FmtSubscriber;
 
 #[derive(Parser)]
 #[command(name = "migrate", version = "0.0.3")]
@@ -44,6 +45,10 @@ fn main() {
 }
 
 fn migrate() -> Result<(), String> {
+    let subscriber = FmtSubscriber::builder().finish();
+    tracing::subscriber::set_global_default(subscriber)
+        .expect("Failed to set global default subscriber");
+
     let args = Args::parse();
     let wrangler = WranglerGenerator::from_path(&args.wrangler_path);
     let spec = wrangler.as_spec();
@@ -131,8 +136,10 @@ fn migrate() -> Result<(), String> {
             migrated_sql_path.display()
         );
 
-        let mut migrated_cidl_file = open_file_or_create(&migrated_cidl_path);
-        let mut migrated_sql_file = open_file_or_create(&migrated_sql_path);
+        let mut migrated_cidl_file =
+            open_file_or_create(&migrated_cidl_path).expect("Failed to create migrated CIDL file");
+        let mut migrated_sql_file =
+            open_file_or_create(&migrated_sql_path).expect("Failed to create migrated SQL file");
 
         let lm_ast_contents = last_migrated_cidl_path
             .map(|p| std::fs::read_to_string(&p).map_err(|e| e.to_string()))

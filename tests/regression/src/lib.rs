@@ -12,7 +12,7 @@ use similar::TextDiff;
 fn diff_file(out: OutputFile, new_contents: String) -> (bool, PathBuf) {
     let name = out.base_name.clone();
 
-    let new_path = out.path.with_file_name(format!("snap___{}", name));
+    let new_path = out.path.with_file_name(format!("snap__{}", name));
     let old_path = out.path.with_file_name(name);
 
     // Empty if it doesn't even exist
@@ -51,7 +51,6 @@ fn diff_file(out: OutputFile, new_contents: String) -> (bool, PathBuf) {
     (true, new_path)
 }
 
-/// A temporary file for storing the outputs of a cloesce extractor/generator call
 struct OutputFile {
     pub base_name: String,
     pub path: PathBuf,
@@ -118,60 +117,31 @@ impl Fixture {
             .to_path_buf()
     }
 
-    pub fn extract_cidl(&self) -> Result<(bool, PathBuf), String> {
-        let out = OutputFile::new(self.path.parent().unwrap(), "cidl.pre.json");
-        let project_root = self.get_project_root();
-        let e2e_dir = project_root.join("tests/e2e");
-
-        tracing::info!("Extracting CIDL for fixture {}", self.fixture_id);
-        let res = self.run_command(
-            Command::new("node")
-                .current_dir(&e2e_dir)
-                .arg("../../src/ts/dist/cli.js")
-                .arg("extract")
-                .arg("--in")
-                .arg(&self.path)
-                .arg("--out")
-                .arg(out.path())
-                .arg("--project-name")
-                .arg("runner")
-                .arg("--truncateSourcePaths"),
-        );
-
-        match res {
-            Ok(_) => Ok(self.read_out_and_diff(out)),
-            Err(err) => Err(err),
-        }
-    }
-
     /// On all success, returns the cidl and wrangler config, otherwise returns the failed file.
-    pub fn generate_all(
-        &self,
-        pre_cidl: &Path,
-        workers_domain: &str,
-    ) -> Result<(bool, PathBuf, PathBuf), String> {
-        let pre_cidl_canon = pre_cidl.canonicalize().unwrap();
+    pub fn compile(&self, workers_domain: &str) -> Result<(bool, PathBuf, PathBuf), String> {
         let project_root = self.get_project_root();
-        let generator_dir = project_root.join("src/generator");
+        let compiler_dir = project_root.join("src/compiler");
 
         let fixture_dir = self.path.parent().unwrap();
         let cidl_out = OutputFile::new(fixture_dir, "cidl.json");
         let wrangler_out = OutputFile::new(fixture_dir, "wrangler.toml");
-        let workers_out = OutputFile::new(fixture_dir, "workers.ts");
+        let backend_out = OutputFile::new(fixture_dir, "backend.ts");
         let client_out = OutputFile::new(fixture_dir, "client.ts");
+
+        let cloesce_dir = &self.path.parent().unwrap();
+        let default_migrations_path = "migrations";
+        let cloesce_source = fixture_dir.join("schema.cloesce");
 
         tracing::info!("Generating outputs for fixture {}", self.fixture_id);
         let cmd = self.run_command(
-            Command::new("./target/release/cli")
-                .arg("generate")
-                .arg(&pre_cidl_canon)
-                .arg(cidl_out.path())
+            Command::new("./target/release/compile")
+                .arg(cloesce_dir)
                 .arg(wrangler_out.path())
-                .arg(workers_out.path())
-                .arg(client_out.path())
+                .arg(default_migrations_path)
                 .arg(workers_domain)
-                .arg("migrations")
-                .current_dir(&generator_dir),
+                .arg(cloesce_source)
+                .arg("--snap")
+                .current_dir(&compiler_dir),
         );
 
         let mut has_diff = false;
@@ -200,7 +170,7 @@ impl Fixture {
             }
         };
 
-        for out in [workers_out, client_out] {
+        for out in [backend_out, client_out] {
             match cmd {
                 Ok(_) => {
                     let (diff, _) = self.read_out_and_diff(out);
@@ -216,22 +186,21 @@ impl Fixture {
     pub fn migrate(&self, cidl: &Path, wrangler_path: &Path) -> Result<(bool, bool), String> {
         let fixture_root = self.path.parent().expect("fixture root to exist");
         let cidl_path = cidl.canonicalize().unwrap();
-        let generator_dir = {
+        let compiler_dir = {
             let project_root = self.get_project_root();
-            project_root.join("src/generator")
+            project_root.join("src/compiler")
         };
 
         tracing::info!("Migrating CIDL for fixture {}", self.fixture_id);
         let res = self.run_command(
-            Command::new("./target/release/cli")
-                .arg("migrations")
+            Command::new("./target/release/migrate")
                 .arg(&cidl_path)
                 .arg("--fixed")
                 .arg("--all")
                 .arg("out.Initial")
                 .arg(&wrangler_path)
                 .arg(fixture_root)
-                .current_dir(&generator_dir),
+                .current_dir(&compiler_dir),
         );
 
         let res = match res {

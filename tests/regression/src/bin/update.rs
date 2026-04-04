@@ -10,7 +10,7 @@ struct Cli {
     delete: bool,
 }
 
-/// Updates all `snap___X` to `X` in the fixtures dir
+/// Updates all `snap__X` to `X` in the fixtures dir
 fn main() -> io::Result<()> {
     let cli = Cli::parse();
 
@@ -23,8 +23,8 @@ fn main() -> io::Result<()> {
 
     for fixture in fixtures {
         let patterns = vec![
-            format!("{}/snap___*", fixture.display()),
-            format!("{}/migrations/*/snap___*", fixture.display()),
+            format!("{}/snap__*", fixture.display()),
+            format!("{}/migrations/*/snap__*", fixture.display()),
         ];
 
         for pat in patterns {
@@ -35,7 +35,7 @@ fn main() -> io::Result<()> {
                 }
 
                 let file_name = entry.file_name().unwrap().to_string_lossy().to_string();
-                let base_name = file_name.strip_prefix("snap___").expect("snap__ prefix");
+                let base_name = file_name.strip_prefix("snap__").expect("snap__ prefix");
                 let base_path = entry.with_file_name(base_name);
 
                 if base_path.exists() {

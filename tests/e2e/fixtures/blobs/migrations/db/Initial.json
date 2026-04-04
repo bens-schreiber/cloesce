@@ -5,10 +5,10 @@
       "hash": 560041510452854967,
       "name": "BlobHaver",
       "d1_binding": "db",
-      "primary_key_columns": [
+      "primary_columns": [
         {
           "hash": 6397878138472974760,
-          "value": {
+          "field": {
             "name": "id",
             "cidl_type": "Integer"
           },
@@ -20,7 +20,7 @@
       "columns": [
         {
           "hash": 17404811013903783014,
-          "value": {
+          "field": {
             "name": "blob1",
             "cidl_type": "Blob"
           },
@@ -30,7 +30,7 @@
         },
         {
           "hash": 14390429867474788070,
-          "value": {
+          "field": {
             "name": "blob2",
             "cidl_type": "Blob"
           },
@@ -39,7 +39,7 @@
           "composite_id": null
         }
       ],
-      "navigation_properties": []
+      "navigation_fields": []
     }
   }
 }

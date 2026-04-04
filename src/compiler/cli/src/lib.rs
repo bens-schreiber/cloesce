@@ -1,16 +1,14 @@
-use std::path::Path;
+use std::{fs::File, io, path::Path};
 
-pub fn open_file_or_create(path: &Path) -> std::fs::File {
-    if path.exists() {
-        return std::fs::OpenOptions::new()
-            .write(true)
-            .truncate(true)
-            .open(path)
-            .expect("file to be opened for writing");
+pub fn open_file_or_create(path: &Path) -> io::Result<File> {
+    match File::create(path) {
+        Ok(f) => Ok(f),
+        Err(e) if e.kind() == io::ErrorKind::NotFound => {
+            if let Some(parent) = path.parent() {
+                std::fs::create_dir_all(parent)?;
+            }
+            File::create(path)
+        }
+        Err(e) => Err(e),
     }
-
-    if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent).expect("parent directories to be created");
-    }
-    std::fs::File::create(path).expect("file to be created")
 }

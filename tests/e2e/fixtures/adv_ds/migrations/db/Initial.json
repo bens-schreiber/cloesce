@@ -1,14 +1,14 @@
 {
-  "hash": 12269881830252270504,
+  "hash": 4268265255132821547,
   "models": {
     "Hamburger": {
-      "hash": 16378746804444100937,
+      "hash": 11891469912896067759,
       "name": "Hamburger",
       "d1_binding": "db",
-      "primary_key_columns": [
+      "primary_columns": [
         {
           "hash": 6397878138472974760,
-          "value": {
+          "field": {
             "name": "id",
             "cidl_type": "Integer"
           },
@@ -20,32 +20,41 @@
       "columns": [
         {
           "hash": 6788679640762437622,
-          "value": {
+          "field": {
             "name": "name",
-            "cidl_type": "Text"
+            "cidl_type": "String"
           },
           "foreign_key_reference": null,
           "unique_ids": [],
           "composite_id": null
         }
       ],
-      "navigation_properties": [
+      "navigation_fields": [
         {
-          "hash": 6498092945051865391,
-          "var_name": "toppings",
+          "hash": 17379672083855794608,
+          "field": {
+            "name": "toppings",
+            "cidl_type": {
+              "Array": {
+                "Object": {
+                  "name": "Topping"
+                }
+              }
+            }
+          },
           "model_reference": "Topping",
           "kind": "ManyToMany"
         }
       ]
     },
     "Topping": {
-      "hash": 14407311656640296225,
+      "hash": 6851490881146770141,
       "name": "Topping",
       "d1_binding": "db",
-      "primary_key_columns": [
+      "primary_columns": [
         {
           "hash": 6397878138472974760,
-          "value": {
+          "field": {
             "name": "id",
             "cidl_type": "Integer"
           },
@@ -57,19 +66,28 @@
       "columns": [
         {
           "hash": 6788679640762437622,
-          "value": {
+          "field": {
             "name": "name",
-            "cidl_type": "Text"
+            "cidl_type": "String"
           },
           "foreign_key_reference": null,
           "unique_ids": [],
           "composite_id": null
         }
       ],
-      "navigation_properties": [
+      "navigation_fields": [
         {
-          "hash": 8945555950776796007,
-          "var_name": "hamburgers",
+          "hash": 7547041568480358228,
+          "field": {
+            "name": "hamburger",
+            "cidl_type": {
+              "Array": {
+                "Object": {
+                  "name": "Hamburger"
+                }
+              }
+            }
+          },
           "model_reference": "Hamburger",
           "kind": "ManyToMany"
         }

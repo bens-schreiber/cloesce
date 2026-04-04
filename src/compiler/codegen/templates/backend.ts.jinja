@@ -30,10 +30,20 @@ export interface {{ poo.name }} {
 {%- endfor %}
 
 {%- for (_key, service) in &ast.services %}
-export interface {{ service.name }} {
+export namespace {{ service.name }} {
+    export interface Self {
 {%- for field in &service.fields %}
-    {{ field.name }}: {{ field.inject_reference }};
+        {{ field.name }}: {{ field.inject_reference }};
 {%- endfor %}
+    }
+
+    export abstract class Api {
+        readonly tag = "{{ service.name }}";
+        abstract init(self: {{ service.name }}.Self): MaybePromise<HttpResult<void> | void>;
+{%- for api in &service.apis %}
+        abstract {{ api.name }}({% if !api.is_static %}self: {{ service.name }}.Self{% if !api.parameters.is_empty() %}, {% endif %}{% endif %}{% for (i, param) in api.parameters.iter().enumerate() %}{{ param.name }}: {{ self.map_type(&param.cidl_type) }}{% if i + 1 < api.parameters.len() %}, {% endif %}{% endfor %}): MaybePromise<HttpResult<{{ self.map_type(&api.return_type) }}>>;
+{%- endfor %}
+    }
 }
 {%- endfor %}
 
@@ -108,20 +118,7 @@ export namespace {{ model.name }} {
     }
 }
 {%- endfor %}
-{%- for (_key, service) in &ast.services %}
-{%- if !service.apis.is_empty() %}
-
-export abstract class {{ service.name }} {
-    readonly tag = "{{ service.name }}";
-    abstract init(self: {{ service.name }}): MaybePromise<HttpResult<void> | void>;
-{%- for api in &service.apis %}
-    abstract {{ api.name }}({% if !api.is_static %}self: {{ service.name }}{% if !api.parameters.is_empty() %}, {% endif %}{% endif %}{% for (i, param) in api.parameters.iter().enumerate() %}{{ param.name }}: {{ self.map_type(&param.cidl_type) }}{% if i + 1 < api.parameters.len() %}, {% endif %}{% endfor %}): MaybePromise<HttpResult<{{ self.map_type(&api.return_type) }}>>;
-{%- endfor %}
-}
-{%- endif %}
-{%- endfor %}
-
-import cidl from "./cidl.json";
+import cidl from "./cidl.json" with { type: "json" };
 {%- for (_key, model) in &ast.models %}
 {%- for ds in model.data_sources.values() %}
 {%- if !ds.is_internal %}
@@ -132,4 +129,11 @@ import cidl from "./cidl.json";
 
 export async function cloesce(): Promise<CloesceApp> {
     return await CloesceApp.init(cidl as any, "{{ worker_url }}")
+}
+
+// Default entrypoint for a Cloesce app. 
+// Replace with a custom fetch handler to register API implementations, add middleware, etc.
+export default async function fetch(request: Request, env: Env): Promise<Response> {
+    const app = await cloesce();
+    return await app.run(request, env);
 }

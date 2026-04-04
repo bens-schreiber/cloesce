@@ -1,9 +1,9 @@
 {
   // Visit https://aka.ms/tsconfig to read more about this file
   "compilerOptions": {
-    "module": "ESNext",
+    "module": "Node16",
     "target": "ES2020",
-    "moduleResolution": "node",
+    "moduleResolution": "node16",
     "types": [],
     "skipLibCheck": true,
 

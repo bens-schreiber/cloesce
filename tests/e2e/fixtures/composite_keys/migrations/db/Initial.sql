@@ -1,17 +1,20 @@
 --- New Models
-CREATE TABLE IF NOT EXISTS "Course" ("id" real PRIMARY KEY, "title" text NOT NULL);
+CREATE TABLE IF NOT EXISTS "Course" (
+  "id" integer PRIMARY KEY,
+  "title" text NOT NULL
+);
 
 CREATE TABLE IF NOT EXISTS "Student" (
-  "id" real NOT NULL,
+  "id" integer NOT NULL,
   "name" text NOT NULL,
   "favoriteColor" text NOT NULL,
   PRIMARY KEY ("id", "name")
 );
 
 CREATE TABLE IF NOT EXISTS "StudentCourse" (
-  "studentId" real NOT NULL,
+  "studentId" integer NOT NULL,
   "studentName" text NOT NULL,
-  "courseId" real NOT NULL,
+  "courseId" integer NOT NULL,
   PRIMARY KEY ("studentId", "studentName", "courseId"),
   FOREIGN KEY ("courseId") REFERENCES "Course" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
   FOREIGN KEY ("studentId", "studentName") REFERENCES "Student" ("id", "name") ON DELETE RESTRICT ON UPDATE CASCADE

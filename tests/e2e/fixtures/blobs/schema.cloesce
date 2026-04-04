@@ -1,0 +1,21 @@
+env { 
+    d1 { db }
+}
+
+service BlobService {}
+api BlobService {
+    post incrementBlob(b: blob) -> blob
+}
+
+[use db, save, get, list]
+model BlobHaver {
+    primary { id: int }
+    blob1: blob
+    blob2: blob
+}
+
+api BlobHaver {
+    get getBlob1(self) -> blob
+    post inputStream(s: stream) -> void
+    get yieldStream(self) -> stream
+}
