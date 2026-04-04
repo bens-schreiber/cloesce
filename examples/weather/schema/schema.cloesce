@@ -25,9 +25,8 @@ model Weather {
         id: int
     }
 
-    foreign (WeatherReport::id, WeatherReport::id2) {
+    foreign (WeatherReport::id) {
         weatherReportId
-        weatherReportId2
         nav { weatherReport }
     }
 

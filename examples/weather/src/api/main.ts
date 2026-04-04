@@ -1,4 +1,4 @@
-import { ExecutionContext, ReadableStream } from "@cloudflare/workers-types";
+import { ReadableStream } from "@cloudflare/workers-types";
 import { cloesce, Env, Weather } from "@cloesce/backend";
 import { HttpResult } from "cloesce";
 
@@ -16,7 +16,7 @@ class WeatherApi extends Weather.Api {
     }
 }
 
-export default async function fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+export default async function fetch(request: Request, env: Env): Promise<Response> {
     // Run Cloesce app
     const app = (await cloesce())
         .register(new WeatherApi());
