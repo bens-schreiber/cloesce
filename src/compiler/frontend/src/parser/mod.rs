@@ -223,9 +223,9 @@ pub fn service_block<'tokens, 'src: 'tokens>()
         .map(|((name, span), fields)| {
             let fields = fields
                 .into_iter()
-                .map(|((name, span), cidl_type)| Symbol {
+                .map(|((field_name, span), cidl_type)| Symbol {
                     span,
-                    name,
+                    name: field_name,
                     cidl_type,
                     kind: SymbolKind::ServiceField,
                     parent_name: Cow::Borrowed(name),

@@ -5,29 +5,29 @@ pub trait LanguageTypeMapper {
     fn media_type(&self, ty: &MediaType) -> String;
 }
 
-pub enum TypescriptMapperKind {
+pub enum TypeScriptMapperKind {
     BackendTypes,
     ClientApi,
 }
 
 pub struct TypeScriptMapper {
-    kind: TypescriptMapperKind,
+    kind: TypeScriptMapperKind,
 }
 impl TypeScriptMapper {
     pub fn backend() -> Self {
         Self {
-            kind: TypescriptMapperKind::BackendTypes,
+            kind: TypeScriptMapperKind::BackendTypes,
         }
     }
 
     pub fn client() -> Self {
         Self {
-            kind: TypescriptMapperKind::ClientApi,
+            kind: TypeScriptMapperKind::ClientApi,
         }
     }
 
     fn namespace(&self, ast: &CloesceAst, name: &str) -> String {
-        if matches!(self.kind, TypescriptMapperKind::ClientApi) {
+        if matches!(self.kind, TypeScriptMapperKind::ClientApi) {
             return name.to_string();
         }
 
@@ -79,15 +79,15 @@ impl LanguageTypeMapper for TypeScriptMapper {
                     .collect::<Vec<_>>()
                     .join(" | ");
 
-                if matches!(self.kind, TypescriptMapperKind::ClientApi) {
+                if matches!(self.kind, TypeScriptMapperKind::ClientApi) {
                     format!("{joined} = \"Default\"")
                 } else {
                     joined
                 }
             }
             CidlType::Stream => match self.kind {
-                TypescriptMapperKind::BackendTypes => "ReadableStream".to_string(),
-                TypescriptMapperKind::ClientApi => "Uint8Array".to_string(),
+                TypeScriptMapperKind::BackendTypes => "ReadableStream".to_string(),
+                TypeScriptMapperKind::ClientApi => "Uint8Array".to_string(),
             },
             CidlType::KvObject(inner) => {
                 let inner_ts = self.cidl_type(inner, ast);
@@ -98,8 +98,8 @@ impl LanguageTypeMapper for TypeScriptMapper {
                 format!("Paginated<{inner_ts}>")
             }
             CidlType::R2Object => match self.kind {
-                TypescriptMapperKind::BackendTypes => "R2ObjectBody".to_string(),
-                TypescriptMapperKind::ClientApi => "R2Object".to_string(),
+                TypeScriptMapperKind::BackendTypes => "R2ObjectBody".to_string(),
+                TypeScriptMapperKind::ClientApi => "R2Object".to_string(),
             },
             CidlType::Inject { name } => self.namespace(ast, name),
             CidlType::Env => "Env".to_string(),

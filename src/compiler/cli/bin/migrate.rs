@@ -5,7 +5,7 @@ use std::{
 };
 
 use ast::MigrationsAst;
-use clap::{Parser, arg, command};
+use clap::Parser;
 use cli::open_file_or_create;
 use codegen::wrangler::WranglerGenerator;
 use migrations::{MigrationsDilemma, MigrationsGenerator, MigrationsIntent};

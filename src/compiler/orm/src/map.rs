@@ -69,10 +69,7 @@ pub fn map_sql(
             // Set scalar columns
             for col in &model.columns {
                 let name = &col.field.name;
-                let val = row
-                    .get(name.as_ref())
-                    .or_else(|| row.get(name.as_ref()))
-                    .cloned();
+                let val = row.get(name.as_ref()).cloned();
                 if let Some(v) = val {
                     m.insert(name.to_string(), v);
                 }
@@ -161,10 +158,13 @@ fn process_navigation_properties(
         // Set nested scalar columns
         for col in &nested_model.columns {
             let name = &col.field.name;
-            let val = row
-                .get(&format!("{}.{}.{}", prefix, nav_prop.field.name, name))
-                .or_else(|| row.get(&format!("{}.{}", nav_prop.field.name, name)))
-                .cloned();
+            let prefixed_key = if prefix.is_empty() {
+                format!("{}.{}", nav_prop.field.name, name)
+            } else {
+                format!("{}.{}.{}", prefix, nav_prop.field.name, name)
+            };
+            let val = row.get(&prefixed_key).cloned();
+
             if let Some(v) = val {
                 nested_model_json.insert(name.to_string(), v);
             }
