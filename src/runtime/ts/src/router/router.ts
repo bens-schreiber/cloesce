@@ -19,7 +19,7 @@ import { hydrateType } from "./orm.js";
 import { crudRoute } from "./crud.js";
 
 const ENV_TAG = "$$env";
-export type DependencyKey = { tag: string } | Function;
+export type DependencyKey = { tag: string };
 
 /**
  * Dependency injection container, mapping an object type name to an instance of that object.
@@ -29,20 +29,14 @@ export type DependencyKey = { tag: string } | Function;
 export class DependencyContainer {
   private container = new Map<string, any>();
 
-  private static tag(key: DependencyKey): string {
-    return "tag" in key ? key.tag : key.name;
-  }
-
   /** @internal */
   _set<T>(key: DependencyKey, instance: T) {
-    if (this.container.has(DependencyContainer.tag(key))) {
+    if (this.container.has(key.tag)) {
       console.warn(
-        `Overwriting existing dependency for key ${DependencyContainer.tag(
-          key,
-        )}. This may cause unexpected behavior.`,
+        `Overwriting existing dependency for key ${key.tag}. This may cause unexpected behavior.`,
       );
     }
-    this.container.set(DependencyContainer.tag(key), instance);
+    this.container.set(key.tag, instance);
   }
 
   set(value: { tag: string }) {
@@ -50,11 +44,11 @@ export class DependencyContainer {
   }
 
   get<T>(key: DependencyKey): T | undefined {
-    return this.container.get(DependencyContainer.tag(key));
+    return this.container.get(key.tag);
   }
 
   has(key: DependencyKey): boolean {
-    return this.container.has(DependencyContainer.tag(key));
+    return this.container.has(key.tag);
   }
 }
 
@@ -125,6 +119,7 @@ export class CloesceApp {
   }
 
   // Maps a model or service name to an instance containing the implementations of its API methods.
+  // Additionally, contains injected dependencies, mapped to their instance.
   private apiRegistry: Map<string, unknown> = new Map();
 
   public register(api: { readonly tag: string }): this {
@@ -202,6 +197,13 @@ export class CloesceApp {
     di: DependencyContainer,
     workerUrl: string,
   ): Promise<HttpResult<unknown>> {
+    // Inject all injectables
+    for (const inject of ast.injects) {
+      if (this.apiRegistry.has(inject)) {
+        di._set({ tag: inject }, this.apiRegistry.get(inject) ?? undefined);
+      }
+    }
+
     // Initialize services
     // Note: Services are in topological order
     for (const name in ast.services) {
@@ -289,12 +291,11 @@ export class CloesceApp {
   public async run(request: Request, env: any): Promise<Response> {
     const { ast, wasm, workerUrl } = RuntimeContainer.get();
 
-    // DI will always contain the WranglerEnv and Request.
+    // DI will always contain the WranglerEnv
     const di = new DependencyContainer();
     if (ast.wrangler_env) {
       di._set({ tag: ENV_TAG }, env);
     }
-    di._set(Request, request);
 
     try {
       const httpResult = await this.router(
@@ -723,9 +724,7 @@ function resolveInjected(
   } else if (typeof ty === "string" && ty === "Env") {
     tag = ENV_TAG;
   } else {
-    throw new InternalError(
-      `Invalid injected type: ${JSON.stringify(ty)}. Expected an Inject type or Env.`,
-    );
+    return undefined;
   }
 
   const injected = di.get({ tag });

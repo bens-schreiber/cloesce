@@ -377,22 +377,12 @@ impl Model<'_> {
 }
 
 #[derive(Deserialize, Serialize, Debug)]
-pub struct ServiceField<'src> {
-    #[serde(borrow)]
-    pub name: &'src str,
-
-    /// Injected symbol name
-    #[serde(borrow)]
-    pub inject_reference: &'src str,
-}
-
-#[derive(Deserialize, Serialize, Debug)]
 pub struct Service<'src> {
     #[serde(borrow)]
     pub name: &'src str,
 
     #[serde(borrow)]
-    pub fields: Vec<ServiceField<'src>>,
+    pub fields: Vec<Field<'src>>,
 
     #[serde(borrow)]
     pub apis: Vec<ApiMethod<'src>>,

@@ -347,8 +347,16 @@ fn model_block_kv_r2() {
                 kv_value: json
             }
 
+            kv(all_caches, "my-interpolated-format") paginated {
+                paginated_value: string
+            }
+
             r2(assets_bucket, "my_interpolated_format{field}") {
                 obj
+            }
+
+            r2(all_buckets, "my_interpolated_format") paginated {
+                paginated_obj
             }
         }
         "#,
@@ -361,18 +369,34 @@ fn model_block_kv_r2() {
         .find(|m| m.symbol.name == "Foo")
         .expect("Foo model to be present");
 
-    assert_eq!(foo.kvs.len(), 1);
-    assert_eq!(foo.r2s.len(), 1);
+    assert_eq!(foo.kvs.len(), 2);
+    assert_eq!(foo.r2s.len(), 2);
 
-    let kv = &foo.kvs[0];
-    assert_eq!(kv.env_binding, "cache_ns");
-    assert_eq!(kv.key_format, "my-interpolated-format{field}-{category}");
-    assert_eq!(kv.field.name, "kv_value");
+    let kv_single = &foo.kvs[0];
+    assert_eq!(kv_single.env_binding, "cache_ns");
+    assert_eq!(
+        kv_single.key_format,
+        "my-interpolated-format{field}-{category}"
+    );
+    assert_eq!(kv_single.field.name, "kv_value");
+    assert!(!kv_single.is_paginated);
 
-    let r2 = &foo.r2s[0];
-    assert_eq!(r2.env_binding, "assets_bucket");
-    assert_eq!(r2.key_format, "my_interpolated_format{field}");
-    assert_eq!(r2.field.name, "obj");
+    let kv_paginated = &foo.kvs[1];
+    assert_eq!(kv_paginated.env_binding, "all_caches");
+    assert_eq!(kv_paginated.key_format, "my-interpolated-format");
+    assert!(kv_paginated.is_paginated);
+    assert_eq!(kv_paginated.field.name, "paginated_value");
+
+    let r2_single = &foo.r2s[0];
+    assert_eq!(r2_single.env_binding, "assets_bucket");
+    assert_eq!(r2_single.key_format, "my_interpolated_format{field}");
+    assert_eq!(r2_single.field.name, "obj");
+
+    let r2_paginated = &foo.r2s[1];
+    assert_eq!(r2_paginated.env_binding, "all_buckets");
+    assert_eq!(r2_paginated.key_format, "my_interpolated_format");
+    assert!(r2_paginated.is_paginated);
+    assert_eq!(r2_paginated.field.name, "paginated_obj");
 }
 
 #[test]

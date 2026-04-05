@@ -1,6 +1,6 @@
 import { CloesceConfigOptions } from "cloesce";
 export default {
     srcPaths: ["./"],
-    workersUrl: "http://localhost:5646/api",
+    workersUrl: "http://localhost:5270/api",
 } satisfies CloesceConfigOptions;
             

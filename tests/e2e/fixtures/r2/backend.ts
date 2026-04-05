@@ -23,7 +23,7 @@ export namespace D1BackedModel {
 
     export abstract class Api {
         readonly tag = Tag;
-        abstract uploadData(self: D1BackedModel.Self, data: ReadableStream): MaybePromise<MaybeHttpResult<void>>;
+        abstract uploadData(self: D1BackedModel.Self, e: Env, data: ReadableStream): MaybePromise<MaybeHttpResult<void>>;
     }
 
     export namespace DataSources {
@@ -67,8 +67,8 @@ export namespace PureR2Model {
 
     export abstract class Api {
         readonly tag = Tag;
-        abstract uploadData(self: PureR2Model.Self, data: ReadableStream): MaybePromise<MaybeHttpResult<void>>;
-        abstract uploadOtherData(self: PureR2Model.Self, data: ReadableStream): MaybePromise<MaybeHttpResult<void>>;
+        abstract uploadData(self: PureR2Model.Self, e: Env, data: ReadableStream): MaybePromise<MaybeHttpResult<void>>;
+        abstract uploadOtherData(self: PureR2Model.Self, e: Env, data: ReadableStream): MaybePromise<MaybeHttpResult<void>>;
     }
 
     export namespace DataSources {
@@ -99,7 +99,7 @@ import cidl from "./cidl.json" with { type: "json" };
 (cidl.models.PureR2Model.data_sources["Default"] as any).gen = PureR2Model.DataSources.Default;
 
 export async function cloesce(): Promise<CloesceApp> {
-    return await CloesceApp.init(cidl as any, "http://localhost:5646/api")
+    return await CloesceApp.init(cidl as any, "http://localhost:5538/api")
 }
 
 // Default entrypoint for a Cloesce app. 

@@ -19,7 +19,7 @@ export namespace Dog {
 
     export abstract class Api {
         readonly tag = Tag;
-        abstract create(dog: DeepPartial<Dog.Self>): MaybePromise<MaybeHttpResult<Dog.Self>>;
+        abstract create(e: Env, dog: DeepPartial<Dog.Self>): MaybePromise<MaybeHttpResult<Dog.Self>>;
         abstract getPartialSelf(self: Dog.Self): MaybePromise<MaybeHttpResult<DeepPartial<Dog.Self>>>;
     }
 
@@ -55,7 +55,7 @@ import cidl from "./cidl.json" with { type: "json" };
 (cidl.models.Dog.data_sources["Default"] as any).gen = Dog.DataSources.Default;
 
 export async function cloesce(): Promise<CloesceApp> {
-    return await CloesceApp.init(cidl as any, "http://localhost:5646/api")
+    return await CloesceApp.init(cidl as any, "http://localhost:5288/api")
 }
 
 // Default entrypoint for a Cloesce app. 

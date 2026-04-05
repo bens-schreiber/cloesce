@@ -9,7 +9,7 @@ export class A {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<A>> {
     const baseUrl = new URL(
-      `http://localhost:5646/api/A/create`
+      `http://localhost:5716/api/A/create`
     );
     const payload: any = {};
     payload["a"] = a;
@@ -34,7 +34,7 @@ export class A {
       encodeURIComponent(String(this.id)),
     ].join("/");
     const baseUrl = new URL(
-      `http://localhost:5646/api/A/${id}/withoutB`
+      `http://localhost:5716/api/A/${id}/withoutB`
     );
 
     const res = await fetchImpl(baseUrl, {
@@ -69,7 +69,7 @@ export class A {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<A>> {
     const baseUrl = new URL(
-      `http://localhost:5646/api/A/$save`
+      `http://localhost:5716/api/A/$save`
     );
     const payload: any = {};
     payload["model"] = model;
@@ -115,7 +115,7 @@ export class A {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<A>> {
     const baseUrl = new URL(
-      `http://localhost:5646/api/A/$get`
+      `http://localhost:5716/api/A/$get`
     );
     const payload: any = {};
   baseUrl.searchParams.append("id", String((args as any).id ?? null));
@@ -149,7 +149,7 @@ export class B {
       encodeURIComponent(String(this.id)),
     ].join("/");
     const baseUrl = new URL(
-      `http://localhost:5646/api/B/${id}/testMethod`
+      `http://localhost:5716/api/B/${id}/testMethod`
     );
     const payload: any = {};
 
@@ -177,7 +177,7 @@ export class B {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<B>> {
     const baseUrl = new URL(
-      `http://localhost:5646/api/B/$save`
+      `http://localhost:5716/api/B/$save`
     );
     const payload: any = {};
     payload["model"] = model;
@@ -209,7 +209,7 @@ export class B {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<B>> {
     const baseUrl = new URL(
-      `http://localhost:5646/api/B/$get`
+      `http://localhost:5716/api/B/$get`
     );
     const payload: any = {};
   baseUrl.searchParams.append("id", String((args as any).id ?? null));
@@ -249,7 +249,7 @@ export class Course {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Course>> {
     const baseUrl = new URL(
-      `http://localhost:5646/api/Course/$save`
+      `http://localhost:5716/api/Course/$save`
     );
     const payload: any = {};
     payload["model"] = model;
@@ -285,7 +285,7 @@ export class Person {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Person>> {
     const baseUrl = new URL(
-      `http://localhost:5646/api/Person/create`
+      `http://localhost:5716/api/Person/create`
     );
     const payload: any = {};
     payload["person"] = person;
@@ -310,7 +310,7 @@ export class Person {
       encodeURIComponent(String(this.id)),
     ].join("/");
     const baseUrl = new URL(
-      `http://localhost:5646/api/Person/${id}/withoutDogs`
+      `http://localhost:5716/api/Person/${id}/withoutDogs`
     );
 
     const res = await fetchImpl(baseUrl, {
@@ -345,7 +345,7 @@ export class Person {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Person>> {
     const baseUrl = new URL(
-      `http://localhost:5646/api/Person/$save`
+      `http://localhost:5716/api/Person/$save`
     );
     const payload: any = {};
     payload["model"] = model;
@@ -391,7 +391,7 @@ export class Person {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Person>> {
     const baseUrl = new URL(
-      `http://localhost:5646/api/Person/$get`
+      `http://localhost:5716/api/Person/$get`
     );
     const payload: any = {};
   baseUrl.searchParams.append("id", String((args as any).id ?? null));
@@ -425,7 +425,7 @@ export class Student {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Student>> {
     const baseUrl = new URL(
-      `http://localhost:5646/api/Student/create`
+      `http://localhost:5716/api/Student/create`
     );
     const payload: any = {};
     payload["student"] = student;
@@ -450,7 +450,7 @@ export class Student {
       encodeURIComponent(String(this.id)),
     ].join("/");
     const baseUrl = new URL(
-      `http://localhost:5646/api/Student/${id}/none`
+      `http://localhost:5716/api/Student/${id}/none`
     );
 
     const res = await fetchImpl(baseUrl, {
@@ -485,7 +485,7 @@ export class Student {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Student>> {
     const baseUrl = new URL(
-      `http://localhost:5646/api/Student/$save`
+      `http://localhost:5716/api/Student/$save`
     );
     const payload: any = {};
     payload["model"] = model;
@@ -531,7 +531,7 @@ export class Student {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Student>> {
     const baseUrl = new URL(
-      `http://localhost:5646/api/Student/$get`
+      `http://localhost:5716/api/Student/$get`
     );
     const payload: any = {};
   baseUrl.searchParams.append("id", String((args as any).id ?? null));
@@ -568,7 +568,7 @@ export class Dog {
       encodeURIComponent(String(this.id)),
     ].join("/");
     const baseUrl = new URL(
-      `http://localhost:5646/api/Dog/${id}/testMethod`
+      `http://localhost:5716/api/Dog/${id}/testMethod`
     );
     const payload: any = {};
 
@@ -596,7 +596,7 @@ export class Dog {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Dog>> {
     const baseUrl = new URL(
-      `http://localhost:5646/api/Dog/$save`
+      `http://localhost:5716/api/Dog/$save`
     );
     const payload: any = {};
     payload["model"] = model;

@@ -68,6 +68,10 @@
           "parameters_media": "Json",
           "parameters": [
             {
+              "name": "e",
+              "cidl_type": "Env"
+            },
+            {
               "name": "dog",
               "cidl_type": {
                 "Partial": {

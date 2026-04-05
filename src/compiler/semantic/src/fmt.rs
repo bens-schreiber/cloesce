@@ -443,23 +443,6 @@ fn display(
                 .ok();
         }
 
-        SemanticError::ServiceInvalidFieldType { field } => {
-            let (path, range) = span_parts(&field.span, file_table);
-            Report::build(ariadne::ReportKind::Error, (path.clone(), range.clone()))
-                .with_message(format!(
-                    "field '{}' has an invalid type for a service",
-                    field.name
-                ))
-                .with_label(
-                    Label::new((path, range))
-                        .with_message("service fields must be of type `Inject` or another service")
-                        .with_color(Color::Red),
-                )
-                .finish()
-                .write(cache, std::io::stderr())
-                .ok();
-        }
-
         SemanticError::DataSourceUnknownModelReference { source } => {
             let (path, range) = span_parts(&source.span, file_table);
             Report::build(ariadne::ReportKind::Error, (path.clone(), range.clone()))

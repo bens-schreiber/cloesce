@@ -4,6 +4,7 @@ import { R2Bucket, KVNamespace, D1Database, R2Object, D1PreparedStatement, R2Obj
 
 type MaybePromise<T> = T | Promise<T>;
 type MaybeHttpResult<T> = T | HttpResult<T>;
+export interface Env {}
 export abstract class InjectedThing {
     readonly tag = "InjectedThing";
 }
@@ -36,7 +37,7 @@ export namespace BarService {
 import cidl from "./cidl.json" with { type: "json" };
 
 export async function cloesce(): Promise<CloesceApp> {
-    return await CloesceApp.init(cidl as any, "http://localhost:5646/api")
+    return await CloesceApp.init(cidl as any, "http://localhost:5144/api")
 }
 
 // Default entrypoint for a Cloesce app. 

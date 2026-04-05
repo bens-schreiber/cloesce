@@ -172,7 +172,9 @@ export class Orm {
       },
     );
 
-    const db = (this.env as any).db as D1Database | undefined;
+    const db: D1Database | undefined = meta.d1_binding
+      ? (this.env as any)[meta.d1_binding]
+      : undefined;
     const queries = res.sql.map((s) => db!.prepare(s.query).bind(...s.values));
 
     // Concurrently execute SQL with KV uploads.

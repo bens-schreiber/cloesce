@@ -5,7 +5,7 @@ export class BlobService {
     b: Uint8Array,
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Uint8Array>> {
-    const baseUrl = new URL("http://localhost:5646/api/BlobService/incrementBlob");
+    const baseUrl = new URL("http://localhost:5270/api/BlobService/incrementBlob");
     const payload: any = {};
     payload["b"] = b;
 
@@ -34,7 +34,7 @@ export class BlobHaver {
       encodeURIComponent(String(this.id)),
     ].join("/");
     const baseUrl = new URL(
-      `http://localhost:5646/api/BlobHaver/${id}/getBlob1`
+      `http://localhost:5270/api/BlobHaver/${id}/getBlob1`
     );
 
     const res = await fetchImpl(baseUrl, {
@@ -53,7 +53,7 @@ export class BlobHaver {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<void>> {
     const baseUrl = new URL(
-      `http://localhost:5646/api/BlobHaver/inputStream`
+      `http://localhost:5270/api/BlobHaver/inputStream`
     );
     const payload: any = {};
     payload["s"] = s;
@@ -78,7 +78,7 @@ export class BlobHaver {
       encodeURIComponent(String(this.id)),
     ].join("/");
     const baseUrl = new URL(
-      `http://localhost:5646/api/BlobHaver/${id}/yieldStream`
+      `http://localhost:5270/api/BlobHaver/${id}/yieldStream`
     );
 
     const res = await fetchImpl(baseUrl, {
@@ -103,7 +103,7 @@ export class BlobHaver {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<BlobHaver>> {
     const baseUrl = new URL(
-      `http://localhost:5646/api/BlobHaver/$save`
+      `http://localhost:5270/api/BlobHaver/$save`
     );
     const payload: any = {};
     payload["model"] = model;
@@ -135,7 +135,7 @@ export class BlobHaver {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<BlobHaver>> {
     const baseUrl = new URL(
-      `http://localhost:5646/api/BlobHaver/$get`
+      `http://localhost:5270/api/BlobHaver/$get`
     );
     const payload: any = {};
   baseUrl.searchParams.append("id", String((args as any).id ?? null));
@@ -166,7 +166,7 @@ export class BlobHaver {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<BlobHaver[]>> {
     const baseUrl = new URL(
-      `http://localhost:5646/api/BlobHaver/$list`
+      `http://localhost:5270/api/BlobHaver/$list`
     );
     const payload: any = {};
   baseUrl.searchParams.append("lastSeen_id", String((args as any).lastSeen_id ?? null));

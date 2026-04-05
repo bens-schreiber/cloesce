@@ -4,7 +4,7 @@ export class FooService {
   static async staticMethod(
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<string>> {
-    const baseUrl = new URL("http://localhost:5646/api/FooService/staticMethod");
+    const baseUrl = new URL("http://localhost:5144/api/FooService/staticMethod");
 
     const res = await fetchImpl(baseUrl, {
       method: "GET",
@@ -20,7 +20,7 @@ export class FooService {
   static async instantiatedMethod(
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<string>> {
-    const baseUrl = new URL("http://localhost:5646/api/FooService/instantiatedMethod");
+    const baseUrl = new URL("http://localhost:5144/api/FooService/instantiatedMethod");
 
     const res = await fetchImpl(baseUrl, {
       method: "GET",
@@ -38,7 +38,7 @@ export class BarService {
   static async useFoo(
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<string>> {
-    const baseUrl = new URL("http://localhost:5646/api/BarService/useFoo");
+    const baseUrl = new URL("http://localhost:5144/api/BarService/useFoo");
 
     const res = await fetchImpl(baseUrl, {
       method: "GET",

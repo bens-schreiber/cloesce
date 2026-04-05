@@ -102,7 +102,12 @@ pub struct Fixture {
 
 impl Fixture {
     pub fn new(path: PathBuf) -> Self {
-        let fixture_id = path.file_stem().unwrap().to_str().unwrap().to_owned();
+        let fixture_id = path
+            .parent()
+            .and_then(|p| p.file_name())
+            .and_then(|s| s.to_str())
+            .unwrap()
+            .to_owned();
         Self { fixture_id, path }
     }
 

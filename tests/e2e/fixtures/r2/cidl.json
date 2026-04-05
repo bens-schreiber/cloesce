@@ -79,6 +79,10 @@
           "parameters_media": "Octet",
           "parameters": [
             {
+              "name": "e",
+              "cidl_type": "Env"
+            },
+            {
               "name": "data",
               "cidl_type": "Stream"
             }
@@ -259,7 +263,7 @@
           },
           "format": "path/",
           "binding": "bucket1",
-          "list_prefix": false
+          "list_prefix": true
         }
       ],
       "navigation_fields": [],
@@ -279,6 +283,10 @@
           "parameters_media": "Octet",
           "parameters": [
             {
+              "name": "e",
+              "cidl_type": "Env"
+            },
+            {
               "name": "data",
               "cidl_type": "Stream"
             }
@@ -295,6 +303,10 @@
           },
           "parameters_media": "Octet",
           "parameters": [
+            {
+              "name": "e",
+              "cidl_type": "Env"
+            },
             {
               "name": "data",
               "cidl_type": "Stream"

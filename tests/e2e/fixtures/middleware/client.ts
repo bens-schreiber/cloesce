@@ -6,7 +6,7 @@ export class Foo {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<void>> {
     const baseUrl = new URL(
-      `http://localhost:5646/api/Foo/blockedMethod`
+      `http://localhost:5560/api/Foo/blockedMethod`
     );
 
     const res = await fetchImpl(baseUrl, {
@@ -24,7 +24,7 @@ export class Foo {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<string>> {
     const baseUrl = new URL(
-      `http://localhost:5646/api/Foo/getInjectedThing`
+      `http://localhost:5560/api/Foo/getInjectedThing`
     );
 
     const res = await fetchImpl(baseUrl, {
@@ -49,7 +49,7 @@ export class Foo {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Foo>> {
     const baseUrl = new URL(
-      `http://localhost:5646/api/Foo/$save`
+      `http://localhost:5560/api/Foo/$save`
     );
     const payload: any = {};
     payload["model"] = model;

@@ -135,6 +135,7 @@ export interface Cidl {
   models: Record<string, Model>;
   poos: Record<string, PlainOldObject>;
   services: Record<string, Service>;
+  injects: string[];
 }
 
 /** @internal */

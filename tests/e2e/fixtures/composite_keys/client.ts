@@ -17,7 +17,7 @@ export class Course {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Course>> {
     const baseUrl = new URL(
-      `http://localhost:5646/api/Course/$get`
+      `http://localhost:5139/api/Course/$get`
     );
     const payload: any = {};
   baseUrl.searchParams.append("id", String((args as any).id ?? null));
@@ -48,7 +48,7 @@ export class Course {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Course[]>> {
     const baseUrl = new URL(
-      `http://localhost:5646/api/Course/$list`
+      `http://localhost:5139/api/Course/$list`
     );
     const payload: any = {};
   baseUrl.searchParams.append("lastSeen_id", String((args as any).lastSeen_id ?? null));
@@ -77,7 +77,7 @@ export class Course {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Course>> {
     const baseUrl = new URL(
-      `http://localhost:5646/api/Course/$save`
+      `http://localhost:5139/api/Course/$save`
     );
     const payload: any = {};
     payload["model"] = model;
@@ -132,7 +132,7 @@ export class Student {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Student>> {
     const baseUrl = new URL(
-      `http://localhost:5646/api/Student/$get`
+      `http://localhost:5139/api/Student/$get`
     );
     const payload: any = {};
   baseUrl.searchParams.append("id", String((args as any).id ?? null));
@@ -174,7 +174,7 @@ export class Student {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Student[]>> {
     const baseUrl = new URL(
-      `http://localhost:5646/api/Student/$list`
+      `http://localhost:5139/api/Student/$list`
     );
     const payload: any = {};
   baseUrl.searchParams.append("lastId", String((args as any).lastId ?? null));
@@ -211,7 +211,7 @@ export class Student {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Student>> {
     const baseUrl = new URL(
-      `http://localhost:5646/api/Student/$save`
+      `http://localhost:5139/api/Student/$save`
     );
     const payload: any = {};
     payload["model"] = model;
@@ -269,7 +269,7 @@ export class StudentCourse {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<StudentCourse>> {
     const baseUrl = new URL(
-      `http://localhost:5646/api/StudentCourse/$get`
+      `http://localhost:5139/api/StudentCourse/$get`
     );
     const payload: any = {};
   baseUrl.searchParams.append("studentId", String((args as any).studentId ?? null));
@@ -314,7 +314,7 @@ export class StudentCourse {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<StudentCourse[]>> {
     const baseUrl = new URL(
-      `http://localhost:5646/api/StudentCourse/$list`
+      `http://localhost:5139/api/StudentCourse/$list`
     );
     const payload: any = {};
   baseUrl.searchParams.append("lastSeen_studentId", String((args as any).lastSeen_studentId ?? null));
@@ -350,7 +350,7 @@ export class StudentCourse {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<StudentCourse>> {
     const baseUrl = new URL(
-      `http://localhost:5646/api/StudentCourse/$save`
+      `http://localhost:5139/api/StudentCourse/$save`
     );
     const payload: any = {};
     payload["model"] = model;

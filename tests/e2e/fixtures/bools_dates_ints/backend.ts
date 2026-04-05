@@ -53,7 +53,7 @@ import cidl from "./cidl.json" with { type: "json" };
 (cidl.models.Weather.data_sources["Default"] as any).gen = Weather.DataSources.Default;
 
 export async function cloesce(): Promise<CloesceApp> {
-    return await CloesceApp.init(cidl as any, "http://localhost:5646/api")
+    return await CloesceApp.init(cidl as any, "http://localhost:5293/api")
 }
 
 // Default entrypoint for a Cloesce app. 

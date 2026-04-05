@@ -1,4 +1,4 @@
-use ast::{CidlType, CloesceAst, Field, PlainOldObject, Service, ServiceField, WranglerEnv};
+use ast::{CidlType, CloesceAst, Field, PlainOldObject, Service, WranglerEnv};
 use frontend::{ModelBlock, ParseAst, PlainOldObjectBlock, ServiceBlock, Symbol, SymbolKind};
 use indexmap::IndexMap;
 
@@ -452,20 +452,9 @@ impl<'src, 'p> SemanticAnalysis {
                     }
                 };
 
-                let inject_reference = match resolved_type {
-                    CidlType::Inject { name } => {
-                        // Only injected fields are allowed in a service
-                        name
-                    }
-                    _ => {
-                        sink.push(SemanticError::ServiceInvalidFieldType { field });
-                        continue;
-                    }
-                };
-
-                fields.push(ServiceField {
-                    name: field.name,
-                    inject_reference,
+                fields.push(Field {
+                    name: field.name.into(),
+                    cidl_type: resolved_type,
                 });
             }
 

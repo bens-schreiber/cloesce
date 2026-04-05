@@ -11,7 +11,7 @@ export class Hamburger {
       encodeURIComponent(String(this.id)),
     ].join("/");
     const baseUrl = new URL(
-      `http://localhost:5646/api/Hamburger/${id}/noLettuceToppings`
+      `http://localhost:5403/api/Hamburger/${id}/noLettuceToppings`
     );
 
     const res = await fetchImpl(baseUrl, {
@@ -32,7 +32,7 @@ export class Hamburger {
       encodeURIComponent(String(this.id)),
     ].join("/");
     const baseUrl = new URL(
-      `http://localhost:5646/api/Hamburger/${id}/onlyBaconToppings`
+      `http://localhost:5403/api/Hamburger/${id}/onlyBaconToppings`
     );
 
     const res = await fetchImpl(baseUrl, {
@@ -62,7 +62,7 @@ export class Hamburger {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Hamburger>> {
     const baseUrl = new URL(
-      `http://localhost:5646/api/Hamburger/$save`
+      `http://localhost:5403/api/Hamburger/$save`
     );
     const payload: any = {};
     payload["model"] = model;
@@ -103,7 +103,7 @@ export class Hamburger {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Hamburger[]>> {
     const baseUrl = new URL(
-      `http://localhost:5646/api/Hamburger/$list`
+      `http://localhost:5403/api/Hamburger/$list`
     );
     const payload: any = {};
   baseUrl.searchParams.append("lastId", String((args as any).lastId ?? null));
@@ -146,7 +146,7 @@ export class Topping {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Topping>> {
     const baseUrl = new URL(
-      `http://localhost:5646/api/Topping/$save`
+      `http://localhost:5403/api/Topping/$save`
     );
     const payload: any = {};
     payload["model"] = model;

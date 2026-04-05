@@ -543,6 +543,56 @@ fn objects_partials() {
 }
 
 #[test]
+fn one_to_many_nav_person_dogs() {
+    let ast = src_to_ast(
+        r#"
+        env {
+            d1 { db }
+        }
+
+        [use db, save, get]
+        model Person {
+            primary { id: int }
+
+            nav (Dog::personId) {
+                dogs
+            }
+        }
+
+        [use db, save]
+        model Dog {
+            primary { id: int }
+
+            foreign (Person::id) {
+                personId
+                nav { person }
+            }
+        }
+        "#,
+    );
+
+    let value = json!({
+        "id": 1,
+        "dogs": [
+            {
+                "id": 101,
+                "personId": 1
+            }
+        ]
+    });
+
+    let result = validate_cidl_type(
+        CidlType::Object { name: "Person" },
+        Some(value.clone()),
+        &ast,
+        false,
+    );
+
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap(), Some(value));
+}
+
+#[test]
 fn json_value_type_accepts_anything() {
     let ast = empty_ast();
     for val in [

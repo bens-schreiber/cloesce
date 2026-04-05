@@ -242,6 +242,10 @@ pub fn validate_cidl_type(
 
             for nav in &model.navigation_fields {
                 let nav_value = obj.remove(nav.field.name.as_ref());
+                if nav_value.is_none() {
+                    // Does not need to exist.
+                    continue;
+                }
 
                 let res =
                     validate_cidl_type(nav.field.cidl_type.clone(), nav_value, ast, is_partial)?;
@@ -253,6 +257,10 @@ pub fn validate_cidl_type(
 
             for kv_obj_meta in &model.kv_fields {
                 let kv_obj_value = obj.remove(kv_obj_meta.field.name.as_ref());
+                if kv_obj_value.is_none() {
+                    // Does not need to exist.
+                    continue;
+                }
 
                 let res = validate_cidl_type(
                     kv_obj_meta.field.cidl_type.clone(),
@@ -268,6 +276,10 @@ pub fn validate_cidl_type(
 
             for r2_obj_meta in &model.r2_fields {
                 let r2_obj_value = obj.remove(r2_obj_meta.field.name.as_ref());
+                if r2_obj_value.is_none() {
+                    // Does not need to exist.
+                    continue;
+                }
                 let res = validate_cidl_type(
                     r2_obj_meta.field.cidl_type.clone(),
                     r2_obj_value,

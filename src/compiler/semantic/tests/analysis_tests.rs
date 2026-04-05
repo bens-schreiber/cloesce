@@ -958,60 +958,14 @@ fn poo_errors() {
 }
 
 #[test]
-fn service_errors() {
-    let src = &with_env(
-        r#"
-        inject {
-            OpenApiService
-            YouTubeApi
-        }
-
-        [use my_d1]
-        model User {
-            primary {
-                id: int
-            }
-            name: string
-        }
-
-        // Error: primitive field type
-        service BadPrimitive {
-            name: string
-        }
-
-        // Error: model field type
-        service BadModel {
-            user: User
-        }
-    "#,
-    );
-
-    let parse = lex_and_parse(src);
-    let (result, errors) = SemanticAnalysis::analyze(&parse);
-
-    assert!(errors.iter().any(|e| matches!(
-        e,
-        SemanticError::ServiceInvalidFieldType { field }
-            if field.name == "name"
-    )));
-
-    assert!(errors.iter().any(|e| matches!(
-        e,
-        SemanticError::ServiceInvalidFieldType { field }
-            if field.name == "user"
-    )));
-
-    assert_eq!(
-        count_errs!(errors, SemanticError::ServiceInvalidFieldType { .. }),
-        2
-    );
-}
-
-#[test]
 fn service_collects_api_blocks() {
     // Arrange
     let src = r#"
-        service MyService {}
+        inject { YouTubeApi }
+        service MyService {
+            tube: YouTubeApi
+            foo: string
+        }
         api MyService {
             post firstMethod(e: env) -> string
         }

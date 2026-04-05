@@ -21,7 +21,7 @@ export class Foo {
       encodeURIComponent(String(this.id)),
     ].join("/");
     const baseUrl = new URL(
-      `http://localhost:5646/api/Foo/${id}/bar`
+      `http://localhost:5719/api/Foo/${id}/bar`
     );
     const payload: any = {};
     baseUrl.searchParams.append("customDs", String(customDs));

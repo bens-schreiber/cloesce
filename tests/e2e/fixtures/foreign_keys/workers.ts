@@ -31,7 +31,7 @@ class Dog extends Cloesce.Dog.Api {
 
 class Student extends Cloesce.Student.Api {
     async create(e: Cloesce.Env, student: Cloesce.Student.Self): Promise<Cloesce.Student.Self> {
-        return (await Cloesce.Student.save(e, student))!;
+        return (await Cloesce.Student.save(e, student, Cloesce.Student.DataSources.WithCoursesStudentsCourses.include))!;
     }
     none(self: Cloesce.Student.Self): Cloesce.Student.Self {
         return self;

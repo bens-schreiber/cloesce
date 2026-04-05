@@ -227,7 +227,7 @@
           },
           "format": "paginated/items/",
           "binding": "namespace",
-          "list_prefix": false
+          "list_prefix": true
         }
       ],
       "r2_fields": [],

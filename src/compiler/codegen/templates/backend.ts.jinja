@@ -20,7 +20,10 @@ export interface Env {
     {{ var.name }}: {{ self.map_type(&var.cidl_type) }};
 {%- endfor %}
 }
+{%- else %}
+export interface Env {}
 {%- endif %}
+
 
 {%- for inject in &ast.injects %}
 export abstract class {{ inject }} {
@@ -42,7 +45,7 @@ export namespace {{ service.name }} {
 
     export interface Self {
 {%- for field in &service.fields %}
-        {{ field.name }}: {{ field.inject_reference }};
+        {{ field.name }}: {{ self.map_type(&field.cidl_type) }};
 {%- endfor %}
     }
 
@@ -97,7 +100,7 @@ export namespace {{ model.name }} {
         export const {{ ds.name }} = {
             include: {{ self.include_tree_to_js(&ds.tree) }},
 {%- if let Some(get) = &ds.get %}
-            getQuery: (env: Env{% for param in get.parameters %}, {{ param.name }}: {{ self.map_type(&param.cidl_type) }}{% endfor %}) => env.db.prepare(`{{ get.raw_sql }}`).bind({% for (i, param) in get.parameters.iter().enumerate() %}{{ param.name }}{% if i + 1 < get.parameters.len() %}, {% endif %}{% endfor %}),
+            getQuery: (env: Env{% for param in get.parameters %}, {{ param.name }}: {{ self.map_type(&param.cidl_type) }}{% endfor %}) => env.{{ model.d1_binding.unwrap() }}.prepare(`{{ get.raw_sql }}`).bind({% for (i, param) in get.parameters.iter().enumerate() %}{{ param.name }}{% if i + 1 < get.parameters.len() %}, {% endif %}{% endfor %}),
             async get(env: Env{% for param in get.parameters %}, {{ param.name }}: {{ self.map_type(&param.cidl_type) }}{% endfor %}{% for key in &model.key_fields %}, {{ key }}: string{% endfor %}): Promise<{{ model.name }}.Self | null> {
                 return await Orm.fromEnv(env).get<{{ model.name }}.Self>({{ model.name }}.Meta, {{ model.name }}.DataSources.{{ ds.name }}.getQuery(env{% for param in get.parameters %}, {{ param.name }}{% endfor %}), {{ model.name }}.DataSources.{{ ds.name }}.include, { {% for (i, key) in model.key_fields.iter().enumerate() %}{{ key }}{% if i + 1 < model.key_fields.len() %}, {% endif %}{% endfor %} });
             },
@@ -107,7 +110,7 @@ export namespace {{ model.name }} {
             },
 {%- endif %}
 {%- if let Some(list) = &ds.list %}
-            listQuery: (env: Env{% for param in list.parameters %}, {{ param.name }}: {{ self.map_type(&param.cidl_type) }}{% endfor %}) => env.db.prepare(`{{ list.raw_sql }}`).bind({% for (i, param) in list.parameters.iter().enumerate() %}{{ param.name }}{% if i + 1 < list.parameters.len() %}, {% endif %}{% endfor %}),
+            listQuery: (env: Env{% for param in list.parameters %}, {{ param.name }}: {{ self.map_type(&param.cidl_type) }}{% endfor %}) => env.{{ model.d1_binding.unwrap() }}.prepare(`{{ list.raw_sql }}`).bind({% for (i, param) in list.parameters.iter().enumerate() %}{{ param.name }}{% if i + 1 < list.parameters.len() %}, {% endif %}{% endfor %}),
             async list(env: Env{% for param in list.parameters %}, {{ param.name }}: {{ self.map_type(&param.cidl_type) }}{% endfor %}): Promise<{{ model.name }}.Self[]> {
                 return await Orm.fromEnv(env).list<{{ model.name }}.Self>({{ model.name }}.Meta, {{ model.name }}.DataSources.{{ ds.name }}.listQuery(env{% for param in list.parameters %}, {{ param.name }}{% endfor %}), {{ model.name }}.DataSources.{{ ds.name }}.include);
             },

@@ -8,6 +8,6 @@ model Dog {
 }
 
 api Dog {
-    post create(dog: Partial<Dog>) -> Dog
+    post create(e: env, dog: Partial<Dog>) -> Dog
     get getPartialSelf(self) -> Partial<Dog>
 }

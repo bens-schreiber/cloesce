@@ -64,7 +64,7 @@ import cidl from "./cidl.json" with { type: "json" };
 (cidl.models.PooAcceptYield.data_sources["Default"] as any).gen = PooAcceptYield.DataSources.Default;
 
 export async function cloesce(): Promise<CloesceApp> {
-    return await CloesceApp.init(cidl as any, "http://localhost:5646/api")
+    return await CloesceApp.init(cidl as any, "http://localhost:5005/api")
 }
 
 // Default entrypoint for a Cloesce app. 

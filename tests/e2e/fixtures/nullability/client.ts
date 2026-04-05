@@ -13,7 +13,7 @@ export class NullabilityChecks {
       encodeURIComponent(String(this.id)),
     ].join("/");
     const baseUrl = new URL(
-      `http://localhost:5646/api/NullabilityChecks/${id}/primitiveTypes`
+      `http://localhost:5904/api/NullabilityChecks/${id}/primitiveTypes`
     );
     const payload: any = {};
     payload["a"] = a;
@@ -40,7 +40,7 @@ export class NullabilityChecks {
       encodeURIComponent(String(this.id)),
     ].join("/");
     const baseUrl = new URL(
-      `http://localhost:5646/api/NullabilityChecks/${id}/modelTypes`
+      `http://localhost:5904/api/NullabilityChecks/${id}/modelTypes`
     );
     const payload: any = {};
     payload["a"] = a;
@@ -65,7 +65,7 @@ export class NullabilityChecks {
       encodeURIComponent(String(this.id)),
     ].join("/");
     const baseUrl = new URL(
-      `http://localhost:5646/api/NullabilityChecks/${id}/injectableTypes`
+      `http://localhost:5904/api/NullabilityChecks/${id}/injectableTypes`
     );
     const payload: any = {};
 
@@ -91,7 +91,7 @@ export class NullabilityChecks {
       encodeURIComponent(String(this.id)),
     ].join("/");
     const baseUrl = new URL(
-      `http://localhost:5646/api/NullabilityChecks/${id}/arrayTypes`
+      `http://localhost:5904/api/NullabilityChecks/${id}/arrayTypes`
     );
     const payload: any = {};
     payload["a"] = a;
@@ -117,7 +117,7 @@ export class NullabilityChecks {
       encodeURIComponent(String(this.id)),
     ].join("/");
     const baseUrl = new URL(
-      `http://localhost:5646/api/NullabilityChecks/${id}/httpResultTypes`
+      `http://localhost:5904/api/NullabilityChecks/${id}/httpResultTypes`
     );
     const payload: any = {};
 

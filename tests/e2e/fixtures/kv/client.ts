@@ -20,7 +20,7 @@ export class D1BackedModel {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<D1BackedModel>> {
     const baseUrl = new URL(
-      `http://localhost:5646/api/D1BackedModel/$get`
+      `http://localhost:5416/api/D1BackedModel/$get`
     );
     const payload: any = {};
   baseUrl.searchParams.append("keyParam", String((args as any).keyParam ?? null));
@@ -49,7 +49,7 @@ export class D1BackedModel {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<D1BackedModel>> {
     const baseUrl = new URL(
-      `http://localhost:5646/api/D1BackedModel/$save`
+      `http://localhost:5416/api/D1BackedModel/$save`
     );
     const payload: any = {};
     payload["model"] = model;
@@ -82,7 +82,7 @@ export class D1BackedModel {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<D1BackedModel[]>> {
     const baseUrl = new URL(
-      `http://localhost:5646/api/D1BackedModel/$list`
+      `http://localhost:5416/api/D1BackedModel/$list`
     );
     const payload: any = {};
   baseUrl.searchParams.append("lastSeen_id", String((args as any).lastSeen_id ?? null));
@@ -115,7 +115,7 @@ export class PaginatedKVModel {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Paginated<KValue<unknown>>>> {
     const baseUrl = new URL(
-      `http://localhost:5646/api/PaginatedKVModel/acceptPaginated`
+      `http://localhost:5416/api/PaginatedKVModel/acceptPaginated`
     );
     const payload: any = {};
     payload["ps"] = ps;
@@ -146,7 +146,7 @@ export class PaginatedKVModel {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<PaginatedKVModel>> {
     const baseUrl = new URL(
-      `http://localhost:5646/api/PaginatedKVModel/$get`
+      `http://localhost:5416/api/PaginatedKVModel/$get`
     );
     const payload: any = {};
   baseUrl.searchParams.append("id", String((args as any).id ?? null));
@@ -191,7 +191,7 @@ export class PureKVModel {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<PureKVModel>> {
     const baseUrl = new URL(
-      `http://localhost:5646/api/PureKVModel/$get`
+      `http://localhost:5416/api/PureKVModel/$get`
     );
     const payload: any = {};
   baseUrl.searchParams.append("id", String((args as any).id ?? null));
@@ -219,7 +219,7 @@ export class PureKVModel {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<PureKVModel>> {
     const baseUrl = new URL(
-      `http://localhost:5646/api/PureKVModel/$save`
+      `http://localhost:5416/api/PureKVModel/$save`
     );
     const payload: any = {};
     payload["model"] = model;

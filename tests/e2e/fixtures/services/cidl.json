@@ -56,7 +56,11 @@
       "fields": [
         {
           "name": "foo",
-          "inject_reference": "FooService"
+          "cidl_type": {
+            "Inject": {
+              "name": "FooService"
+            }
+          }
         }
       ],
       "apis": [

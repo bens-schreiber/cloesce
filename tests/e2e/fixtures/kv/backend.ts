@@ -133,7 +133,7 @@ import cidl from "./cidl.json" with { type: "json" };
 (cidl.models.PureKVModel.data_sources["Default"] as any).gen = PureKVModel.DataSources.Default;
 
 export async function cloesce(): Promise<CloesceApp> {
-    return await CloesceApp.init(cidl as any, "http://localhost:5646/api")
+    return await CloesceApp.init(cidl as any, "http://localhost:5416/api")
 }
 
 // Default entrypoint for a Cloesce app. 

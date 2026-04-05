@@ -39,7 +39,7 @@ export class PooAcceptYield {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<void>> {
     const baseUrl = new URL(
-      `http://localhost:5646/api/PooAcceptYield/acceptPoos`
+      `http://localhost:5005/api/PooAcceptYield/acceptPoos`
     );
     const payload: any = {};
     payload["a"] = a;
@@ -63,7 +63,7 @@ export class PooAcceptYield {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<PooC>> {
     const baseUrl = new URL(
-      `http://localhost:5646/api/PooAcceptYield/yieldPoo`
+      `http://localhost:5005/api/PooAcceptYield/yieldPoo`
     );
     const payload: any = {};
 

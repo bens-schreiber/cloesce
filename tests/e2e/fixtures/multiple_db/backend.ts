@@ -24,11 +24,11 @@ export namespace DB1Model {
     export namespace DataSources {
         export const Default = {
             include: {},
-            getQuery: (env: Env, id: number) => env.db.prepare(`SELECT "DB1Model"."id" AS "id", "DB1Model"."someColumn" AS "someColumn" FROM "DB1Model" WHERE "DB1Model"."id" = ?1`).bind(id),
+            getQuery: (env: Env, id: number) => env.db1.prepare(`SELECT "DB1Model"."id" AS "id", "DB1Model"."someColumn" AS "someColumn" FROM "DB1Model" WHERE "DB1Model"."id" = ?1`).bind(id),
             async get(env: Env, id: number): Promise<DB1Model.Self | null> {
                 return await Orm.fromEnv(env).get<DB1Model.Self>(DB1Model.Meta, DB1Model.DataSources.Default.getQuery(env, id), DB1Model.DataSources.Default.include, {  });
             },
-            listQuery: (env: Env, lastSeen_id: number, limit: number) => env.db.prepare(`SELECT "DB1Model"."id" AS "id", "DB1Model"."someColumn" AS "someColumn" FROM "DB1Model" WHERE "DB1Model"."id" > ?1 ORDER BY "DB1Model"."id" ASC LIMIT ?2`).bind(lastSeen_id, limit),
+            listQuery: (env: Env, lastSeen_id: number, limit: number) => env.db1.prepare(`SELECT "DB1Model"."id" AS "id", "DB1Model"."someColumn" AS "someColumn" FROM "DB1Model" WHERE "DB1Model"."id" > ?1 ORDER BY "DB1Model"."id" ASC LIMIT ?2`).bind(lastSeen_id, limit),
             async list(env: Env, lastSeen_id: number, limit: number): Promise<DB1Model.Self[]> {
                 return await Orm.fromEnv(env).list<DB1Model.Self>(DB1Model.Meta, DB1Model.DataSources.Default.listQuery(env, lastSeen_id, limit), DB1Model.DataSources.Default.include);
             },
@@ -65,11 +65,11 @@ export namespace DB2Model {
     export namespace DataSources {
         export const Default = {
             include: {},
-            getQuery: (env: Env, id: number) => env.db.prepare(`SELECT "DB2Model"."id" AS "id", "DB2Model"."someColumn" AS "someColumn" FROM "DB2Model" WHERE "DB2Model"."id" = ?1`).bind(id),
+            getQuery: (env: Env, id: number) => env.db2.prepare(`SELECT "DB2Model"."id" AS "id", "DB2Model"."someColumn" AS "someColumn" FROM "DB2Model" WHERE "DB2Model"."id" = ?1`).bind(id),
             async get(env: Env, id: number): Promise<DB2Model.Self | null> {
                 return await Orm.fromEnv(env).get<DB2Model.Self>(DB2Model.Meta, DB2Model.DataSources.Default.getQuery(env, id), DB2Model.DataSources.Default.include, {  });
             },
-            listQuery: (env: Env, lastSeen_id: number, limit: number) => env.db.prepare(`SELECT "DB2Model"."id" AS "id", "DB2Model"."someColumn" AS "someColumn" FROM "DB2Model" WHERE "DB2Model"."id" > ?1 ORDER BY "DB2Model"."id" ASC LIMIT ?2`).bind(lastSeen_id, limit),
+            listQuery: (env: Env, lastSeen_id: number, limit: number) => env.db2.prepare(`SELECT "DB2Model"."id" AS "id", "DB2Model"."someColumn" AS "someColumn" FROM "DB2Model" WHERE "DB2Model"."id" > ?1 ORDER BY "DB2Model"."id" ASC LIMIT ?2`).bind(lastSeen_id, limit),
             async list(env: Env, lastSeen_id: number, limit: number): Promise<DB2Model.Self[]> {
                 return await Orm.fromEnv(env).list<DB2Model.Self>(DB2Model.Meta, DB2Model.DataSources.Default.listQuery(env, lastSeen_id, limit), DB2Model.DataSources.Default.include);
             },
@@ -95,7 +95,7 @@ import cidl from "./cidl.json" with { type: "json" };
 (cidl.models.DB2Model.data_sources["Default"] as any).gen = DB2Model.DataSources.Default;
 
 export async function cloesce(): Promise<CloesceApp> {
-    return await CloesceApp.init(cidl as any, "http://localhost:5646/api")
+    return await CloesceApp.init(cidl as any, "http://localhost:5291/api")
 }
 
 // Default entrypoint for a Cloesce app. 

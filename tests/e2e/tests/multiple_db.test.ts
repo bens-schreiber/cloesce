@@ -18,7 +18,7 @@ afterAll(async () => {
 
 describe("Multiple DBs", () => {
   it("CRUD on DB1Model", async () => {
-    const save = await DB1Model.SAVE({
+    const save = await DB1Model.$save({
       someColumn: "test",
     });
     expect(save.ok, withRes("POST should be OK", save)).toBe(true);
@@ -27,15 +27,20 @@ describe("Multiple DBs", () => {
       someColumn: "test",
     });
 
-    const get = await DB1Model.GET(save.data!.id);
-    expect(get.ok, withRes("GET should be OK", get)).toBe(true);
-    expect(get.data).toEqual({
+    const $get = await DB1Model.$get({
+      id: save.data!.id,
+    });
+    expect($get.ok, withRes("$get should be OK", $get)).toBe(true);
+    expect($get.data).toEqual({
       id: 1,
       someColumn: "test",
     });
 
-    const list = await DB1Model.LIST(null, null, null);
-    expect(list.ok, withRes("LIST should be OK", list)).toBe(true);
+    const list = await DB1Model.$list({
+      lastSeen_id: 0,
+      limit: 10,
+    });
+    expect(list.ok, withRes("$list should be OK", list)).toBe(true);
     expect(list.data).toEqual([
       {
         id: 1,
@@ -45,7 +50,7 @@ describe("Multiple DBs", () => {
   });
 
   it("CRUD on DB2Model", async () => {
-    const save = await DB2Model.SAVE({
+    const save = await DB2Model.$save({
       someColumn: "test2",
     });
     expect(save.ok, withRes("POST should be OK", save)).toBe(true);
@@ -54,15 +59,20 @@ describe("Multiple DBs", () => {
       someColumn: "test2",
     });
 
-    const get = await DB2Model.GET(save.data!.id);
-    expect(get.ok, withRes("GET should be OK", get)).toBe(true);
+    const get = await DB2Model.$get({
+      id: save.data!.id,
+    });
+    expect(get.ok, withRes("$get should be OK", get)).toBe(true);
     expect(get.data).toEqual({
       id: 1,
       someColumn: "test2",
     });
 
-    const list = await DB2Model.LIST(null, null, null);
-    expect(list.ok, withRes("LIST should be OK", list)).toBe(true);
+    const list = await DB2Model.$list({
+      lastSeen_id: 0,
+      limit: 10,
+    });
+    expect(list.ok, withRes("$list should be OK", list)).toBe(true);
     expect(list.data).toEqual([
       {
         id: 1,

@@ -628,7 +628,7 @@ impl<'src, 'p> ModelAnalysis<'src, 'p> {
                 },
                 format: kv.key_format,
                 binding: binding_name.unwrap_or_default(),
-                list_prefix: false,
+                list_prefix: kv.is_paginated,
             });
         }
 
@@ -655,7 +655,7 @@ impl<'src, 'p> ModelAnalysis<'src, 'p> {
                 },
                 format: r2.key_format,
                 binding: binding_name.unwrap_or_default(),
-                list_prefix: false,
+                list_prefix: r2.is_paginated,
             });
         }
 

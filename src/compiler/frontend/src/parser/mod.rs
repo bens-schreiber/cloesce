@@ -199,8 +199,8 @@ fn inject_block<'tokens, 'src: 'tokens>()
 ///
 /// ```cloesce
 /// service MyAppService {
-///     ident1: InjectedService1
-///     ident2: InjectedService2
+///     ident1: InjectedService
+///     ident2: cidl_type
 /// }
 /// ```
 pub fn service_block<'tokens, 'src: 'tokens>()

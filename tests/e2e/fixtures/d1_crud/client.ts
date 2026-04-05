@@ -10,7 +10,7 @@ export class CrudHaver {
       encodeURIComponent(String(this.id)),
     ].join("/");
     const baseUrl = new URL(
-      `http://localhost:5646/api/CrudHaver/${id}/notCrud`
+      `http://localhost:5391/api/CrudHaver/${id}/notCrud`
     );
     const payload: any = {};
 
@@ -38,7 +38,7 @@ export class CrudHaver {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<CrudHaver>> {
     const baseUrl = new URL(
-      `http://localhost:5646/api/CrudHaver/$save`
+      `http://localhost:5391/api/CrudHaver/$save`
     );
     const payload: any = {};
     payload["model"] = model;
@@ -70,7 +70,7 @@ export class CrudHaver {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<CrudHaver>> {
     const baseUrl = new URL(
-      `http://localhost:5646/api/CrudHaver/$get`
+      `http://localhost:5391/api/CrudHaver/$get`
     );
     const payload: any = {};
   baseUrl.searchParams.append("id", String((args as any).id ?? null));
@@ -101,7 +101,7 @@ export class CrudHaver {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<CrudHaver[]>> {
     const baseUrl = new URL(
-      `http://localhost:5646/api/CrudHaver/$list`
+      `http://localhost:5391/api/CrudHaver/$list`
     );
     const payload: any = {};
   baseUrl.searchParams.append("lastSeen_id", String((args as any).lastSeen_id ?? null));
@@ -146,7 +146,7 @@ export class Parent {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Parent>> {
     const baseUrl = new URL(
-      `http://localhost:5646/api/Parent/$save`
+      `http://localhost:5391/api/Parent/$save`
     );
     const payload: any = {};
     payload["model"] = model;
@@ -185,7 +185,7 @@ export class Parent {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Parent>> {
     const baseUrl = new URL(
-      `http://localhost:5646/api/Parent/$get`
+      `http://localhost:5391/api/Parent/$get`
     );
     const payload: any = {};
   baseUrl.searchParams.append("id", String((args as any).id ?? null));
@@ -224,7 +224,7 @@ export class Parent {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Parent[]>> {
     const baseUrl = new URL(
-      `http://localhost:5646/api/Parent/$list`
+      `http://localhost:5391/api/Parent/$list`
     );
     const payload: any = {};
   baseUrl.searchParams.append("lastSeen_id", String((args as any).lastSeen_id ?? null));

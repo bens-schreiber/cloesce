@@ -16,7 +16,7 @@ export class DB1Model {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<DB1Model>> {
     const baseUrl = new URL(
-      `http://localhost:5646/api/DB1Model/$get`
+      `http://localhost:5291/api/DB1Model/$get`
     );
     const payload: any = {};
   baseUrl.searchParams.append("id", String((args as any).id ?? null));
@@ -44,7 +44,7 @@ export class DB1Model {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<DB1Model>> {
     const baseUrl = new URL(
-      `http://localhost:5646/api/DB1Model/$save`
+      `http://localhost:5291/api/DB1Model/$save`
     );
     const payload: any = {};
     payload["model"] = model;
@@ -77,7 +77,7 @@ export class DB1Model {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<DB1Model[]>> {
     const baseUrl = new URL(
-      `http://localhost:5646/api/DB1Model/$list`
+      `http://localhost:5291/api/DB1Model/$list`
     );
     const payload: any = {};
   baseUrl.searchParams.append("lastSeen_id", String((args as any).lastSeen_id ?? null));
@@ -117,7 +117,7 @@ export class DB2Model {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<DB2Model>> {
     const baseUrl = new URL(
-      `http://localhost:5646/api/DB2Model/$get`
+      `http://localhost:5291/api/DB2Model/$get`
     );
     const payload: any = {};
   baseUrl.searchParams.append("id", String((args as any).id ?? null));
@@ -145,7 +145,7 @@ export class DB2Model {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<DB2Model>> {
     const baseUrl = new URL(
-      `http://localhost:5646/api/DB2Model/$save`
+      `http://localhost:5291/api/DB2Model/$save`
     );
     const payload: any = {};
     payload["model"] = model;
@@ -178,7 +178,7 @@ export class DB2Model {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<DB2Model[]>> {
     const baseUrl = new URL(
-      `http://localhost:5646/api/DB2Model/$list`
+      `http://localhost:5291/api/DB2Model/$list`
     );
     const payload: any = {};
   baseUrl.searchParams.append("lastSeen_id", String((args as any).lastSeen_id ?? null));

@@ -9,7 +9,7 @@ export class Dog {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Dog>> {
     const baseUrl = new URL(
-      `http://localhost:5646/api/Dog/create`
+      `http://localhost:5288/api/Dog/create`
     );
     const payload: any = {};
     payload["dog"] = dog;
@@ -34,7 +34,7 @@ export class Dog {
       encodeURIComponent(String(this.id)),
     ].join("/");
     const baseUrl = new URL(
-      `http://localhost:5646/api/Dog/${id}/getPartialSelf`
+      `http://localhost:5288/api/Dog/${id}/getPartialSelf`
     );
 
     const res = await fetchImpl(baseUrl, {
@@ -59,7 +59,7 @@ export class Dog {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Dog>> {
     const baseUrl = new URL(
-      `http://localhost:5646/api/Dog/$save`
+      `http://localhost:5288/api/Dog/$save`
     );
     const payload: any = {};
     payload["model"] = model;

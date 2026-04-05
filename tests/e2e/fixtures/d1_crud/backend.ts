@@ -152,7 +152,7 @@ import cidl from "./cidl.json" with { type: "json" };
 (cidl.models.Child.data_sources["Default"] as any).gen = Child.DataSources.Default;
 
 export async function cloesce(): Promise<CloesceApp> {
-    return await CloesceApp.init(cidl as any, "http://localhost:5646/api")
+    return await CloesceApp.init(cidl as any, "http://localhost:5391/api")
 }
 
 // Default entrypoint for a Cloesce app. 

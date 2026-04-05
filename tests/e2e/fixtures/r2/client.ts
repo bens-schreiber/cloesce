@@ -15,7 +15,7 @@ export class D1BackedModel {
       encodeURIComponent(String(this.keyParam)),
     ].join("/");
     const baseUrl = new URL(
-      `http://localhost:5646/api/D1BackedModel/${id}/uploadData`
+      `http://localhost:5538/api/D1BackedModel/${id}/uploadData`
     );
     const payload: any = {};
     payload["data"] = data;
@@ -47,7 +47,7 @@ export class D1BackedModel {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<D1BackedModel>> {
     const baseUrl = new URL(
-      `http://localhost:5646/api/D1BackedModel/$get`
+      `http://localhost:5538/api/D1BackedModel/$get`
     );
     const payload: any = {};
   baseUrl.searchParams.append("keyParam", String((args as any).keyParam ?? null));
@@ -76,7 +76,7 @@ export class D1BackedModel {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<D1BackedModel>> {
     const baseUrl = new URL(
-      `http://localhost:5646/api/D1BackedModel/$save`
+      `http://localhost:5538/api/D1BackedModel/$save`
     );
     const payload: any = {};
     payload["model"] = model;
@@ -109,7 +109,7 @@ export class D1BackedModel {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<D1BackedModel[]>> {
     const baseUrl = new URL(
-      `http://localhost:5646/api/D1BackedModel/$list`
+      `http://localhost:5538/api/D1BackedModel/$list`
     );
     const payload: any = {};
   baseUrl.searchParams.append("lastSeen_id", String((args as any).lastSeen_id ?? null));
@@ -146,7 +146,7 @@ export class PureR2Model {
       encodeURIComponent(String(this.id)),
     ].join("/");
     const baseUrl = new URL(
-      `http://localhost:5646/api/PureR2Model/${id}/uploadData`
+      `http://localhost:5538/api/PureR2Model/${id}/uploadData`
     );
     const payload: any = {};
     payload["data"] = data;
@@ -172,7 +172,7 @@ export class PureR2Model {
       encodeURIComponent(String(this.id)),
     ].join("/");
     const baseUrl = new URL(
-      `http://localhost:5646/api/PureR2Model/${id}/uploadOtherData`
+      `http://localhost:5538/api/PureR2Model/${id}/uploadOtherData`
     );
     const payload: any = {};
     payload["data"] = data;
@@ -203,7 +203,7 @@ export class PureR2Model {
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<PureR2Model>> {
     const baseUrl = new URL(
-      `http://localhost:5646/api/PureR2Model/$get`
+      `http://localhost:5538/api/PureR2Model/$get`
     );
     const payload: any = {};
   baseUrl.searchParams.append("id", String((args as any).id ?? null));

@@ -161,7 +161,7 @@ import cidl from "./cidl.json" with { type: "json" };
 (cidl.models.OneDs.data_sources["ShitAss"] as any).gen = OneDs.DataSources.ShitAss;
 
 export async function cloesce(): Promise<CloesceApp> {
-    return await CloesceApp.init(cidl as any, "http://localhost:5646/api")
+    return await CloesceApp.init(cidl as any, "http://localhost:5719/api")
 }
 
 // Default entrypoint for a Cloesce app. 
