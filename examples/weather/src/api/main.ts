@@ -6,7 +6,7 @@ import { HttpResult } from "cloesce";
 class Weather extends Cloesce.Weather.Api {
     async uploadPhoto(self: Cloesce.Weather.Self, e: Cloesce.Env, s: CfReadableStream): Promise<void> {
         const key = Cloesce.Weather.KeyFormat.photo(self.id);
-        await e.bucket.put(`weather/photos/${self.id}.jpg`, s);
+        await e.bucket.put(key, s);
     }
 
     downloadPhoto(self: Cloesce.Weather.Self): HttpResult<CfReadableStream> {

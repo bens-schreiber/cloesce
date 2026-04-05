@@ -64,6 +64,8 @@ pub enum Token<'src> {
     Paginated,
     #[token("optional")]
     Optional,
+    #[token("self")]
+    SelfToken,
 
     // Environment binding types
     #[token("d1")]
@@ -74,28 +76,6 @@ pub enum Token<'src> {
     Kv,
     #[token("vars")]
     Vars,
-
-    // Primitive types
-    #[token("string")]
-    String,
-    #[token("int")]
-    Int,
-    #[token("double")]
-    Double,
-    #[token("date")]
-    Date,
-    #[token("json")]
-    Json,
-    #[token("bool")]
-    Bool,
-    #[token("void")]
-    Void,
-    #[token("blob")]
-    Blob,
-    #[token("stream")]
-    Stream,
-    #[token("R2Object")]
-    R2Object,
 
     // Punctuation
     #[token("{")]
@@ -132,12 +112,6 @@ pub enum Token<'src> {
         &s[1..s.len()-1]
     })]
     StringLit(&'src str),
-
-    #[regex(r"[0-9][0-9_]*", |lex| lex.slice().replace('_', "").parse::<i64>().ok())]
-    IntLit(i64),
-
-    #[regex(r"[0-9][0-9_]*\.[0-9][0-9_]*", |lex| lex.slice().replace('_', "").parse::<f64>().ok())]
-    DoubleLit(f64),
 
     // Identifiers (must come after keywords)
     #[regex(r"[a-zA-Z_][a-zA-Z0-9_]*", |lex| lex.slice())]

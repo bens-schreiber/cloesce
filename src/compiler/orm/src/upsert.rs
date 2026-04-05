@@ -740,9 +740,6 @@ impl<'a> SqlUpsertBuilder<'a> {
 /// exists in the new model as a stringifiable value.
 ///
 /// Primary keys can be missing and will be left in the key format for later resolution.
-///
-/// Returns None if any required parameter is missing, otherwise returns the formatted key
-/// and if any placeholders remain.
 fn key_format_interpolation(
     key_format: &str,
     new_model: &Map<String, Value>,

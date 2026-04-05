@@ -109,7 +109,7 @@ fn parameter<'tokens, 'src: 'tokens>()
     // self
     let self_parameter = source_tag
         .or_not()
-        .then(select! { Token::Ident(name) if name == "self" => name })
+        .then(just(Token::SelfToken))
         .map(|(data_source, _)| PendingApiParam::SelfParam { data_source });
 
     // ident: cidl_type

@@ -28,16 +28,6 @@ impl std::fmt::Display for Token<'_> {
             Token::D1 => write!(f, "d1"),
             Token::R2 => write!(f, "r2"),
             Token::Kv => write!(f, "kv"),
-            Token::String => write!(f, "string"),
-            Token::Int => write!(f, "int"),
-            Token::Double => write!(f, "double"),
-            Token::Date => write!(f, "date"),
-            Token::Json => write!(f, "json"),
-            Token::Bool => write!(f, "bool"),
-            Token::Void => write!(f, "void"),
-            Token::Blob => write!(f, "blob"),
-            Token::Stream => write!(f, "stream"),
-            Token::R2Object => write!(f, "R2Object"),
             Token::LBrace => write!(f, "{{"),
             Token::RBrace => write!(f, "}}"),
             Token::LParen => write!(f, "("),
@@ -51,8 +41,6 @@ impl std::fmt::Display for Token<'_> {
             Token::Dot => write!(f, "."),
             Token::DoubleColon => write!(f, "::"),
             Token::StringLit(s) => write!(f, "\"{s}\""),
-            Token::IntLit(n) => write!(f, "{n}"),
-            Token::DoubleLit(n) => write!(f, "{n}"),
             Token::Ident(s) => write!(f, "{s}"),
             Token::Error => write!(f, "<error>"),
             Token::Nav => write!(f, "nav"),
@@ -67,6 +55,7 @@ impl std::fmt::Display for Token<'_> {
             Token::Vars => write!(f, "vars"),
             Token::Arrow => write!(f, "->"),
             Token::Optional => write!(f, "optional"),
+            Token::SelfToken => write!(f, "self"),
         }
     }
 }

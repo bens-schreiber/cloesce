@@ -128,7 +128,7 @@ impl LanguageTypeMapper for TypeScriptMapper {
             result = result.replace(&placeholder, &replacement);
         }
 
-        return format!("`{result}`");
+        format!("`{result}`")
     }
 
     fn include_tree(&self, tree: &IncludeTree) -> String {

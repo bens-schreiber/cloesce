@@ -272,16 +272,16 @@ fn cidl_type<'tokens, 'src: 'tokens>()
             });
 
         let primitive_keyword = choice((
-            just(Token::String).to(CidlType::String),
-            just(Token::Int).to(CidlType::Integer),
-            just(Token::Double).to(CidlType::Double),
-            just(Token::Date).to(CidlType::DateIso),
-            just(Token::Bool).to(CidlType::Boolean),
-            just(Token::Json).to(CidlType::Json),
-            just(Token::Void).to(CidlType::Void),
-            just(Token::Blob).to(CidlType::Blob),
-            just(Token::Stream).to(CidlType::Stream),
-            just(Token::R2Object).to(CidlType::R2Object),
+            just(Token::Ident("string")).to(CidlType::String),
+            just(Token::Ident("int")).to(CidlType::Integer),
+            just(Token::Ident("double")).to(CidlType::Double),
+            just(Token::Ident("date")).to(CidlType::DateIso),
+            just(Token::Ident("bool")).to(CidlType::Boolean),
+            just(Token::Ident("json")).to(CidlType::Json),
+            just(Token::Ident("void")).to(CidlType::Void),
+            just(Token::Ident("blob")).to(CidlType::Blob),
+            just(Token::Ident("stream")).to(CidlType::Stream),
+            just(Token::Ident("R2Object")).to(CidlType::R2Object),
             just(Token::Env).to(CidlType::Env),
         ));
 
