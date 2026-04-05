@@ -295,16 +295,32 @@ export class ModelWithCruds {
   id: number;
   categoryId: number;
   name: string;
+  static $get(
+    args: {
+      name: string;
+    },
+  kind: "ByName",
+    fetchImpl?: typeof fetch
+  ): Promise<HttpResult<ModelWithCruds>>;
+  static $get(
+    args: {
+      id: number;
+    },
+  kind: "Default" = "Default",
+    fetchImpl?: typeof fetch
+  ): Promise<HttpResult<ModelWithCruds>>;
   static async $get(
-    args: DataSources.ModelWithCruds.$get.ByName | DataSources.ModelWithCruds.$get.Default,
+    args: any,
+    kind: "ByName" | "Default" = "Default",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<ModelWithCruds>> {
     const baseUrl = new URL(
       `http://example.com/path/to/api/ModelWithCruds/$get`
     );
+    const payload: any = {};
     if ("name" in args) baseUrl.searchParams.append("name", String((args as any).name));
     if ("id" in args) baseUrl.searchParams.append("id", String((args as any).id));
-    baseUrl.searchParams.append("__datasource", args.kind);
+    baseUrl.searchParams.append("__datasource", kind);
 
     const res = await fetchImpl(baseUrl, {
       method: "GET",
@@ -317,17 +333,35 @@ export class ModelWithCruds {
       false
     );
   }
+  static $list(
+    args: {
+      name: string;
+      limit: number;
+    },
+  kind: "ByName",
+    fetchImpl?: typeof fetch
+  ): Promise<HttpResult<ModelWithCruds[]>>;
+  static $list(
+    args: {
+      lastSeen_id: number;
+      limit: number;
+    },
+  kind: "Default" = "Default",
+    fetchImpl?: typeof fetch
+  ): Promise<HttpResult<ModelWithCruds[]>>;
   static async $list(
-    args: DataSources.ModelWithCruds.$list.ByName | DataSources.ModelWithCruds.$list.Default,
+    args: any,
+    kind: "ByName" | "Default" = "Default",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<ModelWithCruds[]>> {
     const baseUrl = new URL(
       `http://example.com/path/to/api/ModelWithCruds/$list`
     );
+    const payload: any = {};
     if ("name" in args) baseUrl.searchParams.append("name", String((args as any).name));
     if ("limit" in args) baseUrl.searchParams.append("limit", String((args as any).limit));
     if ("lastSeen_id" in args) baseUrl.searchParams.append("lastSeen_id", String((args as any).lastSeen_id));
-    baseUrl.searchParams.append("__datasource", args.kind);
+    baseUrl.searchParams.append("__datasource", kind);
 
     const res = await fetchImpl(baseUrl, {
       method: "GET",
@@ -340,16 +374,27 @@ export class ModelWithCruds {
       true
     );
   }
+  static $save(
+    model: DeepPartial<ModelWithCruds>,
+    kind: "ByName",
+    fetchImpl?: typeof fetch
+  ): Promise<HttpResult<ModelWithCruds>>;
+  static $save(
+    model: DeepPartial<ModelWithCruds>,
+    kind: "Default" = "Default",
+    fetchImpl?: typeof fetch
+  ): Promise<HttpResult<ModelWithCruds>>;
   static async $save(
-    args: DataSources.ModelWithCruds.$save,
+    model: DeepPartial<ModelWithCruds>,
+    kind: string,
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<ModelWithCruds>> {
     const baseUrl = new URL(
       `http://example.com/path/to/api/ModelWithCruds/$save`
     );
     const payload: any = {};
-    payload["model"] = (args as any).model;
-    baseUrl.searchParams.append("__datasource", args.kind);
+    payload["model"] = model;
+    baseUrl.searchParams.append("__datasource", kind);
 
     const res = await fetchImpl(baseUrl, {
       method: "POST",
@@ -652,35 +697,5 @@ export class HttpResult<T = unknown> {
       response.headers,
       await data(),
     );
-  }
-}
-export namespace DataSources {
-  export namespace ModelWithCruds {
-    export namespace $get {
-      export type ByName = {
-        kind: "ByName";
-        name: string;
-      }
-      export type Default = {
-        kind: "Default";
-        id: number;
-      }
-    }
-    export namespace $list {
-      export type ByName = {
-        kind: "ByName";
-        name: string;
-        limit: number;
-      }
-      export type Default = {
-        kind: "Default";
-        lastSeen_id: number;
-        limit: number;
-      }
-    }
-    export type $save = {
-      model: DeepPartial<ModelWithCruds>;
-      kind: "ByName" | "Default";
-    }
   }
 }

@@ -92,15 +92,24 @@ export class BlobHaver {
       false
     );
   }
+  static $get(
+    args: {
+      id: number;
+    },
+  kind: "Default" = "Default",
+    fetchImpl?: typeof fetch
+  ): Promise<HttpResult<BlobHaver>>;
   static async $get(
-    args: DataSources.BlobHaver.$get.Default,
+    args: any,
+    kind: "Default" = "Default",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<BlobHaver>> {
     const baseUrl = new URL(
       `http://localhost:5646/api/BlobHaver/$get`
     );
+    const payload: any = {};
     if ("id" in args) baseUrl.searchParams.append("id", String((args as any).id));
-    baseUrl.searchParams.append("__datasource", args.kind);
+    baseUrl.searchParams.append("__datasource", kind);
 
     const res = await fetchImpl(baseUrl, {
       method: "GET",
@@ -113,16 +122,26 @@ export class BlobHaver {
       false
     );
   }
+  static $list(
+    args: {
+      lastSeen_id: number;
+      limit: number;
+    },
+  kind: "Default" = "Default",
+    fetchImpl?: typeof fetch
+  ): Promise<HttpResult<BlobHaver[]>>;
   static async $list(
-    args: DataSources.BlobHaver.$list.Default,
+    args: any,
+    kind: "Default" = "Default",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<BlobHaver[]>> {
     const baseUrl = new URL(
       `http://localhost:5646/api/BlobHaver/$list`
     );
+    const payload: any = {};
     if ("lastSeen_id" in args) baseUrl.searchParams.append("lastSeen_id", String((args as any).lastSeen_id));
     if ("limit" in args) baseUrl.searchParams.append("limit", String((args as any).limit));
-    baseUrl.searchParams.append("__datasource", args.kind);
+    baseUrl.searchParams.append("__datasource", kind);
 
     const res = await fetchImpl(baseUrl, {
       method: "GET",
@@ -135,16 +154,22 @@ export class BlobHaver {
       true
     );
   }
+  static $save(
+    model: DeepPartial<BlobHaver>,
+    kind: "Default" = "Default",
+    fetchImpl?: typeof fetch
+  ): Promise<HttpResult<BlobHaver>>;
   static async $save(
-    args: DataSources.BlobHaver.$save,
+    model: DeepPartial<BlobHaver>,
+    kind: string,
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<BlobHaver>> {
     const baseUrl = new URL(
       `http://localhost:5646/api/BlobHaver/$save`
     );
     const payload: any = {};
-    payload["model"] = (args as any).model;
-    baseUrl.searchParams.append("__datasource", args.kind);
+    payload["model"] = model;
+    baseUrl.searchParams.append("__datasource", kind);
 
     const res = await fetchImpl(baseUrl, {
       method: "POST",
@@ -316,26 +341,5 @@ export class HttpResult<T = unknown> {
       response.headers,
       await data(),
     );
-  }
-}
-export namespace DataSources {
-  export namespace BlobHaver {
-    export namespace $get {
-      export type Default = {
-        kind: "Default";
-        id: number;
-      }
-    }
-    export namespace $list {
-      export type Default = {
-        kind: "Default";
-        lastSeen_id: number;
-        limit: number;
-      }
-    }
-    export type $save = {
-      model: DeepPartial<BlobHaver>;
-      kind: "Default";
-    }
   }
 }

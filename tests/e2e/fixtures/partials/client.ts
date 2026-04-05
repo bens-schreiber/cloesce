@@ -48,16 +48,22 @@ export class Dog {
       false
     );
   }
+  static $save(
+    model: DeepPartial<Dog>,
+    kind: "Default" = "Default",
+    fetchImpl?: typeof fetch
+  ): Promise<HttpResult<Dog>>;
   static async $save(
-    args: DataSources.Dog.$save,
+    model: DeepPartial<Dog>,
+    kind: string,
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Dog>> {
     const baseUrl = new URL(
       `http://localhost:5646/api/Dog/$save`
     );
     const payload: any = {};
-    payload["model"] = (args as any).model;
-    baseUrl.searchParams.append("__datasource", args.kind);
+    payload["model"] = model;
+    baseUrl.searchParams.append("__datasource", kind);
 
     const res = await fetchImpl(baseUrl, {
       method: "POST",
@@ -227,13 +233,5 @@ export class HttpResult<T = unknown> {
       response.headers,
       await data(),
     );
-  }
-}
-export namespace DataSources {
-  export namespace Dog {
-    export type $save = {
-      model: DeepPartial<Dog>;
-      kind: "Default";
-    }
   }
 }

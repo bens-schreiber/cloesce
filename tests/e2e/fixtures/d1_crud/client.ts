@@ -27,15 +27,24 @@ export class CrudHaver {
       false
     );
   }
+  static $get(
+    args: {
+      id: number;
+    },
+  kind: "Default" = "Default",
+    fetchImpl?: typeof fetch
+  ): Promise<HttpResult<CrudHaver>>;
   static async $get(
-    args: DataSources.CrudHaver.$get.Default,
+    args: any,
+    kind: "Default" = "Default",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<CrudHaver>> {
     const baseUrl = new URL(
       `http://localhost:5646/api/CrudHaver/$get`
     );
+    const payload: any = {};
     if ("id" in args) baseUrl.searchParams.append("id", String((args as any).id));
-    baseUrl.searchParams.append("__datasource", args.kind);
+    baseUrl.searchParams.append("__datasource", kind);
 
     const res = await fetchImpl(baseUrl, {
       method: "GET",
@@ -48,16 +57,26 @@ export class CrudHaver {
       false
     );
   }
+  static $list(
+    args: {
+      lastSeen_id: number;
+      limit: number;
+    },
+  kind: "Default" = "Default",
+    fetchImpl?: typeof fetch
+  ): Promise<HttpResult<CrudHaver[]>>;
   static async $list(
-    args: DataSources.CrudHaver.$list.Default,
+    args: any,
+    kind: "Default" = "Default",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<CrudHaver[]>> {
     const baseUrl = new URL(
       `http://localhost:5646/api/CrudHaver/$list`
     );
+    const payload: any = {};
     if ("lastSeen_id" in args) baseUrl.searchParams.append("lastSeen_id", String((args as any).lastSeen_id));
     if ("limit" in args) baseUrl.searchParams.append("limit", String((args as any).limit));
-    baseUrl.searchParams.append("__datasource", args.kind);
+    baseUrl.searchParams.append("__datasource", kind);
 
     const res = await fetchImpl(baseUrl, {
       method: "GET",
@@ -70,16 +89,22 @@ export class CrudHaver {
       true
     );
   }
+  static $save(
+    model: DeepPartial<CrudHaver>,
+    kind: "Default" = "Default",
+    fetchImpl?: typeof fetch
+  ): Promise<HttpResult<CrudHaver>>;
   static async $save(
-    args: DataSources.CrudHaver.$save,
+    model: DeepPartial<CrudHaver>,
+    kind: string,
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<CrudHaver>> {
     const baseUrl = new URL(
       `http://localhost:5646/api/CrudHaver/$save`
     );
     const payload: any = {};
-    payload["model"] = (args as any).model;
-    baseUrl.searchParams.append("__datasource", args.kind);
+    payload["model"] = model;
+    baseUrl.searchParams.append("__datasource", kind);
 
     const res = await fetchImpl(baseUrl, {
       method: "POST",
@@ -105,15 +130,31 @@ export class Parent {
   favoriteChildId: number | null;
   favoriteChild: Child | undefined;
   children: Child[];
+  static $get(
+    args: {
+      id: number;
+    },
+  kind: "Default" = "Default",
+    fetchImpl?: typeof fetch
+  ): Promise<HttpResult<Parent>>;
+  static $get(
+    args: {
+      id: number;
+    },
+  kind: "WithChildren",
+    fetchImpl?: typeof fetch
+  ): Promise<HttpResult<Parent>>;
   static async $get(
-    args: DataSources.Parent.$get.Default | DataSources.Parent.$get.WithChildren,
+    args: any,
+    kind: "Default" | "WithChildren" = "Default",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Parent>> {
     const baseUrl = new URL(
       `http://localhost:5646/api/Parent/$get`
     );
+    const payload: any = {};
     if ("id" in args) baseUrl.searchParams.append("id", String((args as any).id));
-    baseUrl.searchParams.append("__datasource", args.kind);
+    baseUrl.searchParams.append("__datasource", kind);
 
     const res = await fetchImpl(baseUrl, {
       method: "GET",
@@ -126,16 +167,34 @@ export class Parent {
       false
     );
   }
+  static $list(
+    args: {
+      lastSeen_id: number;
+      limit: number;
+    },
+  kind: "Default" = "Default",
+    fetchImpl?: typeof fetch
+  ): Promise<HttpResult<Parent[]>>;
+  static $list(
+    args: {
+      lastSeen_id: number;
+      limit: number;
+    },
+  kind: "WithChildren",
+    fetchImpl?: typeof fetch
+  ): Promise<HttpResult<Parent[]>>;
   static async $list(
-    args: DataSources.Parent.$list.Default | DataSources.Parent.$list.WithChildren,
+    args: any,
+    kind: "Default" | "WithChildren" = "Default",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Parent[]>> {
     const baseUrl = new URL(
       `http://localhost:5646/api/Parent/$list`
     );
+    const payload: any = {};
     if ("lastSeen_id" in args) baseUrl.searchParams.append("lastSeen_id", String((args as any).lastSeen_id));
     if ("limit" in args) baseUrl.searchParams.append("limit", String((args as any).limit));
-    baseUrl.searchParams.append("__datasource", args.kind);
+    baseUrl.searchParams.append("__datasource", kind);
 
     const res = await fetchImpl(baseUrl, {
       method: "GET",
@@ -148,16 +207,27 @@ export class Parent {
       true
     );
   }
+  static $save(
+    model: DeepPartial<Parent>,
+    kind: "Default" = "Default",
+    fetchImpl?: typeof fetch
+  ): Promise<HttpResult<Parent>>;
+  static $save(
+    model: DeepPartial<Parent>,
+    kind: "WithChildren",
+    fetchImpl?: typeof fetch
+  ): Promise<HttpResult<Parent>>;
   static async $save(
-    args: DataSources.Parent.$save,
+    model: DeepPartial<Parent>,
+    kind: string,
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Parent>> {
     const baseUrl = new URL(
       `http://localhost:5646/api/Parent/$save`
     );
     const payload: any = {};
-    payload["model"] = (args as any).model;
-    baseUrl.searchParams.append("__datasource", args.kind);
+    payload["model"] = model;
+    baseUrl.searchParams.append("__datasource", kind);
 
     const res = await fetchImpl(baseUrl, {
       method: "POST",
@@ -342,56 +412,5 @@ export class HttpResult<T = unknown> {
       response.headers,
       await data(),
     );
-  }
-}
-export namespace DataSources {
-  export namespace CrudHaver {
-    export namespace $get {
-      export type Default = {
-        kind: "Default";
-        id: number;
-      }
-    }
-    export namespace $list {
-      export type Default = {
-        kind: "Default";
-        lastSeen_id: number;
-        limit: number;
-      }
-    }
-    export type $save = {
-      model: DeepPartial<CrudHaver>;
-      kind: "Default";
-    }
-  }
-}
-export namespace DataSources {
-  export namespace Parent {
-    export namespace $get {
-      export type Default = {
-        kind: "Default";
-        id: number;
-      }
-      export type WithChildren = {
-        kind: "WithChildren";
-        id: number;
-      }
-    }
-    export namespace $list {
-      export type Default = {
-        kind: "Default";
-        lastSeen_id: number;
-        limit: number;
-      }
-      export type WithChildren = {
-        kind: "WithChildren";
-        lastSeen_id: number;
-        limit: number;
-      }
-    }
-    export type $save = {
-      model: DeepPartial<Parent>;
-      kind: "Default" | "WithChildren";
-    }
   }
 }

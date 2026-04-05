@@ -3,15 +3,24 @@
 export class DB1Model {
   id: number;
   someColumn: string;
+  static $get(
+    args: {
+      id: number;
+    },
+  kind: "Default" = "Default",
+    fetchImpl?: typeof fetch
+  ): Promise<HttpResult<DB1Model>>;
   static async $get(
-    args: DataSources.DB1Model.$get.Default,
+    args: any,
+    kind: "Default" = "Default",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<DB1Model>> {
     const baseUrl = new URL(
       `http://localhost:5646/api/DB1Model/$get`
     );
+    const payload: any = {};
     if ("id" in args) baseUrl.searchParams.append("id", String((args as any).id));
-    baseUrl.searchParams.append("__datasource", args.kind);
+    baseUrl.searchParams.append("__datasource", kind);
 
     const res = await fetchImpl(baseUrl, {
       method: "GET",
@@ -24,16 +33,26 @@ export class DB1Model {
       false
     );
   }
+  static $list(
+    args: {
+      lastSeen_id: number;
+      limit: number;
+    },
+  kind: "Default" = "Default",
+    fetchImpl?: typeof fetch
+  ): Promise<HttpResult<DB1Model[]>>;
   static async $list(
-    args: DataSources.DB1Model.$list.Default,
+    args: any,
+    kind: "Default" = "Default",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<DB1Model[]>> {
     const baseUrl = new URL(
       `http://localhost:5646/api/DB1Model/$list`
     );
+    const payload: any = {};
     if ("lastSeen_id" in args) baseUrl.searchParams.append("lastSeen_id", String((args as any).lastSeen_id));
     if ("limit" in args) baseUrl.searchParams.append("limit", String((args as any).limit));
-    baseUrl.searchParams.append("__datasource", args.kind);
+    baseUrl.searchParams.append("__datasource", kind);
 
     const res = await fetchImpl(baseUrl, {
       method: "GET",
@@ -46,16 +65,22 @@ export class DB1Model {
       true
     );
   }
+  static $save(
+    model: DeepPartial<DB1Model>,
+    kind: "Default" = "Default",
+    fetchImpl?: typeof fetch
+  ): Promise<HttpResult<DB1Model>>;
   static async $save(
-    args: DataSources.DB1Model.$save,
+    model: DeepPartial<DB1Model>,
+    kind: string,
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<DB1Model>> {
     const baseUrl = new URL(
       `http://localhost:5646/api/DB1Model/$save`
     );
     const payload: any = {};
-    payload["model"] = (args as any).model;
-    baseUrl.searchParams.append("__datasource", args.kind);
+    payload["model"] = model;
+    baseUrl.searchParams.append("__datasource", kind);
 
     const res = await fetchImpl(baseUrl, {
       method: "POST",
@@ -79,15 +104,24 @@ export class DB1Model {
 export class DB2Model {
   id: number;
   someColumn: string;
+  static $get(
+    args: {
+      id: number;
+    },
+  kind: "Default" = "Default",
+    fetchImpl?: typeof fetch
+  ): Promise<HttpResult<DB2Model>>;
   static async $get(
-    args: DataSources.DB2Model.$get.Default,
+    args: any,
+    kind: "Default" = "Default",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<DB2Model>> {
     const baseUrl = new URL(
       `http://localhost:5646/api/DB2Model/$get`
     );
+    const payload: any = {};
     if ("id" in args) baseUrl.searchParams.append("id", String((args as any).id));
-    baseUrl.searchParams.append("__datasource", args.kind);
+    baseUrl.searchParams.append("__datasource", kind);
 
     const res = await fetchImpl(baseUrl, {
       method: "GET",
@@ -100,16 +134,26 @@ export class DB2Model {
       false
     );
   }
+  static $list(
+    args: {
+      lastSeen_id: number;
+      limit: number;
+    },
+  kind: "Default" = "Default",
+    fetchImpl?: typeof fetch
+  ): Promise<HttpResult<DB2Model[]>>;
   static async $list(
-    args: DataSources.DB2Model.$list.Default,
+    args: any,
+    kind: "Default" = "Default",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<DB2Model[]>> {
     const baseUrl = new URL(
       `http://localhost:5646/api/DB2Model/$list`
     );
+    const payload: any = {};
     if ("lastSeen_id" in args) baseUrl.searchParams.append("lastSeen_id", String((args as any).lastSeen_id));
     if ("limit" in args) baseUrl.searchParams.append("limit", String((args as any).limit));
-    baseUrl.searchParams.append("__datasource", args.kind);
+    baseUrl.searchParams.append("__datasource", kind);
 
     const res = await fetchImpl(baseUrl, {
       method: "GET",
@@ -122,16 +166,22 @@ export class DB2Model {
       true
     );
   }
+  static $save(
+    model: DeepPartial<DB2Model>,
+    kind: "Default" = "Default",
+    fetchImpl?: typeof fetch
+  ): Promise<HttpResult<DB2Model>>;
   static async $save(
-    args: DataSources.DB2Model.$save,
+    model: DeepPartial<DB2Model>,
+    kind: string,
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<DB2Model>> {
     const baseUrl = new URL(
       `http://localhost:5646/api/DB2Model/$save`
     );
     const payload: any = {};
-    payload["model"] = (args as any).model;
-    baseUrl.searchParams.append("__datasource", args.kind);
+    payload["model"] = model;
+    baseUrl.searchParams.append("__datasource", kind);
 
     const res = await fetchImpl(baseUrl, {
       method: "POST",
@@ -301,47 +351,5 @@ export class HttpResult<T = unknown> {
       response.headers,
       await data(),
     );
-  }
-}
-export namespace DataSources {
-  export namespace DB1Model {
-    export namespace $get {
-      export type Default = {
-        kind: "Default";
-        id: number;
-      }
-    }
-    export namespace $list {
-      export type Default = {
-        kind: "Default";
-        lastSeen_id: number;
-        limit: number;
-      }
-    }
-    export type $save = {
-      model: DeepPartial<DB1Model>;
-      kind: "Default";
-    }
-  }
-}
-export namespace DataSources {
-  export namespace DB2Model {
-    export namespace $get {
-      export type Default = {
-        kind: "Default";
-        id: number;
-      }
-    }
-    export namespace $list {
-      export type Default = {
-        kind: "Default";
-        lastSeen_id: number;
-        limit: number;
-      }
-    }
-    export type $save = {
-      model: DeepPartial<DB2Model>;
-      kind: "Default";
-    }
   }
 }

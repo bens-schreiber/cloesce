@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 
 use askama::Template;
 use ast::{
-    ApiMethod, CidlType, CloesceAst, CrudKind, DataSource, Field, HttpVerb, MediaType, Model,
+    ApiMethod, CidlType, CloesceAst, DataSource, Field, HttpVerb, MediaType, Model,
     NavigationField, NavigationFieldKind,
 };
 
@@ -173,18 +173,6 @@ impl ClientTemplate<'_> {
         name == "$get" || name == "$save" || name == "$list"
     }
 
-    fn is_crud_get(&self, crud: &CrudKind) -> bool {
-        matches!(crud, CrudKind::Get)
-    }
-
-    fn is_crud_list(&self, crud: &CrudKind) -> bool {
-        matches!(crud, CrudKind::List)
-    }
-
-    fn is_crud_save(&self, crud: &CrudKind) -> bool {
-        matches!(crud, CrudKind::Save)
-    }
-
     fn crud_args_type(
         &self,
         method_name: &str,
@@ -204,12 +192,13 @@ impl ClientTemplate<'_> {
     }
 
     fn ds_kind_union(&self, data_sources: &BTreeMap<&str, DataSource<'_>>) -> String {
-        let parts: Vec<String> = data_sources
+        let joined = data_sources
             .values()
-            .filter(|ds| !ds.is_internal)
-            .map(|ds| format!("\"{}\"", ds.name))
-            .collect();
-        parts.join(" | ")
+            .filter(|d| !d.is_internal)
+            .map(|d| format!("\"{}\"", d.name))
+            .collect::<Vec<_>>()
+            .join(" | ");
+        joined
     }
 
     fn ds_get_params<'t>(&self, model: &'t Model<'t>, api: &ApiMethod<'_>) -> Vec<&'t Field<'t>> {

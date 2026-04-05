@@ -3,10 +3,12 @@ import { HttpResult, KValue, CloesceApp, Orm, IncludeTree, DeepPartial } from "c
 import { R2Bucket, KVNamespace, D1Database, R2Object, D1PreparedStatement, ReadableStream, R2ObjectBody } from "@cloudflare/workers-types";
 
 type MaybePromise<T> = T | Promise<T>;
+type MaybeHttpResult<T> = T | HttpResult<T>;
 export interface Env {
     db: D1Database;
 }
 export namespace Dog {
+    export const Tag = "Dog";
     export const Meta = cidl.models.Dog as any;
 
     export interface Self {
@@ -16,9 +18,9 @@ export namespace Dog {
     }
 
     export abstract class Api {
-        readonly tag = "Dog";
-        abstract create(dog: DeepPartial<Dog.Self>): MaybePromise<HttpResult<Dog.Self>>;
-        abstract getPartialSelf(self: Dog.Self): MaybePromise<HttpResult<DeepPartial<Dog.Self>>>;
+        readonly tag = Tag;
+        abstract create(dog: DeepPartial<Dog.Self>): MaybePromise<MaybeHttpResult<Dog.Self>>;
+        abstract getPartialSelf(self: Dog.Self): MaybePromise<MaybeHttpResult<DeepPartial<Dog.Self>>>;
     }
 
     export namespace DataSources {

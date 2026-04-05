@@ -391,5 +391,6 @@
     }
   },
   "services": {},
-  "poos": {}
+  "poos": {},
+  "injects": []
 }

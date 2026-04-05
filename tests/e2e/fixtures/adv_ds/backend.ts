@@ -3,10 +3,12 @@ import { HttpResult, KValue, CloesceApp, Orm, IncludeTree, DeepPartial } from "c
 import { R2Bucket, KVNamespace, D1Database, R2Object, D1PreparedStatement, ReadableStream, R2ObjectBody } from "@cloudflare/workers-types";
 
 type MaybePromise<T> = T | Promise<T>;
+type MaybeHttpResult<T> = T | HttpResult<T>;
 export interface Env {
     db: D1Database;
 }
 export namespace Hamburger {
+    export const Tag = "Hamburger";
     export const Meta = cidl.models.Hamburger as any;
 
     export interface Self {
@@ -16,9 +18,9 @@ export namespace Hamburger {
     }
 
     export abstract class Api {
-        readonly tag = "Hamburger";
-        abstract noLettuceToppings(self: Hamburger.Self): MaybePromise<HttpResult<Topping.Self[]>>;
-        abstract onlyBaconToppings(self: Hamburger.Self): MaybePromise<HttpResult<Topping.Self[]>>;
+        readonly tag = Tag;
+        abstract noLettuceToppings(self: Hamburger.Self): MaybePromise<MaybeHttpResult<Topping.Self[]>>;
+        abstract onlyBaconToppings(self: Hamburger.Self): MaybePromise<MaybeHttpResult<Topping.Self[]>>;
     }
 
     export namespace DataSources {
@@ -83,6 +85,7 @@ export namespace Hamburger {
     }
 }
 export namespace Topping {
+    export const Tag = "Topping";
     export const Meta = cidl.models.Topping as any;
 
     export interface Self {
@@ -92,7 +95,7 @@ export namespace Topping {
     }
 
     export abstract class Api {
-        readonly tag = "Topping";
+        readonly tag = Tag;
     }
 
     export namespace DataSources {
@@ -123,7 +126,6 @@ export namespace Topping {
         return await Orm.fromEnv(env).listQuery<Self>(Meta, args.query, args.include);
     }
 }
-
 import cidl from "./cidl.json" with { type: "json" };
 (cidl.models.Hamburger.data_sources["BurgersWithLettuceOrdered"] as any).gen = Hamburger.DataSources.BurgersWithLettuceOrdered;
 (cidl.models.Hamburger.data_sources["Default"] as any).gen = Hamburger.DataSources.Default;

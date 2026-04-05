@@ -3,10 +3,12 @@ import { HttpResult, KValue, CloesceApp, Orm, IncludeTree, DeepPartial } from "c
 import { R2Bucket, KVNamespace, D1Database, R2Object, D1PreparedStatement, ReadableStream, R2ObjectBody } from "@cloudflare/workers-types";
 
 type MaybePromise<T> = T | Promise<T>;
+type MaybeHttpResult<T> = T | HttpResult<T>;
 export interface Env {
     db: D1Database;
 }
 export namespace NullabilityChecks {
+    export const Tag = "NullabilityChecks";
     export const Meta = cidl.models.NullabilityChecks as any;
 
     export interface Self {
@@ -16,12 +18,12 @@ export namespace NullabilityChecks {
     }
 
     export abstract class Api {
-        readonly tag = "NullabilityChecks";
-        abstract primitiveTypes(self: NullabilityChecks.Self, a: number | null, b: string | null): MaybePromise<HttpResult<boolean | null>>;
-        abstract modelTypes(self: NullabilityChecks.Self, a: NullabilityChecks.Self | null): MaybePromise<HttpResult<NullabilityChecks.Self | null>>;
-        abstract injectableTypes(self: NullabilityChecks.Self): MaybePromise<HttpResult<void>>;
-        abstract arrayTypes(self: NullabilityChecks.Self, a: number[] | null, b: NullabilityChecks.Self[] | null): MaybePromise<HttpResult<string[] | null>>;
-        abstract httpResultTypes(self: NullabilityChecks.Self): MaybePromise<HttpResult<NullabilityChecks.Self[] | null>>;
+        readonly tag = Tag;
+        abstract primitiveTypes(self: NullabilityChecks.Self, a: number | null, b: string | null): MaybePromise<MaybeHttpResult<boolean | null>>;
+        abstract modelTypes(self: NullabilityChecks.Self, a: NullabilityChecks.Self | null): MaybePromise<MaybeHttpResult<NullabilityChecks.Self | null>>;
+        abstract injectableTypes(self: NullabilityChecks.Self): MaybePromise<MaybeHttpResult<void>>;
+        abstract arrayTypes(self: NullabilityChecks.Self, a: number[] | null, b: NullabilityChecks.Self[] | null): MaybePromise<MaybeHttpResult<string[] | null>>;
+        abstract httpResultTypes(self: NullabilityChecks.Self): MaybePromise<MaybeHttpResult<NullabilityChecks.Self[] | null>>;
     }
 
     export namespace DataSources {

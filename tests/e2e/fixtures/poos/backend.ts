@@ -3,6 +3,7 @@ import { HttpResult, KValue, CloesceApp, Orm, IncludeTree, DeepPartial } from "c
 import { R2Bucket, KVNamespace, D1Database, R2Object, D1PreparedStatement, ReadableStream, R2ObjectBody } from "@cloudflare/workers-types";
 
 type MaybePromise<T> = T | Promise<T>;
+type MaybeHttpResult<T> = T | HttpResult<T>;
 export interface Env {
     db: D1Database;
 }
@@ -18,6 +19,7 @@ export interface PooC {
     b: PooB[];
 }
 export namespace PooAcceptYield {
+    export const Tag = "PooAcceptYield";
     export const Meta = cidl.models.PooAcceptYield as any;
 
     export interface Self {
@@ -25,9 +27,9 @@ export namespace PooAcceptYield {
     }
 
     export abstract class Api {
-        readonly tag = "PooAcceptYield";
-        abstract acceptPoos(a: PooA, b: PooB, c: PooC): MaybePromise<HttpResult<void>>;
-        abstract yieldPoo(): MaybePromise<HttpResult<PooC>>;
+        readonly tag = Tag;
+        abstract acceptPoos(a: PooA, b: PooB, c: PooC): MaybePromise<MaybeHttpResult<void>>;
+        abstract yieldPoo(): MaybePromise<MaybeHttpResult<PooC>>;
     }
 
     export namespace DataSources {

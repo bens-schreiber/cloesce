@@ -3,6 +3,7 @@ import { HttpResult, KValue, CloesceApp, Orm, IncludeTree, DeepPartial } from "c
 import { R2Bucket, KVNamespace, D1Database, R2Object, D1PreparedStatement, ReadableStream, R2ObjectBody } from "@cloudflare/workers-types";
 
 type MaybePromise<T> = T | Promise<T>;
+type MaybeHttpResult<T> = T | HttpResult<T>;
 export interface Env {
     db: D1Database;
 }
@@ -10,6 +11,7 @@ export interface Poo {
     ds: "Baz" | "Default";
 }
 export namespace Foo {
+    export const Tag = "Foo";
     export const Meta = cidl.models.Foo as any;
 
     export interface Self {
@@ -17,8 +19,8 @@ export namespace Foo {
     }
 
     export abstract class Api {
-        readonly tag = "Foo";
-        abstract bar(self: Foo.Self, customDs: "Baz" | "Default", oneDs: "Default" | "ShitAss", noDs: "Default", poop: Poo): MaybePromise<HttpResult<void>>;
+        readonly tag = Tag;
+        abstract bar(self: Foo.Self, customDs: "Baz" | "Default", oneDs: "Default" | "ShitAss", noDs: "Default", poop: Poo): MaybePromise<MaybeHttpResult<void>>;
     }
 
     export namespace DataSources {
@@ -26,7 +28,7 @@ export namespace Foo {
             include: {},
             getQuery: (env: Env, id: number) => env.db.prepare(`SELECT "Foo"."id" AS "id" FROM "Foo" WHERE "Foo"."id" = ?1`).bind(id),
             async get(env: Env, id: number): Promise<Foo.Self | null> {
-                return await Orm.fromEnv(env).getQuery<Foo.Self>(Foo.Meta, Foo.DataSources.Baz.getQuery(env, id), Foo.DataSources.Baz.include, {});
+                return await Orm.fromEnv(env).getQuery<Foo.Self>(Foo.Meta, Foo.DataSources.Baz.getQuery(env, id), Foo.DataSources.Baz.include, {  });
             },
             listQuery: (env: Env, lastSeen_id: number, limit: number) => env.db.prepare(`SELECT "Foo"."id" AS "id" FROM "Foo" WHERE "Foo"."id" > ?1 ORDER BY "Foo"."id" ASC LIMIT ?2`).bind(lastSeen_id, limit),
             async list(env: Env, lastSeen_id: number, limit: number): Promise<Foo.Self[]> {
@@ -37,7 +39,7 @@ export namespace Foo {
             include: {},
             getQuery: (env: Env, id: number) => env.db.prepare(`SELECT "Foo"."id" AS "id" FROM "Foo" WHERE "Foo"."id" = ?1`).bind(id),
             async get(env: Env, id: number): Promise<Foo.Self | null> {
-                return await Orm.fromEnv(env).getQuery<Foo.Self>(Foo.Meta, Foo.DataSources.Default.getQuery(env, id), Foo.DataSources.Default.include, {});
+                return await Orm.fromEnv(env).getQuery<Foo.Self>(Foo.Meta, Foo.DataSources.Default.getQuery(env, id), Foo.DataSources.Default.include, {  });
             },
             listQuery: (env: Env, lastSeen_id: number, limit: number) => env.db.prepare(`SELECT "Foo"."id" AS "id" FROM "Foo" WHERE "Foo"."id" > ?1 ORDER BY "Foo"."id" ASC LIMIT ?2`).bind(lastSeen_id, limit),
             async list(env: Env, lastSeen_id: number, limit: number): Promise<Foo.Self[]> {
@@ -61,6 +63,7 @@ export namespace Foo {
     }
 }
 export namespace NoDs {
+    export const Tag = "NoDs";
     export const Meta = cidl.models.NoDs as any;
 
     export interface Self {
@@ -68,7 +71,7 @@ export namespace NoDs {
     }
 
     export abstract class Api {
-        readonly tag = "NoDs";
+        readonly tag = Tag;
     }
 
     export namespace DataSources {
@@ -76,7 +79,7 @@ export namespace NoDs {
             include: {},
             getQuery: (env: Env, id: number) => env.db.prepare(`SELECT "NoDs"."id" AS "id" FROM "NoDs" WHERE "NoDs"."id" = ?1`).bind(id),
             async get(env: Env, id: number): Promise<NoDs.Self | null> {
-                return await Orm.fromEnv(env).getQuery<NoDs.Self>(NoDs.Meta, NoDs.DataSources.Default.getQuery(env, id), NoDs.DataSources.Default.include, {});
+                return await Orm.fromEnv(env).getQuery<NoDs.Self>(NoDs.Meta, NoDs.DataSources.Default.getQuery(env, id), NoDs.DataSources.Default.include, {  });
             },
             listQuery: (env: Env, lastSeen_id: number, limit: number) => env.db.prepare(`SELECT "NoDs"."id" AS "id" FROM "NoDs" WHERE "NoDs"."id" > ?1 ORDER BY "NoDs"."id" ASC LIMIT ?2`).bind(lastSeen_id, limit),
             async list(env: Env, lastSeen_id: number, limit: number): Promise<NoDs.Self[]> {
@@ -100,6 +103,7 @@ export namespace NoDs {
     }
 }
 export namespace OneDs {
+    export const Tag = "OneDs";
     export const Meta = cidl.models.OneDs as any;
 
     export interface Self {
@@ -107,7 +111,7 @@ export namespace OneDs {
     }
 
     export abstract class Api {
-        readonly tag = "OneDs";
+        readonly tag = Tag;
     }
 
     export namespace DataSources {
@@ -115,7 +119,7 @@ export namespace OneDs {
             include: {},
             getQuery: (env: Env, id: number) => env.db.prepare(`SELECT "OneDs"."id" AS "id" FROM "OneDs" WHERE "OneDs"."id" = ?1`).bind(id),
             async get(env: Env, id: number): Promise<OneDs.Self | null> {
-                return await Orm.fromEnv(env).getQuery<OneDs.Self>(OneDs.Meta, OneDs.DataSources.Default.getQuery(env, id), OneDs.DataSources.Default.include, {});
+                return await Orm.fromEnv(env).getQuery<OneDs.Self>(OneDs.Meta, OneDs.DataSources.Default.getQuery(env, id), OneDs.DataSources.Default.include, {  });
             },
             listQuery: (env: Env, lastSeen_id: number, limit: number) => env.db.prepare(`SELECT "OneDs"."id" AS "id" FROM "OneDs" WHERE "OneDs"."id" > ?1 ORDER BY "OneDs"."id" ASC LIMIT ?2`).bind(lastSeen_id, limit),
             async list(env: Env, lastSeen_id: number, limit: number): Promise<OneDs.Self[]> {
@@ -126,7 +130,7 @@ export namespace OneDs {
             include: {},
             getQuery: (env: Env, id: number) => env.db.prepare(`SELECT "OneDs"."id" AS "id" FROM "OneDs" WHERE "OneDs"."id" = ?1`).bind(id),
             async get(env: Env, id: number): Promise<OneDs.Self | null> {
-                return await Orm.fromEnv(env).getQuery<OneDs.Self>(OneDs.Meta, OneDs.DataSources.ShitAss.getQuery(env, id), OneDs.DataSources.ShitAss.include, {});
+                return await Orm.fromEnv(env).getQuery<OneDs.Self>(OneDs.Meta, OneDs.DataSources.ShitAss.getQuery(env, id), OneDs.DataSources.ShitAss.include, {  });
             },
             listQuery: (env: Env, lastSeen_id: number, limit: number) => env.db.prepare(`SELECT "OneDs"."id" AS "id" FROM "OneDs" WHERE "OneDs"."id" > ?1 ORDER BY "OneDs"."id" ASC LIMIT ?2`).bind(lastSeen_id, limit),
             async list(env: Env, lastSeen_id: number, limit: number): Promise<OneDs.Self[]> {

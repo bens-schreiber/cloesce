@@ -3,10 +3,12 @@ import { HttpResult, KValue, CloesceApp, Orm, IncludeTree, DeepPartial } from "c
 import { R2Bucket, KVNamespace, D1Database, R2Object, D1PreparedStatement, ReadableStream, R2ObjectBody } from "@cloudflare/workers-types";
 
 type MaybePromise<T> = T | Promise<T>;
+type MaybeHttpResult<T> = T | HttpResult<T>;
 export interface Env {
     db: D1Database;
 }
 export namespace CrudHaver {
+    export const Tag = "CrudHaver";
     export const Meta = cidl.models.CrudHaver as any;
 
     export interface Self {
@@ -15,8 +17,8 @@ export namespace CrudHaver {
     }
 
     export abstract class Api {
-        readonly tag = "CrudHaver";
-        abstract notCrud(self: CrudHaver.Self): MaybePromise<HttpResult<void>>;
+        readonly tag = Tag;
+        abstract notCrud(self: CrudHaver.Self): MaybePromise<MaybeHttpResult<void>>;
     }
 
     export namespace DataSources {
@@ -48,6 +50,7 @@ export namespace CrudHaver {
     }
 }
 export namespace Parent {
+    export const Tag = "Parent";
     export const Meta = cidl.models.Parent as any;
 
     export interface Self {
@@ -58,7 +61,7 @@ export namespace Parent {
     }
 
     export abstract class Api {
-        readonly tag = "Parent";
+        readonly tag = Tag;
     }
 
     export namespace DataSources {
@@ -101,6 +104,7 @@ export namespace Parent {
     }
 }
 export namespace Child {
+    export const Tag = "Child";
     export const Meta = cidl.models.Child as any;
 
     export interface Self {
@@ -110,7 +114,7 @@ export namespace Child {
     }
 
     export abstract class Api {
-        readonly tag = "Child";
+        readonly tag = Tag;
     }
 
     export namespace DataSources {

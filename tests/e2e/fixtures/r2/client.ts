@@ -33,16 +33,25 @@ export class D1BackedModel {
       false
     );
   }
+  static $get(
+    args: {
+      id: number;
+    },
+  kind: "Default" = "Default",
+    fetchImpl?: typeof fetch
+  ): Promise<HttpResult<D1BackedModel>>;
   static async $get(
-    args: DataSources.D1BackedModel.$get.Default,
+    args: any,
+    kind: "Default" = "Default",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<D1BackedModel>> {
     const baseUrl = new URL(
       `http://localhost:5646/api/D1BackedModel/$get`
     );
+    const payload: any = {};
     if ("keyParam" in args) baseUrl.searchParams.append("keyParam", String((args as any).keyParam));
     if ("id" in args) baseUrl.searchParams.append("id", String((args as any).id));
-    baseUrl.searchParams.append("__datasource", args.kind);
+    baseUrl.searchParams.append("__datasource", kind);
 
     const res = await fetchImpl(baseUrl, {
       method: "GET",
@@ -55,16 +64,26 @@ export class D1BackedModel {
       false
     );
   }
+  static $list(
+    args: {
+      lastSeen_id: number;
+      limit: number;
+    },
+  kind: "Default" = "Default",
+    fetchImpl?: typeof fetch
+  ): Promise<HttpResult<D1BackedModel[]>>;
   static async $list(
-    args: DataSources.D1BackedModel.$list.Default,
+    args: any,
+    kind: "Default" = "Default",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<D1BackedModel[]>> {
     const baseUrl = new URL(
       `http://localhost:5646/api/D1BackedModel/$list`
     );
+    const payload: any = {};
     if ("lastSeen_id" in args) baseUrl.searchParams.append("lastSeen_id", String((args as any).lastSeen_id));
     if ("limit" in args) baseUrl.searchParams.append("limit", String((args as any).limit));
-    baseUrl.searchParams.append("__datasource", args.kind);
+    baseUrl.searchParams.append("__datasource", kind);
 
     const res = await fetchImpl(baseUrl, {
       method: "GET",
@@ -77,16 +96,22 @@ export class D1BackedModel {
       true
     );
   }
+  static $save(
+    model: DeepPartial<D1BackedModel>,
+    kind: "Default" = "Default",
+    fetchImpl?: typeof fetch
+  ): Promise<HttpResult<D1BackedModel>>;
   static async $save(
-    args: DataSources.D1BackedModel.$save,
+    model: DeepPartial<D1BackedModel>,
+    kind: string,
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<D1BackedModel>> {
     const baseUrl = new URL(
       `http://localhost:5646/api/D1BackedModel/$save`
     );
     const payload: any = {};
-    payload["model"] = (args as any).model;
-    baseUrl.searchParams.append("__datasource", args.kind);
+    payload["model"] = model;
+    baseUrl.searchParams.append("__datasource", kind);
 
     const res = await fetchImpl(baseUrl, {
       method: "POST",
@@ -324,26 +349,5 @@ export class HttpResult<T = unknown> {
       response.headers,
       await data(),
     );
-  }
-}
-export namespace DataSources {
-  export namespace D1BackedModel {
-    export namespace $get {
-      export type Default = {
-        kind: "Default";
-        id: number;
-      }
-    }
-    export namespace $list {
-      export type Default = {
-        kind: "Default";
-        lastSeen_id: number;
-        limit: number;
-      }
-    }
-    export type $save = {
-      model: DeepPartial<D1BackedModel>;
-      kind: "Default";
-    }
   }
 }

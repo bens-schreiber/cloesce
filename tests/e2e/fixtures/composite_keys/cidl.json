@@ -775,5 +775,6 @@
     }
   },
   "services": {},
-  "poos": {}
+  "poos": {},
+  "injects": []
 }

@@ -84,5 +84,8 @@
       ]
     }
   },
-  "poos": {}
+  "poos": {},
+  "injects": [
+    "InjectedThing"
+  ]
 }

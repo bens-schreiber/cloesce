@@ -320,5 +320,6 @@
     }
   },
   "services": {},
-  "poos": {}
+  "poos": {},
+  "injects": []
 }

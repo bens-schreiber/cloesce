@@ -100,6 +100,178 @@ export class {{ model.name }} {
 
 {%- for api in &model.apis %}
 {%- if self.is_crud_method(api.name) %}
+{%- if api.name == "$save" %}
+{%- for ds in model.data_sources.values() %}
+{%- if !ds.is_internal %}
+  static $save(
+    model: DeepPartial<{{ model.name }}>,
+    kind: "{{ ds.name }}"{% if ds.name == "Default" %} = "Default"{% endif %},
+    fetchImpl?: typeof fetch
+  ): Promise<HttpResult<{{ self.map_type(&api.return_type) }}>>;
+{%- endif %}
+{%- endfor %}
+  static async $save(
+    model: DeepPartial<{{ model.name }}>,
+    kind: string,
+    fetchImpl: typeof fetch = fetch
+  ): Promise<HttpResult<{{ self.map_type(&api.return_type) }}>> {
+    const baseUrl = new URL(
+      `{{ worker_url }}/{{ model.name }}/{{ api.name }}`
+    );
+{%- if !self.is_get_request(&api.http_verb) %}
+    const payload: any = {};
+    payload["model"] = model;
+{%- endif %}
+    baseUrl.searchParams.append("__datasource", kind);
+
+    const res = await fetchImpl(baseUrl, {
+      method: "{{ self.fmt_verb(&api.http_verb) }}",
+{%- if !self.is_get_request(&api.http_verb) %}
+      headers: { "Content-Type": "{{ self.fmt_content_type(&api.parameters_media) }}" },
+      body: requestBody({{ self.map_media(&api.parameters_media) }}, payload),
+{%- endif %}
+    });
+
+    return await HttpResult.fromResponse(
+      res,
+      {{ self.map_media(&api.return_media) }},
+{%- if self.needs_constructor(&api.return_type) %}
+      {{ self.map_root_type(&api.return_type) }},
+{%- else %}
+      undefined,
+{%- endif %}
+      {{ self.has_array(&api.return_type) }}
+    );
+  }
+{%- elif api.name == "$get" %}
+{%- for ds in model.data_sources.values() %}
+{%- if !ds.is_internal %}
+  static $get(
+{%- if let Some(get) = &ds.get %}
+    args: {
+{%- for param in &get.parameters %}
+      {{ param.name }}: {{ self.map_type(&param.cidl_type) }};
+{%- endfor %}
+    },
+{%- else %}
+  args: {},
+{%- endif %}
+  kind: "{{ ds.name }}"{% if ds.name == "Default" %} = "Default"{% endif %},
+    fetchImpl?: typeof fetch
+  ): Promise<HttpResult<{{ self.map_type(&api.return_type) }}>>;
+{%- endif %}
+{%- endfor %}
+  static async $get(
+    args: any,
+    kind: {{ self.ds_kind_union(&model.data_sources) }} = "Default",
+    fetchImpl: typeof fetch = fetch
+  ): Promise<HttpResult<{{ self.map_type(&api.return_type) }}>> {
+    const baseUrl = new URL(
+      `{{ worker_url }}/{{ model.name }}/{{ api.name }}`
+    );
+{%- if !self.is_get_request(&api.http_verb) %}
+    const payload: any = {};
+{%- else %}
+    const payload: any = {};
+{%- endif %}
+
+{%- for param in &api.parameters %}
+{%- if self.is_serializable(&param.cidl_type) %}
+{%- if !self.is_datasource(&param.cidl_type) %}
+{%- if self.is_url_param(&param.cidl_type, &api.http_verb) %}
+    if ("{{ param.name }}" in args) baseUrl.searchParams.append("{{ param.name }}", String((args as any).{{ param.name }}));
+{%- else %}
+    payload["{{ param.name }}"] = (args as any).{{ param.name }};
+{%- endif %}
+{%- endif %}
+{%- endif %}
+{%- endfor %}
+    baseUrl.searchParams.append("__datasource", kind);
+
+    const res = await fetchImpl(baseUrl, {
+      method: "{{ self.fmt_verb(&api.http_verb) }}",
+{%- if !self.is_get_request(&api.http_verb) %}
+      headers: { "Content-Type": "{{ self.fmt_content_type(&api.parameters_media) }}" },
+      body: requestBody({{ self.map_media(&api.parameters_media) }}, payload),
+{%- endif %}
+    });
+
+    return await HttpResult.fromResponse(
+      res,
+      {{ self.map_media(&api.return_media) }},
+{%- if self.needs_constructor(&api.return_type) %}
+      {{ self.map_root_type(&api.return_type) }},
+{%- else %}
+      undefined,
+{%- endif %}
+      {{ self.has_array(&api.return_type) }}
+    );
+  }
+{%- elif api.name == "$list" %}
+{%- for ds in model.data_sources.values() %}
+{%- if !ds.is_internal %}
+  static $list(
+{%- if let Some(list) = &ds.list %}
+    args: {
+{%- for param in &list.parameters %}
+      {{ param.name }}: {{ self.map_type(&param.cidl_type) }};
+{%- endfor %}
+    },
+{%- else %}
+  args: {},
+{%- endif %}
+  kind: "{{ ds.name }}"{% if ds.name == "Default" %} = "Default"{% endif %},
+    fetchImpl?: typeof fetch
+  ): Promise<HttpResult<{{ self.map_type(&api.return_type) }}>>;
+{%- endif %}
+{%- endfor %}
+  static async $list(
+    args: any,
+    kind: {{ self.ds_kind_union(&model.data_sources) }} = "Default",
+    fetchImpl: typeof fetch = fetch
+  ): Promise<HttpResult<{{ self.map_type(&api.return_type) }}>> {
+    const baseUrl = new URL(
+      `{{ worker_url }}/{{ model.name }}/{{ api.name }}`
+    );
+{%- if !self.is_get_request(&api.http_verb) %}
+    const payload: any = {};
+{%- else %}
+    const payload: any = {};
+{%- endif %}
+
+{%- for param in &api.parameters %}
+{%- if self.is_serializable(&param.cidl_type) %}
+{%- if !self.is_datasource(&param.cidl_type) %}
+{%- if self.is_url_param(&param.cidl_type, &api.http_verb) %}
+    if ("{{ param.name }}" in args) baseUrl.searchParams.append("{{ param.name }}", String((args as any).{{ param.name }}));
+{%- else %}
+    payload["{{ param.name }}"] = (args as any).{{ param.name }};
+{%- endif %}
+{%- endif %}
+{%- endif %}
+{%- endfor %}
+    baseUrl.searchParams.append("__datasource", kind);
+
+    const res = await fetchImpl(baseUrl, {
+      method: "{{ self.fmt_verb(&api.http_verb) }}",
+{%- if !self.is_get_request(&api.http_verb) %}
+      headers: { "Content-Type": "{{ self.fmt_content_type(&api.parameters_media) }}" },
+      body: requestBody({{ self.map_media(&api.parameters_media) }}, payload),
+{%- endif %}
+    });
+
+    return await HttpResult.fromResponse(
+      res,
+      {{ self.map_media(&api.return_media) }},
+{%- if self.needs_constructor(&api.return_type) %}
+      {{ self.map_root_type(&api.return_type) }},
+{%- else %}
+      undefined,
+{%- endif %}
+      {{ self.has_array(&api.return_type) }}
+    );
+  }
+{%- else %}
   static async {{ api.name }}(
     args: {{ self.crud_args_type(api.name, model.name, &model.data_sources) }},
     fetchImpl: typeof fetch = fetch
@@ -143,6 +315,7 @@ export class {{ model.name }} {
       {{ self.has_array(&api.return_type) }}
     );
   }
+{%- endif %}
 {%- else %}
   {% if api.is_static %}static {% endif %}async {{ api.name }}(
 {%- for param in &api.parameters %}
@@ -411,50 +584,3 @@ export class HttpResult<T = unknown> {
     );
   }
 }
-
-{%- for (_key, model) in &ast.models %}
-{%- if !model.cruds.is_empty() %}
-export namespace DataSources {
-  export namespace {{ model.name }} {
-{%- for crud in &model.cruds %}
-{%- if self.is_crud_get(crud) %}
-    export namespace $get {
-{%- for ds in model.data_sources.values() %}
-{%- if !ds.is_internal %}
-      export type {{ ds.name }} = {
-        kind: "{{ ds.name }}";
-{%- if let Some(get) = &ds.get %}
-{%- for param in &get.parameters %}
-        {{ param.name }}: {{ self.map_type(&param.cidl_type) }};
-{%- endfor %}
-{%- endif %}
-      }
-{%- endif %}
-{%- endfor %}
-    }
-{%- else if self.is_crud_list(crud) %}
-    export namespace $list {
-{%- for ds in model.data_sources.values() %}
-{%- if !ds.is_internal %}
-      export type {{ ds.name }} = {
-        kind: "{{ ds.name }}";
-{%- if let Some(list) = &ds.list %}
-{%- for param in &list.parameters %}
-        {{ param.name }}: {{ self.map_type(&param.cidl_type) }};
-{%- endfor %}
-{%- endif %}
-      }
-{%- endif %}
-{%- endfor %}
-    }
-{%- else if self.is_crud_save(crud) %}
-    export type $save = {
-      model: DeepPartial<{{ model.name }}>;
-      kind: {{ self.ds_kind_union(&model.data_sources) }};
-    }
-{%- endif %}
-{%- endfor %}
-  }
-}
-{%- endif %}
-{%- endfor %}

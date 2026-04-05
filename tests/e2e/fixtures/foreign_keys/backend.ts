@@ -3,10 +3,12 @@ import { HttpResult, KValue, CloesceApp, Orm, IncludeTree, DeepPartial } from "c
 import { R2Bucket, KVNamespace, D1Database, R2Object, D1PreparedStatement, ReadableStream, R2ObjectBody } from "@cloudflare/workers-types";
 
 type MaybePromise<T> = T | Promise<T>;
+type MaybeHttpResult<T> = T | HttpResult<T>;
 export interface Env {
     db: D1Database;
 }
 export namespace A {
+    export const Tag = "A";
     export const Meta = cidl.models.A as any;
 
     export interface Self {
@@ -16,10 +18,10 @@ export namespace A {
     }
 
     export abstract class Api {
-        readonly tag = "A";
-        abstract create(a: A.Self): MaybePromise<HttpResult<A.Self>>;
-        abstract returnFatalIfParamsNotInstantiated(a: A.Self): MaybePromise<HttpResult<void>>;
-        abstract withoutB(self: A.Self): MaybePromise<HttpResult<A.Self>>;
+        readonly tag = Tag;
+        abstract create(a: A.Self): MaybePromise<MaybeHttpResult<A.Self>>;
+        abstract returnFatalIfParamsNotInstantiated(a: A.Self): MaybePromise<MaybeHttpResult<void>>;
+        abstract withoutB(self: A.Self): MaybePromise<MaybeHttpResult<A.Self>>;
     }
 
     export namespace DataSources {
@@ -73,6 +75,7 @@ export namespace A {
     }
 }
 export namespace B {
+    export const Tag = "B";
     export const Meta = cidl.models.B as any;
 
     export interface Self {
@@ -81,8 +84,8 @@ export namespace B {
     }
 
     export abstract class Api {
-        readonly tag = "B";
-        abstract testMethod(self: B.Self): MaybePromise<HttpResult<void>>;
+        readonly tag = Tag;
+        abstract testMethod(self: B.Self): MaybePromise<MaybeHttpResult<void>>;
     }
 
     export namespace DataSources {
@@ -114,6 +117,7 @@ export namespace B {
     }
 }
 export namespace Course {
+    export const Tag = "Course";
     export const Meta = cidl.models.Course as any;
 
     export interface Self {
@@ -122,7 +126,7 @@ export namespace Course {
     }
 
     export abstract class Api {
-        readonly tag = "Course";
+        readonly tag = Tag;
     }
 
     export namespace DataSources {
@@ -154,6 +158,7 @@ export namespace Course {
     }
 }
 export namespace Person {
+    export const Tag = "Person";
     export const Meta = cidl.models.Person as any;
 
     export interface Self {
@@ -162,10 +167,10 @@ export namespace Person {
     }
 
     export abstract class Api {
-        readonly tag = "Person";
-        abstract create(person: Person.Self): MaybePromise<HttpResult<Person.Self>>;
-        abstract returnFatalIfParamsNotInstantiated(person: Person.Self): MaybePromise<HttpResult<void>>;
-        abstract withoutDogs(self: Person.Self): MaybePromise<HttpResult<Person.Self>>;
+        readonly tag = Tag;
+        abstract create(person: Person.Self): MaybePromise<MaybeHttpResult<Person.Self>>;
+        abstract returnFatalIfParamsNotInstantiated(person: Person.Self): MaybePromise<MaybeHttpResult<void>>;
+        abstract withoutDogs(self: Person.Self): MaybePromise<MaybeHttpResult<Person.Self>>;
     }
 
     export namespace DataSources {
@@ -219,6 +224,7 @@ export namespace Person {
     }
 }
 export namespace Student {
+    export const Tag = "Student";
     export const Meta = cidl.models.Student as any;
 
     export interface Self {
@@ -227,9 +233,9 @@ export namespace Student {
     }
 
     export abstract class Api {
-        readonly tag = "Student";
-        abstract create(student: Student.Self): MaybePromise<HttpResult<Student.Self>>;
-        abstract none(self: Student.Self): MaybePromise<HttpResult<Student.Self>>;
+        readonly tag = Tag;
+        abstract create(student: Student.Self): MaybePromise<MaybeHttpResult<Student.Self>>;
+        abstract none(self: Student.Self): MaybePromise<MaybeHttpResult<Student.Self>>;
     }
 
     export namespace DataSources {
@@ -283,6 +289,7 @@ export namespace Student {
     }
 }
 export namespace Dog {
+    export const Tag = "Dog";
     export const Meta = cidl.models.Dog as any;
 
     export interface Self {
@@ -292,8 +299,8 @@ export namespace Dog {
     }
 
     export abstract class Api {
-        readonly tag = "Dog";
-        abstract testMethod(self: Dog.Self): MaybePromise<HttpResult<void>>;
+        readonly tag = Tag;
+        abstract testMethod(self: Dog.Self): MaybePromise<MaybeHttpResult<void>>;
     }
 
     export namespace DataSources {

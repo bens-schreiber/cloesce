@@ -3,12 +3,14 @@ import { HttpResult, KValue, CloesceApp, Orm, IncludeTree, DeepPartial } from "c
 import { R2Bucket, KVNamespace, D1Database, R2Object, D1PreparedStatement, ReadableStream, R2ObjectBody } from "@cloudflare/workers-types";
 
 type MaybePromise<T> = T | Promise<T>;
+type MaybeHttpResult<T> = T | HttpResult<T>;
 export interface Env {
     db: D1Database;
     bucket1: R2Bucket;
     bucket2: R2Bucket;
 }
 export namespace D1BackedModel {
+    export const Tag = "D1BackedModel";
     export const Meta = cidl.models.D1BackedModel as any;
 
     export interface Self {
@@ -20,8 +22,8 @@ export namespace D1BackedModel {
     }
 
     export abstract class Api {
-        readonly tag = "D1BackedModel";
-        abstract uploadData(self: D1BackedModel.Self, data: ReadableStream): MaybePromise<HttpResult<void>>;
+        readonly tag = Tag;
+        abstract uploadData(self: D1BackedModel.Self, data: ReadableStream): MaybePromise<MaybeHttpResult<void>>;
     }
 
     export namespace DataSources {
@@ -53,6 +55,7 @@ export namespace D1BackedModel {
     }
 }
 export namespace PureR2Model {
+    export const Tag = "PureR2Model";
     export const Meta = cidl.models.PureR2Model as any;
 
     export interface Self {
@@ -63,9 +66,9 @@ export namespace PureR2Model {
     }
 
     export abstract class Api {
-        readonly tag = "PureR2Model";
-        abstract uploadData(self: PureR2Model.Self, data: ReadableStream): MaybePromise<HttpResult<void>>;
-        abstract uploadOtherData(self: PureR2Model.Self, data: ReadableStream): MaybePromise<HttpResult<void>>;
+        readonly tag = Tag;
+        abstract uploadData(self: PureR2Model.Self, data: ReadableStream): MaybePromise<MaybeHttpResult<void>>;
+        abstract uploadOtherData(self: PureR2Model.Self, data: ReadableStream): MaybePromise<MaybeHttpResult<void>>;
     }
 
     export namespace DataSources {

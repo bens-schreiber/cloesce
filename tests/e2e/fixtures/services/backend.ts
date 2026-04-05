@@ -3,26 +3,34 @@ import { HttpResult, KValue, CloesceApp, Orm, IncludeTree, DeepPartial } from "c
 import { R2Bucket, KVNamespace, D1Database, R2Object, D1PreparedStatement, ReadableStream, R2ObjectBody } from "@cloudflare/workers-types";
 
 type MaybePromise<T> = T | Promise<T>;
+type MaybeHttpResult<T> = T | HttpResult<T>;
+export abstract class InjectedThing {
+    readonly tag = "InjectedThing";
+}
 export namespace FooService {
+    export const Tag = "FooService";
+
     export interface Self {
     }
 
     export abstract class Api {
-        readonly tag = "FooService";
-        abstract init(self: FooService.Self): MaybePromise<HttpResult<void> | void>;
-        abstract staticMethod(thing: InjectedThing): MaybePromise<HttpResult<string>>;
-        abstract instantiatedMethod(self: FooService.Self, thing: InjectedThing): MaybePromise<HttpResult<string>>;
+        readonly tag = Tag;
+        abstract init(self: FooService.Self): MaybePromise<MaybeHttpResult<void>>;
+        abstract staticMethod(thing: InjectedThing): MaybePromise<MaybeHttpResult<string>>;
+        abstract instantiatedMethod(self: FooService.Self, thing: InjectedThing): MaybePromise<MaybeHttpResult<string>>;
     }
 }
 export namespace BarService {
+    export const Tag = "BarService";
+
     export interface Self {
         foo: FooService;
     }
 
     export abstract class Api {
-        readonly tag = "BarService";
-        abstract init(self: BarService.Self): MaybePromise<HttpResult<void> | void>;
-        abstract useFoo(self: BarService.Self, injectedThing: InjectedThing): MaybePromise<HttpResult<string>>;
+        readonly tag = Tag;
+        abstract init(self: BarService.Self): MaybePromise<MaybeHttpResult<void>>;
+        abstract useFoo(self: BarService.Self, injectedThing: InjectedThing): MaybePromise<MaybeHttpResult<string>>;
     }
 }
 import cidl from "./cidl.json" with { type: "json" };

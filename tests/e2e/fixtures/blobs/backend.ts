@@ -3,20 +3,24 @@ import { HttpResult, KValue, CloesceApp, Orm, IncludeTree, DeepPartial } from "c
 import { R2Bucket, KVNamespace, D1Database, R2Object, D1PreparedStatement, ReadableStream, R2ObjectBody } from "@cloudflare/workers-types";
 
 type MaybePromise<T> = T | Promise<T>;
+type MaybeHttpResult<T> = T | HttpResult<T>;
 export interface Env {
     db: D1Database;
 }
 export namespace BlobService {
+    export const Tag = "BlobService";
+
     export interface Self {
     }
 
     export abstract class Api {
-        readonly tag = "BlobService";
-        abstract init(self: BlobService.Self): MaybePromise<HttpResult<void> | void>;
-        abstract incrementBlob(b: Uint8Array): MaybePromise<HttpResult<Uint8Array>>;
+        readonly tag = Tag;
+        abstract init(self: BlobService.Self): MaybePromise<MaybeHttpResult<void>>;
+        abstract incrementBlob(b: Uint8Array): MaybePromise<MaybeHttpResult<Uint8Array>>;
     }
 }
 export namespace BlobHaver {
+    export const Tag = "BlobHaver";
     export const Meta = cidl.models.BlobHaver as any;
 
     export interface Self {
@@ -26,10 +30,10 @@ export namespace BlobHaver {
     }
 
     export abstract class Api {
-        readonly tag = "BlobHaver";
-        abstract getBlob1(self: BlobHaver.Self): MaybePromise<HttpResult<Uint8Array>>;
-        abstract inputStream(s: ReadableStream): MaybePromise<HttpResult<void>>;
-        abstract yieldStream(self: BlobHaver.Self): MaybePromise<HttpResult<ReadableStream>>;
+        readonly tag = Tag;
+        abstract getBlob1(self: BlobHaver.Self): MaybePromise<MaybeHttpResult<Uint8Array>>;
+        abstract inputStream(s: ReadableStream): MaybePromise<MaybeHttpResult<void>>;
+        abstract yieldStream(self: BlobHaver.Self): MaybePromise<MaybeHttpResult<ReadableStream>>;
     }
 
     export namespace DataSources {

@@ -3,12 +3,14 @@ import { HttpResult, KValue, CloesceApp, Orm, IncludeTree, DeepPartial } from "c
 import { R2Bucket, KVNamespace, D1Database, R2Object, D1PreparedStatement, ReadableStream, R2ObjectBody } from "@cloudflare/workers-types";
 
 type MaybePromise<T> = T | Promise<T>;
+type MaybeHttpResult<T> = T | HttpResult<T>;
 export interface Env {
     db: D1Database;
     namespace: KVNamespace;
     otherNamespace: KVNamespace;
 }
 export namespace D1BackedModel {
+    export const Tag = "D1BackedModel";
     export const Meta = cidl.models.D1BackedModel as any;
 
     export interface Self {
@@ -20,7 +22,7 @@ export namespace D1BackedModel {
     }
 
     export abstract class Api {
-        readonly tag = "D1BackedModel";
+        readonly tag = Tag;
     }
 
     export namespace DataSources {
@@ -52,6 +54,7 @@ export namespace D1BackedModel {
     }
 }
 export namespace PaginatedKVModel {
+    export const Tag = "PaginatedKVModel";
     export const Meta = cidl.models.PaginatedKVModel as any;
 
     export interface Self {
@@ -60,8 +63,8 @@ export namespace PaginatedKVModel {
     }
 
     export abstract class Api {
-        readonly tag = "PaginatedKVModel";
-        abstract acceptPaginated(ps: Paginated<KValue<unknown>>): MaybePromise<HttpResult<Paginated<KValue<unknown>>>>;
+        readonly tag = Tag;
+        abstract acceptPaginated(ps: Paginated<KValue<unknown>>): MaybePromise<MaybeHttpResult<Paginated<KValue<unknown>>>>;
     }
 
     export namespace DataSources {
@@ -85,6 +88,7 @@ export namespace PaginatedKVModel {
     }
 }
 export namespace PureKVModel {
+    export const Tag = "PureKVModel";
     export const Meta = cidl.models.PureKVModel as any;
 
     export interface Self {
@@ -94,7 +98,7 @@ export namespace PureKVModel {
     }
 
     export abstract class Api {
-        readonly tag = "PureKVModel";
+        readonly tag = Tag;
     }
 
     export namespace DataSources {

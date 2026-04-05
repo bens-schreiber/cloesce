@@ -46,17 +46,35 @@ export class Hamburger {
       true
     );
   }
+  static $list(
+    args: {
+      lastId: number;
+      limit: number;
+    },
+  kind: "BurgersWithLettuceOrdered",
+    fetchImpl?: typeof fetch
+  ): Promise<HttpResult<Hamburger[]>>;
+  static $list(
+    args: {
+      lastSeen_id: number;
+      limit: number;
+    },
+  kind: "Default" = "Default",
+    fetchImpl?: typeof fetch
+  ): Promise<HttpResult<Hamburger[]>>;
   static async $list(
-    args: DataSources.Hamburger.$list.BurgersWithLettuceOrdered | DataSources.Hamburger.$list.Default,
+    args: any,
+    kind: "BurgersWithLettuceOrdered" | "Default" = "Default",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Hamburger[]>> {
     const baseUrl = new URL(
       `http://localhost:5646/api/Hamburger/$list`
     );
+    const payload: any = {};
     if ("lastId" in args) baseUrl.searchParams.append("lastId", String((args as any).lastId));
     if ("limit" in args) baseUrl.searchParams.append("limit", String((args as any).limit));
     if ("lastSeen_id" in args) baseUrl.searchParams.append("lastSeen_id", String((args as any).lastSeen_id));
-    baseUrl.searchParams.append("__datasource", args.kind);
+    baseUrl.searchParams.append("__datasource", kind);
 
     const res = await fetchImpl(baseUrl, {
       method: "GET",
@@ -69,16 +87,27 @@ export class Hamburger {
       true
     );
   }
+  static $save(
+    model: DeepPartial<Hamburger>,
+    kind: "BurgersWithLettuceOrdered",
+    fetchImpl?: typeof fetch
+  ): Promise<HttpResult<Hamburger>>;
+  static $save(
+    model: DeepPartial<Hamburger>,
+    kind: "Default" = "Default",
+    fetchImpl?: typeof fetch
+  ): Promise<HttpResult<Hamburger>>;
   static async $save(
-    args: DataSources.Hamburger.$save,
+    model: DeepPartial<Hamburger>,
+    kind: string,
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Hamburger>> {
     const baseUrl = new URL(
       `http://localhost:5646/api/Hamburger/$save`
     );
     const payload: any = {};
-    payload["model"] = (args as any).model;
-    baseUrl.searchParams.append("__datasource", args.kind);
+    payload["model"] = model;
+    baseUrl.searchParams.append("__datasource", kind);
 
     const res = await fetchImpl(baseUrl, {
       method: "POST",
@@ -106,16 +135,22 @@ export class Topping {
   id: number;
   name: string;
   hamburger: Hamburger[];
+  static $save(
+    model: DeepPartial<Topping>,
+    kind: "Default" = "Default",
+    fetchImpl?: typeof fetch
+  ): Promise<HttpResult<Topping>>;
   static async $save(
-    args: DataSources.Topping.$save,
+    model: DeepPartial<Topping>,
+    kind: string,
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Topping>> {
     const baseUrl = new URL(
       `http://localhost:5646/api/Topping/$save`
     );
     const payload: any = {};
-    payload["model"] = (args as any).model;
-    baseUrl.searchParams.append("__datasource", args.kind);
+    payload["model"] = model;
+    baseUrl.searchParams.append("__datasource", kind);
 
     const res = await fetchImpl(baseUrl, {
       method: "POST",
@@ -288,33 +323,5 @@ export class HttpResult<T = unknown> {
       response.headers,
       await data(),
     );
-  }
-}
-export namespace DataSources {
-  export namespace Hamburger {
-    export namespace $list {
-      export type BurgersWithLettuceOrdered = {
-        kind: "BurgersWithLettuceOrdered";
-        lastId: number;
-        limit: number;
-      }
-      export type Default = {
-        kind: "Default";
-        lastSeen_id: number;
-        limit: number;
-      }
-    }
-    export type $save = {
-      model: DeepPartial<Hamburger>;
-      kind: "BurgersWithLettuceOrdered" | "Default";
-    }
-  }
-}
-export namespace DataSources {
-  export namespace Topping {
-    export type $save = {
-      model: DeepPartial<Topping>;
-      kind: "Default";
-    }
   }
 }

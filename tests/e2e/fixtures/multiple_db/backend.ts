@@ -3,11 +3,13 @@ import { HttpResult, KValue, CloesceApp, Orm, IncludeTree, DeepPartial } from "c
 import { R2Bucket, KVNamespace, D1Database, R2Object, D1PreparedStatement, ReadableStream, R2ObjectBody } from "@cloudflare/workers-types";
 
 type MaybePromise<T> = T | Promise<T>;
+type MaybeHttpResult<T> = T | HttpResult<T>;
 export interface Env {
     db1: D1Database;
     db2: D1Database;
 }
 export namespace DB1Model {
+    export const Tag = "DB1Model";
     export const Meta = cidl.models.DB1Model as any;
 
     export interface Self {
@@ -16,7 +18,7 @@ export namespace DB1Model {
     }
 
     export abstract class Api {
-        readonly tag = "DB1Model";
+        readonly tag = Tag;
     }
 
     export namespace DataSources {
@@ -48,6 +50,7 @@ export namespace DB1Model {
     }
 }
 export namespace DB2Model {
+    export const Tag = "DB2Model";
     export const Meta = cidl.models.DB2Model as any;
 
     export interface Self {
@@ -56,7 +59,7 @@ export namespace DB2Model {
     }
 
     export abstract class Api {
-        readonly tag = "DB2Model";
+        readonly tag = Tag;
     }
 
     export namespace DataSources {

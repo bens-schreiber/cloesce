@@ -38,16 +38,22 @@ export class Foo {
       false
     );
   }
+  static $save(
+    model: DeepPartial<Foo>,
+    kind: "Default" = "Default",
+    fetchImpl?: typeof fetch
+  ): Promise<HttpResult<Foo>>;
   static async $save(
-    args: DataSources.Foo.$save,
+    model: DeepPartial<Foo>,
+    kind: string,
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Foo>> {
     const baseUrl = new URL(
       `http://localhost:5646/api/Foo/$save`
     );
     const payload: any = {};
-    payload["model"] = (args as any).model;
-    baseUrl.searchParams.append("__datasource", args.kind);
+    payload["model"] = model;
+    baseUrl.searchParams.append("__datasource", kind);
 
     const res = await fetchImpl(baseUrl, {
       method: "POST",
@@ -217,13 +223,5 @@ export class HttpResult<T = unknown> {
       response.headers,
       await data(),
     );
-  }
-}
-export namespace DataSources {
-  export namespace Foo {
-    export type $save = {
-      model: DeepPartial<Foo>;
-      kind: "Default";
-    }
   }
 }
