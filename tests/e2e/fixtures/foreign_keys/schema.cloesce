@@ -33,8 +33,7 @@ source WithoutB for A {
 }
 
 api A {
-    post create(a: A) -> A
-    post returnFatalIfParamsNotInstantiated(a: A) -> void
+    post create(e: env, a: A) -> A
     get withoutB([source WithoutB] self) -> A
 }
 //#endregion
@@ -58,8 +57,7 @@ source WithoutDogs for Person {
 }
 
 api Person {
-    post create(person: Person) -> Person
-    post returnFatalIfParamsNotInstantiated(person: Person) -> void
+    post create(e: env, person: Person) -> Person
     get withoutDogs([source WithoutDogs] self) -> Person
 }
 
@@ -97,7 +95,7 @@ source None for Student {
 }
 
 api Student {
-    post create(student: Student) -> Student
+    post create(e: env, student: Student) -> Student
     get none([source None] self) -> Student
 }
 

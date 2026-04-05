@@ -9,7 +9,7 @@ use ast::{
 };
 use frontend::{ModelBlock, NavigationBlock, Span, Symbol, WranglerEnvBindingKind};
 use indexmap::IndexMap;
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap};
 
 #[derive(Default)]
 pub struct ModelAnalysis<'src, 'p> {
@@ -55,7 +55,6 @@ impl<'src, 'p> ModelAnalysis<'src, 'p> {
 
             // Validate CRUD
             if let Some(tag) = &model_block.use_tag {
-                let mut seen_cruds = HashSet::new();
                 for crud in &tag.cruds {
                     ensure!(
                         !matches!(crud, CrudKind::List) || model.d1_binding.is_some(),
@@ -64,18 +63,9 @@ impl<'src, 'p> ModelAnalysis<'src, 'p> {
                             model: &model_block.symbol
                         }
                     );
-
-                    seen_cruds.insert(crud);
                 }
 
-                let mut cruds: Vec<CrudKind> = seen_cruds.into_iter().cloned().collect();
-                // Sort for deterministic output: Get, List, Save
-                cruds.sort_by_key(|c| match c {
-                    CrudKind::Get => 0,
-                    CrudKind::List => 1,
-                    CrudKind::Save => 2,
-                });
-                model.cruds = cruds;
+                model.cruds = tag.cruds.clone(); // note: cruds are deduped in parser
             }
 
             models.insert(model.name, model);

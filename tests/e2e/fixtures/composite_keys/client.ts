@@ -162,7 +162,7 @@ export class Student {
   static $list(
     args: {
       lastSeen_id: number;
-      lastSeen_name: number;
+      lastSeen_name: string;
       limit: number;
     },
   kind: "Default" = "Default",
@@ -291,7 +291,7 @@ export class StudentCourse {
   static $list(
     args: {
       lastSeen_studentId: number;
-      lastSeen_studentName: number;
+      lastSeen_studentName: string;
       lastSeen_courseId: number;
       limit: number;
     },
@@ -301,7 +301,7 @@ export class StudentCourse {
   static $list(
     args: {
       lastSeen_studentId: number;
-      lastSeen_studentName: number;
+      lastSeen_studentName: string;
       lastSeen_courseId: number;
       limit: number;
     },

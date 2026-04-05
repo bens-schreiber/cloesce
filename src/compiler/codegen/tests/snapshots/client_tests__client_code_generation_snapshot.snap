@@ -267,7 +267,7 @@ export class ToyotaPrius {
 
   static fromJson(data: any): ToyotaPrius {
     const res = Object.assign(new ToyotaPrius(), data);
-    if (res.metadata) res.metadata = Object.assign(new unknown(), res.metadata);
+  if (res.metadata) res.metadata = Object.assign(new KValue(), res.metadata);
     return res;
   }
 }
@@ -333,6 +333,41 @@ export class ModelWithCruds {
       false
     );
   }
+  static $save(
+    model: DeepPartial<ModelWithCruds>,
+    kind: "ByName",
+    fetchImpl?: typeof fetch
+  ): Promise<HttpResult<ModelWithCruds>>;
+  static $save(
+    model: DeepPartial<ModelWithCruds>,
+    kind: "Default" = "Default",
+    fetchImpl?: typeof fetch
+  ): Promise<HttpResult<ModelWithCruds>>;
+  static async $save(
+    model: DeepPartial<ModelWithCruds>,
+    kind: "ByName" | "Default" = "Default",
+    fetchImpl: typeof fetch = fetch
+  ): Promise<HttpResult<ModelWithCruds>> {
+    const baseUrl = new URL(
+      `http://example.com/path/to/api/ModelWithCruds/$save`
+    );
+    const payload: any = {};
+    payload["model"] = model;
+    baseUrl.searchParams.append("__datasource", kind);
+
+    const res = await fetchImpl(baseUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: requestBody(MediaType.Json, payload),
+    });
+
+    return await HttpResult.fromResponse(
+      res,
+      MediaType.Json,
+      ModelWithCruds,
+      false
+    );
+  }
   static $list(
     args: {
       name: string;
@@ -372,41 +407,6 @@ export class ModelWithCruds {
       MediaType.Json,
       ModelWithCruds,
       true
-    );
-  }
-  static $save(
-    model: DeepPartial<ModelWithCruds>,
-    kind: "ByName",
-    fetchImpl?: typeof fetch
-  ): Promise<HttpResult<ModelWithCruds>>;
-  static $save(
-    model: DeepPartial<ModelWithCruds>,
-    kind: "Default" = "Default",
-    fetchImpl?: typeof fetch
-  ): Promise<HttpResult<ModelWithCruds>>;
-  static async $save(
-    model: DeepPartial<ModelWithCruds>,
-    kind: "ByName" | "Default" = "Default",
-    fetchImpl: typeof fetch = fetch
-  ): Promise<HttpResult<ModelWithCruds>> {
-    const baseUrl = new URL(
-      `http://example.com/path/to/api/ModelWithCruds/$save`
-    );
-    const payload: any = {};
-    payload["model"] = model;
-    baseUrl.searchParams.append("__datasource", kind);
-
-    const res = await fetchImpl(baseUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: requestBody(MediaType.Json, payload),
-    });
-
-    return await HttpResult.fromResponse(
-      res,
-      MediaType.Json,
-      ModelWithCruds,
-      false
     );
   }
 
@@ -498,10 +498,10 @@ export class ModelWithKv {
 
   static fromJson(data: any): ModelWithKv {
     const res = Object.assign(new ModelWithKv(), data);
-    if (res.someValue) res.someValue = Object.assign(new unknown(), res.someValue);
+  if (res.someValue) res.someValue = Object.assign(new KValue(), res.someValue);
     if (res.manyValues?.results) {
       for (let i = 0; i < res.manyValues.results.length; i++) {
-        res.manyValues.results[i] = Object.assign(new unknown(), res.manyValues.results[i]);
+    res.manyValues.results[i] = Object.assign(new KValue(), res.manyValues.results[i]);
       }
     }
     return res;

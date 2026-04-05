@@ -27,6 +27,36 @@ export class CrudHaver {
       false
     );
   }
+  static $save(
+    model: DeepPartial<CrudHaver>,
+    kind: "Default" = "Default",
+    fetchImpl?: typeof fetch
+  ): Promise<HttpResult<CrudHaver>>;
+  static async $save(
+    model: DeepPartial<CrudHaver>,
+    kind: "Default" = "Default",
+    fetchImpl: typeof fetch = fetch
+  ): Promise<HttpResult<CrudHaver>> {
+    const baseUrl = new URL(
+      `http://localhost:5646/api/CrudHaver/$save`
+    );
+    const payload: any = {};
+    payload["model"] = model;
+    baseUrl.searchParams.append("__datasource", kind);
+
+    const res = await fetchImpl(baseUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: requestBody(MediaType.Json, payload),
+    });
+
+    return await HttpResult.fromResponse(
+      res,
+      MediaType.Json,
+      CrudHaver,
+      false
+    );
+  }
   static $get(
     args: {
       id: number;
@@ -89,18 +119,34 @@ export class CrudHaver {
       true
     );
   }
+
+  static fromJson(data: any): CrudHaver {
+    const res = Object.assign(new CrudHaver(), data);
+    return res;
+  }
+}
+export class Parent {
+  id: number;
+  favoriteChildId: number | null;
+  favoriteChild: Child | undefined;
+  children: Child[];
   static $save(
-    model: DeepPartial<CrudHaver>,
+    model: DeepPartial<Parent>,
     kind: "Default" = "Default",
     fetchImpl?: typeof fetch
-  ): Promise<HttpResult<CrudHaver>>;
+  ): Promise<HttpResult<Parent>>;
+  static $save(
+    model: DeepPartial<Parent>,
+    kind: "WithChildren",
+    fetchImpl?: typeof fetch
+  ): Promise<HttpResult<Parent>>;
   static async $save(
-    model: DeepPartial<CrudHaver>,
-    kind: "Default" = "Default",
+    model: DeepPartial<Parent>,
+    kind: "Default" | "WithChildren" = "Default",
     fetchImpl: typeof fetch = fetch
-  ): Promise<HttpResult<CrudHaver>> {
+  ): Promise<HttpResult<Parent>> {
     const baseUrl = new URL(
-      `http://localhost:5646/api/CrudHaver/$save`
+      `http://localhost:5646/api/Parent/$save`
     );
     const payload: any = {};
     payload["model"] = model;
@@ -115,21 +161,10 @@ export class CrudHaver {
     return await HttpResult.fromResponse(
       res,
       MediaType.Json,
-      CrudHaver,
+      Parent,
       false
     );
   }
-
-  static fromJson(data: any): CrudHaver {
-    const res = Object.assign(new CrudHaver(), data);
-    return res;
-  }
-}
-export class Parent {
-  id: number;
-  favoriteChildId: number | null;
-  favoriteChild: Child | undefined;
-  children: Child[];
   static $get(
     args: {
       id: number;
@@ -205,41 +240,6 @@ export class Parent {
       MediaType.Json,
       Parent,
       true
-    );
-  }
-  static $save(
-    model: DeepPartial<Parent>,
-    kind: "Default" = "Default",
-    fetchImpl?: typeof fetch
-  ): Promise<HttpResult<Parent>>;
-  static $save(
-    model: DeepPartial<Parent>,
-    kind: "WithChildren",
-    fetchImpl?: typeof fetch
-  ): Promise<HttpResult<Parent>>;
-  static async $save(
-    model: DeepPartial<Parent>,
-    kind: "Default" | "WithChildren" = "Default",
-    fetchImpl: typeof fetch = fetch
-  ): Promise<HttpResult<Parent>> {
-    const baseUrl = new URL(
-      `http://localhost:5646/api/Parent/$save`
-    );
-    const payload: any = {};
-    payload["model"] = model;
-    baseUrl.searchParams.append("__datasource", kind);
-
-    const res = await fetchImpl(baseUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: requestBody(MediaType.Json, payload),
-    });
-
-    return await HttpResult.fromResponse(
-      res,
-      MediaType.Json,
-      Parent,
-      false
     );
   }
 

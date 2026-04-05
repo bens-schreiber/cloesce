@@ -55,6 +55,39 @@
           "parameters": []
         },
         {
+          "name": "$save",
+          "is_static": true,
+          "data_source": null,
+          "http_verb": "Post",
+          "return_media": "Json",
+          "return_type": {
+            "HttpResult": {
+              "Object": {
+                "name": "CrudHaver"
+              }
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "model",
+              "cidl_type": {
+                "Partial": {
+                  "object_name": "CrudHaver"
+                }
+              }
+            },
+            {
+              "name": "__datasource",
+              "cidl_type": {
+                "DataSource": {
+                  "model_name": "CrudHaver"
+                }
+              }
+            }
+          ]
+        },
+        {
           "name": "$get",
           "is_static": true,
           "data_source": null,
@@ -123,39 +156,6 @@
               }
             }
           ]
-        },
-        {
-          "name": "$save",
-          "is_static": true,
-          "data_source": null,
-          "http_verb": "Post",
-          "return_media": "Json",
-          "return_type": {
-            "HttpResult": {
-              "Object": {
-                "name": "CrudHaver"
-              }
-            }
-          },
-          "parameters_media": "Json",
-          "parameters": [
-            {
-              "name": "model",
-              "cidl_type": {
-                "Partial": {
-                  "object_name": "CrudHaver"
-                }
-              }
-            },
-            {
-              "name": "__datasource",
-              "cidl_type": {
-                "DataSource": {
-                  "model_name": "CrudHaver"
-                }
-              }
-            }
-          ]
         }
       ],
       "data_sources": {
@@ -185,9 +185,9 @@
         }
       },
       "cruds": [
+        "Save",
         "Get",
-        "List",
-        "Save"
+        "List"
       ]
     },
     "Parent": {
@@ -270,6 +270,39 @@
       "key_fields": [],
       "apis": [
         {
+          "name": "$save",
+          "is_static": true,
+          "data_source": null,
+          "http_verb": "Post",
+          "return_media": "Json",
+          "return_type": {
+            "HttpResult": {
+              "Object": {
+                "name": "Parent"
+              }
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "model",
+              "cidl_type": {
+                "Partial": {
+                  "object_name": "Parent"
+                }
+              }
+            },
+            {
+              "name": "__datasource",
+              "cidl_type": {
+                "DataSource": {
+                  "model_name": "Parent"
+                }
+              }
+            }
+          ]
+        },
+        {
           "name": "$get",
           "is_static": true,
           "data_source": null,
@@ -338,39 +371,6 @@
               }
             }
           ]
-        },
-        {
-          "name": "$save",
-          "is_static": true,
-          "data_source": null,
-          "http_verb": "Post",
-          "return_media": "Json",
-          "return_type": {
-            "HttpResult": {
-              "Object": {
-                "name": "Parent"
-              }
-            }
-          },
-          "parameters_media": "Json",
-          "parameters": [
-            {
-              "name": "model",
-              "cidl_type": {
-                "Partial": {
-                  "object_name": "Parent"
-                }
-              }
-            },
-            {
-              "name": "__datasource",
-              "cidl_type": {
-                "DataSource": {
-                  "model_name": "Parent"
-                }
-              }
-            }
-          ]
         }
       ],
       "data_sources": {
@@ -424,9 +424,9 @@
         }
       },
       "cruds": [
+        "Save",
         "Get",
-        "List",
-        "Save"
+        "List"
       ]
     },
     "Child": {

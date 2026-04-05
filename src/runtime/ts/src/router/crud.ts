@@ -54,7 +54,7 @@ async function get(
   // plus the key fields for the model. To find the parameters for this specific data source,
   // we have to take the intersection of the data source get params and the args passed in.
   const paramOrder = new Map(
-    dataSource.get!.parameters.map((p, i) => [p.name, i]),
+    dataSource.get?.parameters.map((p, i) => [p.name, i]) ?? [],
   );
   const keyFields = new Set(meta.key_fields);
   const dataSourceArgs: unknown[] = Array.from({ length: paramOrder.size });

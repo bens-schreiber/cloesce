@@ -94,10 +94,6 @@ impl ClientTemplate<'_> {
         }
     }
 
-    fn map_kv_inner_type(&self, ty: &CidlType<'_>) -> String {
-        self.mapper.cidl_type(self.kv_inner_type(ty), self.ast)
-    }
-
     fn object_name<'t>(&self, ty: &'t CidlType<'t>) -> &'t str {
         match ty.root_type() {
             CidlType::Inject { name } | CidlType::Object { name } => name,

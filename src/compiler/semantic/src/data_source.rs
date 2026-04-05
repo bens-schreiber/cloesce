@@ -232,7 +232,7 @@ impl<'src> DataSourceExpansion {
             .iter()
             .map(|pk| Field {
                 name: format!("lastSeen_{}", pk.field.name).into(),
-                cidl_type: CidlType::Integer,
+                cidl_type: pk.field.cidl_type.clone(),
             })
             .chain(vec![Field {
                 name: "limit".into(),

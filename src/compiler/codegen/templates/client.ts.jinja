@@ -152,9 +152,16 @@ export class {{ model.name }} {
 {%- for param in &get.parameters %}
       {{ param.name }}: {{ self.map_type(&param.cidl_type) }};
 {%- endfor %}
+{%- for key in &model.key_fields %}
+      {{ key }}: string;
+{%- endfor %}
     },
 {%- else %}
-  args: {},
+    args: {
+{%- for key in &model.key_fields %}
+      {{ key }}: string;
+{%- endfor %}
+    },
 {%- endif %}
   kind: "{{ ds.name }}"{% if ds.name == "Default" %} = "Default"{% endif %},
     fetchImpl?: typeof fetch
@@ -416,14 +423,14 @@ export class {{ model.name }} {
 {%- if self.is_paginated(&kv.field.cidl_type) %}
     if (res.{{ kv.field.name }}?.results) {
       for (let i = 0; i < res.{{ kv.field.name }}.results.length; i++) {
-        res.{{ kv.field.name }}.results[i] = Object.assign(new {{ self.map_kv_inner_type(&kv.field.cidl_type) }}(), res.{{ kv.field.name }}.results[i]);
+    res.{{ kv.field.name }}.results[i] = Object.assign(new KValue(), res.{{ kv.field.name }}.results[i]);
 {%- if self.is_object(self.kv_inner_type(&kv.field.cidl_type)) %}
         if (res.{{ kv.field.name }}.results[i].raw) res.{{ kv.field.name }}.results[i].raw = {{ self.object_name(self.kv_inner_type(&kv.field.cidl_type)) }}.fromJson(res.{{ kv.field.name }}.results[i].raw);
 {%- endif %}
       }
     }
 {%- else if !self.contains_stream(&kv.field.cidl_type) %}
-    if (res.{{ kv.field.name }}) res.{{ kv.field.name }} = Object.assign(new {{ self.map_kv_inner_type(&kv.field.cidl_type) }}(), res.{{ kv.field.name }});
+  if (res.{{ kv.field.name }}) res.{{ kv.field.name }} = Object.assign(new KValue(), res.{{ kv.field.name }});
 {%- if self.is_object(self.kv_inner_type(&kv.field.cidl_type)) %}
     if (res.{{ kv.field.name }}?.raw) res.{{ kv.field.name }}.raw = {{ self.object_name(self.kv_inner_type(&kv.field.cidl_type)) }}.fromJson(res.{{ kv.field.name }}.raw);
 {%- endif %}

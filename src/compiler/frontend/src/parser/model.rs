@@ -194,7 +194,7 @@ fn r2_block<'tokens, 'src: 'tokens>()
 
 enum UseItem<'src> {
     Crud(CrudKind),
-    Binding(&'src str, Span),
+    Binding(&'src str),
 }
 
 fn use_item<'tokens, 'src: 'tokens>()
@@ -203,7 +203,7 @@ fn use_item<'tokens, 'src: 'tokens>()
         just(Token::Get).map(|_| UseItem::Crud(CrudKind::Get)),
         just(Token::Save).map(|_| UseItem::Crud(CrudKind::Save)),
         just(Token::List).map(|_| UseItem::Crud(CrudKind::List)),
-        select! { Token::Ident(name) => name }.map_with(|name, e| UseItem::Binding(name, e.span())),
+        select! { Token::Ident(name) => name }.map(UseItem::Binding),
     ))
 }
 
@@ -250,7 +250,8 @@ pub fn model_block<'tokens, 'src: 'tokens>()
                 .at_least(1)
                 .collect::<Vec<_>>(),
         )
-        .then_ignore(just(Token::RBracket));
+        .then_ignore(just(Token::RBracket))
+        .map_with(|items, e| (items, e.span()));
 
     // `unique { ... }``
     let unique_block = just(Token::Unique)
@@ -367,14 +368,14 @@ pub fn model_block<'tokens, 'src: 'tokens>()
 fn map_model<'src>(
     model_name: &'src str,
     model_span: Span,
-    tag_lists: Vec<Vec<UseItem<'src>>>,
+    tag_lists: Vec<(Vec<UseItem<'src>>, Span)>,
     items: Vec<ModelItem<'src>>,
 ) -> ModelBlock<'src> {
     let mut cruds: Vec<CrudKind> = Vec::new();
     let mut env_bindings: Vec<&str> = Vec::new();
     let use_tag = {
         let mut use_span: Option<Span> = None;
-        for items_list in tag_lists {
+        for (items_list, tag_span) in tag_lists {
             for item in items_list {
                 match item {
                     UseItem::Crud(c) => {
@@ -382,12 +383,20 @@ fn map_model<'src>(
                             cruds.push(c);
                         }
                     }
-                    UseItem::Binding(b, span) => {
+                    UseItem::Binding(b) => {
                         env_bindings.push(b);
-                        use_span = Some(span);
                     }
                 }
             }
+
+            use_span = Some(match use_span {
+                Some(existing) => Span {
+                    start: existing.start,
+                    end: tag_span.end,
+                    context: existing.context,
+                },
+                None => tag_span,
+            });
         }
 
         use_span.map(|span| UseTag {

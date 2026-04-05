@@ -347,7 +347,7 @@
             {
               "name": "lastSeen_name",
               "cidl_type": {
-                "Nullable": "Integer"
+                "Nullable": "String"
               }
             },
             {
@@ -437,7 +437,7 @@
               },
               {
                 "name": "lastSeen_name",
-                "cidl_type": "Integer"
+                "cidl_type": "String"
               },
               {
                 "name": "limit",
@@ -626,7 +626,7 @@
             {
               "name": "lastSeen_studentName",
               "cidl_type": {
-                "Nullable": "Integer"
+                "Nullable": "String"
               }
             },
             {
@@ -696,7 +696,7 @@
               },
               {
                 "name": "lastSeen_studentName",
-                "cidl_type": "Integer"
+                "cidl_type": "String"
               },
               {
                 "name": "lastSeen_courseId",
@@ -736,7 +736,7 @@
               },
               {
                 "name": "lastSeen_studentName",
-                "cidl_type": "Integer"
+                "cidl_type": "String"
               },
               {
                 "name": "lastSeen_courseId",

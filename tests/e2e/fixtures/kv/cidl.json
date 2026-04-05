@@ -105,6 +105,39 @@
           ]
         },
         {
+          "name": "$save",
+          "is_static": true,
+          "data_source": null,
+          "http_verb": "Post",
+          "return_media": "Json",
+          "return_type": {
+            "HttpResult": {
+              "Object": {
+                "name": "D1BackedModel"
+              }
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "model",
+              "cidl_type": {
+                "Partial": {
+                  "object_name": "D1BackedModel"
+                }
+              }
+            },
+            {
+              "name": "__datasource",
+              "cidl_type": {
+                "DataSource": {
+                  "model_name": "D1BackedModel"
+                }
+              }
+            }
+          ]
+        },
+        {
           "name": "$list",
           "is_static": true,
           "data_source": null,
@@ -131,39 +164,6 @@
               "name": "limit",
               "cidl_type": {
                 "Nullable": "Integer"
-              }
-            },
-            {
-              "name": "__datasource",
-              "cidl_type": {
-                "DataSource": {
-                  "model_name": "D1BackedModel"
-                }
-              }
-            }
-          ]
-        },
-        {
-          "name": "$save",
-          "is_static": true,
-          "data_source": null,
-          "http_verb": "Post",
-          "return_media": "Json",
-          "return_type": {
-            "HttpResult": {
-              "Object": {
-                "name": "D1BackedModel"
-              }
-            }
-          },
-          "parameters_media": "Json",
-          "parameters": [
-            {
-              "name": "model",
-              "cidl_type": {
-                "Partial": {
-                  "object_name": "D1BackedModel"
-                }
               }
             },
             {
@@ -205,8 +205,8 @@
       },
       "cruds": [
         "Get",
-        "List",
-        "Save"
+        "Save",
+        "List"
       ]
     },
     "PaginatedKVModel": {
@@ -260,6 +260,35 @@
               }
             }
           ]
+        },
+        {
+          "name": "$get",
+          "is_static": true,
+          "data_source": null,
+          "http_verb": "Get",
+          "return_media": "Json",
+          "return_type": {
+            "HttpResult": {
+              "Object": {
+                "name": "PaginatedKVModel"
+              }
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "id",
+              "cidl_type": "String"
+            },
+            {
+              "name": "__datasource",
+              "cidl_type": {
+                "DataSource": {
+                  "model_name": "PaginatedKVModel"
+                }
+              }
+            }
+          ]
         }
       ],
       "data_sources": {
@@ -270,7 +299,9 @@
           "is_internal": false
         }
       },
-      "cruds": []
+      "cruds": [
+        "Get"
+      ]
     },
     "PureKVModel": {
       "hash": 5491520551375615806,
@@ -307,7 +338,70 @@
       "key_fields": [
         "id"
       ],
-      "apis": [],
+      "apis": [
+        {
+          "name": "$get",
+          "is_static": true,
+          "data_source": null,
+          "http_verb": "Get",
+          "return_media": "Json",
+          "return_type": {
+            "HttpResult": {
+              "Object": {
+                "name": "PureKVModel"
+              }
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "id",
+              "cidl_type": "String"
+            },
+            {
+              "name": "__datasource",
+              "cidl_type": {
+                "DataSource": {
+                  "model_name": "PureKVModel"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "$save",
+          "is_static": true,
+          "data_source": null,
+          "http_verb": "Post",
+          "return_media": "Json",
+          "return_type": {
+            "HttpResult": {
+              "Object": {
+                "name": "PureKVModel"
+              }
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "model",
+              "cidl_type": {
+                "Partial": {
+                  "object_name": "PureKVModel"
+                }
+              }
+            },
+            {
+              "name": "__datasource",
+              "cidl_type": {
+                "DataSource": {
+                  "model_name": "PureKVModel"
+                }
+              }
+            }
+          ]
+        }
+      ],
       "data_sources": {
         "Default": {
           "name": "Default",
@@ -316,7 +410,10 @@
           "is_internal": false
         }
       },
-      "cruds": []
+      "cruds": [
+        "Get",
+        "Save"
+      ]
     }
   },
   "services": {},

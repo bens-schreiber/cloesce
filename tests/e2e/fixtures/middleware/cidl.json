@@ -105,7 +105,7 @@
             "parameters": [
               {
                 "name": "lastSeen_id",
-                "cidl_type": "Integer"
+                "cidl_type": "String"
               },
               {
                 "name": "limit",

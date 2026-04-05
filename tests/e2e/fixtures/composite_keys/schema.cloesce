@@ -23,7 +23,7 @@ source CoursesOrderedDescending for Student {
             SELECT * FROM students
             WHERE id > $lastId
                AND name > $lastName
-            ORDER BY id ASC, name ASC
+            ORDER BY id DESC, name DESC
             LIMIT $limit
         "
     }

@@ -4,36 +4,6 @@ export class Weather {
   id: number;
   _date: Date;
   isRaining: boolean;
-  static $get(
-    args: {
-      id: number;
-    },
-  kind: "Default" = "Default",
-    fetchImpl?: typeof fetch
-  ): Promise<HttpResult<Weather>>;
-  static async $get(
-    args: any,
-    kind: "Default" = "Default",
-    fetchImpl: typeof fetch = fetch
-  ): Promise<HttpResult<Weather>> {
-    const baseUrl = new URL(
-      `http://localhost:5646/api/Weather/$get`
-    );
-    const payload: any = {};
-  baseUrl.searchParams.append("id", String((args as any).id ?? null));
-    baseUrl.searchParams.append("__datasource", kind);
-
-    const res = await fetchImpl(baseUrl, {
-      method: "GET",
-    });
-
-    return await HttpResult.fromResponse(
-      res,
-      MediaType.Json,
-      Weather,
-      false
-    );
-  }
   static $save(
     model: DeepPartial<Weather>,
     kind: "Default" = "Default",
@@ -55,6 +25,36 @@ export class Weather {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: requestBody(MediaType.Json, payload),
+    });
+
+    return await HttpResult.fromResponse(
+      res,
+      MediaType.Json,
+      Weather,
+      false
+    );
+  }
+  static $get(
+    args: {
+      id: number;
+    },
+  kind: "Default" = "Default",
+    fetchImpl?: typeof fetch
+  ): Promise<HttpResult<Weather>>;
+  static async $get(
+    args: any,
+    kind: "Default" = "Default",
+    fetchImpl: typeof fetch = fetch
+  ): Promise<HttpResult<Weather>> {
+    const baseUrl = new URL(
+      `http://localhost:5646/api/Weather/$get`
+    );
+    const payload: any = {};
+  baseUrl.searchParams.append("id", String((args as any).id ?? null));
+    baseUrl.searchParams.append("__datasource", kind);
+
+    const res = await fetchImpl(baseUrl, {
+      method: "GET",
     });
 
     return await HttpResult.fromResponse(

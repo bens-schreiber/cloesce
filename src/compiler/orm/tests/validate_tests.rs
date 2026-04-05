@@ -376,33 +376,6 @@ fn data_source() {
         );
         assert!(matches!(result, Err(ValidatorErrorKind::UnknownDataSource)));
     }
-
-    // "none" is valid data source
-    {
-        let ast = src_to_ast(
-            r#"
-            env {
-                d1 { db }
-            }
-
-            [use db]
-            model Horse {
-                primary {
-                    id: int
-                }
-            }
-        "#,
-        );
-        let result = validate_cidl_type(
-            CidlType::DataSource {
-                model_name: "Horse",
-            },
-            Some(json!("none")),
-            &ast,
-            false,
-        );
-        assert_eq!(result.unwrap(), Some(json!("none")));
-    }
 }
 
 #[test]
@@ -514,6 +487,58 @@ fn objects_partials() {
         assert!(result.is_ok());
         let obj = result.unwrap();
         assert_eq!(obj, Some(json!({ "id": 1 })));
+    }
+
+    // partial KV passes
+    {
+        let ast = src_to_ast(
+            r#"
+            env {
+                kv { namespace otherNamespace }
+            }
+
+            model PureKVModel {
+                keyfield { id }
+
+                kv(namespace, "path/to/data/{id}") { data: json }
+                kv(otherNamespace, "path/to/other/{id}") { otherData: string }
+            }
+            "#,
+        );
+
+        let value = json!({
+            "id": "test-id",
+            "data": { "raw": { "foo": "bar" } },
+            "otherData": { "raw": "some string data" }
+        });
+
+        let result = validate_cidl_type(
+            CidlType::Partial {
+                object_name: "PureKVModel",
+            },
+            Some(value),
+            &ast,
+            false,
+        );
+
+        assert!(result.is_ok());
+        let obj = result.unwrap().unwrap();
+        assert_eq!(
+            obj,
+            json!({
+                "id": "test-id",
+                "data": {
+                    "key": null,
+                    "metadata": null,
+                    "raw": { "foo": "bar" }
+                },
+                "otherData": {
+                    "key": null,
+                    "metadata": null,
+                    "raw": "some string data"
+                }
+            })
+        );
     }
 }
 

@@ -46,6 +46,41 @@ export class Hamburger {
       true
     );
   }
+  static $save(
+    model: DeepPartial<Hamburger>,
+    kind: "BurgersWithLettuceOrdered",
+    fetchImpl?: typeof fetch
+  ): Promise<HttpResult<Hamburger>>;
+  static $save(
+    model: DeepPartial<Hamburger>,
+    kind: "Default" = "Default",
+    fetchImpl?: typeof fetch
+  ): Promise<HttpResult<Hamburger>>;
+  static async $save(
+    model: DeepPartial<Hamburger>,
+    kind: "BurgersWithLettuceOrdered" | "Default" = "Default",
+    fetchImpl: typeof fetch = fetch
+  ): Promise<HttpResult<Hamburger>> {
+    const baseUrl = new URL(
+      `http://localhost:5646/api/Hamburger/$save`
+    );
+    const payload: any = {};
+    payload["model"] = model;
+    baseUrl.searchParams.append("__datasource", kind);
+
+    const res = await fetchImpl(baseUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: requestBody(MediaType.Json, payload),
+    });
+
+    return await HttpResult.fromResponse(
+      res,
+      MediaType.Json,
+      Hamburger,
+      false
+    );
+  }
   static $list(
     args: {
       lastId: number;
@@ -85,41 +120,6 @@ export class Hamburger {
       MediaType.Json,
       Hamburger,
       true
-    );
-  }
-  static $save(
-    model: DeepPartial<Hamburger>,
-    kind: "BurgersWithLettuceOrdered",
-    fetchImpl?: typeof fetch
-  ): Promise<HttpResult<Hamburger>>;
-  static $save(
-    model: DeepPartial<Hamburger>,
-    kind: "Default" = "Default",
-    fetchImpl?: typeof fetch
-  ): Promise<HttpResult<Hamburger>>;
-  static async $save(
-    model: DeepPartial<Hamburger>,
-    kind: "BurgersWithLettuceOrdered" | "Default" = "Default",
-    fetchImpl: typeof fetch = fetch
-  ): Promise<HttpResult<Hamburger>> {
-    const baseUrl = new URL(
-      `http://localhost:5646/api/Hamburger/$save`
-    );
-    const payload: any = {};
-    payload["model"] = model;
-    baseUrl.searchParams.append("__datasource", kind);
-
-    const res = await fetchImpl(baseUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: requestBody(MediaType.Json, payload),
-    });
-
-    return await HttpResult.fromResponse(
-      res,
-      MediaType.Json,
-      Hamburger,
-      false
     );
   }
 

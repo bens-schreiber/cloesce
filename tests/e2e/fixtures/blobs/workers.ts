@@ -1,6 +1,5 @@
 import { HttpResult } from "cloesce";
 import * as Cloesce from "./backend.js";
-import { ReadableStream } from "@cloudflare/workers-types";
 
 class BlobService extends Cloesce.BlobService.Api {
     init(self: Cloesce.BlobService.Self): void { }
@@ -58,10 +57,12 @@ class BlobHaver extends Cloesce.BlobHaver.Api {
     }
 }
 
-export default async function fetch(request: Request, env: Cloesce.Env): Promise<Response> {
-    const app = await Cloesce.cloesce();
-    app.register(new BlobService())
-        .register(new BlobHaver());
+export default {
+    async fetch(request: Request, env: Cloesce.Env): Promise<Response> {
+        const app = await Cloesce.cloesce();
+        app.register(new BlobService())
+            .register(new BlobHaver());
 
-    return app.run(request, env);
+        return app.run(request, env);
+    }
 }

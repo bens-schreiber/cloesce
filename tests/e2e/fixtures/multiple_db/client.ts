@@ -33,6 +33,36 @@ export class DB1Model {
       false
     );
   }
+  static $save(
+    model: DeepPartial<DB1Model>,
+    kind: "Default" = "Default",
+    fetchImpl?: typeof fetch
+  ): Promise<HttpResult<DB1Model>>;
+  static async $save(
+    model: DeepPartial<DB1Model>,
+    kind: "Default" = "Default",
+    fetchImpl: typeof fetch = fetch
+  ): Promise<HttpResult<DB1Model>> {
+    const baseUrl = new URL(
+      `http://localhost:5646/api/DB1Model/$save`
+    );
+    const payload: any = {};
+    payload["model"] = model;
+    baseUrl.searchParams.append("__datasource", kind);
+
+    const res = await fetchImpl(baseUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: requestBody(MediaType.Json, payload),
+    });
+
+    return await HttpResult.fromResponse(
+      res,
+      MediaType.Json,
+      DB1Model,
+      false
+    );
+  }
   static $list(
     args: {
       lastSeen_id: number;
@@ -63,36 +93,6 @@ export class DB1Model {
       MediaType.Json,
       DB1Model,
       true
-    );
-  }
-  static $save(
-    model: DeepPartial<DB1Model>,
-    kind: "Default" = "Default",
-    fetchImpl?: typeof fetch
-  ): Promise<HttpResult<DB1Model>>;
-  static async $save(
-    model: DeepPartial<DB1Model>,
-    kind: "Default" = "Default",
-    fetchImpl: typeof fetch = fetch
-  ): Promise<HttpResult<DB1Model>> {
-    const baseUrl = new URL(
-      `http://localhost:5646/api/DB1Model/$save`
-    );
-    const payload: any = {};
-    payload["model"] = model;
-    baseUrl.searchParams.append("__datasource", kind);
-
-    const res = await fetchImpl(baseUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: requestBody(MediaType.Json, payload),
-    });
-
-    return await HttpResult.fromResponse(
-      res,
-      MediaType.Json,
-      DB1Model,
-      false
     );
   }
 
@@ -134,6 +134,36 @@ export class DB2Model {
       false
     );
   }
+  static $save(
+    model: DeepPartial<DB2Model>,
+    kind: "Default" = "Default",
+    fetchImpl?: typeof fetch
+  ): Promise<HttpResult<DB2Model>>;
+  static async $save(
+    model: DeepPartial<DB2Model>,
+    kind: "Default" = "Default",
+    fetchImpl: typeof fetch = fetch
+  ): Promise<HttpResult<DB2Model>> {
+    const baseUrl = new URL(
+      `http://localhost:5646/api/DB2Model/$save`
+    );
+    const payload: any = {};
+    payload["model"] = model;
+    baseUrl.searchParams.append("__datasource", kind);
+
+    const res = await fetchImpl(baseUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: requestBody(MediaType.Json, payload),
+    });
+
+    return await HttpResult.fromResponse(
+      res,
+      MediaType.Json,
+      DB2Model,
+      false
+    );
+  }
   static $list(
     args: {
       lastSeen_id: number;
@@ -164,36 +194,6 @@ export class DB2Model {
       MediaType.Json,
       DB2Model,
       true
-    );
-  }
-  static $save(
-    model: DeepPartial<DB2Model>,
-    kind: "Default" = "Default",
-    fetchImpl?: typeof fetch
-  ): Promise<HttpResult<DB2Model>>;
-  static async $save(
-    model: DeepPartial<DB2Model>,
-    kind: "Default" = "Default",
-    fetchImpl: typeof fetch = fetch
-  ): Promise<HttpResult<DB2Model>> {
-    const baseUrl = new URL(
-      `http://localhost:5646/api/DB2Model/$save`
-    );
-    const payload: any = {};
-    payload["model"] = model;
-    baseUrl.searchParams.append("__datasource", kind);
-
-    const res = await fetchImpl(baseUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: requestBody(MediaType.Json, payload),
-    });
-
-    return await HttpResult.fromResponse(
-      res,
-      MediaType.Json,
-      DB2Model,
-      false
     );
   }
 

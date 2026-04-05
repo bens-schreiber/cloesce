@@ -695,6 +695,17 @@ fn model_block_use_tags() {
             }
             name: string
         }
+
+        [use get, save, list]
+        model PureKv {
+            keyfield {
+                key
+            }
+
+            kv(cache_ns, "my_key_format{key}") {
+                value: json
+            }
+        }
         "#,
     );
 
@@ -705,6 +716,12 @@ fn model_block_use_tags() {
         .find(|m| m.symbol.name == "User")
         .expect("User model to be present");
 
+    let pure_kv = ast
+        .models
+        .iter()
+        .find(|m| m.symbol.name == "PureKv")
+        .expect("PureKv model to be present");
+
     assert_eq!(
         user.use_tag.as_ref().unwrap().env_bindings,
         vec!["d1_db", "d2_db"]
@@ -712,6 +729,14 @@ fn model_block_use_tags() {
     assert_eq!(
         user.use_tag.as_ref().unwrap().cruds,
         vec![CrudKind::List, CrudKind::Get, CrudKind::Save]
+    );
+    assert_eq!(
+        pure_kv.use_tag.as_ref().unwrap().cruds,
+        vec![CrudKind::Get, CrudKind::Save, CrudKind::List]
+    );
+    assert_eq!(
+        pure_kv.use_tag.as_ref().unwrap().env_bindings,
+        Vec::<String>::new()
     );
 }
 

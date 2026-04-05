@@ -27,29 +27,6 @@ export class A {
       false
     );
   }
-  static async returnFatalIfParamsNotInstantiated(
-    a: A,
-    fetchImpl: typeof fetch = fetch
-  ): Promise<HttpResult<void>> {
-    const baseUrl = new URL(
-      `http://localhost:5646/api/A/returnFatalIfParamsNotInstantiated`
-    );
-    const payload: any = {};
-    payload["a"] = a;
-
-    const res = await fetchImpl(baseUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: requestBody(MediaType.Json, payload),
-    });
-
-    return await HttpResult.fromResponse(
-      res,
-      MediaType.Json,
-      undefined,
-      false
-    );
-  }
   async withoutB(
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<A>> {
@@ -62,6 +39,46 @@ export class A {
 
     const res = await fetchImpl(baseUrl, {
       method: "GET",
+    });
+
+    return await HttpResult.fromResponse(
+      res,
+      MediaType.Json,
+      A,
+      false
+    );
+  }
+  static $save(
+    model: DeepPartial<A>,
+    kind: "Default" = "Default",
+    fetchImpl?: typeof fetch
+  ): Promise<HttpResult<A>>;
+  static $save(
+    model: DeepPartial<A>,
+    kind: "WithB",
+    fetchImpl?: typeof fetch
+  ): Promise<HttpResult<A>>;
+  static $save(
+    model: DeepPartial<A>,
+    kind: "WithoutB",
+    fetchImpl?: typeof fetch
+  ): Promise<HttpResult<A>>;
+  static async $save(
+    model: DeepPartial<A>,
+    kind: "Default" | "WithB" | "WithoutB" = "Default",
+    fetchImpl: typeof fetch = fetch
+  ): Promise<HttpResult<A>> {
+    const baseUrl = new URL(
+      `http://localhost:5646/api/A/$save`
+    );
+    const payload: any = {};
+    payload["model"] = model;
+    baseUrl.searchParams.append("__datasource", kind);
+
+    const res = await fetchImpl(baseUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: requestBody(MediaType.Json, payload),
     });
 
     return await HttpResult.fromResponse(
@@ -115,46 +132,6 @@ export class A {
       false
     );
   }
-  static $save(
-    model: DeepPartial<A>,
-    kind: "Default" = "Default",
-    fetchImpl?: typeof fetch
-  ): Promise<HttpResult<A>>;
-  static $save(
-    model: DeepPartial<A>,
-    kind: "WithB",
-    fetchImpl?: typeof fetch
-  ): Promise<HttpResult<A>>;
-  static $save(
-    model: DeepPartial<A>,
-    kind: "WithoutB",
-    fetchImpl?: typeof fetch
-  ): Promise<HttpResult<A>>;
-  static async $save(
-    model: DeepPartial<A>,
-    kind: "Default" | "WithB" | "WithoutB" = "Default",
-    fetchImpl: typeof fetch = fetch
-  ): Promise<HttpResult<A>> {
-    const baseUrl = new URL(
-      `http://localhost:5646/api/A/$save`
-    );
-    const payload: any = {};
-    payload["model"] = model;
-    baseUrl.searchParams.append("__datasource", kind);
-
-    const res = await fetchImpl(baseUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: requestBody(MediaType.Json, payload),
-    });
-
-    return await HttpResult.fromResponse(
-      res,
-      MediaType.Json,
-      A,
-      false
-    );
-  }
 
   static fromJson(data: any): A {
     const res = Object.assign(new A(), data);
@@ -189,36 +166,6 @@ export class B {
       false
     );
   }
-  static $get(
-    args: {
-      id: number;
-    },
-  kind: "Default" = "Default",
-    fetchImpl?: typeof fetch
-  ): Promise<HttpResult<B>>;
-  static async $get(
-    args: any,
-    kind: "Default" = "Default",
-    fetchImpl: typeof fetch = fetch
-  ): Promise<HttpResult<B>> {
-    const baseUrl = new URL(
-      `http://localhost:5646/api/B/$get`
-    );
-    const payload: any = {};
-  baseUrl.searchParams.append("id", String((args as any).id ?? null));
-    baseUrl.searchParams.append("__datasource", kind);
-
-    const res = await fetchImpl(baseUrl, {
-      method: "GET",
-    });
-
-    return await HttpResult.fromResponse(
-      res,
-      MediaType.Json,
-      B,
-      false
-    );
-  }
   static $save(
     model: DeepPartial<B>,
     kind: "Default" = "Default",
@@ -240,6 +187,36 @@ export class B {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: requestBody(MediaType.Json, payload),
+    });
+
+    return await HttpResult.fromResponse(
+      res,
+      MediaType.Json,
+      B,
+      false
+    );
+  }
+  static $get(
+    args: {
+      id: number;
+    },
+  kind: "Default" = "Default",
+    fetchImpl?: typeof fetch
+  ): Promise<HttpResult<B>>;
+  static async $get(
+    args: any,
+    kind: "Default" = "Default",
+    fetchImpl: typeof fetch = fetch
+  ): Promise<HttpResult<B>> {
+    const baseUrl = new URL(
+      `http://localhost:5646/api/B/$get`
+    );
+    const payload: any = {};
+  baseUrl.searchParams.append("id", String((args as any).id ?? null));
+    baseUrl.searchParams.append("__datasource", kind);
+
+    const res = await fetchImpl(baseUrl, {
+      method: "GET",
     });
 
     return await HttpResult.fromResponse(
@@ -326,29 +303,6 @@ export class Person {
       false
     );
   }
-  static async returnFatalIfParamsNotInstantiated(
-    person: Person,
-    fetchImpl: typeof fetch = fetch
-  ): Promise<HttpResult<void>> {
-    const baseUrl = new URL(
-      `http://localhost:5646/api/Person/returnFatalIfParamsNotInstantiated`
-    );
-    const payload: any = {};
-    payload["person"] = person;
-
-    const res = await fetchImpl(baseUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: requestBody(MediaType.Json, payload),
-    });
-
-    return await HttpResult.fromResponse(
-      res,
-      MediaType.Json,
-      undefined,
-      false
-    );
-  }
   async withoutDogs(
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Person>> {
@@ -361,6 +315,46 @@ export class Person {
 
     const res = await fetchImpl(baseUrl, {
       method: "GET",
+    });
+
+    return await HttpResult.fromResponse(
+      res,
+      MediaType.Json,
+      Person,
+      false
+    );
+  }
+  static $save(
+    model: DeepPartial<Person>,
+    kind: "Default" = "Default",
+    fetchImpl?: typeof fetch
+  ): Promise<HttpResult<Person>>;
+  static $save(
+    model: DeepPartial<Person>,
+    kind: "WithDogs",
+    fetchImpl?: typeof fetch
+  ): Promise<HttpResult<Person>>;
+  static $save(
+    model: DeepPartial<Person>,
+    kind: "WithoutDogs",
+    fetchImpl?: typeof fetch
+  ): Promise<HttpResult<Person>>;
+  static async $save(
+    model: DeepPartial<Person>,
+    kind: "Default" | "WithDogs" | "WithoutDogs" = "Default",
+    fetchImpl: typeof fetch = fetch
+  ): Promise<HttpResult<Person>> {
+    const baseUrl = new URL(
+      `http://localhost:5646/api/Person/$save`
+    );
+    const payload: any = {};
+    payload["model"] = model;
+    baseUrl.searchParams.append("__datasource", kind);
+
+    const res = await fetchImpl(baseUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: requestBody(MediaType.Json, payload),
     });
 
     return await HttpResult.fromResponse(
@@ -405,46 +399,6 @@ export class Person {
 
     const res = await fetchImpl(baseUrl, {
       method: "GET",
-    });
-
-    return await HttpResult.fromResponse(
-      res,
-      MediaType.Json,
-      Person,
-      false
-    );
-  }
-  static $save(
-    model: DeepPartial<Person>,
-    kind: "Default" = "Default",
-    fetchImpl?: typeof fetch
-  ): Promise<HttpResult<Person>>;
-  static $save(
-    model: DeepPartial<Person>,
-    kind: "WithDogs",
-    fetchImpl?: typeof fetch
-  ): Promise<HttpResult<Person>>;
-  static $save(
-    model: DeepPartial<Person>,
-    kind: "WithoutDogs",
-    fetchImpl?: typeof fetch
-  ): Promise<HttpResult<Person>>;
-  static async $save(
-    model: DeepPartial<Person>,
-    kind: "Default" | "WithDogs" | "WithoutDogs" = "Default",
-    fetchImpl: typeof fetch = fetch
-  ): Promise<HttpResult<Person>> {
-    const baseUrl = new URL(
-      `http://localhost:5646/api/Person/$save`
-    );
-    const payload: any = {};
-    payload["model"] = model;
-    baseUrl.searchParams.append("__datasource", kind);
-
-    const res = await fetchImpl(baseUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: requestBody(MediaType.Json, payload),
     });
 
     return await HttpResult.fromResponse(
@@ -510,6 +464,46 @@ export class Student {
       false
     );
   }
+  static $save(
+    model: DeepPartial<Student>,
+    kind: "Default" = "Default",
+    fetchImpl?: typeof fetch
+  ): Promise<HttpResult<Student>>;
+  static $save(
+    model: DeepPartial<Student>,
+    kind: "None",
+    fetchImpl?: typeof fetch
+  ): Promise<HttpResult<Student>>;
+  static $save(
+    model: DeepPartial<Student>,
+    kind: "WithCoursesStudentsCourses",
+    fetchImpl?: typeof fetch
+  ): Promise<HttpResult<Student>>;
+  static async $save(
+    model: DeepPartial<Student>,
+    kind: "Default" | "None" | "WithCoursesStudentsCourses" = "Default",
+    fetchImpl: typeof fetch = fetch
+  ): Promise<HttpResult<Student>> {
+    const baseUrl = new URL(
+      `http://localhost:5646/api/Student/$save`
+    );
+    const payload: any = {};
+    payload["model"] = model;
+    baseUrl.searchParams.append("__datasource", kind);
+
+    const res = await fetchImpl(baseUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: requestBody(MediaType.Json, payload),
+    });
+
+    return await HttpResult.fromResponse(
+      res,
+      MediaType.Json,
+      Student,
+      false
+    );
+  }
   static $get(
     args: {
       id: number;
@@ -545,46 +539,6 @@ export class Student {
 
     const res = await fetchImpl(baseUrl, {
       method: "GET",
-    });
-
-    return await HttpResult.fromResponse(
-      res,
-      MediaType.Json,
-      Student,
-      false
-    );
-  }
-  static $save(
-    model: DeepPartial<Student>,
-    kind: "Default" = "Default",
-    fetchImpl?: typeof fetch
-  ): Promise<HttpResult<Student>>;
-  static $save(
-    model: DeepPartial<Student>,
-    kind: "None",
-    fetchImpl?: typeof fetch
-  ): Promise<HttpResult<Student>>;
-  static $save(
-    model: DeepPartial<Student>,
-    kind: "WithCoursesStudentsCourses",
-    fetchImpl?: typeof fetch
-  ): Promise<HttpResult<Student>>;
-  static async $save(
-    model: DeepPartial<Student>,
-    kind: "Default" | "None" | "WithCoursesStudentsCourses" = "Default",
-    fetchImpl: typeof fetch = fetch
-  ): Promise<HttpResult<Student>> {
-    const baseUrl = new URL(
-      `http://localhost:5646/api/Student/$save`
-    );
-    const payload: any = {};
-    payload["model"] = model;
-    baseUrl.searchParams.append("__datasource", kind);
-
-    const res = await fetchImpl(baseUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: requestBody(MediaType.Json, payload),
     });
 
     return await HttpResult.fromResponse(

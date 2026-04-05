@@ -36,6 +36,7 @@ export class D1BackedModel {
   static $get(
     args: {
       id: number;
+      keyParam: string;
     },
   kind: "Default" = "Default",
     fetchImpl?: typeof fetch
@@ -55,6 +56,36 @@ export class D1BackedModel {
 
     const res = await fetchImpl(baseUrl, {
       method: "GET",
+    });
+
+    return await HttpResult.fromResponse(
+      res,
+      MediaType.Json,
+      D1BackedModel,
+      false
+    );
+  }
+  static $save(
+    model: DeepPartial<D1BackedModel>,
+    kind: "Default" = "Default",
+    fetchImpl?: typeof fetch
+  ): Promise<HttpResult<D1BackedModel>>;
+  static async $save(
+    model: DeepPartial<D1BackedModel>,
+    kind: "Default" = "Default",
+    fetchImpl: typeof fetch = fetch
+  ): Promise<HttpResult<D1BackedModel>> {
+    const baseUrl = new URL(
+      `http://localhost:5646/api/D1BackedModel/$save`
+    );
+    const payload: any = {};
+    payload["model"] = model;
+    baseUrl.searchParams.append("__datasource", kind);
+
+    const res = await fetchImpl(baseUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: requestBody(MediaType.Json, payload),
     });
 
     return await HttpResult.fromResponse(
@@ -94,36 +125,6 @@ export class D1BackedModel {
       MediaType.Json,
       D1BackedModel,
       true
-    );
-  }
-  static $save(
-    model: DeepPartial<D1BackedModel>,
-    kind: "Default" = "Default",
-    fetchImpl?: typeof fetch
-  ): Promise<HttpResult<D1BackedModel>>;
-  static async $save(
-    model: DeepPartial<D1BackedModel>,
-    kind: "Default" = "Default",
-    fetchImpl: typeof fetch = fetch
-  ): Promise<HttpResult<D1BackedModel>> {
-    const baseUrl = new URL(
-      `http://localhost:5646/api/D1BackedModel/$save`
-    );
-    const payload: any = {};
-    payload["model"] = model;
-    baseUrl.searchParams.append("__datasource", kind);
-
-    const res = await fetchImpl(baseUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: requestBody(MediaType.Json, payload),
-    });
-
-    return await HttpResult.fromResponse(
-      res,
-      MediaType.Json,
-      D1BackedModel,
-      false
     );
   }
 
@@ -186,6 +187,36 @@ export class PureR2Model {
       res,
       MediaType.Json,
       undefined,
+      false
+    );
+  }
+  static $get(
+    args: {
+      id: string;
+    },
+  kind: "Default" = "Default",
+    fetchImpl?: typeof fetch
+  ): Promise<HttpResult<PureR2Model>>;
+  static async $get(
+    args: any,
+    kind: "Default" = "Default",
+    fetchImpl: typeof fetch = fetch
+  ): Promise<HttpResult<PureR2Model>> {
+    const baseUrl = new URL(
+      `http://localhost:5646/api/PureR2Model/$get`
+    );
+    const payload: any = {};
+  baseUrl.searchParams.append("id", String((args as any).id ?? null));
+    baseUrl.searchParams.append("__datasource", kind);
+
+    const res = await fetchImpl(baseUrl, {
+      method: "GET",
+    });
+
+    return await HttpResult.fromResponse(
+      res,
+      MediaType.Json,
+      PureR2Model,
       false
     );
   }

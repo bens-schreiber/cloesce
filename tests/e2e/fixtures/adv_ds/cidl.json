@@ -95,6 +95,39 @@
           "parameters": []
         },
         {
+          "name": "$save",
+          "is_static": true,
+          "data_source": null,
+          "http_verb": "Post",
+          "return_media": "Json",
+          "return_type": {
+            "HttpResult": {
+              "Object": {
+                "name": "Hamburger"
+              }
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "model",
+              "cidl_type": {
+                "Partial": {
+                  "object_name": "Hamburger"
+                }
+              }
+            },
+            {
+              "name": "__datasource",
+              "cidl_type": {
+                "DataSource": {
+                  "model_name": "Hamburger"
+                }
+              }
+            }
+          ]
+        },
+        {
           "name": "$list",
           "is_static": true,
           "data_source": null,
@@ -127,39 +160,6 @@
               "name": "lastSeen_id",
               "cidl_type": {
                 "Nullable": "Integer"
-              }
-            },
-            {
-              "name": "__datasource",
-              "cidl_type": {
-                "DataSource": {
-                  "model_name": "Hamburger"
-                }
-              }
-            }
-          ]
-        },
-        {
-          "name": "$save",
-          "is_static": true,
-          "data_source": null,
-          "http_verb": "Post",
-          "return_media": "Json",
-          "return_type": {
-            "HttpResult": {
-              "Object": {
-                "name": "Hamburger"
-              }
-            }
-          },
-          "parameters_media": "Json",
-          "parameters": [
-            {
-              "name": "model",
-              "cidl_type": {
-                "Partial": {
-                  "object_name": "Hamburger"
-                }
               }
             },
             {
@@ -272,8 +272,8 @@
         }
       },
       "cruds": [
-        "List",
-        "Save"
+        "Save",
+        "List"
       ]
     },
     "Topping": {

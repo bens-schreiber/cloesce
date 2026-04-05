@@ -120,6 +120,39 @@
           ]
         },
         {
+          "name": "$save",
+          "is_static": true,
+          "data_source": null,
+          "http_verb": "Post",
+          "return_media": "Json",
+          "return_type": {
+            "HttpResult": {
+              "Object": {
+                "name": "D1BackedModel"
+              }
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "model",
+              "cidl_type": {
+                "Partial": {
+                  "object_name": "D1BackedModel"
+                }
+              }
+            },
+            {
+              "name": "__datasource",
+              "cidl_type": {
+                "DataSource": {
+                  "model_name": "D1BackedModel"
+                }
+              }
+            }
+          ]
+        },
+        {
           "name": "$list",
           "is_static": true,
           "data_source": null,
@@ -146,39 +179,6 @@
               "name": "limit",
               "cidl_type": {
                 "Nullable": "Integer"
-              }
-            },
-            {
-              "name": "__datasource",
-              "cidl_type": {
-                "DataSource": {
-                  "model_name": "D1BackedModel"
-                }
-              }
-            }
-          ]
-        },
-        {
-          "name": "$save",
-          "is_static": true,
-          "data_source": null,
-          "http_verb": "Post",
-          "return_media": "Json",
-          "return_type": {
-            "HttpResult": {
-              "Object": {
-                "name": "D1BackedModel"
-              }
-            }
-          },
-          "parameters_media": "Json",
-          "parameters": [
-            {
-              "name": "model",
-              "cidl_type": {
-                "Partial": {
-                  "object_name": "D1BackedModel"
-                }
               }
             },
             {
@@ -220,8 +220,8 @@
       },
       "cruds": [
         "Get",
-        "List",
-        "Save"
+        "Save",
+        "List"
       ]
     },
     "PureR2Model": {
@@ -300,6 +300,35 @@
               "cidl_type": "Stream"
             }
           ]
+        },
+        {
+          "name": "$get",
+          "is_static": true,
+          "data_source": null,
+          "http_verb": "Get",
+          "return_media": "Json",
+          "return_type": {
+            "HttpResult": {
+              "Object": {
+                "name": "PureR2Model"
+              }
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "id",
+              "cidl_type": "String"
+            },
+            {
+              "name": "__datasource",
+              "cidl_type": {
+                "DataSource": {
+                  "model_name": "PureR2Model"
+                }
+              }
+            }
+          ]
         }
       ],
       "data_sources": {
@@ -310,7 +339,9 @@
           "is_internal": false
         }
       },
-      "cruds": []
+      "cruds": [
+        "Get"
+      ]
     }
   },
   "services": {},

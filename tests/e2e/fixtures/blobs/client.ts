@@ -92,6 +92,36 @@ export class BlobHaver {
       false
     );
   }
+  static $save(
+    model: DeepPartial<BlobHaver>,
+    kind: "Default" = "Default",
+    fetchImpl?: typeof fetch
+  ): Promise<HttpResult<BlobHaver>>;
+  static async $save(
+    model: DeepPartial<BlobHaver>,
+    kind: "Default" = "Default",
+    fetchImpl: typeof fetch = fetch
+  ): Promise<HttpResult<BlobHaver>> {
+    const baseUrl = new URL(
+      `http://localhost:5646/api/BlobHaver/$save`
+    );
+    const payload: any = {};
+    payload["model"] = model;
+    baseUrl.searchParams.append("__datasource", kind);
+
+    const res = await fetchImpl(baseUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: requestBody(MediaType.Json, payload),
+    });
+
+    return await HttpResult.fromResponse(
+      res,
+      MediaType.Json,
+      BlobHaver,
+      false
+    );
+  }
   static $get(
     args: {
       id: number;
@@ -152,36 +182,6 @@ export class BlobHaver {
       MediaType.Json,
       BlobHaver,
       true
-    );
-  }
-  static $save(
-    model: DeepPartial<BlobHaver>,
-    kind: "Default" = "Default",
-    fetchImpl?: typeof fetch
-  ): Promise<HttpResult<BlobHaver>>;
-  static async $save(
-    model: DeepPartial<BlobHaver>,
-    kind: "Default" = "Default",
-    fetchImpl: typeof fetch = fetch
-  ): Promise<HttpResult<BlobHaver>> {
-    const baseUrl = new URL(
-      `http://localhost:5646/api/BlobHaver/$save`
-    );
-    const payload: any = {};
-    payload["model"] = model;
-    baseUrl.searchParams.append("__datasource", kind);
-
-    const res = await fetchImpl(baseUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: requestBody(MediaType.Json, payload),
-    });
-
-    return await HttpResult.fromResponse(
-      res,
-      MediaType.Json,
-      BlobHaver,
-      false
     );
   }
 

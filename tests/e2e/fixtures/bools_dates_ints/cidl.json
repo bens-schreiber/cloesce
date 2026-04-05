@@ -53,37 +53,6 @@
       "key_fields": [],
       "apis": [
         {
-          "name": "$get",
-          "is_static": true,
-          "data_source": null,
-          "http_verb": "Get",
-          "return_media": "Json",
-          "return_type": {
-            "HttpResult": {
-              "Object": {
-                "name": "Weather"
-              }
-            }
-          },
-          "parameters_media": "Json",
-          "parameters": [
-            {
-              "name": "id",
-              "cidl_type": {
-                "Nullable": "Integer"
-              }
-            },
-            {
-              "name": "__datasource",
-              "cidl_type": {
-                "DataSource": {
-                  "model_name": "Weather"
-                }
-              }
-            }
-          ]
-        },
-        {
           "name": "$save",
           "is_static": true,
           "data_source": null,
@@ -104,6 +73,37 @@
                 "Partial": {
                   "object_name": "Weather"
                 }
+              }
+            },
+            {
+              "name": "__datasource",
+              "cidl_type": {
+                "DataSource": {
+                  "model_name": "Weather"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "$get",
+          "is_static": true,
+          "data_source": null,
+          "http_verb": "Get",
+          "return_media": "Json",
+          "return_type": {
+            "HttpResult": {
+              "Object": {
+                "name": "Weather"
+              }
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "id",
+              "cidl_type": {
+                "Nullable": "Integer"
               }
             },
             {
@@ -144,8 +144,8 @@
         }
       },
       "cruds": [
-        "Get",
-        "Save"
+        "Save",
+        "Get"
       ]
     }
   },

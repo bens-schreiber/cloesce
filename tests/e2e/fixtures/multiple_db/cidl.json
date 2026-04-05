@@ -75,6 +75,39 @@
           ]
         },
         {
+          "name": "$save",
+          "is_static": true,
+          "data_source": null,
+          "http_verb": "Post",
+          "return_media": "Json",
+          "return_type": {
+            "HttpResult": {
+              "Object": {
+                "name": "DB1Model"
+              }
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "model",
+              "cidl_type": {
+                "Partial": {
+                  "object_name": "DB1Model"
+                }
+              }
+            },
+            {
+              "name": "__datasource",
+              "cidl_type": {
+                "DataSource": {
+                  "model_name": "DB1Model"
+                }
+              }
+            }
+          ]
+        },
+        {
           "name": "$list",
           "is_static": true,
           "data_source": null,
@@ -101,39 +134,6 @@
               "name": "limit",
               "cidl_type": {
                 "Nullable": "Integer"
-              }
-            },
-            {
-              "name": "__datasource",
-              "cidl_type": {
-                "DataSource": {
-                  "model_name": "DB1Model"
-                }
-              }
-            }
-          ]
-        },
-        {
-          "name": "$save",
-          "is_static": true,
-          "data_source": null,
-          "http_verb": "Post",
-          "return_media": "Json",
-          "return_type": {
-            "HttpResult": {
-              "Object": {
-                "name": "DB1Model"
-              }
-            }
-          },
-          "parameters_media": "Json",
-          "parameters": [
-            {
-              "name": "model",
-              "cidl_type": {
-                "Partial": {
-                  "object_name": "DB1Model"
-                }
               }
             },
             {
@@ -175,8 +175,8 @@
       },
       "cruds": [
         "Get",
-        "List",
-        "Save"
+        "Save",
+        "List"
       ]
     },
     "DB2Model": {
@@ -244,6 +244,39 @@
           ]
         },
         {
+          "name": "$save",
+          "is_static": true,
+          "data_source": null,
+          "http_verb": "Post",
+          "return_media": "Json",
+          "return_type": {
+            "HttpResult": {
+              "Object": {
+                "name": "DB2Model"
+              }
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "model",
+              "cidl_type": {
+                "Partial": {
+                  "object_name": "DB2Model"
+                }
+              }
+            },
+            {
+              "name": "__datasource",
+              "cidl_type": {
+                "DataSource": {
+                  "model_name": "DB2Model"
+                }
+              }
+            }
+          ]
+        },
+        {
           "name": "$list",
           "is_static": true,
           "data_source": null,
@@ -270,39 +303,6 @@
               "name": "limit",
               "cidl_type": {
                 "Nullable": "Integer"
-              }
-            },
-            {
-              "name": "__datasource",
-              "cidl_type": {
-                "DataSource": {
-                  "model_name": "DB2Model"
-                }
-              }
-            }
-          ]
-        },
-        {
-          "name": "$save",
-          "is_static": true,
-          "data_source": null,
-          "http_verb": "Post",
-          "return_media": "Json",
-          "return_type": {
-            "HttpResult": {
-              "Object": {
-                "name": "DB2Model"
-              }
-            }
-          },
-          "parameters_media": "Json",
-          "parameters": [
-            {
-              "name": "model",
-              "cidl_type": {
-                "Partial": {
-                  "object_name": "DB2Model"
-                }
               }
             },
             {
@@ -344,8 +344,8 @@
       },
       "cruds": [
         "Get",
-        "List",
-        "Save"
+        "Save",
+        "List"
       ]
     }
   },

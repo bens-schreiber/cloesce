@@ -83,26 +83,9 @@
           "parameters_media": "Json",
           "parameters": [
             {
-              "name": "a",
-              "cidl_type": {
-                "Object": {
-                  "name": "A"
-                }
-              }
-            }
-          ]
-        },
-        {
-          "name": "returnFatalIfParamsNotInstantiated",
-          "is_static": true,
-          "data_source": null,
-          "http_verb": "Post",
-          "return_media": "Json",
-          "return_type": {
-            "HttpResult": "Void"
-          },
-          "parameters_media": "Json",
-          "parameters": [
+              "name": "e",
+              "cidl_type": "Env"
+            },
             {
               "name": "a",
               "cidl_type": {
@@ -130,37 +113,6 @@
           "parameters": []
         },
         {
-          "name": "$get",
-          "is_static": true,
-          "data_source": null,
-          "http_verb": "Get",
-          "return_media": "Json",
-          "return_type": {
-            "HttpResult": {
-              "Object": {
-                "name": "A"
-              }
-            }
-          },
-          "parameters_media": "Json",
-          "parameters": [
-            {
-              "name": "id",
-              "cidl_type": {
-                "Nullable": "Integer"
-              }
-            },
-            {
-              "name": "__datasource",
-              "cidl_type": {
-                "DataSource": {
-                  "model_name": "A"
-                }
-              }
-            }
-          ]
-        },
-        {
           "name": "$save",
           "is_static": true,
           "data_source": null,
@@ -181,6 +133,37 @@
                 "Partial": {
                   "object_name": "A"
                 }
+              }
+            },
+            {
+              "name": "__datasource",
+              "cidl_type": {
+                "DataSource": {
+                  "model_name": "A"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "$get",
+          "is_static": true,
+          "data_source": null,
+          "http_verb": "Get",
+          "return_media": "Json",
+          "return_type": {
+            "HttpResult": {
+              "Object": {
+                "name": "A"
+              }
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "id",
+              "cidl_type": {
+                "Nullable": "Integer"
               }
             },
             {
@@ -269,8 +252,8 @@
         }
       },
       "cruds": [
-        "Get",
-        "Save"
+        "Save",
+        "Get"
       ]
     },
     "B": {
@@ -330,37 +313,6 @@
           "parameters": []
         },
         {
-          "name": "$get",
-          "is_static": true,
-          "data_source": null,
-          "http_verb": "Get",
-          "return_media": "Json",
-          "return_type": {
-            "HttpResult": {
-              "Object": {
-                "name": "B"
-              }
-            }
-          },
-          "parameters_media": "Json",
-          "parameters": [
-            {
-              "name": "id",
-              "cidl_type": {
-                "Nullable": "Integer"
-              }
-            },
-            {
-              "name": "__datasource",
-              "cidl_type": {
-                "DataSource": {
-                  "model_name": "B"
-                }
-              }
-            }
-          ]
-        },
-        {
           "name": "$save",
           "is_static": true,
           "data_source": null,
@@ -381,6 +333,37 @@
                 "Partial": {
                   "object_name": "B"
                 }
+              }
+            },
+            {
+              "name": "__datasource",
+              "cidl_type": {
+                "DataSource": {
+                  "model_name": "B"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "$get",
+          "is_static": true,
+          "data_source": null,
+          "http_verb": "Get",
+          "return_media": "Json",
+          "return_type": {
+            "HttpResult": {
+              "Object": {
+                "name": "B"
+              }
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "id",
+              "cidl_type": {
+                "Nullable": "Integer"
               }
             },
             {
@@ -421,8 +404,8 @@
         }
       },
       "cruds": [
-        "Get",
-        "Save"
+        "Save",
+        "Get"
       ]
     },
     "Course": {
@@ -587,26 +570,9 @@
           "parameters_media": "Json",
           "parameters": [
             {
-              "name": "person",
-              "cidl_type": {
-                "Object": {
-                  "name": "Person"
-                }
-              }
-            }
-          ]
-        },
-        {
-          "name": "returnFatalIfParamsNotInstantiated",
-          "is_static": true,
-          "data_source": null,
-          "http_verb": "Post",
-          "return_media": "Json",
-          "return_type": {
-            "HttpResult": "Void"
-          },
-          "parameters_media": "Json",
-          "parameters": [
+              "name": "e",
+              "cidl_type": "Env"
+            },
             {
               "name": "person",
               "cidl_type": {
@@ -634,37 +600,6 @@
           "parameters": []
         },
         {
-          "name": "$get",
-          "is_static": true,
-          "data_source": null,
-          "http_verb": "Get",
-          "return_media": "Json",
-          "return_type": {
-            "HttpResult": {
-              "Object": {
-                "name": "Person"
-              }
-            }
-          },
-          "parameters_media": "Json",
-          "parameters": [
-            {
-              "name": "id",
-              "cidl_type": {
-                "Nullable": "Integer"
-              }
-            },
-            {
-              "name": "__datasource",
-              "cidl_type": {
-                "DataSource": {
-                  "model_name": "Person"
-                }
-              }
-            }
-          ]
-        },
-        {
           "name": "$save",
           "is_static": true,
           "data_source": null,
@@ -685,6 +620,37 @@
                 "Partial": {
                   "object_name": "Person"
                 }
+              }
+            },
+            {
+              "name": "__datasource",
+              "cidl_type": {
+                "DataSource": {
+                  "model_name": "Person"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "$get",
+          "is_static": true,
+          "data_source": null,
+          "http_verb": "Get",
+          "return_media": "Json",
+          "return_type": {
+            "HttpResult": {
+              "Object": {
+                "name": "Person"
+              }
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "id",
+              "cidl_type": {
+                "Nullable": "Integer"
               }
             },
             {
@@ -773,8 +739,8 @@
         }
       },
       "cruds": [
-        "Get",
-        "Save"
+        "Save",
+        "Get"
       ]
     },
     "Student": {
@@ -831,6 +797,10 @@
           "parameters_media": "Json",
           "parameters": [
             {
+              "name": "e",
+              "cidl_type": "Env"
+            },
+            {
               "name": "student",
               "cidl_type": {
                 "Object": {
@@ -857,37 +827,6 @@
           "parameters": []
         },
         {
-          "name": "$get",
-          "is_static": true,
-          "data_source": null,
-          "http_verb": "Get",
-          "return_media": "Json",
-          "return_type": {
-            "HttpResult": {
-              "Object": {
-                "name": "Student"
-              }
-            }
-          },
-          "parameters_media": "Json",
-          "parameters": [
-            {
-              "name": "id",
-              "cidl_type": {
-                "Nullable": "Integer"
-              }
-            },
-            {
-              "name": "__datasource",
-              "cidl_type": {
-                "DataSource": {
-                  "model_name": "Student"
-                }
-              }
-            }
-          ]
-        },
-        {
           "name": "$save",
           "is_static": true,
           "data_source": null,
@@ -908,6 +847,37 @@
                 "Partial": {
                   "object_name": "Student"
                 }
+              }
+            },
+            {
+              "name": "__datasource",
+              "cidl_type": {
+                "DataSource": {
+                  "model_name": "Student"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "$get",
+          "is_static": true,
+          "data_source": null,
+          "http_verb": "Get",
+          "return_media": "Json",
+          "return_type": {
+            "HttpResult": {
+              "Object": {
+                "name": "Student"
+              }
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "id",
+              "cidl_type": {
+                "Nullable": "Integer"
               }
             },
             {
@@ -996,8 +966,8 @@
         }
       },
       "cruds": [
-        "Get",
-        "Save"
+        "Save",
+        "Get"
       ]
     },
     "Dog": {
