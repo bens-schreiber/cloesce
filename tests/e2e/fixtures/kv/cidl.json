@@ -59,6 +59,24 @@
             }
           },
           "format": "d1Backed/{id}/{keyParam}/{someColumn}/{someOtherColumn}",
+          "format_parameters": [
+            {
+              "name": "id",
+              "cidl_type": "Integer"
+            },
+            {
+              "name": "keyParam",
+              "cidl_type": "String"
+            },
+            {
+              "name": "someColumn",
+              "cidl_type": "Double"
+            },
+            {
+              "name": "someOtherColumn",
+              "cidl_type": "String"
+            }
+          ],
           "binding": "namespace",
           "list_prefix": false
         }
@@ -226,6 +244,7 @@
             }
           },
           "format": "paginated/items/",
+          "format_parameters": [],
           "binding": "namespace",
           "list_prefix": true
         }
@@ -318,6 +337,12 @@
             }
           },
           "format": "path/to/data/{id}",
+          "format_parameters": [
+            {
+              "name": "id",
+              "cidl_type": "String"
+            }
+          ],
           "binding": "namespace",
           "list_prefix": false
         },
@@ -329,6 +354,12 @@
             }
           },
           "format": "path/to/other/{id}",
+          "format_parameters": [
+            {
+              "name": "id",
+              "cidl_type": "String"
+            }
+          ],
           "binding": "otherNamespace",
           "list_prefix": false
         }

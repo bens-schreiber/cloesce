@@ -86,6 +86,14 @@ export namespace {{ model.name }} {
 {%- endfor %}
     }
 
+    export namespace KeyFormat {
+{%- for kvr2 in model.kv_fields.iter().chain(model.r2_fields.iter()) %}
+        export function {{ kvr2.field.name }}({% for param in &kvr2.format_parameters %}{{ param.name }}: {{ self.map_type(&param.cidl_type) }},{% endfor %}): string {
+            return {{ self.mapper.key_format(kvr2) }};
+        }
+{%- endfor %}
+    }
+
     export abstract class Api {
         readonly tag = Tag;
 {%- for api in &model.apis %}
@@ -99,7 +107,7 @@ export namespace {{ model.name }} {
     export namespace DataSources {
 {%- for ds in model.data_sources.values() %}
         export const {{ ds.name }} = {
-            include: {{ self.include_tree_to_js(&ds.tree) }},
+            include: {{ self.mapper.include_tree(&ds.tree) }},
 {%- if let Some(get) = &ds.get %}
             getQuery: (env: Env{% for param in get.parameters %}, {{ param.name }}: {{ self.map_type(&param.cidl_type) }}{% endfor %}) => env.{{ model.d1_binding.unwrap() }}.prepare(`{{ get.raw_sql }}`).bind({% for (i, param) in get.parameters.iter().enumerate() %}{{ param.name }}{% if i + 1 < get.parameters.len() %}, {% endif %}{% endfor %}),
             async get(env: Env{% for param in get.parameters %}, {{ param.name }}: {{ self.map_type(&param.cidl_type) }}{% endfor %}{% for key in &model.key_fields %}, {{ key }}: string{% endfor %}): Promise<{{ model.name }}.Self | null> {

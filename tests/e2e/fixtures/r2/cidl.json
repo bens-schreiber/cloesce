@@ -58,6 +58,24 @@
             "cidl_type": "R2Object"
           },
           "format": "d1Backed/{id}/{keyParam}/{someColumn}/{someOtherColumn}",
+          "format_parameters": [
+            {
+              "name": "id",
+              "cidl_type": "Integer"
+            },
+            {
+              "name": "keyParam",
+              "cidl_type": "String"
+            },
+            {
+              "name": "someColumn",
+              "cidl_type": "Double"
+            },
+            {
+              "name": "someOtherColumn",
+              "cidl_type": "String"
+            }
+          ],
           "binding": "bucket1",
           "list_prefix": false
         }
@@ -242,6 +260,12 @@
             "cidl_type": "R2Object"
           },
           "format": "path/to/data/{id}",
+          "format_parameters": [
+            {
+              "name": "id",
+              "cidl_type": "String"
+            }
+          ],
           "binding": "bucket1",
           "list_prefix": false
         },
@@ -251,6 +275,12 @@
             "cidl_type": "R2Object"
           },
           "format": "path/to/other/{id}",
+          "format_parameters": [
+            {
+              "name": "id",
+              "cidl_type": "String"
+            }
+          ],
           "binding": "bucket1",
           "list_prefix": false
         },
@@ -262,6 +292,7 @@
             }
           },
           "format": "path/",
+          "format_parameters": [],
           "binding": "bucket1",
           "list_prefix": true
         }

@@ -1,8 +1,10 @@
-use ast::{CidlType, CloesceAst, MediaType};
+use ast::{CidlType, CloesceAst, IncludeTree, KvR2Field, MediaType};
 
 pub trait LanguageTypeMapper {
     fn cidl_type(&self, ty: &CidlType, ast: &CloesceAst) -> String;
     fn media_type(&self, ty: &MediaType) -> String;
+    fn key_format(&self, kvr2: &KvR2Field) -> String;
+    fn include_tree(&self, tree: &IncludeTree) -> String;
 }
 
 pub enum TypeScriptMapperKind {
@@ -114,5 +116,22 @@ impl LanguageTypeMapper for TypeScriptMapper {
             MediaType::Json => "MediaType.Json".to_string(),
             MediaType::Octet => "MediaType.Octet".to_string(),
         }
+    }
+
+    fn key_format(&self, kvr2: &KvR2Field) -> String {
+        // turns format into an interpolated string like
+        // `user:${id}`
+        let mut result = kvr2.format.to_string();
+        for param in &kvr2.format_parameters {
+            let placeholder = format!("{{{}}}", param.name);
+            let replacement = format!("${{{}}}", param.name);
+            result = result.replace(&placeholder, &replacement);
+        }
+
+        return format!("`{result}`");
+    }
+
+    fn include_tree(&self, tree: &IncludeTree) -> String {
+        serde_json::to_string(&tree).unwrap()
     }
 }

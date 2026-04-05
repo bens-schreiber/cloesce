@@ -1,5 +1,5 @@
 use askama::Template;
-use ast::{CidlType, CloesceAst, IncludeTree};
+use ast::{CidlType, CloesceAst};
 
 use crate::mappers::{LanguageTypeMapper, TypeScriptMapper};
 
@@ -18,10 +18,6 @@ impl BackendTemplate<'_> {
 
     fn is_crud_method(&self, name: &str) -> bool {
         name == "$get" || name == "$save" || name == "$list"
-    }
-
-    fn include_tree_to_js(&self, tree: &IncludeTree<'_>) -> String {
-        serde_json::to_string(&tree).unwrap()
     }
 }
 

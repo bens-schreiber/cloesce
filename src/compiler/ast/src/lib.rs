@@ -269,6 +269,9 @@ pub struct KvR2Field<'src> {
     pub format: &'src str,
 
     #[serde(borrow)]
+    pub format_parameters: Vec<Field<'src>>,
+
+    #[serde(borrow)]
     pub binding: &'src str,
 
     pub list_prefix: bool,

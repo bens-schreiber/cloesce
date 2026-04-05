@@ -1,6 +1,6 @@
 #![allow(unused_variables)]
 
-use ast::{CidlType, MediaType, NavigationFieldKind};
+use ast::{CidlType, Field, MediaType, NavigationFieldKind};
 use compiler_test::lex_and_parse;
 use frontend::{SymbolKind, WranglerEnvBindingKind};
 use semantic::{SemanticAnalysis, err::SemanticError};
@@ -674,8 +674,14 @@ fn kv_and_d1_coexist() {
     let user = result.models.get("User").unwrap();
     assert!(user.d1_binding.is_some());
     assert_eq!(user.kv_fields.len(), 1);
-    // name is the only regular column (id is primary)
-    assert_eq!(user.columns.len(), 1);
+    assert_eq!(user.columns.len(), 1,);
+    assert_eq!(
+        user.kv_fields[0].format_parameters[0],
+        Field {
+            name: "id".into(),
+            cidl_type: CidlType::Integer,
+        }
+    );
 }
 
 #[test]

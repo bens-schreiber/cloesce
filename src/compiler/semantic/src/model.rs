@@ -564,36 +564,50 @@ impl<'src, 'p> ModelAnalysis<'src, 'p> {
         };
 
         // Extracts variables from a formatted string, then validates that they
-        // correspond to fields on the models that are of valid SQLite types
-        let validate_key_format =
-            |sink: &mut ErrorSink<'src, 'p>, span: Span, format: &'src str| -> bool {
-                let vars = match extract_braced(format) {
-                    Ok(vars) => vars,
-                    Err(reason) => {
-                        sink.push(SemanticError::KvR2InvalidKeyFormat { span, reason });
-                        return false;
-                    }
-                };
+        // correspond to fields on the models that are of valid SQLite types.
+        // Returns the parameters to create a key format
+        let validate_key_format = |sink: &mut ErrorSink<'src, 'p>,
+                                   span: Span,
+                                   format: &'src str|
+         -> Result<Vec<Field<'src>>, ()> {
+            let vars = match extract_braced(format) {
+                Ok(vars) => vars,
+                Err(reason) => {
+                    sink.push(SemanticError::KvR2InvalidKeyFormat { span, reason });
+                    return Err(());
+                }
+            };
 
-                for var in vars {
-                    // Look through typed fields and key_fields for a matching name
-                    let in_typed = model_block
-                        .typed_idents
-                        .iter()
-                        .any(|f| f.name == var && is_valid_sql_type(&f.cidl_type));
-                    let in_key_fields = model_block.key_fields.iter().any(|f| f.name == var);
+            let mut parameters = vec![];
+            for var in vars {
+                // Look through typed fields and key_fields for a matching name
+                let column = model_block
+                    .typed_idents
+                    .iter()
+                    .find(|f| f.name == var && is_valid_sql_type(&f.cidl_type));
+                let key_field = model_block.key_fields.iter().find(|f| f.name == var);
 
-                    if !in_typed && !in_key_fields {
+                match (column, key_field) {
+                    (Some(col), _) => parameters.push(Field {
+                        name: col.name.into(),
+                        cidl_type: col.cidl_type.clone(),
+                    }),
+                    (None, Some(kf)) => parameters.push(Field {
+                        name: kf.name.into(),
+                        cidl_type: CidlType::String,
+                    }),
+                    (None, None) => {
                         sink.push(SemanticError::KvR2UnknownKeyVariable {
                             span,
                             variable: var,
                         });
-                        return false;
+                        return Err(());
                     }
                 }
+            }
 
-                true
-            };
+            Ok(parameters)
+        };
 
         for kv in &model_block.kvs {
             let binding_name = validate_binding(
@@ -603,9 +617,10 @@ impl<'src, 'p> ModelAnalysis<'src, 'p> {
                 WranglerEnvBindingKind::Kv,
             );
 
-            if !validate_key_format(&mut self.sink, kv.span, kv.key_format) {
+            let Ok(format_parameters) = validate_key_format(&mut self.sink, kv.span, kv.key_format)
+            else {
                 continue;
-            }
+            };
 
             let mut resolved_type = match resolve_cidl_type(&kv.field, &kv.field.cidl_type, table) {
                 Ok(t) => t,
@@ -628,6 +643,7 @@ impl<'src, 'p> ModelAnalysis<'src, 'p> {
                 },
                 format: kv.key_format,
                 binding: binding_name.unwrap_or_default(),
+                format_parameters,
                 list_prefix: kv.is_paginated,
             });
         }
@@ -640,9 +656,10 @@ impl<'src, 'p> ModelAnalysis<'src, 'p> {
                 WranglerEnvBindingKind::R2,
             );
 
-            if !validate_key_format(&mut self.sink, r2.span, r2.key_format) {
+            let Ok(format_parameters) = validate_key_format(&mut self.sink, r2.span, r2.key_format)
+            else {
                 continue;
-            }
+            };
 
             model.r2_fields.push(KvR2Field {
                 field: Field {
@@ -655,6 +672,7 @@ impl<'src, 'p> ModelAnalysis<'src, 'p> {
                 },
                 format: r2.key_format,
                 binding: binding_name.unwrap_or_default(),
+                format_parameters,
                 list_prefix: r2.is_paginated,
             });
         }
