@@ -4,10 +4,10 @@ env {
 }
 
 [use db]
+[use list, save, get]
 model WeatherReport {
     primary {
         id: int
-        id2: int
     }
 
     nav (Weather::weatherReportId) {

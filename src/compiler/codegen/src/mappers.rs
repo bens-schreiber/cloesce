@@ -86,7 +86,7 @@ impl LanguageTypeMapper for TypeScriptMapper {
                 }
             }
             CidlType::Stream => match self.kind {
-                TypeScriptMapperKind::BackendTypes => "ReadableStream".to_string(),
+                TypeScriptMapperKind::BackendTypes => "CfReadableStream".to_string(),
                 TypeScriptMapperKind::ClientApi => "Uint8Array".to_string(),
             },
             CidlType::KvObject(inner) => {

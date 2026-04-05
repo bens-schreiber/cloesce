@@ -16,7 +16,7 @@
   "license": "ISC",
   "type": "module",
   "dependencies": {
-    "cloesce": "file:../../src/runtime/ts/dist",
+    "cloesce": "file:../../src/runtime/ts",
     "wrangler": "^4.61.1"
   },
   "devDependencies": {

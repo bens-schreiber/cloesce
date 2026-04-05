@@ -5,7 +5,7 @@
       "binding": "db",
       "database_id": "replace_with_db_id",
       "database_name": "replace_with_db_name",
-      "migrations_dir": "./customDir/db"
+      "migrations_dir": "./migrations/db"
     }
   ],
   "main": "./src/api/main.ts",

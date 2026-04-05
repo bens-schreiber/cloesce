@@ -42,9 +42,8 @@ function debugBenchmark(...args: any[]) {
 
 type WasmConfig = {
   name: string;
-  description?: string;
-  wasmFile: string;
   args: string[];
+  wasmUrl: URL;
   wranglerConfigPath: string;
   env?: Record<string, string>;
 };
@@ -101,7 +100,7 @@ const cmds = subcommands({
         const root = process.cwd();
         const compileConfig: WasmConfig = {
           name: "compile",
-          wasmFile: "compile.wasm",
+          wasmUrl: new URL("./compile.wasm", import.meta.url),
           args: [
             config.outPath,
             wranglerConfigPath,
@@ -114,7 +113,7 @@ const cmds = subcommands({
           wranglerConfigPath,
         };
 
-        await compile(compileConfig);
+        await runWasm(compileConfig);
       },
     }),
     migrate: command({
@@ -196,19 +195,19 @@ const cmds = subcommands({
 
         const migrateConfig: WasmConfig = {
           name: "migrations",
-          wasmFile: "migrate.wasm",
+          wasmUrl: new URL("./migrate.wasm", import.meta.url),
           args: wasmArgs,
           wranglerConfigPath,
         };
 
-        await compile(migrateConfig);
+        await runWasm(migrateConfig);
       },
     }),
   },
 });
 
-async function compile(config: WasmConfig) {
-  const debugStart = debugBenchmark(`Starting compilation`);
+async function runWasm(config: WasmConfig) {
+  const debugStart = debugBenchmark(`Preparing to run ${config.name} WASM...`);
   const root = process.cwd();
 
   const wranglerPath = path.join(root, config.wranglerConfigPath);
@@ -226,8 +225,8 @@ async function compile(config: WasmConfig) {
     preopens: { ".": root },
   });
 
-  const readWasmStart = debugBenchmark(`Reading compile binary...`);
-  const wasm = await readFile(new URL("./compile.wasm", import.meta.url));
+  const readWasmStart = debugBenchmark(`Reading ${config.name} binary...`);
+  const wasm = await readFile(config.wasmUrl);
   const mod = await WebAssembly.compile(new Uint8Array(wasm));
   let instance = await WebAssembly.instantiate(mod, {
     wasi_snapshot_preview1: wasi.wasiImport,
