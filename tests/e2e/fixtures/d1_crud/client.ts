@@ -43,7 +43,7 @@ export class CrudHaver {
       `http://localhost:5646/api/CrudHaver/$get`
     );
     const payload: any = {};
-    if ("id" in args) baseUrl.searchParams.append("id", String((args as any).id));
+  baseUrl.searchParams.append("id", String((args as any).id ?? null));
     baseUrl.searchParams.append("__datasource", kind);
 
     const res = await fetchImpl(baseUrl, {
@@ -74,8 +74,8 @@ export class CrudHaver {
       `http://localhost:5646/api/CrudHaver/$list`
     );
     const payload: any = {};
-    if ("lastSeen_id" in args) baseUrl.searchParams.append("lastSeen_id", String((args as any).lastSeen_id));
-    if ("limit" in args) baseUrl.searchParams.append("limit", String((args as any).limit));
+  baseUrl.searchParams.append("lastSeen_id", String((args as any).lastSeen_id ?? null));
+  baseUrl.searchParams.append("limit", String((args as any).limit ?? null));
     baseUrl.searchParams.append("__datasource", kind);
 
     const res = await fetchImpl(baseUrl, {
@@ -96,7 +96,7 @@ export class CrudHaver {
   ): Promise<HttpResult<CrudHaver>>;
   static async $save(
     model: DeepPartial<CrudHaver>,
-    kind: string,
+    kind: "Default" = "Default",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<CrudHaver>> {
     const baseUrl = new URL(
@@ -153,7 +153,7 @@ export class Parent {
       `http://localhost:5646/api/Parent/$get`
     );
     const payload: any = {};
-    if ("id" in args) baseUrl.searchParams.append("id", String((args as any).id));
+  baseUrl.searchParams.append("id", String((args as any).id ?? null));
     baseUrl.searchParams.append("__datasource", kind);
 
     const res = await fetchImpl(baseUrl, {
@@ -192,8 +192,8 @@ export class Parent {
       `http://localhost:5646/api/Parent/$list`
     );
     const payload: any = {};
-    if ("lastSeen_id" in args) baseUrl.searchParams.append("lastSeen_id", String((args as any).lastSeen_id));
-    if ("limit" in args) baseUrl.searchParams.append("limit", String((args as any).limit));
+  baseUrl.searchParams.append("lastSeen_id", String((args as any).lastSeen_id ?? null));
+  baseUrl.searchParams.append("limit", String((args as any).limit ?? null));
     baseUrl.searchParams.append("__datasource", kind);
 
     const res = await fetchImpl(baseUrl, {
@@ -219,7 +219,7 @@ export class Parent {
   ): Promise<HttpResult<Parent>>;
   static async $save(
     model: DeepPartial<Parent>,
-    kind: string,
+    kind: "Default" | "WithChildren" = "Default",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Parent>> {
     const baseUrl = new URL(

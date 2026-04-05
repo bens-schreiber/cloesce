@@ -20,7 +20,7 @@ export class Course {
       `http://localhost:5646/api/Course/$get`
     );
     const payload: any = {};
-    if ("id" in args) baseUrl.searchParams.append("id", String((args as any).id));
+  baseUrl.searchParams.append("id", String((args as any).id ?? null));
     baseUrl.searchParams.append("__datasource", kind);
 
     const res = await fetchImpl(baseUrl, {
@@ -51,8 +51,8 @@ export class Course {
       `http://localhost:5646/api/Course/$list`
     );
     const payload: any = {};
-    if ("lastSeen_id" in args) baseUrl.searchParams.append("lastSeen_id", String((args as any).lastSeen_id));
-    if ("limit" in args) baseUrl.searchParams.append("limit", String((args as any).limit));
+  baseUrl.searchParams.append("lastSeen_id", String((args as any).lastSeen_id ?? null));
+  baseUrl.searchParams.append("limit", String((args as any).limit ?? null));
     baseUrl.searchParams.append("__datasource", kind);
 
     const res = await fetchImpl(baseUrl, {
@@ -73,7 +73,7 @@ export class Course {
   ): Promise<HttpResult<Course>>;
   static async $save(
     model: DeepPartial<Course>,
-    kind: string,
+    kind: "Default" = "Default",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Course>> {
     const baseUrl = new URL(
@@ -135,8 +135,8 @@ export class Student {
       `http://localhost:5646/api/Student/$get`
     );
     const payload: any = {};
-    if ("id" in args) baseUrl.searchParams.append("id", String((args as any).id));
-    if ("name" in args) baseUrl.searchParams.append("name", String((args as any).name));
+  baseUrl.searchParams.append("id", String((args as any).id ?? null));
+  baseUrl.searchParams.append("name", String((args as any).name ?? null));
     baseUrl.searchParams.append("__datasource", kind);
 
     const res = await fetchImpl(baseUrl, {
@@ -177,11 +177,11 @@ export class Student {
       `http://localhost:5646/api/Student/$list`
     );
     const payload: any = {};
-    if ("lastId" in args) baseUrl.searchParams.append("lastId", String((args as any).lastId));
-    if ("lastName" in args) baseUrl.searchParams.append("lastName", String((args as any).lastName));
-    if ("limit" in args) baseUrl.searchParams.append("limit", String((args as any).limit));
-    if ("lastSeen_id" in args) baseUrl.searchParams.append("lastSeen_id", String((args as any).lastSeen_id));
-    if ("lastSeen_name" in args) baseUrl.searchParams.append("lastSeen_name", String((args as any).lastSeen_name));
+  baseUrl.searchParams.append("lastId", String((args as any).lastId ?? null));
+  baseUrl.searchParams.append("lastName", String((args as any).lastName ?? null));
+  baseUrl.searchParams.append("limit", String((args as any).limit ?? null));
+  baseUrl.searchParams.append("lastSeen_id", String((args as any).lastSeen_id ?? null));
+  baseUrl.searchParams.append("lastSeen_name", String((args as any).lastSeen_name ?? null));
     baseUrl.searchParams.append("__datasource", kind);
 
     const res = await fetchImpl(baseUrl, {
@@ -207,7 +207,7 @@ export class Student {
   ): Promise<HttpResult<Student>>;
   static async $save(
     model: DeepPartial<Student>,
-    kind: string,
+    kind: "CoursesOrderedDescending" | "Default" = "Default",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Student>> {
     const baseUrl = new URL(
@@ -272,9 +272,9 @@ export class StudentCourse {
       `http://localhost:5646/api/StudentCourse/$get`
     );
     const payload: any = {};
-    if ("studentId" in args) baseUrl.searchParams.append("studentId", String((args as any).studentId));
-    if ("studentName" in args) baseUrl.searchParams.append("studentName", String((args as any).studentName));
-    if ("courseId" in args) baseUrl.searchParams.append("courseId", String((args as any).courseId));
+  baseUrl.searchParams.append("studentId", String((args as any).studentId ?? null));
+  baseUrl.searchParams.append("studentName", String((args as any).studentName ?? null));
+  baseUrl.searchParams.append("courseId", String((args as any).courseId ?? null));
     baseUrl.searchParams.append("__datasource", kind);
 
     const res = await fetchImpl(baseUrl, {
@@ -317,10 +317,10 @@ export class StudentCourse {
       `http://localhost:5646/api/StudentCourse/$list`
     );
     const payload: any = {};
-    if ("lastSeen_studentId" in args) baseUrl.searchParams.append("lastSeen_studentId", String((args as any).lastSeen_studentId));
-    if ("lastSeen_studentName" in args) baseUrl.searchParams.append("lastSeen_studentName", String((args as any).lastSeen_studentName));
-    if ("lastSeen_courseId" in args) baseUrl.searchParams.append("lastSeen_courseId", String((args as any).lastSeen_courseId));
-    if ("limit" in args) baseUrl.searchParams.append("limit", String((args as any).limit));
+  baseUrl.searchParams.append("lastSeen_studentId", String((args as any).lastSeen_studentId ?? null));
+  baseUrl.searchParams.append("lastSeen_studentName", String((args as any).lastSeen_studentName ?? null));
+  baseUrl.searchParams.append("lastSeen_courseId", String((args as any).lastSeen_courseId ?? null));
+  baseUrl.searchParams.append("limit", String((args as any).limit ?? null));
     baseUrl.searchParams.append("__datasource", kind);
 
     const res = await fetchImpl(baseUrl, {
@@ -346,7 +346,7 @@ export class StudentCourse {
   ): Promise<HttpResult<StudentCourse>>;
   static async $save(
     model: DeepPartial<StudentCourse>,
-    kind: string,
+    kind: "Default" | "WithStudentCourse" = "Default",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<StudentCourse>> {
     const baseUrl = new URL(

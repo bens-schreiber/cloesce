@@ -69,7 +69,7 @@ export class RuntimeContainer {
     public readonly ast: Cidl,
     public readonly wasm: OrmWasmExports,
     public readonly workerUrl: string,
-  ) {}
+  ) { }
 
   static async init(ast: Cidl, workerUrl: string) {
     if (this.instance) return;
@@ -441,7 +441,7 @@ function matchRoute(
 
   let impl =
     registry.get(model.name)?.[method.name] ??
-    (crudRoute(model, method.name, env) as ApiImplementation | undefined);
+    (crudRoute(model, method, env) as ApiImplementation | undefined);
   if (!impl) {
     return notImplemented();
   }
@@ -531,7 +531,7 @@ async function validateRequest(
 
   // Filter out injected parameters
   const requiredParams = route.method.parameters.filter(
-    (p) => !(typeof p.cidl_type === "object" && "Inject" in p.cidl_type),
+    (p) => p.cidl_type !== "Env" && !(typeof p.cidl_type === "object" && "Inject" in p.cidl_type),
   );
 
   // Extract all method parameters from the body
@@ -634,27 +634,7 @@ async function hydrate(
     );
 
   try {
-    let result = null;
-    if (dataSource.gen.get === undefined) {
-      // Must be a KV or R2 based model
-      result = await orm.hydrate(
-        meta,
-        {},
-        route.keyFields,
-        dataSource.gen.tree,
-      );
-    } else {
-      const query = dataSource.gen.get(
-        env,
-        ...Object.values(route.getParamValues),
-      );
-      result = await orm.getQuery(
-        meta,
-        query,
-        dataSource.gen.tree,
-        route.keyFields,
-      );
-    }
+    let result = await dataSource.gen.get(env, ...Object.values(route.getParamValues), ...Object.values(route.keyFields));
 
     // Result will only be null if the record does not exist for a D1 query
     // (KV or R2 based models will just be empty, as that is a valid state).

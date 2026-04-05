@@ -318,8 +318,8 @@ export class ModelWithCruds {
       `http://example.com/path/to/api/ModelWithCruds/$get`
     );
     const payload: any = {};
-    if ("name" in args) baseUrl.searchParams.append("name", String((args as any).name));
-    if ("id" in args) baseUrl.searchParams.append("id", String((args as any).id));
+  baseUrl.searchParams.append("name", String((args as any).name ?? null));
+  baseUrl.searchParams.append("id", String((args as any).id ?? null));
     baseUrl.searchParams.append("__datasource", kind);
 
     const res = await fetchImpl(baseUrl, {
@@ -358,9 +358,9 @@ export class ModelWithCruds {
       `http://example.com/path/to/api/ModelWithCruds/$list`
     );
     const payload: any = {};
-    if ("name" in args) baseUrl.searchParams.append("name", String((args as any).name));
-    if ("limit" in args) baseUrl.searchParams.append("limit", String((args as any).limit));
-    if ("lastSeen_id" in args) baseUrl.searchParams.append("lastSeen_id", String((args as any).lastSeen_id));
+  baseUrl.searchParams.append("name", String((args as any).name ?? null));
+  baseUrl.searchParams.append("limit", String((args as any).limit ?? null));
+  baseUrl.searchParams.append("lastSeen_id", String((args as any).lastSeen_id ?? null));
     baseUrl.searchParams.append("__datasource", kind);
 
     const res = await fetchImpl(baseUrl, {
@@ -386,7 +386,7 @@ export class ModelWithCruds {
   ): Promise<HttpResult<ModelWithCruds>>;
   static async $save(
     model: DeepPartial<ModelWithCruds>,
-    kind: string,
+    kind: "ByName" | "Default" = "Default",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<ModelWithCruds>> {
     const baseUrl = new URL(

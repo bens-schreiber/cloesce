@@ -111,8 +111,8 @@ export interface DataSourceMethod {
 
 export interface DataSourceImpl {
   tree: IncludeTree;
-  get?: (env: any, ...args: unknown[]) => D1PreparedStatement;
-  list?: (env: any, ...args: unknown[]) => D1PreparedStatement;
+  get: (env: any, ...args: unknown[]) => unknown;
+  list?: (env: any, ...args: unknown[]) => unknown;
 }
 
 export interface DataSource {

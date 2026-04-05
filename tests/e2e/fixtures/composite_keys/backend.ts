@@ -171,7 +171,9 @@ export async function cloesce(): Promise<CloesceApp> {
 
 // Default entrypoint for a Cloesce app. 
 // Replace with a custom fetch handler to register API implementations, add middleware, etc.
-export default async function fetch(request: Request, env: Env): Promise<Response> {
-    const app = await cloesce();
-    return await app.run(request, env);
+export default {
+    async fetch(request: Request, env: Env): Promise<Response> {
+        const app = await cloesce();
+        return await app.run(request, env);
+    }
 }

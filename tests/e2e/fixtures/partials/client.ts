@@ -55,7 +55,7 @@ export class Dog {
   ): Promise<HttpResult<Dog>>;
   static async $save(
     model: DeepPartial<Dog>,
-    kind: string,
+    kind: "Default" = "Default",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Dog>> {
     const baseUrl = new URL(

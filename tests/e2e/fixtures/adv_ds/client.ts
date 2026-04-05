@@ -71,9 +71,9 @@ export class Hamburger {
       `http://localhost:5646/api/Hamburger/$list`
     );
     const payload: any = {};
-    if ("lastId" in args) baseUrl.searchParams.append("lastId", String((args as any).lastId));
-    if ("limit" in args) baseUrl.searchParams.append("limit", String((args as any).limit));
-    if ("lastSeen_id" in args) baseUrl.searchParams.append("lastSeen_id", String((args as any).lastSeen_id));
+  baseUrl.searchParams.append("lastId", String((args as any).lastId ?? null));
+  baseUrl.searchParams.append("limit", String((args as any).limit ?? null));
+  baseUrl.searchParams.append("lastSeen_id", String((args as any).lastSeen_id ?? null));
     baseUrl.searchParams.append("__datasource", kind);
 
     const res = await fetchImpl(baseUrl, {
@@ -99,7 +99,7 @@ export class Hamburger {
   ): Promise<HttpResult<Hamburger>>;
   static async $save(
     model: DeepPartial<Hamburger>,
-    kind: string,
+    kind: "BurgersWithLettuceOrdered" | "Default" = "Default",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Hamburger>> {
     const baseUrl = new URL(
@@ -142,7 +142,7 @@ export class Topping {
   ): Promise<HttpResult<Topping>>;
   static async $save(
     model: DeepPartial<Topping>,
-    kind: string,
+    kind: "Default" = "Default",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Topping>> {
     const baseUrl = new URL(

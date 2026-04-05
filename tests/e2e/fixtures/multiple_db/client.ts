@@ -19,7 +19,7 @@ export class DB1Model {
       `http://localhost:5646/api/DB1Model/$get`
     );
     const payload: any = {};
-    if ("id" in args) baseUrl.searchParams.append("id", String((args as any).id));
+  baseUrl.searchParams.append("id", String((args as any).id ?? null));
     baseUrl.searchParams.append("__datasource", kind);
 
     const res = await fetchImpl(baseUrl, {
@@ -50,8 +50,8 @@ export class DB1Model {
       `http://localhost:5646/api/DB1Model/$list`
     );
     const payload: any = {};
-    if ("lastSeen_id" in args) baseUrl.searchParams.append("lastSeen_id", String((args as any).lastSeen_id));
-    if ("limit" in args) baseUrl.searchParams.append("limit", String((args as any).limit));
+  baseUrl.searchParams.append("lastSeen_id", String((args as any).lastSeen_id ?? null));
+  baseUrl.searchParams.append("limit", String((args as any).limit ?? null));
     baseUrl.searchParams.append("__datasource", kind);
 
     const res = await fetchImpl(baseUrl, {
@@ -72,7 +72,7 @@ export class DB1Model {
   ): Promise<HttpResult<DB1Model>>;
   static async $save(
     model: DeepPartial<DB1Model>,
-    kind: string,
+    kind: "Default" = "Default",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<DB1Model>> {
     const baseUrl = new URL(
@@ -120,7 +120,7 @@ export class DB2Model {
       `http://localhost:5646/api/DB2Model/$get`
     );
     const payload: any = {};
-    if ("id" in args) baseUrl.searchParams.append("id", String((args as any).id));
+  baseUrl.searchParams.append("id", String((args as any).id ?? null));
     baseUrl.searchParams.append("__datasource", kind);
 
     const res = await fetchImpl(baseUrl, {
@@ -151,8 +151,8 @@ export class DB2Model {
       `http://localhost:5646/api/DB2Model/$list`
     );
     const payload: any = {};
-    if ("lastSeen_id" in args) baseUrl.searchParams.append("lastSeen_id", String((args as any).lastSeen_id));
-    if ("limit" in args) baseUrl.searchParams.append("limit", String((args as any).limit));
+  baseUrl.searchParams.append("lastSeen_id", String((args as any).lastSeen_id ?? null));
+  baseUrl.searchParams.append("limit", String((args as any).limit ?? null));
     baseUrl.searchParams.append("__datasource", kind);
 
     const res = await fetchImpl(baseUrl, {
@@ -173,7 +173,7 @@ export class DB2Model {
   ): Promise<HttpResult<DB2Model>>;
   static async $save(
     model: DeepPartial<DB2Model>,
-    kind: string,
+    kind: "Default" = "Default",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<DB2Model>> {
     const baseUrl = new URL(

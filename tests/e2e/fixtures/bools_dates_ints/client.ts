@@ -20,7 +20,7 @@ export class Weather {
       `http://localhost:5646/api/Weather/$get`
     );
     const payload: any = {};
-    if ("id" in args) baseUrl.searchParams.append("id", String((args as any).id));
+  baseUrl.searchParams.append("id", String((args as any).id ?? null));
     baseUrl.searchParams.append("__datasource", kind);
 
     const res = await fetchImpl(baseUrl, {
@@ -41,7 +41,7 @@ export class Weather {
   ): Promise<HttpResult<Weather>>;
   static async $save(
     model: DeepPartial<Weather>,
-    kind: string,
+    kind: "Default" = "Default",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<Weather>> {
     const baseUrl = new URL(

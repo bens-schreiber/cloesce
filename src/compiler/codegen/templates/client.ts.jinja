@@ -112,7 +112,7 @@ export class {{ model.name }} {
 {%- endfor %}
   static async $save(
     model: DeepPartial<{{ model.name }}>,
-    kind: string,
+    kind: {{ self.ds_kind_union(&model.data_sources) }} = "Default",
     fetchImpl: typeof fetch = fetch
   ): Promise<HttpResult<{{ self.map_type(&api.return_type) }}>> {
     const baseUrl = new URL(
@@ -179,9 +179,12 @@ export class {{ model.name }} {
 {%- if self.is_serializable(&param.cidl_type) %}
 {%- if !self.is_datasource(&param.cidl_type) %}
 {%- if self.is_url_param(&param.cidl_type, &api.http_verb) %}
-    if ("{{ param.name }}" in args) baseUrl.searchParams.append("{{ param.name }}", String((args as any).{{ param.name }}));
+  baseUrl.searchParams.append("{{ param.name }}", String((args as any).{{ param.name }} ?? null));
 {%- else %}
-    payload["{{ param.name }}"] = (args as any).{{ param.name }};
+  {
+    const value = (args as any).{{ param.name }};
+    payload["{{ param.name }}"] = value === undefined ? null : value;
+  }
 {%- endif %}
 {%- endif %}
 {%- endif %}
@@ -243,9 +246,12 @@ export class {{ model.name }} {
 {%- if self.is_serializable(&param.cidl_type) %}
 {%- if !self.is_datasource(&param.cidl_type) %}
 {%- if self.is_url_param(&param.cidl_type, &api.http_verb) %}
-    if ("{{ param.name }}" in args) baseUrl.searchParams.append("{{ param.name }}", String((args as any).{{ param.name }}));
+  baseUrl.searchParams.append("{{ param.name }}", String((args as any).{{ param.name }} ?? null));
 {%- else %}
-    payload["{{ param.name }}"] = (args as any).{{ param.name }};
+  {
+    const value = (args as any).{{ param.name }};
+    payload["{{ param.name }}"] = value === undefined ? null : value;
+  }
 {%- endif %}
 {%- endif %}
 {%- endif %}
@@ -287,9 +293,12 @@ export class {{ model.name }} {
 {%- if self.is_serializable(&param.cidl_type) %}
 {%- if !self.is_datasource(&param.cidl_type) %}
 {%- if self.is_url_param(&param.cidl_type, &api.http_verb) %}
-    if ("{{ param.name }}" in args) baseUrl.searchParams.append("{{ param.name }}", String((args as any).{{ param.name }}));
+  baseUrl.searchParams.append("{{ param.name }}", String((args as any).{{ param.name }} ?? null));
 {%- else %}
-    payload["{{ param.name }}"] = (args as any).{{ param.name }};
+  {
+    const value = (args as any).{{ param.name }};
+    payload["{{ param.name }}"] = value === undefined ? null : value;
+  }
 {%- endif %}
 {%- endif %}
 {%- endif %}

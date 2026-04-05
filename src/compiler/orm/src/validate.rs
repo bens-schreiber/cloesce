@@ -159,9 +159,7 @@ pub fn validate_cidl_type(
                 return Err(ValidatorErrorKind::NonString);
             };
 
-            // TODO: adjust this when data sources are revamped
-            // for now we allow "none"
-            if value_str == "none" || model.data_sources.contains_key(value_str) {
+            if model.data_sources.contains_key(value_str) {
                 return Ok(Some(value));
             }
 
