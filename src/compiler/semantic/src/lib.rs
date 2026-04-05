@@ -302,12 +302,19 @@ impl<'src, 'p> SemanticAnalysis {
             }
         }
 
+        let injects = parse
+            .injects
+            .iter()
+            .flat_map(|i| i.fields.iter().map(|f| f.name))
+            .collect();
+
         let mut ast = CloesceAst {
             hash: 0,
             wrangler_env,
             models,
             services,
             poos,
+            injects,
         };
         let errs = sink.drain();
         if !errs.is_empty() {

@@ -9,6 +9,8 @@ env {
     }
 }
 
+inject { YouTubeApi } 
+
 [use db]
 model BasicModel {
     primary {

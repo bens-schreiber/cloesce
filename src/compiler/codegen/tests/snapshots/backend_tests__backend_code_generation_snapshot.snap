@@ -7,11 +7,15 @@ import { HttpResult, KValue, CloesceApp, Orm, IncludeTree, DeepPartial } from "c
 import { R2Bucket, KVNamespace, D1Database, R2Object, D1PreparedStatement, ReadableStream, R2ObjectBody } from "@cloudflare/workers-types";
 
 type MaybePromise<T> = T | Promise<T>;
+type MaybeHttpResult<T> = T | HttpResult<T>;
 export interface Env {
     db: D1Database;
     my_kv: KVNamespace;
     my_r2: R2Bucket;
     MY_VAR: string;
+}
+export abstract class YouTubeApi {
+    readonly tag = "YouTubeApi";
 }
 export interface BasicPoo {
     field1: string;
@@ -21,9 +25,23 @@ export interface PooWithComposition {
     field1: BasicPoo;
     field2: BasicModel.Self;
 }
-export interface BasicService {
+export namespace BasicService {
+    export const Tag = "BasicService";
+
+    export interface Self {
+    }
+
+    export abstract class Api {
+        readonly tag = Tag;
+        abstract init(self: BasicService.Self): MaybePromise<MaybeHttpResult<void>>;
+        abstract downloadData(): MaybePromise<MaybeHttpResult<ReadableStream>>;
+        abstract instanceMethod(input: number): MaybePromise<MaybeHttpResult<number>>;
+        abstract staticMethod(input: string): MaybePromise<MaybeHttpResult<string>>;
+        abstract uploadData(data: ReadableStream): MaybePromise<MaybeHttpResult<boolean>>;
+    }
 }
 export namespace HasSqlColumnTypes {
+    export const Tag = "HasSqlColumnTypes";
     export const Meta = cidl.models.HasSqlColumnTypes as any;
 
     export interface Self {
@@ -41,7 +59,7 @@ export namespace HasSqlColumnTypes {
     }
 
     export abstract class Api {
-        readonly tag = "HasSqlColumnTypes";
+        readonly tag = Tag;
     }
 
     export namespace DataSources {
@@ -73,6 +91,7 @@ export namespace HasSqlColumnTypes {
     }
 }
 export namespace ManyToManyModelA {
+    export const Tag = "ManyToManyModelA";
     export const Meta = cidl.models.ManyToManyModelA as any;
 
     export interface Self {
@@ -81,7 +100,7 @@ export namespace ManyToManyModelA {
     }
 
     export abstract class Api {
-        readonly tag = "ManyToManyModelA";
+        readonly tag = Tag;
     }
 
     export namespace DataSources {
@@ -113,6 +132,7 @@ export namespace ManyToManyModelA {
     }
 }
 export namespace ManyToManyModelB {
+    export const Tag = "ManyToManyModelB";
     export const Meta = cidl.models.ManyToManyModelB as any;
 
     export interface Self {
@@ -121,7 +141,7 @@ export namespace ManyToManyModelB {
     }
 
     export abstract class Api {
-        readonly tag = "ManyToManyModelB";
+        readonly tag = Tag;
     }
 
     export namespace DataSources {
@@ -153,6 +173,7 @@ export namespace ManyToManyModelB {
     }
 }
 export namespace ModelWithCompositePk {
+    export const Tag = "ModelWithCompositePk";
     export const Meta = cidl.models.ModelWithCompositePk as any;
 
     export interface Self {
@@ -162,8 +183,8 @@ export namespace ModelWithCompositePk {
     }
 
     export abstract class Api {
-        readonly tag = "ModelWithCompositePk";
-        abstract instanceMethod(self: ModelWithCompositePk.Self, e: Env, input: string): MaybePromise<HttpResult<string>>;
+        readonly tag = Tag;
+        abstract instanceMethod(self: ModelWithCompositePk.Self, e: Env, input: string): MaybePromise<MaybeHttpResult<string>>;
     }
 
     export namespace DataSources {
@@ -195,6 +216,7 @@ export namespace ModelWithCompositePk {
     }
 }
 export namespace ModelWithCustomDs {
+    export const Tag = "ModelWithCustomDs";
     export const Meta = cidl.models.ModelWithCustomDs as any;
 
     export interface Self {
@@ -203,8 +225,8 @@ export namespace ModelWithCustomDs {
     }
 
     export abstract class Api {
-        readonly tag = "ModelWithCustomDs";
-        abstract instanceMethod(self: ModelWithCustomDs.Self, input: string): MaybePromise<HttpResult<string>>;
+        readonly tag = Tag;
+        abstract instanceMethod(self: ModelWithCustomDs.Self, input: string): MaybePromise<MaybeHttpResult<string>>;
     }
 
     export namespace DataSources {
@@ -247,6 +269,7 @@ export namespace ModelWithCustomDs {
     }
 }
 export namespace OneToManyModel {
+    export const Tag = "OneToManyModel";
     export const Meta = cidl.models.OneToManyModel as any;
 
     export interface Self {
@@ -255,7 +278,7 @@ export namespace OneToManyModel {
     }
 
     export abstract class Api {
-        readonly tag = "OneToManyModel";
+        readonly tag = Tag;
     }
 
     export namespace DataSources {
@@ -287,6 +310,7 @@ export namespace OneToManyModel {
     }
 }
 export namespace ToyotaPrius {
+    export const Tag = "ToyotaPrius";
     export const Meta = cidl.models.ToyotaPrius as any;
 
     export interface Self {
@@ -299,8 +323,8 @@ export namespace ToyotaPrius {
     }
 
     export abstract class Api {
-        readonly tag = "ToyotaPrius";
-        abstract instanceMethod(self: ToyotaPrius.Self, input: string): MaybePromise<HttpResult<string>>;
+        readonly tag = Tag;
+        abstract instanceMethod(self: ToyotaPrius.Self, input: string): MaybePromise<MaybeHttpResult<string>>;
     }
 
     export namespace DataSources {
@@ -354,6 +378,7 @@ export namespace ToyotaPrius {
     }
 }
 export namespace BasicModel {
+    export const Tag = "BasicModel";
     export const Meta = cidl.models.BasicModel as any;
 
     export interface Self {
@@ -362,7 +387,7 @@ export namespace BasicModel {
     }
 
     export abstract class Api {
-        readonly tag = "BasicModel";
+        readonly tag = Tag;
     }
 
     export namespace DataSources {
@@ -394,6 +419,7 @@ export namespace BasicModel {
     }
 }
 export namespace HasOneToOne {
+    export const Tag = "HasOneToOne";
     export const Meta = cidl.models.HasOneToOne as any;
 
     export interface Self {
@@ -403,7 +429,7 @@ export namespace HasOneToOne {
     }
 
     export abstract class Api {
-        readonly tag = "HasOneToOne";
+        readonly tag = Tag;
     }
 
     export namespace DataSources {
@@ -435,6 +461,7 @@ export namespace HasOneToOne {
     }
 }
 export namespace ModelWithCruds {
+    export const Tag = "ModelWithCruds";
     export const Meta = cidl.models.ModelWithCruds as any;
 
     export interface Self {
@@ -444,7 +471,7 @@ export namespace ModelWithCruds {
     }
 
     export abstract class Api {
-        readonly tag = "ModelWithCruds";
+        readonly tag = Tag;
     }
 
     export namespace DataSources {
@@ -487,6 +514,7 @@ export namespace ModelWithCruds {
     }
 }
 export namespace ModelWithKv {
+    export const Tag = "ModelWithKv";
     export const Meta = cidl.models.ModelWithKv as any;
 
     export interface Self {
@@ -498,10 +526,10 @@ export namespace ModelWithKv {
     }
 
     export abstract class Api {
-        readonly tag = "ModelWithKv";
-        abstract instanceMethod(self: ModelWithKv.Self, e: Env, input: string): MaybePromise<HttpResult<string>>;
-        abstract staticMethod(input: number): MaybePromise<HttpResult<number>>;
-        abstract hasKvParamAndRes(self: ModelWithKv.Self, input: KValue<string>): MaybePromise<HttpResult<KValue<string>>>;
+        readonly tag = Tag;
+        abstract instanceMethod(self: ModelWithKv.Self, e: Env, input: string): MaybePromise<MaybeHttpResult<string>>;
+        abstract staticMethod(input: number): MaybePromise<MaybeHttpResult<number>>;
+        abstract hasKvParamAndRes(self: ModelWithKv.Self, input: KValue<string>): MaybePromise<MaybeHttpResult<KValue<string>>>;
     }
 
     export namespace DataSources {
@@ -525,6 +553,7 @@ export namespace ModelWithKv {
     }
 }
 export namespace ModelWithR2 {
+    export const Tag = "ModelWithR2";
     export const Meta = cidl.models.ModelWithR2 as any;
 
     export interface Self {
@@ -534,8 +563,8 @@ export namespace ModelWithR2 {
     }
 
     export abstract class Api {
-        readonly tag = "ModelWithR2";
-        abstract hasR2ParamAndRes(self: ModelWithR2.Self, input: R2ObjectBody): MaybePromise<HttpResult<R2ObjectBody>>;
+        readonly tag = Tag;
+        abstract hasR2ParamAndRes(self: ModelWithR2.Self, input: R2ObjectBody): MaybePromise<MaybeHttpResult<R2ObjectBody>>;
     }
 
     export namespace DataSources {
@@ -558,16 +587,6 @@ export namespace ModelWithR2 {
         return await Orm.fromEnv(env).listQuery<Self>(Meta, args.query, args.include);
     }
 }
-
-export abstract class BasicService {
-    readonly tag = "BasicService";
-    abstract init(self: BasicService): MaybePromise<HttpResult<void> | void>;
-    abstract downloadData(): MaybePromise<HttpResult<ReadableStream>>;
-    abstract instanceMethod(input: number): MaybePromise<HttpResult<number>>;
-    abstract staticMethod(input: string): MaybePromise<HttpResult<string>>;
-    abstract uploadData(data: ReadableStream): MaybePromise<HttpResult<boolean>>;
-}
-
 import cidl from "./cidl.json" with { type: "json" };
 (cidl.models.HasSqlColumnTypes.data_sources["Default"] as any).gen = HasSqlColumnTypes.DataSources.Default;
 (cidl.models.ManyToManyModelA.data_sources["Default"] as any).gen = ManyToManyModelA.DataSources.Default;

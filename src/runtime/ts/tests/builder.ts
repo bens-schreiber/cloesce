@@ -1,4 +1,3 @@
-import { Project } from "ts-morph";
 import {
   Model,
   Cidl,
@@ -149,11 +148,7 @@ export class ModelBuilder {
     return this;
   }
 
-  navP(
-    name: string,
-    model_reference: string,
-    kind: NavigationFieldKind,
-  ): this {
+  navP(name: string, model_reference: string, kind: NavigationFieldKind): this {
     this.navigation_fields.push({
       field: { name, cidl_type: { Object: { name: model_reference } } },
       model_reference,
@@ -214,7 +209,6 @@ export class ModelBuilder {
   method(
     name: string,
     http_verb: HttpVerb,
-    is_static: boolean,
     parameters: Field[],
     return_type: CidlType,
     data_source: string | null = null,
@@ -222,7 +216,7 @@ export class ModelBuilder {
     this.apis.push({
       name,
       http_verb,
-      is_static,
+      is_static: data_source === null,
       parameters,
       return_type,
       return_media: "Json",
@@ -235,12 +229,14 @@ export class ModelBuilder {
   dataSource(
     name: string,
     tree: IncludeTree,
+    get?: Field[],
     is_internal: boolean = false,
   ): this {
     this.data_sources[name] = {
       name,
       is_internal,
       gen: { tree },
+      get: get ? { parameters: get } : undefined,
     };
     return this;
   }

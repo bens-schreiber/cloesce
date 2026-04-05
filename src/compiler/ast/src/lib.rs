@@ -172,6 +172,7 @@ pub enum NavigationFieldKind<'src> {
 
 #[derive(Deserialize, Serialize, Debug)]
 pub struct NavigationField<'src> {
+    #[serde(default)]
     pub hash: u64,
 
     #[serde(borrow)]
@@ -204,6 +205,7 @@ pub struct ForeignKeyReference<'src> {
 
 #[derive(Deserialize, Serialize, Debug)]
 pub struct Column<'src> {
+    #[serde(default)]
     pub hash: u64,
 
     #[serde(borrow)]
@@ -306,6 +308,7 @@ pub struct ApiMethod<'src> {
 
 #[derive(Deserialize, Serialize, Debug, Default)]
 pub struct Model<'src> {
+    #[serde(default)]
     pub hash: u64,
 
     #[serde(borrow)]
@@ -421,6 +424,7 @@ pub struct WranglerEnv<'src> {
 
 #[derive(Deserialize, Serialize, Debug, Default)]
 pub struct CloesceAst<'src> {
+    #[serde(default)]
     pub hash: u64,
 
     #[serde(borrow)]
@@ -434,6 +438,9 @@ pub struct CloesceAst<'src> {
 
     #[serde(borrow)]
     pub poos: BTreeMap<&'src str, PlainOldObject<'src>>,
+
+    #[serde(borrow)]
+    pub injects: Vec<&'src str>,
 }
 
 impl CloesceAst<'_> {

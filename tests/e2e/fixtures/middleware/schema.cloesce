@@ -1,0 +1,13 @@
+env { d1 { db } }
+
+inject { InjectedThing }
+
+[use db, save]
+model Foo {
+    primary { id: string }
+}
+
+api Foo {
+    get blockedMethod() -> void
+    get getInjectedThing(thing: InjectedThing) -> string
+}

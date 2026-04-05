@@ -5,9 +5,9 @@ import {
   RuntimeContainer,
   _cloesceInternal,
 } from "../src/router/router";
-import { HttpVerb, MediaType } from "../src/ast";
 import { CloesceApp, HttpResult, DependencyContainer } from "../src/ui/backend";
 import { ModelBuilder, ServiceBuilder, createAst } from "./builder";
+import { Model, Service } from "../src/cidl";
 
 function createRequest(url: string, method?: string, body?: any) {
   return new Request(url, {
@@ -16,15 +16,18 @@ function createRequest(url: string, method?: string, body?: any) {
   });
 }
 
-function createCtorReg(ctors?: (new () => any)[]) {
-  const res: Record<string, new () => any> = {};
-  if (ctors) {
-    for (const ctor of ctors) {
-      res[ctor.name] = ctor;
-    }
-  }
+const mockImpl = vi.fn();
 
-  return res;
+function createRegistry(...namespaces: (Model | Service)[]) {
+  const map = new Map<string, any>();
+  for (const ns of namespaces) {
+    const methodMap: Record<string, any> = {};
+    for (const method of ns.apis) {
+      methodMap[method.name] = mockImpl;
+    }
+    map.set(ns.name, methodMap);
+  }
+  return map;
 }
 
 function mockWranglerEnv() {
@@ -52,9 +55,11 @@ describe("Match Route", () => {
     // Arrange
     const request = createRequest("http://foo.com/does/not/match");
     const ast = createAst();
+    const env = mockWranglerEnv();
+    const registry = createRegistry();
 
     // Act
-    const res = _cloesceInternal.matchRoute(request, ast, api);
+    const res = _cloesceInternal.matchRoute(request, ast, api, registry, env);
 
     // Assert
     expect(res.isLeft()).toBe(true);
@@ -68,9 +73,11 @@ describe("Match Route", () => {
     // Arrange
     const request = createRequest("http://foo.com/api/Model/method");
     const ast = createAst();
+    const env = mockWranglerEnv();
+    const registry = createRegistry();
 
     // Act
-    const res = _cloesceInternal.matchRoute(request, ast, api);
+    const res = _cloesceInternal.matchRoute(request, ast, api, registry, env);
 
     // Assert
     expect(res.isLeft()).toBe(true);
@@ -86,9 +93,11 @@ describe("Match Route", () => {
     const ast = createAst({
       models: [ModelBuilder.model("Model").idPk().build()],
     });
+    const env = mockWranglerEnv();
+    const registry = createRegistry();
 
     // Act
-    const res = _cloesceInternal.matchRoute(request, ast, api);
+    const res = _cloesceInternal.matchRoute(request, ast, api, registry, env);
 
     // Assert
     expect(res.isLeft()).toBe(true);
@@ -105,13 +114,15 @@ describe("Match Route", () => {
       models: [
         ModelBuilder.model("Model")
           .idPk()
-          .method("method", HttpVerb.Delete, false, [], "Void")
+          .method("method", "Delete", [], "Void")
           .build(),
       ],
     });
+    const env = mockWranglerEnv();
+    const registry = createRegistry();
 
     // Act
-    const res = _cloesceInternal.matchRoute(request, ast, api);
+    const res = _cloesceInternal.matchRoute(request, ast, api, registry, env);
 
     // Assert
     expect(res.isLeft()).toBe(true);
@@ -128,23 +139,26 @@ describe("Match Route", () => {
       models: [
         ModelBuilder.model("Model")
           .idPk()
-          .method("method", HttpVerb.Post, true, [], "Void")
+          .method("method", "Post", [], "Void")
           .build(),
       ],
     });
+    const env = mockWranglerEnv();
+    const registry = createRegistry(ast.models["Model"]);
 
     // Act
-    const res = _cloesceInternal.matchRoute(request, ast, api);
+    const res = _cloesceInternal.matchRoute(request, ast, api, registry, env);
 
     // Assert
     expect(res.isRight()).toBe(true);
     expect(res.unwrap()).toEqual({
-      primaryKeyValues: {},
-      keyParams: {},
-      method: ast.models["Model"].methods["method"],
+      getParamValues: {},
+      keyFields: {},
+      method: ast.models["Model"].apis.find((m) => m.name === "method"),
       model: ast.models["Model"],
       namespace: "Model",
       kind: "model",
+      impl: mockImpl,
     });
   });
 
@@ -155,21 +169,26 @@ describe("Match Route", () => {
       models: [
         ModelBuilder.model("Model")
           .idPk()
-          .method("method", HttpVerb.Post, false, [], "Void")
+          .method("method", "Post", [], "Void", "ds")
+          .dataSource("ds", {}, [{ name: "id", cidl_type: "Integer" }])
           .build(),
       ],
     });
+    const env = mockWranglerEnv();
+    const registry = createRegistry(ast.models["Model"]);
 
     // Act
-    const res = _cloesceInternal.matchRoute(request, ast, api);
+    const res = _cloesceInternal.matchRoute(request, ast, api, registry, env);
 
     // Assert
     expect(res.isRight()).toBe(true);
     expect(res.unwrap()).toEqual({
-      primaryKeyValues: { id: "0" },
-      keyParams: {},
+      dataSource: ast.models["Model"].data_sources["ds"],
+      getParamValues: { id: "0" },
+      impl: mockImpl,
+      keyFields: {},
       model: ast.models["Model"],
-      method: ast.models["Model"].methods["method"],
+      method: ast.models["Model"].apis.find((m) => m.name === "method"),
       namespace: "Model",
       kind: "model",
     });
@@ -185,63 +204,37 @@ describe("Match Route", () => {
       models: [
         ModelBuilder.model("Model")
           .idPk()
-          .method("method", HttpVerb.Post, false, [], "Void")
-          .keyParam("key1")
-          .keyParam("key2")
+          .method("method", "Post", [], "Void", "ds")
+          .dataSource("ds", {}, [{ name: "id", cidl_type: "Integer" }])
+          .keyField("key1")
+          .keyField("key2")
           .build(),
       ],
     });
+    const env = mockWranglerEnv();
+    const registry = createRegistry(ast.models["Model"]);
 
     // Act
-    const res = _cloesceInternal.matchRoute(request, ast, api);
+    const res = _cloesceInternal.matchRoute(request, ast, api, registry, env);
 
     // Assert
     expect(res.isRight()).toBe(true);
     expect(res.unwrap()).toEqual({
-      primaryKeyValues: { id: "0" },
-      keyParams: {
+      dataSource: ast.models["Model"].data_sources["ds"],
+      impl: mockImpl,
+      getParamValues: { id: "0" },
+      keyFields: {
         key1: "value1",
         key2: "value2",
       },
       model: ast.models["Model"],
-      method: ast.models["Model"].methods["method"],
+      method: ast.models["Model"].apis.find((m) => m.name === "method"),
       namespace: "Model",
       kind: "model",
     });
   });
 
-  test("Matches instantiated method with composite primary key", () => {
-    // Arrange
-    const request = createRequest(
-      "http://foo.com/api/Model/acme/user123/method",
-      "POST",
-    );
-    const ast = createAst({
-      models: [
-        ModelBuilder.model("Model")
-          .pk("orgId", "Text")
-          .pk("userId", "Text")
-          .method("method", HttpVerb.Post, false, [], "Void")
-          .build(),
-      ],
-    });
-
-    // Act
-    const res = _cloesceInternal.matchRoute(request, ast, api);
-
-    // Assert
-    expect(res.isRight()).toBe(true);
-    expect(res.unwrap()).toEqual({
-      primaryKeyValues: { orgId: "acme", userId: "user123" },
-      keyParams: {},
-      model: ast.models["Model"],
-      method: ast.models["Model"].methods["method"],
-      namespace: "Model",
-      kind: "model",
-    });
-  });
-
-  test("Matches instantiated method with composite primary key and key params", () => {
+  test("Matches instantiated method with composite primary key and key fields", () => {
     // Arrange
     const request = createRequest(
       "http://foo.com/api/Model/acme/user123/value1/value2/method",
@@ -250,28 +243,36 @@ describe("Match Route", () => {
     const ast = createAst({
       models: [
         ModelBuilder.model("Model")
-          .pk("orgId", "Text")
-          .pk("userId", "Text")
-          .method("method", HttpVerb.Post, false, [], "Void")
-          .keyParam("key1")
-          .keyParam("key2")
+          .pk("orgId", "String")
+          .pk("userId", "String")
+          .method("method", "Post", [], "Void", "ds")
+          .dataSource("ds", {}, [
+            { name: "orgId", cidl_type: "String" },
+            { name: "userId", cidl_type: "String" },
+          ])
+          .keyField("key1")
+          .keyField("key2")
           .build(),
       ],
     });
+    const env = mockWranglerEnv();
+    const registry = createRegistry(ast.models["Model"]);
 
     // Act
-    const res = _cloesceInternal.matchRoute(request, ast, api);
+    const res = _cloesceInternal.matchRoute(request, ast, api, registry, env);
 
     // Assert
     expect(res.isRight()).toBe(true);
     expect(res.unwrap()).toEqual({
-      primaryKeyValues: { orgId: "acme", userId: "user123" },
-      keyParams: {
+      dataSource: ast.models["Model"].data_sources["ds"],
+      impl: mockImpl,
+      getParamValues: { orgId: "acme", userId: "user123" },
+      keyFields: {
         key1: "value1",
         key2: "value2",
       },
       model: ast.models["Model"],
-      method: ast.models["Model"].methods["method"],
+      method: ast.models["Model"].apis.find((m) => m.name === "method"),
       namespace: "Model",
       kind: "model",
     });
@@ -283,20 +284,23 @@ describe("Match Route", () => {
     const ast = createAst({
       services: [
         ServiceBuilder.service("Service")
-          .method("method", HttpVerb.Post, true, [], "Void")
+          .method("method", "Post", true, [], "Void")
           .build(),
       ],
     });
+    const env = mockWranglerEnv();
+    const registry = createRegistry(ast.services["Service"]);
 
     // Act
-    const res = _cloesceInternal.matchRoute(request, ast, api);
+    const res = _cloesceInternal.matchRoute(request, ast, api, registry, env);
 
     // Assert
     expect(res.isRight()).toBe(true);
     expect(res.unwrap()).toEqual({
-      primaryKeyValues: {},
-      keyParams: {},
-      method: ast.services["Service"].methods["method"],
+      getParamValues: {},
+      impl: mockImpl,
+      keyFields: {},
+      method: ast.services["Service"].apis.find((m) => m.name === "method"),
       service: ast.services["Service"],
       kind: "service",
       namespace: "Service",
@@ -309,20 +313,23 @@ describe("Match Route", () => {
     const ast = createAst({
       services: [
         ServiceBuilder.service("Service")
-          .method("method", HttpVerb.Post, false, [], "Void")
+          .method("method", "Post", false, [], "Void")
           .build(),
       ],
     });
+    const env = mockWranglerEnv();
+    const registry = createRegistry(ast.services["Service"]);
 
     // Act
-    const res = _cloesceInternal.matchRoute(request, ast, api);
+    const res = _cloesceInternal.matchRoute(request, ast, api, registry, env);
 
     // Assert
     expect(res.isRight()).toBe(true);
     expect(res.unwrap()).toEqual({
-      primaryKeyValues: {},
-      keyParams: {},
-      method: ast.services["Service"].methods["method"],
+      getParamValues: {},
+      impl: mockImpl,
+      keyFields: {},
+      method: ast.services["Service"].apis.find((m) => m.name === "method"),
       service: ast.services["Service"],
       kind: "service",
       namespace: "Service",
@@ -335,28 +342,29 @@ describe("Namespace Middleware", () => {
     _cloesceInternal.RuntimeContainer.dispose();
   });
 
-  test("Exits early on Model", async () => {
+  test("Exits early", async () => {
     // Arrange
     const env = mockWranglerEnv();
     const ast = createAst({
       models: [
         ModelBuilder.model("Foo")
           .idPk()
-          .method("method", HttpVerb.Post, true, [], "Void")
+          .method("method", "Post", [], "Void")
           .build(),
       ],
     });
-    const constructorRegistry = createCtorReg();
-    class Foo {}
-    constructorRegistry[Foo.name] = Foo;
 
-    await RuntimeContainer.init(ast, constructorRegistry, api);
+    await RuntimeContainer.init(ast, api);
     const app = new CloesceApp();
+    app.register({
+      tag: "Foo",
+      method: mockImpl,
+    } as any);
 
     const request = createRequest("http://foo.com/api/Foo/method", "POST");
     const di = createDi();
 
-    app.onNamespace(Foo, async () => {
+    app.onNamespace("Foo", async () => {
       return HttpResult.fail(500, "oogly boogly");
     });
 
@@ -366,47 +374,6 @@ describe("Namespace Middleware", () => {
       env,
       ast,
       undefined,
-      constructorRegistry,
-      di,
-      api,
-    );
-
-    // Assert
-    expect(res.status).toBe(500);
-    expect(res.message).toBe("oogly boogly");
-  });
-
-  test("Exits early on Service", async () => {
-    // Arrange
-    const env = mockWranglerEnv();
-    const ast = createAst({
-      services: [
-        ServiceBuilder.service("Foo")
-          .method("method", HttpVerb.Post, true, [], "Void")
-          .build(),
-      ],
-    });
-    const constructorRegistry = createCtorReg();
-    class Foo {}
-    constructorRegistry[Foo.name] = Foo;
-
-    await RuntimeContainer.init(ast, constructorRegistry, api);
-    const app = new CloesceApp();
-
-    const request = createRequest("http://foo.com/api/Foo/method", "POST");
-    const di = createDi();
-
-    app.onNamespace(Foo, async () => {
-      return HttpResult.fail(500, "oogly boogly");
-    });
-
-    // Act
-    const res = await (app as any).router(
-      request,
-      env,
-      ast,
-      undefined,
-      constructorRegistry,
       di,
       api,
     );
@@ -423,22 +390,24 @@ describe("Request Validation", () => {
     const request = createRequest("http://foo.com/api/Foo/method", "POST", {});
     const model = ModelBuilder.model("Foo")
       .idPk()
-      .method("method", HttpVerb.Post, false, [], "Void")
+      .method("method", "Post", [], "Void", "ds")
+      .dataSource("ds", {}, [{ name: "id", cidl_type: "Integer" }])
       .build();
 
     const route: MatchedRoute = {
       kind: "model",
       namespace: "Foo",
       model,
-      method: model.methods["method"],
-      primaryKeyValues: {},
-      keyParams: {},
+      method: model.apis.find((m) => m.name === "method")!,
+      getParamValues: {},
+      keyFields: {},
+      dataSource: model.data_sources["ds"],
+      impl: mockImpl,
     };
 
     const wasmMock = {} as any;
     const astMock = {} as any;
     const envMock = {} as any;
-    const ctorRegMock = {} as any;
 
     // Act
     const res = await _cloesceInternal.validateRequest(
@@ -446,14 +415,13 @@ describe("Request Validation", () => {
       wasmMock,
       astMock,
       envMock,
-      ctorRegMock,
       route,
     );
 
     // Assert
     expect(res.isLeft()).toBe(true);
     expect(extractErrorCode(res.unwrapLeft().message)).toEqual(
-      RouterError.InstantiatedMethodMissingPrimaryKey,
+      RouterError.InstantiatedMethodMissingGetParam,
     );
   });
 
@@ -462,21 +430,21 @@ describe("Request Validation", () => {
     const request = createRequest("http://foo.com/api/Foo/method", "POST");
     const model = ModelBuilder.model("Foo")
       .idPk()
-      .method("method", HttpVerb.Post, true, [], "Void")
+      .method("method", "Post", [], "Void")
       .build();
 
     const route: MatchedRoute = {
       kind: "model",
       namespace: "Foo",
-      method: model.methods["method"],
-      primaryKeyValues: {},
-      keyParams: {},
+      method: model.apis.find((m) => m.name === "method")!,
+      getParamValues: {},
+      keyFields: {},
+      impl: mockImpl,
     };
 
     const wasmMock = {} as any;
     const astMock = {} as any;
     const envMock = {} as any;
-    const ctorRegMock = {} as any;
 
     // Act
     const res = await _cloesceInternal.validateRequest(
@@ -484,7 +452,6 @@ describe("Request Validation", () => {
       wasmMock,
       astMock,
       envMock,
-      ctorRegMock,
       route,
     );
 
@@ -508,18 +475,17 @@ describe("Method Middleware", () => {
       models: [
         ModelBuilder.model("Foo")
           .idPk()
-          .method("method", HttpVerb.Post, true, [], "Void")
+          .method("method", "Post", [], "Void")
           .build(),
       ],
     });
-    const constructorRegistry = createCtorReg();
-    class Foo {
-      method() {}
-    }
-    constructorRegistry[Foo.name] = Foo;
 
-    await RuntimeContainer.init(ast, constructorRegistry, api);
+    await RuntimeContainer.init(ast, api);
     const app = new CloesceApp();
+    app.register({
+      tag: "Foo",
+      method: mockImpl,
+    } as any);
 
     const request = createRequest(
       "http://foo.com/api/Foo/method",
@@ -529,7 +495,7 @@ describe("Method Middleware", () => {
 
     const di = createDi();
 
-    app.onMethod(Foo, "method", async () => {
+    app.onMethod("Foo", "method", async () => {
       return HttpResult.fail(500, "oogly boogly");
     });
 
@@ -539,7 +505,6 @@ describe("Method Middleware", () => {
       env,
       ast,
       undefined,
-      constructorRegistry,
       di,
       api,
     );
@@ -553,122 +518,102 @@ describe("Method Middleware", () => {
 describe("Method Dispatch", () => {
   test("Void Return Type => 200, no data", async () => {
     // Arrange
-    const crud = {
-      testMethod() {
-        return;
-      },
-    };
 
     const di = createDi();
     const model = ModelBuilder.model("Foo")
       .idPk()
-      .method("testMethod", HttpVerb.Get, true, [], "Void")
+      .method("testMethod", "Get", [], "Void")
       .build();
 
     const route: MatchedRoute = {
       kind: "model",
       namespace: "Foo",
-      method: model.methods["testMethod"],
-      primaryKeyValues: {},
-      keyParams: {},
+      method: model.apis.find((m) => m.name === "testMethod")!,
+      impl: () => {},
+      getParamValues: {},
+      keyFields: {},
     };
 
     // Act
-    const res = await _cloesceInternal.methodDispatch(crud, di, route, {});
+    const res = await _cloesceInternal.methodDispatch({}, di, route, {});
 
     // Assert
-    expect(res).toStrictEqual(HttpResult.ok(200).setMediaType(MediaType.Json));
+    expect(res).toStrictEqual(HttpResult.ok(200).setMediaType("Json"));
     expect(res.data).toBeUndefined();
   });
 
   test("HttpResult Return Type => HttpResult", async () => {
     // Arrange
-    const crud = {
-      testMethod() {
-        return HttpResult.ok(123, "foo");
-      },
-    };
-
     const di = createDi();
 
     const model = ModelBuilder.model("Foo")
       .idPk()
-      .method("testMethod", HttpVerb.Get, true, [], { HttpResult: "Void" })
+      .method("testMethod", "Get", [], { HttpResult: "Void" })
       .build();
 
     const route: MatchedRoute = {
       kind: "model",
       namespace: "Foo",
-      method: model.methods["testMethod"],
-      primaryKeyValues: {},
-      keyParams: {},
+      method: model.apis.find((m) => m.name === "testMethod")!,
+      impl: () => HttpResult.ok(123, "foo"),
+      getParamValues: {},
+      keyFields: {},
     };
 
     // Act
-    const res = await _cloesceInternal.methodDispatch(crud, di, route, {});
+    const res = await _cloesceInternal.methodDispatch({}, di, route, {});
 
     // Assert
-    expect(res).toStrictEqual(
-      HttpResult.ok(123, "foo").setMediaType(MediaType.Json),
-    );
+    expect(res).toStrictEqual(HttpResult.ok(123, "foo").setMediaType("Json"));
   });
 
-  test("Primitive Return Type => HttpResult", async () => {
+  test("Non HttpResult => HttpResult", async () => {
     // Arrange
-    const crud: any = {
-      testMethod() {
-        return "neigh";
-      },
-    };
     const di = createDi();
 
     const model = ModelBuilder.model("Foo")
       .idPk()
-      .method("testMethod", HttpVerb.Get, true, [], "Text")
+      .method("testMethod", "Get", [], "String")
       .build();
 
     const route: MatchedRoute = {
       kind: "model",
       namespace: "Foo",
-      method: model.methods["testMethod"],
-      primaryKeyValues: {},
-      keyParams: {},
+      method: model.apis.find((m) => m.name === "testMethod")!,
+      impl: () => "neigh",
+      getParamValues: {},
+      keyFields: {},
     };
 
     // Act
-    const res = await _cloesceInternal.methodDispatch(crud, di, route, {});
+    const res = await _cloesceInternal.methodDispatch({}, di, route, {});
 
     // Assert
-    expect(res).toStrictEqual(
-      HttpResult.ok(200, "neigh").setMediaType(MediaType.Json),
-    );
+    expect(res).toStrictEqual(HttpResult.ok(200, "neigh").setMediaType("Json"));
   });
 
   test("handles thrown errors", async () => {
-    // Arrange – Error object
+    // Arrange
     const model = ModelBuilder.model("Foo")
       .idPk()
-      .method("testMethod", HttpVerb.Get, true, [], "Text")
+      .method("testMethod", "Get", [], "String")
       .build();
 
     const route: MatchedRoute = {
       kind: "model",
       namespace: "Foo",
-      method: model.methods["testMethod"],
-      primaryKeyValues: {},
-      keyParams: {},
-    };
-
-    const crud = {
-      testMethod() {
+      method: model.apis.find((m) => m.name === "testMethod")!,
+      impl: () => {
         throw new Error("boom");
       },
+      getParamValues: {},
+      keyFields: {},
     };
 
     const di = createDi();
 
     // Act
-    const res = await _cloesceInternal.methodDispatch(crud, di, route, {});
+    const res = await _cloesceInternal.methodDispatch({}, di, route, {});
 
     // Assert
     expect(extractErrorCode(res.message)).toBe(RouterError.UncaughtException);

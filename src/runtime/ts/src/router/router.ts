@@ -14,7 +14,7 @@ import {
   CidlType,
 } from "../cidl.js";
 import { Either, InternalError } from "../common.js";
-import { Orm, KeysOfType, HttpResult } from "../ui/backend.js";
+import { Orm, HttpResult } from "../ui/backend.js";
 import { hydrateType } from "./orm.js";
 import { crudRoute } from "./crud.js";
 
@@ -33,7 +33,8 @@ export class DependencyContainer {
     return "tag" in key ? key.tag : key.name;
   }
 
-  set<T>(key: DependencyKey, instance: T) {
+  /** @internal */
+  _set<T>(key: DependencyKey, instance: T) {
     if (this.container.has(DependencyContainer.tag(key))) {
       console.warn(
         `Overwriting existing dependency for key ${DependencyContainer.tag(
@@ -42,6 +43,10 @@ export class DependencyContainer {
       );
     }
     this.container.set(DependencyContainer.tag(key), instance);
+  }
+
+  set(value: { tag: string }) {
+    this._set({ tag: value.tag }, value);
   }
 
   get<T>(key: DependencyKey): T | undefined {
@@ -143,7 +148,7 @@ export class CloesceApp {
     this.onRouteMiddleware.push(m);
   }
 
-  private namespaceMiddleware: Map<{ tag: string }, MiddlewareFn[]> = new Map();
+  private namespaceMiddleware: Map<string, MiddlewareFn[]> = new Map();
 
   /**
    * Registers middleware for a specific namespace (Model or Service)
@@ -152,16 +157,16 @@ export class CloesceApp {
    *
    * @param m - The middleware function to register.
    */
-  public onNamespace(key: { tag: string }, m: MiddlewareFn) {
-    const existing = this.namespaceMiddleware.get(key);
+  public onNamespace(tag: string, m: MiddlewareFn) {
+    const existing = this.namespaceMiddleware.get(tag);
     if (existing) {
       existing.push(m);
       return;
     }
-    this.namespaceMiddleware.set(key, [m]);
+    this.namespaceMiddleware.set(tag, [m]);
   }
 
-  private methodMiddleware: Map<{ tag: string }, Map<string, MiddlewareFn[]>> =
+  private methodMiddleware: Map<string, Map<string, MiddlewareFn[]>> =
     new Map();
 
   /**
@@ -173,15 +178,11 @@ export class CloesceApp {
    * @param method - The method name or CrudKind to register the middleware for.
    * @param m - The middleware function to register.
    */
-  public onMethod<T>(
-    key: { tag: string },
-    method: KeysOfType<T, (...args: any) => any> | CrudKind,
-    m: MiddlewareFn,
-  ) {
-    let classMap = this.methodMiddleware.get(key);
+  public onMethod(tag: string, method: string | CrudKind, m: MiddlewareFn) {
+    let classMap = this.methodMiddleware.get(tag);
     if (!classMap) {
       classMap = new Map();
-      this.methodMiddleware.set(key, classMap);
+      this.methodMiddleware.set(tag, classMap);
     }
 
     let methodArray = classMap.get(method);
@@ -223,7 +224,7 @@ export class CloesceApp {
         }
       }
 
-      di.set({ tag: serviceMeta.name }, service);
+      di._set({ tag: serviceMeta.name }, service);
     }
 
     // Route match
@@ -242,8 +243,7 @@ export class CloesceApp {
     }
 
     // Namespace middleware
-    for (const m of this.namespaceMiddleware.get({ tag: route.namespace }) ??
-      []) {
+    for (const m of this.namespaceMiddleware.get(route.namespace) ?? []) {
       const res = await m(di);
       if (res) {
         return res;
@@ -259,7 +259,7 @@ export class CloesceApp {
 
     // Method middleware
     for (const m of this.methodMiddleware
-      .get({ tag: route.namespace })
+      .get(route.namespace)
       ?.get(route.method.name) ?? []) {
       const res = await m(di);
       if (res) {
@@ -292,9 +292,9 @@ export class CloesceApp {
     // DI will always contain the WranglerEnv and Request.
     const di = new DependencyContainer();
     if (ast.wrangler_env) {
-      di.set({ tag: ENV_TAG }, env);
+      di._set({ tag: ENV_TAG }, env);
     }
-    di.set(Request, request);
+    di._set(Request, request);
 
     try {
       const httpResult = await this.router(

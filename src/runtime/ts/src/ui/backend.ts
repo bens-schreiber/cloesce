@@ -195,10 +195,6 @@ type DeepPartialInner<T> = T extends (infer U)[]
  */
 export type DeepPartial<T> = DeepPartialInner<T> & { __brand?: "Partial" };
 
-export type KeysOfType<T, U> = {
-  [K in keyof T]: T[K] extends U ? (K extends string ? K : never) : never;
-}[keyof T];
-
 /**  @internal Hack to detect R2Object at runtime */
 function isR2Object(x: unknown): boolean {
   if (typeof x !== "object" || x === null) return false;

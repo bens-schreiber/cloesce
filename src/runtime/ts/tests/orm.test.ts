@@ -1,9 +1,7 @@
 import { describe, test, expect, afterEach } from "vitest";
 import { Miniflare } from "miniflare";
 import { ModelBuilder, createAst } from "./builder";
-import { KValue, Orm, Paginated } from "../src/ui/backend.js";
 import { _cloesceInternal } from "../src/router/router.js";
-import { R2ObjectBody } from "@cloudflare/workers-types";
 import { hydrateType } from "../src/router/orm";
 import { Cidl } from "../src/cidl.js";
 
@@ -16,8 +14,6 @@ function createHydrateArgs() {
     promises: [],
   };
 }
-
-const api = "http://test.com";
 
 describe("hydrateType Tests", () => {
   afterEach(() => {
@@ -166,13 +162,17 @@ describe("hydrateType Tests", () => {
       };
 
       // Act
-      const result = hydrateType(base, { Object: { name: "ParentModel" } }, {
-        ...createHydrateArgs(),
-        ast,
-        includeTree: {
-          child: {},
+      const result = hydrateType(
+        base,
+        { Object: { name: "ParentModel" } },
+        {
+          ...createHydrateArgs(),
+          ast,
+          includeTree: {
+            child: {},
+          },
         },
-      });
+      );
 
       // Assert
       expect(result.child).toBeDefined();
@@ -207,11 +207,15 @@ describe("hydrateType Tests", () => {
       };
 
       // Act
-      const result = hydrateType(base, { Object: { name: "ParentModel2" } }, {
-        ...createHydrateArgs(),
-        ast,
-        includeTree: {},
-      });
+      const result = hydrateType(
+        base,
+        { Object: { name: "ParentModel2" } },
+        {
+          ...createHydrateArgs(),
+          ast,
+          includeTree: {},
+        },
+      );
 
       // Assert
       expect(result.child).toBeDefined();
