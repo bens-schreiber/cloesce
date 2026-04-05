@@ -18,7 +18,7 @@ afterAll(async () => {
 
 describe("Global Middleware", () => {
   it("Rejects POST requests", async () => {
-    const res = await Foo.SAVE({});
+    const res = await Foo.$save({});
     expect(res.ok).toBe(false);
     expect(res.status).toBe(401);
     expect(res.message).toBe("POST methods aren't allowed.");
@@ -40,8 +40,6 @@ describe("Model + Method Middleware", () => {
     const res = await Foo.getInjectedThing();
 
     expect(res.ok).toBe(true);
-    expect(res.data).toEqual({
-      value: "hello world",
-    });
+    expect(res.data).toEqual("hello world");
   });
 });

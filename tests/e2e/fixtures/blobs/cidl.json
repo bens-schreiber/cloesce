@@ -1,25 +1,22 @@
 {
   "hash": 4055048839320829329,
-  "project_name": "runner",
   "wrangler_env": {
-    "name": "Env",
-    "source_path": "./seed__blobs.cloesce.ts",
     "d1_bindings": [
       "db"
     ],
     "kv_bindings": [],
     "r2_bindings": [],
-    "vars": {}
+    "vars": []
   },
   "models": {
     "BlobHaver": {
       "hash": 560041510452854967,
       "name": "BlobHaver",
       "d1_binding": "db",
-      "primary_key_columns": [
+      "primary_columns": [
         {
           "hash": 6397878138472974760,
-          "value": {
+          "field": {
             "name": "id",
             "cidl_type": "Integer"
           },
@@ -31,7 +28,7 @@
       "columns": [
         {
           "hash": 17404811013903783014,
-          "value": {
+          "field": {
             "name": "blob1",
             "cidl_type": "Blob"
           },
@@ -41,7 +38,7 @@
         },
         {
           "hash": 14390429867474788070,
-          "value": {
+          "field": {
             "name": "blob2",
             "cidl_type": "Blob"
           },
@@ -50,38 +47,118 @@
           "composite_id": null
         }
       ],
-      "navigation_properties": [],
-      "key_params": [],
-      "kv_objects": [],
-      "r2_objects": [],
-      "methods": {
-        "GET": {
-          "name": "GET",
+      "kv_fields": [],
+      "r2_fields": [],
+      "navigation_fields": [],
+      "key_fields": [],
+      "apis": [
+        {
+          "name": "getBlob1",
+          "is_static": false,
+          "data_source": "Default",
+          "http_verb": "Get",
+          "return_media": "Json",
+          "return_type": {
+            "HttpResult": "Blob"
+          },
+          "parameters_media": "Json",
+          "parameters": []
+        },
+        {
+          "name": "inputStream",
+          "is_static": true,
+          "data_source": null,
+          "http_verb": "Post",
+          "return_media": "Json",
+          "return_type": {
+            "HttpResult": "Void"
+          },
+          "parameters_media": "Octet",
+          "parameters": [
+            {
+              "name": "s",
+              "cidl_type": "Stream"
+            }
+          ]
+        },
+        {
+          "name": "yieldStream",
+          "is_static": false,
+          "data_source": "Default",
+          "http_verb": "Get",
+          "return_media": "Octet",
+          "return_type": {
+            "HttpResult": "Stream"
+          },
+          "parameters_media": "Json",
+          "parameters": []
+        },
+        {
+          "name": "$save",
+          "is_static": true,
+          "data_source": null,
+          "http_verb": "Post",
+          "return_media": "Json",
+          "return_type": {
+            "HttpResult": {
+              "Object": {
+                "name": "BlobHaver"
+              }
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "model",
+              "cidl_type": {
+                "Partial": {
+                  "object_name": "BlobHaver"
+                }
+              }
+            },
+            {
+              "name": "__datasource",
+              "cidl_type": {
+                "DataSource": {
+                  "model_name": "BlobHaver"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "$get",
           "is_static": true,
           "data_source": null,
           "http_verb": "Get",
           "return_media": "Json",
           "return_type": {
             "HttpResult": {
-              "Object": "BlobHaver"
+              "Object": {
+                "name": "BlobHaver"
+              }
             }
           },
           "parameters_media": "Json",
           "parameters": [
             {
               "name": "id",
-              "cidl_type": "Integer"
+              "cidl_type": {
+                "Nullable": "Integer"
+              }
             },
             {
               "name": "__datasource",
               "cidl_type": {
-                "DataSource": "BlobHaver"
+                "DataSource": {
+                  "model_name": "BlobHaver"
+                }
               }
             }
           ]
         },
-        "LIST": {
-          "name": "LIST",
+        {
+          "name": "$list",
           "is_static": true,
           "data_source": null,
           "http_verb": "Get",
@@ -89,7 +166,9 @@
           "return_type": {
             "HttpResult": {
               "Array": {
-                "Object": "BlobHaver"
+                "Object": {
+                  "name": "BlobHaver"
+                }
               }
             }
           },
@@ -108,126 +187,74 @@
               }
             },
             {
-              "name": "offset",
-              "cidl_type": {
-                "Nullable": "Integer"
-              }
-            },
-            {
               "name": "__datasource",
               "cidl_type": {
-                "DataSource": "BlobHaver"
+                "DataSource": {
+                  "model_name": "BlobHaver"
+                }
               }
             }
           ]
-        },
-        "SAVE": {
-          "name": "SAVE",
-          "is_static": true,
-          "data_source": null,
-          "http_verb": "Post",
-          "return_media": "Json",
-          "return_type": {
-            "HttpResult": {
-              "Object": "BlobHaver"
-            }
-          },
-          "parameters_media": "Json",
-          "parameters": [
-            {
-              "name": "model",
-              "cidl_type": {
-                "Partial": "BlobHaver"
-              }
-            },
-            {
-              "name": "__datasource",
-              "cidl_type": {
-                "DataSource": "BlobHaver"
-              }
-            }
-          ]
-        },
-        "getBlob1": {
-          "name": "getBlob1",
-          "is_static": false,
-          "data_source": null,
-          "http_verb": "Get",
-          "return_media": "Json",
-          "return_type": "Blob",
-          "parameters_media": "Json",
-          "parameters": []
-        },
-        "inputStream": {
-          "name": "inputStream",
-          "is_static": true,
-          "data_source": null,
-          "http_verb": "Post",
-          "return_media": "Json",
-          "return_type": "Void",
-          "parameters_media": "Octet",
-          "parameters": [
-            {
-              "name": "stream",
-              "cidl_type": "Stream"
-            }
-          ]
-        },
-        "yieldStream": {
-          "name": "yieldStream",
-          "is_static": false,
-          "data_source": null,
-          "http_verb": "Get",
-          "return_media": "Octet",
-          "return_type": "Stream",
-          "parameters_media": "Json",
-          "parameters": []
         }
-      },
+      ],
       "data_sources": {
-        "default": {
-          "name": "default",
-          "tree": {},
-          "is_private": false,
-          "list_params": [
-            "LastSeen",
-            "Limit"
-          ]
+        "Default": {
+          "name": "Default",
+          "list": {
+            "parameters": [
+              {
+                "name": "lastSeen_id",
+                "cidl_type": "Integer"
+              },
+              {
+                "name": "limit",
+                "cidl_type": "Integer"
+              }
+            ]
+          },
+          "get": {
+            "parameters": [
+              {
+                "name": "id",
+                "cidl_type": "Integer"
+              }
+            ]
+          },
+          "is_internal": false
         }
       },
       "cruds": [
-        "GET",
-        "LIST",
-        "SAVE"
-      ],
-      "source_path": "./seed__blobs.cloesce.ts"
+        "Save",
+        "Get",
+        "List"
+      ]
     }
   },
   "services": {
     "BlobService": {
       "name": "BlobService",
-      "attributes": [],
-      "initializer": null,
-      "methods": {
-        "incrementBlob": {
+      "fields": [],
+      "apis": [
+        {
           "name": "incrementBlob",
-          "is_static": false,
+          "is_static": true,
           "data_source": null,
           "http_verb": "Post",
           "return_media": "Json",
-          "return_type": "Blob",
+          "return_type": {
+            "HttpResult": "Blob"
+          },
           "parameters_media": "Json",
           "parameters": [
             {
-              "name": "blob",
+              "name": "b",
               "cidl_type": "Blob"
             }
           ]
         }
-      },
-      "source_path": "./seed__blobs.cloesce.ts"
+      ]
     }
   },
   "poos": {},
-  "main_source": null
+  "injects": []
 }

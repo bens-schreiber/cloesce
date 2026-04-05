@@ -1,6 +1,6 @@
-import { defineConfig } from "cloesce/config";
-export default defineConfig({
+import { CloesceConfigOptions } from "cloesce";
+export default {
     srcPaths: ["./"],
-    workersUrl: "http://localhost:5740/api",
-});
+    workersUrl: "http://localhost:5391/api",
+} satisfies CloesceConfigOptions;
             

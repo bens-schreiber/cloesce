@@ -1,0 +1,12 @@
+[package]
+name = "compiler-test"
+version = "0.0.1"
+edition = "2024"
+
+[dependencies]
+ast = { path = "../ast" }
+frontend = { path = "../frontend" }
+semantic = { path = "../semantic" }
+
+[lib]
+doctest = false

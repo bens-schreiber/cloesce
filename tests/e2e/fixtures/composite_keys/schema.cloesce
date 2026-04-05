@@ -1,0 +1,65 @@
+env { d1 { db } }
+
+[use db, get, list, save]
+model Student {
+    primary {
+        id: int
+        name: string
+    }
+
+    favoriteColor: string
+
+    nav (StudentCourse::studentId, StudentCourse::studentName) {
+        studentCourses
+    }
+}
+
+source CoursesOrderedDescending for Student {
+    include { studentCourses }
+
+    sql list(lastId: int, lastName: string, limit: int) {
+        "
+            WITH students AS ($include)
+            SELECT * FROM students
+            WHERE id > $lastId
+               AND name > $lastName
+            ORDER BY id DESC, name DESC
+            LIMIT $limit
+        "
+    }
+}
+
+[use db, get, list, save]
+model Course {
+    primary { id: int }
+    title: string
+
+    nav (StudentCourse::courseId) {
+        studentCourses
+    }
+}
+
+[use db, get, list, save]
+model StudentCourse {
+    primary foreign(Student::id, Student::name) {
+        studentId
+        studentName
+        nav { student }
+    }
+
+    primary foreign(Course::id) {
+        courseId
+        nav { course }
+    }
+}
+
+source Default for StudentCourse {
+    include { }
+}
+
+source WithStudentCourse for StudentCourse {
+    include { 
+        student { studentCourses },
+        course { studentCourses } 
+    }
+}

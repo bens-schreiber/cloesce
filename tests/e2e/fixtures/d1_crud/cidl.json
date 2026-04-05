@@ -1,25 +1,22 @@
 {
-  "hash": 14708433785641074325,
-  "project_name": "runner",
+  "hash": 7593425098127812687,
   "wrangler_env": {
-    "name": "Env",
-    "source_path": "./seed__d1_crud.cloesce.ts",
     "d1_bindings": [
       "db"
     ],
     "kv_bindings": [],
     "r2_bindings": [],
-    "vars": {}
+    "vars": []
   },
   "models": {
     "CrudHaver": {
       "hash": 3221090397089686579,
       "name": "CrudHaver",
       "d1_binding": "db",
-      "primary_key_columns": [
+      "primary_columns": [
         {
           "hash": 6397878138472974760,
-          "value": {
+          "field": {
             "name": "id",
             "cidl_type": "Integer"
           },
@@ -31,47 +28,98 @@
       "columns": [
         {
           "hash": 6788679640762437622,
-          "value": {
+          "field": {
             "name": "name",
-            "cidl_type": "Text"
+            "cidl_type": "String"
           },
           "foreign_key_reference": null,
           "unique_ids": [],
           "composite_id": null
         }
       ],
-      "navigation_properties": [],
-      "key_params": [],
-      "kv_objects": [],
-      "r2_objects": [],
-      "methods": {
-        "GET": {
-          "name": "GET",
+      "kv_fields": [],
+      "r2_fields": [],
+      "navigation_fields": [],
+      "key_fields": [],
+      "apis": [
+        {
+          "name": "notCrud",
+          "is_static": false,
+          "data_source": "Default",
+          "http_verb": "Post",
+          "return_media": "Json",
+          "return_type": {
+            "HttpResult": "Void"
+          },
+          "parameters_media": "Json",
+          "parameters": []
+        },
+        {
+          "name": "$save",
+          "is_static": true,
+          "data_source": null,
+          "http_verb": "Post",
+          "return_media": "Json",
+          "return_type": {
+            "HttpResult": {
+              "Object": {
+                "name": "CrudHaver"
+              }
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "model",
+              "cidl_type": {
+                "Partial": {
+                  "object_name": "CrudHaver"
+                }
+              }
+            },
+            {
+              "name": "__datasource",
+              "cidl_type": {
+                "DataSource": {
+                  "model_name": "CrudHaver"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "$get",
           "is_static": true,
           "data_source": null,
           "http_verb": "Get",
           "return_media": "Json",
           "return_type": {
             "HttpResult": {
-              "Object": "CrudHaver"
+              "Object": {
+                "name": "CrudHaver"
+              }
             }
           },
           "parameters_media": "Json",
           "parameters": [
             {
               "name": "id",
-              "cidl_type": "Integer"
+              "cidl_type": {
+                "Nullable": "Integer"
+              }
             },
             {
               "name": "__datasource",
               "cidl_type": {
-                "DataSource": "CrudHaver"
+                "DataSource": {
+                  "model_name": "CrudHaver"
+                }
               }
             }
           ]
         },
-        "LIST": {
-          "name": "LIST",
+        {
+          "name": "$list",
           "is_static": true,
           "data_source": null,
           "http_verb": "Get",
@@ -79,7 +127,9 @@
           "return_type": {
             "HttpResult": {
               "Array": {
-                "Object": "CrudHaver"
+                "Object": {
+                  "name": "CrudHaver"
+                }
               }
             }
           },
@@ -98,83 +148,56 @@
               }
             },
             {
-              "name": "offset",
-              "cidl_type": {
-                "Nullable": "Integer"
-              }
-            },
-            {
               "name": "__datasource",
               "cidl_type": {
-                "DataSource": "CrudHaver"
+                "DataSource": {
+                  "model_name": "CrudHaver"
+                }
               }
             }
           ]
-        },
-        "SAVE": {
-          "name": "SAVE",
-          "is_static": true,
-          "data_source": null,
-          "http_verb": "Post",
-          "return_media": "Json",
-          "return_type": {
-            "HttpResult": {
-              "Object": "CrudHaver"
-            }
-          },
-          "parameters_media": "Json",
-          "parameters": [
-            {
-              "name": "model",
-              "cidl_type": {
-                "Partial": "CrudHaver"
-              }
-            },
-            {
-              "name": "__datasource",
-              "cidl_type": {
-                "DataSource": "CrudHaver"
-              }
-            }
-          ]
-        },
-        "notCrud": {
-          "name": "notCrud",
-          "is_static": false,
-          "data_source": null,
-          "http_verb": "Post",
-          "return_media": "Json",
-          "return_type": "Void",
-          "parameters_media": "Json",
-          "parameters": []
         }
-      },
+      ],
       "data_sources": {
-        "default": {
-          "name": "default",
-          "tree": {},
-          "is_private": false,
-          "list_params": [
-            "LastSeen",
-            "Limit"
-          ]
+        "Default": {
+          "name": "Default",
+          "list": {
+            "parameters": [
+              {
+                "name": "lastSeen_id",
+                "cidl_type": "Integer"
+              },
+              {
+                "name": "limit",
+                "cidl_type": "Integer"
+              }
+            ]
+          },
+          "get": {
+            "parameters": [
+              {
+                "name": "id",
+                "cidl_type": "Integer"
+              }
+            ]
+          },
+          "is_internal": false
         }
       },
       "cruds": [
-        "GET",
-        "LIST",
-        "SAVE"
-      ],
-      "source_path": "./seed__d1_crud.cloesce.ts"
+        "Save",
+        "Get",
+        "List"
+      ]
     },
     "Parent": {
-      "hash": 1680874102925403923,
+      "hash": 10217849743135784009,
       "name": "Parent",
       "d1_binding": "db",
-      "primary_key_columns": [
+      "primary_columns": [
         {
           "hash": 6397878138472974760,
-          "value": {
+          "field": {
             "name": "id",
             "cidl_type": "Integer"
           },
@@ -185,8 +208,8 @@
       ],
       "columns": [
         {
-          "hash": 13382405950980379557,
-          "value": {
+          "hash": 18265058039846388621,
+          "field": {
             "name": "favoriteChildId",
             "cidl_type": {
               "Nullable": "Integer"
@@ -200,63 +223,118 @@
           "composite_id": null
         }
       ],
-      "navigation_properties": [
+      "kv_fields": [],
+      "r2_fields": [],
+      "navigation_fields": [
         {
-          "hash": 15239595953847103790,
-          "var_name": "favoriteChild",
+          "hash": 4901042800312040762,
+          "field": {
+            "name": "favoriteChild",
+            "cidl_type": {
+              "Object": {
+                "name": "Child"
+              }
+            }
+          },
           "model_reference": "Child",
           "kind": {
             "OneToOne": {
-              "key_columns": [
+              "columns": [
                 "favoriteChildId"
               ]
             }
           }
         },
         {
-          "hash": 9311210626431925322,
-          "var_name": "children",
+          "hash": 10782356584402575912,
+          "field": {
+            "name": "children",
+            "cidl_type": {
+              "Array": {
+                "Object": {
+                  "name": "Child"
+                }
+              }
+            }
+          },
           "model_reference": "Child",
           "kind": {
             "OneToMany": {
-              "key_columns": [
+              "columns": [
                 "parentId"
               ]
             }
           }
         }
       ],
-      "key_params": [],
-      "kv_objects": [],
-      "r2_objects": [],
-      "methods": {
-        "GET": {
-          "name": "GET",
+      "key_fields": [],
+      "apis": [
+        {
+          "name": "$save",
+          "is_static": true,
+          "data_source": null,
+          "http_verb": "Post",
+          "return_media": "Json",
+          "return_type": {
+            "HttpResult": {
+              "Object": {
+                "name": "Parent"
+              }
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "model",
+              "cidl_type": {
+                "Partial": {
+                  "object_name": "Parent"
+                }
+              }
+            },
+            {
+              "name": "__datasource",
+              "cidl_type": {
+                "DataSource": {
+                  "model_name": "Parent"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "$get",
           "is_static": true,
           "data_source": null,
           "http_verb": "Get",
           "return_media": "Json",
           "return_type": {
             "HttpResult": {
-              "Object": "Parent"
+              "Object": {
+                "name": "Parent"
+              }
             }
           },
           "parameters_media": "Json",
           "parameters": [
             {
               "name": "id",
-              "cidl_type": "Integer"
+              "cidl_type": {
+                "Nullable": "Integer"
+              }
             },
             {
               "name": "__datasource",
               "cidl_type": {
-                "DataSource": "Parent"
+                "DataSource": {
+                  "model_name": "Parent"
+                }
               }
             }
           ]
         },
-        "LIST": {
-          "name": "LIST",
+        {
+          "name": "$list",
           "is_static": true,
           "data_source": null,
           "http_verb": "Get",
@@ -264,7 +342,9 @@
           "return_type": {
             "HttpResult": {
               "Array": {
-                "Object": "Parent"
+                "Object": {
+                  "name": "Parent"
+                }
               }
             }
           },
@@ -283,85 +363,80 @@
               }
             },
             {
-              "name": "offset",
-              "cidl_type": {
-                "Nullable": "Integer"
-              }
-            },
-            {
               "name": "__datasource",
               "cidl_type": {
-                "DataSource": "Parent"
-              }
-            }
-          ]
-        },
-        "SAVE": {
-          "name": "SAVE",
-          "is_static": true,
-          "data_source": null,
-          "http_verb": "Post",
-          "return_media": "Json",
-          "return_type": {
-            "HttpResult": {
-              "Object": "Parent"
-            }
-          },
-          "parameters_media": "Json",
-          "parameters": [
-            {
-              "name": "model",
-              "cidl_type": {
-                "Partial": "Parent"
-              }
-            },
-            {
-              "name": "__datasource",
-              "cidl_type": {
-                "DataSource": "Parent"
+                "DataSource": {
+                  "model_name": "Parent"
+                }
               }
             }
           ]
         }
-      },
+      ],
       "data_sources": {
-        "default": {
-          "name": "default",
-          "tree": {
-            "children": {},
-            "favoriteChild": {}
+        "Default": {
+          "name": "Default",
+          "list": {
+            "parameters": [
+              {
+                "name": "lastSeen_id",
+                "cidl_type": "Integer"
+              },
+              {
+                "name": "limit",
+                "cidl_type": "Integer"
+              }
+            ]
           },
-          "is_private": false,
-          "list_params": [
-            "LastSeen",
-            "Limit"
-          ]
+          "get": {
+            "parameters": [
+              {
+                "name": "id",
+                "cidl_type": "Integer"
+              }
+            ]
+          },
+          "is_internal": false
         },
-        "withChildren": {
-          "name": "withChildren",
-          "tree": {
-            "children": {},
-            "favoriteChild": {}
+        "WithChildren": {
+          "name": "WithChildren",
+          "list": {
+            "parameters": [
+              {
+                "name": "lastSeen_id",
+                "cidl_type": "Integer"
+              },
+              {
+                "name": "limit",
+                "cidl_type": "Integer"
+              }
+            ]
           },
-          "is_private": false,
-          "list_params": []
+          "get": {
+            "parameters": [
+              {
+                "name": "id",
+                "cidl_type": "Integer"
+              }
+            ]
+          },
+          "is_internal": false
         }
       },
       "cruds": [
-        "GET",
-        "LIST",
-        "SAVE"
-      ],
-      "source_path": "./seed__d1_crud.cloesce.ts"
+        "Save",
+        "Get",
+        "List"
+      ]
     },
     "Child": {
-      "hash": 968287334711745682,
+      "hash": 2477743275987146240,
       "name": "Child",
       "d1_binding": "db",
-      "primary_key_columns": [
+      "primary_columns": [
         {
           "hash": 6397878138472974760,
-          "value": {
+          "field": {
             "name": "id",
             "cidl_type": "Integer"
           },
@@ -373,7 +448,7 @@
       "columns": [
         {
           "hash": 5546773060400918129,
-          "value": {
+          "field": {
             "name": "parentId",
             "cidl_type": "Integer"
           },
@@ -385,44 +460,61 @@
           "composite_id": null
         }
       ],
-      "navigation_properties": [
+      "kv_fields": [],
+      "r2_fields": [],
+      "navigation_fields": [
         {
-          "hash": 3878402554849143311,
-          "var_name": "parent",
+          "hash": 1543591661476837575,
+          "field": {
+            "name": "parent",
+            "cidl_type": {
+              "Object": {
+                "name": "Parent"
+              }
+            }
+          },
           "model_reference": "Parent",
           "kind": {
             "OneToOne": {
-              "key_columns": [
+              "columns": [
                 "parentId"
               ]
             }
           }
         }
       ],
-      "key_params": [],
-      "kv_objects": [],
-      "r2_objects": [],
-      "methods": {},
+      "key_fields": [],
+      "apis": [],
       "data_sources": {
-        "default": {
-          "name": "default",
-          "tree": {
-            "parent": {
-              "children": {}
-            }
+        "Default": {
+          "name": "Default",
+          "list": {
+            "parameters": [
+              {
+                "name": "lastSeen_id",
+                "cidl_type": "Integer"
+              },
+              {
+                "name": "limit",
+                "cidl_type": "Integer"
+              }
+            ]
           },
-          "is_private": false,
-          "list_params": [
-            "LastSeen",
-            "Limit"
-          ]
+          "get": {
+            "parameters": [
+              {
+                "name": "id",
+                "cidl_type": "Integer"
+              }
+            ]
+          },
+          "is_internal": false
         }
       },
-      "cruds": [],
-      "source_path": "./seed__d1_crud.cloesce.ts"
+      "cruds": []
     }
   },
   "services": {},
   "poos": {},
-  "main_source": null
+  "injects": []
 }

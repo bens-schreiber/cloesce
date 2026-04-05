@@ -1,0 +1,160 @@
+{
+  "hash": 2806924698,
+  "models": {
+    "WeatherReport": {
+      "hash": 2431865963,
+      "name": "WeatherReport",
+      "d1_binding": "db",
+      "primary_columns": [
+        {
+          "hash": 3808173647,
+          "field": {
+            "name": "id",
+            "cidl_type": "Integer"
+          },
+          "foreign_key_reference": null,
+          "unique_ids": [],
+          "composite_id": null
+        }
+      ],
+      "columns": [
+        {
+          "hash": 2971345844,
+          "field": {
+            "name": "title",
+            "cidl_type": "String"
+          },
+          "foreign_key_reference": null,
+          "unique_ids": [],
+          "composite_id": null
+        },
+        {
+          "hash": 3166529739,
+          "field": {
+            "name": "description",
+            "cidl_type": "String"
+          },
+          "foreign_key_reference": null,
+          "unique_ids": [],
+          "composite_id": null
+        }
+      ],
+      "navigation_fields": [
+        {
+          "hash": 1957181309,
+          "field": {
+            "name": "weatherEntries",
+            "cidl_type": {
+              "Array": {
+                "Object": {
+                  "name": "Weather"
+                }
+              }
+            }
+          },
+          "model_reference": "Weather",
+          "kind": {
+            "OneToMany": {
+              "columns": [
+                "weatherReportId"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "Weather": {
+      "hash": 3337042873,
+      "name": "Weather",
+      "d1_binding": "db",
+      "primary_columns": [
+        {
+          "hash": 3808173647,
+          "field": {
+            "name": "id",
+            "cidl_type": "Integer"
+          },
+          "foreign_key_reference": null,
+          "unique_ids": [],
+          "composite_id": null
+        }
+      ],
+      "columns": [
+        {
+          "hash": 4011520963,
+          "field": {
+            "name": "weatherReportId",
+            "cidl_type": "Integer"
+          },
+          "foreign_key_reference": {
+            "model_name": "WeatherReport",
+            "column_name": "id"
+          },
+          "unique_ids": [],
+          "composite_id": null
+        },
+        {
+          "hash": 3583075662,
+          "field": {
+            "name": "dateTime",
+            "cidl_type": "DateIso"
+          },
+          "foreign_key_reference": null,
+          "unique_ids": [],
+          "composite_id": null
+        },
+        {
+          "hash": 1851928714,
+          "field": {
+            "name": "location",
+            "cidl_type": "String"
+          },
+          "foreign_key_reference": null,
+          "unique_ids": [],
+          "composite_id": null
+        },
+        {
+          "hash": 3065958462,
+          "field": {
+            "name": "temperature",
+            "cidl_type": "Integer"
+          },
+          "foreign_key_reference": null,
+          "unique_ids": [],
+          "composite_id": null
+        },
+        {
+          "hash": 3488932653,
+          "field": {
+            "name": "condition",
+            "cidl_type": "String"
+          },
+          "foreign_key_reference": null,
+          "unique_ids": [],
+          "composite_id": null
+        }
+      ],
+      "navigation_fields": [
+        {
+          "hash": 1442272691,
+          "field": {
+            "name": "weatherReport",
+            "cidl_type": {
+              "Object": {
+                "name": "WeatherReport"
+              }
+            }
+          },
+          "model_reference": "WeatherReport",
+          "kind": {
+            "OneToOne": {
+              "columns": [
+                "weatherReportId"
+              ]
+            }
+          }
+        }
+      ]
+    }
+  }
+}

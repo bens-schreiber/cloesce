@@ -1,0 +1,67 @@
+{
+  "name": "cloesce",
+  "version": "0.2.0",
+  "description": "The \"full stack\" language for Cloudflare",
+  "type": "module",
+  "license": "Apache-2.0",
+  "scripts": {
+    "test": "vitest run",
+    "format:fix": "prettier --write .",
+    "format": "prettier --check .",
+    "typecheck": "tsc --noEmit",
+    "build": "tsc -p tsconfig.json && npm run copy-rs-orm-wasm && npm run copy-compiler-wasm && npm run copy-migrate-wasm && chmod +x dist/cli.js",
+    "copy-rs-orm-wasm": "cp ../../compiler/target/wasm32-unknown-unknown/release/orm.wasm ./dist/orm.wasm",
+    "copy-compiler-wasm": "cp ../../compiler/target/wasm32-wasip1/release/compile.wasm ./dist/compile.wasm",
+    "copy-migrate-wasm": "cp ../../compiler/target/wasm32-wasip1/release/migrate.wasm ./dist/migrate.wasm"
+  },
+  "dependencies": {
+    "cmd-ts": "^0.15.0",
+    "jiti": "^2.6.1"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20250906.0",
+    "miniflare": "^4.20251217.0",
+    "oxlint": "^1.32.0",
+    "prettier": "^3.6.2",
+    "ts-node": "^10.9.2",
+    "typedoc": "^0.28.17",
+    "typescript": "^5.6.0",
+    "vite-plugin-wasm": "^3.5.0",
+    "vitest": "^4.0.18"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "bin": {
+    "cloesce": "dist/cli.js"
+  },
+  "typesVersions": {
+    "*": {
+      ".": [
+        "dist/index.d.ts"
+      ]
+    }
+  },
+  "files": [
+    "dist/**/*"
+  ],
+  "sideEffects": false,
+  "engines": {
+    "node": ">=18.17"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/bens-schreiber/cloesce.git"
+  },
+  "homepage": "https://github.com/bens-schreiber/cloesce",
+  "keywords": [
+    "cloudflare",
+    "workers",
+    "d1",
+    "orm",
+    "cli"
+  ]
+}

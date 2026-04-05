@@ -42,8 +42,7 @@ jobs:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
-            src/orm/target
-            src/generator/target
+            src/compiler/target
           key: cargo-${{ hashFiles('**/Cargo.lock') }}
 
       # --- Node Setup ---

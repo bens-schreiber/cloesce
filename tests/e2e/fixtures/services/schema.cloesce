@@ -1,0 +1,19 @@
+inject {
+    InjectedThing
+}
+
+service FooService {
+}
+
+service BarService {
+    foo: FooService
+}
+
+api FooService {
+    get staticMethod(thing: InjectedThing) -> string
+    get instantiatedMethod(self, thing: InjectedThing) -> string
+}
+
+api BarService {
+    get useFoo(self, injectedThing: InjectedThing) -> string
+}

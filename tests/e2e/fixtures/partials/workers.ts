@@ -1,20 +1,22 @@
-// GENERATED CODE. DO NOT MODIFY.
-import { CloesceApp } from "cloesce/backend";
-import cidl from "./cidl.json";
-import { Dog } from "./seed__partials.cloesce.js";
+import { cloesce, Dog, Env } from "./backend.js";
+import { HttpResult, Orm, DeepPartial } from "cloesce";
+
+export class DogImpl extends Dog.Api {
+    async create(env: Env, dog: DeepPartial<Dog.Self>): Promise<Dog.Self> {
+        return (await Dog.save(env, dog))!
+    }
 
 
-import { Env } from "./seed__partials.cloesce.js";
-
-const constructorRegistry: Record<string, new () => any> = {
-	Dog: Dog,
-	Env: Env
-};
-
-async function fetch(request: Request, env: any, ctx: any): Promise<Response> {
-    const app = await CloesceApp.init(cidl as any, constructorRegistry, "http://localhost:5006/api");
-    return await app.run(request, env);
+    getPartialSelf(self: Dog.Self) {
+        return HttpResult.ok<DeepPartial<Dog.Self>>(200, { name: self.name });
+    }
 }
 
-export {cidl, constructorRegistry}
-export default { fetch };
+
+export default {
+    async fetch(request: Request, env: Env): Promise<Response> {
+        const app = await cloesce();
+        app.register(new DogImpl());
+        return await app.run(request, env);
+    }
+}

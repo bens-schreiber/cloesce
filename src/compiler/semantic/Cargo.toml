@@ -1,0 +1,18 @@
+[package]
+name = "semantic"
+version = "0.0.1"
+edition = "2024"
+
+[dependencies]
+ast = { path = "../ast" }
+frontend = { path = "../frontend" }
+indexmap = { workspace = true }
+orm = { path = "../orm" }
+ariadne = { workspace = true }
+
+[dev-dependencies]
+sqlx = { version = "0.8", features = ["sqlite", "runtime-tokio"] }
+compiler-test = { path = "../compiler-test" }
+
+[lib]
+doctest = false

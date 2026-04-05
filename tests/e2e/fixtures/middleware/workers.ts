@@ -1,21 +1,42 @@
-// GENERATED CODE. DO NOT MODIFY.
-import { CloesceApp } from "cloesce/backend";
-import cidl from "./cidl.json";
-import { Foo } from "./seed__app.cloesce.js";
-import { InjectedThing } from "./seed__app.cloesce.js";
+import { HttpResult } from "cloesce";
+import * as Cloesce from "./backend.js";
 
-import { Env } from "./seed__app.cloesce.js";
-import main from "./seed__app.cloesce.js"
-const constructorRegistry: Record<string, new () => any> = {
-	Foo: Foo,
-	InjectedThing: InjectedThing,
-	Env: Env
-};
-
-async function fetch(request: Request, env: any, ctx: any): Promise<Response> {
-    const app = await CloesceApp.init(cidl as any, constructorRegistry, "http://localhost:5977/api");
-    return await main(request, env, app, ctx);
+class InjectedThing extends Cloesce.InjectedThing {
+    constructor(public readonly value: string) {
+        super();
+    }
 }
 
-export {cidl, constructorRegistry}
-export default { fetch };
+class Foo extends Cloesce.Foo.Api {
+    blockedMethod(): void {
+
+    }
+    getInjectedThing(thing: InjectedThing): string {
+        return thing.value;
+    }
+
+}
+
+export default {
+    async fetch(request: Request, env: Cloesce.Env): Promise<Response> {
+        if (request.method === "POST") {
+            return HttpResult.fail(401, "POST methods aren't allowed.").toResponse();
+        }
+
+        const app = await Cloesce.cloesce();
+        app.register(new Foo());
+
+        app.onNamespace(Cloesce.Foo.Tag, (di) => {
+            di.set(new InjectedThing("hello world"));
+        })
+
+        app.onMethod(Cloesce.Foo.Tag, "blockedMethod", (_di) => {
+            return HttpResult.fail(401, "Blocked method");
+        });
+
+        const result = await app.run(request, env);
+        result.headers.set("X-Cloesce-Test", "true");
+
+        return result;
+    }
+}

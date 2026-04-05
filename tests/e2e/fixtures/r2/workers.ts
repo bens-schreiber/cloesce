@@ -1,22 +1,29 @@
-// GENERATED CODE. DO NOT MODIFY.
-import { CloesceApp } from "cloesce/backend";
-import cidl from "./cidl.json";
-import { D1BackedModel } from "./seed__r2.cloesce.js";
-import { PureR2Model } from "./seed__r2.cloesce.js";
+import { PureR2Model, D1BackedModel, Env, cloesce, CfReadableStream } from "./backend.js";
 
+export class PureR2ModelImpl extends PureR2Model.Api {
+    async uploadData(self: PureR2Model.Self, e: Env, data: CfReadableStream) {
+        const key = PureR2Model.KeyFormat.data(self.id);
+        await e.bucket1.put(key, data);
+    }
 
-import { Env } from "./seed__r2.cloesce.js";
-
-const constructorRegistry: Record<string, new () => any> = {
-	D1BackedModel: D1BackedModel,
-	PureR2Model: PureR2Model,
-	Env: Env
-};
-
-async function fetch(request: Request, env: any, ctx: any): Promise<Response> {
-    const app = await CloesceApp.init(cidl as any, constructorRegistry, "http://localhost:5419/api");
-    return await app.run(request, env);
+    async uploadOtherData(self: PureR2Model.Self, e: Env, data: CfReadableStream) {
+        const key = PureR2Model.KeyFormat.otherData(self.id);
+        await e.bucket1.put(key, data as any);
+    }
 }
 
-export {cidl, constructorRegistry}
-export default { fetch };
+export class D1BackedModelImpl extends D1BackedModel.Api {
+    async uploadData(self: D1BackedModel.Self, e: Env, data: CfReadableStream) {
+        const key = D1BackedModel.KeyFormat.r2Data(self.id, self.keyParam, self.someColumn, self.someOtherColumn);
+        await e.bucket1.put(key, data as any);
+    }
+}
+
+export default {
+    async fetch(request: Request, env: Env): Promise<Response> {
+        const app = await cloesce();
+        app.register(new PureR2ModelImpl());
+        app.register(new D1BackedModelImpl());
+        return await app.run(request, env);
+    }
+}

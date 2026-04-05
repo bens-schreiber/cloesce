@@ -1,20 +1,8 @@
-// GENERATED CODE. DO NOT MODIFY.
-import { CloesceApp } from "cloesce/backend";
-import cidl from "./cidl.json";
-import { Weather } from "./seed__bools_dates_ints.cloesce.js";
+import { cloesce, Env } from "./backend.js";
 
-
-import { Env } from "./seed__bools_dates_ints.cloesce.js";
-
-const constructorRegistry: Record<string, new () => any> = {
-	Weather: Weather,
-	Env: Env
-};
-
-async function fetch(request: Request, env: any, ctx: any): Promise<Response> {
-    const app = await CloesceApp.init(cidl as any, constructorRegistry, "http://localhost:5066/api");
-    return await app.run(request, env);
+export default {
+    async fetch(request: Request, env: Env): Promise<Response> {
+        const app = await cloesce();
+        return await app.run(request, env);
+    }
 }
-
-export {cidl, constructorRegistry}
-export default { fetch };

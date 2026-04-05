@@ -339,6 +339,7 @@ tmp/
 
 # ----------- CLOESCE VVV  ----------- 
 .generated
+.cloesce
 tmp.*
 examples/*/package-lock.json
 src/ts/package-lock.json

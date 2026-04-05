@@ -1,0 +1,293 @@
+mod api;
+mod data_source;
+mod env;
+mod model;
+
+use std::borrow::Cow;
+
+use ast::CidlType;
+use chumsky::extra;
+use chumsky::input::MappedInput;
+use chumsky::prelude::*;
+
+use crate::FileTable;
+use crate::Span;
+use crate::Symbol;
+use crate::SymbolKind;
+use crate::lexer::LexedFile;
+use crate::lexer::SpannedToken;
+use crate::lexer::Token;
+use crate::{
+    ApiBlock, DataSourceBlock, InjectBlock, ModelBlock, ParseAst, PlainOldObjectBlock,
+    ServiceBlock, WranglerEnvBlock,
+};
+
+type TokenInput<'tokens, 'src> =
+    MappedInput<'tokens, Token<'src>, Span, &'tokens [SpannedToken<'src>]>;
+
+type Extra<'tokens, 'src> = extra::Err<Rich<'tokens, Token<'src>, Span>>;
+
+pub struct ParserResult<'src, 'tokens> {
+    pub ast: ParseAst<'src>,
+    pub errors: Vec<Rich<'tokens, Token<'src>, Span>>,
+}
+
+impl ParserResult<'_, '_> {
+    pub fn has_errors(&self) -> bool {
+        !self.errors.is_empty()
+    }
+}
+
+pub struct CloesceParser;
+impl CloesceParser {
+    pub fn parse<'tokens, 'src: 'tokens>(
+        lexed: &'tokens [LexedFile<'src>],
+        file_table: &'tokens FileTable<'src>,
+    ) -> ParserResult<'src, 'tokens> {
+        let mut ast = ParseAst::default();
+        let mut errors = Vec::new();
+
+        for lf in lexed {
+            let (src, _) = file_table.resolve(lf.file_id);
+
+            let input = lf.tokens.split_spanned(Span {
+                start: 0,
+                end: src.len(),
+                context: lf.file_id,
+            });
+
+            let res = parser().parse(input).into_result();
+
+            match res {
+                Ok(res) => ast.merge(res),
+                Err(errs) => errors.extend(errs),
+            }
+        }
+
+        ParserResult { ast, errors }
+    }
+}
+
+enum Global<'src> {
+    Env(WranglerEnvBlock<'src>),
+    Model(ModelBlock<'src>),
+    Api(ApiBlock<'src>),
+    Service(ServiceBlock<'src>),
+    Poo(PlainOldObjectBlock<'src>),
+    DataSource(DataSourceBlock<'src>),
+    Inject(InjectBlock<'src>),
+}
+
+fn parser<'tokens, 'src: 'tokens>()
+-> impl Parser<'tokens, TokenInput<'tokens, 'src>, ParseAst<'src>, Extra<'tokens, 'src>> {
+    choice((
+        env::env_block().map(Global::Env),
+        model::model_block().map(Global::Model),
+        api::api_block().map(Global::Api),
+        data_source::data_source_block().map(Global::DataSource),
+        service_block().map(Global::Service),
+        poo_block().map(Global::Poo),
+        inject_block().map(Global::Inject),
+    ))
+    .repeated()
+    .collect::<Vec<_>>()
+    .map(|items| {
+        let mut ast = ParseAst::default();
+        for item in items {
+            match item {
+                Global::Env(env) => ast.wrangler_envs.push(env),
+                Global::Model(model) => ast.models.push(model),
+                Global::Api(api) => ast.apis.push(api),
+                Global::Service(service) => ast.services.push(service),
+                Global::Poo(poo) => ast.poos.push(poo),
+                Global::DataSource(ds) => ast.sources.push(ds),
+                Global::Inject(block) => ast.injects.push(block),
+            }
+        }
+        ast
+    })
+}
+
+/// Parses a block of the form:
+///
+/// ```cloesce
+/// poo MyObject {
+///     ident1: cidl_type
+///     ident2: cidl_type
+///     ...
+/// }
+/// ```
+fn poo_block<'tokens, 'src: 'tokens>()
+-> impl Parser<'tokens, TokenInput<'tokens, 'src>, PlainOldObjectBlock<'src>, Extra<'tokens, 'src>>
+{
+    // ident: cidl_type
+    let poo_field = select! { Token::Ident(name) => name }
+        .then_ignore(just(Token::Colon))
+        .then(cidl_type())
+        .map_with(|(name, ty), e| Symbol {
+            name,
+            cidl_type: ty,
+            span: e.span(),
+            kind: SymbolKind::PlainOldObjectField,
+            parent_name: Cow::Borrowed(name),
+        });
+
+    // poo MyObject { ... }
+    just(Token::Poo)
+        .ignore_then(select! { Token::Ident(name) => name })
+        .then(
+            poo_field
+                .repeated()
+                .collect::<Vec<_>>()
+                .delimited_by(just(Token::LBrace), just(Token::RBrace)),
+        )
+        .map_with(|(name, mut fields), e| {
+            for field in &mut fields {
+                field.parent_name = Cow::Borrowed(name);
+            }
+
+            PlainOldObjectBlock {
+                symbol: Symbol {
+                    name,
+                    span: e.span(),
+                    kind: SymbolKind::PlainOldObjectDecl,
+                    ..Default::default()
+                },
+                fields,
+            }
+        })
+}
+
+/// Parses a block of the form:
+///
+/// ```cloesce
+/// inject {
+///     ident1
+///     ident2
+///     ...
+/// }
+/// ```
+fn inject_block<'tokens, 'src: 'tokens>()
+-> impl Parser<'tokens, TokenInput<'tokens, 'src>, InjectBlock<'src>, Extra<'tokens, 'src>> {
+    just(Token::Inject)
+        .ignore_then(
+            select! { Token::Ident(name) => name }
+                .map_with(|name, e| (name, e.span()))
+                .repeated()
+                .collect::<Vec<_>>()
+                .delimited_by(just(Token::LBrace), just(Token::RBrace)),
+        )
+        .map_with(|fields, e| InjectBlock {
+            symbol: Symbol {
+                kind: SymbolKind::InjectDecl,
+                span: e.span(),
+                ..Default::default()
+            },
+            fields: fields
+                .into_iter()
+                .map(|(field_name, span)| Symbol {
+                    span,
+                    name: field_name,
+                    kind: SymbolKind::InjectDecl,
+                    ..Default::default()
+                })
+                .collect(),
+        })
+}
+
+/// Parses a block of the form:
+///
+/// ```cloesce
+/// service MyAppService {
+///     ident1: InjectedService
+///     ident2: cidl_type
+/// }
+/// ```
+pub fn service_block<'tokens, 'src: 'tokens>()
+-> impl Parser<'tokens, TokenInput<'tokens, 'src>, ServiceBlock<'src>, Extra<'tokens, 'src>> {
+    // ident: InjectedService
+    let attribute = select! { Token::Ident(var_name) => var_name }
+        .map_with(|name, e| (name, e.span()))
+        .then_ignore(just(Token::Colon))
+        .then(cidl_type());
+
+    // service ServiceName { ... }
+    just(Token::Service)
+        .ignore_then(select! { Token::Ident(name) => name }.map_with(|name, e| (name, e.span())))
+        .then(
+            attribute
+                .repeated()
+                .collect::<Vec<_>>()
+                .delimited_by(just(Token::LBrace), just(Token::RBrace)),
+        )
+        .map(|((name, span), fields)| {
+            let fields = fields
+                .into_iter()
+                .map(|((field_name, span), cidl_type)| Symbol {
+                    span,
+                    name: field_name,
+                    cidl_type,
+                    kind: SymbolKind::ServiceField,
+                    parent_name: Cow::Borrowed(name),
+                })
+                .collect();
+
+            ServiceBlock {
+                symbol: Symbol {
+                    span,
+                    name,
+                    kind: SymbolKind::ServiceDecl,
+                    ..Default::default()
+                },
+                fields,
+            }
+        })
+}
+
+fn cidl_type<'tokens, 'src: 'tokens>()
+-> impl Parser<'tokens, TokenInput<'tokens, 'src>, CidlType<'src>, Extra<'tokens, 'src>> {
+    recursive(|cidl_type| {
+        let wrapper = select! { Token::Ident(name) => name }
+            .then_ignore(just(Token::LAngle))
+            .then(cidl_type.clone())
+            .then_ignore(just(Token::RAngle))
+            .try_map(|(wrapper, inner), span| match wrapper {
+                "Option" => Ok(CidlType::nullable(inner)),
+                "Array" => Ok(CidlType::array(inner)),
+                "Paginated" => Ok(CidlType::paginated(inner)),
+                "KvObject" => Ok(CidlType::KvObject(Box::new(inner))),
+                "Partial" => match inner {
+                    CidlType::UnresolvedReference { name } => {
+                        Ok(CidlType::Partial { object_name: name })
+                    }
+                    _ => Err(Rich::custom(span, "Partial<T> expects an object type")),
+                },
+                "DataSource" => match inner {
+                    CidlType::UnresolvedReference { name: model_name } => {
+                        Ok(CidlType::DataSource { model_name })
+                    }
+                    _ => Err(Rich::custom(span, "DataSource<T> expects an object type")),
+                },
+                _ => Err(Rich::custom(span, "Unknown generic type wrapper")),
+            });
+
+        let primitive_keyword = choice((
+            just(Token::Ident("string")).to(CidlType::String),
+            just(Token::Ident("int")).to(CidlType::Integer),
+            just(Token::Ident("double")).to(CidlType::Double),
+            just(Token::Ident("date")).to(CidlType::DateIso),
+            just(Token::Ident("bool")).to(CidlType::Boolean),
+            just(Token::Ident("json")).to(CidlType::Json),
+            just(Token::Ident("void")).to(CidlType::Void),
+            just(Token::Ident("blob")).to(CidlType::Blob),
+            just(Token::Ident("stream")).to(CidlType::Stream),
+            just(Token::Ident("R2Object")).to(CidlType::R2Object),
+            just(Token::Env).to(CidlType::Env),
+        ));
+
+        let unresolved_type = select! { Token::Ident(name) => name }
+            .map(|name: &str| CidlType::UnresolvedReference { name });
+
+        choice((wrapper, primitive_keyword, unresolved_type)).boxed()
+    })
+}

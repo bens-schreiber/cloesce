@@ -19,15 +19,15 @@ afterAll(async () => {
 describe("Bools, Dates, Ints", () => {
   it("POST", async () => {
     const date = new Date("2020-01-01").toISOString();
-    const res = await Weather.SAVE({
+    const res = await Weather.$save({
       isRaining: true,
-      date: date,
+      _date: date,
     });
     expect(res.ok, withRes("POST should be OK", res)).toBe(true);
     expect(res.data).toEqual({
       id: 1,
       isRaining: true,
-      date: date,
+      _date: date,
     });
   });
 });

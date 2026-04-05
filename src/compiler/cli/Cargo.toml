@@ -1,0 +1,26 @@
+[package]
+name = "cli"
+version = "0.0.1"
+edition = "2024"
+
+[dependencies]
+ariadne = { workspace = true }
+ast = { path = "../ast" }
+clap = { version = "4.5.60", features = ["derive"] }
+codegen = { path = "../codegen" }
+frontend = { path = "../frontend" }
+migrations = { path = "../migrations" }
+semantic = { path = "../semantic" }
+tracing = { workspace = true }
+tracing-subscriber = "0.3.22"
+
+[[bin]]
+name = "compile"
+path = "bin/compile.rs"
+
+[[bin]]
+name = "migrate"
+path = "bin/migrate.rs"
+
+[lib]
+doctest = false

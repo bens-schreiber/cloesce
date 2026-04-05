@@ -1,21 +1,41 @@
-// GENERATED CODE. DO NOT MODIFY.
-import { CloesceApp } from "cloesce/backend";
-import cidl from "./cidl.json";
+import { FooService, BarService, InjectedThing, cloesce, Env } from "./backend.js";
+import { HttpResult } from "cloesce";
 
-
-import { FooService } from "./seed__app.cloesce.js";
-import { BarService } from "./seed__app.cloesce.js";
-
-import main from "./seed__app.cloesce.js"
-const constructorRegistry: Record<string, new () => any> = {
-	FooService: FooService,
-	BarService: BarService
-};
-
-async function fetch(request: Request, env: any, ctx: any): Promise<Response> {
-    const app = await CloesceApp.init(cidl as any, constructorRegistry, "http://localhost:5977/api");
-    return await main(request, env, app, ctx);
+export class InjectedThingImpl extends InjectedThing {
+    value: string = "injected value";
 }
 
-export {cidl, constructorRegistry}
-export default { fetch };
+export class FooServiceImpl extends FooService.Api {
+    init(self: FooService.Self) { }
+
+    staticMethod(thing: InjectedThing): string {
+        return "foo's static invocation"
+    }
+
+    instantiatedMethod(self: FooService.Self, thing: InjectedThing): string {
+        return `foo's instantiated invocation`;
+    }
+}
+
+export class BarServiceImpl extends BarService.Api {
+    async init(self: BarService.Self) {
+        if (!self.foo) throw new Error("FooService injection failed");
+    }
+
+    useFoo(self: BarService.Self, injectedThing: InjectedThingImpl) {
+        if (!injectedThing) throw new Error("Injected thing is missing");
+        return HttpResult.ok(200, `foo's instantiated invocation from BarService; injected: ${injectedThing.value}`);
+    }
+}
+
+
+export default {
+    async fetch(request: Request, env: Env): Promise<Response> {
+        const app = await cloesce();
+        app.register(new InjectedThingImpl());
+        app.register(new FooServiceImpl());
+        app.register(new BarServiceImpl());
+
+        return await app.run(request, env);
+    }
+}

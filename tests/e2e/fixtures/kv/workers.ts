@@ -1,24 +1,18 @@
-// GENERATED CODE. DO NOT MODIFY.
-import { CloesceApp } from "cloesce/backend";
-import cidl from "./cidl.json";
-import { D1BackedModel } from "./seed__kv.cloesce.js";
-import { PureKVModel } from "./seed__kv.cloesce.js";
-import { PaginatedKVModel } from "./seed__kv.cloesce.js";
+import { Paginated, KValue, HttpResult } from "cloesce";
+import { cloesce, Env } from "./backend.js";
+import { PaginatedKVModel } from "./backend.js";
 
+class PaginatedKvImpl extends PaginatedKVModel.Api {
+    acceptPaginated(ps: Paginated<KValue<unknown>>): Paginated<KValue<unknown>> {
+        return ps;
+    }
 
-import { Env } from "./seed__kv.cloesce.js";
-
-const constructorRegistry: Record<string, new () => any> = {
-	D1BackedModel: D1BackedModel,
-	PureKVModel: PureKVModel,
-	PaginatedKVModel: PaginatedKVModel,
-	Env: Env
-};
-
-async function fetch(request: Request, env: any, ctx: any): Promise<Response> {
-    const app = await CloesceApp.init(cidl as any, constructorRegistry, "http://localhost:5758/api");
-    return await app.run(request, env);
 }
 
-export {cidl, constructorRegistry}
-export default { fetch };
+export default {
+    async fetch(request: Request, env: Env): Promise<Response> {
+        const app = await cloesce();
+        app.register(new PaginatedKvImpl());
+        return await app.run(request, env);
+    }
+}

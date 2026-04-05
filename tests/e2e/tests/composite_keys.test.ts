@@ -32,17 +32,17 @@ describe("Student Enrollment", () => {
 
   // Student CRUD tests
   it("POST - Create students with composite key (id, name)", async () => {
-    const res1 = await Student.SAVE({
+    const res1 = await Student.$save({
       id: 1,
       name: "Alice",
       favoriteColor: "Red",
     });
-    const res2 = await Student.SAVE({
+    const res2 = await Student.$save({
       id: 2,
       name: "Bob",
       favoriteColor: "Green",
     });
-    const res3 = await Student.SAVE({
+    const res3 = await Student.$save({
       id: 3,
       name: "Charlie",
       favoriteColor: "Blue",
@@ -60,55 +60,66 @@ describe("Student Enrollment", () => {
       id: 1,
       name: "Alice",
       favoriteColor: "Red",
-      courses: [],
+      studentCourses: [],
     });
     expect(student2).toEqual({
       id: 2,
       name: "Bob",
       favoriteColor: "Green",
-      courses: [],
+      studentCourses: [],
     });
     expect(student3).toEqual({
       id: 3,
       name: "Charlie",
       favoriteColor: "Blue",
-      courses: [],
+      studentCourses: [],
     });
   });
 
-  it("GET - Retrieve a student by composite key (id, name)", async () => {
-    const res = await Student.GET(1, "Alice");
-    expect(res.ok, withRes("GET should be OK", res)).toBe(true);
+  it("$get - Retrieve a student by composite key (id, name)", async () => {
+    const res = await Student.$get({
+      id: 1,
+      name: "Alice",
+    });
+    expect(res.ok, withRes("$get should be OK", res)).toBe(true);
     expect(res.data).toEqual(student1);
   });
 
   it("POST - Update a student", async () => {
     student1.favoriteColor = "Purple";
-    const res = await Student.SAVE(student1);
+    const res = await Student.$save(student1);
     expect(res.ok, withRes("POST update should be OK", res)).toBe(true);
     expect(res.data?.favoriteColor).toBe("Purple");
     student1 = res.data!;
   });
 
-  it("LIST - Retrieve all students", async () => {
-    const res = await Student.LIST(null, null, null, null);
-    expect(res.ok, withRes("LIST should be OK", res)).toBe(true);
+  it("$list - Retrieve all students", async () => {
+    const res = await Student.$list({
+      lastSeen_id: 0,
+      lastSeen_name: "",
+      limit: 100,
+    });
+    expect(res.ok, withRes("$list should be OK", res)).toBe(true);
     expect(res.data!.length).toBe(3);
     expect(res.data!.map((s) => s.id)).toContain(1);
     expect(res.data!.map((s) => s.id)).toContain(2);
     expect(res.data!.map((s) => s.id)).toContain(3);
   });
 
-  it("LIST - Paginate students with limit", async () => {
-    const res = await Student.LIST(null, null, 2, null);
-    expect(res.ok, withRes("LIST with limit should be OK", res)).toBe(true);
+  it("$list - Paginate students with limit", async () => {
+    const res = await Student.$list({
+      lastSeen_id: 0,
+      lastSeen_name: "",
+      limit: 2,
+    });
+    expect(res.ok, withRes("$list with limit should be OK", res)).toBe(true);
     expect(res.data!.length).toBe(2);
   });
 
   // Create courses for StudentCourse tests
   it("POST - Create courses", async () => {
-    const courseRes1 = await Course.SAVE({ id: 1, title: "Mathematics" });
-    const courseRes2 = await Course.SAVE({ id: 2, title: "Computer Science" });
+    const courseRes1 = await Course.$save({ id: 1, title: "Mathematics" });
+    const courseRes2 = await Course.$save({ id: 2, title: "Computer Science" });
 
     expect(
       courseRes1.ok,
@@ -126,18 +137,18 @@ describe("Student Enrollment", () => {
   // StudentCourse CRUD tests
   it("POST - Create StudentCourse with composite FK/PK", async () => {
     // Alice enrolls in Mathematics and Computer Science
-    const res1 = await StudentCourse.SAVE({
+    const res1 = await StudentCourse.$save({
       studentId: student1.id,
       studentName: student1.name,
       courseId: course1.id,
     });
-    const res2 = await StudentCourse.SAVE({
+    const res2 = await StudentCourse.$save({
       studentId: student1.id,
       studentName: student1.name,
       courseId: course2.id,
     });
     // Bob enrolls in Computer Science
-    const res3 = await StudentCourse.SAVE({
+    const res3 = await StudentCourse.$save({
       studentId: student2.id,
       studentName: student2.name,
       courseId: course2.id,
@@ -168,71 +179,92 @@ describe("Student Enrollment", () => {
     });
   });
 
-  it("GET - Retrieve StudentCourse by composite key (studentId, studentName, courseId)", async () => {
-    const res = await StudentCourse.GET(student1.id, student1.name, course1.id);
-    expect(res.ok, withRes("GET should be OK", res)).toBe(true);
+  it("$get - Retrieve StudentCourse by composite key (studentId, studentName, courseId)", async () => {
+    const res = await StudentCourse.$get({
+      studentId: student1.id,
+      studentName: student1.name,
+      courseId: course1.id,
+    });
+    expect(res.ok, withRes("$get should be OK", res)).toBe(true);
     expect(res.data).toEqual(enrollment1);
   });
 
-  it("GET - Retrieve another StudentCourse by composite key", async () => {
-    const res = await StudentCourse.GET(student2.id, student2.name, course2.id);
-    expect(res.ok, withRes("GET should be OK", res)).toBe(true);
+  it("$get - Retrieve another StudentCourse by composite key", async () => {
+    const res = await StudentCourse.$get({
+      studentId: student2.id,
+      studentName: student2.name,
+      courseId: course2.id,
+    });
+    expect(res.ok, withRes("$get should be OK", res)).toBe(true);
     expect(res.data).toEqual(enrollment3);
   });
 
-  it("LIST - Retrieve all StudentCourse entries", async () => {
-    const res = await StudentCourse.LIST(null, null, null, null, null);
-    expect(res.ok, withRes("LIST should be OK", res)).toBe(true);
+  it("$list - Retrieve all StudentCourse entries", async () => {
+    const res = await StudentCourse.$list({
+      lastSeen_studentId: 0,
+      lastSeen_studentName: "",
+      lastSeen_courseId: 0,
+      limit: 100,
+    });
+    expect(res.ok, withRes("$list should be OK", res)).toBe(true);
     expect(res.data!.length).toBe(3);
   });
 
-  it("LIST - Paginate StudentCourse with limit", async () => {
-    const res = await StudentCourse.LIST(null, null, null, 2, null);
-    expect(res.ok, withRes("LIST with limit should be OK", res)).toBe(true);
+  it("$list - Paginate StudentCourse with limit", async () => {
+    const res = await StudentCourse.$list({
+      lastSeen_studentId: 0,
+      lastSeen_studentName: "",
+      lastSeen_courseId: 0,
+      limit: 2,
+    });
+    expect(res.ok, withRes("$list with limit should be OK", res)).toBe(true);
     expect(res.data!.length).toBe(2);
   });
 
   it("coursesOrderedDesc data source", async () => {
-    // LIST - Use coursesOrderedDesc data source with default params
-    const listRes = await Student.LIST(
-      null,
-      null,
-      null,
-      null,
-      "coursesOrderedDesc",
+    // $list - Use coursesOrderedDesc data source with default params
+    const $listRes = await Student.$list(
+      {
+        lastId: 0,
+        lastName: "",
+        limit: 100,
+      },
+      "CoursesOrderedDescending",
     );
     expect(
-      listRes.ok,
-      withRes("LIST with coursesOrderedDesc should be OK", listRes),
+      $listRes.ok,
+      withRes("$list with coursesOrderedDesc should be OK", $listRes),
     ).toBe(true);
-    expect(listRes.data).toBeDefined();
-    expect(Array.isArray(listRes.data)).toBe(true);
+    expect($listRes.data).toBeDefined();
+    expect(Array.isArray($listRes.data)).toBe(true);
 
-    // LIST - Use coursesOrderedDesc with limit parameter
-    const limitRes = await Student.LIST(
-      null,
-      null,
-      3,
-      null,
-      "coursesOrderedDesc",
+    // $list - Use coursesOrderedDesc with limit parameter
+    const limitRes = await Student.$list(
+      {
+        lastId: 0,
+        lastName: "",
+        limit: 3,
+      },
+      "CoursesOrderedDescending",
     );
     expect(
       limitRes.ok,
-      withRes("LIST with coursesOrderedDesc and limit should be OK", limitRes),
+      withRes("$list with coursesOrderedDesc and limit should be OK", limitRes),
     ).toBe(true);
     expect(limitRes.data!.length).toBeLessThanOrEqual(3);
 
-    // LIST - coursesOrderedDesc should order by studentId DESC, studentName DESC
-    const orderRes = await Student.LIST(
-      null,
-      null,
-      10,
-      null,
-      "coursesOrderedDesc",
+    // $list - coursesOrderedDesc should order by studentId DESC, studentName DESC
+    const orderRes = await Student.$list(
+      {
+        lastId: 0,
+        lastName: "",
+        limit: 100,
+      },
+      "CoursesOrderedDescending",
     );
     expect(
       orderRes.ok,
-      withRes("LIST with coursesOrderedDesc should be OK", orderRes),
+      withRes("$list with coursesOrderedDesc should be OK", orderRes),
     ).toBe(true);
 
     if (orderRes.data!.length > 1) {
@@ -253,32 +285,33 @@ describe("Student Enrollment", () => {
       }
     }
 
-    // LIST - coursesOrderedDesc should include courses in results
-    const coursesRes = await Student.LIST(
-      null,
-      null,
-      10,
-      null,
-      "coursesOrderedDesc",
+    // $list - coursesOrderedDesc should include courses in results
+    const coursesRes = await Student.$list(
+      {
+        lastId: 0,
+        lastName: "",
+        limit: 100,
+      },
+      "CoursesOrderedDescending",
     );
     expect(
       coursesRes.ok,
-      withRes("LIST with coursesOrderedDesc should be OK", coursesRes),
+      withRes("$list with coursesOrderedDesc should be OK", coursesRes),
     ).toBe(true);
 
     const studentWithCourses = coursesRes.data!.find(
-      (s) => s.courses && s.courses.length > 0,
+      (s) => s.studentCourses && s.studentCourses.length > 0,
     );
 
     if (studentWithCourses) {
-      expect(studentWithCourses.courses).toBeDefined();
-      expect(Array.isArray(studentWithCourses.courses)).toBe(true);
-      expect(studentWithCourses.courses.length).toBeGreaterThan(0);
+      expect(studentWithCourses.studentCourses).toBeDefined();
+      expect(Array.isArray(studentWithCourses.studentCourses)).toBe(true);
+      expect(studentWithCourses.studentCourses.length).toBeGreaterThan(0);
     }
   });
 
   it("POST - Create a StudentCourse, Student, and Course in one request", async () => {
-    const res = await StudentCourse.SAVE(
+    const res = await StudentCourse.$save(
       {
         studentId: 10,
         studentName: "Jack",
@@ -293,7 +326,7 @@ describe("Student Enrollment", () => {
           title: "History",
         },
       },
-      "withStudentCourse",
+      "WithStudentCourse",
     );
 
     expect(
@@ -311,22 +344,26 @@ describe("Student Enrollment", () => {
         id: 10,
         name: "Jack",
         favoriteColor: "Yellow",
-        courses: [
+        studentCourses: [
           {
             studentId: 10,
             studentName: "Jack",
             courseId: 10,
+            student: undefined,
+            course: undefined,
           },
         ],
       },
       course: {
         id: 10,
         title: "History",
-        students: [
+        studentCourses: [
           {
             studentId: 10,
             studentName: "Jack",
             courseId: 10,
+            student: undefined,
+            course: undefined,
           },
         ],
       },

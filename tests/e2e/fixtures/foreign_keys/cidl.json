@@ -1,340 +1,22 @@
 {
-  "hash": 10614301931927518918,
-  "project_name": "runner",
+  "hash": 18432525960313685479,
   "wrangler_env": {
-    "name": "Env",
-    "source_path": "./seed__foreign_keys.cloesce.ts",
     "d1_bindings": [
       "db"
     ],
     "kv_bindings": [],
     "r2_bindings": [],
-    "vars": {}
+    "vars": []
   },
   "models": {
-    "B": {
-      "hash": 10986754699032846248,
-      "name": "B",
-      "d1_binding": "db",
-      "primary_key_columns": [
-        {
-          "hash": 6397878138472974760,
-          "value": {
-            "name": "id",
-            "cidl_type": "Integer"
-          },
-          "foreign_key_reference": null,
-          "unique_ids": [],
-          "composite_id": null
-        }
-      ],
-      "columns": [],
-      "navigation_properties": [],
-      "key_params": [],
-      "kv_objects": [],
-      "r2_objects": [],
-      "methods": {
-        "testMethod": {
-          "name": "testMethod",
-          "is_static": false,
-          "data_source": null,
-          "http_verb": "Post",
-          "return_media": "Json",
-          "return_type": "Void",
-          "parameters_media": "Json",
-          "parameters": []
-        }
-      },
-      "data_sources": {
-        "default": {
-          "name": "default",
-          "tree": {},
-          "is_private": false,
-          "list_params": [
-            "LastSeen",
-            "Limit"
-          ]
-        }
-      },
-      "cruds": [],
-      "source_path": "./seed__foreign_keys.cloesce.ts"
-    },
-    "Course": {
-      "hash": 5332749565369192923,
-      "name": "Course",
-      "d1_binding": "db",
-      "primary_key_columns": [
-        {
-          "hash": 6397878138472974760,
-          "value": {
-            "name": "id",
-            "cidl_type": "Integer"
-          },
-          "foreign_key_reference": null,
-          "unique_ids": [],
-          "composite_id": null
-        }
-      ],
-      "columns": [],
-      "navigation_properties": [
-        {
-          "hash": 7559203103497934557,
-          "var_name": "students",
-          "model_reference": "Student",
-          "kind": "ManyToMany"
-        }
-      ],
-      "key_params": [],
-      "kv_objects": [],
-      "r2_objects": [],
-      "methods": {},
-      "data_sources": {
-        "default": {
-          "name": "default",
-          "tree": {
-            "students": {}
-          },
-          "is_private": false,
-          "list_params": [
-            "LastSeen",
-            "Limit"
-          ]
-        }
-      },
-      "cruds": [],
-      "source_path": "./seed__foreign_keys.cloesce.ts"
-    },
-    "Person": {
-      "hash": 4988692530268976634,
-      "name": "Person",
-      "d1_binding": "db",
-      "primary_key_columns": [
-        {
-          "hash": 6397878138472974760,
-          "value": {
-            "name": "id",
-            "cidl_type": "Integer"
-          },
-          "foreign_key_reference": null,
-          "unique_ids": [],
-          "composite_id": null
-        }
-      ],
-      "columns": [],
-      "navigation_properties": [
-        {
-          "hash": 4536776707783073402,
-          "var_name": "dogs",
-          "model_reference": "Dog",
-          "kind": {
-            "OneToMany": {
-              "key_columns": [
-                "personId"
-              ]
-            }
-          }
-        }
-      ],
-      "key_params": [],
-      "kv_objects": [],
-      "r2_objects": [],
-      "methods": {
-        "post": {
-          "name": "post",
-          "is_static": true,
-          "data_source": null,
-          "http_verb": "Post",
-          "return_media": "Json",
-          "return_type": {
-            "Object": "Person"
-          },
-          "parameters_media": "Json",
-          "parameters": [
-            {
-              "name": "env",
-              "cidl_type": {
-                "Inject": "Env"
-              }
-            },
-            {
-              "name": "person",
-              "cidl_type": {
-                "Object": "Person"
-              }
-            }
-          ]
-        },
-        "returnFatalIfParamsNotInstantiated": {
-          "name": "returnFatalIfParamsNotInstantiated",
-          "is_static": true,
-          "data_source": null,
-          "http_verb": "Post",
-          "return_media": "Json",
-          "return_type": {
-            "HttpResult": "Void"
-          },
-          "parameters_media": "Json",
-          "parameters": [
-            {
-              "name": "person",
-              "cidl_type": {
-                "Object": "Person"
-              }
-            }
-          ]
-        },
-        "withoutDogs": {
-          "name": "withoutDogs",
-          "is_static": false,
-          "data_source": "Person:withoutDogs",
-          "http_verb": "Get",
-          "return_media": "Json",
-          "return_type": {
-            "Object": "Person"
-          },
-          "parameters_media": "Json",
-          "parameters": []
-        }
-      },
-      "data_sources": {
-        "Person:withoutDogs": {
-          "name": "Person:withoutDogs",
-          "tree": {},
-          "is_private": true,
-          "list_params": []
-        },
-        "default": {
-          "name": "default",
-          "tree": {
-            "dogs": {}
-          },
-          "is_private": false,
-          "list_params": [
-            "LastSeen",
-            "Limit"
-          ]
-        },
-        "withDogs": {
-          "name": "withDogs",
-          "tree": {
-            "dogs": {}
-          },
-          "is_private": false,
-          "list_params": []
-        }
-      },
-      "cruds": [],
-      "source_path": "./seed__foreign_keys.cloesce.ts"
-    },
-    "Student": {
-      "hash": 937255833336457394,
-      "name": "Student",
-      "d1_binding": "db",
-      "primary_key_columns": [
-        {
-          "hash": 6397878138472974760,
-          "value": {
-            "name": "id",
-            "cidl_type": "Integer"
-          },
-          "foreign_key_reference": null,
-          "unique_ids": [],
-          "composite_id": null
-        }
-      ],
-      "columns": [],
-      "navigation_properties": [
-        {
-          "hash": 4289972809395887785,
-          "var_name": "courses",
-          "model_reference": "Course",
-          "kind": "ManyToMany"
-        }
-      ],
-      "key_params": [],
-      "kv_objects": [],
-      "r2_objects": [],
-      "methods": {
-        "none": {
-          "name": "none",
-          "is_static": false,
-          "data_source": "Student:none",
-          "http_verb": "Get",
-          "return_media": "Json",
-          "return_type": {
-            "Object": "Student"
-          },
-          "parameters_media": "Json",
-          "parameters": []
-        },
-        "post": {
-          "name": "post",
-          "is_static": true,
-          "data_source": null,
-          "http_verb": "Post",
-          "return_media": "Json",
-          "return_type": {
-            "Object": "Student"
-          },
-          "parameters_media": "Json",
-          "parameters": [
-            {
-              "name": "env",
-              "cidl_type": {
-                "Inject": "Env"
-              }
-            },
-            {
-              "name": "student",
-              "cidl_type": {
-                "Object": "Student"
-              }
-            }
-          ]
-        }
-      },
-      "data_sources": {
-        "Student:none": {
-          "name": "Student:none",
-          "tree": {},
-          "is_private": true,
-          "list_params": []
-        },
-        "default": {
-          "name": "default",
-          "tree": {
-            "courses": {}
-          },
-          "is_private": false,
-          "list_params": [
-            "LastSeen",
-            "Limit"
-          ]
-        },
-        "withCoursesStudentsCourses": {
-          "name": "withCoursesStudentsCourses",
-          "tree": {
-            "courses": {
-              "students": {
-                "courses": {}
-              }
-            }
-          },
-          "is_private": false,
-          "list_params": []
-        }
-      },
-      "cruds": [],
-      "source_path": "./seed__foreign_keys.cloesce.ts"
-    },
     "A": {
-      "hash": 18024792107516338745,
+      "hash": 7977924658294928939,
       "name": "A",
       "d1_binding": "db",
-      "primary_key_columns": [
+      "primary_columns": [
         {
           "hash": 6397878138472974760,
-          "value": {
+          "field": {
             "name": "id",
             "cidl_type": "Integer"
           },
@@ -345,10 +27,12 @@
       ],
       "columns": [
         {
-          "hash": 5114472031400271057,
-          "value": {
+          "hash": 9913313051553690446,
+          "field": {
             "name": "bId",
-            "cidl_type": "Integer"
+            "cidl_type": {
+              "Nullable": "Integer"
+            }
           },
           "foreign_key_reference": {
             "model_name": "B",
@@ -358,125 +42,942 @@
           "composite_id": null
         }
       ],
-      "navigation_properties": [
+      "kv_fields": [],
+      "r2_fields": [],
+      "navigation_fields": [
         {
-          "hash": 9331351263167380859,
-          "var_name": "b",
+          "hash": 12787859864084899288,
+          "field": {
+            "name": "b",
+            "cidl_type": {
+              "Object": {
+                "name": "B"
+              }
+            }
+          },
           "model_reference": "B",
           "kind": {
             "OneToOne": {
-              "key_columns": [
+              "columns": [
                 "bId"
               ]
             }
           }
         }
       ],
-      "key_params": [],
-      "kv_objects": [],
-      "r2_objects": [],
-      "methods": {
-        "post": {
-          "name": "post",
+      "key_fields": [],
+      "apis": [
+        {
+          "name": "create",
           "is_static": true,
           "data_source": null,
           "http_verb": "Post",
           "return_media": "Json",
           "return_type": {
-            "Object": "A"
+            "HttpResult": {
+              "Object": {
+                "name": "A"
+              }
+            }
           },
           "parameters_media": "Json",
           "parameters": [
             {
-              "name": "env",
-              "cidl_type": {
-                "Inject": "Env"
-              }
+              "name": "e",
+              "cidl_type": "Env"
             },
             {
               "name": "a",
               "cidl_type": {
-                "Object": "A"
+                "Object": {
+                  "name": "A"
+                }
               }
             }
           ]
         },
-        "returnFatalIfParamsNotInstantiated": {
-          "name": "returnFatalIfParamsNotInstantiated",
+        {
+          "name": "withoutB",
+          "is_static": false,
+          "data_source": "WithoutB",
+          "http_verb": "Get",
+          "return_media": "Json",
+          "return_type": {
+            "HttpResult": {
+              "Object": {
+                "name": "A"
+              }
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": []
+        },
+        {
+          "name": "$save",
           "is_static": true,
           "data_source": null,
+          "http_verb": "Post",
+          "return_media": "Json",
+          "return_type": {
+            "HttpResult": {
+              "Object": {
+                "name": "A"
+              }
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "model",
+              "cidl_type": {
+                "Partial": {
+                  "object_name": "A"
+                }
+              }
+            },
+            {
+              "name": "__datasource",
+              "cidl_type": {
+                "DataSource": {
+                  "model_name": "A"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "$get",
+          "is_static": true,
+          "data_source": null,
+          "http_verb": "Get",
+          "return_media": "Json",
+          "return_type": {
+            "HttpResult": {
+              "Object": {
+                "name": "A"
+              }
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "id",
+              "cidl_type": {
+                "Nullable": "Integer"
+              }
+            },
+            {
+              "name": "__datasource",
+              "cidl_type": {
+                "DataSource": {
+                  "model_name": "A"
+                }
+              }
+            }
+          ]
+        }
+      ],
+      "data_sources": {
+        "Default": {
+          "name": "Default",
+          "list": {
+            "parameters": [
+              {
+                "name": "lastSeen_id",
+                "cidl_type": "Integer"
+              },
+              {
+                "name": "limit",
+                "cidl_type": "Integer"
+              }
+            ]
+          },
+          "get": {
+            "parameters": [
+              {
+                "name": "id",
+                "cidl_type": "Integer"
+              }
+            ]
+          },
+          "is_internal": false
+        },
+        "WithB": {
+          "name": "WithB",
+          "list": {
+            "parameters": [
+              {
+                "name": "lastSeen_id",
+                "cidl_type": "Integer"
+              },
+              {
+                "name": "limit",
+                "cidl_type": "Integer"
+              }
+            ]
+          },
+          "get": {
+            "parameters": [
+              {
+                "name": "id",
+                "cidl_type": "Integer"
+              }
+            ]
+          },
+          "is_internal": false
+        },
+        "WithoutB": {
+          "name": "WithoutB",
+          "list": {
+            "parameters": [
+              {
+                "name": "lastSeen_id",
+                "cidl_type": "Integer"
+              },
+              {
+                "name": "limit",
+                "cidl_type": "Integer"
+              }
+            ]
+          },
+          "get": {
+            "parameters": [
+              {
+                "name": "id",
+                "cidl_type": "Integer"
+              }
+            ]
+          },
+          "is_internal": false
+        }
+      },
+      "cruds": [
+        "Save",
+        "Get"
+      ]
+    },
+    "B": {
+      "hash": 1898279998179927433,
+      "name": "B",
+      "d1_binding": "db",
+      "primary_columns": [
+        {
+          "hash": 6397878138472974760,
+          "field": {
+            "name": "id",
+            "cidl_type": "Integer"
+          },
+          "foreign_key_reference": null,
+          "unique_ids": [],
+          "composite_id": null
+        }
+      ],
+      "columns": [],
+      "kv_fields": [],
+      "r2_fields": [],
+      "navigation_fields": [
+        {
+          "hash": 14628003936878550728,
+          "field": {
+            "name": "a",
+            "cidl_type": {
+              "Array": {
+                "Object": {
+                  "name": "A"
+                }
+              }
+            }
+          },
+          "model_reference": "A",
+          "kind": {
+            "OneToMany": {
+              "columns": [
+                "bId"
+              ]
+            }
+          }
+        }
+      ],
+      "key_fields": [],
+      "apis": [
+        {
+          "name": "testMethod",
+          "is_static": false,
+          "data_source": "Default",
           "http_verb": "Post",
           "return_media": "Json",
           "return_type": {
             "HttpResult": "Void"
           },
           "parameters_media": "Json",
+          "parameters": []
+        },
+        {
+          "name": "$save",
+          "is_static": true,
+          "data_source": null,
+          "http_verb": "Post",
+          "return_media": "Json",
+          "return_type": {
+            "HttpResult": {
+              "Object": {
+                "name": "B"
+              }
+            }
+          },
+          "parameters_media": "Json",
           "parameters": [
             {
-              "name": "a",
+              "name": "model",
               "cidl_type": {
-                "Object": "A"
+                "Partial": {
+                  "object_name": "B"
+                }
+              }
+            },
+            {
+              "name": "__datasource",
+              "cidl_type": {
+                "DataSource": {
+                  "model_name": "B"
+                }
               }
             }
           ]
         },
-        "withoutB": {
-          "name": "withoutB",
-          "is_static": false,
-          "data_source": "A:withoutB",
+        {
+          "name": "$get",
+          "is_static": true,
+          "data_source": null,
           "http_verb": "Get",
           "return_media": "Json",
           "return_type": {
-            "Object": "A"
+            "HttpResult": {
+              "Object": {
+                "name": "B"
+              }
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "id",
+              "cidl_type": {
+                "Nullable": "Integer"
+              }
+            },
+            {
+              "name": "__datasource",
+              "cidl_type": {
+                "DataSource": {
+                  "model_name": "B"
+                }
+              }
+            }
+          ]
+        }
+      ],
+      "data_sources": {
+        "Default": {
+          "name": "Default",
+          "list": {
+            "parameters": [
+              {
+                "name": "lastSeen_id",
+                "cidl_type": "Integer"
+              },
+              {
+                "name": "limit",
+                "cidl_type": "Integer"
+              }
+            ]
+          },
+          "get": {
+            "parameters": [
+              {
+                "name": "id",
+                "cidl_type": "Integer"
+              }
+            ]
+          },
+          "is_internal": false
+        }
+      },
+      "cruds": [
+        "Save",
+        "Get"
+      ]
+    },
+    "Course": {
+      "hash": 7548065270413022258,
+      "name": "Course",
+      "d1_binding": "db",
+      "primary_columns": [
+        {
+          "hash": 6397878138472974760,
+          "field": {
+            "name": "id",
+            "cidl_type": "Integer"
+          },
+          "foreign_key_reference": null,
+          "unique_ids": [],
+          "composite_id": null
+        }
+      ],
+      "columns": [],
+      "kv_fields": [],
+      "r2_fields": [],
+      "navigation_fields": [
+        {
+          "hash": 6671087506518003146,
+          "field": {
+            "name": "students",
+            "cidl_type": {
+              "Array": {
+                "Object": {
+                  "name": "Student"
+                }
+              }
+            }
+          },
+          "model_reference": "Student",
+          "kind": "ManyToMany"
+        }
+      ],
+      "key_fields": [],
+      "apis": [
+        {
+          "name": "$save",
+          "is_static": true,
+          "data_source": null,
+          "http_verb": "Post",
+          "return_media": "Json",
+          "return_type": {
+            "HttpResult": {
+              "Object": {
+                "name": "Course"
+              }
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "model",
+              "cidl_type": {
+                "Partial": {
+                  "object_name": "Course"
+                }
+              }
+            },
+            {
+              "name": "__datasource",
+              "cidl_type": {
+                "DataSource": {
+                  "model_name": "Course"
+                }
+              }
+            }
+          ]
+        }
+      ],
+      "data_sources": {
+        "Default": {
+          "name": "Default",
+          "list": {
+            "parameters": [
+              {
+                "name": "lastSeen_id",
+                "cidl_type": "Integer"
+              },
+              {
+                "name": "limit",
+                "cidl_type": "Integer"
+              }
+            ]
+          },
+          "get": {
+            "parameters": [
+              {
+                "name": "id",
+                "cidl_type": "Integer"
+              }
+            ]
+          },
+          "is_internal": false
+        }
+      },
+      "cruds": [
+        "Save"
+      ]
+    },
+    "Person": {
+      "hash": 15191552719376020347,
+      "name": "Person",
+      "d1_binding": "db",
+      "primary_columns": [
+        {
+          "hash": 6397878138472974760,
+          "field": {
+            "name": "id",
+            "cidl_type": "Integer"
+          },
+          "foreign_key_reference": null,
+          "unique_ids": [],
+          "composite_id": null
+        }
+      ],
+      "columns": [],
+      "kv_fields": [],
+      "r2_fields": [],
+      "navigation_fields": [
+        {
+          "hash": 103859984955234182,
+          "field": {
+            "name": "dogs",
+            "cidl_type": {
+              "Array": {
+                "Object": {
+                  "name": "Dog"
+                }
+              }
+            }
+          },
+          "model_reference": "Dog",
+          "kind": {
+            "OneToMany": {
+              "columns": [
+                "personId"
+              ]
+            }
+          }
+        }
+      ],
+      "key_fields": [],
+      "apis": [
+        {
+          "name": "create",
+          "is_static": true,
+          "data_source": null,
+          "http_verb": "Post",
+          "return_media": "Json",
+          "return_type": {
+            "HttpResult": {
+              "Object": {
+                "name": "Person"
+              }
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "e",
+              "cidl_type": "Env"
+            },
+            {
+              "name": "person",
+              "cidl_type": {
+                "Object": {
+                  "name": "Person"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "withoutDogs",
+          "is_static": false,
+          "data_source": "WithoutDogs",
+          "http_verb": "Get",
+          "return_media": "Json",
+          "return_type": {
+            "HttpResult": {
+              "Object": {
+                "name": "Person"
+              }
+            }
           },
           "parameters_media": "Json",
           "parameters": []
-        }
-      },
-      "data_sources": {
-        "A:withoutB": {
-          "name": "A:withoutB",
-          "tree": {},
-          "is_private": true,
-          "list_params": []
         },
-        "default": {
-          "name": "default",
-          "tree": {
-            "b": {}
+        {
+          "name": "$save",
+          "is_static": true,
+          "data_source": null,
+          "http_verb": "Post",
+          "return_media": "Json",
+          "return_type": {
+            "HttpResult": {
+              "Object": {
+                "name": "Person"
+              }
+            }
           },
-          "is_private": false,
-          "list_params": [
-            "LastSeen",
-            "Limit"
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "model",
+              "cidl_type": {
+                "Partial": {
+                  "object_name": "Person"
+                }
+              }
+            },
+            {
+              "name": "__datasource",
+              "cidl_type": {
+                "DataSource": {
+                  "model_name": "Person"
+                }
+              }
+            }
           ]
         },
-        "withB": {
-          "name": "withB",
-          "tree": {
-            "b": {}
+        {
+          "name": "$get",
+          "is_static": true,
+          "data_source": null,
+          "http_verb": "Get",
+          "return_media": "Json",
+          "return_type": {
+            "HttpResult": {
+              "Object": {
+                "name": "Person"
+              }
+            }
           },
-          "is_private": false,
-          "list_params": []
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "id",
+              "cidl_type": {
+                "Nullable": "Integer"
+              }
+            },
+            {
+              "name": "__datasource",
+              "cidl_type": {
+                "DataSource": {
+                  "model_name": "Person"
+                }
+              }
+            }
+          ]
+        }
+      ],
+      "data_sources": {
+        "Default": {
+          "name": "Default",
+          "list": {
+            "parameters": [
+              {
+                "name": "lastSeen_id",
+                "cidl_type": "Integer"
+              },
+              {
+                "name": "limit",
+                "cidl_type": "Integer"
+              }
+            ]
+          },
+          "get": {
+            "parameters": [
+              {
+                "name": "id",
+                "cidl_type": "Integer"
+              }
+            ]
+          },
+          "is_internal": false
         },
-        "withoutB": {
-          "name": "withoutB",
-          "tree": {},
-          "is_private": false,
-          "list_params": []
+        "WithDogs": {
+          "name": "WithDogs",
+          "list": {
+            "parameters": [
+              {
+                "name": "lastSeen_id",
+                "cidl_type": "Integer"
+              },
+              {
+                "name": "limit",
+                "cidl_type": "Integer"
+              }
+            ]
+          },
+          "get": {
+            "parameters": [
+              {
+                "name": "id",
+                "cidl_type": "Integer"
+              }
+            ]
+          },
+          "is_internal": false
+        },
+        "WithoutDogs": {
+          "name": "WithoutDogs",
+          "list": {
+            "parameters": [
+              {
+                "name": "lastSeen_id",
+                "cidl_type": "Integer"
+              },
+              {
+                "name": "limit",
+                "cidl_type": "Integer"
+              }
+            ]
+          },
+          "get": {
+            "parameters": [
+              {
+                "name": "id",
+                "cidl_type": "Integer"
+              }
+            ]
+          },
+          "is_internal": false
         }
       },
-      "cruds": [],
-      "source_path": "./seed__foreign_keys.cloesce.ts"
+      "cruds": [
+        "Save",
+        "Get"
+      ]
     },
-    "Dog": {
-      "hash": 18198607126749058975,
-      "name": "Dog",
+    "Student": {
+      "hash": 16878349331798782765,
+      "name": "Student",
       "d1_binding": "db",
-      "primary_key_columns": [
+      "primary_columns": [
         {
           "hash": 6397878138472974760,
-          "value": {
+          "field": {
+            "name": "id",
+            "cidl_type": "Integer"
+          },
+          "foreign_key_reference": null,
+          "unique_ids": [],
+          "composite_id": null
+        }
+      ],
+      "columns": [],
+      "kv_fields": [],
+      "r2_fields": [],
+      "navigation_fields": [
+        {
+          "hash": 5886394064643331584,
+          "field": {
+            "name": "courses",
+            "cidl_type": {
+              "Array": {
+                "Object": {
+                  "name": "Course"
+                }
+              }
+            }
+          },
+          "model_reference": "Course",
+          "kind": "ManyToMany"
+        }
+      ],
+      "key_fields": [],
+      "apis": [
+        {
+          "name": "create",
+          "is_static": true,
+          "data_source": null,
+          "http_verb": "Post",
+          "return_media": "Json",
+          "return_type": {
+            "HttpResult": {
+              "Object": {
+                "name": "Student"
+              }
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "e",
+              "cidl_type": "Env"
+            },
+            {
+              "name": "student",
+              "cidl_type": {
+                "Object": {
+                  "name": "Student"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "none",
+          "is_static": false,
+          "data_source": "None",
+          "http_verb": "Get",
+          "return_media": "Json",
+          "return_type": {
+            "HttpResult": {
+              "Object": {
+                "name": "Student"
+              }
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": []
+        },
+        {
+          "name": "$save",
+          "is_static": true,
+          "data_source": null,
+          "http_verb": "Post",
+          "return_media": "Json",
+          "return_type": {
+            "HttpResult": {
+              "Object": {
+                "name": "Student"
+              }
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "model",
+              "cidl_type": {
+                "Partial": {
+                  "object_name": "Student"
+                }
+              }
+            },
+            {
+              "name": "__datasource",
+              "cidl_type": {
+                "DataSource": {
+                  "model_name": "Student"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "$get",
+          "is_static": true,
+          "data_source": null,
+          "http_verb": "Get",
+          "return_media": "Json",
+          "return_type": {
+            "HttpResult": {
+              "Object": {
+                "name": "Student"
+              }
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "id",
+              "cidl_type": {
+                "Nullable": "Integer"
+              }
+            },
+            {
+              "name": "__datasource",
+              "cidl_type": {
+                "DataSource": {
+                  "model_name": "Student"
+                }
+              }
+            }
+          ]
+        }
+      ],
+      "data_sources": {
+        "Default": {
+          "name": "Default",
+          "list": {
+            "parameters": [
+              {
+                "name": "lastSeen_id",
+                "cidl_type": "Integer"
+              },
+              {
+                "name": "limit",
+                "cidl_type": "Integer"
+              }
+            ]
+          },
+          "get": {
+            "parameters": [
+              {
+                "name": "id",
+                "cidl_type": "Integer"
+              }
+            ]
+          },
+          "is_internal": false
+        },
+        "None": {
+          "name": "None",
+          "list": {
+            "parameters": [
+              {
+                "name": "lastSeen_id",
+                "cidl_type": "Integer"
+              },
+              {
+                "name": "limit",
+                "cidl_type": "Integer"
+              }
+            ]
+          },
+          "get": {
+            "parameters": [
+              {
+                "name": "id",
+                "cidl_type": "Integer"
+              }
+            ]
+          },
+          "is_internal": false
+        },
+        "WithCoursesStudentsCourses": {
+          "name": "WithCoursesStudentsCourses",
+          "list": {
+            "parameters": [
+              {
+                "name": "lastSeen_id",
+                "cidl_type": "Integer"
+              },
+              {
+                "name": "limit",
+                "cidl_type": "Integer"
+              }
+            ]
+          },
+          "get": {
+            "parameters": [
+              {
+                "name": "id",
+                "cidl_type": "Integer"
+              }
+            ]
+          },
+          "is_internal": false
+        }
+      },
+      "cruds": [
+        "Save",
+        "Get"
+      ]
+    },
+    "Dog": {
+      "hash": 11927641146139395250,
+      "name": "Dog",
+      "d1_binding": "db",
+      "primary_columns": [
+        {
+          "hash": 6397878138472974760,
+          "field": {
             "name": "id",
             "cidl_type": "Integer"
           },
@@ -488,7 +989,7 @@
       "columns": [
         {
           "hash": 16174990813136957012,
-          "value": {
+          "field": {
             "name": "personId",
             "cidl_type": "Integer"
           },
@@ -500,38 +1001,109 @@
           "composite_id": null
         }
       ],
-      "navigation_properties": [],
-      "key_params": [],
-      "kv_objects": [],
-      "r2_objects": [],
-      "methods": {
-        "testMethod": {
+      "kv_fields": [],
+      "r2_fields": [],
+      "navigation_fields": [
+        {
+          "hash": 5482872260590270089,
+          "field": {
+            "name": "person",
+            "cidl_type": {
+              "Object": {
+                "name": "Person"
+              }
+            }
+          },
+          "model_reference": "Person",
+          "kind": {
+            "OneToOne": {
+              "columns": [
+                "personId"
+              ]
+            }
+          }
+        }
+      ],
+      "key_fields": [],
+      "apis": [
+        {
           "name": "testMethod",
           "is_static": false,
+          "data_source": "Default",
+          "http_verb": "Post",
+          "return_media": "Json",
+          "return_type": {
+            "HttpResult": "Void"
+          },
+          "parameters_media": "Json",
+          "parameters": []
+        },
+        {
+          "name": "$save",
+          "is_static": true,
           "data_source": null,
           "http_verb": "Post",
           "return_media": "Json",
-          "return_type": "Void",
+          "return_type": {
+            "HttpResult": {
+              "Object": {
+                "name": "Dog"
+              }
+            }
+          },
           "parameters_media": "Json",
-          "parameters": []
-        }
-      },
-      "data_sources": {
-        "default": {
-          "name": "default",
-          "tree": {},
-          "is_private": false,
-          "list_params": [
-            "LastSeen",
-            "Limit"
+          "parameters": [
+            {
+              "name": "model",
+              "cidl_type": {
+                "Partial": {
+                  "object_name": "Dog"
+                }
+              }
+            },
+            {
+              "name": "__datasource",
+              "cidl_type": {
+                "DataSource": {
+                  "model_name": "Dog"
+                }
+              }
+            }
           ]
         }
+      ],
+      "data_sources": {
+        "Default": {
+          "name": "Default",
+          "list": {
+            "parameters": [
+              {
+                "name": "lastSeen_id",
+                "cidl_type": "Integer"
+              },
+              {
+                "name": "limit",
+                "cidl_type": "Integer"
+              }
+            ]
+          },
+          "get": {
+            "parameters": [
+              {
+                "name": "id",
+                "cidl_type": "Integer"
+              }
+            ]
+          },
+          "is_internal": false
+        }
       },
-      "cruds": [],
-      "source_path": "./seed__foreign_keys.cloesce.ts"
+      "cruds": [
+        "Save"
+      ]
     }
   },
   "services": {},
   "poos": {},
-  "main_source": null
+  "injects": []
 }

@@ -33,7 +33,7 @@ async fn main() {
         .expect("Failed to find project root");
 
     let pattern = format!(
-        "{}/tests/e2e/fixtures/{}/seed__*",
+        "{}/tests/e2e/fixtures/{}/schema.cloesce",
         project_root.display(),
         cli.fixture
     );
@@ -49,23 +49,23 @@ async fn main() {
     tracing::subscriber::set_global_default(subscriber)
         .expect("Failed to set global default subscriber");
 
-    // Build generator
-    tracing::info!("Building generator...");
-    let generator_dir = project_root.join("src/generator");
+    // Build compiler
+    tracing::info!("Building compiler...");
+    let compiler_dir = project_root.join("src/compiler");
     let cmd = Command::new("cargo")
-        .current_dir(&generator_dir)
+        .current_dir(&compiler_dir)
         .args(["build", "--release"])
         .status();
     match cmd {
         Ok(status) if status.success() => {}
         Ok(status) => {
-            panic!("Failed to build generator. Exit code: {}", status);
+            panic!("Failed to build compiler. Exit code: {}", status);
         }
         Err(err) => {
             panic!("Failed to execute cargo build: {}", err);
         }
     }
-    tracing::info!("Finished building generator.");
+    tracing::info!("Finished building compiler.");
 
     let mut tasks = Vec::with_capacity(fixtures.len());
     for fixture in fixtures {
@@ -98,28 +98,16 @@ async fn main() {
 }
 
 fn run_integration_test(fixture: Fixture, domain: &str) -> Result<bool, bool> {
-    let (pre_cidl_changed, pre_cidl_path) = match fixture.extract_cidl() {
+    let (generated_changed, cidl_path, wrangler_path) = match fixture.compile(domain) {
         Ok(res) => res,
         Err(err) => {
             eprintln!(
-                "Error extracting CIDL for fixture {}: {}",
+                "Error generating files for fixture {}: {}",
                 fixture.fixture_id, err
             );
             return Err(true);
         }
     };
-
-    let (generated_changed, cidl_path, wrangler_path) =
-        match fixture.generate_all(&pre_cidl_path, domain) {
-            Ok(res) => res,
-            Err(err) => {
-                eprintln!(
-                    "Error generating files for fixture {}: {}",
-                    fixture.fixture_id, err
-                );
-                return Err(true);
-            }
-        };
 
     let (migrated_sql_changed, migrated_cidl_changed) =
         match fixture.migrate(&cidl_path, &wrangler_path) {
@@ -138,7 +126,7 @@ fn run_integration_test(fixture: Fixture, domain: &str) -> Result<bool, bool> {
         fixture.fixture_id
     );
 
-    Ok(pre_cidl_changed | generated_changed | migrated_cidl_changed | migrated_sql_changed)
+    Ok(generated_changed | migrated_cidl_changed | migrated_sql_changed)
 }
 
 fn create_cloesce_config(fixture: &Fixture) -> String {
@@ -148,11 +136,11 @@ fn create_cloesce_config(fixture: &Fixture) -> String {
 
     let domain = format!("http://localhost:{}/api", 5000 + port_seed);
     let config_source = format!(
-        r#"import {{ defineConfig }} from "cloesce/config";
-export default defineConfig({{
+        r#"import {{ CloesceConfigOptions }} from "cloesce";
+export default {{
     srcPaths: ["./"],
     workersUrl: "{}",
-}});
+}} satisfies CloesceConfigOptions;
             "#,
         domain
     );

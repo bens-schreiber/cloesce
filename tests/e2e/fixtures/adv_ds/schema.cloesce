@@ -1,0 +1,73 @@
+env {
+    d1 { db }
+}
+
+[use db, save]
+model Topping {
+    primary { id: int }
+    name: string
+
+    nav (Hamburger::id) {
+        hamburger
+    }
+}
+
+[use db, save, list]
+model Hamburger {
+    primary { id: int }
+    name: string
+
+    nav (Topping::id) {
+        toppings
+    }
+}
+
+source BurgersWithLettuceOrdered for Hamburger {
+    include { toppings }
+
+    sql list(lastId: int, limit: int) {
+        "
+            WITH included as ($include)
+            SELECT * FROM included
+            WHERE [toppings.name] = 'LETTUCE'
+            AND id > $lastId
+            ORDER BY id
+            LIMIT $limit
+        "
+    }
+}
+
+[internal]
+source NoLettuce for Hamburger {
+    include { toppings }
+
+    sql get(id: int) {
+        "
+            WITH included as ($include)
+            SELECT * FROM included
+            WHERE [toppings.name] != 'LETTUCE'
+            AND id = $id
+            ORDER BY id
+        "
+    }
+}
+
+[internal]
+source OnlyBacon for Hamburger {
+    include { toppings }
+
+    sql get(id: int) {
+        "
+            WITH included as ($include)
+            SELECT * FROM included
+            WHERE [toppings.name] = 'BACON'
+            AND id = $id
+            ORDER BY id
+        "
+    }
+}
+
+api Hamburger {
+    get noLettuceToppings([source NoLettuce] self) -> Array<Topping>
+    get onlyBaconToppings([source OnlyBacon] self) -> Array<Topping>
+}

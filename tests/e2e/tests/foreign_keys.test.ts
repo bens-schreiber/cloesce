@@ -34,18 +34,10 @@ describe("POST and refresh A", () => {
 
   let b: B;
   it("POST A", async () => {
-    const res = await A.post(a);
+    const res = await A.create(a);
     expect(res.ok, withRes("POST should be OK", res)).toBe(true);
     expect(res.data!.id, withRes("POST id should match input", res)).toBe(a.id);
     b = res.data!.b!;
-  });
-
-  it("Object to be instantiated on backend", async () => {
-    const res = await A.returnFatalIfParamsNotInstantiated(a);
-    expect(
-      res.ok,
-      withRes("Objects should be instantiated on the backend", res),
-    ).toBe(true);
   });
 
   it("Inner object is instantiated", async () => {
@@ -66,7 +58,7 @@ describe("POST and refresh Person", () => {
   });
 
   it("POST Person", async () => {
-    const res = await Person.post(person);
+    const res = await Person.create(person);
     expect(res.ok).toBe(true);
     expect(res.data!.dogs.length).toBe(1);
   });
@@ -83,7 +75,7 @@ describe("POST and refresh Student", () => {
   const student = Object.assign(new Student(), { id: 1, courses: [course] });
 
   it("POST Student", async () => {
-    const res = await Student.post(student);
+    const res = await Student.create(student);
     expect(res.ok, withRes("Expected POST to work", res)).toBe(true);
     expect(res.data!.courses.length).toBe(1);
 

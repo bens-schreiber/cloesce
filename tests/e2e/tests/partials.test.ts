@@ -16,7 +16,7 @@ afterAll(async () => {
 describe("Dog", () => {
   let dog: Dog | undefined;
   it("Partial", async () => {
-    const res = await Dog.post({
+    const res = await Dog.create({
       name: "fido",
       age: 100,
     });
@@ -32,7 +32,7 @@ describe("Dog", () => {
   });
 
   it("Full", async () => {
-    const res = await Dog.post({
+    const res = await Dog.create({
       id: 2,
       name: "fido",
       age: 100,

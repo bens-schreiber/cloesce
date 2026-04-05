@@ -1,15 +1,9 @@
-import { defineConfig } from "cloesce/config";
-import { Weather } from "./src/data/models.cloesce";
+import { CloesceConfigOptions } from "cloesce";
 
-const config = defineConfig({
-    srcPaths: ["./src/data"],
+const config: CloesceConfigOptions = {
+    srcPaths: ["./schema"],
     workersUrl: "http://localhost:5000/api",
-    migrationsPath: "./customDir",
     wranglerConfigFormat: "jsonc",
-});
-
-config.model(Weather, builder => {
-    builder.unique("dateTime", "location");
-});
+};
 
 export default config;

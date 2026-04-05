@@ -1,0 +1,13 @@
+env { d1 { db } }
+
+[use db, save]
+model Dog {
+    primary { id: int }
+    name: string
+    age: int
+}
+
+api Dog {
+    post create(e: env, dog: Partial<Dog>) -> Dog
+    get getPartialSelf(self) -> Partial<Dog>
+}

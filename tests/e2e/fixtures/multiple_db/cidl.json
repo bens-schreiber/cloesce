@@ -1,26 +1,23 @@
 {
   "hash": 5303730850516668862,
-  "project_name": "runner",
   "wrangler_env": {
-    "name": "Env",
-    "source_path": "./seed__multi_db.cloesce.ts",
     "d1_bindings": [
       "db1",
       "db2"
     ],
     "kv_bindings": [],
     "r2_bindings": [],
-    "vars": {}
+    "vars": []
   },
   "models": {
     "DB1Model": {
       "hash": 7341731061861978357,
       "name": "DB1Model",
       "d1_binding": "db1",
-      "primary_key_columns": [
+      "primary_columns": [
         {
           "hash": 6397878138472974760,
-          "value": {
+          "field": {
             "name": "id",
             "cidl_type": "Integer"
           },
@@ -32,47 +29,86 @@
       "columns": [
         {
           "hash": 3747858334280870224,
-          "value": {
+          "field": {
             "name": "someColumn",
-            "cidl_type": "Text"
+            "cidl_type": "String"
           },
           "foreign_key_reference": null,
           "unique_ids": [],
           "composite_id": null
         }
       ],
-      "navigation_properties": [],
-      "key_params": [],
-      "kv_objects": [],
-      "r2_objects": [],
-      "methods": {
-        "GET": {
-          "name": "GET",
+      "kv_fields": [],
+      "r2_fields": [],
+      "navigation_fields": [],
+      "key_fields": [],
+      "apis": [
+        {
+          "name": "$get",
           "is_static": true,
           "data_source": null,
           "http_verb": "Get",
           "return_media": "Json",
           "return_type": {
             "HttpResult": {
-              "Object": "DB1Model"
+              "Object": {
+                "name": "DB1Model"
+              }
             }
           },
           "parameters_media": "Json",
           "parameters": [
             {
               "name": "id",
-              "cidl_type": "Integer"
+              "cidl_type": {
+                "Nullable": "Integer"
+              }
             },
             {
               "name": "__datasource",
               "cidl_type": {
-                "DataSource": "DB1Model"
+                "DataSource": {
+                  "model_name": "DB1Model"
+                }
               }
             }
           ]
         },
-        "LIST": {
-          "name": "LIST",
+        {
+          "name": "$save",
+          "is_static": true,
+          "data_source": null,
+          "http_verb": "Post",
+          "return_media": "Json",
+          "return_type": {
+            "HttpResult": {
+              "Object": {
+                "name": "DB1Model"
+              }
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "model",
+              "cidl_type": {
+                "Partial": {
+                  "object_name": "DB1Model"
+                }
+              }
+            },
+            {
+              "name": "__datasource",
+              "cidl_type": {
+                "DataSource": {
+                  "model_name": "DB1Model"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "$list",
           "is_static": true,
           "data_source": null,
           "http_verb": "Get",
@@ -80,7 +116,9 @@
           "return_type": {
             "HttpResult": {
               "Array": {
-                "Object": "DB1Model"
+                "Object": {
+                  "name": "DB1Model"
+                }
               }
             }
           },
@@ -99,73 +137,56 @@
               }
             },
             {
-              "name": "offset",
-              "cidl_type": {
-                "Nullable": "Integer"
-              }
-            },
-            {
               "name": "__datasource",
               "cidl_type": {
-                "DataSource": "DB1Model"
-              }
-            }
-          ]
-        },
-        "SAVE": {
-          "name": "SAVE",
-          "is_static": true,
-          "data_source": null,
-          "http_verb": "Post",
-          "return_media": "Json",
-          "return_type": {
-            "HttpResult": {
-              "Object": "DB1Model"
-            }
-          },
-          "parameters_media": "Json",
-          "parameters": [
-            {
-              "name": "model",
-              "cidl_type": {
-                "Partial": "DB1Model"
-              }
-            },
-            {
-              "name": "__datasource",
-              "cidl_type": {
-                "DataSource": "DB1Model"
+                "DataSource": {
+                  "model_name": "DB1Model"
+                }
               }
             }
           ]
         }
-      },
+      ],
       "data_sources": {
-        "default": {
-          "name": "default",
-          "tree": {},
-          "is_private": false,
-          "list_params": [
-            "LastSeen",
-            "Limit"
-          ]
+        "Default": {
+          "name": "Default",
+          "list": {
+            "parameters": [
+              {
+                "name": "lastSeen_id",
+                "cidl_type": "Integer"
+              },
+              {
+                "name": "limit",
+                "cidl_type": "Integer"
+              }
+            ]
+          },
+          "get": {
+            "parameters": [
+              {
+                "name": "id",
+                "cidl_type": "Integer"
+              }
+            ]
+          },
+          "is_internal": false
         }
       },
       "cruds": [
-        "GET",
-        "LIST",
-        "SAVE"
-      ],
-      "source_path": "./seed__multi_db.cloesce.ts"
+        "Get",
+        "Save",
+        "List"
+      ]
     },
     "DB2Model": {
       "hash": 122024037709630579,
       "name": "DB2Model",
       "d1_binding": "db2",
-      "primary_key_columns": [
+      "primary_columns": [
         {
           "hash": 6397878138472974760,
-          "value": {
+          "field": {
             "name": "id",
             "cidl_type": "Integer"
           },
@@ -177,47 +198,86 @@
       "columns": [
         {
           "hash": 3747858334280870224,
-          "value": {
+          "field": {
             "name": "someColumn",
-            "cidl_type": "Text"
+            "cidl_type": "String"
           },
           "foreign_key_reference": null,
           "unique_ids": [],
           "composite_id": null
         }
       ],
-      "navigation_properties": [],
-      "key_params": [],
-      "kv_objects": [],
-      "r2_objects": [],
-      "methods": {
-        "GET": {
-          "name": "GET",
+      "kv_fields": [],
+      "r2_fields": [],
+      "navigation_fields": [],
+      "key_fields": [],
+      "apis": [
+        {
+          "name": "$get",
           "is_static": true,
           "data_source": null,
           "http_verb": "Get",
           "return_media": "Json",
           "return_type": {
             "HttpResult": {
-              "Object": "DB2Model"
+              "Object": {
+                "name": "DB2Model"
+              }
             }
           },
           "parameters_media": "Json",
           "parameters": [
             {
               "name": "id",
-              "cidl_type": "Integer"
+              "cidl_type": {
+                "Nullable": "Integer"
+              }
             },
             {
               "name": "__datasource",
               "cidl_type": {
-                "DataSource": "DB2Model"
+                "DataSource": {
+                  "model_name": "DB2Model"
+                }
               }
             }
           ]
         },
-        "LIST": {
-          "name": "LIST",
+        {
+          "name": "$save",
+          "is_static": true,
+          "data_source": null,
+          "http_verb": "Post",
+          "return_media": "Json",
+          "return_type": {
+            "HttpResult": {
+              "Object": {
+                "name": "DB2Model"
+              }
+            }
+          },
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "model",
+              "cidl_type": {
+                "Partial": {
+                  "object_name": "DB2Model"
+                }
+              }
+            },
+            {
+              "name": "__datasource",
+              "cidl_type": {
+                "DataSource": {
+                  "model_name": "DB2Model"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "$list",
           "is_static": true,
           "data_source": null,
           "http_verb": "Get",
@@ -225,7 +285,9 @@
           "return_type": {
             "HttpResult": {
               "Array": {
-                "Object": "DB2Model"
+                "Object": {
+                  "name": "DB2Model"
+                }
               }
             }
           },
@@ -244,67 +306,50 @@
               }
             },
             {
-              "name": "offset",
-              "cidl_type": {
-                "Nullable": "Integer"
-              }
-            },
-            {
               "name": "__datasource",
               "cidl_type": {
-                "DataSource": "DB2Model"
-              }
-            }
-          ]
-        },
-        "SAVE": {
-          "name": "SAVE",
-          "is_static": true,
-          "data_source": null,
-          "http_verb": "Post",
-          "return_media": "Json",
-          "return_type": {
-            "HttpResult": {
-              "Object": "DB2Model"
-            }
-          },
-          "parameters_media": "Json",
-          "parameters": [
-            {
-              "name": "model",
-              "cidl_type": {
-                "Partial": "DB2Model"
-              }
-            },
-            {
-              "name": "__datasource",
-              "cidl_type": {
-                "DataSource": "DB2Model"
+                "DataSource": {
+                  "model_name": "DB2Model"
+                }
               }
             }
           ]
         }
-      },
+      ],
       "data_sources": {
-        "default": {
-          "name": "default",
-          "tree": {},
-          "is_private": false,
-          "list_params": [
-            "LastSeen",
-            "Limit"
-          ]
+        "Default": {
+          "name": "Default",
+          "list": {
+            "parameters": [
+              {
+                "name": "lastSeen_id",
+                "cidl_type": "Integer"
+              },
+              {
+                "name": "limit",
+                "cidl_type": "Integer"
+              }
+            ]
+          },
+          "get": {
+            "parameters": [
+              {
+                "name": "id",
+                "cidl_type": "Integer"
+              }
+            ]
+          },
+          "is_internal": false
         }
       },
       "cruds": [
-        "GET",
-        "LIST",
-        "SAVE"
-      ],
-      "source_path": "./seed__multi_db.cloesce.ts"
+        "Get",
+        "Save",
+        "List"
+      ]
     }
   },
   "services": {},
   "poos": {},
-  "main_source": null
+  "injects": []
 }

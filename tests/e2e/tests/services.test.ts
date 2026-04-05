@@ -32,7 +32,7 @@ describe("Use Injected Dependency: BarService", () => {
     const res = await BarService.useFoo();
     expect(res.ok, withRes("Expected GET to work", res)).toBe(true);
     expect(res.data).toEqual(
-      "foo's instantiated invocation from BarService, someCrap: just some crap",
+      "foo's instantiated invocation from BarService; injected: injected value",
     );
   });
 });

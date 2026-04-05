@@ -1,24 +1,20 @@
 {
   // Visit https://aka.ms/tsconfig to read more about this file
   "compilerOptions": {
-    "module": "ESNext",
+    "module": "Node16",
     "target": "ES2020",
-    "moduleResolution": "node",
+    "moduleResolution": "node16",
     "types": [],
     "skipLibCheck": true,
 
     // Cloesce required options
-    "resolveJsonModule": true,
-    "strict": true,
-    "strictPropertyInitialization": false,
-    "experimentalDecorators": true,
-    "emitDecoratorMetadata": true,
     "allowSyntheticDefaultImports": true,
+    "resolveJsonModule": true,
     "paths": {
       "@data/*": ["./src/data/*"],
-      "@generated/*": ["./.generated/*"],
+      "@cloesce/*": ["./.cloesce/*"],
     },
     "outDir": "dist",
   },
-  "include": [".generated/*.ts", "src/**/*.ts", "test/**/*.ts"],
+  "include": [".cloesce/*.ts", "src/**/*.ts", "test/**/*.ts"],
 }

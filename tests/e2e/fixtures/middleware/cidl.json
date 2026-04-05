@@ -1,27 +1,24 @@
 {
-  "hash": 6083998897186386139,
-  "project_name": "runner",
+  "hash": 10335980690941339895,
   "wrangler_env": {
-    "name": "Env",
-    "source_path": "./seed__app.cloesce.ts",
     "d1_bindings": [
       "db"
     ],
     "kv_bindings": [],
     "r2_bindings": [],
-    "vars": {}
+    "vars": []
   },
   "models": {
     "Foo": {
-      "hash": 9350576688796676214,
+      "hash": 2057975560306353780,
       "name": "Foo",
       "d1_binding": "db",
-      "primary_key_columns": [
+      "primary_columns": [
         {
-          "hash": 6397878138472974760,
-          "value": {
+          "hash": 4616061733383249414,
+          "field": {
             "name": "id",
-            "cidl_type": "Integer"
+            "cidl_type": "String"
           },
           "foreign_key_reference": null,
           "unique_ids": [],
@@ -29,20 +26,55 @@
         }
       ],
       "columns": [],
-      "navigation_properties": [],
-      "key_params": [],
-      "kv_objects": [],
-      "r2_objects": [],
-      "methods": {
-        "SAVE": {
-          "name": "SAVE",
+      "kv_fields": [],
+      "r2_fields": [],
+      "navigation_fields": [],
+      "key_fields": [],
+      "apis": [
+        {
+          "name": "blockedMethod",
+          "is_static": true,
+          "data_source": null,
+          "http_verb": "Get",
+          "return_media": "Json",
+          "return_type": {
+            "HttpResult": "Void"
+          },
+          "parameters_media": "Json",
+          "parameters": []
+        },
+        {
+          "name": "getInjectedThing",
+          "is_static": true,
+          "data_source": null,
+          "http_verb": "Get",
+          "return_media": "Json",
+          "return_type": {
+            "HttpResult": "String"
+          },
+          "parameters_media": "Json",
+          "parameters": [
+            {
+              "name": "thing",
+              "cidl_type": {
+                "Inject": {
+                  "name": "InjectedThing"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "$save",
           "is_static": true,
           "data_source": null,
           "http_verb": "Post",
           "return_media": "Json",
           "return_type": {
             "HttpResult": {
-              "Object": "Foo"
+              "Object": {
+                "name": "Foo"
+              }
             }
           },
           "parameters_media": "Json",
@@ -50,76 +82,56 @@
             {
               "name": "model",
               "cidl_type": {
-                "Partial": "Foo"
+                "Partial": {
+                  "object_name": "Foo"
+                }
               }
             },
             {
               "name": "__datasource",
               "cidl_type": {
-                "DataSource": "Foo"
-              }
-            }
-          ]
-        },
-        "blockedMethod": {
-          "name": "blockedMethod",
-          "is_static": true,
-          "data_source": null,
-          "http_verb": "Get",
-          "return_media": "Json",
-          "return_type": "Void",
-          "parameters_media": "Json",
-          "parameters": []
-        },
-        "getInjectedThing": {
-          "name": "getInjectedThing",
-          "is_static": true,
-          "data_source": null,
-          "http_verb": "Get",
-          "return_media": "Json",
-          "return_type": {
-            "Object": "InjectedThing"
-          },
-          "parameters_media": "Json",
-          "parameters": [
-            {
-              "name": "thing",
-              "cidl_type": {
-                "Inject": "InjectedThing"
+                "DataSource": {
+                  "model_name": "Foo"
+                }
               }
             }
           ]
         }
-      },
+      ],
       "data_sources": {
-        "default": {
-          "name": "default",
-          "tree": {},
-          "is_private": false,
-          "list_params": [
-            "LastSeen",
-            "Limit"
-          ]
+        "Default": {
+          "name": "Default",
+          "list": {
+            "parameters": [
+              {
+                "name": "lastSeen_id",
+                "cidl_type": "String"
+              },
+              {
+                "name": "limit",
+                "cidl_type": "Integer"
+              }
+            ]
+          },
+          "get": {
+            "parameters": [
+              {
+                "name": "id",
+                "cidl_type": "String"
+              }
+            ]
+          },
+          "is_internal": false
         }
       },
       "cruds": [
-        "SAVE"
-      ],
-      "source_path": "./seed__app.cloesce.ts"
+        "Save"
+      ]
     }
   },
   "services": {},
-  "poos": {
-    "InjectedThing": {
-      "name": "InjectedThing",
-      "attributes": [
-        {
-          "name": "value",
-          "cidl_type": "Text"
-        }
-      ],
-      "source_path": "./seed__app.cloesce.ts"
-    }
-  },
-  "main_source": "./seed__app.cloesce.ts"
+  "poos": {},
+  "injects": [
+    "InjectedThing"
+  ]
 }

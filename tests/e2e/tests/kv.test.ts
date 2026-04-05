@@ -25,7 +25,7 @@ describe("PureKVModel", () => {
   const otherData = "some string data";
 
   it("POST", async () => {
-    const res = await PureKVModel.SAVE({
+    const res = await PureKVModel.$save({
       id,
       data: { raw: data },
       otherData: { raw: otherData },
@@ -34,7 +34,9 @@ describe("PureKVModel", () => {
   });
 
   it("GET", async () => {
-    const res = await PureKVModel.GET(id);
+    const res = await PureKVModel.$get({
+      id,
+    });
     expect(res.ok, withRes("GET should be OK", res)).toBe(true);
     expect(res.data).toBeDefined();
     expect(res.data?.id).toBe(id);
@@ -56,12 +58,15 @@ describe("D1BackedModel", () => {
         raw: data,
       },
     };
-    const res = await D1BackedModel.SAVE(model, "default");
+    const res = await D1BackedModel.$save(model);
     expect(res.ok, withRes("POST should be OK", res)).toBe(true);
   });
 
   it("GET", async () => {
-    const res = await D1BackedModel.GET(1, keyParam, "default");
+    const res = await D1BackedModel.$get({
+      id: 1,
+      keyParam,
+    });
     expect(res.ok, withRes("GET should be OK", res)).toBe(true);
     expect(res.data).toBeDefined();
     expect(res.data?.id).toBe(1);
@@ -71,7 +76,10 @@ describe("D1BackedModel", () => {
 
   it("LIST", async () => {
     // D1BackedModel takes a key param and thus cannot list KV components
-    const res = await D1BackedModel.LIST(null, null, null, "default");
+    const res = await D1BackedModel.$list({
+      lastSeen_id: 0,
+      limit: 10,
+    });
 
     expect(res.ok, withRes("LIST should be OK", res)).toBe(true);
     expect(res.data!.length).toBeGreaterThan(0);
@@ -86,7 +94,7 @@ describe("PaginatedKVModel", () => {
   const id = "test-id";
 
   it("GET with Paginated KV list returns paginated structure", async () => {
-    const res = await PaginatedKVModel.GET(id);
+    const res = await PaginatedKVModel.$get({ id });
     expect(res.ok, withRes("GET should be OK", res)).toBe(true);
     expect(res.data).toBeDefined();
     expect(res.data?.id).toBe(id);
@@ -100,7 +108,7 @@ describe("PaginatedKVModel", () => {
   });
 
   it("paginated KV cursor can be used for next page", async () => {
-    const res = await PaginatedKVModel.GET(id);
+    const res = await PaginatedKVModel.$get({ id });
     expect(res.ok, withRes("GET should be OK", res)).toBe(true);
 
     if (res.data?.items.cursor) {

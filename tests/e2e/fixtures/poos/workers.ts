@@ -1,25 +1,24 @@
-// GENERATED CODE. DO NOT MODIFY.
-import { CloesceApp } from "cloesce/backend";
-import cidl from "./cidl.json";
-import { PooAcceptYield } from "./seed__poo.cloesce.js";
-import { PooA } from "./seed__poo.cloesce.js";
-import { PooB } from "./seed__poo.cloesce.js";
-import { PooC } from "./seed__poo.cloesce.js";
+import { HttpResult } from "cloesce";
+import { cloesce, Env, PooA, PooAcceptYield, PooB, PooC } from "./backend.js";
 
-import { Env } from "./seed__poo.cloesce.js";
+export class PooAcceptYieldImpl extends PooAcceptYield.Api {
+    acceptPoos(a: PooA, b: PooB, c: PooC) {
+        return HttpResult.ok<void>(200);
+    }
 
-const constructorRegistry: Record<string, new () => any> = {
-	PooAcceptYield: PooAcceptYield,
-	PooA: PooA,
-	PooB: PooB,
-	PooC: PooC,
-	Env: Env
-};
-
-async function fetch(request: Request, env: any, ctx: any): Promise<Response> {
-    const app = await CloesceApp.init(cidl as any, constructorRegistry, "http://localhost:5695/api");
-    return await app.run(request, env);
+    yieldPoo() {
+        return HttpResult.ok<PooC>(200, {
+            a: { name: "name", major: "major" },
+            b: [{ color: "color" }],
+        });
+    }
 }
 
-export {cidl, constructorRegistry}
-export default { fetch };
+
+export default {
+    async fetch(request: Request, env: Env): Promise<Response> {
+        const app = await cloesce();
+        app.register(new PooAcceptYieldImpl());
+        return await app.run(request, env);
+    }
+}

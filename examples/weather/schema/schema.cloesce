@@ -1,0 +1,50 @@
+env {
+    d1 { db }
+    r2 { bucket }
+}
+
+[use db]
+[use list, save, get]
+model WeatherReport {
+    primary {
+        id: int
+    }
+
+    nav (Weather::weatherReportId) {
+        weatherEntries
+    }
+
+    title: string
+    description: string
+}
+
+[use db]
+[use get, list, save]
+model Weather {
+    primary {
+        id: int
+    }
+
+    foreign (WeatherReport::id) {
+        weatherReportId
+        nav { weatherReport }
+    }
+
+    r2 (bucket, "weather/photos/{id}.jpg") {
+        photo
+    }
+
+    dateTime: date
+    location: string
+    temperature: int
+    condition: string
+}
+
+api Weather {
+    post uploadPhoto(self, e: env, s: stream) -> void
+    get downloadPhoto([source R2Only] self) -> stream
+}
+
+source R2Only for Weather {
+    include { photo }
+}
