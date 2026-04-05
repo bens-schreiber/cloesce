@@ -60,6 +60,7 @@ impl<'src, 'p> ApiAnalysis<'src, 'p> {
             self.sink.push(SemanticError::ApiReservedMethod {
                 method: &method.symbol,
             });
+            return None;
         }
 
         // Validate data source reference

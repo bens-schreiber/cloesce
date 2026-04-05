@@ -623,6 +623,13 @@ fn resolve_sql_params() {
                 "SELECT * FROM Item WHERE price >= $minPrice AND price <= $maxPrice LIMIT $limit"
             }
         }
+
+        source Prefix for Item {
+            include {}
+            sql get(id: int, id2: int) {
+                "SELECT * FROM Item WHERE id = $id AND other_id = $id2"
+            }
+        }
     "#,
     );
 
@@ -640,6 +647,22 @@ fn resolve_sql_params() {
     assert!(
         pos("?1") < pos("?2") && pos("?2") < pos("?3"),
         "got: {list_sql}"
+    );
+
+    // Prefix parameter names should not collide
+    let prefix = item.data_sources.get("Prefix").unwrap();
+    let prefix_sql = &prefix.get.as_ref().unwrap().raw_sql;
+    assert!(!prefix_sql.contains("$id"), "got: {prefix_sql}");
+    assert!(!prefix_sql.contains("$id2"), "got: {prefix_sql}");
+    assert_eq!(
+        prefix_sql.matches("?1").count(),
+        1,
+        "expected exactly one ?1, got: {prefix_sql}"
+    );
+    assert_eq!(
+        prefix_sql.matches("?2").count(),
+        1,
+        "expected exactly one ?2, got: {prefix_sql}"
     );
 }
 

@@ -285,16 +285,56 @@ impl<'src> DataSourceExpansion {
     /// Normalizes input and resolves `$parameterName` placeholders
     /// to positional `?N` syntax for prepared statements.
     pub fn resolve_sql_params(method: &mut DataSourceMethod) {
+        // Normalize whitespace to keep generated SQL stable.
         method.raw_sql = method
             .raw_sql
             .split_whitespace()
             .collect::<Vec<_>>()
             .join(" ");
-        for (i, param) in method.parameters.iter().enumerate() {
-            let placeholder = format!("${}", param.name);
-            let positional = format!("?{}", i + 1);
-            method.raw_sql = method.raw_sql.replace(&placeholder, &positional);
+
+        let mut result = String::with_capacity(method.raw_sql.len());
+        let mut chars = method.raw_sql.chars().peekable();
+
+        while let Some(ch) = chars.next() {
+            if ch == '$' {
+                // Collect an identifier following '$'.
+                let mut name = String::new();
+                while let Some(&c) = chars.peek() {
+                    if c.is_alphanumeric() || c == '_' {
+                        name.push(c);
+                        chars.next();
+                    } else {
+                        break;
+                    }
+                }
+
+                if name.is_empty() {
+                    // Standalone '$', keep as-is.
+                    result.push('$');
+                    continue;
+                }
+
+                // Look up the parameter index by exact name match.
+                if let Some((idx, _param)) = method
+                    .parameters
+                    .iter()
+                    .enumerate()
+                    .find(|(_, p)| p.name.as_ref() == name.as_str())
+                {
+                    // Replace with positional parameter ?N.
+                    result.push('?');
+                    result.push_str(&(idx + 1).to_string());
+                } else {
+                    // Unknown placeholder here: keep it literal.
+                    result.push('$');
+                    result.push_str(&name);
+                }
+            } else {
+                result.push(ch);
+            }
         }
+
+        method.raw_sql = result;
     }
 
     /// Creates a default [DataSource] for any model that doesn't have one,
