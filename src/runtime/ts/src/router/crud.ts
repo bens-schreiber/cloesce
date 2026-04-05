@@ -31,7 +31,7 @@ async function upsert(
   // Upsert
   let result: unknown | null = null;
   try {
-    result = await orm.upsert(meta, body, dataSource.gen.tree);
+    result = await orm.upsert(meta, body, dataSource.gen.include);
   } catch {
     return HttpResult.fail(400);
   }

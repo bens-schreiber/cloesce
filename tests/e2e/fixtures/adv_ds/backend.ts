@@ -30,7 +30,7 @@ export namespace Hamburger {
             async get(env: Env, id: number): Promise<Hamburger.Self | null> {
                 return await Orm.fromEnv(env).getQuery<Hamburger.Self>(Hamburger.Meta, Hamburger.DataSources.BurgersWithLettuceOrdered.getQuery(env, id), Hamburger.DataSources.BurgersWithLettuceOrdered.include, {  });
             },
-            listQuery: (env: Env, lastId: number, limit: number) => env.db.prepare(`WITH CTE as (SELECT "Hamburger"."id" AS "id", "Hamburger"."name" AS "name", "HamburgerTopping_2"."right" AS "toppings.id", "Topping_1"."name" AS "toppings.name" FROM "Hamburger" LEFT JOIN "HamburgerTopping" AS "HamburgerTopping_2" ON "Hamburger"."id" = "HamburgerTopping_2"."left" LEFT JOIN "Topping" AS "Topping_1" ON "HamburgerTopping_2"."right" = "Topping_1"."id") SELECT * FROM CTE WHERE [toppings.name] = 'LETTUCE' AND id > ?1 ORDER BY id LIMIT ?2`).bind(lastId, limit),
+            listQuery: (env: Env, lastId: number, limit: number) => env.db.prepare(`WITH included as (SELECT "Hamburger"."id" AS "id", "Hamburger"."name" AS "name", "HamburgerTopping_2"."right" AS "toppings.id", "Topping_1"."name" AS "toppings.name" FROM "Hamburger" LEFT JOIN "HamburgerTopping" AS "HamburgerTopping_2" ON "Hamburger"."id" = "HamburgerTopping_2"."left" LEFT JOIN "Topping" AS "Topping_1" ON "HamburgerTopping_2"."right" = "Topping_1"."id") SELECT * FROM included WHERE [toppings.name] = 'LETTUCE' AND id > ?1 ORDER BY id LIMIT ?2`).bind(lastId, limit),
             async list(env: Env, lastId: number, limit: number): Promise<Hamburger.Self[]> {
                 return await Orm.fromEnv(env).listQuery<Hamburger.Self>(Hamburger.Meta, Hamburger.DataSources.BurgersWithLettuceOrdered.listQuery(env, lastId, limit), Hamburger.DataSources.BurgersWithLettuceOrdered.include);
             },
@@ -48,7 +48,7 @@ export namespace Hamburger {
         }
         export const NoLettuce = {
             include: {"toppings":{}},
-            getQuery: (env: Env, id: number) => env.db.prepare(`WITH CTE as (SELECT "Hamburger"."id" AS "id", "Hamburger"."name" AS "name", "HamburgerTopping_2"."right" AS "toppings.id", "Topping_1"."name" AS "toppings.name" FROM "Hamburger" LEFT JOIN "HamburgerTopping" AS "HamburgerTopping_2" ON "Hamburger"."id" = "HamburgerTopping_2"."left" LEFT JOIN "Topping" AS "Topping_1" ON "HamburgerTopping_2"."right" = "Topping_1"."id") SELECT * FROM CTE WHERE [toppings.name] != 'LETTUCE' AND id = ?1 ORDER BY id`).bind(id),
+            getQuery: (env: Env, id: number) => env.db.prepare(`WITH included as (SELECT "Hamburger"."id" AS "id", "Hamburger"."name" AS "name", "HamburgerTopping_2"."right" AS "toppings.id", "Topping_1"."name" AS "toppings.name" FROM "Hamburger" LEFT JOIN "HamburgerTopping" AS "HamburgerTopping_2" ON "Hamburger"."id" = "HamburgerTopping_2"."left" LEFT JOIN "Topping" AS "Topping_1" ON "HamburgerTopping_2"."right" = "Topping_1"."id") SELECT * FROM included WHERE [toppings.name] != 'LETTUCE' AND id = ?1 ORDER BY id`).bind(id),
             async get(env: Env, id: number): Promise<Hamburger.Self | null> {
                 return await Orm.fromEnv(env).getQuery<Hamburger.Self>(Hamburger.Meta, Hamburger.DataSources.NoLettuce.getQuery(env, id), Hamburger.DataSources.NoLettuce.include, {  });
             },
@@ -59,7 +59,7 @@ export namespace Hamburger {
         }
         export const OnlyBacon = {
             include: {"toppings":{}},
-            getQuery: (env: Env, id: number) => env.db.prepare(`WITH CTE as (SELECT "Hamburger"."id" AS "id", "Hamburger"."name" AS "name", "HamburgerTopping_2"."right" AS "toppings.id", "Topping_1"."name" AS "toppings.name" FROM "Hamburger" LEFT JOIN "HamburgerTopping" AS "HamburgerTopping_2" ON "Hamburger"."id" = "HamburgerTopping_2"."left" LEFT JOIN "Topping" AS "Topping_1" ON "HamburgerTopping_2"."right" = "Topping_1"."id") SELECT * FROM CTE WHERE [toppings.name] = 'BACON' AND id = ?1 ORDER BY id`).bind(id),
+            getQuery: (env: Env, id: number) => env.db.prepare(`WITH included as (SELECT "Hamburger"."id" AS "id", "Hamburger"."name" AS "name", "HamburgerTopping_2"."right" AS "toppings.id", "Topping_1"."name" AS "toppings.name" FROM "Hamburger" LEFT JOIN "HamburgerTopping" AS "HamburgerTopping_2" ON "Hamburger"."id" = "HamburgerTopping_2"."left" LEFT JOIN "Topping" AS "Topping_1" ON "HamburgerTopping_2"."right" = "Topping_1"."id") SELECT * FROM included WHERE [toppings.name] = 'BACON' AND id = ?1 ORDER BY id`).bind(id),
             async get(env: Env, id: number): Promise<Hamburger.Self | null> {
                 return await Orm.fromEnv(env).getQuery<Hamburger.Self>(Hamburger.Meta, Hamburger.DataSources.OnlyBacon.getQuery(env, id), Hamburger.DataSources.OnlyBacon.include, {  });
             },

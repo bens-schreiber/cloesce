@@ -110,7 +110,7 @@ export interface DataSourceMethod {
 }
 
 export interface DataSourceImpl {
-  tree: IncludeTree;
+  include: IncludeTree;
   get: (env: any, ...args: unknown[]) => unknown;
   list?: (env: any, ...args: unknown[]) => unknown;
 }

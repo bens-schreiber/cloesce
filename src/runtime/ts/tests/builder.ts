@@ -32,7 +32,7 @@ export function createAst(args?: {
     model.data_sources["Default"] ??= {
       name: "Default",
       is_internal: false,
-      gen: { tree: {} },
+      gen: { include: {} },
     };
   }
 
@@ -235,7 +235,7 @@ export class ModelBuilder {
     this.data_sources[name] = {
       name,
       is_internal,
-      gen: { tree },
+      gen: { include: tree },
       get: get ? { parameters: get } : undefined,
     };
     return this;

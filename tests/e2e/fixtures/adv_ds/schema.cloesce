@@ -27,8 +27,8 @@ source BurgersWithLettuceOrdered for Hamburger {
 
     sql list(lastId: int, limit: int) {
         "
-            WITH CTE as ($include)
-            SELECT * FROM CTE
+            WITH included as ($include)
+            SELECT * FROM included
             WHERE [toppings.name] = 'LETTUCE'
             AND id > $lastId
             ORDER BY id
@@ -43,8 +43,8 @@ source NoLettuce for Hamburger {
 
     sql get(id: int) {
         "
-            WITH CTE as ($include)
-            SELECT * FROM CTE
+            WITH included as ($include)
+            SELECT * FROM included
             WHERE [toppings.name] != 'LETTUCE'
             AND id = $id
             ORDER BY id
@@ -58,8 +58,8 @@ source OnlyBacon for Hamburger {
 
     sql get(id: int) {
         "
-            WITH CTE as ($include)
-            SELECT * FROM CTE
+            WITH included as ($include)
+            SELECT * FROM included
             WHERE [toppings.name] = 'BACON'
             AND id = $id
             ORDER BY id

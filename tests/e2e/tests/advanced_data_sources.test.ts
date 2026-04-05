@@ -56,32 +56,32 @@ describe("Advanced Data Sources", () => {
     expect(res.data!.length).toBe(4);
   });
 
-  // it("$list hamburgers with 'orderedBurgersWithLettuce' data source", async () => {
-  //   const res = await Hamburger.$list(
-  //     {
-  //       lastId: 0,
-  //       limit: 100,
-  //     },
-  //     "BurgersWithLettuceOrdered"
-  //   );
+  it("$list hamburgers with BurgersWithLettuceOrdered data source", async () => {
+    const res = await Hamburger.$list(
+      {
+        lastId: 0,
+        limit: 100,
+      },
+      "BurgersWithLettuceOrdered"
+    );
 
-  //   expect(res.ok, withRes("$list should be OK", res)).toBe(true);
-  //   expect(res.data!.length).toBe(2);
-  //   expect(res.data![0].id).toBe(burgers[0].id);
-  //   expect(res.data![1].id).toBe(burgers[1].id);
-  // });
+    expect(res.ok, withRes("$list should be OK", res)).toBe(true);
+    expect(res.data!.length).toBe(2);
+    expect(res.data![0].id).toBe(burgers[0].id);
+    expect(res.data![1].id).toBe(burgers[1].id);
+  });
 
-  // it("`noLettuceToppings` should return only the toppings that arent LETTUCE", async () => {
-  //   const res = await burgers[0].noLettuceToppings();
-  //   expect(res.ok, withRes("GET should be OK", res)).toBe(true);
-  //   expect(res.data!.length).toBe(1);
-  //   expect(res.data![0].name).toBe("BACON");
-  // });
+  it("`noLettuceToppings` should return only the toppings that arent LETTUCE", async () => {
+    const res = await burgers[0].noLettuceToppings();
+    expect(res.ok, withRes("GET should be OK", res)).toBe(true);
+    expect(res.data!.length).toBe(1);
+    expect(res.data![0].name).toBe("BACON");
+  });
 
-  // it("`onlyBaconToppings` should return only the toppings that are BACON", async () => {
-  //   const res = await burgers[0].onlyBaconToppings();
-  //   expect(res.ok, withRes("GET should be OK", res)).toBe(true);
-  //   expect(res.data!.length).toBe(1);
-  //   expect(res.data![0].name).toBe("BACON");
-  // });
+  it("`onlyBaconToppings` should return only the toppings that are BACON", async () => {
+    const res = await burgers[0].onlyBaconToppings();
+    expect(res.ok, withRes("GET should be OK", res)).toBe(true);
+    expect(res.data!.length).toBe(1);
+    expect(res.data![0].name).toBe("BACON");
+  });
 });

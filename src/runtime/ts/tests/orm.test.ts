@@ -168,9 +168,7 @@ describe("hydrateType Tests", () => {
         {
           ...createHydrateArgs(),
           ast,
-          includeTree: {
-            child: {},
-          },
+          includeTree: null,
         },
       );
 
